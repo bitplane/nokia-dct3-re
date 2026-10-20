@@ -516,6 +516,17 @@ The reset/cleanup helper2170ec instead explicitly restores state3 at217108.
 These are independently decoded candidates, not closure over all writers;
 linear scans across literal pools cannot establish function ownership.
 
+The aligned0000043f literal at254868 is loaded at2544bc and passed through
+2541c8 to constructor287a38. Its own cascade base03e9 (literal287d7c)
+selects287ae2 for043f, copying bytes5/4 of context10c468 to message bytes2/3,
+then selecting task0c at287aec. Thus the state1 input carries MCU context,
+not the native8b measurement body. In the45s `tmp/nsk3-043f-route` run,
+the predecessor254476, constructor287a38 withr0=043f and consumer21a674
+all have zero observations, while the full packet/cache gate still passes.
+This identifies a dormant concrete producer route, not proof that no other
+producer exists. The predecessor's dispatch input and context lifecycle are
+the next unresolved boundary.
+
 ```sh
 .venv/bin/python tools/nsk3_packet_check.py roms/noki6130/source \
   tmp/nsk3-cache-qualified --delivery --cache
