@@ -64,6 +64,18 @@ follow application startup/readiness and the keypad-interrupt enable path, not
 assume that accepted security records imply a live UI. The scan counter and
 logical key mapping remain research observations, not physical-input acceptance.
 
+The follow-up `tmp/nsk3-ui-mask-writer` cold capture localizes the inhibit:
+`2aa870` enables scanning from return address2accc1. Column mask writes are
+1f/60/60 during initialization, 7f/20 during the own2aa754 scan, then3f at
+`2ac31c` at0.284766846s. This last store belongs to routine `2ac2fe`, which
+initializes four software-state bytes and explicitly ORs1f into the column mask.
+MAD2's later IRQ maskce leaves IRQ0 unmasked; the column mask itself prevents
+the contact from latching it. Rowe0/direction1f and columnmask3f persist through
+16s. Direct Thumb calls to2ac2fe were located at270438,270506 and27071a;
+their lifecycle selection, and the corresponding unmask path, remain unresolved.
+Do not clear the mask as a fix: the next boundary is the firmware-owned caller
+and re-enable contract. The record/cold-storage gate also passes this capture.
+
 ## Own firmware inputs
 
 Source: `roms/archive-dct3-packages/nsk3_561.exe`, downloaded from
