@@ -196,6 +196,18 @@ EEPROM links, native record validity and executable flash. Retry counters
 are never initialized by these fixtures. Protected application operations
 remain separate targets; network services are not accepted.
 
+Fixed dialling is not a current card capability: the base EF_SST does not
+advertise service3, `find_file` has no EF_FDN6f3b, and INVALIDATE/REHABILITATE
+are unsupported. A physical menu4-5-3 probe displays Fixed dialling/Off,
+but the attempted continuation did not establish a protected transaction;
+later digits reached the ordinary number editor. No PIN2 or activation APDU
+was observed and the complete card remained unchanged. This does not prove
+that the handset lacks FDN support. Retire that input sequence rather than
+promoting it as an acceptance fixture. A future FDN target must first add a
+coherent standards-backed card profile, file access/activation semantics and
+persistent state; menu traversal and enforcement need their own runtime
+proof. Existing PIN2 change/recovery acceptance does not imply FDN acceptance.
+
 ```sh
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-security-cold-qualified \
   tmp/WRONG --pin-enabled
