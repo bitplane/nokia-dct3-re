@@ -10,6 +10,7 @@ machine.debugger:command('temp1=0')
 machine.debugger:command('bpset 28f4e4,temp1<8,{temp1=temp1+1;logerror "nsk1_code_gate: match=%08x retry=%02x cycles=%016x observer_writes=0\\n",r0,b@r1,totalcycles;g}')
 local events = {}
 for index,contact in ipairs({{2,2},{3,2},{4,2},{2,4},{3,4},{1,4},{1,4},{1,4},{1,4}}) do
+    if _G.nsk1_security_code_only and index > 6 then break end
     local field
     for _,candidate in pairs(machine.ioport.ports[':COL.'..contact[1]].fields) do
         if candidate.mask == contact[2] then field = candidate end

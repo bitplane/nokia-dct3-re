@@ -21,7 +21,8 @@ code/menu acceptance. A two-process gate additionally saves `ADA/123` to the
 SIM, cold-boots only its own persisted files and physically searches/renders
 the contact without rewriting it. The extended four-process gate physically
 deletes it and verifies erased ADN storage after another cold search.
-Registration, calls and SMS remain unproved.
+Offline SMS draft save and cold Outbox read also pass. Registration, calls
+and network SMS remain unproved.
 
 Ordinary erased storage remains a failed-startup control. The record-only
 and checksum-only fixtures remain blank, with checklists `0a` and `0e`.
@@ -733,6 +734,33 @@ not evidence of permanent blocking: the persisted PUK counter remains 9.
 Cold correct-PUK recovery must restore both counters and change only the new
 PIN, then a further cold verification preserves the whole card. Permanent
 PUK exhaustion is not covered by this gate.
+
+## Offline SMS storage
+
+```sh
+.venv/bin/python tools/nsk1_sms_draft_roundtrip.py mame/mame roms \
+  tmp/nsk1-profile-source tmp/nsk1-sms-roundtrip
+```
+
+The own Messages menu directly exposes Inbox/Outbox/Write messages; the sibling
+5190's extra Text messages submenu is not inherited. The first isolated process
+physically enters the phone code, composes `A `, selects Save and requires one
+successful `A0 DC 01 04 B0` update to EF_SMS record 1. Its exact 176-byte record
+is `070281f001ff00810000024110` followed by FF padding: status 07 is an unsent
+SMS-SUBMIT, not a received/network-delivered message. All other nine SMS records
+remain free and all ADN bytes remain erased. Message saved pixels match
+`d4562fa5c9fbc8bb0180f9361ffebbecf39ad0bcda7708ab15e45b196b4144eb`.
+
+Cold preparation revalidates raw save evidence before copying only persistent
+inputs/nvram/cfg. Physical phone-code acknowledgement and menu navigation open
+Outbox, select the stored message and read its `A ` content. The read frame
+matches `f2320fef70b570e75b15c83bcefdcbb8beaf7c80c29b184ca7ddac24e9b9de57`.
+The whole serialized SIM must remain unchanged, with a real READ RECORD and no
+SMS UPDATE. Both phases require ordered physical contacts, decoded key values,
+successful own phone-code comparison, native record arithmetic, sampled native
+execution and unchanged executable/identity/code fields. Save samples through
+59 seconds and cold read through 40 seconds. This proves offline persistence,
+not SMS transport, registration, fitted DSP or speech. Deletion remains to test.
 
 ## Persistent SIM phonebook
 
