@@ -104,6 +104,13 @@ task records at `330b3c`. Event `79` therefore comes from `331030`
 (`00ff0000ffffffff`); it copies ROM bytes 0/1 to runtime flags/routing
 bytes `+7/+6`, initializes state `+8 = 1`, and stores the numeric index at
 `+a`. The hash-qualified flash-contract extractor reports this mapping.
+Expiry helper `2abcec` sets state 3, then tests runtime flag byte `+7`
+bit 0 at `2abcf2..2abcf6`. With this record's zero flags it returns at
+`2abd38`, bypassing the task-linkage code and its `+6` routing byte entirely.
+Thus the observed descriptor is a non-delivering interval, not a missing
+startup message. Predicate `2fd07c` checks its remaining delay through
+`2abc00(79)`; the schedule/remask sequence is consistent with an idle holdoff,
+but neither this usage nor the inactive descriptor identifies IRQ3's source.
 
 The next contract to recover is how ordinary idle is expected to service
 pending work or restore global delivery when the deep-sleep guard declines.

@@ -39,6 +39,8 @@ class Nam2FlashContractTest(unittest.TestCase):
         self.assertEqual(0x331030, 0x330c68 + event['event'] * event['rom_stride'])
         self.assertEqual(0x101334, 0x100d88 + event['event'] * event['runtime_stride'])
         self.assertFalse(event['task_destination_proven'])
+        self.assertFalse(event['initial_expiry_links_task'])
+        self.assertEqual('0x2abcec', event['expiry'])
 
     def test_package_prefix_when_available(self):
         root = Path(__file__).resolve().parents[1]

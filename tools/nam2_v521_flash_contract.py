@@ -66,6 +66,10 @@ def inspect(image):
             raise ValueError(f'interrupt-control instruction differs at {address:#x}')
     rows = [struct.unpack_from(">4H", image, TABLE - BASE + index * 8)
             for index in range(10)]
+    # Expiry stores state 3, then skips task linkage unless flags bit 0 is set.
+    if image[0x2ABCEC - BASE:0x2ABCF8 - BASE].hex() != 'b5302103720179c10849d31f':
+        raise ValueError('event-expiry flag guard differs')
+    irq3_record = image[0x331030 - BASE:0x331038 - BASE]
     return {
         "sha1": SHA1,
         "selector": "0x305b0c",
@@ -96,8 +100,10 @@ def inspect(image):
             "initializer": "0x2ac7a8", "count": 0x109,
             "rom_table": "0x330c68", "rom_stride": 8,
             "rom_record": "0x331030",
-            "rom_bytes": image[0x331030 - BASE:0x331038 - BASE].hex(),
+            "rom_bytes": irq3_record.hex(),
             "runtime_record": "0x101334", "runtime_stride": 12,
+            "expiry": "0x2abcec", "task_link_flag": 1,
+            "initial_expiry_links_task": bool(irq3_record[0] & 1),
             "physical_source": "unresolved",
             "task_destination_proven": False,
         },
