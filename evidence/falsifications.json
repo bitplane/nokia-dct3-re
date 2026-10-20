@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsk1_scan_wait_uses_stale_resident_2420_gateway",
+      "status": "disproven",
+      "hypothesis": "The acquired NSE-1 resident gateway2420 still jumps to0a5c despite the NSK-1 upload relocating the scan initializer to0a71, causing the observed post-RSSI wait",
+      "conclusion": "Qualified own initialized cold observation reads live2420/2421=f073/0a71, with target0a71=76f8 and old0a5c=891a. Exact post-RSSI breakpoints follow3103 ->311a ->312c ->3130 ->0a71. The upload therefore updates this gateway, and execution enters the relocated initializer rather than the old mid-routine address. Boot/storage and native packet/mailbox/stack/return checks pass. This closes this specific ABI hypothesis, not fitted-mask compatibility or other gateways. The wait inside live0a71 remains unresolved; no ROM remapping or patch is justified.",
+      "evidence": ["docs/5130_bringup.md", "tools/nsk1_radio_observe.lua", "tools/nsk1_radio_trace_check.py", "tools/test_nsk1_radio_trace_check.py"]
+    },
+    {
       "id": "nsk1_reason68_reset_is_d3_idle_counter_threshold",
       "status": "disproven",
       "hypothesis": "The late reason68 reset is caused by timerd3 counter10fdea reaching threshold15 because supervised byte10fdef stays zero",

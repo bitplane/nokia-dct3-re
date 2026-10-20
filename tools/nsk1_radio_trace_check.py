@@ -51,8 +51,20 @@ def check(text):
             raise ValueError('post-RSSI return path changed or truncated')
         if any(int(row[1],16) & 0x1000 or tuple(row[2:]) != ('0020','0000','0000','03ff','03ff') for row in returns):
             raise ValueError('post-RSSI TC/control/list state changed')
+    work = re.findall(r'nsk1_rssi_work: pc=([0-9a-f]{4}) ar3=([0-9a-f]{4}) pointer1983=([0-9a-f]{4}) word03ff=([0-9a-f]{4}) control06be=([0-9a-f]{4}) control06e3=([0-9a-f]{4})', text)
+    if 'nsk1_rssi_work:' in text:
+        if [row[0] for row in work] != ['3103','311a','312c','3130','0a71']:
+            raise ValueError('post-RSSI channel-work branch changed or truncated')
+        if [row[1] for row in work] != ['03ff','03ff','0008','0008','0008']:
+            raise ValueError('post-RSSI work register progression changed')
+        if any(tuple(row[2:]) != ('03ff','0374','0020','0000') for row in work):
+            raise ValueError('post-RSSI work cursor/control state changed')
+        gateway = 'nsk1_rssi_gateway: word2420=f073 word2421=0a71 word0a5c=891a word0a71=76f8'
+        if gateway not in text:
+            raise ValueError('live uploaded scan gateway differs or is unobserved')
     return {'tx': len(tx), 'rx': len(rx), 'pending_indexes': [1, 2, 8, 3],
             'live_rssi_stack': True, 'post_rssi_return_observed':bool(returns),
+            'post_rssi_channel_work_observed':bool(work),
             'registration_proved': False, 'rf_validity_proved': False}
 
 

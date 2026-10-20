@@ -19,6 +19,17 @@ def fixture():
 
 
 class NativeRadioTraceTest(unittest.TestCase):
+    def test_live_gateway_not_resident_only_target_is_required(self):
+        entries = [('3103','03ff'),('311a','03ff'),('312c','0008'),('3130','0008'),('0a71','0008')]
+        rows = '\n'.join(f'nsk1_rssi_work: pc={pc} ar3={ar3} pointer1983=03ff word03ff=0374 control06be=0020 control06e3=0000' for pc,ar3 in entries)
+        gateway = 'nsk1_rssi_gateway: word2420=f073 word2421=0a71 word0a5c=891a word0a71=76f8'
+        text = fixture()+'\n'+rows+'\n'+gateway
+        self.assertTrue(check(text)['post_rssi_channel_work_observed'])
+        with self.assertRaisesRegex(ValueError, 'gateway'):
+            check(text.replace('word2421=0a71', 'word2421=0a5c'))
+        with self.assertRaisesRegex(ValueError, 'cursor/control'):
+            check(text.replace('word03ff=0374', 'word03ff=7fff'))
+
     def test_post_rssi_return_is_checked_when_observed(self):
         rows = '\n'.join(f'nsk1_rssi_return: pc={pc} st0=081f st1=6103 control06be=0020 control06e1=0000 control06e3=0000 list11f9=03ff list11fa=03ff' for pc in ('0a2e','0a2f','30ed','30f0','30f2'))
         self.assertTrue(check(fixture()+'\n'+rows)['post_rssi_return_observed'])

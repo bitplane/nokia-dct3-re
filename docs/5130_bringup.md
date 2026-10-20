@@ -479,6 +479,19 @@ not OVM. Neither this return nor the pointer values prove completion of
 the wider native scan lifecycle; its subsequent work/list progression
 remains the next question.
 
+The next branch is qualified in `tmp/nsk1-rssi-gateway-compatibility`.
+After publication, data1983 and AR3 select03ff, whose value0374 is a channel
+word, not end marker7fff. Execution takes3103 ->311a ->312c ->3130 and
+enters0a71; neither immediate-completion3112 nor subsequent313a is observed
+within61 seconds. Crucially, live program2420/2421 contains `f073 0a71`,
+not the acquired resident image's `f073 0a5c`. The upload updates this
+gateway to the relocated routine, whose entry word76f8 matches the scan
+initializer. Live0a5c is891a inside another routine. Thus a stale borrowed
+gateway does not explain this boundary. Boot/storage and executable native
+trace checks pass, including gateway, branch and register/cursor values.
+The next target is the wait/return condition inside live routine0a71;
+the resident-only0a5c function address must not be used for that trace.
+
 `tools/nsk1_radio_trace_check.py` qualifies this observed boundary from the
 captured log: ordered 9-TX/1-RX traffic, complete packet bodies, positive
 DSP entry controls, uncapped post-reset pending-index/completion progression

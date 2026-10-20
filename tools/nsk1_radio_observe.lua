@@ -50,6 +50,10 @@ for index,address in ipairs({'0a2e','0a2f','0a30','0a3b','30ed','30f0','30f2'}) 
     local bit = string.format('%x', 1 << (index+8))
     machine.debugger:command('bpset '..address..'::dsp_c54x:cpu,(temp4&100)!=0&&(temp4&'..bit..')==0,{temp4=temp4|'..bit..';logerror "nsk1_rssi_return: pc='..address..' st0=%04x st1=%04x control06be=%04x control06e1=%04x control06e3=%04x list11f9=%04x list11fa=%04x observer_writes=0\\n",dsp_c54x:cpu.dw@6,dsp_c54x:cpu.dw@7,dsp_c54x:cpu.dw@6be,dsp_c54x:cpu.dw@6e1,dsp_c54x:cpu.dw@6e3,dsp_c54x:cpu.dw@11f9,dsp_c54x:cpu.dw@11fa;g}')
 end
+for index,address in ipairs({'3103','3112','311a','312c','313a','3130','0a5c','0a71'}) do
+    local bit = string.format('%x', 1 << (index+15))
+    machine.debugger:command('bpset '..address..'::dsp_c54x:cpu,(temp4&100)!=0&&(temp4&'..bit..')==0,{temp4=temp4|'..bit..';logerror "nsk1_rssi_work: pc='..address..' ar3=%04x pointer1983=%04x word03ff=%04x control06be=%04x control06e3=%04x observer_writes=0\\n",dsp_c54x:cpu.dw@13,dsp_c54x:cpu.dw@1983,dsp_c54x:cpu.dw@3ff,dsp_c54x:cpu.dw@6be,dsp_c54x:cpu.dw@6e3;g}')
+end
 machine.debugger:command('temp3=0')
 for _,address in ipairs({'2177a0','218d20'}) do
     machine.debugger:command('bpset '..address..',temp3<12,{temp3=temp3+1;logerror "nsk1_radio_activation: pc=%08x r0=%08x caller=%08x observer_writes=0\\n",pc,r0,r14;g}')
@@ -254,6 +258,11 @@ emu.register_frame_done(function()
         index = index+1
     end
     if frame <= #times and now >= times[frame] then
+        if frame == 1 then
+            machine:logerror(string.format('nsk1_rssi_gateway: word2420=%04x word2421=%04x word0a5c=%04x word0a71=%04x observer_writes=0\n',
+                dsp.spaces.program:read_u16(0x2420),dsp.spaces.program:read_u16(0x2421),
+                dsp.spaces.program:read_u16(0x0a5c),dsp.spaces.program:read_u16(0x0a71)))
+        end
         machine:logerror(string.format('nsk1_radio_native_state: t=%.9f control06d1=%04x control06e3=%04x state1949=%04x search0284=%04x observer_writes=0\n',
             now, dsp.spaces.data:read_u16(0x06d1), dsp.spaces.data:read_u16(0x06e3),
             dsp.spaces.data:read_u16(0x1949), dsp.spaces.data:read_u16(0x0284)))
