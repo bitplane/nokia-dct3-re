@@ -57,6 +57,9 @@ void nokia_sim_card_device::device_start()
 	save_item(NAME(m_fdn_present));
 	save_item(NAME(m_adn_valid));
 	save_item(NAME(m_adn_access_when_invalid));
+	save_item(NAME(m_imsi_valid));
+	save_item(NAME(m_loci_valid));
+	save_item(NAME(m_fdn_session_invalidated));
 	save_item(NAME(m_extended_storage));
 	save_item(NAME(m_loci));
 	save_item(NAME(m_kc));
@@ -97,6 +100,8 @@ void nokia_sim_card_device::reset_session_state()
 	if (m_toolkit_timer)
 		m_toolkit_timer->adjust(attotime::never);
 	m_chv_verified[0] = m_chv_verified[1] = false;
+	m_imsi_valid = m_loci_valid = true;
+	m_fdn_session_invalidated = false;
 }
 
 void nokia_sim_card_device::device_reset()
@@ -427,7 +432,7 @@ nokia_sim_card_device::selected_file_for(access_shape shape)
 
 bool nokia_sim_card_device::read_permitted(const file_descriptor &file)
 {
-	if (file.fid == 0x6f3a && !m_adn_valid && !m_adn_access_when_invalid)
+	if (!file_valid(file.fid) && !(file.fid == 0x6f3a && m_adn_access_when_invalid))
 	{
 		queue_status(0x98, 0x10);
 		return false;
@@ -440,7 +445,7 @@ bool nokia_sim_card_device::read_permitted(const file_descriptor &file)
 
 bool nokia_sim_card_device::write_permitted(const file_descriptor &file)
 {
-	if (file.fid == 0x6f3a && !m_adn_valid && !m_adn_access_when_invalid)
+	if (!file_valid(file.fid) && !(file.fid == 0x6f3a && m_adn_access_when_invalid))
 	{
 		queue_status(0x98, 0x10);
 		return false;
@@ -628,6 +633,14 @@ void nokia_sim_card_device::finish_body()
 		 is_directory(requested_file)));
 	if (m_ins == 0xa4 && select_ok)
 	{
+		// GSM 11.11 10.2.7: an enabled FDN card invalidates both identity
+		// files once per session, no later than selection of either file.
+		if (m_fdn_present && !m_adn_valid && !m_fdn_session_invalidated &&
+				(requested_file == 0x6f07 || requested_file == 0x6f7e))
+		{
+			m_imsi_valid = m_loci_valid = false;
+			m_fdn_session_invalidated = true;
+		}
 		m_selected_file = requested_file;
 		if (is_directory(requested_file))
 			m_selected_df = requested_file;
@@ -1415,6 +1428,17 @@ void nokia_sim_card_device::append_completion_status(
 			m_ins, response[length - 2], response[length - 1]);
 }
 
+bool nokia_sim_card_device::file_valid(u16 fid) const
+{
+	switch (fid)
+	{
+	case 0x6f3a: return m_adn_valid;
+	case 0x6f07: return m_imsi_valid;
+	case 0x6f7e: return m_loci_valid;
+	default: return true;
+	}
+}
+
 void nokia_sim_card_device::change_file_validity()
 {
 	if (m_p1 != 0 || m_p2 != 0 || m_p3 != 0)
@@ -1428,20 +1452,27 @@ void nokia_sim_card_device::change_file_validity()
 		queue_status(0x94, 0);
 		return;
 	}
-	// Only ADN has an implemented non-administrative validity policy.
-	if (file->fid != 0x6f3a || !condition_satisfied(access_condition::chv2))
+	const bool identity_rehabilitation = m_ins == 0x44 && (file->fid == 0x6f07 || file->fid == 0x6f7e);
+	const access_condition condition = file->fid == 0x6f3a ? access_condition::chv2 :
+			identity_rehabilitation ? access_condition::chv1 : access_condition::adm;
+	if (!condition_satisfied(condition))
 	{
 		queue_status(0x98, 4);
 		return;
 	}
 	const bool valid = m_ins == 0x44;
-	if (m_adn_valid == valid)
+	if (file_valid(file->fid) == valid)
 	{
 		queue_status(0x98, 0x10);
 		return;
 	}
-	m_adn_valid = valid;
-	m_extended_storage = true;
+	if (file->fid == 0x6f3a)
+	{
+		m_adn_valid = valid;
+		m_extended_storage = true;
+	}
+	else if (file->fid == 0x6f07) m_imsi_valid = valid;
+	else if (file->fid == 0x6f7e) m_loci_valid = valid;
 	queue_status(0x90, 0);
 }
 
@@ -1494,6 +1525,11 @@ void nokia_sim_card_device::queue_fcp(u16 fid, unsigned requested)
 			}
 			if (fid == 0x6f3b)
 				fcp[10] = 0x44; // ADM is deliberately unavailable.
+			if (fid == 0x6f07 || fid == 0x6f7e)
+			{
+				fcp[10] = 0x41; // ADM invalidation, CHV1 rehabilitation.
+				fcp[11] = file_valid(fid) ? 1 : 0;
+			}
 			if (file->fid == 0x6f39)
 			{
 				// EF_ACM is READ/UPDATE/INCREASE under CHV1. Access-condition

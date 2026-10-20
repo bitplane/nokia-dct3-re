@@ -3,7 +3,7 @@ local source=debug.getinfo(1,'S').source:sub(2)
 _G.nsm1_followup_contacts={{1,2,0x19},{2,4,4},{3,4,5},{4,2,3},{1,2,0x19},
     {1,4,0x17},{1,2,0x19},{3,4,5},{4,4,6},{2,8,7},{3,8,8},{1,2,0x19}}
 if _G.nsm1_fdn_disable then
-    table.remove(_G.nsm1_followup_contacts,6)
+    _G.nsm1_followup_contacts[6]={1,8,0x18}
 elseif _G.nsm1_fdn_observe then
     _G.nsm1_followup_contacts={{1,2,0x19},{2,4,4},{3,4,5},{4,2,3}}
 end

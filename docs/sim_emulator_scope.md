@@ -192,7 +192,7 @@ establishes a concrete requirement. Later work includes:
 
 ### Fixed dialling implementation boundary
 
-FDN is an opt-in partial card capability, not a cold-validated NSM-1 feature.
+FDN is an opt-in partial card capability with NSM-1 activation/cold-state coverage.
 [GSM 11.11 v5.3.0](https://www.etsi.org/deliver/etsi_gts/11/1111/05.03.00_60/gsmts_1111v050300p.pdf)
 sections8.14-8.15,10.3.1-10.3.2 and11.5.1 establish the contract:
 EF_FDN6f3b is linear-fixed, uses ADN-style records, requires CHV1 for
@@ -206,30 +206,34 @@ File descriptors now declare explicit ALWAYS/CHV1/CHV2/ADM/NEVER access
 conditions, shared by FCP and execution. Existing policies are retained;
 read-only files now correctly advertise UPDATE=NEVER rather than ALWAYS.
 The serial conformance suite and a fresh NSM-1 physical PIN/phone-code
-Messages boot pass. CHV2 policy is preparatory: no EF selects it yet, so
-its protected-write lifecycle is not accepted by these runs.
+Messages boot pass. CHV2 is selected by EF_FDN and exercised in the
+card-level protected-write tests.
 An append-only3898-byte card image now adds a versioned eight-byte header
 and ten32-byte FDN records. The legacy3570-byte output is retained for base
 cards. Staged loading validates the whole extension before applying it;
 26 executable cold-storage cases cover valid/legacy images and malformed
 lengths, version, flags and reserved bytes. FDN updates require CHV2; ADN
 validity and records are saved independently. Strict invalidated ADN access
-returns9810. Physical NSM-1 activation reaches On, but the following cold
-boot labels Off after reading invalid ADN and receiving9810. Therefore cold
-presentation, deactivation and enforcement remain open. The explicit
-read/update-while-invalid variant also reproduces cold Off and is not a fix.
+returns9810; the explicit readable-invalid profile sets the corresponding
+FCP bit and allows reads/updates subject to the ordinary access conditions.
 Card-only APDU tests pass both policies, including CHV2-only writes, reset
 revocation, validity save/restore, parameter errors, repeated-state errors,
 ADM denial and unchanged ADN contents. These are conformance results, not
-handset FDN enforcement acceptance.
+handset FDN enforcement acceptance. Enabled FDN invalidates IMSI/LOCI once
+per session, no later
+than selecting either file (GSM11.11 10.2.7). CHV1 permits rehabilitation
+of each; ADM invalidation remains unavailable. Re-selection after
+rehabilitation does not re-invalidate within the same session. Activation
+starts a fresh session. These validity flags are saved in machine states,
+not card NVRAM. The NSM-1 now organically shows On/Off across cold boots.
 
 Implementation status and remaining acceptance:
 
 1. CHV2 metadata, extended persistence and selected-ADN validity commands
    have card-level executable coverage; legacy3570-byte output is retained.
-2. Trace the cold NSM-1 state interpretation of the observed FCP/EF_SST;
-   do not synthesize a handset flag to make the menu agree.
-3. Exercise physical activation, FDN write/read and cold deactivation on
+2. Cold NSM-1 interpretation and physical deactivation are accepted through
+   the card's identity-session handshake, not a handset-state fixture.
+3. Exercise physical FDN write/read and rejected PIN2 activation on
    NSM-1. An FDN menu or successful PIN2 change is insufficient evidence.
    Call enforcement needs a separately observed allowed/denied dial attempt;
    do not claim native network or speech acceptance from that UI result.

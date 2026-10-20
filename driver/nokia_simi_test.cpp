@@ -909,7 +909,7 @@ private:
 		for (u8 value : tx) m_card->rx_w(value);
 		expect(m_response == expected, "exact APDU response");
 	}
-	void select(u16 fid) { command({0xa0,0xa4,0,0,2,u8(fid >> 8),u8(fid)}, {0xa4,0x9f,u8(fid == 0x7f10 ? 22 : 15)}); }
+	void select(u16 fid) { command({0xa0,0xa4,0,0,2,u8(fid >> 8),u8(fid)}, {0xa4,0x9f,u8(fid == 0x7f10 || fid == 0x7f20 ? 22 : 15)}); }
 	void verify(unsigned index)
 	{
 		std::vector<u8> tx = {0xa0,0x20,0,u8(index),8};
@@ -953,7 +953,18 @@ private:
 		expect(machine().save().read_stream(saved) == STATERR_NONE,"restore ADN validity");
 		select(0x6f3a);metadata(true);
 		command({0xa0,4,0,0,0},{0x90,0});
+		select(0x7f20);select(0x6f7e);
+		command({0xa0,0xb0,0,0,1},{0x98,0x10});
+		command({0xa0,0x44,0,0,0},{0x90,0});
+		select(0x6f07);command({0xa0,0xb0,0,0,1},{0x98,0x10});
+		command({0xa0,0x44,0,0,0},{0x90,0});
+		select(0x6f7e);command({0xa0,0xb0,0,0,1},{0xb0,0xff,0x90,0});
 		m_card->deactivate();m_card->activate();
+		select(0x7f20);select(0x6f7e);
+		command({0xa0,0xb0,0,0,1},{0x98,0x10});
+		command({0xa0,0x44,0,0,0},{0x98,4});
+		verify(1);command({0xa0,0x44,0,0,0},{0x90,0});
+		select(0x6f07);command({0xa0,0x44,0,0,0},{0x90,0});
 		select(0x7f10);select(0x6f3a);
 		command({0xa0,0x44,0,0,0},{0x98,4});
 		verify(1);command({0xa0,0x44,0,0,0},{0x98,4});
@@ -962,7 +973,7 @@ private:
 		select(0x6f3a);metadata(true);read_record(0xff);
 		select(0x6f3b);read_record(0x41);
 		command({0xa0,4,0,0,0},{0x98,4});
-		osd_printf_info("SIM FDN conformance: PASS readable_invalid=%u chv2_update=1 reset_revokes=1 validity_restore=1 adn_preserved=1 handset_claim=0\n",m_readable);
+		osd_printf_info("SIM FDN conformance: PASS readable_invalid=%u chv2_update=1 reset_revokes=1 validity_restore=1 adn_preserved=1 identity_session_invalidation=1 handset_claim=0\n",m_readable);
 		machine().schedule_exit();
 	}
 };

@@ -201,15 +201,21 @@ profile adds service3, EF_FDN6f3b and retained ADN validity without changing
 the legacy card layout. Physical menu4-5-3 opens On/Off/Numbers; selecting
 On then entering PIN25678 sends VERIFY CHV2 and INVALIDATE ADN, both9000.
 The complete card changes only extension byte3575 from1 to0 and the same
-session displays On. This is not yet cold FDN acceptance: the retained
-invalid flag is returned correctly in the next boot's ADN FCP
-(`000006406f3a040011002200020120`), but its following READ receives9810
-and the menu displays Off. Selecting Off then produces no REHABILITATE.
-The card image remains intact. The standard's optional read/update-while-
-invalid profile also reproduces cold Off, so that policy is not a fix.
-Card-only conformance passes both policies, including CHV2 writes and
-validity save/restore; the handset's cold interpretation remains unresolved.
-FDN record updates, deactivation and dial enforcement remain unaccepted.
+session displays On. Cold initialization requires the GSM11.11 service3
+session mechanism: the enabled card invalidates both IMSI and LOCI once,
+no later than selecting either. Firmware observes invalid LOCI in2039b8,
+sets111e9c, rehabilitates LOCI/IMSI and then reads ADN validity at203ca8.
+The invalid-ADN branch203ce4 publishes FDN enabled through10c048. Without
+that card lifecycle,203c3c skips the validity parser and publishes Off;
+allowing reads of invalid ADN alone cannot fix that earlier gate.
+
+`nsm1_fdn_check.py ON ON_COLD OFF OFF_COLD` verifies physical PIN1 and
+phone-code authentication, PIN2-gated ADN INVALIDATE/REHABILITATE, the
+two session identity rehabilitations, exact complete-card transitions and
+EEPROM links. The enabled cold boot shows On; physical Off and a following
+cold boot show Off. Only retained ADN validity changes, with both
+phonebooks unchanged. Session identity flags are not retained card data.
+FDN record editing and dial enforcement remain separate targets.
 
 ```sh
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-security-cold-qualified \

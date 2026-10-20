@@ -126,6 +126,7 @@ private:
 	void seek_record();
 	void increase_record();
 	void change_file_validity();
+	bool file_valid(u16 fid) const;
 	void run_gsm_algorithm();
 	void accept_terminal_profile();
 	void queue_proactive_command(unsigned requested);
@@ -194,6 +195,9 @@ private:
 	bool m_fdn_present = false;
 	bool m_adn_valid = true;
 	bool m_adn_access_when_invalid = false;
+	bool m_imsi_valid = true;
+	bool m_loci_valid = true;
+	bool m_fdn_session_invalidated = false;
 	bool m_extended_storage = false;
 	u8 m_loci[11] = { 0 };
 	u8 m_kc[9] = { 0 };
