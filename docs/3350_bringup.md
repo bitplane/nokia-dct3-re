@@ -107,7 +107,8 @@ The configuration uses capacity-compatible 4 MiB Intel flash and the documented
 256 KiB SRAM window (`100000..13ffff`), leaving upper aliases unmapped.
 Matching boot/DSP masks are separately `NO_DUMP`; no sibling mask is supplied.
 The shared MCU boot-transfer HLE is retained, not presented as boot-ROM
-execution. Keys are deliberately unmapped. The 96x72 screen is a diagnostic
+execution. Key contacts have separate controller conformance, not firmware
+UI acceptance. The 96x72 screen is a diagnostic
 storage view, not a validated panel viewport or orientation.
 
 The passive observer establishes:
@@ -136,9 +137,10 @@ exchange. Use a new run directory:
 .venv/bin/python tools/noki3350_boot_check.py roms/noki3350/3350f530a.fls RUN
 ```
 
-The next supported experiment is native execution of the own uploaded program
-with the observed arguments and own fragment. Do not acknowledge the transfer
-from an HLE count or install a final verdict merely to reach self-tests.
+Native execution of the own upload is separately bounded by its explicit
+missing-code CALL above. Further native progress requires that routine's
+matching implementation. Do not acknowledge the transfer from an HLE count
+or install a final verdict merely to reach self-tests.
 
 ## Hardware and firmware boundaries
 
