@@ -116,6 +116,30 @@ The new security gates share `check_cold_link`, which rehashes actual executable
 and resident input files as well as matching the manifest's saved-device
 hashes to the preceding process. A matching manifest alone is insufficient.
 
+PIN2 exhaustion is also organic: three separately cold-seeded wrong changes
+decrement retries3-to2-to1-to0, preserving every credential and all other card
+bytes. The first two CHANGE CHV replies are9804; the last is9840 and renders
+PIN2 code blocked. A fresh process retains the exhausted card and the own
+Access codes path asks for PUK2. Physical87654321/new8765/confirmation produces
+one UNBLOCK CHV9000 and restores PIN2 retries3, without changing PUK credentials
+or unrelated card state. Firmware follows successful UNBLOCK with a further
+VERIFY9000; the gate requires that ordering rather than silently ignoring it.
+
+A final cold process uses recovered8765 in an ordinary change back to5678,
+returning the complete card to the original healthy seed. This tests persistent
+recovery, not cached authentication. The gate pins the blocked/PUK2/changed
+frames, all cold-input links and native execution in every phase.
+
+```sh
+.venv/bin/python tools/nsb1_puk2_check.py tmp/nsb1-pin-request-on-cold \
+  tmp/nsb1-pin2-change-wrong tmp/nsb1-pin2-exhaust-one \
+  tmp/nsb1-pin2-exhaust-zero tmp/nsb1-puk2-recovery tmp/nsb1-puk2-restored-cold
+```
+
+Wrong phases and final restore run70s; `nsb1_puk2_recover.lua` runs80s from
+the saved exhausted card. No counter is changed by preparation. Wrong-PUK2
+and permanent PUK2 exhaustion remain separate acceptance items.
+
 The native compatibility configuration also accepts an explicitly synthetic
 PIN-blocked card. Its initial image differs from the laboratory PIN-enabled
 profile only in CHV1 retries (`0`); no handset state is changed. Physical

@@ -22,19 +22,28 @@ def changed_card(before, pin2=False):
     return bytes(result)
 
 
-def check_trace(trace, cold=False, rejected=False):
+def check_operation(trace, instruction, result, count):
     check_contacts(trace, 'pin', 5)
     check_contacts(trace, 'phone', 6)
-    if statuses(trace, 0x20) != [(0x9000, 3, 10)]:
+    unblock_success = instruction == 0x2c and result == 0x9000
+    if statuses(trace, 0x20) != [(0x9000, 3, 10)] * (2 if unblock_success else 1):
         raise ValueError('startup PIN authentication differs')
-    if statuses(trace, 0x24) != ([] if cold else [(0x9804 if rejected else 0x9000, 3, 10)]):
-        raise ValueError('ordinary CHANGE CHV result differs')
-    if any(statuses(trace, ins) for ins in (0x26, 0x28, 0x2c, 0xdc, 4, 0x44)):
-        raise ValueError('unrelated card operation')
+    if unblock_success:
+        sequence = re.findall(r'SIM status ins=(20|2c) sw=([0-9a-f]{4}) ', trace)
+        if sequence != [('20', '9000'), ('2c', '9000'), ('20', '9000')]:
+            raise ValueError('unblock/follow-up VERIFY ordering differs')
+    for ins in (0x24, 0x26, 0x28, 0x2c, 0xdc, 4, 0x44):
+        expected = [(result, 3, 10)] if ins == instruction else []
+        if statuses(trace, ins) != expected:
+            raise ValueError('credential result or unrelated card operation differs')
     contacts = re.findall(r'nsb1_pin_change_contact: index=(\d+) down=([01]) ', trace)
-    expected = [] if cold else [(str(i), down) for i in range(1, 21) for down in ('1', '0')]
+    expected = [(str(i), down) for i in range(1, count + 1) for down in ('1', '0')]
     if contacts != expected:
         raise ValueError('physical PIN-change contacts differ')
+
+
+def check_trace(trace, cold=False, rejected=False):
+    check_operation(trace, None if cold else 0x24, 0x9804 if rejected else 0x9000, 0 if cold else 20)
 
 
 def main():

@@ -249,6 +249,12 @@
       "evidence": ["docs/5190_bringup.md", "tools/nsb1_phonebook_roundtrip.py", "tools/nsb1_phonebook_erase.lua", "tools/nsb1_phonebook_empty.lua", "tools/test_nsb1_phonebook_roundtrip.py"]
     },
     {
+      "id": "nsb1_v671_organic_pin2_exhaustion_puk2", "owner": "nsb1_sim_security", "status": "satisfied",
+      "predicate": "Own physical NSB-1 wrong changes organically exhaust PIN2 across cold processes, then PUK2 recovery persists a usable credential",
+      "current": "Three linked cold-seeded wrong5675 changes decrement only PIN2 retries3-to2-to1-to0. Replies9804/9804/9840 and the exact PIN2 code blocked frame are checked. A fresh process starts with the saved exhausted card; own Access codes asks PUK2 and physical87654321/new8765/confirmation produces UNBLOCK9000 followed by VERIFY9000. The complete recovered card equals the healthy seed except PIN2 credential8765, with retries restored3. A final cold ordinary change correctly authenticates8765 and restores5678, returning the complete card to the healthy seed. Every phase qualifies physical PIN1/phone input, own executable/native execution, reviewed frames and linked saved-device inputs. No preparation counter reset, state forcing or invented peer response is used. Wrong/permanently exhausted PUK2, fitted mask and native radio remain unaccepted.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_puk2_recover.lua", "tools/nsb1_pin_change.lua", "tools/nsb1_puk2_check.py", "tools/test_nsb1_puk2_check.py", "tools/nsb1_pin_change_check.py"]
+    },
+    {
       "id": "nsb1_v671_pin2_change_retry", "owner": "nsb1_sim_security", "status": "satisfied",
       "predicate": "Wrong physical current PIN2 preserves credentials and decrements its retry counter, retained into a successful ordinary cold retry",
       "current": "Own PPM-A Access codes/PIN2 receives5675 as current PIN2 and8765/confirmation as new. CHANGE CHV returns9804 and reviewed Code error; the complete card changes only PIN2 retries3-to2. A linked cold process starts from those exact saved-device hashes, physically authenticates PIN1/phone code and correctly uses5678 to change PIN2 to8765. CHANGE CHV9000 restores PIN2 retries3 and changes only its credential; other card state remains equal to the original seed. Own native execution/flash, contact sequences and reviewed frames pass. Shared cold-link validation rehashes actual executable/resident files, not merely manifest declarations. This does not establish exhaustion/PUK2 handling, fitted mask or native radio.",

@@ -10,8 +10,10 @@ local cells={
 }
 if _G.nsb1_pin2_change then
     cells={{1,4},{2,4},{3,2},{3,4},{3,2}} -- Own Menu4-2-5-2
-    local digits={[5]={3,4},[6]={4,4},[7]={2,8},[8]={3,8}}
-    local old=_G.nsb1_pin2_restore and {8,7,6,5} or {5,6,7,8}
+    local digits={[1]={2,2},[2]={3,2},[3]={4,2},[4]={2,4},
+        [5]={3,4},[6]={4,4},[7]={2,8},[8]={3,8}}
+    local old=_G.nsb1_pin2_puk and {8,7,6,5,4,3,2,1} or
+        (_G.nsb1_pin2_restore and {8,7,6,5} or {5,6,7,8})
     local new=_G.nsb1_pin2_restore and {5,6,7,8} or {8,7,6,5}
     for _,number in ipairs({old,new,new}) do
         for _,digit in ipairs(number) do cells[#cells+1]=digits[digit] end
@@ -30,7 +32,7 @@ for index,cell in ipairs(cells) do
     events[#events+1]={26.2+(index-1)*2,field,0,index}
 end
 local index,frame=1,1
-local times={33,35,45,55,65,67}
+local times={33,35,45,55,65,67,75,77}
 emu.register_frame_done(function()
     local now=machine.time:as_double()
     while events[index] and now>=events[index][1] do
