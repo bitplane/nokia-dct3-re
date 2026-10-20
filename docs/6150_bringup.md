@@ -39,6 +39,29 @@ all have decoded boundaries, including observed extension variants. Neither
 decoding coverage nor the local Calling frame establishes connected calls,
 speech, stock provisioning or native RF acceptance.
 
+The corrected bank also passes the 165-second native packet/queue qualification
+in a 170-second cold process. `nsm1_native_upload_radio_long.lua` retains the existing
+physical authentication/Menu and long radio observer, adding only passive
+upload-retention observation. Ten packets include two native scan-result
+cycles, identical measurement bodies and the expected intervening quiet
+window; no restart is observed. The own EEPROM link and policy byte `03ca=00`
+are unchanged. Thus the timeout-policy caveat below still applies: this is
+bounded operation with inherited diagnostic provisioning, not stock-phone
+stability, acquisition, connected calls or speech.
+
+The corrected 45-second live-program SHA256 is
+`1d3506034405fb546cb8b4c60a26f6196e2cd5c9400217fc856dd6ce3aabf107`.
+`nsm1_native_radio_check.py --retained-upload` selects that exact profile
+and additionally requires all 605 uploaded words retained. The historical
+profile below keeps its own hash; cross-selecting either capture is rejected.
+Neither profile admits arbitrary program hashes or weakened packet/queue
+predicates.
+
+```sh
+.venv/bin/python tools/nsm1_native_radio_check.py \
+  tmp/nsm1-native-upload-radio-long --long-run --retained-upload
+```
+
 Physical/cold software coverage includes SIM contacts, separate Phone-memory
 erase, PIN1/PIN2 and PUK recovery, request settings, offline SMS storage and
 PIN2-protected FDN activation/storage/local dial enforcement. Registered

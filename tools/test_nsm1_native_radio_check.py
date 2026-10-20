@@ -1,5 +1,8 @@
 import unittest
+import hashlib
+from unittest.mock import patch
 from tools.nsm1_native_radio_check import samples,packets,metric_source
+from tools.nsm1_native_radio_check import program_profile
 
 
 def sample_trace():
@@ -12,6 +15,25 @@ def sample_trace():
 
 
 class NativeRadioTests(unittest.TestCase):
+    def test_retained_profile_requires_its_hash_and_upload_observation(self):
+        program=bytes(131072)
+        digest=hashlib.sha256(program).hexdigest()
+        with patch('tools.nsm1_native_radio_check.RETAINED_PROGRAM_SHA256',digest):
+            with self.assertRaises(ValueError):program_profile(program,'',True)
+            with patch('tools.nsm1_native_radio_check.check_upload') as check:
+                program_profile(program,'own retained upload',True)
+                check.assert_called_once_with('own retained upload')
+            with self.assertRaises(ValueError):program_profile(program[:-1],'',True)
+        with self.assertRaises(ValueError):program_profile(program,'',True)
+
+    def test_historical_profile_is_separate(self):
+        program=bytes(131072)
+        with patch('tools.nsm1_native_radio_check.PROGRAM_SHA256',hashlib.sha256(program).hexdigest()):
+            with patch('tools.nsm1_native_radio_check.check_upload') as check:
+                program_profile(program,'',False)
+                check.assert_not_called()
+            with self.assertRaises(ValueError):program_profile(program,'',True)
+
     def test_second_scan_packet_contract(self):
         payload=b'\x00\x80'+b''.join((512+i).to_bytes(2,'big')+(-129-i%2).to_bytes(2,'big',signed=True) for i in range(40))
         rows=[]

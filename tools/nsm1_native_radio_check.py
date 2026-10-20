@@ -12,8 +12,17 @@ from tools.nsm1_published_record_check import records
 from tools.nsm1_v523_static_check import SHA1
 from tools.nsm1_security_check import MENU
 from tools.nsk1_phonebook_roundtrip import frame_check
+from tools.nsm1_native_upload_check import check_upload
 
 PROGRAM_SHA256='b03957d9a60e9e3048826fa16fc407422b87407688cbc0cab75ee31a95f6a89e'
+RETAINED_PROGRAM_SHA256='1d3506034405fb546cb8b4c60a26f6196e2cd5c9400217fc856dd6ce3aabf107'
+
+
+def program_profile(program,trace,retained_upload=False):
+    expected=RETAINED_PROGRAM_SHA256 if retained_upload else PROGRAM_SHA256
+    if len(program)!=131072 or hashlib.sha256(program).hexdigest()!=expected:
+        raise ValueError('own live program capture differs for selected profile')
+    if retained_upload:check_upload(trace)
 
 
 def samples(trace,long_run=False):
@@ -101,6 +110,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('run',type=Path)
     parser.add_argument('--metric-source',action='store_true')
     parser.add_argument('--long-run',action='store_true')
+    parser.add_argument('--retained-upload',action='store_true',help='select the corrected upload-bank profile, not the historical capture')
     args=parser.parse_args()
     try:
         run=args.run;trace=(run/'error.log').read_text();samples(trace,args.long_run);packets(trace,args.long_run)
@@ -110,7 +120,7 @@ def main():
         horizon=165 if args.long_run else 105
         if not horizons or float(horizons[-1])<horizon:raise ValueError(f'{horizon}-second horizon missing')
         program=(run/'nsm1_native_program_45s.bin').read_bytes()
-        if len(program)!=131072 or hashlib.sha256(program).hexdigest()!=PROGRAM_SHA256:raise ValueError('own live program capture differs')
+        program_profile(program,trace,args.retained_upload)
         if args.metric_source:metric_source(trace,program)
         for address,raw in ((0x2420,'f0730a8d'),(0x0b25,'6ff8219b0d20'),(0x330a,'74d60027')):
             expected=bytes.fromhex(raw)
