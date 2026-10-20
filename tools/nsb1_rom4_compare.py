@@ -20,13 +20,13 @@ EMPTY_SOCKET_RGB_SHA256 = 'a879c658a532b6526d3343287b42848f8a16bf10b7215086c1e21
 PHONEBOOK_LIST_RGB_SHA256 = '1c9dac19aa382370ba315a4e99f2ea65c844f4ec099a263624b6593b0525a5bd'
 
 
-def check_menu(trace, snapshots):
+def check_menu(trace, snapshots, frame_indices=(2, 3)):
     from PIL import Image
     contacts = re.findall(r'nsb1_menu_contact: index=(\d+) down=([01]) t=[0-9.]+ physical_only=1', trace)
     if contacts != [('1', '1'), ('1', '0'), ('2', '1'), ('2', '0')]:
         raise ValueError('missing physical Menu/Select sequence')
     # The list is static; unlike the parent menu it has no animated icon.
-    for index in (2, 3):
+    for index in frame_indices:
         with Image.open(snapshots / f'nsb1_menu_{index}.png') as source:
             frame = source.convert('RGB')
             if frame.size != (84, 48) or hashlib.sha256(frame.tobytes()).hexdigest() != PHONEBOOK_LIST_RGB_SHA256:
@@ -211,6 +211,19 @@ def prepare(root, run, checksum_from=None, insert_sim=False, initialized_retry=F
     return run / 'inputs'
 
 
+def run_mame(binary, rompath, run, script, seconds, verbose=False):
+    with (run / 'mame_output.log').open('w') as output:
+        result = subprocess.run([
+            str(binary), 'nsb1r4t', '-rompath', str(rompath), '-noreadconfig',
+            '-video', 'none', '-sound', 'none', '-nothrottle', '-log',
+            *(['-verbose'] if verbose else []),
+            '-seconds_to_run', str(seconds), '-autoboot_delay', '0',
+            '-autoboot_script', str(script)],
+            cwd=run, stdout=output, stderr=subprocess.STDOUT, timeout=180)
+    (run / 'exit_status.json').write_text(json.dumps({'returncode': result.returncode}) + '\n')
+    return result.returncode
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('binary', type=Path)
@@ -237,23 +250,16 @@ def main():
     try:
         binary, root, run = args.binary.resolve(), args.rom_root.resolve(), args.run_dir.resolve()
         rompath = prepare(root, run, args.checksum_control_from, args.insert_sim, args.initialized_retry)
-        with (run / 'mame_output.log').open('w') as output:
-            result = subprocess.run([
-                str(binary), 'nsb1r4t', '-rompath', str(rompath), '-noreadconfig',
-                '-video', 'none', '-sound', 'none', '-nothrottle', '-log',
-                *(['-verbose'] if args.verbose else []),
-                '-seconds_to_run', str(args.seconds), '-autoboot_delay', '0',
-                '-autoboot_script', str(Path(__file__).with_name(
-                    'nsb1_menu_fixture.lua' if args.menu_fixture else
-                    'nsb1_security_fixture.lua' if args.phonecode_fixture else 'nsb1_boot_observe.lua').resolve())],
-                cwd=run, stdout=output, stderr=subprocess.STDOUT, timeout=180)
-        (run / 'exit_status.json').write_text(json.dumps({'returncode': result.returncode}) + '\n')
+        script = Path(__file__).with_name(
+            'nsb1_menu_fixture.lua' if args.menu_fixture else
+            'nsb1_security_fixture.lua' if args.phonecode_fixture else 'nsb1_boot_observe.lua').resolve()
+        returncode = run_mame(binary, rompath, run, script, args.seconds, args.verbose)
         if args.seconds >= 6:
             image = (rompath / 'nsb1r4t/5190f671a.fls').read_bytes()
             if args.menu_fixture:
                 check_native_execution((run / 'error.log').read_text(), minimum_time=args.seconds - 1)
             check_trace((run / 'error.log').read_text(), image[0xb9350:0xb9350 + 372],
-                        image[0xbe570:0xbe570 + 372], result.returncode)
+                        image[0xbe570:0xbe570 + 372], returncode)
             if args.checksum_control_from is None:
                 check_lcd((run / 'error.log').read_text(), run / 'snap')
             elif not args.insert_sim:
@@ -270,7 +276,7 @@ def main():
                 check_menu((run / 'error.log').read_text(), run / 'snap')
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f'NSB-1 comparison failed: {error}\n')
-    status = 'native bootstrap PASS' if args.seconds >= 6 else f'run recorded: returncode={result.returncode}'
+    status = 'native bootstrap PASS' if args.seconds >= 6 else f'run recorded: returncode={returncode}'
     qualifier = ''
     if args.checksum_control_from:
         qualifier = ('checksum diagnostic; graphical empty-socket frame accepted; no card/service acceptance; '

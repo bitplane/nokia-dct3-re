@@ -434,8 +434,8 @@ the Search / Add entry / Edit list. Its static 84x48 RGB SHA-256 is
 The longer `--menu-fixture` (35 s minimum) requires non-illegal native CPU
 samples through the last complete second, continued bootstrap integrity,
 contact edges and exact list pixels. It passes with the corrected ring
-notification described below. Persistent phonebook writes, registration and
-services remain separate, unaccepted boundaries.
+notification described below. The separate round-trip fixture below accepts
+persistent SIM contacts; registration and services remain unaccepted.
 
 The uncorrected ring-notification negative control requests reset at
 31.972845538 s through
@@ -447,9 +447,8 @@ prompt belongs to the restarted boot, not an established phonebook lock.
 
 The passive observer now records this reset explicitly, and native acceptance
 rejects it even before a second upload is visible. Do not shorten the sustained
-gate or disable the watchdog to claim menu completion. Persistent phonebook
-testing follows sustained native operation; no SIM UPDATE RECORD has been
-established.
+gate or disable the watchdog to claim menu completion. The corrected native
+path also permits the independent SIM UPDATE RECORD/readback test below.
 
 In that negative control, at 31.000902077 s,
 `2a46b4` writes `68` to `10ff7c` with LR `2a39c3`. Caller `2a391a` receives
@@ -538,6 +537,37 @@ The empty-socket pixel hash and SIMI counts are unchanged. The self-test flag
 at the one-second sample is now `c0` rather than `40`, clearing to `40` by
 two seconds as genuine DSP traffic is processed; the structural gate is
 deliberately re-banked to `00/c0/c0/40/40`, not relaxed to ignore flags.
+
+### Persistent SIM phonebook
+
+`nsb1_phonebook_roundtrip.py` accepts two separate MAME processes. In the
+first, physical Menu / Phone book / Add entry types `ADA` and `123`; the
+firmware issues `A0 DC 01 04 20` against EF_ADN `6f3a`, the card commits
+record one and returns `9000`, and the LCD renders Saved. Persisted record
+one contains `41 44 41`, erased name padding and number bytes `03 81 21 f3`;
+the remaining 49 ADN records stay erased.
+
+The second process loads only that qualified run's flash, EEPROM and card
+storage, with input/ROM hashes and storage-copy SHA-256 provenance recorded.
+It enters the phone code through physical keys again, then Phone book /
+Search with an empty search name. Cold firmware reads EF_ADN record one and
+renders the exact highlighted ADA result. The checker forbids an ADN update
+in this phase and requires unchanged ADN bytes, not just a pre-existing file.
+Both phases require native bootstrap, legal sustained CPU samples, nonzero
+receive activity and physical security/menu contact evidence.
+
+```sh
+.venv/bin/python tools/nsb1_phonebook_roundtrip.py mame/mame roms \
+  tmp/nsb1-contacts --checksum-control-from tmp/nsb1-rom4-comparison
+```
+
+The card's current 3570-byte storage includes append-only PLMN, SMSS and
+AoC fields after the unchanged ADN prefix. The shared phonebook checker now
+recognizes each complete layout while rejecting truncated intermediate sizes.
+No contact bytes are seeded, no live firmware memory is changed, and no donor
+storage is loaded. This accepts one physical SIM contact save/cold-read path,
+not handset-local storage, all editing operations, registration, calls or SMS.
+Fitted-mask, nominal-input and synthetic checksum/retry limitations remain.
 
 ### External reference leads, not provisioning evidence
 
