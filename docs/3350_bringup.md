@@ -2,10 +2,13 @@
 
 ## Current boundary
 
-The acquired v5.30 installer supplies a qualified executable baseline, not a
-booting machine. No hardware profile, runtime DSP contract, input, SIM,
-registration, call or SMS acceptance is yet established. The package supplies
-no PMM record stream; do not attach a 3330 or other donor's calibration tail.
+`noki3350` is a fail-closed MCU research configuration, not a booting phone.
+Own v5.30 execution installs the exact 247-word DSP program and reaches its
+first ownership wait at `31dc82..31dc86`. No DSP completion, service or radio
+peer is enabled. Graphical boot, physical key-name mapping, SIM, registration,
+calls and SMS remain unestablished. The package supplies no PMM record stream;
+the firmware creates its own catalogue headers from initially erased storage.
+Do not attach a 3330 or other donor's calibration tail.
 
 `tools/nhm9_package_check.py` hash-qualifies the installer, walks every one of
 its 29 adjacent gzip members and strictly decodes all seven phone-record
@@ -33,10 +36,48 @@ Source acquisition is recorded in `roms/archive-dct3-packages/manifest.json`.
 ```
 
 The output is exactly `0x330000` bytes in CPU order, with neither padding nor
-fabricated provisioning. Inspection without `--output` is read-only. The next
-technical step is a product-local hardware/MMIO and bootstrap census before
-adding an executable machine configuration. Shared appearance or nearby model
-numbers are not evidence for the 3330's display, keys or peer grammar.
+fabricated provisioning. Inspection without `--output` is read-only.
+`make normalize-3350` prepares this same input. Shared appearance or nearby
+model numbers are not evidence for the 3330's display, keys or peer grammar.
+
+## MCU acceptance boundary
+
+The configuration uses capacity-compatible 4 MiB Intel flash and the documented
+256 KiB SRAM window (`100000..13ffff`), leaving upper aliases unmapped.
+Matching boot/DSP masks are separately `NO_DUMP`; no sibling mask is supplied.
+The shared MCU boot-transfer HLE is retained, not presented as boot-ROM
+execution. Keys are deliberately unmapped. The 96x72 screen is a diagnostic
+storage view, not a validated panel viewport or orientation.
+
+The passive observer establishes:
+
+- all `0xd0000` bytes after the executable are erased at fixture entry;
+- MCU flash programming makes 200 bus writes and creates `PMM` at `530006`
+  and `EEPROM` at `5e0006`, while preserving every executable byte;
+- the complete 28-entry catalogue relocates to `120f8c`;
+- the installed program at MCU `11e00` matches all 247 own source words;
+- release at `31dc3a` supplies `0100,0300,0019,8000,0001,0001,0200`
+  at `100f6..10102`, not the sibling verifier's argument sequence;
+- the transfer loop has source `200040`, stride `0400`, buffers `10200/10600`
+  and loop bound `0cbf` (3263), but the silent DSP does not acknowledge its
+  **first** transfer; control remains `05` and sampled execution stays at
+  `31dc82..31dc86` through ten seconds.
+
+Fresh catalogue creation is not a valid calibration or identity result.
+The checker protects this first-wait boundary, not a completed 3263-transfer
+exchange. Use a new run directory:
+
+```sh
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame --run-dir RUN -- \
+  noki3350 -rompath ../roms -video none -sound none -nothrottle \
+  -seconds_to_run 12 -log -autoboot_delay 0 \
+  -autoboot_script ../tools/noki3350_boot_observe.lua
+.venv/bin/python tools/noki3350_boot_check.py roms/noki3350/3350f530a.fls RUN
+```
+
+The next supported experiment is native execution of the own uploaded program
+with the observed arguments and own fragment. Do not acknowledge the transfer
+from an HLE count or install a final verdict merely to reach self-tests.
 
 ## Hardware and firmware boundaries
 
@@ -83,7 +124,8 @@ The 104-word bootstrap fragment is byte-identical to the separately qualified
 8250 fragment. The loader differs, and the verifier-format program is 247
 words rather than the 223-word sibling program. Reuse only the identical
 fragment bytes; do not inherit upload counts, arguments, callbacks or a final
-verdict. MCU relocation/selection of the catalogue still needs tracing.
+verdict. The passive MCU run independently confirms relocation and selection
+of slot 27; runtime loader/fragment selection is not yet established.
 
 `tools/extract_nsm3_verifier.py --product 3350` independently checks the full
 source hash, exact descriptor and payload hash. `--loader` and `--fragment`

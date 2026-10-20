@@ -603,6 +603,12 @@ eeprom-profile:
 		$(if $(PROVISIONED_IMEI_PREFIX),--provisioned-imei-prefix $(PROVISIONED_IMEI_PREFIX)) \
 		$(if $(ERASED_IDENTITY_SECURITY_CODE),--erased-identity-security-code $(ERASED_IDENTITY_SECURITY_CODE))
 
+normalize-3350:
+	$(PYTHON) tools/nhm9_package_check.py roms/archive-dct3-packages/nhm9_05.30_install.EXE \
+		--ppm A --output roms/noki3350/3350f530a.fls
+
+.PHONY: normalize-3350
+
 normalize-2100:
 	@test "$$(sha256sum roms/2100-nam2-v584/NAM205.840 | cut -d' ' -f1)" = "6382beb1f8ba2d768f53ccc3111586657f26eff961900249c69061cb710db283"
 	@test "$$(sha256sum roms/2100-nam2-v584/NAM205.84E | cut -d' ' -f1)" = "0e2f2d90d297946522934cfbefe180ce2b7727e331b04f972e48f5a1231502be"

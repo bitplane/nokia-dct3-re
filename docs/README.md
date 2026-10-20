@@ -51,7 +51,7 @@ distinction.
 | `7110_bringup.md` | NSE-5 upload, SED1565/keypad/roller contracts, fail-closed product boundary and explicit ROM4 compatibility instrument. |
 | `2100_bringup.md` | Own v5.21 C3 security/storage checkpoint, unresolved idle/interrupt boundary and separate v5.84 portability fixture. |
 | `3610_bringup.md` | NAM-1 v5.11 executable profile, GENSIO/CCONT evidence and current bring-up boundary. |
-| `3350_bringup.md` | Qualified NHM-9 v5.30 MCU/PPM baseline; hardware and runtime acceptance not yet established. |
+| `3350_bringup.md` | NHM-9 v5.30 own MCU upload/first-wait boundary and partial hardware map; no phone-boot acceptance. |
 | `6110_bootstrap_capture.md` | Physical NSE-3 DSP-bootstrap capture format and acceptance contract. |
 | `structural_regression.md` | Acceptance profiles, semantic predicates, and frame oracles. |
 | `evidence_regime.md` | Normalized topology, hardware, predicate and falsification evidence rules. |

@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nhm9_v530_mcu_upload_boundary", "owner": "nhm9_mcu_bootstrap", "status": "satisfied",
+      "predicate": "The fail-closed own-image 3350 MCU configuration installs its own DSP program, supplies its own arguments and remains at the first unacknowledged ownership transfer",
+      "current": "Fresh noki3350 runs begin with all d0000 storage-tail bytes erased. Passive flash-bus observation records 200 firmware writes creating PMM/EEPROM headers, while persisted executable bytes remain unchanged. The 28-entry catalogue relocates to 120f8c, all 247 installed program words match the own source, and release at 31dc3a supplies 0100/0300/0019/8000/0001/0001/0200. The first transfer polls 31dc82..31dc86 through ten seconds with 543 shared writes, control 05 and no DSP acknowledgement. The MCU loop bound is 0cbf, not an inherited sibling exchange count. The configuration uses capacity-compatible flash, documented 256 KiB SRAM and separately missing internal masks; shared MCU boot-transfer HLE remains explicit. No calibrated PMM, key mapping, graphical boot, native DSP execution or phone service is promoted.",
+      "evidence": ["docs/3350_bringup.md", "driver/nokia_dct3.cpp", "tools/noki3350_boot_observe.lua", "tools/noki3350_boot_check.py", "tools/test_noki3350_boot_check.py"]
+    },
+    {
       "id": "nhm9_v530_own_dsp_upload_assets", "owner": "nhm9_static_firmware", "status": "satisfied",
       "predicate": "The pinned NHM-9 v5.30 PPM-A executable contains independently extractable own loader, bootstrap fragment and verifier-format program",
       "current": "The 28-pointer catalogue at 3c2248 includes slot 0 descriptor 3ead0c with 638 payload words, slot 15 descriptor 3f0c48 with 104 words and slot 27 descriptor 3f1e30 with 247 words. Full image, six-halfword headers and payload hashes are checked independently. Only the 104-word fragment is byte-identical to the separately qualified 8250 input; neither its loader nor the 223-word sibling verifier is substituted. These are static source assets, not observed MCU transfer, native execution, fitted-mask identity, a complete ROM6 mask or boot acceptance. Physical hardware and remaining runtime boundaries are documented separately.",

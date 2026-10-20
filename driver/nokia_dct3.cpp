@@ -1020,6 +1020,16 @@ constexpr nokia_product_config PRODUCT_6110 = make_6110_config();
 constexpr nokia_product_config PRODUCT_5210 = make_5210_config();
 constexpr nokia_product_config PRODUCT_2100 = make_2100_config();
 constexpr nokia_product_config PRODUCT_3610 = make_3610_config();
+constexpr nokia_product_config make_3350_config()
+{
+	nokia_product_config result;
+	// Own ROM has a nine-bank, 96-byte LCD clear candidate. Show its full
+	// storage as a diagnostic view; panel selection/orientation is unproved.
+	result.display = { 96, 72, 96, 72, false };
+	// No DSP bootstrap completion, service backend or donor PMM is supplied.
+	return result;
+}
+constexpr nokia_product_config PRODUCT_3350 = make_3350_config();
 constexpr nokia_product_config PRODUCT_DEFAULT = make_conservative_config();
 constexpr nokia_product_config make_8xxx_config()
 {
@@ -1282,6 +1292,7 @@ public:
 	{ }
 
 	void noki3330(machine_config &config);
+	void noki3350(machine_config &config);
 	void noki3410(machine_config &config);
 	void noki2100(machine_config &config);
 	void nam2c3(machine_config &config);
@@ -1361,6 +1372,7 @@ private:
 	void rom2_mirror_w(offs_t offset, uint32_t data, uint32_t mem_mask = ~0);
 
 	void dct3_map(address_map &map) ATTR_COLD;
+	void dct3_nhm9_map(address_map &map) ATTR_COLD;
 	void dct3_nse3_map(address_map &map) ATTR_COLD;
 	void dct3_nsm1_research_map(address_map &map) ATTR_COLD;
 	void dct3_nse6_research_map(address_map &map) ATTR_COLD;
@@ -2714,6 +2726,14 @@ void nokia_dct3_state::dct3_map(address_map &map)
 	map(0x00e00000, 0x00ffffff).unmaprw();                                                                   // Reserved
 }
 
+void nokia_dct3_state::dct3_nhm9_map(address_map &map)
+{
+	dct3_map(map);
+	// NHM-2/5/6/9 General Information, issue 2, p7: 3350 has 2-Mbit
+	// SRAM. Upper aliases are unproved rather than extra writable memory.
+	map(0x00140000, 0x0017ffff).unmaprw();
+}
+
 void nokia_dct3_state::dct3_nse3_map(address_map &map)
 {
 	map.global_mask(0x00ffffff);
@@ -3217,6 +3237,25 @@ static INPUT_PORTS_START( nmp5stage )
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_UNUSED )
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( noki3350 )
+	PORT_INCLUDE(dct3_network_config)
+	// Own matrix interface is mapped; physical key-name mapping is not.
+	PORT_START("COL.0")
+	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_START("COL.1")
+	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_START("COL.2")
+	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_START("COL.3")
+	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_START("COL.4")
+	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_START("PWR")
+	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_START("CHARGER")
+	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_UNUSED )
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki6210 )
 	// Independently checked NPE-3 normal/special tables and board switches;
 	// reuse the identical logical matrix, not the NSM-5 hardware profile.
@@ -3667,6 +3706,14 @@ void nokia_dct3_state::noki3330(machine_config &config)
 	MICROPHONE(config, "microphone", 1).front_center()
 			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);
 	apply_product_config(PRODUCT_3330);
+}
+
+void nokia_dct3_state::noki3350(machine_config &config)
+{
+	// Capacity-compatible flash; exact fitted identity remains unvalidated.
+	dct3_32mbit_flash_base(config);
+	m_maincpu->set_addrmap(AS_PROGRAM, &nokia_dct3_state::dct3_nhm9_map);
+	apply_product_config(PRODUCT_3350);
 }
 
 void nokia_dct3_state::noki3610(machine_config &config)
@@ -4383,6 +4430,19 @@ ROM_START( noki3330 )
 	ROM_LOAD("3330 virgin eeprom 005f0000.fls", 0x3f0000, 0x010000, CRC(23459c10) SHA1(68481effb39d90a1639e8f261009c66e97d3e668))
 ROM_END
 
+ROM_START( noki3350 )
+	// No fitted NHM-9 mask is acquired; sibling dumps are not a substitute.
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
+	ROM_LOAD("nhm9_rom6_boot.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x20000, "dsp", ROMREGION_ERASE00)
+	ROM_LOAD("nhm9_rom6_dsp_prom.bin", 0, 0xc000, NO_DUMP)
+	ROM_LOAD("nhm9_rom6_dsp_drom.bin", 0xc000, 0x4000, NO_DUMP)
+	ROM_LOAD("nhm9_rom6_dsp_pdrom.bin", 0x10000, 0x1000, NO_DUMP)
+	ROM_REGION16_BE(0x400000, "flash", ROMREGION_ERASEFF)
+	ROM_LOAD("3350f530a.fls", 0, 0x330000,
+			CRC(e0002771) SHA1(3d0dce9c098bdd619c6f3684f739796f64b66169))
+ROM_END
+
 ROM_START( noki3610 )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 
@@ -4874,6 +4934,7 @@ SYST( 2000, noki8890, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empt
 SYST( 2000, nsb6stage, noki8890, 0, nsb6stage, noki3310, nokia_dct3_state, empty_init, "Nokia", "8890 native uploaded DSP research fixture", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nsb6hle, noki8890, 0, nsb6hle, noki8890, nokia_dct3_state, empty_init, "Nokia", "8890 native uploads with runtime transport HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, noki3330, 0,      0,      noki3330, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3330", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2001, noki3350, 0,      0,      noki3350, noki3350, nokia_dct3_state, empty_init, "Nokia", "3350 MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3410, 0,      0,      noki3410, noki3410, nokia_dct3_state, empty_init, "Nokia", "Nokia 3410", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki5210, 0,      0,      noki5210, noki5210, nokia_dct3_state, empty_init, "Nokia", "Nokia 5210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, nmp5stage, 0, 0, nmp5stage, nmp5stage, nokia_dct3_state, empty_init, "Nokia", "5510 own-upload bootstrap (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
