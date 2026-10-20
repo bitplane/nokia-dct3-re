@@ -47,12 +47,28 @@ the required `1428`, and rejects this operation before processing its text.
 Operations `0`, `1` and `0a` bypass this guard; this is not a claim that all
 text API operations fail.
 
-The parent editor remains blank with 160 characters available. The next
-question is the initialization/writer contract of `1097e2`, including whether
-the qualified PPM A configuration supplies the expected text-engine setup.
-The field is not forced to its expected value. A missing initialization,
-resource problem or different input-mode contract remains to be distinguished;
-this is not evidence of a missing DSP response or a diagnosed dictionary defect.
+Initializer `25c8a0` clears `1097e2` through owner `1097cc+16` and writes
+`1428` only on its successful tail. The observed invocation instead returns
+early after `25c4bc`: the resource-header version decoded at `25c4f8` is
+`0`, not required `1`. Resource reader `27388a` copies 32 bytes from address
+`30` because its selected base (`10642c`) is zero. This establishes an invalid
+resource selection, not missing keypad delivery.
+
+The acquired package independently distinguishes the resources:
+
+| PPM | Market in restore INI | LDB chunk CPU address | Declared bytes |
+| --- | --- | --- | --- |
+| A | USA | `2f5144` | `24` (placeholder) |
+| B | USA_T9 | `2ef9c0` | `cb24` (English database) |
+
+These addresses/lengths come from the own big-endian PPM chunk chain beginning
+at `2e0030`, not a search for arbitrary text. The normalized B input SHA-1 is
+`49987333223932f13dd4fb8e71a9645497894f73`; neither its boot nor SMS behavior
+is accepted yet. The next experiment must qualify B separately and trace its
+resource selection/initialization before claiming text entry. Preserve A as
+its own accepted profile; do not silently replace its flash input or force the
+validity field. A's ordinary non-dictionary input path also remains to be
+distinguished from this mode-1 attempt. No missing DSP reply is established.
 
 The separate Spell mode accepts physical letters and renders `ADA`, but the
 manual describes that mode as adding a dictionary word; returning to an empty

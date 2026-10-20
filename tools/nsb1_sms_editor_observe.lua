@@ -3,6 +3,15 @@
 local source = debug.getinfo(1, 'S').source:sub(2)
 dofile(source:match('^(.*[/\\])') .. 'nsb1_security_fixture.lua')
 local machine = manager.machine
+local debugger = assert(machine.debugger, 'editor dispatch probe needs the debugger')
+debugger:command('focus :maincpu')
+debugger:command('temp5=0')
+for _, address in ipairs({'25c8a0','25c8b6','25c8c4','25c8ce','25c92c'}) do
+    debugger:command('bpset ' .. address .. ',temp5<40,{temp5=temp5+1;logerror "nsb1_sms_init: pc=%08x r0=%08x r1=%08x r4=%08x lr=%08x validity=%04x cycles=%016x observer_writes=0\\n",pc,r0,r1,r4,r14,w@1097e2,totalcycles;g}')
+end
+debugger:command('temp6=0')
+debugger:command('bpset 27389c,temp6<10,{temp6=temp6+1;logerror "nsb1_sms_resource: source=%08x destination=%08x bytes=%08x base=%08x observer_writes=0\\n",r1,r0,r2,d@10642c;g}')
+debugger:command('bpset 25c4f8,temp6<10,{logerror "nsb1_sms_resource_header: version=%08x observer_writes=0\\n",r0;g}')
 local keys = {}
 for _, definition in ipairs({{'menu',1,4},{'one',2,2},{'two',3,2},{'three',4,2}}) do
     for _, field in pairs(machine.ioport.ports[':COL.' .. definition[2]].fields) do
