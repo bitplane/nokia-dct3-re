@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_v671_executable_source", "owner": "nsb1_source_qualification", "status": "satisfied",
+      "predicate": "The acquired NSB-1 v6.71 package provides independently identified own MCU and two PPM streams with explicit absent data",
+      "current": "The pinned six-member ZIP supplies MCU 200000..2d2cff and PPM A/B 2e0000..2fffff, each identifying v6.71/25-01-01/NSB-1. The restore INI independently declares ROM4 file families and USA/USA_T9 PPM selection. The 1 MiB normalized A view has SHA-1 27b8f0cb8640e5b423960b206e9aee065f32d726 and explicitly erased unsupplied gap 2d2d00..2dffff. No external EEPROM, identity, resident mask, hardware configuration, MAME machine or phone service is promoted.",
+      "evidence": ["docs/5190_bringup.md", "roms/README.md", "tools/nsb1_package_check.py", "tools/test_nsb1_package_check.py"]
+    },
+    {
       "id": "nhm9_v530_keypad_controller", "owner": "nhm9_board_keypad", "status": "satisfied",
       "predicate": "Own NHM-9 key tables select a five-row matrix and column-bit-1 Power contact whose configured host contacts reproduce controller reads",
       "current": "Pinned v5.30 normal/special maps at 45bd94/45bdb0 and decoder pointers at 3a956c establish the own contract; scanner 3a3568 indexes row*5+column. A fresh MMIO conformance run exercises all 18 physical contacts against five row drives, totaling 90 reads, and Power press/release. The fixture restores controller registers during the measured DSP wait and never writes firmware RAM. This does not prove organic scanner invocation, application key delivery or graphical boot.",

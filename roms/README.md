@@ -364,6 +364,16 @@ service images remain useful RE inputs, but their results must be labelled with 
 The local PPM E result is declared separately as BIOS `450e` with SHA-1
 `7e88caa4963c57ebbd4d919023e38103ff8b528a`; run it with `make smoke-3330e`.
 
+### Nokia 5190 NSB-1 v6.71
+
+`archive-dct3-packages/5190e671.zip` supplies own MCU and PPM A/B service
+streams, not a full handset dump. `tools/nsb1_package_check.py` creates
+`noki5190/5190f671a.fls` from qualified own records, with the unsupplied
+`2d2d00..2dffff` range explicitly erased. The normalized A SHA-1 is
+`27b8f0cb8640e5b423960b206e9aee065f32d726`. No provisioning or resident mask
+is supplied. Source hashes, exact spans and reproduction are authoritative
+in `docs/5190_bringup.md`; no machine/boot support is claimed.
+
 ### Nokia 3350 NHM-9 v5.30
 
 The retained `archive-dct3-packages/nhm9_05.30_install.EXE` (SHA-256
