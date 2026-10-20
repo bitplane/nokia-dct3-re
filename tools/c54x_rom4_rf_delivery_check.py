@@ -94,6 +94,28 @@ def nse1_gsm900_tuning_consistency(packed):
                 evidence_class="numeric-consistency-inference", wire_validated=False)
 
 
+def nsk1_dcs1800_tuning_consistency(packed, direction):
+    """Own NSK-1 addends versus the NSK-3 frequency plan, not wire decoding."""
+    if direction not in ('rx','tx'):
+        raise ValueError('explicit rx or tx direction is required')
+    if not 0 <= packed <= 0xffffffff or packed >> 16 != 0x30 or packed & 0x40:
+        raise ValueError('not the bounded NSK-1 packing family')
+    low = packed & 0xffff
+    divisor = (low >> 7)*64 + (low & 0x3f)
+    channel = divisor - (0x17bf if direction == 'rx' else 0x1797)
+    if not 512 <= channel <= 885:
+        raise ValueError('numeric inference is bounded to DCS 1800')
+    tx_hz = 1710200000 + (channel-512)*200000
+    rx_hz = tx_hz + 95000000
+    lo_hz = divisor*200000
+    if_hz = (rx_hz if direction == 'rx' else tx_hz)-lo_hz
+    if if_hz != (487000000 if direction == 'rx' else 400000000):
+        raise ValueError('divider does not match the bounded NSK frequency plan')
+    return dict(channel=channel,direction=direction,lo_hz=lo_hz,rx_hz=rx_hz,
+                tx_hz=tx_hz,if_hz=if_hz,evidence_class='numeric-consistency-inference',
+                wire_validated=False)
+
+
 def check_tuning_stages(text):
     stages = [dict(FIELDS.findall(match[1])) for match in
               re.finditer(r"rom4_rf_tuning_stage: (.*)", text)]

@@ -585,3 +585,12 @@ bootstrap contract.
 Do not pad a later image, reuse a 3210 EEPROM, or declare a 2 MiB flash device.
 The hardware and staged acceptance requirements are in
 `docs/6110_bringup.md`.
+
+## NSK RF documentation references
+
+Indexed primary documents used by `docs/5130_bringup.md`; the PDF binaries
+were not acquired, so no local file identity or hash is asserted:
+
+- [NSK-3 System Module, issue 3, 01/2001](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/6130/03sys%20%5B106%5D.pdf)
+- [NSK-3 UR9U block diagrams](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/6130/sysa3u%20%5B26%5D.pdf)
+- [NSE/K-1/3 Repair Hints, version 2.0, 13 June 2001](https://files.elektroda.pl/44719,nokia%2B5110_5130_6110_6130_v20.html)

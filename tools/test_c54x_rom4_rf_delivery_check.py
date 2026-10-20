@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from tools.c54x_rom4_rf_delivery_check import (check, check_request, check_tuning,
     check_tuning_stages, check_tuning_upload, check_tuning_blob, pack_tuning_nonnegative, decode_search_bitmap)
-from tools.c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency
+from tools.c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency, nsk1_dcs1800_tuning_consistency
 from tools.c54x_rom4_rf_delivery_check import check_observer_health, main, check_execution_tuning
 
 
@@ -22,6 +22,33 @@ rom4_rf_task10_lifecycle: t=1.6 pc=00211a9a r0=00101438 status=1390
 
 
 class DeliveryTests(unittest.TestCase):
+    def test_nsk_dcs_frequency_plan_over_all_fixed_channels(self):
+        for channel in range(512,886):
+            for direction,addend,intermediate in [('rx',0x17bf,487000000),('tx',0x1797,400000000)]:
+                with self.subTest(channel=channel,direction=direction):
+                    packed = pack_tuning_nonnegative(channel+addend)
+                    result = nsk1_dcs1800_tuning_consistency(packed,direction)
+                    self.assertEqual(result['channel'],channel)
+                    self.assertEqual(result['tx_hz'],1710200000+(channel-512)*200000)
+                    self.assertEqual(result['rx_hz']-result['tx_hz'],95000000)
+                    self.assertEqual(result['if_hz'],intermediate)
+                    self.assertFalse(result['wire_validated'])
+        result = nsk1_dcs1800_tuning_consistency(0x303633,'rx')
+        self.assertEqual((result['channel'],result['lo_hz'],result['rx_hz']),(884,1392600000,1879600000))
+
+    def test_nsk_frequency_inference_never_guesses_direction_or_band(self):
+        ambiguous = pack_tuning_nonnegative(512+0x17bf)
+        self.assertEqual(nsk1_dcs1800_tuning_consistency(ambiguous,'rx')['channel'],512)
+        self.assertEqual(nsk1_dcs1800_tuning_consistency(ambiguous,'tx')['channel'],552)
+        with self.assertRaises(TypeError):
+            nsk1_dcs1800_tuning_consistency(ambiguous)
+        for packed,direction in [(ambiguous,'auto'),(ambiguous|0x40,'rx'),(0x313633,'rx'),
+                                 (pack_tuning_nonnegative(511+0x17bf),'rx'),
+                                 (pack_tuning_nonnegative(886+0x1797),'tx'),
+                                 (pack_tuning_nonnegative(109+0x13a6),'rx')]:
+            with self.subTest(packed=packed,direction=direction), self.assertRaises(ValueError):
+                nsk1_dcs1800_tuning_consistency(packed,direction)
+
     def test_execution_publication_requires_its_own_complete_chain(self):
         marker = 'rom4_rf_publication_probe: points=37ce,3807 phase=instruction_entry\n'
         lines = TRACE.splitlines()

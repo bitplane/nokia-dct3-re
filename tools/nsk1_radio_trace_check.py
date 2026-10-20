@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import re
 
-from tools.c54x_rom4_rf_delivery_check import pack_tuning_nonnegative
+from tools.c54x_rom4_rf_delivery_check import pack_tuning_nonnegative, nsk1_dcs1800_tuning_consistency
 
 
 def check_scan_progress(text):
@@ -93,6 +93,7 @@ def check_tuning_provenance(text):
         raise ValueError('own tuning source/upload/port ordering changed')
     return {'channel_word':'0x0374','receive_addend':'0x17bf','transmit_addend':'0x1797',
             'packed_word':hex(packed),'own_firmware_source_proved':True,
+            'frequency_consistency':nsk1_dcs1800_tuning_consistency(packed,'rx'),
             'physical_synthesizer_semantics_proved':False}
 
 

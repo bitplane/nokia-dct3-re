@@ -613,10 +613,31 @@ Reproduce with `tools/nsk1_rf_tuning.lua` on the initialized cold fixture;
 `python -m tools.nsk1_radio_trace_check LOG --tuning-provenance` checks the
 correlation. The static own-image contract also pins the descriptor/payload.
 This excludes simply transplanting the NSE-1 GSM900 addend13a6 as a repair.
-It does not identify the fitted synthesizer, establish DCS frequency units,
+It does not by itself identify the fitted synthesizer or establish frequency units,
 prove SCU wire serialization, or supply a physical RF sample representation.
 The first two unrelated programming pairs (1d00/0004 and0190/0010) are not
 interpreted as accumulator halves merely because the selected-entry pair is.
+
+Independent frequency-plan corroboration is available from Nokia's
+[NSK-3 System Module, issue3, pp36/39/42](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/6130/03sys%20%5B106%5D.pdf):
+64/65 UHF division,200kHz reference,487MHz receive IF and400MHz transmit IF.
+The [NSK-1/3 Repair Hints v2, p38](https://files.elektroda.pl/44719,nokia%2B5110_5130_6110_6130_v20.html)
+also identifies487/87/13MHz receive filters. These are indexed primary
+documents, not locally archived PDFs. [TS45.005 table2-2](https://www.etsi.org/deliver/etsi_ts/145000_145099/145005/17.00.00_60/ts_145005v170000p.pdf)
+provides the fixed DCS1800 channel formula.
+
+Using the own addends and the checked packing inversion gives:
+
+| Direction / channel884 | Divider | LO | RF | Difference |
+| --- | ---: | ---: | ---: | ---: |
+| Receive (observed port pair) | 6963 | 1392.6MHz | 1879.6MHz | 487MHz |
+| Transmit (calculated only) | 6923 | 1384.6MHz | 1784.6MHz | 400MHz |
+
+`nsk1_dcs1800_tuning_consistency` checks this numerical relation over all374
+fixed DCS channels in each direction. Direction must be explicit: a packed
+value can describe different valid channels under the two addends. This is
+frequency-plan consistency, not SCU wire validation, observed transmission,
+sample timing/encoding or native reception. No machine configuration changes.
 
 `tools/nsk1_radio_trace_check.py` qualifies this observed boundary from the
 captured log: ordered 9-TX/1-RX traffic, complete packet bodies, positive
