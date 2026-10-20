@@ -17,6 +17,20 @@ INPUTS = (
 
 
 EMPTY_SOCKET_RGB_SHA256 = 'a879c658a532b6526d3343287b42848f8a16bf10b7215086c1e215db45ee67cc'
+PHONEBOOK_LIST_RGB_SHA256 = '1c9dac19aa382370ba315a4e99f2ea65c844f4ec099a263624b6593b0525a5bd'
+
+
+def check_menu(trace, snapshots):
+    from PIL import Image
+    contacts = re.findall(r'nsb1_menu_contact: index=(\d+) down=([01]) t=[0-9.]+ physical_only=1', trace)
+    if contacts != [('1', '1'), ('1', '0'), ('2', '1'), ('2', '0')]:
+        raise ValueError('missing physical Menu/Select sequence')
+    # The list is static; unlike the parent menu it has no animated icon.
+    for index in (2, 3):
+        with Image.open(snapshots / f'nsb1_menu_{index}.png') as source:
+            frame = source.convert('RGB')
+            if frame.size != (84, 48) or hashlib.sha256(frame.tobytes()).hexdigest() != PHONEBOOK_LIST_RGB_SHA256:
+                raise ValueError('physical phonebook list pixels changed')
 
 
 def check_security_gate(trace, initialized_retry):
@@ -80,7 +94,7 @@ def check_checksum_control(trace):
 
 
 def check_trace(trace, program3, program4, returncode):
-    if returncode or trace.count('Soft reset') != 1 or '[LUA ERROR]' in trace:
+    if returncode or trace.count('Soft reset') != 1 or '[LUA ERROR]' in trace or 'nsb1_reset_reason:' in trace:
         raise ValueError('native comparison reset, crashed or failed observation')
     programs = re.findall(r'nsb1_release_program: release=(\d+) words=186 data=([0-9a-f]+) observer_writes=0', trace)
     if len(program3) != 372 or len(program4) != 372 or programs != [('1', program3.hex()), ('2', program4.hex())]:
@@ -196,9 +210,15 @@ def main():
                         help='diagnostic external EEPROM only: initialize own 0709 retry byte to zero')
     parser.add_argument('--phonecode-fixture', action='store_true',
                         help='physical 12345/Menu entry plus own comparison/retry observation (27 seconds minimum)')
+    parser.add_argument('--menu-fixture', action='store_true',
+                        help='physical code entry and Phone book list acceptance (35 seconds minimum)')
     parser.add_argument('--checksum-control-from', type=Path,
                         help='diagnostic only: recompute six checksum bytes from a qualified own erased-storage run')
     args = parser.parse_args()
+    if args.menu_fixture:
+        if not args.initialized_retry or args.seconds < 35:
+            parser.error('menu fixture requires initialized retry and at least 35 seconds')
+        args.phonecode_fixture = True
     if args.phonecode_fixture and (not args.insert_sim or not args.checksum_control_from or args.seconds < 27):
         parser.error('phonecode fixture requires inserted card, checksum source and at least 27 seconds')
     try:
@@ -211,6 +231,7 @@ def main():
                 *(['-verbose'] if args.verbose else []),
                 '-seconds_to_run', str(args.seconds), '-autoboot_delay', '0',
                 '-autoboot_script', str(Path(__file__).with_name(
+                    'nsb1_menu_fixture.lua' if args.menu_fixture else
                     'nsb1_security_fixture.lua' if args.phonecode_fixture else 'nsb1_boot_observe.lua').resolve())],
                 cwd=run, stdout=output, stderr=subprocess.STDOUT, timeout=180)
         (run / 'exit_status.json').write_text(json.dumps({'returncode': result.returncode}) + '\n')
@@ -230,6 +251,8 @@ def main():
                 raise ValueError('external EEPROM capacity changed')
             if args.phonecode_fixture:
                 check_security_gate((run / 'error.log').read_text(), args.initialized_retry)
+            if args.menu_fixture:
+                check_menu((run / 'error.log').read_text(), run / 'snap')
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f'NSB-1 comparison failed: {error}\n')
     status = 'native continuation PASS' if args.seconds >= 6 else f'run recorded: returncode={result.returncode}'

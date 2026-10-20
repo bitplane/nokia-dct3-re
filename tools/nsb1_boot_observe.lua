@@ -69,6 +69,10 @@ end)
 local released, result_reads, observing = false, 0, false
 local last_results = {}
 _G.nsb1_release_tap = space:install_write_tap(0x20000, 0x20003, 'nsb1_dsp_release', function(offset, data, mask)
+    if cpu.state['R15'].value == 0x2b1056 then
+        machine:logerror(string.format('nsb1_reset_reason: reason=%08x lr=%08x t=%.9f observer_writes=0\n',
+            cpu.state['R4'].value, cpu.state['R14'].value, machine.time:as_double()))
+    end
     if (mask & 0xff00) == 0 then return end
     local command = (data >> 8) & 255
     if (command & 1) == 0 then released = false; return end

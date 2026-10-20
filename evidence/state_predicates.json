@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_v671_sustained_native_ui", "owner": "nsb1_native_liveness", "status": "drift",
+      "predicate": "Inserted-card NSB-1 native compatibility remains live beyond physical security acceptance and menu navigation",
+      "current": "Physical Menu/Select opens Phone book and its Search/Add entry/Edit list at 26/28 seconds, but the 35-second sustained menu gate fails native acceptance. Firmware writes reset at 2b1056 at 31.972845538 seconds, reason 68 and LR 23ce6b, followed by a repeated own verifier upload. The same reset occurs with no menu input after the security fixture, falsifying attribution to Add entry. Later Security code is a restarted boot, not demonstrated phonebook security. The observer records the reset and check_trace rejects it; the gate is not shortened and no watchdog is disabled. Own timer/counter and DSP receive correlation remain open; persistent contacts and stable UI are not accepted.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_boot_observe.lua", "tools/nsb1_menu_fixture.lua", "tools/nsb1_rom4_compare.py", "tools/test_nsb1_rom4_compare.py"]
+    },
+    {
       "id": "nsb1_v671_physical_security_retry", "owner": "nsb1_phone_security", "status": "satisfied",
       "predicate": "Own NSB-1 security-code comparison and retry-limit rejection are distinguished using physical input and a declared external-storage control",
       "current": "Own 2ab9c8 encodes five characters and compares four bytes at 10c494; 2ab974 rejects all results when retry byte 10c498 >=5. Own record 0709 maps that byte to EEPROM 04ac. Physical 12345/Menu reaches 2ab978 with match one and count ff in the checksum-only negative control, displaying Code error. Initializing only external 04ac to zero beyond the six integrity bytes yields match one/count zero and a Menu / Names frame at 25 seconds. The fixture requires all twelve physical contact edges and the exact own gate observation; it does not assert general graphical/card-service parity. Identity/code contents, firmware and live RAM are not edited. Fitted DSP mask, ADC routing and provisioning remain unproved; registration, contact persistence and speech remain separate work.",

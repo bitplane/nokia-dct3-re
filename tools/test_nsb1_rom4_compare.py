@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
-from tools.nsb1_rom4_compare import checksum_control, check_checksum_control, check_late_presentation, check_lcd, check_trace, check_security_gate, prepare
+from tools.nsb1_rom4_compare import checksum_control, check_checksum_control, check_late_presentation, check_lcd, check_trace, check_security_gate, check_menu, prepare
 
 
 class NativeCompareTest(unittest.TestCase):
@@ -59,7 +59,8 @@ class NativeCompareTest(unittest.TestCase):
                                             'data=0000ffff mask=0000ffff pc=0028fa96'), self.program3, self.program4, 0)
 
     def test_crash_and_reset_rejected(self):
-        for trace, code in ((self.trace(), 139), (self.trace() + '\nSoft reset', 0)):
+        for trace, code in ((self.trace(), 139), (self.trace() + '\nSoft reset', 0),
+                            (self.trace() + '\nnsb1_reset_reason: reason=00000068', 0)):
             with self.subTest(code=code), self.assertRaises(ValueError):
                 check_trace(trace, self.program3, self.program4, code)
 
@@ -132,6 +133,18 @@ class LcdCompareTest(unittest.TestCase):
 
 
 class ChecksumControlTest(unittest.TestCase):
+    def test_menu_requires_contacts_and_nonblank_exact_pixels(self):
+        from PIL import Image
+        with self.assertRaisesRegex(ValueError, 'Menu/Select'):
+            check_menu('', Path('.'))
+        trace = '\n'.join(f'nsb1_menu_contact: index={index} down={down} t=26.0 physical_only=1'
+                          for index in (1, 2) for down in (1, 0))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            Image.new('RGB', (84, 48), 'white').save(root / 'nsb1_menu_2.png')
+            with self.assertRaisesRegex(ValueError, 'pixels'):
+                check_menu(trace, root)
+
     def test_physical_security_gate_controls(self):
         contacts = '\n'.join(f'nsb1_phonecode_contact: index={index} down={down} t=12.0 physical_only=1'
                              for index in range(1, 7) for down in (1, 0))

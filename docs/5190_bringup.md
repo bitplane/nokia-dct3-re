@@ -420,9 +420,31 @@ Reproduce the negative control, then repeat with `--initialized-retry`:
 `nsb1_security_fixture.lua` uses only physical contacts and a read-only gate
 watch; it captures the entry, result and settled frame. Acceptance requires
 all twelve press/release edges and the exact own match/retry observation.
-It does not yet require an exact idle pixel oracle or prove menu navigation,
-phonebook writes, radio service or speech. Next test physical Menu/navigation
-and persistent SIM phonebook operations on this explicitly synthetic fixture.
+It does not require an exact idle pixel oracle or prove phonebook writes,
+radio service or speech.
+
+### Menu navigation and sustained native boundary
+
+Physical Menu at 26 seconds renders Phone book; Select at 28 seconds opens
+the Search / Add entry / Edit list. Its static 84x48 RGB SHA-256 is
+`1c9dac19aa382370ba315a4e99f2ea65c844f4ec099a263624b6593b0525a5bd`.
+This establishes menu navigation within the short accepted security run,
+not a stable handset. The longer `--menu-fixture` (35 s minimum) deliberately
+requires continued native acceptance as well as contact edges and list pixels.
+**It currently fails**: at 31.972845538 s the firmware requests reset through
+`2b1056`, with reason `68` and LR `23ce6b`; own reset caller `23ce66` reads
+the stored reason and calls `2b101e`. Repeated native verifier upload follows.
+The same time/reason occurs after accepted security entry with no menu input,
+so this is not evidence that Add entry crashes the phone. The later security
+prompt belongs to the restarted boot, not an established phonebook lock.
+
+The passive observer now records this reset explicitly, and native acceptance
+rejects it even before a second upload is visible. Do not shorten the sustained
+gate or disable the watchdog to claim menu completion. Reason `68` is
+consistent with the mapped DSP-liveness reset family (`dsp_interface.md`),
+but the own timer/counter path and native DSP receive activity still need
+correlation before selecting a correction. Persistent phonebook testing
+follows sustained native operation; no SIM UPDATE RECORD has been established.
 
 ### External reference leads, not provisioning evidence
 
