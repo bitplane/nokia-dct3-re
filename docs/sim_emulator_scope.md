@@ -233,8 +233,9 @@ Implementation status and remaining acceptance:
    have card-level executable coverage; legacy3570-byte output is retained.
 2. Cold NSM-1 interpretation and physical deactivation are accepted through
    the card's identity-session handshake, not a handset-state fixture.
-3. Exercise physical FDN write/read and rejected PIN2 activation on
-   NSM-1. An FDN menu or successful PIN2 change is insufficient evidence.
+3. NSM-1 physical FDN save/cold-read and rejected PIN2 write are accepted
+   with complete-card and exact-frame checks. Rejected PIN2 activation,
+   record modification/erasure and other handset coverage remain open.
    Call enforcement needs a separately observed allowed/denied dial attempt;
    do not claim native network or speech acceptance from that UI result.
 

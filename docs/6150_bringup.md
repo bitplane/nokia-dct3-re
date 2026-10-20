@@ -215,7 +215,17 @@ two session identity rehabilitations, exact complete-card transitions and
 EEPROM links. The enabled cold boot shows On; physical Off and a following
 cold boot show Off. Only retained ADN validity changes, with both
 phonebooks unchanged. Session identity flags are not retained card data.
-FDN record editing and dial enforcement remain separate targets.
+FDN Numbers/Add entry requires PIN2 before opening Name/Number. Physical
+5678, A/12345 transmits exact `A0 DC 01 04 20` with the32-byte FDN record
+and9000. Only the first FDN record changes; ADN, credentials, retry counters
+and validity remain intact. A separate cold Numbers/Search/List/Details
+run displays selected A and12345 with no update or changed card byte.
+The same-input wrong5675 control displays Code error, sends no UPDATE,
+and changes only PIN2 retries3->2.
+`nsm1_fdn_record_check.py WRITE COLD WRONG` checks physical authentication,
+exact payload and outcome, complete-card changes, cold EEPROM link and
+four exact save/list/detail/error frames. Record modification/erasure and
+dial enforcement remain separate targets.
 
 ```sh
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-security-cold-qualified \

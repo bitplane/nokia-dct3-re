@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_fdn_physical_record_save_cold_read", "owner": "nsm1_sim_security", "status": "satisfied",
+      "predicate": "Physical PIN2-protected FDN record save survives independent cold read and wrong PIN2 cannot write the record",
+      "current": "After physical startup PIN1/phone-code acceptance, Numbers/Add entry asks PIN2 before the name editor. Physical5678 then A/12345 produces one exact A0 DC 01 04 20 plus32-byte record,9000. The whole extended card changes only that first FDN record. Separate cold physical Search/List/Details displays selected A and12345 with unchanged entire card and no UPDATE. Same-input wrong5675 receives9804/Code error, emits no UPDATE and changes only PIN2 retries3->2. Exact contacts/authentication order, credential/APDU bodies, full card and EEPROM links, native record validation, own flash and four exact frames pass. Record modification/erasure, rejected activation and dial enforcement are separate; no network or native speech claim follows.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_fdn_write.lua", "tools/nsm1_fdn_write_wrong.lua", "tools/nsm1_fdn_read.lua", "tools/nsm1_fdn_record_check.py", "tools/test_nsm1_fdn_record_check.py"]
+    },
+    {
       "id": "sim_fdn_card_access_validity_storage_conformance", "owner": "sim_card", "status": "satisfied",
       "predicate": "An explicit extended laboratory card retains FDN records and enforces CHV2 update/ADN-validity policies without changing base-card storage",
       "current": "The versioned3898-byte image appends capability, ADN validity and optional invalid-ADN access flags plus ten32-byte FDN records to the intact3570-byte base. Twenty-six cold storage cases validate current/legacy images and atomically reject malformed extensions. Actual card APDU tests in simfdnt/simfdnrt cover protected reads/updates, CHV2 verification, reset revocation, INVALIDATE/REHABILITATE errors and access, validity save/restore, unchanged ADN and exact persisted FDN record. Enabled FDN also invalidates IMSI/LOCI once per session; CHV1 rehabilitation restores access without repeated invalidation. Card save-state and reactivation checks cover that handshake. Native NSM-1 physical activation and cold On/Off now pass through this boundary. Record editing and dial enforcement remain separate; no handset-state forcing, native network or speech claim follows.",
