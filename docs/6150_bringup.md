@@ -70,6 +70,24 @@ late queue activity followed by the second quiet scan window, physical
 authentication/Menu, unchanged card/flash, own live program hash and165s
 horizon. Missing/malformed second-cycle packets or a restart request fail it.
 
+An independent100s passive policy capture, `tmp/nsm1-native-liveness`, observes
+packet-window counts0,1,0. Both empty windows call2b4b72 with argument1 from
+2c1b95, read policy bytes0002 and return with selected reason0. The own literal
+at2b4f34 identifies record0607. The first byte's bit0 is clear:2b4ba8/2b4baa
+branches past reason68 selection, then2b4bc8 reaches the rearm/clear tail.
+This explains the observed absence of the6130-style reset in this6150 fixture;
+it does not prove the policy bytes represent a factory default or fitted phone.
+Their storage/default provenance remains to be traced. No policy is changed.
+
+```sh
+.venv/bin/python tools/nsm1_liveness_check.py tmp/nsm1-native-liveness
+```
+
+The gate pins own instructions/literals, the complete window/policy census and
+ordering, physical authentication/Menu, native packets/program, unchanged card
+and100s horizon. A configured packet-timeout bit or missing observations fails
+this specific fixture gate rather than being silently treated as equivalent.
+
 The own45s live program SHA256 is
 `b03957d9a60e9e3048826fa16fc407422b87407688cbc0cab75ee31a95f6a89e`.
 Gateway2420 targets uploaded0a8d, not the6130's0a71. The recovered comparison

@@ -1304,6 +1304,12 @@
       "evidence": ["docs/6130_bringup.md", "tools/nsk3_pin_input.lua", "tools/nsk3_pin_reload.lua", "tools/nsk3_pin_check.py", "tools/test_nsk3_pin_check.py", "tools/nsk3_cold_input.py", "tools/nsk3_nominal_input.py"]
     },
     {
+      "id": "nsm1_empty_packet_window_policy", "owner": "nsm1_firmware", "status": "satisfied",
+      "predicate": "Own NSM-1 empty native packet windows select no reset reason because the observed record0607 policy bit0 is clear",
+      "current": "A100s unchanged physical PIN/phone/Menu capture observes own context112860 window counts0,1,0. Each empty window calls2b4b72(argument1) from2c1b95, reads policy bytes0002 and exits with reason0, without reaching the selected-reason block or restart request. Own instruction/literal anchors qualify the packet counter, timer09cd, record0607 and first-byte bit0 test that skips reason68 and rearms/clears the counter. The checker also preserves native packet/program, card/flash and physical Menu acceptance. This explains absence of packet-timeout reset in this fixture, not factory policy provenance, fitted hardware or RF acquisition; the record's storage/default origin remains unresolved. No policy, counter or guest state was changed.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_liveness_observe.lua", "tools/nsm1_liveness_check.py", "tools/test_nsm1_liveness_check.py"]
+    },
+    {
       "id": "nsm1_native_repeated_scan_165s", "owner": "nsm1_firmware", "status": "satisfied",
       "predicate": "The explicit NSM-1 native compatibility composition completes two own measurement packet cycles within165s without an observed restart request",
       "current": "The unchanged own PIN/phone/Menu composition emits the initial seven native packets and a second8a/87 exchange at122.884s followed by8b at161.231s. Second8a carries0375 and both8b measurement payloads are identical162-byte objects with no qualified RF result. Passive queue samples retain the prior105s baseline, show further activity at120s and the second quiet scan window at140/160s. The gate checks ten complete packets, publication windows, queue/counter relationships, own live program hash, unchanged executable/card, physical authentication and exact Menu frame through a165s snapshot horizon. The own2c2a02 restart-request observer records no calls. This does not import the6130 restart deadline, identify fitted mask/physical timing, prove unbounded stability, qualify RF acquisition or establish connected calls/native speech.",
