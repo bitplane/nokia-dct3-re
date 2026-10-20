@@ -147,6 +147,30 @@ The rebuilt saturated control `tmp/nsk3-saturated-post-input` still passes the
 strict blank-frame/record-persistence gate. The next functional boundary is
 own-ROM key translation and physical SIM insertion, not synthetic report14.
 
+### Synthetic card and logical-key boundary
+
+The separate native research instrument now offers an explicitly inserted
+synthetic card with its socket empty by default; ordinary `noki6130` remains
+unchanged. `nsk3_nominal_input.py --insert-sim` changes only this physical
+configuration input in addition to the declared nominal ADC hypothesis.
+`nsk3_sim_observe.lua` observes the real SIMI TX/RX byte lanes and the own
+translator return sites2ac2ec/2ac2fc without guest writes.
+
+`tmp/nsk3-sim-inserted` receives ATR3b1005, completes the ff00ff PPS exchange
+and sends SELECT7f21 followed by STATUS, then further file traffic. The UI
+presents Security code at5/15s. This is initial card communication, not yet a
+complete SIM initialization/security acceptance gate. Firmware also initializes
+additional EEPROM regions; these writes have not yet been semantically classified.
+
+Own normal key table2c7a30 has five rows:
+`3e3e3e3e3e / 1119010203 / 0e17040506 / 0f18070809 / 101a0c0a0b`.
+Thus the inherited column1/mask04 contact means logical17, not its host Menu
+label. The separate `tmp/nsk3-security-physical` probe verifies decoded digits
+1..5 and candidate command19 from physical contacts. The Security code prompt
+remains afterward; neither the candidate's submit meaning nor accepted-code
+status is proved. Do not rename19 as OK based on another handset. Next resolve
+the own editor command mapping and its validation result before claiming unlock.
+
 ## Own firmware inputs
 
 Source: `roms/archive-dct3-packages/nsk3_561.exe`, downloaded from

@@ -14,12 +14,15 @@ from tools.nsk3_analog_contract import inspect
 from tools.nsk3_static_check import inspect as inspect_source
 
 
-def config():
+def config(insert_sim=False):
     root=ET.Element('mameconfig',version='10')
     system=ET.SubElement(root,'system',name='nsk3r4t')
     inputs=ET.SubElement(system,'input')
     ET.SubElement(inputs,'port',tag=':RESEARCH_ADC2',type='CONFIG',
                   mask='1023',defvalue='1023',value='554')
+    if insert_sim:
+        ET.SubElement(inputs,'port',tag=':SIM_REMOVED',type='OTHER',
+                      mask='1',defvalue='1',value='0')
     return ET.ElementTree(root)
 
 
@@ -27,6 +30,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     for name in ('source','control','native_roms','initial','cold','output'):
         parser.add_argument(name,type=Path)
+    parser.add_argument('--insert-sim',action='store_true',help='cold physical insertion of the explicit synthetic card')
     args=parser.parse_args()
     try:
         if args.output.exists():raise ValueError('comparison requires a fresh output directory')
@@ -36,9 +40,10 @@ def main():
         storage=args.cold/'nvram/nsk3r4t'
         shutil.copytree(storage,args.output/'nvram/nsk3r4t')
         (args.output/'cfg').mkdir()
-        config().write(args.output/'cfg/nsk3r4t.cfg',encoding='utf-8',xml_declaration=True)
+        config(args.insert_sim).write(args.output/'cfg/nsk3r4t.cfg',encoding='utf-8',xml_declaration=True)
         metadata={'classification':'nominal external-input hypothesis, not fitted calibration',
                   'raw_adc2':554,'basis':'nominal 3.6 V / typical 6.5 mV per count',
+                  'inserted_synthetic_sim':args.insert_sim,
                   'own_static_contract':contract,
                   'seed':str(args.cold.resolve()),
                   'seed_eeprom_sha256':hashlib.sha256((storage/'eeprom').read_bytes()).hexdigest(),

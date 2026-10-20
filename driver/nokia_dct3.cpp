@@ -3521,6 +3521,9 @@ INPUT_PORTS_END
 static INPUT_PORTS_START( nsk3r4t )
 	PORT_INCLUDE(noki5110)
 	PORT_INCLUDE(dct3_research_adc2)
+	PORT_MODIFY("SIM_REMOVED")
+	PORT_BIT(0x01, IP_ACTIVE_LOW, IPT_OTHER) PORT_NAME("Insert synthetic SIM card") PORT_TOGGLE
+	PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sim_removed_changed), 0)
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki6110 )
@@ -4206,6 +4209,9 @@ void nokia_dct3_state::noki6130(machine_config &config)
 void nokia_dct3_state::nsk3r4t(machine_config &config)
 {
 	noki6130(config);
+	nokia_product_config research = m_product;
+	research.synthetic_sim_card = true;
+	apply_product_config(research);
 	// Own boot4 payload calls resident 8023/802b. NSE-1 ROM4 and its
 	// 52-MHz clock are explicit compatibility inputs, not a fitted NSK-3 dump.
 	config.device_remove("dsp_hle");

@@ -12,6 +12,12 @@ class NominalInputTest(unittest.TestCase):
         self.assertEqual(ports[0].attrib,{'tag':':RESEARCH_ADC2','type':'CONFIG',
                                         'mask':'1023','defvalue':'1023','value':'554'})
 
+    def test_card_insertion_is_an_explicit_separate_input(self):
+        ports=config(True).getroot().findall('.//port')
+        self.assertEqual(len(ports),2)
+        self.assertEqual(ports[1].attrib,{'tag':':SIM_REMOVED','type':'OTHER',
+                                        'mask':'1','defvalue':'1','value':'0'})
+
     def test_readiness_and_contact_requirements(self):
         trace='\n'.join([
             'ccont_adc2_config: raw=22a external_input=1',

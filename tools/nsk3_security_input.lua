@@ -1,0 +1,29 @@
+-- Own table2c7a30: physical digits12345 and candidate command19, no guest writes.
+local source=debug.getinfo(1,'S').source:sub(2)
+dofile(source:match('^(.*[/\\])') .. 'nsk3_sim_observe.lua')
+local machine=manager.machine
+local memory=machine.devices[':maincpu'].spaces.program
+local cells={{2,2,1},{3,2,2},{4,2,3},{2,4,4},{3,4,5},{1,2,0x19}}
+local events={}
+for i,cell in ipairs(cells) do
+    local field
+    for _,candidate in pairs(machine.ioport.ports[':COL.'..cell[1]].fields) do
+        if candidate.mask==cell[2] then field=candidate end
+    end
+    assert(field,'own physical contact unavailable')
+    local row=cell[2]==2 and 1 or 2
+    assert(memory:read_u8(0x2c7a30+row*5+cell[1])==cell[3],'own logical-key table changed')
+    local when=9+(i-1)*0.5
+    events[#events+1]={when,field,1,cell}
+    events[#events+1]={when+0.2,field,0,cell}
+end
+local next_event=1
+emu.register_frame_done(function()
+    local now=machine.time:as_double()
+    while events[next_event] and now>=events[next_event][1] do
+        local event=events[next_event]
+        event[2]:set_value(event[3])
+        machine:logerror(string.format('nsk3_security_contact: key=%02x down=%d column=%d mask=%02x t=%.6f firmware_writes=0\n',event[4][3],event[3],event[4][1],event[4][2],now))
+        next_event=next_event+1
+    end
+end)
