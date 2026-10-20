@@ -37,11 +37,11 @@ def edited_card(before):
 
 
 def check_trace(trace, mode):
-    if mode not in ('write', 'cold', 'wrong', 'edit'):
+    if mode not in ('write', 'cold', 'wrong', 'edit', 'erase', 'cancel', 'empty'):
         raise ValueError('known FDN record mode required')
     check_contacts(trace, 'pin', 5)
     check_contacts(trace, 'phone', 6)
-    count = {'write': 23, 'cold': 11, 'wrong': 15, 'edit': 21}[mode]
+    count = {'write': 23, 'cold': 11, 'wrong': 15, 'edit': 21, 'erase': 19, 'cancel': 19, 'empty': 10}[mode]
     contacts = re.findall(r'nsb1_fdn_contact: index=(\d+) down=([01]) ', trace)
     if contacts != [(str(i), down) for i in range(1, count + 1) for down in ('1', '0')]:
         raise ValueError('physical FDN record input differs')
@@ -50,7 +50,7 @@ def check_trace(trace, mode):
     if trace.index('nsb1_fdn_contact: index=1 down=1 ') < trace.index('nsb1_pin_contact: phase=phone index=6 down=0 '):
         raise ValueError('FDN input preceded phone submission')
     expected = [(0x9000, 3, 10)]
-    if mode != 'cold':
+    if mode not in ('cold', 'empty'):
         expected.append((0x9804 if mode == 'wrong' else 0x9000, 3, 10))
     if statuses(trace, 0x20) != expected:
         raise ValueError('PIN1/PIN2 result differs')
@@ -63,16 +63,18 @@ def check_trace(trace, mode):
         raise ValueError('startup PIN payload differs')
     if bytes.fromhex('a0a40000026f3b') not in tx:
         raise ValueError('FDN selection absent')
-    if mode != 'cold':
+    if mode not in ('cold', 'empty'):
         pin2 = bytes.fromhex('a020000208') + padded_pin('5675' if mode == 'wrong' else '5678')
         if tx.count(pin2) != 1:
             raise ValueError('PIN2 payload differs')
-    if statuses(trace, 0xdc) != ([(0x9000, 3, 10)] if mode in ('write', 'edit') else []):
+    if statuses(trace, 0xdc) != ([(0x9000, 3, 10)] if mode in ('write', 'edit', 'erase') else []):
         raise ValueError('FDN update result differs')
-    if mode in ('write', 'edit'):
+    if mode in ('write', 'edit', 'erase'):
         body = bytearray(RECORD)
         if mode == 'edit':
             body[22] = 0xf6
+        elif mode == 'erase':
+            body[:] = bytes([255]) * 32
         command = bytes.fromhex('a0dc010420') + body
         if tx.count(command) != 1 or tx.index(command) < tx.index(pin2):
             raise ValueError('protected FDN record payload/order differs')

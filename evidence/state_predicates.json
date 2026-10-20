@@ -249,6 +249,12 @@
       "evidence": ["docs/5190_bringup.md", "tools/nsb1_phonebook_roundtrip.py", "tools/nsb1_phonebook_erase.lua", "tools/nsb1_phonebook_empty.lua", "tools/test_nsb1_phonebook_roundtrip.py"]
     },
     {
+      "id": "nsb1_v671_fdn_erase_cancel", "owner": "nsb1_sim_security", "status": "satisfied",
+      "predicate": "Own physical NSB-1 FDN erase changes only the selected record while Cancel preserves the card and cold Search proves the empty result",
+      "current": "Independent warm processes begin with the same saved A/12346 FDN-Off card. Own Search/Options/Erase physically authenticates PIN2 and presents exact Erase? A. Confirmation sends one successful all-FF32-byte UPDATE RECORD to record1 and changes no other card state; Cancel sends no UPDATE RECORD and preserves the entire card. A linked cold process displays exact No phone numbers and leaves the erased card unchanged without UPDATE RECORD. The firmware caption Phone book erased is not promoted into a claim about all ADN/handset storage: the protocol and whole-card checks establish selected FDN erasure. Own native/executable/cold-link qualification, physical PIN1/phone/FDN contacts and exact frames remain mandatory. Local dial restrictions, fitted mask, registration and native speech remain unaccepted.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_fdn_erase.lua", "tools/nsb1_fdn_cancel.lua", "tools/nsb1_fdn_empty.lua", "tools/nsb1_fdn_erase_check.py", "tools/test_nsb1_fdn_erase_check.py", "tools/nsb1_fdn_record_check.py"]
+    },
+    {
       "id": "nsb1_v671_fdn_in_place_edit", "owner": "nsb1_sim_security", "status": "satisfied",
       "predicate": "Own physical NSB-1 PIN2-protected FDN edit changes only the final number digit and persists visibly across cold boot",
       "current": "From independently saved A/12345, own Search/Options/Edit accepts physical5678, retains the name and uses Clear/6/Save to issue one exact successful UPDATE RECORD. The complete card differs only at byte3600 F5-toF6. A linked fresh process holds # for four seconds to display12346, releases to the same name list, sends no UPDATE RECORD and preserves the complete edited card. The gate qualifies physical PIN1/phone/FDN contacts, PIN2 payload/order, own executable/native execution, linked cold devices and exact Saved/edited-number/list frames. FDN erase/cancel/local dial controls, fitted mask, registration and native speech remain unaccepted.",

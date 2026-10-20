@@ -125,9 +125,27 @@ PIN2 authorization, saved/number/list frames, input links and native execution.
   --edit tmp/nsb1-fdn-edit --edit-cold tmp/nsb1-fdn-edit-cold
 ```
 
-`nsb1_fdn_edit.lua` runs74s and the standard cold view runs54s. FDN erase/cancel
-and local dial restrictions remain unaccepted on NSB-1; registration and
-native speech remain separate unresolved boundaries.
+`nsb1_fdn_edit.lua` runs74s and the standard cold view runs54s.
+
+Erase and cancellation are separately accepted from the same saved edited
+card. Physical Search/Options/Erase authenticates PIN2 and presents Erase? A.
+Confirmation issues exactly one successful all-FF32-byte UPDATE RECORD to
+record1; Cancel issues none and preserves the complete card. The success
+caption says Phone book erased, but the APDU/card evidence establishes only
+the selected FDN record's erasure, not wholesale ADN or handset storage loss.
+A linked cold Search displays No phone numbers, sends no UPDATE RECORD and
+preserves the erased card.
+
+```sh
+.venv/bin/python tools/nsb1_fdn_erase_check.py tmp/nsb1-fdn-edit-cold \
+  tmp/nsb1-fdn-erase tmp/nsb1-fdn-cancel tmp/nsb1-fdn-erased-cold
+```
+
+Warm70s fixtures use `nsb1_fdn_erase.lua`/`nsb1_fdn_cancel.lua`; the50s cold
+fixture uses `nsb1_fdn_empty.lua`. The gate checks exact confirmation/result/
+empty frames, native execution, own cold-input links, physical contacts,
+PIN2/update payloads and complete-card effects. Local dial restrictions remain
+unaccepted on NSB-1; registration and native speech remain separate boundaries.
 
 ### SIM credential changes and recovery
 
