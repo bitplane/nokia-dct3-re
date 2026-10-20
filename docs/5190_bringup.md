@@ -204,9 +204,42 @@ at `209236`. These are own-ROM routes, not imported task aliases.
 
 The 61-second physical Call/End run observes neither `24dd5c`, the `043f`
 constructor nor initializer `2138ec`; the probe stream is uncapped by other
-events in that run. The next predecessor to decode is the controller path
-selecting source label `20eb8a`, not an invented DSP reply. The semantics and
-ordinary provisioning of the two control-record bytes also remain unproved.
+events in that run. The semantics and ordinary provisioning of the two
+control-record bytes remain unproved.
+
+### Activation predecessor and current wait
+
+Controller 16 input `0a30` selects the source call at `20b2be -> 20eb8a`.
+The adjacent `MOV #a3; LSL #4` scan finds six producer calls to constructor
+`21ac4c` (at `21c774/21c9d0/21d684/21f924/21fe06/21ff8e`), whose `0a30`
+branch explicitly posts to task 16. This is a bounded instruction-pattern
+inventory, not closure of all data-driven or indirect producers. None fires
+in the measured run.
+
+The receive traces instead establish this earlier transaction:
+
+| Owner | Measured input / continuation |
+| --- | --- |
+| Controller 16 | Receives `0a35`, `0a25`, `09ec`, `09d2`, `09d4`. State at `10a688` changes `3 -> 6 -> 19` (hex); the call/end headers become helper results `0a02/0a05`. |
+| Helper `21ae1c` | Receives `158b` with argument zero, saved caller `21da03`; this matches the expected result at `21da04`, not the earlier guessed initial `09f0` wait. |
+| Subsystem flow | `21da10 -> 21e5d0 -> 21b3f6` returns; the comparison at `21e610` takes the `>=012b` branch `21e6c8`. `21b1e8`, `29c208` and `29c1f2` also return. Constructor `21ac4c(09ec)` at `21eeea` publishes argument 1, then `21eeee` waits in the receive helper. |
+| Controller 16 | State 6 handles `09ec` at `20e464`, forwards `07d6` through `208dd4`, and retains state 6 until physical Call. |
+| Controller 17 | Receives `083b`, then `07d6`; state `109fae` changes `2 -> 1d` (hex). In state `1d`, `24d9ee -> 24da90` constructs `03e9` through `28ed24`, targeting task 11. Cleanup `28ebde` returns, then `24dcc8` enters `24f044`. |
+
+`24f044` calls receive helper `28f224` at `24f050`. It explicitly accepts
+`0811/0812/0813` at `24f058..24f06a`; other inputs go through `24e30c`, whose
+exception/continuation surface is not closed. Neither these replies nor the
+post-call site `24dccc` is observed through 61 seconds. **The next question is
+task 11's own `03e9` consumer and the legitimate producer of its completion**,
+not a fabricated `0a30`, a search-controller byte or a guessed DSP packet.
+
+Field `10af4c == 012b` is not established as a retry limit or direct EEPROM
+integer. `21b37c` counts 299 bitmap positions in a 48-byte structure; reset
+routine `21b1e8` sets the field to 299. The measured storage/update path returns
+before the `09ec` publication. Changing that field to bypass the branch would
+not be an evidenced provisioning correction. Resolved storage/branch trace
+sites are retired from the live diagnostic; the receive and activation taps
+remain for the open completion contract.
 
 The unreached candidate routine statically loops over 40 four-byte records,
 examines signed message byte `+9 + 4*i`, and counts values greater than `-106`.

@@ -10,8 +10,22 @@ if machine.debugger then
     machine.debugger:command('temp9=0')
     machine.debugger:command('temp8=0')
     machine.debugger:command('temp7=0')
-    machine.debugger:command('bpset 28ed24,r0==43f&&temp7<10,{temp7=temp7+1;logerror "nsb1_call_release_construct: input=%04x mode=%02x option=%02x caller=%08x observer_writes=0\\n",r0,b@10c435,b@10c434,r14;g}')
-    for _, address in ipairs({'24dd5c','2138ec'}) do
+    machine.debugger:command('temp6=0')
+    machine.debugger:command('temp5=0')
+    machine.debugger:command('temp4=0')
+    machine.debugger:command('temp3=0')
+    machine.debugger:command('temp2=0')
+    machine.debugger:command('temp0=0')
+    machine.debugger:command('bpset 28ed24,r0==3e9&&temp0<10,{temp0=temp0+1;logerror "nsb1_call_controller_request: input=%04x caller=%08x observer_writes=0\\n",r0,r14;g}')
+    machine.debugger:command('bpset 24f044,temp0<10,{temp0=temp0+1;logerror "nsb1_call_controller_wait: state=%04x caller=%08x observer_writes=0\\n",w@109fae,r14;g}')
+    machine.debugger:command('bpset 21ac4c,r0==a30&&temp6<10,{temp6=temp6+1;logerror "nsb1_call_activation_construct: input=%04x caller=%08x observer_writes=0\\n",r0,r14;g}')
+    -- Receive helper has pushed five registers; saved caller LR is SP+0x10.
+    machine.debugger:command('bpset 21ae22,r0>=100000&&r0<110000&&temp5<40,{temp5=temp5+1;logerror "nsb1_call_activation_receive: object=%08x header=%08x caller=%08x cycles=%016x observer_writes=0\\n",r0,d@r0,d@(r13+10),totalcycles;g}')
+    machine.debugger:command('bpset 20a072,temp2<40,{temp2=temp2+1;logerror "nsb1_call_controller_return: input=%04x state=%04x cycles=%016x observer_writes=0\\n",r6,w@10a688,totalcycles;g}')
+    machine.debugger:command('bpset 209ed8,r0>=100000&&r0<110000&&temp4<40,{temp4=temp4+1;logerror "nsb1_call_controller_receive: controller=16 object=%08x header=%08x cycles=%016x observer_writes=0\\n",r0,d@r0,totalcycles;g}')
+    machine.debugger:command('bpset 28f440,r0>=100000&&r0<110000&&temp3<40,{temp3=temp3+1;logerror "nsb1_call_controller_receive: controller=17 object=%08x header=%08x state=%04x cycles=%016x observer_writes=0\\n",r0,d@r0,w@109fae,totalcycles;g}')
+    machine.debugger:command('bpset 28ed24,r0==43f&&temp7<10,{temp7=temp7+1;logerror "nsb1_call_release_construct: input=%04x field5=%02x field4=%02x caller=%08x observer_writes=0\\n",r0,b@10c435,b@10c434,r14;g}')
+    for _, address in ipairs({'24dd5c','2138ec','20b2be','20eb8a'}) do
         machine.debugger:command('bpset ' .. address .. ',temp7<10,{temp7=temp7+1;logerror "nsb1_call_release_stage: pc=%08x r0=%08x caller=%08x observer_writes=0\\n",pc,r0,r14;g}')
     end
     machine.debugger:command('bpset 268944,r0==c&&r1>=100000&&r1<110000&&w@r1==13b8&&temp9<10,{temp9=temp9+1;logerror "nsb1_call_result_post: task=%08x object=%08x header=%08x caller=%08x observer_writes=0\\n",r0,r1,d@r1,r14;g}')
@@ -85,6 +99,22 @@ end)
 local result_reads = 0
 local status_reads = 0
 local state_writes = 0
+local controller_writes = 0
+local controller17_writes = 0
+_G.nsb1_call_controller17_state = memory:install_write_tap(0x109fac,0x109faf,'nsb1_call_controller17_state',function(offset,data,mask)
+    if mask & 0xffff ~= 0 and controller17_writes < 24 then
+        controller17_writes = controller17_writes+1
+        machine:logerror(string.format('nsb1_call_controller17_state: value=%04x pc=%08x t=%.9f observer_writes=0\n',
+            data & 0xffff,cpu.state['R15'].value,machine.time:as_double()))
+    end
+end)
+_G.nsb1_call_source_state = memory:install_write_tap(0x10a688,0x10a68b,'nsb1_call_source_state',function(offset,data,mask)
+    if mask & 0xffff0000 ~= 0 and controller_writes < 32 then
+        controller_writes = controller_writes+1
+        machine:logerror(string.format('nsb1_call_source_state: value=%04x pc=%08x t=%.9f observer_writes=0\n',
+            (data >> 16) & 0xffff,cpu.state['R15'].value,machine.time:as_double()))
+    end
+end)
 _G.nsb1_call_search_state = memory:install_write_tap(0x106a9c,0x106a9f,'nsb1_call_search_state',function(offset,data,mask)
     if mask & 0xff000000 ~= 0 and state_writes < 24 then
         state_writes = state_writes+1
