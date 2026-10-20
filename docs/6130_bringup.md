@@ -2,18 +2,40 @@
 
 ## Current result
 
-**Long-run limit:** the declared native compatibility composition requests a
+**Pre-overlay-correction long-run limit:** the declared native compatibility composition requests a
 reason68 restart at93.967473692s. Short physical UI/storage/security gates do
 not establish sustained native operation. The own packet-supervision contract
 below reproduces this failure; no keepalive or disabled watchdog is installed.
+The uploaded-bank correction below is qualified through40s; its longer-run
+supervision behavior has not yet been requalified.
 
-**Active native boundary:** the last8b object is delivered intact and cached
+**Pre-correction native packet boundary:** the last8b object is delivered intact and cached
 by mailbox0c in initial state3/phase1. The mapped acknowledgement server
 (mailbox0e) receives no input through45s. MCU work-queue routes are also
 dormant. These are measured boundaries, not proof that acquisition needs an
 injected acknowledgement. Native control capture and the remaining RF/data
 contracts are described below; registration, connected calls and speech remain
 unaccepted.
+
+### Executable upload bank
+
+The own boot4 loader writes811 distinct program words in `2800..2b2a`.
+The old `2800` overlay end discards the upload, exposing resident program
+words and zero data instead. For example, uploaded `2800=10f8` reads as
+program `a594` and data `0000`; nine coincidental matching values are not
+upload retention. The research `nsk3r4t` configuration now selects a `3000`
+overlay extent. This is an upload-derived bank model, not fitted-mask or
+complete physical-memory identification; normal `noki6130` is unchanged.
+
+`nsk3_native_upload_observe.lua` shares only read-only observation mechanics
+with the6150 fixture. Both old/corrected40-second runs use the own qualified
+FDN-enabled cold storage, physical PIN/phone-code input and listed-number
+dial action. Existing handoff, authentication, SIM conversation, unchanged
+whole-card and exact-frame checks pass in both. Only the corrected run passes
+`nsk3_native_upload_check.check_upload`, retaining all811 uploaded words in
+both memory views at1s. Its566 observed first opcode words all have decoded
+boundaries, including observed extension variants. These are short-run
+software/mapping qualifications, not native registration or speech proof.
 
 The separate native compatibility instrument reaches **Insert SIM card** and
 rescans the physical matrix under an explicit nominal ADC2 hypothesis (554).

@@ -4229,6 +4229,8 @@ void nokia_dct3_state::nsk3r4t(machine_config &config)
 	// 52-MHz clock are explicit compatibility inputs, not a fitted NSK-3 dump.
 	config.device_remove("dsp_hle");
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	// Own boot4 loader uploads 811 words above 2800, through 2b2a.
+	m_dsp_c54x->set_overlay_end(0x3000);
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
 
