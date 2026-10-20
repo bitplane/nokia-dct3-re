@@ -193,13 +193,29 @@ advances from `068f` at 13 s to `0f22` at 30 s while software timestamp
 20 s return an adjusted interval of zero, still declining deep sleep.
 IRQ0 from the 18 s physical contact remains pending. Waiting for this short
 timer or inventing a faster clock is therefore not an evidenced correction.
-The unentered deep-sleep helper `2fad22` nevertheless contains two explicit
+The deep-sleep helper `2fad22`, not selected in those late samples, contains two explicit
 `STRH r0,[r2,#6]` writes to Timer 1 destination (`2fadac`, `2fadce`), first
 adding 50 and later applying division by 79. This is not a globally read-only
 register contract. The fresh no-SIM observer counts zero destination writes
 through 15 s and reads `7fff`, so these dormant stores do not explain the
 current pre-deep-sleep stall. Actual destination-write semantics remain open;
 the fixed-terminal model must not be promoted to complete NAM-2 sleep support.
+
+The whole-boot clock-write observer `tools/nam2_c3_clock_observe.lua` separates
+that late window from earlier idle work. A fresh own-checksum/no-SIM run
+(`tmp/nam2-clock-caller-qualified`) observes helper write `304c56` emitting
+`2e` first at8.918624385s, then `2c` first at9.750710077s. Through29s the
+uncapped totals are4653 and156792 respectively. The static helper at304c2e
+uses `(old & fe)` for argument0, versus `(old | 02) & fe` for nonzero;
+the stack-saved return002f85fb independently places both command forms in
+the supervisor's shared call at2f85f6, rather than its other direct caller
+256034. The deep-sleep branch at2f868c therefore cannot be described as
+wholly unentered on this boot. These are observed command writes, not proof of clock suspension,
+destination writes or successful wakeup. Late input still leaves IRQ0 pending
+and control0a. The next discriminating window is the early2e-to-late2c
+transition, not another post-10s sample of the same declined guard. No clock
+or global-enable behavior is changed. Own executable and both stored identity
+checksums pass the existing `check_pmm` qualification.
 
 Executable provenance is independently bounded by the acquired
 `NAM-2_MCU_v5.21.EXE` installer (SHA-256
