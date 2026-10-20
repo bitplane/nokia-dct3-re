@@ -7,6 +7,8 @@ pairs. Both normalize to a1MiB flash extent200000..2fffff. Conservative
 `noki6130` executes both variants from erased external storage and renders
 the exact CONTACT SERVICE frame. The silent DSP leaves shared bootstrap
 cells unacknowledged; no usable boot, input or phone service is accepted.
+Own checksum-only EEPROM diagnostics additionally clear CONTACT SERVICE to a
+blank frame in the native compatibility instrument; they do not reach idle.
 Factory EEPROM content, fitted flash/RAM geometry, display viewport and DSP
 mask compatibility remain unproved.
 
@@ -92,10 +94,10 @@ idle or fitted-hardware claim follows from this failure presentation.
 
 ## Next boundary
 
-The separate native checkpoint below closes the boot4 upload boundary, not
-the startup checks. Recover the direct producer/caller of the early reason04
-restart and the surviving failed self-test/storage predicate. Do not import
-5130 EEPROM state or synthesize a successful verdict to clear the frame.
+The native checkpoint closes the boot4 upload boundary. The startup contract
+below independently separates integrity failures from a format-invalid
+decoded record. Next recover a constrained own-capture record input and its
+accepted-copy contract; do not import 5130 EEPROM state or inject a verdict.
 
 ## Native ROM4 compatibility checkpoint
 
@@ -134,3 +136,61 @@ SERVICE. Own executable flash stays unchanged; the firmware-initialized EEPROM
 has a separate reviewed hash from the silent control. Loader acceptance does
 not establish interactivity, SIM initialization, stable radio, speech or
 long-run native execution. Those remain unaccepted.
+
+## Storage startup contract
+
+The own record consumer26f150 receives class74/primitive3532. Its format
+check reaches26f2d0 with valid0 in both boots. On the first failure, marker
+10fdca changes5a->a5, checksum10fdcc is recomputed and caller26f330 invokes
+restart2ac65e with reason04 (observed LR26f335). After restart, the same
+failure instead changes the marker to55 and returns. This is distinct from
+the dormant immediate-reason4 power-key caller2ac6fe. The bounded raw Thumb
+scan finds eight BL candidates to2ac65e, including data matches; this is not
+an indirect-caller closure.
+
+Requests13..16 are observed at own post primitive266a2c, target3. Identity
+reply26ef5c reproduces the requested flash field82153f2d through the shared
+MSID decoder and yields modeled chip field00160010. Both record replies
+match the independently implemented ROM4 decode and encoded echo exactly.
+The invalid decoded blocks are therefore consistent transforms of the erased
+inputs, not evidence of a missing DSP response. This does not establish
+factory fields or fitted silicon identity.
+
+Two integrity contracts are separately recovered from own code:
+
+| Consumer | Stored field | Computation |
+| --- | --- | --- |
+| `23aa20`, compared at`23aca4` | `011e..011f` BE16 | Sum`0040..011d`, excluding bytes`0074/0075`, modulo65536 on the normal allocated path |
+| `26f556`, called by`2928ca` | `003c..003f` BE32 | Sum`0000..003b`, modulo65536 |
+
+The erased-source comparator trace (`tmp/nsk3-startup-checksum-control`) has
+`ffff != db24` in the first comparison and
+`ffffffff != 00003bc4` in the second. The two-byte security-only fixture
+passesdb24/db24; firmware later writesda54/da54 itself. Its24-entry startup
+result sweep still has item12h/code12h, and CONTACT SERVICE remains. Adding
+only the four-byte low-block checksum makes all24 entries acceptable and
+clears the failure frame to blank. Neither fixture fixes decoded-record
+validity or suppresses the early reason04 restart.
+
+```sh
+.venv/bin/python tools/make_nsk3_checksum_profile.py roms/noki6130/source \
+  tmp/nsk3-native-checkpoint roms/nsk3r4t \
+  tmp/nsk3-both-checksums-final/nvram/nsk3r4t/eeprom --low-block
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame \
+  --run-dir tmp/nsk3-both-checksums-final -- nsk3r4t -rompath ../roms \
+  -video none -sound none -nothrottle -seconds_to_run 16 -log \
+  -debug -debugger none -autoboot_delay 0 \
+  -autoboot_script ../tools/nsk3_startup_observe.lua
+.venv/bin/python tools/nsk3_startup_check.py roms/noki6130/source \
+  tmp/nsk3-native-checkpoint roms/nsk3r4t tmp/nsk3-both-checksums-final --low-block
+```
+
+The generator requires the qualified own native control and a fresh output;
+it changes checksums only, preserving every identity, lock and calibration
+byte. Omit`--low-block` and use a separate run directory for the security-only
+control (`tmp/nsk3-checksum-results-final`). The checker guards both complete
+upload passes, both24-item result sweeps, native record arithmetic, marker
+ordering, unchanged flash and whole EEPROM differences. Firmware changes
+only0073,007a and the011e checksum after the initial fixture. The blank5s/15s
+frames are a bounded negative presentation result, not graphical boot or UI
+acceptance. No firmware RAM, result flag, callback or peer reply is injected.
