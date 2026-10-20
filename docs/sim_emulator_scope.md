@@ -240,8 +240,10 @@ Implementation status and remaining acceptance:
    Physical
    PIN2-protected erase/cancel and cold-empty search also pass on NSM-1,
    preserving the complete card outside the selected FDN record.
-   Call enforcement needs a separately observed allowed/denied dial attempt;
-   do not claim native network or speech acceptance from that UI result.
+   NSM-1 local dial enforcement also passes a listed/unlisted/Off physical
+   comparison: listed12346 reaches Calling, unlisted54321 is denied, and
+   physical Off permits54321 to reach Calling with an unchanged card.
+   This is not native network connection or speech acceptance.
 
 `tools/run_sim_fdn.py RUN --base-card BASE --mame mame/mame` runs both
 development-only `simfdnt` and `simfdnrt` after `make build`. BASE must be

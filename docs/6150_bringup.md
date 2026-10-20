@@ -241,8 +241,19 @@ byte3600 fromF5 toF6, updating12345 to12346 in the same FDN record.
 `nsm1_fdn_record_check.py WRITE COLD WRONG --edit EDIT --edit-cold EDIT_COLD`
 checks the exact protected UPDATE payload, physical edit contacts, full
 card/EEPROM links, save confirmation and independent cold12346 Details.
-No unrelated file, credential or validity flag changes. Dial enforcement
-remains a separate target.
+No unrelated file, credential or validity flag changes.
+
+Local dial enforcement is accepted with a three-way physical control.
+After enabling FDN on the card containing A/12346, cold physical12346/Send
+reaches Calling. Same-input cold54321/Send displays Call not allowed.
+Physical FDN Off changes only ADN validity; another cold54321/Send now
+reaches Calling. Send is the own row2/column0 contact (logical0e), not a
+volume key. All three dial attempts preserve the entire card; exact
+authentication, session rehabilitation, matched EEPROM inputs, executable
+flash and distinct26s frames are checked by
+`nsm1_fdn_dial_check.py SOURCE LISTED UNLISTED DISABLED OFF_CALL`.
+Calling here establishes passage through local FDN validation only. There
+is no registered native radio link, connected call or native speech claim.
 
 ```sh
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-security-cold-qualified \

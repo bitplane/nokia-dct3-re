@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_fdn_physical_local_dial_enforcement", "owner": "nsm1_sim_security", "status": "satisfied",
+      "predicate": "An enabled FDN card permits its listed number and rejects an unlisted number, while physical FDN Off permits that same unlisted dial attempt",
+      "current": "From the same enabled A/12346 card and EEPROM, independent cold physical12346/Send reaches exact Calling12346 pixels and54321/Send reaches exact Call not allowed pixels. Physical FDN Off then changes only retained ADN validity, and a separate cold54321/Send reaches Calling54321. All use own Send row2/column0/logical0e after physical startup PIN1 and phone-code acceptance. Exact contacts, authentication, identity rehabilitation targets/statuses, full matched EEPROM/card inputs, unchanged entire card on all dial runs, native record validity and own executable flash pass. Calling is local progress only: network_connection=0 and no native speech claim. No peer or firmware state is injected.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_fdn_dial.lua", "tools/nsm1_fdn_dial_blocked.lua", "tools/nsm1_fdn_dial_check.py", "tools/test_nsm1_fdn_dial_check.py"]
+    },
+    {
       "id": "nsm1_fdn_physical_in_place_edit_cold_read", "owner": "nsm1_sim_security", "status": "satisfied",
       "predicate": "Physical PIN2-protected FDN Edit updates the existing record and survives independent cold read without unrelated mutation",
       "current": "After startup PIN1/phone acceptance, physical FDN Search/Details/Options verifies PIN25678, selects Edit, retains Name A, clears the last digit of12345 and enters6 before Save. One exact A0 DC 01 04 20 plus edited record returns9000. The complete3898-byte card changes only byte3600 F5->F6; the record location, name, ADN, credentials, retries and validity are unchanged. A separate cold Search/Details run displays12346 with no UPDATE or card-byte change. Exact physical contacts/authentication order, payload, full card/EEPROM links, native record validity, own flash and save/Details frames pass. The existing save/read/wrong-PIN checks also pass through the extended record gate. Dial enforcement remains unaccepted.",
