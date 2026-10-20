@@ -52,8 +52,40 @@ def packets(trace):
     if not 49<float(rows[-1][4])<50:raise ValueError('measurement publication window differs')
 
 
+def metric_source(trace,program):
+    fragments={0x0b25:'6ff8219b0d20',0x0b47:'77161262e8015086',
+               0x4701:'f0742424',0x47e6:'7712125477131255308a218a20823083',0x330a:'74d60027'}
+    if len(program)!=131072:raise ValueError('live measurement program extent differs')
+    for address,raw in fragments.items():
+        expected=bytes.fromhex(raw)
+        if program[address*2:address*2+len(expected)]!=expected:raise ValueError(f'own measurement anchor differs at {address:04x}')
+    rows=re.findall(r'nsm1_scan_metric: index=(\d+) pc=([0-9a-f]+) a=([0-9a-f]+) threshold=([0-9a-f]+) producer=([0-9a-f]+) consumer=([0-9a-f]+) t=([0-9.]+) observer_writes=0',trace)
+    if len(rows)!=8 or len(rows)!=trace.count('nsm1_scan_metric: '):raise ValueError('measurement census missing/malformed')
+    previous=None
+    for index,(number,pc,acc,threshold,producer,consumer,time) in enumerate(rows,1):
+        pointer=int(producer,16)
+        if int(number)!=index or int(pc,16)!=0x0b26 or int(acc,16)!=0 or int(threshold,16)!=0x574:
+            raise ValueError('own measurement return/comparison differs')
+        if producer!=consumer or not 0x1a00<=pointer<0x1a48 or not 50<float(time)<51:
+            raise ValueError('measurement queue/window differs')
+        if previous is not None and (pointer-previous)%0x48!=4:raise ValueError('measurement queue did not advance by four words')
+        previous=pointer
+    source=re.findall(r'nsm1_scan_rf_input: index=(\d+) value=([0-9a-f]{4}) pc=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0',trace)
+    if len(source)!=8 or len(source)!=trace.count('nsm1_scan_rf_input: '):raise ValueError('RF input census incomplete')
+    previous=50
+    for index,(number,value,pc,time) in enumerate(source):
+        timestamp=float(time)
+        if int(number)!=index+1 or int(value,16)!=0 or int(pc,16)!=(0x330c,0x3312,0x3318,0x331e)[index%4]:
+            raise ValueError('RF input value/callsite differs')
+        if not previous<timestamp<51:raise ValueError('RF observation ordering differs')
+        previous=timestamp
+    queue=re.findall(r'nsm1_scan_rf_queue: start=1a00 words=72 data=([0-9a-f]+) observer_writes=0',trace)
+    if queue!=['0000'*72] or trace.count('nsm1_scan_rf_queue: ')!=1:raise ValueError('RF queue is not exactly72 zero words')
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('run',type=Path)
+    parser.add_argument('--metric-source',action='store_true')
     args=parser.parse_args()
     try:
         run=args.run;trace=(run/'error.log').read_text();samples(trace);packets(trace)
@@ -63,6 +95,7 @@ def main():
         if not horizons or float(horizons[-1])<105:raise ValueError('105-second horizon missing')
         program=(run/'nsm1_native_program_45s.bin').read_bytes()
         if len(program)!=131072 or hashlib.sha256(program).hexdigest()!=PROGRAM_SHA256:raise ValueError('own live program capture differs')
+        if args.metric_source:metric_source(trace,program)
         for address,raw in ((0x2420,'f0730a8d'),(0x0b25,'6ff8219b0d20'),(0x330a,'74d60027')):
             expected=bytes.fromhex(raw)
             if program[address*2:address*2+len(expected)]!=expected:raise ValueError('live candidate anchor differs')
@@ -73,6 +106,7 @@ def main():
     except (OSError,ValueError) as error:
         print(f'NSM-1 native radio baseline failed: {error}',file=sys.stderr);return 1
     print('NSM-1 bounded105s native packet/queue baseline PASS; fitted_mask=unproved RF_semantics=unproved registration=0')
+    if args.metric_source:print('NSM-1 own live comparison and zero port27/72-word queue PASS; physical_sample_format=unproved')
     return 0
 
 

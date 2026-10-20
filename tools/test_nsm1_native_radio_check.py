@@ -1,5 +1,5 @@
 import unittest
-from tools.nsm1_native_radio_check import samples,packets
+from tools.nsm1_native_radio_check import samples,packets,metric_source
 
 
 def sample_trace():
@@ -12,6 +12,25 @@ def sample_trace():
 
 
 class NativeRadioTests(unittest.TestCase):
+    def test_own_metric_address_and_zero_source_are_both_required(self):
+        program=bytearray(131072)
+        for address,raw in {0x0b25:'6ff8219b0d20',0x0b47:'77161262e8015086',
+                0x4701:'f0742424',0x47e6:'7712125477131255308a218a20823083',0x330a:'74d60027'}.items():
+            fragment=bytes.fromhex(raw);program[address*2:address*2+len(fragment)]=fragment
+        rows=[]
+        for index in range(8):
+            pointer=0x1a08+index*4
+            rows.append(f'nsm1_scan_metric: index={index+1} pc=0b26 a=0000000000 threshold=0574 producer={pointer:04x} consumer={pointer:04x} t={50.001+index*.005:.9f} observer_writes=0')
+            rows.append(f'nsm1_scan_rf_input: index={index+1} value=0000 pc={(0x330c,0x3312,0x3318,0x331e)[index%4]:04x} t={50.0001+index*.000001:.9f} observer_writes=0')
+        rows.append('nsm1_scan_rf_queue: start=1a00 words=72 data='+'0000'*72+' observer_writes=0')
+        trace='\n'.join(rows);metric_source(trace,program)
+        for bad in (trace.replace('pc=0b26','pc=0ae7'),trace.replace('a=0000000000','a=0000000001',1),
+                    trace.replace('value=0000','value=0001',1),trace.replace('consumer=1a08','consumer=1a0c',1),
+                    trace.replace('words=72','words=71')):
+            with self.assertRaises(ValueError):metric_source(bad,program)
+        program[0x0b25*2]^=1
+        with self.assertRaises(ValueError):metric_source(trace,program)
+
     def test_quiet_initial_window_is_not_a_permanent_queue_stall(self):
         trace=sample_trace();self.assertEqual(len(samples(trace)),7)
         for bad in (trace.replace('qualified=0000','qualified=0001',1),

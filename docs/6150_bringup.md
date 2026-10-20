@@ -41,7 +41,7 @@ The105s run receives types74 four times,8a/87 once at2.563s and8b once at
 pairs whose signed values are-129/-130. This differs from the6130 inventory;
 do not import its report timing or supervision-reset deadline.
 
-Candidate counter1262/1263 stays zero through45s, then isffffcf03 at65s,
+Native counter1262/1263 stays zero through45s, then isffffcf03 at65s,
 ffffe42c at90s andffffeca2 at100s. Between65 and90, each queue cursor has5417
 writes; between90 and100, each has2166. Those increments equal the counter
 steps, and late cursors agree. Sampled1344/1266 remain zero and219b is0574.
@@ -52,11 +52,25 @@ The own45s live program SHA256 is
 `b03957d9a60e9e3048826fa16fc407422b87407688cbc0cab75ee31a95f6a89e`.
 Gateway2420 targets uploaded0a8d, not the6130's0a71. The recovered comparison
 fragment `6ff8 219b 0d20` occurs at0b25, not the6130's0ae6; PORTR0027 remains
-at330a. The next experiment must observe this own comparison return and RF
-source before assigning physical sample semantics or adding any waveform.
+at330a. The own0b47 sequence selects1262 and increments it, independently
+qualifying the counter interpretation.
+
+The separate `nsm1_scan_metric_observe.lua` run observes eight own0b25
+comparison entries (exposed PC0b26) at50.0017..50.0341s, all A=0 against
+threshold219b=0574, with equal cursors advancing four words each time.
+Port27 reads at330c/3312/3318/331e are zero; the first comparison snapshot
+contains exactly72 zero queue words. Live4701 consumes that queue and47e6
+performs its reduction. Uploaded0b25..0b4f compares the reduction, conditionally
+increments1344 and advances the scan counter. The backend routes port27
+to COBBA's unattached RF callback, whose default value is zero.
+This locates the observed zero-score source; it does not prove arithmetic
+silicon fidelity, physical RF units, component ordering, sample-clock rate
+or receive-window wiring. Those contracts remain necessary before supplying
+a waveform; neither guessed noise nor a threshold-crossing score is evidence.
 
 ```sh
 .venv/bin/python tools/nsm1_native_radio_check.py tmp/NATIVE_RADIO
+.venv/bin/python tools/nsm1_native_radio_check.py tmp/SCAN_SOURCE --metric-source
 ```
 
 The checker pins the own live image, complete packet/sample inventory,

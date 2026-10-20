@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_native_measurement_zero_rf_source", "owner": "nsm1_native_compatibility", "status": "satisfied",
+      "predicate": "The own live NSM-1 qualification comparison observes zero reduction alongside independently observed zero native RF input and queue contents",
+      "current": "A separate105s run preserves the baseline packet/image/authentication contract. Eight program observations at own0b25 (exposed PC0b26) from50.0017..50.0341s return A=0 with219b=0574 and drained cursors advancing four words. Eight port27 reads at330c/3312/3318/331e are zero and the first comparison snapshots72 zero queue words. Live instruction anchors independently qualify4701 queue consumption,47e6 reduction,330a PORTR27,0b25 comparison and0b47 counter advancement. Backend port27 resolves to COBBA's unattached zero-valued callback. This supports the missing-source boundary, not a reduction-defect claim, fitted-mask proof or physical sample units/ordering/clock/receive-window semantics. No waveform, score or packet is injected.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_scan_metric_observe.lua", "tools/nsm1_native_radio_check.py", "tools/test_nsm1_native_radio_check.py", "driver/nokia_dsp_c54x.cpp", "driver/nokia_cobba.cpp"]
+    },
+    {
       "id": "nsm1_native_radio_bounded_packet_queue_baseline", "owner": "nsm1_native_compatibility", "status": "satisfied",
       "predicate": "An own105-second physical-authenticated native compatibility run has complete packet evidence and late correlated queue/candidate-counter activity without observed restart",
       "current": "Own MCU dispatcher2c1b96 observes exactly74x4,8ax1,87x1,8bx1. Type8b arrives49.097797s with162 body bytes, leading0080 and40 channel/signed-value pairs at-129/-130. Candidate1262/1263 is zero through45s;65->90 and90->100 increments5417/2166 equal producer and consumer write deltas with drained late cursors. Fields1344/1266 remain0 and219b=0574. No reset/restart is observed through105s. Own live45s program is SHA256 b03957d9a60e9e3048826fa16fc407422b87407688cbc0cab75ee31a95f6a89e;2420 targets0a8d and the comparison fragment is at0b25, not sibling0ae6. The checker also requires own flash, native record validity, physical PIN/phone/Menu, exact Menu pixels and unchanged card. Physical RF/sample semantics, fitted mask, native registration/speech and longer stability remain unaccepted. The next boundary is observing the own comparison return and port27 input, not importing a sibling address or injecting a score.",
