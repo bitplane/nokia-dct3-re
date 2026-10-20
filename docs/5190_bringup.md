@@ -227,6 +227,25 @@ boundary `{startup_reason=0a, phase=06, reports=0e, column_mask=3f}` and asks
 for deliberate review if it changes. This protects the observed incomplete
 state, not a requirement that a future faithful phone remain blocked.
 
+### External reference leads, not provisioning evidence
+
+The [independent emulator's current coverage table](https://github.com/djr-747/nokia-dct3-emulator/blob/main/docs/MODELS.md)
+reports 5190 standby. Its current product profile still uses an NSE-1 donor
+EEPROM and security-settings repairs, so that outcome is not a forcing-free,
+own-storage comparison for this configuration. The useful testable lead is
+its security-record interpretation: candidate eight-byte directory records
+in the own image at `2cc0b2` and `2cc0ba` contain respectively
+`0701 04a8 0008 0000` and `0702 04b0 0030 0000`. This independently confirms
+the matching source bytes, not yet the directory reader, field semantics,
+or valid factory contents. In particular, `04b0+1f=04cf` is an address
+relationship, not permission to clear a purported lock field. Recover the
+own reader/validator before constructing any fixture; no donor bytes are
+admitted.
+
+Public catalogues also list a [5190 system-module document, `sysa3.pdf`](https://www.eserviceinfo.com/downloadsm/233124/NOKIA_sysa3.html).
+Its contents have not been acquired or verified here; the listing alone
+does not establish ADC nets or fitted component identities.
+
 Fresh passive runs observe the following without firmware RAM/MMIO writes:
 
 - runtime EEPROM descriptor is mode 1, page `20`, capacity `2000`;
