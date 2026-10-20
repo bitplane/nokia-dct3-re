@@ -10,6 +10,9 @@ machine.debugger:command('bpset 2823c4,r1>=100000 && r1<10ff00,{logerror "nsk3_p
 machine.debugger:command('bpset 266eb0,d@(r13+4)>=100000 && d@(r13+4)<10ff00 && w@(d@(r13+4))==13b8,{logerror "nsk3_packet_receive: task=%02x pointer=%08x header=%08x caller=%08x cycles=%016x observer_writes=0\\n",b@(r5+2),d@(r13+4),d@(d@(r13+4)),d@(r13+28),totalcycles;g}')
 machine.debugger:command('bpset 21a2ea,r5>=100000 && r5<10ff00,{logerror "nsk3_packet_consumer: pointer=%08x header=%08x owner=%08x state=%02x phase=%02x cache=%08x cycles=%016x observer_writes=0\\n",r5,d@r5,r6,b@(r6+14),b@(r6+19),d@(r4+28),totalcycles;g}')
 local writes=0
+machine.debugger:command('bpset 2882d4,1,{logerror "nsk3_service_result: value=%04x caller=%08x cycles=%016x observer_writes=0\\n",r6,d@(r13+10),totalcycles;g}')
+machine.debugger:command('bpset 2880b6,1,{logerror "nsk3_07e5_translate: object=%08x header=%08x input=%04x cycles=%016x observer_writes=0\\n",r4,d@r4,r6,totalcycles;g}')
+machine.debugger:command('bpset 266a2c,r1>=100000 && r1<300000 && w@r1==7e5,{logerror "nsk3_07e5_post: target=%02x pointer=%08x header=%08x caller=%08x cycles=%016x observer_writes=0\\n",r0,r1,d@r1,r14,totalcycles;g}')
 machine.debugger:command('bpset 287a38,r0==3e9,{logerror "nsk3_mode_construct: caller=%08x cycles=%016x observer_writes=0\\n",r14,totalcycles;g}')
 machine.debugger:command('bpset 266a2c,r1>=100000 && r1<110000 && w@r1==3e9,{logerror "nsk3_mode_post: target=%02x pointer=%08x header=%08x caller=%08x cycles=%016x observer_writes=0\\n",r0,r1,d@r1,r14,totalcycles;g}')
 machine.debugger:command('bpset 2144b0,1,{logerror "nsk3_radio_argument2: object=%08x header=%08x cycles=%016x observer_writes=0\\n",r8,d@r8,totalcycles;g}')

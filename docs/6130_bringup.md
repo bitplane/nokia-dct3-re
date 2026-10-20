@@ -604,10 +604,15 @@ not the observed cause. Do not edit the unrelated context pointers to test it.
 then post266a2c caller287d77 to mailbox0b withsameobject102eb4/header03e90100.
 The03e9 constructor table selects287d54, copying byte10a3d1 to message+2
 and10a3c5 to+3 (literals2880c4/2880c8), then a sequence byte to+4.
-The caller2541a2 follows receive helper287f70 and an exact07e5 comparison
-at254188 (literal25430c). This is a mapped07e5 ->03e9 ->043c route;
-the producer/semantics of07e5 and its causal relation to09ec remain open.
-No native response format should be inferred from this internal namespace.
+The active predecessor is receive-helper result07d6, not07e5:
+`tmp/nsk3-service-result` records07d6 at2882d4/caller25455f. Dispatcher
+table254578 entry29 points254188, whose07e5 comparison fails and reaches
+2540f2; that alternate path can rejoin254196 before03e9 construction.
+The observed construction caller remains2541a7. An earlier083b result
+returns to254181. The07e5 comparison is an alternate route, not proof of
+the input that executed; no07e5 queued post or2880b6 translation is observed
+through45s. The source/meaning of actual07d6 and its causal relation to09ec
+remain open. No native response format follows from this internal namespace.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
