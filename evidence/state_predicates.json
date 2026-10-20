@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_v671_phonebook_erase_cold_empty", "owner": "nsb1_sim_phonebook", "status": "satisfied",
+      "predicate": "A physically saved and cold-read SIM contact is physically erased and a fourth process verifies the durable empty book",
+      "current": "The four-process --erase gate saves ADA/123, independently cold-searches it, then physically selects Erase/One by one/ADA and confirms. Exactly one EF_ADN record-one UPDATE RECORD succeeds; all 1600 ADN bytes are erased and unrelated SIM storage is unchanged. A fourth qualified cold process performs an empty-name Search, reads record one without rewriting, renders exact No phone numbers pixels and preserves the entire card. Each phase checks native execution, receive activity, phone-code/menu input and unchanged executable flash. No contact storage is seeded or deleted by the harness. Fitted mask, nominal ADC, synthetic EEPROM and absent native network limits remain.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_phonebook_roundtrip.py", "tools/nsb1_phonebook_erase.lua", "tools/nsb1_phonebook_empty.lua", "tools/test_nsb1_phonebook_roundtrip.py"]
+    },
+    {
       "id": "nsb1_v671_sim_unblock_cold_pin", "owner": "nsb1_sim_security", "status": "satisfied",
       "predicate": "Physical PUK/new-PIN entry unblocks the laboratory SIM and a separate cold process verifies its persisted new PIN",
       "current": "The initial synthetic card changes only CHV1 retries to zero. Physical 12345678/4321/4321 yields exactly one A0 2C/9000, restores counters to 3/3/10/10 and persists only the expected new CHV1 credential. A qualified cold process copies own devices and physically submits 4321 for A0 20/9000, followed by the separate phone-code flow. The three-process wrong-PUK-first variant additionally proves 87654321 produces 9804, unchanged credentials and counters 0/3/9/10; those persisted devices cold-boot into successful correct-PUK recovery before the final new-PIN boot. All phases require reviewed exact frames, physical contacts, native execution and unchanged flash. The SIM card blocked failure text is not permanent-exhaustion evidence. PUK exhaustion, network registration and fitted-mask identity remain unproved.",

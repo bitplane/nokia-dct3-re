@@ -997,6 +997,16 @@ in this phase and requires unchanged ADN bytes, not just a pre-existing file.
 Both phases require native bootstrap, legal sustained CPU samples, nonzero
 receive activity and physical security/menu contact evidence.
 
+Add `--erase` to extend this to four independent processes. After cold
+readback, physical Erase / One by one selects ADA and confirms `Erase?`.
+Firmware performs exactly one successful record-one UPDATE RECORD; all
+1600 ADN bytes become erased, while unrelated SIM files remain unchanged.
+A fourth cold process physically submits an empty-name Search, renders
+`No phone numbers`, reads EF_ADN without any update, and leaves the complete
+SIM storage unchanged. Exact confirmation/empty-result frames, native and
+physical-input checks pass in all phases. No contact is removed by the
+harness.
+
 ```sh
 .venv/bin/python tools/nsb1_phonebook_roundtrip.py mame/mame roms \
   tmp/nsb1-contacts --checksum-control-from tmp/nsb1-rom4-comparison
@@ -1006,7 +1016,7 @@ The card's current 3570-byte storage includes append-only PLMN, SMSS and
 AoC fields after the unchanged ADN prefix. The shared phonebook checker now
 recognizes each complete layout while rejecting truncated intermediate sizes.
 No contact bytes are seeded, no live firmware memory is changed, and no donor
-storage is loaded. This accepts one physical SIM contact save/cold-read path,
+storage is loaded. This accepts physical SIM contact save/cold-read/delete,
 not handset-local storage, all editing operations, registration, calls or SMS.
 Fitted-mask, nominal-input and synthetic checksum/retry limitations remain.
 

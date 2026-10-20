@@ -6,7 +6,8 @@ import unittest
 from unittest.mock import patch
 
 from tools.nsb1_phonebook_roundtrip import (
-    SAVE_KEYS, check_frame, check_reloaded, check_saved, prepare_reload,
+    SAVE_KEYS, ERASE_KEYS, check_frame, check_reloaded, check_saved, prepare_reload,
+    check_empty_storage, check_erased,
 )
 from tools.sim_phonebook_check import CURRENT_NVRAM_LENGTH
 
@@ -60,6 +61,37 @@ class PhonebookRoundtripTest(unittest.TestCase):
             Image.new('RGB', (84, 48), 'white').save(path)
             with self.assertRaisesRegex(ValueError, 'frame mismatch'):
                 check_frame(path, '0' * 64)
+
+    def erase_trace(self,cold=False):
+        phase,keys = ('cold',('menu','menu')) if cold else ('erase',ERASE_KEYS)
+        return '\n'.join(f'nsb1_phonebook_erase: phase={phase} index={index} key={key} down={down} t=30.0 physical_only=1'
+            for index,key in enumerate(keys,1) for down in (1,0)) + (
+            '\nins=b2 p1=01 p2=04 p3=20 selected=6f3a' if cold else
+            '\nins=dc p1=01 p2=04 p3=20 selected=6f3a\nupdate fid=6f3a record=1 length=32\nSIM status ins=dc sw=9000')
+
+    def test_erase_requires_physical_confirmation_success_and_exact_blank_storage(self):
+        blank = b'\xff'*CURRENT_NVRAM_LENGTH
+        with patch('tools.nsb1_phonebook_roundtrip.check_frame') as frame:
+            check_erased(self.erase_trace(),blank,Path('.'))
+            self.assertEqual(frame.call_count,2)
+            for trace in (self.erase_trace().replace('index=7','index=6'),
+                          self.erase_trace().replace('sw=9000','sw=9804'),
+                          self.erase_trace()+'\nupdate fid=6f3a record=2 length=32'):
+                with self.subTest(trace=trace),self.assertRaises(ValueError):
+                    check_erased(trace,blank,Path('.'))
+        for card in (self.storage(),blank[:-1]):
+            with self.assertRaises(ValueError):
+                check_empty_storage(card)
+
+    def test_cold_empty_search_requires_read_and_forbids_write(self):
+        blank = b'\xff'*CURRENT_NVRAM_LENGTH
+        with patch('tools.nsb1_phonebook_roundtrip.check_frame') as frame:
+            check_erased(self.erase_trace(True),blank,Path('.'),cold=True)
+            frame.assert_called_once()
+            for trace in (self.erase_trace(True).replace('ins=b2','ins=f2'),
+                          self.erase_trace(True)+'\nupdate fid=6f3a record=1 length=32'):
+                with self.subTest(trace=trace),self.assertRaises(ValueError):
+                    check_erased(trace,blank,Path('.'),cold=True)
 
     def source(self, root):
         source = root / 'save'
