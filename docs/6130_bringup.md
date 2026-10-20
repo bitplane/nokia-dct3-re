@@ -99,6 +99,16 @@ meaning of the physical input still require decoding before any changed-input
 fixture. This observation does not authorize selecting an ADC value solely to
 cross the startup threshold.
 
+`nsk3_analog_contract.py` now anchors the boot4 conversion, signed limit
+comparisons, countdown path, scale literals and own channel table; mutation
+tests reject changes to every anchored fragment. Its independent read confirms
+the1500/232 scale and1800..5500 inclusive validator. Gain/offset are read at
+10fe34/10fe38. The saturated identity conversion is6614, matching the observed
+19d6; live coefficient values still need direct capture before promoting that
+match into a calibration claim. The existing NSK-1 nominal3.6-V/typical6.5-mV
+input is a possible explicitly labeled comparison, not measured NSK-3 data or
+an authorized product default.
+
 ## Own firmware inputs
 
 Source: `roms/archive-dct3-packages/nsk3_561.exe`, downloaded from
