@@ -240,6 +240,28 @@ remaining contract is how a real clock wake permits firmware service from
 this disabled-delivery lifecycle; neither forcing05 nor suppressing the
 physical wake source is an evidenced repair.
 
+The bounded post-wake flow is now independently captured by
+`nam2_c3_wake_flow_observe.lua`. After the 8.95 s physical IRQ wake, 64
+positive fetch observations cover 16 repetitions of supervisor PCs
+`2f85fa/2f860e/2f866a/2f8688` through approximately 8.952551 s.
+Every sampled CPSR has low byte `3f`: Thumb System mode with both ARM IRQ
+and FIQ masks clear. MAD2 control is `0a` throughout these observations;
+at 19 s IRQ0 is pending with nesting zero. This excludes a CPU CPSR
+mask leak within the measured continuation, not every CPU exception issue.
+The unobserved mid-routine POP is not used as negative execution evidence.
+
+`nam2_c3_wake_flow_check.py` also requires the C3 family, own checksum/release
+and persisted executable/PMM qualification. Its result explicitly denotes a
+known wake-without-delivery failure, not usable idle/input. It requires the
+physical contact and hardware wake, ordered complete flow census, unmasked
+CPU mode and late pending-key observation; changed or incomplete traces fail.
+No controller state, RAM or guest timer result is written by the observer.
+
+```sh
+.venv/bin/python tools/nam2_c3_wake_flow_check.py \
+  roms/noki2100/2100f521sharp.fls tmp/nam2-c3-wake-flow-qualified
+```
+
 Executable provenance is independently bounded by the acquired
 `NAM-2_MCU_v5.21.EXE` installer (SHA-256
 `8d53e0ccced4c510707ee752f2b66129f033fc8762082e7f4b29a80653d2d99a`).
