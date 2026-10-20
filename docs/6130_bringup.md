@@ -76,6 +76,29 @@ their lifecycle selection, and the corresponding unmask path, remain unresolved.
 Do not clear the mask as a fix: the next boundary is the firmware-owned caller
 and re-enable contract. The record/cold-storage gate also passes this capture.
 
+`tmp/nsk3-ui-second-group` identifies caller270506 (return27050b). Its
+startup receive join27052c observes37,c8,32,33,c8. The first low-nibble
+group10ff94 reaches6, satisfying2705d4. The second group10c42d changes
+00 ->08 ->0a ->0e, written by270550;2705e0 requires0f. Missing bit0 is
+selected specifically by incoming report14 at27055e, while16/15/17 select
+bits1/2/3. This is a real startup readiness gate, unlike the previously
+retired 3210 shutdown-report interpretation. The own report14 stub2a88f2
+posts `(1,14)` through266b7c; a direct Thumb caller was located at235962.
+Its surrounding state-machine path and external measurement inputs remain to
+be decoded. No report or readiness bit is synthesized by the observer.
+
+The analog trace `tmp/nsk3-analog-samples` resolves the immediate prerequisite:
+event26 repeatedly visits2358ec while byte10a689 remains0a. Routine27851a
+only decrements this ten-sample counter when278446 accepts both converted
+measurements in the inclusive range0708..157c. Observed samples are19d6/19d6
+and return0, above the upper bound. Consequently23592e..235962 does not publish
+the readiness report. Own reader2a989a maps source7 through table2c7a54
+(`00 04 05 06 07 03 01 02 02 01`) to CCONT ADC2; source8 is a cached sample,
+not necessarily a second physical channel. Conversion/calibration and the
+meaning of the physical input still require decoding before any changed-input
+fixture. This observation does not authorize selecting an ADC value solely to
+cross the startup threshold.
+
 ## Own firmware inputs
 
 Source: `roms/archive-dct3-packages/nsk3_561.exe`, downloaded from
