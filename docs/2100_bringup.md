@@ -94,6 +94,25 @@ Do not auto-write control `05`, alter software timer results or change the
 credential on this evidence. The accepted-code presentation and persistent
 storage are independent of this still-open idle/interrupt boundary.
 
+The extended capture `tmp/nam2-c3-idle-timer-late-20261020` excludes a
+stopped Timer 0 or permanently fixed interval of 2: the hardware counter
+advances from `068f` at 13 s to `0f22` at 30 s while software timestamp
+`10f9f8` remains `0672`. Eight separately capped guard samples after roughly
+20 s return an adjusted interval of zero, still declining deep sleep.
+IRQ0 from the 18 s physical contact remains pending. Waiting for this short
+timer or inventing a faster clock is therefore not an evidenced correction.
+
+Executable provenance is independently bounded by the acquired
+`NAM-2_MCU_v5.21.EXE` installer (SHA-256
+`8d53e0ccced4c510707ee752f2b66129f033fc8762082e7f4b29a80653d2d99a`).
+Gzip member `49aa6d` decodes 176 contiguous MCU records covering
+`200000..35ffff`; member `2080b8` decodes 72 matching PPM records covering
+`360000..3effff`. Together they equal all `0x1f0000` executable-prefix bytes
+of the Sharp-labelled full image, including the idle/control routines.
+This rules out a difference between those acquired executable sources, not
+cryptographic vendor authenticity or PMM provenance. Reproduce with
+`tools/nam2_v521_flash_contract.py IMAGE --installer INSTALLER`.
+
 ## Own v5.21 checksum fixture
 
 The complete Sharp-labelled v5.21 image (SHA-1

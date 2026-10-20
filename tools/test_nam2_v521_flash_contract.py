@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from tools.nam2_v521_flash_contract import inspect, select_family
+from tools.nam2_v521_flash_contract import inspect, select_family, check_package
 
 
 class Nam2FlashContractTest(unittest.TestCase):
@@ -30,3 +30,16 @@ class Nam2FlashContractTest(unittest.TestCase):
         candidate = result["intel_c3_top_candidate"]
         self.assertEqual(3, candidate["selected_family"])
         self.assertFalse(candidate["fitted_part_proven"])
+
+    def test_package_prefix_when_available(self):
+        root = Path(__file__).resolve().parents[1]
+        image = root / 'roms/noki2100/2100f521sharp.fls'
+        installer = root / 'roms/archive-dct3-packages/NAM-2_MCU_v5.21.EXE'
+        if not image.exists() or not installer.exists():
+            self.skipTest('acquired NAM-2 inputs not present')
+        report = check_package(installer.read_bytes(), image.read_bytes())
+        self.assertEqual(0x1f0000, report['equal_prefix_bytes'])
+        self.assertEqual(2, len(report['members']))
+        self.assertFalse(report['pmm_provenance_claim'])
+        with self.assertRaisesRegex(ValueError, 'installer'):
+            check_package(b'invalid', image.read_bytes())
