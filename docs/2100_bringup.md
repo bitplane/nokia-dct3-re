@@ -193,13 +193,26 @@ advances from `068f` at 13 s to `0f22` at 30 s while software timestamp
 20 s return an adjusted interval of zero, still declining deep sleep.
 IRQ0 from the 18 s physical contact remains pending. Waiting for this short
 timer or inventing a faster clock is therefore not an evidenced correction.
-The deep-sleep helper `2fad22`, not selected in those late samples, contains two explicit
-`STRH r0,[r2,#6]` writes to Timer 1 destination (`2fadac`, `2fadce`), first
-adding 50 and later applying division by 79. This is not a globally read-only
-register contract. The fresh no-SIM observer counts zero destination writes
-through 15 s and reads `7fff`, so these dormant stores do not explain the
-current pre-deep-sleep stall. Actual destination-write semantics remain open;
-the fixed-terminal model must not be promoted to complete NAM-2 sleep support.
+The deep-sleep helper `2fad22` reads Timer 1's counter and terminal value,
+but its stores at `2fadac/2fadce` target RAM `10f9fa`, not Timer-1 MMIO.
+Literal reload `2fada2` selects `2fae44=10f9f4`; it replaces the earlier
+MMIO base `2fae40=20000`. Both calls to signed divide `307098` preserve R2.
+The bounded runtime observer confirms both store PCs with base `10f9f4`,
+target `10f9fa` and low-halfword write masks. Sixteen observed stores match
+the software `+50` and modulo-79 remainder sequence, beginning `0032/0064/0015`.
+These are fractional software accounting, not a writable hardware destination
+or an absent MMIO side effect. They do not justify changing Timer 1's model.
+
+`nam2_v521_flash_contract.py` follows the literal and store register fields,
+checks both divide call targets and R2 save/restore, and exports
+`software_sleep_accounting_writers`. Its tests distinguish identical STRH
+opcodes with RAM versus MMIO base literals. Runtime qualification also retains
+the existing own-image/checksum/PMM and physical-wake boundary checks:
+
+```sh
+.venv/bin/python tools/nam2_c3_wake_flow_check.py \
+  roms/noki2100/2100f521sharp.fls tmp/nam2-c3-sleep-accounting --sleep-accounting
+```
 
 The whole-boot clock-write observer `tools/nam2_c3_clock_observe.lua` separates
 that late window from earlier idle work. A fresh own-checksum/no-SIM run

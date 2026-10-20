@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nam2_sleep_accounting_stores_write_timer1_destination",
+      "status": "disproven",
+      "hypothesis": "NAM-2 stores at 0x2fadac and 0x2fadce write MAD2 Timer-1 destination 0x20006 and require a writable hardware model",
+      "conclusion": "Both stores use the reloaded R2 base from literal 0x2fae44=0x10f9f4, not the routine's earlier MMIO base at 0x2fae40. Both signed-divide calls target 0x307098, whose prologue and both exits preserve R2. The effective target is RAM 0x10f9fa. A bounded physical-wake run observes both PCs, R2=0x10f9f4 and sixteen low-halfword RAM stores matching +50/modulo-79 accounting, beginning 0x32,0x64,0x15. The old extractor and writable-Timer-1 claim are retired. An opcode plus displacement is not an effective-address proof; this does not settle global interrupt restoration or all possible Timer-1 writers.",
+      "evidence": ["docs/2100_bringup.md", "docs/mad2_fidelity.md", "tools/nam2_v521_flash_contract.py", "tools/test_nam2_v521_flash_contract.py", "tools/nam2_c3_sleep_accounting_observe.lua", "tools/nam2_c3_wake_flow_check.py", "tools/test_nam2_c3_wake_flow_check.py"]
+    },
+    {
       "id": "nsm1_phone_erase_rebuilds_sim_list_name",
       "status": "disproven",
       "hypothesis": "The selected SIM list name is malformed or blank and needs cache reconstruction by Phone-memory erasure",

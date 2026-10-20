@@ -7,6 +7,28 @@ import sys
 if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from tools.nam2_c3_checkpoint_check import check_boot,check_pmm
+from tools.nam2_v521_flash_contract import inspect
+
+
+def check_accounting(trace,contract):
+    if len(contract['stores'])!=2 or any(row['is_mad2_mmio'] for row in contract['stores']):
+        raise ValueError('accounting contract is not the two RAM stores')
+    rows=re.findall(r'nam2_sleep_accounting: index=(\d+) pc=([0-9a-f]{8}) base=([0-9a-f]{8}) target=([0-9a-f]{8}) value=([0-9a-f]{4}) mask=([0-9a-f]{8}) t=([0-9.]+) observer_writes=0',trace)
+    if len(rows)!=16 or len(rows)!=trace.count('nam2_sleep_accounting:'):
+        raise ValueError('bounded RAM accounting census is incomplete')
+    expected_pc=int(contract['stores'][0]['address'],16)
+    previous=0;timestamp=0
+    add,reduce=(int(row['address'],16) for row in contract['stores'])
+    targets={int(row['target'],16) for row in contract['stores']}
+    for index,(number,pc,base,target,value,mask,time) in enumerate(rows,1):
+        if int(number)!=index or int(pc,16)!=expected_pc or int(base,16)!=int(contract['base'],16) or int(target,16) not in targets or mask!='0000ffff':
+            raise ValueError('sleep-accounting writer/base/byte lane differs')
+        want=(previous+contract['increment'])&0xffff if expected_pc==add else previous%contract['divisor']
+        if int(value,16)!=want or not timestamp<float(time):
+            raise ValueError('sleep-accounting arithmetic or write order differs')
+        previous=want;timestamp=float(time)
+        expected_pc=reduce if int(pc,16)==add and want>=contract['divisor'] else add
+    return {'bounded_ram_stores':16,'target':sorted(targets),'hardware_timer_write':False}
 
 
 def check_flow(trace):
@@ -43,12 +65,16 @@ def check_flow(trace):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image',type=Path);parser.add_argument('run',type=Path)
+    parser.add_argument('--sleep-accounting',action='store_true')
     args=parser.parse_args()
     try:
         trace=(args.run/'error.log').read_text()
+        source=args.image.read_bytes()
+        contract=inspect(source)
         check_boot(trace)
-        check_pmm(args.image.read_bytes(),(args.run/'nvram/nam2c3_1/flash').read_bytes())
+        check_pmm(source,(args.run/'nvram/nam2c3_1/flash').read_bytes())
         print(check_flow(trace))
+        if args.sleep_accounting:print(check_accounting(trace,contract['software_sleep_accounting_writers']))
     except (OSError,ValueError) as error:
         print(f'NAM-2 wake-flow observation failed: {error}',file=sys.stderr);return 1
     print('Known wake-without-delivery boundary reproduced; not idle/input acceptance')

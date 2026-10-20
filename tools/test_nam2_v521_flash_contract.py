@@ -1,10 +1,36 @@
 import unittest
+import struct
 from pathlib import Path
 
-from tools.nam2_v521_flash_contract import inspect, select_family, check_package
+from tools.nam2_v521_flash_contract import inspect, select_family, check_package, sleep_accounting_contract
 
 
 class Nam2FlashContractTest(unittest.TestCase):
+    def accounting_image(self):
+        image=bytearray(0x10714a)
+        for address,word in ((0x2fada2,0x4a28),(0x2fada6,0x3032),(0x2fadba,0x234f),(0x2fadac,0x80d0),(0x2fadce,0x80d0),
+                             (0x307098,0xb43c),(0x307140,0xbc3c),(0x307146,0xbc3c)):
+            struct.pack_into('>H',image,address-0x200000,word)
+        struct.pack_into('>I',image,0xfae44,0x10f9f4)
+        image[0xfadbe:0xfadc2]=bytes.fromhex('f00cf96b')
+        image[0xfadca:0xfadce]=bytes.fromhex('f00cf965')
+        return image
+
+    def test_store_opcode_does_not_determine_memory_owner(self):
+        image=self.accounting_image()
+        report=sleep_accounting_contract(image)
+        self.assertEqual(['0x10f9fa']*2,[row['target'] for row in report['stores']])
+        struct.pack_into('>I',image,0xfae44,0x20000)
+        report=sleep_accounting_contract(image)
+        self.assertEqual(['0x20006']*2,[row['target'] for row in report['stores']])
+        self.assertTrue(all(row['is_mad2_mmio'] for row in report['stores']))
+
+    def test_base_register_and_callee_preservation_are_required(self):
+        for offset,word in ((0xfada2,0x4b28),(0xfadac,0x80c8),
+                            (0x107140,0xbc38),(0xfadc0,0xf96a)):
+            image=self.accounting_image();struct.pack_into('>H',image,offset,word)
+            with self.assertRaises(ValueError):sleep_accounting_contract(image)
+
     def test_last_match_wins(self):
         rows = [(1, 0xB0, 0xFFFF, 0xFFFF), (4, 0xB0, 0xEA, 0xFFFF)]
         self.assertEqual(1, select_family(rows, 0xB0, 0xD0, 0))
@@ -41,8 +67,13 @@ class Nam2FlashContractTest(unittest.TestCase):
         self.assertFalse(event['task_destination_proven'])
         self.assertFalse(event['initial_expiry_links_task'])
         self.assertEqual('0x2abcec', event['expiry'])
-        timer = result['timer1_destination_writers']
+        timer = result['software_sleep_accounting_writers']
         self.assertEqual(['80d0', '80d0'], [store['opcode'] for store in timer['stores']])
+        self.assertEqual('0x2fae44',timer['base_literal'])
+        self.assertEqual('0x10f9f4',timer['base'])
+        self.assertTrue(timer['divide_preserves_r2'])
+        self.assertEqual(['0x10f9fa']*2,[store['target'] for store in timer['stores']])
+        self.assertFalse(any(store['is_mad2_mmio'] for store in timer['stores']))
 
     def test_package_prefix_when_available(self):
         root = Path(__file__).resolve().parents[1]

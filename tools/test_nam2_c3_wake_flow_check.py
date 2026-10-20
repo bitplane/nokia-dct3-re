@@ -1,9 +1,36 @@
 import unittest
 
-from tools.nam2_c3_wake_flow_check import check_flow
+from tools.nam2_c3_wake_flow_check import check_flow,check_accounting
 
 
 class WakeFlowTest(unittest.TestCase):
+    def accounting_trace(self):
+        contract={'base':'0x10f9f4','increment':50,'divisor':79,'stores':[
+            {'address':'0x2fadac','target':'0x10f9fa','is_mad2_mmio':False},
+            {'address':'0x2fadce','target':'0x10f9fa','is_mad2_mmio':False}]}
+        state=0;reduce=False;trace=''
+        for index in range(16):
+            pc=0x2fadce if reduce else 0x2fadac
+            state=state%79 if reduce else (state+50)&0xffff
+            trace+=f'nam2_sleep_accounting: index={index+1} pc={pc:08x} base=0010f9f4 target=0010f9fa value={state:04x} mask=0000ffff t={8.918+index*.0001:.9f} observer_writes=0\n'
+            reduce=not reduce and state>=79
+        return trace,contract
+
+    def test_ram_accounting_follows_add_and_remainder(self):
+        trace,contract=self.accounting_trace()
+        self.assertFalse(check_accounting(trace,contract)['hardware_timer_write'])
+
+    def test_accounting_rejects_misattribution_or_changed_arithmetic(self):
+        trace,contract=self.accounting_trace()
+        for bad in (trace.replace('base=0010f9f4','base=00020000',1),
+                    trace.replace('target=0010f9fa','target=00020006',1),
+                    trace.replace('value=0032','value=0033',1),
+                    trace.replace('mask=0000ffff','mask=ffff0000',1),
+                    trace.replace('index=16','index=15')):
+            with self.assertRaises(ValueError):check_accounting(bad,contract)
+        contract['stores'][0]['is_mad2_mmio']=True
+        with self.assertRaises(ValueError):check_accounting(trace,contract)
+
     def setUp(self):
         self.trace='nam2_clock_early_key: down=1 t=8.95 physical_only=1\nnam2_clock_early_key: down=0 t=9.15 physical_only=1\n'
         self.trace+='mad2_sleep: event=wake domain=IRQ fiq=008 irq=001 timer0=0484 timer1=24f4 t=8.950000000 ctrl=0a\n'

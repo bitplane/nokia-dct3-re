@@ -148,6 +148,8 @@ Some recurring mistakes need stronger checks than ordinary source review:
   mode and live page/frame controls before naming a mapped register. On C54x,
   a short direct Smem operand inherits DP/CPL, while a literal dmad/MMR
   address may not; identical numeric fields can name different storage.
+  For register-based stores, follow the last dominating base reload and
+  callee preservation: a routine can reuse the same register for MMIO and RAM.
 - Zero-valued writes do not establish a clear operation. Decode the source
   and destination paths: a copy of zero-filled data can produce the same
   write trace. Keep copy source, copy destination and initializer length

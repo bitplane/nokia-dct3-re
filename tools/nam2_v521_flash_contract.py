@@ -55,6 +55,41 @@ def select_family(rows, manufacturer, device, third):
     return selected
 
 
+def sleep_accounting_contract(image):
+    """Follow the actual R2 literal reload, not the routine's earlier MMIO base."""
+    load=0x2fada2
+    opcode=struct.unpack_from('>H',image,load-BASE)[0]
+    if opcode&0xff00!=0x4a00:
+        raise ValueError('sleep-accounting R2 literal load differs')
+    literal=((load+4)&~3)+(opcode&0xff)*4
+    base=struct.unpack_from('>I',image,literal-BASE)[0]
+    increment=struct.unpack_from('>H',image,0x2fada6-BASE)[0]
+    divisor=struct.unpack_from('>H',image,0x2fadba-BASE)[0]
+    if increment&0xff00!=0x3000 or divisor&0xff00!=0x2300 or not divisor&0xff:
+        raise ValueError('sleep-accounting increment/divisor instructions differ')
+    for address in (0x2fadbe,0x2fadca):
+        hi,lo=struct.unpack_from('>2H',image,address-BASE)
+        displacement=((hi&0x7ff)<<12)|((lo&0x7ff)<<1)
+        if displacement&0x400000:displacement-=0x800000
+        if hi&0xf800!=0xf000 or lo&0xf800!=0xf800 or address+4+displacement!=0x307098:
+            raise ValueError('sleep-accounting divide call target differs')
+    # Both signed-divide exits restore R2 from the entry save set.
+    for address,word in ((0x307098,0xb43c),(0x307140,0xbc3c),(0x307146,0xbc3c)):
+        if struct.unpack_from('>H',image,address-BASE)[0]!=word:
+            raise ValueError('divide helper R2 preservation differs')
+    stores=[]
+    for address in (0x2fadac,0x2fadce):
+        word=struct.unpack_from('>H',image,address-BASE)[0]
+        if word&0xf800!=0x8000 or (word>>3)&7!=2 or word&7:
+            raise ValueError('sleep-accounting STRH source/base differs')
+        target=base+((word>>6)&31)*2
+        stores.append({'address':hex(address),'opcode':f'{word:04x}',
+                       'target':hex(target),'is_mad2_mmio':0x20000<=target<0x20100})
+    return {'helper':'0x2fad22','base_reload':hex(load),'base_literal':hex(literal),
+            'base':hex(base),'increment':increment&0xff,'divisor':divisor&0xff,
+            'divide_preserves_r2':True,'stores':stores}
+
+
 def inspect(image):
     if hashlib.sha1(image).hexdigest() != SHA1:
         raise ValueError("requires the unchanged acquired NAM-2 v5.21 image")
@@ -94,14 +129,7 @@ def inspect(image):
             "dispatch_slots": "0x10fac8",
         },
         "erase_geometry": "not established by algorithm selection",
-        "timer1_destination_writers": {
-            "register": "0x20006", "helper": "0x2fad22",
-            "stores": [{"address": hex(address),
-                        "opcode": image[address - BASE:address - BASE + 2].hex()}
-                       for address in (0x2fadac, 0x2fadce)],
-            "execution_requires": "deep-sleep guard 0x2fac86 succeeds",
-            "write_semantics": "unresolved; current MAD2 model retains fixed 0x7fff",
-        },
+        "software_sleep_accounting_writers": sleep_accounting_contract(image),
         "idle_irq3_event": {
             "handler": "0x3075c8", "schedule": "0x2abaf4",
             "cancel": "0x2ab970", "event": 0x79, "delay": 0x4b,
