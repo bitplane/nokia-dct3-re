@@ -1498,6 +1498,24 @@ offsets are retained in the run manifest. Retire this control as a bring-up
 instrument once product-matched calibrated storage supplies its replacement;
 retain the decoded integrity formulas and this negative result.
 
+### Local fixed-dialling permission
+
+The research native-mask composition enforces the saved FDN record A/12346
+through physical single-Navi input. With FDN enabled, dialling 12346 reaches
+call-progress UI, while 54321 displays `Call not allowed`. After menu-driven
+FDN disable and a cold restart, the same 54321 reaches the same call-progress
+frame as the listed-number control. Each dial preserves the complete card;
+the enable/disable cycles change only the ADN-validity byte. Cold storage,
+own native execution and the SIM identity-rehabilitation handshake are gated.
+This is local permission handling, not registration, connection or speech.
+
+```sh
+.venv/bin/python tools/nsb1_fdn_dial_check.py tmp/nsb1-fdn-edit-cold \
+  tmp/nsb1-fdn-dial-enabled tmp/nsb1-fdn-dial-listed \
+  tmp/nsb1-fdn-dial-unlisted tmp/nsb1-fdn-dial-off \
+  tmp/nsb1-fdn-dial-unlisted-off
+```
+
 ### Empty-socket SIMI boundary
 
 Own routine `29cde8` resets SIMI at `20038`, configures `2003a`, writes
