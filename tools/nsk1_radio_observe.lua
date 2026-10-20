@@ -28,6 +28,12 @@ end
 machine.debugger:command('focus :maincpu')
 machine.debugger:command('observe :dsp_c54x:cpu')
 machine.debugger:command('bpset 295136,1,{logerror "nsk1_radio_reset_request: reason=%08x caller=%08x observer_writes=0\\n",r0,r14;g}')
+machine.debugger:command('bpset 289434,r0==68,{logerror "nsk1_supervisor_reason_set: reason=%02x caller=%08x observer_writes=0\\n",r0,r14;g}')
+machine.debugger:command('bpset 22ee70,r0==d3||r0==d5,{logerror "nsk1_supervisor_event: input=%04x observer_writes=0\\n",r0;g}')
+machine.debugger:command('bpset 22effe,1,{logerror "nsk1_supervisor_reset_path: event=d5 reason=%02x observer_writes=0\\n",b@r6;g}')
+machine.debugger:command('bpset 22f10e,1,{logerror "nsk1_supervisor_reset_path: event=d3 counter=%02x observer_writes=0\\n",b@(r4+6e);g}')
+machine.debugger:command('bpset 2942c0,1,{logerror "nsk1_dsp_liveness_check: count=%04x observer_writes=0\\n",w@(r5+2);g}')
+machine.debugger:command('bpset 28c2b2,r0==1,{logerror "nsk1_dsp_liveness_fault: kind=1 caller=%08x observer_writes=0\\n",r14;g}')
 machine.debugger:command('temp7=0')
 machine.debugger:command('bpset 27341a,d@r13>=100000&&d@r13<110000&&b@(d@r13+3)==8b&&temp7<8,{temp7=temp7+1;logerror "nsk1_radio_receive_return: object=%08x header=%08x caller=%08x observer_writes=0\\n",d@r13,d@(d@r13),d@(r13+14);g}')
 machine.debugger:command('temp6=0')
@@ -81,6 +87,32 @@ for _,address in ipairs({'20bbf4','20aa2e','20aa98','20ab48','20bd02'}) do
     machine.debugger:command('bpset '..address..',temp3<30,{temp3=temp3+1;logerror "nsk1_radio_task15_stage: pc=%08x input=%04x owner=%08x state=%04x mode=%02x caller=%08x observer_writes=0\\n",pc,r9,r4,w@(r4+42),b@(r4+1),r14;g}')
 end
 local counts = {tx=0,rx=0}
+local liveness_writes = 0
+_G.nsk1_liveness_counter = memory:install_write_tap(0x10bf88,0x10bf8b,'nsk1_dsp_liveness_counter',function(_,data,mask)
+    if machine.time:as_double() < 20 or (mask & 0xffff) == 0 then return end
+    liveness_writes = liveness_writes + 1
+    if liveness_writes > 32 then return end
+    machine:logerror(string.format('nsk1_dsp_liveness_write: value=%04x pc=%08x t=%.9f observer_writes=0\n',
+        data & 0xffff,cpu.state['PC'].value,machine.time:as_double()))
+end)
+local supervisor_counts, supervisor_last = {}, {}
+local supervisor_taps = {}
+for _, field in ipairs({{0x10fde8,0x10fdea,8},{0x10fdec,0x10fdef,0}}) do
+    supervisor_taps[#supervisor_taps+1] = memory:install_write_tap(field[1],field[1]+3,
+        'nsk1_supervisor_'..field[2],function(_,data,mask)
+            local lane = 0xff << field[3]
+            if (mask & lane) == 0 then return end
+            local value = (data >> field[3]) & 255
+            if supervisor_last[field[2]] == value then return end
+            supervisor_last[field[2]] = value
+            local count = (supervisor_counts[field[2]] or 0) + 1
+            supervisor_counts[field[2]] = count
+            if count > 64 then return end
+            machine:logerror(string.format('nsk1_supervisor_write: address=%08x value=%02x pc=%08x t=%.9f observer_writes=0\n',
+                field[2],value,cpu.state['PC'].value,machine.time:as_double()))
+        end)
+end
+_G.nsk1_supervisor_taps = supervisor_taps
 local queue_writes = 0
 _G.nsk1_radio_queue = memory:install_write_tap(0x109f28,0x109f2b,'nsk1_radio_queue',function(_,data)
     queue_writes = queue_writes + 1

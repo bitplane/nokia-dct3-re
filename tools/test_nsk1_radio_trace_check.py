@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsk1_radio_trace_check import check
+from tools.nsk1_radio_trace_check import check, diagnose_liveness_reset
 
 
 def fixture():
@@ -19,6 +19,32 @@ def fixture():
 
 
 class NativeRadioTraceTest(unittest.TestCase):
+    def liveness_fixture(self):
+        return '\n'.join([
+            'nsk1_supervisor_write: address=0010fdea value=01',
+            'nsk1_supervisor_write: address=0010fdea value=00',
+            'nsk1_dsp_liveness_check: count=0001',
+            'nsk1_dsp_liveness_check: count=0001',
+            'nsk1_dsp_liveness_check: count=0000',
+            'nsk1_dsp_liveness_fault: kind=1 caller=00294191',
+            'nsk1_supervisor_reason_set: reason=68 caller=0028c351',
+            'nsk1_supervisor_reset_path: event=d5 reason=68',
+            'nsk1_radio_reset_request: reason=00000068 caller=0022f117'])
+
+    def test_liveness_diagnosis_is_explicitly_a_failure(self):
+        result = diagnose_liveness_reset(self.liveness_fixture())
+        self.assertFalse(result['long_run_stability_proved'])
+        self.assertFalse(result['idle_counter_threshold_cause'])
+
+    def test_liveness_diagnosis_requires_the_empty_window(self):
+        with self.assertRaises(ValueError):
+            diagnose_liveness_reset(self.liveness_fixture().replace('count=0000', 'count=0001'))
+
+    def test_liveness_diagnosis_rejects_idle_threshold_and_wrong_caller(self):
+        for old, new in [('value=01', 'value=0f'), ('caller=00294191', 'caller=00294195')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                diagnose_liveness_reset(self.liveness_fixture().replace(old, new))
+
     def test_qualified_boundary_is_not_registration(self):
         result = check(fixture())
         self.assertEqual([1, 2, 8, 3], result['pending_indexes'])

@@ -3,10 +3,17 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsk1_reason68_reset_is_d3_idle_counter_threshold",
+      "status": "disproven",
+      "hypothesis": "The late reason68 reset is caused by timerd3 counter10fdea reaching threshold15 because supervised byte10fdef stays zero",
+      "conclusion": "Changed-write observation avoids repeated-zero cap exhaustion and shows counter10fdea only rising to1 at31/62/93 seconds, then clearing through282a50 from idle2893b2. Exact reset-path traces select eventd5 via22effe, not the d3 threshold tail22f10e. DSP packet counter10bf8a instead has timerdd windows1,1,0; the zero window calls28c2b2 from29418c and writes reason68 before delayed d5 reset. A shared reset callsite does not establish ownership of its predecessor branch. Byte10fdef also has multi-valued protocol-state uses; no periodic heartbeat format follows from it.",
+      "evidence": ["docs/5130_bringup.md", "tools/nsk1_radio_observe.lua", "tools/nsk1_radio_contract.py", "tools/nsk1_radio_trace_check.py", "tools/test_nsk1_radio_trace_check.py"]
+    },
+    {
       "id": "nsk1_late_reason68_reset_requires_network_search_or_quit",
       "status": "disproven",
       "hypothesis": "Manual network selection or its physical Quit action causes the observed late reason-68 reboot",
-      "conclusion": "Matched101-second initialized cold processes use the same own persistent source and native compatibility inputs. The search/Quit run and unattended control both call295136 with reason68 from22f117 and request MCU reset at93.974106s. Quit at90s visibly dismisses Searching before the reboot, but is not necessary for the failure. Own timerd3 supervision checks heartbeat10fdef and counter10fdea; producer and transport ownership remain unresolved, so this does not establish a DSP or CCONT cause. The99s phone-code prompt must not be accepted as normal menu return.",
+      "conclusion": "Matched101-second initialized cold processes use the same own persistent source and native compatibility inputs. The search/Quit run and unattended control both call295136 with reason68 from22f117 and request MCU reset at93.974106s. Quit at90s visibly dismisses Searching before the reboot, but is not necessary for the failure. Later predecessor traces identify empty DSP packet-counter windowdd and delayed reset eventd5; independent d3 idle supervision is not the cause. The99s phone-code prompt must not be accepted as normal menu return.",
       "evidence": ["docs/5130_bringup.md", "tools/nsk1_network_search.py", "tools/nsk1_network_cancel_input.lua", "tools/nsk1_radio_observe.lua", "tools/test_nsk1_network_search.py"]
     },
     {

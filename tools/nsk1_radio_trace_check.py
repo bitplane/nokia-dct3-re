@@ -49,12 +49,40 @@ def check(text):
             'live_rssi_stack': True, 'registration_proved': False, 'rf_validity_proved': False}
 
 
+def diagnose_liveness_reset(text):
+    counts = re.findall(r'nsk1_dsp_liveness_check: count=([0-9a-f]{4})', text)
+    if counts != ['0001', '0001', '0000']:
+        raise ValueError('expected two active packet windows followed by an empty window')
+    position = 0
+    for marker in ('nsk1_dsp_liveness_check: count=0000',
+                   'nsk1_dsp_liveness_fault: kind=1 caller=00294191',
+                   'nsk1_supervisor_reason_set: reason=68 caller=0028c351',
+                   'nsk1_supervisor_reset_path: event=d5 reason=68',
+                   'nsk1_radio_reset_request: reason=00000068 caller=0022f117'):
+        position = text.find(marker, position)
+        if position < 0:
+            raise ValueError('missing ordered native liveness-reset predecessor: ' + marker)
+        position += len(marker)
+    if 'nsk1_supervisor_reset_path: event=d3' in text:
+        raise ValueError('independent idle-supervision reset also observed')
+    before_reset = text.split('nsk1_radio_reset_request:', 1)[0]
+    idle_counts = re.findall(r'nsk1_supervisor_write: address=0010fdea value=([0-9a-f]{2})', before_reset)
+    if not idle_counts or max(int(value, 16) for value in idle_counts) >= 15:
+        raise ValueError('idle counter exclusion is missing or contradicted')
+    return {'observed_failure': 'native DSP packet-liveness reset', 'reset_reason': '0x68',
+            'packet_windows': [1,1,0], 'idle_counter_threshold_cause': False,
+            'long_run_stability_proved': False}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
+    parser.add_argument('--diagnose-liveness-reset', action='store_true',
+                        help='classify the known late failure; does not qualify stability')
     args = parser.parse_args()
     try:
-        print(json.dumps(check(args.log.read_text()), indent=2))
+        checker = diagnose_liveness_reset if args.diagnose_liveness_reset else check
+        print(json.dumps(checker(args.log.read_text()), indent=2))
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSK-1 radio boundary: FAIL: {error}\n')
 

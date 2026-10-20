@@ -56,13 +56,28 @@ late failure is not caused by cancellation. Captures:
 `tmp/nsk1-network-cancel-reset-source` and
 `tmp/nsk1-radio-late-watchdog-control`.
 
-Own supervisory timer dispatcher 22ee70 maps input d3 to 22f04c. This
-path increments counter byte 10fdea when byte 10fdef is zero and resets the
-counter when nonzero; threshold 15 reaches reset request 295136 via 22f112.
-The reset reason is read from 10ff7c. These facts establish a supervisory
-heartbeat failure, not DSP ownership: the heartbeat's legitimate producer
-and its service/transport contract remain open. Do not import another ROM's
-watchdog event number, inject heartbeat traffic or disable this guard.
+The reset is native DSP packet-activity supervision. Dispatcher 294180
+owns counter 10bf8a, incremented at 294196 for received packets. Timer dd
+checks it at 2942c0: a zero count selects 29418a ->28c2b2(argument 1).
+The policy writes reason 68 at 28c34c, then delayed event d5 reaches
+22ef78/22effe and reset request 295136. Nonzero windows clear the counter
+at 2942d0 and rearm timer id1d with ticks09cd. Qualified capture
+`tmp/nsk1-native-liveness-contract` observes windows 1,1,0: clear at
+31.000230s, the native8b increments to1 at38.791914s, clear at62.001171s,
+then the empty window faults. The explicit failure diagnostic is:
+
+```sh
+.venv/bin/python -m tools.nsk1_radio_trace_check LOG --diagnose-liveness-reset
+```
+
+Independent timer d3 is not the cause. Its counter 10fdea only rises to1
+and is cleared at282a50 from the idle loop2893b2; it never reaches its
+threshold15 in the changed-write capture. Byte10fdef has multi-valued
+protocol-state uses, not an established periodic heartbeat contract. The
+shared reset tail22f112 must not be used to assign d3 ownership to d5.
+The next boundary is the native DSP's legitimate post-RSSI packet-producing
+lifecycle. No arbitrary periodic packet, disabled watchdog, counter poke or
+imported heartbeat format is justified by this liveness requirement alone.
 
 Ordinary erased storage remains a failed-startup control. The record-only
 and checksum-only fixtures remain blank, with checklists `0a` and `0e`.

@@ -94,6 +94,8 @@ def analyze(image):
                    0x26e410:0x05dd,0x24dac4:0x07ea,0x24dd48:0x05dd,
                    0x26e8a8:0x07ea,0x26e79c:0x109f24,
                    0x26e8a0:0x05ee,0x26e78c:0x07d4,0x26e790:0x05e1})
+    checks.update({0x2942d4:0x10bf88,0x2942d8:0x09cd,
+                   0x22ee90:0x22ef78,0x22f254:0x10ff7c,0x22f260:0x10fd7c})
     for address,value in checks.items():
         if word(address) != value:
             raise ValueError(f'own dispatch/control literal differs at {address:08x}')
@@ -201,6 +203,14 @@ def analyze(image):
                                     'mode2_call':'0x24ee1a',
                                     'mode2_condition':'owner byte +0x0a is neither 2 nor 3; otherwise receive mode 1',
                                     'scope':'checked direct queue path; alias writes and upstream request eligibility remain open'},
+            'late_dsp_liveness':{'counter':'0x10bf8a','increment':'0x294196',
+                                 'timer_input':'0x00dd','timer_selector':'0x2942ba',
+                                 'check':'0x2942c0','zero_branch':'0x29418a',
+                                 'fault_policy':'0x28c2b2 with argument 1',
+                                 'rearm_timer_id':'0x1d','rearm_ticks':'0x09cd','counter_clear':'0x2942d0',
+                                 'reason_set':'0x28c34c','delayed_reset_event':'0x00d5',
+                                 'delayed_reset_case':'0x22ef78','reset_tail':'0x22effe',
+                                 'scope':'packet-activity supervision; not proof that an arbitrary periodic packet is a faithful DSP contract'},
             'nested_completion_decoder':{'inputs':['0x05ea','0x05eb'],
                                           'helper_case':'0x26e4e4','buffer_pointer_offset':8,
                                           'selector':'buffer byte +4 low nibble equals 6',
