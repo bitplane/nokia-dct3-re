@@ -9,6 +9,7 @@ if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from tools.extract_dct3_wintesla import extract_records
 from tools.nsk1_static_check import read_catalogue
+from tools.dct3_eeprom_descriptor import eeprom_geometry
 
 PROFILES={
     'boot4':('nsk3__05.61',0xc7e00,0x2ae384,4,
@@ -18,6 +19,44 @@ PROFILES={
              'b5f1f652cd7d3591418bc23187dbe5cc1c287992e58921658bcb082bca6e48a5',
              '25bd572968c6e61718b50f68b5f32549ade7b921f18b64c0a222ddbc636acc99'),
 }
+
+PERIPHERAL_FRAGMENTS={
+    'eeprom_stop':(0x2a772a,'22012380029b33207819431170197919431171192004781943017019'),
+    'eeprom_start':(0x2a779c,'22012380029b33207819439170197919431171192004781943017019'),
+    'eeprom_input':(0x2a765e,'25802601270446a6200002ab3320791a781c43b2711a'),
+    'ccont':(0x2a8a62,'222821225411222a21044321541121295c0908c9d3fb212d5c08'),
+    'lcd_command':(0x2a8fa0,'21295c890849d3fb212c548846f7'),
+    'lcd_data':(0x2a9006,'21295c890849d3fb212b548846f7'),
+    'keypad_scan':(0x2aa788,'2031231f5503202f26e0550620305d0006c00ec006000e0125ff291f'),
+    'simi_init':(0x29916c,'213820ff550820c07220'),
+    'power_raw_compare':(0x2ac6ea,'2884d1f9'),
+}
+
+
+def peripheral_contract(image,variant):
+    shift=0 if variant=='boot4' else -0x10
+    sites={}
+    for name,(address,encoded) in PERIPHERAL_FRAGMENTS.items():
+        address+=shift
+        expected=bytes.fromhex(encoded)
+        if image[address-0x200000:address-0x200000+len(expected)] != expected:
+            raise ValueError(f'own NSK-3 {name} instruction contract differs')
+        sites[name]=hex(address)
+    if image[0xe4:0xec] != bytes.fromhex('e28f0001 e12fff10'):
+        raise ValueError('own NSK-3 ARM/Thumb interworking differs')
+    if image[0x16c:0x170] != bytes.fromhex('0010fa5c'):
+        raise ValueError('own NSK-3 stack literal differs')
+    geometry=eeprom_geometry(image[5])
+    if geometry['descriptor']!='0xf4':
+        raise ValueError('own NSK-3 EEPROM descriptor differs')
+    return {'instruction_sites':sites,'thumb_entry':'0x2000ec','stack_literal':'0x10fa5c',
+            'eeprom_geometry':geometry,'eeprom_sda_bit':0,'eeprom_scl_bit':2,
+            'gensio':{'select':'0x28','ccont_select_value':'0x22','command':'0x2a',
+                      'receive':'0x2d','status':'0x29','ready_bit':2,
+                      'lcd_command':'0x2c','lcd_data':'0x2b'},
+            'keypad':{'row_signal':'0x31','row_direction':'0x2f','column_input':'0x30','rows':5},
+            'simi_iir':'0x38','simi_control':'0x39',
+            'physical_wiring_or_timing_proved':False}
 
 
 def bootstrap_identity(payload):
@@ -65,6 +104,7 @@ def inspect(directory,variant):
             'flash_bytes':len(flash),'flash_sha1':hashlib.sha1(flash).hexdigest(),
             'flash_sha256':hashlib.sha256(flash).hexdigest(),
             'catalogue_address':hex(table),'catalogue':catalogue,
+            'peripheral_contract':peripheral_contract(flash,variant),
             'bootstrap_data_0803':identity,'bootstrap_resident_calls':[hex(x) for x in calls],
             'bootstrap_mask_compatibility_proved':False,
             'external_eeprom_acquired':False,'runtime_acceptance':False},flash

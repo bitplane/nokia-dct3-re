@@ -3,9 +3,12 @@
 ## Current result
 
 The acquired v5.61 installer contains two independently qualified MCU/PPM-A
-pairs. Both normalize to a1MiB flash extent200000..2fffff. No NSK-3 machine
-configuration or runtime acceptance is established. External EEPROM content,
-fitted flash/RAM geometry and DSP mask compatibility remain unproved.
+pairs. Both normalize to a1MiB flash extent200000..2fffff. Conservative
+`noki6130` executes both variants from erased external storage and renders
+the exact CONTACT SERVICE frame. The silent DSP leaves shared bootstrap
+cells unacknowledged; no usable boot, input or phone service is accepted.
+Factory EEPROM content, fitted flash/RAM geometry, display viewport and DSP
+mask compatibility remain unproved.
 
 ## Own firmware inputs
 
@@ -43,10 +46,52 @@ and8010 once; boot4 instead calls8023 twice and802b once. The checker anchors
 all three C54x CALL instructions. Resident ABI selection is therefore a real
 code difference, not merely alternative product text or a PPM choice.
 
+## Reset and peripheral contract
+
+Both images enter ARM at200040 and switch to Thumb at2000ec, with initial
+stack literal10fa5c. Header descriptorf4 declares two-byte EEPROM addresses,
+32-byte pages and8192-byte capacity. This is not the 5130's2KiB contract.
+The profile uses capacity-compatible trial flash and a bounded64KiB RAM
+decode covering the stack; neither is a fitted-part identification.
+
+The static checker anchors the own instruction fragments in both variants
+(boot3 code sites are10h lower than boot4):
+
+| boot4 site | Contract |
+| --- | --- |
+| `2a765e/2a772a/2a779c` | EEPROM SDA on PUP bit0, SCL on bit2 |
+| `2a8a62` | GENSIO select28/value22, command2a, RX2d, status29/ready bit2 |
+| `2a8fa0/2a9006` | LCD command2c/data2b |
+| `2aa788` | Five-row scanner, row31/direction2f/column30 |
+| `2ac6ea` | Raw power-key comparison84 |
+| `29916c` | SIMI IIR38/control39 initialization |
+
+The default mandatory DSP backend has disabled bootstrap and service
+contracts: it supplies neither a completion nor a foreign mask. Ordinary
+host key labels, physical timing and SIM operation remain unvalidated.
+
+## Cold execution checkpoint
+
+```sh
+make build
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame \
+  --run-dir tmp/nsk3-boot4-qualified -- noki6130 -bios 561a4 \
+  -rompath ../roms -video none -sound none -nothrottle -seconds_to_run 16 \
+  -log -autoboot_delay 0 -autoboot_script ../tools/nsk3_boot_observe.lua
+.venv/bin/python tools/nsk3_boot_check.py roms/noki6130/source \
+  tmp/nsk3-boot4-qualified --variant boot4
+```
+
+Use a fresh run directory. Boot3 uses BIOS561a3, a separate directory and
+`--variant boot3`. Both16-second runs retain unchanged executable flash and
+initialize the erased8KiB EEPROM to the same firmware-owned bytes. The5s/15s
+frames are identical CONTACT SERVICE. Shared cells remain0000/ffff/ffff/ffff
+after12 MCU writes; the sampled PC is the supervisor wait2a02f6..2a02fc
+(boot3 minus10h), not a direct DSP-poll instruction. No native, graphical
+idle or fitted-hardware claim follows from this failure presentation.
+
 ## Next boundary
 
-Recover reset/interworking, bootstrap publication and own memory/peripheral
-layout. Compare both loaders before choosing any native compatibility backend.
-Then establish a fail-closed configuration and measure its first unmet cold
-execution boundary. Do not inherit the 5130 hardware profile, EEPROM fixture
-or addresses from the NSK prefix or a shared descriptor shape.
+Recover the own loader's pre-upload acknowledgement and compare both resident
+ABI requirements before choosing a native compatibility instrument. Do not
+inject a bootstrap response or import 5130 EEPROM state to clear the frame.

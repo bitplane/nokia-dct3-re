@@ -1326,6 +1326,7 @@ public:
 	void noki5190(machine_config &config);
 	void nsb1r4t(machine_config &config);
 	void nsk1r4t(machine_config &config);
+	void noki6130(machine_config &config);
 	void noki6110(machine_config &config);
 	void nsm1r4t(machine_config &config);
 	void nse6stage(machine_config &config);
@@ -4167,6 +4168,31 @@ void nokia_dct3_state::nsb1r4t(machine_config &config)
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
 
+void nokia_dct3_state::noki6130(machine_config &config)
+{
+	dct3_base(config);
+	// Bounded research decode covers own initial stack 10fa5c and 1-MiB
+	// image. Fitted RAM capacity and flash-part identity remain unproved.
+	m_maincpu->set_addrmap(AS_PROGRAM, &nokia_dct3_state::dct3_nse3_map);
+	INTEL_28F800B3T(config.replace(), "flash");
+	// Own f4 descriptor: two-byte address, 32-byte pages, 8 KiB.
+	I2C_24C64(config, m_eeprom);
+	m_eeprom->set_write_cycle_time(attotime::from_msec(5));
+	m_pup->eeprom_sda_read_cb().set(m_eeprom, FUNC(i2cmem_device::read_sda));
+	m_pup->eeprom_sda_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_sda));
+	m_pup->eeprom_scl_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_scl));
+	nokia_product_config research;
+	research.pup_eeprom_scl_bit = 2;
+	// Own 2aa788 scan grammar and 2ac6ea raw-84 power comparison.
+	// Ordinary physical host key labels are not accepted yet.
+	research.keypad_wiring = { 5, 0x10, 0x31, 0x30, 0x33, 0x2f };
+	research.gensio_wiring = GENSIO_NSE1;
+	research.simi_controller = true;
+	apply_product_config(research);
+	// The mandatory backend remains silent: default bootstrap/service
+	// contracts are disabled, with neither completion nor a foreign mask.
+}
+
 void nokia_dct3_state::nsk1r4t(machine_config &config)
 {
 	dct3_base(config);
@@ -4556,6 +4582,20 @@ ROM_START( nsk1r4t )
 	ROM_REGION16_BE(0x20000, "dsp_data", ROMREGION_ERASE00)
 	ROM_LOAD("nse1_rom4_dsp_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))
+ROM_END
+
+ROM_START( noki6130 )
+	ROM_SYSTEM_BIOS(0, "561a4", "v05.61 PPM A (bootstrap identity 4)")
+	ROM_SYSTEM_BIOS(1, "561a3", "v5.61 PPM A (bootstrap identity 3)")
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
+	ROM_LOAD("nsk3_boot.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x100000, "flash", ROMREGION_ERASEFF)
+	ROMX_LOAD("6130-v561-boot4-a.fls", 0, 0x100000,
+			CRC(b1b871bc) SHA1(5469c8fe048036673124dd2aece4ef71da1cce22), ROM_BIOS(0))
+	ROMX_LOAD("6130-v561-boot3-a.fls", 0, 0x100000,
+			CRC(725d3a41) SHA1(bac9e599da510c97c59eca0412db987d7e0bf946), ROM_BIOS(1))
+	ROM_REGION(0x2000, "eeprom", ROMREGION_ERASEFF)
+	ROM_LOAD("nsk3_eeprom.bin", 0, 0x2000, NO_DUMP)
 ROM_END
 
 ROM_START( noki6110 )
@@ -5095,6 +5135,7 @@ SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empt
 SYST( 1998, noki5190, 0, 0, noki5190, noki5110, nokia_dct3_state, empty_init, "Nokia", "5190 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsb1r4t, noki5190, 0, nsb1r4t, nsb1r4t, nokia_dct3_state, empty_init, "Research", "NSB-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsk1r4t, 0, 0, nsk1r4t, nsk1r4t, nokia_dct3_state, empty_init, "Research", "NSK-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1998, noki6130, 0, 0, noki6130, noki5110, nokia_dct3_state, empty_init, "Nokia", "6130 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pcm, noki5110, 0, nse1pcm, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 8 kHz PCM frame fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1bit, noki5110, 0, nse1bit, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 1 MHz PCM wire fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pin, noki5110, 0, nse1pin, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 clocked boot-loopback fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
