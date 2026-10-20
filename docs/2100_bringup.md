@@ -217,6 +217,29 @@ transition, not another post-10s sample of the same declined guard. No clock
 or global-enable behavior is changed. Own executable and both stored identity
 checksums pass the existing `check_pmm` qualification.
 
+### First wake/delivery boundary
+
+Run the clock observer with `-verbose` to retain the device's actual
+sleep/wake decisions, not only the requested command. Fresh no-SIM capture
+`tmp/nam2-clock-guard-final` accepts sleep at8.918624385s. At9.000000000s
+the HLE peer enqueues idle type03 and signals FIQ0; MAD2 wakes the ARM with
+FIQ009, IRQ000 and control0a. The next stop request is rejected because
+that locally unmasked FIQ is still pending. At the first2c write, the queue
+head00101964 holds interval3, Timer0 is04ec and its software stamp04eb:
+the adjusted interval is2, explaining the later guard decline without
+postulating a stopped hardware timer.
+
+The independent physical control `tools/nam2_c3_clock_key_observe.lua` presses
+Keypad1 at8.95s, before that DSP tick. Capture `tmp/nam2-clock-key-final`
+wakes through IRQ with FIQ008/IRQ001 and control0a at8.950000000s; IRQ0
+remains pending at10s and19s. Both captures retain the own executable and
+valid identity/checksum storage. This rules out an HLE-packet-specific cause
+for the wake-without-service result. It does not establish automatic global
+enable, IRQ_SLEEP generation or control-register readback semantics. The
+remaining contract is how a real clock wake permits firmware service from
+this disabled-delivery lifecycle; neither forcing05 nor suppressing the
+physical wake source is an evidenced repair.
+
 Executable provenance is independently bounded by the acquired
 `NAM-2_MCU_v5.21.EXE` installer (SHA-256
 `8d53e0ccced4c510707ee752f2b66129f033fc8762082e7f4b29a80653d2d99a`).
