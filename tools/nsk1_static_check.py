@@ -39,6 +39,40 @@ def read_eeprom_output_contract(image, variant):
             'input_wiring_or_fitted_part_proved': False}
 
 
+def read_peripheral_contract(image, variant):
+    """Own GPIO input and serial instruction fragments, not electrical timing."""
+    shift = {'standard': 0, '2915': -0x10}[variant]
+    fragments = (
+        (0x29088e, '25802601270446a6200002ab3320791a781c43b2711a'),
+        (0x2908c8, '433c701c'),
+        (0x2908e6, '78194231d000432843bc701c086dd1d6'),
+        (0x291830, '4835222821225411222a21044321541121295c0908c9d3fb212d5c08'),
+        (0x291908, '00020000'),
+        (0x292172, '4a7621295c890849d3fb212c548846f7'),
+        (0x2921d8, '4a5c21295c890849d3fb212b548846f7'),
+        (0x29234c, '00020000'),
+        (0x2933f8, '2031231f5503202f26e0550620305d0006c00ec006000e0125ff291f'),
+        (0x293424, '203143d7550720305d0006c00ec006000e004681281f'),
+        (0x29346a, '2805dbe8203155021c4806000e012905dbcf'),
+        (0x293558, '00020000'),
+    )
+    for address, encoded in fragments:
+        offset = address+shift-0x200000
+        expected = bytes.fromhex(encoded)
+        if image[offset:offset+len(expected)] != expected:
+            raise ValueError('peripheral input/serial instruction contract differs')
+    return {'eeprom_read_entry': hex(0x290886+shift),
+            'eeprom_sda_input_register': '0x20020', 'eeprom_sda_input_bit': 0,
+            'ccont_select_offset': '0x28', 'ccont_select_value': '0x22',
+            'ccont_command_offset': '0x2a', 'ccont_receive_offset': '0x2d',
+            'serial_status_offset': '0x29', 'ccont_ready_bit': 2,
+            'lcd_data_offset': '0x2b', 'lcd_command_offset': '0x2c',
+            'lcd_ready_bit': 0, 'keypad_scan_entry': hex(0x2933c4+shift),
+            'keypad_rows': 5, 'keypad_row_signal_offset': '0x31',
+            'keypad_row_direction_offset': '0x2f', 'keypad_column_input_offset': '0x30',
+            'physical_key_mapping_proved': False, 'electrical_timing_proved': False}
+
+
 def read_catalogue(image,table):
     offset = table-0x200000
     if offset < 8 or offset+112 > len(image):
@@ -80,6 +114,7 @@ def inspect(image,variant):
         raise ValueError('startup interworking boundary differs')
     return {'variant':variant,'sha1':digest,'catalogue':catalogue,
             'eeprom_output_contract':read_eeprom_output_contract(image,variant),
+            'peripheral_contract':read_peripheral_contract(image,variant),
             'arm_entry':'0x200040','thumb_entry':'0x2000ec',
             'firmware_eeprom_geometry':eeprom_geometry(image[5]),
             'stack_literal':hex(int.from_bytes(image[0x16c:0x170],'big')),

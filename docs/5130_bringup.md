@@ -2,11 +2,14 @@
 
 ## Current boundary
 
-Own NSK-1 v5.61 service streams are qualified and normalized; no MAME
-configuration, graphical boot, input, SIM or radio acceptance is claimed.
-The own reset, loader selection and EEPROM output contracts are mapped
-below. The next step is a bounded native compatibility composition, with
-GENSIO/input wiring still to establish independently. Do not inherit
+Own NSK-1 v5.61 service streams are qualified and normalized. The explicitly
+labelled `nsk1r4t` native compatibility instrument runs both families with
+own erased EEPROM and acquired NSE-1 resident DSP input. The standard family
+reaches descriptor-0 transfers and native runtime; `2915` stops after its
+first loader exchange. Neither paints at five seconds. No graphical boot,
+physical input, SIM or radio acceptance is claimed.
+The next boundary is the standard family's runtime startup/self-test and
+the separate `2915` loader-result interpretation. Do not inherit
 NSE-1/NSB-1 EEPROM contents, DSP identities, acknowledgement counts or clocks.
 
 ## Acquired inputs
@@ -93,8 +96,21 @@ set SDA direction bit 0 at `20024`. The `2915` counterparts are `2909b6`
 and `290944`; their five checked GPIO instruction fragments are identical.
 `nsk1_static_check.py` checks those fragments on both pinned images, with
 mutation controls for each fragment. This establishes output wiring only:
-SDA input sampling, fitted EEPROM part/page wrap and electrical timing
-remain separate contracts, not inferred from the START/STOP routines.
+SDA input sampling is independently checked at reader `290886`: direction
+bit 0 is cleared at `20024`, SCL rises, and bit 0 is sampled at `20020`.
+Fitted EEPROM part/page wrap and electrical timing remain unproved.
+
+Own CCONT reader fragment `291830..29184a` selects `22` at `20028`, writes
+the command at `2002a`, polls bit 2 of `20029`, and receives at `2002d`.
+LCD helpers `292172/2921d8` use commands/data at `2002c/2002b`, polling
+bit 0 of `20029`. These match the shared GENSIO register contract.
+The keypad scanner `2933c4` separately uses row signal `31`, direction
+`2f`, column input `30` and five rows/columns; IRQ mask manipulation uses
+`33`. These do not overlap the serial interface. The default later-product
+keypad layout does overlap it and must not be retained for this composition.
+The static checker covers these own instruction fragments and both variants'
+literal base addresses. Physical key mapping and the compatibility
+power-on-column value `10` are not yet accepted.
 
 ```sh
 .venv/bin/python tools/nsk1_static_check.py roms/noki5130/5130f561a.fls
@@ -103,8 +119,8 @@ remain separate contracts, not inferred from the START/STOP routines.
 ```
 
 Both real images pass, along with initializer/payload/null-slot mutation
-controls. The next boundary is the own MCU's catalogue selection and DSP
-release/identity grammar; no release result has been synthesized.
+controls. The cold-transfer observations below preserve the own MCU's catalogue
+selection and DSP release/identity grammar; no release result is synthesized.
 
 ## Cold-transfer contract
 
@@ -139,3 +155,57 @@ spike against the acquired NSE-1 ROM4 input. Such a spike must keep own MCU
 and PPM bytes, erased own external storage, and bounded read-only upload/
 CPU observations. It must not promote board/clock/fitted-mask correctness
 from a successful handshake, or seed NSE-1 EEPROM to get past later checks.
+
+## Native compatibility observation
+
+`nsk1r4t` uses the own 1-MiB image, an initially erased 2-KiB serial EEPROM,
+the common boot-ROM substitution and the explicitly named NSE-1 program/data
+ROM inputs. The 52-MHz DSP clock, capacity-compatible flash/EEPROM parts,
+power-on column and default analog inputs are compatibility assumptions,
+not recovered NSK-1 board calibration. The bounded 64-KiB SRAM / 1-MiB flash
+map is reused from the existing NSE-3 extent, not a fitted-part attribution.
+No DSP HLE, synthetic SIM, radio/service responder or physical key sequence
+is enabled by this composition.
+
+```sh
+.venv/bin/python tools/nsk1_rom4_compare.py mame/mame roms tmp/nsk1-native-qualified
+.venv/bin/python tools/nsk1_rom4_compare.py mame/mame roms \
+  tmp/nsk1-2915-native-qualified --variant 2915
+```
+
+Each command requires a new isolated directory, pins all input hashes, checks
+the own first slot-25 upload byte-for-byte, retains the passive trace and
+five-second PNG, and verifies unchanged executable flash and EEPROM capacity.
+Its result is an observation report, **not** a graphical-boot acceptance gate.
+
+| Observation through five seconds | Standard | `2915` |
+| --- | --- | --- |
+| Own cold release PC | `273504` | `2734f4` |
+| First upload matches own slot 25 | Yes | Yes |
+| Descriptor-0 release observed | Twice, `273786` | No |
+| Total DSP releases | 3 | 1 |
+| Native illegal instruction sampled | No | No |
+| Final DSP PC | `408d` | `0f17` |
+| Final MCU PC | `289406` | `2893f8` |
+| Final presentation | Blank | Blank |
+
+The standard family's sampled early result is `0000/ffff/0004/0004`;
+`2915` reports `0000/ffff/0004/0003`. Their uploads are genuinely different;
+do not transfer the standard family's later progress to `2915` or infer
+which resident mask is fitted from either result alone. Standard native
+runtime records RF reads and completion strobes, but neither decoded RF
+reception nor speech is established.
+
+The final standard MCU PC belongs to the loop `289402..289408`, reading a
+firmware-owned byte after the startup/idle predicate chain, not the cold
+loader's sentinel wait. The next investigation should observe this loop's
+release and startup/self-test state, including whether the own LCD routines
+run. The `2915` loader-result branch is a separate static/runtime question.
+Unmapped writes to `600000/600100` are retained in the trace; they are not
+evidence for fitted writable storage there. Both experiments retain their
+blank frame rather than manufacturing a presentation or completion.
+
+Checkpoint validation: both isolated compatibility runs above reproduce;
+the NSB-1 native-bootstrap regression and default 3210 structural gate pass.
+All 24 MAME patches apply to the pinned upstream revision. The tools suite
+passes 3,725 tests with one skip; these do not establish NSK-1 UI support.

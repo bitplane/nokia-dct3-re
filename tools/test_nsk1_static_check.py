@@ -3,7 +3,7 @@ import struct
 import unittest
 from unittest.mock import patch
 
-from tools.nsk1_static_check import inspect,read_catalogue,read_eeprom_output_contract
+from tools.nsk1_static_check import inspect,read_catalogue,read_eeprom_output_contract,read_peripheral_contract
 
 
 class Nsk1StaticTest(unittest.TestCase):
@@ -32,7 +32,8 @@ class Nsk1StaticTest(unittest.TestCase):
         self.assertFalse(report['execution_or_mask_identity_proved'])
         profiles = {'test':(hashlib.sha1(image).hexdigest(),self.table)}
         with patch('tools.nsk1_static_check.PROFILES',profiles), \
-                patch('tools.nsk1_static_check.read_eeprom_output_contract',return_value={}):
+                patch('tools.nsk1_static_check.read_eeprom_output_contract',return_value={}), \
+                patch('tools.nsk1_static_check.read_peripheral_contract',return_value={}):
             result = inspect(image,'test')
             self.assertEqual('0x2000ec',result['thumb_entry'])
             self.assertFalse(result['boot_or_fitted_hardware_proved'])
@@ -84,6 +85,37 @@ class Nsk1StaticTest(unittest.TestCase):
                 image[offset] ^= 1
             with self.assertRaises(ValueError):
                 read_eeprom_output_contract(b'',variant)
+
+    def test_serial_and_input_fragments_fail_closed(self):
+        fragments = (
+            (0x29088e, '25802601270446a6200002ab3320791a781c43b2711a'),
+            (0x2908c8, '433c701c'),
+            (0x2908e6, '78194231d000432843bc701c086dd1d6'),
+            (0x291830, '4835222821225411222a21044321541121295c0908c9d3fb212d5c08'),
+            (0x291908, '00020000'),
+            (0x292172, '4a7621295c890849d3fb212c548846f7'),
+            (0x2921d8, '4a5c21295c890849d3fb212b548846f7'),
+            (0x29234c, '00020000'),
+            (0x2933f8, '2031231f5503202f26e0550620305d0006c00ec006000e0125ff291f'),
+            (0x293424, '203143d7550720305d0006c00ec006000e004681281f'),
+            (0x29346a, '2805dbe8203155021c4806000e012905dbcf'),
+            (0x293558, '00020000'),
+        )
+        for variant,shift in (('standard',0),('2915',-0x10)):
+            image = bytearray(0x100000)
+            for address,encoded in fragments:
+                start = address+shift-0x200000
+                image[start:start+len(bytes.fromhex(encoded))] = bytes.fromhex(encoded)
+            result = read_peripheral_contract(image,variant)
+            self.assertEqual(0,result['eeprom_sda_input_bit'])
+            self.assertEqual(2,result['ccont_ready_bit'])
+            self.assertFalse(result['electrical_timing_proved'])
+            for address,_ in fragments:
+                offset = address+shift-0x200000
+                image[offset] ^= 1
+                with self.subTest(variant=variant,address=address),self.assertRaises(ValueError):
+                    read_peripheral_contract(image,variant)
+                image[offset] ^= 1
 
 
 if __name__ == '__main__':

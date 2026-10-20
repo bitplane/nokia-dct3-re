@@ -401,6 +401,11 @@ constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE8 = { 4, 0x01 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE1 = {
 	5, 0x10, 0x31, 0x30, 0x33, 0x2f
 };
+// NSK-1 scanner 2933c4 independently uses these five-row GPIO registers.
+// Power-on column remains a compatibility input pending its key-table audit.
+constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSK1 = {
+	5, 0x10, 0x31, 0x30, 0x33, 0x2f
+};
 // NSM-1 v5.23 scanner 0x2c084c and special table 0x2e0b34.
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSM1 = {
 	5, 0x10, 0x31, 0x30, 0x33, 0x2f
@@ -1319,6 +1324,7 @@ public:
 	void noki5110(machine_config &config);
 	void noki5190(machine_config &config);
 	void nsb1r4t(machine_config &config);
+	void nsk1r4t(machine_config &config);
 	void noki6110(machine_config &config);
 	void nsm1r4t(machine_config &config);
 	void nse6stage(machine_config &config);
@@ -4140,6 +4146,35 @@ void nokia_dct3_state::nsb1r4t(machine_config &config)
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
 
+void nokia_dct3_state::nsk1r4t(machine_config &config)
+{
+	dct3_base(config);
+	// Minimum 64-KiB research decode covering own stack 10f370. The NSE-3
+	// map supplies that bounded extent, not a claim about fitted NSK-1 parts.
+	m_maincpu->set_addrmap(AS_PROGRAM, &nokia_dct3_state::dct3_nse3_map);
+	INTEL_28F800B3T(config.replace(), "flash");
+	// Own descriptor 92 declares one-byte addressing and 2 KiB. Fitted
+	// page geometry and timing remain unproved; start with erased storage.
+	I2C_24C16(config, m_eeprom);
+	m_eeprom->set_write_cycle_time(attotime::from_msec(5));
+	m_pup->eeprom_sda_read_cb().set(m_eeprom, FUNC(i2cmem_device::read_sda));
+	m_pup->eeprom_sda_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_sda));
+	m_pup->eeprom_scl_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_scl));
+	nokia_product_config research;
+	// Own 290886 samples SDA bit 0; START/STOP drive SCL bit 2.
+	research.pup_eeprom_scl_bit = 2;
+	research.keypad_wiring = KEYPAD_NSK1;
+	// Own 291830 selects 22 at 28, commands at 2a, polls 29 bit 2,
+	// receives at 2d; LCD command/data use 2c/2b at 292182/2921d8.
+	research.gensio_wiring = GENSIO_NSE1;
+	apply_product_config(research);
+	config.device_remove("dsp_hle");
+	// Explicit NSE-1 resident mask/clock compatibility input. No NSK-1
+	// fitted-mask, physical-clock, keypad or SIM acceptance is implied.
+	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
+}
+
 void nokia_dct3_state::noki6110(machine_config &config)
 {
 	dct3_base(config);
@@ -4470,6 +4505,26 @@ ROM_START( nsb1r4t )
 	ROM_REGION(0x2000, "eeprom", ROMREGION_ERASEFF)
 	ROM_LOAD("nsb1_eeprom.bin", 0, 0x2000, NO_DUMP)
 	// Explicit NSE-1 compatibility inputs, not relabeled NSB-1 dumps.
+	ROM_REGION16_BE(0x20000, "dsp_program", ROMREGION_ERASE00)
+	ROM_LOAD("nse1_rom4_dsp_program.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739))
+	ROM_REGION16_BE(0x20000, "dsp_data", ROMREGION_ERASE00)
+	ROM_LOAD("nse1_rom4_dsp_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))
+ROM_END
+
+ROM_START( nsk1r4t )
+	ROM_SYSTEM_BIOS(0, "561a", "v5.61 PPM A")
+	ROM_SYSTEM_BIOS(1, "561a2915", "v5.61 PPM A (2915 filename family)")
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
+	ROM_LOAD("nsk1_boot.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x100000, "flash", ROMREGION_ERASEFF)
+	ROMX_LOAD("5130f561a.fls", 0, 0x100000,
+			CRC(b7e976f7) SHA1(a2a99ec6c52104eebcbae281cf8e845bdc8ea1d9), ROM_BIOS(0))
+	ROMX_LOAD("5130f561a-2915.fls", 0, 0x100000,
+			CRC(7a6cb06a) SHA1(64068df6b7950b47f34ac141d0ef9c51dc666cca), ROM_BIOS(1))
+	ROM_REGION(0x800, "eeprom", ROMREGION_ERASEFF)
+	ROM_LOAD("nsk1_eeprom.bin", 0, 0x800, NO_DUMP)
 	ROM_REGION16_BE(0x20000, "dsp_program", ROMREGION_ERASE00)
 	ROM_LOAD("nse1_rom4_dsp_program.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739))
@@ -5014,6 +5069,7 @@ SYST( 2026, nam2c3, noki2100, 0, nam2c3, noki2100, nokia_dct3_state, empty_init,
 SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
 SYST( 1998, noki5190, 0, 0, noki5190, noki5110, nokia_dct3_state, empty_init, "Nokia", "5190 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsb1r4t, noki5190, 0, nsb1r4t, nsb1r4t, nokia_dct3_state, empty_init, "Research", "NSB-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1998, nsk1r4t, 0, 0, nsk1r4t, noki5110, nokia_dct3_state, empty_init, "Research", "NSK-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pcm, noki5110, 0, nse1pcm, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 8 kHz PCM frame fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1bit, noki5110, 0, nse1bit, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 1 MHz PCM wire fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pin, noki5110, 0, nse1pin, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 clocked boot-loopback fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
