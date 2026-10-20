@@ -36,7 +36,9 @@ identity reader `135340` enters ID mode and reads four halfwords at
 **user** protection field, not its factory serial number. The generic model
 now reads erased user words unless supplied through an optional 18-byte
 `flash:otp` region (lock word, four factory words, four user words, BE).
-Unknown factory words remain undumped; OTP programming remains unsupported.
+Unknown factory words remain undumped. The generic C3 model separately
+supports one-way user-OTP programming and irreversible user locking; the
+handset checkpoint below does not program OTP or invent factory identity.
 The earlier unimplemented-ID fallback returned zero and incorrectly changed
 the runtime checksum from `a0aa` to `98b2`; no checksum was adjusted for that
 fallback.
@@ -308,11 +310,37 @@ make build
 
 It checks identity, power-up lock, rejected locked program/erase, NOR writes,
 parameter/main erase isolation, lock-down with both WP# levels, reset and
-save/load restoration of locks, pin and array state. Full CFI queries,
-protection-register programming and measured operation timing are not
-implemented by this addition. The handset still uses its previous part;
-next is an isolated NAM-2 configuration trial. This remains a
-firmware-supported candidate, not proof of the acquired board's chip.
+save/load restoration of locks, pin, array and protection-register state.
+Protection command `c0` separately programs user words `85..88` one-way;
+factory words reject writes, and clearing protection-lock bit 1 cannot be
+undone by programming or reset. These semantics come from section 3.4 of
+the retained Intel datasheet, not a guessed handset response. CFI queries
+and measured operation timing remain unsupported/unmeasured.
+
+Changed OTP state is serialized as an optional 18-byte big-endian tail after
+the raw array in this C3 part's NVRAM file. Raw-array-only seeds retain their
+existing format; the tail is written only after OTP changes. Partial or
+oversized tails and an unlocked factory segment are rejected. OTP state is
+included in save states but not cleared by device reset; ordinary block
+locks are volatile and reset locked. The standalone fixture tests malformed
+tail bounds, then a second fresh MAME process verifies the retained user
+word `1200`, irreversible lock `fffc` and neighboring array data `5678`:
+
+```sh
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame \
+  --run-dir tmp/c3-cold -- c3test -video none -sound none -nothrottle \
+  -nvram_directory ../tmp/c3-conformance/nvram -seconds_to_run 4 -log
+```
+
+Fresh and cold validation captures are
+`tmp/c3-otp-banked-{first,cold}-20261020.stdout.log`. The original `noki2100`
+configuration still uses its previous part; `nam2c3` is the explicit trial
+described above, not proof of the acquired board's chip.
+
+The retained MADos archive's `include/hw/ioports.h` independently names
+the enable/disable pairs, but `hw/clock.c`'s attempted clock-source switch
+is commented out and explicitly marked nonworking. It supplies no validated
+idle-transition behavior to substitute for the unresolved own-ROM contract.
 
 ## Established contracts
 

@@ -36,6 +36,10 @@ def check_boot(text):
 
 
 def check_pmm(source, flash):
+    if len(flash) == len(source) + 18:
+        if flash[-17] & 1:
+            raise ValueError('invalid C3 OTP factory-lock state')
+        flash = flash[:-18]
     check_storage(source, flash)
     if flash[0x1fc006:0x1fc00c] != b'EEPROM':
         raise ValueError('own EEPROM catalogue lost')

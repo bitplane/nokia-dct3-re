@@ -49,7 +49,7 @@ distinction.
 | `6210_bringup.md` | NPE-3 normal/native boundary, own-PMM research-HLE phone services, accessory audit and isolated restoration acceptance. |
 | `6250_bringup.md` | Product-local staged DSP boundary and research boot, input, SIM, phonebook, registration, call-signaling and SMS acceptance. |
 | `7110_bringup.md` | NSE-5 upload, SED1565/keypad/roller contracts, fail-closed product boundary and explicit ROM4 compatibility instrument. |
-| `2100_bringup.md` | Bounded NAM-2 v5.84 portability frontier and display resumption contract. |
+| `2100_bringup.md` | Own v5.21 C3 security/storage checkpoint, unresolved idle/interrupt boundary and separate v5.84 portability fixture. |
 | `3610_bringup.md` | NAM-1 v5.11 executable profile, GENSIO/CCONT evidence and current bring-up boundary. |
 | `6110_bootstrap_capture.md` | Physical NSE-3 DSP-bootstrap capture format and acceptance contract. |
 | `structural_regression.md` | Acceptance profiles, semantic predicates, and frame oracles. |

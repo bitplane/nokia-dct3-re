@@ -1,8 +1,16 @@
 diff --git a/src/devices/machine/intelfsh.cpp b/src/devices/machine/intelfsh.cpp
-index 5b41774ad3c..ddc76ed4814 100644
+index 5b41774ad3c..b69da40d803 100644
 --- a/src/devices/machine/intelfsh.cpp
 +++ b/src/devices/machine/intelfsh.cpp
-@@ -111,6 +111,7 @@ DEFINE_DEVICE_TYPE(MACRONIX_29L001MC,        macronix_29l001mc_device,        "m
+@@ -45,6 +45,7 @@ enum
+ 	FM_WRITEBUFFER2, // part 2 of write to buffer sequence
+ 	FM_FAST_RESET,
+ 	FM_WRITEPAGEWINBOND,
++	FM_PROTECTION_PROGRAM,
+ };
+ 
+ 
+@@ -111,6 +112,7 @@ DEFINE_DEVICE_TYPE(MACRONIX_29L001MC,        macronix_29l001mc_device,        "m
  DEFINE_DEVICE_TYPE(MACRONIX_29LV160TMC,      macronix_29lv160tmc_device,      "macronix_29lv160tmc",      "Macronix 29LV160TMC Flash")
  DEFINE_DEVICE_TYPE(ST_M29W640GB,             st_m29w640gb_device,             "st_m29w640gb",             "ST M29W640GB Flash")
  DEFINE_DEVICE_TYPE(ST_M29W640FT,             st_m29w640ft_device,             "st_m29w640ft",             "ST M29W640FT Flash")
@@ -10,7 +18,7 @@ index 5b41774ad3c..ddc76ed4814 100644
  DEFINE_DEVICE_TYPE(TMS_29F040,               tms_29f040_device,               "tms_29f040",               "Texas Instruments 29F040 Flash")
  
  DEFINE_DEVICE_TYPE(PANASONIC_MN63F805MNP,    panasonic_mn63f805mnp_device,    "panasonic_mn63f805mnp",    "Panasonic MN63F805MNP Flash")
-@@ -125,6 +126,8 @@ DEFINE_DEVICE_TYPE(SST_49LF020,              sst_49lf020_device,              "s
+@@ -125,6 +127,8 @@ DEFINE_DEVICE_TYPE(SST_49LF020,              sst_49lf020_device,              "s
  DEFINE_DEVICE_TYPE(SHARP_LH28F400,           sharp_lh28f400_device,           "sharp_lh28f400",           "Sharp LH28F400 Flash")
  DEFINE_DEVICE_TYPE(INTEL_E28F008SA,          intel_e28f008sa_device,          "intel_e28f008sa",          "Intel E28F008SA Flash")
  DEFINE_DEVICE_TYPE(INTEL_TE28F160,           intel_te28f160_device,           "intel_te28f160",           "Intel TE28F160 Flash")
@@ -19,7 +27,7 @@ index 5b41774ad3c..ddc76ed4814 100644
  DEFINE_DEVICE_TYPE(SHARP_LH28F160S3,         sharp_lh28f160s3_device,         "sharp_lh28f160s3",         "Sharp LH28F160S3 Flash")
  DEFINE_DEVICE_TYPE(INTEL_TE28F320,           intel_te28f320_device,           "intel_te28f320",           "Intel TE28F320 Flash")
  DEFINE_DEVICE_TYPE(SHARP_LH28F320BF,         sharp_lh28f320bf_device,         "sharp_lh28f320bf",         "Sharp LH28F320BFHE-PBTL Flash")
-@@ -156,6 +159,7 @@ intelfsh_device::intelfsh_device(const machine_config &mconfig, device_type type
+@@ -156,6 +160,7 @@ intelfsh_device::intelfsh_device(const machine_config &mconfig, device_type type
  	: device_t(mconfig, type, tag, owner, clock),
  		device_nvram_interface(mconfig, *this),
  		m_region(*this, DEVICE_SELF),
@@ -27,7 +35,7 @@ index 5b41774ad3c..ddc76ed4814 100644
  		m_size(size),
  		m_bits(bits),
  		m_addrmask(0),
-@@ -163,10 +167,14 @@ intelfsh_device::intelfsh_device(const machine_config &mconfig, device_type type
+@@ -163,10 +168,14 @@ intelfsh_device::intelfsh_device(const machine_config &mconfig, device_type type
  		m_device_id2(0),
  		m_device_id3(0),
  		m_maker_id(maker_id),
@@ -42,7 +50,7 @@ index 5b41774ad3c..ddc76ed4814 100644
  		m_status(0x80),
  		m_erase_sector(0),
  		m_flash_mode(FM_NORMAL),
-@@ -270,6 +278,15 @@ st_m29w640gb_device::st_m29w640gb_device(const machine_config &mconfig, const ch
+@@ -270,6 +279,15 @@ st_m29w640gb_device::st_m29w640gb_device(const machine_config &mconfig, const ch
  st_m29w640ft_device::st_m29w640ft_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
  	: intelfsh16_device(mconfig, ST_M29W640FT, tag, owner, clock, 0x800000, MFG_ST, 0x22ed) { m_bot_boot_sector = true; m_device_id2 = 0x2210; m_device_id3 = 0x2200; }
  
@@ -58,7 +66,7 @@ index 5b41774ad3c..ddc76ed4814 100644
  panasonic_mn63f805mnp_device::panasonic_mn63f805mnp_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
  	: intelfsh8_device(mconfig, PANASONIC_MN63F805MNP, tag, owner, clock, 0x10000, MFG_PANASONIC, 0x1b) { m_sector_is_4k = true; }
  
-@@ -297,6 +314,24 @@ sst_49lf020_device::sst_49lf020_device(const machine_config &mconfig, const char
+@@ -297,6 +315,24 @@ sst_49lf020_device::sst_49lf020_device(const machine_config &mconfig, const char
  sharp_lh28f400_device::sharp_lh28f400_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
  	: intelfsh16_device(mconfig, SHARP_LH28F400, tag, owner, clock, 0x80000, MFG_SHARP, 0xed) { }
  
@@ -83,7 +91,7 @@ index 5b41774ad3c..ddc76ed4814 100644
  intel_te28f160_device::intel_te28f160_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
  	: intelfsh16_device(mconfig, INTEL_TE28F160, tag, owner, clock, 0x200000, MFG_SHARP, 0xd0) { }
  
-@@ -304,7 +339,12 @@ sharp_lh28f160s3_device::sharp_lh28f160s3_device(const machine_config &mconfig,
+@@ -304,7 +340,12 @@ sharp_lh28f160s3_device::sharp_lh28f160s3_device(const machine_config &mconfig,
  	: intelfsh16_device(mconfig, SHARP_LH28F160S3, tag, owner, clock, 0x200000, MFG_SHARP, 0xd0) { }
  
  intel_te28f320_device::intel_te28f320_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
@@ -97,7 +105,7 @@ index 5b41774ad3c..ddc76ed4814 100644
  
  spansion_s29gl064s_device::spansion_s29gl064s_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
  	: intelfsh16_device(mconfig, SPANSION_S29GL064S, tag, owner, clock, 0x800000, MFG_SPANSION, 0x227e)
-@@ -356,6 +396,21 @@ void intelfsh_device::device_start()
+@@ -356,6 +397,21 @@ void intelfsh_device::device_start()
  {
  	m_data = std::make_unique<uint8_t []>(m_size);
  	m_timer = timer_alloc(FUNC(intelfsh_device::delay_tick), this);
@@ -119,12 +127,14 @@ index 5b41774ad3c..ddc76ed4814 100644
  
  	save_item( NAME(m_status) );
  	save_item( NAME(m_erase_sector) );
-@@ -368,9 +423,32 @@ void intelfsh_device::device_start()
+@@ -368,9 +424,34 @@ void intelfsh_device::device_start()
  	save_item( NAME(m_write_buffer_start_address) );
  	save_item( NAME(m_write_buffer_count) );
  	save_item( NAME(m_fast_mode) );
 +	save_item(NAME(m_block_locks));
 +	save_item(NAME(m_wp));
++	save_item(NAME(m_protection_data));
++	save_item(NAME(m_protection_dirty));
  	save_pointer( &m_data[0], "m_data", m_size);
  }
  
@@ -152,7 +162,53 @@ index 5b41774ad3c..ddc76ed4814 100644
  //-------------------------------------------------
  //  is_ready - emulates the *Busy/Ready pin on some
  //             flash devices.
-@@ -507,11 +585,14 @@ uint32_t intelfsh_device::read_full(uint32_t address)
+@@ -444,7 +525,24 @@ void intelfsh_device::nvram_default()
+ bool intelfsh_device::nvram_read(util::read_stream &file)
+ {
+ 	auto const [err, actual] = read(file, &m_data[0], m_size);
+-	return !err && (actual == m_size);
++	if (err || actual != m_size)
++		return false;
++	if (!m_flexible_block_lock)
++		return true;
++	// Preserve raw-array compatibility; changed C3 OTP has an 18-byte BE tail.
++	std::array<u8, 19> tail{};
++	auto const [tail_err, tail_size] = read(file, tail.data(), tail.size());
++	if (tail_err || (tail_size && tail_size != 18))
++		return false;
++	if (tail_size)
++	{
++		if (tail[1] & 1) // Factory segment cannot be unlocked.
++			return false;
++		for (unsigned i = 0; i < m_protection_data.size(); ++i)
++			m_protection_data[i] = (u16(tail[i * 2]) << 8) | tail[i * 2 + 1];
++		m_protection_dirty = true;
++	}
++	return true;
+ }
+ 
+ 
+@@ -456,7 +554,18 @@ bool intelfsh_device::nvram_read(util::read_stream &file)
+ bool intelfsh_device::nvram_write(util::write_stream &file)
+ {
+ 	auto const [err, actual] = write(file, &m_data[0], m_size);
+-	return !err;
++	if (err || !m_flexible_block_lock || !m_protection_dirty)
++		return !err;
++	if (actual != m_size)
++		return false;
++	std::array<u8, 18> tail{};
++	for (unsigned i = 0; i < m_protection_data.size(); ++i)
++	{
++		tail[i * 2] = m_protection_data[i] >> 8;
++		tail[i * 2 + 1] = m_protection_data[i];
++	}
++	auto const [tail_err, tail_size] = write(file, tail.data(), tail.size());
++	return !tail_err && tail_size == tail.size();
+ }
+ 
+ 
+@@ -507,11 +616,14 @@ uint32_t intelfsh_device::read_full(uint32_t address)
  			switch (address & 0xff)
  			{
  				case 0x00: data = m_maker_id; break;
@@ -168,7 +224,7 @@ index 5b41774ad3c..ddc76ed4814 100644
  			}
  		}
  		else if (m_maker_id == MFG_WINBOND)
-@@ -543,6 +624,11 @@ uint32_t intelfsh_device::read_full(uint32_t address)
+@@ -543,6 +655,11 @@ uint32_t intelfsh_device::read_full(uint32_t address)
  		}
  		break;
  	case FM_READID:
@@ -180,7 +236,7 @@ index 5b41774ad3c..ddc76ed4814 100644
  		if (m_maker_id == MFG_INTEL && m_device_id == 0x16)
  		{
  			switch (address & 0xff)
-@@ -563,7 +649,7 @@ uint32_t intelfsh_device::read_full(uint32_t address)
+@@ -563,7 +680,7 @@ uint32_t intelfsh_device::read_full(uint32_t address)
  				data = m_device_id;
  				break;
  			case 2: // block lock config
@@ -189,7 +245,20 @@ index 5b41774ad3c..ddc76ed4814 100644
  				break;
  			case 3: // master lock config
  				if (m_flash_master_lock)
-@@ -1059,14 +1145,21 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+@@ -671,6 +788,12 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+ 		case 0x60:  // set master lock
+ 			m_flash_mode = FM_SETMASTER;
+ 			break;
++		case 0xc0:
++			if (m_flexible_block_lock)
++				m_flash_mode = FM_PROTECTION_PROGRAM;
++			else
++				logerror("unsupported protection program command\n");
++			break;
+ 		case 0x70:  // read status
+ 			m_flash_mode = FM_READSTATUS;
+ 			break;
+@@ -1059,14 +1182,21 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
  		m_flash_mode = FM_NORMAL;
  		break;
  	case FM_WRITEPART1:
@@ -214,7 +283,7 @@ index 5b41774ad3c..ddc76ed4814 100644
  			break;
  		default:
  			logerror( "FM_WRITEPART1 not supported when m_bits == %d\n", m_bits );
-@@ -1136,6 +1229,13 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+@@ -1136,6 +1266,13 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
  	case FM_CLEARPART1:
  		if( ( data & 0xff ) == 0xd0 )
  		{
@@ -228,7 +297,7 @@ index 5b41774ad3c..ddc76ed4814 100644
  			if (m_maker_id == MFG_SST && m_device_id == 0x04)
  			{
  				// clear the 256 bytes block containing the current address to all 0xffs
-@@ -1186,6 +1286,19 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+@@ -1186,6 +1323,19 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
  
  				m_timer->adjust( attotime::from_msec( duration ) );
  			}
@@ -248,9 +317,31 @@ index 5b41774ad3c..ddc76ed4814 100644
  			else
  			{
  				// clear the 64k block containing the current address to all 0xffs
-@@ -1205,6 +1318,22 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+@@ -1204,7 +1354,44 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+ 			logerror( "unexpected %02x in FM_CLEARPART1\n", data & 0xff );
  		}
  		break;
++	case FM_PROTECTION_PROGRAM:
++		// Intel 290645-011 3.4: factory words are immutable; user lock is OTP.
++		if (address == 0x80)
++		{
++			m_protection_data[0] &= data | 0xfffd; // Only user-lock bit 1 can clear.
++			m_protection_dirty = true;
++			m_status = 0x80;
++		}
++		else if (address >= 0x85 && address <= 0x88 && BIT(m_protection_data[0], 1))
++		{
++			m_protection_data[address - 0x80] &= data;
++			m_protection_dirty = true;
++			m_status = 0x80;
++		}
++		else if (address >= 0x81 && address <= 0x88)
++			m_status = 0x92;
++		else
++			// The datasheet reserves these addresses without defining a result.
++			logerror("unsupported protection-program address %x\n", address);
++		m_flash_mode = FM_READSTATUS;
++		break;
  	case FM_SETMASTER:
 +		if (m_flexible_block_lock)
 +		{
@@ -272,7 +363,7 @@ index 5b41774ad3c..ddc76ed4814 100644
  		{
  		case 0xf1:
 diff --git a/src/devices/machine/intelfsh.h b/src/devices/machine/intelfsh.h
-index 5274f6b3d3c..93adebf5dfe 100644
+index 5274f6b3d3c..c411dd6cb7b 100644
 --- a/src/devices/machine/intelfsh.h
 +++ b/src/devices/machine/intelfsh.h
 @@ -16,6 +16,7 @@ public:
@@ -291,7 +382,7 @@ index 5274f6b3d3c..93adebf5dfe 100644
  
  	// device_nvram_interface overrides
  	virtual void nvram_default() override;
-@@ -32,10 +34,13 @@ protected:
+@@ -32,10 +34,14 @@ protected:
  	// derived helpers
  	uint32_t read_full(uint32_t offset);
  	void write_full(uint32_t offset, uint32_t data);
@@ -302,10 +393,11 @@ index 5274f6b3d3c..93adebf5dfe 100644
  	optional_memory_region   m_region;
 +	optional_memory_region   m_protection_region;
 +	std::array<uint16_t, 9> m_protection_data{};
++	bool m_protection_dirty = false;
  
  	// configuration state
  	uint32_t                 m_size;
-@@ -45,10 +50,15 @@ protected:
+@@ -45,10 +51,15 @@ protected:
  	uint16_t                 m_device_id2;
  	uint16_t                 m_device_id3;
  	uint8_t                  m_maker_id;
@@ -321,7 +413,7 @@ index 5274f6b3d3c..93adebf5dfe 100644
  	uint16_t                 m_page_size;
  
  	// internal state
-@@ -67,6 +77,8 @@ protected:
+@@ -67,6 +78,8 @@ protected:
  	uint32_t                 m_write_buffer_count;
  
  	bool                     m_fast_mode;
@@ -330,7 +422,7 @@ index 5274f6b3d3c..93adebf5dfe 100644
  };
  
  
-@@ -236,6 +248,12 @@ public:
+@@ -236,6 +249,12 @@ public:
  	st_m29w640ft_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
  };
  
@@ -343,7 +435,7 @@ index 5274f6b3d3c..93adebf5dfe 100644
  class panasonic_mn63f805mnp_device : public intelfsh8_device
  {
  public:
-@@ -309,6 +327,18 @@ public:
+@@ -309,6 +328,18 @@ public:
  	sharp_lh28f400_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
  };
  
@@ -362,7 +454,7 @@ index 5274f6b3d3c..93adebf5dfe 100644
  class intel_te28f160_device : public intelfsh16_device
  {
  public:
-@@ -440,6 +470,7 @@ DECLARE_DEVICE_TYPE(MACRONIX_29L001MC,       macronix_29l001mc_device)
+@@ -440,6 +471,7 @@ DECLARE_DEVICE_TYPE(MACRONIX_29L001MC,       macronix_29l001mc_device)
  DECLARE_DEVICE_TYPE(MACRONIX_29LV160TMC,     macronix_29lv160tmc_device)
  DECLARE_DEVICE_TYPE(ST_M29W640GB,            st_m29w640gb_device)
  DECLARE_DEVICE_TYPE(ST_M29W640FT,            st_m29w640ft_device)
@@ -370,7 +462,7 @@ index 5274f6b3d3c..93adebf5dfe 100644
  DECLARE_DEVICE_TYPE(TMS_29F040,              tms_29f040_device)
  
  DECLARE_DEVICE_TYPE(PANASONIC_MN63F805MNP,   panasonic_mn63f805mnp_device)
-@@ -453,7 +484,9 @@ DECLARE_DEVICE_TYPE(SST_49LF020,             sst_49lf020_device)
+@@ -453,7 +485,9 @@ DECLARE_DEVICE_TYPE(SST_49LF020,             sst_49lf020_device)
  
  DECLARE_DEVICE_TYPE(SHARP_LH28F400,          sharp_lh28f400_device)
  DECLARE_DEVICE_TYPE(INTEL_E28F008SA,         intel_e28f008sa_device)

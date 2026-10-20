@@ -43,6 +43,12 @@ class Nam2C3CheckpointTest(unittest.TestCase):
         flash[0x1fc006:0x1fc00c] = b'EEPROM'
         with patch('tools.noki2100_v521_security_check.V521_SHA1', hashlib.sha1(source).hexdigest()):
             check_pmm(source, flash)
+            otp = bytes.fromhex('fffe' + 'ffff' * 8)
+            check_pmm(source, flash + otp)
+            with self.assertRaisesRegex(ValueError, 'factory-lock'):
+                check_pmm(source, flash + bytes([0xff]) * 18)
+            with self.assertRaisesRegex(ValueError, 'executable'):
+                check_pmm(source, flash + otp[:-1])
             flash[0x1fc030] = 1
             with self.assertRaisesRegex(ValueError, 'checksum'):
                 check_pmm(source, flash)
