@@ -5,7 +5,7 @@ local machine = manager.machine
 local contacts = {{2,2},{3,2},{4,2},{2,4},{3,4},{1,4}}
 local events = {}
 local pin = _G.nsk1_replacement_pin and {4,3,2,1,6} or {1,2,3,4,6}
-for _,phase in ipairs({{12,'pin',pin},{18,'phone',{1,2,3,4,5,6}}}) do
+for _,phase in ipairs({{12,'pin',pin},{_G.nsk1_phone_input_time or 18,'phone',{1,2,3,4,5,6}}}) do
     for index,key in ipairs(phase[3]) do
         local field
         for _,candidate in pairs(machine.ioport.ports[':COL.'..contacts[key][1]].fields) do

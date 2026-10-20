@@ -10,19 +10,8 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.nsb1_rom4_compare import check_cold_link, check_card_run, check_frame
 from tools.nsb1_pin_roundtrip import check_contacts, ACCEPTED_RGB_SHA256
-from tools.sim_fdn_profile import extend, EXTENDED_LENGTH
+from tools.sim_fdn_profile import extend, EXTENDED_LENGTH, expected_validity_card as expected_card
 from tools.sim_fdn_protocol_check import check_phase
-
-
-def expected_card(before, phase):
-    if phase not in range(4) or len(before) != EXTENDED_LENGTH or before[3570:3575] != b'FDN\x01\x01':
-        raise ValueError('known phase and extended FDN card required')
-    if before[3575] != (1 if phase in (0, 3) else 0):
-        raise ValueError('initial FDN validity differs')
-    after = bytearray(before)
-    if phase in (0, 2):
-        after[3575] = 0 if phase == 0 else 1
-    return bytes(after)
 
 
 def check_trace(trace, phase):

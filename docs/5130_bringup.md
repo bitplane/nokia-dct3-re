@@ -1517,6 +1517,40 @@ storage distinguish credential refusal from dead input. This is firmware UI
 refusal at zero PUK2 retries, not a claim that a correct-PUK2 APDU was submitted
 at zero, nor that the entire SIM is rejected: startup PIN1 still authenticates.
 
+### Fixed-dialling activation and cold state
+
+```sh
+.venv/bin/python tools/nsk1_fdn_check.py tmp/nsk1-pin-roundtrip-qualified \
+  tmp/nsk1-fdn-on-qualified tmp/nsk1-fdn-on-cold \
+  tmp/nsk1-fdn-off tmp/nsk1-fdn-off-cold
+```
+
+`nsk1_fdn_prepare.py SOURCE OUTPUT` appends the explicit laboratory FDN
+extension to a requalified healthy card and records base/derived hashes;
+it does not alter handset storage. Physical Settings4 → Security3 →
+Fixed dialling2, On and PIN25678 issue VERIFY CHV2 and INVALIDATE ADN.
+Only serialized ADN-validity byte3575 changes1→0. Firmware rehabilitates
+LOCI and IMSI through the actual SIMI transport. The settled frame shows
+Fixed dialling On; a separate cold process authenticates PIN1, repeats the
+identity rehabilitation and preserves the complete card and On frame.
+
+Physical Off with PIN25678 rehabilitates ADN in addition to the startup
+identity exchange, changing only3575 from0→1. The final cold process
+preserves the complete card, shows Off and needs no validity operations.
+All four phases qualify native execution, own storage/flash, source and
+cold links, ordered physical/decoded keys, complete APDU payloads/statuses,
+whole-card differences and exact settled frames. The warm fixtures are
+`nsk1_fdn_input.lua`/`nsk1_fdn_disable.lua`; `nsk1_fdn_cold.lua` only browses
+the stored state. Phone-code input is delayed to24 seconds; menu entry
+starts34 seconds after the acceptance presentation has expired. Intermediate
+LCD captures may lag a selection; the gate uses settled frames and protocol
+results, not those images alone. The common expected-card validity transition
+now lives in `sim_fdn_profile.py`, shared with the NSB-1 gate; handset menus
+and native acceptance remain product-owned.
+
+This does not yet accept protected FDN record save/edit/erase or local dial
+enforcement. The compatibility-mask and radio boundaries are unchanged.
+
 ### Ordinary PIN change
 
 ```sh

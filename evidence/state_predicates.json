@@ -1484,6 +1484,12 @@
       "evidence": ["docs/5130_bringup.md", "tools/nsk1_puk2_exhaust.py", "tools/nsk1_puk2_check.py", "tools/nsk1_puk2_wrong.lua", "tools/nsk1_pin2_entry.lua", "tools/nsk1_pin2_entry_down.lua", "tools/test_nsk1_puk2_exhaust.py", "tools/test_nsk1_puk2_check.py"]
     },
     {
+      "id": "nsk1_fdn_activation_cold_identity", "owner": "nsk1_firmware", "status": "satisfied",
+      "predicate": "Own NSK-1 physically enables and disables FDN with separate cold state and identity-handshake acceptance",
+      "current": "An explicitly extended laboratory card is derived from the qualified healthy card without handset storage edits. Own physical Menu4-3-2 and PIN2 verification invalidate ADN; only serialized validity3575 changes1 to0. Cold FDN-On authenticates PIN1, rehabilitates LOCI/IMSI and preserves the whole card. Physical Off additionally rehabilitates ADN and changes only3575 back to1; cold Off preserves the card without validity operations. Own native/storage/source/cold links, physical and decoded input, standard APDU payloads/statuses and exact settled On/Off frames pass. Protected FDN records, local enforcement, fitted mask, radio and speech are not promoted.",
+      "evidence": ["docs/5130_bringup.md", "tools/nsk1_fdn_prepare.py", "tools/nsk1_fdn_input.lua", "tools/nsk1_fdn_disable.lua", "tools/nsk1_fdn_cold.lua", "tools/nsk1_fdn_check.py", "tools/test_nsk1_fdn_prepare.py", "tools/test_nsk1_fdn_check.py", "tools/sim_fdn_profile.py", "tools/sim_fdn_protocol_check.py"]
+    },
+    {
       "id": "nam1_display_frontier", "owner": "nam1_firmware", "status": "satisfied",
       "predicate": "Nokia 3610 v5.11 organically reaches a deterministic firmware-rendered display boundary through product-owned GENSIO and geometry contracts",
       "current": "NAM-1 independently writes GENSIO control 0x22 at 0x2d, transfers CCONT bytes at 0x2c and polls 0x6d. Byte-write receive-ready releases that loop. Firmware then writes nine 96-byte display banks; a 96x65 visible area with reversed segment order renders the complete CONTACT SERVICE frame. Separate gates prove DSP bootstrap/service control, request-derived discovery, accepted application sequences 0x42/0x43, channel-0x5f use and a complete physical M2BUS terminal exchange. Missing product state remains the next boundary.",
