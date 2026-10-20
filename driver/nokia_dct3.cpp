@@ -4312,6 +4312,9 @@ void nokia_dct3_state::nsm1r4t(machine_config &config)
 	apply_product_config(research);
 	config.device_remove("dsp_hle");
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	// Own loader writes executable words through 2a5c. Preserve the
+	// uploaded bank instead of exposing the resident image at 2800.
+	m_dsp_c54x->set_overlay_end(0x3000);
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
 

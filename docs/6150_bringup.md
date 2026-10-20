@@ -17,6 +17,28 @@ not factory provisioning or fitted-chip proof. Negative saturated/original-
 retry controls remain distinct. No readiness event or firmware flag is
 synthesized.
 
+### Native executable upload extent
+
+The own v5.23 loader writes 605 distinct program words in `2800..2a5c`.
+The former `2800` overlay boundary discards these writes, exposing resident
+ROM in program space and zeros in data space instead. A read-only upload
+observer confirms, for example, uploaded `2800=1221` versus old program
+`a594` and data `0000`. Six coincidentally matching zero values do not
+constitute retention of the upload.
+
+The research `nsm1r4t` configuration selects a `3000` overlay extent;
+`nsm1_native_upload_observe.lua` confirms all 605 words are visible in both
+views at one second. This upload-derived bank model does not identify the
+fitted DSP mask or establish the complete physical RAM geometry.
+The matched 40-second old/corrected runs use only the qualified own
+FDN-enabled EEPROM/card and physical listed-number dial inputs. Both pass
+the existing authentication, published-record and exact Calling-frame
+checks with unchanged SIM contents; only the corrected run passes
+`nsm1_native_upload_check.check_upload`. Its 618 observed first opcode words
+all have decoded boundaries, including observed extension variants. Neither
+decoding coverage nor the local Calling frame establishes connected calls,
+speech, stock provisioning or native RF acceptance.
+
 Physical/cold software coverage includes SIM contacts, separate Phone-memory
 erase, PIN1/PIN2 and PUK recovery, request settings, offline SMS storage and
 PIN2-protected FDN activation/storage/local dial enforcement. Registered
