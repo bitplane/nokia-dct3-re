@@ -5,6 +5,7 @@ from tools.sim_phonebook_check import (
     PRE_ACM_NVRAM_LENGTH,
     RECORD_COUNT,
     RECORD_LENGTH,
+    SUPPORTED_NVRAM_LENGTHS,
     validate_phonebook,
 )
 
@@ -49,6 +50,16 @@ class SimPhonebookCheckTest(unittest.TestCase):
         trace, data = self.fixture()
         data.extend(bytes(CURRENT_NVRAM_LENGTH - len(data)))
         validate_phonebook(trace, bytes(data))
+
+    def test_accepts_each_complete_append_only_layout(self):
+        trace, data = self.fixture()
+        self.assertEqual(CURRENT_NVRAM_LENGTH, 3570)
+        for length in SUPPORTED_NVRAM_LENGTHS:
+            with self.subTest(length=length):
+                validate_phonebook(trace, bytes(data) + bytes(length - len(data)))
+        for length in (3525, 3559, 3561, 3569, 3571):
+            with self.subTest(length=length), self.assertRaisesRegex(ValueError, 'expected one of'):
+                validate_phonebook(trace, bytes(data) + bytes(length - len(data)))
 
     def test_accepts_pre_acm_append_only_card_layout(self):
         trace, data = self.fixture()
