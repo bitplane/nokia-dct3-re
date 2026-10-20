@@ -25,6 +25,14 @@ end
 machine.debugger:command('temp2=0')
 machine.debugger:command('bpset 26def0,r0==43f&&temp2<8,{temp2=temp2+1;logerror "nsk1_radio_construct: input=%04x field2=%02x field3=%02x caller=%08x observer_writes=0\\n",r0,b@10be7c,b@10be7b,r14;g}')
 machine.debugger:command('bpset 24df64,temp2<16,{temp2=temp2+1;logerror "nsk1_radio_producer: pc=%08x caller=%08x observer_writes=0\\n",pc,r14;g}')
+machine.debugger:command('temp1=0')
+machine.debugger:command('bpset 221236,r0==a30&&temp1<16,{temp1=temp1+1;logerror "nsk1_radio_upstream: input=%04x caller=%08x observer_writes=0\\n",r0,r14;g}')
+machine.debugger:command('bpset 2081d8,r0==834&&temp1<24,{temp1=temp1+1;logerror "nsk1_radio_request: input=%04x field2=%02x field3=%02x caller=%08x observer_writes=0\\n",r0,b@10a463,b@10a460,r14;g}')
+machine.debugger:command('bpset 20c5e0,temp1<32,{temp1=temp1+1;logerror "nsk1_radio_selector: input=%04x caller=%08x observer_writes=0\\n",r9,r14;g}')
+machine.debugger:command('temp8=0')
+machine.debugger:command('bpset 221236,temp8<40,{temp8=temp8+1;logerror "nsk1_radio_controller_output: input=%04x caller=%08x observer_writes=0\\n",r0,r14;g}')
+machine.debugger:command('temp9=0')
+machine.debugger:command('bpset 22137e,r0>=100000&&r0<110000&&temp9<40,{temp9=temp9+1;logerror "nsk1_radio_controller_receive: object=%08x header=%08x caller=%08x observer_writes=0\\n",r0,d@r0,d@(r13+10);g}')
 local counts = {tx=0,rx=0}
 local observing = false
 local function shared_word(address)

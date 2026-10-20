@@ -122,6 +122,29 @@ unresolved predecessor is the ordinary lifecycle selecting 20c5e0 and the
 source of the two control bytes. These literal results do not close
 table-driven, computed or indirect production.
 
+The predecessor selector is now mapped: 20cb58 forms input 0a30 and its
+equal branch at 20cb62 reaches 20c5e0. The common tail invokes constructor
+2081d8 with 0834; case 208588 copies owner 10a444 bytes +1f/+1c
+(10a463/10a460) into message +2/+3. Constructor 221236 posts its relevant
+0a30 path to task 15. A bounded MOVS r0,a3 / LSLS r0,4 / direct-BL pattern
+scan finds five calls: 222cdc, 222e5a, 224650, 22473a, 224ca8. This is not
+closure of every computed or table-driven producer. All five are preceded
+by a store to their owner register r5 +1d (values 2,3,1,2,3 respectively);
+the owner and lifecycle prerequisites still require independent mapping.
+The qualified runtime observes no 0a30 construction, 20c5e0 selector entry,
+or 0834 constructor call. Thus the open software boundary is upstream of
+these paths, not an unacknowledged 8b packet to bypass.
+
+The controller's observed output constructor 221236 emits 0a35 (caller
+221215), then 0a25 (2236e5), then 09ec (224bfd). Its receive helper 221378
+observes object header 158b00c1 from caller 22370d before the 09ec request;
+no further helper result is observed through 61 seconds. Own routine 224bdc
+sends 09ec and enters that receive loop, accepting 09f0 or 0434 as exit
+statuses. Constructor 221236's 09ec branch fills a mode byte from its
+firmware owner and posts to task 15. The mode's runtime value and the
+task-15 receive/reply route remain to map; this is an observed earlier
+transaction, not proof that an external peer must fabricate either exit.
+
 `tools/nsk1_radio_contract.py` checks the own image hash, critical table
 entries/instruction fragments and emits machine-readable bounded references:
 

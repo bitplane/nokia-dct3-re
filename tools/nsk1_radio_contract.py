@@ -37,13 +37,17 @@ def analyze(image):
         return int.from_bytes(image[address-BASE:address-BASE+4],'big')
     checks = {0x2941e4:0x294210,0x26a534:0x13b8,0x218c58:0x13a3,
               0x218950:0x218996,0x218c1c:0x043f,0x24d7dc:0x0834,
-              0x26e234:0x03e9,0x26e230:0x10be77}
+              0x26e234:0x03e9,0x26e230:0x10be77,0x2086c4:0x10a444,
+              0x20c914:0x0834}
     for address,value in checks.items():
         if word(address) != value:
             raise ValueError(f'own dispatch/control literal differs at {address:08x}')
     fragments = {0x26a440:'b5101c04483b80201c2021a8',
                  0x2177e2:'486b27017507',0x21884c:'4edb2003',
-                 0x26df9a:'4825794170a1790070e0'}
+                 0x26df9a:'4825794170a1790070e0',
+                 0x20cb58:'20a3010146484288d100e53d',
+                 0x208588:'484e7fc170a17f0070e0',
+                 0x2212ce:'200fe7f9'}
     for address,encoded in fragments.items():
         expected = bytes.fromhex(encoded)
         if image[address-BASE:address-BASE+len(expected)] != expected:
@@ -52,12 +56,23 @@ def analyze(image):
               if ((encoded:=int.from_bytes(image[offset:offset+2],'big')) & 0xf800 == 0x7000
                   and (encoded >> 6) & 31 == 20)]
     calls = thumb_bl_candidates(image,(0x2177a0,))[0x2177a0]
+    # MOVS r0,#a3; LSLS r0,r0,#4 followed by a direct BL is a bounded
+    # producer pattern, not closure of data-driven or indirect input creation.
+    pattern_sites = [BASE+offset for offset in range(0,len(image)-7,2)
+                     if image[offset:offset+4] == bytes.fromhex('20a30100')]
+    upstream_calls = thumb_bl_candidates(image,(0x221236,))[0x221236]
+    producers = [site+4 for site in pattern_sites if site+4 in upstream_calls]
     return {'image_sha1':hashlib.sha1(image).hexdigest(),
             'rx_route':{'type':'0x8b','table':'0x2941c4','index':8,'handler':'0x26a440',
                         'status':'0x13b8','task':11,'consumer':'0x218996'},
             'activation':{'input':'0x043f','handler':'0x218d20','initializer':'0x2177a0',
                           'producer_input':'0x0834','producer_handler':'0x24df64',
                           'constructor':'0x26def0','control_bytes':['0x10be7c','0x10be7b']},
+            'upstream_activation':{'selector':'0x20cb58','input':'0x0a30',
+                                   'status_constructor':'0x2081d8','control_bytes':['0x10a463','0x10a460'],
+                                   'a30_constructor':'0x221236','target_task':15,
+                                   'literal_shift_direct_bl_producers':[hex(address) for address in producers],
+                                   'scope':'MOVS/LSLS/direct-BL pattern only; not all argument or descriptor sources'},
             'owner_references':literal_references(image,{0x107158,0x10716c}),
             'activation_input_references':literal_references(image,{0x043f,0x0834}),
             'member_store_candidates':{'range':['0x213000','0x218e00'],'offset':20,'addresses':stores,
