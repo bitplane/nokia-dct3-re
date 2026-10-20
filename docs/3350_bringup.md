@@ -8,7 +8,10 @@ first ownership wait at `31dc82..31dc86`. No DSP completion, service or radio
 peer is enabled. Graphical boot, physical key-name mapping, SIM, registration,
 calls and SMS remain unestablished. The package supplies no PMM record stream;
 the firmware creates its own catalogue headers from initially erased storage.
-Do not attach a 3330 or other donor's calibration tail.
+Do not attach a 3330 or other donor's calibration tail. The external emulator's
+3350 v5.22 profile reports interactive presentation after grafting a 3330
+EEPROM block; that is a protocol/provisioning clue, not an admissible own-data
+fixture for this v5.30 configuration.
 
 The separate `nhm9stage` research configuration executes the uploaded verifier
 with the product's own 104-word fragment and 247-word program extent. At the
@@ -33,6 +36,32 @@ Reproduce this negative native boundary with a fresh run directory:
 The checker qualifies the source image and CALL words, requires the own
 247-word release and immutable-fragment probe, rejects crashes and any
 completion/handoff, and records the native output beside the MAME log.
+
+## Own keypad contract
+
+The qualified v5.30 image supplies the normal 25-byte map at `45bd94` and
+five-byte special map at `45bdb0`. Decoder `3a94e8` calls scanner `3a3568`;
+normal input indexes `table[raw + 25 * selector]`, while special input indexes
+`special[raw - 80 + 5 * selector]`. The selector byte is at `1244fe`.
+Scanner `3a35ce..3a36ae` independently establishes five rows, active-low
+columns and raw index `row * 5 + column`. Its literal pool selects row signal
+`20028`, column input `2002a`, direction `200a8` and IRQ mask `2006b`.
+The special map is `3e 0d 3e 3e 3e`, selecting Power on column bit 1.
+
+| Row | Column 0 | Column 1 | Column 2 | Column 3 | Column 4 |
+| --- | --- | --- | --- | --- | --- |
+| 0 | 3e | 1a | 0a | 18 | 19 |
+| 1 | 3e | 0f | 01 | 02 | 0e |
+| 2 | 3e | 3e | 06 | 05 | 04 |
+| 3 | 3e | 3e | 09 | 08 | 07 |
+| 4 | 3e | 03 | 0b | 17 | 0c |
+
+The bytes match the separately mapped NHM-2 key table, supporting the
+external emulator's shared-layout hypothesis with own-image evidence.
+This is a static decoder/wiring contract, not observed keypad scan or UI
+delivery: the current input-port stub still deliberately exposes no keys.
+The next independent step is to configure this five-row/bit-1 contract and
+prove physical contact/readback before claiming application interactivity.
 
 `tools/nhm9_package_check.py` hash-qualifies the installer, walks every one of
 its 29 adjacent gzip members and strictly decodes all seven phone-record
