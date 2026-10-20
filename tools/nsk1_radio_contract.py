@@ -91,7 +91,8 @@ def analyze(image):
                    0x23c394:0x05e6,0x23c398:0x05ed,0x23c7bc:0x05e6,0x23c7c0:0x05ed,
                    0x23aef0:0x040b,0x26a038:0x040b,0x26a4f0:0x040b,
                    0x2ac8e0:0x040c0000,0x2ac2f0:0x040d0000,0x2ac2f4:0x040d0300,
-                   0x26e410:0x05dd})
+                   0x26e410:0x05dd,0x24dac4:0x07ea,0x24dd48:0x05dd,
+                   0x26e8a8:0x07ea,0x26e79c:0x109f24})
     for address,value in checks.items():
         if word(address) != value:
             raise ValueError(f'own dispatch/control literal differs at {address:08x}')
@@ -122,6 +123,7 @@ def analyze(image):
     upstream_calls = thumb_bl_candidates(image,(0x221236,))[0x221236]
     producers = [site+4 for site in pattern_sites if site+4 in upstream_calls]
     completion_calls = thumb_bl_candidates(image,(0x26dc28,))[0x26dc28]
+    dynamic_request_calls = thumb_bl_candidates(image, (0x26e25c,))[0x26e25c]
     completion_producers = [BASE+offset+10 for offset in range(0,len(image)-13,2)
                             if image[offset:offset+4] == bytes.fromhex('203f0140')
                             and BASE+offset+10 in completion_calls]
@@ -183,6 +185,13 @@ def analyze(image):
                                             'dynamic_inputs':['0x05dd..0x05e3','0x060a','0x060b'],
                                             'dynamic_post':'0x26e3ee',
                                             'scope':'MOVS r0,#13 within final two halfwords only; excludes shared tails, register/data-driven and indirect callers'},
+            'dynamic_request_predecessor':{'constructor':'0x26e25c',
+                                           'direct_call_candidates':[hex(site) for site in dynamic_request_calls],
+                                           'explicit_05dd_call':'0x24d9a8','branch_input':'0x07ea',
+                                           'branch_selector':'0x24d70e','body':'0x24d99c',
+                                           'body_gate':'owner byte +0x0a differs from 4',
+                                           'virtual_input':'helper 0x26e424 mode 2 with queued object at 0x109f28 and no prior result returns 0x07ea',
+                                           'scope':'bounded explicit selector and helper route; queued-work producer and alternate call arguments unclosed'},
             'nested_completion_decoder':{'inputs':['0x05ea','0x05eb'],
                                           'helper_case':'0x26e4e4','buffer_pointer_offset':8,
                                           'selector':'buffer byte +4 low nibble equals 6',

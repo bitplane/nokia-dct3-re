@@ -272,6 +272,18 @@ remain independent questions. In particular, 05fa/05fb dispatch recognition
 alone does not establish an additional producer: the helper also returns
 05fb after its local context/timer cleanup at 23ac4e/23ac6c.
 
+Constructor 26e25c has 33 aligned direct Thumb-BL candidates. The explicit
+05dd call at 24d9a8 is reached from input 07ea at selector 24d70e via
+24d714 ->24d99c, provided owner byte +0a differs from 4. It supplies
+null object/field2=3, then stores owner +0a=2. Status 07ea is itself virtual:
+helper 26e424, in receive mode 2 with no prior result, checks queued pointer
+`[109f24+4]` at 26e62e and returns 07ea through 26e786 when nonzero.
+It must not be requested as a DSP wire message. Qualified cold run
+`tmp/nsk1-radio-dynamic-server-request` passes boot/storage and native-radio
+checks, with zero calls to 26e25c. The queued-work producer, helper mode-2
+selection and other dynamic call arguments remain open; the callsite census
+does not close indirect callers.
+
 There is also a nested-buffer decoder, not an equivalent completion code:
 05ea/05eb select 26e4e4, which reads the buffer pointer at message +8.
 Buffer byte +4 low nibble 6 selects 23daac, with outer message byte +3
