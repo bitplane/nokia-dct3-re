@@ -19,6 +19,15 @@ MEMBERS = {'nsb1_3.pp', 'nsb1___6.71a', 'nsb1___6.71b',
            'nsb1___6.710', 'nsb1_671.doc', 'nsb-1.ini'}
 
 
+def eeprom_geometry(descriptor):
+    page_shift = ((descriptor >> 3) & 7) - 1
+    if page_shift < 0:
+        raise ValueError('EEPROM descriptor has an invalid page shift')
+    return {'descriptor': hex(descriptor), 'address_bytes': 2 if descriptor & 0x40 else 1,
+            'page_bytes': 1 << page_shift, 'capacity_bytes': 1 << ((descriptor & 7) + 9),
+            'fitted_part_proved': False}
+
+
 def inspect(source, ppm='A'):
     if ppm not in ('A', 'B'):
         raise ValueError('unsupported NSB-1 PPM selection')
@@ -57,6 +66,7 @@ def inspect(source, ppm='A'):
                             'decoded_sha1': hashlib.sha1(data).hexdigest()})
     return bytes(image), {'archive_sha256': SHA256, 'streams': streams,
                          'ppm': ppm, 'normalized_bytes': len(image),
+                         'firmware_eeprom_geometry': eeprom_geometry(image[5]),
                          'normalized_sha1': hashlib.sha1(image).hexdigest(),
                          'absent_erased_gap': ['0x2d2d00', '0x2dffff'],
                          'provisioning_supplied': False, 'boot_claim': False,

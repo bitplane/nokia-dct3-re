@@ -10,6 +10,14 @@ from tools import nsb1_package_check as checker
 
 
 class PackageTest(unittest.TestCase):
+    def test_eeprom_descriptor_fields(self):
+        geometry = checker.eeprom_geometry(0xf4)
+        self.assertEqual((2, 32, 8192), (geometry['address_bytes'], geometry['page_bytes'], geometry['capacity_bytes']))
+        self.assertFalse(geometry['fitted_part_proved'])
+        self.assertEqual(1, checker.eeprom_geometry(0xb4)['address_bytes'])
+        with self.assertRaises(ValueError):
+            checker.eeprom_geometry(0)
+
     def test_unknown_archive(self):
         with self.assertRaisesRegex(ValueError, 'acquired'):
             checker.inspect(b'not a package')

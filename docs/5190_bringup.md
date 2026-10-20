@@ -43,3 +43,27 @@ security state or internal boot/DSP mask is supplied or synthesized.
 The normalized A SHA-1 is
 `27b8f0cb8640e5b423960b206e9aee065f32d726`. Omitting `--output` is read-only.
 The checker rejects source overwrite and never extracts archive paths.
+
+## Own EEPROM initializer
+
+Routine `2ab168` reads ROM byte `200005` through its literal at `2ab1dc`.
+The own source byte is `f4`. It constructs the runtime descriptor at
+`10c4a4`: byte 0 is `(f4 >> 6) & 1 = 1`, byte 1 is
+`1 << (((f4 >> 3) & 7) - 1) = 32`, and word 4 is
+`1 << ((f4 & 7) + 9) = 8192`. This establishes the firmware-declared
+two-byte word addressing, 32-byte write page and 8 KiB capacity; it does
+not independently identify the fitted EEPROM part.
+
+Read helper `2ab0e6` calls address setup `2aaf58`. The latter checks the
+address against descriptor word 4, selects slave byte `a0` for nonzero
+descriptor byte 0, sends `address >> 8` at `2aafa8`, then sends its low byte
+at `2aafb4`, and issues repeated START/read slave `a1` for reads.
+Its zero-mode branch instead folds high address bits into the slave byte.
+Consequently a one-byte-addressed 24C16 fixture is not faithful to this
+initializer, even if its donor contents happen to satisfy a checksum.
+
+Validator `26cc4c` reads `120` bytes, calls byte-sum routine `2a0fbc` over
+the first `11c`, and compares the resulting 16-bit sum with the big-endian
+32-bit field at `11c`. This confirms one external checksum clue without
+supplying the absent calibration/identity contents. The separate checksum
+at `1fe` still requires its complete producer/reader derivation.
