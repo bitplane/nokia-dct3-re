@@ -82,7 +82,7 @@ def copy_persistent(run, source):
         shutil.copytree(source/name,run/name)
     initial = (run/'nvram/nsk1r4t/eeprom').read_bytes()
     (run/'initial_eeprom.bin').write_bytes(initial)
-    provenance = {'classification':'cold continuation of qualified own serial contact workflow',
+    provenance = {'classification':'cold continuation of qualified own persistent-input workflow',
                   'source_manifest_sha256':hashlib.sha256((source/'input_manifest.json').read_bytes()).hexdigest(),
                   'source_card_sha256':hashlib.sha256((source/'nvram/nsk1r4t/sim_card').read_bytes()).hexdigest(),
                   'copied_directories':['inputs','nvram','cfg'],'ram_or_save_state_copied':False}

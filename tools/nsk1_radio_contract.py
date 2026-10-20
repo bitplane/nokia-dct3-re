@@ -87,6 +87,8 @@ def analyze(image):
               0x24e3b8:0x109f00,0x24e094:0x03e9,
               0x20bfb0:0x09ef,0x20bd7c:0x09ec,0x20bd80:0x0a02,
               0x20bd84:0x0a03,0x20bd8c:0x07d5}
+    checks.update({0x23af00:0x10858c,0x23befc:0x05e6,0x23bf00:0x05ed,
+                   0x23c394:0x05e6,0x23c398:0x05ed,0x23c7bc:0x05e6,0x23c7c0:0x05ed})
     for address,value in checks.items():
         if word(address) != value:
             raise ValueError(f'own dispatch/control literal differs at {address:08x}')
@@ -97,7 +99,10 @@ def analyze(image):
                  0x208588:'484e7fc170a17f0070e0',
                  0x2091b2:'78a070682801',
                  0x20bd02:'203f014146484288',
-                 0x2212ce:'200fe7f9'}
+                 0x2212ce:'200fe7f9',0x23a736:'782870a08026',
+                 0x23bb6e:'21ff313b5c082800d10148e0',
+                 0x23bffe:'21ff313b5c082800d10148e2',
+                 0x23c59c:'20ff303b46595c402800d1014884'}
     for address,encoded in fragments.items():
         expected = bytes.fromhex(encoded)
         if image[address-BASE:address-BASE+len(expected)] != expected:
@@ -151,6 +156,12 @@ def analyze(image):
             'completion_recode':{'message_input':'0x05e6','helper_case':'0x26e56a',
                                   'condition':'message byte +2 is nonzero','returned_status':'0x07e5',
                                   'scope':'internal helper recode, not a raw DSP packet or a closed producer census'},
+            'completion_producer_selectors':{'constructor':'0x23a728',
+                                             'calls':['0x23bb80','0x23c010','0x23c5b0'],
+                                             'selection':'owner byte +0x13a zero selects 0x05e6; nonzero selects 0x05ed',
+                                             'message_byte2':'constructor copies owner byte +0',
+                                             'receive_call':'0x23abca','receive_owner':'0x10858c',
+                                             'scope':'three checked direct selector sites, not all indirect or computed producers'},
             'nested_completion_decoder':{'inputs':['0x05ea','0x05eb'],
                                           'helper_case':'0x26e4e4','buffer_pointer_offset':8,
                                           'selector':'buffer byte +4 low nibble equals 6',

@@ -227,6 +227,19 @@ literal 0447 at 26e898 plus the decoded subtract offset 019f establishes
 observed mode-1 request does not take. Neither is evidence that DSP type 8a
 alone satisfies this acknowledgement.
 
+Three checked direct calls to constructor 23a728 select 05e6 versus 05ed:
+23bb80, 23c010 and 23c5b0 each test owner byte +13a. Zero selects 05e6;
+nonzero selects 05ed. The constructor copies owner byte +0 to outer
+message byte +2, so selecting 05e6 alone does not prove the nonzero
+success recode. The receive helper owns context 10858c and calls the RTOS
+receiver at 23abca. Qualified initialized cold capture
+`tmp/nsk1-radio-completion-server` passes the 61-second boot/storage check
+and native radio trace checker; the server enters 23abca but has no
+observed return at 23abce, and no 05e6/05ed/05ea/05eb construction occurs.
+This bounds this boot and these direct sites, not all producers. The next
+boundary is the server's legitimate ingress; changing +13a would not make
+an absent receive occur.
+
 There is also a nested-buffer decoder, not an equivalent completion code:
 05ea/05eb select 26e4e4, which reads the buffer pointer at message +8.
 Buffer byte +4 low nibble 6 selects 23daac, with outer message byte +3
