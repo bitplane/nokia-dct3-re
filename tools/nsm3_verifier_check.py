@@ -27,7 +27,7 @@ def check(output, trace, returncode, count=116):
 def check_cobba(output, trace, returncode, expected, version=6, count=116,
                 fingerprint="c2e06006"):
     publication = re.search(
-        rf"publication: blocks={count} word0=([0-9a-f]{{4}}) word1={version:04x} word2={version:04x} word3=0006 pc=0f64", output)
+        rf"publication: blocks={count} word0=([0-9a-f]{{4}}) word1={version:04x} word2={version:04x} word3=0006 pc=0f65", output)
     if returncode != 3 or not publication or int(publication[1], 16) != expected:
         raise ValueError("staged verifier did not publish the supplied COBBA register-F value")
     # Pinned stock-input calculation in this core fixture, not a silicon verdict.

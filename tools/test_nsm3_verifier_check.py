@@ -31,7 +31,7 @@ class VerifierFrontierTest(unittest.TestCase):
             trace += f"nsm3_verifier: port_write=002c data={select} blocks=116\n"
         for read in [value] * 3 + [12, 12, value]:
             trace += f"nsm3_verifier: port_read=002d data={read:04x} blocks=116\n"
-        output = f"publication: blocks=116 word0={value:04x} word1={version:04x} word2={version:04x} word3=0006 pc=0f64 fingerprint=c2e06006 pmst=ffa8"
+        output = f"publication: blocks=116 word0={value:04x} word1={version:04x} word2={version:04x} word3=0006 pc=0f65 fingerprint=c2e06006 pmst=ffa8"
         return output, trace
 
     def test_wrong_fingerprint(self):
@@ -43,6 +43,11 @@ class VerifierFrontierTest(unittest.TestCase):
         output, trace = self.comparison(0)
         with self.assertRaises(ValueError):
             check_cobba(output.replace("pmst=ffa8", "pmst=ffa0"), trace, 3, 0)
+
+    def test_pre_publication_pc_rejected(self):
+        output, trace = self.comparison(0)
+        with self.assertRaises(ValueError):
+            check_cobba(output.replace("pc=0f65", "pc=0f64"), trace, 3, 0)
 
     def test_cobba_publication(self):
         for value in (0, 0x16):
