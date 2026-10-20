@@ -1394,6 +1394,38 @@ presentation/persistence on the native compatibility instrument, not fitted
 DSP proof, stable radio or network acceptance. Qualified capture:
 `tmp/nsk1-puk-permanent-final`.
 
+### PIN-request setting
+
+```sh
+.venv/bin/python tools/nsk1_pin_request_roundtrip.py mame/mame \
+  tmp/nsk1-pin-roundtrip-qualified tmp/nsk1-pin-request-final
+```
+
+On the authenticated PIN-enabled card, physical navigation through Settings
+→ Security settings → PIN code request, entry of PIN1234, and selection of
+Off produces DISABLE CHV (`A0 26`) with status9000 and the Done frame.
+Exactly serialized card byte3520 changes from1 to0; credentials, retry
+counters and all files remain unchanged. Native execution, own flash and
+phone identity/code storage checks pass through59 seconds.
+
+A separate41-second cold process with that persisted card and no physical
+input issues no VERIFY command, preserves the whole card, and displays the
+distinct phone Security code prompt at10/20/30/40 seconds. Disabling SIM PIN
+does not disable the phone lock.
+
+Starting from the persisted disabled card, physical phone-code authentication
+and the same Security settings menu produce ENABLE CHV (`A0 28`), status9000.
+Exactly byte3520 changes from0 to1. A further no-input cold process displays
+the exact PIN prompt at10/20/30/40 seconds, sends no VERIFY, and leaves the
+whole card unchanged. The authenticated UI requires one initial
+Menu press in this disabled-card lifecycle, versus two in the PIN-enabled
+fixture; do not reuse the input schedule without its startup authentication.
+The four-process gate requalifies the wrong/correct-PIN source capture before
+copying persistent inputs only. It checks exact ordered menu contacts,
+command statuses, whole-card differences, Done frames and cold prompt frames.
+Qualified output: `tmp/nsk1-pin-request-final`. Ordinary CHANGE CHV plus cold
+replacement-PIN verification remains open.
+
 ## Offline SMS storage
 
 ```sh
