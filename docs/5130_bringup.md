@@ -58,3 +58,40 @@ as Thumb is invalid; later interworking boundaries must be established.
 No fitted internal boot/DSP image, external EEPROM or factory identity is
 supplied by this package. Native compatibility requires an explicit,
 separately labelled instrument; source acquisition alone is not support.
+
+## Startup and upload structure
+
+`tools/nsk1_static_check.py` pins both normalized hashes and checks the
+catalogue initializer, all 28 pointer slots and descriptor payload bounds.
+Each variant has 25 nonzero descriptors; slots 11, 26 and 27 are null.
+The copy initializer declares 112 bytes destined for MCU RAM `10b260`.
+Its pointer table starts at `296d10` in the standard stream and `296d00`
+in the `2915` stream. Slot 25's descriptor is respectively `29c2e4` and
+`29d044`, with raw header `0f00 0000 00ba 0700 00b4 0000` and 186 payload
+words. The bootstrap's familiar ABI prefix does not prove a fitted DSP mask
+or that firmware selects this slot at runtime. Other descriptor addresses
+and lengths genuinely differ between variants; they are not interchangeable.
+
+ARM entry sets banked stack pointers using literal `10f370`, clears the
+own BSS starting at `100020`, then uses `ADD/BX` at `2000e4/2000e8` to
+enter Thumb at `2000ec`. These establish a 64-KiB addressed RAM requirement
+for this startup, not a fitted SRAM capacity or mirror decode.
+
+EEPROM initializer `28efb4` (standard) / `28efa4` (`2915`) reads the
+literal header address `200005` and derives the same bit fields as NSB-1:
+capacity `1 << ((descriptor & 7)+9)`, transfer page
+`1 << (((descriptor >> 3) & 7)-1)`, and address-mode bit 6. Own descriptor
+`92` therefore declares 2048 bytes, two-byte transfer pages and one-byte
+addressing. The shared helper `dct3_eeprom_descriptor.py` decodes that
+grammar while retaining distinct product values and no fitted-part claim.
+This says nothing about provisioned identity/security/calibration contents.
+
+```sh
+.venv/bin/python tools/nsk1_static_check.py roms/noki5130/5130f561a.fls
+.venv/bin/python tools/nsk1_static_check.py \
+  roms/noki5130/5130f561a-2915.fls --variant 2915
+```
+
+Both real images pass, along with initializer/payload/null-slot mutation
+controls. The next boundary is the own MCU's catalogue selection and DSP
+release/identity grammar; no release result has been synthesized.

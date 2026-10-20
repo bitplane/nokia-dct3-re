@@ -13,20 +13,12 @@ from zipfile import BadZipFile, ZipFile
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.extract_dct3_wintesla import decode_records
+from tools.dct3_eeprom_descriptor import eeprom_geometry
 
 SHA256 = '7c7167aba12342fa1ef3810c93bf518b0f8aeb79f67e9637e19d76b34e781128'
 VERSION = b'V  6.71\n25-01-01\nNSB-1\n(c) NMP.'
 MEMBERS = {'nsb1_3.pp', 'nsb1___6.71a', 'nsb1___6.71b',
            'nsb1___6.710', 'nsb1_671.doc', 'nsb-1.ini'}
-
-
-def eeprom_geometry(descriptor):
-    page_shift = ((descriptor >> 3) & 7) - 1
-    if page_shift < 0:
-        raise ValueError('EEPROM descriptor has an invalid page shift')
-    return {'descriptor': hex(descriptor), 'address_bytes': 2 if descriptor & 0x40 else 1,
-            'page_bytes': 1 << page_shift, 'capacity_bytes': 1 << ((descriptor & 7) + 9),
-            'fitted_part_proved': False}
 
 
 def security_record_directory(image):
