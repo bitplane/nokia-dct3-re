@@ -201,6 +201,17 @@ causes, not established defects. Some other diagnostic calls point at binary
 or empty data rather than plain ASCII; do not assign names by treating every
 helper argument as a zero-terminated string.
 
+Getter `2a42a0` reads byte `10ff6d`. Its observed initializer is store
+`2a456e`, which writes `0a` at 0.004768 seconds; no subsequent write is
+observed through 30 seconds. In routine `2a4522`, the literal at `2a4734`
+addresses MAD2 reset register `20001`. Its bit-0-set branch at `2a4528`
+selects this `0a` store. Thus this selector is not a direct interpretation
+of CCONT's charger-reset latch. The current MAD2 cold-reset value is `01`;
+the observed branch is consistent with that input and does not justify
+changing CCONT reset causes or clearing the MAD2 power-up indication.
+Charging initialization and its report completion still need tracing from
+this cold-reset lifecycle.
+
 Fresh passive runs observe the following without firmware RAM/MMIO writes:
 
 - runtime EEPROM descriptor is mode 1, page `20`, capacity `2000`;
