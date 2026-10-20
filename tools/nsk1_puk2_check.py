@@ -43,32 +43,38 @@ def check_exhaustion(run, previous):
     frame_check(run / 'snap/nsk1_pin_change_20.png', BLOCKED if expected_sw == 0x9840 else CODE_ERROR)
 
 
-def recovered_card(before):
+def recovered_card(before, wrong=False):
     if (len(before) != 3570 or before[ATTEMPTS_OFFSET+1] != 0
-            or before[ATTEMPTS_OFFSET+3] != 10
+            or before[ATTEMPTS_OFFSET+3] not in (9, 10)
             or before[CHV_OFFSET+8:CHV_OFFSET+16] != b'5678\xff\xff\xff\xff'):
         raise ValueError('organically exhausted PIN2 and unused PUK2 required')
     after = bytearray(before)
-    after[ATTEMPTS_OFFSET+1] = 3
-    after[CHV_OFFSET+8:CHV_OFFSET+12] = b'8765'
+    if wrong:
+        if before[ATTEMPTS_OFFSET+3] != 10:
+            raise ValueError('first PUK2 rejection requires ten retries')
+        after[ATTEMPTS_OFFSET+3] = 9
+    else:
+        after[ATTEMPTS_OFFSET+1] = 3
+        after[ATTEMPTS_OFFSET+3] = 10
+        after[CHV_OFFSET+8:CHV_OFFSET+12] = b'8765'
     return bytes(after)
 
 
-def check_recovery(run, previous):
+def check_recovery(run, previous, wrong=False):
     before = check_cold_link(run, previous)
     _, trace = check_phase(run, (run / 'initial_eeprom.bin').read_bytes(), through=59, minimum_records=1)
     check_contacts(trace, 'pin', 5)
     check_contacts(trace, 'phone', 6)
-    check_change_contacts(trace, pin2=True, puk2=True)
-    if (statuses(trace, 0x20) != [(0x9000, 3, 10)]*2
-            or statuses(trace, 0x2c) != [(0x9000, 3, 10)]
-            or re.findall(r'SIM status ins=(20|2c) ', trace) != ['20', '2c', '20']):
+    check_change_contacts(trace, pin2=True, puk2=True, wrong_puk2=wrong)
+    if (statuses(trace, 0x20) != [(0x9000, 3, 10)]*(1 if wrong else 2)
+            or statuses(trace, 0x2c) != [(0x9804 if wrong else 0x9000, 3, 10)]
+            or re.findall(r'SIM status ins=(20|2c) ', trace) != (['20', '2c'] if wrong else ['20', '2c', '20'])):
         raise ValueError('startup PIN1, UNBLOCK and automatic PIN2 verification differ')
     if any(statuses(trace, ins) for ins in (4, 0x44, 0x24, 0x26, 0x28, 0xdc, 0xd6)):
         raise ValueError('unrelated recovery operation')
-    if (run / 'nvram/nsk1r4t/sim_card').read_bytes() != recovered_card(before):
+    if (run / 'nvram/nsk1r4t/sim_card').read_bytes() != recovered_card(before, wrong):
         raise ValueError('PUK2 recovery changed unrelated card bytes')
-    frame_check(run / 'snap/nsk1_pin_change_21.png', ACCEPTED)
+    frame_check(run / 'snap/nsk1_pin_change_21.png', CODE_ERROR if wrong else ACCEPTED)
 
 
 def main():
@@ -76,6 +82,7 @@ def main():
     for name in ('source', 'two', 'one', 'zero'):
         parser.add_argument(name, type=Path)
     parser.add_argument('--recovery', nargs=2, type=Path, metavar=('RECOVER', 'COLD'))
+    parser.add_argument('--wrong-puk-cycle', nargs=3, type=Path, metavar=('WRONG', 'RECOVER', 'COLD'))
     args = parser.parse_args()
     try:
         _, wrong = check_pin(args.source / 'wrong')
@@ -92,10 +99,17 @@ def main():
             check_change(cold, recover, restore=True)
             if (cold / 'nvram/nsk1r4t/sim_card').read_bytes() != card:
                 raise ValueError('cold restored card differs from original seed')
+        if args.wrong_puk_cycle:
+            rejected, recover, cold = args.wrong_puk_cycle
+            check_recovery(rejected, args.zero, wrong=True)
+            check_recovery(recover, rejected)
+            check_change(cold, recover, restore=True)
+            if (cold / 'nvram/nsk1r4t/sim_card').read_bytes() != card:
+                raise ValueError('post-rejection restored card differs from original seed')
     except (ValueError, OSError, KeyError) as error:
         print(f'NSK-1 PIN2 exhaustion failed: {error}', file=sys.stderr)
         return 1
-    print('NSK-1 organic PIN2 exhaustion PASS' + ('; cold PUK2 recovery and authentication PASS' if args.recovery else '; recovery not implied'))
+    print('NSK-1 organic PIN2 exhaustion PASS' + ('; cold PUK2 recovery and authentication PASS' if args.recovery or args.wrong_puk_cycle else '; recovery not implied'))
     return 0
 
 

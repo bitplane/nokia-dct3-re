@@ -1479,8 +1479,15 @@ A further cold process accepts8765 and changes it back to5678. The entire
 card equals the original healthy seed. The checker requalifies that seed,
 native execution, own flash/storage, every cold link, physical contacts,
 command ordering, complete card differences and exact reviewed frames.
-This does not cover wrong-PUK2 rejection or permanent PUK2 exhaustion, and
-does not establish fitted-mask, network or long-run stability acceptance.
+Add `--wrong-puk-cycle tmp/nsk1-puk2-wrong tmp/nsk1-puk2-after-wrong
+tmp/nsk1-puk2-after-wrong-cold` for an independent rejection branch from the
+same organically blocked card. Physical PUK87654322 plus replacement and
+confirmation returns UNBLOCK9804 with Code error. Only PUK2 retry byte3519
+changes10→9; PIN2 remains blocked and both credentials remain unchanged.
+A cold correct-PUK2 recovery resets both retry counters and applies8765;
+a further cold authentication/restoration returns the whole card to the
+original seed. This does not cover permanent PUK2 exhaustion and does not
+establish fitted-mask, network or long-run stability acceptance.
 
 ### Ordinary PIN change
 

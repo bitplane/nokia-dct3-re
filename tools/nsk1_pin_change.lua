@@ -24,7 +24,8 @@ local replacement=_G.nsk1_change_pin2 and {'eight','seven','six','five','menu'} 
 if _G.nsk1_restore_pin2 then old,replacement=replacement,old end
 if _G.nsk1_wrong_pin2 then old={'five','six','seven','five','menu'} end
 if _G.nsk1_puk2 then old={'eight','seven','six','five','four','three','two','one','menu'} end
--- The card checks the old PIN only after new-code confirmation submits CHANGE CHV.
+if _G.nsk1_wrong_puk2 then old={'eight','seven','six','five','four','three','two','two','menu'} end
+-- Authentication is deferred until new-code confirmation submits the card command.
 local delay=_G.nsk1_puk2 and 2 or 0
 local phases={{60,'old',old},{64+delay,'new',replacement},{68+delay,'confirm',replacement}}
 for _,phase in ipairs(phases) do
