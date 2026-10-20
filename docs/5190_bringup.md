@@ -242,6 +242,19 @@ charging/ADC hypothesis. The source reader `2a3686` explicitly samples ADC
 selector 5 and applies calibration before returning a charger measurement;
 its calibration/units require independent validation before changing inputs.
 
+The charging state dispatcher at `224836` indexes 30 word targets at
+`22484c` using halfword `10b9a2` (structure base `10b96c`, offset `36`).
+A passive changed-value watch observes `0000 -> 0018` during initialization,
+`0018 -> 001a` at `221aba` around 0.284 seconds, `001a -> 0004` at
+`2219f2` around 3.697 seconds, then `0004 -> 0003` at `221aba` around
+5.183 seconds. State 3 remains at 29 seconds. Table entries 24, 26, 4 and
+3 point respectively to `223d3c`, `223fb6`, `224064`, and `224114`, matching
+the positively observed initialization/boot-charge/voltage-wait/disconnected
+labels. The state-3 handler tests translated events `49` and `41` before
+its ordinary continuation. This proves initialization progresses to a
+disconnected waiting state; it does not yet identify the missing report's
+ordering dependency or establish that another ADC tuple would be correct.
+
 The reusable observer now records `nsb1_input_readiness` at all five normal
 sample times. The checksum-control checker requires the five-second
 boundary `{startup_reason=0a, phase=06, reports=0e, column_mask=3f}` and asks
