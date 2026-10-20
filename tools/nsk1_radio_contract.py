@@ -38,7 +38,9 @@ def analyze(image):
     checks = {0x2941e4:0x294210,0x26a534:0x13b8,0x218c58:0x13a3,
               0x218950:0x218996,0x218c1c:0x043f,0x24d7dc:0x0834,
               0x26e234:0x03e9,0x26e230:0x10be77,0x2086c4:0x10a444,
-              0x20c914:0x0834,0x20c970:0x20a590,0x221374:0x09ec}
+              0x20c914:0x0834,0x20c970:0x20a590,0x221374:0x09ec,
+              0x26dec4:0x07d9,0x24e074:0x24dd0a,0x24df58:0x07e5,
+              0x24d6e0:0x07d6,0x26df38:0x26e20c}
     for address,value in checks.items():
         if word(address) != value:
             raise ValueError(f'own dispatch/control literal differs at {address:08x}')
@@ -64,6 +66,10 @@ def analyze(image):
                      if image[offset:offset+4] == bytes.fromhex('20a30100')]
     upstream_calls = thumb_bl_candidates(image,(0x221236,))[0x221236]
     producers = [site+4 for site in pattern_sites if site+4 in upstream_calls]
+    completion_calls = thumb_bl_candidates(image,(0x26dc28,))[0x26dc28]
+    completion_producers = [BASE+offset+10 for offset in range(0,len(image)-13,2)
+                            if image[offset:offset+4] == bytes.fromhex('203f0140')
+                            and BASE+offset+10 in completion_calls]
     return {'image_sha1':hashlib.sha1(image).hexdigest(),
             'rx_route':{'type':'0x8b','table':'0x2941c4','index':8,'handler':'0x26a440',
                         'status':'0x13b8','task':11,'consumer':'0x218996'},
@@ -81,7 +87,13 @@ def analyze(image):
                             'scope':'static mode-storage/state-6 selection contract; runtime state requires its own trace'},
             'continuation_wait':{'entry':'0x20bbf4','receive_call':'0x20bcfc',
                                  'comparison':'0x20bd02','success_input':'0x07e0',
+                                 'completion_constructor':'0x26dc28','destination_task':15,
+                                 'literal_shift_direct_bl_producers':[hex(address) for address in completion_producers],
                                  'scope':'one explicit success comparison; other lifecycle exits not closed'},
+            'nested_request':{'input':'0x07d6','task':16,'dispatcher':'0x24dff8',
+                              'state29_handler':'0x24dd0a','expected_input':'0x07e5',
+                              'request_constructor':'0x26def0','request':'0x03e9','destination_task':10,
+                              'scope':'static nested route; runtime values require observation'},
             'owner_references':literal_references(image,{0x107158,0x10716c}),
             'activation_input_references':literal_references(image,{0x043f,0x0834}),
             'member_store_candidates':{'range':['0x213000','0x218e00'],'offset':20,'addresses':stores,

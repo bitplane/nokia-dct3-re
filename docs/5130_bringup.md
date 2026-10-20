@@ -173,6 +173,30 @@ forcing 09f0/0434 or treating the user-driven state-19 path as normal boot.
 This comparison does not close every alternate exit of the surrounding
 controller. The optional 20aa2e path is not observed in this matched pair.
 
+### Nested acknowledgement route
+
+A bounded MOVS 3f / LSLS 5 / direct-BL scan finds three 07e0 constructor
+calls: 24e462, 24ebb6, 24ecee. Each calls 26dc28 with zero message pointer
+and zero status argument; the own 07e0 branch posts to task 15 without a
+DSP ring payload. This is an MCU controller acknowledgement surface, not
+evidence that hardware directly emits 07e0. No such construction is observed
+in the 61-second no-call run.
+
+The preceding request is 07d6/mode 1, observed by receive helper 26e424 as
+header 07d6018b. Dispatcher 24dff8 reads state 1d from word 109f00 and table
+24e000 index 29 selects 24dd0a. That state compares against 07e5; the 07d6
+fallback reaches 24d3f0, recognizes 07d6 and enters 24dd14. It constructs
+03e9 through 26def0: own table entry 26df38 selects 26e20c, which copies
+bytes 109ef5/109ee9 and increments counter 10be75 before posting to task 10.
+Runtime confirms object 102fd4/header 03e90100/counter 01. Cleanup helper
+26dd50 then releases retained objects; it is not a receive operation.
+
+No later 26e424 receive/return is observed in this no-call interval, so
+the next boundary is task 10's handling/completion of that 03e9 request and
+the ordinary route back to 07e5. The 07e0 producers are downstream of this
+transaction and must not be replayed to skip it. Mode/counter fields are
+observations, not values to write into firmware or synthesized replies.
+
 `tools/nsk1_radio_contract.py` checks the own image hash, critical table
 entries/instruction fragments and emits machine-readable bounded references:
 
