@@ -73,8 +73,11 @@ initializer, even if its donor contents happen to satisfy a checksum.
 Validator `26cc4c` reads `120` bytes, calls byte-sum routine `2a0fbc` over
 the first `11c`, and compares the resulting 16-bit sum with the big-endian
 32-bit field at `11c`. This confirms one external checksum clue without
-supplying the absent calibration/identity contents. The separate checksum
-at `1fe` still requires its complete producer/reader derivation.
+supplying the absent calibration/identity contents. Routine `239da4`
+independently reads `120..1fd`, sums its bytes modulo 65536, then subtracts
+the **two individual bytes** returned by the `154/155` reader `295bcc`.
+It compares that value with the big-endian u16 at `1fe`. This excludes the
+adjustment bytes from the sum; it is not subtraction of their numeric u16.
 
 ## MCU research configuration
 
@@ -230,3 +233,34 @@ used to infer a broken display: the observed firmware deliberately clears
 the self-test pattern. The next consumer-side investigation is application
 presentation after self-test, with the own EEPROM validity gates kept
 separate from hardware transport.
+
+### EEPROM checksum-only diagnostic control
+
+With initially erased storage, own self-test flag byte `10fde5` reaches
+`c4`, loses bit `40` at checksum-failure store `23a018`, becomes `80` after
+the DSP-related check, then `00` after `29a61c` clears bit 7. This is an
+observed failed integrity path, not proof of missing native execution.
+
+An explicitly labeled control recomputes only `11c..11f` and `1fe..1ff`
+in the EEPROM created by a qualified own erased-storage run. It preserves
+every calibration, identity, security and other content byte; it neither
+imports a donor nor makes erased contents into a valid factory profile.
+The runner verifies the source run's exact input manifest and unchanged
+own executable before generating the six-byte integrity control. It cannot
+chain from another checksum control or silently reuse prior NVRAM.
+
+```sh
+.venv/bin/python tools/nsb1_rom4_compare.py mame/mame roms \
+  tmp/nsb1-checksum-control --seconds 6 \
+  --checksum-control-from tmp/nsb1-rom4-comparison
+```
+
+This control retains bit `40` (`c0` at 0.5 seconds, `40` at 1/2/5 seconds),
+with the same completed native bootstrap. But the LCD traffic and final
+white frame remain unchanged. Therefore checksum consistency alone does
+**not** establish application presentation or valid provisioning. The default
+native acceptance and its strict LCD oracle remain unchanged; the diagnostic
+deliberately makes no presentation claim. Its input/output hashes and changed
+offsets are retained in the run manifest. Retire this control as a bring-up
+instrument once product-matched calibrated storage supplies its replacement;
+retain the decoded integrity formulas and this negative result.

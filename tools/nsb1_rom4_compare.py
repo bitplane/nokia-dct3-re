@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import struct
 import subprocess
 
 INPUTS = (
@@ -12,6 +13,26 @@ INPUTS = (
     ('noki5110/nse1_rom4_dsp_program.bin', 'a05a1e96a8c36ec5a47e1ea059d15afa54ca5739'),
     ('noki5110/nse1_rom4_dsp_data.bin', '024c7f970f4ef754d3e90471de48a167515f930d'),
 )
+
+
+def checksum_control(source):
+    """Own decoded integrity fields only; never claim erased contents are calibrated."""
+    if len(source) != 8192:
+        raise ValueError('checksum control requires own 8 KiB external storage')
+    result = bytearray(source)
+    security_sum = sum(source[:0x11c]) & 0xffff
+    calibration_sum = (sum(source[0x120:0x1fe]) - source[0x154] - source[0x155]) & 0xffff
+    struct.pack_into('>I', result, 0x11c, security_sum)
+    struct.pack_into('>H', result, 0x1fe, calibration_sum)
+    return bytes(result)
+
+
+def check_checksum_control(trace):
+    flags = re.findall(r'nsb1_presentation: t=([0-9.]+) selftest_flags=([0-9a-f]{2}) observer_writes=0', trace)
+    if len(flags) != 5 or [value for _, value in flags] != ['00', 'c0', '40', '40', '40']:
+        raise ValueError('checksum control did not retain the observed self-test bit 40')
+    if re.search(r'nsb1_selftest_flags: value=[0-9a-f]{2} pc=0023a018 ', trace):
+        raise ValueError('checksum-failure branch still executed in checksum control')
 
 
 def check_trace(trace, program3, program4, returncode):
@@ -63,7 +84,7 @@ def check_lcd(trace, snapshots):
                 raise ValueError(f'LCD self-test pixels mismatch: {name}')
 
 
-def prepare(root, run):
+def prepare(root, run, checksum_from=None):
     if run.exists():
         raise ValueError('use a fresh comparison directory; no prior EEPROM is admitted')
     qualified = []
@@ -72,6 +93,16 @@ def prepare(root, run):
         if hashlib.sha1(data).hexdigest() != expected:
             raise ValueError(f'unqualified comparison input: {name}')
         qualified.append((name, data, expected))
+    fixture = None
+    if checksum_from:
+        previous = json.loads((checksum_from / 'input_manifest.json').read_text())
+        if (previous.get('inputs') != [{'source': name, 'sha1': expected} for name, expected in INPUTS]
+                or previous.get('external_eeprom') != 'erased 8 KiB; no donor storage'):
+            raise ValueError('checksum source must be a qualified own erased-storage comparison')
+        if hashlib.sha1((checksum_from / 'nvram/nsb1r4t/flash').read_bytes()).hexdigest() != INPUTS[0][1]:
+            raise ValueError('checksum source executable differs')
+        original = (checksum_from / 'nvram/nsb1r4t/eeprom').read_bytes()
+        fixture = checksum_control(original)
     target = run / 'inputs/nsb1r4t'
     target.mkdir(parents=True)
     for name, data, expected in qualified:
@@ -81,6 +112,15 @@ def prepare(root, run):
                 'resident_mask': 'NSE-1 compatibility candidate; NSB-1 fitted identity unproved',
                 'dsp_clock_hz': 52000000, 'physical_dsp_clock_proved': False,
                 'boot_claim': False}
+    if fixture is not None:
+        storage = run / 'nvram/nsb1r4t'
+        storage.mkdir(parents=True)
+        (storage / 'eeprom').write_bytes(fixture)
+        manifest['external_eeprom'] = 'diagnostic checksum-only control; calibration/identity not validated'
+        manifest['checksum_source_run'] = str(checksum_from.resolve())
+        manifest['checksum_source_sha1'] = hashlib.sha1(original).hexdigest()
+        manifest['checksum_fixture_sha1'] = hashlib.sha1(fixture).hexdigest()
+        manifest['changed_offsets'] = [hex(i) for i, (a, b) in enumerate(zip(original, fixture)) if a != b]
     (run / 'input_manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     return run / 'inputs'
 
@@ -92,10 +132,12 @@ def main():
     parser.add_argument('run_dir', type=Path)
     parser.add_argument('--seconds', type=int, default=6, choices=range(1, 61))
     parser.add_argument('--verbose', action='store_true', help='include the larger native opcode inventory')
+    parser.add_argument('--checksum-control-from', type=Path,
+                        help='diagnostic only: recompute six checksum bytes from a qualified own erased-storage run')
     args = parser.parse_args()
     try:
         binary, root, run = args.binary.resolve(), args.rom_root.resolve(), args.run_dir.resolve()
-        rompath = prepare(root, run)
+        rompath = prepare(root, run, args.checksum_control_from)
         with (run / 'mame_output.log').open('w') as output:
             result = subprocess.run([
                 str(binary), 'nsb1r4t', '-rompath', str(rompath), '-noreadconfig',
@@ -109,7 +151,10 @@ def main():
             image = (rompath / 'nsb1r4t/5190f671a.fls').read_bytes()
             check_trace((run / 'error.log').read_text(), image[0xb9350:0xb9350 + 372],
                         image[0xbe570:0xbe570 + 372], result.returncode)
-            check_lcd((run / 'error.log').read_text(), run / 'snap')
+            if args.checksum_control_from is None:
+                check_lcd((run / 'error.log').read_text(), run / 'snap')
+            else:
+                check_checksum_control((run / 'error.log').read_text())
             if (run / 'nvram/nsb1r4t/flash').read_bytes() != image:
                 raise ValueError('own executable flash changed')
             if len((run / 'nvram/nsb1r4t/eeprom').read_bytes()) != 8192:
@@ -117,7 +162,8 @@ def main():
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f'NSB-1 comparison failed: {error}\n')
     status = 'native continuation PASS' if args.seconds >= 6 else f'run recorded: returncode={result.returncode}'
-    print(f'NSB-1 compatibility {status}; fitted mask/phone boot not promoted; evidence={run}')
+    qualifier = 'checksum diagnostic; presentation not accepted; ' if args.checksum_control_from else ''
+    print(f'NSB-1 compatibility {status}; {qualifier}fitted mask/phone boot not promoted; evidence={run}')
 
 
 if __name__ == '__main__':

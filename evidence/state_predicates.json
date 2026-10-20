@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_v671_checksum_only_control", "owner": "nsb1_external_storage", "status": "satisfied",
+      "predicate": "An own-source six-byte EEPROM integrity control isolates checksum failure from the remaining presentation boundary without importing calibration or forcing firmware state",
+      "current": "Own 239da4 sums bytes 120..1fd modulo 65536 and subtracts the individual 154/155 bytes; stored u16 is 1fe. Own 26cc4c compares sum 0..11b with u32 11c. The explicit control accepts only EEPROM from a qualified erased-storage native run with unchanged own executable and manifest, edits only those six integrity bytes, and records provenance/changed offsets. Self-test bit 40, cleared at 23a018 in the erased control, remains set (c0 at 0.5 s, 40 at 1/2/5 s). Native bootstrap still completes, but LCD bus traffic/final white pixels are unchanged: checksum consistency alone does not produce application presentation. No calibration/identity values are changed or validated, no donor storage or firmware writes are supplied, and no GUI/phone-service promotion follows.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_boot_observe.lua", "tools/nsb1_rom4_compare.py", "tools/test_nsb1_rom4_compare.py"]
+    },
+    {
       "id": "nsb1_v671_lcd_selftest_transport", "owner": "nsb1_lcd_interface", "status": "satisfied",
       "predicate": "The native compatibility configuration carries the own firmware's six-bank LCD clear/fill/clear traffic into the expected full-raster pixels",
       "current": "Passive MCU capture under selection 21 records commands at 2c and data at 2b. The own initialization sequence selects six 84-byte banks, with 32 commands/1008 data bytes/504 nonzero bytes at 0.5 and 1 seconds, then 68/2016/504 at 2 and 5 seconds. Named snapshots are exactly 84x48 black at 1 second and white at 5 seconds. The checker requires both ordered bus initialization/counts and decoded pixel extrema, with negative controls rejecting always-white output and missing nonzero traffic. No observer framebuffer or guest-state write is used. This is LCD self-test transport/raster acceptance, not fitted controller identity, contrast/timing, graphical application boot or phone-service parity.",

@@ -5,6 +5,15 @@ local cpu = machine.devices[':maincpu']
 local space = cpu.spaces.program
 local shared_writes, handoffs, releases = 0, 0, 0
 local serial_selection, lcd_commands, lcd_bytes, lcd_nonzero = 0, 0, 0, 0
+local selftest_writes = 0
+_G.nsb1_selftest_tap = space:install_write_tap(0x10fde4, 0x10fde7, 'nsb1_selftest_flags', function(offset, data, mask)
+    if (mask & 0x00ff0000) == 0 then return end
+    selftest_writes = selftest_writes + 1
+    if selftest_writes <= 32 then
+        machine:logerror(string.format('nsb1_selftest_flags: value=%02x pc=%08x t=%.9f observer_writes=0\n',
+            (data >> 16) & 255, cpu.state['R15'].value, machine.time:as_double()))
+    end
+end)
 _G.nsb1_lcd_tap = space:install_write_tap(0x20028, 0x2002f, 'nsb1_lcd_bus', function(offset, data, mask)
     if offset == 0x20028 and (mask & 0xff000000) ~= 0 then
         serial_selection = (data >> 24) & 255
@@ -106,6 +115,8 @@ emu.register_frame_done(function()
     end
     machine:logerror(string.format('nsb1_lcd_summary: t=%.9f commands=%d data_bytes=%d nonzero=%d observer_writes=0\n',
         now, lcd_commands, lcd_bytes, lcd_nonzero))
+    machine:logerror(string.format('nsb1_presentation: t=%.9f selftest_flags=%02x observer_writes=0\n',
+        now, space:read_u8(0x10fde5)))
     next_sample = next_sample + 1
     observing = false
 end, 'NSB-1 passive MCU boundary')

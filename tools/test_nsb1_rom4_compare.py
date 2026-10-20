@@ -1,8 +1,9 @@
 from pathlib import Path
+import struct
 import tempfile
 import unittest
 
-from tools.nsb1_rom4_compare import check_lcd, check_trace, prepare
+from tools.nsb1_rom4_compare import checksum_control, check_checksum_control, check_lcd, check_trace, prepare
 
 
 class NativeCompareTest(unittest.TestCase):
@@ -102,3 +103,32 @@ class LcdCompareTest(unittest.TestCase):
     def test_missing_nonzero_transfer(self):
         with self.assertRaisesRegex(ValueError, 'traffic'):
             check_lcd(self.trace().replace('nonzero=504', 'nonzero=0'), Path('.'))
+
+
+class ChecksumControlTest(unittest.TestCase):
+    def test_runtime_bit_retention(self):
+        trace = '\n'.join(f'nsb1_presentation: t={time} selftest_flags={value} observer_writes=0'
+                          for time, value in zip((0.1, 0.5, 1, 2, 5), ('00', 'c0', '40', '40', '40')))
+        check_checksum_control(trace)
+        with self.assertRaises(ValueError):
+            check_checksum_control(trace.replace('selftest_flags=40', 'selftest_flags=00'))
+        with self.assertRaises(ValueError):
+            check_checksum_control(trace + '\nnsb1_selftest_flags: value=84 pc=0023a018 t=0.4')
+
+    def test_only_six_integrity_bytes_change(self):
+        original = bytearray(b'\xff' * 8192)
+        original[0x154:0x156] = b'\x12\x34'
+        before = bytes(original)
+        result = checksum_control(original)
+        self.assertEqual(before, bytes(original))
+        allowed = {*range(0x11c, 0x120), 0x1fe, 0x1ff}
+        self.assertTrue({i for i, (a, b) in enumerate(zip(before, result)) if a != b} <= allowed)
+        self.assertEqual((284 * 255) & 0xffff, struct.unpack_from('>I', result, 0x11c)[0])
+        # Exclude each adjustment byte, not the numerical 0x1234 word.
+        self.assertEqual((220 * 255) & 0xffff, struct.unpack_from('>H', result, 0x1fe)[0])
+        self.assertEqual(result, checksum_control(result))
+
+    def test_wrong_geometry_refused(self):
+        for size in (2048, 4096, 16384):
+            with self.subTest(size=size), self.assertRaises(ValueError):
+                checksum_control(bytes(size))
