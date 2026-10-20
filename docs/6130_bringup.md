@@ -669,6 +669,17 @@ context prerequisite, not a demonstrated provisioning defect: a phone with
 no remembered context must still have an ordinary acquisition path. Do not
 invent a cached value merely to bypass it. The static contract/mutation
 checks now anchor the NV read, range comparisons, sentinel store and branch.
+
+The independent5130 mapping suggests an acknowledgement boundary, now
+qualified against this own ROM: helper2881e0 subtracts base0447
+(literal2883ec), thenff+a0, so input05e6 selects2880b6. Nonzero message
+byte2 loads return07e5 from2883d4; zero consumes without that result.
+The static contract and mutation tests cover the arithmetic and byte gate.
+The qualified45s `tmp/nsk3-completion-surface` capture observes neither a
+05e6 post to mailbox11 nor the helper translation, while mode-chain/cache
+checks still pass.
+This is an MCU acknowledgement candidate, not a DSP opcode; other05e6
+literals in unrelated catalogues do not establish this mailbox's producers.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
