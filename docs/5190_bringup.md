@@ -168,6 +168,23 @@ receive loop is not wholly dormant. The remaining question is which
 firmware transition reaches a legitimate input-enable continuation, not
 whether to synthesize a key IRQ through the existing column mask.
 
+The native checksum-control run extended to 30 seconds narrows the
+`26f4aa..26f4be` continuation: byte `10ffb0` reaches `06` at store
+`2aa942` around 1.249 seconds, satisfying its low-nibble comparison with 6.
+The other byte, `10c3f5`, accumulates `08 -> 0a -> 0e` at `26f420` and
+remains `0e` at 10, 20 and 29 seconds, short of the required low nibble `f`.
+Positive instruction observations associate those accumulated bits with
+logical inputs `17`, `16` and `15`. The bit-0 branch at `26f42e` requires
+logical input `14`; it is not reached in the observed interval.
+
+Own wrapper `2aaae8` calls the existing helper `2b1ee0`, then posts with
+`r0=1,r1=14` through `268a94` at `2aaaf6`. An aligned classic Thumb BL scan
+finds one direct-call candidate, `221f08`, after call `276fa8` and a flag
+OR with `40`. This does not close indirect/data-driven callers or establish
+the semantic owner of that routine. The next boundary is this report's
+organic producer lifecycle, not a missing column IRQ or an arbitrary delay
+before pressing Menu. No report or readiness byte has been injected.
+
 Fresh passive runs observe the following without firmware RAM/MMIO writes:
 
 - runtime EEPROM descriptor is mode 1, page `20`, capacity `2000`;
