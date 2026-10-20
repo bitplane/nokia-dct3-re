@@ -33,6 +33,14 @@ def check_menu(trace, snapshots):
                 raise ValueError('physical phonebook list pixels changed')
 
 
+def check_native_execution(trace):
+    samples = re.findall(r'nsb1_native_execution: t=([0-9.]+) pc=([0-9a-f]{4}) illegal=([01]) idle=[01] tx=[0-9a-f]{4}/[0-9a-f]{4} rx=[0-9a-f]{4}/[0-9a-f]{4} observer_writes=0', trace)
+    if not samples or not any(float(time) >= 5 for time, _, _ in samples):
+        raise ValueError('missing native DSP execution observations')
+    if any(illegal != '0' for _, _, illegal in samples):
+        raise ValueError('native DSP stopped on an illegal instruction; bootstrap alone is insufficient')
+
+
 def check_security_gate(trace, initialized_retry):
     contacts = re.findall(r'nsb1_phonecode_contact: index=(\d+) down=([01]) t=[0-9.]+ physical_only=1', trace)
     if contacts != [(str(index), down) for index in range(1, 7) for down in ('1', '0')]:
@@ -237,6 +245,8 @@ def main():
         (run / 'exit_status.json').write_text(json.dumps({'returncode': result.returncode}) + '\n')
         if args.seconds >= 6:
             image = (rompath / 'nsb1r4t/5190f671a.fls').read_bytes()
+            if args.menu_fixture:
+                check_native_execution((run / 'error.log').read_text())
             check_trace((run / 'error.log').read_text(), image[0xb9350:0xb9350 + 372],
                         image[0xbe570:0xbe570 + 372], result.returncode)
             if args.checksum_control_from is None:
@@ -255,13 +265,15 @@ def main():
                 check_menu((run / 'error.log').read_text(), run / 'snap')
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f'NSB-1 comparison failed: {error}\n')
-    status = 'native continuation PASS' if args.seconds >= 6 else f'run recorded: returncode={result.returncode}'
+    status = 'native bootstrap PASS' if args.seconds >= 6 else f'run recorded: returncode={result.returncode}'
     qualifier = ''
     if args.checksum_control_from:
         qualifier = ('checksum diagnostic; graphical empty-socket frame accepted; no card/service acceptance; '
                      if args.seconds >= 12 else 'checksum diagnostic; late presentation not tested; ')
     if args.insert_sim:
         qualifier = 'inserted-card experiment; card/presentation acceptance not established; '
+    if re.search(r'nsb1_native_execution: .* illegal=1 ', (run / 'error.log').read_text()):
+        qualifier += 'DSP execution fault observed; no sustained-native acceptance; '
     print(f'NSB-1 compatibility {status}; {qualifier}fitted mask/phone boot not promoted; evidence={run}')
 
 

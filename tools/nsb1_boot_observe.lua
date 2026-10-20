@@ -158,6 +158,12 @@ emu.register_frame_done(function()
         space:read_u8(0x10c4a4), space:read_u8(0x10c4a5), space:read_u32(0x10c4a8),
         space:read_u8(0x10c466), space:read_u16(0x10ad2e),
         space:read_u32(0x10adc0), space:read_u32(0x10ad50), shared_writes))
+    if machine.system.name == 'nsb1r4t' then
+        local dsp = machine.devices[':dsp_c54x:cpu']
+        machine:logerror(string.format('nsb1_native_execution: t=%.9f pc=%04x illegal=%d idle=%d tx=%04x/%04x rx=%04x/%04x observer_writes=0\n',
+            now, dsp.state['PC'].value, dsp.state['ILLEGAL'].value, dsp.state['IDLE'].value,
+            space:read_u16(0x100a4), space:read_u16(0x100a6), space:read_u16(0x101c8), space:read_u16(0x101ca)))
+    end
     machine:logerror(string.format('nsb1_interrupts: t=%.9f cpsr=%08x ctrl=%02x fiqmask=%02x fiq=%02x irq=%02x ext=%02x supervisor=%02x flag_writes=%d observer_writes=0\n',
         now, cpu.state['CPSR'].value, space:read_u8(0x2000c), space:read_u8(0x2000a),
         space:read_u8(0x20008), space:read_u8(0x20009), space:read_u8(0x20016),

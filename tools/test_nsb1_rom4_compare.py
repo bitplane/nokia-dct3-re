@@ -7,10 +7,17 @@ import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
-from tools.nsb1_rom4_compare import checksum_control, check_checksum_control, check_late_presentation, check_lcd, check_trace, check_security_gate, check_menu, prepare
+from tools.nsb1_rom4_compare import checksum_control, check_checksum_control, check_late_presentation, check_lcd, check_trace, check_security_gate, check_menu, check_native_execution, prepare
 
 
 class NativeCompareTest(unittest.TestCase):
+    def test_native_execution_is_separate_from_bootstrap(self):
+        sample = 'nsb1_native_execution: t=5.0 pc=31a5 illegal=0 idle=1 tx=0041/0041 rx=00a6/00a6 observer_writes=0'
+        check_native_execution(sample)
+        for trace in ('', sample.replace('5.0', '0.5'), sample.replace('illegal=0', 'illegal=1')):
+            with self.subTest(trace=trace), self.assertRaises(ValueError):
+                check_native_execution(trace)
+
     program3 = b'\x12\x34' * 186
     program4 = b'\x56\x78' * 186
 

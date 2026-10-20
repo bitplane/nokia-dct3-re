@@ -12,7 +12,9 @@ a blocked lifecycle. In the ordinary silent configuration, the unanswered transi
 program's resident-version publication to shared word `10004`, before the
 MCU begins sparse-flash handoffs. Separate `nsb1r4t` executes acquired NSE-1
 ROM4 as an explicit compatibility candidate: it passes own version selection,
-63 block handoffs and native loader/resident continuation. LCD bus/pixel
+63 block handoffs and native loader/resident bootstrap continuation. This
+does not establish sustained native DSP execution: the compatibility core
+stops on an illegal instruction before 0.5 s (see below). LCD bus/pixel
 acceptance reproduces firmware clear/fill/clear self-test with erased storage.
 The qualified checksum/nominal-input comparison additionally reaches the
 firmware's Insert SIM card screen. Fitted mask identity and DSP cadence remain unproved.
@@ -475,6 +477,37 @@ separate layers, rather than competing explanations. The passive read at
 The own decode now
 identifies the precise receive loop whose missing traffic matters; it still
 does not justify synthesizing a packet or clearing EEPROM policy bits.
+
+### Native execution stops before the UI milestone
+
+Direct CPU-state observations distinguish bootstrap success from a running
+DSP. At 0.5/1/2/5/10/20/30 seconds the compatibility core reports
+`ILLEGAL=1`, `IDLE=0`, PC `ffc0`, with TX producer/consumer `0041/0033`
+and RX producer/consumer `00a6/00a6`. Thus queued work is not being consumed;
+the MCU's later graphical/security progress is not sustained native operation.
+
+A bounded program-read tail catches the earlier stop at PC `1db4`, first
+observed at 0.366666667 s; later interrupt acceptance changes the exposed PC
+to `ffc0`, so that later PC must not be treated as the faulting instruction.
+The upload writes program `1d9e=fc00` (return) through native PC `31d7`
+at 0.137594269 s. Read-only program samples still see `fc00` at 0.2/0.3/0.35 s.
+At 0.362311077 s, a data-space stack write at native PC `465e`, SP `1d9e`,
+stores `465e` into that same overlaid word. Execution later branches from
+`1caa` to `1d9d`, reads `f6bb`, then reads the overwritten return and falls
+through into stack/data words, ending at `1db4` after `3798`.
+
+This establishes an observed stack/program overlap, not its root cause.
+It does not yet distinguish an emulated CPU/overlay error from an incompatible
+resident-mask ABI or incorrect stack allocation in the current composition.
+No stack pointer, return instruction or memory geometry is patched. Next
+recover the SP initialization and intervening call/interrupt stack history,
+then compare that mechanism with the independently executing NSE-1 control.
+
+The ordinary comparison reports **native bootstrap PASS** only and explicitly
+warns when CPU execution has faulted. `--menu-fixture` additionally requires
+non-illegal native samples and now rejects the earlier execution fault rather
+than waiting for the secondary 32-second reset. Neither a graphical frame nor
+the bootstrap handshake is accepted as evidence of sustained native execution.
 
 ### External reference leads, not provisioning evidence
 
