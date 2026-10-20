@@ -1284,6 +1284,7 @@ public:
 	void noki3330(machine_config &config);
 	void noki3410(machine_config &config);
 	void noki2100(machine_config &config);
+	void nam2c3(machine_config &config);
 	void noki5110(machine_config &config);
 	void noki6110(machine_config &config);
 	void nsm1r4t(machine_config &config);
@@ -3650,6 +3651,13 @@ void nokia_dct3_state::dct3_32mbit_flash_base(machine_config &config)
 	INTEL_TE28F320(config.replace(), "flash");
 }
 
+void nokia_dct3_state::nam2c3(machine_config &config)
+{
+	// Own-ROM explicit 0089/88c2 support; fitted board part remains unproved.
+	noki2100(config);
+	INTEL_28F160C3T(config.replace(), "flash");
+}
+
 void nokia_dct3_state::noki3330(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
@@ -4815,6 +4823,7 @@ private:
 };
 
 #define rom_nse1pcm rom_noki5110
+#define rom_nam2c3 rom_noki2100
 #define rom_nse1bit rom_noki5110
 #define rom_nse1pin rom_noki5110
 #define rom_nse1aclk rom_noki5110
@@ -4828,6 +4837,7 @@ private:
 //    YEAR  NAME      PARENT  COMPAT  MACHINE   INPUT     CLASS           INIT        COMPANY  FULLNAME      FLAGS
 SYST( 1999, noki3210, 0,      0,      noki3210, noki3210, nokia_dct3_state, empty_init, "Nokia", "Nokia 3210", 0 )
 SYST( 2003, noki2100, 0,      0,      noki2100, noki2100, nokia_dct3_state, empty_init, "Nokia", "Nokia 2100 (NAM-2 candidate)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nam2c3, noki2100, 0, nam2c3, noki2100, nokia_dct3_state, empty_init, "Research", "NAM-2 Intel C3 flash configuration (fitted part unproved)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
 SYST( 2026, nse1pcm, noki5110, 0, nse1pcm, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 8 kHz PCM frame fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1bit, noki5110, 0, nse1bit, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 1 MHz PCM wire fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

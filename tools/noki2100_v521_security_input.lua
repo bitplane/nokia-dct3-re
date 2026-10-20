@@ -1,6 +1,6 @@
 -- Physical contacts only; this fixture does not assert security-code acceptance.
 local machine = manager.machine
-assert(machine.system.name == 'noki2100')
+assert(machine.system.name == 'noki2100' or machine.system.name == 'nam2c3')
 local start = _G.nam2_v521_key_start or 14
 local step = _G.nam2_v521_key_step or 1
 assert(start >= 0 and step >= 0.2)

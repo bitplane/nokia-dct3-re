@@ -2,6 +2,14 @@
 
 ## Current result
 
+The own-image v5.21 `nam2c3` research configuration now renders **Code
+accepted** after physical `12345` and left softkey, preserves its EEPROM
+catalogue through parameter erases, and passes checksum/startup release on
+a cold restart of the firmware-written NVRAM. This is not usable idle or
+service parity: late physical input remains unconsumed. The C3 configuration
+is explicitly a supported-part trial, not an identification of the acquired
+board; `noki2100` retains its previous flash composition.
+
 The hash-pinned v5.84 MCU and PPM-E streams execute through a product-local NAM-2
 profile. The firmware completes CCONT and LCD traffic, performs a 64-exchange DSP
 bootstrap, acknowledges DSP service command 4, completes the type-05 external-
@@ -17,6 +25,44 @@ because the identity-derived verifier changes during the same boot.
 This is a bounded interactive compatibility result, not a default boot profile.
 No 3210, 3310, or 5210 keypad, display, SIM, service, radio, or nonvolatile-state
 contract is inherited merely because its values appear compatible.
+
+## Own v5.21 C3 storage checkpoint
+
+`nam2c3 -bios 521sharp` uses the same acquired image and the same two-byte
+checksum repair below, but selects the separate Intel C3 model. No donor
+PMM, credential edit or firmware-state write is added. The installed family-3
+identity reader `135340` enters ID mode and reads four halfwords at
+`20010a..200110` through caller `3071bc`: word addresses `85..88`, the C3
+**user** protection field, not its factory serial number. The generic model
+now reads erased user words unless supplied through an optional 18-byte
+`flash:otp` region (lock word, four factory words, four user words, BE).
+Unknown factory words remain undumped; OTP programming remains unsupported.
+The earlier unimplemented-ID fallback returned zero and incorrectly changed
+the runtime checksum from `a0aa` to `98b2`; no checksum was adjusted for that
+fallback.
+
+Fresh run `tmp/nam2-c3-otp-first-20261020` confirms family 3, checksum
+`a0aa/a0aa`, release 1, five physical digits, then the reviewed localized
+Code-accepted pixels. Unlike the uniform-block run's rejection, the original
+EEPROM catalogue survives the firmware's index-7 and index-6 erases. The
+executable prefix is unchanged. Restart
+`tmp/nam2-c3-cold-20261020` uses a copy of that persisted NVRAM in
+`tmp/nam2-c3-cold-storage-20261020`, without re-running the generator;
+checksum `a0aa/a0aa` and release 1 reproduce. Both stored identity blocks
+also validate by direct sum. The late-input restart does not consume keys:
+credential presentation in the first run is not proof of unattended idle,
+repeatable late input or network services.
+
+Reproduce the first run with `tools/nam2_c3_security_observe.lua` in debugger
+mode (`-debug -debugger none`). Seed the checksum fixture at
+`RUN/nvram/nam2c3_1/flash`. Copy the resulting NVRAM to a separate cold-run
+directory without regenerating it, then restart with the read-only
+`tools/noki2100_v521_startup_observe.lua`. Validate the captures using:
+
+```sh
+.venv/bin/python tools/nam2_c3_checkpoint_check.py \
+  roms/noki2100/2100f521sharp.fls FIRST_RUN COLD_RUN COLD_FLASH
+```
 
 ## Own v5.21 checksum fixture
 

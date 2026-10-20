@@ -62,6 +62,9 @@ private:
 		{
 			m_flash->write(0, 0x90);
 			require(m_flash->read(0) == 0x89 && m_flash->read(1) == 0x88c2, "identity");
+			require(m_flash->read(0x80) == 0xfffe, "OTP protection word");
+			for (unsigned address = 0x85; address <= 0x88; ++address)
+				require(m_flash->read(address) == 0xffff, "erased user OTP read plane");
 			require(locks(A) == 1 && locks(B) == 1, "power-up locked");
 			program(A, 0x1234);
 			require(m_flash->read(A) == 0x92 && array(A) == 0xffff, "locked program rejected");

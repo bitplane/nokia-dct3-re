@@ -1,6 +1,6 @@
 -- Read-only NAM-2 v5.21 startup observer. Run with -debug -debugger none.
 local machine = manager.machine
-assert(machine.system.name == 'noki2100')
+assert(machine.system.name == 'noki2100' or machine.system.name == 'nam2c3')
 local debugger = machine.debugger
 local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces.program
