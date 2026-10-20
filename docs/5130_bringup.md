@@ -262,6 +262,20 @@ message byte +2 to r7 +18 and returns the unchanged input in r6 through
 the 20bd02 wait still requires the downstream lifecycle path, not just
 the presence of a finalizer call.
 
+The acquired NSE-1 resident ROM4 program contains a native type-8a publisher:
+313f tests data 1949 bit 0080 and branches to 3153 when set. Otherwise it
+copies data 1867 to 1200, sets AR5 to 2 and AR3 to 1200, then CALLD 37ce
+at 314d sets packet type AR4=008a in the delay slot at 314f. The optional
+`--dsp-program` contract checks the acquired image hash and this instruction
+sequence; this does not establish the fitted NSK-1 mask.
+
+Qualified capture `tmp/nsk1-radio-native-completion-breakpoints` passes the
+61-second boot/storage checks. Exact DSP breakpoints at 313f, 314d and 3153
+have zero hits; the native type-8b response still arrives. Thus this run
+does not reach even the local 1949 gate. Its bit value alone cannot explain
+the missing 8a. The preceding native operation/entry remains to be mapped;
+neither a guessed packet nor a changed DSP control word is justified.
+
 For the mapped mode-1 continuation, 042f fails the explicit success comparison
 at 20bd02 and the subsequent 09ef, 0a02, 0410, 09ec and 0a03 selectors.
 It reaches 20bb8e; because it is not 07d5, 20bb96 calls 20cb42 with state

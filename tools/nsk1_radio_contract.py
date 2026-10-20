@@ -11,6 +11,19 @@ from tools.nse5_roller_contract import thumb_bl_candidates
 BASE = 0x200000
 
 
+def native_completion_contract(image):
+    if hashlib.sha1(image).hexdigest() != 'a05a1e96a8c36ec5a47e1ea059d15afa54ca5739':
+        raise ValueError('native completion contract requires acquired NSE-1 ROM4 program')
+    expected = bytes.fromhex('61f8 1949 0080 f830 3153 7713 1200 10f8 1867 8083 7715 0002 7713 1200 f274 37ce 7714 008a')
+    if image[0x313f*2:0x313f*2+len(expected)] != expected:
+        raise ValueError('native type-8a publisher sequence differs')
+    return {'publisher_call':'0x314d','publisher':'0x37ce','packet_type':'0x8a',
+            'delay_slot':'0x314f sets AR4 to 0x008a',
+            'payload':'two bytes at data 0x1200, copied from data 0x1867',
+            'gate':'0x313f tests data 0x1949 bit 0x0080; set branches to 0x3153 instead',
+            'scope':'resident ROM4 static path; neither execution nor fitted DSP mask is established by this contract'}
+
+
 def literal_references(image, targets):
     pools = {BASE+offset:int.from_bytes(image[offset:offset+4],'big')
              for offset in range(0,len(image)-3,4)
@@ -139,9 +152,13 @@ def analyze(image):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image',type=Path)
+    parser.add_argument('--dsp-program',type=Path)
     args = parser.parse_args()
     try:
-        print(json.dumps(analyze(args.image.read_bytes()),indent=2))
+        result = analyze(args.image.read_bytes())
+        if args.dsp_program:
+            result['native_completion'] = native_completion_contract(args.dsp_program.read_bytes())
+        print(json.dumps(result,indent=2))
     except (OSError,ValueError) as error:
         parser.exit(1,f'NSK-1 radio contract failed: {error}\n')
 

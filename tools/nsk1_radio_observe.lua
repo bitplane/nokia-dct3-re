@@ -6,6 +6,10 @@ local machine = manager.machine
 local cpu = machine.devices[':maincpu']
 local dsp = machine.devices[':dsp_c54x:cpu']
 local memory = cpu.spaces.program
+machine.debugger:command('focus :dsp_c54x:cpu')
+for _, address in ipairs({'313f', '314d', '3153'}) do
+    machine.debugger:command('bpset '..address..',1,{logerror "nsk1_radio_native_completion: pc=%04x state1949=%04x channel1867=%04x observer_writes=0\\n",pc,w@1949,w@1867;g}')
+end
 machine.debugger:command('focus :maincpu')
 machine.debugger:command('temp7=0')
 machine.debugger:command('bpset 27341a,d@r13>=100000&&d@r13<110000&&b@(d@r13+3)==8b&&temp7<8,{temp7=temp7+1;logerror "nsk1_radio_receive_return: object=%08x header=%08x caller=%08x observer_writes=0\\n",d@r13,d@(d@r13),d@(r13+14);g}')

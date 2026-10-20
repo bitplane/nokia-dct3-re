@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsk1_radio_contract import literal_references,analyze
+from tools.nsk1_radio_contract import literal_references,analyze,native_completion_contract
 
 
 class Nsk1RadioContractTest(unittest.TestCase):
@@ -19,6 +19,10 @@ class Nsk1RadioContractTest(unittest.TestCase):
     def test_requires_own_exact_image(self):
         with self.assertRaisesRegex(ValueError,'own standard'):
             analyze(bytes(1024))
+
+    def test_native_publisher_rejects_unqualified_program(self):
+        with self.assertRaisesRegex(ValueError, 'acquired NSE-1'):
+            native_completion_contract(bytes(1024))
 
 
 if __name__ == '__main__':
