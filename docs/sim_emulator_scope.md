@@ -203,15 +203,20 @@ rehabilitates EF_ADN. Capability discovery combines service3 in EF_SST with
 ADN activation/validity. An invalid EF normally refuses application access;
 its file status may explicitly permit reads/updates while invalidated.
 
-The current model cannot represent this faithfully: `file_descriptor`
-has only CHV1-read and ADM-update booleans, FCP always reports valid files,
-and there is no EF_FDN body or persistent validity state. Do not implement
-this as a handset-specific latch or by changing EF_SST alone.
+File descriptors now declare explicit ALWAYS/CHV1/CHV2/ADM/NEVER access
+conditions, shared by FCP and execution. Existing policies are retained;
+read-only files now correctly advertise UPDATE=NEVER rather than ALWAYS.
+The serial conformance suite and a fresh NSM-1 physical PIN/phone-code
+Messages boot pass. CHV2 policy is preparatory: no EF selects it yet, so
+its protected-write lifecycle is not accepted by these runs.
+FCP still reports valid files and there is no EF_FDN body or persistent
+validity state. Do not implement those as a handset-specific latch or by
+changing EF_SST alone.
 
 Implementation order and acceptance:
 
-1. Extend access metadata for CHV2 without changing existing file policies.
-   Test authorization before/after VERIFY, activation and reset; FCP must
+1. Exercise CHV2 metadata with the new EF before accepting that policy:
+   test authorization before/after VERIFY, activation and reset; FCP must
    describe exactly the permissions the command handlers enforce.
 2. Add an explicitly configured FDN card profile, its records and ADN
    validity. Keep the base profile's service advertisement unchanged.

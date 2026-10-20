@@ -387,7 +387,7 @@ nokia_sim_card_device::selected_file_for(access_shape shape)
 
 bool nokia_sim_card_device::read_permitted(const file_descriptor &file)
 {
-	if (!file.read_chv1 || chv1_authorized())
+	if (condition_satisfied(file.read_condition()))
 		return true;
 	queue_status(0x98, 0x04);
 	return false;
@@ -1404,12 +1404,7 @@ void nokia_sim_card_device::queue_fcp(u16 fid, unsigned requested)
 			const unsigned size = file->size;
 			u8 fcp[15] = { 0, 0, u8(size >> 8), u8(size), u8(fid >> 8), u8(fid),
 				0x04, 0, 0, 0, 0, 0x01, 0x02, 0x00, 0x00 };
-			if (file->mutable_data)
-				fcp[8] = 0x01; // UPDATE requires CHV1 (satisfied while disabled).
-			if (file->update_adm)
-				fcp[8] = 0x04; // Laboratory ADM level; no ADM credential is implemented.
-			if (file->read_chv1)
-				fcp[8] |= 0x10;
+			fcp[8] = (u8(file->read_condition()) << 4) | u8(file->update_condition());
 			if (file->fid == 0x6f39)
 			{
 				// EF_ACM is READ/UPDATE/INCREASE under CHV1. Access-condition
@@ -1662,52 +1657,53 @@ void nokia_sim_card_device::increase_record()
 
 const nokia_sim_card_device::file_descriptor *nokia_sim_card_device::find_file(u16 fid)
 {
+	using ac = access_condition;
 	static constexpr file_descriptor files[] = {
-		{ 0x3f00, 0x0000, 0, 0, file_structure::directory, false },
-		{ 0x7f10, 0x3f00, 0, 0, file_structure::directory, false },
-		{ 0x7f20, 0x3f00, 0, 0, file_structure::directory, false },
-		{ 0x7f21, 0x3f00, 0, 0, file_structure::directory, false },
-		{ 0x7f40, 0x3f00, 0, 0, file_structure::directory, false },
-		{ 0x2fe2, 0x3f00, 10, 0, file_structure::transparent, false },
-		{ 0x2fe6, 0x3f00, 4, 0, file_structure::transparent, false },
-		{ 0x6f3a, 0x7f10, 50 * 32, 32, file_structure::linear_fixed, true, true },
+		{ 0x3f00, 0x0000, 0, 0, file_structure::directory, ac::never },
+		{ 0x7f10, 0x3f00, 0, 0, file_structure::directory, ac::never },
+		{ 0x7f20, 0x3f00, 0, 0, file_structure::directory, ac::never },
+		{ 0x7f21, 0x3f00, 0, 0, file_structure::directory, ac::never },
+		{ 0x7f40, 0x3f00, 0, 0, file_structure::directory, ac::never },
+		{ 0x2fe2, 0x3f00, 10, 0, file_structure::transparent, ac::never },
+		{ 0x2fe6, 0x3f00, 4, 0, file_structure::transparent, ac::never },
+		{ 0x6f3a, 0x7f10, 50 * 32, 32, file_structure::linear_fixed, ac::chv1, ac::chv1 },
 		{ 0x6f3c, 0x7f10, sms_record_count * sms_record_length,
-				sms_record_length, file_structure::linear_fixed, true, true },
+				sms_record_length, file_structure::linear_fixed, ac::chv1, ac::chv1 },
 		{ 0x6f42, 0x7f10, smsp_record_count * smsp_record_length,
-				smsp_record_length, file_structure::linear_fixed, true, true },
-		{ 0x6f05, 0x7f20, 4, 0, file_structure::transparent, false },
-		{ 0x6fb7, 0x7f20, 15, 0, file_structure::transparent, false },
-		{ 0x6fad, 0x7f20, 4, 0, file_structure::transparent, false },
-		{ 0x6f07, 0x7f20, 9, 0, file_structure::transparent, false, true, true },
-		{ 0x6f38, 0x7f20, 15, 0, file_structure::transparent, false, true, true },
-		{ 0x6f74, 0x7f20, 16, 0, file_structure::transparent, true, true },
-		{ 0x6f78, 0x7f20, 2, 0, file_structure::transparent, false, true, true },
-		{ 0x6f7e, 0x7f20, 11, 0, file_structure::transparent, true, true },
-		{ 0x6f20, 0x7f20, 9, 0, file_structure::transparent, true, true },
-		{ 0x6f30, 0x7f20, 24, 0, file_structure::transparent, true, true },
-		{ 0x6f7b, 0x7f20, 12, 0, file_structure::transparent, true, true },
-		{ 0x6fae, 0x7f20, 1, 0, file_structure::transparent, false },
-		{ 0x6f31, 0x7f20, 1, 0, file_structure::transparent, false, true, true },
+				smsp_record_length, file_structure::linear_fixed, ac::chv1, ac::chv1 },
+		{ 0x6f05, 0x7f20, 4, 0, file_structure::transparent, ac::never },
+		{ 0x6fb7, 0x7f20, 15, 0, file_structure::transparent, ac::never },
+		{ 0x6fad, 0x7f20, 4, 0, file_structure::transparent, ac::never },
+		{ 0x6f07, 0x7f20, 9, 0, file_structure::transparent, ac::adm, ac::chv1 },
+		{ 0x6f38, 0x7f20, 15, 0, file_structure::transparent, ac::adm, ac::chv1 },
+		{ 0x6f74, 0x7f20, 16, 0, file_structure::transparent, ac::chv1, ac::chv1 },
+		{ 0x6f78, 0x7f20, 2, 0, file_structure::transparent, ac::adm, ac::chv1 },
+		{ 0x6f7e, 0x7f20, 11, 0, file_structure::transparent, ac::chv1, ac::chv1 },
+		{ 0x6f20, 0x7f20, 9, 0, file_structure::transparent, ac::chv1, ac::chv1 },
+		{ 0x6f30, 0x7f20, 24, 0, file_structure::transparent, ac::chv1, ac::chv1 },
+		{ 0x6f7b, 0x7f20, 12, 0, file_structure::transparent, ac::chv1, ac::chv1 },
+		{ 0x6fae, 0x7f20, 1, 0, file_structure::transparent, ac::never },
+		{ 0x6f31, 0x7f20, 1, 0, file_structure::transparent, ac::adm, ac::chv1 },
 		// GSM 11.11 10.2.6/10.2.12: this laboratory profile fixes UPDATE
 		// to CHV1 during administration, as for its existing EF_ACM.
-		{ 0x6f37, 0x7f20, 3, 0, file_structure::transparent, true, true },
-		{ 0x6f39, 0x7f20, 3, 3, file_structure::cyclic, true, true },
-		{ 0x6f41, 0x7f20, 5, 0, file_structure::transparent, true, true },
-		{ 0x6f43, 0x7f10, 2, 0, file_structure::transparent, true, true },
-		{ 0x6f46, 0x7f20, 17, 0, file_structure::transparent, false },
-		{ 0x6f13, 0x7f20, 1, 0, file_structure::transparent, false },
-		{ 0x6f98, 0x7f40, 22, 0, file_structure::transparent, false },
-		{ 0x6f9b, 0x7f40, 37, 0, file_structure::transparent, false },
-		{ 0x6f91, 0x7f40, 1, 0, file_structure::transparent, false },
-		{ 0x6f93, 0x7f40, 1, 0, file_structure::transparent, false },
-		{ 0x6f95, 0x7f40, 29, 0, file_structure::transparent, false },
-		{ 0x6f96, 0x7f40, 29, 0, file_structure::transparent, false },
-		{ 0x6f9f, 0x7f40, 1, 0, file_structure::transparent, false },
-		{ 0x6f92, 0x7f40, 1, 0, file_structure::transparent, false },
-		{ 0x6f16, 0x7f20, 3, 0, file_structure::transparent, false },
-		{ 0x6f15, 0x7f20, 18, 0, file_structure::transparent, false },
-		{ 0xea00, 0x7f20, 18, 0, file_structure::transparent, false },
-		{ 0xea03, 0x7f20, 11, 0, file_structure::transparent, false }
+		{ 0x6f37, 0x7f20, 3, 0, file_structure::transparent, ac::chv1, ac::chv1 },
+		{ 0x6f39, 0x7f20, 3, 3, file_structure::cyclic, ac::chv1, ac::chv1 },
+		{ 0x6f41, 0x7f20, 5, 0, file_structure::transparent, ac::chv1, ac::chv1 },
+		{ 0x6f43, 0x7f10, 2, 0, file_structure::transparent, ac::chv1, ac::chv1 },
+		{ 0x6f46, 0x7f20, 17, 0, file_structure::transparent, ac::never },
+		{ 0x6f13, 0x7f20, 1, 0, file_structure::transparent, ac::never },
+		{ 0x6f98, 0x7f40, 22, 0, file_structure::transparent, ac::never },
+		{ 0x6f9b, 0x7f40, 37, 0, file_structure::transparent, ac::never },
+		{ 0x6f91, 0x7f40, 1, 0, file_structure::transparent, ac::never },
+		{ 0x6f93, 0x7f40, 1, 0, file_structure::transparent, ac::never },
+		{ 0x6f95, 0x7f40, 29, 0, file_structure::transparent, ac::never },
+		{ 0x6f96, 0x7f40, 29, 0, file_structure::transparent, ac::never },
+		{ 0x6f9f, 0x7f40, 1, 0, file_structure::transparent, ac::never },
+		{ 0x6f92, 0x7f40, 1, 0, file_structure::transparent, ac::never },
+		{ 0x6f16, 0x7f20, 3, 0, file_structure::transparent, ac::never },
+		{ 0x6f15, 0x7f20, 18, 0, file_structure::transparent, ac::never },
+		{ 0xea00, 0x7f20, 18, 0, file_structure::transparent, ac::never },
+		{ 0xea03, 0x7f20, 11, 0, file_structure::transparent, ac::never }
 	};
 	for (const auto &file : files)
 		if (file.fid == fid)
@@ -1828,10 +1824,22 @@ const u8 *nokia_sim_card_device::mutable_file_data(u16 fid) const
 
 bool nokia_sim_card_device::access_allowed(const file_descriptor &file) const
 {
-	// Mutable laboratory files use the CHV1 update condition.  GSM 11.11
-	// treats it as ALWAYS while CHV1 is disabled, otherwise verification is
-	// scoped to the current card session.
-	return file.mutable_data && chv1_authorized();
+	// FCP and execution share the same declared update policy. ADM remains
+	// unavailable in the laboratory profile; no credential is synthesized.
+	return condition_satisfied(file.update_condition());
+}
+
+bool nokia_sim_card_device::condition_satisfied(access_condition condition) const
+{
+	switch (condition)
+	{
+	case access_condition::always: return true;
+	case access_condition::chv1: return chv1_authorized();
+	case access_condition::chv2: return m_chv_attempts[1] != 0 && m_chv_verified[1];
+	case access_condition::adm:
+	case access_condition::never: return false;
+	}
+	return false;
 }
 
 bool nokia_sim_card_device::chv1_authorized() const

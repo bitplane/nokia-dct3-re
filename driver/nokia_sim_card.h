@@ -68,6 +68,7 @@ protected:
 private:
 	TIMER_CALLBACK_MEMBER(toolkit_command_ready);
 	enum class file_structure : u8 { directory, transparent, linear_fixed, cyclic };
+	enum class access_condition : u8 { always = 0, chv1 = 1, chv2 = 2, adm = 4, never = 15 };
 	struct file_descriptor
 	{
 		u16 fid;
@@ -75,9 +76,16 @@ private:
 		u16 size;
 		u8 record_length;
 		file_structure structure;
-		bool mutable_data;
-		bool read_chv1 = false;
-		bool update_adm = false;
+		access_condition update_access;
+		access_condition read_access = access_condition::always;
+		access_condition read_condition() const
+		{
+			return read_access;
+		}
+		access_condition update_condition() const
+		{
+			return update_access;
+		}
 	};
 
 	// The structure a command requires of the EF it is addressed to. Named
@@ -136,6 +144,7 @@ private:
 	const u8 *mutable_file_data(u16 fid) const;
 	bool access_allowed(const file_descriptor &file) const;
 	bool chv1_authorized() const;
+	bool condition_satisfied(access_condition condition) const;
 	void initialize_sms_files();
 	void initialize_plmn_files();
 
