@@ -269,12 +269,24 @@ at 314d sets packet type AR4=008a in the delay slot at 314f. The optional
 `--dsp-program` contract checks the acquired image hash and this instruction
 sequence; this does not establish the fitted NSK-1 mask.
 
-Qualified capture `tmp/nsk1-radio-native-completion-breakpoints` passes the
-61-second boot/storage checks. Exact DSP breakpoints at 313f, 314d and 3153
-have zero hits; the native type-8b response still arrives. Thus this run
-does not reach even the local 1949 gate. Its bit value alone cannot explain
-the missing 8a. The preceding native operation/entry remains to be mapped;
-neither a guessed packet nor a changed DSP control word is justified.
+CPU-qualified breakpoints with explicitly DSP-scoped data expressions are
+required here: debugger `focus` controls observation, not the CPU used by an
+unqualified breakpoint or expression. Earlier unqualified DSP breakpoint
+negatives are not evidence. Capture `tmp/nsk1-radio-native-operation-scoped`
+passes the 61-second boot/storage checks and positively observes native
+entries 3000, 3076 and search handler 3d5e, but no entry at 30bf, 30f5,
+313f, 314d or 3153. Thus the operation initializes but does not reach the
+local 1949 gate. Its bit value alone cannot explain the missing 8a.
+The selector at 3078 calls 31ae with AR2=4. That helper computes T=15-AR2
+and returns BITT of data 06d1; C54x bit numbering therefore selects physical
+bit 4 (mask 0010), not bit 11. Clear TC enters the service loop at 307e;
+the set path reaches 3096 and subsequently requires 06e3 bit 0 before 30bf.
+The qualified final capture `tmp/nsk1-radio-native-operation-final` repeats
+the positive entries and samples 06d1=010e, 06e3=0000, 1949=0000 at
+30.5, 33, 36, 50 and 59 seconds, with the boot/storage checks passing.
+The sampled control word leaves bit 4 clear. Its legitimate setter and the
+operation that requests it are the next boundary; neither a guessed packet
+nor a changed DSP control word is justified.
 
 For the mapped mode-1 continuation, 042f fails the explicit success comparison
 at 20bd02 and the subsequent 09ef, 0a02, 0410, 09ec and 0a03 selectors.

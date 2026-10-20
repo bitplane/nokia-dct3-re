@@ -17,10 +17,14 @@ def native_completion_contract(image):
     expected = bytes.fromhex('61f8 1949 0080 f830 3153 7713 1200 10f8 1867 8083 7715 0002 7713 1200 f274 37ce 7714 008a')
     if image[0x313f*2:0x313f*2+len(expected)] != expected:
         raise ValueError('native type-8a publisher sequence differs')
+    selector = bytes.fromhex('e80f 08f8 0012 880e fe00 34f8 06d1')
+    if image[0x31ae*2:0x31ae*2+len(selector)] != selector:
+        raise ValueError('native control selector sequence differs')
     return {'publisher_call':'0x314d','publisher':'0x37ce','packet_type':'0x8a',
             'delay_slot':'0x314f sets AR4 to 0x008a',
             'payload':'two bytes at data 0x1200, copied from data 0x1867',
             'gate':'0x313f tests data 0x1949 bit 0x0080; set branches to 0x3153 instead',
+            'preceding_control':'0x3078 calls 0x31ae with AR2=4; BITT uses T=15-AR2 against data 0x06d1, selecting physical bit 4',
             'scope':'resident ROM4 static path; neither execution nor fitted DSP mask is established by this contract'}
 
 

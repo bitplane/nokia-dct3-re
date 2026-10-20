@@ -6,11 +6,16 @@ local machine = manager.machine
 local cpu = machine.devices[':maincpu']
 local dsp = machine.devices[':dsp_c54x:cpu']
 local memory = cpu.spaces.program
-machine.debugger:command('focus :dsp_c54x:cpu')
-for _, address in ipairs({'313f', '314d', '3153'}) do
-    machine.debugger:command('bpset '..address..',1,{logerror "nsk1_radio_native_completion: pc=%04x state1949=%04x channel1867=%04x observer_writes=0\\n",pc,w@1949,w@1867;g}')
+machine.debugger:command('temp0=0')
+for index, address in ipairs({'3000','3076','30bf','30f5','3d5e','313f','3153'}) do
+    local bit = string.format('%x', 1 << (index - 1))
+    machine.debugger:command('bpset '..address..'::dsp_c54x:cpu,(temp0&'..bit..')==0,{temp0=temp0|'..bit..';logerror "nsk1_radio_native_entry: pc='..address..' control06e3=%04x state1949=%04x search0284=%04x observer_writes=0\\n",dsp_c54x:cpu.dw@6e3,dsp_c54x:cpu.dw@1949,dsp_c54x:cpu.dw@284;g}')
+end
+for _, address in ipairs({'314d'}) do
+    machine.debugger:command('bpset '..address..'::dsp_c54x:cpu,1,{logerror "nsk1_radio_native_completion: pc='..address..' state1949=%04x channel1867=%04x observer_writes=0\\n",dsp_c54x:cpu.dw@1949,dsp_c54x:cpu.dw@1867;g}')
 end
 machine.debugger:command('focus :maincpu')
+machine.debugger:command('observe :dsp_c54x:cpu')
 machine.debugger:command('temp7=0')
 machine.debugger:command('bpset 27341a,d@r13>=100000&&d@r13<110000&&b@(d@r13+3)==8b&&temp7<8,{temp7=temp7+1;logerror "nsk1_radio_receive_return: object=%08x header=%08x caller=%08x observer_writes=0\\n",d@r13,d@(d@r13),d@(r13+14);g}')
 machine.debugger:command('temp6=0')
@@ -176,6 +181,9 @@ emu.register_frame_done(function()
         index = index+1
     end
     if frame <= #times and now >= times[frame] then
+        machine:logerror(string.format('nsk1_radio_native_state: t=%.9f control06d1=%04x control06e3=%04x state1949=%04x search0284=%04x observer_writes=0\n',
+            now, dsp.spaces.data:read_u16(0x06d1), dsp.spaces.data:read_u16(0x06e3),
+            dsp.spaces.data:read_u16(0x1949), dsp.spaces.data:read_u16(0x0284)))
         machine.screens[':screen']:snapshot('nsk1_radio_'..frame..'.png')
         frame = frame+1
         if frame > #times then
