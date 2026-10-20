@@ -142,6 +142,14 @@ task-message producer, remain the boundary to recover.
 
 The next contract to recover is how ordinary idle is expected to service
 pending work or restore global delivery when the deep-sleep guard declines.
+The hash-qualified extractor's `idle_control_flow` checks both guard exits,
+the explicit-enable block and the complete clock helper. A zero guard branches
+to `2f85f4` (argument zero); a nonzero guard reaches `2f85f6` with argument
+one after accounting. Neither traverses `2f865a`'s control-`05` write. Both
+helper arms resolve their own literal base to `20000`, clear clock bit 0,
+and converge on `2000d`; only the nonzero arm sets bit 1. The helper contains
+no global-enable store. This closes a firmware-restoration interpretation of
+that helper, not the physical meaning of the two clock bits.
 Do not auto-write control `05`, alter software timer results or change the
 credential on this evidence. The accepted-code presentation and persistent
 storage are independent of this still-open idle/interrupt boundary.

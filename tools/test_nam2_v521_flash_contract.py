@@ -2,7 +2,7 @@ import unittest
 import struct
 from pathlib import Path
 
-from tools.nam2_v521_flash_contract import inspect, select_family, check_package, sleep_accounting_contract
+from tools.nam2_v521_flash_contract import inspect, select_family, check_package, sleep_accounting_contract, idle_control_contract
 
 
 class Nam2FlashContractTest(unittest.TestCase):
@@ -50,6 +50,10 @@ class Nam2FlashContractTest(unittest.TestCase):
         if not source.exists():
             self.skipTest("acquired NAM-2 v5.21 image not present")
         result = inspect(source.read_bytes())
+        idle = result['idle_control_flow']
+        self.assertFalse(idle['helper_restores_global_delivery'])
+        self.assertFalse(idle['all_idle_exit_traverses_explicit_enable'])
+        self.assertEqual('0x2000d', idle['clock_store_target'])
         self.assertEqual(10, len(result["rows"]))
         self.assertEqual((1, 0xB0, 0xFFFF, 0xFFFF), result["rows"][2])
         self.assertEqual(1, result["selected_family"])
@@ -74,6 +78,16 @@ class Nam2FlashContractTest(unittest.TestCase):
         self.assertTrue(timer['divide_preserves_r2'])
         self.assertEqual(['0x10f9fa']*2,[store['target'] for store in timer['stores']])
         self.assertFalse(any(store['is_mad2_mmio'] for store in timer['stores']))
+
+    def test_idle_contract_rejects_changed_return_or_clock_base(self):
+        source = Path(__file__).resolve().parents[1] / 'roms/noki2100/2100f521sharp.fls'
+        if not source.exists():
+            self.skipTest('acquired NAM-2 image not present')
+        for offset in (0xf868a, 0x104c56, 0x104c70):
+            image = bytearray(source.read_bytes())
+            image[offset] ^= 1
+            with self.assertRaises(ValueError):
+                idle_control_contract(image)
 
     def test_package_prefix_when_available(self):
         root = Path(__file__).resolve().parents[1]

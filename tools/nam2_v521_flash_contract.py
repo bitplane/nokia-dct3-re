@@ -90,6 +90,38 @@ def sleep_accounting_contract(image):
             'divide_preserves_r2':True,'stores':stores}
 
 
+def idle_control_contract(image):
+    """Qualify the two idle exits and the complete clock helper separately."""
+    blocks = (
+        (0x2f8658, '2005732078282800d0cb78282800d0c8e7fb'),
+        (0x2f8688, '2800d0b3f002fb492001e7b0'),
+        (0x304c2e, 'b5102800d1072002f002fc3d490d7b4a20fe4010e008'
+                     '24021c20f002fc3449087b484320104000407348bd10'),
+    )
+    for address, expected in blocks:
+        payload = bytes.fromhex(expected)
+        if image[address-BASE:address-BASE+len(payload)] != payload:
+            raise ValueError(f'idle control-flow block differs at {address:#x}')
+    # Both arms converge on STRB [R1+0xd]; resolve both PC-relative bases.
+    bases = []
+    for address in (0x304c3a, 0x304c4c):
+        word = struct.unpack_from('>H', image, address-BASE)[0]
+        literal = ((address+4)&~3)+(word&0xff)*4
+        bases.append(struct.unpack_from('>I', image, literal-BASE)[0])
+    if bases != [0x20000, 0x20000]:
+        raise ValueError('clock-helper MMIO base differs')
+    return {'explicit_enable': '0x2f865a', 'enable_value': 5,
+            'guard_return': '0x2f8688',
+            'zero_guard_target': '0x2f85f4',
+            'nonzero_guard_target': '0x2f85f6',
+            'clock_helper': '0x304c2e', 'clock_store': '0x304c56',
+            'clock_store_target': '0x2000d',
+            'both_helper_arms_clear_bit0': True,
+            'nonzero_argument_sets_bit1': True,
+            'helper_restores_global_delivery': False,
+            'all_idle_exit_traverses_explicit_enable': False}
+
+
 def inspect(image):
     if hashlib.sha1(image).hexdigest() != SHA1:
         raise ValueError("requires the unchanged acquired NAM-2 v5.21 image")
@@ -130,6 +162,7 @@ def inspect(image):
         },
         "erase_geometry": "not established by algorithm selection",
         "software_sleep_accounting_writers": sleep_accounting_contract(image),
+        "idle_control_flow": idle_control_contract(image),
         "idle_irq3_event": {
             "handler": "0x3075c8", "schedule": "0x2abaf4",
             "cancel": "0x2ab970", "event": 0x79, "delay": 0x4b,
