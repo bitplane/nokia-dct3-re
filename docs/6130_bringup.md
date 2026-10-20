@@ -543,6 +543,20 @@ own-ROM selectors, instructions and context. The qualified contract checker
 now anchors these relationships too. The0a30 producer and its prerequisites
 remain unresolved; no computed/table-driven producer closure is claimed.
 
+The bounded MOVS r0,a3 / LSLS r0,4 / direct-BL pattern scan finds five
+own calls to constructor21a782:21c44a,21c68c,21eb00,21eff8,21f4b0.
+Each is preceded by a store to owner register r6+1d (2,3,1,2,3).
+This is pattern coverage, not exhaustive construction coverage. Runtime
+`tmp/nsk3-controller-lifecycle` observes constructor inputs0a35 (caller21a761),
+0a25 (21d0a1),09ec (21f391), but no0a30. The receive helper21a8cc sees
+15870000/15920000/158b006d and then043c0000 (caller21f395). Own subtract
+arithmetic maps043c to21ab4c, which clears context byte6 and rejoins cleanup;
+the helper retains nonzero status043c for return. Therefore this object must
+not be described as a missing09ec response merely because it differs from
+the caller's09f0 success test. The caller's subsequent21ca46 path and later
+controller lifecycle remain to be traced. The full packet/cache gate still
+passes on this45s run, and state3/phase1 remain unchanged.
+
 ```sh
 .venv/bin/python tools/nsk3_packet_check.py roms/noki6130/source \
   tmp/nsk3-cache-qualified --delivery --cache
