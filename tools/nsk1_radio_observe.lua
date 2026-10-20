@@ -56,6 +56,7 @@ machine.debugger:command('bpset 23a728,(r0==5e6||r0==5ed||r0==5ea||r0==5eb)&&r1>
 machine.debugger:command('bpset 23abca,(temp0&1000)==0,{temp0=temp0|1000;logerror "nsk1_radio_completion_server_wait: pc=23abca observer_writes=0\\n";g}')
 machine.debugger:command('bpset 23abce,r0>=100000&&r0<110000&&temp0<200000,{temp0=temp0+10000;logerror "nsk1_radio_completion_server_receive: object=%08x header=%08x observer_writes=0\\n",r0,d@r0;g}')
 machine.debugger:command('bpset 26e25c,1,{logerror "nsk1_radio_dynamic_request: input=%04x object=%08x field2=%02x caller=%08x observer_writes=0\\n",r0,r1,r2,r14;g}')
+machine.debugger:command('bpset 26e424,r0==2&&(temp0&2000)==0,{temp0=temp0|2000;logerror "nsk1_radio_queue_poll: mode=2 caller=%08x queue=%08x observer_writes=0\\n",r14,d@109f28;g}')
 machine.debugger:command('temp9=0')
 machine.debugger:command('bpset 22137e,r0>=100000&&r0<110000&&temp9<40,{temp9=temp9+1;logerror "nsk1_radio_controller_receive: object=%08x header=%08x caller=%08x observer_writes=0\\n",r0,d@r0,d@(r13+10);g}')
 machine.debugger:command('bpset 26e642,r0>=100000&&r0<110000&&temp9<40,{temp9=temp9+1;logerror "nsk1_radio_task16_receive: object=%08x header=%08x caller=%08x waitmode=%08x observer_writes=0\\n",r0,d@r0,d@(r13+10),r5;g}')
@@ -79,6 +80,13 @@ for _,address in ipairs({'20bbf4','20aa2e','20aa98','20ab48','20bd02'}) do
     machine.debugger:command('bpset '..address..',temp3<30,{temp3=temp3+1;logerror "nsk1_radio_task15_stage: pc=%08x input=%04x owner=%08x state=%04x mode=%02x caller=%08x observer_writes=0\\n",pc,r9,r4,w@(r4+42),b@(r4+1),r14;g}')
 end
 local counts = {tx=0,rx=0}
+local queue_writes = 0
+_G.nsk1_radio_queue = memory:install_write_tap(0x109f28,0x109f2b,'nsk1_radio_queue',function(_,data)
+    queue_writes = queue_writes + 1
+    if queue_writes > 16 then return end
+    machine:logerror(string.format('nsk1_radio_queue_write: value=%08x pc=%08x t=%.9f observer_writes=0\n',
+        data, cpu.state['R15'].value, machine.time:as_double()))
+end)
 local observing = false
 local function shared_word(address)
     observing = true

@@ -92,7 +92,8 @@ def analyze(image):
                    0x23aef0:0x040b,0x26a038:0x040b,0x26a4f0:0x040b,
                    0x2ac8e0:0x040c0000,0x2ac2f0:0x040d0000,0x2ac2f4:0x040d0300,
                    0x26e410:0x05dd,0x24dac4:0x07ea,0x24dd48:0x05dd,
-                   0x26e8a8:0x07ea,0x26e79c:0x109f24})
+                   0x26e8a8:0x07ea,0x26e79c:0x109f24,
+                   0x26e8a0:0x05ee,0x26e78c:0x07d4,0x26e790:0x05e1})
     for address,value in checks.items():
         if word(address) != value:
             raise ValueError(f'own dispatch/control literal differs at {address:08x}')
@@ -192,6 +193,14 @@ def analyze(image):
                                            'body_gate':'owner byte +0x0a differs from 4',
                                            'virtual_input':'helper 0x26e424 mode 2 with queued object at 0x109f28 and no prior result returns 0x07ea',
                                            'scope':'bounded explicit selector and helper route; queued-work producer and alternate call arguments unclosed'},
+            'queued_work_contract':{'inputs':['0x07d3','0x07d4'],
+                                    'selector':'0x26e6f8','handler':'0x26e47c',
+                                    'enqueue_condition':'message byte +2 nonzero',
+                                    'store':'0x26e4b4','queue':'0x109f28',
+                                    'zero_field2_forward':{'0x07d3':'0x05e0','0x07d4':'0x05e1'},
+                                    'mode2_call':'0x24ee1a',
+                                    'mode2_condition':'owner byte +0x0a is neither 2 nor 3; otherwise receive mode 1',
+                                    'scope':'checked direct queue path; alias writes and upstream request eligibility remain open'},
             'nested_completion_decoder':{'inputs':['0x05ea','0x05eb'],
                                           'helper_case':'0x26e4e4','buffer_pointer_offset':8,
                                           'selector':'buffer byte +4 low nibble equals 6',

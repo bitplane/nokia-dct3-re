@@ -284,6 +284,18 @@ checks, with zero calls to 26e25c. The queued-work producer, helper mode-2
 selection and other dynamic call arguments remain open; the callsite census
 does not close indirect callers.
 
+Queue storage is explicit: helper dispatch 26e6f8..26e6fe selects
+07d3/07d4, then 26e47c tests message byte +2. Nonzero replaces/frees the
+old queued object and stores the new message at 109f28 through 26e4b4.
+Zero instead forwards the message through constructor 26e25c as 05e0
+(07d3) or 05e1 (07d4). The explicit mode-2 receive call is 24ee1a:
+24ee0e selects mode 2 only when owner byte +0a is neither 2 nor 3;
+otherwise 24ee3e selects mode 1. Cold capture `tmp/nsk1-radio-queued-work`
+passes boot/storage and native-radio checks, observes only zero writes
+to 109f28 (startup clear and 24dcd4), and never enters receive mode 2.
+This is a dormant queued-work route, not a demonstrated missing startup
+packet. Upstream request eligibility and computed aliases remain unclosed.
+
 There is also a nested-buffer decoder, not an equivalent completion code:
 05ea/05eb select 26e4e4, which reads the buffer pointer at message +8.
 Buffer byte +4 low nibble 6 selects 23daac, with outer message byte +3
