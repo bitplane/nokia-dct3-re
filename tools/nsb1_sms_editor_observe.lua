@@ -13,6 +13,8 @@ debugger:command('temp6=0')
 debugger:command('bpset 27389c,temp6<10,{temp6=temp6+1;logerror "nsb1_sms_resource: source=%08x destination=%08x bytes=%08x base=%08x observer_writes=0\\n",r1,r0,r2,d@10642c;g}')
 debugger:command('bpset 25c4f8,temp6<10,{logerror "nsb1_sms_resource_header: version=%08x observer_writes=0\\n",r0;g}')
 debugger:command('temp7=0')
+debugger:command('temp8=0')
+debugger:command('bpset 2ab0e6,r1<=10fced&&r1+r2>10fced&&temp8<8,{temp8=temp8+1;logerror "nsb1_sms_preference_read: eeprom=%08x destination=%08x bytes=%08x caller=%08x observer_writes=0\\n",r0,r1,r2,r14;g}')
 for _, address in ipairs({'272c70','272c9e','272ca2'}) do
     debugger:command('bpset ' .. address .. ',temp7<20,{temp7=temp7+1;logerror "nsb1_sms_language: pc=%08x r0=%08x language=%02x state=%02x selected_base=%08x observer_writes=0\\n",pc,r0,b@10fced,b@106424,d@10642c;g}')
 end

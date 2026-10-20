@@ -42,11 +42,26 @@ class NativeCompareTest(unittest.TestCase):
                 prepare(root, run, source, True, True, ppm='B')
                 self.assertTrue((run / 'nvram/nsb1r4t_1/eeprom').exists())
                 self.assertFalse((run / 'nvram/nsb1r4t/eeprom').exists())
+                dictionary = root / 'dictionary'
+                prepare(root, dictionary, source, True, True, ppm='B', english_dictionary=True)
+                before = (run / 'nvram/nsb1r4t_1/eeprom').read_bytes()
+                after = (dictionary / 'nvram/nsb1r4t_1/eeprom').read_bytes()
+                self.assertEqual([0x4c7], [i for i, pair in enumerate(zip(before, after)) if pair[0] != pair[1]])
+                self.assertEqual(1, after[0x4c7])
+                self.assertEqual(1, json.loads((dictionary / 'input_manifest.json').read_text())['synthetic_dictionary_language'])
                 manifest['inputs'][0]['sha1'] = 'wrong variant'
                 (source / 'input_manifest.json').write_text(json.dumps(manifest))
                 with self.assertRaisesRegex(ValueError, 'qualified own'):
                     prepare(root, root / 'rejected', source, True, True, ppm='B')
                 self.assertFalse((root / 'rejected').exists())
+
+    def test_dictionary_fixture_requires_qualified_variant_and_retry_control(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for ppm, retry in (('A', True), ('B', False)):
+                with self.assertRaisesRegex(ValueError, 'dictionary fixture'):
+                    prepare(root, root / 'run', initialized_retry=retry, ppm=ppm, english_dictionary=True)
+                self.assertFalse((root / 'run').exists())
 
     def test_native_execution_is_separate_from_bootstrap(self):
         sample = 'nsb1_native_execution: t=5.0 pc=31a5 illegal=0 idle=1 tx=0041/0041 rx=00a6/00a6 observer_writes=0'

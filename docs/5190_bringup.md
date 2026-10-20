@@ -31,7 +31,23 @@ retry recovery are accepted in this compatibility configuration. General app
 coverage, radio services and fitted ADC routing remain unproved.
 The ordinary silent `noki5190` configuration is unchanged.
 
-### Open SMS editor contract
+### Offline SMS draft and text-resource contract
+
+PPM B with an explicitly synthetic English preference accepts physical text
+entry, Save, and a separate cold Outbox read. The two-process gate checks exact
+Saved/read pixels, the unsent EF_SMS record, physical contact order, phone-code
+acceptance, legal native execution, inactivity coverage and unchanged flash.
+This is offline storage, not registration or network SMS acceptance.
+
+```sh
+.venv/bin/python tools/nsb1_sms_draft_roundtrip.py mame/mame roms tmp/NEW \
+  --checksum-control-from tmp/QUALIFIED_B_ERASED_RUN
+```
+
+The checksum source must be a qualified own PPM B erased-storage run produced
+with `prepare(..., ppm='B')` and run using `-bios 671b`. The fixture changes
+only the existing checksum/retry controls plus EEPROM preference `04c7 = 01`;
+it does not supply donor storage or change identity, calibration or live RAM.
 
 Menu shortcut `2 1 3` opens Write messages, then a blank editor. Physical
 digit `2` reaches decoder `2af79e` and task 5 as packed statuses `40c8/40c9`
@@ -74,23 +90,34 @@ accepts the physical phone code, reaches the editor, sustains legal native
 execution through 40 seconds and leaves executable flash unchanged. It still
 selects base zero, reads header version zero and returns text-API result `9`.
 Thus adding the full database does not by itself select it. A's exact physical
-Phone book menu acceptance also passes after adding the BIOS choices. The next
-question is the user/stored language preference, not database presence.
+Phone book menu acceptance also passes after adding the BIOS choices.
 Selector `272c70` calls the PPM lookup `2ace64` with resource tag `LDB` and
 language byte `10fced == ff`; the lookup returns zero, which `272ca2` stores
 to `10642c`. A read-only startup watch observes that byte first cleared by
 `28bbc6`, then loaded as `ff` by EEPROM reader `2ab110` at approximately
-0.197 seconds. Its external-record mapping and valid preference values are
-not yet decoded. Physical Options navigation on B has not yet established a
-successful Dictionary/language selection; do not label the resulting unrelated
-screen as a dictionary failure. A's ordinary non-dictionary input path remains
-independently open. Neither SMS text entry nor a missing DSP reply is
-established, and neither the preference nor validity field is forced.
+0.197 seconds. The EEPROM read starts at `04b0`, copies record `0702`'s
+`30` bytes to `10fcd6`, and therefore maps `10fced` to offset `04c7`.
+B's supplied LDB declares language ID `1`. With only that external preference
+changed, firmware selects `2ef9d0`, reads version `1`, sets `1428` itself and
+returns success for operation `3`. No live selector or validity field is forced.
+
+Physical digit `2`, then `0`, enters `A `; Options/Save writes EF_SMS record 1
+through successful `A0 DC`, and displays Message saved. The 176-byte record
+at SIM-storage offset 1636 is `070281f001ff00810000024110` followed by `ff`:
+status `07` (unsent), SMS-SUBMIT with GSM-7 `A `, and unused padding. Record 2
+remains free. The cold process copies only qualified own flash/EEPROM/card,
+opens Outbox through physical Menu `2 1 2`, displays `A`, and leaves SMS bytes
+unchanged with no record update. This does not validate the placeholder SMSC
+or recipient for transmission.
+
+Physical Dictionary selection has not established a successful language choice;
+A's non-dictionary path, richer editing and network SMS remain open. The own
+Options order places Dictionary before Send special and Save (option 7), not
+after Exit; earlier eight-Down attempts were not dictionary-selection evidence.
 
 The separate Spell mode accepts physical letters and renders `ADA`, but the
 manual describes that mode as adding a dictionary word; returning to an empty
-message is not by itself a failed text-copy contract. No nonempty SMS draft
-save or transmission is accepted yet. `tools/nsb1_sms_editor_observe.lua` is a
+message is not by itself a failed text-copy contract. `tools/nsb1_sms_editor_observe.lua` is a
 bounded read-only debugger instrument, not an acceptance gate; its temporary
 fixed-pool read watch does not establish allocator ownership. Task 6's observed
 eight-byte message is not classified as text delivery.

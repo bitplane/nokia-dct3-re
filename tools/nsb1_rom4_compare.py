@@ -181,9 +181,11 @@ def storage_for_ppm(ppm):
     return 'nsb1r4t' if ppm == 'A' else 'nsb1r4t_1'
 
 
-def prepare(root, run, checksum_from=None, insert_sim=False, initialized_retry=False, ppm='A'):
+def prepare(root, run, checksum_from=None, insert_sim=False, initialized_retry=False, ppm='A', english_dictionary=False):
     inputs = inputs_for_ppm(ppm)
     storage_name = storage_for_ppm(ppm)
+    if english_dictionary and (ppm != 'B' or not initialized_retry):
+        raise ValueError('English dictionary fixture requires PPM B and initialized retry control')
     if initialized_retry and (checksum_from is None or not insert_sim):
         raise ValueError('initialized retry requires an inserted-card checksum-control experiment')
     if run.exists():
@@ -204,6 +206,11 @@ def prepare(root, run, checksum_from=None, insert_sim=False, initialized_retry=F
             raise ValueError('checksum source executable differs')
         original = (checksum_from / 'nvram' / storage_name / 'eeprom').read_bytes()
         fixture = checksum_control(original, initialized_retry)
+        if english_dictionary:
+            # Own 0702+0x17 -> 10fced; qualified PPM B declares LDB language 1.
+            fixture = bytearray(fixture)
+            fixture[0x4c7] = 1
+            fixture = bytes(fixture)
     target = run / 'inputs/nsb1r4t'
     target.mkdir(parents=True)
     for name, data, expected in qualified:
@@ -217,6 +224,7 @@ def prepare(root, run, checksum_from=None, insert_sim=False, initialized_retry=F
                 'physical_nsb1_adc_routing_proved': False,
                 'synthetic_sim_inserted': insert_sim,
                 'synthetic_retry_initialized': initialized_retry,
+                'synthetic_dictionary_language': 1 if english_dictionary else None,
                 'boot_claim': False}
     if fixture is not None:
         storage = run / 'nvram' / storage_name
@@ -240,10 +248,13 @@ def prepare(root, run, checksum_from=None, insert_sim=False, initialized_retry=F
     return run / 'inputs'
 
 
-def run_mame(binary, rompath, run, script, seconds, verbose=False):
+def run_mame(binary, rompath, run, script, seconds, verbose=False, bios=None):
+    if bios not in (None, '671a', '671b'):
+        raise ValueError('unsupported NSB-1 BIOS')
     with (run / 'mame_output.log').open('w') as output:
         result = subprocess.run([
             str(binary), 'nsb1r4t', '-rompath', str(rompath), '-noreadconfig',
+            *(['-bios', bios] if bios else []),
             '-video', 'none', '-sound', 'none', '-nothrottle', '-log',
             *(['-verbose'] if verbose else []),
             '-seconds_to_run', str(seconds), '-autoboot_delay', '0',
@@ -253,24 +264,26 @@ def run_mame(binary, rompath, run, script, seconds, verbose=False):
     return result.returncode
 
 
-def prepare_cold_run(run, source, validate_card, inputs):
+def prepare_cold_run(run, source, validate_card, inputs, ppm='A'):
     """Copy only qualified own persisted devices; the workflow validates card contents."""
     if run.exists():
         raise ValueError('cold reload requires a fresh directory')
+    storage_name = storage_for_ppm(ppm)
     manifest = json.loads((source / 'input_manifest.json').read_text())
     if (manifest.get('inputs') != [{'source': name, 'sha1': digest} for name, digest in inputs]
+            or manifest.get('ppm', 'A') != ppm
             or not manifest.get('synthetic_sim_inserted') or not manifest.get('synthetic_retry_initialized')
             or manifest.get('external_eeprom') != 'diagnostic checksum/retry control; calibration/identity not validated'):
         raise ValueError('cold reload requires qualified own synthetic save provenance')
     for name, digest in inputs:
         if hashlib.sha1((source / 'inputs/nsb1r4t' / Path(name).name).read_bytes()).hexdigest() != digest:
             raise ValueError('cold reload executable/resident inputs changed')
-    storage = source / 'nvram/nsb1r4t'
+    storage = source / 'nvram' / storage_name
     files = {name: (storage / name).read_bytes() for name in ('flash', 'eeprom', 'sim_card')}
     if hashlib.sha1(files['flash']).hexdigest() != inputs[0][1] or len(files['eeprom']) != 8192:
         raise ValueError('cold reload executable or EEPROM geometry changed')
     validate_card(files['sim_card'])
-    target = run / 'nvram/nsb1r4t'
+    target = run / 'nvram' / storage_name
     target.mkdir(parents=True)
     shutil.copytree(source / 'inputs', run / 'inputs')
     shutil.copytree(source / 'cfg', run / 'cfg')
@@ -282,16 +295,17 @@ def prepare_cold_run(run, source, validate_card, inputs):
     return run / 'inputs'
 
 
-def check_card_run(run, returncode, seconds):
-    image = (run / 'inputs/nsb1r4t/5190f671a.fls').read_bytes()
+def check_card_run(run, returncode, seconds, ppm='A'):
+    image = (run / 'inputs/nsb1r4t' / Path(inputs_for_ppm(ppm)[0][0]).name).read_bytes()
+    storage = run / 'nvram' / storage_for_ppm(ppm)
     trace = (run / 'error.log').read_text()
     check_trace(trace, image[0xb9350:0xb9350 + 372], image[0xbe570:0xbe570 + 372], returncode)
     check_native_execution(trace, seconds - 1)
-    if (run / 'nvram/nsb1r4t/flash').read_bytes() != image:
+    if (storage / 'flash').read_bytes() != image:
         raise ValueError('card phase changed executable flash')
-    if len((run / 'nvram/nsb1r4t/eeprom').read_bytes()) != 8192:
+    if len((storage / 'eeprom').read_bytes()) != 8192:
         raise ValueError('card phase changed EEPROM geometry')
-    return trace, (run / 'nvram/nsb1r4t/sim_card').read_bytes()
+    return trace, (storage / 'sim_card').read_bytes()
 
 
 def main():
