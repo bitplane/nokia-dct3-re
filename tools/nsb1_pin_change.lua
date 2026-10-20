@@ -22,6 +22,13 @@ if _G.nsb1_pin2_change then
     end
     if _G.nsb1_pin2_wrong then cells[9]={3,4} end -- Current5675, not5678.
 end
+if _G.nsb1_pin2_entry_only then
+    while #cells>5 do table.remove(cells) end
+    cells[#cells+1]={1,4}
+    if _G.nsb1_pin2_entry_back then
+        cells[#cells+1]={1,2} -- Distinguish an unselectable item from dead input.
+    end
+end
 local events={}
 for index,cell in ipairs(cells) do
     local field
@@ -33,7 +40,7 @@ for index,cell in ipairs(cells) do
     events[#events+1]={26.2+(index-1)*2,field,0,index}
 end
 local index,frame=1,1
-local times={33,35,45,55,65,67,75,77}
+local times={33,35,37,39,45,55,65,67,75,77}
 emu.register_frame_done(function()
     local now=machine.time:as_double()
     while events[index] and now>=events[index][1] do

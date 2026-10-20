@@ -137,8 +137,7 @@ frames, all cold-input links and native execution in every phase.
 ```
 
 Wrong phases and final restore run70s; `nsb1_puk2_recover.lua` runs80s from
-the saved exhausted card. No counter is changed by preparation. Permanent PUK2
-exhaustion remains a separate acceptance item.
+the saved exhausted card. No counter is changed by preparation.
 
 The gate's `--wrong-puk-cycle WRONG RECOVER COLD` branch is independently
 seeded from the saved PIN2-exhausted card. Physical wrong87654322/new8765 and
@@ -156,6 +155,33 @@ native-execution, physical-contact, frame and complete-card checks.
   --wrong-puk-cycle tmp/nsb1-puk2-wrong tmp/nsb1-puk2-after-wrong \
   tmp/nsb1-puk2-after-wrong-cold
 ```
+
+Permanent PUK2 exhaustion is independently accepted without a counter fixture.
+Starting at the retained nine-retry wrong-PUK2 card, nine more isolated cold
+processes physically submit the same wrong PUK2. Every run changes only that
+counter. Replies remain9804 down to one remaining retry; the last decrement
+to zero returns9840. The final card retains PIN2=0 and PUK2=0 with credentials,
+PIN1 state, file records and request settings unchanged.
+
+Two independent cold controls start from the zero-retry card. Own Change PIN2
+plus Select stays at that menu item through45s and sends no CHANGE or UNBLOCK.
+The second performs the same selection followed by Back and returns to Access
+codes, proving input remains responsive. Both preserve the complete exhausted
+card and pass the normal own-executable/native/input gates. This is firmware
+UI refusal, not a claim that a correct PUK2 APDU was submitted by the phone.
+
+```sh
+.venv/bin/python tools/nsb1_puk2_exhaust.py mame/mame \
+  tmp/nsb1-pin-request-on-cold tmp/nsb1-pin2-exhaust-zero \
+  tmp/nsb1-puk2-wrong tmp/nsb1-puk2-permanent --check-only \
+  --permanent-cold tmp/nsb1-puk2-permanent-select tmp/nsb1-puk2-permanent-cold
+```
+
+Without `--check-only`, a fresh output directory runs the nine80s physical
+attempts and records progress after each verified transition. Check-only reads
+all raw run logs, card files and qualified cold links, not the progress JSON.
+The two50s cold controls use `nsb1_pin2_entry.lua` and
+`nsb1_pin2_entry_back.lua`. The normal silent handset profile is not promoted.
 
 The native compatibility configuration also accepts an explicitly synthetic
 PIN-blocked card. Its initial image differs from the laboratory PIN-enabled
