@@ -16,6 +16,17 @@ if machine.debugger then
     machine.debugger:command('temp3=0')
     machine.debugger:command('temp2=0')
     machine.debugger:command('temp0=0')
+    machine.debugger:command('temp1=0')
+    machine.debugger:command('bpset 2188f0,temp1<30,{temp1=temp1+1;logerror "nsb1_call_service_start: mode=%08x caller=%08x observer_writes=0\\n",r0,r14;g}')
+    machine.debugger:command('bpset 218b34,temp1<30,{temp1=temp1+1;logerror "nsb1_call_service_dsp_post: task=%08x object=%08x header=%08x body=%08x count=%04x observer_writes=0\\n",r0,r1,d@r1,d@(r1+4),w@(r4+18);g}')
+    for _, address in ipairs({'219ea8','219ec0','219eda','21a1bc','21a22e'}) do
+        machine.debugger:command('bpset ' .. address .. ',temp1<30,{temp1=temp1+1;logerror "nsb1_call_service_tail: pc=%08x r0=%08x message=%08x caller=%08x observer_writes=0\\n",pc,r0,r8,r14;g}')
+    end
+    machine.debugger:command('bpset 268944,r1>=100000&&r1<110000&&w@r1>=811&&w@r1<=813&&temp1<30,{temp1=temp1+1;logerror "nsb1_call_service_completion: task=%08x object=%08x header=%08x caller=%08x observer_writes=0\\n",r0,r1,d@r1,r14;g}')
+    for _, address in ipairs({'219c60','219e52','219e64'}) do
+        machine.debugger:command('bpset ' .. address .. ',temp1<10,{temp1=temp1+1;logerror "nsb1_call_service_consumer: pc=%08x r0=%08x r4=%08x message=%08x caller=%08x observer_writes=0\\n",pc,r0,r4,r8,r14;g}')
+    end
+    machine.debugger:command('bpset 268944,r0==b&&r1>=100000&&r1<110000&&w@r1==3e9&&temp1<10,{temp1=temp1+1;logerror "nsb1_call_service_post: task=%08x object=%08x header=%08x caller=%08x observer_writes=0\\n",r0,r1,d@r1,r14;g}')
     machine.debugger:command('bpset 28ed24,r0==3e9&&temp0<10,{temp0=temp0+1;logerror "nsb1_call_controller_request: input=%04x caller=%08x observer_writes=0\\n",r0,r14;g}')
     machine.debugger:command('bpset 24f044,temp0<10,{temp0=temp0+1;logerror "nsb1_call_controller_wait: state=%04x caller=%08x observer_writes=0\\n",w@109fae,r14;g}')
     machine.debugger:command('bpset 21ac4c,r0==a30&&temp6<10,{temp6=temp6+1;logerror "nsb1_call_activation_construct: input=%04x caller=%08x observer_writes=0\\n",r0,r14;g}')

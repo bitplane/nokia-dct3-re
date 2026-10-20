@@ -233,6 +233,30 @@ post-call site `24dccc` is observed through 61 seconds. **The next question is
 task 11's own `03e9` consumer and the legitimate producer of its completion**,
 not a fabricated `0a30`, a search-controller byte or a guessed DSP packet.
 
+The task-11 destination is runtime-confirmed: `268944` posts object `102a48`
+with header `03e90100` to task `0b`. The same object reaches consumer `219c60`
+and its argument-1 branch `219e52`. That branch calls `29c6b4` and returns to
+`219e64`, so that call is not the stalled boundary. Follow the subsequent
+consumer continuation to identify its legitimate completion; the meaning of
+its returned value `5` is not yet established. The 61-second observation run
+retains native receive activity, security acceptance and unchanged flash.
+The continuation reaches `219ea8`, `219ec0`, `219eda`, then `21a1bc` and
+the handler epilogue `21a22e`. Thus the request handler returns normally:
+`21a1bc -> 21a1d4` calls `2188f0(2)`. No `0811..0813` post through `268944`
+is observed in that run. The next boundary is the asynchronous work initiated
+by `2188f0`, not a blocked call inside the `03e9` handler. This post-site watch
+does not exclude alternate delivery primitives or unobserved later replies.
+
+`2188f0(2)` is the measured producer of the boot-time DSP type-`1a` request:
+at `218b34` it posts to task 3, object `101b4c`, header `0002441a`, body prefix
+`00419800`, bitmap count `012b`. The TX ring subsequently contains the same
+68-byte body at 4.831431385 seconds. Static construction at `218992..2189a4`
+sets class `0002`, length `44`, type `1a`; `218b18` supplies payload byte `98`.
+This connects the pending controller transaction to existing native traffic,
+but does not prove that this packet requires a direct DSP reply or that the
+later task-12 `8b` result completes task 11. The completion contract remains
+open; neither a guessed reply nor a controller-state change is justified.
+
 Field `10af4c == 012b` is not established as a retry limit or direct EEPROM
 integer. `21b37c` counts 299 bitmap positions in a 48-byte structure; reset
 routine `21b1e8` sets the field to 299. The measured storage/update path returns
