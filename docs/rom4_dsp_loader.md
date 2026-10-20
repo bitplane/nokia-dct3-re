@@ -62,6 +62,25 @@ does not select the command expression CPU: the observer explicitly sets
 Queued headless startup scripts or failed breakpoint installation supply no
 negative execution evidence. The bounded counter is debugger-host state only.
 
+## Native MAR assertion attribution
+
+Missing exact-word tags in the default fixture do not imply missing semantic
+coverage across isolated profiles. `mar-index` already checks 3,072 cases
+plus save/restore replays against independently calculated 16-bit AR updates;
+`mar-reverse` checks another 3,072 cases/replays using a bit-serial oracle.
+The architectural Access update now emits exact-word assertion attribution:
+`6da8..6db7` for indexed MAR, `6da0..6da7` and `6db8..6dbf` for reverse carry.
+Fresh verbose profile runs require both the existing completion gate and
+execution evidence for each attributed word. CPU execution is unchanged.
+
+The corrected NSK-1 trace contains indexed words `6db1/6db2/6db3/6db7`,
+with counts 5/69751/69751/2244: 141,751 executions now link directly to the
+isolated semantic fixture. This is not a new all-opcode closure, physical
+pipeline timing proof or evidence about arbitrary producer compositions.
+Use `c54x_opcode_coverage.py --additional-fixture-log` to combine separately
+completed profile evidence; never manufacture execution credit by combining
+an assertion-only run with a handset's execution trace.
+
 ## Mapped move and younger repeat ownership
 
 Decode can arm an RPT header while an older MVDK remains in Access. A global

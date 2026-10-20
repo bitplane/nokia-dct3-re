@@ -52769,6 +52769,10 @@ private:
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfeabcd9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (f.compatibility ? 0x20 : 0)), "Indexed MAR preserves accumulators T and ST1");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= 4 ? f.st0 : 0x8608), "Indexed MAR publishes only compatibility ARP at Access");
 			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (tick > 4 ? 0x2200 + i : tick == 4 && i == f.selected ? f.result : f.initial[i]), "Indexed MAR updates the selected register once at Access using original AR0");
+			if (tick == 4)
+				expect_opcode((reverse ? f.add ? 0x6db8 : 0x6da0 : f.add ? 0x6db0 : 0x6da8) | f.ar,
+					m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == f.result,
+					"Exact indexed MAR opcode publishes the independently calculated AR update");
 			if (tick == 4) for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i);
 			unsigned const checkpoint = 3 + f.snapshot;
 			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_extensions_reads}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save indexed MAR before or after Access update"); }
