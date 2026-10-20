@@ -586,6 +586,16 @@ Do not pad a later image, reuse a 3210 EEPROM, or declare a 2 MiB flash device.
 The hardware and staged acceptance requirements are in
 `docs/6110_bringup.md`.
 
+## NSE-6 system manual reference
+
+`reference-docs/nse6/03SYS-preview.html` is the downloaded eServiceInfo text
+preview of Nokia's NSE-6 System Module manual, Original08/98:
+<https://www.eserviceinfo.com/preview_html.php?fileid=5448&previewid=3000>.
+SHA-256: `91350eb0b42b650be11c43cb6be82596faae46a901af4fe1b6f2f5db6fbb507d`.
+This is an HTML/OCR reference, not a downloaded full PDF or schematic. Its
+accessory-interface description is product-specific corroboration, not a DSP
+port34/35/36 register specification. No ready-bit semantics are inferred.
+
 ## NSK RF documentation references
 
 Indexed primary documents used by `docs/5130_bringup.md`; the PDF binaries

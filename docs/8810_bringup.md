@@ -121,6 +121,17 @@ configuration, but does not identify the exact AccIF wiring or status-bit
 implementation. The completion bit remains unmapped, so no reset timer or
 UART-ready constant is yet justified.
 
+The own-product Nokia NSE-6 System Module manual, Original08/98,
+corroborates a separate accessory path without closing the register mapping.
+Its [text preview](https://www.eserviceinfo.com/preview_html.php?fileid=5448&previewid=3000)
+identifies AccIF separately from MFI and DSP PCM (pp.3-31..33), and gives
+FBUS_RX/TX rates9.6..230.4kbit/s (p.3-12). It therefore strengthens the serial
+candidate over an RF interpretation, but names no DSP I/O address, restart
+bit or completion delay. The recovered port34/35/36 transaction must still
+be linked to that physical interface before implementing status transitions.
+The local reference is an HTML text preview, not the full schematic PDF;
+see `roms/README.md` for its hash and acquisition scope.
+
 The adjacent `djr-747` emulator at revision
 `b93a7f7143ea8d6d636ae920ac29258d3f6666f6` does not close this boundary.
 Its native `mad2_dsp_c54x.c` port-36 read is an explicit
