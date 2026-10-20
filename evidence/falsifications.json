@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsk1_late_reason68_reset_requires_network_search_or_quit",
+      "status": "disproven",
+      "hypothesis": "Manual network selection or its physical Quit action causes the observed late reason-68 reboot",
+      "conclusion": "Matched101-second initialized cold processes use the same own persistent source and native compatibility inputs. The search/Quit run and unattended control both call295136 with reason68 from22f117 and request MCU reset at93.974106s. Quit at90s visibly dismisses Searching before the reboot, but is not necessary for the failure. Own timerd3 supervision checks heartbeat10fdef and counter10fdea; producer and transport ownership remain unresolved, so this does not establish a DSP or CCONT cause. The99s phone-code prompt must not be accepted as normal menu return.",
+      "evidence": ["docs/5130_bringup.md", "tools/nsk1_network_search.py", "tools/nsk1_network_cancel_input.lua", "tools/nsk1_radio_observe.lua", "tools/test_nsk1_network_search.py"]
+    },
+    {
       "id": "nsk1_radio_index4_absence_requires_provisioning_restart",
       "status": "disproven",
       "hypothesis": "The missing native index-4 control completion and radio continuation are caused solely by loss of state across first-boot provisioning restart",

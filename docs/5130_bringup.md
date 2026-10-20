@@ -44,6 +44,26 @@ the runner rechecks it and copies only inputs/NVRAM/config, never RAM or a
 save state. Qualified result: `tmp/nsk1-network-manual-qualified`. The menu
 sequence is an own-English-ROM harness detail, not a device configuration.
 
+The extended `--cancel` gate is currently **failing**, not accepted:
+Searching remains visible at 80/89 seconds, physical Quit at 90 seconds is
+decoded and restores the selection list at 92 seconds, but firmware requests
+a reboot at 93.974106 seconds. The Security code frame at 99 seconds is a
+post-reset boot, not a normal menu return. The gate rejects that reset and
+requires a stable selection list instead; its oracle has not been weakened.
+Matched initialized cold runs with manual search/Quit and with neither
+action request the same reason-68 reset through caller 22f117. Thus the
+late failure is not caused by cancellation. Captures:
+`tmp/nsk1-network-cancel-reset-source` and
+`tmp/nsk1-radio-late-watchdog-control`.
+
+Own supervisory timer dispatcher 22ee70 maps input d3 to 22f04c. This
+path increments counter byte 10fdea when byte 10fdef is zero and resets the
+counter when nonzero; threshold 15 reaches reset request 295136 via 22f112.
+The reset reason is read from 10ff7c. These facts establish a supervisory
+heartbeat failure, not DSP ownership: the heartbeat's legitimate producer
+and its service/transport contract remain open. Do not import another ROM's
+watchdog event number, inject heartbeat traffic or disable this guard.
+
 Ordinary erased storage remains a failed-startup control. The record-only
 and checksum-only fixtures remain blank, with checklists `0a` and `0e`.
 The combined fixture deliberately retains its firmware-owned record update

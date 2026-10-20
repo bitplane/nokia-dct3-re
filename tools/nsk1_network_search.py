@@ -40,19 +40,53 @@ def check_trace(trace):
     return summary
 
 
-def check_run(run, initial, card):
-    summary, trace = check_phase(run, initial, through=59, minimum_records=1)
-    summary.update(check_trace(trace))
-    if (run/'nvram/nsk1r4t/sim_card').read_bytes() != card:
-        raise ValueError('manual search changed persisted SIM storage')
-    for index, digest in FRAMES.items():
-        frame_check(run/f'snap/nsk1_network_{index}.png', digest)
+def check_cancel_trace(trace):
+    resets = re.findall(r'mad2_(?:clock|ledger):[^\n]*\bW off=01 data=05[^\n]*\bt=([0-9.]+)', trace)
+    if any(float(time) >= 49 for time in resets):
+        raise ValueError('handset requested reboot during manual-search lifecycle')
+    prefix, marker, _ = trace.partition('nsk1_network_quit: down=1')
+    if not marker:
+        raise ValueError('missing physical search Quit')
+    summary = check_trace(prefix)
+    contacts = re.findall(r'nsk1_network_quit: down=([01]) t=([0-9.]+) physical_only=1', trace)
+    if len(contacts) != 2 or [row[0] for row in contacts] != ['1','0'] or any(
+            abs(float(row[1]) - time) > 0.017 for row, time in zip(contacts, (90,90.2))):
+        raise ValueError('physical Quit contact order/timing differs')
+    after = trace.split(marker, 1)[1]
+    keys = re.findall(r'nsk1_code_key: value=([0-9a-f]{2}) t=([0-9.]+)', after)
+    if len(keys) != 1 or keys[0][0] != '19' or not 90 <= float(keys[0][1]) <= 90.5:
+        raise ValueError('physical Quit was not decoded exactly once')
+    times = [float(time) for time in re.findall(r'nsk1_network_late: t=([0-9.]+)', trace)]
+    if times != [80,89,92,99]:
+        raise ValueError('missing bounded late-search observations')
+    summary.update(physical_search_ui_cancelled=True, stable_idle_return_proved=False)
+    return summary
+
+
+def check_search_body(path):
     from PIL import Image
-    with Image.open(run/'snap/nsk1_network_14.png') as source:
+    with Image.open(path) as source:
         image = source.convert('RGB')
         # Exclude only the animated search-progress strip above row 10.
         if image.size != (84,48) or hashlib.sha256(image.crop((0,10,84,48)).tobytes()).hexdigest() != SEARCH_BODY:
             raise ValueError('manual-search Searching/Quit frame differs')
+
+
+def check_run(run, initial, card, cancel=False):
+    cancellation = check_cancel_trace((run/'error.log').read_text()) if cancel else None
+    summary, trace = check_phase(run, initial, through=59, minimum_records=1)
+    summary.update(cancellation if cancel else check_trace(trace))
+    if (run/'nvram/nsk1r4t/sim_card').read_bytes() != card:
+        raise ValueError('manual search changed persisted SIM storage')
+    for index, digest in FRAMES.items():
+        frame_check(run/f'snap/nsk1_network_{index}.png', digest)
+    check_search_body(run/'snap/nsk1_network_14.png')
+    if cancel:
+        for index in (1,2):
+            check_search_body(run/f'snap/nsk1_network_late_{index}.png')
+        frame_check(run/'snap/nsk1_network_late_3.png', FRAMES[13])
+        frame_check(run/'snap/nsk1_network_late_4.png', FRAMES[13])
+        summary['stable_selection_return'] = True
     return summary
 
 
@@ -60,14 +94,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('binary','source','run'):
         parser.add_argument(name, type=Path)
+    parser.add_argument('--cancel', action='store_true', help='observe through 89 seconds, physically Quit, qualify the late return')
     args = parser.parse_args()
     try:
         source, run = args.source.resolve(), args.run.resolve()
         check_phase(source, (source/'initial_eeprom.bin').read_bytes(), through=59, minimum_records=1)
         card = (source/'nvram/nsk1r4t/sim_card').read_bytes()
         initial = copy_persistent(run, source)
-        command = run_machine(args.binary, run, Path(__file__).with_name('nsk1_network_search_input.lua'), 61, True)
-        summary = check_run(run, initial, card)
+        script = 'nsk1_network_cancel_input.lua' if args.cancel else 'nsk1_network_search_input.lua'
+        command = run_machine(args.binary, run, Path(__file__).with_name(script), 101 if args.cancel else 61, True)
+        summary = check_run(run, initial, card, args.cancel)
         summary['command'] = command
         (run/'summary.json').write_text(json.dumps(summary, indent=2)+'\n')
         print(json.dumps(summary, indent=2))
