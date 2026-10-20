@@ -114,6 +114,7 @@ class ChecksumControlTest(unittest.TestCase):
         trace += '\nnsb1_simi: direction=W address=00020038 data=ff pc=0029cdfc'
         trace += '\nnsb1_simi: direction=W address=0002003a data=03 pc=0029ce26'
         trace += '\nnsb1_simi: direction=W address=0002003d data=18 pc=0029ce3c'
+        trace += '\nnsb1_startup_mode: value=02 pc=002a438e t=0.128846692 observer_writes=0'
         check_checksum_control(trace)
         with self.assertRaises(ValueError):
             check_checksum_control(trace.replace('selftest_flags=40', 'selftest_flags=00'))

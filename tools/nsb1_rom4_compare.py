@@ -33,6 +33,8 @@ def check_checksum_control(trace):
         raise ValueError('checksum control did not retain the observed self-test bit 40')
     if re.search(r'nsb1_selftest_flags: value=[0-9a-f]{2} pc=0023a018 ', trace):
         raise ValueError('checksum-failure branch still executed in checksum control')
+    if not re.search(r'nsb1_startup_mode: value=02 pc=002a438e t=[0-9.]+ observer_writes=0', trace):
+        raise ValueError('missing own ADC-conditioned initializer mode write')
     for marker in ('direction=W address=00020038 data=ff pc=0029cdfc',
                    'direction=W address=0002003a data=03 pc=0029ce26',
                    'direction=W address=0002003d data=18 pc=0029ce3c'):

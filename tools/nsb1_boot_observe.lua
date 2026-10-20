@@ -6,6 +6,15 @@ local space = cpu.spaces.program
 local shared_writes, handoffs, releases = 0, 0, 0
 local serial_selection, lcd_commands, lcd_bytes, lcd_nonzero = 0, 0, 0, 0
 local selftest_writes = 0
+local mode_writes = 0
+_G.nsb1_startup_mode_tap = space:install_write_tap(0x10c4c4, 0x10c4c7, 'nsb1_startup_mode', function(offset, data, mask)
+    if (mask & 0xff000000) == 0 then return end
+    mode_writes = mode_writes + 1
+    if mode_writes <= 16 then
+        machine:logerror(string.format('nsb1_startup_mode: value=%02x pc=%08x t=%.9f observer_writes=0\n',
+            (data >> 24) & 255, cpu.state['R15'].value, machine.time:as_double()))
+    end
+end)
 local simi_reads, simi_writes = 0, 0
 local function simi_access(offset, data, mask, write)
     for lane = 0, 3 do

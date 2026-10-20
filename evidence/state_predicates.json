@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_v671_executable_integrity_and_mode", "owner": "nsb1_startup_controller", "status": "satisfied",
+      "predicate": "Own executable checksum and ADC-conditioned mode are decoded without treating an observed branch as a missing startup gate",
+      "current": "Routine 294e70 sums BE halfwords over header-declared 200024..2bffff, terminates at ffffff and compares against stored 8016 at 200022; the independent parser computes 8016, requiring no code repair and claiming no whole-flash authentication. Passive writes initialize 10c4c4 to 2 at 2a438e after selector-3 ADC sampling and a <3fa threshold; the configured sample is 280. Getter 2a46ac returns 2, but positive instruction observations show flash checking and SIM initialization still execute. This does not identify mode 2 as abnormal, establish pack semantics or justify tuning ADC inputs. Debugger action errors were explicitly checked; retained evidence uses passive taps and tested source decoding.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_package_check.py", "tools/test_nsb1_package_check.py", "tools/nsb1_boot_observe.lua", "tools/nsb1_rom4_compare.py"]
+    },
+    {
       "id": "nsb1_v671_empty_socket_simi_init", "owner": "nsb1_simi_controller", "status": "satisfied",
       "predicate": "Own NSB-1 firmware initializes the mapped SIMI controller with an empty socket after the integrity-only diagnostic passes",
       "current": "Own 29cde8 initializes 38/39/3a and FIFO controls 3d/3e; 29ce5e drains RX 37 while testing count 3c. The profile now enables this controller but never inserts the synthetic card. Erased storage yields zero accesses through five seconds; the qualified six-byte checksum control produces 18 writes around 0.94 seconds from own initializer PCs, including 29cdfc/29ce26/29ce3c, with zero reads. The checker requires those positive sites and write-count sequence 0/0/18/18/18. Native verifier/loader and LCD oracles are unchanged. This is write-side initialization only, not ATR, card RX/TX, SIM security, application UI or calibrated storage acceptance.",

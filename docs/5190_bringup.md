@@ -52,6 +52,32 @@ The normalized A SHA-1 is
 `27b8f0cb8640e5b423960b206e9aee065f32d726`. Omitting `--output` is read-only.
 The checker rejects source overwrite and never extracts archive paths.
 
+### Executable integrity and controller mode
+
+Own routine `294e70` reads the stored big-endian halfword at `200022` and
+at most two six-byte `{24-bit start,24-bit inclusive end}` entries beginning
+at `200024`; start `ffffff` terminates the list. The qualified input declares
+`200024..2bffff`, followed by a sentinel. Its big-endian halfword sum modulo
+65536 is `8016`, exactly the stored value. The normalizer now independently
+checks this grammar/sum. This covers that declared range, **not whole-flash
+authentication**, and requires no executable-byte repair.
+
+Passive observation of byte `10c4c4` identifies initialization from zero to
+2 at store `2a438e`. Own initializer `2a42c6` reads ADC selector 3 via
+`2b1730`; after an earlier special-case window, a sample below ROM threshold
+`3fa` takes this store. The configured selector-3 input is `280`. Getter
+`2a46ac` consequently returns 2 in the startup controller. Static decode and
+positive debugger observations show this continuation still executes the
+flash checksum and SIM initialization. It is not evidence that mode 2 is
+an erroneous boot state, nor justification for adjusting an ADC value to
+select a different branch. Physical pack semantics remain unproved.
+
+Diagnostic instruction probes must validate debugger-console errors as well
+as the emulation log: accepted breakpoint installation does not validate its
+action expressions. This ARM debugger exposes the link register as `r14`,
+not `lr`; an invalid action must not become a false "function never ran"
+conclusion. The retained normal observer uses passive RAM/MMIO taps instead.
+
 ## Own EEPROM initializer
 
 Routine `2ab168` reads ROM byte `200005` through its literal at `2ab1dc`.

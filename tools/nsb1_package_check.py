@@ -5,6 +5,7 @@ import configparser
 import hashlib
 import io
 import json
+import struct
 from pathlib import Path
 import sys
 from zipfile import BadZipFile, ZipFile
@@ -26,6 +27,30 @@ def eeprom_geometry(descriptor):
     return {'descriptor': hex(descriptor), 'address_bytes': 2 if descriptor & 0x40 else 1,
             'page_bytes': 1 << page_shift, 'capacity_bytes': 1 << ((descriptor & 7) + 9),
             'fitted_part_proved': False}
+
+
+def flash_integrity(image):
+    """Own 294e70 header grammar: at most two inclusive BE-halfword ranges."""
+    if len(image) < 0x30:
+        raise ValueError('truncated flash-integrity header')
+    ranges, total = [], 0
+    for index in range(2):
+        offset = 0x24 + 6 * index
+        start = int.from_bytes(image[offset:offset + 3], 'big')
+        end = int.from_bytes(image[offset + 3:offset + 6], 'big')
+        if start == 0xffffff:
+            break
+        if (start < 0x200000 or end >= 0x200000 + len(image) or start > end
+                or start & 1 or not end & 1):
+            raise ValueError('invalid own flash-integrity span')
+        payload = image[start - 0x200000:end - 0x200000 + 1]
+        total = (total + sum(word[0] for word in struct.iter_unpack('>H', payload))) & 0xffff
+        ranges.append([hex(start), hex(end)])
+    stored = int.from_bytes(image[0x22:0x24], 'big')
+    if not ranges or total != stored:
+        raise ValueError('own declared flash-integrity sum mismatch')
+    return {'ranges': ranges, 'computed': hex(total), 'stored': hex(stored),
+            'whole_flash_authentication': False}
 
 
 def inspect(source, ppm='A'):
@@ -67,6 +92,7 @@ def inspect(source, ppm='A'):
     return bytes(image), {'archive_sha256': SHA256, 'streams': streams,
                          'ppm': ppm, 'normalized_bytes': len(image),
                          'firmware_eeprom_geometry': eeprom_geometry(image[5]),
+                         'declared_flash_integrity': flash_integrity(image),
                          'normalized_sha1': hashlib.sha1(image).hexdigest(),
                          'absent_erased_gap': ['0x2d2d00', '0x2dffff'],
                          'provisioning_supplied': False, 'boot_claim': False,

@@ -2,6 +2,7 @@ import contextlib
 import io
 from pathlib import Path
 import tempfile
+import struct
 import unittest
 from unittest.mock import patch
 from zipfile import ZipFile
@@ -10,6 +11,21 @@ from tools import nsb1_package_check as checker
 
 
 class PackageTest(unittest.TestCase):
+    def test_flash_integrity_word_order_and_bounds(self):
+        image = bytearray(0x40)
+        image[0x24:0x2a] = bytes.fromhex('20003020003f')
+        image[0x2a:0x30] = b'\xff' * 6
+        struct.pack_into('>8H', image, 0x30, *range(1, 9))
+        struct.pack_into('>H', image, 0x22, 36)
+        report = checker.flash_integrity(image)
+        self.assertEqual('0x24', report['computed'])
+        self.assertFalse(report['whole_flash_authentication'])
+        image[0x30] = 1
+        with self.assertRaisesRegex(ValueError, 'sum mismatch'):
+            checker.flash_integrity(image)
+        image[0x27:0x2a] = bytes.fromhex('200040')
+        with self.assertRaisesRegex(ValueError, 'span'):
+            checker.flash_integrity(image)
     def test_eeprom_descriptor_fields(self):
         geometry = checker.eeprom_geometry(0xf4)
         self.assertEqual((2, 32, 8192), (geometry['address_bytes'], geometry['page_bytes'], geometry['capacity_bytes']))
