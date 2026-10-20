@@ -1468,8 +1468,8 @@
     {
       "id": "nsk1_pin2_change_cold_restore", "owner": "nsk1_firmware", "status": "satisfied",
       "predicate": "Own NSK-1 physical PIN2 change persists and authenticates a subsequent cold restoration",
-      "current": "The unproved native-mask compatibility composition changes PIN2 from5678 to8765 through physical own-menu contacts, with CHANGE CHV9000 and the exact PIN2 code changed frame. Only four PIN2 credential bytes change. A separate cold process authenticates PIN1 and the persisted8765, then restores5678 through CHANGE CHV; the complete card equals its original. Own native execution/storage and the qualified source are rechecked. This is SIM security acceptance, not fitted DSP, radio, connected calls or speech.",
-      "evidence": ["docs/5130_bringup.md", "tools/nsk1_pin2_change.lua", "tools/nsk1_pin2_restore.lua", "tools/nsk1_pin2_change_check.py", "tools/test_nsk1_pin2_change_check.py"]
+      "current": "The unproved native-mask compatibility composition changes PIN2 from5678 to8765 through physical own-menu contacts, with CHANGE CHV9000 and the exact PIN2 code changed frame. Only four PIN2 credential bytes change. A separate cold process authenticates PIN1 and the persisted8765, then restores5678 through CHANGE CHV; the complete card equals its original. Independent wrong-current5675 plus replacement/confirmation returns9804 and changes only PIN2 retry3 to2; a cold correct5678 submission applies8765 and restores retry3 with exact successful-control card equality. Own native execution/storage and the qualified source are rechecked. This is SIM security acceptance, not fitted DSP, radio, connected calls or speech.",
+      "evidence": ["docs/5130_bringup.md", "tools/nsk1_pin2_change.lua", "tools/nsk1_pin2_restore.lua", "tools/nsk1_pin2_wrong.lua", "tools/nsk1_pin2_change_check.py", "tools/test_nsk1_pin2_change_check.py"]
     },
     {
       "id": "nam1_display_frontier", "owner": "nam1_firmware", "status": "satisfied",

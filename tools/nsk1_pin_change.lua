@@ -22,7 +22,10 @@ end
 local old=_G.nsk1_change_pin2 and {'five','six','seven','eight','menu'} or {'one','two','three','four','menu'}
 local replacement=_G.nsk1_change_pin2 and {'eight','seven','six','five','menu'} or {'four','three','two','one','menu'}
 if _G.nsk1_restore_pin2 then old,replacement=replacement,old end
-for _,phase in ipairs({{60,'old',old},{64,'new',replacement},{68,'confirm',replacement}}) do
+if _G.nsk1_wrong_pin2 then old={'five','six','seven','five','menu'} end
+-- The card checks the old PIN only after new-code confirmation submits CHANGE CHV.
+local phases={{60,'old',old},{64,'new',replacement},{68,'confirm',replacement}}
+for _,phase in ipairs(phases) do
     for index,name in ipairs(phase[3]) do add(phase[1]+(index-1)*0.5,name,index,phase[2]) end
 end
 for _,time in ipairs({63,67,71,73}) do frames[#frames+1]=time end

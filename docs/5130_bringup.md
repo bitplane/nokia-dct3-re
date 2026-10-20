@@ -1445,6 +1445,17 @@ composed over the existing PIN1 input harness. The PIN2 route adds one Down
 contact before selecting the change-code entry; it is not inherited from
 another product's menu layout.
 
+Append `--rejection-cycle tmp/nsk1-pin2-wrong-complete
+tmp/nsk1-pin2-retry-recovery` to qualify the rejection control. Physical
+current PIN2 `5675`, followed by replacement8765 and confirmation, returns
+CHANGE CHV9804 and the exact Code error frame. Only PIN2 retry byte3517
+changes3→2. The editor does not authenticate the old-code field on its own:
+no card command is sent until the replacement and confirmation are submitted.
+A separate cold process accepts the unchanged current5678, applies8765,
+and restores retries to3; its complete card matches the successful change
+control. Neither the wrong code nor the retry count is supplied through a
+card-state edit.
+
 ### Ordinary PIN change
 
 ```sh
