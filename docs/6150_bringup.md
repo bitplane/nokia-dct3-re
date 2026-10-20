@@ -56,6 +56,25 @@ template, not the current diagnostic frontier. The next task is the own
 post-validation startup/readiness lifecycle; do not adjust physical inputs
 until their own readers and units are established.
 
+The independent60s cold run `tmp/nsm1-startup-qualified` preserves the
+validated EEPROM exactly and passes the record checker. Uncapped entry
+counters at10/20/30/40/50/60s remain zero for280ac0,280b0c,2813a0,2bf2e6,
+2239f2 and2bc4d4; SIMI initialization2af080 runs twice. Report bitmap1126c1
+stays0e, charger-state1127d8 stays0, pending notification1127d9 stays1,
+SIM-ready10e6ce stays0 and selector10be8c staysff. This extends the earlier
+short negative control after storage validation; it does not close indirect
+report producers or establish a hardware absence.
+
+The startup selector's reason0a path reads cached word90ff through2bf050.
+After the analog/key checks, bit7 selects class3, bit2 selects class1,
+otherwise bit1 selects class2. Thus the modeled ordinary PWRONX status03 is
+consistent with class2; the omitted class1 send is not by itself evidence
+of incorrect boot classification. Do not alter reset causes to select it.
+
+```sh
+.venv/bin/python tools/nsm1_startup_check.py tmp/nsm1-startup-qualified/error.log
+```
+
 `nsm1r4t` uses the own normalized flash and checksum-consistent EEPROM,
 128 KiB SRAM and the acquired NSE-1 ROM4 native DSP program/data. That mask
 is an unproved compatibility input, not an identified NSM-1 fitted mask.
