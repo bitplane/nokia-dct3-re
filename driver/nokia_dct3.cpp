@@ -4117,6 +4117,13 @@ void nokia_dct3_state::noki5190(machine_config &config)
 void nokia_dct3_state::nsb1r4t(machine_config &config)
 {
 	noki5190(config);
+	// Explicit nominal-input experiment, not measured NSB-1 board calibration:
+	// own source-7 acquisition uses ADC2; the 5190 manual specifies 3.6 V,
+	// and CCONT's typical VBAT transfer is 6.5 mV/bit, hence raw 554.
+	// Keep the ordinary silent machine and all other channels unchanged.
+	nokia_product_config research = PRODUCT_5190;
+	research.ccont_board.channel_defaults[2] = 554;
+	apply_product_config(research);
 	// Compatibility instrument only: NSE-1 resident ROM4 is acquired,
 	// but fitted NSB-1 mask identity and DSP cadence remain unproved.
 	config.device_remove("dsp_hle");

@@ -17,6 +17,13 @@ acceptance reproduces firmware clear/fill/clear self-test, not application
 presentation. Fitted NSB-1 mask identity and DSP cadence remain unproved.
 No scheduler or ownership flag is injected.
 
+The compatibility instrument now uses an explicitly nominal ADC2 input of
+554. With the six-byte checksum diagnostic it completes ten acquisitions,
+posts readiness report `14` organically, and unmasks keypad columns. Physical
+Menu causes new scanner reads. The five-second raster is not a readable
+application screen; decoded-key/UI acceptance and fitted ADC routing remain
+unproved. The ordinary silent `noki5190` configuration is unchanged.
+
 ## Qualified executable input
 
 Source: [archived Nokia service package](https://archive.org/download/Nokia_DCT3_firmwares/5190e671.zip).
@@ -132,6 +139,12 @@ special table `2d29a0` using selector byte `10c466`. The normal table matches
 the existing NSE-1 host layout; the active special table is
 `3e 3e 3e 3e 0d`, selecting Power on bit 4, not bit 1. These are independently
 mapped source facts; physical input/UI delivery has not yet been accepted.
+
+### Full-scale ADC2 negative control
+
+The observations in this subsection use the full-scale ADC2 value `3ff`,
+not the compatibility instrument's current nominal 554 input. They explain
+the rejected acquisition, not a still-missing event under nominal inputs.
 
 A bounded physical Menu test on the checksum-only native compatibility
 configuration holds row 2/column 1 from 3.0 to 3.25 seconds. Passive reads
@@ -276,11 +289,10 @@ its ordinary continuation. This proves initialization progresses to a
 disconnected waiting state; it does not yet identify the missing report's
 ordering dependency or establish that another ADC tuple would be correct.
 
-The reusable observer now records `nsb1_input_readiness` at all five normal
-sample times. The checksum-control checker requires the five-second
-boundary `{startup_reason=0a, phase=06, reports=0e, column_mask=3f}` and asks
-for deliberate review if it changes. This protects the observed incomplete
-state, not a requirement that a future faithful phone remain blocked.
+The reusable observer records `nsb1_input_readiness` at all five normal
+sample times. This full-scale negative control has five-second boundary
+`{startup_reason=0a, phase=06, reports=0e, column_mask=3f}`. The current
+nominal-input diagnostic below has a separately reviewed boundary.
 
 ### Acquisition rejection before readiness
 
@@ -300,9 +312,32 @@ offset zero; the configured full-scale input 1023 gives integer result
 `1023*1500/229 = 6700`, matching the rejected sample. The reusable passive
 observer records the count and calibration at its normal sample times.
 This identifies a concrete invalid acquisition under the placeholder tuple,
-not yet physical voltage units or a valid NSB-1 pack input. Establish the
-own battery net and silicon transfer before changing that tuple; no timer,
+not by itself physical voltage units or a valid NSB-1 pack input. No timer,
 report or acquisition result should be synthesized.
+
+### Nominal voltage comparison
+
+The original [5190 owner manual](https://altehandys.de/downloads/man-no-5190.pdf)
+specifies 3.6 V DC in Technical Data. The retained PDF is
+`roms/reference-docs/nsb1/nokia-5190-owner-manual.pdf`, SHA-256
+`8245c8a69d31989d9261d941fd1ae9b9396fde4de10c64dfd741b761583a294b`.
+The CCONT typical VBAT transfer, documented in Nokia's NSE-8/9 service manual
+Table 30, is 6.5 mV/bit (see `8810_bringup.md` for the silicon reference,
+not its board routing). `round(3600/6.5)=554` supplies one nominal experiment,
+independent of whether the firmware boots. Only `nsb1r4t` changes ADC2;
+the ordinary `noki5190` configuration and other inputs remain unchanged.
+Fitted NSB-1 board routing and per-unit calibration are not promoted.
+
+With checksum-only storage, ten positive acquisitions produce both samples
+`0e2c` (3628) with pre-decrement counts `0a..01`. The real continuation
+executes `221efc`, `221f08` and report wrapper `2aaae8`, with no synthetic
+event `21`: the periodic event-26 acquisition lifecycle itself completes.
+By two seconds readiness is `0f`, phase is `03`, and column mask is `20`.
+Physical Menu from 3.0 to 3.25 seconds now produces scanner-register reads
+(77 total including bounded observer snapshots), unlike the full-scale
+control. Decoded key identity and application navigation remain unaccepted.
+The inspected five-second PNG has only a small black feature at its right
+edge, not a legible application screen. Do not call this graphical boot.
 
 ### External reference leads, not provisioning evidence
 
@@ -494,8 +529,8 @@ chain from another checksum control or silently reuse prior NVRAM.
 ```
 
 This control retains bit `40` (`c0` at 0.5 seconds, `40` at 1/2/5 seconds),
-with the same completed native bootstrap. But the LCD traffic and final
-white frame remain unchanged. Therefore checksum consistency alone does
+with the same completed native bootstrap. At full-scale ADC2, LCD traffic
+and the final white frame remain unchanged. Therefore checksum consistency alone does
 **not** establish application presentation or valid provisioning. The default
 native acceptance and its strict LCD oracle remain unchanged; the diagnostic
 deliberately makes no presentation claim. Its input/output hashes and changed
@@ -516,9 +551,12 @@ The erased-storage native control makes no SIMI access in the first five
 seconds. The checksum-only control reaches the own initializer at about
 0.94 seconds: passive taps observe 18 writes, including `38=ff` at `29cdfc`,
 `3a=03` at `29ce26` and the FIFO-control sequence beginning at `29ce3c`.
-All five samples report zero SIMI reads, consistent with this bounded
-empty-socket path. The diagnostic checker requires positive initializer
-sites and the 0/0/18/18/18 write-count sequence, not merely a source setter.
+At full-scale ADC2 all five samples report zero SIMI reads. With nominal
+ADC2, later firmware begins empty-socket transactions: sampled read/write
+counts are `0/0, 0/0, 0/18, 3/21, 9/45`. The diagnostic checker now requires
+that sequence plus final input readiness `0a/03/0f/20`, preserving the positive
+initializer sites rather than merely accepting a source setter. These reads
+are controller polling, not card responses or ATR acceptance.
 Native bootstrap and LCD self-test oracles remain unchanged.
 
 This is firmware initialization/write-side acceptance, not character RX/TX,

@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_v671_nominal_acquisition_readiness", "owner": "nsb1_analog_acquisition", "status": "satisfied",
+      "predicate": "Explicit nominal-input NSB-1 native compatibility completes the own acquisition lifecycle and organically unmasks keypad input without injected readiness",
+      "current": "Own 275fd0 reads source 7 through table 2d29a8 to ADC2, applies observed identity calibration and scales by 1500/229. Full-scale 1023 produces rejected 6700 against inclusive 1800..5500, leaving ten acquisitions pending. The 5190 owner manual specifies 3.6 V DC; the banked CCONT typical 6.5 mV/bit gives nominal raw 554 independently of the boot outcome. Only nsb1r4t adopts that declared hypothesis. With the existing six-byte integrity diagnostic, ten acquisitions return success with samples 0e2c and counts 0a..01; real 221efc/221f08/2aaae8 execute and final readiness is 0a/03/0f/20. A physical Menu hold causes new scanner reads, but decoded key identity and readable application presentation remain unaccepted. The normal silent machine is unchanged. Fitted mask, clock, ADC routing and per-unit calibration remain unproved; no donor storage or firmware-state forcing is supplied.",
+      "evidence": ["docs/5190_bringup.md", "driver/nokia_dct3.cpp", "tools/nsb1_boot_observe.lua", "tools/nsb1_rom4_compare.py", "tools/test_nsb1_rom4_compare.py"]
+    },
+    {
       "id": "nsb1_v671_executable_integrity_and_mode", "owner": "nsb1_startup_controller", "status": "satisfied",
       "predicate": "Own executable checksum and ADC-conditioned mode are decoded without treating an observed branch as a missing startup gate",
       "current": "Routine 294e70 sums BE halfwords over header-declared 200024..2bffff, terminates at ffffff and compares against stored 8016 at 200022; the independent parser computes 8016, requiring no code repair and claiming no whole-flash authentication. Passive writes initialize 10c4c4 to 2 at 2a438e after selector-3 ADC sampling and a <3fa threshold; the configured sample is 280. Getter 2a46ac returns 2, but positive instruction observations show flash checking and SIM initialization still execute. This does not identify mode 2 as abnormal, establish pack semantics or justify tuning ADC inputs. Debugger action errors were explicitly checked; retained evidence uses passive taps and tested source decoding.",
@@ -11,7 +17,7 @@
     {
       "id": "nsb1_v671_empty_socket_simi_init", "owner": "nsb1_simi_controller", "status": "satisfied",
       "predicate": "Own NSB-1 firmware initializes the mapped SIMI controller with an empty socket after the integrity-only diagnostic passes",
-      "current": "Own 29cde8 initializes 38/39/3a and FIFO controls 3d/3e; 29ce5e drains RX 37 while testing count 3c. The profile now enables this controller but never inserts the synthetic card. Erased storage yields zero accesses through five seconds; the qualified six-byte checksum control produces 18 writes around 0.94 seconds from own initializer PCs, including 29cdfc/29ce26/29ce3c, with zero reads. The checker requires those positive sites and write-count sequence 0/0/18/18/18. Native verifier/loader and LCD oracles are unchanged. This is write-side initialization only, not ATR, card RX/TX, SIM security, application UI or calibrated storage acceptance.",
+      "current": "Own 29cde8 initializes 38/39/3a and FIFO controls 3d/3e; 29ce5e drains RX 37 while testing count 3c. The controller is enabled with no synthetic card inserted. Erased storage yields zero accesses through five seconds. With checksum-only storage and nominal ADC2, positive initializer PCs remain 29cdfc/29ce26/29ce3c; sampled read/write counts are 0/0, 0/0, 0/18, 3/21, 9/45. The checker requires that sequence. The full-scale ADC2 negative control stopped at 18 writes and zero reads. Later reads are controller polling, not ATR/card replies, SIM security, application UI or calibrated-storage acceptance.",
       "evidence": ["docs/5190_bringup.md", "driver/nokia_dct3.cpp", "tools/nsb1_boot_observe.lua", "tools/nsb1_rom4_compare.py", "tools/test_nsb1_rom4_compare.py"]
     },
     {

@@ -41,12 +41,13 @@ def check_checksum_control(trace):
         if marker not in trace:
             raise ValueError('missing own SIMI initialization after integrity acceptance')
     simi = re.findall(r'nsb1_simi_summary: t=([0-9.]+) reads=(\d+) writes=(\d+) card_inserted=0 observer_writes=0', trace)
-    if len(simi) != 5 or [(reads, writes) for _, reads, writes in simi] != [('0', '0')] * 2 + [('0', '18')] * 3:
+    if len(simi) != 5 or [(reads, writes) for _, reads, writes in simi] != [
+            ('0', '0'), ('0', '0'), ('0', '18'), ('3', '21'), ('9', '45')]:
         raise ValueError('unexpected empty-socket SIMI lifecycle')
     readiness = re.findall(r'nsb1_input_readiness: t=([0-9.]+) startup_reason=([0-9a-f]{2}) phase=([0-9a-f]{2}) reports=([0-9a-f]{2}) column_mask=([0-9a-f]{2}) observer_writes=0', trace)
-    # This is a diagnostic boundary regression, not an input/boot acceptance gate.
+    # Nominal-input diagnostic boundary, not accepted presentation or fitted hardware.
     if (len(readiness) != 5 or not 5 <= float(readiness[-1][0]) < 5.1
-            or readiness[-1][1:] != ('0a', '06', '0e', '3f')):
+            or readiness[-1][1:] != ('0a', '03', '0f', '20')):
         raise ValueError('checksum-control input-readiness boundary changed; inspect before re-banking')
 
 
@@ -126,6 +127,8 @@ def prepare(root, run, checksum_from=None):
                 'external_eeprom': 'erased 8 KiB; no donor storage',
                 'resident_mask': 'NSE-1 compatibility candidate; NSB-1 fitted identity unproved',
                 'dsp_clock_hz': 52000000, 'physical_dsp_clock_proved': False,
+                'adc2_raw': 554, 'adc2_basis': '3.6 V / CCONT typical 6.5 mV per bit; nominal hypothesis',
+                'physical_nsb1_adc_routing_proved': False,
                 'boot_claim': False}
     if fixture is not None:
         storage = run / 'nvram/nsb1r4t'

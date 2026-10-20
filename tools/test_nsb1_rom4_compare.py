@@ -109,13 +109,13 @@ class ChecksumControlTest(unittest.TestCase):
     def test_runtime_bit_retention(self):
         trace = '\n'.join(f'nsb1_presentation: t={time} selftest_flags={value} observer_writes=0'
                           for time, value in zip((0.1, 0.5, 1, 2, 5), ('00', 'c0', '40', '40', '40')))
-        trace += '\n' + '\n'.join(f'nsb1_simi_summary: t={time} reads=0 writes={writes} card_inserted=0 observer_writes=0'
-                                    for time, writes in ((0.1, 0), (0.5, 0), (1, 18), (2, 18), (5, 18)))
+        trace += '\n' + '\n'.join(f'nsb1_simi_summary: t={time} reads={reads} writes={writes} card_inserted=0 observer_writes=0'
+                                    for time, reads, writes in ((0.1, 0, 0), (0.5, 0, 0), (1, 0, 18), (2, 3, 21), (5, 9, 45)))
         trace += '\nnsb1_simi: direction=W address=00020038 data=ff pc=0029cdfc'
         trace += '\nnsb1_simi: direction=W address=0002003a data=03 pc=0029ce26'
         trace += '\nnsb1_simi: direction=W address=0002003d data=18 pc=0029ce3c'
         trace += '\nnsb1_startup_mode: value=02 pc=002a438e t=0.128846692 observer_writes=0'
-        trace += '\n' + '\n'.join(f'nsb1_input_readiness: t={time} startup_reason=0a phase=06 reports=0e column_mask=3f observer_writes=0'
+        trace += '\n' + '\n'.join(f'nsb1_input_readiness: t={time} startup_reason=0a phase=03 reports=0f column_mask=20 observer_writes=0'
                                     for time in (0.1, 0.5, 1, 2, 5))
         check_checksum_control(trace)
         with self.assertRaises(ValueError):
@@ -126,8 +126,8 @@ class ChecksumControlTest(unittest.TestCase):
             check_checksum_control(trace.replace('pc=0029cdfc', 'pc=0029cdfd'))
         with self.assertRaisesRegex(ValueError, 'empty-socket'):
             check_checksum_control(trace.replace('writes=18', 'writes=0'))
-        for old, new in (('reports=0e', 'reports=0f'), ('column_mask=3f', 'column_mask=20'),
-                         ('startup_reason=0a', 'startup_reason=00'), ('phase=06', 'phase=00'),
+        for old, new in (('reports=0f', 'reports=0e'), ('column_mask=20', 'column_mask=3f'),
+                         ('startup_reason=0a', 'startup_reason=00'), ('phase=03', 'phase=00'),
                          ('nsb1_input_readiness:', 'missing_readiness:')):
             with self.subTest(change=old), self.assertRaisesRegex(ValueError, 'input-readiness'):
                 check_checksum_control(trace.replace(old, new))
