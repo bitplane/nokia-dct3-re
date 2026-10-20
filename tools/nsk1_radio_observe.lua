@@ -18,7 +18,7 @@ for _, address in ipairs({0x06d0, 0x06d1}) do
 end
 _G.nsk1_native_control_taps = control_taps
 machine.debugger:command('temp0=0')
-for index, address in ipairs({'3000','3076','30bf','30f5','3d5e','313f','3153'}) do
+for index, address in ipairs({'3000','3076','30bf','30f5','3d5e','313f','3153','3aac','4a3c','4a49'}) do
     local bit = string.format('%x', 1 << (index - 1))
     machine.debugger:command('bpset '..address..'::dsp_c54x:cpu,(temp0&'..bit..')==0,{temp0=temp0|'..bit..';logerror "nsk1_radio_native_entry: pc='..address..' control06e3=%04x state1949=%04x search0284=%04x observer_writes=0\\n",dsp_c54x:cpu.dw@6e3,dsp_c54x:cpu.dw@1949,dsp_c54x:cpu.dw@284;g}')
 end

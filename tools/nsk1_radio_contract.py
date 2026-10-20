@@ -34,6 +34,10 @@ def native_completion_contract(image):
             'completion_setter':'0x31e7..0x31ed ORs 1 shifted by pending index data 0x06d0 into data 0x06d1',
             'request_helper':'0x318e',
             'index4_delayed_call_candidates':request4,
+            'index4_request_selection':{'host_type':'0x70','type_handler':'0x4951',
+                                        'subcommand':'0x11','table_base':'0xb0a6',
+                                        'table_entry':'0xb0b7','routine':'0x4a3c',
+                                        'scope':'data-ROM table entry must be checked against acquired companion data image'},
             'scope':'resident ROM4 static path; neither execution nor fitted DSP mask is established by this contract'}
 
 

@@ -301,6 +301,20 @@ Exactly one has the immediate delay-slot assignment AR2=4: CALLD at 4a49,
 followed by STM at 4a4b. This is the next static caller to classify, not
 proof of its ordinary execution or the payload semantics of mailbox 0872.
 
+The caller is selected by host control type 70: dispatch 397e..3982 calls
+4951 for that type. Handler 4951 extracts the upper byte of its first
+payload word and uses table B0a6 for values through 18; companion acquired
+data-ROM entry B0b7 is 4a3c, identifying subcommand 11. Routine 4a3c
+services the mailbox, optionally waits on its previous index, requests
+index 4 at 4a49 and waits at 4a4d before branching to 3aac.
+Capture `tmp/nsk1-radio-native-request-dispatch` passes the boot/storage
+checks and observes 4a3c/4a49 before the provisioning restart: pending
+06d0=0004 at 0.603154 seconds, completion 06d1=011e at 0.603515 seconds.
+The later reset clears both words at 1.299708 seconds; subsequent observed
+requests are 1, 2, 8 and 3, not 4. This is not an operation that never
+executes. The open question is its replay/retention contract across that
+restart, including whether the modeled reset domain is faithful.
+
 For the mapped mode-1 continuation, 042f fails the explicit success comparison
 at 20bd02 and the subsequent 09ef, 0a02, 0410, 09ec and 0a03 selectors.
 It reaches 20bb8e; because it is not 07d5, 20bb96 calls 20cb42 with state
