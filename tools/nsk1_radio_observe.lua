@@ -35,8 +35,11 @@ machine.debugger:command('temp9=0')
 machine.debugger:command('bpset 22137e,r0>=100000&&r0<110000&&temp9<40,{temp9=temp9+1;logerror "nsk1_radio_controller_receive: object=%08x header=%08x caller=%08x observer_writes=0\\n",r0,d@r0,d@(r13+10);g}')
 machine.debugger:command('bpset 255268,r0==f&&r1>=100000&&r1<110000&&w@r1==9ec,{logerror "nsk1_radio_request_post: task=%02x object=%08x header=%08x caller=%08x observer_writes=0\\n",r0,r1,d@r1,r14;g}')
 machine.debugger:command('bpset 2091b2,1,{logerror "nsk1_radio_mode_receive: object=%08x mode=%02x owner=%08x aux=%08x observer_writes=0\\n",r4,b@(r4+2),r5,r7;g}')
-machine.debugger:command('bpset 20948a,r6==9ec,{logerror "nsk1_radio_mode_return: mode=%02x flag=%02x caller=%08x observer_writes=0\\n",b@(r5+1),b@(r5+2),d@(r13+14);g}')
+machine.debugger:command('bpset 20948a,temp2<40,{temp2=temp2+1;logerror "nsk1_radio_task15_receive_return: input=%04x mode=%02x flag=%02x caller=%08x observer_writes=0\\n",r6,b@(r5+1),b@(r5+2),d@(r13+14);g}')
 machine.debugger:command('bpset 20c950,r9==9ec,{logerror "nsk1_radio_task15_dispatch: input=%04x state=%04x owner=%08x target=%08x observer_writes=0\\n",r9,r0,r4,d@(r1+r0*4);g}')
+for _,address in ipairs({'20bbf4','20aa2e','20aa98','20ab48','20bd02'}) do
+    machine.debugger:command('bpset '..address..',temp3<30,{temp3=temp3+1;logerror "nsk1_radio_task15_stage: pc=%08x input=%04x owner=%08x state=%04x mode=%02x caller=%08x observer_writes=0\\n",pc,r9,r4,w@(r4+42),b@(r4+1),r14;g}')
+end
 local counts = {tx=0,rx=0}
 local observing = false
 local function shared_word(address)
@@ -77,6 +80,13 @@ local tx,rx = 0,0
 local result_reads = 0
 local status_reads = 0
 local state_writes = 0
+local lifecycle_writes = 0
+_G.nsk1_radio_lifecycle = memory:install_write_tap(0x10a484,0x10a487,'nsk1_radio_lifecycle',function(_,data,mask)
+    if mask & 0xffff ~= 0 and lifecycle_writes < 48 then
+        lifecycle_writes = lifecycle_writes+1
+        machine:logerror(string.format('nsk1_radio_lifecycle_write: state=%04x pc=%08x t=%.9f observer_writes=0\n',data & 0xffff,cpu.state['R15'].value,machine.time:as_double()))
+    end
+end)
 _G.nsk1_radio_state = memory:install_write_tap(0x10716c,0x10716f,'nsk1_radio_state',function(_,data,mask)
     if mask & 0xff000000 ~= 0 and state_writes < 32 then
         state_writes = state_writes+1
@@ -117,11 +127,13 @@ for name,cell in pairs({menu={1,4},five={3,4},zero={3,0x10},one={2,2}}) do
     assert(keys[name],'own call contact missing')
 end
 local sequence = {{21,'menu'}}
-for index,name in ipairs({'five','five','five','zero','one','zero','zero'}) do
-    sequence[#sequence+1] = {26+(index-1)*0.6,name}
+if not _G.nsk1_radio_no_call then
+    for index,name in ipairs({'five','five','five','zero','one','zero','zero'}) do
+        sequence[#sequence+1] = {26+(index-1)*0.6,name}
+    end
+    sequence[#sequence+1] = {32,'menu'}
+    sequence[#sequence+1] = {52,'menu'}
 end
-sequence[#sequence+1] = {32,'menu'}
-sequence[#sequence+1] = {52,'menu'}
 local events = {}
 for index,event in ipairs(sequence) do
     events[#events+1] = {event[1],event[2],1,index}

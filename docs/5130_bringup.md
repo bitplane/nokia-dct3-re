@@ -151,12 +151,27 @@ at +2, clears auxiliary owner 10a464 +1, then calls 280408. The receive
 helper returns 09ec to main dispatcher 20c940. Runtime 20c950 reads lifecycle
 state 6 at owner +42, selecting table 20c958 index 6 -> 20a590.
 That handler recognizes 09ec; mode 1 is not its special mode-4 branch, so
-it takes 20a65c, stores a local flag at owner +1e via 20a83e and continues
-the lifecycle through 20bbf4/20aa2e. This is not a lost mailbox delivery or
-an immediate completion publisher. The next question is which continuation
-or receive input this state-6 lifecycle requires before it acknowledges the
-mode request. The temporary broad RAM read probe was removed once the own
+it takes 20a65c, stores a local flag at owner +1e via 20a83e and enters
+continuation 20bbf4. This is not a lost mailbox delivery or an immediate
+completion publisher. The temporary broad RAM read probe was removed once the own
 consumer was found; only targeted read-only probes remain.
+
+The matched `nsk1_radio_no_call.lua` control accepts the phone code but omits
+all dialing/Call/End contacts. Both runs initialize lifecycle word 10a486
+to 6 at 209dbe (2.670265 seconds), receive 09ec and enter 20bbf4. Only the
+Call/End run receives 0a02 just after the physical Call at 32 seconds and
+0a05 just after End at 52 seconds; writer 20cb44 sets lifecycle state 19
+at 32.080274 and again at 52.063210. The no-call control observes neither
+input nor that transition. These are user-action-correlated continuations,
+not evidence of autonomous radio progress.
+
+Without Call/End, no further task-15 helper return is observed through
+61 seconds after 09ec. Continuation 20bbf4 reaches receive call 20bcfc;
+comparison 20bd02 forms 07e0 and its equal branch advances to 20bd0c.
+The next question is the own ordinary source and semantics of 07e0, not
+forcing 09f0/0434 or treating the user-driven state-19 path as normal boot.
+This comparison does not close every alternate exit of the surrounding
+controller. The optional 20aa2e path is not observed in this matched pair.
 
 `tools/nsk1_radio_contract.py` checks the own image hash, critical table
 entries/instruction fragments and emits machine-readable bounded references:

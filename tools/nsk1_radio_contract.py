@@ -48,6 +48,7 @@ def analyze(image):
                  0x20cb58:'20a3010146484288d100e53d',
                  0x208588:'484e7fc170a17f0070e0',
                  0x2091b2:'78a070682801',
+                 0x20bd02:'203f014146484288',
                  0x2212ce:'200fe7f9'}
     for address,encoded in fragments.items():
         expected = bytes.fromhex(encoded)
@@ -78,6 +79,9 @@ def analyze(image):
                             'mode_handler':'0x2091b2','owner':'0x10a444',
                             'main_dispatch':'0x20c950','state6_handler':'0x20a590',
                             'scope':'static mode-storage/state-6 selection contract; runtime state requires its own trace'},
+            'continuation_wait':{'entry':'0x20bbf4','receive_call':'0x20bcfc',
+                                 'comparison':'0x20bd02','success_input':'0x07e0',
+                                 'scope':'one explicit success comparison; other lifecycle exits not closed'},
             'owner_references':literal_references(image,{0x107158,0x10716c}),
             'activation_input_references':literal_references(image,{0x043f,0x0834}),
             'member_store_candidates':{'range':['0x213000','0x218e00'],'offset':20,'addresses':stores,
