@@ -492,6 +492,16 @@ trace checks pass, including gateway, branch and register/cursor values.
 The next target is the wait/return condition inside live routine0a71;
 the resident-only0a5c function address must not be used for that trace.
 
+A further qualified cold capture, `tmp/nsk1-live-scan-wait`, includes live
+disassembly of0a00..0dff and positive execution markers at0a94,407c,408c,
+4097,0a99,0aca and0ae4 after RSSI publication. Thus the initializer's
+407c interrupt/IDLE wait does return; it is not the terminal boundary.
+Live0ae4 calls4701, whose disassembly includes sample-buffer cursor waits
+at4717 and4742 comparing data06b7 against the cursor selected from06b8.
+These are candidates for the next runtime trace, not proven stalls or a
+license to fabricate sample data. The capture passes independent boot,
+storage and native-radio checks; registration remains unproved.
+
 `tools/nsk1_radio_trace_check.py` qualifies this observed boundary from the
 captured log: ordered 9-TX/1-RX traffic, complete packet bodies, positive
 DSP entry controls, uncapped post-reset pending-index/completion progression
