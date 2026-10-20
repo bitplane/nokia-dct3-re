@@ -17,15 +17,17 @@ initialization reads identity/service files and scans fifty ADN records,
 then renders **Security code**. A separately decoded retry-byte fixture permits
 physical `12345` acceptance and Menu/Select navigation into the Phone book
 list. This is native compatibility boot, SIM initialization and physical
-code/menu acceptance, not contact persistence, registration, calls or SMS.
+code/menu acceptance. A two-process gate additionally saves `ADA/123` to the
+SIM, cold-boots only its own persisted files and physically searches/renders
+the contact without rewriting it. Registration, calls and SMS remain unproved.
 
 Ordinary erased storage remains a failed-startup control. The record-only
 and checksum-only fixtures remain blank, with checklists `0a` and `0e`.
 The combined fixture deliberately retains its firmware-owned record update
 and reason-`04` restart rather than suppressing them. Identity and calibration
 are not borrowed. `2915` separately stops after its first loader exchange.
-The next boundary is a physical contact save and independently cold-read
-SIM phonebook transaction.
+The next software targets are contact deletion/cold-empty verification and
+the product's physical SIM-security workflows.
 Fitted-mask, physical-clock and measured analog calibration evidence remain
 incomplete; no independent NSK-1 DSP mask has been acquired.
 Do not inherit
@@ -683,6 +685,41 @@ Security code prompt at 28/30 seconds. The positive gate requires exact
 `3600e3d1cab564b185d03403552ea401e1e76edd07b110184716700828a5df2a`.
 The list exposes Search / Add entry / Erase; no persistent contact write,
 network registration, call, SMS or fitted-mask claim follows from this gate.
+
+## Persistent SIM phonebook
+
+```sh
+.venv/bin/python tools/nsk1_phonebook_roundtrip.py mame/mame roms \
+  tmp/nsk1-profile-source tmp/nsk1-phonebook-roundtrip
+```
+
+The first isolated process uses the qualified own external-input composition
+and physical security/menu flow. Down/Select enters Add entry; ordinary
+multi-tap `2/3/2` and numeric `1/2/3` produce `ADA/123`. Exactly one
+`A0 DC 01 04 20` succeeds for `EF_ADN` record 1. The 32 persisted bytes
+contain name `ADA`, length `03`, type `81`, digits `21 f3`, and erased
+extension/padding; the other 49 ADN records remain erased. The Saved frame
+must match RGB SHA256
+`8c01f87b60e87cb07ab22ffe2418b7a4510554681ede41c423e85abecaca5231`.
+
+Cold preparation re-runs the save's raw evidence checks, verifies the own
+input composition, then copies only its `inputs`, `nvram` and `cfg`
+directories. No RAM, save state, snapshot or donor storage is copied.
+The second process physically enters the phone code, opens Search, types
+prefix `A` and confirms. It must read ADN record 1 without an UPDATE and
+preserve the **entire** serialized SIM file byte-for-byte, not just the ADN
+area. Three recall frames show `ADA` and match RGB SHA256
+`22e30aaccff2be9f4f9628a8033d6e6c15b6615f2082af9de5a04ff1ba952a63`.
+The number's persistence is verified in the exact SIM bytes; the name-only
+recall frame is not claimed to display the number.
+
+The save gate samples native execution through 50 seconds; cold recall
+samples through 40 seconds. Both validate their own DSP upload/read exchanges,
+unchanged executable flash, full readiness, code acceptance, exact physical
+keys and preserved identity/encoded-code EEPROM fields. Shared GSM 11.11 ADN
+validators are reused rather than giving this product a different record
+format. This proves contact save and cold read on the native compatibility
+composition, not deletion, full SIM security, network service or fitted mask.
 
 `nsk1_input_check.py` requires all physical contact observations and reports
 the actual masks, flags, forwarded keys, scalar posts and control reply.

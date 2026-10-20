@@ -36,6 +36,10 @@ class Nsk1SecurityCompareTest(unittest.TestCase):
                 for initialized in (False,True):
                     trace = self.trace(initialized)
                     self.assertEqual(initialized,check(trace,frames,initialized)['phonebook_list_accepted'])
+                    extended = trace+'\nnsk1_code_key: value=18 t=30.0 observer_writes=0'
+                    with self.assertRaises(ValueError):
+                        check(extended,frames,initialized)
+                    self.assertEqual(initialized,check(extended,frames,initialized,(0x18,))['phonebook_list_accepted'])
                     for changed in (trace.replace('column=2','column=1',1),
                                     trace.replace('match=00000001','match=00000000'),
                                     trace.replace('t=12 ','t=11 ',1),

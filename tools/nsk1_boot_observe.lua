@@ -98,7 +98,7 @@ emu.register_frame_done(function()
     if next_sample == #times then machine.screens[':screen']:snapshot('nsk1_native_5s.png') end
     next_sample = next_sample+1
 end, 'NSK-1 passive native boundary')
-local late_times, late_index = {10,20,30,50,59},1
+local late_times, late_index = {10,20,30,40,50,59},1
 emu.register_frame_done(function()
     local now = machine.time:as_double()
     if late_index > #late_times or now < late_times[late_index] then return end

@@ -18,7 +18,7 @@ CODE_ERROR_RGB_SHA256 = 'fd5b8fb1ab0c3397bf958d567a46aee84a72f75123802a00d5bc802
 CONTACTS = ((2,2),(3,2),(4,2),(2,4),(3,4),(1,4),(1,4),(1,4),(1,4))
 
 
-def check(trace, snapshots, initialized_retry):
+def check(trace, snapshots, initialized_retry, following_keys=()):
     from PIL import Image
     if '[LUA ERROR]' in trace:
         raise ValueError('security fixture Lua error')
@@ -34,7 +34,7 @@ def check(trace, snapshots, initialized_retry):
         if actual != wanted[:4] or not wanted[4] <= float(row[4]) < wanted[4]+0.1:
             raise ValueError('physical security contact order/time differs')
     keys = re.findall(r'nsk1_code_key: value=([0-9a-f]{2}) t=[0-9.]+ observer_writes=0',trace)
-    if len(keys) != trace.count('nsk1_code_key:') or [int(key,16) for key in keys] != [1,2,3,4,5,0x19,0x19,0x19,0x19]:
+    if len(keys) != trace.count('nsk1_code_key:') or [int(key,16) for key in keys] != [1,2,3,4,5,0x19,0x19,0x19,0x19]+list(following_keys):
         raise ValueError('physical security/menu key decoding differs')
     gates = re.findall(r'nsk1_code_gate: match=([0-9a-f]{8}) retry=([0-9a-f]{2}) cycles=[0-9a-f]{16} observer_writes=0',trace)
     if (not gates or len(gates) != trace.count('nsk1_code_gate:')
@@ -60,6 +60,45 @@ def check(trace, snapshots, initialized_retry):
             'scope':'own physical phone-code/menu comparison; not factory provisioning, persistent contacts or radio'}
 
 
+def run_machine(binary, run, script, seconds, verbose=False):
+    command = [str(binary.resolve()),'nsk1r4t','-bios','561a','-rompath','inputs',
+               '-noreadconfig','-video','none','-sound','none','-nothrottle','-log',
+               '-seconds_to_run',str(seconds),'-debug','-debugger','none','-autoboot_delay','0',
+               '-autoboot_script',str(script.resolve()),*(['-verbose'] if verbose else [])]
+    with (run/'console.log').open('w') as output:
+        process = subprocess.run(command,cwd=run,stdout=output,stderr=subprocess.STDOUT,timeout=180)
+    if process.returncode:
+        raise ValueError(f'MAME exited {process.returncode}')
+    return command
+
+
+def check_phase(run, initial, initialized_retry=True, through=30, minimum_records=2):
+    trace = (run/'error.log').read_text()
+    if '[LUA ERROR]' in (run/'console.log').read_text():
+        raise ValueError('security fixture console Lua error')
+    for name,digest in INPUTS:
+        if hashlib.sha1((run/'inputs/nsk1r4t'/Path(name).name).read_bytes()).hexdigest() != digest:
+            raise ValueError('own compatibility input changed')
+    image = (run/'inputs/nsk1r4t/5130f561a.fls').read_bytes()
+    summary = summarize(trace,image,'standard')
+    adc = re.findall(r'ccont_adc2_config: raw=([0-9a-f]{3}) external_input=1',trace)
+    if not adc or any(value != '22a' for value in adc):
+        raise ValueError('nominal ADC2 configuration was not applied')
+    storage = run/'nvram/nsk1r4t'
+    final = (storage/'eeprom').read_bytes()
+    if (hashlib.sha1((storage/'flash').read_bytes()).hexdigest() != INPUTS[0][1]
+            or len(initial) != 2048 or len(final) != 2048 or final[:0x20] != initial[:0x20]
+            or final[0x2a0:0x2a4] != initial[0x2a0:0x2a4]
+            or final[0x2a4] != (0 if initialized_retry else 255)
+            or summary['native_illegal_observed']
+            or [row['time'] for row in summary['late_samples']] != [time for time in (10,20,30,40,50,59) if time <= through]):
+        raise ValueError('native/storage/late observation boundary differs')
+    notifications = [line for line in trace.splitlines() if 'nsk1_record_reply:' in line and 'payload=35340000' in line]
+    summary['record_arithmetic'] = check_records('\n'.join(line for line in trace.splitlines() if line not in notifications),minimum=minimum_records)
+    summary['record_update_notifications_unqualified'] = notifications
+    return summary,trace
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('binary',type=Path)
@@ -71,34 +110,8 @@ def main():
     run = args.run.resolve()
     try:
         initial = prepare(args.roms.resolve(),run,args.capture.resolve(),True,True,True,True,args.initialized_retry)
-        command = [str(args.binary.resolve()),'nsk1r4t','-bios','561a','-rompath','inputs',
-                   '-noreadconfig','-video','none','-sound','none','-nothrottle','-log',
-                   '-seconds_to_run','31','-debug','-debugger','none','-autoboot_delay','0',
-                   '-autoboot_script',str(Path(__file__).with_name('nsk1_security_fixture.lua').resolve())]
-        with (run/'console.log').open('w') as output:
-            process = subprocess.run(command,cwd=run,stdout=output,stderr=subprocess.STDOUT,timeout=180)
-        if process.returncode:
-            raise ValueError(f'MAME exited {process.returncode}')
-        trace = (run/'error.log').read_text()
-        if '[LUA ERROR]' in (run/'console.log').read_text():
-            raise ValueError('security fixture console Lua error')
-        image = (run/'inputs/nsk1r4t/5130f561a.fls').read_bytes()
-        summary = summarize(trace,image,'standard')
-        adc = re.findall(r'ccont_adc2_config: raw=([0-9a-f]{3}) external_input=1',trace)
-        if not adc or any(value != '22a' for value in adc):
-            raise ValueError('nominal ADC2 configuration was not applied')
-        storage = run/'nvram/nsk1r4t'
-        final = (storage/'eeprom').read_bytes()
-        if (hashlib.sha1((storage/'flash').read_bytes()).hexdigest() != INPUTS[0][1]
-                or len(final) != 2048 or final[:0x20] != initial[:0x20]
-                or final[0x2a0:0x2a4] != initial[0x2a0:0x2a4]
-                or final[0x2a4] != (0 if args.initialized_retry else 255)
-                or summary['native_illegal_observed']
-                or [row['time'] for row in summary['late_samples']] != [10,20,30]):
-            raise ValueError('native/storage/late observation boundary differs')
-        notifications = [line for line in trace.splitlines() if 'nsk1_record_reply:' in line and 'payload=35340000' in line]
-        summary['record_arithmetic'] = check_records('\n'.join(line for line in trace.splitlines() if line not in notifications))
-        summary['record_update_notifications_unqualified'] = notifications
+        command = run_machine(args.binary,run,Path(__file__).with_name('nsk1_security_fixture.lua'),31)
+        summary,trace = check_phase(run,initial,args.initialized_retry)
         summary['physical_security'] = check(trace,run/'snap',args.initialized_retry)
         summary['command'] = command
         (run/'summary.json').write_text(json.dumps(summary,indent=2)+'\n')

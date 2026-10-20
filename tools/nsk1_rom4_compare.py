@@ -245,8 +245,8 @@ def main():
         if not configured_adc or any(int(value,16) != expected_adc for value in configured_adc):
             raise ValueError('requested physical ADC2 configuration was not applied')
         summary['adc2_source'] = expected_adc
-        required_late = [time for time in (10,20,30,50,59) if time <= args.seconds-1]
-        allowed_late = [time for time in (10,20,30,50,59) if time <= args.seconds]
+        required_late = [time for time in (10,20,30,40,50,59) if time <= args.seconds-1]
+        allowed_late = [time for time in (10,20,30,40,50,59) if time <= args.seconds]
         if not len(required_late) <= len(summary['late_samples']) <= len(allowed_late) or any(
                 not expected <= sample['time'] < expected+0.1
                 for expected,sample in zip(allowed_late,summary['late_samples'])):
