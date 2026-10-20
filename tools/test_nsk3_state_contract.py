@@ -1,6 +1,6 @@
 import unittest
 from pathlib import Path
-from tools.nsk3_state_contract import decode, direct_server_sends
+from tools.nsk3_state_contract import decode, direct_server_sends, direct_call_candidates
 
 
 class StateContractTest(unittest.TestCase):
@@ -9,6 +9,10 @@ class StateContractTest(unittest.TestCase):
         if not path.exists():self.skipTest('local own-ROM qualification fixture unavailable')
         image=path.read_bytes()
         self.assertEqual(decode(image)['selector'],0x834)
+        dynamic=direct_call_candidates(image,0x287da4)
+        self.assertEqual(len(dynamic),33)
+        self.assertIn(0x253cc4,dynamic)
+        self.assertIn(0x287fdc,dynamic)
         inventory=direct_server_sends(image)
         self.assertEqual(inventory['direct_post_candidates'],363)
         self.assertEqual(inventory['narrow_mailbox0e_sites'],[

@@ -49,18 +49,26 @@ def inspect_source(source):
     return decode(image)
 
 
-def direct_server_sends(image):
-    """Aligned direct BL candidates; only final-two-halfword literal destinations."""
+def direct_call_candidates(image,target):
+    """Decode aligned direct BL candidates without claiming code/data ownership."""
     from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_MODE_BIG_ENDIAN
     decoder=Cs(CS_ARCH_ARM,CS_MODE_THUMB|CS_MODE_BIG_ENDIAN)
     calls=[]
-    selected=[]
     for offset in range(0,len(image)-4,2):
         if int.from_bytes(image[offset:offset+2],'big')&0xf800!=0xf000:continue
         instructions=list(decoder.disasm(image[offset:offset+4],0x200000+offset))
-        if not instructions or instructions[0].mnemonic!='bl' or instructions[0].op_str!='#0x266a2c':continue
+        if not instructions or instructions[0].mnemonic!='bl' or instructions[0].op_str!=f'#{target:#x}':continue
         calls.append(0x200000+offset)
+    return calls
+
+
+def direct_server_sends(image):
+    """Aligned direct BL candidates; only final-two-halfword literal destinations."""
+    calls=direct_call_candidates(image,0x266a2c)
+    selected=[]
+    for address in calls:
+        offset=address-0x200000
         if b'\x20\x0e' in (image[offset-2:offset],image[offset-4:offset-2]):
-            selected.append(0x200000+offset)
+            selected.append(address)
     return {'direct_post_candidates':len(calls),'narrow_mailbox0e_sites':selected,
             'shared_indirect_computed_destinations_covered':False}

@@ -727,6 +727,17 @@ Its counter/context predicates are not fully classified and must remain
 separate from the direct80 branch. Own instruction/literal mutation checks
 anchor both040b rewrites, destinations and the native type80 entry. These
 static routes do not establish a valid RF body or explain the absent packet.
+
+Dynamic constructor287da4 preserves requested header at287e4c, accepts
+05dd..05e3 and060a/060b through its own cascade (base05dd at287f5c),
+and selects mailbox0e at287f36. Object-null arguments allocate a12-byte
+message; caller field2 is stored before dispatch. The reproducible aligned
+direct-call inventory finds33 candidates. One explicit05dd site253cc4
+passes null object/field2=3 when controller byte+a!=4, then sets+a=2.
+Its higher-level input is not yet classified. Qualified45s capture
+`tmp/nsk3-server-dynamic` observes no constructor entry and retains the
+empty-server/mode-chain/cache gates. Thus the MCU dynamic route is dormant
+too, but an absent constructor observation does not prove DSP-only ownership.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
