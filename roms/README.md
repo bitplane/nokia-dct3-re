@@ -364,6 +364,25 @@ service images remain useful RE inputs, but their results must be labelled with 
 The local PPM E result is declared separately as BIOS `450e` with SHA-1
 `7e88caa4963c57ebbd4d919023e38103ff8b528a`; run it with `make smoke-3330e`.
 
+### Nokia 3350 NHM-9 v5.30
+
+The retained `archive-dct3-packages/nhm9_05.30_install.EXE` (SHA-256
+`e9686c1c5171157b4308a0bdf96008ac040e866e6f5c31ca1ed993bac4e34acd`)
+contains one MCU and six matching PPM record streams, but no PMM stream.
+`nhm9_530.exe` has the same hash. The original acquisition URL and hashes
+are retained in that directory's `manifest.json`.
+
+```sh
+.venv/bin/python tools/nhm9_package_check.py \
+  roms/archive-dct3-packages/nhm9_05.30_install.EXE \
+  --ppm A --output roms/noki3350/3350f530a.fls
+```
+
+The normalized CPU-order file is `0x330000` bytes, SHA-1
+`3d0dce9c098bdd619c6f3684f739796f64b66169`, covering `0x200000..0x52ffff`.
+No erased or donor tail is appended. This is a qualified analysis input,
+not a declared MAME set or boot result; see `docs/3350_bringup.md`.
+
 ### Nokia 3410 NHM-2 v5.46
 
 Place `NHM2NX05.460`, `NHM2NX05.46E`, and `3410 virgin eeprom.pmm` in

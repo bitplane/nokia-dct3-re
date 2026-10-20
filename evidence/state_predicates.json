@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nhm9_v530_executable_baseline", "owner": "nhm9_source_qualification", "status": "satisfied",
+      "predicate": "The acquired NHM-9 v5.30 installer supplies identified contiguous own MCU and PPM records without importing provisioning",
+      "current": "The SHA-256-qualified installer contains 29 complete adjacent gzip members, seven strictly decoded phone-record streams: 312 MCU records covering 200000..46ffff and six 96-record PPM packs covering 470000..52ffff. Each embedded header identifies v5.30/15-03-03/NHM-9; each PPM header supplies its A-F identity. Combined A is 330000 bytes with SHA-1 3d0dce9c098bdd619c6f3684f739796f64b66169. No PMM stream or fabricated tail is supplied. The duplicate installer wrapper is not independent evidence. No hardware configuration, fitted mask, boot or handset service is promoted.",
+      "evidence": ["docs/3350_bringup.md", "roms/README.md", "tools/nhm9_package_check.py", "tools/test_nhm9_package_check.py"]
+    },
+    {
       "id": "nam2_c3_security_input_state_replay", "owner": "nam2_research_checkpoint", "status": "satisfied",
       "predicate": "The own-image C3 research configuration restores its pre-input security checkpoint and repeats physical code acceptance with exact architecture and reviewed pixels",
       "current": "At 7.75 seconds the fixture captures all 37 ARM/banked registers, PC/SP, time and RAM checksum at emulator pre-save. Post-load observation is exactly equal. Both independently scheduled physical 12345/left-softkey sequences at 8..10.5 seconds reach equal architecture at 11 seconds and the existing 96x65 Code-accepted pixel hash. The checker requires exact observation/contact ordering, one terminal result, no fixture errors, unchanged executable bytes and valid own PMM/catalogue after the run. This is early security-editor replay, not usable idle, late input, native DSP or fitted-flash identification.",
