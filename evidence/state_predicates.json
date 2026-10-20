@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsk1_v561_physical_permanent_puk_block", "owner": "nsk1_sim_security", "status": "satisfied",
+      "predicate": "Normal laboratory retry counts are physically exhausted and the permanently blocked card remains rejected with identical storage after a cold native-compatibility boot",
+      "current": "The twelve-process --exhaust-puk gate starts with current-format3570-byte storage, CHV1 retries3 and PUK1 retries10. Three physical wrong PINs change only CHV1 retries. Ten independently cold wrong-PUK/new-PIN/confirmation workflows decrement only PUK1 retries, returning9804 for the first nine and9840 for the last. Original credentials, CHV2/PUK2 and unrelated files are byte-identical. The final attempt renders Code error then exact SIM card rejected pixels at35/40 seconds. A cold process reproduces the unmasked full frame at10/20/30/40 seconds, sends no VERIFY/UNBLOCK and preserves the complete exhausted card. All phases independently retain boot/storage/native-execution checks. No blocked state, firmware result or APDU is injected. Fitted DSP, long-run stability and network acceptance are not promoted.",
+      "evidence": ["docs/5130_bringup.md", "docs/model_coverage.md", "tools/nsk1_puk_roundtrip.py", "tools/nsk1_pin_block.lua", "tools/nsk1_puk_wrong.lua", "tools/nsk1_puk_input.lua", "tools/test_nsk1_puk_roundtrip.py"]
+    },
+    {
       "id": "nsk1_v561_own_native_tuning_provenance", "owner": "nsk1_native_radio", "status": "satisfied",
       "predicate": "Own MCU tuning parameters pass through native overlay upload and selected-entry arithmetic to the DSP programming port pair without firmware-state substitution",
       "current": "The own descriptor at29821c and payload at298228 contain fields0004/17bf/1797. A qualified initialized cold run observes MCU296104 reading000417bf and17971d00 before native program-overlay writes at31d7 assign216a/216b/216c. Selected word0374, control06be0020 and receive addend17bf yield packed00303633; actual4023/4028 callbacks write3633/0030 to ports31/32. Executable checkers correlate source, upload and arithmetic ordering alongside independent boot/storage/native-radio acceptance. These are own product software values, not the sibling NSE-1 GSM900 addend13a6. Physical synthesizer layout, frequency units, SCU serialization, RF input encoding, fitted mask and reception remain unproved.",

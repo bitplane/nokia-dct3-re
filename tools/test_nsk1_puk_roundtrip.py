@@ -4,11 +4,59 @@ import unittest
 from unittest.mock import patch
 
 from tools.make_sim_card_profile import CHV1,CHV2,PUK1,PUK2
-from tools.nsk1_puk_roundtrip import check_run,NEW_PIN
+from tools.nsk1_puk_roundtrip import check_run,NEW_PIN,exhaustion_profile
 from tools.sim_security_trace_check import CHV_OFFSET,ATTEMPTS_OFFSET,ENABLED_OFFSET,AOC_NVRAM_SIZE
 
 
 class Nsk1PukTest(unittest.TestCase):
+    def test_exhaustion_starts_with_current_unblocked_laboratory_card(self):
+        card = exhaustion_profile()
+        self.assertEqual(len(card),AOC_NVRAM_SIZE)
+        self.assertEqual(card[ATTEMPTS_OFFSET:ATTEMPTS_OFFSET+4],bytes((3,3,10,10)))
+        self.assertEqual(card[CHV_OFFSET:CHV_OFFSET+32],CHV1+CHV2+PUK1+PUK2)
+        self.assertEqual(card[ENABLED_OFFSET],1)
+        self.assertEqual(card[3524:],bytes.fromhex('00f110')+b'\xff'*43)
+
+    def test_each_exhaustion_step_and_permanent_cold_storage(self):
+        blocked = bytearray(AOC_NVRAM_SIZE)
+        blocked[CHV_OFFSET:CHV_OFFSET+32] = CHV1+CHV2+PUK1+PUK2
+        blocked[ATTEMPTS_OFFSET:ATTEMPTS_OFFSET+4] = bytes((0,3,10,10))
+        blocked[ENABLED_OFFSET] = 1
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            path = run/'nvram/nsk1r4t/sim_card'
+            path.parent.mkdir(parents=True)
+            (run/'initial_eeprom.bin').write_bytes(bytes(2048))
+            with patch('tools.nsk1_puk_roundtrip.check_contacts'),patch('tools.nsk1_puk_roundtrip.frame_check'),patch('tools.nsk1_puk_roundtrip.PERMANENT_BLOCK','reviewed'):
+                for before in range(10,0,-1):
+                    previous = bytearray(blocked)
+                    previous[ATTEMPTS_OFFSET+2] = before
+                    final = bytearray(previous)
+                    final[ATTEMPTS_OFFSET+2] -= 1
+                    path.write_bytes(final)
+                    sw = '9840' if before == 1 else '9804'
+                    trace = f'SIM status ins=2c sw={sw} chv=0/3 puk={before-1}/10 enabled=1'
+                    with patch('tools.nsk1_puk_roundtrip.check_phase',return_value=({},trace)):
+                        self.assertEqual(check_run(run,'wrong',previous,True)[1],final)
+                        changed = bytearray(final)
+                        changed[0] ^= 1
+                        path.write_bytes(changed)
+                        with self.assertRaises(ValueError):
+                            check_run(run,'wrong',previous,True)
+                        path.write_bytes(final)
+                    with patch('tools.nsk1_puk_roundtrip.check_phase',return_value=({},trace.replace(sw,'9000'))):
+                        with self.assertRaises(ValueError):
+                            check_run(run,'wrong',previous,True)
+                with patch('tools.nsk1_puk_roundtrip.check_phase',return_value=({},'')):
+                    self.assertEqual(check_run(run,'permanent',final,True)[1],final)
+                    with self.assertRaises(ValueError):
+                        check_run(run,'permanent',blocked,True)
+                    with self.assertRaises(ValueError):
+                        check_run(run,'wrong',final,True)
+                with patch('tools.nsk1_puk_roundtrip.check_phase',return_value=({},'SIM status ins=2c sw=9000 chv=3/3 puk=10/10 enabled=1')):
+                    with self.assertRaises(ValueError):
+                        check_run(run,'permanent',final,True)
+
     def test_exact_recovery_and_cold_storage_contract(self):
         blocked = bytearray(AOC_NVRAM_SIZE)
         blocked[CHV_OFFSET:CHV_OFFSET+32] = CHV1+CHV2+PUK1+PUK2

@@ -87,7 +87,8 @@ are not borrowed. `2915` separately stops after its first loader exchange.
 Physical SIM wrong-PIN/cold-correct-PIN verification also passes using the
 shared laboratory card. Physical PIN exhaustion, cold PUK recovery and cold
 replacement-PIN verification also pass, including a wrong-PUK retry persisted
-across cold recovery. Permanent PUK exhaustion remains untested on this product.
+across cold recovery. A separate twelve-process gate also proves permanent
+PUK exhaustion and cold SIM-card rejection; see SIM security below.
 Fitted-mask, physical-clock and measured analog calibration evidence remain
 incomplete; no independent NSK-1 DSP mask has been acquired.
 Do not inherit
@@ -1364,8 +1365,34 @@ UNBLOCK `9804`; exactly the PUK1 retry byte changes from 10 to 9. Credentials
 and PIN retries remain unchanged. Its frame says SIM card blocked, which is
 not evidence of permanent blocking: the persisted PUK counter remains 9.
 Cold correct-PUK recovery must restore both counters and change only the new
-PIN, then a further cold verification preserves the whole card. Permanent
-PUK exhaustion is not covered by this gate.
+PIN, then a further cold verification preserves the whole card. This recovery
+mode does not exhaust PUK; the separate mode below does.
+
+### Permanent card blocking
+
+```sh
+.venv/bin/python tools/nsk1_puk_roundtrip.py mame/mame roms \
+  tmp/nsk1-profile-source tmp/nsk1-puk-permanent-final --exhaust-puk
+```
+
+This twelve-process gate starts with a complete current-format3570-byte
+laboratory card, normal CHV1 retries3 and PUK1 retries10. It supplies no
+blocked state. Three physical wrong PINs block CHV1, changing only that
+retry byte. Ten subsequent independent cold processes each enter the wrong
+PUK87654321, new PIN4321 and confirmation through physical contacts. The
+first nine UNBLOCK commands return9804 and decrement exactly one PUK retry;
+the tenth returns9840 with both counters zero. Every other card byte,
+including credentials, unrelated files and CHV2/PUK2 counters, is preserved.
+
+The last attempt first renders Code error, then the exact SIM card rejected
+frame at35/40 seconds. A final cold process renders that same full frame
+at10/20/30/40 seconds, sends no VERIFY or UNBLOCK command and leaves the
+entire exhausted card unchanged. No frame mask is used. All phases retain
+the native boot/storage/execution qualification and no donor provisioning,
+firmware-state write or injected APDU is used. This is permanent card-block
+presentation/persistence on the native compatibility instrument, not fitted
+DSP proof, stable radio or network acceptance. Qualified capture:
+`tmp/nsk1-puk-permanent-final`.
 
 ## Offline SMS storage
 
