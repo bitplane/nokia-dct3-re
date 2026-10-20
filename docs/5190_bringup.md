@@ -221,6 +221,16 @@ and `179`; that capped list is not exhaustive absence evidence for later
 receives. It does establish live periodic activity, rather than a wholly
 dormant charging task.
 
+A single host charger-contact diagnostic connects at 3 seconds and removes
+at 6 seconds, using the existing configured connected raw value `3ff`
+(physical voltage not validated). It still observes `{phase=06,reports=0e,
+column_mask=3f}` at 10 seconds and a white 84x48 raster; neither direct
+event-21 publisher nor report-14 wrapper executes through 30 seconds. This
+rules out that specific contact sequence as an unblock, not the whole
+charging/ADC hypothesis. The source reader `2a3686` explicitly samples ADC
+selector 5 and applies calibration before returning a charger measurement;
+its calibration/units require independent validation before changing inputs.
+
 The reusable observer now records `nsb1_input_readiness` at all five normal
 sample times. The checksum-control checker requires the five-second
 boundary `{startup_reason=0a, phase=06, reports=0e, column_mask=3f}` and asks
