@@ -57,11 +57,21 @@ def summarize(trace, image, variant):
         expected = image[slot0-0x200000:slot0-0x200000+10].hex()
         if arguments[:20] != expected:
             raise ValueError(f'release {index} is not own descriptor-0 transfer')
+    presentation = re.findall(r'nsk1_presentation: t=([0-9.]+) commands=(\d+) data=(\d+) nonzero=(\d+) startup_reason=([0-9a-f]{2}) idle_flag=([0-9a-f]{2}) observer_writes=0', trace)
+    if len(presentation) != 5 or [row[0] for row in presentation] != [row[0] for row in samples]:
+        raise ValueError('missing synchronized LCD/startup observations')
+    last = presentation[-1]
+    decisions = re.findall(r'nsk1_record_decision: pointer=([0-9a-f]{8}) state=([0-9a-f]{8}) valid=([0-9a-f]{8}) observer_writes=0', trace)
     return {'variant': variant, 'samples': len(samples),
             'last_mcu_pc': samples[-1][1],
             'native_illegal_observed': any(row[2] != '0' for row in samples),
             'releases': len(releases), 'own_slot25_payload_observed': True,
             'descriptor0_release_observed': len(releases) > 1,
+            'lcd_commands': int(last[1]), 'lcd_data_bytes': int(last[2]),
+            'lcd_nonzero_bytes': int(last[3]),
+            'startup_reasons': [row[4] for row in presentation],
+            'record_decisions': [{'pointer': pointer, 'state': int(state,16), 'valid': int(valid,16)}
+                                 for pointer,state,valid in decisions],
             'graphical_or_fitted_hardware_proved': False}
 
 
@@ -71,6 +81,7 @@ def main():
     parser.add_argument('roms', type=Path)
     parser.add_argument('run', type=Path)
     parser.add_argument('--variant', choices=('standard', '2915'), default='standard')
+    parser.add_argument('--debug-startup', action='store_true', help='bounded read-only own startup entry traces')
     args = parser.parse_args()
     run = args.run.resolve()
     try:
@@ -82,6 +93,7 @@ def main():
                 '561a' if args.variant == 'standard' else '561a2915',
                 '-rompath', str(run / 'inputs'), '-noreadconfig', '-video', 'none',
                 '-sound', 'none', '-nothrottle', '-log', '-seconds_to_run', '6',
+                *(['-debug', '-debugger', 'none'] if args.debug_startup else []),
                 '-autoboot_delay', '0', '-autoboot_script', str(script),
             ], cwd=run, stdout=output, stderr=subprocess.STDOUT, timeout=180)
         (run / 'exit_status.json').write_text(json.dumps({'returncode': result.returncode})+'\n')

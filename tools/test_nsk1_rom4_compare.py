@@ -16,6 +16,8 @@ class Nsk1CompareTest(unittest.TestCase):
         image[0x9728c:0x97296] = bytes.fromhex('fd00ff80024405000078')
         trace = '\n'.join(f'[luaengine] nsk1_boot: t={time} pc=00289406 dsp_pc=408d illegal=0'
                           for time in (0.1,0.5,1,2,5))
+        trace += '\n'+'\n'.join(f'nsk1_presentation: t={time} commands=20 data=504 nonzero=504 startup_reason=0a idle_flag=01 observer_writes=0'
+                                for time in (0.1,0.5,1,2,5))
         release = ('[luaengine] nsk1_release: index=1 command=01 pc=00273504 '
                    f'args=0100030000008000000100010200 program={payload.hex()}')
         trace += '\n'+release
@@ -24,12 +26,17 @@ class Nsk1CompareTest(unittest.TestCase):
         self.assertTrue(report['own_slot25_payload_observed'])
         self.assertFalse(report['descriptor0_release_observed'])
         self.assertFalse(report['graphical_or_fitted_hardware_proved'])
+        self.assertEqual(504,report['lcd_nonzero_bytes'])
+        decision = '\nnsk1_record_decision: pointer=00101bc8 state=00000002 valid=00000000 observer_writes=0'
+        self.assertEqual([{'pointer':'00101bc8','state':2,'valid':0}],
+                         summarize(trace+decision,image,'standard')['record_decisions'])
         second = '\nnsk1_release: index=2 command=01 pc=00273786 args=fd00ff8002440500007800000000 program=00'
         self.assertTrue(summarize(trace+second,image,'standard')['descriptor0_release_observed'])
         for bad in (trace.replace('00273504','00273506'),
                     trace.replace(payload.hex(),'00'),
                     trace.replace('t=5 ','t=4 '),
                     trace+'\n[LUA ERROR]',
+                    trace.replace('nsk1_presentation: t=5','nsk1_presentation: t=6'),
                     trace+second.replace('fd00ff80','fd01ff80')):
             with self.assertRaises(ValueError):
                 summarize(bad,image,'standard')

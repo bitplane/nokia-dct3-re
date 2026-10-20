@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsk1_v561_coherent_presentation", "owner": "nsk1_startup_storage", "status": "unresolved",
+      "predicate": "Own NSK-1 firmware reaches a useful graphical presentation using independently grounded device and external-storage inputs",
+      "current": "The explicit NSE-1 ROM4 compatibility instrument retains own MCU/PPM and erased 2-KiB EEPROM. Standard v5.61 performs three releases, executes native DSP runtime and sends 3024 LCD pixel bytes, including 1008 nonzero bytes; the final five-second frame is blank, with an intermediate all-black test frame rather than a useful UI. Own EEPROM reads at 0000/000c supply twenty ff bytes to task-3 request 15/14. The returned record reaches validator 25a814 and decision 25a994 in state 2 with validity zero. One continuation calls restart 295136 with reason 04; its register-6a guard prevents interpreting every invalid result as an unconditional restart. Record transform/key provenance and a justified synthetic profile remain unresolved. The separate 2915 family sends LCD commands/pixels but has only one DSP release and no descriptor-0 transfer in this interval. No donor provisioning, fabricated reply, validity flag or internal completion is supplied; fitted DSP mask/clock and physical-key mapping remain unproved.",
+      "evidence": ["docs/5130_bringup.md", "tools/nsk1_static_check.py", "tools/nsk1_rom4_compare.py", "tools/nsk1_boot_observe.lua", "tools/test_nsk1_static_check.py", "tools/test_nsk1_rom4_compare.py"]
+    },
+    {
       "id": "nsb1_v671_offline_sms_erase_cold_empty", "owner": "nsb1_sim_sms", "status": "satisfied",
       "predicate": "A physically composed and cold-read native SIM draft is physically deleted and remains absent after another cold boot",
       "current": "The four-process PPM B --erase gate saves A-space, cold-reads its exact unsent record, then physically selects Options/Erase and confirms. One A0 DC 01 04 B0 succeeds; only EF_SMS record one's status changes 07 to 00, with payload and all other card bytes preserved. A fourth qualified cold process reads EF_SMS without update and physically opens an exact No messages in outbox frame. Each phase requires native execution, receive activity, phone-code contacts and unchanged flash. This is offline logical deletion, not payload scrubbing, network SMS, registration or fitted-mask proof.",

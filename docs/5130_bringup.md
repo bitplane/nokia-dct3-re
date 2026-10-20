@@ -8,8 +8,9 @@ own erased EEPROM and acquired NSE-1 resident DSP input. The standard family
 reaches descriptor-0 transfers and native runtime; `2915` stops after its
 first loader exchange. Neither paints at five seconds. No graphical boot,
 physical input, SIM or radio acceptance is claimed.
-The next boundary is the standard family's runtime startup/self-test and
-the separate `2915` loader-result interpretation. Do not inherit
+The next boundary is the standard family's low-NV record validation and
+the separate `2915` loader-result interpretation, not an absent LCD link.
+Do not inherit
 NSE-1/NSB-1 EEPROM contents, DSP identities, acknowledgement counts or clocks.
 
 ## Acquired inputs
@@ -198,9 +199,8 @@ reception nor speech is established.
 
 The final standard MCU PC belongs to the loop `289402..289408`, reading a
 firmware-owned byte after the startup/idle predicate chain, not the cold
-loader's sentinel wait. The next investigation should observe this loop's
-release and startup/self-test state, including whether the own LCD routines
-run. The `2915` loader-result branch is a separate static/runtime question.
+loader's sentinel wait. The `2915` loader-result branch is a separate
+static/runtime question.
 Unmapped writes to `600000/600100` are retained in the trace; they are not
 evidence for fitted writable storage there. Both experiments retain their
 blank frame rather than manufacturing a presentation or completion.
@@ -209,3 +209,56 @@ Checkpoint validation: both isolated compatibility runs above reproduce;
 the NSB-1 native-bootstrap regression and default 3210 structural gate pass.
 All 24 MAME patches apply to the pinned upstream revision. The tools suite
 passes 3,725 tests with one skip; these do not establish NSK-1 UI support.
+
+## Presentation and low-NV validation
+
+The LCD receives real commands and pixels. The own sequence initializes
+the controller at about 145 ms (`2921e8`), clears all six banks, sets normal
+display mode with command `0c`, and later sends nonzero bytes. Intermediate
+captures include the all-black test frame; the final white image is not
+evidence that the LCD interface never ran.
+
+The passive sampler now captures all five times, not only the final frame:
+
+| Five-second cumulative observation | Standard | `2915` |
+| --- | --- | --- |
+| LCD commands | 100 | 110 |
+| Pixel bytes | 3024 | 3024 |
+| Nonzero pixel bytes | 1008 | 922 |
+| Startup reasons at 0.1/0.5/1/2/5 s | `0a/0a/04/04/04` | `0a/0a/0a/0a/0a` |
+
+For a bounded read-only startup trace, add `--debug-startup` to the runner.
+The probes use debugger temporary counters only; they do not change guest
+registers, RAM, storage, keys or peer results. Their retirement condition is
+acceptance of the low-NV validation contract.
+
+On the standard family, own routine `25a2fa` reads 12 bytes at EEPROM zero
+and `25a306` reads eight bytes at `000c`. It builds the task-3 request with
+command/length `15/14`; the trace at post primitive `255268` confirms all
+20 supplied data bytes are `ff`. Adjacent requests `14/0c` and `16/18`
+likewise originate in own EEPROM reads at `0014` and `0020`. These are
+observed input bytes, not a borrowed handset's provisioning or an invented
+reply contract.
+
+The later record object reaches `25a814` via dispatcher call `22c6f2`.
+Its byte 9 is `32`; the validator examines the packed bytes beginning at
+offset `0c` and reaches decision `25a994` with state 2 and validity 0.
+Its first observed payload begins `b2ade0d9 99085170 cbb40000`; the later
+warm-lifecycle object differs. These are transformed results, not plaintext
+EEPROM fields. Their exact key/transform and identity meaning must be
+established before generating an alternative profile.
+
+The same routine's continuation calls restart entry `295136` with reason
+`04` from `25a9f4`; subsequent startup retains reason `04`. The guard at
+`25a9b0..25a9c8` also reads register offset `6a`, so a validity-zero result
+alone must not be described as an unconditional restart. This locates the
+observed restart in firmware's own validation lifecycle, rather than
+proving an ADC failure, missing DSP reply or bad LCD geometry. No validity
+flag, branch, packed record or internal completion is patched.
+
+The next software task is to recover the low-record transform and its own
+key provenance, then determine whether a coherent synthetic external
+profile can be generated from this machine's independently observed inputs.
+Do not reuse `make_5110_eeprom_profile.py`'s NSE-1 MSID, identity, FAID or
+fault-latch values: sharing capacity and a compatible resident DSP does not
+make those handset records NSK-1 evidence.
