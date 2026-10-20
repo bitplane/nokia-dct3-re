@@ -36,6 +36,13 @@ def check_contacts(trace, reload=False):
         raise ValueError('missing physical SMS draft contacts')
 
 
+def check_editor_state(trace):
+    saved = re.findall(r'nsb1_sms_state: event=saved t=([0-9.]+) pc=([0-9a-f]{8}) ram=([0-9a-f]{8}) dsp=([^\r\n]+)', trace)
+    restored = re.findall(r'nsb1_sms_state: event=restored result=pass t=([0-9.]+) pc=([0-9a-f]{8}) ram=([0-9a-f]{8}) dsp=([^\r\n]+)', trace)
+    if len(saved) != 1 or saved != restored or 'nsb1_sms_state: FAIL' in trace:
+        raise ValueError('native SMS editor save-state mismatch or incomplete roundtrip')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('binary', type=Path)
@@ -43,6 +50,8 @@ def main():
     parser.add_argument('run_dir', type=Path)
     parser.add_argument('--checksum-control-from', type=Path, required=True,
                         help='qualified own PPM B erased-storage run')
+    parser.add_argument('--restore-editor', action='store_true',
+                        help='save/load the populated editor before physical Save continuation')
     args = parser.parse_args()
     try:
         root, output = args.rom_root.resolve(), args.run_dir.resolve()
@@ -52,11 +61,14 @@ def main():
         rompath = prepare(root, save, args.checksum_control_from.resolve(), True, True,
                           ppm='B', english_dictionary=True)
         code = run_mame(args.binary.resolve(), rompath, save,
-                        Path(__file__).with_name('nsb1_sms_draft_input.lua').resolve(), 61, bios='671b')
+                        Path(__file__).with_name('nsb1_sms_draft_state.lua' if args.restore_editor
+                                                 else 'nsb1_sms_draft_input.lua').resolve(), 61, bios='671b')
         trace, card = check_card_run(save, code, 61, ppm='B')
         check_receive_activity(trace, 60)
         check_security_gate(trace, True)
         check_contacts(trace)
+        if args.restore_editor:
+            check_editor_state(trace)
         check_card(card)
         if 'SIM status ins=dc sw=9000' not in trace:
             raise ValueError('missing successful card update')
@@ -77,6 +89,7 @@ def main():
         (output/'result.json').write_text(json.dumps({
             'offline_sim_draft_roundtrip': True, 'ppm': 'B',
             'synthetic_dictionary_language': 1, 'network_sms_accepted': False,
+            'native_editor_state_restored': args.restore_editor,
             'fitted_dsp_mask_proved': False}, indent=2)+'\n')
     except (ValueError, OSError) as error:
         parser.exit(1, f'NSB-1 draft roundtrip failed: {error}\n')

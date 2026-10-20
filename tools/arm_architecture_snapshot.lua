@@ -1,8 +1,10 @@
--- Read-only ARM7 state for acceptance fixtures; no product or input policy.
-return function(machine)
+-- Read-only ARM7 state; optional backed-RAM bound, no product/input policy.
+return function(machine, ram_end)
     local cpu = assert(machine.devices[':maincpu'])
     local memory, sum = cpu.spaces['program'], 0
-    for address = 0x100000, 0x17fffc, 4 do
+    ram_end = ram_end or 0x17fffc
+    assert(ram_end >= 0x100000 and ram_end <= 0x17fffc and ram_end % 4 == 0)
+    for address = 0x100000, ram_end, 4 do
         sum = ((sum << 5) - sum + memory:read_u32(address)) & 0xffffffff
     end
     local registers = {}

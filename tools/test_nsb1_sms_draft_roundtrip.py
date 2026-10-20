@@ -1,10 +1,20 @@
 import unittest
 
 from tools.nsb1_sms_draft_roundtrip import (DRAFT, RECORD_SIZE, SMS_OFFSET,
-                                           check_card, check_contacts)
+                                           check_card, check_contacts, check_editor_state)
 
 
 class DraftTest(unittest.TestCase):
+    def test_state_requires_matching_snapshot_and_single_completed_roundtrip(self):
+        saved = 'nsb1_sms_state: event=saved t=41.500000000 pc=002a4672 ram=f20de5ff dsp=PC:47a1,ILLEGAL:0\n'
+        restored = saved.replace('event=saved', 'event=restored result=pass')
+        check_editor_state(saved + restored)
+        for trace in (saved, restored, saved+restored+restored,
+                      saved+restored.replace('47a1', '47a2'),
+                      saved+restored+'nsb1_sms_state: FAIL incomplete\n'):
+            with self.assertRaisesRegex(ValueError, 'save-state'):
+                check_editor_state(trace)
+
     def card(self):
         data = bytearray(3570)
         data[SMS_OFFSET:SMS_OFFSET+RECORD_SIZE] = DRAFT

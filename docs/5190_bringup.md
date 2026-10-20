@@ -44,6 +44,14 @@ This is offline storage, not registration or network SMS acceptance.
   --checksum-control-from tmp/QUALIFIED_B_ERASED_RUN
 ```
 
+Add `--restore-editor` to save at 41.5 seconds in the populated editor,
+advance 0.25 seconds and reload before physical Save. The gate requires exact
+emulated time, ARM registers (including banked state), a hash of the own backed
+64-KiB RAM and exposed C54x architectural state to match at save/load. It then
+requires the same Saved pixels/card record and cold Outbox read. This mode
+passes; it covers sampled architecture and functional continuation, not every
+hidden peripheral state or native network/speech behavior.
+
 The checksum source must be a qualified own PPM B erased-storage run produced
 with `prepare(..., ppm='B')` and run using `-bios 671b`. The fixture changes
 only the existing checksum/retry controls plus EEPROM preference `04c7 = 01`;
