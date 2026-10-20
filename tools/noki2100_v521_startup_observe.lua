@@ -5,6 +5,10 @@ local debugger = machine.debugger
 local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces.program
 local commands = {
+    {0x305b82, 'flash_family', 'family=%08x id0=%04x maker=%04x device=%04x third=%04x',
+        'r0,w@r13,w@(r13+2),w@(r13+4),w@(r13+6)'},
+    {0x305bea, 'flash_dispatch', 'program=%08x erase=%08x extra0=%08x extra1=%08x',
+        'd@10fac8,d@10facc,d@10fad0,d@10fad4'},
     {0x291b24, 'checksum_input', 'root=%08x identity0=%08x identity1=%08x callback=%08x',
         'r4,d@(r4+c),d@(r4+10),d@10fad4'},
     {0x291b3e, 'checksum', 'computed=%08x stored=%08x root=%08x identity0=%08x identity1=%08x',

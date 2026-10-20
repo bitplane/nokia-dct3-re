@@ -142,6 +142,22 @@ establish the firmware's selected erase geometry; that selection remains the
 next static/runtime boundary to recover. Do not infer an 8 KiB erase unit
 from the PMM spacing or change all Sharp `b0/d0` devices on this evidence.
 
+The query stub's saved stack return identifies caller `305b5c`, which copies
+the ID reader from `33dffc` to `1351f0` before querying. Selector `305b0c`
+scans all ten eight-byte records at `33d748`; each has a family plus three
+ID halfwords, with `ffff` as wildcard and the last matching record winning.
+Observed `b0/d0/0000` matches the manufacturer-wide family-1 record. The
+family-1 branch at `305bd0` copies `0x144` bytes from `33e064` to `1351f0`
+and installs program `1351f1` and erase `135239` in slots `10fac8/10facc`.
+These reproduce the captured program/erase PCs. This selects an algorithm,
+not an erase size: the ten-record table contains no geometry field.
+`tools/nam2_v521_flash_contract.py` extracts the hash-qualified table and
+tests its selection semantics; the startup observer records the runtime
+selection and installed slots. The PMM erase-span contract remains open.
+Fresh isolated capture `tmp/nam2-v521-family-20261020/error.log` confirms
+family `1`, ID tuple `0000/b0/d0/0000`, program `1351f1`, erase `135239`,
+and both extra dispatch slots zero. Its observer makes no firmware writes.
+
 ## Established contracts
 
 - The normalized stock image occupies `0x200000..0x3effff` and executes from the
