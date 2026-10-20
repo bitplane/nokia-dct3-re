@@ -110,7 +110,13 @@ bit 0 at `2abcf2..2abcf6`. With this record's zero flags it returns at
 Thus the observed descriptor is a non-delivering interval, not a missing
 startup message. Predicate `2fd07c` checks its remaining delay through
 `2abc00(79)`; the schedule/remask sequence is consistent with an idle holdoff,
-but neither this usage nor the inactive descriptor identifies IRQ3's source.
+The retained MADos archive (commit
+`c4b9591e243a74484e27becf343655bb459f99b7`) explicitly names line 3
+`IRQ_SLEEP` in `include/hw/int.h`. This independent source label supports
+a sleep-related interpretation; it was missed in the earlier header audit.
+It does not specify the generating edge, wake latency, or global-enable
+readback/restoration behavior. Those hardware semantics, rather than a
+task-message producer, remain the boundary to recover.
 
 The next contract to recover is how ordinary idle is expected to service
 pending work or restore global delivery when the deep-sleep guard declines.
@@ -189,6 +195,12 @@ do not justify hiding disable bits on reads or enabling interrupts on every
 idle-loop iteration. The physical write/read/clock-transition contract still
 needs independent evidence; no alternative emulator's read-mask convention
 is promoted by this audit.
+The passive control-write inventory through 15 s observes only `05` and
+`0a` in the no-SIM run. Independent per-domain enable/disable command
+semantics therefore cannot by themselves change this observed failure:
+both domains are explicitly commanded together, not accidentally lost to
+a partial whole-byte write. The existing idle observer retains the value
+inventory; it does not establish all possible command or readback semantics.
 
 ## Own v5.21 checksum fixture
 

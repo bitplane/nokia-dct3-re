@@ -105,6 +105,7 @@ def inspect(image):
             "expiry": "0x2abcec", "task_link_flag": 1,
             "initial_expiry_links_task": bool(irq3_record[0] & 1),
             "physical_source": "unresolved",
+            "external_source_label": "MADos include/hw/int.h: IRQ_SLEEP=3",
             "task_destination_proven": False,
         },
         "interrupt_control_consumers": {

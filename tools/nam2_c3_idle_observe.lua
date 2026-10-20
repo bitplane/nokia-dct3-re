@@ -4,6 +4,13 @@ assert(machine.system.name == 'nam2c3')
 local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces.program
 local owner_taps = {}
+local control_commands = {}
+owner_taps[#owner_taps + 1] = memory:install_write_tap(
+    0x2000c, 0x2000f, 'nam2_idle_control_commands', function(offset, value, mask)
+        if (mask & 0xff000000) == 0 then return end
+        local command = (value >> 24) & 0xff
+        control_commands[command] = (control_commands[command] or 0) + 1
+    end)
 for _, address in ipairs({0x10ef46, 0x10917b, 0x107b8b, 0x109173}) do
     local shift = (3 - (address & 3)) * 8
     local last = memory:read_u8(address)
@@ -46,6 +53,12 @@ emu.register_frame_done(function()
     local now = machine.time:as_double()
     if not descriptor_sampled and now >= 15 then
         descriptor_sampled = true
+        for command = 0, 255 do
+            if control_commands[command] then
+                machine:logerror(string.format('nam2_idle_control_command: data=%02x count=%d observer_writes=0\n',
+                    command, control_commands[command]))
+            end
+        end
         local bytes = {}
         for i = 0, 11 do
             bytes[#bytes + 1] = string.format('%02x', memory:read_u8(0x101334 + i))
