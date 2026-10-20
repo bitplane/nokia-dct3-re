@@ -26,6 +26,13 @@ latency are not established. The surrounding port-0/port-36 sequence is
 observed below, but its physical completion contract remains open; do not assign
 the port to COBBA or a PLL from the polling shape alone.
 
+A fresh ten-second control after removing the duplicate MDISND commit-time
+HPINT reproduces this boundary: `0080 -> 809c`, unchanged poll reads, and
+PC `9142` at five seconds. `nse6_serial_control_check.py` passes with decoded
+transaction time 3.649006673 s and no completion claim. The shared fix that
+permits sustained NSB-1 execution does not establish this independent port's
+missing completion bit, nor stable long-run NSE-6 operation.
+
 The trigger is an organic type-`0x4c` packet (`0x044c`, payload
 `0080,0104`) consumed at 3.649007 seconds. Resident dispatch `0x3bcd`
 calls `0x9232` (saved return `0x3bcf`); that routine clears control-word
@@ -306,13 +313,13 @@ board-level battery routing. Other ADC channels remain research defaults.
 
 ### Menu Execution and Restart Boundary
 
-**Open contract:** recover the MCU TX queue's ring-space wakeup contract.
-The organic type-`1a` object reaches mailbox 3 but remains behind partially
-drained memory uploads; native consumption never reaches it. Startup packets, native
-memory uploads, control handlers, and frame interrupts execute; the processing
-tail remains dormant. Neither a fabricated heartbeat nor altered NV reset
-policy is an evidenced correction. The acquired NSE-1 mask remains a
-compatibility instrument, not an identified fitted NSE-6 mask.
+**Current native contract:** recover the port-`36` completion described under
+Current Result. The earlier MCU TX queue/ring-space observations are not a
+second unresolved message-producer frontier: native upload/control processing
+now reaches the independently observed port transaction before further search
+work can complete. Neither a fabricated heartbeat nor altered NV reset policy
+is an evidenced correction. The acquired NSE-1 mask remains a compatibility
+instrument, not an identified fitted NSE-6 mask.
 
 `tools/nse6_menu_fixture.lua` accepts the default code then applies physical
 Menu, Down and Select contacts. Snapshots show Messages, Call register, and

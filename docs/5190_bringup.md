@@ -25,9 +25,31 @@ The compatibility instrument now uses an explicitly nominal ADC2 input of
 554. With the six-byte checksum diagnostic it completes ten acquisitions,
 posts readiness report `14` organically, and unmasks keypad columns. Physical
 Menu reaches logical decoder result `19`. The five-second raster is transient;
-the exact readable empty-socket frame is accepted at ten seconds. Menu/app
-navigation, inserted-card services and fitted ADC routing remain unproved.
+the exact readable empty-socket frame is accepted at ten seconds. Physical
+Phone book navigation, SIM contact save/cold search, and SIM PIN failure/cold
+retry recovery are accepted in this compatibility configuration. General app
+coverage, radio services and fitted ADC routing remain unproved.
 The ordinary silent `noki5190` configuration is unchanged.
+
+### Open SMS editor contract
+
+Menu shortcut `2 1 3` opens Write messages, then a blank editor. Physical
+digit `2` reaches decoder `2af79e` and task 5 as packed statuses `40c8/40c9`
+with argument `2`. Receiver `2abd5c` extracts the argument count and normalizes
+the status to `00c8/00c9`; dispatcher `2abe10` passes it through its handler
+pipeline. The observed key-down remains `00c8` through `2528c0`, then
+`28e4a4` returns `057c`. The parent editor remains blank with 160 characters
+available. The next question is which branch in `28e4a4` selects that result
+and whether it is the intended text-entry context. This is not evidence of
+a missing DSP response or a diagnosed dictionary defect.
+
+The separate Spell mode accepts physical letters and renders `ADA`, but the
+manual describes that mode as adding a dictionary word; returning to an empty
+message is not by itself a failed text-copy contract. No nonempty SMS draft
+save or transmission is accepted yet. `tools/nsb1_sms_editor_observe.lua` is a
+bounded read-only debugger instrument, not an acceptance gate; its temporary
+fixed-pool read watch does not establish allocator ownership. Task 6's observed
+eight-byte message is not classified as text delivery.
 
 ## Qualified executable input
 
