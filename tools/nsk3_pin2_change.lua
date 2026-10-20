@@ -5,11 +5,12 @@ dofile(directory .. 'nsk3_pin_reload.lua')
 _G.nsk3_phone_code_start=15
 local keys={{1,2,0x19},{2,4,4},{3,4,5},{4,4,6},{1,2,0x19},{1,8,0x18},{1,8,0x18},{1,2,0x19}}
 local digits={
+    [1]={2,2,1},[2]={3,2,2},[3]={4,2,3},[4]={2,4,4},
     [5]={3,4,5},[6]={4,4,6},[7]={2,8,7},[8]={3,8,8}
 }
 local old=_G.nsk3_pin2_old or {5,6,7,8}
 local new=_G.nsk3_pin2_new or {8,7,6,5}
-for _,credential in ipairs({old,new,new}) do
+for _,credential in ipairs(_G.nsk3_pin2_prompt_only and {} or {old,new,new}) do
     for _,digit in ipairs(credential) do keys[#keys+1]=assert(digits[digit]) end
     keys[#keys+1]={1,2,0x19}
 end

@@ -18,9 +18,11 @@ ERROR_FRAME='fd5b8fb1ab0c3397bf958d567a46aee84a72f75123802a00d5bc802a1814543e'
 
 
 def check_change(trace,before,after,old,new,accepted=True):
+    if len(before)!=AOC_NVRAM_SIZE or not 1<=before[ATTEMPTS_OFFSET+1]<=3:
+        raise ValueError('initial PIN2 attempts/extent differs')
     keys=PREFIX+tuple(int(d) for d in old)+(0x19,)+2*(tuple(int(d) for d in new)+(0x19,))
     check_phone(trace,True,keys)
-    result=0x9000 if accepted else 0x9804
+    result=0x9000 if accepted else 0x9840 if before[ATTEMPTS_OFFSET+1]==1 else 0x9804
     if statuses(trace,0x20)!=[(0x9000,3,10)] or statuses(trace,0x24)!=[(result,3,10)]:
         raise ValueError('PIN1 startup or PIN2 change result differs')
     if any(statuses(trace,ins) for ins in (0x26,0x28,0x2c)):
@@ -80,7 +82,7 @@ def main():
     except (ValueError,OSError) as error:
         print(f'NSK-3 PIN2 qualification failed: {error}',file=sys.stderr)
         return 1
-    print('Physical PIN2 change and cold new-PIN2 authentication PASS; PUK2 remains unaccepted')
+    print('Physical PIN2 change and cold new-PIN2 authentication PASS; PUK2 has a separate gate')
     return 0
 
 

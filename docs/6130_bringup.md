@@ -33,7 +33,8 @@ boot without bypassing the separate phone lock. Other SIM/security operations
 and radio remain unaccepted.
 Ordinary physical Change PIN also persists4321 and authenticates after cold boot.
 Physical Change PIN2 now persists8765 and authenticates an ordinary change
-back to5678 after a separate cold boot; PUK2 remains unaccepted.
+back to5678 after a separate cold boot. Physical PIN2 exhaustion, cold PUK2
+prompt/recovery and recovered-PIN2 cold authentication are separately checked.
 Physical offline SMS composition saves an unsent A draft to EF_SMS; a cold
 Outbox read displays it without changing card bytes. Network SMS is unproved.
 Physical Erase/cancel and a cold empty-Outbox check also pass.
@@ -303,7 +304,7 @@ and the whole persistent retry transition. The shared card generator uses an
 older serialized prefix; the device appends its later storage defaults, which
 the cold comparison preserves byte-for-byte. No unexpected credential-changing
 APDU is admitted. The gates below extend PUK, ordinary PIN/PIN2 change and
-request settings; permanent blocking and PUK2 remain unaccepted.
+request settings and PUK2 recovery; permanent blocking remains unaccepted.
 
 ### PUK recovery and new-PIN persistence
 
@@ -328,7 +329,7 @@ uploads and own unchanged executable flash are checked:
 
 This accepts a physical PUK recovery lifecycle under the declared research
 inputs. Other gates cover ordinary CHANGE CHV and PIN-request settings;
-permanent PUK blocking, PUK2, radio and fitted hardware remain unaccepted.
+permanent PUK blocking, radio and fitted hardware remain unaccepted.
 
 ### PIN-request enable
 
@@ -374,7 +375,7 @@ The fixture composes startup PIN and phone-code input through one idempotent
 passive SIM observer; timing offsets schedule physical contacts only. All
 hardware defaults and declared native/analog/provisioning hypotheses remain
 unchanged. PIN-request disable and PIN2 change have separate gates below;
-permanent blocking and PUK2 remain unaccepted.
+PUK2 has its own gate below; permanent blocking remains unaccepted.
 
 ### PIN-request disable
 
@@ -392,7 +393,7 @@ SIM VERIFY or credential mutation, and presents phone Security code directly.
 ```
 
 The paired On and Off gates preserve credential bytes and independently verify
-the corresponding cold challenge behavior. PUK2, permanent PUK blocking,
+the corresponding cold challenge behavior. Permanent PUK blocking,
 correct idle content and radio remain unaccepted. A Battery low alert appears
 around33s in the longer Off run under the unchanged nominal-input hypothesis;
 that analog/power observation is not hidden by adjusting the fixture voltage.
@@ -417,7 +418,8 @@ authentication or a card-side command injected by the harness.
 The checker verifies physical contacts, phone-code acceptance, startup PIN1,
 exact CHANGE CHV bytes/status, whole-card mutation boundaries, cold card
 identity, native uploads, own unchanged flash and exact Change PIN2 frame.
-This does not accept PIN2 retry exhaustion, PUK2 recovery or permanent block.
+PIN2 exhaustion and PUK2 recovery have separate gates below; permanent block
+is not accepted by this change gate.
 
 The wrong-PIN2 control submits5675 and receives9804, displays **Code error**,
 preserves all credential bytes and changes only PIN2 attempts3->2 at3517.
@@ -433,7 +435,35 @@ CHV retry/cold-state tests, not direct APDU injection.
 ```
 
 The checker verifies complete rejected/cold card transitions and the exact
-error/success frames. Exhaustion to0, PUK2 and permanent blocking remain open.
+error/success frames. Exhaustion and PUK2 are qualified below; permanent
+blocking remains open.
+
+### PIN2 exhaustion and PUK2 recovery
+
+Three physical wrong-PIN2 CHANGE attempts are linked by independent cold
+copies, not edited retry fixtures. Whole-card checks prove attempts3->2->1->0,
+statuses9804/9804/9840, and no credential/PUK counter changes. The terminal
+frame says **PIN2 code blocked**. A separate cold process preserves that
+card unchanged; selecting Change PIN2 presents **Enter PUK2 code** without
+another CHANGE or UNBLOCK command.
+
+Physical PUK2 87654321, new PIN2 8765 and confirmation produce
+`a0 2c 00 02 10` with those exact bytes. Firmware then automatically sends
+VERIFY CHV2 `a0 20 00 02 08` using8765; both return9000, after the startup
+PIN1 VERIFY. Only PIN2 and its attempts0->3 change in persistent card data.
+A further cold process receives that saved card and authenticates8765 in an
+ordinary change back to5678. This closes recovery/persistence, not native
+network service or a fitted DSP assumption.
+
+```sh
+.venv/bin/python tools/nsk3_puk2_check.py roms/noki6130/source \
+  tmp/nsk3-pin2-wrong tmp/nsk3-pin2-wrong-second tmp/nsk3-pin2-blocked \
+  tmp/nsk3-pin2-blocked-cold tmp/nsk3-puk2-recovered tmp/nsk3-puk2-cold-auth
+```
+
+The gate checks every cold card link, physical input, exact APDU ordering,
+whole-card mutation limits, native upload/own flash, and blocked/prompt/success
+frames. Wrong PUK2, PUK2 exhaustion and permanent blocking remain unaccepted.
 
 ### Offline SMS draft
 

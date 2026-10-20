@@ -1102,8 +1102,14 @@
     {
       "id": "nsk3_pin2_change_cold_authentication", "owner": "nsk3_firmware", "status": "satisfied",
       "predicate": "Physical NSK-3 CHANGE CHV2 persists only PIN2 and independently authenticates the new credential after cold boot",
-      "current": "The explicit lab card accepts physical old5678/new8765 confirmation through menu4-5-6 Change PIN2, transmitting A0 24 00 02 10 with exact padded credentials and receiving9000. Full3570-byte storage changes only PIN2 digits. A separate cold process with saved card bytes uses8765 as the old credential and successfully changes it back to5678. The gate checks physical unlock/menu/credential contacts, startup PIN1, phone-code acceptance, native uploads, own flash and exact final frame. PUK2 recovery, retry exhaustion, permanent blocking, radio and fitted hardware remain unaccepted.",
+      "current": "The explicit lab card accepts physical old5678/new8765 confirmation through menu4-5-6 Change PIN2, transmitting A0 24 00 02 10 with exact padded credentials and receiving9000. Full3570-byte storage changes only PIN2 digits. A separate cold process with saved card bytes uses8765 as the old credential and successfully changes it back to5678. Wrong5675 decrements only PIN2 retries3->2; a separate cold correct retry restores3 and changes only PIN2. The gate checks physical unlock/menu/credential contacts, startup PIN1, phone-code acceptance, native uploads, own flash and exact frames. Exhaustion/PUK2 recovery have a separate predicate; permanent blocking, radio and fitted hardware remain unaccepted.",
       "evidence": ["docs/6130_bringup.md", "tools/nsk3_pin2_change.lua", "tools/nsk3_pin2_restore.lua", "tools/nsk3_pin2_check.py", "tools/test_nsk3_pin2_check.py"]
+    },
+    {
+      "id": "nsk3_pin2_exhaustion_puk2_cold_recovery", "owner": "nsk3_firmware", "status": "satisfied",
+      "predicate": "Physical NSK-3 PIN2 exhaustion persists across cold processes and PUK2 recovers an independently authenticated new PIN2",
+      "current": "Three physical wrong CHANGE CHV2 operations linked by cold card copies produce attempts3->2->1->0 and statuses9804/9804/9840, preserving all credentials/PUK counters. The terminal frame says PIN2 code blocked. A separate cold process presents Enter PUK2 code without mutating the card. Physical87654321/new8765 confirmation produces A0 2C 00 02 10 then an automatic A0 20 00 02 08 VERIFY using8765, both9000. Only PIN2 digits and retries0->3 change. A further cold process authenticates8765 for ordinary change back5678. All cold links, APDU order, physical inputs, whole-card transitions, native upload/own flash and exact frames pass. Wrong PUK2, permanent blocking and network/radio remain unaccepted.",
+      "evidence": ["docs/6130_bringup.md", "tools/nsk3_pin2_wrong.lua", "tools/nsk3_pin2_prompt.lua", "tools/nsk3_puk2_recover.lua", "tools/nsk3_puk2_check.py", "tools/test_nsk3_puk2_check.py"]
     },
     {
       "id": "nsk3_physical_send_end_mapping", "owner": "nsk3_firmware", "status": "satisfied",

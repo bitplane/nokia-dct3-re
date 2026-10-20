@@ -25,6 +25,9 @@ class Pin2Test(unittest.TestCase):
         rejected=bytearray(before);rejected[ATTEMPTS_OFFSET+1]=2
         check_change(wrong,before,rejected,'5675','8765',False)
         check_change(trace,rejected,after,'5678','8765')
+        last=bytearray(before);last[ATTEMPTS_OFFSET+1]=1
+        blocked=bytearray(last);blocked[ATTEMPTS_OFFSET+1]=0
+        check_change(wrong.replace('sw=9804 chv=3/2','sw=9840 chv=3/0'),last,blocked,'5675','8765',False)
         with self.assertRaises(ValueError):check_change(wrong,before,after,'5675','8765',False)
         for bad in (trace.replace('value=24','value=2c'),trace.replace('ins=24 sw=9000','ins=24 sw=9804'),trace.replace('key=18','key=17')):
             with self.assertRaises(ValueError):check_change(bad,before,after,'5678','8765')

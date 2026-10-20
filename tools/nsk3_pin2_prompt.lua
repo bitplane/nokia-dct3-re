@@ -1,0 +1,3 @@
+_G.nsk3_pin2_prompt_only=true
+local source=debug.getinfo(1,'S').source:sub(2)
+dofile(source:match('^(.*[/\\])') .. 'nsk3_pin2_change.lua')
