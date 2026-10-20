@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_fdn_physical_cancel_erase_cold_empty", "owner": "nsm1_sim_security", "status": "satisfied",
+      "predicate": "Physical PIN2-protected FDN cancellation preserves the record and confirmed erase survives independent cold empty search",
+      "current": "After startup PIN1/phone acceptance, FDN Details/Options requires PIN25678 before showing Edit/Erase. Both controls reach exact Erase? A pixels. Physical Back returns to selected A and preserves all card bytes with no UPDATE. Confirm transmits one exact A0 DC 01 04 20 plus32FF bytes,9000, displays Memory erased and changes only the selected FDN record. Cold physical search shows No phone numbers with unchanged complete card and no UPDATE. Physical key/authentication order, exact APDUs, complete card/EEPROM chain, native record validity, own flash and confirmation/cancel/erase/empty frames pass. Record modification and dial enforcement remain separate.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_fdn_read.lua", "tools/nsm1_fdn_record_options.lua", "tools/nsm1_fdn_record_erase.lua", "tools/nsm1_fdn_record_cancel.lua", "tools/nsm1_fdn_erase_check.py", "tools/test_nsm1_fdn_erase_check.py"]
+    },
+    {
       "id": "nsm1_fdn_physical_record_save_cold_read", "owner": "nsm1_sim_security", "status": "satisfied",
       "predicate": "Physical PIN2-protected FDN record save survives independent cold read and wrong PIN2 cannot write the record",
       "current": "After physical startup PIN1/phone-code acceptance, Numbers/Add entry asks PIN2 before the name editor. Physical5678 then A/12345 produces one exact A0 DC 01 04 20 plus32-byte record,9000. The whole extended card changes only that first FDN record. Separate cold physical Search/List/Details displays selected A and12345 with unchanged entire card and no UPDATE. Same-input wrong5675 receives9804/Code error, emits no UPDATE and changes only PIN2 retries3->2. Exact contacts/authentication order, credential/APDU bodies, full card and EEPROM links, native record validation, own flash and four exact frames pass. Record modification/erasure, rejected activation and dial enforcement are separate; no network or native speech claim follows.",

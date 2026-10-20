@@ -32,11 +32,7 @@ def changed_card(before,wrong=False):
     return bytes(expected)
 
 
-def check_trace(trace,mode):
-    if mode not in ('write','wrong','cold'):raise ValueError('unknown FDN record phase')
-    wrong=mode=='wrong'
-    keys=(0x19,4,5,3,0x19,0x18,0x19,0x19,0x19,0x19) if mode=='cold' else PREFIX+(5,6,7,5 if wrong else 8,0x19)
-    if mode=='write':keys+=(2,0x19,1,2,3,4,5,0x19)
+def check_authentication(trace,keys,results):
     check_phone(trace,True,keys)
     contacts=re.findall(r'nsm1_pin_contact: correct=1 key=([0-9a-f]+) down=([01]) ',trace)
     if contacts!=[(f'{key:02x}',down) for key in (1,2,3,4,0x19) for down in ('1','0')]:
@@ -45,9 +41,17 @@ def check_trace(trace,mode):
         raise ValueError('startup authentication order differs')
     application=list(re.finditer(r'nsm1_security_contact: key=[0-9a-f]+ down=1 ',trace))
     if application[6].start()<trace.index('nsm1_security_accepted:'):raise ValueError('early application input')
+    if statuses(trace,0x20)!=results:raise ValueError('PIN1/PIN2 results differ')
+
+
+def check_trace(trace,mode):
+    if mode not in ('write','wrong','cold'):raise ValueError('unknown FDN record phase')
+    wrong=mode=='wrong'
+    keys=(0x19,4,5,3,0x19,0x18,0x19,0x19,0x19,0x19) if mode=='cold' else PREFIX+(5,6,7,5 if wrong else 8,0x19)
+    if mode=='write':keys+=(2,0x19,1,2,3,4,5,0x19)
     results=[(0x9000,3,10)]
     if mode!='cold':results.append((0x9804 if wrong else 0x9000,3,10))
-    if statuses(trace,0x20)!=results:raise ValueError('PIN1/PIN2 results differ')
+    check_authentication(trace,keys,results)
     if any(statuses(trace,ins) for ins in (4,0x44,0x24,0x26,0x28,0x2c)):
         raise ValueError('unexpected validity/credential operation')
     tx=transmitted(trace,4096,'nsm1_sim_tx')

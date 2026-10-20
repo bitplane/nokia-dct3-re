@@ -224,8 +224,18 @@ The same-input wrong5675 control displays Code error, sends no UPDATE,
 and changes only PIN2 retries3->2.
 `nsm1_fdn_record_check.py WRITE COLD WRONG` checks physical authentication,
 exact payload and outcome, complete-card changes, cold EEPROM link and
-four exact save/list/detail/error frames. Record modification/erasure and
-dial enforcement remain separate targets.
+four exact save/list/detail/error frames.
+
+The entry's Options path also authenticates PIN2 before exposing Edit/Erase.
+Physical Erase reaches Erase? A; Back preserves the entire card and returns
+to the selected A list without UPDATE. Confirmation sends one
+`A0 DC 01 04 20` plus32FF bytes,9000 and displays Memory erased. A separate
+cold search displays No phone numbers and does not rewrite the card.
+`nsm1_fdn_erase_check.py SAVED CANCEL ERASE COLD` checks full EEPROM/card
+links, physical PIN1/phone/PIN2 ordering, exact APDUs, confirmation/cancel/
+erase/empty frames and unchanged unrelated files. The write and erase
+checkers share the physical-authentication assertion.
+Record modification and dial enforcement remain separate targets.
 
 ```sh
 .venv/bin/python tools/nsm1_nominal_input.py tmp/nsm1-security-cold-qualified \
