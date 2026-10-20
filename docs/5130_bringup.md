@@ -1423,8 +1423,26 @@ fixture; do not reuse the input schedule without its startup authentication.
 The four-process gate requalifies the wrong/correct-PIN source capture before
 copying persistent inputs only. It checks exact ordered menu contacts,
 command statuses, whole-card differences, Done frames and cold prompt frames.
-Qualified output: `tmp/nsk1-pin-request-final`. Ordinary CHANGE CHV plus cold
-replacement-PIN verification remains open.
+Qualified output: `tmp/nsk1-pin-request-final`.
+
+### Ordinary PIN change
+
+```sh
+.venv/bin/python tools/nsk1_pin_change_roundtrip.py mame/mame \
+  tmp/nsk1-pin-roundtrip-qualified tmp/nsk1-pin-change-final
+```
+
+Physical Settings → Security settings → Change access codes → Change PIN
+code accepts current PIN1234, replacement4321 and matching confirmation.
+The card receives CHANGE CHV (`A0 24`), returns9000 and changes only the four
+PIN digits. The exact PIN code changed frame guards presentation; CHV2,
+PUK credentials, retry counters, enabled flag and every file remain intact.
+A separate cold process physically verifies4321, returns9000, reaches the
+distinct phone-code prompt and preserves the entire card. No UNBLOCK command
+is involved: this verifies ordinary PIN change separately from PUK recovery.
+The gate requalifies the existing PIN source and guards native execution,
+own flash and phone identity/code fields. Its75-second change phase remains
+below the known late DSP-liveness reboot; it does not prove long stability.
 
 ## Offline SMS storage
 
