@@ -311,6 +311,24 @@ other special inputs handled before that path. The next producer query is
 task-14 input delivery, upstream of `2405e4`, not fabrication of a task-17
 completion. No receive-path closure or fitted RF compatibility is claimed.
 
+One native ingress to that server is statically identified:
+
+| Boundary | Own-ROM evidence |
+| --- | --- |
+| Native packet dispatch | `2afdea..2afdf0` selects type `80`, then `2afe94/2afe96` calls `283d1c`. An aligned Thumb BL scan finds only that direct caller. |
+| MCU data decoder | Conditional path `283f26` loads `040b` from literal `2842d0`, stores it in the object, copies a discriminator to byte `+b`, then `283f56` posts to task `0e`. Decoder gates before publication remain significant. |
+| Server receive | `240a98` loads special-input base `040b` from `240dac`; equality enters `240bec`, calls discriminator reader `240764`, then processes the object through `2407b8`. |
+
+This is distinct from native `8b -> 13b8 -> task 12`. It identifies a
+possible data-bearing entrance, not evidence that any fabricated type-80
+body would be accepted or that the current compatibility DSP/RF model can
+produce valid received radio data.
+The 61-second physical probe observes neither decoder entry `283d1c`,
+task-14 posts through `268944`, nor a return from its receive call. Its
+native receive stream still includes `8b`; execution/security/unchanged-flash
+checks pass. Next inspect the DSP type-80 publisher and its RF/codec input
+requirements, rather than inserting an MCU-side completion.
+
 Field `10af4c == 012b` is not established as a retry limit or direct EEPROM
 integer. `21b37c` counts 299 bitmap positions in a 48-byte structure; reset
 routine `21b1e8` sets the field to 299. The measured storage/update path returns

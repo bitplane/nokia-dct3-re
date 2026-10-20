@@ -17,6 +17,8 @@ if machine.debugger then
     machine.debugger:command('temp2=0')
     machine.debugger:command('temp0=0')
     machine.debugger:command('temp1=0')
+    machine.debugger:command('bpset 283d1c,temp6<20,{temp6=temp6+1;logerror "nsb1_call_native_data_decode: object=%08x header=%08x caller=%08x observer_writes=0\\n",r0,d@r0,r14;g}')
+    machine.debugger:command('bpset 268944,r0==e&&r1>=100000&&r1<110000&&temp6<20,{temp6=temp6+1;logerror "nsb1_call_link_post: object=%08x header=%08x caller=%08x observer_writes=0\\n",r1,d@r1,r14;g}')
     for _, address in ipairs({'241040','240a6c','240a86'}) do
         machine.debugger:command('bpset ' .. address .. ',temp6<20,{temp6=temp6+1;logerror "nsb1_call_link_entry: pc=%08x caller=%08x observer_writes=0\\n",pc,r14;g}')
     end
