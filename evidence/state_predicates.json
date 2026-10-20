@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_ordinary_pin_change_cold_authentication", "owner": "nsm1_sim_security", "status": "satisfied",
+      "predicate": "Physical authenticated Change PIN changes only PIN1 and its new credential authenticates after a cold restart",
+      "current": "Physical startup PIN1234 and phone12345 precede menu4-5-6, Change PIN selection and old1234/new4321/confirmation. Exact A0 24 00 01 10 plus padded credentials returns9000 and the full card changes only its PIN1 bytes. Exact PIN code changed pixels pass. Independent cold4321 authentication preserves all card bytes; saved EEPROM link, own flash and native record validity pass. The shared authentication helper permits only the explicitly named CHANGE operation for this gate; other gates retain the no-mutation default. No phone unlock bypass or radio acceptance follows.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_pin_change.lua", "tools/nsm1_pin_change_check.py", "tools/test_nsm1_pin_change_check.py"]
+    },
+    {
       "id": "nsm1_physical_pin_exhaustion_puk_cold_recovery", "owner": "nsm1_sim_security", "status": "satisfied",
       "predicate": "Physical PIN failures exhaust retries, PUK rejection preserves blocked PIN and correct recovery installs a cold-authenticatable new PIN",
       "current": "Starting from the qualified first wrong-PIN card, two independent cold wrong4321 entries produce retries1/9804 then0/9840. Physical PUK12345679/new4321/confirmation changes only PUK retries10->9 with9804. A separate run from the same exhausted input uses12345678, receives9000 and changes only PIN1234->4321 and retries0->3. Cold physical4321 authentication returns9000 with the complete saved card unchanged. Exact contacts, UNBLOCK body, whole-card transitions, EEPROM input links, own executable flash and native record validity pass. No counter poke, phone unlock, network or fitted-DSP-mask claim follows.",

@@ -161,7 +161,14 @@ An independent cold boot accepts4321 without changing any card byte.
 checks physical contacts, exact UNBLOCK APDU, whole-card transitions,
 saved EEPROM links, executable flash and native validation dialogue.
 No retry counter is initialized or changed by the harness.
-Ordinary PIN changes, request toggles, PIN2 and
+Ordinary Change PIN is also accepted: physical authenticated menu4-5-6,
+selection of Change PIN, old1234/new4321/confirmation produces exact
+`A0 24 00 01 10` with both padded credentials and9000. Only PIN1 bytes
+change in the complete card. The screen confirms PIN code changed;
+independent cold4321 authentication preserves the full card.
+`nsm1_pin_change_check.py CHANGED COLD` checks the physical authentication
+order, APDU, whole-card transition, EEPROM link and exact confirmation.
+PIN-request toggles, PIN2 and
 authenticated network services remain separately unaccepted on NSM-1.
 
 ```sh

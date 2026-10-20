@@ -17,8 +17,8 @@ from tools.nsk1_phonebook_roundtrip import frame_check
 from tools.nsm1_security_check import check_trace as check_phone,MENU
 
 
-def check_authenticated(trace,following_keys=(0x19,)):
-    check_trace(trace,True,prefix='nsm1',tx_limit=4096)
+def check_authenticated(trace,following_keys=(0x19,),allowed_mutations=()):
+    check_trace(trace,True,prefix='nsm1',tx_limit=4096,allowed_mutations=allowed_mutations)
     check_phone(trace,True,following_keys)
     positions=[trace.index(marker) for marker in ('SIM status ins=20 sw=9000',
                'nsm1_security_submit:','nsm1_security_accepted:')]
