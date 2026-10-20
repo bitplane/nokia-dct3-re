@@ -1100,6 +1100,12 @@
       "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "docs/2100_bringup.md"]
     },
     {
+      "id": "nsk3_physical_sim_phonebook_cold_read", "owner": "nsk3_firmware", "status": "satisfied",
+      "predicate": "Physical NSK-3 Add entry saves A/12345 to SIM and a separate cold process displays the persisted number without rewriting the card",
+      "current": "Own table/asserted contacts drive Names, Down, Add entry, A/12345 and Save after physical code acceptance. The complete bounded TX stream contains one exact absolute UPDATE RECORD payload. Card record1 matches GSM ADN ASCII A and BCD12345, with all49 other records erased. The separate cold process unlocks, searches and renders exact Details12345, sends no UPDATE RECORD and leaves the entire card unchanged. Exact Saved/Details frames, own unchanged flash and native upload are checked. Research native-mask/nominal-ADC/retry fixtures remain explicit; other SIM security, handset-local storage, idle content and radio remain unaccepted.",
+      "evidence": ["docs/6130_bringup.md", "tools/nsk3_phonebook_input.lua", "tools/nsk3_phonebook_reload.lua", "tools/nsk3_phonebook_check.py", "tools/test_nsk3_phonebook_check.py", "tools/nsk3_security_input.lua", "driver/nokia_dct3.cpp"]
+    },
+    {
       "id": "nsk3_physical_menu_cold_storage", "owner": "nsk3_firmware", "status": "satisfied",
       "predicate": "Own physical matching-code acceptance and subsequent command open a readable Messages menu while cold processes preserve reviewed storage",
       "current": "Under explicit native compatibility, nominal ADC2, synthetic-card and own retry-byte fixtures, physical12345/command19 reaches validator result1; a second command19 opens Messages with Select/Exit. Two isolated runs reproduce the exact15s frame. Fresh cold process using only saved NVRAM/config preserves the entire EEPROM and returns to Security code. Own executable flash remains unchanged. Repeated idle glyphs remain unresolved, but general display/input failure is falsified. This is not factory provisioning, complete SIM/phonebook parity, laboratory registration, calls, SMS or native speech acceptance.",

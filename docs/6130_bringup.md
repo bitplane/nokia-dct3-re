@@ -8,6 +8,9 @@ With the synthetic SIM inserted and an own-initializer retry-byte fixture,
 physical12345 submission is accepted and another physical command opens a
 readable Messages menu. A separate cold process preserves storage unchanged
 and requires the phone code again. The displayed idle content is not accepted.
+Physical Add entry now saves A/12345 to SIM EF_ADN; a separate cold process
+retrieves the entry through Search/Details and displays12345 without rewriting
+the card. Other SIM/security operations and radio remain unaccepted.
 The saturated control remains blank after diagnostic record acceptance.
 Neither fixture proves fitted calibration, complete key mapping, full SIM operation,
 registration, calls or speech. Ordinary `noki6130` remains the conservative
@@ -218,8 +221,38 @@ The gate covers qualified own firmware/record inputs, physical ASCII submission,
 validator acceptance, native uploads, exact prompt/menu frames and the reviewed
 firmware-written EEPROM hash across cold processes. It does not establish full
 keypad labels, arbitrary SIM support, persistent phonebook, radio, calls or SMS.
-Next test phonebook access through this live UI and classify idle content
-independently; no missing handoff message should be synthesized.
+The independent phonebook gate below extends this menu boundary. Classify idle
+content separately; no missing handoff message should be synthesized.
+
+### Persistent SIM phonebook
+
+Own table2c7a30 and visible navigation establish column1 row1/2/3/4 as
+left command19, Up17, Down18 and right command1a. The native research profile
+now labels these separately from the inherited NSE-1 single-Navi layout.
+Digits retain their own asserted ROM-table contacts; the remaining physical
+labels are not fully audited.
+
+`nsk3_phonebook_input.lua` physically unlocks, opens Names, selects Add entry,
+enters A/12345 and saves. `tmp/nsk3-phonebook-save-verified` displays Saved to
+SIM card at23s. The observed TX stream contains one absolute UPDATE RECORD
+`a0 dc 01 04 20` followed by the exact32-byte ADN payload. Record1 contains
+ASCII41, erased alpha padding, length04, TON81 and BCD21 43 f5; records2..50
+remain erased. No SIM/NVRAM result is prewritten by the input script.
+
+`tmp/nsk3-phonebook-reload-verified` starts in a separate process using only
+the saved NVRAM and physical configuration. `nsk3_phonebook_reload.lua`
+unlocks again, searches and selects Details. The exact17s frame displays12345;
+the full serialized card is byte-identical and its complete bounded TX stream
+contains no UPDATE RECORD. Both final-build runs pass:
+
+```sh
+.venv/bin/python tools/nsk3_phonebook_check.py roms/noki6130/source \
+  tmp/nsk3-phonebook-save-verified tmp/nsk3-phonebook-reload-verified
+```
+
+This accepts one physical SIM-backed phonebook save/cold-read lifecycle under
+the declared research inputs, not arbitrary contacts, handset-local storage,
+all SIM security, correct idle content or network service.
 
 ## Own firmware inputs
 
