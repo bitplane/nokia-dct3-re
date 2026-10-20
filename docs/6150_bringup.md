@@ -151,7 +151,17 @@ phone12345 and Menu in one cold boot. Its gate requires VERIFY before phone
 submission, phone acceptance before application input, an unchanged full
 card, preserved cold EEPROM input and the exact Messages frame at24s.
 The shared UART observer is installed once across both physical fixtures.
-PIN exhaustion/PUK, PIN changes, request toggles, PIN2 and
+Two further physical wrong-PIN cold boots produce retries1 then0
+(`9804`, then `9840`). From that exhausted saved card, physical
+PUK12345679/new PIN4321/confirmation returns9804 and changes only PUK
+retries10->9. A separate positive control from the same exhausted input
+enters PUK12345678 and installs4321 with9000 and PIN retries0->3.
+An independent cold boot accepts4321 without changing any card byte.
+`nsm1_puk_check.py SOURCE SECOND EXHAUSTED WRONG RECOVERY COLD`
+checks physical contacts, exact UNBLOCK APDU, whole-card transitions,
+saved EEPROM links, executable flash and native validation dialogue.
+No retry counter is initialized or changed by the harness.
+Ordinary PIN changes, request toggles, PIN2 and
 authenticated network services remain separately unaccepted on NSM-1.
 
 ```sh

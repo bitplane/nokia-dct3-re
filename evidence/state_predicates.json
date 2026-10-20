@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm1_physical_pin_exhaustion_puk_cold_recovery", "owner": "nsm1_sim_security", "status": "satisfied",
+      "predicate": "Physical PIN failures exhaust retries, PUK rejection preserves blocked PIN and correct recovery installs a cold-authenticatable new PIN",
+      "current": "Starting from the qualified first wrong-PIN card, two independent cold wrong4321 entries produce retries1/9804 then0/9840. Physical PUK12345679/new4321/confirmation changes only PUK retries10->9 with9804. A separate run from the same exhausted input uses12345678, receives9000 and changes only PIN1234->4321 and retries0->3. Cold physical4321 authentication returns9000 with the complete saved card unchanged. Exact contacts, UNBLOCK body, whole-card transitions, EEPROM input links, own executable flash and native record validity pass. No counter poke, phone unlock, network or fitted-DSP-mask claim follows.",
+      "evidence": ["docs/6150_bringup.md", "tools/nsm1_pin_input.lua", "tools/nsm1_puk_input.lua", "tools/nsm1_puk_wrong.lua", "tools/nsm1_puk_reload.lua", "tools/nsm1_puk_check.py", "tools/test_nsm1_puk_check.py"]
+    },
+    {
       "id": "nsm1_authenticated_sms_cancel_erase_cold_empty", "owner": "nsm1_firmware", "status": "satisfied",
       "predicate": "Physical authenticated SMS cancellation preserves the draft, confirmed erasure frees only its status byte and an independent cold Outbox is empty",
       "current": "Every phase physically verifies PIN1234 then phone12345 before application input. Both cancel and confirm reach exact Erase message? pixels. Back cancellation returns to A with no UPDATE RECORD or changed card byte. Confirm sends one A0 DC 01 04 B0 with only status07->00,9000; old TPDU bytes are retained and all other card bytes match. A separate cold process preserves saved EEPROM/card, authenticates both credentials and displays exact No messages without a record write. Full cold links, own flash, native record dialogue, physical key/APDU order and confirmation/read/empty frames pass. This is logical slot deletion, not secure wiping or network SMS acceptance.",
