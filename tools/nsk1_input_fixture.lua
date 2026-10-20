@@ -8,15 +8,19 @@ assert(machine.debugger, 'physical input probe requires debugger observations')
 local shift = space:read_u32(0x296d08) == 112 and 0 or -0x10
 local checklist = space:read_u32(0x25bfb0+shift)
 local layout = space:read_u32(0x29494c+shift)
+local ready_flags = space:read_u32(0x241898+shift)
 assert(checklist >= 0x100000 and checklist < 0x110000)
 assert(layout >= 0x100000 and layout < 0x110000)
+assert(ready_flags >= 0x100000 and ready_flags+11 <= 0x110000)
 machine.debugger:command('focus :maincpu')
 machine.debugger:command('temp3=0')
 machine.debugger:command('temp4=0')
 machine.debugger:command('temp5=0')
+machine.debugger:command('temp6=0')
 machine.debugger:command(string.format('bpset %x,temp3<20&&r0!=3e,{temp3=temp3+1;logerror "nsk1_key_forward: key=%%02x caller=%%08x cycles=%%016x observer_writes=0\\n",r0,r14,totalcycles;g}',0x294862+shift))
 machine.debugger:command(string.format('bpset %x,temp4<40&&r0==1,{temp4=temp4+1;logerror "nsk1_task1_scalar: value=%%08x caller=%%08x cycles=%%016x observer_writes=0\\n",r1,r14,totalcycles;g}',0x2553b8+shift))
 machine.debugger:command(string.format('bpset %x,temp5<8,{temp5=temp5+1;logerror "nsk1_checklist_compare: bits=%%02x cycles=%%016x observer_writes=0\\n",r0,totalcycles;g}',0x25bca4+shift))
+machine.debugger:command(string.format('bpset %x,temp6<32,{temp6=temp6+1;logerror "nsk1_ready_input: value=%%02x caller=%%08x cycles=%%016x observer_writes=0\\n",r0,r14,totalcycles;g}',0x2415ac+shift))
 local fields = {}
 for _,field in pairs(machine.ioport.ports[':COL.1'].fields) do fields[field.mask] = field end
 local events = {{12,4,1},{12.2,4,0},{14,16,1},{14.2,16,0},{16,2,1},{16.2,2,0}}
@@ -37,6 +41,19 @@ end
 handles[#handles+1] = space:install_read_tap(0x20034,0x2003f,'nsk1_simi_read',function(offset,data,mask) simi(offset,data,mask,false) end)
 handles[#handles+1] = space:install_write_tap(0x20034,0x2003f,'nsk1_simi_write',function(offset,data,mask) simi(offset,data,mask,true) end)
 _G.nsk1_input_handles = handles
+local flag_writes = 0
+handles[#handles+1] = space:install_write_tap(ready_flags & ~3,(ready_flags+10) | 3,'nsk1_ready_flags',function(offset,data,mask)
+    for lane = 0,3 do
+        local address,bit = offset+lane,(3-lane)*8
+        if address >= ready_flags and address < ready_flags+11 and (mask & (255 << bit)) ~= 0 then
+            flag_writes = flag_writes+1
+            if flag_writes <= 40 then
+                machine:logerror(string.format('nsk1_ready_flag_write: index=%d value=%02x pc=%08x t=%.9f observer_writes=0\n',
+                    address-ready_flags,(data >> bit) & 255,cpu.state['R15'].value,machine.time:as_double()))
+            end
+        end
+    end
+end)
 local root_writes = 0
 handles[#handles+1] = space:install_write_tap(0x10ffb0,0x10ffb3,'nsk1_root_state',function(offset,data,mask)
     if (mask & 0xff000000) == 0 or root_writes >= 16 then return end
@@ -60,6 +77,9 @@ emu.register_frame_done(function()
         local event = events[next_event]
         assert(fields[event[2]],'physical NSK-1 contact missing')
         fields[event[2]]:set_value(event[3])
+        local flags = {}
+        for index = 0,10 do flags[#flags+1] = string.format('%02x',space:read_u8(ready_flags+index)) end
+        machine:logerror(string.format('nsk1_ready_flags_snapshot: flags=%s t=%.9f observer_writes=0\n',table.concat(flags),now))
         machine:logerror(string.format('nsk1_key_contact: mask=%02x down=%d irq=%02x irqmask=%02x ctrl=%02x column_mask=%02x root_byte=%02x checklist=%02x layout=%02x simi_reads=%d simi_writes=%d t=%.9f physical_only=1\n',
             event[2],event[3],space:read_u8(0x20009),space:read_u8(0x2000b),space:read_u8(0x2000c),space:read_u8(0x20033),space:read_u8(0x10ffb0),space:read_u8(checklist),space:read_u8(layout),reads,writes,now))
         next_event = next_event+1

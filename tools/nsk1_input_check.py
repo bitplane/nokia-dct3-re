@@ -21,6 +21,12 @@ def check(text):
     scalars = re.findall(r'nsk1_task1_scalar: value=([0-9a-f]{8}) caller=([0-9a-f]{8}) cycles=[0-9a-f]{16} observer_writes=0',text)
     controls = re.findall(r'nsk1_control_reply: payload=([0-9a-f]{4}) envelope=[0-9a-f]{8}/[0-9a-f]{8} t=[0-9.]+ observer_writes=0',text)
     comparisons = re.findall(r'nsk1_checklist_compare: bits=([0-9a-f]{2}) cycles=[0-9a-f]{16} observer_writes=0',text)
+    ready_inputs = re.findall(r'nsk1_ready_input: value=([0-9a-f]{2}) caller=([0-9a-f]{8}) cycles=[0-9a-f]{16} observer_writes=0',text)
+    ready_snapshots = re.findall(r'nsk1_ready_flags_snapshot: flags=([0-9a-f]{22}) t=[0-9.]+ observer_writes=0',text)
+    ready_writes = re.findall(r'nsk1_ready_flag_write: index=(10|[0-9]) value=([0-9a-f]{2}) pc=([0-9a-f]{8}) t=[0-9.]+ observer_writes=0',text)
+    for name,rows_ in (('input',ready_inputs),('flags_snapshot',ready_snapshots),('flag_write',ready_writes)):
+        if len(rows_) != text.count(f'nsk1_ready_{name}:'):
+            raise ValueError('unrecognized readiness trace format')
     if (len(keys) != text.count('nsk1_key_forward:') or len(scalars) != text.count('nsk1_task1_scalar:')
             or len(controls) != text.count('nsk1_control_reply:')
             or len(comparisons) != text.count('nsk1_checklist_compare:')):
@@ -29,4 +35,7 @@ def check(text):
             'task1_scalars':[{'value':int(value,16),'caller':caller} for value,caller in scalars],
             'control_reply_payloads':controls,
             'checklist_comparisons':[int(value,16) for value in comparisons],
+            'ready_inputs':[{'value':int(value,16),'caller':caller} for value,caller in ready_inputs],
+            'ready_flag_snapshots':ready_snapshots,
+            'ready_flag_writes':[{'index':int(index),'value':int(value,16),'pc':pc} for index,value,pc in ready_writes],
             'scope':'physical-contact and passive startup observation, not interactive UI acceptance'}

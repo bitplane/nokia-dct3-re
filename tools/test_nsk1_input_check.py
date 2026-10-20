@@ -38,6 +38,18 @@ class Nsk1InputCheckTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check(changed)
 
+    def test_readiness_observations_and_malformed_markers(self):
+        markers = ('nsk1_ready_input: value=64 caller=00267c85 cycles=00000000006115a3 observer_writes=0',
+                   'nsk1_ready_flags_snapshot: flags=0000000000000000000000 t=12.0 observer_writes=0',
+                   'nsk1_ready_flag_write: index=10 value=00 pc=0024160e t=0.49 observer_writes=0')
+        result = check(self.trace()+'\n'+'\n'.join(markers))
+        self.assertEqual(100,result['ready_inputs'][0]['value'])
+        self.assertEqual(['00'*11],result['ready_flag_snapshots'])
+        self.assertEqual(10,result['ready_flag_writes'][0]['index'])
+        for marker in markers:
+            with self.assertRaises(ValueError):
+                check(self.trace()+'\n'+marker.split(':')[0]+': malformed')
+
 
 if __name__ == '__main__':
     unittest.main()

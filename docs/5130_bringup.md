@@ -391,7 +391,7 @@ The startup consumer gives this state a precise scope:
 | `25bc40..25bc46` | Input `10` selects low-nibble state 6 via setter `291968`. Its source is not established by the scalar-post trace. |
 | `25bc92..25bca6` | State must be 6 and the checklist low nibble must be `f`; otherwise execution returns to receive helper `25ad34`. The live comparison sees `0a`. |
 | `291ad2` / `22a1c0` | Literal report-14 stub and its mapped direct caller. Recover the caller's preceding lifecycle. |
-| `291af6` / `24168c` | Literal report-15 stub and its mapped direct caller after the eleven-byte aggregation test at `241672..241682`. Enumerate the eleven flag producers. |
+| `291af6` / `24168c` | Literal report-15 stub and its mapped direct caller after the eleven-byte aggregation test at `241672..241682`. Its eleven direct flag-setting inputs are mapped below. |
 
 Only `16` and `17` of this checklist family are observed through scalar
 post primitive `2553b8`; the live bitmap confirms `14/15` are not latched
@@ -400,6 +400,39 @@ for checklist bits. The mapped direct callers are not an absence proof for
 indirect/table-driven producers. The task-2 control dispatcher `22c5f8`
 also receives real payload `0d00`; its arrival is not proof of full storage
 or hardware self-test success, nor a reason to invent different status bits.
+
+Aggregator `2415ac` dispatches inputs `0a..12,14,15` to the eleven bytes at
+`10bd88`; `13` is a no-op and `64` clears the array. Input `0a` falls through
+to the all-flags check; the other flag setters branch there. Only eleven
+nonzero bytes permit publication of report `15`.
+
+| Input | Flag index | Direct call site |
+| --- | --- | --- |
+| `0a` | 0 | `20e3f0` |
+| `0b` | 1 | `2187e4` |
+| `0c` | 2 | `2657f8` |
+| `0d` | 3 | `23b2ba` |
+| `0e` | 4 | `2495e4` |
+| `0f` | 5 | `209b8c` |
+| `10` | 6 | `24d354` |
+| `11` | 7 | `2227a2` |
+| `12` | 8 | `269362` |
+| `14` | 9 | `207560` |
+| `15` | 10 | `2643e0` |
+| `64` | reset all | `267c80` |
+
+`tools/nsk1_startup_census.py IMAGE [--variant 2915]` validates the dispatcher,
+table and handler instructions and scans all 524,287 aligned Thumb-BL
+candidate positions. Both variants recover 12/12 direct calls and their
+literal arguments, with zero undecoded candidates to this target. This is
+not closure over indirect calls, ARM callers or interpreted data. Input
+numbers alone do not establish task ownership.
+
+The standard 21-second physical-input trace observes only input `64`, from
+`267c80`. The write watch records BSS clearing and the explicit reset loop;
+all six contact-time snapshots contain eleven zeros. No flag-setting write
+is observed. A shared activation predecessor is therefore a stronger next
+candidate than eleven independent missing replies, but remains a hypothesis.
 
 `nsk1_input_check.py` requires all physical contact observations and reports
 the actual masks, flags, forwarded keys, scalar posts and control reply.
