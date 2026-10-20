@@ -632,6 +632,16 @@ ordered07d6 construction/post,03e9 construction/post, argument2 selection,
 qualifies that sequence without assigning mode1 semantics. The remaining
 question is who sets owner byte10a7d9 and which legitimate lifecycle changes
 it; this is not evidence of a missing native response to synthesize.
+
+Mode provenance is now measured in `tmp/nsk3-request-mode`: the sole
+post-clear10a7d9 write is209a24 copying byte2 of object101760/header09ec0191.
+The09ec constructor enters with controller flag10adee=1,state10ade4=0,
+source10ae3e=1, selecting that source byte rather than the alternate2/9/10
+constants. The source itself is written1 at21f388 from literal r5=1 set
+at21f36a, after21f36e finds controller byte6!=1. Thus the mode is a
+deliberate firmware-owned branch, not an erased scalar default or unsolicited
+DSP byte. The controlling controller byte10ade6 and entry21f358 lifecycle
+are the next unresolved predicates; mode1's domain meaning remains unproved.
 `nsk3_packet_check.py --controller --cache`
 checks the measured send/result/wait ordering and retains unknown reply
 semantics; mutation tests reject wrong source, object, status, selector/order.
