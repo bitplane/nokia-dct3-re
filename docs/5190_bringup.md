@@ -282,6 +282,28 @@ boundary `{startup_reason=0a, phase=06, reports=0e, column_mask=3f}` and asks
 for deliberate review if it changes. This protects the observed incomplete
 state, not a requirement that a future faithful phone remain blocked.
 
+### Acquisition rejection before readiness
+
+Periodic logical event `26` reaches accumulator `2760a4`, which calls
+acquisition helper `275fd0`. Its success branch alone decrements the
+remaining-sample byte `10a0fe` from its initial ten and accumulates the two
+samples. Both transformed halfwords must lie in inclusive `0708..157c`
+(1800..5500). A checksum-control native trace observes 16 rejected attempts
+at `2760b2`, all returning zero with both samples `1a2c` (6700), while
+remaining stays `0a`. Debugger-console validation reports no action errors.
+
+Own source reader `2ae342` selects table `2d29a8`, whose ten bytes are
+`00 04 05 06 07 03 01 02 02 01`; source 7 uses ADC channel 2 via `2b1730`.
+Helper `275fd0` applies calibration gain/offset at `10fe50/10fe54` and then
+the own constants 1500 and 229. Observed gain bits are `3f800000` (1.0),
+offset zero; the configured full-scale input 1023 gives integer result
+`1023*1500/229 = 6700`, matching the rejected sample. The reusable passive
+observer records the count and calibration at its normal sample times.
+This identifies a concrete invalid acquisition under the placeholder tuple,
+not yet physical voltage units or a valid NSB-1 pack input. Establish the
+own battery net and silicon transfer before changing that tuple; no timer,
+report or acquisition result should be synthesized.
+
 ### External reference leads, not provisioning evidence
 
 The [independent emulator's current coverage table](https://github.com/djr-747/nokia-dct3-emulator/blob/main/docs/MODELS.md)
