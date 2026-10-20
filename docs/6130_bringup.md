@@ -463,7 +463,12 @@ network service or a fitted DSP assumption.
 
 The gate checks every cold card link, physical input, exact APDU ordering,
 whole-card mutation limits, native upload/own flash, and blocked/prompt/success
-frames. Wrong PUK2, PUK2 exhaustion and permanent blocking remain unaccepted.
+frames. The optional `--wrong tmp/nsk3-puk2-wrong --retry-cold
+tmp/nsk3-puk2-retry-cold` pair qualifies wrong PUK2 87654322 returning 9804:
+only its retry counter changes from 10 to 9, with PIN2 still blocked. Correct
+PUK2 after a separate cold boot restores PIN2/PUK2 counters to 3/10 and stores
+PIN2 8765, producing the same saved card as direct recovery. PUK2 exhaustion
+and permanent blocking remain unaccepted.
 
 ### Offline SMS draft
 

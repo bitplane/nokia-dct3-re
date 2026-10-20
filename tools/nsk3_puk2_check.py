@@ -18,25 +18,32 @@ PROMPT='4714aaf1a23d14b5d10638facad9d9aa4b4296c2e4ff33e8f7707957630230a9'
 KEYS=PREFIX+(8,7,6,5,4,3,2,1,0x19)+(8,7,6,5,0x19)*2
 
 
-def recovery(trace,before,after):
-    check_phone(trace,True,KEYS)
-    if statuses(trace,0x20)!=[(0x9000,3,10)]*2 or statuses(trace,0x2c)!=[(0x9000,3,10)]:
+def recovery(trace,before,after,accepted=True):
+    puk='87654321' if accepted else '87654322'
+    keys=PREFIX+tuple(map(int,puk))+(0x19,)+(8,7,6,5,0x19)*2
+    check_phone(trace,True,keys)
+    if statuses(trace,0x20)!=[(0x9000,3,10)]*(2 if accepted else 1) or statuses(trace,0x2c)!=[(0x9000 if accepted else 0x9804,3,10)]:
         raise ValueError('startup PIN1 or UNBLOCK CHV2 result differs')
     if any(statuses(trace,ins) for ins in (0x24,0x26,0x28)):
         raise ValueError('unexpected credential operation during recovery')
     tx=transmitted(trace)
     commands=(bytes.fromhex('a020000108')+padded_pin('1234'),
-              bytes.fromhex('a02c000210')+b'87654321'+padded_pin('8765'),
-              bytes.fromhex('a020000208')+padded_pin('8765'))
+              bytes.fromhex('a02c000210')+puk.encode()+padded_pin('8765'))
+    automatic=bytes.fromhex('a020000208')+padded_pin('8765')
+    if accepted:commands+=(automatic,)
+    elif automatic in tx:raise ValueError('failed unblock unexpectedly verified PIN2')
     if any(tx.count(command)!=1 for command in commands):
         raise ValueError('physical PUK2/new-PIN2 and automatic VERIFY payloads differ')
     positions=[tx.index(command) for command in commands]
     if positions!=sorted(positions):raise ValueError('PUK2 recovery/VERIFY ordering differs')
-    if len(before)!=AOC_NVRAM_SIZE or before[ATTEMPTS_OFFSET:ATTEMPTS_OFFSET+4]!=bytes((3,0,10,10)):
+    if len(before)!=AOC_NVRAM_SIZE or before[ATTEMPTS_OFFSET:ATTEMPTS_OFFSET+3]!=bytes((3,0,10)) or not 2<=before[ATTEMPTS_OFFSET+3]<=10:
         raise ValueError('recovery input is not the exhausted lab PIN2 card')
     expected=bytearray(before)
-    expected[CHV_OFFSET+8:CHV_OFFSET+16]=padded_pin('8765')
-    expected[ATTEMPTS_OFFSET+1]=3
+    if accepted:
+        expected[CHV_OFFSET+8:CHV_OFFSET+16]=padded_pin('8765')
+        expected[ATTEMPTS_OFFSET+1]=3
+        expected[ATTEMPTS_OFFSET+3]=10
+    else:expected[ATTEMPTS_OFFSET+3]-=1
     if after!=expected:raise ValueError('PUK2 recovery changed other persistent card bytes')
 
 
@@ -44,6 +51,8 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     for name in ('source','first','second','blocked','prompt','recovered','cold'):
         parser.add_argument(name,type=Path)
+    parser.add_argument('--wrong',type=Path)
+    parser.add_argument('--retry-cold',type=Path)
     args=parser.parse_args()
     try:
         _,image=inspect(args.source,'boot4')
@@ -66,11 +75,21 @@ def main():
             raise ValueError('cold prompt changed blocked card')
         recovered=(args.recovered/'nvram/nsk3r4t/sim_card').read_bytes()
         recovery((args.recovered/'error.log').read_text(),previous,recovered)
+        if bool(args.wrong)!=bool(args.retry_cold):raise ValueError('wrong/retry cold runs must be paired')
+        extras=[]
+        if args.wrong:
+            for run,accepted in ((args.wrong,False),(args.retry_cold,True)):
+                before=(run/'initial_sim_card.bin').read_bytes()
+                if before!=previous:raise ValueError('PUK2 retry cold chain differs')
+                previous=(run/'nvram/nsk3r4t/sim_card').read_bytes()
+                recovery((run/'error.log').read_text(),before,previous,accepted)
+                extras.append(run)
+            if previous!=recovered:raise ValueError('retry recovery differs from direct recovery')
         if (args.cold/'initial_sim_card.bin').read_bytes()!=recovered:
             raise ValueError('cold authentication did not receive recovered card')
         check_change((args.cold/'error.log').read_text(),recovered,
                      (args.cold/'nvram/nsk3r4t/sim_card').read_bytes(),'8765','5678')
-        for run in (args.first,args.second,args.blocked,args.prompt,args.recovered,args.cold):
+        for run in (args.first,args.second,args.blocked,args.prompt,args.recovered,args.cold,*extras):
             check_upload_handoffs((run/'error.log').read_text(),1)
             if (run/'nvram/nsk3r4t/flash').read_bytes()!=image:raise ValueError('own executable flash changed')
         frame_check(args.blocked/'snap/nsk3_pin2_40.png',BLOCKED)
