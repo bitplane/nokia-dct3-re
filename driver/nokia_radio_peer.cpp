@@ -1782,10 +1782,15 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			current_phase() == phase::release_deconfigure &&
 			packet.type == 0x02 && packet.length == 20 &&
 			packet.payload[8] == 0x60 && packet.payload[15] == 0x0f;
+	const bool partial_background_request =
+			m_protocol.background_band_measurements && packet.type == 0x57 &&
+			packet.length == m_protocol.background_measurement_request.size() &&
+			std::equal(m_protocol.background_measurement_request.begin(),
+				m_protocol.background_measurement_request.end(), packet.payload.begin());
 	if (m_protocol.coverage != acquisition_coverage::full &&
 			!partial_common_control_request && !partial_random_access_request &&
 			!partial_dedicated_request && !partial_establish_request && !partial_acknowledgement &&
-			!partial_release_request)
+			!partial_release_request && !partial_background_request)
 	{
 		if (packet.type == 0x55 && packet.length == 4 &&
 				packet.payload[0] == 3 &&

@@ -12,7 +12,7 @@ _G.nsb7_page_9c8_source=memory:install_read_tap(0x22e28c,0x22e28f,'nsb7_9c8_sour
 end)
 local tap=memory:install_read_tap(0x2898e8,0x2898eb,'nsb7_page_posts',function()
     local time=machine.time:as_double()
-    if cpu.state['R15'].value~=0x2898e8 or time<3 or time>17 or count>=256 then return end
+    if cpu.state['R15'].value~=0x2898e8 or time<3 or time>19 or count>=256 then return end
     local target=cpu.state['R0'].value
     if target~=13 and target~=16 and target~=17 and target~=18 then return end
     local object=cpu.state['R1'].value
@@ -41,9 +41,23 @@ _G.nsb7_page_service_completion=memory:install_read_tap(0x2a3644,0x2a3647,'nsb7_
     if cpu.state['R15'].value~=0x2a3646 then return end
     local pending=memory:read_u32(0x130854)
     if pending<0x100000 or pending>=0x17ff00 then return end
-    machine:logerror(string.format('nsb7_service_completion: pending=%08x tag=%04x t=%.9f observer_writes=0\n',
-        pending,memory:read_u16(pending),machine.time:as_double()))
+    machine:logerror(string.format('nsb7_service_completion: pending=%08x tag=%04x caller=%08x t=%.9f observer_writes=0\n',
+        pending,memory:read_u16(pending),cpu.state['R14'].value,machine.time:as_double()))
 end)
+local snapshots=coroutine.create(function()
+    for _,target in ipairs({7,10.6,14.7,16,24}) do
+        assert(emu.wait(target-machine.time:as_double()))
+        local root=memory:read_u32(0x12fbd8)
+        local pending=memory:read_u32(0x130854)
+        local state,tag=0xffffffff,0xffff
+        if root>=0x100000 and root<0x17ff00 then state=memory:read_u32(root) end
+        if pending>=0x100000 and pending<0x17ff00 then tag=memory:read_u16(pending) end
+        machine:logerror(string.format('nsb7_service_snapshot: root=%08x state=%08x pending=%08x tag=%04x mode=%02x t=%.9f observer_writes=0\n',
+            root,state,pending,tag,memory:read_u8(0x130310),machine.time:as_double()))
+    end
+end)
+_G.nsb7_service_snapshots=snapshots
+assert(coroutine.resume(snapshots))
 _G.nsb7_page_9c8_completion=memory:install_read_tap(0x232058,0x23205b,'nsb7_9c8_completion',function()
     if cpu.state['R15'].value~=0x23205a then return end
     machine:logerror(string.format('nsb7_9c8_completion: event=%04x record=%08x t=%.9f observer_writes=0\n',

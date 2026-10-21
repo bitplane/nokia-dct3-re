@@ -59,6 +59,10 @@ def contract(image):
         raise ValueError('own AGCH tag/block-ending contract differs')
     if word(0x2e52a0) != 0x409 or image[0xe506e:0xe5072] != bytes.fromhex('4291d02d'):
         raise ValueError('own 0409 receiver-cache bypass contract differs')
+    if (image[0xb6a1e:0xb6a24] != bytes.fromhex('b5701c0d1c06') or
+            image[0xb6a3c:0xb6a40] != bytes.fromhex('205770e0') or
+            image[0xb6a4c:0xb6a50] != bytes.fromhex('f7fffdd3')):
+        raise ValueError('own background request constructor/selector encoder differs')
     ranges = []
     start = 0
     previous = channel_class(0, 0x98000000)
@@ -78,6 +82,9 @@ def contract(image):
                       'queued_descriptor_tag': '0402', 'armed_clear_pc': '002e5086'},
             'rx_86': {'dispatcher': '002e5228', 'dedicated_handler': '002e513e',
                       'dedicated_uplink_queue': '00130434', 'selector': '80'},
+            'tx_57': {'constructor': '002b6a1e', 'selector_encoder': '002b65f6',
+                      'payload_bytes': 4, 'qualified_request': '03050000',
+                      'response_type': '8b', 'response_bytes': 166},
             'contention': {'handler': '002664be', 'state_offset': 0x163,
                            'pending_length_offset': 0x12e, 'pending_pointer_offset': 0x130,
                            'received_information_offset': 0x1a, 'state_write': '002665c0',
@@ -356,6 +363,41 @@ def check_addressed_page(text):
         raise ValueError('bounded page-parser fixture unexpectedly advanced to access')
 
 
+def check_page_response(text, card):
+    check_location_update(text.split('nsb7_radio_tx: index=46 ', 1)[0])
+    packets = PACKET.findall(text)
+    if len(packets) != 69:
+        raise ValueError('bounded paging-response TX inventory differs')
+    expected = '0080013f41062707032058810809101010325476982b2b2b2b000000'
+    if packets[60][1:4] != ('1b', '28', expected):
+        raise ValueError('own SABM does not contain the qualified Paging Response')
+    checks = [
+        r'nsb7_radio_tx: index=49 type=57 length=4 data=03050000 ',
+        r'nsb7_radio_rx: index=29 type=8b length=166 ',
+        r'nsb7_service_completion: pending=[0-9a-f]{8} tag=03ec caller=00220deb ',
+        r'nsb7_9c8_completion: event=1584 record=[0-9a-f]{8} ',
+        r'nsb7_radio_tx: index=57 type=0c length=8 data=',
+        r'nsb7_radio_tx: index=61 type=1b length=28 data=',
+    ]
+    # Skip the first, pre-registration completion; require the later one
+    # after the actual background request/reply, not just global counters.
+    position = 0
+    for pattern in checks:
+        match = re.search(pattern, text[position:])
+        if match is None:
+            raise ValueError('background measurement to paging-response chain is incomplete')
+        position += match.end()
+    ua = '01734106270703205881080910101032547698' + '2b'*5
+    for pc, task in [('002e49e6', '4'), ('002645ec', '14')]:
+        if not re.search(r'nsb7_lapdm_downlink: pc=' + pc + ' task=' + task +
+                         ' selector=80 block=' + ua + ' ', text):
+            raise ValueError('Paging Response contention echo did not reach both MCU consumers')
+    if 'nsb7_9c8_completion: event=1599 ' in text:
+        raise ValueError('service request still timed out')
+    if card[1600:1611] != bytes.fromhex('ffffffff00f1100001ff00'):
+        raise ValueError('accepted laboratory location was not retained')
+
+
 def check_trace(text, measurement=False, synchronization=False, channel=False, bcch=False, ccch=False, rach=False, assignment=False, dedicated=False, uplink=False, contention=False):
     uplink = uplink or contention
     dedicated = dedicated or uplink
@@ -541,11 +583,15 @@ def main():
     parser.add_argument('--release', action='store_true')
     parser.add_argument('--paging', action='store_true')
     parser.add_argument('--addressed-page', action='store_true')
+    parser.add_argument('--page-response', action='store_true')
     args = parser.parse_args()
     try:
         report = contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
-        if args.addressed_page:
+        if args.page_response:
+            check_security(text)
+            check_page_response(text, (args.run / 'nvram/nsb7hle/sim_card').read_bytes())
+        elif args.addressed_page:
             check_security(text)
             check_addressed_page(text)
         elif args.release or args.paging:
@@ -563,7 +609,8 @@ def main():
             args.contract_json.write_text(json.dumps(report, indent=2) + '\n')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 radio inventory: FAIL: {error}\n')
-    print('PASS: ' + ('own addressed page matches IMSI and returns parser event 083e; no access response' if args.addressed_page else
+    print('PASS: ' + ('background request completed; own Paging Response SABM and contention echo; LOCI retained' if args.page_response else
+                     'own addressed page matches IMSI and returns parser event 083e; no access response' if args.addressed_page else
                      'own LOCI retained; repeated empty paging blocks reach firmware decoder' if args.paging else
                      'own LU/release acknowledged; receiver returned; SIM LOCI retained; paging withheld' if args.release else
                      'own contention echo accepted; firmware link state 2 to 4; no LU Accept supplied' if args.contention else

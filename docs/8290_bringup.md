@@ -22,8 +22,9 @@ Updating Request inside LAPDm SABM, followed by accepted contention-resolution
 UA and firmware link state `2 -> 4`. Location Updating Accept and Channel
 Release are acknowledged by firmware; EF_LOCI is updated over SIMI and
 retained, and the receiver returns to common control. Repeated empty paging
-blocks reach its RR decoder. Stable registered idle presentation, addressed
-paging response, calls and SMS remain unestablished.
+blocks reach its RR decoder. An addressed page now produces the handset's
+own Paging Response after background measurement completion. Stable
+registered idle presentation, calls and SMS remain unestablished.
 In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
 No PMM, resident DSP mask, hardware profile or provisioning is supplied by
@@ -1141,5 +1142,40 @@ prove that another DSP packet is required.
 two service submissions, single completion, and `1584` then `1599`
 returns from the same task-18 record. The next investigation is what
 prevents task 13 completing the post-release `03ec`, compared with the
-earlier successful lifecycle. The page is not lost and its subscriber
-identity is not the remaining unknown.
+earlier successful lifecycle. That boundary is resolved by the background
+measurement contract below; the bounded timeout fixture remains a negative
+control, not the currently selected peer coverage.
+
+### Background measurement completes paging-response access
+
+The outstanding type-57/4 `03050000` is a request, not a stop-only
+notification. Own constructor `2b6a1e` allocates and clears eight bytes,
+sets type `57` and payload length 4, and uses the same selector encoder
+`2b65f6` as the recovered acquisition constructors. NSB-7's existing
+type-8b consumer accepts the forty-record channel/RSSI layout already
+qualified for initial acquisition. The product now enables the shared
+background-measurement contract. Its exact request is admitted through
+the partial-coverage guard; other unqualified requests remain withheld.
+
+In `tmp/nsb7-background` and independently seeded
+`tmp/nsb7-background-cold`, RX29 is type-8b/166 after TX49 type-57.
+The ordinary task-13 lifecycle reconfigures the receiver and completes
+pending `03ec` through caller `220de6` at 17.906 seconds. Task 18's
+second wait receives `1584` at 17.909 seconds, rather than timeout
+`1599`. The queued matched page then causes firmware to emit its own
+CHANNEL REQUEST at TX57, accept an assignment, and publish TX61:
+`0080013f41062707032058810809101010325476982b2b2b2b000000`.
+The LAPDm SABM information is the RR Paging Response beginning `06 27`,
+including the handset classmark and the same synthetic-card IMSI. Both
+MCU consumers receive UA contention echo
+`01734106270703205881080910101032547698` plus five `2b` bytes.
+The page-only network then releases the channel; this is not call setup.
+
+`--page-response` requires the ordered type-57/type-8b/completion/access
+chain, the exact own Paging Response, both contention-echo consumers,
+69 bounded TX packets, no service timeout, and retained laboratory
+EF_LOCI. The cycle continues with another background request after the
+page-only release. Subsequent service-completion stability, incoming
+call/SMS and usable idle graphics remain separate acceptance work.
+The earlier serving-type-83 sufficiency falsification remains valid:
+this correction answers type 57 with type 8b, not periodic serving RSSI.

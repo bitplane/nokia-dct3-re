@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsb7_radio_check import check_location_update, check_receiver_return, check_paging, check_addressed_page
+from tools.nsb7_radio_check import check_location_update, check_receiver_return, check_paging, check_addressed_page, check_page_response
 
 
 def trace():
@@ -149,6 +149,41 @@ class LocationUpdateCheckTests(unittest.TestCase):
     def test_post_release_timeout_not_completion(self):
         with self.assertRaises(ValueError):
             check_addressed_page(self.addressed_fixture().replace('event=1599', 'event=1584'))
+
+    def response_fixture(self):
+        text, card = self.release_fixture()
+        rows = [text, 'nsb7_radio_rx: index=29 type=8b length=166 t=15',
+                'nsb7_service_completion: pending=00102138 tag=03ec caller=00220deb t=17',
+                'nsb7_9c8_completion: event=1584 record=0012f2e8 t=17']
+        for index in range(50, 70):
+            kind, data = '00', ''
+            if index == 57:
+                kind, data = '0c', '0000186c00000000'
+            if index == 61:
+                kind, data = '1b', '0080013f41062707032058810809101010325476982b2b2b2b000000'
+            rows.append(f'nsb7_radio_tx: index={index} type={kind} length={len(data)//2} data={data} cursor=00 producer=01 pc=002cb0ec t=18.0 observer_writes=0')
+        ua = '01734106270703205881080910101032547698' + '2b'*5
+        for pc, task in [('002e49e6', 4), ('002645ec', 14)]:
+            rows.append(f'nsb7_lapdm_downlink: pc={pc} task={task} selector=80 block={ua} t=18')
+        return '\n'.join(rows), card
+
+    def test_own_paging_response(self):
+        check_page_response(*self.response_fixture())
+
+    def test_paging_response_wrong_identity(self):
+        text, card = self.response_fixture()
+        with self.assertRaises(ValueError):
+            check_page_response(text.replace('06270703205881080910101032547698', '06270703205881080910101032547699'), card)
+
+    def test_paging_response_no_background_completion(self):
+        text, card = self.response_fixture()
+        with self.assertRaises(ValueError):
+            check_page_response(text.replace('index=29 type=8b', 'index=29 type=83'), card)
+
+    def test_paging_response_retained_location(self):
+        text, card = self.response_fixture()
+        with self.assertRaises(ValueError):
+            check_page_response(text, card[:-1] + b'\x01')
 
 
 if __name__ == '__main__':
