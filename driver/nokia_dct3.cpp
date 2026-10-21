@@ -1070,6 +1070,16 @@ constexpr nokia_product_config make_8xxx_config()
 }
 constexpr nokia_product_config PRODUCT_8XXX = make_8xxx_config();
 
+constexpr nokia_product_config make_8290_config()
+{
+	nokia_product_config result;
+	// NSB-7 v5.22 305796 selects 22; 3057b4 writes 2c, then
+	// 3057b8 polls 6d bit 2 and 3057c0 reads 6c. No DSP verdict.
+	result.gensio_wiring = { 0x2c, 0x2d, 0x2e, 0x6c, 0x6d, 0x6e, 0x03, true };
+	return result;
+}
+constexpr nokia_product_config PRODUCT_8290 = make_8290_config();
+
 constexpr nokia_product_config make_8850_config()
 {
 	nokia_product_config result = make_8xxx_config();
@@ -1353,6 +1363,7 @@ public:
 	void noki3210(machine_config &config);
 	void noki5210(machine_config &config);
 	void noki8xxx(machine_config &config);
+	void noki8290(machine_config &config);
 	void noki8850(machine_config &config);
 	void nsm2stage(machine_config &config);
 	void nsm2hle(machine_config &config);
@@ -3874,6 +3885,12 @@ void nokia_dct3_state::noki8850(machine_config &config)
 	apply_product_config(PRODUCT_8850);
 }
 
+void nokia_dct3_state::noki8290(machine_config &config)
+{
+	dct3_base(config);
+	apply_product_config(PRODUCT_8290);
+}
+
 void nokia_dct3_state::nsm2stage(machine_config &config)
 {
 	noki8850(config);
@@ -4971,6 +4988,17 @@ ROM_START( nsm3dhle )
 	ROM_LOAD("8250 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(7ca585e0) SHA1(a974fb5fddcd0438ac4aaf32b431f1453e8d923c))
 ROM_END
 
+ROM_START( noki8290 )
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
+	ROM_LOAD("nsb7_boot.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x20000, "dsp", ROMREGION_ERASE00)
+	ROM_LOAD("nsb7_dsp_prom.bin", 0, 0xc000, NO_DUMP)
+	ROM_LOAD("nsb7_dsp_drom.bin", 0xc000, 0x4000, NO_DUMP)
+	ROM_LOAD("nsb7_dsp_pdrom.bin", 0x10000, 0x1000, NO_DUMP)
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF)
+	ROM_LOAD("8290f522a.fls", 0, 0x1d0000, CRC(607499b2) SHA1(4dacc50f57fe295168a53d3e5855a81acf35ab96))
+ROM_END
+
 ROM_START( noki8850 )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 
@@ -5222,6 +5250,7 @@ SYST( 1999, nse5r4t,  noki7110, 0,    nse5r4t,  noki7110, nokia_dct3_state, empt
 SYST( 1999, noki8210, 0,      0,      noki8210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3stage, noki8210, 0, nsm3stage, noki3310, nokia_dct3_state, empty_init, "Nokia", "8210 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3hle, noki8210, 0, nsm3hle, noki8210, nokia_dct3_state, empty_init, "Nokia", "8210 native uploads with runtime HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, noki8290, 0,      0,      noki8290, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8290 (NSB-7 research, no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8850, 0,      0,      noki8850, noki8850, nokia_dct3_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2stage, noki8850, 0, nsm2stage, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2hle, noki8850, 0, nsm2hle, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

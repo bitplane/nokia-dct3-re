@@ -2,7 +2,7 @@ diff --git a/src/mame/mame.lst b/src/mame/mame.lst
 index 6286bba4..240e84a4 100644
 --- a/src/mame/mame.lst
 +++ b/src/mame/mame.lst
-@@ -36164,8 +36164,23 @@ mm1m7g
+@@ -36164,8 +36164,24 @@ mm1m7g
  @source:nokia/mikromikko2.cpp
  mm2m35d
  
@@ -11,6 +11,7 @@ index 6286bba4..240e84a4 100644
  noki3210
 +noki2100
 +nam2c3
++noki8290
 +noki5110
 +noki5190
 +nsb1r4t
