@@ -530,9 +530,48 @@ a sibling code-pattern hypothesis, then independently decoded here; an
 exact 16-byte cross-ROM signature did not match because the literal-load
 encoding differs. Sibling addresses or packet labels are not the contract.
 
-Before enabling acquisition responses, recover the own RX broker's
-wire-to-object prefix and the PCS eligibility/band mapping. Those determine
-whether the shared 8b encoder is applicable and which laboratory carrier
-is meaningful for this GSM1900 product. Channel confirmation, traffic
-release, neighbours and authentication are not established by the initial
-55 request or these two parser callers. No radio peer has been enabled.
+### Own RX routing and channel classes
+
+RX broker `2cb1cc` allocates/initializes a message through `2cb156`, then
+copies ring payload halfwords to message base `+4` (`2cb208..2cb226`).
+Dispatcher `309f14` subtracts `83` before indexing the 13-entry table
+`309f60`. Entry eight (`8b`) is `309fb4`, calling `2e5258`. That forwarder
+requires byte `130784 == 1`, then posts the unchanged message to task
+**13** through `2898e8`. Do not reuse the sibling's task-12 attribution.
+The gate is one in read-only samples at 3.5, 6, 14 and 24 seconds.
+
+The unchanged four-byte prefix means parser object `+6/+7` is wire
+payload `+2/+3`, and object `+9` is wire payload `+5`. These match the
+shared measurement encoder's 40 four-byte channel/RSSI records. This is
+static wire-layout agreement; no 8b measurement response has yet been
+delivered to this product.
+
+Classifier `2c7f48` tests capability predicates `2de900(1..5)` in order.
+They read bits 31..27 of word `12e4ec`; the live word is `98000000` in
+all four samples. Its decoded channel ranges under that word are:
+
+| Inputs | Returned class |
+| --- | --- |
+| `0000` | 0 |
+| `0001..007c` (1..124) | 1 |
+| `007d..01ff` (125..511) | 0 |
+| `0200..0375` (512..885) | 2 |
+| `0376..ffff` | 0 |
+
+The bit-28 branch precedes the overlapping bit-27 branch. If bit 27 were
+enabled alone, 512..810 would instead return class 3. Thus a laboratory
+carrier such as 600 is software-eligible as class 2 under the observed
+word; these class numbers and feature flags do **not** establish fitted
+RF bands or extra transceiver hardware. The independent product manual
+identifies this handset as GSM1900.
+
+The optional `--contract-json PATH` on the radio checker reports the own
+RX entry/task/prefix and evaluates the decoded classifier over all 65,536
+16-bit inputs. It checks the pinned source bytes and threshold literals;
+this is a static decoded-contract check, not original CPU execution on
+every input. Unit cases cover precedence and range endpoints.
+
+The next bounded experiment is a standards-owned PCS topology with the
+now-supported measurement format. Channel confirmation, traffic release,
+neighbours and authentication remain unestablished. No radio peer has
+been enabled merely from the initial 55 request or these parser callers.

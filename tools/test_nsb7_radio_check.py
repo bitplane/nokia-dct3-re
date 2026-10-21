@@ -1,5 +1,6 @@
 import unittest
-from tools.nsb7_radio_check import check_trace, TYPES, LENGTHS
+from tools.nsb7_radio_check import check_trace, channel_class, contract, TYPES, LENGTHS
+from pathlib import Path
 from tools.test_nsb7_security_check import trace as security_trace
 
 
@@ -16,6 +17,33 @@ def trace():
 
 
 class RadioInventoryTests(unittest.TestCase):
+    def test_own_receive_and_exhaustive_classifier_contract(self):
+        image = Path(__file__).resolve().parents[1] / 'roms/noki8290/8290f522a.fls'
+        if not image.exists():
+            self.skipTest('own NSB-7 image unavailable')
+        report = contract(image.read_bytes())
+        self.assertEqual(report['task'], 13)
+        self.assertEqual(report['payload_prefix_bytes'], 4)
+        self.assertEqual(report['classified_inputs'], 65536)
+        self.assertEqual(report['ranges'], [
+            {'first': 0, 'last': 0, 'class': 0},
+            {'first': 1, 'last': 124, 'class': 1},
+            {'first': 125, 'last': 511, 'class': 0},
+            {'first': 512, 'last': 885, 'class': 2},
+            {'first': 886, 'last': 65535, 'class': 0}])
+
+    def test_classifier_precedence_and_edges(self):
+        for channel, value in ((511, 0), (512, 3), (810, 3), (811, 0)):
+            self.assertEqual(channel_class(channel, 1 << 27), value)
+        self.assertEqual(channel_class(600, (1 << 27) | (1 << 28)), 2)
+        self.assertEqual(channel_class(0, 1 << 30), 1)
+        self.assertEqual(channel_class(975, 1 << 30), 1)
+        self.assertEqual(channel_class(1024, 1 << 30), 0)
+        self.assertEqual(channel_class(955, 1 << 29), 1)
+        self.assertEqual(channel_class(974, 1 << 29), 1)
+        with self.assertRaises(ValueError):
+            channel_class(65536, 0xffffffff)
+
     def test_complete_wrapped_inventory(self):
         check_trace(trace())
 

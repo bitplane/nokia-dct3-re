@@ -32,3 +32,12 @@ _G.nsb7_radio_tx_tap=memory:install_write_tap(0x100a4,0x100a7,'nsb7_radio_tx',fu
         cursor=(cursor+words)%0x52
     end
 end)
+local state=coroutine.create(function()
+    for _,target in ipairs({3.5,6,14,24}) do
+        assert(emu.wait(target-machine.time:as_double()))
+        machine:logerror(string.format('nsb7_radio_state: bands=%08x measurement_route=%02x t=%.9f observer_writes=0\n',
+            memory:read_u32(0x12e4ec),memory:read_u8(0x130784),machine.time:as_double()))
+    end
+end)
+_G.nsb7_radio_state=state
+assert(coroutine.resume(state))
