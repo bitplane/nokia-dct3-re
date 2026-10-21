@@ -1652,7 +1652,9 @@ bool nokia_radio_peer_device::handle_acquisition_packet(
 				m_reports_remaining == 0) ||
 			(uses_candidate_window() &&
 				current_phase() == phase::candidate_measurement &&
-				m_reports_remaining == 1)))
+				(m_reports_remaining == 1 ||
+				 (m_protocol.coverage == acquisition_coverage::candidate_channel &&
+				  m_reports_remaining == 0)))))
 	{
 		const bool active_candidate_window =
 				uses_candidate_window() &&
@@ -1744,12 +1746,20 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			if (request == search_request::autonomous_band_scan)
 				handle_search_request(request);
 		}
-		else if (m_protocol.coverage == acquisition_coverage::candidate_synchronization &&
+		else if (m_protocol.coverage >= acquisition_coverage::candidate_synchronization &&
 				packet.type == 0x56 && packet.length == 160)
 		{
 			const search_request request = decode_search_request(packet);
 			if (request == search_request::candidate_window)
 				handle_search_request(request);
+		}
+		else if (m_protocol.coverage == acquisition_coverage::candidate_channel &&
+				packet.type == 0x02 && packet.length == 20 && packet.payload[0] == 4)
+		{
+			// The own channel handler commits cached receiver state on 89.
+			// No independent terminal-search report is established here.
+			if (handle_acquisition_packet(packet))
+				m_reports_remaining = 1;
 		}
 		return;
 	}
@@ -2821,9 +2831,19 @@ void nokia_radio_peer_device::emit_report()
 		advance_after_report(report_type);
 		// Partial acquisition contracts establish one SCH observation, not
 		// the sibling products' subsequent terminal RSSI/channel dialogue.
-		if (m_protocol.coverage == acquisition_coverage::candidate_synchronization &&
+		if (m_protocol.coverage >= acquisition_coverage::candidate_synchronization &&
 				report_type == 0x80 && payload[0] == 0x40)
 			m_reports_remaining = 0;
+		if (m_protocol.coverage == acquisition_coverage::candidate_channel && report_type == 0x89)
+		{
+			// The full contract re-arms periodic BCCH from serving_bcch even
+			// with no queued reports. A bounded channel-only product must not
+			// inherit that continuation after acknowledging its configuration.
+			set_phase(phase::inactive);
+			m_reports_remaining = 0;
+			m_wait_ticks = 0;
+			m_report_deferred = false;
+		}
 	}
 	m_transport->notify_rx();
 	if (m_trace_enabled)

@@ -11,7 +11,7 @@ if __package__ in (None, ''):
 from tools.nsb7_input_check import IMAGE_SHA1
 from tools.nsb7_security_check import check_trace as check_security
 
-PACKET = re.compile(r'nsb7_radio_tx: index=(\d+) type=([0-9a-f]{2}) length=(\d+) data=([0-9a-f]+) '
+PACKET = re.compile(r'nsb7_radio_tx: index=(\d+) type=([0-9a-f]{2}) length=(\d+) data=([0-9a-f]*) '
                     r'cursor=([0-9a-f]{2}) producer=([0-9a-f]{2}) pc=([0-9a-f]{8}) t=([0-9.]+) observer_writes=0')
 TYPES = (5, 5, 5, 0x70, 0x70, 0x70, 0x70, 0x70, 0x3c,
          0x0d, 0x0d, 0x0d, 0x0d, 5, 0x0d, 0x0d, 0x0d, 0x0d, 0x70, 5,
@@ -84,7 +84,8 @@ def contract(image):
             'scope': 'decoded software classes, not fitted RF-band proof'}
 
 
-def check_trace(text, measurement=False, synchronization=False):
+def check_trace(text, measurement=False, synchronization=False, channel=False):
+    synchronization = synchronization or channel
     measurement = measurement or synchronization
     check_security(text)
     rows = PACKET.findall(text)
@@ -108,6 +109,9 @@ def check_trace(text, measurement=False, synchronization=False):
     if synchronization:
         expected_types += (0x02,)
         expected_lengths += (20,)
+    if channel:
+        expected_types += (0x03, 0x55)
+        expected_lengths += (0, 4)
     if tuple(kind for kind, _ in inventory) != expected_types or tuple(len(payload) for _, payload in inventory) != expected_lengths:
         raise ValueError('bounded packet inventory differs')
     if inventory[28] != (0x55, bytes.fromhex('03050000')):
@@ -129,6 +133,8 @@ def check_trace(text, measurement=False, synchronization=False):
         expected_replies = [('1', '8e', '10'), ('2', '8e', '10'), ('3', '8b', '166')]
         if synchronization:
             expected_replies.append(('4', '80', '14'))
+        if channel:
+            expected_replies.append(('5', '89', '8'))
         if replies != expected_replies:
             raise ValueError('qualified acquisition RX scope differs')
         consumers = re.findall(r'nsb7_measurement: pc=([0-9a-f]{8}) task=(\d+) type=([0-9a-f]{2}) first=([0-9a-f]{4}) '
@@ -153,6 +159,15 @@ def check_trace(text, measurement=False, synchronization=False):
             raise ValueError('SCH payload channel, status or decoded BSIC differs')
         if 'nsb7_sch_candidate_commit: channel=0258 flags=a4 bsic=12 ' not in text:
             raise ValueError('firmware did not settle the synchronized candidate record')
+    if channel:
+        if inventory[31:] != [(0x03, b''), (0x55, bytes.fromhex('04080000'))]:
+            raise ValueError('unanswered BCCH timeout tail differs')
+        if 'nsb7_channel_cached: descriptor=00000000 data=045000000000120002580000 live_channel=0000 live_mode=00 ' not in text:
+            raise ValueError('own receiver configuration was not cached before acknowledgement')
+        if not re.search(r'nsb7_channel_ack: pc=002e5054 task=4 type=89 bit=00 cached=00[1-7][0-9a-f]{5} channel=0000 mode=00 bsic=00 ', text):
+            raise ValueError('channel acknowledgement did not reach the own pending-config consumer')
+        if 'nsb7_channel_state: cached=00000000 channel=0258 mode=50 bsic=12 t=6.000000000 ' not in text:
+            raise ValueError('channel acknowledgement did not commit the own receiver state')
 
 
 def main():
@@ -162,11 +177,12 @@ def main():
     parser.add_argument('--contract-json', type=Path)
     parser.add_argument('--measurement', action='store_true')
     parser.add_argument('--synchronization', action='store_true')
+    parser.add_argument('--channel', action='store_true')
     args = parser.parse_args()
     try:
         report = contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
-        check_trace(text, args.measurement, args.synchronization)
+        check_trace(text, args.measurement, args.synchronization, args.channel)
         states = re.findall(r'nsb7_radio_state: bands=([0-9a-f]{8}) measurement_route=([0-9a-f]{2}) t=([0-9.]+)', text)
         if states != [('98000000', '01', f'{time:.9f}') for time in (3.5, 6, 14, 24)]:
             raise ValueError('live feature/forwarding predicate differs')
@@ -174,7 +190,8 @@ def main():
             args.contract_json.write_text(json.dumps(report, indent=2) + '\n')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 radio inventory: FAIL: {error}\n')
-    print('PASS: ' + ('own SCH accepted; organic channel request left unanswered' if args.synchronization else
+    print('PASS: ' + ('own channel acknowledgement commits receiver; no BCCH replies' if args.channel else
+                     'own SCH accepted; organic channel request left unanswered' if args.synchronization else
                      'PCS RSSI consumed by task 13; organic 56 request left unanswered' if args.measurement else
                      'own 29-packet no-peer TX baseline; final 55/03050000') + '; no RF completion claim')
 

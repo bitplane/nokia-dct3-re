@@ -14,7 +14,9 @@ inserted, SIMI startup file reads and the phone Security code editor
 reproduce across cold runs. A separate one-byte erased-retry fixture permits
 physical acceptance of the own-ROM default phone code and menu navigation.
 A physical SIM phonebook save and cold Details retrieval are qualified.
-Usable idle and RF services remain unestablished.
+The opt-in PCS peer qualifies band measurements, candidate synchronization
+and receiver-configuration acknowledgement. BCCH delivery, camping,
+registration, calls, SMS and a usable idle frame remain unestablished.
 In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
 No PMM, resident DSP mask, hardware profile or provisioning is supplied by
@@ -574,9 +576,10 @@ every input. Unit cases cover precedence and range endpoints.
 ### Opt-in PCS acquisition acceptance
 
 Radio HLE defaults off in the NSB-7 input configuration. The existing
-`Radio peer HLE` setting enables a product-owned **candidate-synchronization**
+`Radio peer HLE` setting enables a product-owned **candidate-channel**
 contract: the decoded four-byte type-55 forms `03050000/03030000` and
-the subsequent eighty-channel type-56 list are answered. Channel acknowledgement, traffic,
+the subsequent eighty-channel type-56 list, and its type-02/20 receiver
+configuration are answered. BCCH delivery, traffic,
 neighbour and authentication contracts are not inherited from siblings.
 Other products retain their existing contracts unchanged. Retire the
 acquisition-coverage limit only after the subsequent product contracts are
@@ -593,13 +596,14 @@ fourteen-byte type-80/subtype-40 encoding. No firmware queue, state or APDU is
 injected to make this progression happen.
 
 `tools/nsb7_radio_measurement_observe.lua` adds own broker/consumer/class
-observations. Use `tools/nsb7_radio_check.py IMAGE RUN --synchronization` for
-this composition. It requires all 31 TX publications, the correct task
+observations. Use `tools/nsb7_radio_check.py IMAGE RUN --channel` for
+this composition. It requires all 33 TX publications, the correct task
 and payload values, and the complete observed RX inventory: two existing
 external-service `8e/10` frames, one measurement `8b/166`, and one SCH
-`80/14` through the 25-second fixture. The older `--measurement` check
-retains the preceding 30-TX/measurement-only trace contract. No channel
-completion response is accepted. The no-peer/default fixture still
+`80/14`, and one channel acknowledgement `89/8` through the 25-second
+fixture. The older `--measurement` and `--synchronization` checks retain
+the preceding 30-/31-TX trace contracts. No BCCH or terminal-search
+response is accepted. The no-peer/default fixture still
 reproduces its original 29-packet inventory.
 
 Own constructor `2b6848` allocates 164 bytes, writes type `56` and payload
@@ -618,8 +622,8 @@ alone is insufficient: firmware asserts the native DSP reset line again
 while runtime HLE remains in use. This is a bootstrap/runtime ownership
 correction, not a candidate-payload special case.
 
-Decode the callers and their populated request fields before
-extending peer coverage. Channel confirmation, traffic release, neighbours,
+Decode each subsequent request's callers and populated fields before
+extending peer coverage. BCCH delivery, traffic release, neighbours,
 authentication and registration remain unestablished on this handset.
 
 ### Candidate response routing
@@ -666,7 +670,37 @@ run observes the same payload at broker `2e4ef4`, task-13 lookup `287574`
 and update `28734c`. Firmware changes the candidate's flags `a2 -> a4`,
 stores decoded BSIC `12`, and publishes type `02`/20 bytes beginning
 `041202000000005050000258`. The final eight request bytes are captured
-but not yet assigned semantics. The peer leaves this channel request
-unanswered: neither a sibling's channel acknowledgements nor a terminal
-RSSI report is justified by the synchronization result alone. Channel
-completion and the subsequent BCCH lifecycle remain separate contracts.
+but not yet assigned semantics. Channel completion and the subsequent
+BCCH lifecycle are independently qualified below; the latter remains open.
+
+### Receiver configuration acknowledgement
+
+Own constructor `2b7170` allocates 24 bytes and publishes a 20-byte type-02
+payload. BCCH caller `2ef69e` sets internal mode `50`, the candidate channel,
+and BSIC, caching its first twelve internal bytes through `2ef3ec` before
+transmission. The pending cache is `[1306e4]`; the live receiver record is
+`130308`. In the single-cell run the cache is
+`045000000000120002580000`, while the live channel/mode remain zero.
+
+Type-89 handler `2e5054` first checks `130784`. Its separate queued
+application descriptor `[130844]` is null for this request. This is an
+explicit handler branch, not a missing prerequisite: `2e50ce` calls
+`2ef3ec(NULL)`, which copies the cached channel/BSIC/mode into the live
+record and frees the cache, then forwards the original response to task
+13. When an application descriptor exists, the handler instead checks
+the response's low bit against descriptor byte 2 and requires byte 3 to
+be armed; that other lifecycle is not established by this fixture.
+
+One zero-bit `89/8` response to the captured type-02 request is sufficient
+to commit carrier `0258`, BSIC `12` and mode `50`; at six seconds the
+cache is null and all three live fields agree. The bounded peer then
+stops. Clearing report count alone is insufficient because the full
+serving-BCCH phase periodically re-arms itself; partial coverage must
+leave that phase as well. No terminal `8f` or sibling BCCH stream is
+included in this contract.
+
+Without BCCH delivery, firmware times out and publishes type `03` with
+zero payload, then type-55 control `04080000` at about 8.87 seconds. The
+channel checker requires this tail and exactly five total RX packets,
+so an accidentally inherited BCCH continuation fails acceptance. Network
+camping, registration, calls and SMS remain unestablished on this model.

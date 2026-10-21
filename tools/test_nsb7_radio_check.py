@@ -48,7 +48,29 @@ def synchronization_trace():
     return '\n'.join(rows)
 
 
+def channel_trace():
+    cursor = (sum((length+3)//2 for length in LENGTHS) + 81 + 11) % 0x52
+    return synchronization_trace() + '\n' + '\n'.join([
+        f'nsb7_radio_tx: index=32 type=03 length=0 data= cursor={cursor:02x} producer={(cursor+1)%0x52:02x} pc=002cb0ec t=8 observer_writes=0',
+        f'nsb7_radio_tx: index=33 type=55 length=4 data=04080000 cursor={(cursor+1)%0x52:02x} producer={(cursor+4)%0x52:02x} pc=002cb0ec t=9 observer_writes=0',
+        'nsb7_radio_rx: index=5 type=89 length=8 t=5.8 observer_writes=0',
+        'nsb7_channel_cached: descriptor=00000000 data=045000000000120002580000 live_channel=0000 live_mode=00 t=5.8 observer_writes=0',
+        'nsb7_channel_ack: pc=002e5054 task=4 type=89 bit=00 cached=00101d78 channel=0000 mode=00 bsic=00 t=5.8 observer_writes=0',
+        'nsb7_channel_state: cached=00000000 channel=0258 mode=50 bsic=12 t=6.000000000 observer_writes=0'])
+
+
 class RadioInventoryTests(unittest.TestCase):
+    def test_channel_ack_commits_config_without_bcch_continuation(self):
+        check_trace(channel_trace(), channel=True)
+        for old, new in [('bit=00 cached=', 'bit=01 cached='),
+                         ('cached=00000000 channel=0258', 'cached=00101d78 channel=0258'),
+                         ('channel=0258 mode=50', 'channel=0258 mode=00'),
+                         ('data=045000000000120002580000', 'data=045000000000120000010000')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_trace(channel_trace().replace(old, new), channel=True)
+        with self.assertRaises(ValueError):
+            check_trace(channel_trace() + '\nnsb7_radio_rx: index=6 type=80 length=34 t=7', channel=True)
+
     def test_synchronization_requires_own_parser_and_organic_request(self):
         check_trace(synchronization_trace(), synchronization=True)
         for old, new in [('flags=a4 bsic=12', 'flags=a2 bsic=12'),

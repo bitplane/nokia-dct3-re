@@ -30,6 +30,27 @@ for _,pc in ipairs({0x2e5258,0x2a3704}) do
             memory:read_u16(object+10),rssi,machine.time:as_double()))
     end)
 end
+local channel_state=coroutine.create(function()
+    assert(emu.wait(6-machine.time:as_double()))
+    machine:logerror(string.format('nsb7_channel_state: cached=%08x channel=%04x mode=%02x bsic=%02x t=%.9f observer_writes=0\n',
+        memory:read_u32(0x1306e4),memory:read_u16(0x13030c),memory:read_u8(0x130310),
+        memory:read_u8(0x13030f),machine.time:as_double()))
+end)
+_G.nsb7_channel_state=channel_state
+assert(coroutine.resume(channel_state))
+for _,pc in ipairs({0x2e5054}) do
+    local count=0
+    taps[#taps+1]=memory:install_read_tap(pc,pc+3,'nsb7_channel_ack_'..pc,function()
+        if cpu.state['R15'].value~=pc or count>=16 then return end
+        count=count+1
+        local object=cpu.state['R0'].value
+        if object<0x100000 or object>=0x17ff00 then return end
+        machine:logerror(string.format('nsb7_channel_ack: pc=%08x task=%u type=%02x bit=%02x cached=%08x channel=%04x mode=%02x bsic=%02x t=%.9f observer_writes=0\n',
+            pc,memory:read_u8(0x100022),memory:read_u8(object+3),memory:read_u8(object+4),
+            memory:read_u32(0x1306e4),memory:read_u16(0x13030c),memory:read_u8(0x130310),
+            memory:read_u8(0x13030f),machine.time:as_double()))
+    end)
+end
 local classes=0
 local candidates=0
 taps[#taps+1]=memory:install_read_tap(0x2b6880,0x2b6883,'nsb7_candidate_before_transport',function()
@@ -69,6 +90,18 @@ taps[#taps+1]=memory:install_write_tap(0x100a4,0x100a7,'nsb7_sch_candidate_commi
     commits=commits+1
     machine:logerror(string.format('nsb7_sch_candidate_commit: channel=%04x flags=%02x bsic=%02x t=%.9f observer_writes=0\n',
         memory:read_u16(record+6),memory:read_u8(record+13),memory:read_u8(record+10),machine.time:as_double()))
+    local pending=memory:read_u32(0x130844)
+    local cached=memory:read_u32(0x1306e4)
+    if cached>=0x100000 and cached<0x17ff00 then
+        local bytes={}
+        for index=0,11 do bytes[#bytes+1]=string.format('%02x',memory:read_u8(cached+index)) end
+        machine:logerror(string.format('nsb7_channel_cached: descriptor=%08x data=%s live_channel=%04x live_mode=%02x t=%.9f observer_writes=0\n',
+            pending,table.concat(bytes),memory:read_u16(0x13030c),memory:read_u8(0x130310),machine.time:as_double()))
+    end
+    if pending>=0x100000 and pending<0x17ff00 then
+        machine:logerror(string.format('nsb7_channel_pending: address=%08x tag=%04x bit=%02x armed=%02x t=%.9f observer_writes=0\n',
+            pending,memory:read_u16(pending),memory:read_u8(pending+2),memory:read_u8(pending+3),machine.time:as_double()))
+    end
 end)
 for _,pc in ipairs({0x2e4ef4,0x287574,0x28734c}) do
     local count=0

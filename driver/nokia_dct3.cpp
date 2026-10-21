@@ -3948,9 +3948,10 @@ void nokia_dct3_state::nsb7hle(machine_config &config)
 	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
 	// Own 55/03050000 and task-13 8b consumer agree on forty RSSI records.
 	// Own 56 list and 287574/28734c accept the shared SCH encoding;
-	// channel acknowledgements and later radio stages remain unanswered.
+	// 2e50ce commits the cached receiver configuration on type 89;
+	// the later BCCH stream remains unanswered.
 	runtime.radio.acquisition = nokia_radio_peer_device::acquisition_strategy::candidate_window;
-	runtime.radio.coverage = nokia_radio_peer_device::acquisition_coverage::candidate_synchronization;
+	runtime.radio.coverage = nokia_radio_peer_device::acquisition_coverage::candidate_channel;
 	runtime.radio.band_scan_accepts_candidate_window = true;
 	apply_product_config(runtime);
 	auto *const staged = subdevice<nokia_dsp_staged_device>("dsp_staged");
