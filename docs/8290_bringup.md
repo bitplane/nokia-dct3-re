@@ -12,7 +12,7 @@ nominal VBATT input, reaches `Insert SIM card` and physically enters digit
 `1` into the dial editor with an empty socket. With the synthetic card
 inserted, SIMI startup file reads and the phone Security code editor
 reproduce across cold runs. A separate one-byte erased-retry fixture permits
-physical acceptance of the own-ROM default phone code. Usable idle/menu,
+physical acceptance of the own-ROM default phone code and menu navigation. Usable idle,
 SIM writes and RF services remain unestablished.
 In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
@@ -413,6 +413,27 @@ own code/retry storage. Acceptance repeats in a new process retaining the
 preceding run's own flash and card NVRAM.
 
 The post-acceptance frame has `Menu/Names` softkeys but malformed main-area
-content. Do not call it a usable idle or registered screen. The next
-application boundary is physical menu activation and the display/resource
-state after acceptance; no security verdict or UI state should be injected.
+content. Do not call it a usable idle or registered screen. Physical menu
+activation works independently, as qualified below; no security verdict or
+UI state is injected.
+
+## Physical menu acceptance
+
+After the same physical security sequence, Menu at 26 seconds opens the
+firmware's `Messages` menu. Down at 29 seconds selects `Call log`; Menu at
+32 seconds opens its `Missed calls` item. Text, icons, scrollbar and
+softkey labels render coherently on all three screens. Their corresponding
+logical decodes are `19/18/19`. This distinguishes the malformed idle
+content from a general LCD/controller or keyboard-navigation failure.
+
+`tools/nsb7_menu_observe.lua` composes the security observer and those
+physical contacts. `tools/nsb7_menu_check.py IMAGE RUN` requires the
+security comparison and retry evidence, each decoded menu contact, and
+exact RGB frames for all three views. The same frames reproduce in a new
+process retaining the preceding run's own flash and card. It does not
+establish call history, messaging services, a usable idle screen or RF.
+
+The remaining display/application question is why the idle main area
+contains malformed content while menu resources render normally. Inspect
+firmware-owned settings/resource selection (including erased NV inputs)
+before modifying the LCD device or synthesizing network presentation.
