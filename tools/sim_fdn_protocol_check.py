@@ -3,8 +3,8 @@ from tools.nsk3_phonebook_check import transmitted
 from tools.sim_security_trace_check import statuses,padded_pin
 
 
-def validity_targets(tx,instruction):
-    offset=0;selected=None;targets=[]
+def apdus(tx):
+    offset=0;selected=None
     incoming={0xa4,0x20,0x24,0x26,0x28,0x2c,0xdc,0xd6,0x10,0x14,0xc2,0x88,0x32,0xa2}
     while offset<len(tx):
         if tx[offset]==0xff:
@@ -16,6 +16,12 @@ def validity_targets(tx,instruction):
         if offset+count>len(tx):raise ValueError('truncated command body')
         body=tx[offset:offset+count];offset+=count
         if ins==0xa4 and len(body)==2:selected=int.from_bytes(body,'big')
+        yield ins,p1,p2,length,body,selected
+
+
+def validity_targets(tx,instruction):
+    targets=[]
+    for ins,p1,p2,length,body,selected in apdus(tx):
         if ins==instruction:
             if p1 or p2 or length:raise ValueError('validity parameters differ')
             targets.append(selected)

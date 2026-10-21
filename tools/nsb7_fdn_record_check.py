@@ -1,0 +1,111 @@
+"""Protected NSB-7 FDN Save/cold Details and rejected-PIN2 preservation."""
+import argparse
+from pathlib import Path
+import re
+import sys
+
+if __package__ in (None, ''):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools.nsb7_pin_check import check_trace as check_pin, check_frame
+from tools.nsb7_security_check import check_trace as check_phone
+from tools.nsb7_storage_check import inspect
+from tools.nsb7_fdn_check import PREFIX
+from tools.nsk3_phonebook_check import expected_record, transmitted
+from tools.sim_fdn_profile import EXTENDED_LENGTH
+from tools.sim_fdn_protocol_check import apdus, validity_targets
+from tools.sim_security_trace_check import statuses, padded_pin, ATTEMPTS_OFFSET
+
+FRAMES = {
+    'write': [(75,'fadcc0b3b9dbabd90d23602e2b3d698ddb88606a2bdd25748a009ae499d2f402')],
+    'cold': [(53,'1e824b13197f421c04863244c3bc5ea19163d72bbfd74c1ef8acf5a8d1a1bdf8'),
+             (56,'acf677164f77fcd6dc7df53c3e98dee65f4ec28e6c6ed69965a3dea358544e9e')],
+    'wrong': [(60,'460778ecafd4fb9a23ec8c6632d3b4272b29c63c059b8c2eb764ad810f6c53c8')],
+}
+
+
+def expected_card(before, wrong=False):
+    if len(before) != EXTENDED_LENGTH or before[3570:3578] != b'FDN\x01\x01\x00\x00\x00' or \
+            before[3578:] != b'\xff'*320 or before[ATTEMPTS_OFFSET+1] != 3:
+        raise ValueError('fresh FDN-On card and PIN2 retries required')
+    after = bytearray(before)
+    if wrong:
+        after[ATTEMPTS_OFFSET+1] = 2
+    else:
+        after[3578:3610] = expected_record()
+    return bytes(after)
+
+
+def check_trace(text, mode):
+    if mode not in ('write', 'cold', 'wrong'):
+        raise ValueError('unknown FDN record mode')
+    check_pin(text.split('nsb7_menu_input:', 1)[0], True)
+    check_phone(text)
+    keys = PREFIX + [('Left Softkey / Menu', 0x19), ('Scroll Down', 0x18),
+                     ('Scroll Down', 0x18), ('Left Softkey / Menu', 0x19)]
+    if mode == 'cold':
+        keys += [('Left Softkey / Menu', 0x19)]*3
+    else:
+        keys += [('Scroll Down', 0x18), ('Left Softkey / Menu', 0x19)]
+        keys += [('Keypad '+str(i), i) for i in (5,6,7,5 if mode == 'wrong' else 8)]
+        keys += [('Left Softkey / Menu', 0x19)]
+        if mode == 'write':
+            keys += [('Keypad 2', 2), ('Left Softkey / Menu', 0x19)]
+            keys += [('Keypad '+str(i), i) for i in (1,2,3,4,5)]
+            keys += [('Left Softkey / Menu', 0x19)]
+    rows = list(re.finditer(r'nsb7_menu_input: key=(.*?) state=([01]) ', text))
+    if [(r[1],r[2]) for r in rows] != [(key,edge) for key,_ in keys for edge in ('1','0')]:
+        raise ValueError('FDN record physical sequence differs')
+    for index, (_,code) in enumerate(keys):
+        if f'nsb7_key_decode: key={code:02x} observer_writes=0' not in text[rows[2*index].end():rows[2*index+1].start()]:
+            raise ValueError('FDN record contact did not decode')
+    outcomes = [(0x9000,3,10)]
+    if mode != 'cold':
+        outcomes.append((0x9804 if mode == 'wrong' else 0x9000,3,10))
+    if statuses(text,0x20) != outcomes:
+        raise ValueError('FDN record PIN1/PIN2 result differs')
+    if any(statuses(text,ins) for ins in (4,0x24,0x26,0x28,0x2c)):
+        raise ValueError('FDN record changed validity or credentials')
+    tx = transmitted(text,4096,'nsb7_sim_tx')
+    if validity_targets(tx,0x44) != [0x6f7e,0x6f07]:
+        raise ValueError('FDN-On startup identity rehabilitation differs')
+    if statuses(text,0x44) != [(0x9000,3,10)]*2:
+        raise ValueError('FDN-On identity rehabilitation failed')
+    updates = [row for row in apdus(tx) if row[0] == 0xdc]
+    expected = [(0xdc,1,4,32,expected_record(),0x6f3b)] if mode == 'write' else []
+    if updates != expected:
+        raise ValueError('FDN UPDATE target/body differs or rejected/read phase wrote a record')
+    if statuses(text,0xdc) != ([(0x9000,3,10)] if mode == 'write' else []):
+        raise ValueError('FDN UPDATE outcome differs')
+    if mode != 'cold':
+        pin2 = bytes.fromhex('a020000208')+padded_pin('5675' if mode == 'wrong' else '5678')
+        if tx.count(pin2) != 1:
+            raise ValueError('FDN record PIN2 payload differs')
+        if mode == 'write' and tx.index(bytes.fromhex('a0dc010420')+expected_record()) < tx.index(pin2):
+            raise ValueError('protected UPDATE preceded PIN2')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in ('source','write','cold','wrong'):
+        parser.add_argument(name,type=Path)
+    args = parser.parse_args()
+    try:
+        initial = (args.source/'nvram/nsb7hle/sim_card').read_bytes()
+        saved = expected_card(initial)
+        for run,mode in ((args.write,'write'),(args.cold,'cold'),(args.wrong,'wrong')):
+            if (run/'initial_sim_card.bin').read_bytes() != (saved if mode == 'cold' else initial):
+                raise ValueError('FDN record cold/source card link differs')
+            storage = run/'nvram/nsb7hle'
+            if (storage/'sim_card').read_bytes() != (expected_card(initial,True) if mode == 'wrong' else saved):
+                raise ValueError('FDN record whole-card transition differs')
+            inspect((storage/'flash').read_bytes())
+            check_trace((run/'error.log').read_text(),mode)
+            for second,digest in FRAMES[mode]:
+                check_frame(run/f'snap/nsb7_menu_{second}.png',digest)
+    except (OSError,ValueError) as error:
+        parser.exit(1,f'NSB-7 FDN record: FAIL: {error}\n')
+    print('PASS: PIN2-protected FDN Save/cold Details and rejected-write full-card preservation')
+
+
+if __name__ == '__main__':
+    main()

@@ -23,8 +23,9 @@ isolation and cold reuse also pass, along with physical PIN2 exhaustion,
 failed-PUK2 retry retention and cold PUK2 recovery/reuse. Permanent PUK1
 exhaustion and cold card rejection are qualified. Permanent PUK2 exhaustion
 also retains ordinary PIN1 authentication and menus. An explicit extended
-card qualifies physical PIN2-authorized FDN On/cold-On/Off/cold-Off; FDN
-record editing, dial enforcement and AoC authorization remain separate work.
+card qualifies physical PIN2-authorized FDN On/cold-On/Off/cold-Off and
+protected Save/cold Details/rejected-write isolation. FDN editing/deletion,
+dial enforcement and AoC authorization remain separate work.
 PIN-enabled fresh/cold laboratory registration and a long wrong-PIN
 non-registration control are qualified as one coherent composition.
 The authenticated composition also qualifies physical incoming/outgoing calls,
@@ -2062,3 +2063,35 @@ in the input script; menu presentation alone is not used as protocol proof.
 This qualifies FDN discovery, PIN2 authorization and durable On/Off, not
 protected FDN record CRUD, listed/unlisted dialing or connected calls with
 FDN enabled. The radio-disabled fixture keeps those claims separate.
+
+### Protected FDN Save and cold retrieval
+
+With the own cold FDN-On card as input, `nsb7_fdn_write.lua` physically
+selects Fixed dialing / Numbers / Add, authenticates PIN2 `5678` and saves
+`A / 12345`. Exactly one successful UPDATE RECORD targets selected EF_FDN
+`6f3b`, record 1, absolute mode 4, with the complete 32-byte body. Ordinary
+ADN is not the update target. The full card differs only in that FDN record;
+FDN validity, other records and credentials remain unchanged.
+
+An independent process copies the saved own storage and physically executes
+Numbers / Search / empty search / Details through `nsb7_fdn_read.lua`.
+Reviewed list and number frames display `A` and `12345`; no PIN2 request or
+record update occurs, and the entire card remains identical.
+
+The negative fixture `nsb7_fdn_write_wrong.lua` starts from the same blank
+FDN-On source and submits `5675`. Firmware renders Code error; no UPDATE is
+sent, and complete-card comparison permits only PIN2 retries `3 -> 2`.
+Startup identity rehabilitation is independently checked in all three runs.
+The shared APDU parser tracks selected files and complete command bodies,
+so an ADN write or a command-like byte sequence inside record data cannot
+satisfy the protected FDN write check.
+
+```sh
+.venv/bin/python tools/nsb7_fdn_record_check.py \
+  tmp/nsb7-fdn-cold-on tmp/nsb7-fdn-write tmp/nsb7-fdn-read \
+  tmp/nsb7-fdn-write-wrong
+```
+
+FDN edit/erase/cancel and listed-versus-unlisted dial permission remain
+separate acceptance targets. These radio-disabled storage runs do not
+establish a connected FDN-enabled call.

@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_protected_fdn_save_cold_and_rejection",
+      "owner": "nsb7_sim_storage", "status": "satisfied",
+      "predicate": "Physical PIN2 authorizes EF_FDN Save, independent cold Details retrieves the contact and wrong PIN2 preserves all records",
+      "current": "Own cold FDN-On storage physically authenticates PIN1/phone code and follows Numbers/Add with PIN25678. One successful UPDATE RECORD selects6f3b, record1/mode4 and exact32-byte A/12345 body; complete card permits only that FDN record. A separate cold process physically lists A and displays12345 without PIN2/update or persistent changes. A same-source wrong5675 control renders Code error, emits no UPDATE and changes only PIN2 retries3->2. Exact Saved/list/number/error frames pass. Startup identity rehabilitation remains checked. Edit/erase/cancel, FDN dial permission and connected FDN calls are not promoted.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_fdn_write.lua", "tools/nsb7_fdn_read.lua", "tools/nsb7_fdn_write_wrong.lua", "tools/nsb7_fdn_record_check.py", "tools/test_nsb7_fdn_record_check.py", "tools/sim_fdn_protocol_check.py"]
+    },
+    {
       "id": "nsb7_physical_fdn_on_cold_off_cycle",
       "owner": "nsb7_sim_security", "status": "satisfied",
       "predicate": "An explicit FDN-capable card supports physical PIN2-authorized On/Off with independent cold persistence",
