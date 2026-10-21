@@ -64,8 +64,8 @@ make build
 Use a fresh run directory for the erased-storage baseline. The checker pins
 own source bytes, sampled continuation/shared state and exact RGB failure
 pixels. It does not test task messages, input, native DSP or phone services.
-The own native-upload evidence is separate below; startup self-test consumers
-remain open.
+The own native-upload and transport-HLE evidence below remain separate from
+this normal-machine baseline.
 A sibling's working HLE or EEPROM is not evidence for those contracts.
 
 ## Own identity-6 native upload boundary
@@ -105,5 +105,50 @@ runtime handshake. No substitute opcode, return or runtime HLE is enabled.
 
 The fresh-directory runner requires the ordered native publications and
 controlled missing-code stop. The MCU failure-frame baseline remains separate.
-Next recover startup self-test consumers and the post-upload transport
-contract; native continuation itself requires an authentic resident source.
+Native continuation itself requires an authentic resident source; the
+separate runtime HLE contract below does not remove that boundary.
+
+## Runtime transport and compact self-test
+
+`nsb7hle` explicitly suspends native execution at `2c75` after the own
+uploads, then enables shared service transport and request-correlated D0
+discovery. It emits `1eff00d000030101e000`, consumes the D0/04 response and
+acknowledges it with `1e0200d0000305014100`. Setup requests `13/14/15/16`
+precede `70:0d00`.
+
+The own class dispatcher `24b81a..24b844` resolves class `74` and calls
+`248b00` at `24b856`. Its command cascade selects `0d` at `248b74`.
+Flag `13fde1` bit 2 arms this path; it cancels timer `19`, clears fault
+index `0f`, and consumes reply byte `+9` bits 0/1 for fault indices `10/11`.
+That contract qualifies the existing compact request-correlated `74:0d00`
+HLE response, not a silicon measurement or security-record verdict.
+
+Runtime observation sees flags `84` and faults `ff,ff,ff` at consumer entry,
+then flags `80` and faults `00,00,00` at the join `248c28`. Firmware submits
+the `0a09` follow-up before that traced join. Neither the transport nor this
+consumer result establishes idle: the display still shows CONTACT SERVICE.
+
+The remaining concrete failure is independent of the three cleared faults.
+Writer `248948` sets fault index `0c` to `0c` after checksum comparison
+`24892c..24893e`: computed `bd42`, stored logical record `1e0=ffff`, and
+logical record `170=ffff`. Helper `2486dc` sums the `c0` bytes read from
+logical record `120`. These are record identifiers, not physical flash
+addresses. The unprovisioned comparison fails equality; the separate nonzero
+guard would pass for these values. This is not evidence for another missing
+DSP reply.
+
+```sh
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame \
+  --run-dir tmp/nsb7-service -- nsb7hle -rompath ../roms -video none \
+  -sound none -nothrottle -seconds_to_run 9 -log -verbose \
+  -autoboot_delay 0 -autoboot_script ../tools/nsb7_service_observe.lua
+.venv/bin/python tools/nsb7_service_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-service
+```
+
+The observer is bounded and read-only. The checker requires the native
+handoff, discovery, actual response consumption and still-failing own
+checksum comparison; it cannot pass as normal-machine boot acceptance.
+Next map the firmware-owned record contents and their physical storage/update
+contract. Do not transplant another product's PMM, force the fault clear, or
+answer an unobserved identity/record query to bypass this check.

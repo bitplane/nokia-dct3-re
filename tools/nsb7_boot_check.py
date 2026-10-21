@@ -14,6 +14,8 @@ SAMPLE = re.compile(r'nsb7_boot: pc=([0-9a-f]{8}) lr=([0-9a-f]{8}) cpsr=([0-9a-f
 
 
 def check_trace(text):
+    if re.findall(r'nsb7_profile: machine=(\w+) observer_writes=0', text) != ['noki8290']:
+        raise ValueError('requires the normal fail-closed NSB-7 profile')
     rows = SAMPLE.findall(text)
     if len(rows) != 5 or len(rows) != text.count('nsb7_boot:'):
         raise ValueError('bounded observer inventory differs')

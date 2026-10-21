@@ -1,6 +1,7 @@
 -- Bounded read-only NSB-7 bring-up observation, not phone acceptance.
 local machine=manager.machine
-assert(machine.system.name=='noki8290','NSB-7 profile required')
+assert(machine.system.name=='noki8290' or machine.system.name=='nsb7hle','NSB-7 MCU observation profile required')
+machine:logerror('nsb7_profile: machine='..machine.system.name..' observer_writes=0\n')
 local cpu=machine.devices[':maincpu']
 local memory=cpu.spaces.program
 local observer=coroutine.create(function()

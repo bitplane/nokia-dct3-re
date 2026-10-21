@@ -1080,6 +1080,20 @@ constexpr nokia_product_config make_8290_config()
 }
 constexpr nokia_product_config PRODUCT_8290 = make_8290_config();
 
+constexpr nokia_product_config make_8290_upload_config()
+{
+	nokia_product_config result = PRODUCT_8290;
+	result.dsp_reset_wiring = { 0x10, 0x01 };
+	// Own compiled identity-6 branch, not a fitted resident mask.
+	result.dsp_bootstrap = {
+		nokia_dsp_hle_device::bootstrap_exchange_strategy::ping_pong,
+		0, {}, 0, std::nullopt,
+		nokia_dsp_hle_device::bootstrap_parked_contract { 0x004, 0xffff, 6 }, 0
+	};
+	return result;
+}
+constexpr nokia_product_config PRODUCT_8290_UPLOAD = make_8290_upload_config();
+
 constexpr nokia_product_config make_8850_config()
 {
 	nokia_product_config result = make_8xxx_config();
@@ -1365,6 +1379,7 @@ public:
 	void noki8xxx(machine_config &config);
 	void noki8290(machine_config &config);
 	void nsb7stage(machine_config &config);
+	void nsb7hle(machine_config &config);
 	void noki8850(machine_config &config);
 	void nsm2stage(machine_config &config);
 	void nsm2hle(machine_config &config);
@@ -3895,20 +3910,27 @@ void nokia_dct3_state::noki8290(machine_config &config)
 void nokia_dct3_state::nsb7stage(machine_config &config)
 {
 	noki8290(config);
-	nokia_product_config research = PRODUCT_8290;
-	research.dsp_reset_wiring = { 0x10, 0x01 };
-	// Six selects the own identity-6 fragment, not an acquired resident mask.
-	research.dsp_bootstrap = {
-		nokia_dsp_hle_device::bootstrap_exchange_strategy::ping_pong,
-		0, {}, 0, std::nullopt,
-		nokia_dsp_hle_device::bootstrap_parked_contract { 0x004, 0xffff, 6 }, 0
-	};
-	apply_product_config(research);
+	apply_product_config(PRODUCT_8290_UPLOAD);
 	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
 	staged.set_program_fragment(0x11dcac);
 	staged.set_loader2_source(0x11ddd8, 623);
 	staged.set_loader_control_address(0x0880);
 	staged.set_cycle_guard_for_loader(true);
+}
+
+void nokia_dct3_state::nsb7hle(machine_config &config)
+{
+	nsb7stage(config);
+	nokia_product_config runtime = PRODUCT_8290_UPLOAD;
+	// Own 24b840 class-74 route calls 248b00. Command 0d at 248b74
+	// cancels timer 19 and consumes reply +9 bits 0/1 as fault results.
+	runtime.dsp_service = true;
+	runtime.external_service_transport = true;
+	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
+	apply_product_config(runtime);
+	auto *const staged = subdevice<nokia_dsp_staged_device>("dsp_staged");
+	staged->set_observe_after_missing_code(true);
+	staged->set_runtime_hle_after_loader(true);
 }
 
 void nokia_dct3_state::nsm2stage(machine_config &config)
@@ -5020,6 +5042,7 @@ ROM_START( noki8290 )
 ROM_END
 
 #define rom_nsb7stage rom_noki8290
+#define rom_nsb7hle rom_noki8290
 
 ROM_START( noki8850 )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
@@ -5274,6 +5297,7 @@ SYST( 1999, nsm3stage, noki8210, 0, nsm3stage, noki3310, nokia_dct3_state, empty
 SYST( 1999, nsm3hle, noki8210, 0, nsm3hle, noki8210, nokia_dct3_state, empty_init, "Nokia", "8210 native uploads with runtime HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8290, 0,      0,      noki8290, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8290 (NSB-7 research, no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nsb7stage, noki8290, 0, nsb7stage, noki3310, nokia_dct3_state, empty_init, "Research", "NSB-7 own identity-6 staged uploads (resident DSP undumped)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, nsb7hle, noki8290, 0, nsb7hle, noki3310, nokia_dct3_state, empty_init, "Research", "NSB-7 own uploads with runtime transport HLE", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8850, 0,      0,      noki8850, noki8850, nokia_dct3_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2stage, noki8850, 0, nsm2stage, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2hle, noki8850, 0, nsm2hle, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
