@@ -20,6 +20,8 @@ def measurement_trace():
     cursor = sum((length+3)//2 for length in LENGTHS) % 0x52
     producer = (cursor+81) % 0x52
     return trace() + '\n' + '\n'.join([
+        'nsb7_candidate_object: index=1 type=56 length=160 words=' + ','.join(['0258'] + ['ffff']*79) +
+        ' t=3 observer_writes=0',
         f'nsb7_radio_tx: index=30 type=56 length=160 data=0258' + 'ff'*158 +
         f' cursor={cursor:02x} producer={producer:02x} pc=002cb0ec t=3.5 observer_writes=0',
         'nsb7_radio_rx: index=1 type=8e length=10 t=1 observer_writes=0',
@@ -31,6 +33,14 @@ def measurement_trace():
 
 
 class RadioInventoryTests(unittest.TestCase):
+    def test_runtime_bootstrap_alias_corruption_rejected(self):
+        payload = '0258' + 'ff'*158
+        corrupted = payload[:49*4] + '0006' + payload[50*4:]
+        with self.assertRaises(ValueError):
+            check_trace(measurement_trace().replace(payload, corrupted), True)
+        with self.assertRaises(ValueError):
+            check_trace(measurement_trace().replace('nsb7_candidate_object:', 'missing_object:'), True)
+
     def test_measurement_reaches_own_consumer_without_extra_responses(self):
         check_trace(measurement_trace(), True)
         for old, new in [('task=13', 'task=12'), ('first=0258', 'first=0001'),

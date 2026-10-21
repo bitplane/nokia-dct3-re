@@ -41,6 +41,7 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_service_control_completion_sent));
 	save_item(NAME(m_service_code_block_published));
 	save_item(NAME(m_bootstrap_exchange_count));
+	save_item(NAME(m_runtime_packets_started));
 	save_item(NAME(m_mcu_control_word));
 	save_item(NAME(m_mcu_control_wire));
 	save_item(NAME(m_applied_parameters));
@@ -101,6 +102,7 @@ void nokia_dsp_hle_device::device_reset()
 	m_service_control_completion_sent = false;
 	m_service_code_block_published = false;
 	m_bootstrap_exchange_count = 0;
+	m_runtime_packets_started = false;
 	m_mcu_control_word = 0;
 	m_mcu_control_wire = 0;
 	m_applied_parameters.fill(0);
@@ -216,6 +218,8 @@ void nokia_dsp_hle_device::tx_commit_w(int state)
 {
 	if (!m_powered || native_owns_transport())
 		return;
+	if (state)
+		m_runtime_packets_started = true;
 	if (state && (m_external_service_enabled || m_radio_peer->enabled() ||
 			m_service_control.enabled()))
 		m_packet_timer->adjust(attotime::from_usec(100));
@@ -275,6 +279,11 @@ void nokia_dsp_hle_device::handle_bootstrap_parked_write(
 		u16 callback_offset)
 {
 	if (!m_powered || native_owns_transport())
+		return;
+	// Runtime TX reuses the bootstrap cell as ring storage. Firmware may
+	// assert the native DSP reset line during HLE operation, so native-core
+	// ownership is not sufficient to distinguish bootstrap from packet data.
+	if (m_runtime_packets_started)
 		return;
 	if (!m_bootstrap.parked)
 		return;

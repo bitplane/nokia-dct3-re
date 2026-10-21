@@ -87,8 +87,11 @@ def check_trace(text, measurement=False):
     if inventory[28] != (0x55, bytes.fromhex('03050000')):
         raise ValueError('initial own scan-control request differs')
     if measurement:
-        if inventory[29][1][:2] != bytes.fromhex('0258'):
-            raise ValueError('organic candidate request did not retain carrier 600')
+        if inventory[29][1] != bytes.fromhex('0258' + 'ff'*158):
+            raise ValueError('organic candidate request differs from the single-cell candidate list')
+        objects = re.findall(r'nsb7_candidate_object: index=1 type=56 length=160 words=([0-9a-f,]+) ', text)
+        if len(objects) != 1 or objects[0].split(',') != ['0258'] + ['ffff']*79:
+            raise ValueError('pre-transport candidate object is missing or differs')
         replies = re.findall(r'nsb7_radio_rx: index=(\d+) type=([0-9a-f]{2}) length=(\d+) ', text)
         # Two existing external-service 8e frames precede the sole RF reply.
         if replies != [('1', '8e', '10'), ('2', '8e', '10'), ('3', '8b', '166')]:

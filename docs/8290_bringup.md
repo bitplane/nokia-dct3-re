@@ -602,6 +602,20 @@ reproduces its original 29-packet inventory.
 
 Own constructor `2b6848` allocates 164 bytes, writes type `56` and payload
 length 160, and fills that payload with `ff` before returning to its
-callers. Decode those callers and their populated request fields before
+callers. The single-cell fixture sends `0258` followed by 79 unused
+`ffff` words. The observer captures the object at sender `2b6880`, before
+the ring writer, and the checker requires the complete transmitted payload.
+
+The bootstrap identity cell at shared byte offset `004` is reused by the
+runtime TX ring. With packet start cursor `22`, candidate word 49 maps to
+that cell: `(0x22 + 1 + 49) % 0x52 == 2`. Continuing to answer sentinel
+writes there changes an unused `ffff` candidate to identity value `0006`.
+The HLE retires the parked bootstrap responder after its first runtime TX
+commit; this phase is saved and cleared by device reset. Native ownership
+alone is insufficient: firmware asserts the native DSP reset line again
+while runtime HLE remains in use. This is a bootstrap/runtime ownership
+correction, not a candidate-payload special case.
+
+Decode the callers and their populated request fields before
 extending peer coverage. Channel confirmation, traffic release, neighbours,
 authentication and registration remain unestablished on this handset.

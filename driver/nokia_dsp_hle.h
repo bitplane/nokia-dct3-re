@@ -206,6 +206,7 @@ private:
 	bool m_service_control_completion_sent = false;
 	bool m_service_code_block_published = false;
 	unsigned m_bootstrap_exchange_count = 0;
+	bool m_runtime_packets_started = false;
 	bootstrap_contract m_bootstrap;
 	u16 m_mcu_control_word = 0;
 	u16 m_mcu_control_wire = 0;

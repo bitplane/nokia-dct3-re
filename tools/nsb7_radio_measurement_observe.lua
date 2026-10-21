@@ -31,6 +31,19 @@ for _,pc in ipairs({0x2e5258,0x2a3704}) do
     end)
 end
 local classes=0
+local candidates=0
+taps[#taps+1]=memory:install_read_tap(0x2b6880,0x2b6883,'nsb7_candidate_before_transport',function()
+    if cpu.state['R15'].value~=0x2b6880 or candidates>=16 then return end
+    local object=cpu.state['R0'].value
+    if object<0x100000 or object>=0x17ff00 then return end
+    candidates=candidates+1
+    local words={}
+    for index=0,79 do
+        words[#words+1]=string.format('%04x',memory:read_u16(object+4+index*2))
+    end
+    machine:logerror(string.format('nsb7_candidate_object: index=%d type=%02x length=%u words=%s t=%.9f observer_writes=0\n',
+        candidates,memory:read_u8(object+3),memory:read_u8(object+2),table.concat(words,','),machine.time:as_double()))
+end)
 taps[#taps+1]=memory:install_read_tap(0x2c7fcc,0x2c7fcf,'nsb7_measured_channel_class',function()
     if cpu.state['R15'].value~=0x2c7fcc or machine.time:as_double()<3.4 or classes>=32 then return end
     local channel=cpu.state['R5'].value
