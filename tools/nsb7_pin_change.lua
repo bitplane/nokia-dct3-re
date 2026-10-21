@@ -1,9 +1,10 @@
--- Ordinary PIN1 change via the observed 4-6-5 physical menu path.
+-- Physical Access codes workflow; menu details stay in the test harness.
 _G.nsb7_correct_pin=true
 _G.nsb7_pin_continue=true
 local source=debug.getinfo(1,'S').source:sub(2)
 dofile(assert(source:match('^(.*[/\\])'))..'nsb7_pin_input.lua')
 local machine=manager.machine
+local pin2=_G.nsb7_pin2_change==true
 local fields={}
 for _,port in pairs(machine.ioport.ports) do
     for _,field in pairs(port.fields) do fields[field.name]=field end
@@ -13,11 +14,14 @@ local input=coroutine.create(function()
     for index,digit in ipairs({'1','2','3','4','5'}) do steps[#steps+1]={15+index,'Keypad '..digit,'phone'} end
     steps[#steps+1]={21,'Left Softkey / Menu','phone'}
     for _,step in ipairs({{26,'Left Softkey / Menu','menu'},{28,'Keypad 4','menu'},
-            {30,'Keypad 6','menu'},{32,'Keypad 5','menu'},{35,'Left Softkey / Menu','menu'}}) do
+            {30,'Keypad 6','menu'},{32,'Keypad 5','menu'}}) do
         steps[#steps+1]=step
     end
-    for _,phase in ipairs({{'old',_G.nsb7_change_old or '1234',38},
-            {'new','4321',45},{'confirm','4321',52}}) do
+    if pin2 then steps[#steps+1]={34,'Keypad 2','menu'} end
+    steps[#steps+1]={35,'Left Softkey / Menu','menu'}
+    local old=_G.nsb7_change_old or (pin2 and '5678' or '1234')
+    local new=_G.nsb7_change_new or (pin2 and '8765' or '4321')
+    for _,phase in ipairs({{'old',old,38},{'new',new,45},{'confirm',new,52}}) do
         for index=1,4 do steps[#steps+1]={phase[3]+index-1,'Keypad '..phase[2]:sub(index,index),phase[1]} end
         steps[#steps+1]={phase[3]+4,'Left Softkey / Menu',phase[1]}
     end

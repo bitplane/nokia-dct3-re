@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_physical_pin2_change_rejection_cold_reuse",
+      "owner": "nsb7_sim_security", "status": "satisfied",
+      "predicate": "Physical PIN2 change targets CHV2, isolates failed-attempt accounting and authenticates the saved new PIN2 after a cold restart",
+      "current": "Own menu4-6-5-2 prompts Current PIN2 code. Physical5678/new8765/confirmation sends A024000210...;9000 and exact PIN2 code changed pixels accompany only four changed PIN2 bytes. Independent current1111 returns9804/Code error and changes only PIN2 retries3->2; PIN1 remains unchanged. A cold saved-card process uses8765 to change PIN2 back5678, restoring the complete original card. Shared input parser, explicit second retry fields, own journals and complete card pairs pass. PUK2, FDN/AoC and PIN2 save-state claims remain separate.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_pin_change.lua", "tools/nsb7_pin2_change.lua", "tools/nsb7_pin2_wrong.lua", "tools/nsb7_pin2_restore.lua", "tools/nsb7_pin2_check.py", "tools/test_nsb7_pin2_check.py"]
+    },
+    {
       "id": "nsb7_physical_ordinary_pin_change_cold_reuse",
       "owner": "nsb7_sim_security", "status": "satisfied",
       "predicate": "Physical ordinary PIN1 change persists only the new credential, rejects a wrong current PIN and permits cold new-PIN authentication",

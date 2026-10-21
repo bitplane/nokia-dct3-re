@@ -18,7 +18,8 @@ PIN, saved retry decrement and cold correct-PIN recovery to the phone-code
 prompt. Physical PIN exhaustion, failed-PUK retry, PUK recovery with a new
 PIN and cold replacement-PIN acceptance are also qualified. Physical
 SIM-card-security Off/On, cold PIN-request behavior and ordinary PIN1
-change/rejection/cold reuse pass; PIN2 remains separate work.
+change/rejection/cold reuse pass. PIN2 change, rejected-current-PIN2
+isolation and cold reuse also pass; PUK2 remains separate work.
 A physical SIM phonebook save and cold Details retrieval are qualified.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
@@ -1712,3 +1713,34 @@ authentication, CHANGE CHV after final confirmation, exact success/error
 statuses and pixels, own flash journals and complete initial/final cards
 for both controls and cold reuse. This ordinary CHANGE CHV result is
 independent of the earlier PUK-based replacement-PIN recovery.
+
+### Physical PIN2 change, retry isolation and cold reuse
+
+The own `4 -> 6 -> 5 -> 2` leaf is `Change PIN2 code` and prompts
+`Current PIN2 code`. `tools/nsb7_pin2_change.lua` composes the shared
+physical Access codes harness with old PIN2 `5678`, new `8765` and its
+confirmation. The firmware sends `A0 24 00 02 10` plus the two padded
+credentials, receives `9000` and displays `PIN2 code changed`.
+Only PIN2's four credential bytes change; PIN1, both PUKs, retries,
+enabled state and all files remain unchanged.
+
+The independent `tools/nsb7_pin2_wrong.lua` control uses current PIN2
+`1111`: CHANGE CHV returns `9804` and its own exact `Code error` frame.
+Only PIN2 retries change `3 -> 2`; PIN1 retries remain 3 and neither
+credential changes. `tools/nsb7_pin2_restore.lua` starts a new process
+with the successful run's complete saved card, authenticates using
+PIN2 `8765` and changes it back to `5678`. The entire final card equals
+the original declared enabled card. PIN1 authentication still happens
+independently at startup in every run.
+
+```sh
+.venv/bin/python tools/nsb7_pin2_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin2-wrong \
+  tmp/nsb7-pin2-change tmp/nsb7-pin2-cold
+```
+
+Acceptance reuses the observed physical change parser with selector 2,
+adds explicit PIN2/PUK2 retry accounting, complete initial/final card
+comparisons and exact PIN2 success/error frames. The shared PIN1 branch
+is separately rerun. This does not establish PIN2 exhaustion, PUK2,
+FDN/AoC authorization or PIN2-specific save-state restoration.

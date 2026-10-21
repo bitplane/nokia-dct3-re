@@ -7,13 +7,16 @@ from tools.sim_security_trace_check import CHV_OFFSET, ATTEMPTS_OFFSET, padded_p
 from tools.test_nsb7_pin_check import fixture as pin_fixture
 
 
-def fixture(wrong):
-    old = '1111' if wrong else '1234'
+def fixture(wrong, pin2=False, old=None, new=None):
+    old = old if old is not None else ('1111' if wrong else '5678' if pin2 else '1234')
+    new = new if new is not None else ('8765' if pin2 else '4321')
     steps = [(16+i, 'Keypad '+digit, 'phone') for i, digit in enumerate('12345')]
     steps += [(21, 'Left Softkey / Menu', 'phone'), (26, 'Left Softkey / Menu', 'menu'),
-              (28, 'Keypad 4', 'menu'), (30, 'Keypad 6', 'menu'), (32, 'Keypad 5', 'menu'),
-              (35, 'Left Softkey / Menu', 'menu')]
-    for phase, digits, start in [('old', old, 38), ('new', '4321', 45), ('confirm', '4321', 52)]:
+              (28, 'Keypad 4', 'menu'), (30, 'Keypad 6', 'menu'), (32, 'Keypad 5', 'menu')]
+    if pin2:
+        steps.append((34, 'Keypad 2', 'menu'))
+    steps.append((35, 'Left Softkey / Menu', 'menu'))
+    for phase, digits, start in [('old', old, 38), ('new', new, 45), ('confirm', new, 52)]:
         steps += [(start+i, 'Keypad '+digit, phase) for i, digit in enumerate(digits)]
         steps.append((start+4, 'Left Softkey / Menu', phase))
     lines = [pin_fixture(True)]
@@ -22,9 +25,9 @@ def fixture(wrong):
         lines += [f'nsb7_change_input: phase={phase} key={key} state=1 t={second}.000000000',
                   f'nsb7_key_decode: key={code:02x} observer_writes=0']
         if second == 56:
-            apdu = bytes.fromhex('a024000110') + padded_pin(old) + padded_pin('4321')
+            apdu = bytes((0xa0, 0x24, 0, 2 if pin2 else 1, 16)) + padded_pin(old) + padded_pin(new)
             lines += [f'nsb7_sim_tx: index={i} value={byte:02x}' for i, byte in enumerate(apdu, 1)]
-            lines.append(f'SIM status ins=24 sw={"9804" if wrong else "9000"} chv={2 if wrong else 3}/3 puk=10/10 enabled=1')
+            lines.append(f'SIM status ins=24 sw={"9804" if wrong else "9000"} chv={3 if pin2 else 2 if wrong else 3}/{2 if pin2 and wrong else 3} puk=10/10 enabled=1')
         lines.append(f'nsb7_change_input: phase={phase} key={key} state=0 t={second}.200000000')
     return '\n'.join(lines + ['nsb7_change_input: complete'])
 

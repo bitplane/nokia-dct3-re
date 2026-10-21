@@ -13,15 +13,18 @@ from tools.nsb7_storage_check import inspect
 from tools.sim_security_trace_check import statuses, CHV_OFFSET, ATTEMPTS_OFFSET, padded_pin
 
 
-def check_change(text, wrong):
+def check_change(text, wrong, *, pin2=False, old=None, new=None, remaining=None):
     if '[LUA ERROR]' in text or 'nsb7_change_input: complete' not in text:
         raise ValueError('change-PIN fixture incomplete')
     steps = [(16+i, 'Keypad '+digit, 'phone') for i, digit in enumerate('12345')]
     steps += [(21, 'Left Softkey / Menu', 'phone'), (26, 'Left Softkey / Menu', 'menu'),
-              (28, 'Keypad 4', 'menu'), (30, 'Keypad 6', 'menu'), (32, 'Keypad 5', 'menu'),
-              (35, 'Left Softkey / Menu', 'menu')]
-    old = '1111' if wrong else '1234'
-    for phase, digits, start in [('old', old, 38), ('new', '4321', 45), ('confirm', '4321', 52)]:
+              (28, 'Keypad 4', 'menu'), (30, 'Keypad 6', 'menu'), (32, 'Keypad 5', 'menu')]
+    if pin2:
+        steps.append((34, 'Keypad 2', 'menu'))
+    steps.append((35, 'Left Softkey / Menu', 'menu'))
+    old = old if old is not None else ('1111' if wrong else '5678' if pin2 else '1234')
+    new = new if new is not None else ('8765' if pin2 else '4321')
+    for phase, digits, start in [('old', old, 38), ('new', new, 45), ('confirm', new, 52)]:
         steps += [(start+i, 'Keypad '+digit, phase) for i, digit in enumerate(digits)]
         steps.append((start+4, 'Left Softkey / Menu', phase))
     rows = list(re.finditer(r'nsb7_change_input: phase=(\w+) key=(.*?) state=([01]) t=([0-9.]+)', text))
@@ -34,11 +37,15 @@ def check_change(text, wrong):
         if f'nsb7_key_decode: key={code:02x} observer_writes=0' not in text[rows[2*index].end():rows[2*index+1].start()]:
             raise ValueError('change-PIN contact did not decode')
     check_pin(text.split('nsb7_change_input: phase=menu', 1)[0], True)
-    if statuses(text, 0x24) != [(0x9804 if wrong else 0x9000, 2 if wrong else 3, 10)]:
+    remaining = remaining if remaining is not None else (2 if wrong else 3)
+    result = (0x9840 if remaining == 0 else 0x9804) if wrong else 0x9000
+    if statuses(text, 0x24) != [(result, 3 if pin2 else remaining, 10)]:
         raise ValueError('CHANGE CHV outcome/retries differ')
+    if pin2 and re.findall(r'SIM status ins=24 sw=[0-9a-f]{4} chv=3/(\d+) puk=10/(\d+) enabled=1', text) != [(str(remaining), '10')]:
+        raise ValueError('PIN2/PUK2 retry accounting differs')
     if any(statuses(text, instruction) for instruction in (0x26, 0x28, 0x2c)):
         raise ValueError('unrelated security mutation')
-    command = bytes.fromhex('a024000110') + padded_pin(old) + padded_pin('4321')
+    command = bytes((0xa0, 0x24, 0, 2 if pin2 else 1, 16)) + padded_pin(old) + padded_pin(new)
     wire = tx_bytes(text)
     if wire.count(command) != 1 or command not in tx_bytes(text[rows[-2].end():]) or b'\xa0\xdc' in wire:
         raise ValueError('CHANGE CHV must follow confirmation without file writes')
