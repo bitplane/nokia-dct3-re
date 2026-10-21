@@ -976,6 +976,8 @@ u8 nokia_radio_peer_device::next_report_type() const
 	case phase::candidate_channel_change:
 		return m_reports_remaining == 2 ? 0x8f : 0x89;
 	case phase::serving_bcch:
+		if (m_protocol.coverage == acquisition_coverage::candidate_bcch)
+			return 0x80;
 		if (m_registered || m_idle_common_control_active)
 			return (m_reports_remaining % 3) == 1 ? 0x83 : 0x80;
 		return (m_reports_remaining & 1) == 0 ? 0x80 : 0x83;
@@ -1653,7 +1655,7 @@ bool nokia_radio_peer_device::handle_acquisition_packet(
 			(uses_candidate_window() &&
 				current_phase() == phase::candidate_measurement &&
 				(m_reports_remaining == 1 ||
-				 (m_protocol.coverage == acquisition_coverage::candidate_channel &&
+				 (m_protocol.coverage >= acquisition_coverage::candidate_channel &&
 				  m_reports_remaining == 0)))))
 	{
 		const bool active_candidate_window =
@@ -1753,7 +1755,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			if (request == search_request::candidate_window)
 				handle_search_request(request);
 		}
-		else if (m_protocol.coverage == acquisition_coverage::candidate_channel &&
+		else if (m_protocol.coverage >= acquisition_coverage::candidate_channel &&
 				packet.type == 0x02 && packet.length == 20 && packet.payload[0] == 4)
 		{
 			// The own channel handler commits cached receiver state on 89.
@@ -2843,6 +2845,14 @@ void nokia_radio_peer_device::emit_report()
 			m_reports_remaining = 0;
 			m_wait_ticks = 0;
 			m_report_deferred = false;
+		}
+		if (m_protocol.coverage == acquisition_coverage::candidate_bcch && report_type == 0x89)
+		{
+			// This product establishes BCCH directly after the receiver
+			// acknowledgement, not the sibling's unsolicited RA-info report.
+			set_phase(phase::serving_bcch);
+			m_reports_remaining = serving_cycle_reports();
+			m_wait_ticks = 59;
 		}
 	}
 	m_transport->notify_rx();

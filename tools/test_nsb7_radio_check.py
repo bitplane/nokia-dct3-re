@@ -59,7 +59,38 @@ def channel_trace():
         'nsb7_channel_state: cached=00000000 channel=0258 mode=50 bsic=12 t=6.000000000 observer_writes=0'])
 
 
+def bcch_trace():
+    rows = [line for line in channel_trace().splitlines() if not line.startswith(
+        ('nsb7_radio_tx: index=32 ', 'nsb7_radio_tx: index=33 '))]
+    cursor = (sum((length+3)//2 for length in LENGTHS) + 81 + 11) % 0x52
+    rows.append(f'nsb7_radio_tx: index=32 type=02 length=20 data=041202090000001060000258' + '00'*8 +
+                f' cursor={cursor:02x} producer={(cursor+11)%0x52:02x} pc=002cb0ec t=8 observer_writes=0')
+    for index, kind in enumerate([0x1a, 0x1b, 0x1c, 0x1a, 0x1a, 0x1b, 0x1c, 0x19], 6):
+        block = bytearray(24)
+        block[:3] = bytes([0x49, 6, kind])
+        if kind == 0x1b:
+            block[3:10] = bytes.fromhex('000100f1100001')
+        rows.append(f'nsb7_radio_rx: index={index} type=80 length=34 t=7 observer_writes=0')
+        for pc, task, tag in [('002e4e96', 4, '1802'), ('0029d42c', 17, '07ff')]:
+            rows.append(f'nsb7_bcch: pc={pc} task={task} tag={tag} mode=50 error=00 channel=0258 '
+                        f'block={block.hex()} flags=00 t=7 observer_writes=0')
+    rows.append('nsb7_bcch_flags: flags=0f pc=0029d5ae t=8 observer_writes=0')
+    return '\n'.join(rows)
+
+
 class RadioInventoryTests(unittest.TestCase):
+    def test_bcch_reaches_own_si_parser_and_ccch_request(self):
+        check_trace(bcch_trace(), bcch=True)
+        for old, new in [('flags=0f pc=0029d5ae', 'flags=0e pc=0029d5ae'),
+                         ('pc=0029d42c task=17', 'pc=0029d42c task=13'),
+                         ('tag=07ff mode=50', 'tag=07fe mode=50'),
+                         ('block=49061b000100f1100001', 'block=49061b000100f1100002'),
+                         ('041202090000001060000258', '041202090000001050000258')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_trace(bcch_trace().replace(old, new), bcch=True)
+        with self.assertRaises(ValueError):
+            check_trace(bcch_trace() + '\nnsb7_radio_rx: index=14 type=89 length=8 t=9', bcch=True)
+
     def test_channel_ack_commits_config_without_bcch_continuation(self):
         check_trace(channel_trace(), channel=True)
         for old, new in [('bit=00 cached=', 'bit=01 cached='),
@@ -119,6 +150,9 @@ class RadioInventoryTests(unittest.TestCase):
         self.assertEqual(report['rx_80']['subtype40_gate_address'], '00130784')
         self.assertEqual(report['rx_80']['candidate_channel_payload_offsets'], [6, 7])
         self.assertEqual(report['rx_80']['success_record_state'], 4)
+        self.assertEqual(report['rx_80']['bcch_task'], 17)
+        self.assertEqual(report['rx_80']['bcch_block_payload_offset'], 10)
+        self.assertEqual(report['rx_80']['complete_si_bitmap'], 15)
         self.assertEqual(report['payload_prefix_bytes'], 4)
         self.assertEqual(report['classified_inputs'], 65536)
         self.assertEqual(report['ranges'], [

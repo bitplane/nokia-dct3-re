@@ -44,7 +44,8 @@ public:
 		full,
 		band_measurements,
 		candidate_synchronization,
-		candidate_channel
+		candidate_channel,
+		candidate_bcch
 	};
 
 	enum class neighbour_arfcn_encoding : u8

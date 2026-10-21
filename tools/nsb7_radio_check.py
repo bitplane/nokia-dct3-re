@@ -75,6 +75,10 @@ def contract(image):
                       'candidate_update': '0028734c',
                       'success_record_state': 4,
                       'sch_bsic_payload_offset': 10,
+                      'bcch_forwarder': '002e4e96', 'bcch_task': 17,
+                      'bcch_tag': '07ff', 'bcch_parser': '0029d42c',
+                      'bcch_block_payload_offset': 10, 'bcch_block_bytes': 24,
+                      'si_state': '0012d790', 'complete_si_bitmap': 15,
                       'subtype_handlers': {'40': '002e4f8a', '50': '002e4e96',
                                            '60': '002e4d24', '70': '002e4b86',
                                            '80': '002e49e6', 'a0': '002e4f52',
@@ -84,7 +88,8 @@ def contract(image):
             'scope': 'decoded software classes, not fitted RF-band proof'}
 
 
-def check_trace(text, measurement=False, synchronization=False, channel=False):
+def check_trace(text, measurement=False, synchronization=False, channel=False, bcch=False):
+    channel = channel or bcch
     synchronization = synchronization or channel
     measurement = measurement or synchronization
     check_security(text)
@@ -109,7 +114,10 @@ def check_trace(text, measurement=False, synchronization=False, channel=False):
     if synchronization:
         expected_types += (0x02,)
         expected_lengths += (20,)
-    if channel:
+    if bcch:
+        expected_types += (0x02,)
+        expected_lengths += (20,)
+    elif channel:
         expected_types += (0x03, 0x55)
         expected_lengths += (0, 4)
     if tuple(kind for kind, _ in inventory) != expected_types or tuple(len(payload) for _, payload in inventory) != expected_lengths:
@@ -135,6 +143,8 @@ def check_trace(text, measurement=False, synchronization=False, channel=False):
             expected_replies.append(('4', '80', '14'))
         if channel:
             expected_replies.append(('5', '89', '8'))
+        if bcch:
+            expected_replies.extend((str(index), '80', '34') for index in range(6, 14))
         if replies != expected_replies:
             raise ValueError('qualified acquisition RX scope differs')
         consumers = re.findall(r'nsb7_measurement: pc=([0-9a-f]{8}) task=(\d+) type=([0-9a-f]{2}) first=([0-9a-f]{4}) '
@@ -160,7 +170,7 @@ def check_trace(text, measurement=False, synchronization=False, channel=False):
         if 'nsb7_sch_candidate_commit: channel=0258 flags=a4 bsic=12 ' not in text:
             raise ValueError('firmware did not settle the synchronized candidate record')
     if channel:
-        if inventory[31:] != [(0x03, b''), (0x55, bytes.fromhex('04080000'))]:
+        if not bcch and inventory[31:] != [(0x03, b''), (0x55, bytes.fromhex('04080000'))]:
             raise ValueError('unanswered BCCH timeout tail differs')
         if 'nsb7_channel_cached: descriptor=00000000 data=045000000000120002580000 live_channel=0000 live_mode=00 ' not in text:
             raise ValueError('own receiver configuration was not cached before acknowledgement')
@@ -168,6 +178,22 @@ def check_trace(text, measurement=False, synchronization=False, channel=False):
             raise ValueError('channel acknowledgement did not reach the own pending-config consumer')
         if 'nsb7_channel_state: cached=00000000 channel=0258 mode=50 bsic=12 t=6.000000000 ' not in text:
             raise ValueError('channel acknowledgement did not commit the own receiver state')
+    if bcch:
+        if inventory[31][1][:12] != bytes.fromhex('041202090000001060000258'):
+            raise ValueError('complete SI did not yield the own CCCH receiver request')
+        rows = re.findall(r'nsb7_bcch: pc=([0-9a-f]{8}) task=(\d+) tag=([0-9a-f]{4}) '
+                          r'mode=50 error=00 channel=0258 block=([0-9a-f]{48}) flags=[0-9a-f]{2} ', text)
+        broker = [row[3] for row in rows if row[:2] == ('002e4e96', '4')]
+        consumer = [row[3] for row in rows if row[:3] == ('0029d42c', '17', '07ff')]
+        if len(rows) != 16 or len(broker) != 8 or broker != consumer:
+            raise ValueError('BCCH blocks did not traverse the own task-17 consumer unchanged')
+        blocks = [bytes.fromhex(block) for block in consumer]
+        if any(block[1] != 6 for block in blocks) or {block[2] for block in blocks} != {0x19, 0x1a, 0x1b, 0x1c}:
+            raise ValueError('own consumer did not receive the complete RR system-information family')
+        if any(block[3:10] != bytes.fromhex('000100f1100001') for block in blocks if block[2] == 0x1b):
+            raise ValueError('SI3 laboratory cell identity or LAI differs')
+        if 'nsb7_bcch_flags: flags=0f pc=0029d5ae ' not in text:
+            raise ValueError('own SI parser did not complete its bitmap')
 
 
 def main():
@@ -178,11 +204,12 @@ def main():
     parser.add_argument('--measurement', action='store_true')
     parser.add_argument('--synchronization', action='store_true')
     parser.add_argument('--channel', action='store_true')
+    parser.add_argument('--bcch', action='store_true')
     args = parser.parse_args()
     try:
         report = contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
-        check_trace(text, args.measurement, args.synchronization, args.channel)
+        check_trace(text, args.measurement, args.synchronization, args.channel, args.bcch)
         states = re.findall(r'nsb7_radio_state: bands=([0-9a-f]{8}) measurement_route=([0-9a-f]{2}) t=([0-9.]+)', text)
         if states != [('98000000', '01', f'{time:.9f}') for time in (3.5, 6, 14, 24)]:
             raise ValueError('live feature/forwarding predicate differs')
@@ -190,7 +217,8 @@ def main():
             args.contract_json.write_text(json.dumps(report, indent=2) + '\n')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 radio inventory: FAIL: {error}\n')
-    print('PASS: ' + ('own channel acknowledgement commits receiver; no BCCH replies' if args.channel else
+    print('PASS: ' + ('own SI bitmap complete; organic CCCH request left unanswered' if args.bcch else
+                     'own channel acknowledgement commits receiver; no BCCH replies' if args.channel else
                      'own SCH accepted; organic channel request left unanswered' if args.synchronization else
                      'PCS RSSI consumed by task 13; organic 56 request left unanswered' if args.measurement else
                      'own 29-packet no-peer TX baseline; final 55/03050000') + '; no RF completion claim')

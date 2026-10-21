@@ -7,7 +7,7 @@ local memory=cpu.spaces.program
 local taps={}
 local received=0
 taps[#taps+1]=memory:install_read_tap(0x309f24,0x309f27,'nsb7_radio_rx_dispatch',function()
-    if cpu.state['R15'].value~=0x309f26 or received>=64 then return end
+    if cpu.state['R15'].value~=0x309f26 or received>=256 then return end
     local object=cpu.state['R4'].value
     if object<0x100000 or object>=0x17ff00 then return end
     local kind=memory:read_u8(object+3)
@@ -114,6 +114,7 @@ for _,pc in ipairs({0x2e4ef4,0x287574,0x28734c}) do
         if record>=0x100000 and record<0x17fff0 then flags=memory:read_u8(record+13) end
         local payload={}
         local object=cpu.state['R0'].value
+        if object>=0x100000 and object<0x17ff00 and memory:read_u8(object+4)~=0x40 then return end
         if object>=0x100000 and object<0x17ff00 then
             for index=0,13 do payload[#payload+1]=string.format('%02x',memory:read_u8(object+4+index)) end
         end
