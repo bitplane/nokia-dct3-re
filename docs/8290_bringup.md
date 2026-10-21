@@ -130,9 +130,10 @@ consumer result establishes idle: the display still shows CONTACT SERVICE.
 
 The remaining concrete failure is independent of the three cleared faults.
 Writer `248948` sets fault index `0c` to `0c` after checksum comparison
-`24892c..24893e`: computed `bd42`, stored logical record `1e0=ffff`, and
-logical record `170=ffff`. Helper `2486dc` sums the `c0` bytes read from
-logical record `120`. These are record identifiers, not physical flash
+`24892c..24893e`: computed `bd42`, stored logical EEPROM word `1e0=ffff`, and
+marker word `170=ffff`. Helper `2486dc` sums `c0` bytes from logical offset
+`120`, then subtracts both bytes of word `154` through helper `2e3eb4`.
+These are offsets in a 32 KiB shadow, not record IDs or physical flash
 addresses. The unprovisioned comparison fails equality; the separate nonzero
 guard would pass for these values. This is not evidence for another missing
 DSP reply.
@@ -149,6 +150,48 @@ DSP reply.
 The observer is bounded and read-only. The checker requires the native
 handoff, discovery, actual response consumption and still-failing own
 checksum comparison; it cannot pass as normal-machine boot acceptance.
-Next map the firmware-owned record contents and their physical storage/update
-contract. Do not transplant another product's PMM, force the fault clear, or
-answer an unobserved identity/record query to bypass this check.
+Do not transplant another product's PMM, force the fault clear, or answer an
+unobserved identity/record query to bypass this check.
+
+## Logical EEPROM replay and checksum-only fixture
+
+Reader `30d658` calls `2cdd08`, which bounds `offset+length` by `8000` and
+copies from RAM base `10d5c8` (literal `2cde3c`). The persisted own flash
+contains an EEPROM journal at file offset `1d0000` (CPU `3d0000`), with
+header word `+18=00c8`. A complete initial 32 KiB record at `+20` is followed
+by ordinary write records. Replaying the first 64 KiB window, including all
+11 initial-run records and their byte checksums, matches every byte of the
+runtime shadow. This does not establish the fitted flash part or its erase
+geometry; `00c8` is an observed header field, not an imported NSE-5 version.
+
+The own erased calibration span independently computes `bd42` using
+`sum(shadow[120:1e0]) - sum(shadow[154:156])`, modulo 65536. The explicit
+research fixture appends only `08e001e0bd42` at file offset `1d80e6`.
+The header encodes a two-byte write, valid record checksum and logical
+destination `1e0`. All executable bytes and every logical byte except the
+two application-checksum bytes remain unchanged. No calibration values,
+identity, marker, credential or firmware RAM state are manufactured.
+
+```sh
+# Fresh unprovisioned capture; omitting verbose avoids the large CPU trace.
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame \
+  --run-dir tmp/nsb7-storage -- nsb7hle -rompath ../roms -video none \
+  -sound none -nothrottle -seconds_to_run 7 -log -autoboot_delay 0 \
+  -autoboot_script ../tools/nsb7_storage_observe.lua
+.venv/bin/python tools/nsb7_storage_check.py \
+  tmp/nsb7-storage/nvram/nsb7hle/flash \
+  --shadow tmp/nsb7-storage/nsb7_nv_shadow.bin \
+  --trace tmp/nsb7-storage/error.log \
+  --checksum-fixture tmp/nsb7-checksum/nvram/nsb7hle/flash
+```
+
+Boot that generated external input using the same observer and run directory.
+The own comparison reads `bd42/bd42/ffff` and takes success store `248942`,
+clearing fault index `0c` organically. Independent replay still matches all
+32 KiB after the new boot and a separate cold process using only that own
+retained flash; the accepted checksum persists without another fixture write.
+The screen remains CONTACT SERVICE: checksum
+validity is not sufficient to establish idle, nor does it make erased
+calibration into authentic factory data. The unprovisioned baseline remains
+protected separately. Next trace the surviving startup result and its owner,
+not another guessed DSP completion.
