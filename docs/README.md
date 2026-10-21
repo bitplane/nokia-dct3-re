@@ -47,7 +47,7 @@ distinction.
 | `5510_bringup.md` | NPM-5 staged DSP/service frontier, erased NV journal and separate MU4/FBUS input ownership. |
 | `aac_validation.md` | Independent native music-decoder procedure, original reference fixtures and unresolved measurement contract. |
 | `8210_bringup.md` | NSM-3 normal/native boundary, acquired base-record research-HLE phone services, own PCM/audio and restoration acceptance. |
-| `8290_bringup.md` | Own NSB-7 v5.22 inputs, native upload boundary, checksum-only storage repairs and research-HLE physical dial-editor input; SIM/RF unestablished. |
+| `8290_bringup.md` | Own NSB-7 uploads and research-HLE input/security, menus, RTC retention and persistent SIM phonebook; usable idle/RF unestablished. |
 | `8xxx_bringup.md` | Acquired 8250/8850/8890 GENSIO contracts and bounded software-only frontiers. |
 | `6210_bringup.md` | NPE-3 normal/native boundary, own-PMM research-HLE phone services, accessory audit and isolated restoration acceptance. |
 | `6250_bringup.md` | Product-local staged DSP boundary and research boot, input, SIM, phonebook, registration, call-signaling and SMS acceptance. |

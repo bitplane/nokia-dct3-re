@@ -12,8 +12,9 @@ nominal VBATT input, reaches `Insert SIM card` and physically enters digit
 `1` into the dial editor with an empty socket. With the synthetic card
 inserted, SIMI startup file reads and the phone Security code editor
 reproduce across cold runs. A separate one-byte erased-retry fixture permits
-physical acceptance of the own-ROM default phone code and menu navigation. Usable idle,
-SIM writes and RF services remain unestablished.
+physical acceptance of the own-ROM default phone code and menu navigation.
+A physical SIM phonebook save and cold Details retrieval are qualified.
+Usable idle and RF services remain unestablished.
 In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
 No PMM, resident DSP mask, hardware profile or provisioning is supplied by
@@ -465,3 +466,31 @@ the rest of the malformed idle screen is not promoted to an oracle.
 This qualifies own RTC/settings behavior, not full idle, calendar or alarm
 support. No device behavior, RTC seed, NV field or guest RAM was patched
 to make the time-setting transaction succeed.
+
+## Persistent SIM phonebook acceptance
+
+The physical Names/Add entry workflow saves contact `A / 12345`. It
+produces exactly one complete `a0dc010420` UPDATE RECORD through SIMI and
+the shared card's normal APDU receiver, followed by `Saved to SIM card`.
+The first 32-byte ADN record is:
+
+```text
+41ffffffffffffffffffffffffffffffffff04812143f5ffffffffffffffffff
+```
+
+The remaining 49 ADN records stay erased. No handset RAM, card-storage
+file or APDU stream is edited to create the entry. A new process retaining
+the preceding run's own flash, card and CCONT state physically opens
+Names/Find and Details: it displays `A`, then `12345`. That retrieval sends
+no UPDATE RECORD and leaves the complete card NVRAM byte-for-byte unchanged.
+This proves persistence independently of the warm handset's RAM cache.
+
+`tools/nsb7_phonebook_save_input.lua` and
+`tools/nsb7_phonebook_read_input.lua` hold all menu-layout knowledge.
+`tools/nsb7_phonebook_check.py SAVE COLD` requires the own security and
+physical-key evidence, complete captured APDU framing, one exact save
+payload versus no cold write, replayable own handset flash, persisted ADN
+bytes, and exact saved/list/details frames. It shares the card-record
+contract checks used by the other handsets; the NSB-7 input/UI evidence
+remains product-local. Contact editing, deletion, full-card failure and
+RF services are not established by this single-record round trip.
