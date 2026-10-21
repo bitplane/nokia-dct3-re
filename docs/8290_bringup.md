@@ -494,3 +494,45 @@ bytes, and exact saved/list/details frames. It shares the card-record
 contract checks used by the other handsets; the NSB-7 input/UI evidence
 remains product-local. Contact editing, deletion, full-card failure and
 RF services are not established by this single-record round trip.
+
+## Initial radio boundary (no peer responses enabled)
+
+`tools/nsb7_radio_observe.lua` composes the physical security fixture with
+a read-only TX-producer tap. Own writer `2cb08c` loads the producer at
+HPI offset `a4`, writes the type/length header and packed payload, wraps
+at byte offset `a4` (82 words), and commits the new producer at `2cb0ec`.
+That independently supports the observer's ring extent and byte ordering.
+
+The bounded 25-second fixture observes 29 complete packets with no capture
+gap or cap hit: service discovery/acknowledgements, compact self-test,
+parameter uploads, `4c/4`, seven `51` uploads, then `55/4` with payload
+`03050000`. No later TX packet is observed in this fixture; this is not a
+proof that no other firmware producer exists. `tools/nsb7_radio_check.py
+IMAGE RUN` checks the own source hash, physical security evidence, ordered
+type/length inventory and every producer wrap. This is a no-radio-peer
+diagnostic baseline, not registration acceptance; retire or replace it
+when a qualified peer changes the ordinary packet sequence.
+
+Own constructor `2b6656` allocates eight bytes, marks four payload bytes
+and type `55`, calls encoder `2b65f6`, then posts through task 3. Encoder
+selector 3 uses ROM table `343781 = 05 03 03`; option zero produces the
+observed `03 05` prefix. The remaining two bytes are zero-initialized by
+the constructor. Do not assign continuous-scan or cancellation meanings
+to the selector/option bytes from this alone.
+
+Own receive consumers `2209d4` and `224058` explicitly test input `8b`
+before passing their object pointer to wrapper `2a3704`. It selects
+`2889d8` or `288ae6` according to the current request context. The first
+parser reads a big-endian channel at object offsets `+6/+7`, signed RSSI
+at `+9`, advances records by four bytes and bounds its loop to 40 entries.
+Its channel eligibility helper is `2885e4`. The wrapper was located with
+a sibling code-pattern hypothesis, then independently decoded here; an
+exact 16-byte cross-ROM signature did not match because the literal-load
+encoding differs. Sibling addresses or packet labels are not the contract.
+
+Before enabling acquisition responses, recover the own RX broker's
+wire-to-object prefix and the PCS eligibility/band mapping. Those determine
+whether the shared 8b encoder is applicable and which laboratory carrier
+is meaningful for this GSM1900 product. Channel confirmation, traffic
+release, neighbours and authentication are not established by the initial
+55 request or these two parser callers. No radio peer has been enabled.
