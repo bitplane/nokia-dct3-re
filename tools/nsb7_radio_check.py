@@ -72,6 +72,10 @@ def contract(image):
             'rx_84': {'forwarder': '002e4fa4', 'task': 13, 'parser': '002f5274',
                       'ra_payload_offset': 0, 'frame_payload_offsets': [1, 2, 3],
                       'request_reference_tag': '07f9', 'request_reference_task': 17},
+            'rx_89': {'handler': '002e5054', 'dedicated_bit': 1,
+                      'queued_descriptor_tag': '0402', 'armed_clear_pc': '002e5086'},
+            'rx_86': {'dispatcher': '002e5228', 'dedicated_handler': '002e513e',
+                      'dedicated_uplink_queue': '00130434', 'selector': '80'},
             'tx_0c': {'constructor': '002b6e58', 'payload_bytes': 8,
                       'timing_mode_offset': 1, 'ra_offset': 2, 'slot_delay_offset': 3,
                       'scheduled_base_offsets': [4, 5], 'coverage': 'non-combined CCCH only'},
@@ -143,7 +147,7 @@ def check_rach(text, inventory, assignment=False):
         previous_frame = actual
 
 
-def check_assignment(text, inventory):
+def check_assignment(text, inventory, dedicated=False):
     check_rach(text, inventory, assignment=True)
     forward = re.findall(r'nsb7_agch_forward: index=1 task=4 mode=60 error=00 frame=(\d+) block=([0-9a-f]{48}) ', text)
     consumer = re.findall(r'nsb7_agch_consumer: index=1 task=14 tag=0623 mode=60 block=([0-9a-f]{48}) ', text)
@@ -166,16 +170,44 @@ def check_assignment(text, inventory):
         raise ValueError('AGCH metadata is not the next eligible decoded block after RACH')
     if f'assignment_deadline access_frame={access_frame} deadline={frame}' not in text:
         raise ValueError('assignment scheduling evidence missing')
-    if inventory[39:] != [(0x1f, bytes.fromhex('00090000')),
+    if inventory[39:41] != [(0x1f, bytes.fromhex('00090000')),
                            (0x02, bytes.fromhex('0412000000000040800002584000000000000000'))]:
         raise ValueError('own assignment did not produce the dedicated-channel request')
     if not re.search(r'nsb7_channel_pending: address=00[1-7][0-9a-f]{5} tag=0402 bit=01 armed=01 ', text):
         raise ValueError('dedicated request did not arm its own bit-1 descriptor')
-    if 'nsb7_channel_state: cached=00000000 channel=0258 mode=1a bsic=12 t=24.000000000 ' not in text:
+    if not dedicated and 'nsb7_channel_state: cached=00000000 channel=0258 mode=1a bsic=12 t=24.000000000 ' not in text:
         raise ValueError('unacknowledged dedicated request unexpectedly committed receiver state')
 
 
-def check_trace(text, measurement=False, synchronization=False, channel=False, bcch=False, ccch=False, rach=False, assignment=False):
+def check_dedicated(text, inventory, uplink=False):
+    descriptor = re.search(r'nsb7_channel_pending: address=([0-9a-f]{8}) tag=0402 bit=01 armed=01 ', text)
+    cleared = re.search(r'nsb7_dedicated_armed: address=([0-9a-f]{8}) value=00 pc=002e5086 task=4 ', text)
+    if not descriptor or not cleared or descriptor[1] != cleared[1]:
+        raise ValueError('dedicated acknowledgement did not clear the own armed descriptor')
+    if not re.search(r'nsb7_channel_ack: pc=002e5054 task=4 type=89 bit=01 cached=00000000 channel=0258 mode=1a bsic=12 ', text):
+        raise ValueError('dedicated bit-1 reply did not reach the own handler')
+    for time in (14, 24):
+        if f'nsb7_channel_state: cached=00000000 channel=0258 mode=40 bsic=12 t={time}.000000000 ' not in text:
+            raise ValueError('dedicated receiver mode 40 did not settle')
+    if not uplink:
+        return
+    rows = re.findall(r'nsb7_block_request: pc=([0-9a-f]{8}) task=4 selector=([0-9a-f]{2}) queue=([0-9a-f]{8}) ', text)
+    if (len(rows) != 2 or [(row[0], row[1]) for row in rows] != [('002e5228', '80'), ('002e513e', '00')] or
+            rows[0][2] != rows[1][2] or not 0x100000 <= int(rows[0][2], 16) < 0x17ff00):
+        raise ValueError('block request did not select the own nonempty dedicated queue')
+    frame = inventory[41][1]
+    if frame[:5] != bytes.fromhex('0080013f49') or frame[4] >> 2 != 18:
+        raise ValueError('own uplink is not an eighteen-byte LAPDm SABM establishment')
+    information = frame[5:23]
+    if information != bytes.fromhex('05087000f000fffe20080910101032547698'):
+        raise ValueError('own Location Updating Request, classmark or subscriber identity differs')
+    if frame[23:] != bytes.fromhex('2b2b000000'):
+        raise ValueError('own SEND_BLOCK padding/trailer differs')
+
+
+def check_trace(text, measurement=False, synchronization=False, channel=False, bcch=False, ccch=False, rach=False, assignment=False, dedicated=False, uplink=False):
+    dedicated = dedicated or uplink
+    assignment = assignment or dedicated
     ccch = ccch or rach or assignment
     bcch = bcch or ccch
     channel = channel or bcch
@@ -218,6 +250,9 @@ def check_trace(text, measurement=False, synchronization=False, channel=False, b
     if assignment:
         expected_types += (0x0c, 0x1f, 0x02)
         expected_lengths += (8, 4, 20)
+    if uplink:
+        expected_types += (0x1b,)
+        expected_lengths += (28,)
     if tuple(kind for kind, _ in inventory) != expected_types or tuple(len(payload) for _, payload in inventory) != expected_lengths:
         raise ValueError('bounded packet inventory differs')
     if inventory[28] != (0x55, bytes.fromhex('03050000')):
@@ -250,6 +285,10 @@ def check_trace(text, measurement=False, synchronization=False, channel=False, b
                 ['84', '84', '89', '89', '84', '84', '89'], 17))
         if assignment:
             expected_replies.extend([('17', '84', '8'), ('18', '80', '34')])
+        if dedicated:
+            expected_replies.append(('19', '89', '8'))
+        if uplink:
+            expected_replies.append(('20', '86', '8'))
         if replies != expected_replies:
             raise ValueError('qualified acquisition RX scope differs')
         consumers = re.findall(r'nsb7_measurement: pc=([0-9a-f]{8}) task=(\d+) type=([0-9a-f]{2}) first=([0-9a-f]{4}) '
@@ -316,14 +355,16 @@ def check_trace(text, measurement=False, synchronization=False, channel=False, b
             if not re.search(r'nsb7_channel_ack: pc=002e5054 task=4 type=89 bit=00 cached=00[1-7][0-9a-f]{5} '
                              f'channel=0258 mode={previous} bsic=12 ', text):
                 raise ValueError(f'own mode-{mode} acknowledgement missing')
-        if not rach and 'nsb7_channel_state: cached=00000000 channel=0258 mode=1a bsic=12 t=14.000000000 ' not in text:
+        if not rach and not dedicated and 'nsb7_channel_state: cached=00000000 channel=0258 mode=1a bsic=12 t=14.000000000 ' not in text:
             raise ValueError('common-control receiver did not finish in mode 1a')
     if rach:
         check_rach(text, inventory)
         if 'nsb7_channel_state: cached=00000000 channel=0258 mode=16 bsic=12 t=24.000000000 ' not in text:
             raise ValueError('unanswered-assignment lifecycle did not settle in receiver mode 16')
     if assignment:
-        check_assignment(text, inventory)
+        check_assignment(text, inventory, dedicated)
+    if dedicated:
+        check_dedicated(text, inventory, uplink)
 
 
 def main():
@@ -338,11 +379,13 @@ def main():
     parser.add_argument('--ccch', action='store_true')
     parser.add_argument('--rach', action='store_true')
     parser.add_argument('--assignment', action='store_true')
+    parser.add_argument('--dedicated', action='store_true')
+    parser.add_argument('--uplink', action='store_true')
     args = parser.parse_args()
     try:
         report = contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
-        check_trace(text, args.measurement, args.synchronization, args.channel, args.bcch, args.ccch, args.rach, args.assignment)
+        check_trace(text, args.measurement, args.synchronization, args.channel, args.bcch, args.ccch, args.rach, args.assignment, args.dedicated, args.uplink)
         states = re.findall(r'nsb7_radio_state: bands=([0-9a-f]{8}) measurement_route=([0-9a-f]{2}) t=([0-9.]+)', text)
         if states != [('98000000', '01', f'{time:.9f}') for time in (3.5, 6, 14, 24)]:
             raise ValueError('live feature/forwarding predicate differs')
@@ -350,7 +393,9 @@ def main():
             args.contract_json.write_text(json.dumps(report, indent=2) + '\n')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 radio inventory: FAIL: {error}\n')
-    print('PASS: ' + ('own Immediate Assignment accepted; dedicated-channel acknowledgement withheld' if args.assignment else
+    print('PASS: ' + ('own LAPDm SABM carries Location Updating Request; no UA supplied' if args.uplink else
+                     'own bit-1 acknowledgement commits dedicated receiver; block request withheld' if args.dedicated else
+                     'own Immediate Assignment accepted; dedicated-channel acknowledgement withheld' if args.assignment else
                      'own timed access completions reach task 17; assignment unanswered' if args.rach else
                      'own CCCH configuration committed; organic random-access request left unanswered' if args.ccch else
                      'own SI bitmap complete; organic CCCH request left unanswered' if args.bcch else

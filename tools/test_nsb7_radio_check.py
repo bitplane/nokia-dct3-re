@@ -162,7 +162,43 @@ def assignment_trace():
     return '\n'.join(rows)
 
 
+def dedicated_trace():
+    return assignment_trace().replace('mode=1a bsic=12 t=', 'mode=40 bsic=12 t=') + '\n' + '\n'.join([
+        'nsb7_radio_rx: index=19 type=89 length=8 t=12 observer_writes=0',
+        'nsb7_channel_ack: pc=002e5054 task=4 type=89 bit=01 cached=00000000 channel=0258 mode=1a bsic=12 t=12 observer_writes=0',
+        'nsb7_dedicated_armed: address=00102138 value=00 pc=002e5086 task=4 t=12 observer_writes=0'])
+
+
+def uplink_trace():
+    payload = '0080013f4905087000f000fffe200809101010325476982b2b000000'
+    cursor = (sum((length+3)//2 for length in LENGTHS) + 81 + 22 + 5 + 11 + 35 + 11 + 3 + 5 + 5 + 3 + 11) % 0x52
+    return dedicated_trace() + '\n' + '\n'.join([
+        'nsb7_radio_rx: index=20 type=86 length=8 t=12 observer_writes=0',
+        'nsb7_block_request: pc=002e5228 task=4 selector=80 queue=001021f8 t=12 observer_writes=0',
+        'nsb7_block_request: pc=002e513e task=4 selector=00 queue=001021f8 t=12 observer_writes=0',
+        f'nsb7_radio_tx: index=42 type=1b length=28 data={payload} cursor={cursor:02x} producer={(cursor+15)%0x52:02x} pc=002cb0ec t=12 observer_writes=0'])
+
+
 class RadioInventoryTests(unittest.TestCase):
+    def test_dedicated_ack_requires_own_descriptor_clear(self):
+        check_trace(dedicated_trace(), dedicated=True)
+        for old, new in [('bit=01 cached=00000000', 'bit=00 cached=00000000'),
+                         ('address=00102138 value=00', 'address=00102138 value=01'),
+                         ('mode=40 bsic=12 t=24', 'mode=1a bsic=12 t=24')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_trace(dedicated_trace().replace(old, new), dedicated=True)
+
+    def test_block_request_pulls_own_sabm_with_location_update(self):
+        check_trace(uplink_trace(), uplink=True)
+        for old, new in [('selector=80 queue=', 'selector=70 queue='),
+                         ('pc=002e513e task=4 selector=00 queue=001021f8', 'pc=002e513e task=4 selector=00 queue=00000000'),
+                         ('0080013f49', '0080010349'), ('fffe200809', 'fffe230809'),
+                         ('0910101032547698', '0910101032547699')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_trace(uplink_trace().replace(old, new), uplink=True)
+        with self.assertRaises(ValueError):
+            check_trace(uplink_trace() + '\nnsb7_radio_rx: index=21 type=80 length=34 t=13', uplink=True)
+
     def test_assignment_preserves_access_reference_and_arms_dedicated_request(self):
         check_trace(assignment_trace(), assignment=True)
         for old, new in [('frame=2395 block=', 'frame=2391 block='),
@@ -279,6 +315,8 @@ class RadioInventoryTests(unittest.TestCase):
         self.assertEqual(report['rx_80']['agch_task'], 14)
         self.assertEqual(report['rx_80']['agch_tag'], '0623')
         self.assertEqual(report['rx_80']['ccch_block_endings'], [9, 15, 19, 25, 29, 35, 39, 45, 49])
+        self.assertEqual(report['rx_89']['dedicated_bit'], 1)
+        self.assertEqual(report['rx_86']['dedicated_uplink_queue'], '00130434')
         self.assertEqual(report['payload_prefix_bytes'], 4)
         self.assertEqual(report['classified_inputs'], 65536)
         self.assertEqual(report['ranges'], [

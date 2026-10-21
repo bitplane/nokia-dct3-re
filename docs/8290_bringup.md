@@ -17,7 +17,8 @@ A physical SIM phonebook save and cold Details retrieval are qualified.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
 parsing, CCCH setup, timed random-access completion and an accepted
-Immediate Assignment. Dedicated-channel setup, camping,
+Immediate Assignment, dedicated-channel setup and an emitted Location
+Updating Request inside LAPDm SABM. LAPDm establishment, camping,
 registration, calls, SMS and a usable idle frame remain unestablished.
 In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
@@ -578,13 +579,14 @@ every input. Unit cases cover precedence and range endpoints.
 ### Opt-in PCS acquisition acceptance
 
 Radio HLE defaults off in the NSB-7 input configuration. The existing
-`Radio peer HLE` setting enables a product-owned **candidate-assignment**
+`Radio peer HLE` setting enables a product-owned **candidate-block-request**
 contract: the decoded four-byte type-55 forms `03050000/03030000` and
 the subsequent eighty-channel type-56 list, and its type-02/20 receiver
 configuration are answered, followed by eight BCCH blocks and the same
 receiver-configuration grammar for CCCH modes and request-correlated access
-frame completion plus a request-correlated Immediate Assignment. Dedicated
-channel acknowledgement, traffic,
+frame completion, a request-correlated Immediate Assignment, bit-1
+dedicated-channel acknowledgement and one uplink block request. LAPDm
+acknowledgement, traffic,
 neighbour and authentication contracts are not inherited from siblings.
 Other products retain their existing contracts unchanged. Retire the
 acquisition-coverage limit only after the subsequent product contracts are
@@ -601,16 +603,17 @@ fourteen-byte type-80/subtype-40 encoding. No firmware queue, state or APDU is
 injected to make this progression happen.
 
 `tools/nsb7_radio_measurement_observe.lua` adds own broker/consumer/class
-observations. Use `tools/nsb7_radio_check.py IMAGE RUN --assignment` with
-`tools/nsb7_agch_observe.lua` for this composition. It requires all 41
+observations. Use `tools/nsb7_radio_check.py IMAGE RUN --uplink` with
+`tools/nsb7_dedicated_observe.lua` for this composition. It requires all 42
 TX publications, the correct task
 and payload values, and the complete observed RX inventory: two existing
 external-service `8e/10` frames, one measurement `8b/166`, and one SCH
 `80/14`, one channel acknowledgement `89/8`, and eight BCCH `80/34`
-frames, CCCH acknowledgements, one access completion and one assignment through the
+frames, receiver acknowledgements, one access completion, one assignment
+and one uplink block request through the
 25-second fixture. The older `--measurement`, `--synchronization`,
-`--channel`, `--bcch`, `--ccch` and `--rach` checks retain the preceding
-bounded trace contracts. No dedicated-channel acknowledgement,
+`--channel`, `--bcch`, `--ccch`, `--rach`, `--assignment` and `--dedicated`
+checks retain the preceding bounded trace contracts. No UA,
 paging block, RSSI or terminal-search
 response is accepted. The no-peer/default fixture still
 reproduces its original 29-packet inventory.
@@ -632,7 +635,7 @@ while runtime HLE remains in use. This is a bootstrap/runtime ownership
 correction, not a candidate-payload special case.
 
 Decode each subsequent request's callers and populated fields before
-extending peer coverage. Dedicated-channel setup, traffic release, neighbours,
+extending peer coverage. LAPDm establishment, traffic release, neighbours,
 authentication and registration remain unestablished on this handset.
 
 ### Candidate response routing
@@ -681,7 +684,7 @@ stores decoded BSIC `12`, and publishes type `02`/20 bytes beginning
 `041202000000005050000258`. The final eight request bytes are captured
 but not yet assigned semantics. Channel completion and the subsequent
 BCCH, CCCH, access-frame and assignment lifecycles are independently
-qualified below; dedicated-channel setup remains open.
+qualified below; LAPDm acknowledgement remains open.
 
 ### Receiver configuration acknowledgement
 
@@ -841,14 +844,51 @@ block reaches the forwarding boundary, task-14 decoder and event `061a`.
 Firmware publishes control `1f/4 = 00090000`, then a type-02/20 dedicated
 request `0412000000000040800002584000000000000000`. Its own descriptor
 at `[130844]` has tag `0402`, expected bit 1 and armed byte 1; this is
-not the earlier null-descriptor common-control lifecycle. The peer leaves
-it unanswered. The live receiver remains in mode `1a`, without falsely
-committing a dedicated channel.
+not the earlier null-descriptor common-control lifecycle. The bounded
+`--assignment` fixture leaves it unanswered, with the live receiver still
+in mode `1a`; the acknowledgement is qualified separately below.
 
 `--assignment` checks all 41 TX and eighteen RX packets, the single
 request-correlated access completion, the original assignment reference,
 the distinct eligible downlink block frame, the unchanged block at all
 three consumer boundaries, and the armed bit-1 dedicated descriptor.
-It rejects an extra dedicated acknowledgement. Immediate Assignment
+That bounded fixture rejects an extra dedicated acknowledgement. Immediate Assignment
 acceptance does not yet establish LAPDm, Location Updating, registration
 or a call.
+
+### Dedicated acknowledgement and first uplink
+
+The own `0402` descriptor requires reply bit 1, not the zero-bit replies
+used for common control. With one type-89/8 response containing byte 1,
+handler `2e5054` takes the queued-descriptor branch. The read-only watch
+observes instruction `2e5086` clear that same descriptor's armed byte,
+and the live receiver commits mode `40` on carrier 600 with BSIC `12`.
+The `--dedicated` contract stops there without an uplink request.
+
+Type-86 decoder `2e5228` accepts payload selector `80` and calls
+`2e513e`. Under the firmware's ordinary critical section it checks
+dedicated queue pointer `[130434]` and calls constructor/dispatcher
+`2b64d0`: a nonempty queue selects case 0, which publishes the queued
+type-1b frame; an empty queue selects case 1 and builds a fill frame.
+The own jump table is at `2b64e0`, with targets `2b6568` and `2b65b0`
+for those cases. Neither a frame nor a queue pointer is supplied by the
+emulator.
+
+The qualified block request finds a nonempty queue and firmware publishes
+`1b/28` with payload
+`0080013f4905087000f000fffe200809101010325476982b2b000000`.
+After the two-byte DSP prefix, LAPDm address/control/length are `01/3f/49`:
+SABM with an eighteen-byte information field. That field is the handset's
+MM Location Updating Request, beginning `05 08`, with own classmark `20`
+and synthetic-card mobile identity `0910101032547698`. The final two
+LAPDm fill bytes and three DSP trailer bytes are preserved in the trace.
+This is generated by firmware after physical boot/SIM initialization,
+not constructed by the host or copied from another model's message.
+
+`--uplink` requires all 42 TX and twenty RX packets, the armed-descriptor
+clear, committed mode `40`, both block-request decoder boundaries, the
+same nonzero queue pointer, and the exact own SABM/Location Updating
+Request. It rejects an extra UA/downlink reply. The peer has not yet
+accepted this uplink into its network session or acknowledged SABM;
+link establishment, Location Updating acceptance and registration remain
+unproved.

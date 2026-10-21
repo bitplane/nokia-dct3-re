@@ -1761,8 +1761,13 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			current_phase() == phase::serving_bcch && m_idle_common_control_active &&
 			packet.type == 0x0c && packet.length == 8 && packet.payload[0] == 0 &&
 			packet.payload[2] != 0;
+	const bool partial_dedicated_request =
+			m_protocol.coverage >= acquisition_coverage::candidate_dedicated &&
+			current_phase() == phase::random_access &&
+			packet.type == 0x02 && packet.length == 20 &&
+			packet.payload[0] == 4 && packet.payload[8] == 0x80;
 	if (m_protocol.coverage != acquisition_coverage::full &&
-			!partial_common_control_request && !partial_random_access_request)
+			!partial_common_control_request && !partial_random_access_request && !partial_dedicated_request)
 	{
 		if (packet.type == 0x55 && packet.length == 4 &&
 				packet.payload[0] == 3 &&
@@ -2533,10 +2538,10 @@ void nokia_radio_peer_device::emit_report()
 		// across save/load instead of moving by a frame after a slightly
 		// different firmware poll latency.
 		u32 frame_number = current_phase() == phase::random_access &&
-				m_protocol.coverage != acquisition_coverage::candidate_assignment ? m_access_frame :
+				m_protocol.coverage < acquisition_coverage::candidate_assignment ? m_access_frame :
 				m_tdma_frame_number % 2'715'648;
 		if (current_phase() == phase::random_access &&
-				m_protocol.coverage == acquisition_coverage::candidate_assignment)
+				m_protocol.coverage >= acquisition_coverage::candidate_assignment)
 			frame_number = m_access_deadline % 2'715'648;
 		if (pch_report)
 			frame_number = paging_frame_number(
@@ -2879,6 +2884,8 @@ void nokia_radio_peer_device::emit_report()
 	++m_reports_sent;
 	if (!asynchronous_neighbour_report)
 	{
+		const bool completing_candidate = current_phase() == phase::candidate_channel_change;
+		const bool completing_dedicated = current_phase() == phase::assigned_channel_change;
 		const bool completing_common_control = current_phase() == phase::serving_channel_change;
 		--m_reports_remaining;
 		advance_after_report(report_type);
@@ -2898,7 +2905,7 @@ void nokia_radio_peer_device::emit_report()
 			m_report_deferred = false;
 		}
 		if (m_protocol.coverage >= acquisition_coverage::candidate_bcch &&
-				report_type == 0x89 && !completing_common_control)
+				report_type == 0x89 && completing_candidate)
 		{
 			// This product establishes BCCH directly after the receiver
 			// acknowledgement, not the sibling's unsolicited RA-info report.
@@ -2924,7 +2931,7 @@ void nokia_radio_peer_device::emit_report()
 			m_wait_ticks = 0;
 			m_report_deferred = false;
 		}
-		if (m_protocol.coverage == acquisition_coverage::candidate_assignment && report_type == 0x84)
+		if (m_protocol.coverage >= acquisition_coverage::candidate_assignment && report_type == 0x84)
 		{
 			const u32 frame = m_access_reference_frame % 2'715'648;
 			m_access_deadline = m_access_reference_frame +
@@ -2933,8 +2940,15 @@ void nokia_radio_peer_device::emit_report()
 			LOGMASKED(LOG_RADIO, "dsp_hle: assignment_deadline access_frame=%u deadline=%u\n",
 					m_access_reference_frame, m_access_deadline);
 		}
-		if (m_protocol.coverage == acquisition_coverage::candidate_assignment && report_type == 0x80)
+		if (m_protocol.coverage >= acquisition_coverage::candidate_assignment && report_type == 0x80)
 			m_access_deadline_pending = false;
+		if (m_protocol.coverage == acquisition_coverage::candidate_dedicated &&
+				report_type == 0x89 && completing_dedicated)
+		{
+			m_reports_remaining = 0;
+			m_wait_ticks = 0;
+			m_report_deferred = false;
+		}
 	}
 	m_transport->notify_rx();
 	if (m_trace_enabled)
