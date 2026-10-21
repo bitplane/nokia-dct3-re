@@ -437,3 +437,31 @@ The remaining display/application question is why the idle main area
 contains malformed content while menu resources render normally. Inspect
 firmware-owned settings/resource selection (including erased NV inputs)
 before modifying the LCD device or synthesizing network presentation.
+
+### Firmware-owned clock setting and RTC retention
+
+`tools/nsb7_clock_input.lua` navigates the physical Settings/Clock/Set the
+time controls, enters `13:47`, confirms, and returns through Back. The
+editor displays the intended digits and the firmware confirms `Time is
+set`. The idle top-right clock then displays `13:47`, while malformed
+main-area content remains. A valid clock therefore does not by itself
+resolve that separate display/resource issue.
+
+Independent journal replay observes a firmware-written opaque word at
+logical `0408` (`ffffffff -> 91055b00`) plus several setting bytes. Do not
+infer timestamp units or a complete settings format from that word.
+In a new process with the same own flash and card but fresh CCONT state,
+the firmware asks for time again. Retaining the preceding run's own
+nine-byte CCONT NVRAM instead restores `13:47` without time-entry keys.
+The CCONT counter minute/hour bytes agree with the two UI outcomes;
+retained controller bytes are not a donor handset configuration.
+
+`tools/nsb7_clock_check.py SETTING RETAINED FLASH_ONLY` requires security
+acceptance in each run, physical time-entry decodes and confirmation
+pixels, independently replayable own flash, the CCONT minute/hour
+contrast, and the fresh-controller time prompt. The retained-run pixel
+check deliberately covers only the top-right clock `(52,0)-(78,8)`;
+the rest of the malformed idle screen is not promoted to an oracle.
+This qualifies own RTC/settings behavior, not full idle, calendar or alarm
+support. No device behavior, RTC seed, NV field or guest RAM was patched
+to make the time-setting transaction succeed.

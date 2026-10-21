@@ -8,7 +8,8 @@ for _,port in pairs(machine.ioport.ports) do
     for _,field in pairs(port.fields) do fields[field.name]=field end
 end
 local input=coroutine.create(function()
-    for _,step in ipairs({{26,'Left Softkey / Menu'},{29,'Scroll Down'},{32,'Left Softkey / Menu'}}) do
+    local steps=_G.nsb7_menu_steps or {{26,'Left Softkey / Menu'},{29,'Scroll Down'},{32,'Left Softkey / Menu'}}
+    for _,step in ipairs(steps) do
         assert(emu.wait(step[1]-machine.time:as_double()))
         local field=assert(fields[step[2]])
         machine:logerror(string.format('nsb7_menu_input: key=%s state=1 t=%.9f\n',step[2],machine.time:as_double()))
