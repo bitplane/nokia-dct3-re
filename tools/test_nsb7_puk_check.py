@@ -33,6 +33,24 @@ class PukCheckTest(unittest.TestCase):
         check_puk(fixture(True), True)
         check_puk(fixture(False), False)
 
+    def test_every_failed_puk_retry_and_permanent_status(self):
+        for remaining in range(10):
+            status = '9840' if remaining == 0 else '9804'
+            text = fixture(True).replace('puk=9/10', f'puk={remaining}/10').replace('sw=9804', 'sw='+status)
+            with self.subTest(remaining=remaining):
+                check_puk(text, True, remaining=remaining)
+                with self.assertRaises(ValueError):
+                    check_puk(text.replace('sw='+status, 'sw=9000'), True, remaining=remaining)
+
+    def test_permanent_requires_blocked_status(self):
+        with self.assertRaises(ValueError):
+            check_puk(fixture(True).replace('puk=9/10', 'puk=0/10'), True, remaining=0)
+
+    def test_retry_domain(self):
+        for remaining in (-1, 10):
+            with self.subTest(remaining=remaining), self.assertRaises(ValueError):
+                check_puk(fixture(True), True, remaining=remaining)
+
     def test_corrupt_or_missing_evidence(self):
         for old, new in [('phase=confirm', 'phase=missing'), ('key=19 observer_writes=0', 'key=18 observer_writes=0'),
                          ('sw=9804', 'sw=9000'), ('puk=9/10', 'puk=10/10'),

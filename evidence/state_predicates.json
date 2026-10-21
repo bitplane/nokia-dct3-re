@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_physical_permanent_puk1_exhaustion",
+      "owner": "nsb7_sim_security", "status": "satisfied",
+      "predicate": "Ten cold physical wrong-PUK attempts permanently block the own PIN-exhausted card and a new process rejects it without retry",
+      "current": "Exact physical PUK/new-PIN/confirmation input, decoded contacts and UNBLOCK APDU pass for each of ten processes. Status9804 decrements retries10->1 and final9840 decrements1->0; complete-card checks permit only the PUK1 attempt byte. A separate cold process preserves exhausted storage, emits no credential operation and renders exact SIM card rejected pixels. No retries or credentials are forced and no radio/native speech result is implied.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_puk_exhaustion.py", "tools/nsb7_puk_permanent.lua", "tools/nsb7_puk_check.py", "tools/test_nsb7_puk_exhaustion.py", "tools/test_nsb7_puk_check.py"]
+    },
+    {
       "id": "nsb7_pin_authenticated_phonebook_persistence",
       "owner": "nsb7_sim_storage", "status": "satisfied",
       "predicate": "Physical PIN and cold laboratory registration compose with contact save and independent cold Details retrieval",

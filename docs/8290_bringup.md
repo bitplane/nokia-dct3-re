@@ -20,13 +20,14 @@ PIN and cold replacement-PIN acceptance are also qualified. Physical
 SIM-card-security Off/On, cold PIN-request behavior and ordinary PIN1
 change/rejection/cold reuse pass. PIN2 change, rejected-current-PIN2
 isolation and cold reuse also pass, along with physical PIN2 exhaustion,
-failed-PUK2 retry retention and cold PUK2 recovery/reuse. Permanent PUK
-exhaustion and FDN/AoC authorization remain separate work.
+failed-PUK2 retry retention and cold PUK2 recovery/reuse. Permanent PUK1
+exhaustion and cold card rejection are qualified; permanent PUK2 exhaustion
+and FDN/AoC authorization remain separate work.
 PIN-enabled fresh/cold laboratory registration and a long wrong-PIN
 non-registration control are qualified as one coherent composition.
-The authenticated composition also qualifies physical outgoing calls and
-incoming SMS read/Reply with exact card and UI outcomes.
-A physical SIM phonebook save and cold Details retrieval are qualified.
+The authenticated composition also qualifies physical incoming/outgoing calls,
+incoming SMS read/Reply, active incoming-call/SMS restoration and persistent
+phonebook save/cold Details retrieval with exact card and UI outcomes.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
 parsing, CCCH setup, timed random-access completion and an accepted
@@ -1963,4 +1964,25 @@ default.
 .venv/bin/python tools/nsb7_phonebook_check.py \
   tmp/nsb7-pin-phonebook-save tmp/nsb7-pin-phonebook-cold \
   --pin-source tmp/nsb7-pin-registration-cold
+```
+
+### Permanent PUK1 exhaustion
+
+`nsb7_puk_exhaustion.py` starts from the own organically PIN-exhausted card
+with ten PUK retries. Ten independent cold processes physically enter a
+wrong PUK and matching replacement PIN; each preserves its predecessor's
+flash/card/clock files. Exact input/decode/APDU checks require one UNBLOCK
+per process, `9804` while retries remain and `9840` at zero. Whole-card
+comparison permits only the PUK1 retry byte to decrement; no replacement
+credential or file change is accepted.
+
+An eleventh cold process makes no credential attempt. It retains the exact
+exhausted card and renders the reviewed `SIM card rejected` frame (RGB SHA256
+`28d2c33c296179f37c24b66a42dd40014d9a8671e257f41338ca066c55bce3e0`).
+This is permanent SIM-card rejection, not evidence of radio functionality.
+The runner rejects an existing output directory to preserve prior evidence.
+
+```sh
+.venv/bin/python tools/nsb7_puk_exhaustion.py \
+  tmp/nsb7-pin-blocked tmp/nsb7-puk-exhaustion-fresh
 ```

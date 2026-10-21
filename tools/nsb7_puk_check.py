@@ -31,7 +31,7 @@ def check_cards(pairs):
         raise ValueError('complete cold card chain differs from PIN/PUK/new-PIN transitions')
 
 
-def check_puk(text, wrong):
+def check_puk(text, wrong, remaining=9):
     if '[LUA ERROR]' in text or 'nsb7_puk_input: complete' not in text:
         raise ValueError('physical PUK fixture incomplete')
     puk = '12345679' if wrong else '12345678'
@@ -48,7 +48,10 @@ def check_puk(text, wrong):
     for index, code in enumerate(codes):
         if f'nsb7_key_decode: key={code:02x} observer_writes=0' not in text[rows[2*index].end():rows[2*index+1].start()]:
             raise ValueError('PUK contact did not decode')
-    if statuses(text, 0x2c) != [(0x9804 if wrong else 0x9000, 0 if wrong else 3, 9 if wrong else 10)]:
+    if not 0 <= remaining <= 9:
+        raise ValueError('wrong-PUK retry must be in 0..9')
+    status = (0x9840 if remaining == 0 else 0x9804) if wrong else 0x9000
+    if statuses(text, 0x2c) != [(status, 0 if wrong else 3, remaining if wrong else 10)]:
         raise ValueError('UNBLOCK result/retries differ')
     if any(statuses(text, ins) for ins in (0x20, 0x24, 0x26, 0x28)):
         raise ValueError('unexpected credential command during PUK recovery')
