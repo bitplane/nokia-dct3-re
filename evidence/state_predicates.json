@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_registered_fdn_listed_unlisted_off_controls",
+      "owner": "nsb7_lab_calls", "status": "satisfied",
+      "predicate": "Registered physical listed dialing connects, unlisted FDN-On dialing is locally denied and physical FDN-Off permits the same unlisted number",
+      "current": "Own edited FDN-On card12346 authenticates PIN1/phone code and registers before dialing. Listed12346 completes CM/CC/RR and physical End. Identical-source unlisted12347 renders exact Call not allowed without CM Service Request/SETUP/assignment/CONNECT. Physical PIN2-authorized Off changes only ADN validity; a separate12347 run then completes signaling/release. Full cards remain unchanged in all dial runs. Held-contact decoding and exact13:49 retained-clock idle frames pass. Off's two identical SETUP bodies are separately required on SDCCH then post-assignment TCH with one request identity; ordinary gates retain strict single-SETUP acceptance. Native speech, RF, SIP and broader FDN matching rules are not promoted.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_fdn_dial.lua", "tools/nsb7_fdn_dial_unlisted.lua", "tools/nsb7_fdn_dial_check.py", "tools/nsb7_outgoing_call_observe.lua", "tools/nsb7_outgoing_call_check.py", "tools/test_nsb7_fdn_dial_check.py", "tools/test_nsb7_outgoing_call_check.py"]
+    },
+    {
       "id": "nsb7_protected_fdn_edit_and_cold_number",
       "owner": "nsb7_sim_storage", "status": "satisfied",
       "predicate": "Physical PIN2-protected FDN edit changes A/12345 to A/12346 and independent cold Details displays the persisted result",

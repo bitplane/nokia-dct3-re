@@ -25,8 +25,9 @@ exhaustion and cold card rejection are qualified. Permanent PUK2 exhaustion
 also retains ordinary PIN1 authentication and menus. An explicit extended
 card qualifies physical PIN2-authorized FDN On/cold-On/Off/cold-Off and
 protected Save/cold Details/rejected-write isolation, edit/cold edited-number
-retrieval and cancel/erase/cold-empty. FDN dial enforcement and AoC
-authorization remain separate work.
+retrieval and cancel/erase/cold-empty. Registered listed/unlisted/Off controls
+qualify FDN dial enforcement and permitted laboratory call signaling. AoC
+authorization remains separate work.
 PIN-enabled fresh/cold laboratory registration and a long wrong-PIN
 non-registration control are qualified as one coherent composition.
 The authenticated composition also qualifies physical incoming/outgoing calls,
@@ -2145,3 +2146,43 @@ pairs are rejected, and the original Save/read/wrong-PIN2 checks still run.
   tmp/nsb7-fdn-write-wrong --edit tmp/nsb7-fdn-edit \
   --edit-cold tmp/nsb7-fdn-edit-cold
 ```
+
+### Registered FDN dial permission
+
+Three measurement-enabled cold compositions use the own edited FDN record
+`A / 12346`, with physical PIN1 and phone-code entry before dialing. The
+original physical outgoing-call harness now accepts explicit fixture digits;
+its default `5551234` and existing gates are unchanged.
+
+| Control | Physical number | Observed result |
+| --- | --- | --- |
+| FDN On, listed | `12346` | CM Service Request, exact called-party SETUP, one traffic assignment, CONNECT/ACK, physical End and complete CC/RR release. |
+| FDN On, unlisted | `12347` | Exact Call not allowed frame; no CM Service Request, SETUP, traffic assignment or CONNECT. |
+| FDN Off, same unlisted | `12347` | The ordinary physical PIN2-authorized Off route precedes a new process; CM/CC/RR completes and physical End releases. |
+
+The On controls start with identical source cards. Physical Off changes only
+ADN validity; all dial runs retain their entire input card, including the FDN
+record and retries. Actual contacts must decode while held. Authentication
+and retained-location registration are qualified before the first dial key.
+All three final frames match the separately reviewed 13:49 DCT3 LAB idle
+oracle: the own retained RTC has advanced through the earlier physical cold
+workflows. The original 13:47 oracle is unchanged; neither time nor pixels
+are rewritten or masked.
+
+The Off control emits identical SETUP bodies first on SDCCH and then on TCH
+after Assignment Complete, with the same observed request ID. Its explicit
+`setup_transfer` check requires exactly those two packets, their channel
+prefixes, identical bodies/request identity and ordering before CONNECT.
+Default outgoing-call acceptance still rejects duplicate SETUP. This records
+the observed assignment-crossing sequence, not a generic permission to ignore
+duplicates or a hardware timing claim.
+
+```sh
+.venv/bin/python tools/nsb7_fdn_dial_check.py \
+  tmp/nsb7-fdn-edit-cold tmp/nsb7-fdn-dial-listed \
+  tmp/nsb7-fdn-dial-unlisted tmp/nsb7-fdn-dial-disable tmp/nsb7-fdn-dial-off
+```
+
+This establishes bounded FDN enforcement and permitted lab-HLE call signaling,
+not emergency-number exceptions, wildcard/prefix matching, native speech,
+external RF or a SIP-connected call.

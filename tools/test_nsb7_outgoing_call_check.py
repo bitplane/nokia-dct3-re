@@ -2,7 +2,7 @@
 import unittest
 import re
 
-from tools.nsb7_outgoing_call_check import check
+from tools.nsb7_outgoing_call_check import check, check_inputs
 
 
 def fixture():
@@ -34,6 +34,39 @@ def fixture():
 
 
 class OutgoingCallTest(unittest.TestCase):
+    def test_explicit_setup_transfer_requires_channel_and_request_identity(self):
+        text=fixture()
+        setup=next(line for line in text.splitlines() if 'message=05' in line)
+        body='03450404600201805e0581551532f4150101'
+        request='GSM outgoing request id=1 digits=5551234'
+        text=text.replace(setup,'nsb7_radio_tx: index=70 type=1b length=28 data=0080013049'+body+'2b2b000000\n'+setup+'\n'+request,1)
+        connect='GSM service downlink kind=12 sapi=0 pd=03 message=07 length=2'
+        text=text.replace(connect,'nsb7_radio_tx: index=78 type=1b length=28 data=00b0012249'+body+'2b2b000000\n'+setup+'\n'+request+'\n'+connect)
+        check(text,setup_transfer=True)
+        with self.assertRaises(ValueError):
+            check(text)
+        with self.assertRaises(ValueError):
+            check(text.replace('data=00b0012249','data=0080012249'),setup_transfer=True)
+        last=text.rfind(request)
+        with self.assertRaises(ValueError):
+            check(text[:last]+text[last:].replace('id=1','id=2',1),setup_transfer=True)
+
+    def test_explicit_five_digit_fixture(self):
+        steps=[(20+i,'Keypad '+digit) for i,digit in enumerate('12346')]+[(28,'Send')]
+        prefix='\n'.join(f'nsb7_outgoing_call_input: key={key} state={edge} t={second}.{fraction}'
+                         for second,key in steps for edge,fraction in [('1','000000000'),('0','200000000')])
+        text=prefix+'\nGSM service establish'+fixture().split('GSM service establish',1)[1]
+        text=text.replace('length=18 data=03450404600201805e0581551532f4150101',
+                          'length=17 data=03450404600201805e04812143f6150101')
+        check(text,digits='12346')
+        with self.assertRaises(ValueError):
+            check(text,digits='12347')
+
+    def test_dial_fixture_domain(self):
+        for digits in ('','12345678','12*34','１２３'):
+            with self.subTest(digits=digits),self.assertRaises(ValueError):
+                check_inputs(fixture(),digits=digits)
+
     def test_explicit_physical_delay(self):
         text = re.sub(r't=(\d+)\.', lambda m: f't={int(m[1])+8}.', fixture())
         check(text, delay=8)

@@ -9,9 +9,13 @@ for _,port in pairs(machine.ioport.ports) do
     for _,field in pairs(port.fields) do fields[field.name]=field end
 end
 local input=coroutine.create(function()
-    for _,step in ipairs({{20,'Keypad 5'},{21,'Keypad 5'},{22,'Keypad 5'},
-            {23,'Keypad 1'},{24,'Keypad 2'},{25,'Keypad 3'},{26,'Keypad 4'},
-            {28,'Send'},{40,'End'}}) do
+    local digits=_G.nsb7_outgoing_call_digits or '5551234'
+    assert(digits:match('^%d+$') and #digits<=7,'invalid physical dial fixture')
+    local steps={}
+    for index=1,#digits do steps[#steps+1]={19+index,'Keypad '..digits:sub(index,index)} end
+    steps[#steps+1]={28,'Send'}
+    steps[#steps+1]={40,'End'}
+    for _,step in ipairs(steps) do
         assert(emu.wait(step[1]+delay-machine.time:as_double()))
         local field=assert(fields[step[2]])
         machine:logerror(string.format('nsb7_outgoing_call_input: key=%s state=1 t=%.9f\n',step[2],machine.time:as_double()))
