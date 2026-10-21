@@ -117,6 +117,14 @@ class LocationUpdateCheckTests(unittest.TestCase):
             'nsb7_page_post: index=46 source=16 target=17 lr=00200e39 data=07d4 t=14',
             'nsb7_rr_flag06_trigger: event=07d4 report=03ec t=14',
             'nsb7_rr_flag06: value=01 pc=00260a48 task=17 t=14'])
+        rows.extend([
+            'nsb7_9c8_source: caller=00232057 task=18 t=6',
+            'nsb7_9c8_source: caller=00232057 task=18 t=14',
+            'nsb7_9c8_completion: event=1584 record=0012f2e8 t=10',
+            'nsb7_9c8_completion: event=1599 record=0012f2e8 t=20',
+            'nsb7_service_completion: pending=00102168 tag=03ec t=10',
+            'nsb7_page_post: index=21 source=17 target=13 lr=002b29a1 data=03ec t=6',
+            'nsb7_page_post: index=76 source=17 target=13 lr=002b29a1 data=03ec t=14'])
         return '\n'.join(rows)
 
     def test_addressed_imsi_match(self):
@@ -137,6 +145,10 @@ class LocationUpdateCheckTests(unittest.TestCase):
     def test_addressed_readiness_not_assumed(self):
         with self.assertRaises(ValueError):
             check_addressed_page(self.addressed_fixture().replace('flag06=01', 'flag06=00'))
+
+    def test_post_release_timeout_not_completion(self):
+        with self.assertRaises(ValueError):
+            check_addressed_page(self.addressed_fixture().replace('event=1599', 'event=1584'))
 
 
 if __name__ == '__main__':

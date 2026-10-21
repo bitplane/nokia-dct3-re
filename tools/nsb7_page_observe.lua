@@ -5,11 +5,16 @@ local machine=manager.machine
 local cpu=machine.devices[':maincpu']
 local memory=cpu.spaces.program
 local count=0
+_G.nsb7_page_9c8_source=memory:install_read_tap(0x22e28c,0x22e28f,'nsb7_9c8_source',function()
+    if cpu.state['R15'].value~=0x22e28c or cpu.state['R0'].value~=0x9c8 then return end
+    machine:logerror(string.format('nsb7_9c8_source: caller=%08x task=%u t=%.9f observer_writes=0\n',
+        cpu.state['R14'].value,memory:read_u8(0x100022),machine.time:as_double()))
+end)
 local tap=memory:install_read_tap(0x2898e8,0x2898eb,'nsb7_page_posts',function()
     local time=machine.time:as_double()
     if cpu.state['R15'].value~=0x2898e8 or time<3 or time>17 or count>=256 then return end
     local target=cpu.state['R0'].value
-    if target~=16 and target~=17 then return end
+    if target~=13 and target~=16 and target~=17 and target~=18 then return end
     local object=cpu.state['R1'].value
     if object<0x100000 or object>=0x17ff00 then return end
     count=count+1
@@ -31,6 +36,18 @@ local tap=memory:install_read_tap(0x2898e8,0x2898eb,'nsb7_page_posts',function()
                 pointer,table.concat(body),time))
         end
     end
+end)
+_G.nsb7_page_service_completion=memory:install_read_tap(0x2a3644,0x2a3647,'nsb7_service_completion',function()
+    if cpu.state['R15'].value~=0x2a3646 then return end
+    local pending=memory:read_u32(0x130854)
+    if pending<0x100000 or pending>=0x17ff00 then return end
+    machine:logerror(string.format('nsb7_service_completion: pending=%08x tag=%04x t=%.9f observer_writes=0\n',
+        pending,memory:read_u16(pending),machine.time:as_double()))
+end)
+_G.nsb7_page_9c8_completion=memory:install_read_tap(0x232058,0x23205b,'nsb7_9c8_completion',function()
+    if cpu.state['R15'].value~=0x23205a then return end
+    machine:logerror(string.format('nsb7_9c8_completion: event=%04x record=%08x t=%.9f observer_writes=0\n',
+        cpu.state['R0'].value,cpu.state['R4'].value,machine.time:as_double()))
 end)
 _G.nsb7_page_flag06_trigger=memory:install_read_tap(0x260a34,0x260a37,'nsb7_rr_flag06_trigger',function()
     if cpu.state['R15'].value~=0x260a34 then return end

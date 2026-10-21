@@ -343,6 +343,14 @@ def check_addressed_page(text):
             'nsb7_rr_flag06_trigger: event=07d4 report=03ec ' not in text or
             not re.search(r'nsb7_rr_flag06: value=01 pc=00260a48 task=17 ', text)):
         raise ValueError('firmware-owned readiness-request chain is missing')
+    completions = re.findall(r'nsb7_9c8_completion: event=([0-9a-f]{4}) record=([0-9a-f]{8}) ', text)
+    reports = re.findall(r'nsb7_service_completion: pending=([0-9a-f]{8}) tag=03ec ', text)
+    submitted = re.findall(r'nsb7_page_post: index=\d+ source=17 target=13 lr=002b29a1 data=03ec', text)
+    callers = re.findall(r'nsb7_9c8_source: caller=00232057 task=18 ', text)
+    if ([row[0] for row in completions] != ['1584', '1599'] or
+            completions[0][1] != completions[1][1] or len(reports) != 1 or
+            len(submitted) != 2 or len(callers) != 2):
+        raise ValueError('bounded first-completion/post-release-timeout contract differs')
     packets = PACKET.findall(text)
     if len(packets) != 49:
         raise ValueError('bounded page-parser fixture unexpectedly advanced to access')

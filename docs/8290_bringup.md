@@ -1107,6 +1107,39 @@ task names or a claim that `07d4` means a particular GSM primitive.
 
 `tmp/nsb7-page-mm-request` and `--addressed-page` require this request
 chain, the writer and all three readiness values alongside the accepted
-IMSI and `083e` continuation. The current question is why task 18 selects
-`09c8` after location updating and what ordinary-service lifecycle should
-replace it. Forcing `+6` clear would bypass that unanswered contract.
+IMSI and `083e` continuation. The `09c8` completion boundary is described
+below. Forcing `+6` clear would bypass that unanswered contract.
+
+### Post-release service completion boundary
+
+Task 18's generic sender `22e28c` receives `09c8` from call `232052`
+(Thumb return `232057`) both before registration and after release.
+That branch sends `09c5` first, then `09c8`, and waits through `22e5c4`
+for event `1584` at `23205a`. The first wait completes with `1584`
+around 10.551 seconds; the post-release wait instead returns `1599`
+around 20.289 seconds. No `1584` is injected or substituted for that
+timeout.
+
+The successful completion chain is:
+`03ec` (task 17 to task 13, `2b299c`) -> task-13 completion `2a3646`
+-> `07ee` (task 13 to task 17, `2a35e0`) -> `09f9` (task 17 to task 16)
+-> `1584` (task 16 to task 18). Completion dispatcher `2a3646` reads
+the pending object through `130854` (also `13084c+8`) and dispatches
+tag `03ec` to `2a3696`; that calls constructor `2a354c` with `07ee`.
+The neighboring `03eb` case selects `07ef`, not `07ee`.
+
+`tmp/nsb7-page-service-completion` observes two `03ec` submissions,
+at 6.669 and 14.666 seconds, but only one `2a3646` completion for tag
+`03ec`, at 10.548 seconds. The corresponding `07ee` and `09f9` precede
+the first `1584`. After release the receiver-return indication is instead
+`09f7 -> 1580`, followed by the new `09c8` request and no second `03ec`
+completion through 25 seconds. This identifies a task-13 service
+completion boundary; it does not yet identify the missing condition or
+prove that another DSP packet is required.
+
+`--addressed-page` additionally requires the two own caller observations,
+two service submissions, single completion, and `1584` then `1599`
+returns from the same task-18 record. The next investigation is what
+prevents task 13 completing the post-release `03ec`, compared with the
+earlier successful lifecycle. The page is not lost and its subscriber
+identity is not the remaining unknown.
