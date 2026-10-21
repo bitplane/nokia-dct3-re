@@ -22,6 +22,8 @@ def measurement_trace():
     return trace() + '\n' + '\n'.join([
         'nsb7_candidate_object: index=1 type=56 length=160 words=' + ','.join(['0258'] + ['ffff']*79) +
         ' t=3 observer_writes=0',
+        'nsb7_candidate_context: route=01 root08=00000000 root0c=00109438 root18=00109438 root28=00109438 t=3 observer_writes=0',
+        'nsb7_candidate_record: address=00109438 channel=0258 flags=a2 t=3 observer_writes=0',
         f'nsb7_radio_tx: index=30 type=56 length=160 data=0258' + 'ff'*158 +
         f' cursor={cursor:02x} producer={producer:02x} pc=002cb0ec t=3.5 observer_writes=0',
         'nsb7_radio_rx: index=1 type=8e length=10 t=1 observer_writes=0',
@@ -45,6 +47,9 @@ class RadioInventoryTests(unittest.TestCase):
         check_trace(measurement_trace(), True)
         for old, new in [('task=13', 'task=12'), ('first=0258', 'first=0001'),
                          ('index=3 type=8b', 'index=3 type=89'),
+                         ('root08=00000000', 'root08=00109438'),
+                         ('flags=a2', 'flags=a4'),
+                         ('root28=00109438', 'root28=00000000'),
                          ('class=2 t=3', 'class=3 t=3')]:
             with self.subTest(old=old), self.assertRaises(ValueError):
                 check_trace(measurement_trace().replace(old, new), True)
@@ -63,6 +68,9 @@ class RadioInventoryTests(unittest.TestCase):
         self.assertEqual(report['rx_8a']['task'], 13)
         self.assertEqual(report['rx_80']['subtype_handlers']['40'], '002e4f8a')
         self.assertEqual(report['rx_80']['frame_payload_offsets'], [3, 4, 5])
+        self.assertEqual(report['rx_80']['subtype40_gate_address'], '00130784')
+        self.assertEqual(report['rx_80']['candidate_channel_payload_offsets'], [6, 7])
+        self.assertEqual(report['rx_80']['success_record_state'], 4)
         self.assertEqual(report['payload_prefix_bytes'], 4)
         self.assertEqual(report['classified_inputs'], 65536)
         self.assertEqual(report['ranges'], [

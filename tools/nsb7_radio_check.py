@@ -69,6 +69,12 @@ def contract(image):
             'rx_80': {'dispatcher': '002e4ef4', 'gate': '00130784 == 1',
                       'subtype_payload_offset': 0, 'status_payload_offset': 2,
                       'frame_payload_offsets': [3, 4, 5],
+                      'subtype40_gate_address': '00130784',
+                      'candidate_parser': '00287574',
+                      'candidate_channel_payload_offsets': [6, 7],
+                      'candidate_update': '0028734c',
+                      'success_record_state': 4,
+                      'sch_bsic_payload_offset': 10,
                       'subtype_handlers': {'40': '002e4f8a', '50': '002e4e96',
                                            '60': '002e4d24', '70': '002e4b86',
                                            '80': '002e49e6', 'a0': '002e4f52',
@@ -108,6 +114,12 @@ def check_trace(text, measurement=False):
         objects = re.findall(r'nsb7_candidate_object: index=1 type=56 length=160 words=([0-9a-f,]+) ', text)
         if len(objects) != 1 or objects[0].split(',') != ['0258'] + ['ffff']*79:
             raise ValueError('pre-transport candidate object is missing or differs')
+        contexts = re.findall(r'nsb7_candidate_context: route=01 root08=00000000 root0c=([0-9a-f]{8}) '
+                              r'root18=([0-9a-f]{8}) root28=([0-9a-f]{8}) ', text)
+        records = re.findall(r'nsb7_candidate_record: address=([0-9a-f]{8}) channel=0258 flags=a2 ', text)
+        if (len(contexts) != 1 or len(records) != 1 or
+                contexts[0] != (records[0],)*3 or not 0x100000 <= int(records[0], 16) < 0x17fff0):
+            raise ValueError('candidate context does not contain the sole measured carrier')
         replies = re.findall(r'nsb7_radio_rx: index=(\d+) type=([0-9a-f]{2}) length=(\d+) ', text)
         # Two existing external-service 8e frames precede the sole RF reply.
         if replies != [('1', '8e', '10'), ('2', '8e', '10'), ('3', '8b', '166')]:

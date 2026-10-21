@@ -635,7 +635,7 @@ after the four-byte object prefix. Payload bytes 3..5 form a big-endian
 
 | Subtype | Own branch / handler |
 | --- | --- |
-| `40` | `2e4f8a`: forward to task 13 only if the context's byte `+0c` is 1 |
+| `40` | `2e4f8a`: forward to task 13 under the same `130784 == 1` gate |
 | `50` | `2e4e96` |
 | `60` | `2e4d24` |
 | `70` | `2e4b86` |
@@ -644,6 +644,21 @@ after the four-byte object prefix. Payload bytes 3..5 form a big-endian
 | `b0` | `2e4f4c`: status-dependent branch to `2e49e6` |
 
 Other subtypes are freed. Status values other than 1 also call `2e49d0`
-before subtype dispatch. These are decoded routes, not a qualified reply
-payload: establish the candidate lifecycle's context gate and task-13
-consumer fields before enabling a success response or channel completion.
+before subtype dispatch. The subtype-40 context literal is `130778`, so
+its byte `+0c` aliases the outer gate rather than imposing a second
+independent readiness requirement.
+
+After the single-cell measurement, root `12fbc8` has `+08 == 0`, while
+`+0c/+18/+28` all identify the same carrier-600 record. Its byte `+0d`
+is `a2`; the RX gate is already 1. Task 13's candidate wait checks type
+`80`/subtype `40` at `223fea..223ffe` and calls `22076c -> 287574`.
+The parser looks up the candidate using payload bytes 6..7 as a big-endian
+channel. Update helper `28734c` checks payload byte 2: zero calls
+`2872c4`, clears the record's failure counter, and changes the low nibble
+of byte `+0d` to 4; a nonzero error increments the counter and ordinarily
+sets that nibble to 1. The payload's bytes 3..5 supply the 24-bit frame
+value, bytes 8..9 supply a signed shift on the relevant call variant,
+and byte 10 shifted right by two supplies the decoded BSIC. These offsets
+fit the existing shared fourteen-byte SCH payload shape, but a successful
+end-to-end synchronization exchange is not yet qualified. Channel
+completion and the subsequent BCCH lifecycle remain separate contracts.

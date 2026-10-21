@@ -43,6 +43,14 @@ taps[#taps+1]=memory:install_read_tap(0x2b6880,0x2b6883,'nsb7_candidate_before_t
     end
     machine:logerror(string.format('nsb7_candidate_object: index=%d type=%02x length=%u words=%s t=%.9f observer_writes=0\n',
         candidates,memory:read_u8(object+3),memory:read_u8(object+2),table.concat(words,','),machine.time:as_double()))
+    machine:logerror(string.format('nsb7_candidate_context: route=%02x root08=%08x root0c=%08x root18=%08x root28=%08x t=%.9f observer_writes=0\n',
+        memory:read_u8(0x130784),memory:read_u32(0x12fbd0),memory:read_u32(0x12fbd4),
+        memory:read_u32(0x12fbe0),memory:read_u32(0x12fbf0),machine.time:as_double()))
+    local record=memory:read_u32(0x12fbe0)
+    if record>=0x100000 and record<0x17fff0 then
+        machine:logerror(string.format('nsb7_candidate_record: address=%08x channel=%04x flags=%02x t=%.9f observer_writes=0\n',
+            record,memory:read_u16(record+6),memory:read_u8(record+13),machine.time:as_double()))
+    end
 end)
 taps[#taps+1]=memory:install_read_tap(0x2c7fcc,0x2c7fcf,'nsb7_measured_channel_class',function()
     if cpu.state['R15'].value~=0x2c7fcc or machine.time:as_double()<3.4 or classes>=32 then return end
