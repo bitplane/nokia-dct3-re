@@ -24,8 +24,8 @@ Release are acknowledged by firmware; EF_LOCI is updated over SIMI and
 retained, and the receiver returns to common control. Repeated empty paging
 blocks reach its RR decoder. An addressed page now produces the handset's
 own Paging Response after background measurement completion. Stable
-registered idle presentation remains unestablished. Incoming SMS delivery
-and cold SIM readback are qualified below; user-facing reading is not. Incoming-call
+registered idle presentation remains unestablished. Incoming SMS delivery,
+physical reading and cold read-status retention are qualified below. Incoming-call
 control through physical Answer/End, CONNECT acknowledgement and release
 is qualified below; speech is not established.
 In the normal machine, DSP exchange/service replies are disabled; own internal
@@ -1298,5 +1298,38 @@ or marked read by the UI.
 The checker pins the own ROM, initial location-update exchange, ordered
 83-packet delivery inventory, SAPI3/CP/RP acknowledgements, release,
 exact wire write and stored record, untouched other slots, and cold
-full-record RX with unchanged storage. Read/delete/outgoing SMS and
-user-facing message presentation remain separate targets.
+full-record RX with unchanged storage. The user-driven reading continuation
+is qualified below; delete and outgoing SMS remain separate targets.
+
+### Physical SMS reading and readable message screen
+
+`tools/nsb7_sms_read_observe.lua` presses the physical left softkey at
+23 and 25 seconds after the same incoming delivery. The first delivered
+record is unchanged until that reading sequence. Firmware then sends a
+second complete UPDATE RECORD at 25.483 seconds, changing only its
+status from unread `03` to read `01`; the text, sender, other nine SMS
+records and the rest of the card remain byte-identical.
+
+The captured `tmp/nsb7-sms-read/snap/nsb7_sms_read_25.png` visibly shows
+`hello` with `Options` and `Back`. Its 84x48 RGB pixel SHA256 is
+`73f302b41033281ec674b38bfb011a95857ddbd0b533b94a5520a821c9b36b4f`.
+The checker hashes decoded pixels rather than PNG file metadata. This is
+a readable message-screen result, not a correction of the still-malformed
+idle/call main-area presentation. `progress_latest_frame.png` is updated
+from this actual firmware screenshot.
+
+`tmp/nsb7-sms-read-retained` cold-starts using that process's own saved
+files and no queued network SMS. The MCU reads the full retained read
+record through SIMI; the entire card stays unchanged, including status
+`01`. The extended acceptance command is:
+
+```sh
+.venv/bin/python tools/nsb7_sms_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-sms tmp/nsb7-sms-retained \
+  --read tmp/nsb7-sms-read --read-cold tmp/nsb7-sms-read-retained
+```
+
+It additionally requires exact physical key timing, delivery-before-read
+wire writes, a status-only card change after the key presses, the message
+pixel oracle and cold full-record readback. No firmware, SIM record or
+read flag is set by the observer. Deletion and outgoing SMS remain open.

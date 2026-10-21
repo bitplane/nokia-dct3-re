@@ -1,7 +1,9 @@
 import re
+from pathlib import Path
+import tempfile
 import unittest
 
-from tools.nsb7_sms_check import check_delivery, check_cold
+from tools.nsb7_sms_check import check_delivery, check_cold, check_read, check_read_frame
 from tools.radio_sms_acceptance_common import FIRST_SMS_DELIVER_BODY, SMS_NVRAM_OFFSET
 from tools.test_nsb7_location_update_check import trace as location_trace
 
@@ -67,6 +69,51 @@ class SmsTests(unittest.TestCase):
     def test_cold_card_modified(self):
         with self.assertRaises(ValueError):
             check_cold(cold(), card()[:-1], card())
+
+    def read_fixture(self):
+        saved = card()
+        read = bytearray(saved)
+        read[SMS_NVRAM_OFFSET] = 1
+        rows = []
+        for time in (23, 25):
+            rows.extend([f'nsb7_sms_input: key=Menu state=1 t={time}.000000000',
+                         f'nsb7_sms_input: key=Menu state=0 t={time}.200000000'])
+        wire = bytes.fromhex('a0dc0104b0') + saved[SMS_NVRAM_OFFSET:SMS_NVRAM_OFFSET+176]
+        wire += bytes.fromhex('a0dc0104b0') + bytes(read[SMS_NVRAM_OFFSET:SMS_NVRAM_OFFSET+176])
+        rows.extend(f'nsb7_sim_tx: index={i} value={value:02x}' for i, value in enumerate(wire, 1))
+        rows.extend(['sim_device: update fid=6f3c record=1 length=176 t=19.146',
+                     'sim_device: update fid=6f3c record=1 length=176 t=25.482'])
+        return '\n'.join(rows), bytes(read), saved
+
+    def test_physical_read(self):
+        check_read(*self.read_fixture())
+
+    def test_read_without_key(self):
+        text, read, saved = self.read_fixture()
+        with self.assertRaises(ValueError):
+            check_read(text.replace('key=Menu', 'key=Other'), read, saved)
+
+    def test_read_not_allowed_to_change_body(self):
+        text, read, saved = self.read_fixture()
+        changed = bytearray(read)
+        changed[SMS_NVRAM_OFFSET+20] ^= 1
+        with self.assertRaises(ValueError):
+            check_read(text, bytes(changed), saved)
+
+    def test_read_write_before_key(self):
+        text, read, saved = self.read_fixture()
+        with self.assertRaises(ValueError):
+            check_read(text.replace('t=25.482', 't=24.482'), read, saved)
+
+    def test_blank_frame_is_not_readable_message_evidence(self):
+        from PIL import Image
+        scratch = Path(__file__).resolve().parents[1] / 'tmp'
+        scratch.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=scratch) as directory:
+            path = Path(directory) / 'blank.png'
+            Image.new('RGB', (84, 48), 'white').save(path)
+            with self.assertRaises(ValueError):
+                check_read_frame(path)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,6 @@
 """Own NSB-7 incoming SMS delivery and cold SIM readback, not UI rendering."""
 import argparse
+import hashlib
 from pathlib import Path
 import re
 import sys
@@ -7,7 +8,9 @@ import sys
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.nsb7_radio_check import PACKET, contract, check_location_update
-from tools.radio_sms_acceptance_common import FIRST_SMS_DELIVER_BODY, sms_record
+from tools.radio_sms_acceptance_common import FIRST_SMS_DELIVER_BODY, SMS_NVRAM_OFFSET, sms_record
+
+READ_FRAME_SHA256 = '73f302b41033281ec674b38bfb011a95857ddbd0b533b94a5520a821c9b36b4f'
 
 
 def tx_bytes(text):
@@ -64,21 +67,61 @@ def check_cold(text, card, delivered):
         raise ValueError('MCU did not read the complete retained SMS record through SIMI')
 
 
+def check_read(text, card, delivered):
+    if '[LUA ERROR]' in text or sms_record(delivered)[0] != 3:
+        raise ValueError('reading requires a successful fixture and an unread source record')
+    expected = bytearray(delivered)
+    expected[SMS_NVRAM_OFFSET] = 1
+    if card != bytes(expected):
+        raise ValueError('physical reading must change only the delivered record status to read')
+    keys = re.findall(r'nsb7_sms_input: key=Menu state=([01]) t=([0-9.]+)', text)
+    if keys != [('1', '23.000000000'), ('0', '23.200000000'),
+                ('1', '25.000000000'), ('0', '25.200000000')]:
+        raise ValueError('physical message-reading keys differ')
+    wire = tx_bytes(text)
+    unread = bytes.fromhex('a0dc0104b0') + sms_record(delivered)
+    read = bytes.fromhex('a0dc0104b0') + sms_record(card)
+    if wire.count(unread) != 1 or wire.count(read) != 1 or wire.index(unread) >= wire.index(read):
+        raise ValueError('delivery then read-status UPDATE RECORD exchange differs')
+    writes = re.findall(r'sim_device: update fid=6f3c record=1 length=176 t=([0-9.]+)', text)
+    if len(writes) != 2 or not (float(writes[0]) < 23 and 25 < float(writes[1]) < 35):
+        raise ValueError('read-status write must follow the physical reading keys')
+
+
+def check_read_frame(path):
+    from PIL import Image
+    with Image.open(path) as source:
+        pixels = source.convert('RGB')
+        if pixels.size != (84, 48) or hashlib.sha256(pixels.tobytes()).hexdigest() != READ_FRAME_SHA256:
+            raise ValueError('SMS hello/Options/Back pixel oracle differs')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image', type=Path)
     parser.add_argument('delivery', type=Path)
     parser.add_argument('cold', type=Path)
+    parser.add_argument('--read', type=Path)
+    parser.add_argument('--read-cold', type=Path)
     args = parser.parse_args()
+    if bool(args.read) != bool(args.read_cold):
+        parser.error('--read and --read-cold must be supplied together')
     try:
         contract(args.image.read_bytes())
         saved = (args.delivery / 'nvram/nsb7hle/sim_card').read_bytes()
         check_delivery((args.delivery / 'error.log').read_text(), saved)
         check_cold((args.cold / 'error.log').read_text(),
                    (args.cold / 'nvram/nsb7hle/sim_card').read_bytes(), saved)
+        if args.read:
+            read = (args.read / 'nvram/nsb7hle/sim_card').read_bytes()
+            check_read((args.read / 'error.log').read_text(), read, saved)
+            check_read_frame(args.read / 'snap/nsb7_sms_read_25.png')
+            check_cold((args.read_cold / 'error.log').read_text(),
+                       (args.read_cold / 'nvram/nsb7hle/sim_card').read_bytes(), read)
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 SMS: FAIL: {error}\n')
-    print('PASS: handset CP/RP ACK, exact SIM SMS write and cold MCU readback; no UI claim')
+    print('PASS: handset CP/RP ACK, exact SIM SMS write and cold MCU readback' +
+          ('; physical read/status persistence and hello pixel oracle' if args.read else '; no UI claim'))
 
 
 if __name__ == '__main__':
