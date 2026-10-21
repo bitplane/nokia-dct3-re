@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_active_call_and_incoming_sms_restoration",
+      "owner": "nsb7_hle_state", "status": "satisfied",
+      "predicate": "An established lab call and an incoming CP/RP transaction restore exact architecture, replay their observed traffic and accept physical continuation",
+      "current": "The33s outgoing-call save follows CONNECT ACK; exact ARM/RAM/time and call pixels restore, modeled L1 frame-clock events replay over33..36s, and post-load physical End completes CC/RR release to exact clean idle with unchanged SIM. The19.35s incoming-SMS save lies after CP-ACK and before RP-ACK; exact architecture/protocol/pixels restore and physical Menu23/25 reads hello and performs the status-only SIM update. A late19.65s save is rejected by the CP/RP boundary check. The shared harness's idle path is independently rerun. L1 good=0 ticks are not decoded speech; native DSP, outgoing-submit and host-dialog restoration are not promoted.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_state_roundtrip.lua", "tools/nsb7_state_call.lua", "tools/nsb7_state_sms.lua", "tools/nsb7_state_check.py", "tools/test_nsb7_state_check.py"]
+    },
+    {
       "id": "nsb7_settled_idle_exact_restoration",
       "owner": "nsb7_hle_state", "status": "satisfied",
       "predicate": "Own clean lab idle restores exact ARM/RAM/time state, protocol replay and pixels and accepts a physical Menu contact afterward",

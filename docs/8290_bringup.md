@@ -1532,5 +1532,41 @@ persistent SIM card remains byte-identical to the input storage.
 ```
 
 This qualifies settled-idle architectural/protocol/pixel restoration and
-post-load input for `nsb7hle`, not native DSP restoration, active-call
-or active-SMS replay. Those transaction boundaries remain separate work.
+post-load input for `nsb7hle`, not native DSP restoration. Active-call
+and incoming-SMS boundaries are qualified separately below.
+
+### Established-call and active incoming-SMS restoration
+
+The three entry scripts now compose `tools/nsb7_state_roundtrip.lua`
+rather than duplicating architecture/replay mechanics.
+`nsb7_state_call.lua` saves the physically dialed outgoing call at 33 seconds,
+after CONNECT ACKNOWLEDGE and before physical End. Exact ARM/RAM/time
+restoration and reference/restored call pixels pass. The quiet signalling
+window has no ordinary packet exchange, so call acceptance additionally
+compares the model's ordered `radio_l1` frame-clock events over 33..36
+seconds. Their `good=0` traffic is timing evidence, not speech acceptance.
+After replay, physical End at 40 seconds still drives DISCONNECT,
+RELEASE COMPLETE and common-control return, with the exact clean-idle
+frame at 50 seconds. The entire SIM card is unchanged.
+
+`nsb7_state_sms.lua` saves at 19.35 seconds: the handset has sent CP-ACK
+at about 19.3474, but has not yet sent RP-ACK at about 19.3632. The
+checker rejects a save after RP completion. Exact architectural state,
+three-second protocol replay and reference/restored notification pixels
+pass. Physical Menu at 23/25 seconds then reads `hello`, reproduces its
+full text oracle and writes only the read status. The complete resulting
+card equals the own input card plus the one delivered/read SMS record;
+delivery and read-status UPDATE RECORD wire ordering are checked.
+
+```sh
+.venv/bin/python tools/nsb7_state_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-state-call \
+  tmp/nsb7-netmonitor-off-cold --call
+.venv/bin/python tools/nsb7_state_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-state-sms-active \
+  tmp/nsb7-netmonitor-off-cold --sms
+```
+
+These results cover an established lab-HLE call and the incoming CP/RP
+completion boundary, not every call/SMS phase, outgoing-submit restoration,
+host-dialog replay or native DSP/media restoration.

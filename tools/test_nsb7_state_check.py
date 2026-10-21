@@ -2,6 +2,7 @@
 import unittest
 
 from tools.nsb7_state_check import check
+from tools.test_nsb7_outgoing_call_check import fixture as call_fixture
 
 
 def fixture():
@@ -47,6 +48,32 @@ class StateCheckTest(unittest.TestCase):
     def test_incomplete_fixture(self):
         with self.assertRaises(ValueError):
             check(fixture() + '\nnsb7_state: FAIL incomplete')
+
+    def test_call_restoration(self):
+        state = fixture().split('nsb7_state_physical:')[0].replace(
+            'nsb7_idle', 'nsb7_call').replace('27.', '33.').replace('30.', '36.')
+        text = call_fixture().replace('nsb7_outgoing_call_input: key=End state=1',
+                                      state + 'nsb7_outgoing_call_input: key=End state=1')
+        check(text, call=True)
+
+    def test_call_must_be_connected_at_save(self):
+        with self.assertRaises(ValueError):
+            check(fixture() + '\n' + call_fixture(), call=True)
+
+    def test_active_sms_completion(self):
+        cp = 'GSM service uplink sapi=3 pd=09 message=04 length=2 data=8904\n'
+        rp = 'GSM service uplink sapi=3 pd=09 message=01 length=5 data=8901020240'
+        text = cp + fixture().split('nsb7_state_physical:')[0].replace(
+            'RX enqueue type=80 payload=34 data=6000 t=27.1', rp)
+        text = text.replace('nsb7_idle', 'nsb7_sms').replace(
+            '27.000000000', '19.350000000').replace('30.000000000', '22.350000000')
+        text += '\nnsb7_sms_input: key=Menu state=1 t=23.000000000\nnsb7_state_sms: complete'
+        check(text, sms=True)
+
+    def test_sms_already_completed_before_save(self):
+        rp = 'GSM service uplink sapi=3 pd=09 message=01 length=5 data=8901020240\n'
+        with self.assertRaises(ValueError):
+            check(rp + fixture(), sms=True)
 
 
 if __name__ == '__main__':
