@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_physical_ordinary_pin_change_cold_reuse",
+      "owner": "nsb7_sim_security", "status": "satisfied",
+      "predicate": "Physical ordinary PIN1 change persists only the new credential, rejects a wrong current PIN and permits cold new-PIN authentication",
+      "current": "Own Change access codes path4-6-5 and physical old1234/new4321/confirmation send A024000110 plus padded credentials after final OK.9000 and exact PIN code changed pixels accompany only four changed PIN1 bytes. Independent old1111 control returns9804/Code error and changes only retries3->2, preserving1234. A cold process retains the successful complete card and physical4321 VERIFY succeeds with unchanged card. All input decodes, initial PIN authentication, own flash journals and complete card comparisons pass. PIN2 and PIN-enabled network acceptance remain separate.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_pin_change.lua", "tools/nsb7_pin_change_wrong.lua", "tools/nsb7_pin_change_check.py", "tools/test_nsb7_pin_change_check.py"]
+    },
+    {
       "id": "nsb7_physical_pin_request_off_on_cold",
       "owner": "nsb7_sim_security", "status": "satisfied",
       "predicate": "Physical SIM-card-security Off/On persists only the PIN-enabled flag and changes the cold startup prompt accordingly",

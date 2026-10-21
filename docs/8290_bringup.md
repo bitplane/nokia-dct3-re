@@ -17,8 +17,8 @@ A separate PIN-enabled synthetic-card fixture qualifies physical wrong
 PIN, saved retry decrement and cold correct-PIN recovery to the phone-code
 prompt. Physical PIN exhaustion, failed-PUK retry, PUK recovery with a new
 PIN and cold replacement-PIN acceptance are also qualified. Physical
-SIM-card-security Off/On and cold PIN-request behavior pass; PIN2 and
-ordinary credential-change menus remain separate work.
+SIM-card-security Off/On, cold PIN-request behavior and ordinary PIN1
+change/rejection/cold reuse pass; PIN2 remains separate work.
 A physical SIM phonebook save and cold Details retrieval are qualified.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
@@ -1680,5 +1680,35 @@ Acceptance requires decoded physical navigation/authentication contacts,
 the setting APDU after final confirmation, correct security statuses,
 complete cold card comparisons, own flash-journal validity, phone-code
 acceptance without startup VERIFY while Off, exact Off/On menu frames,
-and the restored cold PIN prompt/VERIFY. This does not qualify ordinary
-PIN changes, PIN2/PUK2 or PIN-enabled network registration.
+and the restored cold PIN prompt/VERIFY. Ordinary PIN1 change is qualified
+below; PIN2/PUK2 and PIN-enabled network registration remain separate work.
+
+### Ordinary PIN1 change and rejected-current-PIN control
+
+The own `4 -> 6 -> 5` Change access codes path opens `Current PIN code`;
+successful completion returns to the `Change PIN code` leaf `4-6-5-1`.
+`tools/nsb7_pin_change.lua` authenticates PIN1/phone code physically,
+enters current PIN `1234`, new PIN `4321` and its confirmation. The MCU
+transmits `A0 24 00 01 10`, padded old `1234` and padded new `4321`.
+`9000` and the exact `PIN code changed` frame accompany a change to only
+the four PIN1 credential bytes; retries, enabled state, PUKs and all
+user files remain unchanged.
+
+The independent `tools/nsb7_pin_change_wrong.lua` control starts with the
+same own card and enters current PIN `1111`. CHANGE CHV returns `9804`
+and displays `Code error`; only PIN1 retries change `3 -> 2`, and PIN1
+remains `1234`. A separate cold run using the successful process's entire
+own card physically verifies `4321`, returns `9000` and reaches the phone
+Security-code prompt with no persistent card changes.
+
+```sh
+.venv/bin/python tools/nsb7_pin_change_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin-change-wrong \
+  tmp/nsb7-pin-change tmp/nsb7-pin-changed-cold
+```
+
+Acceptance checks all physical old/new/confirm decodes, initial PIN
+authentication, CHANGE CHV after final confirmation, exact success/error
+statuses and pixels, own flash journals and complete initial/final cards
+for both controls and cold reuse. This ordinary CHANGE CHV result is
+independent of the earlier PUK-based replacement-PIN recovery.
