@@ -24,7 +24,8 @@ Release are acknowledged by firmware; EF_LOCI is updated over SIMI and
 retained, and the receiver returns to common control. Repeated empty paging
 blocks reach its RR decoder. An addressed page now produces the handset's
 own Paging Response after background measurement completion. Stable
-registered idle presentation and SMS remain unestablished. Incoming-call
+registered idle presentation remains unestablished. Incoming SMS delivery
+and cold SIM readback are qualified below; user-facing reading is not. Incoming-call
 control through physical Answer/End, CONNECT acknowledgement and release
 is qualified below; speech is not established.
 In the normal machine, DSP exchange/service replies are disabled; own internal
@@ -1259,3 +1260,43 @@ incoming-call control and physical Answer/End, not native DSP speech,
 audio fidelity, external telephony or a usable call-screen image.
 The next independent service target is SMS delivery; extended repeated
 call/save-state qualification and display correctness remain separate.
+
+### Incoming SMS delivery and cold SIM readback
+
+`fixtures/nsb7_incoming_sms/nsb7hle.cfg` queues one ordinary laboratory
+SMS instead of a call. `tools/nsb7_sms_observe.lua` extends passive
+protocol observation to 35 seconds, without input after phone-code
+acceptance. No emulation change was needed after the call-control work.
+
+In `tmp/nsb7-sms`, the handset establishes SAPI 3, acknowledges both
+CP-DATA segments, then emits CP-ACK `8904` (TX70) and RP-ACK
+`8901020240` (TX71). After network CP-ACK it acknowledges RR release,
+deconfigures the dedicated receiver (TX74), returns to common control
+and issues a new background request (TX78). These are MCU uplinks,
+not merely laboratory-session state changes.
+
+The physical SIM TX stream contains one `A0 DC 01 04 B0` UPDATE RECORD
+with the exact 176-byte record saved in EF_SMS slot 1. Its status is
+`03` (unread), followed by laboratory SMSC `06912143658709` and the
+shared SMS-DELIVER body for sender digits `5551234`, text `hello`; remaining
+bytes are `ff`. The other nine records remain empty. EF_LOCI remains
+the accepted laboratory location. No card file is populated by the host.
+
+`tmp/nsb7-sms-retained` starts a separate process with that process's
+own saved flash/card/CCONT files and no radio/SMS input configuration.
+Firmware requests READ RECORD 1 (`A0 B2 01 04 B0`) and consumes the
+entire retained 176-byte record through SIMI RX. The card file remains
+byte-identical; no UPDATE RECORD occurs. This proves cold retention and
+MCU transport readback, not that the message body is rendered correctly
+or marked read by the UI.
+
+```sh
+.venv/bin/python tools/nsb7_sms_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-sms tmp/nsb7-sms-retained
+```
+
+The checker pins the own ROM, initial location-update exchange, ordered
+83-packet delivery inventory, SAPI3/CP/RP acknowledgements, release,
+exact wire write and stored record, untouched other slots, and cold
+full-record RX with unchanged storage. Read/delete/outgoing SMS and
+user-facing message presentation remain separate targets.
