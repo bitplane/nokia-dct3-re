@@ -612,6 +612,10 @@ EXTRA_PROFILES = {
         "TMS320C54x staged MVDP: PASS cases=336 restore=336 forms=7 registers=8 pages=2 snapshots=3 source_reads=1 program_writes=1 repeat=unvalidated silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVDP complete",
     ),
+    "dual-sub-native": (
+        "TMS320C54x native dual SUB: PASS cases=256 restore=256 opcode=a245 patterns=8x8 sxm=0,1 ovm=0,1 physical_phase_claim=0",
+        "Fatal error: TMS320C54x isolated native dual SUB complete",
+    ),
     "parallel-sub": (
         "TMS320C54x atomic ST||SUB fractions: PASS cases=128 restore=128 source_dest_pairs=4 fractional_patterns=8 memory_patterns=4 ordinary_ram=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated ST||SUB fractions complete",
@@ -2290,7 +2294,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("mvdd-follow", "st-acc-mvmm", "shift16-load-age", "addsub-ar-age", "bd-read-a", "mac-map-imm", "tc-delay-call", "tmac-repeat", "tmac-rpt-edge", "lms", "lms-edge", "addm-ar-short", "bd-maca-long", "bd-maca-edge", "push-mvmm-sp"):
         machine = "tms54xtra"
-    if args.profile in ("pmac-mod3-edge","store-observe","push-observe"):
+    if args.profile in ("pmac-mod3-edge","store-observe","push-observe","dual-sub-native"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",

@@ -20231,6 +20231,7 @@ private:
 		if (!strcmp(machine().options().bios(), "xc-status")) { start_xc_status(0); return; }
 		if (!strcmp(machine().options().bios(), "xc-latency")) { start_xc_latency(0); return; }
 		if (!strcmp(machine().options().bios(), "xc-barrier")) { start_xc_barrier(0); return; }
+		if (!strcmp(machine().options().bios(), "dual-sub-native")) { start_native_dual_sub(0); return; }
 		if (!strcmp(machine().options().bios(), "parallel-sub")) { start_parallel_sub_fraction(0); return; }
 		if (!strcmp(machine().options().bios(), "saccd")) { start_saccd_case(0); return; }
 		if (!strcmp(machine().options().bios(), "stlm-pmst-edge")) { start_stlm_pmst_edge(); return; }
@@ -21271,6 +21272,34 @@ private:
 		return { values[index % 8], values[(index + 3) % 8], words[(index / 8) % 4],
 			bool((index / 32) & 1), bool((index / 64) & 1) };
 	}
+	void start_native_dual_sub(unsigned index)
+	{
+		static constexpr u16 values[] = { 0, 1, 0x7fff, 0x8000, 0xffff, 0xfffb, 7, 0x1234 };
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		program.write_word(0x600, 0xa245); // SUB *AR2-,*AR3-,A.
+		program.write_word(0x601, 0xf4e1);
+		data.write_word(0x2000, values[index % 8]);
+		data.write_word(0x2100, values[(index / 8) % 8]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x56789a);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x2000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x2100);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x4444);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | ((index / 64) << 8));
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_pipeline_frontend(false);
+		m_rom4_codec_replay = false; m_phase = 700000 + index;
+		m_saved_pipeline.str({}); m_saved_pipeline.clear();
+		expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save native dual SUB fixture");
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+
 	void start_parallel_sub_fraction(unsigned index)
 	{
 		auto const f = parallel_sub_fraction_case(index);
@@ -54030,6 +54059,39 @@ private:
 			}
 			start_rom4_efr_decoder(0, true); return;
 		}
+		if (m_phase >= 700000 && m_phase < 700256)
+		{
+			unsigned const index = m_phase - 700000;
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE)) { m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+			static constexpr u16 values[] = { 0, 1, 0x7fff, 0x8000, 0xffff, 0xfffb, 7, 0x1234 };
+			u16 const x = values[index % 8], y = values[(index / 8) % 8];
+			bool const sxm = BIT(index, 6), ovm = BIT(index, 7);
+			// SPRU172C dual-memory SUB: sign-extend each word before shifting by 16.
+			s64 const difference = (sxm ? s64(s16(x)) - s16(y) : s64(x) - y) * 65536;
+			bool const overflow = difference < -0x80000000LL || difference > 0x7fffffffLL;
+			u64 const result = overflow && ovm ? (difference < 0 ? 0xff80000000ULL : 0x7fffffffULL) : u64(difference) & 0xffffffffffULL;
+			expect_opcode(0xa245,
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == result &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x56789a &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x4444 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1fff &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x20ff &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == ((x >= y ? 0x800 : 0) | (overflow ? 0x400 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | ((index / 64) << 8)) &&
+				data.read_word(0x2000) == x && data.read_word(0x2100) == y,
+				"Exact native dual SUB preserves sources and independently decrements both pointers");
+			if (!m_rom4_codec_replay)
+			{
+				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore native dual SUB fixture");
+				m_phase = 700000 + index; m_rom4_codec_replay = true;
+				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+			}
+			if (index < 255) { start_native_dual_sub(index + 1); return; }
+			osd_printf_info("TMS320C54x native dual SUB: PASS cases=256 restore=256 opcode=a245 patterns=8x8 sxm=0,1 ovm=0,1 physical_phase_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x isolated native dual SUB complete");
+		}
 		if (m_phase >= 525000 && m_phase < 525128)
 		{
 			unsigned const index = m_phase - 525000;
@@ -57063,6 +57125,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(200, "pmac-mod3-edge", "Write-only short-preincrement program multiply source exclusions")
 	ROM_SYSTEM_BIOS(201, "store-observe", "Retained accumulator-store inspection across pending write restore")
 	ROM_SYSTEM_BIOS(202, "push-observe", "Retained direct-PSHM stack and source inspection across restore")
+	ROM_SYSTEM_BIOS(203, "dual-sub-native", "Exact native dual-memory subtraction and pointer updates")
 ROM_END
 
 ROM_START(tms54rom4)

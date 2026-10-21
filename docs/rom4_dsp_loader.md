@@ -81,6 +81,30 @@ Use `c54x_opcode_coverage.py --additional-fixture-log` to combine separately
 completed profile evidence; never manufacture execution credit by combining
 an assertion-only run with a handset's execution trace.
 
+## Native dual-memory subtraction
+
+The corrected NSK-3 long trace executes `a245` 69,751 times. This exact
+encoding is `SUB *AR2-,*AR3-,A`: both pointers post-decrement, unlike
+the separately tested mixed-direction `a249` form. The isolated
+`dual-sub-native` profile checks eight source patterns in each operand,
+with SXM and OVM independently clear/set (256 cases, each replayed from
+save state). It checks the shifted signed/unsigned difference, guard bits,
+32-bit overflow/saturation, no-borrow carry, unchanged B/T/status controls,
+unchanged source RAM and both pointer updates. Initial overflow flags are
+clear; sticky overflow, other registers/encodings, staged pipeline ownership
+and physical cycle timing are outside this fixture's claim.
+
+```sh
+.venv/bin/python tools/run_c54x_core.py --mame mame/mame \
+  --rompath mame/roms --profile dual-sub-native --verbose \
+  --output-root tmp/native-dual-sub
+```
+
+The qualified run contains the `a245` assertion and 512 actual executions.
+No CPU arithmetic implementation change is needed. The current complete
+default core run separately passes 294 markers; its assertions alone must
+not be promoted to exact execution attribution without an opcode inventory.
+
 ## Mapped move and younger repeat ownership
 
 Decode can arm an RPT header while an older MVDK remains in Access. A global

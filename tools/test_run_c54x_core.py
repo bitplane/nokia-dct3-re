@@ -14,6 +14,19 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_native_dual_sub_requires_exact_scope_and_completion(self):
+        marker, ending = EXTRA_PROFILES['dual-sub-native']
+        text = marker + '\n' + ending
+        check_result(text, 3, profile='dual-sub-native')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'),
+                                 3, profile='dual-sub-native')
+        for bad in (marker, text + '\n' + marker):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='dual-sub-native')
+
     def test_store_observation_requires_retained_address_and_restore_scope(self):
         marker,ending = EXTRA_PROFILES['store-observe']
         text = marker+'\n'+ending
