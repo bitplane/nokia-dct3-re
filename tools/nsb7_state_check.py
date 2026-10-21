@@ -13,7 +13,10 @@ from tools.nsb7_menu_check import FRAMES
 from tools.radio_state_roundtrip import verify_roundtrip
 
 
-def check(text, call=False, sms=False, incoming_call=False, card=None):
+def check(text, call=False, sms=False, incoming_call=False, card=None, pin=False):
+    if pin:
+        from tools.nsb7_pin_services_check import check_authentication
+        check_authentication(text.split('nsb7_state: event=saved', 1)[0])
     if sum((bool(call), bool(sms), bool(incoming_call))) > 1:
         raise ValueError('choose one state scenario')
     scenario = 'incoming_call' if incoming_call else 'call' if call else 'sms' if sms else 'idle'
@@ -53,7 +56,7 @@ def check(text, call=False, sms=False, incoming_call=False, card=None):
                 rp not in text[restored:end]:
             raise ValueError('save must straddle incoming CP/RP acknowledgement completion')
         if 'nsb7_state_sms: complete' not in text or \
-                not re.search(r'nsb7_sms_input: key=Menu state=1 t=23\.', text[end:]):
+                not re.search(r'nsb7_sms_input: key=Menu state=1 t=' + ('26' if pin else '23') + r'\.', text[end:]):
             raise ValueError('missing post-load SMS reading')
         return
     if call:
@@ -81,13 +84,14 @@ def main():
     scenario.add_argument('--call', action='store_true', help='established outgoing call restoration')
     scenario.add_argument('--sms', action='store_true', help='incoming CP/RP completion and physical reading')
     scenario.add_argument('--incoming-call', action='store_true', help='PIN-authenticated connected incoming call')
+    parser.add_argument('--pin', action='store_true', help='require physical PIN/cold registration before save')
     args = parser.parse_args()
     try:
         contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
         check_security(text)
         card = (args.run / 'nvram/nsb7hle/sim_card').read_bytes()
-        check(text, call=args.call, sms=args.sms, incoming_call=args.incoming_call, card=card)
+        check(text, call=args.call, sms=args.sms, incoming_call=args.incoming_call, card=card, pin=args.pin)
         if args.call or args.incoming_call:
             kind = 'incoming_call' if args.incoming_call else 'call'
             from PIL import Image
@@ -104,8 +108,10 @@ def main():
             record = b'\x03' + FIRST_SMS_DELIVER_BODY
             record += b'\xff' * (176-len(record))
             delivered[SMS_NVRAM_OFFSET:SMS_NVRAM_OFFSET+176] = record
-            check_read(text, (args.run / 'nvram/nsb7hle/sim_card').read_bytes(), bytes(delivered))
-            check_read_frame(args.run / 'snap/nsb7_sms_read_25.png')
+            read_times = (26, 28, 30, 32) if args.pin else (23, 25)
+            check_read(text, (args.run / 'nvram/nsb7hle/sim_card').read_bytes(), bytes(delivered),
+                       read_times=read_times)
+            check_read_frame(args.run / f'snap/nsb7_sms_read_{read_times[-1]}.png')
             from PIL import Image
             with Image.open(args.run / 'snap/nsb7_state_sms_reference.png') as reference, \
                     Image.open(args.run / 'snap/nsb7_state_sms_restored.png') as restored:

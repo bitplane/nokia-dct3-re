@@ -9,7 +9,7 @@ local observer=scenario=='call' and 'nsb7_outgoing_call_observe.lua' or
 dofile(directory..observer)
 local machine=manager.machine
 -- With the own test00 setting, CP-ACK is at19.3474 and RP-ACK at19.3632.
-local save_time=({idle=27,call=33,sms=19.35,incoming_call=23})[scenario]
+local save_time=_G.nsb7_state_save_time or ({idle=27,call=33,sms=19.35,incoming_call=23})[scenario]
 local capture=dofile(directory..'arm_architecture_snapshot.lua')
 local saved,complete
 local retained={}
@@ -39,7 +39,7 @@ retained[#retained+1]=emu.add_machine_post_load_notifier(function()
             local key
             for _,port in pairs(machine.ioport.ports) do key=key or port.fields['Left Softkey / Menu'] end
             assert(key,'Menu contact absent')
-            for _,target in ipairs({23,25}) do
+            for _,target in ipairs(_G.nsb7_sms_read_times or {23,25}) do
                 assert(emu.wait(target-machine.time:as_double()))
                 machine:logerror(string.format('nsb7_sms_input: key=Menu state=1 t=%.9f\n',machine.time:as_double()))
                 key:set_value(1)
@@ -49,7 +49,7 @@ retained[#retained+1]=emu.add_machine_post_load_notifier(function()
                 assert(emu.wait(0.8))
                 machine.screens[':screen']:snapshot('nsb7_sms_read_'..target..'.png')
             end
-            assert(emu.wait(30-machine.time:as_double()))
+            assert(emu.wait((_G.nsb7_state_finish_time or 30)-machine.time:as_double()))
             complete=true
             machine:logerror('nsb7_state_sms: complete\n')
             machine:exit()

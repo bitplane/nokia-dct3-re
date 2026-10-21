@@ -98,6 +98,16 @@ class StateCheckTest(unittest.TestCase):
         text += '\nnsb7_sms_input: key=Menu state=1 t=23.000000000\nnsb7_state_sms: complete'
         check(text, sms=True)
 
+    def test_pin_authentication_is_bounded_before_save(self):
+        text = fixture()
+        with patch('tools.nsb7_pin_services_check.check_authentication') as authentication:
+            check(text, pin=True)
+            authentication.assert_called_once_with('')
+
+    def test_pin_requires_real_authentication(self):
+        with self.assertRaises(ValueError):
+            check(fixture(), pin=True)
+
     def test_sms_already_completed_before_save(self):
         rp = 'GSM service uplink sapi=3 pd=09 message=01 length=5 data=8901020240\n'
         with self.assertRaises(ValueError):

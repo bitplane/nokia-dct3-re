@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_pin_active_sms_restoration",
+      "owner": "nsb7_lab_services", "status": "satisfied",
+      "predicate": "Physical PIN authentication and cold registration precede an active incoming-SMS save with exact restored completion",
+      "current": "Save21.96 lies after CP-ACK21.952335 and before RP-ACK21.968092. All37 ARM/banked registers, RAM checksum, exact emulated time, three-second protocol replay and notification pixels match after restore. Physical Menu26/28/30/32 reads hello; complete card comparison permits only the delivered/read SMS record. Authentication is checked only in the raw prefix preceding save. This is lab-HLE SMS signaling/storage, not native RF or speech.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_pin_sms_state.lua", "tools/nsb7_state_roundtrip.lua", "tools/nsb7_state_check.py", "tools/test_nsb7_state_check.py"]
+    },
+    {
       "id": "nsb7_pin_incoming_call_restoration",
       "owner": "nsb7_lab_services", "status": "satisfied",
       "predicate": "Physical PIN authentication composes with incoming Answer/End and exact established-call restoration",

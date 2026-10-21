@@ -1924,3 +1924,20 @@ budget or be attributed to the descriptor.
   roms/noki8290/8290f522a.fls tmp/nsb7-pin-incoming-state-live \
   tmp/nsb7-pin-registration-cold --incoming-call
 ```
+
+### PIN-authenticated active SMS restoration
+
+`nsb7_pin_sms_state.lua` composes the same physical PIN/phone-code and cold
+registration with a save at 21.96 seconds, between the measured CP-ACK
+(21.952335) and RP-ACK (21.968092). Exact ARM/banked registers, RAM checksum,
+emulated time, three seconds of protocol replay and notification pixels
+match after restoration. Physical Menu at 26/28/30/32 seconds reads `hello`;
+the complete final card differs only by the delivered/read SMS record.
+The `--pin` checker bounds authentication and registration before the save,
+not merely somewhere in the combined reference/replayed trace.
+
+```sh
+.venv/bin/python tools/nsb7_state_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin-sms-state \
+  tmp/nsb7-pin-registration-cold --sms --pin
+```
