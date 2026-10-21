@@ -21,8 +21,9 @@ Immediate Assignment, dedicated-channel setup and an emitted Location
 Updating Request inside LAPDm SABM, followed by accepted contention-resolution
 UA and firmware link state `2 -> 4`. Location Updating Accept and Channel
 Release are acknowledged by firmware; EF_LOCI is updated over SIMI and
-retained, and the receiver returns to common control. Post-release paging,
-stable registered idle presentation, calls and SMS remain unestablished.
+retained, and the receiver returns to common control. Repeated empty paging
+blocks reach its RR decoder. Stable registered idle presentation, addressed
+paging response, calls and SMS remain unestablished.
 In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
 No PMM, resident DSP mask, hardware profile or provisioning is supplied by
@@ -979,3 +980,27 @@ sequence, three channel confirmations with no later paging payload,
 SIM TX commands and saved EF_LOCI. This qualifies an accepted laboratory
 location update and receiver return, not durable paging reachability,
 usable operator presentation, calls, SMS or native DSP speech.
+
+### Post-release empty paging reception
+
+`candidate_paging` enables the existing BCCH/PCH cycle only after a
+registered session and a subsequent common-control receiver confirmation.
+It does not enable an incoming service. This partial profile omits type-83
+measurements, so it must re-arm its registered cycle on the final type-80
+report; otherwise the shared scheduler stops after one cycle.
+
+In `tmp/nsb7-paging-cycle`, sixteen empty Paging Request Type 1 blocks
+`1506210001f0` plus eighteen `2b` fill bytes reach both `2e49e6` and
+task-14 `2645ec`. Each produces diagnostic decoder result `061a`.
+No new access request follows through 25 seconds; EF_LOCI remains updated.
+`--paging` checks these consumers, decoded blocks, receiver-return sequence
+and card persistence. This is reception evidence, not an addressed page
+or proof that call/SMS delivery works.
+
+The first paging frame is 3453; subsequent frames remain in the same
+102-frame subscriber group. The calibrated peer poll cadence sometimes
+skips an opportunity (204-frame rather than 102-frame separation).
+The checker permits those explicit gaps but rejects a different group;
+physical-time paging delivery remains unqualified. The idle screenshot
+still has malformed main-area content despite working softkey text and
+clock, so there is no usable registered-idle graphics claim.

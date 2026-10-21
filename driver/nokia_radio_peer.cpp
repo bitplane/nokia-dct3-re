@@ -2910,7 +2910,7 @@ void nokia_radio_peer_device::emit_report()
 		--m_reports_remaining;
 		advance_after_report(report_type);
 		// Qualify the receiver return independently of post-release paging.
-		if (m_protocol.coverage == acquisition_coverage::candidate_release &&
+		if (m_protocol.coverage >= acquisition_coverage::candidate_release &&
 				report_type == 0x89 && completing_release)
 		{
 			m_reports_remaining = 0;
@@ -2949,6 +2949,11 @@ void nokia_radio_peer_device::emit_report()
 			m_reports_remaining = 0;
 			m_wait_ticks = 0;
 			m_report_deferred = false;
+			if (m_protocol.coverage >= acquisition_coverage::candidate_paging && m_registered)
+			{
+				m_reports_remaining = serving_cycle_reports();
+				m_wait_ticks = 59;
+			}
 		}
 		if (m_protocol.coverage == acquisition_coverage::candidate_random_access && report_type == 0x84)
 		{
@@ -3044,6 +3049,11 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 				((m_reports_remaining + 1) % 3) == 2;
 		if (!pch_report)
 			m_wait_ticks = 59;
+		// Partial acquisition omits the unqualified type-83 measurement
+		// report, so its registered BCCH/PCH cycle ends on type 80 instead.
+		if (m_protocol.coverage >= acquisition_coverage::candidate_paging &&
+				m_registered && m_reports_remaining == 0)
+			m_reports_remaining = serving_cycle_reports();
 	}
 	else if (current_phase() == phase::serving_bcch && report_type == 0x83 &&
 			m_reports_remaining == 0)

@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsb7_radio_check import check_location_update, check_receiver_return
+from tools.nsb7_radio_check import check_location_update, check_receiver_return, check_paging
 
 
 def trace():
@@ -67,6 +67,35 @@ class LocationUpdateCheckTests(unittest.TestCase):
         text, card = self.release_fixture()
         with self.assertRaises(ValueError):
             check_receiver_return(text.replace('nsb7_sim_tx:', 'absent:'), card)
+
+    def paging_fixture(self):
+        block = '1506210001f0' + '2b'*18
+        rows = []
+        for index in range(8):
+            rows.extend([
+                f'nsb7_agch_forward: index={index} task=4 mode=60 error=00 frame={3453+index*102} block={block} t=15',
+                f'nsb7_agch_consumer: index={index} task=14 tag=0623 mode=60 block={block} t=15',
+                f'nsb7_rr_decoder_result: index={index} task=14 code=061a block={block} t=15'])
+        return '\n'.join(rows)
+
+    def test_repeated_paging(self):
+        check_paging(self.paging_fixture())
+
+    def test_paging_wrong_frame(self):
+        with self.assertRaises(ValueError):
+            check_paging(self.paging_fixture().replace('frame=3555', 'frame=3556'))
+
+    def test_paging_not_decoded(self):
+        with self.assertRaises(ValueError):
+            check_paging(self.paging_fixture().replace('code=061a', 'code=0000', 1))
+
+    def test_explicitly_permitted_missed_opportunity(self):
+        # The qualification is group consistency, not complete L1 timing.
+        text = self.paging_fixture()
+        for index in reversed(range(1, 8)):
+            text = text.replace(f'frame={3453+index*102} ',
+                                f'frame={3453+(index+1)*102} ')
+        check_paging(text)
 
 
 if __name__ == '__main__':

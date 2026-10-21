@@ -255,7 +255,7 @@ def check_location_update(text):
         raise ValueError('firmware link release state sequence differs')
 
 
-def check_receiver_return(text, card):
+def check_receiver_return(text, card, paging=False):
     check_location_update(text.split('nsb7_radio_tx: index=46 ', 1)[0])
     packets = [(int(row[0]), int(row[1], 16), bytes.fromhex(row[3]))
                for row in PACKET.findall(text)]
@@ -266,8 +266,10 @@ def check_receiver_return(text, card):
     if packets[45:] != expected:
         raise ValueError('post-release receiver sequence differs')
     replies = re.findall(r'nsb7_radio_rx: index=(2[6-9]|[3-9][0-9]) type=([0-9a-f]{2}) length=(\d+) ', text)
-    if replies != [('26', '89', '8'), ('27', '89', '8'), ('28', '89', '8')]:
+    if replies[:3] != [('26', '89', '8'), ('27', '89', '8'), ('28', '89', '8')]:
         raise ValueError('receiver return needs exactly three confirmations, no paging payload')
+    if not paging and len(replies) != 3:
+        raise ValueError('unexpected traffic after bounded receiver return')
     if 'live_channel=0258 live_mode=1a ' not in text or 'live_channel=0258 live_mode=16 ' not in text:
         raise ValueError('common-control receiver was not committed')
     # Native card NVRAM stores 50 32-byte ADN records before the 11-byte LOCI.
@@ -277,6 +279,30 @@ def check_receiver_return(text, card):
         r'nsb7_sim_tx: index=\d+ value=([0-9a-f]{2})', text))
     if bytes.fromhex('a0a40000026f7ea0d600040500f1100001a0d6000a0100') not in wire:
         raise ValueError('LOCI update was not observed on the physical SIM TX path')
+    if paging:
+        check_paging(text)
+
+
+def check_paging(text):
+    empty = '1506210001f0' + '2b'*18
+    forwarded = re.findall(r'nsb7_agch_forward: index=\d+ task=4 mode=60 error=00 frame=(\d+) block=([0-9a-f]{48}) ', text)
+    consumed = re.findall(r'nsb7_agch_consumer: index=\d+ task=14 tag=0623 mode=60 block=([0-9a-f]{48}) ', text)
+    # The earlier Immediate Assignment uses the same CCCH route, not PCH.
+    forwarded = [row for row in forwarded if row[1][2:6] == '0621']
+    consumed = [block for block in consumed if block[2:6] == '0621']
+    if (len(forwarded) < 8 or consumed != [row[1] for row in forwarded] or
+            any(row[1] != empty for row in forwarded)):
+        raise ValueError('two cycles of empty paging blocks did not reach both MCU consumers')
+    frames = [int(row[0]) for row in forwarded]
+    # This proves the monitored group, not complete physical-time delivery:
+    # calibrated HLE cadence can skip a two-multiframe receive opportunity.
+    if any((later-earlier) % 2715648 == 0 or
+           ((later-earlier) % 2715648) % 102 != 0
+           for earlier, later in zip(frames, frames[1:])):
+        raise ValueError('subscriber paging multiframe sequence differs')
+    decoded = re.findall(r'nsb7_rr_decoder_result: index=\d+ task=14 code=061a block=([0-9a-f]{48}) ', text)
+    if decoded.count(empty) != len(forwarded):
+        raise ValueError('empty paging blocks did not pass the RR decoder')
 
 
 def check_trace(text, measurement=False, synchronization=False, channel=False, bcch=False, ccch=False, rach=False, assignment=False, dedicated=False, uplink=False, contention=False):
@@ -462,13 +488,14 @@ def main():
     parser.add_argument('--uplink', action='store_true')
     parser.add_argument('--contention', action='store_true')
     parser.add_argument('--release', action='store_true')
+    parser.add_argument('--paging', action='store_true')
     args = parser.parse_args()
     try:
         report = contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
-        if args.release:
+        if args.release or args.paging:
             check_security(text)
-            check_receiver_return(text, (args.run / 'nvram/nsb7hle/sim_card').read_bytes())
+            check_receiver_return(text, (args.run / 'nvram/nsb7hle/sim_card').read_bytes(), paging=args.paging)
         else:
             check_trace(text, measurement=args.measurement, synchronization=args.synchronization,
                         channel=args.channel, bcch=args.bcch, ccch=args.ccch, rach=args.rach,
@@ -481,7 +508,8 @@ def main():
             args.contract_json.write_text(json.dumps(report, indent=2) + '\n')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 radio inventory: FAIL: {error}\n')
-    print('PASS: ' + ('own LU/release acknowledged; receiver returned; SIM LOCI retained; paging withheld' if args.release else
+    print('PASS: ' + ('own LOCI retained; repeated empty paging blocks reach firmware decoder' if args.paging else
+                     'own LU/release acknowledged; receiver returned; SIM LOCI retained; paging withheld' if args.release else
                      'own contention echo accepted; firmware link state 2 to 4; no LU Accept supplied' if args.contention else
                      'own LAPDm SABM carries Location Updating Request; no UA supplied' if args.uplink else
                      'own bit-1 acknowledgement commits dedicated receiver; block request withheld' if args.dedicated else
