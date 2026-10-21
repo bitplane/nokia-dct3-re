@@ -57,6 +57,12 @@ class RadioInventoryTests(unittest.TestCase):
             self.skipTest('own NSB-7 image unavailable')
         report = contract(image.read_bytes())
         self.assertEqual(report['task'], 13)
+        self.assertEqual(len(report['rx_dispatch']), 13)
+        self.assertEqual(report['rx_dispatch']['8a'], '00309fbc')
+        self.assertEqual(report['rx_dispatch']['85'], '0030a006')
+        self.assertEqual(report['rx_8a']['task'], 13)
+        self.assertEqual(report['rx_80']['subtype_handlers']['40'], '002e4f8a')
+        self.assertEqual(report['rx_80']['frame_payload_offsets'], [3, 4, 5])
         self.assertEqual(report['payload_prefix_bytes'], 4)
         self.assertEqual(report['classified_inputs'], 65536)
         self.assertEqual(report['ranges'], [

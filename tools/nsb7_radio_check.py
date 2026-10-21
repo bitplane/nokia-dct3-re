@@ -42,6 +42,12 @@ def contract(image):
         raise ValueError('requires own qualified image')
     def word(address):
         return int.from_bytes(image[address-0x200000:address-0x200000+4], 'big')
+    dispatch = [word(0x309f60 + index*4) for index in range(13)]
+    expected_dispatch = [0x309fec, 0x309fe4, 0x30a006, 0x309fdc,
+                         0x309fd4, 0x309fcc, 0x309fc4, 0x309fbc,
+                         0x309fb4, 0x309fac, 0x30a006, 0x30a006, 0x309fa4]
+    if dispatch != expected_dispatch:
+        raise ValueError('own complete 83..8f RX dispatch differs')
     if word(0x309f60 + 8*4) != 0x309fb4 or image[0xe526c:0xe526e] != bytes.fromhex('200d'):
         raise ValueError('own 8b dispatch/task-13 contract differs')
     if image[0xcb208:0xcb20a] != bytes.fromhex('3404'):
@@ -57,6 +63,16 @@ def contract(image):
             ranges.append({'first': start, 'last': channel-1, 'class': previous})
             start, previous = channel, value
     return {'image_sha1': IMAGE_SHA1, 'rx_8b_table_entry': '309fb4', 'forwarder': '2e5258',
+            'rx_dispatch': {f'{0x83+index:02x}': f'{target:08x}'
+                            for index, target in enumerate(dispatch)},
+            'rx_8a': {'forwarder': '002e4fdc', 'gate': '00130784 == 1', 'task': 13},
+            'rx_80': {'dispatcher': '002e4ef4', 'gate': '00130784 == 1',
+                      'subtype_payload_offset': 0, 'status_payload_offset': 2,
+                      'frame_payload_offsets': [3, 4, 5],
+                      'subtype_handlers': {'40': '002e4f8a', '50': '002e4e96',
+                                           '60': '002e4d24', '70': '002e4b86',
+                                           '80': '002e49e6', 'a0': '002e4f52',
+                                           'b0': '002e4f4c'}},
             'task': 13, 'payload_prefix_bytes': 4, 'feature_word': '98000000',
             'classified_inputs': 65536, 'ranges': ranges,
             'scope': 'decoded software classes, not fitted RF-band proof'}

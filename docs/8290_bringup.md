@@ -619,3 +619,31 @@ correction, not a candidate-payload special case.
 Decode the callers and their populated request fields before
 extending peer coverage. Channel confirmation, traffic release, neighbours,
 authentication and registration remain unestablished on this handset.
+
+### Candidate response routing
+
+The own RX dispatcher has thirteen entries for types `83..8f`, reported
+in full by the radio checker's contract JSON. Types `85/8d/8e` enter the
+generic path `30a006`, not a dedicated radio forwarder. Type `8a` enters
+`309fbc -> 2e4fdc`: it forwards the original object to task 13 only when
+`130784 == 1`, otherwise freeing it. This routing does not establish that
+`8a` is a successful synchronization response.
+
+Type `80` enters `2e4ef4`, under the same gate, and parses the payload
+after the four-byte object prefix. Payload bytes 3..5 form a big-endian
+24-bit value; byte 2 is a status selector; byte 0 selects these branches:
+
+| Subtype | Own branch / handler |
+| --- | --- |
+| `40` | `2e4f8a`: forward to task 13 only if the context's byte `+0c` is 1 |
+| `50` | `2e4e96` |
+| `60` | `2e4d24` |
+| `70` | `2e4b86` |
+| `80` | `2e49e6` |
+| `a0` | `2e4f52`: retag then forward to task 17 |
+| `b0` | `2e4f4c`: status-dependent branch to `2e49e6` |
+
+Other subtypes are freed. Status values other than 1 also call `2e49d0`
+before subtype dispatch. These are decoded routes, not a qualified reply
+payload: establish the candidate lifecycle's context gate and task-13
+consumer fields before enabling a success response or channel completion.
