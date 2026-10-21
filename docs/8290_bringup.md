@@ -24,9 +24,9 @@ failed-PUK2 retry retention and cold PUK2 recovery/reuse. Permanent PUK1
 exhaustion and cold card rejection are qualified. Permanent PUK2 exhaustion
 also retains ordinary PIN1 authentication and menus. An explicit extended
 card qualifies physical PIN2-authorized FDN On/cold-On/Off/cold-Off and
-protected Save/cold Details/rejected-write isolation and cancel/erase/cold-empty.
-FDN editing,
-dial enforcement and AoC authorization remain separate work.
+protected Save/cold Details/rejected-write isolation, edit/cold edited-number
+retrieval and cancel/erase/cold-empty. FDN dial enforcement and AoC
+authorization remain separate work.
 PIN-enabled fresh/cold laboratory registration and a long wrong-PIN
 non-registration control are qualified as one coherent composition.
 The authenticated composition also qualifies physical incoming/outgoing calls,
@@ -2093,8 +2093,8 @@ satisfy the protected FDN write check.
   tmp/nsb7-fdn-write-wrong
 ```
 
-FDN editing and listed-versus-unlisted dial permission remain
-separate acceptance targets. These radio-disabled storage runs do not
+Listed-versus-unlisted dial permission remains a separate acceptance target.
+These radio-disabled storage runs do not
 establish a connected FDN-enabled call.
 
 ### FDN erase cancellation and durable deletion
@@ -2121,4 +2121,27 @@ selected-file APDUs, own flash integrity and prompt/result pixels.
   tmp/nsb7-fdn-cold-on tmp/nsb7-fdn-write tmp/nsb7-fdn-read \
   tmp/nsb7-fdn-write-wrong --cancel tmp/nsb7-fdn-cancel \
   --erase tmp/nsb7-fdn-erase --empty tmp/nsb7-fdn-empty
+```
+
+### Protected FDN edit and cold edited-number retrieval
+
+`nsb7_fdn_edit.lua` starts from the saved own `A / 12345` FDN-On card,
+physically reopens Details and authorizes Options with PIN2. Edit retains
+name `A`; Clear removes the final digit and keypad `6` replaces it. One
+successful EF_FDN record-1 UPDATE writes the exact `A / 12346` record after
+PIN2 verification. The complete card changes only record byte 22 (`f5 -> f6`)
+at persistent offset 3600, leaving validity, credentials and all other files
+unchanged. Firmware renders the reviewed Saved to SIM card frame.
+
+A separate cold process uses the existing physical Numbers/Search/Details
+route, retains the entire edited card and emits no UPDATE or PIN2 request.
+The reviewed detail frame displays `12346`, independently of the stored-byte
+assertion. Paired `--edit` / `--edit-cold` arguments are required; incomplete
+pairs are rejected, and the original Save/read/wrong-PIN2 checks still run.
+
+```sh
+.venv/bin/python tools/nsb7_fdn_record_check.py \
+  tmp/nsb7-fdn-cold-on tmp/nsb7-fdn-write tmp/nsb7-fdn-read \
+  tmp/nsb7-fdn-write-wrong --edit tmp/nsb7-fdn-edit \
+  --edit-cold tmp/nsb7-fdn-edit-cold
 ```

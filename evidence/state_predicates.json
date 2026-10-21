@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_protected_fdn_edit_and_cold_number",
+      "owner": "nsb7_sim_storage", "status": "satisfied",
+      "predicate": "Physical PIN2-protected FDN edit changes A/12345 to A/12346 and independent cold Details displays the persisted result",
+      "current": "Own saved FDN-On card physically authenticates PIN1/phone code and PIN2, opens Edit, retains A, clears the last number digit and enters6. One successful selected6f3b record1/mode4 UPDATE writes the exact32-byte edited record after PIN2. Complete-card comparison permits only persistent byte3600 f5->f6; Saved pixels match. A separate cold physical Search/Details run displays12346 with the exact reviewed number frame, no PIN2/update and byte-identical card. Paired acceptance retains original Save/read/rejected-write checks. FDN dial enforcement and connected-call acceptance remain separate.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_fdn_edit.lua", "tools/nsb7_fdn_read.lua", "tools/nsb7_fdn_record_check.py", "tools/test_nsb7_fdn_record_check.py"]
+    },
+    {
       "id": "nsb7_fdn_cancel_erase_cold_empty",
       "owner": "nsb7_sim_storage", "status": "satisfied",
       "predicate": "Physical FDN erase cancellation preserves the saved card; confirmed protected erase survives cold empty search",

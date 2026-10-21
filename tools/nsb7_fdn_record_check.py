@@ -25,6 +25,9 @@ FRAMES = {
     'erase': [(72,'2501be7ff54218d5a541e0ae7c0d2a19430bfefe4b550b3d46942d172d88606c'),
               (75,'b6d00bc47bb41b2a485d56e188c9058fbbb3e943f0b469fdee8d669fec3f4ff4')],
     'empty': [(53,'0e582d0a026f1a5aa59e3c57af1aaa0db3e0feef618ccb6067da9e5ea76f9288')],
+    'edit': [(81,'fadcc0b3b9dbabd90d23602e2b3d698ddb88606a2bdd25748a009ae499d2f402')],
+    'edited-cold': [(53,'1e824b13197f421c04863244c3bc5ea19163d72bbfd74c1ef8acf5a8d1a1bdf8'),
+                    (56,'f25284f55cacd3dcfc231f1ad2b753de0f744991b88b90ba66763c508a78ff2e')],
 }
 
 
@@ -40,14 +43,20 @@ def expected_card(before, wrong=False):
     return bytes(after)
 
 
+def edited_record():
+    record = bytearray(expected_record())
+    record[22] = 0xf6
+    return bytes(record)
+
+
 def check_trace(text, mode):
-    if mode not in ('write', 'cold', 'wrong', 'cancel', 'erase', 'empty'):
+    if mode not in ('write', 'cold', 'wrong', 'cancel', 'erase', 'empty', 'edit', 'edited-cold'):
         raise ValueError('unknown FDN record mode')
     check_pin(text.split('nsb7_menu_input:', 1)[0], True)
     check_phone(text)
     keys = PREFIX + [('Left Softkey / Menu', 0x19), ('Scroll Down', 0x18),
                      ('Scroll Down', 0x18), ('Left Softkey / Menu', 0x19)]
-    if mode in ('cold','cancel','erase','empty'):
+    if mode in ('cold','cancel','erase','empty','edit','edited-cold'):
         keys += [('Left Softkey / Menu', 0x19)]*(2 if mode == 'empty' else 3)
         if mode in ('cancel','erase'):
             keys += [('Left Softkey / Menu',0x19)]
@@ -55,6 +64,11 @@ def check_trace(text, mode):
             keys += [('Left Softkey / Menu',0x19),('Scroll Down',0x18),
                      ('Left Softkey / Menu',0x19),
                      ('Right Softkey / C',0x1a) if mode == 'cancel' else ('Left Softkey / Menu',0x19)]
+        elif mode == 'edit':
+            keys += [('Left Softkey / Menu',0x19)]
+            keys += [('Keypad '+str(i),i) for i in (5,6,7,8)]
+            keys += [('Left Softkey / Menu',0x19)]*3
+            keys += [('Right Softkey / C',0x1a),('Keypad 6',6),('Left Softkey / Menu',0x19)]
     else:
         keys += [('Scroll Down', 0x18), ('Left Softkey / Menu', 0x19)]
         keys += [('Keypad '+str(i), i) for i in (5,6,7,5 if mode == 'wrong' else 8)]
@@ -70,7 +84,7 @@ def check_trace(text, mode):
         if f'nsb7_key_decode: key={code:02x} observer_writes=0' not in text[rows[2*index].end():rows[2*index+1].start()]:
             raise ValueError('FDN record contact did not decode')
     outcomes = [(0x9000,3,10)]
-    if mode not in ('cold','empty'):
+    if mode not in ('cold','empty','edited-cold'):
         outcomes.append((0x9804 if mode == 'wrong' else 0x9000,3,10))
     if statuses(text,0x20) != outcomes:
         raise ValueError('FDN record PIN1/PIN2 result differs')
@@ -82,13 +96,13 @@ def check_trace(text, mode):
     if statuses(text,0x44) != [(0x9000,3,10)]*2:
         raise ValueError('FDN-On identity rehabilitation failed')
     updates = [row for row in apdus(tx) if row[0] == 0xdc]
-    expected = [(0xdc,1,4,32,expected_record() if mode == 'write' else b'\xff'*32,0x6f3b)] \
-        if mode in ('write','erase') else []
+    body = edited_record() if mode == 'edit' else expected_record() if mode == 'write' else b'\xff'*32
+    expected = [(0xdc,1,4,32,body,0x6f3b)] if mode in ('write','erase','edit') else []
     if updates != expected:
         raise ValueError('FDN UPDATE target/body differs or rejected/read phase wrote a record')
-    if statuses(text,0xdc) != ([(0x9000,3,10)] if mode in ('write','erase') else []):
+    if statuses(text,0xdc) != ([(0x9000,3,10)] if mode in ('write','erase','edit') else []):
         raise ValueError('FDN UPDATE outcome differs')
-    if mode not in ('cold','empty'):
+    if mode not in ('cold','empty','edited-cold'):
         pin2 = bytes.fromhex('a020000208')+padded_pin('5675' if mode == 'wrong' else '5678')
         if tx.count(pin2) != 1:
             raise ValueError('FDN record PIN2 payload differs')
@@ -100,7 +114,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('source','write','cold','wrong'):
         parser.add_argument(name,type=Path)
-    for name in ('cancel','erase','empty'):
+    for name in ('cancel','erase','empty','edit','edit-cold'):
         parser.add_argument('--'+name,type=Path)
     args = parser.parse_args()
     try:
@@ -133,11 +147,26 @@ def main():
                 for second,digest in FRAMES[mode]:
                     check_frame(run/f'snap/nsb7_menu_{second}.png',digest)
                 previous = run
+        if bool(args.edit) != bool(args.edit_cold):
+            raise ValueError('edit and edit-cold must be paired')
+        if args.edit:
+            edited = bytearray(saved)
+            edited[3578:3610] = edited_record()
+            for run,mode,before in ((args.edit,'edit',saved),(args.edit_cold,'edited-cold',bytes(edited))):
+                if (run/'initial_sim_card.bin').read_bytes() != before or \
+                        (run/'nvram/nsb7hle/sim_card').read_bytes() != bytes(edited):
+                    raise ValueError('FDN edit/cold whole-card transition differs')
+                inspect((run/'nvram/nsb7hle/flash').read_bytes())
+                check_trace((run/'error.log').read_text(),mode)
+                for second,digest in FRAMES[mode]:
+                    check_frame(run/f'snap/nsb7_menu_{second}.png',digest)
     except (OSError,ValueError) as error:
         parser.exit(1,f'NSB-7 FDN record: FAIL: {error}\n')
     print('PASS: PIN2-protected FDN Save/cold Details and rejected-write full-card preservation')
     if args.cancel:
         print('PASS: physical erase cancellation, confirmed EF_FDN erase and cold empty search')
+    if args.edit:
+        print('PASS: physical protected FDN edit and exact cold edited-number retrieval')
 
 
 if __name__ == '__main__':
