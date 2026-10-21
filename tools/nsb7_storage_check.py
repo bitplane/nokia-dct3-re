@@ -95,6 +95,28 @@ def checksum_fixture(flash, shadow, prefix=False):
     return bytes(result), report
 
 
+def security_retry_fixture(flash, shadow):
+    cache, stop, report = inspect(flash, shadow)
+    destination = 0x9d8
+    if shadow is None or cache[destination] != 0xff:
+        raise ValueError('requires observed erased retry byte')
+    payload = b'\x00'
+    record = bytes([4, record_checksum(destination, payload)]) + destination.to_bytes(2, 'big') + payload
+    if stop+len(record)+2 > SECTOR or flash[BASE+stop:BASE+stop+len(record)+2] != b'\xff'*(len(record)+2):
+        raise ValueError('no erased journal append space')
+    result = bytearray(flash)
+    result[BASE+stop:BASE+stop+len(record)] = record
+    after, _, _ = inspect(result)
+    expected = bytearray(cache)
+    expected[destination] = 0
+    if after != expected:
+        raise ValueError('fixture changed bytes beyond the erased retry counter')
+    report['fixture'] = {'kind': 'research erased retry byte, not phone-code/identity provisioning',
+                         'logical_offset': hex(destination), 'payload': payload.hex(),
+                         'physical_append': hex(BASE+stop), 'record': record.hex()}
+    return bytes(result), report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('flash', type=Path)
@@ -103,11 +125,12 @@ def main():
     fixtures = parser.add_mutually_exclusive_group()
     fixtures.add_argument('--checksum-fixture', type=Path)
     fixtures.add_argument('--prefix-checksum-fixture', type=Path)
+    fixtures.add_argument('--security-retry-fixture', type=Path)
     args = parser.parse_args()
     try:
         flash = args.flash.read_bytes()
         shadow = args.shadow.read_bytes() if args.shadow else None
-        output_path = args.prefix_checksum_fixture or args.checksum_fixture
+        output_path = args.security_retry_fixture or args.prefix_checksum_fixture or args.checksum_fixture
         if output_path:
             if output_path.exists():
                 raise ValueError('fixture output must be a fresh path')
@@ -115,7 +138,10 @@ def main():
                 inspect(flash, shadow, args.trace.read_text())
             if output_path.resolve() == args.flash.resolve():
                 raise ValueError('fixture must not overwrite its source')
-            output, report = checksum_fixture(flash, shadow, prefix=bool(args.prefix_checksum_fixture))
+            if args.security_retry_fixture:
+                output, report = security_retry_fixture(flash, shadow)
+            else:
+                output, report = checksum_fixture(flash, shadow, prefix=bool(args.prefix_checksum_fixture))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(output)
         else:

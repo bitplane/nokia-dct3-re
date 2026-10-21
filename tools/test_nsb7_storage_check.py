@@ -1,6 +1,6 @@
 from pathlib import Path
 import unittest
-from tools.nsb7_storage_check import checksum, checksum_fixture, inspect, BASE, CACHE
+from tools.nsb7_storage_check import checksum, checksum_fixture, security_retry_fixture, inspect, BASE, CACHE
 
 
 class StorageTests(unittest.TestCase):
@@ -66,6 +66,19 @@ class StorageTests(unittest.TestCase):
         for flash in (b'', bytes(0x200000)):
             with self.assertRaises(ValueError):
                 inspect(flash)
+
+    def test_retry_fixture_preserves_code_identity_and_all_other_fields(self):
+        flash = self.own_initial_flash()
+        result, report = security_retry_fixture(flash, b'\xff'*CACHE)
+        cache, _, _ = inspect(result)
+        expected = bytearray(b'\xff'*CACHE)
+        expected[0x9d8] = 0
+        self.assertEqual(cache, expected)
+        self.assertEqual(result[:BASE], flash[:BASE])
+        self.assertEqual(report['fixture']['record'], '04e109d800')
+        for source, shadow in ((result, cache), (flash, None), (flash, bytes(CACHE))):
+            with self.assertRaises(ValueError):
+                security_retry_fixture(source, shadow)
 
     def test_runtime_branch_must_match_replayed_inputs(self):
         flash = self.own_initial_flash()

@@ -60,8 +60,8 @@ machine.debugger:command('temp8=0')
 machine.debugger:command('temp9=0')
 machine.debugger:command('bpset 30835c,1,{logerror "nsb7_key_init: observer_writes=0\\n";g}')
 machine.debugger:command('bpset 30833a,1,{logerror "nsb7_key_irq: observer_writes=0\\n";g}')
-machine.debugger:command('bpset 30ad50,r0!=0xff && temp8<32,{temp8=temp8+1;logerror "nsb7_key_raw: raw=%02x observer_writes=0\\n",r0;g}')
-machine.debugger:command('bpset 30ad80,temp9<32,{temp9=temp9+1;logerror "nsb7_key_decode: key=%02x observer_writes=0\\n",r0;g}')
+machine.debugger:command('bpset 30ad50,r0!=0xff && temp8<128,{temp8=temp8+1;logerror "nsb7_key_raw: raw=%02x observer_writes=0\\n",r0;g}')
+machine.debugger:command('bpset 30ad80,temp9<128,{temp9=temp9+1;logerror "nsb7_key_decode: key=%02x observer_writes=0\\n",r0;g}')
 local fields={}
 for _,port in pairs(machine.ioport.ports) do
     for _,field in pairs(port.fields) do fields[field.name]=field end
@@ -73,6 +73,7 @@ if not _G.nsb7_observe_inserted_card then
 end
 machine:logerror('nsb7_card_fixture: present='..(_G.nsb7_observe_inserted_card and '1' or '0')..' physical_contact=1\n')
 local input=coroutine.create(function()
+    if _G.nsb7_observe_only then return end
     for _,step in ipairs({{8,'Left Softkey / Menu'},{10,'Keypad 1'}}) do
         assert(emu.wait(step[1]-machine.time:as_double()))
         local key=assert(fields[step[2]],'physical key missing')

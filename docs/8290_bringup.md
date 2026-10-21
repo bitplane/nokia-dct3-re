@@ -11,8 +11,9 @@ research composition, with own checksum-only journal repairs and a declared
 nominal VBATT input, reaches `Insert SIM card` and physically enters digit
 `1` into the dial editor with an empty socket. With the synthetic card
 inserted, SIMI startup file reads and the phone Security code editor
-reproduce across cold runs. Phone unlock, SIM writes and RF services
-remain unestablished.
+reproduce across cold runs. A separate one-byte erased-retry fixture permits
+physical acceptance of the own-ROM default phone code. Usable idle/menu,
+SIM writes and RF services remain unestablished.
 In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
 No PMM, resident DSP mask, hardware profile or provisioning is supplied by
@@ -361,9 +362,9 @@ SIM update commands or a complete SIM feature matrix.
 The physical Menu fixture submits an empty phone-security editor and
 produces `Code error`; digit-1 then produces `Security code: *` with
 `OK/Clear`. This is phone-side security presentation, not SIM PIN failure
-or proof that a stored phone code is accepted. The next storage question
-is the own phone-code/lock record contract; do not replace it with a
-firmware-memory patch or a sibling's security bytes.
+or proof that a stored phone code is accepted. The own phone-code/retry
+record contract is qualified below without a firmware-memory patch or a
+sibling's security bytes.
 
 `tools/nsb7_sim_observe.lua` retains the configured physical card, runs the
 same two contacts, and records read-only controller traffic.
@@ -374,3 +375,44 @@ pixels. It reproduces in a new process retaining only the preceding run's
 own flash and synthetic-card NVRAM. The empty-socket input observer instead
 asserts the physical `Remove SIM card` contact at startup and continues
 to reproduce its separate `Insert SIM card` / dial-digit acceptance.
+
+## Phone-code and erased retry contract
+
+Own reader `295a28` reads three packed bytes at logical EEPROM offset
+`0110`, expands their nibbles, and checks the first five decoded characters.
+At `295a72`, invalid digits select ROM string `12345` at `295e08`; return
+value zero records that fallback. Runtime observes input `ffffff` and
+output `3132333435`, not a provisioned or borrowed phone code.
+
+Initializer `2c8e7a` calls this reader and encodes the result through
+`302c5c` into runtime record `130a8c`. On physical `12345`, validator
+`302e78` observes input `313233343500` and equal encoded/stored words
+`d83b30d8`. Its subsequent retry guard `302e24` nevertheless rejects counts
+greater than or equal to five. The initial eight-byte record is read from
+logical `09d4`; byte `09d8`, corresponding to runtime `130a90`, is erased
+`ff`. This is independently observed at the NV reader and retry consumer.
+It is not a failed character decode or mismatched code.
+
+`tools/nsb7_storage_check.py --security-retry-fixture OUTPUT`, with the
+matching own runtime `--shadow`, appends short journal record
+`04e109d800`: only logical byte `09d8` becomes zero. Zero is the retry-clear
+value used by the firmware at `302e64`; it is not a guessed code or lock
+mode. The fixture leaves every identity, packed-code and encoded-code byte
+unchanged, along with both prior checksum fields. It refuses a non-erased
+retry byte, unknown source image, mismatching shadow or occupied append
+space. This is explicitly a generated research fixture, not authentic
+factory provisioning.
+
+`tools/nsb7_security_observe.lua` physically enters digits 1..5 and Menu at
+8..13 seconds. The unchanged erased-retry control shows equal encoded words,
+retry `ff`, and `Code error`. The one-byte fixture shows the same encoded
+words, retry `00`, and `Code accepted`. Both exact frames are checked by
+`tools/nsb7_security_check.py IMAGE RUN` (add `--rejected` for the negative
+control), alongside each physical key decode and independently replayed
+own code/retry storage. Acceptance repeats in a new process retaining the
+preceding run's own flash and card NVRAM.
+
+The post-acceptance frame has `Menu/Names` softkeys but malformed main-area
+content. Do not call it a usable idle or registered screen. The next
+application boundary is physical menu activation and the display/resource
+state after acceptance; no security verdict or UI state should be injected.
