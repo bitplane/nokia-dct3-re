@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsb7_radio_check import check_location_update, check_receiver_return, check_paging, check_addressed_page, check_page_response, check_incoming_call_setup
+from tools.nsb7_radio_check import check_location_update, check_receiver_return, check_paging, check_addressed_page, check_page_response, check_incoming_call_setup, check_physical_call
 
 
 def trace():
@@ -220,6 +220,52 @@ class LocationUpdateCheckTests(unittest.TestCase):
         text, card = self.call_fixture()
         with self.assertRaises(ValueError):
             check_incoming_call_setup(text.replace('index=67 type=1b', 'index=68 type=1b'), card)
+
+    def physical_call_fixture(self):
+        text, card = self.call_fixture()
+        rows = text.splitlines()
+        def block(prefix):
+            return prefix + '2b'*(25-len(bytes.fromhex(prefix))) + '000000'
+        payloads = {71: block('00b0013f01'), 72: block('00b001000d062900'),
+                    75: block('00b00104098307'), 78: block('00b0012615836502e090'),
+                    80: block('00b0014809832a'),
+                    83: '041202001117001a600002580000001400000001',
+                    86: '0412020200000016600002580000000001297000', 87: '03050000'}
+        for index in range(71, 93):
+            key = 'Send' if index == 75 else 'End' if index == 78 else None
+            if key:
+                when = 22 if key == 'Send' else 27
+                rows.append(f'nsb7_call_input: key={key} state=1 t={when}.000000000')
+            data = payloads.get(index, '')
+            kind = '02' if index in (83, 86) else '57' if index == 87 else '1b'
+            time = 19.14 if index < 75 else 22.04 if index < 78 else 27.04 if index < 84 else 30.0
+            rows.append(f'nsb7_radio_tx: index={index} type={kind} length={len(data)//2} data={data} cursor=00 producer=01 pc=002cb0ec t={time} observer_writes=0')
+            if key:
+                rows.append(f'nsb7_call_input: key={key} state=0 t={when}.200000000')
+        for prefix in ('017301', '036009030f'):
+            data = prefix + '2b'*(24-len(bytes.fromhex(prefix)))
+            for pc, task in [('002e49e6', 4), ('002645ec', 14)]:
+                rows.append(f'nsb7_lapdm_downlink: pc={pc} task={task} selector=b0 block={data} t=28')
+        rows.append('nsb7_dedicated_armed: address=00102168 value=00 pc=002e5086 task=4 t=19.13')
+        return '\n'.join(rows), card
+
+    def test_physical_answer_end_signalling(self):
+        check_physical_call(*self.physical_call_fixture())
+
+    def test_physical_connect_missing(self):
+        text, card = self.physical_call_fixture()
+        with self.assertRaises(ValueError):
+            check_physical_call(text.replace('00b00104098307', '00b00104098308'), card)
+
+    def test_physical_answer_required(self):
+        text, card = self.physical_call_fixture()
+        with self.assertRaises(ValueError):
+            check_physical_call(text.replace('key=Send state=1', 'key=End state=1'), card)
+
+    def test_physical_release_parameter(self):
+        text, card = self.physical_call_fixture()
+        with self.assertRaises(ValueError):
+            check_physical_call(text.replace('600002580000001400000001', '600002580000000f00000001'), card)
 
 
 if __name__ == '__main__':

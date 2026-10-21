@@ -398,7 +398,7 @@ def check_page_response(text, card):
         raise ValueError('accepted laboratory location was not retained')
 
 
-def check_incoming_call_setup(text, card):
+def check_incoming_call_setup(text, card, traffic=False):
     check_location_update(text.split('nsb7_radio_tx: index=46 ', 1)[0])
     rows = PACKET.findall(text)
     if [int(row[0]) for row in rows] != list(range(1, len(rows)+1)):
@@ -419,10 +419,47 @@ def check_incoming_call_setup(text, card):
             raise ValueError('incoming SETUP did not reach both MCU consumers')
     if not re.search(r'nsb7_channel_pending: address=[0-9a-f]{8} tag=0402 bit=00 armed=01 ', text):
         raise ValueError('own TCH configuration descriptor is not armed with bit zero')
-    if any(kind == '1b' and payload.startswith('00b0') for kind, payload in packets.values()):
+    if not traffic and any(kind == '1b' and payload.startswith('00b0') for kind, payload in packets.values()):
         raise ValueError('bounded call-setup fixture unexpectedly entered the traffic link')
     if card[1600:1611] != bytes.fromhex('ffffffff00f1100001ff00'):
         raise ValueError('laboratory location was not retained during call setup')
+
+
+def check_physical_call(text, card):
+    check_incoming_call_setup(text, card, traffic=True)
+    rows = PACKET.findall(text)
+    if len(rows) != 92:
+        raise ValueError('bounded physical-call packet inventory differs')
+    def block(prefix):
+        return prefix + '2b'*(25-len(bytes.fromhex(prefix))) + '000000'
+    expected = {
+        71: ('1b', block('00b0013f01')),
+        72: ('1b', block('00b001000d062900')),
+        75: ('1b', block('00b00104098307')),
+        78: ('1b', block('00b0012615836502e090')),
+        80: ('1b', block('00b0014809832a')),
+        83: ('02', '041202001117001a600002580000001400000001'),
+        86: ('02', '0412020200000016600002580000000001297000'),
+        87: ('57', '03050000'),
+    }
+    if any((rows[index-1][1], rows[index-1][3]) != value for index, value in expected.items()):
+        raise ValueError('own traffic establishment/connect/disconnect/release sequence differs')
+    keys = re.findall(r'nsb7_call_input: key=(Send|End) state=([01]) t=([0-9.]+)', text)
+    if keys != [('Send', '1', '22.000000000'), ('Send', '0', '22.200000000'),
+                ('End', '1', '27.000000000'), ('End', '0', '27.200000000')]:
+        raise ValueError('physical Answer/End fixture differs')
+    for key, index in [('Send', 75), ('End', 78)]:
+        if text.index(f'nsb7_call_input: key={key} state=1 ') > text.index(f'nsb7_radio_tx: index={index} '):
+            raise ValueError('call signalling predates physical input')
+    if not 22 <= float(rows[74][7]) < 27 or float(rows[77][7]) < 27:
+        raise ValueError('CONNECT/clearing does not follow the physical call interval')
+    for prefix in ['017301', '036009030f']:
+        downlink = prefix + '2b'*(24-len(bytes.fromhex(prefix)))
+        for pc, task in [('002e49e6', 4), ('002645ec', 14)]:
+            if f'nsb7_lapdm_downlink: pc={pc} task={task} selector=b0 block={downlink} ' not in text:
+                raise ValueError('traffic UA/CONNECT ACK did not reach both MCU consumers')
+    if not re.search(r'nsb7_dedicated_armed: address=[0-9a-f]{8} value=00 pc=002e5086 task=4 t=19\.', text):
+        raise ValueError('firmware did not clear the traffic configuration descriptor')
 
 
 def check_trace(text, measurement=False, synchronization=False, channel=False, bcch=False, ccch=False, rach=False, assignment=False, dedicated=False, uplink=False, contention=False):
@@ -612,11 +649,15 @@ def main():
     parser.add_argument('--addressed-page', action='store_true')
     parser.add_argument('--page-response', action='store_true')
     parser.add_argument('--incoming-call', action='store_true')
+    parser.add_argument('--physical-call', action='store_true')
     args = parser.parse_args()
     try:
         report = contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
-        if args.incoming_call:
+        if args.physical_call:
+            check_security(text)
+            check_physical_call(text, (args.run / 'nvram/nsb7hle/sim_card').read_bytes())
+        elif args.incoming_call:
             check_security(text)
             check_incoming_call_setup(text, (args.run / 'nvram/nsb7hle/sim_card').read_bytes())
         elif args.page_response:
@@ -640,7 +681,8 @@ def main():
             args.contract_json.write_text(json.dumps(report, indent=2) + '\n')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 radio inventory: FAIL: {error}\n')
-    print('PASS: ' + ('own CALL CONFIRMED and ALERTING; traffic configuration pending; no connected-call claim' if args.incoming_call else
+    print('PASS: ' + ('physical Answer/End produce CONNECT and cleared signalling call; no speech claim' if args.physical_call else
+                     'own CALL CONFIRMED and ALERTING; traffic configuration pending; no connected-call claim' if args.incoming_call else
                      'background request completed; own Paging Response SABM and contention echo; LOCI retained' if args.page_response else
                      'own addressed page matches IMSI and returns parser event 083e; no access response' if args.addressed_page else
                      'own LOCI retained; repeated empty paging blocks reach firmware decoder' if args.paging else

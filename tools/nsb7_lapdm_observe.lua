@@ -13,12 +13,12 @@ for _,pc in ipairs({0x2e49e6,0x2645ec}) do
         local object=cpu.state['R0'].value
         if object<0x100000 or object>=0x17ff00 then return end
         local selector=memory:read_u8(object+(pc==0x2e49e6 and 4 or 11))
-        if selector~=0x80 then return end
+        if selector~=0x80 and selector~=0xb0 then return end
         count=count+1
         local body={}
         for index=0,23 do body[#body+1]=string.format('%02x',memory:read_u8(object+14+index)) end
-        machine:logerror(string.format('nsb7_lapdm_downlink: pc=%08x task=%u selector=80 block=%s t=%.9f observer_writes=0\n',
-            pc,memory:read_u8(0x100022),table.concat(body),machine.time:as_double()))
+        machine:logerror(string.format('nsb7_lapdm_downlink: pc=%08x task=%u selector=%02x block=%s t=%.9f observer_writes=0\n',
+            pc,memory:read_u8(0x100022),selector,table.concat(body),machine.time:as_double()))
     end)
 end
 _G.nsb7_lapdm_taps=taps

@@ -24,8 +24,9 @@ Release are acknowledged by firmware; EF_LOCI is updated over SIMI and
 retained, and the receiver returns to common control. Repeated empty paging
 blocks reach its RR decoder. An addressed page now produces the handset's
 own Paging Response after background measurement completion. Stable
-registered idle presentation, connected calls and SMS remain unestablished;
-incoming-call setup through CALL CONFIRMED/ALERTING is qualified below.
+registered idle presentation and SMS remain unestablished. Incoming-call
+control through physical Answer/End, CONNECT acknowledgement and release
+is qualified below; speech is not established.
 In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
 No PMM, resident DSP mask, hardware profile or provisioning is supplied by
@@ -1213,5 +1214,48 @@ continuation, which requires its own acceptance contract.
 This proves incoming-call signaling through ALERTING, not visible
 ringing, physical Answer, CONNECT, traffic-channel completion or native
 speech. The captured main-area screen remains unsuitable as a call-UI
-oracle. Next qualify the own `c1` configuration acknowledgement and
-main-link establishment before testing physical answer/release.
+oracle. The subsequently qualified `c1` acknowledgement and physical
+answer/release continuation are described below.
+
+### Physical Answer/End and traffic-link signaling
+
+The current profile admits the own `c1` request to the shared traffic
+assignment handler. Type-89 with bit zero clears its armed `0402`
+descriptor at `2e5086`. Firmware immediately publishes an empty SABM
+on selector `b0`, without waiting for a block request. That observed
+28-byte uplink is admitted in the traffic-establishment phase. After
+UA, active `b0` uplinks are admitted throughout the shared service-phase
+range, including unsolicited first transmissions; limiting them to the
+scheduled wait phase discarded those first frames and induced retries.
+
+`tools/nsb7_call_observe.lua` extends the existing physical security-code
+fixture with Send at 22 seconds and End at 27 seconds, both released
+after 200 ms. It exits at 35 seconds. In `tmp/nsb7-call-release` and
+`tmp/nsb7-call-release-cold`, the handset emits:
+
+| TX | Firmware-owned signaling |
+| --- | --- |
+| 71 | Empty `b0` LAPDm SABM; UA reaches both MCU consumers |
+| 72 | RR Assignment Complete information `062900` |
+| 75 | CC CONNECT `8307`, after physical Send |
+| 78 | CC DISCONNECT `836502e090`, after physical End |
+| 80 | CC RELEASE COMPLETE `832a` |
+| 83 | Receiver deconfiguration `041202001117001a600002580000001400000001` |
+| 86 | Common-control mode-16 configuration |
+| 87 | Background measurement request `57/03050000` |
+
+The CONNECT ACKNOWLEDGE block `036009030f` plus nineteen `2b` bytes
+reaches both forwarding helper and task-14 consumer on selector `b0`.
+The final deconfiguration uses byte `14`, now an own product parameter
+for the existing shared release handler. Its descriptor is `0409`,
+so the already-qualified cache-commit branch accepts a zero-valued reply.
+The receiver returns through modes `1a` and `16`, with EF_LOCI retained.
+
+`--physical-call` checks the earlier SETUP/ALERTING path, traffic
+descriptor clear, UA and CONNECT ACK at both MCU consumers, ordered
+92-packet TX inventory, physical key timing, CONNECT/clearing uplinks,
+release parameter and common-control return. This proves laboratory
+incoming-call control and physical Answer/End, not native DSP speech,
+audio fidelity, external telephony or a usable call-screen image.
+The next independent service target is SMS delivery; extended repeated
+call/save-state qualification and display correctness remain separate.

@@ -3954,6 +3954,8 @@ void nokia_dct3_state::nsb7hle(machine_config &config)
 	runtime.radio.coverage = nokia_radio_peer_device::acquisition_coverage::candidate_paging;
 	// Own 2b6a1e emits the same selector grammar for late type-57 scans.
 	runtime.radio.background_band_measurements = true;
+	// Own post-call CHANNEL_CONFIGURE requests carry deconfiguration 14.
+	runtime.radio.traffic_release_parameter = 0x14;
 	runtime.radio.assigned_channel_confirmation = 1;
 	runtime.radio.band_scan_accepts_candidate_window = true;
 	apply_product_config(runtime);

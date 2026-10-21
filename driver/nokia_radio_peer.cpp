@@ -1749,8 +1749,8 @@ void nokia_radio_peer_device::encode_random_access_info(u8 *payload)
 
 void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &packet)
 {
-	// A qualified partial product may enter the existing common-control
-	// configuration handler, but no other full-contract request handlers.
+	// Partial products enter only the shared handlers whose request grammar
+	// and firmware continuation have been independently qualified.
 	const bool partial_common_control_request =
 			m_protocol.coverage >= acquisition_coverage::candidate_common_control &&
 			current_phase() == phase::serving_bcch &&
@@ -1781,7 +1781,9 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			m_protocol.coverage >= acquisition_coverage::candidate_release &&
 			current_phase() == phase::release_deconfigure &&
 			packet.type == 0x02 && packet.length == 20 &&
-			packet.payload[8] == 0x60 && packet.payload[15] == 0x0f;
+			packet.payload[8] == 0x60 &&
+			(packet.payload[15] == 0x0f ||
+				(m_traffic_channel_active && packet.payload[15] == m_protocol.traffic_release_parameter));
 	const bool partial_background_request =
 			m_protocol.background_band_measurements && packet.type == 0x57 &&
 			packet.length == m_protocol.background_measurement_request.size() &&
@@ -1789,13 +1791,29 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 				m_protocol.background_measurement_request.end(), packet.payload.begin());
 	const bool partial_service_uplink =
 			m_protocol.coverage >= acquisition_coverage::candidate_paging &&
-			current_phase() == phase::service_uplink_wait &&
+			(current_phase() == phase::service_uplink_wait ||
+				(m_traffic_channel_active && current_phase() >= phase::service_downlink &&
+				 current_phase() <= phase::service_uplink_acknowledgement)) &&
 			packet.type == 0x1b && packet.length == 28 &&
-			packet.payload[0] == 0 && packet.payload[1] == 0x80;
+			packet.payload[0] == 0 &&
+			(packet.payload[1] == 0x80 ||
+				(m_traffic_channel_active && packet.payload[1] == 0xb0));
+	const bool partial_traffic_establishment =
+			m_protocol.coverage >= acquisition_coverage::candidate_paging &&
+			current_phase() == phase::traffic_lapdm_establish &&
+			packet.type == 0x1b && packet.length == 28 &&
+			packet.payload[0] == 0 && packet.payload[1] == 0xb0;
+	const bool partial_traffic_configuration =
+			m_protocol.coverage >= acquisition_coverage::candidate_paging &&
+			(current_phase() == phase::service_uplink_request ||
+			 current_phase() == phase::service_uplink_wait ||
+			 current_phase() == phase::service_uplink_acknowledgement) &&
+			packet.type == 0x02 && packet.length == 20 && packet.payload[8] == 0xc1;
 	if (m_protocol.coverage != acquisition_coverage::full &&
 			!partial_common_control_request && !partial_random_access_request &&
 			!partial_dedicated_request && !partial_establish_request && !partial_acknowledgement &&
-			!partial_release_request && !partial_background_request && !partial_service_uplink)
+			!partial_release_request && !partial_background_request && !partial_service_uplink &&
+			!partial_traffic_configuration && !partial_traffic_establishment)
 	{
 		if (packet.type == 0x55 && packet.length == 4 &&
 				packet.payload[0] == 3 &&
