@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_authenticated_independent_host_sms_directions",
+      "owner": "nsb7_host_services", "status": "satisfied",
+      "predicate": "Independent physical PIN-authenticated NSB-7 runs qualify host-originated incoming SMS/read and host-decided outgoing Reply",
+      "current": "Incoming disables automatic lab SMS, accepts one host hello after PCS600 registration, observes queued/delivered and handset CP/RP, then physically reads via Menu23/25/27/29 with exact hello pixels and full-card record/status-only change. Outgoing uses the ordinary lab hello as Reply source; host receives exact GSM7 A/5551234, rejects wrong request ID, accepts once and rejects duplicate. Existing raw authentication, exact handset CP/RP/SMSS and complete-card checks pass; final pixels show composer A, not a claimed success banner. No C++ changes were needed. These are separate directions, not one combined host reply session, external carrier, native RF or speech.",
+      "evidence": ["docs/8290_bringup.md", "fixtures/nsb7_host/nsb7hle.cfg", "fixtures/nsb7_host_sms_reply/nsb7hle.cfg", "tools/nsb7_pin_sms_read.lua", "tools/nsb7_host_sms_check.py", "tools/test_nsb7_host_sms_check.py", "tools/run_host_incoming_sms_gate.py", "tools/run_host_sms_gate.py"]
+    },
+    {
       "id": "nsb7_registered_fdn_listed_unlisted_off_controls",
       "owner": "nsb7_lab_calls", "status": "satisfied",
       "predicate": "Registered physical listed dialing connects, unlisted FDN-On dialing is locally denied and physical FDN-Off permits the same unlisted number",

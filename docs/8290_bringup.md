@@ -33,6 +33,8 @@ non-registration control are qualified as one coherent composition.
 The authenticated composition also qualifies physical incoming/outgoing calls,
 incoming SMS read/Reply, active incoming-call/SMS restoration and persistent
 phonebook save/cold Details retrieval with exact card and UI outcomes.
+Independent host-originated incoming SMS/read and host-decided outgoing Reply
+also pass through the shared WebSocket adapter without new device behavior.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
 parsing, CCCH setup, timed random-access completion and an accepted
@@ -2186,3 +2188,32 @@ duplicates or a hardware timing claim.
 This establishes bounded FDN enforcement and permitted lab-HLE call signaling,
 not emergency-number exceptions, wildcard/prefix matching, native speech,
 external RF or a SIP-connected call.
+
+## Authenticated host SMS
+
+Two independent compositions qualify the existing external WebSocket backend
+on NSB-7 without changing driver/device behavior. Both copy only the own
+PIN-enabled registered flash/card/clock, physically authenticate PIN1 and
+phone code, and qualify retained-location registration before service input.
+
+| Direction | Configuration / input | Acceptance |
+| --- | --- | --- |
+| Incoming | `fixtures/nsb7_host/nsb7hle.cfg`, `nsb7_pin_sms_read.lua`, `run_host_incoming_sms_gate.py` | Automatic lab SMS is disabled. After registration on PCS carrier600, the host supplies one `hello` from5551234. Queued/delivered host events and exact paging/CP/RP precede physical Menu23/25/27/29 reading and the existing hello frame. Whole card permits only that delivered/read SMS record. |
+| Outgoing | `fixtures/nsb7_host_sms_reply/nsb7hle.cfg`, `nsb7_pin_sms_reply.lua`, `run_host_sms_gate.py --user-data 41 --user-data-length 1` | The incoming source is the ordinary lab hello fixture; physical Reply submits A/5551234 to the host. Wrong request ID is rejected, the correlated accept is consumed once and its duplicate rejected. Handset CP/RP closes; full card permits only read status and the exact EF_SMSS reference update. |
+
+The outgoing final frame is the reviewed composer containing `A`, not a
+captured success banner. This is consistent with completed protocol/storage
+acceptance but must not be described as a Message sent frame. The standalone
+incoming and outgoing runs do not claim a single host-originated-message to
+host-reply session, external SMS carrier delivery, SIP or native RF/speech.
+
+Run the existing host runners with the isolated MAME command, `-http` and
+matching `-http_port` (qualified local ports18930 incoming,18929 outgoing).
+The handset scripts exit at35 and74 emulated seconds respectively. Host
+runner success alone is insufficient: require the combined checker too.
+
+```sh
+.venv/bin/python tools/nsb7_host_sms_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin-host-sms-incoming \
+  tmp/nsb7-pin-host-sms-reply
+```
