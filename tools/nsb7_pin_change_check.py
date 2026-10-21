@@ -13,7 +13,8 @@ from tools.nsb7_storage_check import inspect
 from tools.sim_security_trace_check import statuses, CHV_OFFSET, ATTEMPTS_OFFSET, padded_pin
 
 
-def check_change(text, wrong, *, pin2=False, old=None, new=None, remaining=None, unblock=False):
+def check_change(text, wrong, *, pin2=False, old=None, new=None, remaining=None, unblock=False,
+                 puk_remaining=None):
     if unblock and not pin2:
         raise ValueError('this menu recovery fixture targets PIN2 only')
     if '[LUA ERROR]' in text or 'nsb7_change_input: complete' not in text:
@@ -44,10 +45,13 @@ def check_change(text, wrong, *, pin2=False, old=None, new=None, remaining=None,
     check_pin(text.split('nsb7_change_input: phase=menu', 1)[0], True)
     remaining = remaining if remaining is not None else (0 if unblock and wrong else 2 if wrong else 3)
     instruction = 0x2c if unblock else 0x24
-    result = (0x9804 if unblock or remaining else 0x9840) if wrong else 0x9000
+    puk_remaining = puk_remaining if puk_remaining is not None else (9 if unblock and wrong else 10)
+    if not 0 <= puk_remaining <= 10:
+        raise ValueError('PUK retry count outside 0..10')
+    result = (0x9840 if (unblock and puk_remaining == 0) or (not unblock and remaining == 0)
+              else 0x9804) if wrong else 0x9000
     if statuses(text, instruction) != [(result, 3 if pin2 else remaining, 10)]:
         raise ValueError('credential-command outcome/retries differ')
-    puk_remaining = 9 if unblock and wrong else 10
     if pin2 and re.findall(rf'SIM status ins={instruction:02x} sw=[0-9a-f]{{4}} chv=3/(\d+) puk=10/(\d+) enabled=1', text) != [(str(remaining), str(puk_remaining))]:
         raise ValueError('PIN2/PUK2 retry accounting differs')
     if any(statuses(text, ins) for ins in (0x26, 0x28, 0x24 if unblock else 0x2c)):

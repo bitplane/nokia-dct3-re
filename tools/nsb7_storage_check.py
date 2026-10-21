@@ -30,7 +30,15 @@ def record_checksum(destination, payload):
 def inspect(flash, shadow=None, trace=None):
     if len(flash) != 0x200000 or hashlib.sha1(flash[:BASE]).hexdigest() != NSB7_FLASH_SHA1:
         raise ValueError('requires own NSB-7 executable prefix and 2 MiB flash')
-    sector = flash[BASE:BASE+SECTOR]
+    # Cold rotation retires the old header and publishes the other sector.
+    # Dual-live headers need a separately recovered generation-order contract.
+    candidates = [base for base in (BASE, BASE+SECTOR)
+                  if flash[base+6:base+12] == b'EEPROM' and
+                  flash[base+0x18:base+0x1a] == b'\x00\xc8']
+    if len(candidates) != 1:
+        raise ValueError('requires exactly one live own EEPROM journal sector')
+    selected = candidates[0]
+    sector = flash[selected:selected+SECTOR]
     cache, records, stop = replay(sector, CACHE, sector_size=SECTOR, version=0xc8)
     if not records or records[0]['destination'] != 0 or records[0]['length'] != CACHE:
         raise ValueError('complete own initial shadow record required')
@@ -63,6 +71,7 @@ def inspect(flash, shadow=None, trace=None):
             prefix_matched = True
     return cache, stop, {
         'source_sha256': hashlib.sha256(flash).hexdigest(), 'journal_records': len(records),
+        'sector_base': hex(selected),
         'stop': hex(stop), 'shadow_bytes': len(cache), 'runtime_shadow_matched': shadow is not None,
         'computed': f'{checksum(cache):04x}', 'stored': cache[0x1e0:0x1e2].hex(),
         'excluded_word': cache[0x154:0x156].hex(), 'marker': cache[0x170:0x172].hex(),
@@ -74,16 +83,17 @@ def inspect(flash, shadow=None, trace=None):
 
 def checksum_fixture(flash, shadow, prefix=False):
     cache, stop, report = inspect(flash, shadow)
+    base = int(report['sector_base'], 16)
     destination, width = (0x11c, 4) if prefix else (0x1e0, 2)
     if shadow is None or cache[destination:destination+width] != b'\xff'*width:
         raise ValueError('requires observed unprovisioned checksum field')
     value = (sum(cache[:0x11c]) & 0xffff) if prefix else checksum(cache)
     payload = value.to_bytes(width, 'big')
     record = bytes([width << 2, record_checksum(destination, payload)]) + destination.to_bytes(2, 'big') + payload
-    if stop+len(record)+2 > SECTOR or flash[BASE+stop:BASE+stop+len(record)+2] != b'\xff'*(len(record)+2):
+    if stop+len(record)+2 > SECTOR or flash[base+stop:base+stop+len(record)+2] != b'\xff'*(len(record)+2):
         raise ValueError('no erased journal append space')
     result = bytearray(flash)
-    result[BASE+stop:BASE+stop+len(record)] = record
+    result[base+stop:base+stop+len(record)] = record
     after, _, _ = inspect(result)
     expected = bytearray(cache)
     expected[destination:destination+width] = payload
@@ -91,21 +101,22 @@ def checksum_fixture(flash, shadow, prefix=False):
         raise ValueError('fixture changed logical bytes beyond the checksum')
     report['fixture'] = {'kind': 'research checksum-only, not factory calibration',
                          'logical_offset': hex(destination), 'payload': payload.hex(),
-                         'physical_append': hex(BASE+stop), 'record': record.hex()}
+                         'physical_append': hex(base+stop), 'record': record.hex()}
     return bytes(result), report
 
 
 def security_retry_fixture(flash, shadow):
     cache, stop, report = inspect(flash, shadow)
+    base = int(report['sector_base'], 16)
     destination = 0x9d8
     if shadow is None or cache[destination] != 0xff:
         raise ValueError('requires observed erased retry byte')
     payload = b'\x00'
     record = bytes([4, record_checksum(destination, payload)]) + destination.to_bytes(2, 'big') + payload
-    if stop+len(record)+2 > SECTOR or flash[BASE+stop:BASE+stop+len(record)+2] != b'\xff'*(len(record)+2):
+    if stop+len(record)+2 > SECTOR or flash[base+stop:base+stop+len(record)+2] != b'\xff'*(len(record)+2):
         raise ValueError('no erased journal append space')
     result = bytearray(flash)
-    result[BASE+stop:BASE+stop+len(record)] = record
+    result[base+stop:base+stop+len(record)] = record
     after, _, _ = inspect(result)
     expected = bytearray(cache)
     expected[destination] = 0
@@ -113,7 +124,7 @@ def security_retry_fixture(flash, shadow):
         raise ValueError('fixture changed bytes beyond the erased retry counter')
     report['fixture'] = {'kind': 'research erased retry byte, not phone-code/identity provisioning',
                          'logical_offset': hex(destination), 'payload': payload.hex(),
-                         'physical_append': hex(BASE+stop), 'record': record.hex()}
+                         'physical_append': hex(base+stop), 'record': record.hex()}
     return bytes(result), report
 
 

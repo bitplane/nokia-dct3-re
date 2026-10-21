@@ -18,6 +18,22 @@ class Puk2Test(unittest.TestCase):
         check_change(fixture(False, pin2=True, unblock=True), False, pin2=True, unblock=True)
         check_change(fixture(True, pin2=True, unblock=True), True, pin2=True, unblock=True)
 
+    def test_every_puk2_retry_and_permanent_status(self):
+        for remaining in range(10):
+            text = fixture(True, pin2=True, unblock=True).replace('puk=10/9', f'puk=10/{remaining}')
+            if remaining == 0:
+                text = text.replace('ins=2c sw=9804', 'ins=2c sw=9840')
+            with self.subTest(remaining=remaining):
+                check_change(text, True, pin2=True, unblock=True, puk_remaining=remaining)
+                with self.assertRaises(ValueError):
+                    check_change(text.replace(f'puk=10/{remaining}', 'puk=9/10'), True,
+                                 pin2=True, unblock=True, puk_remaining=remaining)
+
+    def test_permanent_puk2_requires_blocked_status(self):
+        with self.assertRaises(ValueError):
+            check_change(fixture(True, pin2=True, unblock=True).replace('puk=10/9', 'puk=10/0'),
+                         True, pin2=True, unblock=True, puk_remaining=0)
+
     def test_success_requires_automatic_new_pin2_verify(self):
         text = fixture(False, pin2=True, unblock=True)
         text = text.replace('nsb7_sim_tx: index=30 value=a0', 'missing automatic VERIFY')

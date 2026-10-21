@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_permanent_puk2_and_journal_rotation",
+      "owner": "nsb7_sim_storage", "status": "satisfied",
+      "predicate": "Physical PUK2 exhaustion preserves PIN1 and cold navigation while rotated own EEPROM storage replays exactly",
+      "current": "Ten cold physical PUK2 attempts consume10->0 with exact UNBLOCK CHV2 bodies,9804 then9840 and complete-card retry-byte isolation. A separate cold process authenticates PIN1, accepts the phone code and reaches exact Messages/Call log/Missed calls frames without credential mutation or card changes. At attempt8 the old EEPROM header retires and the live journal moves1d0000->1e0000. A separate cold shadow capture matches all32768 replayed bytes and valid calibration/prefix checksums. Inspection permits exactly one live own signature/version sector and rejects ambiguous dual-live headers; no generation-order or atomic power-loss claim is made.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_puk_exhaustion.py", "tools/nsb7_puk2_permanent.lua", "tools/nsb7_pin_change_check.py", "tools/nsb7_storage_check.py", "tools/nsb7_storage_observe.lua", "tools/test_nsb7_puk2_check.py", "tools/test_nsb7_puk_exhaustion.py", "tools/test_nsb7_storage_check.py"]
+    },
+    {
       "id": "nsb7_physical_permanent_puk1_exhaustion",
       "owner": "nsb7_sim_security", "status": "satisfied",
       "predicate": "Ten cold physical wrong-PUK attempts permanently block the own PIN-exhausted card and a new process rejects it without retry",

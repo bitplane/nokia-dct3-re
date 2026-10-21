@@ -21,8 +21,9 @@ SIM-card-security Off/On, cold PIN-request behavior and ordinary PIN1
 change/rejection/cold reuse pass. PIN2 change, rejected-current-PIN2
 isolation and cold reuse also pass, along with physical PIN2 exhaustion,
 failed-PUK2 retry retention and cold PUK2 recovery/reuse. Permanent PUK1
-exhaustion and cold card rejection are qualified; permanent PUK2 exhaustion
-and FDN/AoC authorization remain separate work.
+exhaustion and cold card rejection are qualified. Permanent PUK2 exhaustion
+also retains ordinary PIN1 authentication and menus. FDN/AoC authorization
+remains separate work.
 PIN-enabled fresh/cold laboratory registration and a long wrong-PIN
 non-registration control are qualified as one coherent composition.
 The authenticated composition also qualifies physical incoming/outgoing calls,
@@ -202,6 +203,16 @@ by ordinary write records. Replaying the first 64 KiB window, including all
 11 initial-run records and their byte checksums, matches every byte of the
 runtime shadow. This does not establish the fitted flash part or its erase
 geometry; `00c8` is an observed header field, not an imported NSE-5 version.
+
+Long cold security sequences independently exercise journal rotation. After
+988 records filled the first sector to relative `ff8a`, firmware retired its
+`EEPROM` header and published a fresh complete-shadow journal at file offset
+`1e0000` (CPU `3e0000`). A separate cold capture replayed all 32768 shadow
+bytes exactly from that second sector; calibration and prefix checksums
+remained valid. `nsb7_storage_check.py` therefore checks both observed 64 KiB
+slots and requires exactly one live `EEPROM`/`00c8` header. It does not guess
+generation order when both headers appear live. Fixture append addresses
+follow the selected sector; the retired sector remains unchanged.
 
 The own erased calibration span independently computes `bd42` using
 `sum(shadow[120:1e0]) - sum(shadow[154:156])`, modulo 65536. The explicit
@@ -1985,4 +1996,32 @@ The runner rejects an existing output directory to preserve prior evidence.
 ```sh
 .venv/bin/python tools/nsb7_puk_exhaustion.py \
   tmp/nsb7-pin-blocked tmp/nsb7-puk-exhaustion-fresh
+```
+
+### Permanent PUK2 isolation
+
+The same runner's `--pin2` mode starts from the own organically PIN2-blocked
+card and physically consumes all ten PUK2 retries across independent cold
+processes. Each process authenticates PIN1 and enters the phone code before
+Access codes / PIN2 recovery. Exact UNBLOCK CHV2 bodies and contact decoding
+are retained; `9804` becomes `9840` on the last attempt. Whole-card checks
+permit only the PUK2 retry byte to decrement, preserving PIN1, PIN2, PUK1,
+files and PIN-request policy.
+
+An eleventh cold process physically authenticates PIN1, accepts the phone code
+and navigates Messages / Call log / Missed calls with the existing exact
+frames. It makes no credential mutation and retains the complete exhausted
+card. Thus permanent PIN2-service loss does not imply whole-card rejection.
+The endurance sequence also exercises the independently shadow-validated
+flash-journal rotation described above.
+
+`--check-only` revalidates retained traces/card chains without writing evidence.
+`--resume` revalidates existing complete processes and runs only missing ones;
+an incomplete or invalid retained process stops rather than being overwritten.
+
+```sh
+.venv/bin/python tools/nsb7_puk_exhaustion.py \
+  tmp/nsb7-pin2-blocked tmp/nsb7-puk2-exhaustion-fresh --pin2
+.venv/bin/python tools/nsb7_puk_exhaustion.py \
+  tmp/nsb7-pin2-blocked tmp/nsb7-puk2-exhaustion --pin2 --check-only
 ```

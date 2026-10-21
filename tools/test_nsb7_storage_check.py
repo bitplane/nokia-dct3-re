@@ -1,9 +1,27 @@
 from pathlib import Path
 import unittest
-from tools.nsb7_storage_check import checksum, checksum_fixture, security_retry_fixture, inspect, BASE, CACHE
+from tools.nsb7_storage_check import checksum, checksum_fixture, security_retry_fixture, inspect, BASE, CACHE, SECTOR
 
 
 class StorageTests(unittest.TestCase):
+    def test_rotated_sector_and_fixture_ownership(self):
+        flash = self.own_initial_flash()
+        original = bytes(flash[BASE:BASE+SECTOR])
+        flash[BASE:BASE+SECTOR] = b'\xff'*SECTOR
+        flash[BASE+SECTOR:BASE+2*SECTOR] = original
+        shadow, _, report = inspect(flash)
+        self.assertEqual(report['sector_base'], hex(BASE+SECTOR))
+        result, report = checksum_fixture(flash, shadow)
+        self.assertEqual(result[BASE:BASE+SECTOR], flash[BASE:BASE+SECTOR])
+        self.assertGreaterEqual(int(report['fixture']['physical_append'], 16), BASE+SECTOR)
+        self.assertTrue(inspect(result)[2]['checksum_valid'])
+
+    def test_dual_live_sectors_are_not_guessed(self):
+        flash = self.own_initial_flash()
+        flash[BASE+SECTOR:BASE+2*SECTOR] = flash[BASE:BASE+SECTOR]
+        with self.assertRaises(ValueError):
+            inspect(flash)
+
     def test_checksum_excludes_the_full_word(self):
         cache = bytearray(b'\xff' * CACHE)
         self.assertEqual(checksum(cache), 0xbd42)
