@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_settled_idle_exact_restoration",
+      "owner": "nsb7_hle_state", "status": "satisfied",
+      "predicate": "Own clean lab idle restores exact ARM/RAM/time state, protocol replay and pixels and accepts a physical Menu contact afterward",
+      "current": "The own test00 retained-storage run saves at27s and restores all37 ARM/banked registers, R15/SP, mapped-RAM checksum and emulated time exactly. Three-second TX/RX/service/SIM intervals match using the shared timestamp/idle-poll exclusions. Both full idle frames equal the clean DCT3 LAB oracle; post-load physical Menu decodes19 and reproduces the Messages frame. The complete SIM card is unchanged. This does not promote active-call/SMS or native DSP restoration.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_state_idle.lua", "tools/nsb7_state_check.py", "tools/test_nsb7_state_check.py"]
+    },
+    {
       "id": "nsb7_physical_netmonitor_disable_clean_cold_idle",
       "owner": "nsb7_mmi_settings", "status": "satisfied",
       "predicate": "Physical Net monitor test00 selection removes the radio-status overlay and retains clean laboratory idle across a cold restart",

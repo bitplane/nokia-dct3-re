@@ -1509,3 +1509,28 @@ passes the outgoing signalling checker unchanged. Its dial screen reads
 `5551234`, its call screen reads `Calling...`, and it returns to the same
 clean idle after physical End. These are lab-HLE presentation and
 signalling results, not native speech or external-network qualification.
+
+### Settled-idle save/load acceptance
+
+`tools/nsb7_state_idle.lua` starts from the own retained test-00 storage,
+enters the phone code physically, and saves settled lab idle at 27 seconds.
+Pre-save and post-load observations match the complete 37-register
+ARM/banked inventory, R15/SP, mapped-RAM checksum and emulated time exactly.
+The 27..30-second reference/restored intervals have identical ordered
+TX/RX/service/SIM protocol records using the shared replay checker (which
+excludes bodyless idle polls and diagnostic print timestamps).
+
+Both reference and restored screenshots equal the full clean-idle RGB
+oracle above. A physical Menu contact after the restored interval decodes
+`19` and produces the existing exact Messages-menu oracle. The entire
+persistent SIM card remains byte-identical to the input storage.
+
+```sh
+.venv/bin/python tools/nsb7_state_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-state-idle \
+  tmp/nsb7-netmonitor-off-cold
+```
+
+This qualifies settled-idle architectural/protocol/pixel restoration and
+post-load input for `nsb7hle`, not native DSP restoration, active-call
+or active-SMS replay. Those transaction boundaries remain separate work.
