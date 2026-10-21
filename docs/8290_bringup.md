@@ -19,8 +19,10 @@ receiver-configuration acknowledgement and complete BCCH system-information
 parsing, CCCH setup, timed random-access completion and an accepted
 Immediate Assignment, dedicated-channel setup and an emitted Location
 Updating Request inside LAPDm SABM, followed by accepted contention-resolution
-UA and firmware link state `2 -> 4`. Location Updating acceptance, camping,
-registration, calls, SMS and a usable idle frame remain unestablished.
+UA and firmware link state `2 -> 4`. Location Updating Accept and Channel
+Release are acknowledged by firmware; EF_LOCI is updated over SIMI and
+retained, and the receiver returns to common control. Post-release paging,
+stable registered idle presentation, calls and SMS remain unestablished.
 In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
 No PMM, resident DSP mask, hardware profile or provisioning is supplied by
@@ -636,8 +638,9 @@ while runtime HLE remains in use. This is a bootstrap/runtime ownership
 correction, not a candidate-payload special case.
 
 Decode each subsequent request's callers and populated fields before
-extending peer coverage. LU Accept/release, traffic release, neighbours,
-authentication and registration remain unestablished on this handset.
+extending peer coverage. LU Accept and signaling-channel release are
+qualified below; traffic release, neighbours and authentication remain
+unestablished on this handset.
 
 ### Candidate response routing
 
@@ -685,7 +688,7 @@ stores decoded BSIC `12`, and publishes type `02`/20 bytes beginning
 `041202000000005050000258`. The final eight request bytes are captured
 but not yet assigned semantics. Channel completion and the subsequent
 BCCH, CCCH, access-frame and assignment lifecycles are independently
-qualified below; Location Updating acceptance remains open.
+qualified below, including Location Updating acceptance and receiver return.
 
 ### Receiver configuration acknowledgement
 
@@ -717,8 +720,8 @@ included in this contract.
 Without BCCH delivery, firmware times out and publishes type `03` with
 zero payload, then type-55 control `04080000` at about 8.87 seconds. The
 bounded `--channel` checker requires this tail and exactly five total RX packets,
-so an accidentally inherited BCCH continuation fails acceptance. Network
-camping, registration, calls and SMS remain unestablished on this model.
+so an accidentally inherited BCCH continuation fails this bounded acceptance.
+It does not establish network camping, registration, calls or SMS.
 
 ### BCCH system information
 
@@ -893,8 +896,8 @@ not constructed by the host or copied from another model's message.
 clear, committed mode `40`, both block-request decoder boundaries, the
 same nonzero queue pointer, and the exact own SABM/Location Updating
 Request. That bounded fixture rejects an extra UA/downlink reply. Contention
-resolution is qualified separately below; Location Updating acceptance
-and registration remain unproved.
+resolution and Location Updating acceptance are qualified separately below;
+this uplink-only fixture does not prove registration.
 
 ### Contention-resolution UA
 
@@ -923,3 +926,56 @@ packets and twenty-one RX packets. The peer withholds the subsequently
 queued Location Updating Accept. This establishes the contention
 exchange and firmware link progression, not completed registration or
 native DSP execution.
+
+### Location-update acceptance and release boundary
+
+The `candidate_location_update` qualification level permits the existing
+GSM session to send its queued Location Updating Accept after the accepted
+contention echo. It also permits the handset's actual type-1b supervisory
+acknowledgements in the location-update and channel-release phases. It
+does not enable the subsequent receiver-deconfiguration request.
+
+In `tmp/nsb7-lu-accept`, both MCU dedicated-block consumers observe
+`030045050200f1100001170809101010325476982b2b2b2b`.
+Firmware responds to the following type-86 block request with
+`0080032101` followed by fill/trailer bytes: LAPDm RR with N(R)=1.
+The peer then sends Channel Release block
+`03020d060d002b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b`,
+again observed at both MCU consumers. Firmware acknowledges with
+`0080034101` plus fill/trailer (N(R)=2). Its own link-state writes
+progress from 4 to 3 at `26644a`, then to 0 at `265674`.
+
+Finally, firmware publishes type-02/20 receiver request
+`041202000000001a600002580000000f00000000` at 11.724501 seconds.
+This is the withheld boundary for `candidate_location_update`. These wire-level
+acknowledgements establish reception and link progression, not by
+themselves durable MM registration, SIM EF_LOCI persistence, operator
+presentation, or native DSP execution.
+
+### Common-control return and persistent location state
+
+The pending descriptor at the return request is tag `0409`, not the
+earlier armed `0402`. In handler `2e5054`, the comparison at `2e506e`
+uses literal `0409` from `2e52a0` and branches to `2e50ce`: it commits
+the cached receiver with `2ef3ec(NULL)` without checking descriptor reply
+bit or armed state. `candidate_release` therefore enables the existing
+zero-valued type-89 channel confirmation, then withholds paging reports.
+
+In both `tmp/nsb7-release` and `tmp/nsb7-release-cold`, the reply commits
+mode `1a`. Firmware subsequently emits type-46/8, two type-02/20 requests
+for mode `16`, and type-57/4 `03050000`. The two further ordinary
+channel confirmations commit mode `16`; no paging payload is supplied.
+
+Firmware also sends this physical SIM command sequence:
+`a0 a4 00 00 02 6f 7e` (select EF_LOCI),
+`a0 d6 00 04 05 00 f1 10 00 01` (write laboratory LAI), and
+`a0 d6 00 0a 01 00` (location status updated). Saved card bytes
+1600..1610 change from `ffffffffffffffffffff01`
+to `ffffffff00f1100001ff00`. No host write populates this state.
+
+`tools/nsb7_radio_check.py IMAGE RUN --release` requires both downlink
+consumers, firmware acknowledgements, link release, the return-request
+sequence, three channel confirmations with no later paging payload,
+SIM TX commands and saved EF_LOCI. This qualifies an accepted laboratory
+location update and receiver return, not durable paging reachability,
+usable operator presentation, calls, SMS or native DSP speech.

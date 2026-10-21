@@ -57,6 +57,8 @@ def contract(image):
     ccch_endings = list(image[0x143fb4:0x143fbd])
     if ccch_endings != [9, 15, 19, 25, 29, 35, 39, 45, 49] or word(0x2e4d04) != 0x623:
         raise ValueError('own AGCH tag/block-ending contract differs')
+    if word(0x2e52a0) != 0x409 or image[0xe506e:0xe5072] != bytes.fromhex('4291d02d'):
+        raise ValueError('own 0409 receiver-cache bypass contract differs')
     ranges = []
     start = 0
     previous = channel_class(0, 0x98000000)
@@ -226,6 +228,55 @@ def check_contention(text, inventory):
     result = re.findall(r'nsb7_rr_decoder_result: index=3 task=14 code=0614 block=([0-9a-f]{48}) ', text)
     if result != [expected.hex()]:
         raise ValueError('UA decoder result differs')
+
+
+def check_location_update(text):
+    """Qualify the post-UA exchange only; this is not a registration oracle."""
+    blocks = re.findall(r'nsb7_lapdm_downlink: pc=([0-9a-f]{8}) task=(\d+) selector=80 block=([0-9a-f]{48}) ', text)
+    expected = [
+        '01734905087000f000fffe200809101010325476982b2b2b',
+        '030045050200f1100001170809101010325476982b2b2b2b',
+        '03020d060d002b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b',
+    ]
+    if blocks != [(pc, task, block) for block in expected
+                  for pc, task in [('002e49e6', '4'), ('002645ec', '14')]]:
+        raise ValueError('location-update/release blocks did not reach both MCU consumers')
+    transmissions = re.findall(r'nsb7_radio_tx: index=(4[3-5]) type=([0-9a-f]{2}) length=(\d+) data=([0-9a-f]+) ', text)
+    if transmissions != [
+            ('43', '1b', '28', '0080032101' + '2b'*20 + '000000'),
+            ('44', '1b', '28', '0080034101' + '2b'*20 + '000000'),
+            ('45', '02', '20', '041202000000001a600002580000000f00000000')]:
+        raise ValueError('firmware acknowledgement or receiver-return request differs')
+    states = re.findall(r'nsb7_lapdm_state: context=([0-9a-f]{8}) state=(\d+) pc=([0-9a-f]{8}) task=(\d+) ', text)
+    if (len(states) != 3 or len({row[0] for row in states}) != 1 or
+            [row[1:] for row in states] != [('4', '002665c0', '14'),
+                                           ('3', '0026644a', '14'),
+                                           ('0', '00265674', '14')]):
+        raise ValueError('firmware link release state sequence differs')
+
+
+def check_receiver_return(text, card):
+    check_location_update(text.split('nsb7_radio_tx: index=46 ', 1)[0])
+    packets = [(int(row[0]), int(row[1], 16), bytes.fromhex(row[3]))
+               for row in PACKET.findall(text)]
+    expected = [(46, 0x46, bytes.fromhex('3210321000010000')),
+                (47, 2, bytes.fromhex('0412020200000016600002580000000001297000')),
+                (48, 2, bytes.fromhex('0412020200000016600002580000000001297000')),
+                (49, 0x57, bytes.fromhex('03050000'))]
+    if packets[45:] != expected:
+        raise ValueError('post-release receiver sequence differs')
+    replies = re.findall(r'nsb7_radio_rx: index=(2[6-9]|[3-9][0-9]) type=([0-9a-f]{2}) length=(\d+) ', text)
+    if replies != [('26', '89', '8'), ('27', '89', '8'), ('28', '89', '8')]:
+        raise ValueError('receiver return needs exactly three confirmations, no paging payload')
+    if 'live_channel=0258 live_mode=1a ' not in text or 'live_channel=0258 live_mode=16 ' not in text:
+        raise ValueError('common-control receiver was not committed')
+    # Native card NVRAM stores 50 32-byte ADN records before the 11-byte LOCI.
+    if len(card) < 1611 or card[1600:1611] != bytes.fromhex('ffffffff00f1100001ff00'):
+        raise ValueError('card did not retain laboratory LAI and updated LOCI status')
+    wire = bytes(int(value, 16) for value in re.findall(
+        r'nsb7_sim_tx: index=\d+ value=([0-9a-f]{2})', text))
+    if bytes.fromhex('a0a40000026f7ea0d600040500f1100001a0d6000a0100') not in wire:
+        raise ValueError('LOCI update was not observed on the physical SIM TX path')
 
 
 def check_trace(text, measurement=False, synchronization=False, channel=False, bcch=False, ccch=False, rach=False, assignment=False, dedicated=False, uplink=False, contention=False):
@@ -410,14 +461,19 @@ def main():
     parser.add_argument('--dedicated', action='store_true')
     parser.add_argument('--uplink', action='store_true')
     parser.add_argument('--contention', action='store_true')
+    parser.add_argument('--release', action='store_true')
     args = parser.parse_args()
     try:
         report = contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
-        check_trace(text, measurement=args.measurement, synchronization=args.synchronization,
-                    channel=args.channel, bcch=args.bcch, ccch=args.ccch, rach=args.rach,
-                    assignment=args.assignment, dedicated=args.dedicated, uplink=args.uplink,
-                    contention=args.contention)
+        if args.release:
+            check_security(text)
+            check_receiver_return(text, (args.run / 'nvram/nsb7hle/sim_card').read_bytes())
+        else:
+            check_trace(text, measurement=args.measurement, synchronization=args.synchronization,
+                        channel=args.channel, bcch=args.bcch, ccch=args.ccch, rach=args.rach,
+                        assignment=args.assignment, dedicated=args.dedicated, uplink=args.uplink,
+                        contention=args.contention)
         states = re.findall(r'nsb7_radio_state: bands=([0-9a-f]{8}) measurement_route=([0-9a-f]{2}) t=([0-9.]+)', text)
         if states != [('98000000', '01', f'{time:.9f}') for time in (3.5, 6, 14, 24)]:
             raise ValueError('live feature/forwarding predicate differs')
@@ -425,7 +481,8 @@ def main():
             args.contract_json.write_text(json.dumps(report, indent=2) + '\n')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 radio inventory: FAIL: {error}\n')
-    print('PASS: ' + ('own contention echo accepted; firmware link state 2 to 4; no LU Accept supplied' if args.contention else
+    print('PASS: ' + ('own LU/release acknowledged; receiver returned; SIM LOCI retained; paging withheld' if args.release else
+                     'own contention echo accepted; firmware link state 2 to 4; no LU Accept supplied' if args.contention else
                      'own LAPDm SABM carries Location Updating Request; no UA supplied' if args.uplink else
                      'own bit-1 acknowledgement commits dedicated receiver; block request withheld' if args.dedicated else
                      'own Immediate Assignment accepted; dedicated-channel acknowledgement withheld' if args.assignment else

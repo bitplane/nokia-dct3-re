@@ -1767,13 +1767,25 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			packet.type == 0x02 && packet.length == 20 &&
 			packet.payload[0] == 4 && packet.payload[8] == 0x80;
 	const bool partial_establish_request =
-			m_protocol.coverage == acquisition_coverage::candidate_contention &&
+			m_protocol.coverage >= acquisition_coverage::candidate_contention &&
 			current_phase() == phase::lapdm_establish &&
 			packet.type == 0x1b && packet.length == 28 &&
 			packet.payload[0] == 0 && packet.payload[1] == 0x80;
+	const bool partial_acknowledgement =
+			m_protocol.coverage >= acquisition_coverage::candidate_location_update &&
+			(current_phase() == phase::location_update_acknowledgement ||
+			 current_phase() == phase::channel_release_acknowledgement) &&
+			packet.type == 0x1b && packet.length == 28 &&
+			packet.payload[0] == 0 && packet.payload[1] == 0x80;
+	const bool partial_release_request =
+			m_protocol.coverage >= acquisition_coverage::candidate_release &&
+			current_phase() == phase::release_deconfigure &&
+			packet.type == 0x02 && packet.length == 20 &&
+			packet.payload[8] == 0x60 && packet.payload[15] == 0x0f;
 	if (m_protocol.coverage != acquisition_coverage::full &&
 			!partial_common_control_request && !partial_random_access_request &&
-			!partial_dedicated_request && !partial_establish_request)
+			!partial_dedicated_request && !partial_establish_request && !partial_acknowledgement &&
+			!partial_release_request)
 	{
 		if (packet.type == 0x55 && packet.length == 4 &&
 				packet.payload[0] == 3 &&
@@ -2894,8 +2906,17 @@ void nokia_radio_peer_device::emit_report()
 		const bool completing_dedicated = current_phase() == phase::assigned_channel_change;
 		const bool completing_contention = current_phase() == phase::contention_resolution;
 		const bool completing_common_control = current_phase() == phase::serving_channel_change;
+		const bool completing_release = current_phase() == phase::release_channel_change;
 		--m_reports_remaining;
 		advance_after_report(report_type);
+		// Qualify the receiver return independently of post-release paging.
+		if (m_protocol.coverage == acquisition_coverage::candidate_release &&
+				report_type == 0x89 && completing_release)
+		{
+			m_reports_remaining = 0;
+			m_wait_ticks = 0;
+			m_report_deferred = false;
+		}
 		// Partial acquisition contracts establish one SCH observation, not
 		// the sibling products' subsequent terminal RSSI/channel dialogue.
 		if (m_protocol.coverage >= acquisition_coverage::candidate_synchronization &&
