@@ -1,4 +1,8 @@
 import unittest
+from unittest.mock import patch
+from tools.nsb7_phonebook_check import check_pin_card
+from tools.nsb7_pin_check import serialized_profile
+from tools.nsb7_pin_registration_check import LOCI
 from tools.nsb7_phonebook_check import check_trace, SAVE_KEYS, READ_KEYS, HOST_KEYS
 from tools.nsk3_phonebook_check import expected_record
 from tools.test_nsb7_security_check import trace as security_trace
@@ -17,6 +21,26 @@ def trace(readback=False):
 
 
 class PhonebookCheckTests(unittest.TestCase):
+    def test_pin_whole_card_contract(self):
+        initial = bytearray(serialized_profile())
+        initial[1600:1611] = LOCI
+        saved = bytearray(initial)
+        saved[:32] = expected_record()
+        check_pin_card(bytes(initial), bytes(saved))
+        for offset in (32, 1600, 3484, 3516, 3520):
+            changed = bytearray(saved)
+            changed[offset] ^= 1
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                check_pin_card(bytes(initial), bytes(changed))
+
+    def test_pin_authentication_precedes_phonebook(self):
+        text = trace()
+        with patch('tools.nsb7_pin_services_check.check_authentication') as authentication:
+            check_trace(text, pin=True)
+            authentication.assert_called_once_with(text.split('nsb7_menu_input:', 1)[0])
+        with self.assertRaises(ValueError):
+            check_trace(text, pin=True)
+
     def test_complete_save_and_read(self):
         check_trace(trace())
         check_trace(trace(True), True)

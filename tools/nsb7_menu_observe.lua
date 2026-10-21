@@ -1,7 +1,7 @@
 -- Post-security menu exploration through physical contacts only.
 _G.nsb7_security_continue=true
 local source=debug.getinfo(1,'S').source:sub(2)
-dofile(source:match('^(.*[/\\])')..'nsb7_security_observe.lua')
+dofile(source:match('^(.*[/\\])')..(_G.nsb7_menu_base_observer or 'nsb7_security_observe.lua'))
 local machine=manager.machine
 local fields={}
 for _,port in pairs(machine.ioport.ports) do

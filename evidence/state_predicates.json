@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_pin_authenticated_phonebook_persistence",
+      "owner": "nsb7_sim_storage", "status": "satisfied",
+      "predicate": "Physical PIN and cold laboratory registration compose with contact save and independent cold Details retrieval",
+      "current": "Both processes authenticate before their first phonebook contact. Names/Add saves A/12345 with one complete UPDATE RECORD and the exact Saved frame. An independent cold process physically finds and displays Details with exact existing frames and no UPDATE. Whole-card comparison permits only the first32-byte ADN record relative to the own registered PIN-enabled source; cold storage is identical. Passive radio capture proves registration rather than inferring it from UI. No firmware forcing, donor input or native RF claim is involved.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_pin_phonebook_save.lua", "tools/nsb7_pin_phonebook_read.lua", "tools/nsb7_menu_observe.lua", "tools/nsb7_phonebook_check.py", "tools/test_nsb7_phonebook_check.py"]
+    },
+    {
       "id": "nsb7_pin_active_sms_restoration",
       "owner": "nsb7_lab_services", "status": "satisfied",
       "predicate": "Physical PIN authentication and cold registration precede an active incoming-SMS save with exact restored completion",

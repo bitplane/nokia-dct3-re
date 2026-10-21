@@ -1941,3 +1941,26 @@ not merely somewhere in the combined reference/replayed trace.
   roms/noki8290/8290f522a.fls tmp/nsb7-pin-sms-state \
   tmp/nsb7-pin-registration-cold --sms --pin
 ```
+
+### PIN-authenticated persistent phonebook
+
+`nsb7_pin_phonebook_save.lua` and `nsb7_pin_phonebook_read.lua` compose
+physical PIN/phone-code entry and retained-location laboratory registration
+with the established Names/Add and cold Find/Details routes. Each process
+proves authentication before the first phonebook contact. Save emits exactly
+one complete UPDATE RECORD for `A / 12345`; cold retrieval emits no UPDATE.
+Exact Saved, Find and Details frames match the existing phonebook oracles.
+The complete saved card equals the own PIN-enabled registered input with
+only its first 32-byte ADN record replaced; the cold card is identical.
+Credentials, retries, other records and location information are preserved.
+
+The authenticated wrappers select the passive LAPDm/radio observer as the
+menu harness's base observer, so registration is measured rather than inferred
+from successful UI activity. The ordinary menu harness remains unchanged by
+default.
+
+```sh
+.venv/bin/python tools/nsb7_phonebook_check.py \
+  tmp/nsb7-pin-phonebook-save tmp/nsb7-pin-phonebook-cold \
+  --pin-source tmp/nsb7-pin-registration-cold
+```
