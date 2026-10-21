@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_host_outgoing_call_settled_idle",
+      "owner": "nsb7_host_services", "status": "satisfied",
+      "predicate": "Physical dialing from authenticated settled idle publishes one correlated host-decided outgoing call and physical End releases it",
+      "current": "Own PIN-enabled source authenticates/registers before exact45s clean-idle pixels. Physical5551234 at46..52 and Send54 publish request1/epoch1. Wrong-ID busy is rejected, matching connect queues/consumes once and duplicate is rejected. Single SETUP/assignment complete through CONNECT/ACK, exact Calling/active Call1 pixels and host connected. Physical End66 closes CC/RR and same-epoch media_closed/ended, with exact76s idle and unchanged complete card. Shared observe-end waits for connection then release under one90s budget without media/remote termination. Zero media sequences and phase names do not establish speech, RF, SIP or external-dialog restoration.",
+      "evidence": ["docs/8290_bringup.md", "docs/external_call_bridge.md", "tools/nsb7_pin_host_outgoing_call.lua", "tools/nsb7_host_outgoing_call_check.py", "tools/test_nsb7_host_outgoing_call_check.py", "tools/run_host_call_adapter_gate.py", "tools/test_host_physical_end.py", "fixtures/nsb7_host/nsb7hle.cfg"]
+    },
+    {
       "id": "nsb7_host_incoming_call_settled_idle",
       "owner": "nsb7_host_services", "status": "satisfied",
       "predicate": "A host request after reviewed authenticated idle produces displayed caller, physical Answer/End and correlated incoming-call signaling release",

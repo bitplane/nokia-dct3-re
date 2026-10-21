@@ -65,6 +65,24 @@ async def observe_restored_call(websocket, epoch, request_id):
             return
 
 
+async def observe_physical_end(websocket, epoch, request_id):
+    connected = False
+    async with asyncio.timeout(90):
+        while True:
+            event = json.loads(await websocket.recv())
+            if event.get('type') != 'outgoing_call_state':
+                continue
+            if (event.get('epoch'), event.get('request_id')) != (epoch, request_id):
+                raise RuntimeError('physical release changed call identity/epoch')
+            phase = event.get('phase')
+            if phase == 'connected':
+                connected = True
+            elif phase == 'ended':
+                if not connected:
+                    raise RuntimeError('call ended before connection')
+                return
+
+
 async def run(args: argparse.Namespace) -> None:
     process = await asyncio.create_subprocess_exec(
         *args.command, cwd=args.cwd
@@ -138,6 +156,8 @@ async def run(args: argparse.Namespace) -> None:
             await websocket.send(json.dumps(decision))
             if args.observe_restore:
                 await observe_restored_call(websocket, epoch, 1)
+            elif getattr(args, 'observe_end', False):
+                await observe_physical_end(websocket, epoch, 1)
             elif args.media_frames:
                 connected = False
                 returned = 0
@@ -240,6 +260,8 @@ def main() -> int:
     parser.add_argument("--hostile-pre-setup", action="store_true")
     parser.add_argument('--observe-restore', action='store_true',
                         help='remain attached through connected save/load and physical release')
+    parser.add_argument('--observe-end', action='store_true',
+                        help='remain attached through connection and physical release without requiring media')
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.command[:1] == ["--"]:
@@ -248,6 +270,8 @@ def main() -> int:
         parser.error("a MAME launch command is required after --")
     if args.observe_restore and (args.decision != 'connect' or args.terminate or args.media_frames):
         parser.error('--observe-restore requires connect without remote termination/media echo')
+    if args.observe_end and (args.decision != 'connect' or args.terminate or args.media_frames or args.observe_restore):
+        parser.error('--observe-end requires connect without remote termination/media/restore')
     try:
         asyncio.run(run(args))
     except (RuntimeError, asyncio.TimeoutError) as error:

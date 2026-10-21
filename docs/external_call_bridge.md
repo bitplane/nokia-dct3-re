@@ -35,6 +35,14 @@ accepts the republished request and connected media cursors and rejects media
 from older identities.  Sequence numbers and timestamps are correlation data;
 they never schedule firmware or radio work.
 
+Signaling-only acceptance can use `run_host_call_adapter_gate.py --decision
+connect --observe-end`. This keeps the host attached until a correlated
+connected-to-ended lifecycle completes within one90s budget, without sending
+media or a remote termination. It is not an audio gate; product-specific
+physical-input, protocol, storage and UI checks remain required. The
+[8290 host contract](8290_bringup.md#host-decided-outgoing-call) is one
+independently qualified composition.
+
 ## Protocol contract
 
 The WebSocket endpoint speaks protocol version 1. On connection and after a

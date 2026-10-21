@@ -35,8 +35,9 @@ incoming SMS read/Reply, active incoming-call/SMS restoration and persistent
 phonebook save/cold Details retrieval with exact card and UI outcomes.
 Independent host-originated incoming SMS/read and host-decided outgoing Reply
 also pass through the shared WebSocket adapter without new device behavior.
-Host-originated incoming call signaling separately passes from reviewed clean
-idle through displayed caller, physical Answer/End and correlated release.
+Host-originated incoming and host-decided outgoing call signaling separately
+pass from reviewed clean idle through physical Answer/dial/End, exact UI and
+correlated release.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
 parsing, CCCH setup, timed random-access completion and an accepted
@@ -2254,5 +2255,38 @@ Require the handset checker as well as runner success:
 ```
 
 This validates external host signaling and physical UI acceptance, not host
-media, native speech, an external carrier or a SIP-connected call. Outgoing
-host-call decisions and host-call restoration remain separate targets.
+media, native speech, an external carrier or a SIP-connected call. Host-call
+restoration remains a separate target.
+
+## Host-decided outgoing call
+
+`nsb7_pin_host_outgoing_call.lua` uses the same own PIN-enabled registered
+storage and `fixtures/nsb7_host/nsb7hle.cfg`. Physical authentication and the
+exact45s clean-idle snapshot precede dial digits46..52 (`5551234`), Send54,
+End66 and final76s. Exact frames cover ready idle, displayed number, Calling,
+the60s active `Call 1` UI and return to idle. The complete SIM card remains
+unchanged and the own flash journal stays valid.
+
+The host receives request1/epoch1 for5551234. A wrong-ID busy decision is
+rejected; the correlated connect decision queues and consumes once; its
+duplicate is rejected. One SETUP and traffic assignment lead to CONNECT/ACK,
+host connected, physical End and the complete CC/RR release, followed by
+media_closed/ended in the same epoch. Media sequence counters remain zero;
+the phase name is not speech evidence.
+
+The shared runner's `--observe-end` option keeps its WebSocket attached until
+connected then ended, with one90s wall-clock budget. It submits no remote
+termination or media and rejects request/epoch changes. It requires connect
+and cannot be combined with restoration, media echo or remote termination.
+
+Use `run_host_call_adapter_gate.py --port 18933 --decision connect
+--observe-end` around the isolated MAME command with `-http -http_port 18933`,
+this Lua script and an82s guard; require the handset checker too:
+
+```sh
+.venv/bin/python tools/nsb7_host_outgoing_call_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin-host-outgoing-call
+```
+
+This qualifies host-decided outgoing signaling with physical/UI continuity,
+not host speech, SIP media, native RF or restoration of an external dialog.
