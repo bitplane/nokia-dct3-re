@@ -24,7 +24,8 @@ Release are acknowledged by firmware; EF_LOCI is updated over SIMI and
 retained, and the receiver returns to common control. Repeated empty paging
 blocks reach its RR decoder. An addressed page now produces the handset's
 own Paging Response after background measurement completion. Stable
-registered idle presentation remains unestablished. Incoming SMS delivery,
+lab-registered idle presentation is qualified after physically selecting
+Net monitor test `00`, with own cold settings retention. Incoming SMS delivery,
 physical reading/deletion, cancellation, cold status retention and outgoing
 Reply submission are qualified below. Incoming-call
 control through physical Answer/End, CONNECT acknowledgement and release,
@@ -430,7 +431,8 @@ preceding run's own flash and card NVRAM.
 
 The post-acceptance frame has `Menu/Names` softkeys and a radio-status
 overlay in the main area (source-text contract below). Do not call it
-an ordinary idle or registered screen. Physical menu
+an ordinary idle or registered screen until Net monitor is disabled as
+qualified below. Physical menu
 activation works independently, as qualified below; no security verdict or
 UI state is injected.
 
@@ -450,11 +452,11 @@ exact RGB frames for all three views. The same frames reproduce in a new
 process retaining the preceding run's own flash and card. It does not
 establish call history, messaging services, a usable idle screen or RF.
 
-The remaining display/application question is why the firmware's radio-status
-overlay is active during ordinary UI use. Its source text is qualified
-below; activation/settings ownership is unresolved. Inspect firmware-owned
-settings/resource selection (including erased NV inputs) before modifying
-the LCD device or synthesizing network presentation.
+The radio-status overlay is Net monitor test `01`. Physical selection of
+test `00` removes it and persists across a cold restart, as qualified
+below. No LCD/font or network-presentation workaround is needed. The
+individual setting-bit semantics and erased-input initialization remain
+undecoded; the physical menu is the supported settings path.
 
 ### Firmware-owned clock setting and RTC retention
 
@@ -463,7 +465,7 @@ time controls, enters `13:47`, confirms, and returns through Back. The
 editor displays the intended digits and the firmware confirms `Time is
 set`. The idle top-right clock then displays `13:47`, while the main-area
 radio-status overlay remains. A valid clock therefore does not by itself
-resolve that separate activation/settings question.
+disable Net monitor; its physical control is qualified below.
 
 Independent journal replay observes a firmware-written opaque word at
 logical `0408` (`ffffffff -> 91055b00`) plus several setting bytes. Do not
@@ -1011,7 +1013,8 @@ skips an opportunity (204-frame rather than 102-frame separation).
 The checker permits those explicit gaps but rejects a different group;
 physical-time paging delivery remains unqualified. The idle screenshot
 still contains the radio-status overlay despite working softkey text and
-clock, so there is no ordinary registered-idle graphics claim.
+clock. The ordinary lab-registered idle frame is qualified separately
+after physical Net monitor disable below.
 
 ### Addressed page: own identity accepted, RR continuation unresolved
 
@@ -1437,7 +1440,7 @@ ordered connection and release, absence of an incoming page, and a
 complete 50-second observation. Both `tmp/nsb7-outgoing-call` and a fresh
 process retaining its own flash/card/CCONT storage at
 `tmp/nsb7-outgoing-call-cold` pass this check. Ordinary dial/call presentation
-without the radio-status overlay remains unqualified. L1 speech ticks with
+without the radio-status overlay is qualified below. L1 speech ticks with
 `good=0` do not establish decoded speech;
 this result is call-control signalling only, not a native voice or
 external telephone call.
@@ -1470,6 +1473,39 @@ while composing the existing physical Messages/Call log/Missed calls
 fixture. `tools/nsb7_display_text_check.py IMAGE RUN` requires the own ROM,
 complete runtime string and all three existing exact menu control frames.
 This proves the origin of the apparent junk, not every aspect of its
-layout. A field-test/net-monitor page is the working interpretation;
-its activation selector and provisioning contract are not yet decoded.
-Do not disable it by guest-state writes or claim an LCD/font repair.
+layout. The physical menu experiment below confirms it is Net monitor
+test `01`. Do not disable it by guest-state writes or claim an LCD/font repair.
+
+### Physical Net monitor disable and ordinary idle
+
+From Messages, physical Up selects the final `Net monitor` menu item.
+Opening it displays `Test: 01`. `tools/nsb7_netmonitor_off.lua` enters
+`00` with two physical keypad-0 presses and confirms with Menu/OK.
+The firmware returns to a clean idle frame containing `DCT3 LAB`,
+`13:47`, signal/battery bars and `Menu/Names`. Its 84x48 RGB SHA256 is
+`18af845e6ddde36b7e5ba8ecb09c7d6c6c5a67170d2e56e18d99327961e0f147`.
+No RAM, flash or LCD state is written by the harness.
+
+Independent replay of the menu-only control and disabled run's own
+flash journals differs at exactly one logical byte: `0x04f1: ff -> 3d`.
+Both had the same starting own storage. A new process retaining the
+disabled run's own flash/SIM/CCONT state reproduces the exact idle frame
+after physical security-code entry, without navigating Net monitor.
+The bit-level meaning of `3d` is not established; it is a firmware-written
+setting, not a new fixture constant to inject.
+
+```sh
+.venv/bin/python tools/nsb7_netmonitor_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-netmonitor-menu \
+  tmp/nsb7-netmonitor-off-final tmp/nsb7-netmonitor-off-cold \
+  --call tmp/nsb7-outgoing-call-clean
+```
+
+Acceptance requires the decoded physical contacts, Net monitor menu,
+test-01/test-00 and idle pixel oracles, independently validated journals,
+the one-byte control difference and cold retained setting/frame.
+`tmp/nsb7-outgoing-call-clean` starts with that own retained storage and
+passes the outgoing signalling checker unchanged. Its dial screen reads
+`5551234`, its call screen reads `Calling...`, and it returns to the same
+clean idle after physical End. These are lab-HLE presentation and
+signalling results, not native speech or external-network qualification.

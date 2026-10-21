@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_physical_netmonitor_disable_clean_cold_idle",
+      "owner": "nsb7_mmi_settings", "status": "satisfied",
+      "predicate": "Physical Net monitor test00 selection removes the radio-status overlay and retains clean laboratory idle across a cold restart",
+      "current": "Physical Menu/Up/Menu exposes Net monitor and Test01; two keypad0 contacts and OK select00. Independent own journal replay differs from the menu-only control at exactly logical04f1 ff->3d. The cold own-storage run retains3d and the same exact84x48 DCT3 LAB/13:47/Menu/Names idle frame. The unchanged outgoing-call fixture also passes setup/connect/End/release with readable dial/Calling frames and returns to that exact idle. The harness drives only physical inputs. Setting-bit semantics remain undecoded; no native speech or external RF claim follows.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_netmonitor_off.lua", "tools/nsb7_netmonitor_check.py", "tools/test_nsb7_netmonitor_check.py", "tools/nsb7_outgoing_call_check.py"]
+    },
+    {
       "id": "nsm1_native_measurement_zero_rf_source", "owner": "nsm1_native_compatibility", "status": "satisfied",
       "predicate": "The own live NSM-1 qualification comparison observes zero reduction alongside independently observed zero native RF input and queue contents",
       "current": "A separate105s run preserves the baseline packet/image/authentication contract. Eight program observations at own0b25 (exposed PC0b26) from50.0017..50.0341s return A=0 with219b=0574 and drained cursors advancing four words. Eight port27 reads at330c/3312/3318/331e are zero and the first comparison snapshots72 zero queue words. Live instruction anchors independently qualify4701 queue consumption,47e6 reduction,330a PORTR27,0b25 comparison and0b47 counter advancement. Backend port27 resolves to COBBA's unattached zero-valued callback. This supports the missing-source boundary, not a reduction-defect claim, fitted-mask proof or physical sample units/ordering/clock/receive-window semantics. No waveform, score or packet is injected.",
