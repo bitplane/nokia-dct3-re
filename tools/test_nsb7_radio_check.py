@@ -101,7 +101,51 @@ def ccch_trace():
     return '\n'.join(rows)
 
 
+def rach_trace():
+    rows = [ccch_trace().replace('mode=1a bsic=12 t=14', 'mode=16 bsic=12 t=14')]
+    cursor = (sum((length+3)//2 for length in LENGTHS) + 81 + 22 + 5 + 11 + 35 + 11 + 3 + 5) % 0x52
+    config16 = '041202020000001660000258' + '00'*8
+    config1a = '041202000000001a60000258' + '00'*8
+    for index, (kind, payload) in enumerate([
+            (0x0c, '00010902098e0000'), (2, config16), (2, config1a),
+            (0x1f, '00040000'), (0x0c, '0000086c00000000'),
+            (0x0c, '000108020def0000'), (2, config16)], 39):
+        length = len(payload)//2
+        producer = (cursor+(length+3)//2) % 0x52
+        rows.append(f'nsb7_radio_tx: index={index} type={kind:02x} length={length} data={payload} '
+                    f'cursor={cursor:02x} producer={producer:02x} pc=002cb0ec t=12 observer_writes=0')
+        cursor = producer
+    for index, kind in enumerate(['84', '84', '89', '89', '84', '84', '89'], 17):
+        rows.append(f'nsb7_radio_rx: index={index} type={kind} length=8 t=12 observer_writes=0')
+    cases = [(15, 0, 2288, 2288, 0, 102, 2390, 2391),
+             (9, 1, 2391, 2391, 2446, 2, 2448, 2449),
+             (8, 0, 3402, 3402, 0, 108, 3510, 3512),
+             (8, 1, 3512, 3512, 3567, 2, 3569, 3570)]
+    for index, (ra, mode, frame, anchor, base, slots, deadline, actual) in enumerate(cases, 1):
+        rows.append(f'dsp_hle: access_deadline ra={ra:02x} mode={mode} frame={frame} anchor={anchor} '
+                    f'base={base} slots={slots} deadline={deadline} t=12')
+        payload = bytes([ra]) + actual.to_bytes(3, 'big') + bytes(4)
+        for pc, task in [('002e4fa4', 4), ('002f5274', 13)]:
+            rows.append(f'nsb7_rach: pc={pc} task={task} type=84 payload={payload.hex()} t=12 observer_writes=0')
+        rows.append(f'nsb7_rach_reference: index={index} task=13 target=17 tag=07f9 '
+                    f't1={(actual//1326)&31:02x} t3={actual%51:02x} t2={actual%26:02x} ra={ra:02x} t=12 observer_writes=0')
+    rows.append('nsb7_channel_state: cached=00000000 channel=0258 mode=16 bsic=12 t=24.000000000 observer_writes=0')
+    return '\n'.join(rows)
+
+
 class RadioInventoryTests(unittest.TestCase):
+    def test_access_completion_honours_deadline_and_own_request_reference(self):
+        check_trace(rach_trace(), rach=True)
+        for old, new in [('deadline=2390', 'deadline=2289'),
+                         ('frame=2391 anchor=2391', 'frame=2391 anchor=2288'),
+                         ('payload=0f000957', 'payload=0f0008f1'),
+                         ('t1=01 t3=2d t2=19 ra=0f', 't1=01 t3=2d t2=19 ra=09'),
+                         ('mode=16 bsic=12 t=24', 'mode=1a bsic=12 t=24')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_trace(rach_trace().replace(old, new), rach=True)
+        with self.assertRaises(ValueError):
+            check_trace(rach_trace() + '\nnsb7_radio_rx: index=24 type=80 length=34 t=17', rach=True)
+
     def test_common_control_reconfiguration_reaches_organic_access_request(self):
         check_trace(ccch_trace(), ccch=True)
         for old, new in [('mode=1a bsic=12 t=14', 'mode=16 bsic=12 t=14'),
@@ -187,6 +231,9 @@ class RadioInventoryTests(unittest.TestCase):
         self.assertEqual(report['rx_80']['bcch_task'], 17)
         self.assertEqual(report['rx_80']['bcch_block_payload_offset'], 10)
         self.assertEqual(report['rx_80']['complete_si_bitmap'], 15)
+        self.assertEqual(report['rx_84']['request_reference_task'], 17)
+        self.assertEqual(report['rx_84']['frame_payload_offsets'], [1, 2, 3])
+        self.assertEqual(report['tx_0c']['scheduled_base_offsets'], [4, 5])
         self.assertEqual(report['payload_prefix_bytes'], 4)
         self.assertEqual(report['classified_inputs'], 65536)
         self.assertEqual(report['ranges'], [

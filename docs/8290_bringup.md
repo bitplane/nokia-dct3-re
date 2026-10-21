@@ -16,7 +16,8 @@ physical acceptance of the own-ROM default phone code and menu navigation.
 A physical SIM phonebook save and cold Details retrieval are qualified.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
-parsing, and CCCH setup through an organic random-access request. Camping,
+parsing, CCCH setup and timed random-access completions through task 17.
+Immediate Assignment, camping,
 registration, calls, SMS and a usable idle frame remain unestablished.
 In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
@@ -577,11 +578,12 @@ every input. Unit cases cover precedence and range endpoints.
 ### Opt-in PCS acquisition acceptance
 
 Radio HLE defaults off in the NSB-7 input configuration. The existing
-`Radio peer HLE` setting enables a product-owned **candidate-common-control**
+`Radio peer HLE` setting enables a product-owned **candidate-random-access**
 contract: the decoded four-byte type-55 forms `03050000/03030000` and
 the subsequent eighty-channel type-56 list, and its type-02/20 receiver
 configuration are answered, followed by eight BCCH blocks and the same
-receiver-configuration grammar for CCCH modes. Random access, traffic,
+receiver-configuration grammar for CCCH modes and request-correlated access
+frame completions. Assignment, traffic,
 neighbour and authentication contracts are not inherited from siblings.
 Other products retain their existing contracts unchanged. Retire the
 acquisition-coverage limit only after the subsequent product contracts are
@@ -598,16 +600,17 @@ fourteen-byte type-80/subtype-40 encoding. No firmware queue, state or APDU is
 injected to make this progression happen.
 
 `tools/nsb7_radio_measurement_observe.lua` adds own broker/consumer/class
-observations. Use `tools/nsb7_radio_check.py IMAGE RUN --ccch` with
-`tools/nsb7_bcch_observe.lua` for this composition. It requires all 38
+observations. Use `tools/nsb7_radio_check.py IMAGE RUN --rach` with
+`tools/nsb7_rach_observe.lua` for this composition. It requires all 45
 TX publications, the correct task
 and payload values, and the complete observed RX inventory: two existing
 external-service `8e/10` frames, one measurement `8b/166`, and one SCH
 `80/14`, one channel acknowledgement `89/8`, and eight BCCH `80/34`
-frames and three CCCH acknowledgements through the 25-second fixture.
-The older `--measurement`, `--synchronization`, `--channel` and `--bcch`
-checks retain the preceding bounded trace contracts. No random-access
-completion, paging block, RSSI or terminal-search
+frames, CCCH acknowledgements and four access completions through the
+25-second fixture. The older `--measurement`, `--synchronization`,
+`--channel`, `--bcch` and `--ccch` checks retain the preceding bounded
+trace contracts. No Immediate Assignment,
+paging block, RSSI or terminal-search
 response is accepted. The no-peer/default fixture still
 reproduces its original 29-packet inventory.
 
@@ -628,7 +631,7 @@ while runtime HLE remains in use. This is a bootstrap/runtime ownership
 correction, not a candidate-payload special case.
 
 Decode each subsequent request's callers and populated fields before
-extending peer coverage. Random access, traffic release, neighbours,
+extending peer coverage. Assignment, traffic release, neighbours,
 authentication and registration remain unestablished on this handset.
 
 ### Candidate response routing
@@ -676,8 +679,8 @@ and update `28734c`. Firmware changes the candidate's flags `a2 -> a4`,
 stores decoded BSIC `12`, and publishes type `02`/20 bytes beginning
 `041202000000005050000258`. The final eight request bytes are captured
 but not yet assigned semantics. Channel completion and the subsequent
-BCCH and CCCH lifecycles are independently qualified below; random access
-remains open.
+BCCH, CCCH and access-frame lifecycles are independently qualified below;
+assignment remains open.
 
 ### Receiver configuration acknowledgement
 
@@ -759,13 +762,54 @@ After the third acknowledgement, the cache is empty and the live receiver
 holds carrier 600, BSIC `12`, mode `1a`. Firmware also publishes type
 `46/8`, an empty `0f/68` neighbour list, control `1f/4 = 00040000`, and
 finally `0c/8 = 00000f6600000000`. The latter has the nonzero access
-octet `0f`; its completion and assignment are not yet modeled. The
+octet `0f`; its completion is qualified below, but assignment remains open. The
 semantics of the type-46 payload and remaining control bytes are not
 inferred solely from this ordering.
 
 `--ccch` requires all 38 TX packets, sixteen RX packets, all three cached
 configuration/acknowledgement pairs, and the final mode plus the organic
-access request. The partial peer retains the receiver phase for repeated
+access request. The partial common-control contract retains the receiver phase for repeated
 configuration, but clears scheduled reports and waits so no unqualified
 PCH/AGCH or access-completion indication is emitted. Registration and
 native speech remain unproved.
+
+### Access-frame completion and timing
+
+Own type-84 forwarder `2e4fa4` sends the original object to task 13 under
+`130784 == 1`. Its wait dispatches through `224bbe -> 2243c0 -> 2f5274`.
+The parser reads payload byte 0 as the access octet and bytes 1..3 as a
+big-endian 24-bit frame. It stores that frame and constructs task-17
+message `07f9` containing the same octet plus `(frame/1326)&31`,
+`frame%51`, and `frame%26`. No firmware state is supplied by the peer.
+
+Type-0c constructor `2b6e58` places the timing mode in payload byte 1,
+access octet in byte 2, slot delay in byte 3, and (for mode 1) a low-16-bit
+scheduled base in bytes 4..5. Initial producer `2f5446` emits mode 0 with
+a relative delay in this fixture; it also has an unqualified initial-mode-1
+branch, which the partial peer rejects without a completed access reference.
+Retry producer `2f53a4` emits mode 1, deriving its base
+from the previous completed access frame plus the firmware's separation
+table. In the non-combined laboratory profile this separation is 55 frames.
+The combined-CCCH branch uses converter `2f5ace` over allowed RACH frame
+positions and is not qualified by the current profile.
+
+The peer's old immediate completion ignored these fields: a request with
+102-frame delay was completed in the next frame, and a retry targeting a
+later base was completed before it. NSB-7's partial contract now waits
+until the decoded deadline. Relative requests anchor to their receive
+frame; retries anchor to the previous reported access frame, preserving
+the distinction between sixteen-bit base truncation and GSM hyperframe
+wrap. Deadline/reference state is saved and cleared on device reset.
+`nokia_radio_timing.h` has executable C++ tests for relative and scheduled
+delays, stale bases, base/counter wrap, and the due/not-due boundary.
+Other products retain their existing timing policy pending qualification.
+
+The 25-second run has four own access requests and four type-84/8 replies.
+The same payload reaches the broker and task-13 parser, and each task-17
+reference matches the returned frame/octet. Reports occur zero to two
+frames after the deadline because the HLE service polling cadence is
+calibrated, not measured silicon timing. The checker rejects premature
+reports, mismatched octets/references and any assignment block. With no
+assignment, firmware retries, then returns to live receiver mode `16`.
+All 45 TX and 23 RX publications are accounted for. This establishes
+access-frame reporting, not an accepted radio assignment or registration.

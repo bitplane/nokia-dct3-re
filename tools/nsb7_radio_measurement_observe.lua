@@ -31,7 +31,7 @@ for _,pc in ipairs({0x2e5258,0x2a3704}) do
     end)
 end
 local channel_state=coroutine.create(function()
-    for _,target in ipairs({6,14}) do
+    for _,target in ipairs({6,14,24}) do
         assert(emu.wait(target-machine.time:as_double()))
         machine:logerror(string.format('nsb7_channel_state: cached=%08x channel=%04x mode=%02x bsic=%02x t=%.9f observer_writes=0\n',
             memory:read_u32(0x1306e4),memory:read_u16(0x13030c),memory:read_u8(0x130310),

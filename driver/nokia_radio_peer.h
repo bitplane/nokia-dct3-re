@@ -47,7 +47,8 @@ public:
 		candidate_synchronization,
 		candidate_channel,
 		candidate_bcch,
-		candidate_common_control
+		candidate_common_control,
+		candidate_random_access
 	};
 
 	enum class neighbour_arfcn_encoding : u8
@@ -364,6 +365,10 @@ private:
 	unsigned m_neighbour_resume_wait_ticks = 0;
 	u8 m_access_ra = 0;
 	u32 m_access_frame = 0;
+	u32 m_access_deadline = 0;
+	bool m_access_deadline_pending = false;
+	u32 m_access_reference_frame = 0;
+	bool m_access_reference_valid = false;
 	bool m_search_has_serving_arfcn = false;
 	u16 m_serving_arfcn = 1;
 	u16 m_receiver_arfcn = 1;

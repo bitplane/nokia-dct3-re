@@ -3,6 +3,7 @@
 #include "emu.h"
 #include "emuopts.h"
 #include "nokia_radio_peer.h"
+#include "nokia_radio_timing.h"
 
 #define LOG_RADIO (1U << 0)
 #define VERBOSE (LOG_RADIO)
@@ -150,6 +151,10 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_neighbour_resume_wait_ticks));
 	save_item(NAME(m_access_ra));
 	save_item(NAME(m_access_frame));
+	save_item(NAME(m_access_deadline));
+	save_item(NAME(m_access_deadline_pending));
+	save_item(NAME(m_access_reference_frame));
+	save_item(NAME(m_access_reference_valid));
 	save_item(NAME(m_search_has_serving_arfcn));
 	save_item(NAME(m_serving_arfcn));
 	save_item(NAME(m_receiver_arfcn));
@@ -319,6 +324,10 @@ void nokia_radio_peer_device::device_reset()
 	m_neighbour_resume_wait_ticks = 0;
 	m_access_ra = 0;
 	m_access_frame = 0;
+	m_access_deadline = 0;
+	m_access_deadline_pending = false;
+	m_access_reference_frame = 0;
+	m_access_reference_valid = false;
 	m_search_has_serving_arfcn = false;
 	m_serving_arfcn = 1;
 	m_receiver_arfcn = 1;
@@ -1729,6 +1738,9 @@ void nokia_radio_peer_device::encode_channel_confirmation(u8 *payload) const
 void nokia_radio_peer_device::encode_random_access_info(u8 *payload)
 {
 	m_access_frame = m_tdma_frame_number % 2'715'648;
+	m_access_deadline_pending = false;
+	m_access_reference_frame = m_tdma_frame_number;
+	m_access_reference_valid = true;
 	payload[0] = m_access_ra;
 	payload[1] = m_access_frame >> 16;
 	payload[2] = m_access_frame >> 8;
@@ -1740,11 +1752,17 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 	// A qualified partial product may enter the existing common-control
 	// configuration handler, but no other full-contract request handlers.
 	const bool partial_common_control_request =
-			m_protocol.coverage == acquisition_coverage::candidate_common_control &&
+			m_protocol.coverage >= acquisition_coverage::candidate_common_control &&
 			current_phase() == phase::serving_bcch &&
 			packet.type == 0x02 && packet.length == 20 &&
 			packet.payload[0] == 4 && packet.payload[8] == 0x60;
-	if (m_protocol.coverage != acquisition_coverage::full && !partial_common_control_request)
+	const bool partial_random_access_request =
+			m_protocol.coverage == acquisition_coverage::candidate_random_access &&
+			current_phase() == phase::serving_bcch && m_idle_common_control_active &&
+			packet.type == 0x0c && packet.length == 8 && packet.payload[0] == 0 &&
+			packet.payload[2] != 0;
+	if (m_protocol.coverage != acquisition_coverage::full &&
+			!partial_common_control_request && !partial_random_access_request)
 	{
 		if (packet.type == 0x55 && packet.length == 4 &&
 				packet.payload[0] == 3 &&
@@ -1823,6 +1841,27 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 				packet.length >= 3 && packet.payload[2] != 0;
 		if (!channel_request)
 			return;
+		if (m_protocol.coverage == acquisition_coverage::candidate_random_access)
+		{
+			const u16 base = (u16(packet.payload[4]) << 8) | packet.payload[5];
+			if (packet.payload[1] == 1 && !m_access_reference_valid)
+				return;
+			// Scheduled retries are based on the previous reported access,
+			// not on the later MCU request time. Keep that absolute anchor so
+			// truncation to sixteen bits and GSM hyperframe wrap stay distinct.
+			const u32 anchor = packet.payload[1] == 1 ?
+					m_access_reference_frame : m_tdma_frame_number;
+			const auto delay = nokia::radio::access_delay(
+					anchor % 2'715'648, packet.payload[1], base, packet.payload[3]);
+			if (!delay)
+				return;
+			m_access_deadline = anchor + *delay;
+			m_access_deadline_pending = true;
+			LOGMASKED(LOG_RADIO,
+					"dsp_hle: access_deadline ra=%02x mode=%u frame=%u anchor=%u base=%u slots=%u deadline=%u t=%.9f\n",
+					packet.payload[2], packet.payload[1], m_tdma_frame_number,
+					anchor, base, packet.payload[3], m_access_deadline, machine().time().as_double());
+		}
 		m_access_ra = channel_request ? packet.payload[2] : 0;
 		m_access_frame = 0;
 		set_phase(phase::random_access);
@@ -2863,11 +2902,20 @@ void nokia_radio_peer_device::emit_report()
 			m_reports_remaining = serving_cycle_reports();
 			m_wait_ticks = 59;
 		}
-		if (m_protocol.coverage == acquisition_coverage::candidate_common_control &&
+		if (m_protocol.coverage >= acquisition_coverage::candidate_common_control &&
 				report_type == 0x89 && completing_common_control)
 		{
 			// Retain the configured receiver so another command in the same
 			// grammar can reconfigure it, but schedule no unqualified PCH data.
+			m_reports_remaining = 0;
+			m_wait_ticks = 0;
+			m_report_deferred = false;
+		}
+		if (m_protocol.coverage == acquisition_coverage::candidate_random_access && report_type == 0x84)
+		{
+			// Publish the observed access frame only. AGCH assignment is a
+			// separate contract; keep the receiver available for organic retry.
+			set_phase(phase::serving_bcch);
 			m_reports_remaining = 0;
 			m_wait_ticks = 0;
 			m_report_deferred = false;
@@ -3332,6 +3380,9 @@ void nokia_radio_peer_device::tick()
 		m_report_deferred = true;
 	}
 
+	if (current_phase() == phase::random_access && m_access_deadline_pending &&
+			!nokia::radio::frame_due(m_tdma_frame_number, m_access_deadline))
+		return;
 	if (m_reports_remaining != 0 && phase_waits())
 		--m_wait_ticks;
 	if ((current_phase() == phase::candidate_ra_info || current_phase() == phase::selected_ra_info) &&
