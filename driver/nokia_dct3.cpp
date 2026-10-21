@@ -3930,6 +3930,9 @@ void nokia_dct3_state::nsb7hle(machine_config &config)
 {
 	nsb7stage(config);
 	nokia_product_config runtime = PRODUCT_8290_UPLOAD;
+	// Nominal VBATT transfer hypothesis: 3.6 V / 6.5 mV per CCONT bit.
+	// Other analog channels remain provisional; no charger is asserted.
+	runtime.ccont_board.channel_defaults[2] = 554;
 	// Own 24b840 class-74 route calls 248b00. Command 0d at 248b74
 	// cancels timer 19 and consumes reply +9 bits 0/1 as fault results.
 	runtime.dsp_service = true;

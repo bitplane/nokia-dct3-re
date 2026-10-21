@@ -6,7 +6,11 @@ The acquired NSB-7 v5.22 package now has a qualified, contiguous MCU/PPM-A
 image. `noki8290` is a fail-closed MCU research configuration: it reaches
 the supervisor and renders the firmware's complete `CONTACT SERVICE`
 failure frame. Idle, organic keypad/SIM, registration, calls and SMS are
-not established. DSP exchange/service replies are disabled; own internal
+not established for that fail-closed machine. The separate `nsb7hle`
+research composition, with own checksum-only journal repairs and a declared
+nominal VBATT input, reaches `Insert SIM card` and physically enters digit
+`1` into the dial editor. SIM and RF services remain unestablished.
+In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
 No PMM, resident DSP mask, hardware profile or provisioning is supplied by
 this normalization. The [Nokia 8290 user guide](https://www.instructionsmanuals.com/sites/default/files/2019-05/Nokia-8290-en.pdf)
@@ -49,7 +53,7 @@ The six-second sample is in supervisor `2f82fe..2f8304`, with global
 control `05`; shared observations remain `0000,ffff,0001,0001` at
 `10000/10004/100fe/10100`. These are observations, not a DSP success verdict.
 The 84x48 presentation matches the failure text, but keypad wiring and the
-remaining board defaults are provisional, not NSB-7 hardware acceptance.
+remaining board defaults are provisional, not complete NSB-7 hardware acceptance.
 
 ```sh
 make build
@@ -296,3 +300,36 @@ or assert a charger cause to escape the branch. Raw analog defaults remain
 provisional. The NSB-7 service manual independently describes BLB-2 battery
 identification and a 100 kohm BSI pull-up, but does not establish the current
 emulator tuple as a measured NSB-7 electrical profile.
+
+### Nominal VBATT and physical UI acceptance
+
+`nsb7hle` alone supplies ADC channel 2 = `554`, a declared nominal
+3.6 V / 6.5 mV-per-bit CCONT transfer hypothesis. It replaces only the
+full-scale channel-2 placeholder; BSI, BTEMP, all other ADC inputs, charger
+status, executable bytes and the checksum-only EEPROM contents are unchanged.
+This is not measured NSB-7 calibration or a recovered complete battery model.
+The normal `noki8290` and native-only `nsb7stage` profiles retain their
+previous inputs and acceptance boundaries.
+
+This single input change produces readiness `0f` at approximately 3.391
+seconds. Before the scripted physical contacts the keypad mask is `20`.
+Menu at eight seconds produces IRQ0, raw matrix position `06`, logical
+key `19`, and an `Insert SIM card` frame. Digit-1 at ten seconds produces
+IRQ0, raw `07`, logical `01`, and the dial editor displaying `1` with
+`Clear`. The early six-second frame is still blank; it must not substitute
+for the later physical-input evidence. The analog task still visits charging
+branches later, so the result does not validate the whole power lifecycle.
+
+Both physical-contact frames and the ordered readiness/IRQ/scan/decode
+evidence reproduce in a new process using the preceding run's own retained
+flash. `tools/nsb7_input_check.py IMAGE RUN` requires the explicit runtime
+HLE handoff, complete readiness sequence, enabled pre-press masks, decodes
+between each physical press/release, and exact pixels for both frames.
+It rejects normal/native profiles and makes no SIM, RF or speech claim.
+Run `tools/nsb7_input_observe.lua` with `-debug -debugger none`; seed only
+the own flash containing the two checksum-only repairs described above.
+
+The status retry's `9004` query resolves index `10` in table `343ee0` to
+serial command `70`, CCONT register `0e`, mask `04`. That is a status query,
+not an ADC sample, and was left untouched. Recover the own SIMI activation
+and card transport next rather than adding an application-level SIM reply.
