@@ -1733,6 +1733,19 @@ void nokia_radio_peer_device::encode_random_access_info(u8 *payload)
 
 void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &packet)
 {
+	if (m_protocol.band_measurements_only)
+	{
+		if (packet.type == 0x55 && packet.length == 4 &&
+				packet.payload[0] == 3 &&
+				(packet.payload[1] == 3 || packet.payload[1] == 5) &&
+				packet.payload[2] == 0 && packet.payload[3] == 0)
+		{
+			const search_request request = decode_search_request(packet);
+			if (request == search_request::autonomous_band_scan)
+				handle_search_request(request);
+		}
+		return;
+	}
 	// Product-owned late scans consume ordinary 8b records without stopping
 	// the serving receiver; the request grammar is independently configured.
 	if (m_protocol.background_band_measurements && packet.type == 0x57 &&

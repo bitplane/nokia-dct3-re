@@ -62,7 +62,7 @@ def contract(image):
             'scope': 'decoded software classes, not fitted RF-band proof'}
 
 
-def check_trace(text):
+def check_trace(text, measurement=False):
     check_security(text)
     rows = PACKET.findall(text)
     if len(rows) != text.count('nsb7_radio_tx:') or not rows or len(rows) >= 256:
@@ -80,10 +80,26 @@ def check_trace(text):
         if int(producer, 16) != cursor:
             raise ValueError('packet publication extent differs')
         inventory.append((int(kind, 16), bytes.fromhex(payload)))
-    if tuple(kind for kind, _ in inventory) != TYPES or tuple(len(payload) for _, payload in inventory) != LENGTHS:
-        raise ValueError('bounded no-peer packet inventory differs')
-    if inventory[-1] != (0x55, bytes.fromhex('03050000')):
+    expected_types = TYPES + ((0x56,) if measurement else ())
+    expected_lengths = LENGTHS + ((160,) if measurement else ())
+    if tuple(kind for kind, _ in inventory) != expected_types or tuple(len(payload) for _, payload in inventory) != expected_lengths:
+        raise ValueError('bounded packet inventory differs')
+    if inventory[28] != (0x55, bytes.fromhex('03050000')):
         raise ValueError('initial own scan-control request differs')
+    if measurement:
+        if inventory[29][1][:2] != bytes.fromhex('0258'):
+            raise ValueError('organic candidate request did not retain carrier 600')
+        replies = re.findall(r'nsb7_radio_rx: index=(\d+) type=([0-9a-f]{2}) length=(\d+) ', text)
+        # Two existing external-service 8e frames precede the sole RF reply.
+        if replies != [('1', '8e', '10'), ('2', '8e', '10'), ('3', '8b', '166')]:
+            raise ValueError('measurement-only RX scope differs')
+        consumers = re.findall(r'nsb7_measurement: pc=([0-9a-f]{8}) task=(\d+) type=([0-9a-f]{2}) first=([0-9a-f]{4}) '
+                               r'second=([0-9a-f]{4}) rssi=(-?\d+) ', text)
+        if consumers != [('002e5258', '4', '8b', '0258', 'ffff', '-60'),
+                         ('002a3704', '13', '8b', '0258', 'ffff', '-60')]:
+            raise ValueError('PCS measurement did not reach the own broker and task-13 consumer')
+        if 'nsb7_measurement_class: channel=0258 class=2 ' not in text:
+            raise ValueError('own carrier classifier did not run')
 
 
 def main():
@@ -91,11 +107,12 @@ def main():
     parser.add_argument('image', type=Path)
     parser.add_argument('run', type=Path)
     parser.add_argument('--contract-json', type=Path)
+    parser.add_argument('--measurement', action='store_true')
     args = parser.parse_args()
     try:
         report = contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
-        check_trace(text)
+        check_trace(text, args.measurement)
         states = re.findall(r'nsb7_radio_state: bands=([0-9a-f]{8}) measurement_route=([0-9a-f]{2}) t=([0-9.]+)', text)
         if states != [('98000000', '01', f'{time:.9f}') for time in (3.5, 6, 14, 24)]:
             raise ValueError('live feature/forwarding predicate differs')
@@ -103,7 +120,8 @@ def main():
             args.contract_json.write_text(json.dumps(report, indent=2) + '\n')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 radio inventory: FAIL: {error}\n')
-    print('PASS: own 29-packet no-peer TX baseline; final 55/03050000; no RF completion claim')
+    print('PASS: ' + ('PCS RSSI consumed by task 13; organic 56 request left unanswered' if args.measurement else
+                     'own 29-packet no-peer TX baseline; final 55/03050000') + '; no RF completion claim')
 
 
 if __name__ == '__main__':

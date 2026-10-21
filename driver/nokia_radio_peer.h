@@ -67,6 +67,9 @@ public:
 		bool background_band_measurements = false;
 		std::array<u8, 4> background_measurement_request{3, 5, 0, 0};
 		std::optional<std::array<u8, 4>> background_measurement_followup_request = std::nullopt;
+		// Partial products may establish RSSI transport before channel/SCH
+		// contracts. Do not answer the latter using another product's defaults.
+		bool band_measurements_only = false;
 
 		constexpr bool enabled() const
 		{

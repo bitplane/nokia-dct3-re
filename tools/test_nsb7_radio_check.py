@@ -16,7 +16,31 @@ def trace():
     return '\n'.join(rows)
 
 
+def measurement_trace():
+    cursor = sum((length+3)//2 for length in LENGTHS) % 0x52
+    producer = (cursor+81) % 0x52
+    return trace() + '\n' + '\n'.join([
+        f'nsb7_radio_tx: index=30 type=56 length=160 data=0258' + 'ff'*158 +
+        f' cursor={cursor:02x} producer={producer:02x} pc=002cb0ec t=3.5 observer_writes=0',
+        'nsb7_radio_rx: index=1 type=8e length=10 t=1 observer_writes=0',
+        'nsb7_radio_rx: index=2 type=8e length=10 t=1 observer_writes=0',
+        'nsb7_radio_rx: index=3 type=8b length=166 t=3 observer_writes=0',
+        'nsb7_measurement: pc=002e5258 task=4 type=8b first=0258 second=ffff rssi=-60 t=3 observer_writes=0',
+        'nsb7_measurement: pc=002a3704 task=13 type=8b first=0258 second=ffff rssi=-60 t=3 observer_writes=0',
+        'nsb7_measurement_class: channel=0258 class=2 t=3 observer_writes=0'])
+
+
 class RadioInventoryTests(unittest.TestCase):
+    def test_measurement_reaches_own_consumer_without_extra_responses(self):
+        check_trace(measurement_trace(), True)
+        for old, new in [('task=13', 'task=12'), ('first=0258', 'first=0001'),
+                         ('index=3 type=8b', 'index=3 type=89'),
+                         ('class=2 t=3', 'class=3 t=3')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_trace(measurement_trace().replace(old, new), True)
+        with self.assertRaises(ValueError):
+            check_trace(measurement_trace() + '\nnsb7_radio_rx: index=4 type=80 length=10 t=4', True)
+
     def test_own_receive_and_exhaustive_classifier_contract(self):
         image = Path(__file__).resolve().parents[1] / 'roms/noki8290/8290f522a.fls'
         if not image.exists():

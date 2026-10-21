@@ -1,0 +1,42 @@
+-- Opt-in PCS topology and measurement-only peer; read-only MCU observations.
+local source=debug.getinfo(1,'S').source:sub(2)
+dofile(source:match('^(.*[/\\])')..'nsb7_radio_observe.lua')
+local machine=manager.machine
+local cpu=machine.devices[':maincpu']
+local memory=cpu.spaces.program
+local taps={}
+local received=0
+taps[#taps+1]=memory:install_read_tap(0x309f24,0x309f27,'nsb7_radio_rx_dispatch',function()
+    if cpu.state['R15'].value~=0x309f26 or received>=64 then return end
+    local object=cpu.state['R4'].value
+    if object<0x100000 or object>=0x17ff00 then return end
+    local kind=memory:read_u8(object+3)
+    if kind<0x80 then return end
+    received=received+1
+    machine:logerror(string.format('nsb7_radio_rx: index=%d type=%02x length=%u t=%.9f observer_writes=0\n',
+        received,kind,memory:read_u8(object+2),machine.time:as_double()))
+end)
+for _,pc in ipairs({0x2e5258,0x2a3704}) do
+    local count=0
+    taps[#taps+1]=memory:install_read_tap(pc,pc+3,'nsb7_measurement_'..pc,function()
+        if cpu.state['R15'].value~=pc or count>=32 then return end
+        count=count+1
+        local object=cpu.state['R0'].value
+        if object<0x100000 or object>=0x17ff00 then return end
+        local rssi=memory:read_u8(object+9)
+        if rssi>=128 then rssi=rssi-256 end
+        machine:logerror(string.format('nsb7_measurement: pc=%08x task=%u type=%02x first=%04x second=%04x rssi=%d t=%.9f observer_writes=0\n',
+            pc,memory:read_u8(0x100022),memory:read_u8(object+3),memory:read_u16(object+6),
+            memory:read_u16(object+10),rssi,machine.time:as_double()))
+    end)
+end
+local classes=0
+taps[#taps+1]=memory:install_read_tap(0x2c7fcc,0x2c7fcf,'nsb7_measured_channel_class',function()
+    if cpu.state['R15'].value~=0x2c7fcc or machine.time:as_double()<3.4 or classes>=32 then return end
+    local channel=cpu.state['R5'].value
+    if channel<512 or channel>810 then return end
+    classes=classes+1
+    machine:logerror(string.format('nsb7_measurement_class: channel=%04x class=%u t=%.9f observer_writes=0\n',
+        channel,cpu.state['R4'].value,machine.time:as_double()))
+end)
+_G.nsb7_measurement_taps=taps

@@ -571,7 +571,37 @@ RX entry/task/prefix and evaluates the decoded classifier over all 65,536
 this is a static decoded-contract check, not original CPU execution on
 every input. Unit cases cover precedence and range endpoints.
 
-The next bounded experiment is a standards-owned PCS topology with the
-now-supported measurement format. Channel confirmation, traffic release,
-neighbours and authentication remain unestablished. No radio peer has
-been enabled merely from the initial 55 request or these parser callers.
+### Opt-in PCS measurement acceptance
+
+Radio HLE defaults off in the NSB-7 input configuration. The existing
+`Radio peer HLE` setting enables a product-owned **band-measurement-only**
+contract: only the decoded four-byte type-55 forms `03050000/03030000`
+are answered. Candidate windows, SCH, channel acknowledgement, traffic,
+neighbour and authentication contracts are not inherited from siblings.
+Other products retain their existing contracts unchanged. Retire the
+measurement-only limit only after the subsequent product contracts are
+qualified; zero/default channel parameters are not evidence for them.
+
+`fixtures/nsb7_measurement/nsb7hle.cfg` enables that peer and the shared
+standards-level PCS topology at ARFCN 600/601. With a single receivable
+cell, the own broker receives `8b` containing carrier 600, RSSI -60 and an
+unused `ffff` second slot. It forwards from task 4 to task 13, whose
+`2a3704` consumer reads those same values and classifies 600 as class 2.
+Firmware then organically publishes `56/160` beginning `0258`; the peer
+deliberately leaves it unanswered. No firmware queue, state or APDU is
+injected to make this progression happen.
+
+`tools/nsb7_radio_measurement_observe.lua` adds own broker/consumer/class
+observations. Use `tools/nsb7_radio_check.py IMAGE RUN --measurement` for
+this composition. It requires all 30 TX publications, the correct task
+and payload values, and the complete observed RX inventory: two existing
+external-service `8e/10` frames, followed by exactly one measurement
+`8b/166` through the 25-second fixture. No SCH/channel-completion response
+is accepted as part of this milestone. The no-peer/default fixture still
+reproduces its original 29-packet inventory.
+
+Own constructor `2b6848` allocates 164 bytes, writes type `56` and payload
+length 160, and fills that payload with `ff` before returning to its
+callers. Decode those callers and their populated request fields before
+extending peer coverage. Channel confirmation, traffic release, neighbours,
+authentication and registration remain unestablished on this handset.
