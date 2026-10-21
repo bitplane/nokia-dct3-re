@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsb7_idle_x_fields_are_lcd_pixel_corruption",
+      "status": "disproven",
+      "hypothesis": "The repeated x/zero/CCCH marks in the NSB-7 idle main area are caused by LCD or font pixel corruption",
+      "conclusion": "Read-only glyph-source observation at own ROM 0x28156a, caller 0x23ed6c, captures the complete UTF-16 radio-status text at 0x1040e0 with font0x341420: channel600, zero fields, literal x placeholders and CCCH. The own ASCII CCCH label exists at0x2363c0 beside other channel-status labels. The same run reproduces the three exact physical menu control frames. This disproves corruption as the origin of these marks, not every layout defect. A field-test/net-monitor overlay is a working interpretation; its activation/provisioning selector is unresolved and no guest state or device behavior was changed.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_display_text_observe.lua", "tools/nsb7_display_text_check.py", "tools/test_nsb7_display_text_check.py"]
+    },
+    {
       "id": "nsb7_serving_rssi_alone_unblocks_addressed_paging",
       "status": "disproven",
       "hypothesis": "Adding the shared peer's serving type-83 RSSI reports after NSB-7 location updating is sufficient to make the matched page start access",

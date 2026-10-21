@@ -428,8 +428,9 @@ control), alongside each physical key decode and independently replayed
 own code/retry storage. Acceptance repeats in a new process retaining the
 preceding run's own flash and card NVRAM.
 
-The post-acceptance frame has `Menu/Names` softkeys but malformed main-area
-content. Do not call it a usable idle or registered screen. Physical menu
+The post-acceptance frame has `Menu/Names` softkeys and a radio-status
+overlay in the main area (source-text contract below). Do not call it
+an ordinary idle or registered screen. Physical menu
 activation works independently, as qualified below; no security verdict or
 UI state is injected.
 
@@ -439,8 +440,8 @@ After the same physical security sequence, Menu at 26 seconds opens the
 firmware's `Messages` menu. Down at 29 seconds selects `Call log`; Menu at
 32 seconds opens its `Missed calls` item. Text, icons, scrollbar and
 softkey labels render coherently on all three screens. Their corresponding
-logical decodes are `19/18/19`. This distinguishes the malformed idle
-content from a general LCD/controller or keyboard-navigation failure.
+logical decodes are `19/18/19`. This distinguishes the idle radio-status
+overlay from a general LCD/controller or keyboard-navigation failure.
 
 `tools/nsb7_menu_observe.lua` composes the security observer and those
 physical contacts. `tools/nsb7_menu_check.py IMAGE RUN` requires the
@@ -449,19 +450,20 @@ exact RGB frames for all three views. The same frames reproduce in a new
 process retaining the preceding run's own flash and card. It does not
 establish call history, messaging services, a usable idle screen or RF.
 
-The remaining display/application question is why the idle main area
-contains malformed content while menu resources render normally. Inspect
-firmware-owned settings/resource selection (including erased NV inputs)
-before modifying the LCD device or synthesizing network presentation.
+The remaining display/application question is why the firmware's radio-status
+overlay is active during ordinary UI use. Its source text is qualified
+below; activation/settings ownership is unresolved. Inspect firmware-owned
+settings/resource selection (including erased NV inputs) before modifying
+the LCD device or synthesizing network presentation.
 
 ### Firmware-owned clock setting and RTC retention
 
 `tools/nsb7_clock_input.lua` navigates the physical Settings/Clock/Set the
 time controls, enters `13:47`, confirms, and returns through Back. The
 editor displays the intended digits and the firmware confirms `Time is
-set`. The idle top-right clock then displays `13:47`, while malformed
-main-area content remains. A valid clock therefore does not by itself
-resolve that separate display/resource issue.
+set`. The idle top-right clock then displays `13:47`, while the main-area
+radio-status overlay remains. A valid clock therefore does not by itself
+resolve that separate activation/settings question.
 
 Independent journal replay observes a firmware-written opaque word at
 logical `0408` (`ffffffff -> 91055b00`) plus several setting bytes. Do not
@@ -477,7 +479,7 @@ acceptance in each run, physical time-entry decodes and confirmation
 pixels, independently replayable own flash, the CCONT minute/hour
 contrast, and the fresh-controller time prompt. The retained-run pixel
 check deliberately covers only the top-right clock `(52,0)-(78,8)`;
-the rest of the malformed idle screen is not promoted to an oracle.
+the remaining idle presentation is not promoted to an oracle.
 This qualifies own RTC/settings behavior, not full idle, calendar or alarm
 support. No device behavior, RTC seed, NV field or guest RAM was patched
 to make the time-setting transaction succeed.
@@ -1008,8 +1010,8 @@ The first paging frame is 3453; subsequent frames remain in the same
 skips an opportunity (204-frame rather than 102-frame separation).
 The checker permits those explicit gaps but rejects a different group;
 physical-time paging delivery remains unqualified. The idle screenshot
-still has malformed main-area content despite working softkey text and
-clock, so there is no usable registered-idle graphics claim.
+still contains the radio-status overlay despite working softkey text and
+clock, so there is no ordinary registered-idle graphics claim.
 
 ### Addressed page: own identity accepted, RR continuation unresolved
 
@@ -1316,8 +1318,8 @@ The captured `tmp/nsb7-sms-read/snap/nsb7_sms_read_25.png` visibly shows
 `hello` with `Options` and `Back`. Its 84x48 RGB pixel SHA256 is
 `73f302b41033281ec674b38bfb011a95857ddbd0b533b94a5520a821c9b36b4f`.
 The checker hashes decoded pixels rather than PNG file metadata. This is
-a readable message-screen result, not a correction of the still-malformed
-idle/call main-area presentation. `progress_latest_frame.png` is updated
+a readable message-screen result, not a resolution of the idle/call
+overlay question. `progress_latest_frame.png` is updated
 from this actual firmware screenshot.
 
 `tmp/nsb7-sms-read-retained` cold-starts using that process's own saved
@@ -1434,7 +1436,40 @@ called number and payload lengths, one SETUP/traffic assignment,
 ordered connection and release, absence of an incoming page, and a
 complete 50-second observation. Both `tmp/nsb7-outgoing-call` and a fresh
 process retaining its own flash/card/CCONT storage at
-`tmp/nsb7-outgoing-call-cold` pass this check. The dial/call main-area graphics remain
-malformed. L1 speech ticks with `good=0` do not establish decoded speech;
+`tmp/nsb7-outgoing-call-cold` pass this check. Ordinary dial/call presentation
+without the radio-status overlay remains unqualified. L1 speech ticks with
+`good=0` do not establish decoded speech;
 this result is call-control signalling only, not a native voice or
 external telephone call.
+
+## Idle radio-status overlay source
+
+The earlier blanket description of the idle/dial main area as malformed
+graphics is too strong. The glyph lookup at `0x28156a`, called from
+`0x23ed6c`, receives font `0x341420` and characters from the firmware's
+UTF-16 buffer `0x1040e0`. After registration on the measurement-only
+fixture, the complete source text is:
+
+```text
+ 600   0 xxx
+ 0  0 x xxxx
+   0       0
+    CCCH
+```
+
+The own ROM contains the ASCII status label `CCCH` at `0x2363c0`, beside
+`AGCH`, `BCCH`, `SEAR`, `NSPS`, `xxxx`, `CBCH` and `SDCC`; its pointer
+appears in the table at `0x330544`. The repeated `x` marks are therefore
+supplied by firmware, not created by LCD corruption. The byte-output
+routine `0x307308` is called by `0x282666`, which sends framebuffer
+`0x129124` masked by plane `0x128f2c` over the same LCD path used by
+readable menus and SMS screens.
+
+`tools/nsb7_display_text_observe.lua` records the source string read-only,
+while composing the existing physical Messages/Call log/Missed calls
+fixture. `tools/nsb7_display_text_check.py IMAGE RUN` requires the own ROM,
+complete runtime string and all three existing exact menu control frames.
+This proves the origin of the apparent junk, not every aspect of its
+layout. A field-test/net-monitor page is the working interpretation;
+its activation selector and provisioning contract are not yet decoded.
+Do not disable it by guest-state writes or claim an LCD/font repair.
