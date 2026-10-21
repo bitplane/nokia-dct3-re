@@ -1073,6 +1073,9 @@ constexpr nokia_product_config PRODUCT_8XXX = make_8xxx_config();
 constexpr nokia_product_config make_8290_config()
 {
 	nokia_product_config result;
+	// Own 308240 scan covers rows 0..4; tables 343d7c/343d98
+	// use the five-row NSM-5 logical layout and special Power column 4.
+	result.keypad_wiring = { 5, 0x10 };
 	// NSB-7 v5.22 305796 selects 22; 3057b4 writes 2c, then
 	// 3057b8 polls 6d bit 2 and 3057c0 reads 6c. No DSP verdict.
 	result.gensio_wiring = { 0x2c, 0x2d, 0x2e, 0x6c, 0x6d, 0x6e, 0x03, true };
@@ -3322,6 +3325,11 @@ static INPUT_PORTS_START( noki6210 )
 	PORT_INCLUDE(noki5210)
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( noki8290 )
+	// NSB-7's own 25-byte normal and five-byte special maps match exactly.
+	PORT_INCLUDE(noki5210)
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki6250 )
 	// Own NHM-3 table 0x288f7c matches this existing five-row layout.
 	// The separate power table 0x288f98 selects column 4.
@@ -5295,9 +5303,9 @@ SYST( 1999, nse5r4t,  noki7110, 0,    nse5r4t,  noki7110, nokia_dct3_state, empt
 SYST( 1999, noki8210, 0,      0,      noki8210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3stage, noki8210, 0, nsm3stage, noki3310, nokia_dct3_state, empty_init, "Nokia", "8210 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3hle, noki8210, 0, nsm3hle, noki8210, nokia_dct3_state, empty_init, "Nokia", "8210 native uploads with runtime HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2000, noki8290, 0,      0,      noki8290, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8290 (NSB-7 research, no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2000, nsb7stage, noki8290, 0, nsb7stage, noki3310, nokia_dct3_state, empty_init, "Research", "NSB-7 own identity-6 staged uploads (resident DSP undumped)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2000, nsb7hle, noki8290, 0, nsb7hle, noki3310, nokia_dct3_state, empty_init, "Research", "NSB-7 own uploads with runtime transport HLE", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, noki8290, 0,      0,      noki8290, noki8290, nokia_dct3_state, empty_init, "Nokia", "Nokia 8290 (NSB-7 research, no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, nsb7stage, noki8290, 0, nsb7stage, noki8290, nokia_dct3_state, empty_init, "Research", "NSB-7 own identity-6 staged uploads (resident DSP undumped)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, nsb7hle, noki8290, 0, nsb7hle, noki8290, nokia_dct3_state, empty_init, "Research", "NSB-7 own uploads with runtime transport HLE", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8850, 0,      0,      noki8850, noki8850, nokia_dct3_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2stage, noki8850, 0, nsm2stage, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2hle, noki8850, 0, nsm2hle, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

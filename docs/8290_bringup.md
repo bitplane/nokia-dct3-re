@@ -227,3 +227,44 @@ idle or input delivery. The remaining task is to recover the own keypad
 contract and test application activity physically, alongside the surviving
 startup continuation. The normal erased-storage baseline and native
 missing-resident-code boundary are unchanged.
+
+## Keypad startup boundary
+
+Own scanner `308240` scans five rows with no row-pin shift. Its normal
+table at `343d7c` and special table at `343d98` match the existing five-row
+logical host layout; the special Power contact is column mask `10`.
+This table equality supports input reuse, not broader board equivalence.
+
+With both checksum-only repairs, read-only debugger observations confirm
+initializer `30835c` executes. MMIO write taps record initialization at
+1.129 seconds, a scan at 1.154 seconds, and a later write at `30ada8` at
+1.224 seconds setting column mask `6b` to `3f`. Routine `30ad82` explicitly
+ORs its low five bits with `1f`; this is firmware-owned masking, not a host
+input failure inferred from missing logs. Physical Menu and digit-1 presses
+at eight and ten seconds leave the columns masked and produce no observed
+scanner IRQ or decode breakpoint. Global control remains `05`.
+
+`tools/nsb7_input_observe.lua` reproduces those physical contacts and
+read-only mask/initialization observations with the debugger enabled. It
+does not unmask columns or write guest state. The next question is which
+startup dependency releases that keypad state. Interactive boot remains
+unproven.
+
+The saved return address at the mask write is `29eee7`, identifying direct
+caller `29eee2` (the other direct BL sites are `29ee14` and `29f0d6`). This
+is the branch selected by the startup result `2`; it resets the state
+through `301ed0`, then receives readiness reports. Its continuation at
+`29efa2` requires the low nibble at `13ff00` to be `6` and that at `1308b1`
+to be `0f`. Only after those tests does it call `30acf2` at `29efde`.
+Runtime writes establish state `6` at 2.189 seconds and readiness `0e`
+at 2.853 seconds. The report decoder maps `14/16/15/17` to bits `1/2/4/8`;
+the missing bit therefore belongs to report `14`, not a guessed key event.
+This identifies the next producer question without claiming that the
+readiness gate is the sole remaining UI dependency.
+
+`tools/nsb7_keypad_conformance.lua`, on a separate fresh `noki8290` run,
+tests 20 physical matrix contacts against all five row drives (100 scans),
+plus the Power special contact and release. It writes controller MMIO and
+is explicitly conformance evidence, not organic input delivery. Those
+checks pass; the normal failure-frame oracle and native `2c75` controlled
+stop also reproduce after the keypad configuration change.
