@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsb7_radio_check import check_location_update, check_receiver_return, check_paging, check_addressed_page, check_page_response
+from tools.nsb7_radio_check import check_location_update, check_receiver_return, check_paging, check_addressed_page, check_page_response, check_incoming_call_setup
 
 
 def trace():
@@ -184,6 +184,42 @@ class LocationUpdateCheckTests(unittest.TestCase):
         text, card = self.response_fixture()
         with self.assertRaises(ValueError):
             check_page_response(text, card[:-1] + b'\x01')
+
+    def call_fixture(self):
+        text, card = self.response_fixture()
+        rows = text.splitlines()
+        payloads = {
+            64: '00800140090632' + '2b'*18 + '000000',
+            67: '008001622d8308040460020180150101' + '2b'*9 + '000000',
+            68: '00800184098341' + '2b'*18 + '000000',
+        }
+        for index, payload in payloads.items():
+            replacement = f'nsb7_radio_tx: index={index} type=1b length=28 data={payload} cursor=00 producer=01 pc=002cb0ec t=19.0 observer_writes=0'
+            rows = [replacement if row.startswith(f'nsb7_radio_tx: index={index} ') else row for row in rows]
+        rows.append('nsb7_radio_tx: index=70 type=02 length=20 data=041202000271012fc10002580000000400000000 cursor=00 producer=01 pc=002cb0ec t=19.0 observer_writes=0')
+        block = '032445030504046002008134015c0581551532f4' + '2b'*4
+        for pc, task in [('002e49e6', 4), ('002645ec', 14)]:
+            rows.append(f'nsb7_lapdm_downlink: pc={pc} task={task} selector=80 block={block} t=19')
+        rows.append('nsb7_channel_pending: address=00102168 tag=0402 bit=00 armed=01 t=19')
+        return '\n'.join(rows), card
+
+    def test_incoming_call_confirmed_and_alerting(self):
+        check_incoming_call_setup(*self.call_fixture())
+
+    def test_call_without_alerting_fails(self):
+        text, card = self.call_fixture()
+        with self.assertRaises(ValueError):
+            check_incoming_call_setup(text.replace('00800184098341', '00800184098342'), card)
+
+    def test_call_wrong_traffic_descriptor(self):
+        text, card = self.call_fixture()
+        with self.assertRaises(ValueError):
+            check_incoming_call_setup(text.replace('bit=00 armed=01', 'bit=01 armed=01'), card)
+
+    def test_call_packet_order_is_not_a_set(self):
+        text, card = self.call_fixture()
+        with self.assertRaises(ValueError):
+            check_incoming_call_setup(text.replace('index=67 type=1b', 'index=68 type=1b'), card)
 
 
 if __name__ == '__main__':

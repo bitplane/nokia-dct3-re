@@ -24,7 +24,8 @@ Release are acknowledged by firmware; EF_LOCI is updated over SIMI and
 retained, and the receiver returns to common control. Repeated empty paging
 blocks reach its RR decoder. An addressed page now produces the handset's
 own Paging Response after background measurement completion. Stable
-registered idle presentation, calls and SMS remain unestablished.
+registered idle presentation, connected calls and SMS remain unestablished;
+incoming-call setup through CALL CONFIRMED/ALERTING is qualified below.
 In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
 No PMM, resident DSP mask, hardware profile or provisioning is supplied by
@@ -1179,3 +1180,38 @@ page-only release. Subsequent service-completion stability, incoming
 call/SMS and usable idle graphics remain separate acceptance work.
 The earlier serving-type-83 sufficiency falsification remains valid:
 this correction answers type 57 with type 8b, not periodic serving RSSI.
+
+### Incoming call setup: traffic configuration withheld
+
+`fixtures/nsb7_incoming_call/nsb7hle.cfg` selects the existing laboratory
+incoming-call input instead of a page-only transaction. After the own
+Paging Response, the network sends Ciphering Mode Command `06 35`,
+then an Identity Request and CC SETUP. The partial product previously
+discarded type-1b uplinks in `service_uplink_wait`, causing repeated
+downlink attempts. It now admits the observed 28-byte SEND_BLOCK with
+prefix `00 80` to the existing LAPDm/session parser in that phase.
+No firmware event, queue or result is supplied by the driver.
+
+In `tmp/nsb7-call-service` and `tmp/nsb7-call-service-cold`, firmware
+acknowledges the command and emits Ciphering Mode Complete `06 32`.
+Both MCU consumers receive CC SETUP block
+`032445030504046002008134015c0581551532f4` plus four `2b` bytes.
+The handset then sends TX67 type-1b information
+`8308040460020180150101` (CALL CONFIRMED), followed by TX68
+`8341` (ALERTING with the sequence bit set). The peer's RR Assignment
+Command leads to TX70 type-02/20:
+`041202000271012fc10002580000000400000000`.
+
+Its pending `0402` descriptor requires reply bit zero and is armed.
+That `c1` traffic-channel request remains withheld in this checkpoint;
+there is no new main-link SABM on selector `b0`. Later empty uplink fill
+blocks are not call progress. `--incoming-call` checks the ordered TX
+inventory, exact own call-control uplinks, SETUP at both MCU consumers,
+pending descriptor and retained EF_LOCI. It rejects a traffic-link
+continuation, which requires its own acceptance contract.
+
+This proves incoming-call signaling through ALERTING, not visible
+ringing, physical Answer, CONNECT, traffic-channel completion or native
+speech. The captured main-area screen remains unsuitable as a call-UI
+oracle. Next qualify the own `c1` configuration acknowledgement and
+main-link establishment before testing physical answer/release.

@@ -1787,10 +1787,15 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			packet.length == m_protocol.background_measurement_request.size() &&
 			std::equal(m_protocol.background_measurement_request.begin(),
 				m_protocol.background_measurement_request.end(), packet.payload.begin());
+	const bool partial_service_uplink =
+			m_protocol.coverage >= acquisition_coverage::candidate_paging &&
+			current_phase() == phase::service_uplink_wait &&
+			packet.type == 0x1b && packet.length == 28 &&
+			packet.payload[0] == 0 && packet.payload[1] == 0x80;
 	if (m_protocol.coverage != acquisition_coverage::full &&
 			!partial_common_control_request && !partial_random_access_request &&
 			!partial_dedicated_request && !partial_establish_request && !partial_acknowledgement &&
-			!partial_release_request && !partial_background_request)
+			!partial_release_request && !partial_background_request && !partial_service_uplink)
 	{
 		if (packet.type == 0x55 && packet.length == 4 &&
 				packet.payload[0] == 3 &&

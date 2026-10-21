@@ -398,6 +398,33 @@ def check_page_response(text, card):
         raise ValueError('accepted laboratory location was not retained')
 
 
+def check_incoming_call_setup(text, card):
+    check_location_update(text.split('nsb7_radio_tx: index=46 ', 1)[0])
+    rows = PACKET.findall(text)
+    if [int(row[0]) for row in rows] != list(range(1, len(rows)+1)):
+        raise ValueError('call packet inventory is reordered, missing or duplicated')
+    packets = {int(row[0]): (row[1], row[3]) for row in rows}
+    expected = {
+        61: ('1b', '0080013f41062707032058810809101010325476982b2b2b2b000000'),
+        64: ('1b', '00800140090632' + '2b'*18 + '000000'),
+        67: ('1b', '008001622d8308040460020180150101' + '2b'*9 + '000000'),
+        68: ('1b', '00800184098341' + '2b'*18 + '000000'),
+        70: ('02', '041202000271012fc10002580000000400000000'),
+    }
+    if any(packets.get(index) != value for index, value in expected.items()):
+        raise ValueError('own paging/cipher-complete/call-confirmed/alerting/TCH request differs')
+    setup = '032445030504046002008134015c0581551532f4' + '2b'*4
+    for pc, task in [('002e49e6', 4), ('002645ec', 14)]:
+        if f'nsb7_lapdm_downlink: pc={pc} task={task} selector=80 block={setup} ' not in text:
+            raise ValueError('incoming SETUP did not reach both MCU consumers')
+    if not re.search(r'nsb7_channel_pending: address=[0-9a-f]{8} tag=0402 bit=00 armed=01 ', text):
+        raise ValueError('own TCH configuration descriptor is not armed with bit zero')
+    if any(kind == '1b' and payload.startswith('00b0') for kind, payload in packets.values()):
+        raise ValueError('bounded call-setup fixture unexpectedly entered the traffic link')
+    if card[1600:1611] != bytes.fromhex('ffffffff00f1100001ff00'):
+        raise ValueError('laboratory location was not retained during call setup')
+
+
 def check_trace(text, measurement=False, synchronization=False, channel=False, bcch=False, ccch=False, rach=False, assignment=False, dedicated=False, uplink=False, contention=False):
     uplink = uplink or contention
     dedicated = dedicated or uplink
@@ -584,11 +611,15 @@ def main():
     parser.add_argument('--paging', action='store_true')
     parser.add_argument('--addressed-page', action='store_true')
     parser.add_argument('--page-response', action='store_true')
+    parser.add_argument('--incoming-call', action='store_true')
     args = parser.parse_args()
     try:
         report = contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
-        if args.page_response:
+        if args.incoming_call:
+            check_security(text)
+            check_incoming_call_setup(text, (args.run / 'nvram/nsb7hle/sim_card').read_bytes())
+        elif args.page_response:
             check_security(text)
             check_page_response(text, (args.run / 'nvram/nsb7hle/sim_card').read_bytes())
         elif args.addressed_page:
@@ -609,7 +640,8 @@ def main():
             args.contract_json.write_text(json.dumps(report, indent=2) + '\n')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 radio inventory: FAIL: {error}\n')
-    print('PASS: ' + ('background request completed; own Paging Response SABM and contention echo; LOCI retained' if args.page_response else
+    print('PASS: ' + ('own CALL CONFIRMED and ALERTING; traffic configuration pending; no connected-call claim' if args.incoming_call else
+                     'background request completed; own Paging Response SABM and contention echo; LOCI retained' if args.page_response else
                      'own addressed page matches IMSI and returns parser event 083e; no access response' if args.addressed_page else
                      'own LOCI retained; repeated empty paging blocks reach firmware decoder' if args.paging else
                      'own LU/release acknowledged; receiver returned; SIM LOCI retained; paging withheld' if args.release else
