@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_physical_pin2_exhaustion_puk2_recovery",
+      "owner": "nsb7_sim_security", "status": "satisfied",
+      "predicate": "Cold physical PIN2 failures exhaust retries, wrong PUK2 persists an isolated retry loss, and cold correct recovery installs a reusable new PIN2 without affecting PIN1",
+      "current": "Three cold wrong1111 CHANGE CHV2 operations return9804/9804/9840 and change only PIN2 retries3->2->1->0; startup PIN1 remains usable. Physical wrong PUK287654322/new8765/confirmation sends A02C000210... and changes only PUK2 retries10->9. Cold correct87654321 returns9000, changes only PIN2 and counters0/9->3/10, then automatically verifies new8765. A final cold change using8765 restores5678 and the complete original card. Exact input/command ordering, second-family retry fields, all six full card pairs, own journals and blocked/error/accepted/changed frames pass. Permanent PUK2 exhaustion, FDN/AoC and native media remain separate.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_pin_change.lua", "tools/nsb7_pin_change_check.py", "tools/nsb7_puk2_wrong.lua", "tools/nsb7_puk2_recover.lua", "tools/nsb7_puk2_check.py", "tools/test_nsb7_puk2_check.py"]
+    },
+    {
       "id": "nsb7_physical_pin2_change_rejection_cold_reuse",
       "owner": "nsb7_sim_security", "status": "satisfied",
       "predicate": "Physical PIN2 change targets CHV2, isolates failed-attempt accounting and authenticates the saved new PIN2 after a cold restart",

@@ -19,7 +19,9 @@ prompt. Physical PIN exhaustion, failed-PUK retry, PUK recovery with a new
 PIN and cold replacement-PIN acceptance are also qualified. Physical
 SIM-card-security Off/On, cold PIN-request behavior and ordinary PIN1
 change/rejection/cold reuse pass. PIN2 change, rejected-current-PIN2
-isolation and cold reuse also pass; PUK2 remains separate work.
+isolation and cold reuse also pass, along with physical PIN2 exhaustion,
+failed-PUK2 retry retention and cold PUK2 recovery/reuse. Permanent PUK
+exhaustion and FDN/AoC authorization remain separate work.
 A physical SIM phonebook save and cold Details retrieval are qualified.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
@@ -1742,5 +1744,47 @@ independently at startup in every run.
 Acceptance reuses the observed physical change parser with selector 2,
 adds explicit PIN2/PUK2 retry accounting, complete initial/final card
 comparisons and exact PIN2 success/error frames. The shared PIN1 branch
-is separately rerun. This does not establish PIN2 exhaustion, PUK2,
-FDN/AoC authorization or PIN2-specific save-state restoration.
+is separately rerun. Exhaustion/PUK2 recovery are qualified below;
+FDN/AoC authorization and PIN2-specific save-state restoration remain
+separate work.
+
+### Physical PIN2 exhaustion and PUK2 recovery
+
+The same physical wrong-PIN2 change workflow runs in three independent
+cold processes, retaining each preceding complete card. CHANGE CHV2
+returns `9804`, `9804`, `9840`, with only PIN2 retries changing
+`3 -> 2 -> 1 -> 0`. PIN1 still verifies at startup in every process.
+The final view displays `PIN2 code blocked`.
+
+On that physically exhausted card, `tools/nsb7_puk2_wrong.lua` navigates
+the same menu and enters PUK2 `87654322`, new PIN2 `8765` and its
+confirmation. The MCU sends `A0 2C 00 02 10` plus PUK2 and padded PIN2.
+`9804` changes only PUK2 retries `10 -> 9`; PIN2 stays blocked and its
+credential remains `5678`.
+
+A cold process retains that entire failed-PUK2 card.
+`tools/nsb7_puk2_recover.lua` physically enters correct PUK2 `87654321`
+and confirmed new PIN2 `8765`. UNBLOCK CHV2 returns `9000`, changing
+only PIN2 credential bytes and resetting PIN2/PUK2 retries `0/9 -> 3/10`.
+The firmware then automatically sends VERIFY CHV2 with `8765`, receives
+`9000` and displays `Code accepted`. The checker requires that ordering;
+the failed-PUK2 control must not verify the proposed new PIN2.
+
+A final cold `nsb7_pin2_restore.lua` process authenticates with `8765`
+and changes PIN2 back to `5678`. Its complete saved card equals the
+original declared laboratory card, including unchanged PIN1, PUK1,
+enabled state and all files. No retry counter or credential is edited
+in guest memory or preseeded to force an exhausted state.
+
+```sh
+.venv/bin/python tools/nsb7_puk2_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin2-wrong \
+  tmp/nsb7-pin2-wrong-second tmp/nsb7-pin2-blocked tmp/nsb7-puk2-wrong \
+  tmp/nsb7-puk2-recovered tmp/nsb7-puk2-cold
+```
+
+Acceptance covers decoded physical inputs, selectors 1/2, exact
+CHANGE/UNBLOCK/automatic-VERIFY commands, both credential families'
+retry fields, all six complete cold card pairs, own flash journals and
+blocked/error/accepted/changed pixel oracles. Permanent PUK2 exhaustion,
+FDN/AoC authorization and PIN2-specific save-state replay are not promoted.

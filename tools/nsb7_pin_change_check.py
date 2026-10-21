@@ -13,7 +13,9 @@ from tools.nsb7_storage_check import inspect
 from tools.sim_security_trace_check import statuses, CHV_OFFSET, ATTEMPTS_OFFSET, padded_pin
 
 
-def check_change(text, wrong, *, pin2=False, old=None, new=None, remaining=None):
+def check_change(text, wrong, *, pin2=False, old=None, new=None, remaining=None, unblock=False):
+    if unblock and not pin2:
+        raise ValueError('this menu recovery fixture targets PIN2 only')
     if '[LUA ERROR]' in text or 'nsb7_change_input: complete' not in text:
         raise ValueError('change-PIN fixture incomplete')
     steps = [(16+i, 'Keypad '+digit, 'phone') for i, digit in enumerate('12345')]
@@ -22,11 +24,14 @@ def check_change(text, wrong, *, pin2=False, old=None, new=None, remaining=None)
     if pin2:
         steps.append((34, 'Keypad 2', 'menu'))
     steps.append((35, 'Left Softkey / Menu', 'menu'))
-    old = old if old is not None else ('1111' if wrong else '5678' if pin2 else '1234')
+    old = old if old is not None else (('87654322' if wrong else '87654321') if unblock else
+                                      '1111' if wrong else '5678' if pin2 else '1234')
     new = new if new is not None else ('8765' if pin2 else '4321')
-    for phase, digits, start in [('old', old, 38), ('new', new, 45), ('confirm', new, 52)]:
+    new_start = 38+len(old)+3
+    for phase, digits, start in [('puk2' if unblock else 'old', old, 38),
+                                 ('new', new, new_start), ('confirm', new, new_start+len(new)+3)]:
         steps += [(start+i, 'Keypad '+digit, phase) for i, digit in enumerate(digits)]
-        steps.append((start+4, 'Left Softkey / Menu', phase))
+        steps.append((start+len(digits), 'Left Softkey / Menu', phase))
     rows = list(re.finditer(r'nsb7_change_input: phase=(\w+) key=(.*?) state=([01]) t=([0-9.]+)', text))
     expected = [(phase, key, state, f'{second}.{fraction}') for second, key, phase in steps
                 for state, fraction in [('1', '000000000'), ('0', '200000000')]]
@@ -37,18 +42,28 @@ def check_change(text, wrong, *, pin2=False, old=None, new=None, remaining=None)
         if f'nsb7_key_decode: key={code:02x} observer_writes=0' not in text[rows[2*index].end():rows[2*index+1].start()]:
             raise ValueError('change-PIN contact did not decode')
     check_pin(text.split('nsb7_change_input: phase=menu', 1)[0], True)
-    remaining = remaining if remaining is not None else (2 if wrong else 3)
-    result = (0x9840 if remaining == 0 else 0x9804) if wrong else 0x9000
-    if statuses(text, 0x24) != [(result, 3 if pin2 else remaining, 10)]:
-        raise ValueError('CHANGE CHV outcome/retries differ')
-    if pin2 and re.findall(r'SIM status ins=24 sw=[0-9a-f]{4} chv=3/(\d+) puk=10/(\d+) enabled=1', text) != [(str(remaining), '10')]:
+    remaining = remaining if remaining is not None else (0 if unblock and wrong else 2 if wrong else 3)
+    instruction = 0x2c if unblock else 0x24
+    result = (0x9804 if unblock or remaining else 0x9840) if wrong else 0x9000
+    if statuses(text, instruction) != [(result, 3 if pin2 else remaining, 10)]:
+        raise ValueError('credential-command outcome/retries differ')
+    puk_remaining = 9 if unblock and wrong else 10
+    if pin2 and re.findall(rf'SIM status ins={instruction:02x} sw=[0-9a-f]{{4}} chv=3/(\d+) puk=10/(\d+) enabled=1', text) != [(str(remaining), str(puk_remaining))]:
         raise ValueError('PIN2/PUK2 retry accounting differs')
-    if any(statuses(text, instruction) for instruction in (0x26, 0x28, 0x2c)):
+    if any(statuses(text, ins) for ins in (0x26, 0x28, 0x24 if unblock else 0x2c)):
         raise ValueError('unrelated security mutation')
-    command = bytes((0xa0, 0x24, 0, 2 if pin2 else 1, 16)) + padded_pin(old) + padded_pin(new)
+    command = bytes((0xa0, instruction, 0, 2 if pin2 else 1, 16)) + padded_pin(old) + padded_pin(new)
     wire = tx_bytes(text)
     if wire.count(command) != 1 or command not in tx_bytes(text[rows[-2].end():]) or b'\xa0\xdc' in wire:
-        raise ValueError('CHANGE CHV must follow confirmation without file writes')
+        raise ValueError('credential APDU must follow confirmation without file writes')
+    if unblock:
+        automatic = bytes.fromhex('a020000208') + padded_pin(new)
+        if statuses(text, 0x20) != [(0x9000, 3, 10)]*(1 if wrong else 2):
+            raise ValueError('startup and post-unblock VERIFY outcomes differ')
+        if wrong and automatic in wire:
+            raise ValueError('failed PUK2 must not verify the proposed PIN2')
+        if not wrong and (wire.count(automatic) != 1 or wire.index(automatic) < wire.index(command)):
+            raise ValueError('recovered PIN2 must be automatically verified after UNBLOCK')
 
 
 def check_cards(pairs):
