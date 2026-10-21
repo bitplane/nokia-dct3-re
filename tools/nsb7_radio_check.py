@@ -76,6 +76,10 @@ def contract(image):
                       'queued_descriptor_tag': '0402', 'armed_clear_pc': '002e5086'},
             'rx_86': {'dispatcher': '002e5228', 'dedicated_handler': '002e513e',
                       'dedicated_uplink_queue': '00130434', 'selector': '80'},
+            'contention': {'handler': '002664be', 'state_offset': 0x163,
+                           'pending_length_offset': 0x12e, 'pending_pointer_offset': 0x130,
+                           'received_information_offset': 0x1a, 'state_write': '002665c0',
+                           'before': 2, 'after': 4},
             'tx_0c': {'constructor': '002b6e58', 'payload_bytes': 8,
                       'timing_mode_offset': 1, 'ra_offset': 2, 'slot_delay_offset': 3,
                       'scheduled_base_offsets': [4, 5], 'coverage': 'non-combined CCCH only'},
@@ -94,7 +98,7 @@ def contract(image):
                       'si_state': '0012d790', 'complete_si_bitmap': 15,
                       'agch_forwarder': '002e49e6', 'agch_task': 14,
                       'agch_tag': '0623', 'agch_decoder': '002645ec',
-                      'agch_decoded_event': '061a',
+                      'agch_decoded_result': '061a',
                       'ccch_endings_table': '00343fb4', 'ccch_block_endings': ccch_endings,
                       'subtype_handlers': {'40': '002e4f8a', '50': '002e4e96',
                                            '60': '002e4d24', '70': '002e4b86',
@@ -151,9 +155,9 @@ def check_assignment(text, inventory, dedicated=False):
     check_rach(text, inventory, assignment=True)
     forward = re.findall(r'nsb7_agch_forward: index=1 task=4 mode=60 error=00 frame=(\d+) block=([0-9a-f]{48}) ', text)
     consumer = re.findall(r'nsb7_agch_consumer: index=1 task=14 tag=0623 mode=60 block=([0-9a-f]{48}) ', text)
-    event = re.findall(r'nsb7_agch_event: index=1 task=14 code=061a block=([0-9a-f]{48}) ', text)
-    if len(forward) != 1 or consumer != [forward[0][1]] or event != consumer:
-        raise ValueError('own AGCH route did not preserve the block through task-14 event 061a')
+    result = re.findall(r'nsb7_rr_decoder_result: index=1 task=14 code=061a block=([0-9a-f]{48}) ', text)
+    if len(forward) != 1 or consumer != [forward[0][1]] or result != consumer:
+        raise ValueError('own AGCH route did not preserve the block through task-14 decoder result 061a')
     block = bytes.fromhex(consumer[0])
     if block[:7] != bytes.fromhex('2d063f00200258'):
         raise ValueError('Immediate Assignment does not select the lab SDCCH carrier')
@@ -205,7 +209,27 @@ def check_dedicated(text, inventory, uplink=False):
         raise ValueError('own SEND_BLOCK padding/trailer differs')
 
 
-def check_trace(text, measurement=False, synchronization=False, channel=False, bcch=False, ccch=False, rach=False, assignment=False, dedicated=False, uplink=False):
+def check_contention(text, inventory):
+    information = inventory[41][1][5:23]
+    expected = bytes.fromhex('017349') + information + bytes.fromhex('2b2b2b')
+    rows = re.findall(r'nsb7_lapdm_downlink: pc=([0-9a-f]{8}) task=(\d+) selector=80 block=([0-9a-f]{48}) ', text)
+    if ([(row[0], row[1]) for row in rows] != [('002e49e6', '4'), ('002645ec', '14')] or
+            any(bytes.fromhex(row[2]) != expected for row in rows)):
+        raise ValueError('contention UA did not echo the own SABM through both native consumers')
+    compare = re.findall(r'nsb7_ua_compare: context=([0-9a-f]{8}) state=2 length=18 sent=([0-9a-f]{36}) '
+                         r'received=([0-9a-f]{36}) ', text)
+    states = re.findall(r'nsb7_lapdm_state: context=([0-9a-f]{8}) state=(\d+) pc=([0-9a-f]{8}) task=(\d+) ', text)
+    if (len(compare) != 1 or not 0x100000 <= int(compare[0][0], 16) < 0x17fe00 or
+            states != [(compare[0][0], '4', '002665c0', '14')] or
+            compare[0][1:] != (information.hex(), information.hex())):
+        raise ValueError('firmware did not compare contention data and advance link state 2 to 4')
+    result = re.findall(r'nsb7_rr_decoder_result: index=3 task=14 code=0614 block=([0-9a-f]{48}) ', text)
+    if result != [expected.hex()]:
+        raise ValueError('UA decoder result differs')
+
+
+def check_trace(text, measurement=False, synchronization=False, channel=False, bcch=False, ccch=False, rach=False, assignment=False, dedicated=False, uplink=False, contention=False):
+    uplink = uplink or contention
     dedicated = dedicated or uplink
     assignment = assignment or dedicated
     ccch = ccch or rach or assignment
@@ -289,6 +313,8 @@ def check_trace(text, measurement=False, synchronization=False, channel=False, b
             expected_replies.append(('19', '89', '8'))
         if uplink:
             expected_replies.append(('20', '86', '8'))
+        if contention:
+            expected_replies.append(('21', '80', '34'))
         if replies != expected_replies:
             raise ValueError('qualified acquisition RX scope differs')
         consumers = re.findall(r'nsb7_measurement: pc=([0-9a-f]{8}) task=(\d+) type=([0-9a-f]{2}) first=([0-9a-f]{4}) '
@@ -365,6 +391,8 @@ def check_trace(text, measurement=False, synchronization=False, channel=False, b
         check_assignment(text, inventory, dedicated)
     if dedicated:
         check_dedicated(text, inventory, uplink)
+    if contention:
+        check_contention(text, inventory)
 
 
 def main():
@@ -381,11 +409,15 @@ def main():
     parser.add_argument('--assignment', action='store_true')
     parser.add_argument('--dedicated', action='store_true')
     parser.add_argument('--uplink', action='store_true')
+    parser.add_argument('--contention', action='store_true')
     args = parser.parse_args()
     try:
         report = contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
-        check_trace(text, args.measurement, args.synchronization, args.channel, args.bcch, args.ccch, args.rach, args.assignment, args.dedicated, args.uplink)
+        check_trace(text, measurement=args.measurement, synchronization=args.synchronization,
+                    channel=args.channel, bcch=args.bcch, ccch=args.ccch, rach=args.rach,
+                    assignment=args.assignment, dedicated=args.dedicated, uplink=args.uplink,
+                    contention=args.contention)
         states = re.findall(r'nsb7_radio_state: bands=([0-9a-f]{8}) measurement_route=([0-9a-f]{2}) t=([0-9.]+)', text)
         if states != [('98000000', '01', f'{time:.9f}') for time in (3.5, 6, 14, 24)]:
             raise ValueError('live feature/forwarding predicate differs')
@@ -393,7 +425,8 @@ def main():
             args.contract_json.write_text(json.dumps(report, indent=2) + '\n')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 radio inventory: FAIL: {error}\n')
-    print('PASS: ' + ('own LAPDm SABM carries Location Updating Request; no UA supplied' if args.uplink else
+    print('PASS: ' + ('own contention echo accepted; firmware link state 2 to 4; no LU Accept supplied' if args.contention else
+                     'own LAPDm SABM carries Location Updating Request; no UA supplied' if args.uplink else
                      'own bit-1 acknowledgement commits dedicated receiver; block request withheld' if args.dedicated else
                      'own Immediate Assignment accepted; dedicated-channel acknowledgement withheld' if args.assignment else
                      'own timed access completions reach task 17; assignment unanswered' if args.rach else

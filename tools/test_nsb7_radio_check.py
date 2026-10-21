@@ -158,7 +158,7 @@ def assignment_trace():
     rows.extend([
         f'nsb7_agch_forward: index=1 task=4 mode=60 error=00 frame=2395 block={block} t=12 observer_writes=0',
         f'nsb7_agch_consumer: index=1 task=14 tag=0623 mode=60 block={block} t=12 observer_writes=0',
-        f'nsb7_agch_event: index=1 task=14 code=061a block={block} t=12 observer_writes=0'])
+        f'nsb7_rr_decoder_result: index=1 task=14 code=061a block={block} t=12 observer_writes=0'])
     return '\n'.join(rows)
 
 
@@ -179,7 +179,33 @@ def uplink_trace():
         f'nsb7_radio_tx: index=42 type=1b length=28 data={payload} cursor={cursor:02x} producer={(cursor+15)%0x52:02x} pc=002cb0ec t=12 observer_writes=0'])
 
 
+def contention_trace():
+    information = '05087000f000fffe20080910101032547698'
+    block = '017349' + information + '2b2b2b'
+    return uplink_trace() + '\n' + '\n'.join([
+        'nsb7_radio_rx: index=21 type=80 length=34 t=13 observer_writes=0',
+        f'nsb7_lapdm_downlink: pc=002e49e6 task=4 selector=80 block={block} t=13 observer_writes=0',
+        f'nsb7_lapdm_downlink: pc=002645ec task=14 selector=80 block={block} t=13 observer_writes=0',
+        f'nsb7_ua_compare: context=0012a6dc state=2 length=18 sent={information} received={information} t=13 observer_writes=0',
+        'nsb7_lapdm_state: context=0012a6dc state=4 pc=002665c0 task=14 t=13 observer_writes=0',
+        f'nsb7_rr_decoder_result: index=3 task=14 code=0614 block={block} t=13 observer_writes=0'])
+
+
 class RadioInventoryTests(unittest.TestCase):
+    def test_contention_requires_native_echo_comparison_and_link_state_change(self):
+        check_trace(contention_trace(), contention=True)
+        for old, new in [('received=05087000f000fffe20', 'received=05087000f000fffe23'),
+                         ('state=4 pc=002665c0', 'state=2 pc=002665c0'),
+                         ('code=0614 block=', 'code=0613 block='),
+                         ('block=017349', 'block=017301'),
+                         ('context=0012a6dc', 'context=00000000')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_trace(contention_trace().replace(old, new), contention=True)
+        with self.assertRaises(ValueError):
+            check_trace(contention_trace() + '\nnsb7_radio_rx: index=22 type=80 length=34 t=14', contention=True)
+        with self.assertRaises(ValueError):
+            check_trace(contention_trace() + '\nnsb7_lapdm_state: context=0012a6dc state=2 pc=002665c0 task=14 t=15', contention=True)
+
     def test_dedicated_ack_requires_own_descriptor_clear(self):
         check_trace(dedicated_trace(), dedicated=True)
         for old, new in [('bit=01 cached=00000000', 'bit=00 cached=00000000'),
@@ -317,6 +343,8 @@ class RadioInventoryTests(unittest.TestCase):
         self.assertEqual(report['rx_80']['ccch_block_endings'], [9, 15, 19, 25, 29, 35, 39, 45, 49])
         self.assertEqual(report['rx_89']['dedicated_bit'], 1)
         self.assertEqual(report['rx_86']['dedicated_uplink_queue'], '00130434')
+        self.assertEqual(report['contention']['state_offset'], 0x163)
+        self.assertEqual(report['contention']['after'], 4)
         self.assertEqual(report['payload_prefix_bytes'], 4)
         self.assertEqual(report['classified_inputs'], 65536)
         self.assertEqual(report['ranges'], [

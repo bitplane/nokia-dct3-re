@@ -3951,7 +3951,7 @@ void nokia_dct3_state::nsb7hle(machine_config &config)
 	// 2e50ce commits the cached receiver configuration on type 89;
 	// task-17 parser 29d42c consumes the shared BCCH block layout.
 	runtime.radio.acquisition = nokia_radio_peer_device::acquisition_strategy::candidate_window;
-	runtime.radio.coverage = nokia_radio_peer_device::acquisition_coverage::candidate_block_request;
+	runtime.radio.coverage = nokia_radio_peer_device::acquisition_coverage::candidate_contention;
 	runtime.radio.assigned_channel_confirmation = 1;
 	runtime.radio.band_scan_accepts_candidate_window = true;
 	apply_product_config(runtime);

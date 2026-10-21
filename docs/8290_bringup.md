@@ -18,7 +18,8 @@ The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
 parsing, CCCH setup, timed random-access completion and an accepted
 Immediate Assignment, dedicated-channel setup and an emitted Location
-Updating Request inside LAPDm SABM. LAPDm establishment, camping,
+Updating Request inside LAPDm SABM, followed by accepted contention-resolution
+UA and firmware link state `2 -> 4`. Location Updating acceptance, camping,
 registration, calls, SMS and a usable idle frame remain unestablished.
 In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
@@ -579,14 +580,14 @@ every input. Unit cases cover precedence and range endpoints.
 ### Opt-in PCS acquisition acceptance
 
 Radio HLE defaults off in the NSB-7 input configuration. The existing
-`Radio peer HLE` setting enables a product-owned **candidate-block-request**
+`Radio peer HLE` setting enables a product-owned **candidate-contention**
 contract: the decoded four-byte type-55 forms `03050000/03030000` and
 the subsequent eighty-channel type-56 list, and its type-02/20 receiver
 configuration are answered, followed by eight BCCH blocks and the same
 receiver-configuration grammar for CCCH modes and request-correlated access
 frame completion, a request-correlated Immediate Assignment, bit-1
-dedicated-channel acknowledgement and one uplink block request. LAPDm
-acknowledgement, traffic,
+dedicated-channel acknowledgement, one uplink block request and a
+SABM-correlated UA. Location Updating Accept, traffic,
 neighbour and authentication contracts are not inherited from siblings.
 Other products retain their existing contracts unchanged. Retire the
 acquisition-coverage limit only after the subsequent product contracts are
@@ -603,17 +604,17 @@ fourteen-byte type-80/subtype-40 encoding. No firmware queue, state or APDU is
 injected to make this progression happen.
 
 `tools/nsb7_radio_measurement_observe.lua` adds own broker/consumer/class
-observations. Use `tools/nsb7_radio_check.py IMAGE RUN --uplink` with
-`tools/nsb7_dedicated_observe.lua` for this composition. It requires all 42
+observations. Use `tools/nsb7_radio_check.py IMAGE RUN --contention` with
+`tools/nsb7_lapdm_observe.lua` for this composition. It requires all 42
 TX publications, the correct task
 and payload values, and the complete observed RX inventory: two existing
 external-service `8e/10` frames, one measurement `8b/166`, and one SCH
 `80/14`, one channel acknowledgement `89/8`, and eight BCCH `80/34`
 frames, receiver acknowledgements, one access completion, one assignment
-and one uplink block request through the
+one uplink block request and one contention-resolution UA through the
 25-second fixture. The older `--measurement`, `--synchronization`,
-`--channel`, `--bcch`, `--ccch`, `--rach`, `--assignment` and `--dedicated`
-checks retain the preceding bounded trace contracts. No UA,
+`--channel`, `--bcch`, `--ccch`, `--rach`, `--assignment`, `--dedicated`
+and `--uplink` checks retain the preceding bounded trace contracts. No LU Accept,
 paging block, RSSI or terminal-search
 response is accepted. The no-peer/default fixture still
 reproduces its original 29-packet inventory.
@@ -635,7 +636,7 @@ while runtime HLE remains in use. This is a bootstrap/runtime ownership
 correction, not a candidate-payload special case.
 
 Decode each subsequent request's callers and populated fields before
-extending peer coverage. LAPDm establishment, traffic release, neighbours,
+extending peer coverage. LU Accept/release, traffic release, neighbours,
 authentication and registration remain unestablished on this handset.
 
 ### Candidate response routing
@@ -684,7 +685,7 @@ stores decoded BSIC `12`, and publishes type `02`/20 bytes beginning
 `041202000000005050000258`. The final eight request bytes are captured
 but not yet assigned semantics. Channel completion and the subsequent
 BCCH, CCCH, access-frame and assignment lifecycles are independently
-qualified below; LAPDm acknowledgement remains open.
+qualified below; Location Updating acceptance remains open.
 
 ### Receiver configuration acknowledgement
 
@@ -825,8 +826,10 @@ as `0623` and forwards it to task 14, preserving the 24-byte block at
 object `+0e`. The task's receive loop is `2648bc`, observed returning to
 `2648da`. Case `264966` passes the message through `264592/2645ec`.
 The common-control decoder validates pseudo-length/control bits and
-copies the RR body from object `+0f`; it publishes event `061a` through
-`2e6184`. This is distinct from task 17's BCCH parser.
+copies the RR body from object `+0f`; it returns decoder result `061a`,
+also passed to diagnostic helper `2e6184`. That helper checks a trace
+mask through `307484`; observing its argument is not proof of a mailbox
+post. This is distinct from task 17's BCCH parser.
 
 The supplied Immediate Assignment uses the shared standards-level encoder
 and echoes the completed RACH octet and reduced frame reference exactly.
@@ -840,7 +843,8 @@ to the existing assignment encoder.
 
 The qualified run completes access octet `0f` at frame 2391 and delivers
 the assignment with downlink metadata frame 2395. The same assignment
-block reaches the forwarding boundary, task-14 decoder and event `061a`.
+block reaches the forwarding boundary and task-14 decoder, whose result
+is `061a`.
 Firmware publishes control `1f/4 = 00090000`, then a type-02/20 dedicated
 request `0412000000000040800002584000000000000000`. Its own descriptor
 at `[130844]` has tag `0402`, expected bit 1 and armed byte 1; this is
@@ -888,7 +892,34 @@ not constructed by the host or copied from another model's message.
 `--uplink` requires all 42 TX and twenty RX packets, the armed-descriptor
 clear, committed mode `40`, both block-request decoder boundaries, the
 same nonzero queue pointer, and the exact own SABM/Location Updating
-Request. It rejects an extra UA/downlink reply. The peer has not yet
-accepted this uplink into its network session or acknowledged SABM;
-link establishment, Location Updating acceptance and registration remain
-unproved.
+Request. That bounded fixture rejects an extra UA/downlink reply. Contention
+resolution is qualified separately below; Location Updating acceptance
+and registration remain unproved.
+
+### Contention-resolution UA
+
+The peer accepts the actual type-1b SABM through the existing LAPDm link
+and GSM-session parser, not a synthesized upper-layer request. Its UA
+echoes the same eighteen information bytes and is delivered as a dedicated
+type-80/34 block. Both forwarding helper `2e49e6` and task-14 decoder
+`2645ec` receive the same `01 73 49` LAPDm header plus that information.
+The decoder returns result `0614`; the diagnostic hook observes this
+value without treating it as a mailbox post.
+
+Firmware handler `2664be` validates contention data. In the selected
+context it reads the pending information length at `+12e`, the pending
+buffer pointer at `+130`, and compares pending bytes `buffer+4` against
+received information at `context+1a` using `30e8e8`. With nonempty pending
+information, the matching branch selects state 4 and releases the pending
+buffer; mismatch bypasses that transition. The state byte
+is `context+163`, not the context's first byte, which is a selector.
+The read-only watch observes length 18 and byte-identical sent/received
+information while that state is 2, followed by instruction `2665c0`
+writing state 4 in task 14. No state or timer is injected.
+
+`--contention` requires that native comparison and state transition,
+the exact echoed information at both consumer boundaries, 42 MCU TX
+packets and twenty-one RX packets. The peer withholds the subsequently
+queued Location Updating Accept. This establishes the contention
+exchange and firmware link progression, not completed registration or
+native DSP execution.

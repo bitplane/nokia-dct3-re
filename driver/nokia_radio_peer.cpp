@@ -1766,8 +1766,14 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			current_phase() == phase::random_access &&
 			packet.type == 0x02 && packet.length == 20 &&
 			packet.payload[0] == 4 && packet.payload[8] == 0x80;
+	const bool partial_establish_request =
+			m_protocol.coverage == acquisition_coverage::candidate_contention &&
+			current_phase() == phase::lapdm_establish &&
+			packet.type == 0x1b && packet.length == 28 &&
+			packet.payload[0] == 0 && packet.payload[1] == 0x80;
 	if (m_protocol.coverage != acquisition_coverage::full &&
-			!partial_common_control_request && !partial_random_access_request && !partial_dedicated_request)
+			!partial_common_control_request && !partial_random_access_request &&
+			!partial_dedicated_request && !partial_establish_request)
 	{
 		if (packet.type == 0x55 && packet.length == 4 &&
 				packet.payload[0] == 3 &&
@@ -2886,6 +2892,7 @@ void nokia_radio_peer_device::emit_report()
 	{
 		const bool completing_candidate = current_phase() == phase::candidate_channel_change;
 		const bool completing_dedicated = current_phase() == phase::assigned_channel_change;
+		const bool completing_contention = current_phase() == phase::contention_resolution;
 		const bool completing_common_control = current_phase() == phase::serving_channel_change;
 		--m_reports_remaining;
 		advance_after_report(report_type);
@@ -2944,6 +2951,13 @@ void nokia_radio_peer_device::emit_report()
 			m_access_deadline_pending = false;
 		if (m_protocol.coverage == acquisition_coverage::candidate_dedicated &&
 				report_type == 0x89 && completing_dedicated)
+		{
+			m_reports_remaining = 0;
+			m_wait_ticks = 0;
+			m_report_deferred = false;
+		}
+		if (m_protocol.coverage == acquisition_coverage::candidate_contention &&
+				report_type == 0x80 && completing_contention)
 		{
 			m_reports_remaining = 0;
 			m_wait_ticks = 0;

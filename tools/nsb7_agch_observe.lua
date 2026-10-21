@@ -36,15 +36,15 @@ taps[#taps+1]=memory:install_read_tap(0x2645ec,0x2645ef,'nsb7_agch_task14',funct
     machine:logerror(string.format('nsb7_agch_consumer: index=%d task=14 tag=0623 mode=%02x block=%s t=%.9f observer_writes=0\n',
         decoded,memory:read_u8(object+11),table.concat(body),machine.time:as_double()))
 end)
-local events=0
-taps[#taps+1]=memory:install_read_tap(0x2e6184,0x2e6187,'nsb7_agch_decoded_event',function()
-    if cpu.state['R15'].value~=0x2e6184 or memory:read_u8(0x100022)~=14 or events>=32 then return end
+local results=0
+taps[#taps+1]=memory:install_read_tap(0x2e6184,0x2e6187,'nsb7_rr_decoder_result',function()
+    if cpu.state['R15'].value~=0x2e6184 or memory:read_u8(0x100022)~=14 or results>=32 then return end
     local block=cpu.state['R2'].value
     if block<0x100000 or block>=0x17ff00 then return end
-    events=events+1
+    results=results+1
     local body={}
     for index=0,23 do body[#body+1]=string.format('%02x',memory:read_u8(block+index)) end
-    machine:logerror(string.format('nsb7_agch_event: index=%d task=14 code=%04x block=%s t=%.9f observer_writes=0\n',
-        events,cpu.state['R0'].value&65535,table.concat(body),machine.time:as_double()))
+    machine:logerror(string.format('nsb7_rr_decoder_result: index=%d task=14 code=%04x block=%s t=%.9f observer_writes=0\n',
+        results,cpu.state['R0'].value&65535,table.concat(body),machine.time:as_double()))
 end)
 _G.nsb7_agch_taps=taps
