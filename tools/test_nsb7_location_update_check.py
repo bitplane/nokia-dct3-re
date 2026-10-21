@@ -109,6 +109,10 @@ class LocationUpdateCheckTests(unittest.TestCase):
                 'pc=00274e82 r0=00000001 ',
                 'pc=002b3130 r0=0000083e ']:
             rows.append('nsb7_page_identity: ' + data + 't=16')
+        rows.extend([
+            'nsb7_page_event_return: event=083e caller=00260c2b record=00130660 t=16',
+            'nsb7_page_dispatch: pc=00260c4c event=083e record=0012c97c flag0b=00 saved=001069bc t=16',
+            'nsb7_page_dispatch: pc=00260c16 event=083e record=0012c97c flag0b=01 saved=00000000 t=16'])
         return '\n'.join(rows)
 
     def test_addressed_imsi_match(self):
@@ -121,6 +125,10 @@ class LocationUpdateCheckTests(unittest.TestCase):
     def test_addressed_result_missing(self):
         with self.assertRaises(ValueError):
             check_addressed_page(self.addressed_fixture().replace('r0=0000083e', 'r0=00000000'))
+
+    def test_addressed_saved_record_not_released(self):
+        with self.assertRaises(ValueError):
+            check_addressed_page(self.addressed_fixture().replace('saved=00000000', 'saved=001069bc'))
 
 
 if __name__ == '__main__':

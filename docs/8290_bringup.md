@@ -1027,7 +1027,7 @@ In the observed run, dispatch-record bytes begin `00fe010005eb000000`
 at that return boundary. The meaning of the `fe` byte is not assigned.
 There is no new type-0c CHANNEL REQUEST through 25 seconds: the runtime
 TX inventory remains 49 packets. The unresolved question is how the
-firmware's RR lifecycle consumes `083e`, not whether the page carries
+firmware's RR lifecycle advances after `083e`, not whether the page carries
 the correct subscriber identity or reaches the RR parser.
 
 `tools/nsb7_page_observe.lua` captures transport posts, pointed-to
@@ -1037,3 +1037,21 @@ page/identity/result chain and rejects an unexpected access continuation.
 The qualified capture is `tmp/nsb7-page-parser`; the earlier
 `tmp/nsb7-page-identity` independently reproduces identity matching.
 Neither establishes an over-air Paging Response, call or SMS delivery.
+
+The receive wrapper returns `083e` to caller `260c2a` (Thumb return
+address `260c2b`). The first comparison at `260c34`, using literal
+`083e` at `260ce8`, explicitly selects `260c4c`; it does not fall
+through the generic dispatcher. That continuation sets record `12c97c`
+byte `+0b` from zero to one, frees its saved pointer at `+28` (observed
+`1069bc`), clears the pointer, and branches to `260c16`. Firmware writes
+outer state 4 and re-enters receive call `260c26`. Events `083f` and
+`0840` share this static continuation; their semantics are not inferred.
+
+`tmp/nsb7-page-dispatch-qualified` proves the wrapper return, selected
+branch, flag update and cleared saved pointer, in addition to the IMSI
+match. The observer retains only these focused taps; the temporary
+time-window instruction-path trace and unconfirmed snapshot-restore
+hook were removed. `--addressed-page` now requires this continuation.
+The next question is which lifecycle exit from this state should initiate
+access, or whether a prerequisite to entering the ordinary paging-ready
+state remains incomplete. No missing hardware response is yet identified.

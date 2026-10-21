@@ -54,3 +54,19 @@ for _,pc in ipairs({0x274124,0x2741dc,0x2741f6,0x274e82,0x2b3130}) do
     end)
 end
 _G.nsb7_page_identity_taps=identity_taps
+_G.nsb7_page_event_return=memory:install_read_tap(0x2b31a8,0x2b31ab,'nsb7_page_event_return',function()
+    if cpu.state['R15'].value~=0x2b31aa or cpu.state['R0'].value~=0x83e then return end
+    machine:logerror(string.format('nsb7_page_event_return: event=083e caller=%08x record=%08x t=%.9f observer_writes=0\n',
+        memory:read_u32(cpu.state['R13'].value+20),cpu.state['R4'].value,machine.time:as_double()))
+end)
+local dispatch_taps={}
+for _,pc in ipairs({0x260c4c,0x260c16}) do
+    dispatch_taps[#dispatch_taps+1]=memory:install_read_tap(pc-pc%4,pc-pc%4+3,'nsb7_page_dispatch_'..pc,function()
+        if cpu.state['R15'].value~=pc or memory:read_u32(cpu.state['R13'].value+4)~=0x83e then return end
+        local record=cpu.state['R4'].value
+        if record<0x100000 or record>=0x17ff00 then return end
+        machine:logerror(string.format('nsb7_page_dispatch: pc=%08x event=083e record=%08x flag0b=%02x saved=%08x t=%.9f observer_writes=0\n',
+            pc,record,memory:read_u8(record+0xb),memory:read_u32(record+0x28),machine.time:as_double()))
+    end)
+end
+_G.nsb7_page_dispatch_taps=dispatch_taps

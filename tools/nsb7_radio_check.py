@@ -327,6 +327,14 @@ def check_addressed_page(text):
         positions.append(match.start())
     if positions != sorted(positions):
         raise ValueError('paging identity evidence order differs')
+    returned = re.findall(r'nsb7_page_event_return: event=083e caller=00260c2b record=([0-9a-f]{8}) ', text)
+    dispatch = re.findall(r'nsb7_page_dispatch: pc=([0-9a-f]{8}) event=083e record=([0-9a-f]{8}) flag0b=([0-9a-f]{2}) saved=([0-9a-f]{8}) ', text)
+    if (len(returned) != 1 or len(dispatch) != 2 or
+            dispatch[0][0] != '00260c4c' or dispatch[1][0] != '00260c16' or
+            dispatch[0][1] != dispatch[1][1] or
+            dispatch[0][2] != '00' or dispatch[1][2:] != ('01', '00000000') or
+            not 0x100000 <= int(dispatch[0][3], 16) < 0x180000):
+        raise ValueError('explicit page-event continuation did not release its saved record')
     packets = PACKET.findall(text)
     if len(packets) != 49:
         raise ValueError('bounded page-parser fixture unexpectedly advanced to access')
