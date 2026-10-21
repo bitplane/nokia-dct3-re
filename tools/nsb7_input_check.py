@@ -17,6 +17,8 @@ def check_trace(text):
         raise ValueError('requires the explicit research-HLE composition')
     if 'runtime_hle_handoff pc=2c75 native_suspended=1' not in text:
         raise ValueError('native/HLE boundary missing')
+    if 'nsb7_card_fixture: present=0 physical_contact=1' not in text:
+        raise ValueError('requires the explicit empty physical socket')
     if any(error in text for error in ('LUA ERROR', 'c54x_failure:', 'observer_writes=1')):
         raise ValueError('observer or emulation failure')
     values = re.findall(r'nsb7_startup_write: address=001308b1 value=([0-9a-f]{2}) ', text)

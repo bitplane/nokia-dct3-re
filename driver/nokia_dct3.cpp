@@ -3933,6 +3933,10 @@ void nokia_dct3_state::nsb7hle(machine_config &config)
 	// Nominal VBATT transfer hypothesis: 3.6 V / 6.5 mV per CCONT bit.
 	// Other analog channels remain provisional; no charger is asserted.
 	runtime.ccont_board.channel_defaults[2] = 554;
+	// Own 2eef68 initializes IIR/control 38/39, FIFOs 3d/3e and
+	// clock bit 5; 2eeee6 services the FIQ6 cause register.
+	runtime.simi_controller = true;
+	runtime.synthetic_sim_card = true;
 	// Own 24b840 class-74 route calls 248b00. Command 0d at 248b74
 	// cancels timer 19 and consumes reply +9 bits 0/1 as fault results.
 	runtime.dsp_service = true;

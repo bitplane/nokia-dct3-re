@@ -4,6 +4,7 @@ from tools.nsb7_input_check import check_trace
 
 def trace():
     rows = ['nsb7_profile: machine=nsb7hle observer_writes=0',
+            'nsb7_card_fixture: present=0 physical_contact=1',
             'runtime_hle_handoff pc=2c75 native_suspended=1']
     rows += [f'nsb7_startup_write: address=001308b1 value={value} pc=0029ef2c '
              for value in ('00', '08', '0a', '0e', '0f')]

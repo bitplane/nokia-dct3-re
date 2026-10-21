@@ -9,7 +9,10 @@ failure frame. Idle, organic keypad/SIM, registration, calls and SMS are
 not established for that fail-closed machine. The separate `nsb7hle`
 research composition, with own checksum-only journal repairs and a declared
 nominal VBATT input, reaches `Insert SIM card` and physically enters digit
-`1` into the dial editor. SIM and RF services remain unestablished.
+`1` into the dial editor with an empty socket. With the synthetic card
+inserted, SIMI startup file reads and the phone Security code editor
+reproduce across cold runs. Phone unlock, SIM writes and RF services
+remain unestablished.
 In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
 No PMM, resident DSP mask, hardware profile or provisioning is supplied by
@@ -331,5 +334,43 @@ the own flash containing the two checksum-only repairs described above.
 
 The status retry's `9004` query resolves index `10` in table `343ee0` to
 serial command `70`, CCONT register `0e`, mask `04`. That is a status query,
-not an ADC sample, and was left untouched. Recover the own SIMI activation
-and card transport next rather than adding an application-level SIM reply.
+not an ADC sample, and was left untouched. The own SIMI activation and
+card transport are qualified separately below, without an application-level
+SIM reply.
+
+## SIMI and physical card boundary
+
+The own constant-index census resolves 54 candidate accesses in the
+`36..3f` register window. Reviewed initializer `2eef68` clears IIR `38`,
+sets clock register `3a` to `03`, enables CTSI `0d` bit 5, programs RX/TX
+FIFO controls `3d/3e`, and writes control `39=32`. Receive handler `2eeee6`
+reads/acknowledges IIR `38`; its `40` cause drains RX fill `3c` through data
+`37` at `2eee80`. The controller/card are enabled only in `nsb7hle`;
+the fail-closed normal and native-only profiles remain unchanged.
+
+With the existing standards-oriented synthetic card, firmware subsequently
+writes control `33/b3`, receives ATR `3b1005`, exchanges PPS `ff00ff`, and
+issues SELECT, GET RESPONSE, READ BINARY and READ RECORD commands through
+the real controller byte path. Own wire observations contain 938 TX bytes,
+including MF/DF and ICCID/phase/IMSI reads, all 50 ADN records, and a final
+`a0f2000016` presence-monitor request. No APDU or firmware message is
+injected. The capture is bounded below its 4096-byte TX and 8192-byte RX
+limits. This establishes startup reads, not successful credential checks,
+SIM update commands or a complete SIM feature matrix.
+
+The physical Menu fixture submits an empty phone-security editor and
+produces `Code error`; digit-1 then produces `Security code: *` with
+`OK/Clear`. This is phone-side security presentation, not SIM PIN failure
+or proof that a stored phone code is accepted. The next storage question
+is the own phone-code/lock record contract; do not replace it with a
+firmware-memory patch or a sibling's security bytes.
+
+`tools/nsb7_sim_observe.lua` retains the configured physical card, runs the
+same two contacts, and records read-only controller traffic.
+`tools/nsb7_sim_check.py IMAGE RUN` checks the explicit HLE boundary,
+activation/FIQ consumer, complete captured TX framing, startup commands,
+ADN record reads, ATR/PPS reception, final STATUS and exact security-editor
+pixels. It reproduces in a new process retaining only the preceding run's
+own flash and synthetic-card NVRAM. The empty-socket input observer instead
+asserts the physical `Remove SIM card` contact at startup and continues
+to reproduce its separate `Insert SIM card` / dial-digit acceptance.

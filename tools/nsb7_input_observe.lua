@@ -66,6 +66,12 @@ local fields={}
 for _,port in pairs(machine.ioport.ports) do
     for _,field in pairs(port.fields) do fields[field.name]=field end
 end
+-- The baseline input fixture has an empty physical socket. The separate SIM
+-- observer retains the configured card; neither fixture writes guest state.
+if not _G.nsb7_observe_inserted_card then
+    assert(fields['Remove SIM card']):set_value(1)
+end
+machine:logerror('nsb7_card_fixture: present='..(_G.nsb7_observe_inserted_card and '1' or '0')..' physical_contact=1\n')
 local input=coroutine.create(function()
     for _,step in ipairs({{8,'Left Softkey / Menu'},{10,'Keypad 1'}}) do
         assert(emu.wait(step[1]-machine.time:as_double()))
