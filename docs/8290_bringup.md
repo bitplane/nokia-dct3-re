@@ -27,8 +27,9 @@ own Paging Response after background measurement completion. Stable
 registered idle presentation remains unestablished. Incoming SMS delivery,
 physical reading/deletion, cancellation, cold status retention and outgoing
 Reply submission are qualified below. Incoming-call
-control through physical Answer/End, CONNECT acknowledgement and release
-is qualified below; speech is not established.
+control through physical Answer/End, CONNECT acknowledgement and release,
+plus physical outgoing dial/Send/End signalling, is qualified below;
+speech is not established.
 In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
 No PMM, resident DSP mask, hardware profile or provisioning is supplied by
@@ -1404,3 +1405,36 @@ replay and physical notification/read/selective-delete paths.
 
 This qualifies lab-network submission and the firmware confirmation UI,
 not delivery through an external mobile network or native DSP execution.
+
+## Physical outgoing call signalling
+
+With the measurement-only PCS fixture (no incoming page configured),
+`tools/nsb7_outgoing_call_observe.lua` enters `5551234` on physical keypad
+contacts at 20..26 seconds, presses Send at 28 seconds and End at 40.
+The handset produces CM SERVICE REQUEST
+`05247103205881080910101032547698`, then SETUP
+`03450404600201805e0581551532f4150101`, whose Called Party BCD Number
+is `5551234`. The existing lab peer supplies CM SERVICE ACCEPT,
+CALL PROCEEDING, traffic assignment, ALERTING and CONNECT. Firmware
+publishes Assignment Complete and CONNECT ACKNOWLEDGE organically.
+
+Physical End produces DISCONNECT `036502e090`, followed by network
+RELEASE, handset RELEASE COMPLETE `032a`, acknowledged RR Channel
+Release and the product's traffic-deconfigure parameter `14`. The
+receiver returns to common control and requests background measurement
+`57/03050000`. No new peer response or driver behavior was required.
+
+```sh
+.venv/bin/python tools/nsb7_outgoing_call_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-outgoing-call
+```
+
+Acceptance checks the own ROM, exact physical input sequence, decoded
+called number and payload lengths, one SETUP/traffic assignment,
+ordered connection and release, absence of an incoming page, and a
+complete 50-second observation. Both `tmp/nsb7-outgoing-call` and a fresh
+process retaining its own flash/card/CCONT storage at
+`tmp/nsb7-outgoing-call-cold` pass this check. The dial/call main-area graphics remain
+malformed. L1 speech ticks with `good=0` do not establish decoded speech;
+this result is call-control signalling only, not a native voice or
+external telephone call.
