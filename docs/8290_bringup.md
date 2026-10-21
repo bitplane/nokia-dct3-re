@@ -1076,3 +1076,37 @@ the observer retains the bounded routing tap. This is not a proof that
 all task-13 readiness inputs are irrelevant or that measurement timing
 is correct. See `nsb7_serving_rssi_alone_unblocks_addressed_paging` in
 the falsification ledger.
+
+### Firmware-owned readiness request
+
+Reader `200690` stores its selector on the stack, passes it through
+diagnostic helper `2e61c4`, then reads `12d213` for selector 1 and
+`12d219` otherwise. The former is initialized to 1 at `2006f6`
+(`12d1ec+27`). No physical hardware meaning is assigned to these bytes.
+At the matched-page continuation, selector-1 storage is 1 and RR record
+`12c97c` has `+3=0`, `+6=1`. Thus `+6`, not the selector-1 byte or
+`+3`, fails the alternative path's static conditions.
+
+The read-only write-watch observes `12c982` (`record+6`) clear during
+initialization (`25e2f6`), set at `260a48` around 3.459 and 6.670 seconds,
+clear at `26080e` around 10.549 seconds, then set again at `260a48`
+around 14.667 seconds. These are firmware writes in task 17.
+Entry `260a34` records the triggering event before it is overwritten:
+`07d3 -> 03eb` on the first set and `07d4 -> 03ec` on the later sets.
+The shared tail stores 1 in `+6` and enters outer state 4.
+
+The post-release `07d4` is not DSP-generated. Task 18 posts `09c8` to
+task 16 at 14.663 seconds through send site `22e31e`. Task 16's
+translator `201124` subtracts base `09c6`; input `09c8` selects the
+literal `07d4` at `2011bc`, then calls constructor/sender `20081c`.
+The send to task 17 returns at `200e38`; saved caller `20117d` ties
+the runtime post to that translator. The resulting `07d4` reaches
+`260a34`, reports `03ec`, and sets `+6` before the addressed page.
+These task identities are numeric observations, not imported sibling
+task names or a claim that `07d4` means a particular GSM primitive.
+
+`tmp/nsb7-page-mm-request` and `--addressed-page` require this request
+chain, the writer and all three readiness values alongside the accepted
+IMSI and `083e` continuation. The current question is why task 18 selects
+`09c8` after location updating and what ordinary-service lifecycle should
+replace it. Forcing `+6` clear would bypass that unanswered contract.

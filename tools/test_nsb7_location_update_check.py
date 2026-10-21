@@ -111,8 +111,12 @@ class LocationUpdateCheckTests(unittest.TestCase):
             rows.append('nsb7_page_identity: ' + data + 't=16')
         rows.extend([
             'nsb7_page_event_return: event=083e caller=00260c2b record=00130660 t=16',
-            'nsb7_page_dispatch: pc=00260c4c event=083e record=0012c97c flag0b=00 saved=001069bc t=16',
-            'nsb7_page_dispatch: pc=00260c16 event=083e record=0012c97c flag0b=01 saved=00000000 t=16'])
+            'nsb7_page_dispatch: pc=00260c4c event=083e record=0012c97c flag0b=00 saved=001069bc flag03=00 flag06=01 api1=01 t=16',
+            'nsb7_page_dispatch: pc=00260c16 event=083e record=0012c97c flag0b=01 saved=00000000 flag03=00 flag06=01 api1=01 t=16',
+            'nsb7_page_post: index=42 source=18 target=16 lr=0022e323 data=09c8 t=14',
+            'nsb7_page_post: index=46 source=16 target=17 lr=00200e39 data=07d4 t=14',
+            'nsb7_rr_flag06_trigger: event=07d4 report=03ec t=14',
+            'nsb7_rr_flag06: value=01 pc=00260a48 task=17 t=14'])
         return '\n'.join(rows)
 
     def test_addressed_imsi_match(self):
@@ -129,6 +133,10 @@ class LocationUpdateCheckTests(unittest.TestCase):
     def test_addressed_saved_record_not_released(self):
         with self.assertRaises(ValueError):
             check_addressed_page(self.addressed_fixture().replace('saved=00000000', 'saved=001069bc'))
+
+    def test_addressed_readiness_not_assumed(self):
+        with self.assertRaises(ValueError):
+            check_addressed_page(self.addressed_fixture().replace('flag06=01', 'flag06=00'))
 
 
 if __name__ == '__main__':

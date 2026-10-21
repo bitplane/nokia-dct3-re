@@ -335,6 +335,14 @@ def check_addressed_page(text):
             dispatch[0][2] != '00' or dispatch[1][2:] != ('01', '00000000') or
             not 0x100000 <= int(dispatch[0][3], 16) < 0x180000):
         raise ValueError('explicit page-event continuation did not release its saved record')
+    readiness = re.findall(r'nsb7_page_dispatch: pc=00260c(?:4c|16) [^\n]*flag03=([0-9a-f]{2}) flag06=([0-9a-f]{2}) api1=([0-9a-f]{2}) ', text)
+    if readiness != [('00', '01', '01'), ('00', '01', '01')]:
+        raise ValueError('own paging-readiness predicates differ')
+    if (not re.search(r'nsb7_page_post: index=\d+ source=18 target=16 lr=0022e323 data=09c8', text) or
+            not re.search(r'nsb7_page_post: index=\d+ source=16 target=17 lr=00200e39 data=07d4', text) or
+            'nsb7_rr_flag06_trigger: event=07d4 report=03ec ' not in text or
+            not re.search(r'nsb7_rr_flag06: value=01 pc=00260a48 task=17 ', text)):
+        raise ValueError('firmware-owned readiness-request chain is missing')
     packets = PACKET.findall(text)
     if len(packets) != 49:
         raise ValueError('bounded page-parser fixture unexpectedly advanced to access')

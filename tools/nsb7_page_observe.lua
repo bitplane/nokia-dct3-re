@@ -7,7 +7,9 @@ local memory=cpu.spaces.program
 local count=0
 local tap=memory:install_read_tap(0x2898e8,0x2898eb,'nsb7_page_posts',function()
     local time=machine.time:as_double()
-    if cpu.state['R15'].value~=0x2898e8 or time<15 or time>17 or count>=256 then return end
+    if cpu.state['R15'].value~=0x2898e8 or time<3 or time>17 or count>=256 then return end
+    local target=cpu.state['R0'].value
+    if target~=16 and target~=17 then return end
     local object=cpu.state['R1'].value
     if object<0x100000 or object>=0x17ff00 then return end
     count=count+1
@@ -16,6 +18,10 @@ local tap=memory:install_read_tap(0x2898e8,0x2898eb,'nsb7_page_posts',function()
     machine:logerror(string.format('nsb7_page_post: index=%u source=%u target=%u lr=%08x data=%s t=%.9f observer_writes=0\n',
         count,memory:read_u8(0x100022),cpu.state['R0'].value,cpu.state['R14'].value,
         table.concat(bytes),time))
+    if memory:read_u16(object)==0x7d4 and cpu.state['R14'].value==0x200e39 then
+        machine:logerror(string.format('nsb7_rr_7d4_caller: caller=%08x t=%.9f observer_writes=0\n',
+            memory:read_u32(cpu.state['R13'].value+12),time))
+    end
     if memory:read_u16(object)==0x5eb then
         local pointer=memory:read_u32(object+8)
         if pointer>=0x100000 and pointer<0x17ff00 then
@@ -25,6 +31,11 @@ local tap=memory:install_read_tap(0x2898e8,0x2898eb,'nsb7_page_posts',function()
                 pointer,table.concat(body),time))
         end
     end
+end)
+_G.nsb7_page_flag06_trigger=memory:install_read_tap(0x260a34,0x260a37,'nsb7_rr_flag06_trigger',function()
+    if cpu.state['R15'].value~=0x260a34 then return end
+    machine:logerror(string.format('nsb7_rr_flag06_trigger: event=%04x report=%04x t=%.9f observer_writes=0\n',
+        memory:read_u32(cpu.state['R13'].value+4),cpu.state['R0'].value,machine.time:as_double()))
 end)
 _G.nsb7_page_post_tap=tap
 local receives=0
@@ -65,8 +76,9 @@ for _,pc in ipairs({0x260c4c,0x260c16}) do
         if cpu.state['R15'].value~=pc or memory:read_u32(cpu.state['R13'].value+4)~=0x83e then return end
         local record=cpu.state['R4'].value
         if record<0x100000 or record>=0x17ff00 then return end
-        machine:logerror(string.format('nsb7_page_dispatch: pc=%08x event=083e record=%08x flag0b=%02x saved=%08x t=%.9f observer_writes=0\n',
-            pc,record,memory:read_u8(record+0xb),memory:read_u32(record+0x28),machine.time:as_double()))
+        machine:logerror(string.format('nsb7_page_dispatch: pc=%08x event=083e record=%08x flag0b=%02x saved=%08x flag03=%02x flag06=%02x api1=%02x t=%.9f observer_writes=0\n',
+            pc,record,memory:read_u8(record+0xb),memory:read_u32(record+0x28),
+            memory:read_u8(record+3),memory:read_u8(record+6),memory:read_u8(0x12d213),machine.time:as_double()))
     end)
 end
 _G.nsb7_page_dispatch_taps=dispatch_taps
@@ -80,4 +92,11 @@ _G.nsb7_page_rssi_forward=memory:install_read_tap(0x2e49b4,0x2e49b7,'nsb7_servin
     for i=0,11 do bytes[#bytes+1]=string.format('%02x',memory:read_u8(object+i)) end
     machine:logerror(string.format('nsb7_serving_rssi_forward: data=%s t=%.9f observer_writes=0\n',
         table.concat(bytes),machine.time:as_double()))
+end)
+local flag_writes=0
+_G.nsb7_page_flag06_watch=memory:install_write_tap(0x12c980,0x12c983,'nsb7_rr_flag06',function(_,value,mask)
+    if mask&0xff00==0 or flag_writes>=32 then return end
+    flag_writes=flag_writes+1
+    machine:logerror(string.format('nsb7_rr_flag06: value=%02x pc=%08x task=%u t=%.9f observer_writes=0\n',
+        (value>>8)&255,cpu.state['R15'].value,memory:read_u8(0x100022),machine.time:as_double()))
 end)
