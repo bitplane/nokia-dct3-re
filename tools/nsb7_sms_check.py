@@ -67,7 +67,7 @@ def check_cold(text, card, delivered):
         raise ValueError('MCU did not read the complete retained SMS record through SIMI')
 
 
-def check_read(text, card, delivered):
+def check_read(text, card, delivered, read_times=(23,25)):
     if '[LUA ERROR]' in text or sms_record(delivered)[0] != 3:
         raise ValueError('reading requires a successful fixture and an unread source record')
     expected = bytearray(delivered)
@@ -75,8 +75,8 @@ def check_read(text, card, delivered):
     if card != bytes(expected):
         raise ValueError('physical reading must change only the delivered record status to read')
     keys = re.findall(r'nsb7_sms_input: key=Menu state=([01]) t=([0-9.]+)', text)
-    if keys != [('1', '23.000000000'), ('0', '23.200000000'),
-                ('1', '25.000000000'), ('0', '25.200000000')]:
+    if keys != [(state, f'{second}.{fraction}') for second in read_times
+                for state, fraction in [('1', '000000000'), ('0', '200000000')]]:
         raise ValueError('physical message-reading keys differ')
     wire = tx_bytes(text)
     unread = bytes.fromhex('a0dc0104b0') + sms_record(delivered)
@@ -84,7 +84,7 @@ def check_read(text, card, delivered):
     if wire.count(unread) != 1 or wire.count(read) != 1 or wire.index(unread) >= wire.index(read):
         raise ValueError('delivery then read-status UPDATE RECORD exchange differs')
     writes = re.findall(r'sim_device: update fid=6f3c record=1 length=176 t=([0-9.]+)', text)
-    if len(writes) != 2 or not (float(writes[0]) < 23 and 25 < float(writes[1]) < 35):
+    if len(writes) != 2 or not (float(writes[0]) < read_times[0] and read_times[-1] < float(writes[1]) < read_times[-1]+10):
         raise ValueError('read-status write must follow the physical reading keys')
 
 

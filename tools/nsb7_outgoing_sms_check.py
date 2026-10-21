@@ -10,7 +10,9 @@ if __package__ in (None, ''):
 from tools.nsb7_radio_check import contract
 
 
-def check(text):
+def check(text, delay=0):
+    if not isinstance(delay, int) or delay < 0:
+        raise ValueError('physical input delay must be a nonnegative integer')
     if '[LUA ERROR]' in text:
         raise ValueError('physical fixture failed')
     keys = re.findall(r'nsb7_sms_reply_input: key=(.*?) state=([01]) t=([0-9.]+)', text)
@@ -18,7 +20,7 @@ def check(text):
              (32, 'Left Softkey / Menu'), (34, 'Left Softkey / Menu'),
              (36, 'Keypad 2'), (38, 'Left Softkey / Menu'),
              (40, 'Left Softkey / Menu'), (42, 'Left Softkey / Menu')]
-    expected = [(key, state, f'{second}.{fraction}') for second, key in steps
+    expected = [(key, state, f'{second+delay}.{fraction}') for second, key in steps
                 for state, fraction in [('1', '000000000'), ('0', '200000000')]]
     if keys != expected:
         raise ValueError('physical Reply input sequence differs')
@@ -40,7 +42,7 @@ def check(text):
     incoming = re.findall(r'GSM service uplink sapi=3 pd=09 message=01 length=5 data=8901020240', text)
     if len(incoming) != 1:
         raise ValueError('incoming SMS must complete exactly once, without fixture replay')
-    if 'nsb7_sms_reply_done: t=70.' not in text:
+    if f'nsb7_sms_reply_done: t={70+delay}.' not in text:
         raise ValueError('one-shot check requires the complete 70-second observation')
 
 
@@ -56,11 +58,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image', type=Path)
     parser.add_argument('run', type=Path)
+    parser.add_argument('--delay', type=int, default=0, help='physical input delay, not emulation timing')
     args = parser.parse_args()
     try:
         contract(args.image.read_bytes())
-        check((args.run / 'error.log').read_text())
-        check_frame(args.run / 'snap/nsb7_sms_reply_final_44.3.png')
+        check((args.run / 'error.log').read_text(), delay=args.delay)
+        check_frame(args.run / f'snap/nsb7_sms_reply_final_{44.3+args.delay}.png')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 outgoing SMS: FAIL: {error}\n')
     print('PASS: physical Reply, accepted submit, CP/RP ACK, release, Message sent and no incoming replay')

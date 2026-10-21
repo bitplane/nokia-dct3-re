@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_pin_authenticated_call_sms_composition",
+      "owner": "nsb7_lab_services", "status": "satisfied",
+      "predicate": "Physical PIN and phone-code entry compose with cold registration, outgoing call control and incoming/read/reply SMS without state forcing",
+      "current": "Own registered PIN-enabled storage reauthenticates physically before each service. Dial inputs28..34, Send36 and End48 produce the unchanged SETUP/connect/CC/RR lifecycle and exact dial/Calling/idle frames with an unchanged full card. SMS Menu23/25/27/29 reads hello; Reply32..46 sends A to5551234 with exact CP/RP closure and Message sent pixels. The74s run has one incoming transaction, no replay, one read-record status update and exact EF_SMSS00ff write after submission. Full card comparison permits only the read hello record and sender referenceff->00. Raw authentication/registration scopes preserve payload checks. No native speech, external calls or authenticated active-state claim follows.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_pin_outgoing_call.lua", "tools/nsb7_pin_sms_reply.lua", "tools/nsb7_pin_services_check.py", "tools/test_nsb7_pin_services_check.py", "tools/nsb7_pin_registration_check.py"]
+    },
+    {
       "id": "nsb7_physical_pin_gated_fresh_cold_registration",
       "owner": "nsb7_lab_registration", "status": "satisfied",
       "predicate": "Physical SIM PIN gates exact fresh/cold lab registration and clean idle while a long wrong-PIN control remains unregistered",

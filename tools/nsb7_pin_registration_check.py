@@ -23,10 +23,12 @@ def request(cold):
                          '05087000f000fffe20080910101032547698')
 
 
-def check_registered(text, cold=False):
-    check_pin(text, True)
-    check_phone(text)
-    if 'nsb7_pin_registration: complete' not in text:
+def check_registered(text, cold=False, require_complete=True, authentication_text=None):
+    # Service fixtures scope radio startup separately from later file writes.
+    authentication = authentication_text if authentication_text is not None else text
+    check_pin(authentication, True)
+    check_phone(authentication)
+    if require_complete and 'nsb7_pin_registration: complete' not in text:
         raise ValueError('authenticated observation incomplete')
     rows = PACKET.findall(text)
     if [int(row[0]) for row in rows] != list(range(1, 58)):

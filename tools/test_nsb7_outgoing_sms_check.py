@@ -1,5 +1,6 @@
 """Regression cases for NSB-7 physical outgoing SMS acceptance."""
 import unittest
+import re
 
 from tools.nsb7_outgoing_sms_check import check
 
@@ -25,6 +26,12 @@ def fixture():
 
 
 class OutgoingSmsTest(unittest.TestCase):
+    def test_explicit_physical_delay(self):
+        text = re.sub(r't=(\d+)\.', lambda m: f't={int(m[1])+4}.', fixture())
+        check(text, delay=4)
+        with self.assertRaises(ValueError):
+            check(text)
+
     def test_complete(self):
         check(fixture())
 

@@ -1,5 +1,6 @@
 """Positive and negative NSB-7 outgoing signalling fixtures."""
 import unittest
+import re
 
 from tools.nsb7_outgoing_call_check import check
 
@@ -33,6 +34,12 @@ def fixture():
 
 
 class OutgoingCallTest(unittest.TestCase):
+    def test_explicit_physical_delay(self):
+        text = re.sub(r't=(\d+)\.', lambda m: f't={int(m[1])+8}.', fixture())
+        check(text, delay=8)
+        with self.assertRaises(ValueError):
+            check(text)
+
     def test_signalling_without_speech(self):
         check(fixture())
 

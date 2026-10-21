@@ -24,6 +24,8 @@ failed-PUK2 retry retention and cold PUK2 recovery/reuse. Permanent PUK
 exhaustion and FDN/AoC authorization remain separate work.
 PIN-enabled fresh/cold laboratory registration and a long wrong-PIN
 non-registration control are qualified as one coherent composition.
+The authenticated composition also qualifies physical outgoing calls and
+incoming SMS read/Reply with exact card and UI outcomes.
 A physical SIM phonebook save and cold Details retrieval are qualified.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
@@ -1841,5 +1843,53 @@ Acceptance combines physical PIN and phone-code evidence, exact request
 variants and their ordering after VERIFY, the contiguous 57-entry TX inventory,
 MCU consumer/release checks, SIMI writes versus cold non-writes,
 complete initial/final card comparisons and full clean-idle pixels.
-This is authenticated lab-HLE registration, not native DSP/RF, network
-authentication/ciphering or PIN-enabled call/SMS/save-state acceptance.
+This is authenticated lab-HLE registration, not native DSP/RF or network
+authentication/ciphering. PIN-enabled outgoing-call/SMS acceptance is
+qualified below; PIN-enabled save-state boundaries remain separate work.
+
+## PIN-authenticated call and SMS composition
+
+`tools/nsb7_pin_outgoing_call.lua` composes physical PIN and phone-code
+entry with the existing outgoing-call fixture. Dial inputs are shifted
+eight seconds so they start at 28 seconds, after phone-code completion;
+Send is at 36, End at 48 and the final frame at 58. This is a physical
+test-input schedule, not a change to firmware, timer or peer latency.
+The strict cold-registration exchange precedes the service. SETUP for
+`5551234`, traffic assignment, CONNECT ACKNOWLEDGE, physical End and
+CC/RR release pass unchanged. Exact dial/Calling/clean-idle pixels pass,
+and the entire SIM card is unchanged.
+
+`tools/nsb7_pin_sms_reply.lua` uses the same own PIN-enabled registered
+card and the incoming-SMS lab fixture. In this composition, physical Menu
+at 23/25/27/29 seconds follows Messages/Inbox/sender/read and displays
+the existing exact `hello` text oracle. The read status changes `03 -> 01`
+over SIMI. The old two-contact notification-reader route is not assumed
+to apply to this UI context.
+
+The ordinary Reply sequence then starts at 32 seconds, enters `A` and
+confirms Send/destination at 46. The existing exact SMS-SUBMIT to
+`5551234`, CP/RP acknowledgements, handset completion and RR release
+pass. The frame at 48.3 reads `Message sent`; the 74-second observation
+also requires exactly one incoming transaction, with no fixture replay.
+
+Sending additionally writes EF_SMSS (`6f43`), offset 0, length 2,
+with `00 ff` after the accepted submission. Card byte 3560 changes
+`ff -> 00`, matching the submitted TP-MR `00`. Acceptance checks this
+exact APDU/order separately from the earlier delivery/read transaction.
+The complete final card contains only the one read `hello` record and
+that sender-reference change relative to the input; all other records,
+credentials, retries and location data are preserved.
+
+```sh
+.venv/bin/python tools/nsb7_pin_services_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin-outgoing-call \
+  tmp/nsb7-pin-sms-reply-qualified
+```
+
+Authentication and radio-startup scopes are kept as raw trace slices:
+the last physical phone-code release bounds authentication, and TX58
+bounds the first post-registration service. No log bytes or guest state
+are rewritten to make the inherited protocol checks pass. This qualifies
+PIN-authenticated outgoing call control and incoming/read/reply SMS,
+not native speech, external telephony, authenticated incoming-call
+acceptance or authenticated active-state restoration.
