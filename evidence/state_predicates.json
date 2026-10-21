@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_physical_pin_wrong_cold_correct",
+      "owner": "nsb7_sim_security", "status": "satisfied",
+      "predicate": "A wrong physical SIM PIN persists one retry loss and a cold correct PIN restores retries without unrelated card changes",
+      "current": "The declared PIN-enabled laboratory card receives physical4321/Menu and own VERIFY A020000108...;9804 changes only PIN1 retries3->2 within its legacy prefix, with the exact normal serialization extension checked. A fresh process consumes that entire saved card; physical1234/Menu returns9000 and changes only retries2->3. Exact Enter PIN code, Code error and separate phone Security-code prompt frames pass, along with key decodes/APDUs and absence of credential mutations or file UPDATE. Radio is disabled for this fixture; PIN2/PUK and PIN-enabled registration are not promoted.",
+      "evidence": ["docs/8290_bringup.md", "fixtures/nsb7_sim_security/nsb7hle.cfg", "tools/nsb7_pin_input.lua", "tools/nsb7_pin_correct.lua", "tools/nsb7_pin_check.py", "tools/test_nsb7_pin_check.py"]
+    },
+    {
       "id": "nsb7_active_call_and_incoming_sms_restoration",
       "owner": "nsb7_hle_state", "status": "satisfied",
       "predicate": "An established lab call and an incoming CP/RP transaction restore exact architecture, replay their observed traffic and accept physical continuation",

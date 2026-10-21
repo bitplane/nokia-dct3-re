@@ -13,6 +13,9 @@ nominal VBATT input, reaches `Insert SIM card` and physically enters digit
 inserted, SIMI startup file reads and the phone Security code editor
 reproduce across cold runs. A separate one-byte erased-retry fixture permits
 physical acceptance of the own-ROM default phone code and menu navigation.
+A separate PIN-enabled synthetic-card fixture qualifies physical wrong
+PIN, saved retry decrement and cold correct-PIN recovery to the phone-code
+prompt. PIN2/PUK and security-setting menus remain separate work.
 A physical SIM phonebook save and cold Details retrieval are qualified.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
@@ -1570,3 +1573,40 @@ delivery and read-status UPDATE RECORD wire ordering are checked.
 These results cover an established lab-HLE call and the incoming CP/RP
 completion boundary, not every call/SMS phase, outgoing-submit restoration,
 host-dialog replay or native DSP/media restoration.
+
+## Physical SIM PIN and cold retry retention
+
+This is distinct from the phone's `Security code`. The explicit card is
+created by `tools/make_sim_card_profile.py --pin-enabled`: PIN1 `1234`,
+three retries, laboratory identities and otherwise empty user storage.
+`fixtures/nsb7_sim_security/nsb7hle.cfg` disables the lab radio peer, so
+this experiment cannot be mistaken for authenticated registration.
+The own phone flash/CCONT inputs retain the earlier physical test-00
+setting; no SIM credential or retry is written through guest RAM.
+
+`tools/nsb7_pin_input.lua` captures `Enter PIN code`, then physically
+enters `4321` and Menu at 8..12 seconds. The MCU transmits
+`A0 20 00 01 08 34 33 32 31 FF FF FF FF`; the card returns `9804`,
+the firmware displays `Code error`, and exactly PIN1 retries change
+from 3 to 2. The initial legacy card prefix is preserved byte-for-byte
+otherwise; the device's normal 46-byte PLMN/SMSS/AoC serialization
+extension is independently checked.
+
+A new process copies the wrong run's complete own card, flash and CCONT.
+`tools/nsb7_pin_correct.lua` physically enters `1234`; the corresponding
+VERIFY returns `9000`, exactly retries 2 -> 3 change in the entire card,
+and the screen advances to the phone `Security code` prompt. Neither
+run sends credential-change/enable/disable/unblock commands or a file
+UPDATE. This proves PIN retry persistence and recovery, not PUK/PIN2,
+PIN-request settings or registration with PIN enabled.
+
+```sh
+.venv/bin/python tools/nsb7_pin_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin-wrong-final \
+  tmp/nsb7-pin-correct-final
+```
+
+Acceptance checks the own ROM, decoded physical contacts and exact APDUs,
+VERIFY outcomes and retry counts, no unrelated security/file writes,
+complete initial/cold/final card contents and exact PIN/error/phone-lock
+prompt pixels.
