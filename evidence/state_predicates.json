@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_pin_incoming_call_restoration",
+      "owner": "nsb7_lab_services", "status": "satisfied",
+      "predicate": "Physical PIN authentication composes with incoming Answer/End and exact established-call restoration",
+      "current": "Own registered PIN-enabled storage authenticates before the 95-packet incoming-call exchange. Physical Send22 decodes0e and CONNECT receives network CONNECT ACK; physical End27 decodes0f and completes release to exact clean idle with unchanged whole-card storage. Saving at23s restores all37 ARM/banked registers, RAM checksum and exact emulated time; three-second reference/restored radio events and connected-call pixels match before physical hang-up. Descriptor traces are restricted to the live0402 object and actual ACK consumer, excluding heap reuse. This qualifies lab-HLE signaling and state restoration, not native speech or external telephony.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_pin_incoming_call.lua", "tools/nsb7_pin_incoming_state.lua", "tools/nsb7_pin_services_check.py", "tools/nsb7_state_check.py", "tools/test_nsb7_state_check.py"]
+    },
+    {
       "id": "nsb7_pin_authenticated_call_sms_composition",
       "owner": "nsb7_lab_services", "status": "satisfied",
       "predicate": "Physical PIN and phone-code entry compose with cold registration, outgoing call control and incoming/read/reply SMS without state forcing",

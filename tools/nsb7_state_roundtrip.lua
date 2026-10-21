@@ -3,11 +3,13 @@ _G.nsb7_security_continue=true
 local source=debug.getinfo(1,'S').source:sub(2)
 local directory=assert(source:match('^(.*[/\\])'))
 local scenario=_G.nsb7_state_scenario or 'idle'
-assert(scenario=='idle' or scenario=='call' or scenario=='sms')
-dofile(directory..(scenario=='call' and 'nsb7_outgoing_call_observe.lua' or 'nsb7_page_observe.lua'))
+assert(scenario=='idle' or scenario=='call' or scenario=='sms' or scenario=='incoming_call')
+local observer=scenario=='call' and 'nsb7_outgoing_call_observe.lua' or
+    scenario=='incoming_call' and 'nsb7_call_observe.lua' or 'nsb7_page_observe.lua'
+dofile(directory..observer)
 local machine=manager.machine
 -- With the own test00 setting, CP-ACK is at19.3474 and RP-ACK at19.3632.
-local save_time=({idle=27,call=33,sms=19.35})[scenario]
+local save_time=({idle=27,call=33,sms=19.35,incoming_call=23})[scenario]
 local capture=dofile(directory..'arm_architecture_snapshot.lua')
 local saved,complete
 local retained={}
@@ -53,19 +55,25 @@ retained[#retained+1]=emu.add_machine_post_load_notifier(function()
             machine:exit()
             return
         end
-        if scenario=='call' then
-            assert(emu.wait(40-machine.time:as_double()))
+        if scenario=='call' or scenario=='incoming_call' then
+            local incoming=scenario=='incoming_call'
+            local end_time=incoming and 27 or 40
+            local finish_time=incoming and 35 or 50
+            local prefix=incoming and 'nsb7_call_input' or 'nsb7_outgoing_call_input'
+            assert(emu.wait(end_time-machine.time:as_double()))
             local key
             for _,port in pairs(machine.ioport.ports) do key=key or port.fields['End'] end
             assert(key,'End contact absent')
-            machine:logerror(string.format('nsb7_outgoing_call_input: key=End state=1 t=%.9f\n',machine.time:as_double()))
+            machine:logerror(string.format('%s: key=End state=1 t=%.9f\n',prefix,machine.time:as_double()))
             key:set_value(1)
             assert(emu.wait(0.2))
             key:set_value(0)
-            machine:logerror(string.format('nsb7_outgoing_call_input: key=End state=0 t=%.9f\n',machine.time:as_double()))
-            assert(emu.wait(50-machine.time:as_double()))
-            machine.screens[':screen']:snapshot('nsb7_state_call_final.png')
-            machine:logerror(string.format('nsb7_outgoing_call_done: t=%.9f\n',machine.time:as_double()))
+            machine:logerror(string.format('%s: key=End state=0 t=%.9f\n',prefix,machine.time:as_double()))
+            assert(emu.wait(finish_time-machine.time:as_double()))
+            machine.screens[':screen']:snapshot('nsb7_state_'..scenario..'_final.png')
+            if not incoming then
+                machine:logerror(string.format('nsb7_outgoing_call_done: t=%.9f\n',machine.time:as_double()))
+            end
             complete=true
             machine:exit()
             return

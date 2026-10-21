@@ -402,8 +402,9 @@ def check_page_response(text, card):
         raise ValueError('accepted laboratory location was not retained')
 
 
-def check_incoming_call_setup(text, card, traffic=False):
-    check_location_update(text.split('nsb7_radio_tx: index=46 ', 1)[0])
+def check_incoming_call_setup(text, card, traffic=False, startup_offset=0, request=None):
+    check_location_update(text.split(f'nsb7_radio_tx: index={46+startup_offset} ', 1)[0],
+                          first_ack=43+startup_offset, request=request)
     rows = PACKET.findall(text)
     if [int(row[0]) for row in rows] != list(range(1, len(rows)+1)):
         raise ValueError('call packet inventory is reordered, missing or duplicated')
@@ -415,7 +416,7 @@ def check_incoming_call_setup(text, card, traffic=False):
         68: ('1b', '00800184098341' + '2b'*18 + '000000'),
         70: ('02', '041202000271012fc10002580000000400000000'),
     }
-    if any(packets.get(index) != value for index, value in expected.items()):
+    if any(packets.get(index+startup_offset) != value for index, value in expected.items()):
         raise ValueError('own paging/cipher-complete/call-confirmed/alerting/TCH request differs')
     setup = '032445030504046002008134015c0581551532f4' + '2b'*4
     for pc, task in [('002e49e6', 4), ('002645ec', 14)]:
@@ -429,10 +430,10 @@ def check_incoming_call_setup(text, card, traffic=False):
         raise ValueError('laboratory location was not retained during call setup')
 
 
-def check_physical_call(text, card):
-    check_incoming_call_setup(text, card, traffic=True)
+def check_physical_call(text, card, startup_offset=0, request=None, armed_second=19):
+    check_incoming_call_setup(text, card, traffic=True, startup_offset=startup_offset, request=request)
     rows = PACKET.findall(text)
-    if len(rows) != 92:
+    if len(rows) != 92+startup_offset:
         raise ValueError('bounded physical-call packet inventory differs')
     def block(prefix):
         return prefix + '2b'*(25-len(bytes.fromhex(prefix))) + '000000'
@@ -446,23 +447,23 @@ def check_physical_call(text, card):
         86: ('02', '0412020200000016600002580000000001297000'),
         87: ('57', '03050000'),
     }
-    if any((rows[index-1][1], rows[index-1][3]) != value for index, value in expected.items()):
+    if any((rows[index+startup_offset-1][1], rows[index+startup_offset-1][3]) != value for index, value in expected.items()):
         raise ValueError('own traffic establishment/connect/disconnect/release sequence differs')
     keys = re.findall(r'nsb7_call_input: key=(Send|End) state=([01]) t=([0-9.]+)', text)
     if keys != [('Send', '1', '22.000000000'), ('Send', '0', '22.200000000'),
                 ('End', '1', '27.000000000'), ('End', '0', '27.200000000')]:
         raise ValueError('physical Answer/End fixture differs')
     for key, index in [('Send', 75), ('End', 78)]:
-        if text.index(f'nsb7_call_input: key={key} state=1 ') > text.index(f'nsb7_radio_tx: index={index} '):
+        if text.index(f'nsb7_call_input: key={key} state=1 ') > text.index(f'nsb7_radio_tx: index={index+startup_offset} '):
             raise ValueError('call signalling predates physical input')
-    if not 22 <= float(rows[74][7]) < 27 or float(rows[77][7]) < 27:
+    if not 22 <= float(rows[74+startup_offset][7]) < 27 or float(rows[77+startup_offset][7]) < 27:
         raise ValueError('CONNECT/clearing does not follow the physical call interval')
     for prefix in ['017301', '036009030f']:
         downlink = prefix + '2b'*(24-len(bytes.fromhex(prefix)))
         for pc, task in [('002e49e6', 4), ('002645ec', 14)]:
             if f'nsb7_lapdm_downlink: pc={pc} task={task} selector=b0 block={downlink} ' not in text:
                 raise ValueError('traffic UA/CONNECT ACK did not reach both MCU consumers')
-    if not re.search(r'nsb7_dedicated_armed: address=[0-9a-f]{8} value=00 pc=002e5086 task=4 t=19\.', text):
+    if not re.search(r'nsb7_dedicated_armed: address=[0-9a-f]{8} value=00 pc=002e5086 task=4 t='+str(armed_second)+r'\.', text):
         raise ValueError('firmware did not clear the traffic configuration descriptor')
 
 

@@ -17,6 +17,10 @@ taps[#taps+1]=memory:install_read_tap(0x2e5054,0x2e5057,'nsb7_dedicated_ack',fun
     local count=0
     taps[#taps+1]=memory:install_write_tap(descriptor,descriptor+3,'nsb7_dedicated_armed_'..descriptor,function(_,value,mask)
         if mask&255==0 or count>=16 then return end
+        -- The allocator reuses this address between registration and calls.
+        -- Observe the live ACK consumer, not unrelated writes to a freed slot.
+        if cpu.state['R15'].value~=0x2e5086 or memory:read_u32(0x130844)~=descriptor or
+                memory:read_u16(descriptor)~=0x402 then return end
         count=count+1
         machine:logerror(string.format('nsb7_dedicated_armed: address=%08x value=%02x pc=%08x task=%u t=%.9f observer_writes=0\n',
             descriptor,value&255,cpu.state['R15'].value,memory:read_u8(0x100022),machine.time:as_double()))

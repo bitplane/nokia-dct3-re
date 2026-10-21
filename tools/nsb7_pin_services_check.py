@@ -6,8 +6,8 @@ import sys
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.nsb7_radio_check import contract
-from tools.nsb7_pin_registration_check import check_registered, LOCI
+from tools.nsb7_radio_check import contract, check_physical_call
+from tools.nsb7_pin_registration_check import check_registered, LOCI, request
 from tools.nsb7_outgoing_call_check import check as check_call
 from tools.nsb7_outgoing_sms_check import check as check_submit, check_frame as sent_frame
 from tools.nsb7_sms_check import check_read, check_read_frame, tx_bytes
@@ -35,6 +35,17 @@ def check_source(card):
     expected[1600:1611] = LOCI
     if card != bytes(expected):
         raise ValueError('service input must be the own PIN-enabled registered card')
+
+
+def check_incoming(text, card):
+    check_source(card)
+    check_authentication(text)
+    check_physical_call(text, card, startup_offset=3, request=request(True), armed_second=21)
+    for key, code in [('Send', 0x0e), ('End', 0x0f)]:
+        press = text.index(f'nsb7_call_input: key={key} state=1 ')
+        release = text.index(f'nsb7_call_input: key={key} state=0 ')
+        if f'nsb7_key_decode: key={code:02x} observer_writes=0' not in text[press:release]:
+            raise ValueError('incoming Answer/End contact did not decode')
 
 
 def check_sms(text, initial, final):
@@ -68,6 +79,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('image', 'call', 'sms'):
         parser.add_argument(name, type=Path)
+    parser.add_argument('--incoming', type=Path)
     args = parser.parse_args()
     try:
         contract(args.image.read_bytes())
@@ -86,6 +98,15 @@ def main():
                   (args.sms / 'nvram/nsb7hle/sim_card').read_bytes())
         check_read_frame(args.sms / 'snap/nsb7_sms_read_29.png')
         sent_frame(args.sms / 'snap/nsb7_sms_reply_final_48.3.png')
+        if args.incoming:
+            initial = (args.incoming / 'initial_sim_card.bin').read_bytes()
+            final = (args.incoming / 'nvram/nsb7hle/sim_card').read_bytes()
+            inspect((args.incoming / 'nvram/nsb7hle/flash').read_bytes())
+            check_source(initial)
+            if final != initial:
+                raise ValueError('incoming call changed persistent SIM data')
+            check_incoming((args.incoming / 'error.log').read_text(), final)
+            frame(args.incoming / 'snap/nsb7_call_final.png', IDLE_HASH)
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 PIN services: FAIL: {error}\n')
     print('PASS: physical PIN/cold registration precede outgoing call and SMS read/reply; exact card/pixel outcomes')

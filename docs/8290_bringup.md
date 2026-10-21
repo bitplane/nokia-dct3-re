@@ -1890,6 +1890,37 @@ Authentication and radio-startup scopes are kept as raw trace slices:
 the last physical phone-code release bounds authentication, and TX58
 bounds the first post-registration service. No log bytes or guest state
 are rewritten to make the inherited protocol checks pass. This qualifies
-PIN-authenticated outgoing call control and incoming/read/reply SMS,
-not native speech, external telephony, authenticated incoming-call
-acceptance or authenticated active-state restoration.
+PIN-authenticated outgoing call control and incoming/read/reply SMS.
+The additional incoming-call and active-state coverage below remains
+laboratory HLE signaling, not native speech or external telephony.
+
+### PIN-authenticated incoming call and restoration
+
+`nsb7_pin_incoming_call.lua` composes physical PIN authentication with
+the existing incoming-call fixture. Physical Send at 22 seconds decodes
+as `0x0e`, publishes CONNECT, and receives CONNECT ACK. Physical End at
+27 seconds decodes as `0x0f` and completes DISCONNECT/RELEASE before
+returning to the exact clean idle frame. The checker retains the exact
+packet bodies and allows only the three authenticated-startup packets
+preceding the established incoming-call inventory (95 packets total).
+Whole-card persistence is unchanged.
+
+`nsb7_pin_incoming_state.lua` saves the connected incoming call at
+23 seconds, compares all 37 ARM/banked registers, RAM checksum and exact
+emulated time after restoration, and compares three seconds of reference
+and restored radio events and connected-call pixels. Physical End after
+replay returns to the same clean idle frame without changing SIM storage.
+
+The descriptor observer follows only the live `0x0402` object and its
+ACK consumer at `0x2e5086`: the heap address is reused between registration
+and calls, so unrelated writes to a freed slot must not exhaust its trace
+budget or be attributed to the descriptor.
+
+```sh
+.venv/bin/python tools/nsb7_pin_services_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin-outgoing-call \
+  tmp/nsb7-pin-sms-reply-qualified --incoming tmp/nsb7-pin-incoming-call-live
+.venv/bin/python tools/nsb7_state_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin-incoming-state-live \
+  tmp/nsb7-pin-registration-cold --incoming-call
+```

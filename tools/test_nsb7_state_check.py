@@ -1,5 +1,6 @@
 """Executable acceptance checks for exact NSB-7 idle replay."""
 import unittest
+from unittest.mock import patch
 
 from tools.nsb7_state_check import check
 from tools.test_nsb7_outgoing_call_check import fixture as call_fixture
@@ -25,6 +26,33 @@ def fixture():
 
 
 class StateCheckTest(unittest.TestCase):
+    def incoming_fixture(self):
+        state = fixture().split('nsb7_state_physical:')[0].replace(
+            'nsb7_idle', 'nsb7_incoming_call').replace('27.', '23.').replace('30.', '26.')
+        return ('GSM service downlink kind=1 sapi=0 pd=03 message=0f\n' + state +
+                '\nnsb7_call_input: key=End state=1 t=27.000000000')
+
+    def test_incoming_restoration(self):
+        text = self.incoming_fixture()
+        with patch('tools.nsb7_pin_services_check.check_incoming') as child:
+            check(text, incoming_call=True, card=b'actual card')
+            child.assert_called_once_with(text, b'actual card')
+
+    def test_incoming_requires_card(self):
+        with self.assertRaises(ValueError):
+            check(self.incoming_fixture(), incoming_call=True)
+
+    def test_incoming_requires_connection_before_save(self):
+        with patch('tools.nsb7_pin_services_check.check_incoming'), self.assertRaises(ValueError):
+            check(self.incoming_fixture().replace('message=0f', 'message=01'),
+                  incoming_call=True, card=b'card')
+
+    def test_incoming_requires_end_after_replay(self):
+        text = self.incoming_fixture()
+        text = 'nsb7_call_input: key=End state=1\n' + text.split('\nnsb7_call_input:')[0]
+        with patch('tools.nsb7_pin_services_check.check_incoming'), self.assertRaises(ValueError):
+            check(text, incoming_call=True, card=b'card')
+
     def test_complete(self):
         check(fixture())
 

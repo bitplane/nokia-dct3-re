@@ -13,10 +13,10 @@ from tools.nsb7_menu_check import FRAMES
 from tools.radio_state_roundtrip import verify_roundtrip
 
 
-def check(text, call=False, sms=False):
-    if call and sms:
+def check(text, call=False, sms=False, incoming_call=False, card=None):
+    if sum((bool(call), bool(sms), bool(incoming_call))) > 1:
         raise ValueError('choose one state scenario')
-    scenario = 'call' if call else 'sms' if sms else 'idle'
+    scenario = 'incoming_call' if incoming_call else 'call' if call else 'sms' if sms else 'idle'
     if f'state_roundtrip: result=pass scenario=nsb7_{scenario} ' not in text:
         raise ValueError('state scenario marker differs')
     if '[LUA ERROR]' in text or 'nsb7_state: FAIL' in text:
@@ -30,9 +30,20 @@ def check(text, call=False, sms=False):
     if rows[0][1:] != rows[1][1:]:
         raise ValueError('CPU/RAM/time restoration differs')
     tokens = ('TX packet', 'RX enqueue', 'GSM service', 'sim_device:')
-    if call:
+    if call or incoming_call:
         tokens += ('radio_l1:',)
-    verify_roundtrip(text, tokens, 'NSB-7 call' if call else 'NSB-7 SMS' if sms else 'NSB-7 idle')
+    verify_roundtrip(text, tokens, 'NSB-7 '+scenario)
+    if incoming_call:
+        from tools.nsb7_pin_services_check import check_incoming
+        if card is None:
+            raise ValueError('incoming-call restoration requires actual SIM storage')
+        check_incoming(text, card)
+        if not re.search(r'GSM service downlink kind=\d+ sapi=0 pd=03 message=0f[^\n]*[\s\S]*'
+                         r'nsb7_state: event=saved[\s\S]*'
+                         r'state_replay: phase=restored event=end[\s\S]*'
+                         r'nsb7_call_input: key=End state=1', text):
+            raise ValueError('incoming call must connect before save and physically release after replay')
+        return
     if sms:
         saved = text.index('nsb7_state: event=saved')
         restored = text.index('state_replay: phase=restored event=begin')
@@ -69,20 +80,23 @@ def main():
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument('--call', action='store_true', help='established outgoing call restoration')
     scenario.add_argument('--sms', action='store_true', help='incoming CP/RP completion and physical reading')
+    scenario.add_argument('--incoming-call', action='store_true', help='PIN-authenticated connected incoming call')
     args = parser.parse_args()
     try:
         contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
         check_security(text)
-        check(text, call=args.call, sms=args.sms)
-        if args.call:
+        card = (args.run / 'nvram/nsb7hle/sim_card').read_bytes()
+        check(text, call=args.call, sms=args.sms, incoming_call=args.incoming_call, card=card)
+        if args.call or args.incoming_call:
+            kind = 'incoming_call' if args.incoming_call else 'call'
             from PIL import Image
-            with Image.open(args.run / 'snap/nsb7_state_call_reference.png') as reference, \
-                    Image.open(args.run / 'snap/nsb7_state_call_restored.png') as restored:
+            with Image.open(args.run / f'snap/nsb7_state_{kind}_reference.png') as reference, \
+                    Image.open(args.run / f'snap/nsb7_state_{kind}_restored.png') as restored:
                 if reference.size != (84, 48) or restored.size != reference.size or \
                         reference.convert('RGB').tobytes() != restored.convert('RGB').tobytes():
                     raise ValueError('connected-call reference/restored pixels differ')
-            frame(args.run / 'snap/nsb7_state_call_final.png', IDLE_HASH)
+            frame(args.run / f'snap/nsb7_state_{kind}_final.png', IDLE_HASH)
         elif args.sms:
             from tools.nsb7_sms_check import check_read, check_read_frame
             from tools.radio_sms_acceptance_common import FIRST_SMS_DELIVER_BODY, SMS_NVRAM_OFFSET
@@ -103,11 +117,11 @@ def main():
                 frame(args.run / f'snap/nsb7_state_idle_{name}.png', IDLE_HASH)
             frame(args.run / 'snap/nsb7_state_idle_menu.png', FRAMES['nsb7_menu_26.png'])
         if not args.sms and (args.run / 'nvram/nsb7hle/sim_card').read_bytes() != (args.source / 'nvram/nsb7hle/sim_card').read_bytes():
-            raise ValueError('idle replay changed persistent SIM storage')
+            raise ValueError('state replay changed persistent SIM storage')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 state: FAIL: {error}\n')
     print('PASS: exact ARM/RAM/time restore, radio replay, pixels and physical ' +
-          ('End/clean idle after load' if args.call else 'SMS read after load' if args.sms else 'Menu after load'))
+          ('End/clean idle after load' if args.call or args.incoming_call else 'SMS read after load' if args.sms else 'Menu after load'))
 
 
 if __name__ == '__main__':
