@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsb7_serving_rssi_alone_unblocks_addressed_paging",
+      "status": "disproven",
+      "hypothesis": "Adding the shared peer's serving type-83 RSSI reports after NSB-7 location updating is sufficient to make the matched page start access",
+      "conclusion": "In the bounded own-ROM run, type83 reaches forwarder2e49b4 and is posted as message1802 from task4 to task13 with serving measurement bytes c3/c4/c5. The addressed IMSI still matches; RR parser returns083e and the same260c4c continuation sets record+0b, releases record+28 and returns to state4. There are still49 MCU TX packets and no further type0c request through25 seconds. The trial production scheduling change was removed. This disproves sufficiency of these serving RSSI reports in this lifecycle, not all task13 readiness contracts or RSSI timing fidelity.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_page_observe.lua", "tools/nsb7_radio_check.py", "tools/test_nsb7_location_update_check.py"]
+    },
+    {
       "id": "nam2_sleep_accounting_stores_write_timer1_destination",
       "status": "disproven",
       "hypothesis": "NAM-2 stores at 0x2fadac and 0x2fadce write MAD2 Timer-1 destination 0x20006 and require a writable hardware model",

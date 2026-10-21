@@ -70,3 +70,14 @@ for _,pc in ipairs({0x260c4c,0x260c16}) do
     end)
 end
 _G.nsb7_page_dispatch_taps=dispatch_taps
+local rssi_count=0
+_G.nsb7_page_rssi_forward=memory:install_read_tap(0x2e49b4,0x2e49b7,'nsb7_serving_rssi_forward',function()
+    if cpu.state['R15'].value~=0x2e49b4 or rssi_count>=24 then return end
+    local object=cpu.state['R0'].value
+    if object<0x100000 or object>=0x17ff00 then return end
+    rssi_count=rssi_count+1
+    local bytes={}
+    for i=0,11 do bytes[#bytes+1]=string.format('%02x',memory:read_u8(object+i)) end
+    machine:logerror(string.format('nsb7_serving_rssi_forward: data=%s t=%.9f observer_writes=0\n',
+        table.concat(bytes),machine.time:as_double()))
+end)

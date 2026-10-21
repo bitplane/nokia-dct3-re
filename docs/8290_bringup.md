@@ -1055,3 +1055,24 @@ hook were removed. `--addressed-page` now requires this continuation.
 The next question is which lifecycle exit from this state should initiate
 access, or whether a prerequisite to entering the ordinary paging-ready
 state remains incomplete. No missing hardware response is yet identified.
+
+A two-byte-aligned PC-relative literal-reference scan of own-ROM
+`25d000..261000` finds six comparisons against `083e`, at `25e666`,
+`25f7a2`, `25f9fa`, `260a9a`, `260b2a` and `260c30`, plus one literal
+load used to synthesize that event at `260af0`. This bounds the checked
+direct-literal surface, not indirect or arithmetic event selection.
+The alternative path at `260af4` can call `25f6de` only when API
+`200690(1)` returns 1, record `+3` is zero and record `+6` is not 1.
+The current `260c4c` path does not evaluate those conditions. Their
+ownership and the lifecycle selecting that alternative remain open.
+
+The serving-RSSI sufficiency experiment is falsified. In
+`tmp/nsb7-page-rssi`, the existing shared type-83 payload reaches own
+forwarder `2e49b4` and task 13 as message `1802`, with signed serving
+samples `c3/c4/c5`. The matching page still returns `083e`, sets the
+same flag and releases the same saved record, without a new access
+request through 25 seconds. The trial scheduling change was removed;
+the observer retains the bounded routing tap. This is not a proof that
+all task-13 readiness inputs are irrelevant or that measurement timing
+is correct. See `nsb7_serving_rssi_alone_unblocks_addressed_paging` in
+the falsification ledger.
