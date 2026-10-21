@@ -133,7 +133,49 @@ def rach_trace():
     return '\n'.join(rows)
 
 
+def assignment_trace():
+    rows = [ccch_trace()]
+    cursor = (sum((length+3)//2 for length in LENGTHS) + 81 + 22 + 5 + 11 + 35 + 11 + 3 + 5) % 0x52
+    for index, (kind, payload) in enumerate([
+            (0x0c, '00010902098e0000'), (0x1f, '00090000'),
+            (2, '0412000000000040800002584000000000000000')], 39):
+        length = len(payload)//2
+        producer = (cursor+(length+3)//2) % 0x52
+        rows.append(f'nsb7_radio_tx: index={index} type={kind:02x} length={length} data={payload} '
+                    f'cursor={cursor:02x} producer={producer:02x} pc=002cb0ec t=12 observer_writes=0')
+        cursor = producer
+    rows.extend([
+        'nsb7_radio_rx: index=17 type=84 length=8 t=11 observer_writes=0',
+        'nsb7_radio_rx: index=18 type=80 length=34 t=12 observer_writes=0',
+        'dsp_hle: access_deadline ra=0f mode=0 frame=2288 anchor=2288 base=0 slots=102 deadline=2390 t=10',
+        'nsb7_rach: pc=002e4fa4 task=4 type=84 payload=0f00095700000000 t=11 observer_writes=0',
+        'nsb7_rach: pc=002f5274 task=13 type=84 payload=0f00095700000000 t=11 observer_writes=0',
+        'nsb7_rach_reference: index=1 task=13 target=17 tag=07f9 t1=01 t3=2d t2=19 ra=0f t=11 observer_writes=0',
+        'dsp_hle: assignment_deadline access_frame=2391 deadline=2395',
+        'nsb7_channel_pending: address=00102138 tag=0402 bit=01 armed=01 t=12 observer_writes=0',
+        'nsb7_channel_state: cached=00000000 channel=0258 mode=1a bsic=12 t=24.000000000 observer_writes=0'])
+    block = (bytes.fromhex('2d063f002002580f0db90000') + b'\x2b'*12).hex()
+    rows.extend([
+        f'nsb7_agch_forward: index=1 task=4 mode=60 error=00 frame=2395 block={block} t=12 observer_writes=0',
+        f'nsb7_agch_consumer: index=1 task=14 tag=0623 mode=60 block={block} t=12 observer_writes=0',
+        f'nsb7_agch_event: index=1 task=14 code=061a block={block} t=12 observer_writes=0'])
+    return '\n'.join(rows)
+
+
 class RadioInventoryTests(unittest.TestCase):
+    def test_assignment_preserves_access_reference_and_arms_dedicated_request(self):
+        check_trace(assignment_trace(), assignment=True)
+        for old, new in [('frame=2395 block=', 'frame=2391 block='),
+                         ('code=061a block=', 'code=061b block='),
+                         ('tag=0623 mode=', 'tag=0622 mode='),
+                         ('02580f0db9', '0258090db9'),
+                         ('tag=0402 bit=01 armed=01', 'tag=0402 bit=00 armed=01'),
+                         ('004080000258', '004080000001')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_trace(assignment_trace().replace(old, new), assignment=True)
+        with self.assertRaises(ValueError):
+            check_trace(assignment_trace() + '\nnsb7_radio_rx: index=19 type=89 length=8 t=13', assignment=True)
+
     def test_access_completion_honours_deadline_and_own_request_reference(self):
         check_trace(rach_trace(), rach=True)
         for old, new in [('deadline=2390', 'deadline=2289'),
@@ -234,6 +276,9 @@ class RadioInventoryTests(unittest.TestCase):
         self.assertEqual(report['rx_84']['request_reference_task'], 17)
         self.assertEqual(report['rx_84']['frame_payload_offsets'], [1, 2, 3])
         self.assertEqual(report['tx_0c']['scheduled_base_offsets'], [4, 5])
+        self.assertEqual(report['rx_80']['agch_task'], 14)
+        self.assertEqual(report['rx_80']['agch_tag'], '0623')
+        self.assertEqual(report['rx_80']['ccch_block_endings'], [9, 15, 19, 25, 29, 35, 39, 45, 49])
         self.assertEqual(report['payload_prefix_bytes'], 4)
         self.assertEqual(report['classified_inputs'], 65536)
         self.assertEqual(report['ranges'], [

@@ -48,7 +48,8 @@ public:
 		candidate_channel,
 		candidate_bcch,
 		candidate_common_control,
-		candidate_random_access
+		candidate_random_access,
+		candidate_assignment
 	};
 
 	enum class neighbour_arfcn_encoding : u8

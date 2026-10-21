@@ -20,6 +20,18 @@ int main()
 	static_assert(!frame_due(0xffffffffU, 1));
 	static_assert(frame_due(1, 1));
 	static_assert(frame_due(0, 0xffffffffU));
+	static_assert(common_control_block_end(2391 + 4) == 2395);
+	static_assert(common_control_block_end(2396) == 2406);
+	static_assert(common_control_block_end(2'715'647 + 4) == 2'715'648 + 9);
+	for (unsigned minimum = 0; minimum < 102; ++minimum)
+	{
+		const auto ending = common_control_block_end(minimum);
+		assert(ending >= minimum);
+		assert(ending - minimum <= 10);
+		assert(ending % 51 == 9 || ending % 51 == 15 || ending % 51 == 19 ||
+				ending % 51 == 25 || ending % 51 == 29 || ending % 51 == 35 ||
+				ending % 51 == 39 || ending % 51 == 45 || ending % 51 == 49);
+	}
 	for (unsigned delay = 0; delay < 256; ++delay)
 	{
 		const auto deadline = 0xfffffff0U + delay;

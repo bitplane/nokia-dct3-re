@@ -86,12 +86,13 @@ end)
 _G.nsb7_measurement_taps=taps
 local commits=0
 taps[#taps+1]=memory:install_write_tap(0x100a4,0x100a7,'nsb7_sch_candidate_commit',function()
-    if cpu.state['R15'].value~=0x2cb0ec or commits>=16 then return end
+    if cpu.state['R15'].value~=0x2cb0ec or machine.time:as_double()<3.4 or commits>=128 then return end
     local record=memory:read_u32(0x12fbe0)
-    if record<0x100000 or record>=0x17fff0 then return end
     commits=commits+1
-    machine:logerror(string.format('nsb7_sch_candidate_commit: channel=%04x flags=%02x bsic=%02x t=%.9f observer_writes=0\n',
-        memory:read_u16(record+6),memory:read_u8(record+13),memory:read_u8(record+10),machine.time:as_double()))
+    if record>=0x100000 and record<0x17fff0 then
+        machine:logerror(string.format('nsb7_sch_candidate_commit: channel=%04x flags=%02x bsic=%02x t=%.9f observer_writes=0\n',
+            memory:read_u16(record+6),memory:read_u8(record+13),memory:read_u8(record+10),machine.time:as_double()))
+    end
     local pending=memory:read_u32(0x130844)
     local cached=memory:read_u32(0x1306e4)
     if cached>=0x100000 and cached<0x17ff00 then

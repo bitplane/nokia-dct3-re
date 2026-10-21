@@ -54,6 +54,9 @@ def contract(image):
         raise ValueError('own RX payload prefix differs')
     if (word(0x2c8268), word(0x2c826c), word(0x2c8270), word(0x2c8378)) != (955, 974, 886, 810):
         raise ValueError('own channel thresholds differ')
+    ccch_endings = list(image[0x143fb4:0x143fbd])
+    if ccch_endings != [9, 15, 19, 25, 29, 35, 39, 45, 49] or word(0x2e4d04) != 0x623:
+        raise ValueError('own AGCH tag/block-ending contract differs')
     ranges = []
     start = 0
     previous = channel_class(0, 0x98000000)
@@ -85,6 +88,10 @@ def contract(image):
                       'bcch_tag': '07ff', 'bcch_parser': '0029d42c',
                       'bcch_block_payload_offset': 10, 'bcch_block_bytes': 24,
                       'si_state': '0012d790', 'complete_si_bitmap': 15,
+                      'agch_forwarder': '002e49e6', 'agch_task': 14,
+                      'agch_tag': '0623', 'agch_decoder': '002645ec',
+                      'agch_decoded_event': '061a',
+                      'ccch_endings_table': '00343fb4', 'ccch_block_endings': ccch_endings,
                       'subtype_handlers': {'40': '002e4f8a', '50': '002e4e96',
                                            '60': '002e4d24', '70': '002e4b86',
                                            '80': '002e49e6', 'a0': '002e4f52',
@@ -94,7 +101,7 @@ def contract(image):
             'scope': 'decoded software classes, not fitted RF-band proof'}
 
 
-def check_rach(text, inventory):
+def check_rach(text, inventory, assignment=False):
     requests = [payload for kind, payload in inventory if kind == 0x0c]
     deadlines = re.findall(r'access_deadline ra=([0-9a-f]{2}) mode=(\d+) frame=(\d+) anchor=(\d+) '
                            r'base=(\d+) slots=(\d+) deadline=(\d+) ', text)
@@ -103,7 +110,9 @@ def check_rach(text, inventory):
     consumer = [bytes.fromhex(payload) for pc, task, payload in received if (pc, task) == ('002f5274', '13')]
     references = re.findall(r'nsb7_rach_reference: index=(\d+) task=13 target=17 tag=07f9 '
                             r't1=([0-9a-f]{2}) t3=([0-9a-f]{2}) t2=([0-9a-f]{2}) ra=([0-9a-f]{2}) ', text)
-    if len(requests) != 4 or len(deadlines) != 4 or len(received) != 8 or broker != consumer or len(broker) != 4 or len(references) != 4:
+    count = 1 if assignment else 4
+    request_count = 2 if assignment else 4
+    if len(requests) != request_count or len(deadlines) != count or len(received) != count*2 or broker != consumer or len(broker) != count or len(references) != count:
         raise ValueError('random-access request/completion/reference inventory differs')
     previous_frame = None
     for index, (request, scheduling, completion, reference) in enumerate(zip(requests, deadlines, consumer, references), 1):
@@ -134,8 +143,40 @@ def check_rach(text, inventory):
         previous_frame = actual
 
 
-def check_trace(text, measurement=False, synchronization=False, channel=False, bcch=False, ccch=False, rach=False):
-    ccch = ccch or rach
+def check_assignment(text, inventory):
+    check_rach(text, inventory, assignment=True)
+    forward = re.findall(r'nsb7_agch_forward: index=1 task=4 mode=60 error=00 frame=(\d+) block=([0-9a-f]{48}) ', text)
+    consumer = re.findall(r'nsb7_agch_consumer: index=1 task=14 tag=0623 mode=60 block=([0-9a-f]{48}) ', text)
+    event = re.findall(r'nsb7_agch_event: index=1 task=14 code=061a block=([0-9a-f]{48}) ', text)
+    if len(forward) != 1 or consumer != [forward[0][1]] or event != consumer:
+        raise ValueError('own AGCH route did not preserve the block through task-14 event 061a')
+    block = bytes.fromhex(consumer[0])
+    if block[:7] != bytes.fromhex('2d063f00200258'):
+        raise ValueError('Immediate Assignment does not select the lab SDCCH carrier')
+    completed = re.findall(r'nsb7_rach: pc=002f5274 task=13 type=84 payload=([0-9a-f]{16}) ', text)
+    payload = bytes.fromhex(completed[0])
+    access_frame = int.from_bytes(payload[1:4], 'big')
+    reference = (block[7], block[8] >> 3, ((block[8]&7)<<3) | (block[9]>>5), block[9]&31)
+    if reference != (payload[0], (access_frame//1326)&31, access_frame%51, access_frame%26):
+        raise ValueError('assignment reference does not identify the completed access')
+    frame = int(forward[0][0])
+    endings = (9, 15, 19, 25, 29, 35, 39, 45, 49)
+    expected = next(number for number in range(access_frame+4, access_frame+15) if number%51 in endings)
+    if frame != expected:
+        raise ValueError('AGCH metadata is not the next eligible decoded block after RACH')
+    if f'assignment_deadline access_frame={access_frame} deadline={frame}' not in text:
+        raise ValueError('assignment scheduling evidence missing')
+    if inventory[39:] != [(0x1f, bytes.fromhex('00090000')),
+                           (0x02, bytes.fromhex('0412000000000040800002584000000000000000'))]:
+        raise ValueError('own assignment did not produce the dedicated-channel request')
+    if not re.search(r'nsb7_channel_pending: address=00[1-7][0-9a-f]{5} tag=0402 bit=01 armed=01 ', text):
+        raise ValueError('dedicated request did not arm its own bit-1 descriptor')
+    if 'nsb7_channel_state: cached=00000000 channel=0258 mode=1a bsic=12 t=24.000000000 ' not in text:
+        raise ValueError('unacknowledged dedicated request unexpectedly committed receiver state')
+
+
+def check_trace(text, measurement=False, synchronization=False, channel=False, bcch=False, ccch=False, rach=False, assignment=False):
+    ccch = ccch or rach or assignment
     bcch = bcch or ccch
     channel = channel or bcch
     synchronization = synchronization or channel
@@ -174,6 +215,9 @@ def check_trace(text, measurement=False, synchronization=False, channel=False, b
     if rach:
         expected_types += (0x0c, 0x02, 0x02, 0x1f, 0x0c, 0x0c, 0x02)
         expected_lengths += (8, 20, 20, 4, 8, 8, 20)
+    if assignment:
+        expected_types += (0x0c, 0x1f, 0x02)
+        expected_lengths += (8, 4, 20)
     if tuple(kind for kind, _ in inventory) != expected_types or tuple(len(payload) for _, payload in inventory) != expected_lengths:
         raise ValueError('bounded packet inventory differs')
     if inventory[28] != (0x55, bytes.fromhex('03050000')):
@@ -204,6 +248,8 @@ def check_trace(text, measurement=False, synchronization=False, channel=False, b
         if rach:
             expected_replies.extend((str(index), kind, '8') for index, kind in enumerate(
                 ['84', '84', '89', '89', '84', '84', '89'], 17))
+        if assignment:
+            expected_replies.extend([('17', '84', '8'), ('18', '80', '34')])
         if replies != expected_replies:
             raise ValueError('qualified acquisition RX scope differs')
         consumers = re.findall(r'nsb7_measurement: pc=([0-9a-f]{8}) task=(\d+) type=([0-9a-f]{2}) first=([0-9a-f]{4}) '
@@ -276,6 +322,8 @@ def check_trace(text, measurement=False, synchronization=False, channel=False, b
         check_rach(text, inventory)
         if 'nsb7_channel_state: cached=00000000 channel=0258 mode=16 bsic=12 t=24.000000000 ' not in text:
             raise ValueError('unanswered-assignment lifecycle did not settle in receiver mode 16')
+    if assignment:
+        check_assignment(text, inventory)
 
 
 def main():
@@ -289,11 +337,12 @@ def main():
     parser.add_argument('--bcch', action='store_true')
     parser.add_argument('--ccch', action='store_true')
     parser.add_argument('--rach', action='store_true')
+    parser.add_argument('--assignment', action='store_true')
     args = parser.parse_args()
     try:
         report = contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
-        check_trace(text, args.measurement, args.synchronization, args.channel, args.bcch, args.ccch, args.rach)
+        check_trace(text, args.measurement, args.synchronization, args.channel, args.bcch, args.ccch, args.rach, args.assignment)
         states = re.findall(r'nsb7_radio_state: bands=([0-9a-f]{8}) measurement_route=([0-9a-f]{2}) t=([0-9.]+)', text)
         if states != [('98000000', '01', f'{time:.9f}') for time in (3.5, 6, 14, 24)]:
             raise ValueError('live feature/forwarding predicate differs')
@@ -301,7 +350,8 @@ def main():
             args.contract_json.write_text(json.dumps(report, indent=2) + '\n')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 radio inventory: FAIL: {error}\n')
-    print('PASS: ' + ('own timed access completions reach task 17; assignment unanswered' if args.rach else
+    print('PASS: ' + ('own Immediate Assignment accepted; dedicated-channel acknowledgement withheld' if args.assignment else
+                     'own timed access completions reach task 17; assignment unanswered' if args.rach else
                      'own CCCH configuration committed; organic random-access request left unanswered' if args.ccch else
                      'own SI bitmap complete; organic CCCH request left unanswered' if args.bcch else
                      'own channel acknowledgement commits receiver; no BCCH replies' if args.channel else

@@ -1757,7 +1757,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 			packet.type == 0x02 && packet.length == 20 &&
 			packet.payload[0] == 4 && packet.payload[8] == 0x60;
 	const bool partial_random_access_request =
-			m_protocol.coverage == acquisition_coverage::candidate_random_access &&
+			m_protocol.coverage >= acquisition_coverage::candidate_random_access &&
 			current_phase() == phase::serving_bcch && m_idle_common_control_active &&
 			packet.type == 0x0c && packet.length == 8 && packet.payload[0] == 0 &&
 			packet.payload[2] != 0;
@@ -1841,7 +1841,7 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 				packet.length >= 3 && packet.payload[2] != 0;
 		if (!channel_request)
 			return;
-		if (m_protocol.coverage == acquisition_coverage::candidate_random_access)
+		if (m_protocol.coverage >= acquisition_coverage::candidate_random_access)
 		{
 			const u16 base = (u16(packet.payload[4]) << 8) | packet.payload[5];
 			if (packet.payload[1] == 1 && !m_access_reference_valid)
@@ -2532,8 +2532,12 @@ void nokia_radio_peer_device::emit_report()
 		// with the rest of the L1 state, so SCH/BCCH metadata remains coherent
 		// across save/load instead of moving by a frame after a slightly
 		// different firmware poll latency.
-		u32 frame_number = current_phase() == phase::random_access ? m_access_frame :
+		u32 frame_number = current_phase() == phase::random_access &&
+				m_protocol.coverage != acquisition_coverage::candidate_assignment ? m_access_frame :
 				m_tdma_frame_number % 2'715'648;
+		if (current_phase() == phase::random_access &&
+				m_protocol.coverage == acquisition_coverage::candidate_assignment)
+			frame_number = m_access_deadline % 2'715'648;
 		if (pch_report)
 			frame_number = paging_frame_number(
 					frame_number, paging_schedule::monitored);
@@ -2729,7 +2733,7 @@ void nokia_radio_peer_device::emit_report()
 		else if (payload[0] == 0x60)
 		{
 			const auto assignment = m_gsm_network->immediate_assignment(
-					m_access_ra, frame_number, m_serving_arfcn);
+					m_access_ra, m_access_frame, m_serving_arfcn);
 			std::copy(assignment.begin(), assignment.end(), std::begin(payload) + 10);
 		}
 		else if (payload[0] == 0x50)
@@ -2920,6 +2924,17 @@ void nokia_radio_peer_device::emit_report()
 			m_wait_ticks = 0;
 			m_report_deferred = false;
 		}
+		if (m_protocol.coverage == acquisition_coverage::candidate_assignment && report_type == 0x84)
+		{
+			const u32 frame = m_access_reference_frame % 2'715'648;
+			m_access_deadline = m_access_reference_frame +
+					nokia::radio::common_control_block_end(frame + 4) - frame;
+			m_access_deadline_pending = true;
+			LOGMASKED(LOG_RADIO, "dsp_hle: assignment_deadline access_frame=%u deadline=%u\n",
+					m_access_reference_frame, m_access_deadline);
+		}
+		if (m_protocol.coverage == acquisition_coverage::candidate_assignment && report_type == 0x80)
+			m_access_deadline_pending = false;
 	}
 	m_transport->notify_rx();
 	if (m_trace_enabled)
