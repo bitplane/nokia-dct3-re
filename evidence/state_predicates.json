@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_physical_fdn_on_cold_off_cycle",
+      "owner": "nsb7_sim_security", "status": "satisfied",
+      "predicate": "An explicit FDN-capable card supports physical PIN2-authorized On/Off with independent cold persistence",
+      "current": "Four isolated processes physically authenticate PIN1 and phone code, navigate4-6-4 and prove On/cold-On/Off/cold-Off. Activation verifies PIN25678, invalidates ADN and rehabilitates LOCI/IMSI. Cold-On reestablishes identity without PIN2; deactivation verifies PIN2 and rehabilitates LOCI/IMSI/ADN; cold-Off emits no validity change. Exact contacts, APDU bodies/results/targets, On/Off frames, own journal integrity and complete-card predecessor links pass. Only ADN validity changes during activation/deactivation. This does not promote protected record CRUD, FDN dial enforcement or connected calls with FDN enabled.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_fdn_input.lua", "tools/nsb7_fdn_cold.lua", "tools/nsb7_fdn_disable.lua", "tools/nsb7_fdn_check.py", "tools/test_nsb7_fdn_check.py", "tools/sim_fdn_protocol_check.py", "tools/sim_fdn_profile.py"]
+    },
+    {
       "id": "nsb7_permanent_puk2_and_journal_rotation",
       "owner": "nsb7_sim_storage", "status": "satisfied",
       "predicate": "Physical PUK2 exhaustion preserves PIN1 and cold navigation while rotated own EEPROM storage replays exactly",
