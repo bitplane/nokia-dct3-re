@@ -190,8 +190,40 @@ The own comparison reads `bd42/bd42/ffff` and takes success store `248942`,
 clearing fault index `0c` organically. Independent replay still matches all
 32 KiB after the new boot and a separate cold process using only that own
 retained flash; the accepted checksum persists without another fixture write.
-The screen remains CONTACT SERVICE: checksum
+The calibration-only fixture's screen remains CONTACT SERVICE: checksum
 validity is not sufficient to establish idle, nor does it make erased
 calibration into authentic factory data. The unprovisioned baseline remains
 protected separately. Next trace the surviving startup result and its owner,
 not another guessed DSP completion.
+
+## Prefix checksum and complete startup-result table
+
+Initializer `2e95b6..2e95c4` sets 29 bytes at `13fbe0` to `ff`.
+The observer and unprovisioned service checker cover all 29, not only the
+first 18 around the compact self-test. With only the calibration checksum
+corrected, index `12` (hex) remains `12`. Its first writer is `2e8ffc`,
+which stores `fd` when `29656e` returns anything other than one; `2488cc`
+then converts that failure to the index value `12`.
+
+Reader `29656e` copies logical bytes `0000..011f`, calls `2f1db0` with
+length `011c`, and compares its result with the big-endian 32-bit word at
+`011c`. The checksum helper accumulates bytes modulo 65536. For the own
+erased prefix this produces `00001ae4`, versus stored `ffffffff`.
+No identity-field semantics are inferred from that integrity check.
+
+The separate `--prefix-checksum-fixture OUTPUT` option appends
+`101b011c00001ae4` to the own journal, retaining every logical byte except
+the four checksum bytes. In particular it does not create an IMEI, phone
+code, SIM identity or calibration. Use the previously qualified flash and
+matching shadow with `tools/nsb7_storage_check.py`; outputs must be fresh.
+
+Firmware then compares `00001ae4/00001ae4`, returns one, and stores zero at
+result index `12` without the failure conversion. Both checksum comparisons
+and full-shadow replay remain valid after a cold restart with the own
+retained flash. Flags at six seconds are `40`; the rendered frame is blank
+rather than CONTACT SERVICE, and the frame remains blank at 15 and 30 seconds
+with control `05` and flags `40`. Neither that flag nor blank pixels establish
+idle or input delivery. The remaining task is to recover the own keypad
+contract and test application activity physically, alongside the surviving
+startup continuation. The normal erased-storage baseline and native
+missing-resident-code boundary are unchanged.

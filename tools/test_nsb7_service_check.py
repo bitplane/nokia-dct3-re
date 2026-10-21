@@ -16,7 +16,9 @@ def fixture():
         'TX pending type=70 payload=2 data=0a09',
         'nsb7_calibration_compare: computed=bd42 stored=ffff marker=ffff',
         'nsb7_fault12: pc=00248948 value=0c mask=ff000000',
-        'nsb7_status: flags=00 faults=ffff00ff00ff000000ffff000cff00000000'])
+        'nsb7_prefix_compare: computed=00001ae4 stored=ffffffff',
+        'nsb7_result: index=12 pc=002e8ffc value=fd mask=0000ff00',
+        'nsb7_status: flags=00 faults=ffff00ff00ff000000ffff000cff00000000120000ffffffffffffffff t=6.000000000'])
 
 
 class ServiceCheckTests(unittest.TestCase):
@@ -37,6 +39,10 @@ class ServiceCheckTests(unittest.TestCase):
             check_trace('\n'.join(lines))
         with self.assertRaises(ValueError):
             check_trace('\n'.join(fixture().splitlines()[::-1]))
+
+    def test_reject_partial_startup_result_table(self):
+        with self.assertRaises(ValueError):
+            check_trace(fixture().replace('00120000ffffffffffffffff t=', ' t='))
 
 
 if __name__ == '__main__':

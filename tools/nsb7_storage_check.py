@@ -42,6 +42,9 @@ def inspect(flash, shadow=None, trace=None):
         raise ValueError('runtime shadow differs from independent journal replay')
     valid = checksum(cache) == int.from_bytes(cache[0x1e0:0x1e2], 'big') and (
         checksum(cache) | int.from_bytes(cache[0x170:0x172], 'big')) != 0
+    prefix_sum = sum(cache[:0x11c]) & 0xffff
+    prefix_stored = int.from_bytes(cache[0x11c:0x120], 'big')
+    prefix_matched = False
     if trace is not None:
         expected = (f'{checksum(cache):04x}', cache[0x1e0:0x1e2].hex(), cache[0x170:0x172].hex())
         observed = re.findall(r'nsb7_calibration_compare: computed=([0-9a-f]{4}) stored=([0-9a-f]{4}) marker=([0-9a-f]{4})', trace)
@@ -50,31 +53,44 @@ def inspect(flash, shadow=None, trace=None):
         pc, value = ('00248942', '00') if valid else ('00248948', '0c')
         if len(re.findall(f'nsb7_fault12: pc={pc} value={value} mask=ff000000', trace)) != 1:
             raise ValueError('runtime checksum branch differs')
+        prefix_rows = re.findall(r'nsb7_prefix_compare: computed=([0-9a-f]{8}) stored=([0-9a-f]{8})', trace)
+        if prefix_rows and prefix_rows != [(f'{prefix_sum:08x}', f'{prefix_stored:08x}')]:
+            raise ValueError('runtime prefix checksum differs from replay')
+        if prefix_rows:
+            value = '00' if prefix_sum == prefix_stored else 'fd'
+            if len(re.findall(f'nsb7_result: index=12 pc=002e8ffc value={value} mask=0000ff00', trace)) != 1:
+                raise ValueError('runtime prefix checksum result differs')
+            prefix_matched = True
     return cache, stop, {
         'source_sha256': hashlib.sha256(flash).hexdigest(), 'journal_records': len(records),
         'stop': hex(stop), 'shadow_bytes': len(cache), 'runtime_shadow_matched': shadow is not None,
         'computed': f'{checksum(cache):04x}', 'stored': cache[0x1e0:0x1e2].hex(),
         'excluded_word': cache[0x154:0x156].hex(), 'marker': cache[0x170:0x172].hex(),
+        'prefix_computed': f'{prefix_sum:08x}', 'prefix_stored': f'{prefix_stored:08x}',
+        'prefix_valid': prefix_sum == prefix_stored,
+        'runtime_prefix_branch_matched': prefix_matched,
         'checksum_valid': valid, 'runtime_branch_matched': trace is not None}
 
 
-def checksum_fixture(flash, shadow):
+def checksum_fixture(flash, shadow, prefix=False):
     cache, stop, report = inspect(flash, shadow)
-    if shadow is None or cache[0x1e0:0x1e2] != b'\xff\xff':
+    destination, width = (0x11c, 4) if prefix else (0x1e0, 2)
+    if shadow is None or cache[destination:destination+width] != b'\xff'*width:
         raise ValueError('requires observed unprovisioned checksum field')
-    payload = checksum(cache).to_bytes(2, 'big')
-    record = bytes([8, record_checksum(0x1e0, payload)]) + b'\x01\xe0' + payload
+    value = (sum(cache[:0x11c]) & 0xffff) if prefix else checksum(cache)
+    payload = value.to_bytes(width, 'big')
+    record = bytes([width << 2, record_checksum(destination, payload)]) + destination.to_bytes(2, 'big') + payload
     if stop+len(record)+2 > SECTOR or flash[BASE+stop:BASE+stop+len(record)+2] != b'\xff'*(len(record)+2):
         raise ValueError('no erased journal append space')
     result = bytearray(flash)
     result[BASE+stop:BASE+stop+len(record)] = record
     after, _, _ = inspect(result)
     expected = bytearray(cache)
-    expected[0x1e0:0x1e2] = payload
+    expected[destination:destination+width] = payload
     if after != expected:
         raise ValueError('fixture changed logical bytes beyond the checksum')
     report['fixture'] = {'kind': 'research checksum-only, not factory calibration',
-                         'logical_offset': '0x1e0', 'payload': payload.hex(),
+                         'logical_offset': hex(destination), 'payload': payload.hex(),
                          'physical_append': hex(BASE+stop), 'record': record.hex()}
     return bytes(result), report
 
@@ -84,21 +100,24 @@ def main():
     parser.add_argument('flash', type=Path)
     parser.add_argument('--shadow', type=Path)
     parser.add_argument('--trace', type=Path)
-    parser.add_argument('--checksum-fixture', type=Path)
+    fixtures = parser.add_mutually_exclusive_group()
+    fixtures.add_argument('--checksum-fixture', type=Path)
+    fixtures.add_argument('--prefix-checksum-fixture', type=Path)
     args = parser.parse_args()
     try:
         flash = args.flash.read_bytes()
         shadow = args.shadow.read_bytes() if args.shadow else None
-        if args.checksum_fixture:
-            if args.checksum_fixture.exists():
+        output_path = args.prefix_checksum_fixture or args.checksum_fixture
+        if output_path:
+            if output_path.exists():
                 raise ValueError('fixture output must be a fresh path')
             if args.trace:
                 inspect(flash, shadow, args.trace.read_text())
-            if args.checksum_fixture.resolve() == args.flash.resolve():
+            if output_path.resolve() == args.flash.resolve():
                 raise ValueError('fixture must not overwrite its source')
-            output, report = checksum_fixture(flash, shadow)
-            args.checksum_fixture.parent.mkdir(parents=True, exist_ok=True)
-            args.checksum_fixture.write_bytes(output)
+            output, report = checksum_fixture(flash, shadow, prefix=bool(args.prefix_checksum_fixture))
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(output)
         else:
             _, _, report = inspect(flash, shadow, args.trace.read_text() if args.trace else None)
     except (OSError, ValueError) as error:

@@ -37,7 +37,9 @@ def check_trace(text):
     for pattern in (
             r'nsb7_calibration_compare: computed=bd42 stored=ffff marker=ffff',
             r'nsb7_fault12: pc=00248948 value=0c mask=ff000000',
-            r'nsb7_status: flags=00 faults=ffff00ff00ff000000ffff000cff00000000'):
+            r'nsb7_prefix_compare: computed=00001ae4 stored=ffffffff',
+            r'nsb7_result: index=12 pc=002e8ffc value=fd mask=0000ff00',
+            r'nsb7_status: flags=00 faults=ffff00ff00ff000000ffff000cff00000000120000ffffffffffffffff t=6\.000000000'):
         if len(re.findall(pattern, text)) != 1:
             raise ValueError('unprovisioned checksum boundary differs')
     if 'LUA ERROR' in text or 'c54x_failure:' in text:

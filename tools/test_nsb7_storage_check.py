@@ -47,6 +47,21 @@ class StorageTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             inspect(flash)
 
+    def test_prefix_fixture_preserves_calibration_and_identity_contents(self):
+        initial = self.own_initial_flash()
+        calibrated, _ = checksum_fixture(initial, b'\xff'*CACHE)
+        shadow, _, _ = inspect(calibrated)
+        result, report = checksum_fixture(calibrated, shadow, prefix=True)
+        after, _, status = inspect(result)
+        expected = bytearray(shadow)
+        expected[0x11c:0x120] = bytes.fromhex('00001ae4')
+        self.assertEqual(after, expected)
+        self.assertEqual(after[:0x11c], shadow[:0x11c])
+        self.assertTrue(status['checksum_valid'])
+        self.assertTrue(status['prefix_valid'])
+        self.assertEqual(report['fixture']['logical_offset'], '0x11c')
+        self.assertEqual(report['fixture']['record'], '101b011c00001ae4')
+
     def test_rejects_wrong_executable_and_extent(self):
         for flash in (b'', bytes(0x200000)):
             with self.assertRaises(ValueError):
