@@ -25,7 +25,7 @@ retained, and the receiver returns to common control. Repeated empty paging
 blocks reach its RR decoder. An addressed page now produces the handset's
 own Paging Response after background measurement completion. Stable
 registered idle presentation remains unestablished. Incoming SMS delivery,
-physical reading and cold read-status retention are qualified below. Incoming-call
+physical reading/deletion, cancellation and cold status retention are qualified below. Incoming-call
 control through physical Answer/End, CONNECT acknowledgement and release
 is qualified below; speech is not established.
 In the normal machine, DSP exchange/service replies are disabled; own internal
@@ -1332,4 +1332,42 @@ record through SIMI; the entire card stays unchanged, including status
 It additionally requires exact physical key timing, delivery-before-read
 wire writes, a status-only card change after the key presses, the message
 pixel oracle and cold full-record readback. No firmware, SIM record or
-read flag is set by the observer. Deletion and outgoing SMS remain open.
+read flag is set by the observer. Deletion is qualified below; outgoing
+SMS remains open.
+
+### Physical SMS erase, cancellation and cold persistence
+
+The readable Options list selects Erase first. Physical Menu at 28 seconds
+opens it, and Menu at 30 seconds opens `Erase message?` with OK/Back.
+The record remains read (`01`) at this confirmation boundary.
+`tools/nsb7_sms_delete_observe.lua` presses Menu/OK at 32 seconds;
+`tools/nsb7_sms_delete_cancel.lua` instead presses physical Back at the
+same time. Both compose the existing delivery/read fixture, with no
+guest or card writes from the observer.
+
+`tmp/nsb7-sms-delete-confirm` shows a third complete SIM UPDATE RECORD
+after OK. Only card byte 1636 changes, from read `01` to unused `00`.
+The old SMS body remains in the unused record: this is logical deletion,
+not secure erasure. `tmp/nsb7-sms-delete-cancel` performs only the earlier
+delivery/read writes, and its entire card is byte-identical to the
+read-message baseline. Back does not transmit a logical-delete write.
+
+`tmp/nsb7-sms-delete-retained` cold-starts with the confirmed-deletion
+process's own saved files, without a new network SMS. The MCU reads the
+complete retained record (status `00`, residual old body) through SIMI;
+the full card remains unchanged. This qualifies deleted-slot persistence,
+not secure data destruction or a corrected empty-inbox/idle pixel oracle.
+
+```sh
+.venv/bin/python tools/nsb7_sms_delete_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-sms-read \
+  tmp/nsb7-sms-delete-confirm tmp/nsb7-sms-delete-cancel \
+  tmp/nsb7-sms-delete-retained
+```
+
+Acceptance requires the own ROM and read-screen oracle, exact physical
+confirmation/cancellation sequence, status-only card difference,
+delivery/read/delete write counts and ordering, the complete wire delete
+record, Back's non-write control, and cold full-record readback. Other
+SMS slots and all remaining card bytes must be unchanged. Outgoing SMS
+is the next independent message-service target.

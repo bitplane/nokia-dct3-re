@@ -19,8 +19,10 @@ local input=coroutine.create(function()
         assert(emu.wait(0.8))
         machine.screens[':screen']:snapshot('nsb7_sms_read_'..target..'.png')
     end
-    assert(emu.wait(35-machine.time:as_double()))
-    machine:exit()
+    if not _G.nsb7_sms_read_continue then
+        assert(emu.wait(35-machine.time:as_double()))
+        machine:exit()
+    end
 end)
 _G.nsb7_sms_read_input=input
 assert(coroutine.resume(input))
