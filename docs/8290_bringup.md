@@ -25,7 +25,8 @@ retained, and the receiver returns to common control. Repeated empty paging
 blocks reach its RR decoder. An addressed page now produces the handset's
 own Paging Response after background measurement completion. Stable
 registered idle presentation remains unestablished. Incoming SMS delivery,
-physical reading/deletion, cancellation and cold status retention are qualified below. Incoming-call
+physical reading/deletion, cancellation, cold status retention and outgoing
+Reply submission are qualified below. Incoming-call
 control through physical Answer/End, CONNECT acknowledgement and release
 is qualified below; speech is not established.
 In the normal machine, DSP exchange/service replies are disabled; own internal
@@ -1299,7 +1300,7 @@ The checker pins the own ROM, initial location-update exchange, ordered
 83-packet delivery inventory, SAPI3/CP/RP acknowledgements, release,
 exact wire write and stored record, untouched other slots, and cold
 full-record RX with unchanged storage. The user-driven reading continuation
-is qualified below; delete and outgoing SMS remain separate targets.
+is qualified below; deletion and outgoing Reply are qualified in the following sections.
 
 ### Physical SMS reading and readable message screen
 
@@ -1332,8 +1333,8 @@ record through SIMI; the entire card stays unchanged, including status
 It additionally requires exact physical key timing, delivery-before-read
 wire writes, a status-only card change after the key presses, the message
 pixel oracle and cold full-record readback. No firmware, SIM record or
-read flag is set by the observer. Deletion is qualified below; outgoing
-SMS remains open.
+read flag is set by the observer. Deletion and outgoing Reply are
+qualified below.
 
 ### Physical SMS erase, cancellation and cold persistence
 
@@ -1369,5 +1370,37 @@ Acceptance requires the own ROM and read-screen oracle, exact physical
 confirmation/cancellation sequence, status-only card difference,
 delivery/read/delete write counts and ordering, the complete wire delete
 record, Back's non-write control, and cold full-record readback. Other
-SMS slots and all remaining card bytes must be unchanged. Outgoing SMS
-is the next independent message-service target.
+SMS slots and all remaining card bytes must be unchanged.
+
+## Physical outgoing SMS Reply
+
+The physical Reply fixture composes the incoming-message/read fixture.
+Menu at 28 seconds opens Options, Down selects Reply, Menu at 32/34
+selects As message, keypad 2 enters `A`, and Menu at 38/40/42 selects
+Send and confirms the sender-derived destination `5551234`. The observer
+only drives physical inputs and captures frames; it does not construct
+the handset's SMS or edit guest state.
+
+The MCU establishes its SAPI-3 service and emits the reassembled CP-DATA
+`390118000100069121436587090d11000781551532f40000a70141`.
+The lab network decodes one accepted SMS-SUBMIT with destination `5551234`,
+SMSC `1234567890`, GSM7 user length 1 and payload `41`. Network CP-ACK
+and RP-ACK are followed by the handset's `3904` CP-ACK, acknowledged
+Channel Release and return to common control. The 44.3-second image
+reads `Message sent` (84x48 RGB SHA256
+`9ac0ef8ceeb981079a93cde45249a30256763d25119e5fcfae1218f05cf5c0b7`).
+
+The 70-second observation also guards a shared peer lifecycle correction:
+an outgoing service must retain the consumed latch for an earlier
+one-shot incoming fixture. Otherwise that incoming SMS repeats after
+the outgoing release. Explicitly queued successors still rearm paging;
+`verify-radio-sms-sequential` checks two-message delivery, save/load
+replay and physical notification/read/selective-delete paths.
+
+```sh
+.venv/bin/python tools/nsb7_outgoing_sms_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-sms-reply-final
+```
+
+This qualifies lab-network submission and the firmware confirmation UI,
+not delivery through an external mobile network or native DSP execution.

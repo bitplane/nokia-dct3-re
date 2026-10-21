@@ -2393,8 +2393,9 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 				// Registration release arms the configured incoming page.  A
 				// completed one-shot service does not repeat; multipart SMS
 				// alone leaves a successor queued and therefore re-arms it.
+				// Outgoing services must preserve an already consumed incoming page.
 				m_page_transmitted =
-						m_gsm_session->incoming_service_completed() &&
+						(m_page_transmitted || m_gsm_session->incoming_service_completed()) &&
 						!m_gsm_session->incoming_service_queued();
 				m_pch_fill_delivered = false;
 			}
