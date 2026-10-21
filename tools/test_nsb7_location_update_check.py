@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsb7_radio_check import check_location_update, check_receiver_return, check_paging
+from tools.nsb7_radio_check import check_location_update, check_receiver_return, check_paging, check_addressed_page
 
 
 def trace():
@@ -96,6 +96,31 @@ class LocationUpdateCheckTests(unittest.TestCase):
             text = text.replace(f'frame={3453+index*102} ',
                                 f'frame={3453+(index+1)*102} ')
         check_paging(text)
+
+    def addressed_fixture(self):
+        text, _ = self.release_fixture()
+        rows = [text,
+                'nsb7_agch_consumer: index=6 task=14 tag=0623 mode=60 block=31062110080910101032547698' + '2b'*11 + ' t=16',
+                'nsb7_page_post: index=10 source=14 target=17 lr=00264591 data=05eb t=16']
+        for data in [
+                'pc=00274124 r0=00000017 r2=00000009 data=080910101032547698 ',
+                'pc=002741dc r0=00000001 r2=00000000 data=080910101032547698 stack=00102168080910101032547698 ',
+                'pc=002741f6 r0=00000000 ',
+                'pc=00274e82 r0=00000001 ',
+                'pc=002b3130 r0=0000083e ']:
+            rows.append('nsb7_page_identity: ' + data + 't=16')
+        return '\n'.join(rows)
+
+    def test_addressed_imsi_match(self):
+        check_addressed_page(self.addressed_fixture())
+
+    def test_addressed_identity_mismatch(self):
+        with self.assertRaises(ValueError):
+            check_addressed_page(self.addressed_fixture().replace('pc=002741f6 r0=00000000', 'pc=002741f6 r0=00000001'))
+
+    def test_addressed_result_missing(self):
+        with self.assertRaises(ValueError):
+            check_addressed_page(self.addressed_fixture().replace('r0=0000083e', 'r0=00000000'))
 
 
 if __name__ == '__main__':

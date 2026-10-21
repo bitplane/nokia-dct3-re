@@ -1,0 +1,56 @@
+-- Observe upper-layer delivery after PCH decoding; never inject messages.
+local source=debug.getinfo(1,'S').source:sub(2)
+dofile(source:match('^(.*[/\\])')..'nsb7_lapdm_observe.lua')
+local machine=manager.machine
+local cpu=machine.devices[':maincpu']
+local memory=cpu.spaces.program
+local count=0
+local tap=memory:install_read_tap(0x2898e8,0x2898eb,'nsb7_page_posts',function()
+    local time=machine.time:as_double()
+    if cpu.state['R15'].value~=0x2898e8 or time<15 or time>17 or count>=256 then return end
+    local object=cpu.state['R1'].value
+    if object<0x100000 or object>=0x17ff00 then return end
+    count=count+1
+    local bytes={}
+    for index=0,31 do bytes[#bytes+1]=string.format('%02x',memory:read_u8(object+index)) end
+    machine:logerror(string.format('nsb7_page_post: index=%u source=%u target=%u lr=%08x data=%s t=%.9f observer_writes=0\n',
+        count,memory:read_u8(0x100022),cpu.state['R0'].value,cpu.state['R14'].value,
+        table.concat(bytes),time))
+    if memory:read_u16(object)==0x5eb then
+        local pointer=memory:read_u32(object+8)
+        if pointer>=0x100000 and pointer<0x17ff00 then
+            local body={}
+            for index=0,27 do body[#body+1]=string.format('%02x',memory:read_u8(pointer+index)) end
+            machine:logerror(string.format('nsb7_page_indication: pointer=%08x data=%s t=%.9f observer_writes=0\n',
+                pointer,table.concat(body),time))
+        end
+    end
+end)
+_G.nsb7_page_post_tap=tap
+local receives=0
+_G.nsb7_page_receive_tap=memory:install_read_tap(0x289b3c,0x289b3f,'nsb7_page_receive',function()
+    local time=machine.time:as_double()
+    if cpu.state['R15'].value~=0x289b3c or memory:read_u8(0x100022)~=17 or
+            time<15 or time>17 or receives>=64 then return end
+    receives=receives+1
+    machine:logerror(string.format('nsb7_page_receive: lr=%08x t=%.9f observer_writes=0\n',
+        cpu.state['R14'].value,time))
+end)
+local identity_taps={}
+for _,pc in ipairs({0x274124,0x2741dc,0x2741f6,0x274e82,0x2b3130}) do
+    local hits=0
+    identity_taps[#identity_taps+1]=memory:install_read_tap(pc-pc%4,pc-pc%4+3,'nsb7_page_identity_'..pc,function()
+        if cpu.state['R15'].value~=pc or hits>=24 then return end
+        hits=hits+1
+        local pointer=cpu.state[pc==0x274124 and 'R1' or 'R4'].value
+        local bytes={}
+        if pointer>=0x100000 and pointer<0x17ff00 then
+            for i=0,8 do bytes[#bytes+1]=string.format('%02x',memory:read_u8(pointer+i)) end
+        end
+        local stack={}
+        for i=0,12 do stack[#stack+1]=string.format('%02x',memory:read_u8(cpu.state['R13'].value+i)) end
+        machine:logerror(string.format('nsb7_page_identity: pc=%08x r0=%08x r2=%08x data=%s stack=%s t=%.9f observer_writes=0\n',
+            pc,cpu.state['R0'].value,cpu.state['R2'].value,table.concat(bytes),table.concat(stack),machine.time:as_double()))
+    end)
+end
+_G.nsb7_page_identity_taps=identity_taps

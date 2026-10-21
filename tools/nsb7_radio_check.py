@@ -305,6 +305,33 @@ def check_paging(text):
         raise ValueError('empty paging blocks did not pass the RR decoder')
 
 
+def check_addressed_page(text):
+    """Prove the own IMSI match and parser event, not a Paging Response."""
+    page = '31062110080910101032547698' + '2b'*11
+    if not re.search(r'nsb7_agch_consumer: index=\d+ task=14 tag=0623 mode=60 block=' + page + r' ', text):
+        raise ValueError('addressed paging block did not reach the MCU consumer')
+    if not re.search(r'nsb7_page_post: index=\d+ source=14 target=17 lr=00264591 data=05eb', text):
+        raise ValueError('decoded page was not forwarded to task 17')
+    checks = [
+        r'pc=00274124 r0=00000017 r2=00000009 data=080910101032547698 ',
+        r'pc=002741dc r0=00000001 r2=00000000 data=080910101032547698 stack=[0-9a-f]{8}080910101032547698 ',
+        r'pc=002741f6 r0=00000000 ',
+        r'pc=00274e82 r0=00000001 ',
+        r'pc=002b3130 r0=0000083e ',
+    ]
+    positions = []
+    for pattern in checks:
+        match = re.search(r'nsb7_page_identity: ' + pattern, text)
+        if match is None:
+            raise ValueError('own paging identity comparison/parser result is missing')
+        positions.append(match.start())
+    if positions != sorted(positions):
+        raise ValueError('paging identity evidence order differs')
+    packets = PACKET.findall(text)
+    if len(packets) != 49:
+        raise ValueError('bounded page-parser fixture unexpectedly advanced to access')
+
+
 def check_trace(text, measurement=False, synchronization=False, channel=False, bcch=False, ccch=False, rach=False, assignment=False, dedicated=False, uplink=False, contention=False):
     uplink = uplink or contention
     dedicated = dedicated or uplink
@@ -489,11 +516,15 @@ def main():
     parser.add_argument('--contention', action='store_true')
     parser.add_argument('--release', action='store_true')
     parser.add_argument('--paging', action='store_true')
+    parser.add_argument('--addressed-page', action='store_true')
     args = parser.parse_args()
     try:
         report = contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
-        if args.release or args.paging:
+        if args.addressed_page:
+            check_security(text)
+            check_addressed_page(text)
+        elif args.release or args.paging:
             check_security(text)
             check_receiver_return(text, (args.run / 'nvram/nsb7hle/sim_card').read_bytes(), paging=args.paging)
         else:
@@ -508,7 +539,8 @@ def main():
             args.contract_json.write_text(json.dumps(report, indent=2) + '\n')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 radio inventory: FAIL: {error}\n')
-    print('PASS: ' + ('own LOCI retained; repeated empty paging blocks reach firmware decoder' if args.paging else
+    print('PASS: ' + ('own addressed page matches IMSI and returns parser event 083e; no access response' if args.addressed_page else
+                     'own LOCI retained; repeated empty paging blocks reach firmware decoder' if args.paging else
                      'own LU/release acknowledged; receiver returned; SIM LOCI retained; paging withheld' if args.release else
                      'own contention echo accepted; firmware link state 2 to 4; no LU Accept supplied' if args.contention else
                      'own LAPDm SABM carries Location Updating Request; no UA supplied' if args.uplink else

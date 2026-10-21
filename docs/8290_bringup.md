@@ -1004,3 +1004,36 @@ The checker permits those explicit gaps but rejects a different group;
 physical-time paging delivery remains unqualified. The idle screenshot
 still has malformed main-area content despite working softkey text and
 clock, so there is no usable registered-idle graphics claim.
+
+### Addressed page: own identity accepted, RR continuation unresolved
+
+`fixtures/nsb7_page/nsb7hle.cfg` queues one laboratory page through the
+existing NETCFG input; it does not enable an incoming call or SMS. At
+frame 3555, task 14 receives Paging Request Type 1 block
+`31062110080910101032547698` plus eleven `2b` bytes. It publishes
+`05eb` to task 17 through `26458c`, with a separate information buffer
+containing length `000c` and RR bytes `062110080910101032547698`.
+
+Task 17's receive call returns at `2b2edc`. Its `05ea/05eb` branch at
+`2b311c` checks protocol discriminator 6 and calls RR parser `274220`.
+The complete subtract cascade selects Paging Request Type 1 handler
+`274e4a` for message `21`. Identity helper `274124` receives the LV
+identity `08 0910101032547698`; own identity reader `2a15d8` returns
+the same length and bytes. Comparison `30e8e8` returns zero at `2741f6`,
+and the helper returns match 1 at `274e82`. The RR parser then returns
+event `083e` at `2b3130`. Empty paging blocks return zero there.
+
+In the observed run, dispatch-record bytes begin `00fe010005eb000000`
+at that return boundary. The meaning of the `fe` byte is not assigned.
+There is no new type-0c CHANNEL REQUEST through 25 seconds: the runtime
+TX inventory remains 49 packets. The unresolved question is how the
+firmware's RR lifecycle consumes `083e`, not whether the page carries
+the correct subscriber identity or reaches the RR parser.
+
+`tools/nsb7_page_observe.lua` captures transport posts, pointed-to
+information, task-17 receive return, identity comparison and parser
+result without guest writes. `--addressed-page` checks the matching
+page/identity/result chain and rejects an unexpected access continuation.
+The qualified capture is `tmp/nsb7-page-parser`; the earlier
+`tmp/nsb7-page-identity` independently reproduces identity matching.
+Neither establishes an over-air Paging Response, call or SMS delivery.
