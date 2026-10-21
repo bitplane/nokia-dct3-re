@@ -23,6 +23,31 @@ for _,address in ipairs({0x1308b1,0x13ff00}) do
     end)
 end
 _G.nsb7_input_startup_taps=startup_taps
+local analog_count=0
+_G.nsb7_input_analog_tap=space:install_write_tap(0x130020,0x130023,'nsb7_analog_state',function(_,value,mask)
+    if mask&0xffff0000==0 or analog_count>=64 then return end
+    analog_count=analog_count+1
+    machine:logerror(string.format('nsb7_analog_state: value=%04x pc=%08x t=%.9f observer_writes=0\n',
+        (value>>16)&0xffff,machine.devices[':maincpu'].state['R15'].value,machine.time:as_double()))
+end)
+local text_count=0
+local seen_text={}
+_G.nsb7_input_analog_text=space:install_read_tap(0x30ae80,0x30ae83,'nsb7_analog_text',function()
+    local cpu=machine.devices[':maincpu']
+    local address=cpu.state['R0'].value
+    if cpu.state['R15'].value~=0x30ae82 or address<0x245000 or address>=0x248600 or text_count>=100 then return end
+    local chars={}
+    for offset=0,95 do
+        local byte=space:read_u8(address+offset)
+        if byte==0 then break end
+        chars[#chars+1]=byte>=32 and byte<=126 and string.char(byte) or '?'
+    end
+    local text=table.concat(chars)
+    if text=='' or seen_text[text] then return end
+    seen_text[text]=true
+    text_count=text_count+1
+    machine:logerror(string.format('nsb7_analog_text: text=%s t=%.9f observer_writes=0\n',text,machine.time:as_double()))
+end)
 local function registers(phase)
     machine:logerror(string.format('nsb7_input_regs: phase=%s row=%02x direction=%02x column_mask=%02x irq=%02x irq_mask=%02x ctrl=%02x observer_writes=0\n',
         phase,space:read_u8(0x20028),space:read_u8(0x200a8),space:read_u8(0x2006b),

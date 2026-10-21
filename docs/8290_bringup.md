@@ -268,3 +268,31 @@ plus the Power special contact and release. It writes controller MMIO and
 is explicitly conformance evidence, not organic input delivery. Those
 checks pass; the normal failure-frame oracle and native `2c75` controlled
 stop also reproduce after the keypad configuration change.
+
+### Missing analog readiness report
+
+Own wrapper `301f6c` clears its local diagnostic flag, then posts task
+`1` / report `14` through `289a38`. An aligned Thumb BL scan of the entire
+qualified image finds one direct caller, `2463b2`. This does not exclude
+indirect or table-driven publishers. The call is in the analog routine
+containing the firmware strings `VBAT Checks` and `Start limited fast VBAT
+read`; no DSP reply is inferred from the report number.
+
+Its 21-entry state table is at `247ab8`; state is the halfword at
+`130020` (context `r6+1c`). Runtime writes with the current default board
+inputs enter `11` at 1.228 seconds, `4` at 4.691 seconds, then `3` at
+5.155 seconds. Repeated state writes are active dispatch, not evidence of
+an inactive task. Read-only observation of the firmware's own text routine
+`30ae82` independently identifies `CHECK TEST MODE`, `CHECK POWER ON REASON`,
+`INIT CHARGING`, then `BOOT UP CHARGE`, `WAIT CHARGER VOLTAGE SETTING`, and
+`CHARGER DISCONNECTED`. These strings name software branches, not proof
+that the physical charger input was asserted.
+
+State 3 entry `2472e0` distinguishes events `49` and `41`. On `49`, it
+tests its countdown and context byte `+0d`, then predicate `305800` before
+proceeding. Decode that predicate and the preceding power/ADC branch before
+changing board inputs; do not synthesize report `14`, unmask the keypad,
+or assert a charger cause to escape the branch. Raw analog defaults remain
+provisional. The NSB-7 service manual independently describes BLB-2 battery
+identification and a 100 kohm BSI pull-up, but does not establish the current
+emulator tuple as a measured NSB-7 electrical profile.
