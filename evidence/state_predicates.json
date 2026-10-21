@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_fdn_cancel_erase_cold_empty",
+      "owner": "nsb7_sim_storage", "status": "satisfied",
+      "predicate": "Physical FDN erase cancellation preserves the saved card; confirmed protected erase survives cold empty search",
+      "current": "Three predecessor-linked cold processes retain FDN-On. PIN2-authenticated Details/Erase renders exact Erase? A; physical Back returns to the list with no UPDATE and byte-identical card. The next process physically confirms OK after PIN2 and sends one successful EF_FDN6f3b record1/mode4 UPDATE of32 erased bytes, rendering Phone book erased. Whole-card comparison permits only that record. A separate cold physical Search renders No phone numbers with no PIN2/update or persistent card change. Combined acceptance retains prior Save/read/wrong-PIN2 checks; edit and dial enforcement remain unpromoted.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_fdn_cancel.lua", "tools/nsb7_fdn_erase.lua", "tools/nsb7_fdn_empty.lua", "tools/nsb7_fdn_read.lua", "tools/nsb7_fdn_record_check.py", "tools/test_nsb7_fdn_record_check.py"]
+    },
+    {
       "id": "nsb7_protected_fdn_save_cold_and_rejection",
       "owner": "nsb7_sim_storage", "status": "satisfied",
       "predicate": "Physical PIN2 authorizes EF_FDN Save, independent cold Details retrieves the contact and wrong PIN2 preserves all records",

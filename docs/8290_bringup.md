@@ -24,7 +24,8 @@ failed-PUK2 retry retention and cold PUK2 recovery/reuse. Permanent PUK1
 exhaustion and cold card rejection are qualified. Permanent PUK2 exhaustion
 also retains ordinary PIN1 authentication and menus. An explicit extended
 card qualifies physical PIN2-authorized FDN On/cold-On/Off/cold-Off and
-protected Save/cold Details/rejected-write isolation. FDN editing/deletion,
+protected Save/cold Details/rejected-write isolation and cancel/erase/cold-empty.
+FDN editing,
 dial enforcement and AoC authorization remain separate work.
 PIN-enabled fresh/cold laboratory registration and a long wrong-PIN
 non-registration control are qualified as one coherent composition.
@@ -2092,6 +2093,32 @@ satisfy the protected FDN write check.
   tmp/nsb7-fdn-write-wrong
 ```
 
-FDN edit/erase/cancel and listed-versus-unlisted dial permission remain
+FDN editing and listed-versus-unlisted dial permission remain
 separate acceptance targets. These radio-disabled storage runs do not
 establish a connected FDN-enabled call.
+
+### FDN erase cancellation and durable deletion
+
+Starting from the saved own card, `nsb7_fdn_cancel.lua` physically reopens
+Details, verifies PIN2 and selects Erase. The reviewed `Erase? A` prompt is
+dismissed with the real Back contact; the contact list returns and no UPDATE
+is sent. The whole card remains byte-identical.
+
+`nsb7_fdn_erase.lua` cold-starts from that unchanged cancellation output and
+confirms the same prompt with OK. Exactly one successful EF_FDN record-1
+UPDATE writes 32 erased bytes after PIN2 authentication. Firmware renders
+`Phone book erased`; the entire card changes only in that record.
+`nsb7_fdn_empty.lua` then cold-starts from the erased output and physically
+searches, rendering `No phone numbers` without PIN2 verification, an UPDATE
+or any persistent card change. FDN remains enabled throughout.
+
+The checker requires all three optional phases together and validates the
+actual predecessor-card link, full card, exact input/decode inventory,
+selected-file APDUs, own flash integrity and prompt/result pixels.
+
+```sh
+.venv/bin/python tools/nsb7_fdn_record_check.py \
+  tmp/nsb7-fdn-cold-on tmp/nsb7-fdn-write tmp/nsb7-fdn-read \
+  tmp/nsb7-fdn-write-wrong --cancel tmp/nsb7-fdn-cancel \
+  --erase tmp/nsb7-fdn-erase --empty tmp/nsb7-fdn-empty
+```
