@@ -31,7 +31,7 @@ local input=coroutine.create(function()
     assert(emu.wait(18-machine.time:as_double()))
     machine.screens[':screen']:snapshot('nsb7_pin_final.png')
     machine:logerror('nsb7_pin_input: complete\n')
-    machine:exit()
+    if not _G.nsb7_pin_continue then machine:exit() end
 end)
 _G.nsb7_pin_input=input
 assert(coroutine.resume(input))

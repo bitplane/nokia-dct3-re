@@ -16,8 +16,9 @@ physical acceptance of the own-ROM default phone code and menu navigation.
 A separate PIN-enabled synthetic-card fixture qualifies physical wrong
 PIN, saved retry decrement and cold correct-PIN recovery to the phone-code
 prompt. Physical PIN exhaustion, failed-PUK retry, PUK recovery with a new
-PIN and cold replacement-PIN acceptance are also qualified. PIN2 and
-security-setting menus remain separate work.
+PIN and cold replacement-PIN acceptance are also qualified. Physical
+SIM-card-security Off/On and cold PIN-request behavior pass; PIN2 and
+ordinary credential-change menus remain separate work.
 A physical SIM phonebook save and cold Details retrieval are qualified.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
@@ -1599,9 +1600,9 @@ A new process copies the wrong run's complete own card, flash and CCONT.
 VERIFY returns `9000`, exactly retries 2 -> 3 change in the entire card,
 and the screen advances to the phone `Security code` prompt. Neither
 run sends credential-change/enable/disable/unblock commands or a file
-UPDATE. This proves PIN retry persistence and recovery; PUK recovery is
-qualified below. PIN2, PIN-request settings and PIN-enabled registration
-remain separate work.
+UPDATE. This proves PIN retry persistence and recovery; PUK recovery
+and PIN-request settings are qualified below. PIN2 and PIN-enabled
+registration remain separate work.
 
 ```sh
 .venv/bin/python tools/nsb7_pin_check.py \
@@ -1649,3 +1650,35 @@ flash journals, all six complete initial/final card pairs, no unrelated
 credential/file writes, and exact PUK/phone-lock prompt frames. Permanent
 PUK exhaustion, PIN2/PUK2, ordinary PIN changes and request settings are
 not implied by this recovery result.
+
+### Physical SIM-card-security Off/On
+
+The own menu route is `4 -> 6 -> 1` (`Settings / Security settings /
+SIM card security`).
+`tools/nsb7_pin_request.lua` physically enters startup PIN `1234` and
+phone code `12345`, navigates this route, enters the current PIN at the
+settings prompt, selects Off and confirms. The firmware sends
+`A0 26 00 01 08 31 32 33 34 FF FF FF FF`, receives `9000` and displays
+`SIM card security / Off`. Exactly card byte 3520 changes `1 -> 0`.
+
+A fresh process retains the complete saved card/phone/CCONT storage.
+`tools/nsb7_pin_request_enable.lua` reaches and physically accepts the
+phone-code prompt without any startup SIM VERIFY. The same settings route
+selects On and sends `A0 28 00 01 08` plus padded `1234`, receiving `9000`.
+Exactly byte 3520 changes back `0 -> 1`; the complete card equals the
+original enabled card. Another cold process shows the exact `Enter PIN
+code` prompt and physically verifies `1234`, leaving persistent card
+contents unchanged. All runs use the radio-disabled security fixture.
+
+```sh
+.venv/bin/python tools/nsb7_pin_request_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin-request-off \
+  tmp/nsb7-pin-request-on tmp/nsb7-pin-request-restored
+```
+
+Acceptance requires decoded physical navigation/authentication contacts,
+the setting APDU after final confirmation, correct security statuses,
+complete cold card comparisons, own flash-journal validity, phone-code
+acceptance without startup VERIFY while Off, exact Off/On menu frames,
+and the restored cold PIN prompt/VERIFY. This does not qualify ordinary
+PIN changes, PIN2/PUK2 or PIN-enabled network registration.

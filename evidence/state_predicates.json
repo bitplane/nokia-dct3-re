@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_physical_pin_request_off_on_cold",
+      "owner": "nsb7_sim_security", "status": "satisfied",
+      "predicate": "Physical SIM-card-security Off/On persists only the PIN-enabled flag and changes the cold startup prompt accordingly",
+      "current": "Own menu4-6-1 accepts physical current PIN1234 and Off; A026000108... returns9000 and only complete-card byte3520 changes1->0. Cold retained storage reaches physical phone-code acceptance without startup SIM VERIFY. Physical On sends A028000108... and changes only3520 back0->1, restoring the original complete card. Another cold physical1234 VERIFY succeeds with unchanged card and exact PIN prompt. Input decodes, post-confirm APDUs, own flash journals and Off/On pixels pass. Radio remains disabled; PIN2/PUK2 and PIN-enabled registration are not promoted.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_pin_request.lua", "tools/nsb7_pin_request_enable.lua", "tools/nsb7_pin_request_check.py", "tools/test_nsb7_pin_request_check.py"]
+    },
+    {
       "id": "nsb7_physical_pin_exhaustion_puk_recovery",
       "owner": "nsb7_sim_security", "status": "satisfied",
       "predicate": "Cold physical PIN failures exhaust retries, a wrong PUK persists its own retry loss, and correct PUK installs a new PIN accepted after another cold boot",
