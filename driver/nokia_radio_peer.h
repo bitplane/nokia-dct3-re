@@ -39,6 +39,12 @@ public:
 		direct,
 		low_six_bits
 	};
+	enum class acquisition_coverage : u8
+	{
+		full,
+		band_measurements,
+		candidate_synchronization
+	};
 
 	enum class neighbour_arfcn_encoding : u8
 	{
@@ -69,7 +75,7 @@ public:
 		std::optional<std::array<u8, 4>> background_measurement_followup_request = std::nullopt;
 		// Partial products may establish RSSI transport before channel/SCH
 		// contracts. Do not answer the latter using another product's defaults.
-		bool band_measurements_only = false;
+		acquisition_coverage coverage = acquisition_coverage::full;
 
 		constexpr bool enabled() const
 		{

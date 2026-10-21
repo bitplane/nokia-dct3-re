@@ -84,7 +84,8 @@ def contract(image):
             'scope': 'decoded software classes, not fitted RF-band proof'}
 
 
-def check_trace(text, measurement=False):
+def check_trace(text, measurement=False, synchronization=False):
+    measurement = measurement or synchronization
     check_security(text)
     rows = PACKET.findall(text)
     if len(rows) != text.count('nsb7_radio_tx:') or not rows or len(rows) >= 256:
@@ -104,6 +105,9 @@ def check_trace(text, measurement=False):
         inventory.append((int(kind, 16), bytes.fromhex(payload)))
     expected_types = TYPES + ((0x56,) if measurement else ())
     expected_lengths = LENGTHS + ((160,) if measurement else ())
+    if synchronization:
+        expected_types += (0x02,)
+        expected_lengths += (20,)
     if tuple(kind for kind, _ in inventory) != expected_types or tuple(len(payload) for _, payload in inventory) != expected_lengths:
         raise ValueError('bounded packet inventory differs')
     if inventory[28] != (0x55, bytes.fromhex('03050000')):
@@ -122,8 +126,11 @@ def check_trace(text, measurement=False):
             raise ValueError('candidate context does not contain the sole measured carrier')
         replies = re.findall(r'nsb7_radio_rx: index=(\d+) type=([0-9a-f]{2}) length=(\d+) ', text)
         # Two existing external-service 8e frames precede the sole RF reply.
-        if replies != [('1', '8e', '10'), ('2', '8e', '10'), ('3', '8b', '166')]:
-            raise ValueError('measurement-only RX scope differs')
+        expected_replies = [('1', '8e', '10'), ('2', '8e', '10'), ('3', '8b', '166')]
+        if synchronization:
+            expected_replies.append(('4', '80', '14'))
+        if replies != expected_replies:
+            raise ValueError('qualified acquisition RX scope differs')
         consumers = re.findall(r'nsb7_measurement: pc=([0-9a-f]{8}) task=(\d+) type=([0-9a-f]{2}) first=([0-9a-f]{4}) '
                                r'second=([0-9a-f]{4}) rssi=(-?\d+) ', text)
         if consumers != [('002e5258', '4', '8b', '0258', 'ffff', '-60'),
@@ -131,6 +138,21 @@ def check_trace(text, measurement=False):
             raise ValueError('PCS measurement did not reach the own broker and task-13 consumer')
         if 'nsb7_measurement_class: channel=0258 class=2 ' not in text:
             raise ValueError('own carrier classifier did not run')
+    if synchronization:
+        if inventory[30][1][:12] != bytes.fromhex('041202000000005050000258'):
+            raise ValueError('organic channel request does not select the synchronized carrier')
+        sch = re.findall(r'nsb7_sch: pc=([0-9a-f]{8}) task=(\d+) selected=([0-9a-f]{8}) flags=([0-9a-f]{2}) '
+                         r'payload=([0-9a-f]+) ', text)
+        if len(sch) != 3 or [(row[0], row[1]) for row in sch] != [
+                ('002e4ef4', '4'), ('00287574', '13'), ('0028734c', '13')]:
+            raise ValueError('SCH did not traverse the own broker, lookup and candidate update')
+        payloads = [bytes.fromhex(row[4]) for row in sch]
+        if (len(set(payloads)) != 1 or len(payloads[0]) != 14 or
+                payloads[0][:3] != bytes.fromhex('401200') or
+                payloads[0][6:8] != bytes.fromhex('0258') or payloads[0][10] >> 2 != 0x12):
+            raise ValueError('SCH payload channel, status or decoded BSIC differs')
+        if 'nsb7_sch_candidate_commit: channel=0258 flags=a4 bsic=12 ' not in text:
+            raise ValueError('firmware did not settle the synchronized candidate record')
 
 
 def main():
@@ -139,11 +161,12 @@ def main():
     parser.add_argument('run', type=Path)
     parser.add_argument('--contract-json', type=Path)
     parser.add_argument('--measurement', action='store_true')
+    parser.add_argument('--synchronization', action='store_true')
     args = parser.parse_args()
     try:
         report = contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
-        check_trace(text, args.measurement)
+        check_trace(text, args.measurement, args.synchronization)
         states = re.findall(r'nsb7_radio_state: bands=([0-9a-f]{8}) measurement_route=([0-9a-f]{2}) t=([0-9.]+)', text)
         if states != [('98000000', '01', f'{time:.9f}') for time in (3.5, 6, 14, 24)]:
             raise ValueError('live feature/forwarding predicate differs')
@@ -151,7 +174,8 @@ def main():
             args.contract_json.write_text(json.dumps(report, indent=2) + '\n')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 radio inventory: FAIL: {error}\n')
-    print('PASS: ' + ('PCS RSSI consumed by task 13; organic 56 request left unanswered' if args.measurement else
+    print('PASS: ' + ('own SCH accepted; organic channel request left unanswered' if args.synchronization else
+                     'PCS RSSI consumed by task 13; organic 56 request left unanswered' if args.measurement else
                      'own 29-packet no-peer TX baseline; final 55/03050000') + '; no RF completion claim')
 
 

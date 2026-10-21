@@ -1,4 +1,4 @@
--- Opt-in PCS topology and measurement-only peer; read-only MCU observations.
+-- Opt-in PCS acquisition peer; read-only MCU observations.
 local source=debug.getinfo(1,'S').source:sub(2)
 dofile(source:match('^(.*[/\\])')..'nsb7_radio_observe.lua')
 local machine=manager.machine
@@ -61,3 +61,30 @@ taps[#taps+1]=memory:install_read_tap(0x2c7fcc,0x2c7fcf,'nsb7_measured_channel_c
         channel,cpu.state['R4'].value,machine.time:as_double()))
 end)
 _G.nsb7_measurement_taps=taps
+local commits=0
+taps[#taps+1]=memory:install_write_tap(0x100a4,0x100a7,'nsb7_sch_candidate_commit',function()
+    if cpu.state['R15'].value~=0x2cb0ec or commits>=16 then return end
+    local record=memory:read_u32(0x12fbe0)
+    if record<0x100000 or record>=0x17fff0 then return end
+    commits=commits+1
+    machine:logerror(string.format('nsb7_sch_candidate_commit: channel=%04x flags=%02x bsic=%02x t=%.9f observer_writes=0\n',
+        memory:read_u16(record+6),memory:read_u8(record+13),memory:read_u8(record+10),machine.time:as_double()))
+end)
+for _,pc in ipairs({0x2e4ef4,0x287574,0x28734c}) do
+    local count=0
+    local aligned=pc-pc%4
+    taps[#taps+1]=memory:install_read_tap(aligned,aligned+3,'nsb7_sch_'..pc,function()
+        if cpu.state['R15'].value~=pc or count>=16 then return end
+        count=count+1
+        local record=memory:read_u32(0x12fbd0)
+        local flags=0xff
+        if record>=0x100000 and record<0x17fff0 then flags=memory:read_u8(record+13) end
+        local payload={}
+        local object=cpu.state['R0'].value
+        if object>=0x100000 and object<0x17ff00 then
+            for index=0,13 do payload[#payload+1]=string.format('%02x',memory:read_u8(object+4+index)) end
+        end
+        machine:logerror(string.format('nsb7_sch: pc=%08x task=%u selected=%08x flags=%02x payload=%s t=%.9f observer_writes=0\n',
+            pc,memory:read_u8(0x100022),record,flags,table.concat(payload),machine.time:as_double()))
+    end)
+end

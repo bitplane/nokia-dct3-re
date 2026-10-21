@@ -34,7 +34,33 @@ def measurement_trace():
         'nsb7_measurement_class: channel=0258 class=2 t=3 observer_writes=0'])
 
 
+def synchronization_trace():
+    cursor = (sum((length+3)//2 for length in LENGTHS) + 81) % 0x52
+    producer = (cursor+11) % 0x52
+    rows = [measurement_trace(),
+            f'nsb7_radio_tx: index=31 type=02 length=20 data=041202000000005050000258' + '00'*8 +
+            f' cursor={cursor:02x} producer={producer:02x} pc=002cb0ec t=6 observer_writes=0',
+            'nsb7_radio_rx: index=4 type=80 length=14 t=5 observer_writes=0']
+    for pc, task in [('002e4ef4', 4), ('00287574', 13), ('0028734c', 13)]:
+        rows.append(f'nsb7_sch: pc={pc} task={task} selected=00109438 flags=a2 '
+                    'payload=4012000004eb0258000048001d80 t=5 observer_writes=0')
+    rows.append('nsb7_sch_candidate_commit: channel=0258 flags=a4 bsic=12 t=6 observer_writes=0')
+    return '\n'.join(rows)
+
+
 class RadioInventoryTests(unittest.TestCase):
+    def test_synchronization_requires_own_parser_and_organic_request(self):
+        check_trace(synchronization_trace(), synchronization=True)
+        for old, new in [('flags=a4 bsic=12', 'flags=a2 bsic=12'),
+                         ('pc=0028734c task=13', 'pc=0028734c task=12'),
+                         ('4012000004eb0258', '4012010004eb0258'),
+                         ('041202000000005050000258', '041202000000005050000001'),
+                         ('0048001d80', '0000001d80')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_trace(synchronization_trace().replace(old, new), synchronization=True)
+        with self.assertRaises(ValueError):
+            check_trace(synchronization_trace() + '\nnsb7_radio_rx: index=5 type=89 length=8 t=7', synchronization=True)
+
     def test_runtime_bootstrap_alias_corruption_rejected(self):
         payload = '0258' + 'ff'*158
         corrupted = payload[:49*4] + '0006' + payload[50*4:]

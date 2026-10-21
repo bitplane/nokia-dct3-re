@@ -571,15 +571,15 @@ RX entry/task/prefix and evaluates the decoded classifier over all 65,536
 this is a static decoded-contract check, not original CPU execution on
 every input. Unit cases cover precedence and range endpoints.
 
-### Opt-in PCS measurement acceptance
+### Opt-in PCS acquisition acceptance
 
 Radio HLE defaults off in the NSB-7 input configuration. The existing
-`Radio peer HLE` setting enables a product-owned **band-measurement-only**
-contract: only the decoded four-byte type-55 forms `03050000/03030000`
-are answered. Candidate windows, SCH, channel acknowledgement, traffic,
+`Radio peer HLE` setting enables a product-owned **candidate-synchronization**
+contract: the decoded four-byte type-55 forms `03050000/03030000` and
+the subsequent eighty-channel type-56 list are answered. Channel acknowledgement, traffic,
 neighbour and authentication contracts are not inherited from siblings.
 Other products retain their existing contracts unchanged. Retire the
-measurement-only limit only after the subsequent product contracts are
+acquisition-coverage limit only after the subsequent product contracts are
 qualified; zero/default channel parameters are not evidence for them.
 
 `fixtures/nsb7_measurement/nsb7hle.cfg` enables that peer and the shared
@@ -587,17 +587,19 @@ standards-level PCS topology at ARFCN 600/601. With a single receivable
 cell, the own broker receives `8b` containing carrier 600, RSSI -60 and an
 unused `ffff` second slot. It forwards from task 4 to task 13, whose
 `2a3704` consumer reads those same values and classifies 600 as class 2.
-Firmware then organically publishes `56/160` beginning `0258`; the peer
-deliberately leaves it unanswered. No firmware queue, state or APDU is
+Firmware then organically publishes `56/160` beginning `0258`. One
+standards-level SCH observation answers this list, using the shared
+fourteen-byte type-80/subtype-40 encoding. No firmware queue, state or APDU is
 injected to make this progression happen.
 
 `tools/nsb7_radio_measurement_observe.lua` adds own broker/consumer/class
-observations. Use `tools/nsb7_radio_check.py IMAGE RUN --measurement` for
-this composition. It requires all 30 TX publications, the correct task
+observations. Use `tools/nsb7_radio_check.py IMAGE RUN --synchronization` for
+this composition. It requires all 31 TX publications, the correct task
 and payload values, and the complete observed RX inventory: two existing
-external-service `8e/10` frames, followed by exactly one measurement
-`8b/166` through the 25-second fixture. No SCH/channel-completion response
-is accepted as part of this milestone. The no-peer/default fixture still
+external-service `8e/10` frames, one measurement `8b/166`, and one SCH
+`80/14` through the 25-second fixture. The older `--measurement` check
+retains the preceding 30-TX/measurement-only trace contract. No channel
+completion response is accepted. The no-peer/default fixture still
 reproduces its original 29-packet inventory.
 
 Own constructor `2b6848` allocates 164 bytes, writes type `56` and payload
@@ -659,6 +661,12 @@ of byte `+0d` to 4; a nonzero error increments the counter and ordinarily
 sets that nibble to 1. The payload's bytes 3..5 supply the 24-bit frame
 value, bytes 8..9 supply a signed shift on the relevant call variant,
 and byte 10 shifted right by two supplies the decoded BSIC. These offsets
-fit the existing shared fourteen-byte SCH payload shape, but a successful
-end-to-end synchronization exchange is not yet qualified. Channel
+fit the existing shared fourteen-byte SCH payload shape. The qualified
+run observes the same payload at broker `2e4ef4`, task-13 lookup `287574`
+and update `28734c`. Firmware changes the candidate's flags `a2 -> a4`,
+stores decoded BSIC `12`, and publishes type `02`/20 bytes beginning
+`041202000000005050000258`. The final eight request bytes are captured
+but not yet assigned semantics. The peer leaves this channel request
+unanswered: neither a sibling's channel acknowledgements nor a terminal
+RSSI report is justified by the synchronization result alone. Channel
 completion and the subsequent BCCH lifecycle remain separate contracts.
