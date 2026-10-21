@@ -15,7 +15,9 @@ reproduce across cold runs. A separate one-byte erased-retry fixture permits
 physical acceptance of the own-ROM default phone code and menu navigation.
 A separate PIN-enabled synthetic-card fixture qualifies physical wrong
 PIN, saved retry decrement and cold correct-PIN recovery to the phone-code
-prompt. PIN2/PUK and security-setting menus remain separate work.
+prompt. Physical PIN exhaustion, failed-PUK retry, PUK recovery with a new
+PIN and cold replacement-PIN acceptance are also qualified. PIN2 and
+security-setting menus remain separate work.
 A physical SIM phonebook save and cold Details retrieval are qualified.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
@@ -1597,8 +1599,9 @@ A new process copies the wrong run's complete own card, flash and CCONT.
 VERIFY returns `9000`, exactly retries 2 -> 3 change in the entire card,
 and the screen advances to the phone `Security code` prompt. Neither
 run sends credential-change/enable/disable/unblock commands or a file
-UPDATE. This proves PIN retry persistence and recovery, not PUK/PIN2,
-PIN-request settings or registration with PIN enabled.
+UPDATE. This proves PIN retry persistence and recovery; PUK recovery is
+qualified below. PIN2, PIN-request settings and PIN-enabled registration
+remain separate work.
 
 ```sh
 .venv/bin/python tools/nsb7_pin_check.py \
@@ -1610,3 +1613,39 @@ Acceptance checks the own ROM, decoded physical contacts and exact APDUs,
 VERIFY outcomes and retry counts, no unrelated security/file writes,
 complete initial/cold/final card contents and exact PIN/error/phone-lock
 prompt pixels.
+
+### Physical PIN exhaustion and PUK recovery
+
+Three independent cold wrong-PIN processes start with the declared
+PIN-enabled card and retain the preceding process's entire own card.
+Their VERIFY results are `9804`, `9804`, `9840`, with PIN1 retries
+`3 -> 2 -> 1 -> 0`. The final screen reads `Enter PUK code`.
+No retry state is edited to manufacture a blocked card.
+
+`tools/nsb7_puk_wrong.lua` enters wrong PUK `12345679`, replacement PIN
+`4321` and its confirmation through physical keys. The own firmware
+sends `A0 2C 00 00 10` followed by eight PUK ASCII bytes and
+`34 33 32 31 FF FF FF FF`. The response is `9804`; exactly PUK1 retries
+change `10 -> 9`, while PIN1 remains blocked and its credential unchanged.
+
+A fresh process retains that failed-PUK card. `tools/nsb7_puk_input.lua`
+enters correct PUK `12345678` and the same new PIN/confirmation. The
+UNBLOCK response is `9000`; exactly PIN1 changes from `1234` to `4321`,
+PIN1 retries reset `0 -> 3`, and PUK1 retries reset `9 -> 10`.
+A final cold process uses `tools/nsb7_pin_recovered.lua` to physically
+VERIFY `4321`, receiving `9000` and the separate phone Security-code
+prompt with the entire persistent card unchanged.
+
+```sh
+.venv/bin/python tools/nsb7_puk_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin-wrong-final \
+  tmp/nsb7-pin-wrong-second tmp/nsb7-pin-blocked tmp/nsb7-puk-wrong \
+  tmp/nsb7-puk-recovered tmp/nsb7-pin-recovered-cold
+```
+
+Acceptance requires every decoded physical PUK/new/confirm contact,
+the exact VERIFY/UNBLOCK APDUs and outcomes, independently valid own
+flash journals, all six complete initial/final card pairs, no unrelated
+credential/file writes, and exact PUK/phone-lock prompt frames. Permanent
+PUK exhaustion, PIN2/PUK2, ordinary PIN changes and request settings are
+not implied by this recovery result.

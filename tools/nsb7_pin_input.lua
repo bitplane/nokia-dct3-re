@@ -11,7 +11,10 @@ end
 local input=coroutine.create(function()
     assert(emu.wait(7.5))
     machine.screens[':screen']:snapshot('nsb7_pin_prompt.png')
-    local digits=correct and {'1','2','3','4'} or {'4','3','2','1'}
+    local digits={}
+    for digit in (_G.nsb7_pin_digits or (correct and '1234' or '4321')):gmatch('.') do
+        digits[#digits+1]=digit
+    end
     digits[#digits+1]='Menu'
     for index,digit in ipairs(digits) do
         assert(emu.wait(7+index-machine.time:as_double()))

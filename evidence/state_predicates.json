@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_physical_pin_exhaustion_puk_recovery",
+      "owner": "nsb7_sim_security", "status": "satisfied",
+      "predicate": "Cold physical PIN failures exhaust retries, a wrong PUK persists its own retry loss, and correct PUK installs a new PIN accepted after another cold boot",
+      "current": "Six processes retain exact own card transitions: wrong4321 VERIFY returns9804/9804/9840 and PIN retries3->2->1->0; wrong PUK12345679 with confirmed new4321 sends A02C000010... and returns9804, changing only PUK retries10->9. Cold correct PUK12345678 returns9000 and changes only PIN1 credential1234->4321 and counters0/9->3/10. Cold physical4321 VERIFY returns9000 with unchanged complete card and the phone-code prompt. Exact input decodes, wire commands, full card pairs, own flash journals and prompt frames pass. No counter/credential is edited in guest state; PIN2/PUK2 and permanent PUK exhaustion remain unqualified.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_pin_input.lua", "tools/nsb7_pin_recovered.lua", "tools/nsb7_puk_input.lua", "tools/nsb7_puk_wrong.lua", "tools/nsb7_puk_check.py", "tools/test_nsb7_puk_check.py"]
+    },
+    {
       "id": "nsb7_physical_pin_wrong_cold_correct",
       "owner": "nsb7_sim_security", "status": "satisfied",
       "predicate": "A wrong physical SIM PIN persists one retry loss and a cold correct PIN restores retries without unrelated card changes",
