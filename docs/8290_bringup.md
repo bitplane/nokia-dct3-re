@@ -64,5 +64,46 @@ make build
 Use a fresh run directory for the erased-storage baseline. The checker pins
 own source bytes, sampled continuation/shared state and exact RGB failure
 pixels. It does not test task messages, input, native DSP or phone services.
-Next recover the own DSP identity/upload and startup self-test consumers.
+The own native-upload evidence is separate below; startup self-test consumers
+remain open.
 A sibling's working HLE or EEPROM is not evidence for those contracts.
+
+## Own identity-6 native upload boundary
+
+`nsb7stage` is a separate research composition, not the normal machine.
+It selects identity 6 from the own compiled fragment, a declared unmeasured
+13 MHz execution clock and the own reset-release bit-0 path. No resident
+mask is supplied, and identity 6 is not a measured fitted-part assertion.
+The MCU routine at `2cb2e4..2cb2f2` compares the identity with 6 before
+selecting one of two descriptor roots. Both branches exist in this image;
+only the identity-6 composition is qualified below.
+
+| Own descriptor (file offset) | Destination / words | Payload SHA1 |
+| --- | --- | --- |
+| `11ee88` verifier | `0f00` / 223 | `6646da3c5be9c70deda7e0b5b9f257d5d2ace815` |
+| `11dca0` program fragment | `ff80` / 104 | `440bf49f1eba4cadb12f7f7581c992b0025807d6` |
+| `1183a4` support upload | `fd00` / 638 | `70c931c40b3e7cdebc8d09f2488e3cc1e3c848d9` |
+| `11ddcc` second loader | `0a00` / 623 | `89080bea5785eb944586574a3e1463145d8d4460` |
+
+The support upload is not the second loader: the latter's descriptor is
+`0a00,1000,026f,0200,03e8,0000`, and the staged device compares every one of
+its 623 words against the own source before entry. The extraction tool's
+`--product 8290` verifier/fragment/loader modes pin the corresponding source
+hash and descriptor; `--loader` denotes the support upload, consistent with
+that tool's existing contract.
+
+Native execution releases the 223-word verifier twice, publishes
+`0000/0006/0006/0006` at DSP PC `0f64`, executes the 126-word first loader,
+verifies the complete 623-word second loader at `0a00`, then stops at absent
+resident program address `2c75`. This is not a returned success or completed
+runtime handshake. No substitute opcode, return or runtime HLE is enabled.
+
+```sh
+.venv/bin/python tools/nsb7_native_boundary_check.py \
+  mame/mame roms tmp/nsb7-native-boundary
+```
+
+The fresh-directory runner requires the ordered native publications and
+controlled missing-code stop. The MCU failure-frame baseline remains separate.
+Next recover startup self-test consumers and the post-upload transport
+contract; native continuation itself requires an authentic resident source.

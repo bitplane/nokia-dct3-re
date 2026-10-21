@@ -1364,6 +1364,7 @@ public:
 	void noki5210(machine_config &config);
 	void noki8xxx(machine_config &config);
 	void noki8290(machine_config &config);
+	void nsb7stage(machine_config &config);
 	void noki8850(machine_config &config);
 	void nsm2stage(machine_config &config);
 	void nsm2hle(machine_config &config);
@@ -3891,6 +3892,25 @@ void nokia_dct3_state::noki8290(machine_config &config)
 	apply_product_config(PRODUCT_8290);
 }
 
+void nokia_dct3_state::nsb7stage(machine_config &config)
+{
+	noki8290(config);
+	nokia_product_config research = PRODUCT_8290;
+	research.dsp_reset_wiring = { 0x10, 0x01 };
+	// Six selects the own identity-6 fragment, not an acquired resident mask.
+	research.dsp_bootstrap = {
+		nokia_dsp_hle_device::bootstrap_exchange_strategy::ping_pong,
+		0, {}, 0, std::nullopt,
+		nokia_dsp_hle_device::bootstrap_parked_contract { 0x004, 0xffff, 6 }, 0
+	};
+	apply_product_config(research);
+	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	staged.set_program_fragment(0x11dcac);
+	staged.set_loader2_source(0x11ddd8, 623);
+	staged.set_loader_control_address(0x0880);
+	staged.set_cycle_guard_for_loader(true);
+}
+
 void nokia_dct3_state::nsm2stage(machine_config &config)
 {
 	noki8850(config);
@@ -4999,6 +5019,8 @@ ROM_START( noki8290 )
 	ROM_LOAD("8290f522a.fls", 0, 0x1d0000, CRC(607499b2) SHA1(4dacc50f57fe295168a53d3e5855a81acf35ab96))
 ROM_END
 
+#define rom_nsb7stage rom_noki8290
+
 ROM_START( noki8850 )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 
@@ -5251,6 +5273,7 @@ SYST( 1999, noki8210, 0,      0,      noki8210, noki3310, nokia_dct3_state, empt
 SYST( 1999, nsm3stage, noki8210, 0, nsm3stage, noki3310, nokia_dct3_state, empty_init, "Nokia", "8210 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3hle, noki8210, 0, nsm3hle, noki8210, nokia_dct3_state, empty_init, "Nokia", "8210 native uploads with runtime HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8290, 0,      0,      noki8290, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8290 (NSB-7 research, no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, nsb7stage, noki8290, 0, nsb7stage, noki3310, nokia_dct3_state, empty_init, "Research", "NSB-7 own identity-6 staged uploads (resident DSP undumped)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8850, 0,      0,      noki8850, noki8850, nokia_dct3_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2stage, noki8850, 0, nsm2stage, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2hle, noki8850, 0, nsm2hle, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

@@ -10,6 +10,19 @@ from tools import extract_nsm3_verifier as verifier
 
 
 class VerifierExtractionTest(unittest.TestCase):
+    def test_8290_own_rom6_uploads_when_available(self):
+        source = Path(__file__).resolve().parents[1] / 'roms/noki8290/8290f522a.fls'
+        if not source.exists():
+            self.skipTest('normalized NSB-7 input absent')
+        image = source.read_bytes()
+        self.assertEqual(446, len(verifier.extract(image, '8290')))
+        self.assertEqual(1276, len(verifier.extract_loader(image, '8290')))
+        fragment = verifier.extract_program_fragment(image, '8290')
+        self.assertEqual(208, len(fragment))
+        self.assertEqual(6, struct.unpack_from('>H', fragment, 14)[0])
+        with self.assertRaisesRegex(ValueError, 'pinned 8250'):
+            verifier.extract(image, '8250')
+
     def test_cli_cannot_overwrite_source_flash(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / 'original.fls'

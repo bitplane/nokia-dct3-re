@@ -26,11 +26,13 @@ NHM9_FLASH_SHA1 = "3d0dce9c098bdd619c6f3684f739796f64b66169"
 NHM9_DESCRIPTOR_OFFSET = 0x1f1e30
 NHM9_PROGRAM_SHA1 = "1fc2116ac98a106df41f3822322377a3101aabd5"
 NHM9_LOADER_SHA1 = "dc3c2a37913e07a2962d09f6a17cde676a04dd76"
+NSB7_FLASH_SHA1 = "4dacc50f57fe295168a53d3e5855a81acf35ab96"
 
 
 def extract_program_fragment(image, product="8250"):
     profiles = {"8250": (NSM3D_FLASH_SHA1, 0x117700),
-                "3350": (NHM9_FLASH_SHA1, 0x1f0c48)}
+                "3350": (NHM9_FLASH_SHA1, 0x1f0c48),
+                "8290": (NSB7_FLASH_SHA1, 0x11dca0)}
     if product not in profiles:
         raise ValueError("unsupported fragment product")
     expected, offset = profiles[product]
@@ -47,7 +49,8 @@ def extract_program_fragment(image, product="8250"):
 def extract_loader(image, product="8250"):
     """Return the whole owned upload, including its table and code tail."""
     profiles = {"8250": (NSM3D_FLASH_SHA1, NSM3D_LOADER_OFFSET, NSM3D_LOADER_SHA1),
-                "3350": (NHM9_FLASH_SHA1, 0x1ead0c, NHM9_LOADER_SHA1)}
+                "3350": (NHM9_FLASH_SHA1, 0x1ead0c, NHM9_LOADER_SHA1),
+                "8290": (NSB7_FLASH_SHA1, 0x1183a4, '70c931c40b3e7cdebc8d09f2488e3cc1e3c848d9')}
     if product not in profiles:
         raise ValueError("unsupported loader product")
     expected, offset, program_sha1 = profiles[product]
@@ -79,6 +82,8 @@ def extract(image, product="8210"):
                  (0x0f00, 0, PROGRAM_WORDS, 0x0f00, 0x00dc, 0), PROGRAM_SHA1),
         "3350": (NHM9_FLASH_SHA1, NHM9_DESCRIPTOR_OFFSET, 247,
                  (0x0f00, 0, 247, 0x0f00, 0x00dc, 0), NHM9_PROGRAM_SHA1),
+        "8290": (NSB7_FLASH_SHA1, 0x11ee88, PROGRAM_WORDS,
+                 (0x0f00, 0, PROGRAM_WORDS, 0x0f00, 0x00dc, 0), PROGRAM_SHA1),
     }
     if product not in profiles:
         raise ValueError("unsupported verifier product")
@@ -99,10 +104,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("flash", type=Path)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--product", choices=("8210", "6210", "7110", "8250", "6250", "3310", "3350"), default="8210")
+    parser.add_argument("--product", choices=("8210", "6210", "7110", "8250", "6250", "3310", "3350", "8290"), default="8210")
     kind = parser.add_mutually_exclusive_group()
-    kind.add_argument("--loader", action="store_true", help="extract the 8250/3350 second-stage upload")
-    kind.add_argument("--fragment", action="store_true", help="extract the owned 8250/3350 bootstrap fragment")
+    kind.add_argument("--loader", action="store_true", help="extract the supported product's second-stage upload")
+    kind.add_argument("--fragment", action="store_true", help="extract the supported product's owned bootstrap fragment")
     args = parser.parse_args()
     try:
         if args.output.resolve() == args.flash.resolve():
