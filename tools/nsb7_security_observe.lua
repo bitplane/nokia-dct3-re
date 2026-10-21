@@ -1,7 +1,13 @@
 -- Enter the own-ROM fallback code through physical matrix contacts only.
 _G.nsb7_observe_only=true
 local source=debug.getinfo(1,'S').source:sub(2)
-dofile(source:match('^(.*[/\\])')..'nsb7_sim_observe.lua')
+if _G.nsb7_security_with_pin then
+    _G.nsb7_correct_pin=true
+    _G.nsb7_pin_continue=true
+    dofile(source:match('^(.*[/\\])')..'nsb7_pin_input.lua')
+else
+    dofile(source:match('^(.*[/\\])')..'nsb7_sim_observe.lua')
+end
 local machine=manager.machine
 local cpu=machine.devices[':maincpu']
 local memory=cpu.spaces.program
@@ -57,8 +63,9 @@ taps[#taps+1]=memory:install_write_tap(0x130a8c,0x130a93,'nsb7_security_record',
         address,value,mask,cpu.state['R15'].value,machine.time:as_double()))
 end)
 local input=coroutine.create(function()
+    local delay=_G.nsb7_security_with_pin and 8 or 0
     for index,key in ipairs({'Keypad 1','Keypad 2','Keypad 3','Keypad 4','Keypad 5','Left Softkey / Menu'}) do
-        assert(emu.wait(7+index-machine.time:as_double()))
+        assert(emu.wait(7+index+delay-machine.time:as_double()))
         local field=assert(fields[key])
         machine:logerror(string.format('nsb7_security_input: key=%s state=1 t=%.9f\n',key,machine.time:as_double()))
         field:set_value(1)
@@ -68,7 +75,8 @@ local input=coroutine.create(function()
         assert(emu.wait(0.3))
         machine.screens[':screen']:snapshot('nsb7_security_key_'..index..'.png')
     end
-    for _,target in ipairs({14,18,25}) do
+    for _,base in ipairs({14,18,25}) do
+        local target=base+delay
         assert(emu.wait(target-machine.time:as_double()))
         machine.screens[':screen']:snapshot('nsb7_security_'..target..'.png')
     end

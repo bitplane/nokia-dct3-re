@@ -22,6 +22,8 @@ change/rejection/cold reuse pass. PIN2 change, rejected-current-PIN2
 isolation and cold reuse also pass, along with physical PIN2 exhaustion,
 failed-PUK2 retry retention and cold PUK2 recovery/reuse. Permanent PUK
 exhaustion and FDN/AoC authorization remain separate work.
+PIN-enabled fresh/cold laboratory registration and a long wrong-PIN
+non-registration control are qualified as one coherent composition.
 A physical SIM phonebook save and cold Details retrieval are qualified.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
@@ -1604,8 +1606,8 @@ VERIFY returns `9000`, exactly retries 2 -> 3 change in the entire card,
 and the screen advances to the phone `Security code` prompt. Neither
 run sends credential-change/enable/disable/unblock commands or a file
 UPDATE. This proves PIN retry persistence and recovery; PUK recovery
-and PIN-request settings are qualified below. PIN2 and PIN-enabled
-registration remain separate work.
+and PIN-request settings, PIN2 and PIN-enabled registration have separate
+acceptance contracts below.
 
 ```sh
 .venv/bin/python tools/nsb7_pin_check.py \
@@ -1684,7 +1686,8 @@ the setting APDU after final confirmation, correct security statuses,
 complete cold card comparisons, own flash-journal validity, phone-code
 acceptance without startup VERIFY while Off, exact Off/On menu frames,
 and the restored cold PIN prompt/VERIFY. Ordinary PIN1 change is qualified
-below; PIN2/PUK2 and PIN-enabled network registration remain separate work.
+below, as are PIN2/PUK2 and PIN-enabled network registration. Those results
+are not inferred from the request-setting fixture alone.
 
 ### Ordinary PIN1 change and rejected-current-PIN control
 
@@ -1788,3 +1791,55 @@ CHANGE/UNBLOCK/automatic-VERIFY commands, both credential families'
 retry fields, all six complete cold card pairs, own flash journals and
 blocked/error/accepted/changed pixel oracles. Permanent PUK2 exhaustion,
 FDN/AoC authorization and PIN2-specific save-state replay are not promoted.
+
+## PIN-authenticated fresh and cold registration
+
+`tools/nsb7_pin_registration.lua` composes physical PIN `1234` at
+8..12 seconds, phone code `12345` at 16..21, and the existing read-only
+radio observers. The initial card is the declared PIN-enabled profile
+with unregistered LOCI; the own phone storage retains physical Net
+monitor test00 and the clock setting. The PCS measurement fixture enables
+the lab peer, but the harness posts no radio or registration messages.
+
+After successful VERIFY, firmware emits the own Location Updating
+Request `05087000f000fffe20080910101032547698`. Exact contention UA,
+Location Updating Accept and release bytes reach both MCU consumers;
+the same link states `4 -> 3 -> 0` and acknowledgement payloads are
+required. PIN-gated startup adds three earlier packets: this run's SABM
+is TX45 and acknowledgement/release requests are TX46..48 rather than
+the older TX42/TX43..45. The shared checker takes those explicit ordinals
+without changing its default or weakening payload/consumer checks.
+
+Firmware writes exactly registered EF_LOCI
+`ffffffff00f1100001ff00` through SIMI, returns to common control and
+requests background measurement. The complete serialized card differs
+from the declared profile only in LOCI. The full 45-second idle image
+matches the clean `DCT3 LAB` oracle.
+
+A new process retaining the complete own card/phone/CCONT storage again
+requires physical PIN, then emits
+`05087200f110000120080910101032547698`, carrying the retained LAI.
+The same exact acceptance/release checks pass; the firmware does not
+rewrite already-correct LOCI, and the entire card remains unchanged.
+Its full idle image matches the same oracle. Registration follows SIM
+PIN verification and can precede completion of the separate phone-lock
+editor; the two credentials are not interchangeable.
+
+`tools/nsb7_pin_registration_wrong.lua` uses the same fresh PIN-enabled
+card and radio fixture but enters wrong `4321` and no further keys.
+Through 45 seconds it sends no subscriber Location Updating Request and
+receives no acknowledged Location Updating Accept. Only PIN1 retries
+change `3 -> 2`; LOCI and all files remain unmodified.
+
+```sh
+.venv/bin/python tools/nsb7_pin_registration_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin-registration-wrong \
+  tmp/nsb7-pin-registration tmp/nsb7-pin-registration-cold
+```
+
+Acceptance combines physical PIN and phone-code evidence, exact request
+variants and their ordering after VERIFY, the contiguous 57-entry TX inventory,
+MCU consumer/release checks, SIMI writes versus cold non-writes,
+complete initial/final card comparisons and full clean-idle pixels.
+This is authenticated lab-HLE registration, not native DSP/RF, network
+authentication/ciphering or PIN-enabled call/SMS/save-state acceptance.

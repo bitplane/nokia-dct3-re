@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_physical_pin_gated_fresh_cold_registration",
+      "owner": "nsb7_lab_registration", "status": "satisfied",
+      "predicate": "Physical SIM PIN gates exact fresh/cold lab registration and clean idle while a long wrong-PIN control remains unregistered",
+      "current": "Fresh PIN1234 acceptance precedes own050870... Location Updating; exact dual-consumer UA/Accept/Release, link4->3->0, TX46..48 acknowledgements and common-control return pass. Only LOCI changes in the full card via SIMI. Cold retained storage again requires PIN and emits050872 plus retained LAI00f1100001; no redundant SIM writes occur and the whole card is unchanged. Both45s idle frames equal the clean oracle. A same-fixture wrong4321 control through45s loses one retry but sends no subscriber LU and leaves all files unmodified. Phone-code acceptance is independently physical. This does not promote native RF, AKA/ciphering or PIN-enabled call/SMS restoration.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_pin_registration.lua", "tools/nsb7_pin_registration_wrong.lua", "tools/nsb7_pin_registration_check.py", "tools/test_nsb7_pin_registration_check.py", "tools/nsb7_radio_check.py"]
+    },
+    {
       "id": "nsb7_physical_pin2_exhaustion_puk2_recovery",
       "owner": "nsb7_sim_security", "status": "satisfied",
       "predicate": "Cold physical PIN2 failures exhaust retries, wrong PUK2 persists an isolated retry loss, and cold correct recovery installs a reusable new PIN2 without affecting PIN1",

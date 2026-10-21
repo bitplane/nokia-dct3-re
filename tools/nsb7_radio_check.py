@@ -237,22 +237,26 @@ def check_contention(text, inventory):
         raise ValueError('UA decoder result differs')
 
 
-def check_location_update(text):
+def check_location_update(text, first_ack=43, request=None):
     """Qualify the post-UA exchange only; this is not a registration oracle."""
     blocks = re.findall(r'nsb7_lapdm_downlink: pc=([0-9a-f]{8}) task=(\d+) selector=80 block=([0-9a-f]{48}) ', text)
+    request = request if request is not None else bytes.fromhex('05087000f000fffe20080910101032547698')
+    if len(request) != 18 or request[:2] != bytes.fromhex('0508'):
+        raise ValueError('location-update request must have the own MM layout')
     expected = [
-        '01734905087000f000fffe200809101010325476982b2b2b',
+        (bytes.fromhex('017349') + request + b'\x2b'*3).hex(),
         '030045050200f1100001170809101010325476982b2b2b2b',
         '03020d060d002b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b',
     ]
     if blocks != [(pc, task, block) for block in expected
                   for pc, task in [('002e49e6', '4'), ('002645ec', '14')]]:
         raise ValueError('location-update/release blocks did not reach both MCU consumers')
-    transmissions = re.findall(r'nsb7_radio_tx: index=(4[3-5]) type=([0-9a-f]{2}) length=(\d+) data=([0-9a-f]+) ', text)
+    indices = '|'.join(str(first_ack+i) for i in range(3))
+    transmissions = re.findall(r'nsb7_radio_tx: index=('+indices+r') type=([0-9a-f]{2}) length=(\d+) data=([0-9a-f]+) ', text)
     if transmissions != [
-            ('43', '1b', '28', '0080032101' + '2b'*20 + '000000'),
-            ('44', '1b', '28', '0080034101' + '2b'*20 + '000000'),
-            ('45', '02', '20', '041202000000001a600002580000000f00000000')]:
+            (str(first_ack), '1b', '28', '0080032101' + '2b'*20 + '000000'),
+            (str(first_ack+1), '1b', '28', '0080034101' + '2b'*20 + '000000'),
+            (str(first_ack+2), '02', '20', '041202000000001a600002580000000f00000000')]:
         raise ValueError('firmware acknowledgement or receiver-return request differs')
     states = re.findall(r'nsb7_lapdm_state: context=([0-9a-f]{8}) state=(\d+) pc=([0-9a-f]{8}) task=(\d+) ', text)
     if (len(states) != 3 or len({row[0] for row in states}) != 1 or
