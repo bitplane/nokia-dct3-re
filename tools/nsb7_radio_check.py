@@ -88,7 +88,8 @@ def contract(image):
             'scope': 'decoded software classes, not fitted RF-band proof'}
 
 
-def check_trace(text, measurement=False, synchronization=False, channel=False, bcch=False):
+def check_trace(text, measurement=False, synchronization=False, channel=False, bcch=False, ccch=False):
+    bcch = bcch or ccch
     channel = channel or bcch
     synchronization = synchronization or channel
     measurement = measurement or synchronization
@@ -120,6 +121,9 @@ def check_trace(text, measurement=False, synchronization=False, channel=False, b
     elif channel:
         expected_types += (0x03, 0x55)
         expected_lengths += (0, 4)
+    if ccch:
+        expected_types += (0x46, 0x02, 0x0f, 0x02, 0x1f, 0x0c)
+        expected_lengths += (8, 20, 68, 20, 4, 8)
     if tuple(kind for kind, _ in inventory) != expected_types or tuple(len(payload) for _, payload in inventory) != expected_lengths:
         raise ValueError('bounded packet inventory differs')
     if inventory[28] != (0x55, bytes.fromhex('03050000')):
@@ -145,6 +149,8 @@ def check_trace(text, measurement=False, synchronization=False, channel=False, b
             expected_replies.append(('5', '89', '8'))
         if bcch:
             expected_replies.extend((str(index), '80', '34') for index in range(6, 14))
+        if ccch:
+            expected_replies.extend((str(index), '89', '8') for index in range(14, 17))
         if replies != expected_replies:
             raise ValueError('qualified acquisition RX scope differs')
         consumers = re.findall(r'nsb7_measurement: pc=([0-9a-f]{8}) task=(\d+) type=([0-9a-f]{2}) first=([0-9a-f]{4}) '
@@ -194,6 +200,25 @@ def check_trace(text, measurement=False, synchronization=False, channel=False, b
             raise ValueError('SI3 laboratory cell identity or LAI differs')
         if 'nsb7_bcch_flags: flags=0f pc=0029d5ae ' not in text:
             raise ValueError('own SI parser did not complete its bitmap')
+    if ccch:
+        if inventory[32][1] != bytes.fromhex('3210321000010000'):
+            raise ValueError('post-CCCH type-46 publication differs')
+        if (inventory[33][1][:12] != bytes.fromhex('041202020000001660000258') or
+                inventory[35][1][:12] != bytes.fromhex('041202000000001a60000258')):
+            raise ValueError('own common-control reconfiguration sequence differs')
+        if inventory[34][1] != bytes.fromhex('8400' + 'ff'*64 + '0000'):
+            raise ValueError('own empty neighbour-list publication differs')
+        if inventory[36:] != [(0x1f, bytes.fromhex('00040000')), (0x0c, bytes.fromhex('00000f6600000000'))]:
+            raise ValueError('organic access-policy/random-access request differs')
+        for mode, previous in [('10', '50'), ('16', '10'), ('1a', '16')]:
+            cached = f'nsb7_channel_cached: descriptor=00000000 data=04{mode}00000000120002580000 live_channel=0258 live_mode={previous} '
+            if cached not in text:
+                raise ValueError(f'own mode-{mode} configuration was not cached from the previous receiver mode')
+            if not re.search(r'nsb7_channel_ack: pc=002e5054 task=4 type=89 bit=00 cached=00[1-7][0-9a-f]{5} '
+                             f'channel=0258 mode={previous} bsic=12 ', text):
+                raise ValueError(f'own mode-{mode} acknowledgement missing')
+        if 'nsb7_channel_state: cached=00000000 channel=0258 mode=1a bsic=12 t=14.000000000 ' not in text:
+            raise ValueError('common-control receiver did not finish in mode 1a')
 
 
 def main():
@@ -205,11 +230,12 @@ def main():
     parser.add_argument('--synchronization', action='store_true')
     parser.add_argument('--channel', action='store_true')
     parser.add_argument('--bcch', action='store_true')
+    parser.add_argument('--ccch', action='store_true')
     args = parser.parse_args()
     try:
         report = contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
-        check_trace(text, args.measurement, args.synchronization, args.channel, args.bcch)
+        check_trace(text, args.measurement, args.synchronization, args.channel, args.bcch, args.ccch)
         states = re.findall(r'nsb7_radio_state: bands=([0-9a-f]{8}) measurement_route=([0-9a-f]{2}) t=([0-9.]+)', text)
         if states != [('98000000', '01', f'{time:.9f}') for time in (3.5, 6, 14, 24)]:
             raise ValueError('live feature/forwarding predicate differs')
@@ -217,7 +243,8 @@ def main():
             args.contract_json.write_text(json.dumps(report, indent=2) + '\n')
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSB-7 radio inventory: FAIL: {error}\n')
-    print('PASS: ' + ('own SI bitmap complete; organic CCCH request left unanswered' if args.bcch else
+    print('PASS: ' + ('own CCCH configuration committed; organic random-access request left unanswered' if args.ccch else
+                     'own SI bitmap complete; organic CCCH request left unanswered' if args.bcch else
                      'own channel acknowledgement commits receiver; no BCCH replies' if args.channel else
                      'own SCH accepted; organic channel request left unanswered' if args.synchronization else
                      'PCS RSSI consumed by task 13; organic 56 request left unanswered' if args.measurement else

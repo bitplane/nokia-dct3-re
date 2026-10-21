@@ -16,7 +16,7 @@ physical acceptance of the own-ROM default phone code and menu navigation.
 A physical SIM phonebook save and cold Details retrieval are qualified.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
-parsing. CCCH setup, camping,
+parsing, and CCCH setup through an organic random-access request. Camping,
 registration, calls, SMS and a usable idle frame remain unestablished.
 In the normal machine, DSP exchange/service replies are disabled; own internal
 ROM regions are explicitly undumped rather than attached sibling files.
@@ -577,10 +577,11 @@ every input. Unit cases cover precedence and range endpoints.
 ### Opt-in PCS acquisition acceptance
 
 Radio HLE defaults off in the NSB-7 input configuration. The existing
-`Radio peer HLE` setting enables a product-owned **candidate-BCCH**
+`Radio peer HLE` setting enables a product-owned **candidate-common-control**
 contract: the decoded four-byte type-55 forms `03050000/03030000` and
 the subsequent eighty-channel type-56 list, and its type-02/20 receiver
-configuration are answered, followed by eight BCCH blocks. CCCH setup, traffic,
+configuration are answered, followed by eight BCCH blocks and the same
+receiver-configuration grammar for CCCH modes. Random access, traffic,
 neighbour and authentication contracts are not inherited from siblings.
 Other products retain their existing contracts unchanged. Retire the
 acquisition-coverage limit only after the subsequent product contracts are
@@ -597,15 +598,16 @@ fourteen-byte type-80/subtype-40 encoding. No firmware queue, state or APDU is
 injected to make this progression happen.
 
 `tools/nsb7_radio_measurement_observe.lua` adds own broker/consumer/class
-observations. Use `tools/nsb7_radio_check.py IMAGE RUN --bcch` with
-`tools/nsb7_bcch_observe.lua` for this composition. It requires all 32
+observations. Use `tools/nsb7_radio_check.py IMAGE RUN --ccch` with
+`tools/nsb7_bcch_observe.lua` for this composition. It requires all 38
 TX publications, the correct task
 and payload values, and the complete observed RX inventory: two existing
 external-service `8e/10` frames, one measurement `8b/166`, and one SCH
 `80/14`, one channel acknowledgement `89/8`, and eight BCCH `80/34`
-frames through the 25-second fixture. The older `--measurement`,
-`--synchronization` and `--channel` checks retain the preceding bounded
-trace contracts. No CCCH acknowledgement, RSSI or terminal-search
+frames and three CCCH acknowledgements through the 25-second fixture.
+The older `--measurement`, `--synchronization`, `--channel` and `--bcch`
+checks retain the preceding bounded trace contracts. No random-access
+completion, paging block, RSSI or terminal-search
 response is accepted. The no-peer/default fixture still
 reproduces its original 29-packet inventory.
 
@@ -626,7 +628,7 @@ while runtime HLE remains in use. This is a bootstrap/runtime ownership
 correction, not a candidate-payload special case.
 
 Decode each subsequent request's callers and populated fields before
-extending peer coverage. CCCH setup, traffic release, neighbours,
+extending peer coverage. Random access, traffic release, neighbours,
 authentication and registration remain unestablished on this handset.
 
 ### Candidate response routing
@@ -674,7 +676,8 @@ and update `28734c`. Firmware changes the candidate's flags `a2 -> a4`,
 stores decoded BSIC `12`, and publishes type `02`/20 bytes beginning
 `041202000000005050000258`. The final eight request bytes are captured
 but not yet assigned semantics. Channel completion and the subsequent
-BCCH lifecycle are independently qualified below; CCCH setup remains open.
+BCCH and CCCH lifecycles are independently qualified below; random access
+remains open.
 
 ### Receiver configuration acknowledgement
 
@@ -698,8 +701,9 @@ One zero-bit `89/8` response to the captured type-02 request is sufficient
 to commit carrier `0258`, BSIC `12` and mode `50`; at six seconds the
 cache is null and all three live fields agree. The bounded peer then
 stops. Clearing report count alone is insufficient because the full
-serving-BCCH phase periodically re-arms itself; partial coverage must
-leave that phase as well. No terminal `8f` or sibling BCCH stream is
+candidate-RA-info phase re-arms its timed response and then enters BCCH;
+partial channel-only coverage must leave that phase as well. No terminal
+`8f` or sibling BCCH stream is
 included in this contract.
 
 Without BCCH delivery, firmware times out and publishes type `03` with
@@ -724,10 +728,44 @@ The supplied SI3 identifies laboratory cell identity 1, PLMN 001/01 and
 LAC 1; firmware's own SI bitmap reaches `0f` at `29d5ae`.
 Firmware then publishes a second type-02/20 receiver request beginning
 `041202090000001060000258`, selecting mode `60` rather than the previous
-BCCH mode `50`. Its acknowledgement is not yet enabled.
+BCCH mode `50`. Its acknowledgement is qualified separately below.
 
 `--bcch` requires all eight broker-to-task-17 block pairs, all four SI
 types, the own bitmap completion, the organic CCCH request and the full
 13-packet RX inventory. A sibling's extra RA-info, measurement or channel
 response fails this contract. This proves BCCH acquisition and SI
 completion, not camping, Location Updating or registration.
+
+### Common-control receiver setup
+
+The mode-60 wire requests use the same `2b7170` constructor and
+`2ef3ec` cache/commit mechanism as the BCCH request. Internal mode `10`
+encodes wire selector `60` through `2b71ba..2b71d6`; later modes `16`
+and `1a` retain that selector. Each request first caches its own twelve
+configuration bytes, with a null application descriptor, then commits
+on a zero-bit type-89 response. No firmware flags are supplied by the
+peer.
+
+The qualified run observes these successive cache values while the live
+receiver still holds the preceding mode:
+
+| Requested mode | Cached bytes | Previous live mode |
+| --- | --- | --- |
+| `10` | `041000000000120002580000` | `50` |
+| `16` | `041600000000120002580000` | `10` |
+| `1a` | `041a00000000120002580000` | `16` |
+
+After the third acknowledgement, the cache is empty and the live receiver
+holds carrier 600, BSIC `12`, mode `1a`. Firmware also publishes type
+`46/8`, an empty `0f/68` neighbour list, control `1f/4 = 00040000`, and
+finally `0c/8 = 00000f6600000000`. The latter has the nonzero access
+octet `0f`; its completion and assignment are not yet modeled. The
+semantics of the type-46 payload and remaining control bytes are not
+inferred solely from this ordering.
+
+`--ccch` requires all 38 TX packets, sixteen RX packets, all three cached
+configuration/acknowledgement pairs, and the final mode plus the organic
+access request. The partial peer retains the receiver phase for repeated
+configuration, but clears scheduled reports and waits so no unqualified
+PCH/AGCH or access-completion indication is emitted. Registration and
+native speech remain unproved.

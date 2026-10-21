@@ -976,7 +976,7 @@ u8 nokia_radio_peer_device::next_report_type() const
 	case phase::candidate_channel_change:
 		return m_reports_remaining == 2 ? 0x8f : 0x89;
 	case phase::serving_bcch:
-		if (m_protocol.coverage == acquisition_coverage::candidate_bcch)
+		if (m_protocol.coverage >= acquisition_coverage::candidate_bcch)
 			return 0x80;
 		if (m_registered || m_idle_common_control_active)
 			return (m_reports_remaining % 3) == 1 ? 0x83 : 0x80;
@@ -1737,7 +1737,14 @@ void nokia_radio_peer_device::encode_random_access_info(u8 *payload)
 
 void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &packet)
 {
-	if (m_protocol.coverage != acquisition_coverage::full)
+	// A qualified partial product may enter the existing common-control
+	// configuration handler, but no other full-contract request handlers.
+	const bool partial_common_control_request =
+			m_protocol.coverage == acquisition_coverage::candidate_common_control &&
+			current_phase() == phase::serving_bcch &&
+			packet.type == 0x02 && packet.length == 20 &&
+			packet.payload[0] == 4 && packet.payload[8] == 0x60;
+	if (m_protocol.coverage != acquisition_coverage::full && !partial_common_control_request)
 	{
 		if (packet.type == 0x55 && packet.length == 4 &&
 				packet.payload[0] == 3 &&
@@ -2829,6 +2836,7 @@ void nokia_radio_peer_device::emit_report()
 	++m_reports_sent;
 	if (!asynchronous_neighbour_report)
 	{
+		const bool completing_common_control = current_phase() == phase::serving_channel_change;
 		--m_reports_remaining;
 		advance_after_report(report_type);
 		// Partial acquisition contracts establish one SCH observation, not
@@ -2838,21 +2846,31 @@ void nokia_radio_peer_device::emit_report()
 			m_reports_remaining = 0;
 		if (m_protocol.coverage == acquisition_coverage::candidate_channel && report_type == 0x89)
 		{
-			// The full contract re-arms periodic BCCH from serving_bcch even
-			// with no queued reports. A bounded channel-only product must not
-			// inherit that continuation after acknowledging its configuration.
+			// The full contract re-arms timed candidate RA-info and then BCCH
+			// even with no queued reports. A bounded channel-only product must
+			// not inherit that continuation after acknowledging configuration.
 			set_phase(phase::inactive);
 			m_reports_remaining = 0;
 			m_wait_ticks = 0;
 			m_report_deferred = false;
 		}
-		if (m_protocol.coverage == acquisition_coverage::candidate_bcch && report_type == 0x89)
+		if (m_protocol.coverage >= acquisition_coverage::candidate_bcch &&
+				report_type == 0x89 && !completing_common_control)
 		{
 			// This product establishes BCCH directly after the receiver
 			// acknowledgement, not the sibling's unsolicited RA-info report.
 			set_phase(phase::serving_bcch);
 			m_reports_remaining = serving_cycle_reports();
 			m_wait_ticks = 59;
+		}
+		if (m_protocol.coverage == acquisition_coverage::candidate_common_control &&
+				report_type == 0x89 && completing_common_control)
+		{
+			// Retain the configured receiver so another command in the same
+			// grammar can reconfigure it, but schedule no unqualified PCH data.
+			m_reports_remaining = 0;
+			m_wait_ticks = 0;
+			m_report_deferred = false;
 		}
 	}
 	m_transport->notify_rx();

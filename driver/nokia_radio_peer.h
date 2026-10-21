@@ -39,13 +39,15 @@ public:
 		direct,
 		low_six_bits
 	};
+	// Partial levels are ordered by the independently qualified continuation.
 	enum class acquisition_coverage : u8
 	{
 		full,
 		band_measurements,
 		candidate_synchronization,
 		candidate_channel,
-		candidate_bcch
+		candidate_bcch,
+		candidate_common_control
 	};
 
 	enum class neighbour_arfcn_encoding : u8

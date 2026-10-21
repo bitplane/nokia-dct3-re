@@ -78,7 +78,41 @@ def bcch_trace():
     return '\n'.join(rows)
 
 
+def ccch_trace():
+    rows = [bcch_trace()]
+    cursor = (sum((length+3)//2 for length in LENGTHS) + 81 + 22) % 0x52
+    payloads = [(0x46, '3210321000010000'),
+                (2, '041202020000001660000258' + '00'*8),
+                (0x0f, '8400' + 'ff'*64 + '0000'),
+                (2, '041202000000001a60000258' + '00'*8),
+                (0x1f, '00040000'), (0x0c, '00000f6600000000')]
+    for index, (kind, payload) in enumerate(payloads, 33):
+        length = len(payload)//2
+        producer = (cursor+(length+3)//2) % 0x52
+        rows.append(f'nsb7_radio_tx: index={index} type={kind:02x} length={length} data={payload} '
+                    f'cursor={cursor:02x} producer={producer:02x} pc=002cb0ec t=11 observer_writes=0')
+        cursor = producer
+    for index, (mode, previous) in enumerate([('10', '50'), ('16', '10'), ('1a', '16')], 14):
+        rows.extend([
+            f'nsb7_radio_rx: index={index} type=89 length=8 t=10 observer_writes=0',
+            f'nsb7_channel_cached: descriptor=00000000 data=04{mode}00000000120002580000 live_channel=0258 live_mode={previous} t=10 observer_writes=0',
+            f'nsb7_channel_ack: pc=002e5054 task=4 type=89 bit=00 cached=00101e08 channel=0258 mode={previous} bsic=12 t=10 observer_writes=0'])
+    rows.append('nsb7_channel_state: cached=00000000 channel=0258 mode=1a bsic=12 t=14.000000000 observer_writes=0')
+    return '\n'.join(rows)
+
+
 class RadioInventoryTests(unittest.TestCase):
+    def test_common_control_reconfiguration_reaches_organic_access_request(self):
+        check_trace(ccch_trace(), ccch=True)
+        for old, new in [('mode=1a bsic=12 t=14', 'mode=16 bsic=12 t=14'),
+                         ('data=041a00000000120002580000', 'data=041600000000120002580000'),
+                         ('data=00000f6600000000', 'data=0000006600000000'),
+                         ('channel=0258 mode=16 bsic=12 t=10', 'channel=0258 mode=10 bsic=12 t=10')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_trace(ccch_trace().replace(old, new), ccch=True)
+        with self.assertRaises(ValueError):
+            check_trace(ccch_trace() + '\nnsb7_radio_rx: index=17 type=84 length=8 t=12', ccch=True)
+
     def test_bcch_reaches_own_si_parser_and_ccch_request(self):
         check_trace(bcch_trace(), bcch=True)
         for old, new in [('flags=0f pc=0029d5ae', 'flags=0e pc=0029d5ae'),
