@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_host_incoming_call_settled_idle",
+      "owner": "nsb7_host_services", "status": "satisfied",
+      "predicate": "A host request after reviewed authenticated idle produces displayed caller, physical Answer/End and correlated incoming-call signaling release",
+      "current": "Own PIN-enabled source physically authenticates and registers on PCS600 before45s readiness; readiness pixels must equal exact clean idle rather than a startup logo. With automatic calls disabled, host caller447700900123 appears in the exact51s ringing frame. Physical Send52 decodes0e, CONNECT/ACK precedes epoch1 connected and exact active Call1 pixels. Physical End60 decodes0f, closes CC/RR and host request1, then returns to exact68s idle/common-control/background. Full SIM card remains unchanged; exact queued/paging/alerting/connected/media_closed/ended phases stay in epoch1. Media_closed is bookkeeping, not speech or PCM evidence. Outgoing host decisions, restoration, native RF and SIP calls remain separate.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_pin_host_incoming_call.lua", "tools/nsb7_call_observe.lua", "tools/nsb7_host_incoming_call_check.py", "tools/test_nsb7_host_incoming_call_check.py", "tools/run_host_incoming_signaling_gate.py", "fixtures/nsb7_host/nsb7hle.cfg"]
+    },
+    {
       "id": "nsb7_authenticated_independent_host_sms_directions",
       "owner": "nsb7_host_services", "status": "satisfied",
       "predicate": "Independent physical PIN-authenticated NSB-7 runs qualify host-originated incoming SMS/read and host-decided outgoing Reply",

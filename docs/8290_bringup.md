@@ -35,6 +35,8 @@ incoming SMS read/Reply, active incoming-call/SMS restoration and persistent
 phonebook save/cold Details retrieval with exact card and UI outcomes.
 Independent host-originated incoming SMS/read and host-decided outgoing Reply
 also pass through the shared WebSocket adapter without new device behavior.
+Host-originated incoming call signaling separately passes from reviewed clean
+idle through displayed caller, physical Answer/End and correlated release.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
 parsing, CCCH setup, timed random-access completion and an accepted
@@ -2217,3 +2219,40 @@ runner success alone is insufficient: require the combined checker too.
   roms/noki8290/8290f522a.fls tmp/nsb7-pin-host-sms-incoming \
   tmp/nsb7-pin-host-sms-reply
 ```
+
+## Host incoming call from settled idle
+
+`nsb7_pin_host_incoming_call.lua` composes physical PIN/phone-code entry with
+the radio observer and named Send/End contacts. The host fixture uses
+`fixtures/nsb7_host/nsb7hle.cfg`: automatic incoming calls are disabled.
+At45s the handset emits a readiness snapshot matching the exact clean idle
+oracle; the host runner must start from a fresh, absent readiness file and
+wait for that artifact before requesting caller `447700900123`.
+
+The settled boundary is part of acceptance, not just a host synchronization
+convenience. A startup logo or an arbitrary existing PNG must not satisfy it,
+even if signaling happens to work underneath. Authentication and PCS600
+registration must precede readiness; the checker verifies the ready pixels.
+
+The exact ringing frame at51s displays `447700900123`. Physical Send52
+decodes0e, emits CONNECT and receives CONNECT ACK before the host reports
+connected. The53s frame shows the firmware's active `Call 1` UI. Physical
+End60 decodes0f and completes DISCONNECT/RELEASE/RELEASE COMPLETE, then host
+ended and common-control/background return. The68s final frame equals clean
+idle. Host request1 remains in epoch1 through the exact queued/paging/
+alerting/connected/media_closed/ended sequence; `media_closed` is lifecycle
+bookkeeping, not evidence of speech. The complete SIM card is unchanged.
+
+Use `run_host_incoming_signaling_gate.py --port 18932 --ready-file
+tmp/nsb7-pin-host-incoming-idle/snap/nsb7_call_ready.png` around the isolated
+MAME command with `-http -http_port 18932`, this Lua script and a75s guard.
+Require the handset checker as well as runner success:
+
+```sh
+.venv/bin/python tools/nsb7_host_incoming_call_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin-host-incoming-idle
+```
+
+This validates external host signaling and physical UI acceptance, not host
+media, native speech, an external carrier or a SIP-connected call. Outgoing
+host-call decisions and host-call restoration remain separate targets.
