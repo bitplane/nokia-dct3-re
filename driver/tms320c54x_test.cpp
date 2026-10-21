@@ -45828,7 +45828,8 @@ private:
 			{
 				{
 					auto const disable = machine().disable_side_effects();
-					expect(m_pipeline_store_writes == 2 && m_pipeline_extensions_reads == (short_form ? 0 : 1) &&
+					u16 const opcode = 0x4e00 | (f.source << 8) | (short_form ? 0x80 + (f.kind - 4) * 8 + f.reg : f.kind == 3 ? 0xf8 : 0xe0 + f.kind * 8 + f.reg);
+					expect_opcode(opcode, m_pipeline_store_writes == 2 && m_pipeline_extensions_reads == (short_form ? 0 : 1) &&
 						m_cpu->space(AS_DATA).read_word(f.address) == u16(f.stored >> 16) && m_cpu->space(AS_DATA).read_word(f.address ^ 1) == u16(f.stored) &&
 						m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == 0x2000,
 						"DST retains both source words and destination despite later accumulator/AR/literal changes");
@@ -47615,7 +47616,8 @@ private:
 			{
 				u16 const st0 = (flags & 2) && f.reg && form != 15 ? (0x6608 & ~0xe000) | (f.reg << 13) : 0x6608;
 				u16 const st1 = 0x800 | ((flags & 1) << 8) | ((flags & 2) << 4) | ((flags & 4) << 5);
-				expect(m_pipeline_operand_reads == 2 && m_pipeline_extensions_reads == unsigned(form >= 12) &&
+				u16 const opcode = 0x5600 | (f.source << 8) | (form < 12 ? 0x80 + form * 8 + f.reg : form == 15 ? 0xf8 : 0xe0 + (form - 12) * 8 + f.reg);
+				expect_opcode(opcode, m_pipeline_operand_reads == 2 && m_pipeline_extensions_reads == unsigned(form >= 12) &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == st1 &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == (f.source ? 0x1111222233ULL : f.value) &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == (f.source ? f.value : 0x4444555566ULL) &&

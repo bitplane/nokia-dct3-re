@@ -105,6 +105,24 @@ No CPU arithmetic implementation change is needed. The current complete
 default core run separately passes 294 markers; its assertions alone must
 not be promoted to exact execution attribution without an opcode inventory.
 
+## Paired-memory assertion attribution
+
+`indirect-dld` already validates extended DST (3,072 cases), short-indirect
+DST (9,216), indirect DLD (23,040), and store/load composition (1,152),
+including saved in-flight execution. The final paired-memory result checks
+now attribute their exact opcode instead of only emitting family-level PASS
+markers. Source/address retention, bus counts and pointer checks are unchanged;
+this does not change CPU execution or expand the tested status/operand domains.
+
+A fresh verbose profile run links 22 observed NSK-3 words (641,822 executions)
+to actual execution and assertions in that fixture. Eight of these words were
+absent from the default fixture's assertion inventory: `4e81/4e83/4e85/4e86`,
+`4ed2`, `5682`, `578d`, and `57d2` (120,365 observed executions). This is
+attribution of existing semantic checks, not discovery of eight CPU defects.
+Run `tools/run_c54x_core.py` with the same paths as above and
+`--profile indirect-dld --verbose`, retaining its complete log before combining
+it through the coverage tool's `--additional-fixture-log` option.
+
 ## Mapped move and younger repeat ownership
 
 Decode can arm an RPT header while an older MVDK remains in Access. A global
