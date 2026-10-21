@@ -602,6 +602,15 @@ This is an HTML/OCR reference, not a downloaded full PDF or schematic. Its
 accessory-interface description is product-specific corroboration, not a DSP
 port34/35/36 register specification. No ready-bit semantics are inferred.
 
+## NSB-7 v5.22 package
+
+The already acquired `archive-dct3-packages/nsb7_5.22.exe` contains its own
+MCU and PPM-A record streams, but no PMM. `tools/nsb7_package_check.py`
+qualifies the installer, restore manifest, record addresses and exact decoded
+hashes before writing `noki8290/8290f522a.fls` (CPU order, `0x1d0000` bytes,
+SHA1 `4dacc50f57fe295168a53d3e5855a81acf35ab96`). Full inputs and
+reproduction are in `docs/8290_bringup.md`. This is not boot acceptance.
+
 ## NSK RF documentation references
 
 Indexed primary documents used by `docs/5130_bringup.md`; the PDF binaries
