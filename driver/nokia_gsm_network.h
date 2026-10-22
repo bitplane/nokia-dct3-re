@@ -200,7 +200,13 @@ public:
 	void set_ussd_outcome(ussd_outcome outcome) { m_ussd_outcome = outcome; }
 	ussd_outcome configured_ussd_outcome() const { return m_ussd_outcome; }
 	bool set_host_incoming_ussd(u8 data_coding_scheme,
-			const u8 *data, unsigned length);
+			const u8 *data, unsigned length, bool request = false);
+	bool host_incoming_ussd_is_request() const { return m_host_ussd_request; }
+	const gsm::ss::ussd_result &host_incoming_ussd_reply() const { return m_host_ussd_reply; }
+	void record_host_incoming_ussd_reply(const gsm::ss::ussd_result &reply)
+	{
+		if (m_host_ussd_pending && m_host_ussd_request) m_host_ussd_reply = reply;
+	}
 	void clear_host_incoming_ussd() { m_host_ussd_pending = false; }
 	bool host_incoming_ussd_pending() const { return m_host_ussd_pending; }
 	gsm::ss::message host_incoming_ussd() const;
@@ -386,6 +392,8 @@ private:
 	u8 m_host_sms_user_data_length = 0;
 	ussd_outcome m_ussd_outcome = ussd_outcome::success;
 	bool m_host_ussd_pending = false;
+	bool m_host_ussd_request = false;
+	gsm::ss::ussd_result m_host_ussd_reply{};
 	u8 m_host_ussd_data_coding_scheme = 0x0f;
 	std::array<u8, gsm::ss::maximum_ussd_length> m_host_ussd_data{};
 	u8 m_host_ussd_data_length = 0;

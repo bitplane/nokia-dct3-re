@@ -87,7 +87,12 @@ physical response/idle/menu recovery. Its branches intentionally differ in
 host input; equal protocol replay is not claimed. One continued laboratory
 dialogue additionally proves physical Answer, numeric reply, correlated final
 result and idle/menu recovery with unchanged card; it does not promote
-host-controlled multi-turn USSD. Native radio and speech remain unproved; see
+host-controlled multi-turn USSD. A separate network-originated laboratory
+request proves physical Read/Answer/2/Send, correlated release and exact idle/
+menu; pending-editor restoration reproduces architecture, time and protocol.
+An explicit WebSocket host request also delivers the unchanged typed reply
+after RR release, with matching identity/epoch and unchanged card. That host
+request's restoration remains unqualified. Native radio and speech remain unproved; see
 `nsb7_host_ussd_check.py` and `8290_bringup.md`.
 
 ## Promotion rules

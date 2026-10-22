@@ -119,6 +119,12 @@ int main()
 			response.data[1] != 0x3b || response.data[11] != 0x3c ||
 			response.data[3] != response.length - 4)
 		return 23;
+	const auto packed_network_request = gsm::ss::network_unstructured_uss_request(
+			0x0b, 1, 0x0f, response.data.data() + 19, response.length - 19);
+	if (packed_network_request.length != response.length) return 35;
+	for (unsigned i = 0; i < response.length; ++i)
+		if (packed_network_request.data[i] != response.data[i]) return 36;
+	if (gsm::ss::network_unstructured_uss_request(0x0b,1,0x0f,nullptr,1).length) return 37;
 	for (unsigned i = 0; i < response.length; ++i)
 		std::printf("%02x", response.data[i]);
 	std::puts("");

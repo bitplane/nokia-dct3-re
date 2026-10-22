@@ -152,13 +152,21 @@ void nokia_gsm_network_device::device_start()
 	save_item(NAME(m_host_sms_user_data_octets));
 	save_item(NAME(m_host_sms_user_data_length));
 	save_item(NAME(m_host_ussd_pending));
+	save_item(NAME(m_host_ussd_request));
+	save_item(NAME(m_host_ussd_reply.valid));
+	save_item(NAME(m_host_ussd_reply.has_parameters));
+	save_item(NAME(m_host_ussd_reply.transaction));
+	save_item(NAME(m_host_ussd_reply.invoke_id));
+	save_item(NAME(m_host_ussd_reply.data_coding_scheme));
+	save_item(NAME(m_host_ussd_reply.ussd_length));
+	save_item(NAME(m_host_ussd_reply.ussd));
 	save_item(NAME(m_host_ussd_data_coding_scheme));
 	save_item(NAME(m_host_ussd_data));
 	save_item(NAME(m_host_ussd_data_length));
 }
 
 bool nokia_gsm_network_device::set_host_incoming_ussd(
-		u8 data_coding_scheme, const u8 *data, unsigned length)
+		u8 data_coding_scheme, const u8 *data, unsigned length, bool request)
 {
 	if (!data || !length || length > m_host_ussd_data.size() ||
 			m_host_ussd_pending)
@@ -168,6 +176,8 @@ bool nokia_gsm_network_device::set_host_incoming_ussd(
 	m_host_ussd_data_coding_scheme = data_coding_scheme;
 	m_host_ussd_data_length = u8(length);
 	m_host_ussd_pending = true;
+	m_host_ussd_request = request;
+	m_host_ussd_reply = {};
 	return true;
 }
 
@@ -175,6 +185,10 @@ gsm::ss::message nokia_gsm_network_device::host_incoming_ussd() const
 {
 	if (!m_host_ussd_pending)
 		return {};
+	if (m_host_ussd_request)
+		return gsm::ss::network_unstructured_uss_request(
+				0x0b, 1, m_host_ussd_data_coding_scheme,
+				m_host_ussd_data.data(), m_host_ussd_data_length);
 	return gsm::ss::network_unstructured_uss_notify(
 			0x0b, 1, m_host_ussd_data_coding_scheme,
 			m_host_ussd_data.data(), m_host_ussd_data_length);

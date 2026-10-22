@@ -1,4 +1,5 @@
 import unittest
+import re
 from unittest.mock import patch
 
 from tools.nsb7_network_ussd_request_check import KEYS, check, check_state
@@ -25,11 +26,33 @@ def fixture():
     return '\n'.join(lines)
 
 
+def host_fixture():
+    text=fixture()
+    def shift(match):
+        second=int(match[1])
+        return f't={second if second==24 else second+4}.{match[2]}'
+    text=re.sub(r't=(\d+)\.(000000000|200000000)',shift,text)
+    prefix=('gsm_call_adapter: incoming ussd id=1 result=accepted t=24.010000\n'
+            'gsm_call_adapter: incoming ussd state id=1 epoch=1 phase=queued\n')
+    return prefix+text.replace('LAPDm service Channel Release acknowledged\n',
+        'LAPDm service Channel Release acknowledged\n'
+        'gsm_call_adapter: incoming ussd reply id=1 epoch=1 dcs=0f data=32 empty=0\n'
+        'gsm_call_adapter: incoming ussd state id=1 epoch=1 phase=answered\n')
+
+
 class NetworkUssdTests(unittest.TestCase):
-    def verify(self, text, final=b'card'):
+    def verify(self, text, final=b'card', host=False):
         with patch('tools.nsb7_network_ussd_request_check.check_source'), \
                 patch('tools.nsb7_network_ussd_request_check.check_authentication'):
-            check(text, b'card', final)
+            check(text, b'card', final, host)
+
+    def test_host_response_follows_release(self):
+        self.verify(host_fixture(),host=True)
+        for old,new in [('reply id=1 epoch=1','reply id=1 epoch=2'),
+                        ('data=32 empty=0','data=33 empty=0'),
+                        ('phase=answered','phase=delivered')]:
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                self.verify(host_fixture().replace(old,new),host=True)
 
     def test_physical_reply(self):
         self.verify(fixture())

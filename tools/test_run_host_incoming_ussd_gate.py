@@ -9,27 +9,40 @@ from tools import run_host_incoming_ussd_gate as gate
 
 class IncomingUssdRunnerTest(unittest.IsolatedAsyncioTestCase):
     async def run_fixture(self, reference=('queued','delivered'), *, restore=True,
-                          output=b'clean handset\n', wrong_request=False):
+                          output=b'clean handset\n', wrong_request=False,
+                          request=False, reply='32', include_reply=True):
         process=SimpleNamespace(returncode=0,wait=AsyncMock(return_value=0),
             stdout=SimpleNamespace(readline=AsyncMock(side_effect=[output,b''])))
         socket=AsyncMock()
         socket.__aenter__.return_value=socket
         events=[dict(type='call_adapter_ready',epoch=1),
                 dict(type='network_state',epoch=1,registered=True)]
-        events += [dict(type='incoming_ussd_state',epoch=1,
-                        request_id=2 if wrong_request else 1,phase=phase) for phase in reference]
+        for phase in reference:
+            if request and phase=='answered' and include_reply:
+                events.append(dict(type='incoming_ussd_response',epoch=1,request_id=1,
+                                   dcs=15,data=reply,empty=False))
+            events.append(dict(type='incoming_ussd_state',epoch=1,
+                               request_id=2 if wrong_request else 1,phase=phase))
         if restore:
             events += [dict(type='call_adapter_ready',epoch=2)]
             events += [dict(type='incoming_ussd_state',epoch=2,request_id=1,phase=phase)
                        for phase in ('queued','delivered')]
         socket.recv.side_effect=[json.dumps(event) for event in events]
         args=SimpleNamespace(command=['mame'],cwd=None,port=18990,
-                             text='Host notice',require_restore=restore)
+                             text='Host notice',require_restore=restore,request=request,expected_reply='2')
         with patch.object(gate.asyncio,'create_subprocess_exec',AsyncMock(return_value=process)), \
              patch.object(gate,'connect',AsyncMock(return_value=socket)),patch('builtins.print'):
             await gate.run(args)
         self.assertEqual(socket.send.await_count,1)
         self.assertEqual(socket.recv.await_count,len(events))
+        self.assertEqual(json.loads(socket.send.call_args.args[0]).get('operation'),
+                         'request' if request else None)
+
+    async def test_request_requires_actual_correlated_reply(self):
+        await self.run_fixture(('queued','answered'),restore=False,request=True)
+        for kwargs in ({'reply':'33'}, {'include_reply':False}, {'wrong_request':True}):
+            with self.subTest(kwargs=kwargs),self.assertRaises(RuntimeError):
+                await self.run_fixture(('queued','answered'),restore=False,request=True,**kwargs)
 
     async def test_reference_delivery_does_not_skip_restore(self):
         await self.run_fixture()

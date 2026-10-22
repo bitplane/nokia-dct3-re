@@ -40,6 +40,7 @@ private:
 	void publish_ussd_request();
 	void publish_ussd_state(const char *phase);
 	void publish_incoming_ussd_state(const char *phase);
+	void publish_incoming_ussd_reply();
 	void publish_ready();
 	void publish_state(const char *phase);
 	void publish_incoming_state(const char *phase,

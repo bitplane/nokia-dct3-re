@@ -95,8 +95,9 @@ it must not resend an `incoming_call` that MAME has already accepted.
 | MAME to host | `outgoing_ussd` | identity, DCS and packed USSD request data |
 | Host to MAME | `outgoing_ussd_response` | identity, outcome and either DCS plus packed response data or an error/problem code |
 | MAME to host | `outgoing_ussd_state` | identity and `phase`: `accepted` or `ended` |
-| Host to MAME | `incoming_ussd` | identity, DCS and packed notification data |
-| MAME to host | `incoming_ussd_state` | identity and `phase`: `queued`, `delivered` or `expired` |
+| Host to MAME | `incoming_ussd` | identity, DCS, packed data and optional `operation`: `notify` (default) or `request` |
+| MAME to host | `incoming_ussd_response` | identity, DCS, packed handset reply and `empty` parameter flag, after ordinary RR release |
+| MAME to host | `incoming_ussd_state` | identity and `phase`: `queued`, `delivered`, `answered`, `cancelled` or `expired` |
 
 The `*` is direction-specific (`incoming` or `outgoing`) and must match the
 call. Frames are conventional GSM 06.10 full-rate payloads, not PCM. The host
@@ -228,12 +229,21 @@ wrong-ID rejection, response/idle/menu frames, unchanged card and retained RTC.
 Only the restored branch receives the host result, so equal protocol replay
 is not claimed. Neither gate proves multi-turn dialogue continuity.
 
-Host-originated `incoming_ussd` is deliberately a notification, matching the
-network-initiated form this firmware accepts. It enters through registered-idle
+Host-originated `incoming_ussd` defaults to a notification. It enters through registered-idle
 paging and is reported `delivered` only after the handset ReturnResult and
 channel release. The standalone bridge can exercise it with
 `--incoming-ussd 'Host notice' --once`; the generic wire contract accepts
 already packed data rather than assuming a text alphabet.
+An explicit `"operation":"request"` selects network `UnstructuredSS-Request`.
+The firmware owns the editor and physical input. A correlated typed ReturnResult
+is retained until RR release, then published once as `incoming_ussd_response`
+before state `answered`. A handset RELEASE COMPLETE without a result ends as
+`cancelled`; no reply is fabricated. Unknown operation strings are rejected.
+The backward-compatible standalone bridge CLI still sends notifications;
+the request acceptance runner uses `--request --expected-reply 2`.
+Authenticated NSB-7 acceptance is documented in `8290_bringup.md`. Arbitrary
+host multi-turn continuation and pending host-request save/load are not yet
+qualified by this gate.
 CLI USSD text uses the same GSM tables but its own padding: a spare septet is
 CR rather than zero (`@`), and an intended final CR on an octet boundary is
 protected by another CR. USSD does not carry an SMS TP-UDL. These boundary

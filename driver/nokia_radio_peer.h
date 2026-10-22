@@ -160,7 +160,9 @@ public:
 	bool host_incoming_sms_queued() const { return m_host_incoming_sms_pending; }
 	void cancel_host_incoming_sms();
 	bool queue_host_incoming_ussd(u8 data_coding_scheme,
-			const u8 *data, unsigned length);
+			const u8 *data, unsigned length, bool request = false);
+	bool host_incoming_ussd_is_request() const { return m_gsm_network->host_incoming_ussd_is_request(); }
+	const gsm::ss::ussd_result &host_incoming_ussd_reply() const { return m_gsm_network->host_incoming_ussd_reply(); }
 	bool host_incoming_ussd_pending() const
 	{
 		return m_host_incoming_ussd_pending || m_host_incoming_ussd_active;

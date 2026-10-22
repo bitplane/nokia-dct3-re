@@ -99,6 +99,7 @@ struct nokia_gsm_call_adapter_device::host_state
 	{
 		u32 epoch = 0;
 		u32 request_id = 0;
+		bool request = false;
 		u8 data_coding_scheme = 0x0f;
 		std::array<u8, gsm::ss::maximum_ussd_length> data{};
 		u8 length = 0;
@@ -346,6 +347,13 @@ void nokia_gsm_call_adapter_device::device_start()
 							!message.HasMember("data") || !message["data"].IsString())
 						return;
 					host_state::queued_incoming_ussd item;
+					if (message.HasMember("operation"))
+					{
+						if (!message["operation"].IsString()) return;
+						const std::string_view operation(message["operation"].GetString(), message["operation"].GetStringLength());
+						if (operation != "request" && operation != "notify") return;
+						item.request = operation == "request";
+					}
 					item.epoch = message["epoch"].GetUint();
 					item.request_id = message["request_id"].GetUint();
 					item.data_coding_scheme = u8(message["dcs"].GetUint());
@@ -623,7 +631,7 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 		const bool accepted = item.epoch == m_transport_epoch.load() &&
 				m_incoming_ussd_request_id == 0 &&
 				m_radio_peer->queue_host_incoming_ussd(
-						item.data_coding_scheme, item.data.data(), item.length);
+						item.data_coding_scheme, item.data.data(), item.length, item.request);
 		LOGMASKED(LOG_CALL_ADAPTER,
 				"gsm_call_adapter: incoming ussd id=%u result=%s t=%.6f\n",
 				item.request_id, accepted ? "accepted" : "rejected",
@@ -638,7 +646,14 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 	if (m_incoming_ussd_request_id &&
 			!m_radio_peer->host_incoming_ussd_pending())
 	{
-		publish_incoming_ussd_state("delivered");
+		if (m_radio_peer->host_incoming_ussd_is_request())
+		{
+			const bool answered = m_radio_peer->host_incoming_ussd_reply().valid;
+			if (answered) publish_incoming_ussd_reply();
+			publish_incoming_ussd_state(answered ? "answered" : "cancelled");
+		}
+		else
+			publish_incoming_ussd_state("delivered");
 		m_incoming_ussd_request_id = 0;
 		m_incoming_ussd_queue_ticks = 0;
 	}
@@ -1064,6 +1079,31 @@ void nokia_gsm_call_adapter_device::publish_incoming_sms_state(const char *phase
 			"gsm_call_adapter: incoming sms state id=%u epoch=%u phase=%s t=%.6f\n",
 			m_incoming_sms_request_id, m_transport_epoch.load(), phase,
 			machine().time().as_double());
+}
+
+void nokia_gsm_call_adapter_device::publish_incoming_ussd_reply()
+{
+	const auto &reply = m_radio_peer->host_incoming_ussd_reply();
+	std::string data;
+	for (unsigned index = 0; index < reply.ussd_length; ++index)
+		data += util::string_format("%02x", reply.ussd[index]);
+	rapidjson::StringBuffer buffer;
+	rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+	writer.StartObject();
+	writer.Key("type"); writer.String("incoming_ussd_response");
+	writer.Key("request_id"); writer.Uint(m_incoming_ussd_request_id);
+	writer.Key("epoch"); writer.Uint(m_transport_epoch.load());
+	writer.Key("dcs"); writer.Uint(reply.data_coding_scheme);
+	writer.Key("data"); writer.String(data.c_str());
+	writer.Key("empty"); writer.Bool(!reply.has_parameters);
+	writer.EndObject();
+	std::lock_guard<std::mutex> lock(m_host->mutex);
+	for (const auto &connection : m_host->connections)
+		connection->send_message(buffer.GetString(), 1);
+	LOGMASKED(LOG_CALL_ADAPTER,
+			"gsm_call_adapter: incoming ussd reply id=%u epoch=%u dcs=%02x data=%s empty=%u t=%.6f\n",
+			m_incoming_ussd_request_id, m_transport_epoch.load(), reply.data_coding_scheme,
+			data.c_str(), reply.has_parameters ? 0 : 1, machine().time().as_double());
 }
 
 void nokia_gsm_call_adapter_device::publish_incoming_ussd_state(const char *phase)

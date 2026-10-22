@@ -562,6 +562,16 @@ message network_unstructured_uss_request(
 			packed.data(), packed_length);
 }
 
+message network_unstructured_uss_request(
+		std::uint8_t transaction, std::uint8_t invoke_id,
+		std::uint8_t data_coding_scheme, const std::uint8_t *packed,
+		unsigned packed_length)
+{
+	return network_unstructured_uss(transaction, invoke_id,
+			operation::unstructured_uss_request, data_coding_scheme,
+			packed, packed_length);
+}
+
 message network_unstructured_uss_notify(
 		std::uint8_t transaction, std::uint8_t invoke_id, const char *text)
 {

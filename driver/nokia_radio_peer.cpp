@@ -77,12 +77,12 @@ bool nokia_radio_peer_device::queue_host_incoming_sms(
 }
 
 bool nokia_radio_peer_device::queue_host_incoming_ussd(
-		u8 data_coding_scheme, const u8 *data, unsigned length)
+		u8 data_coding_scheme, const u8 *data, unsigned length, bool request)
 {
 	if (!m_enabled || !m_registered || !m_gsm_session->idle() ||
 			m_host_incoming_ussd_pending || m_host_incoming_ussd_active ||
 			!m_gsm_network->set_host_incoming_ussd(
-					data_coding_scheme, data, length))
+					data_coding_scheme, data, length, request))
 		return false;
 	m_host_incoming_ussd_pending = true;
 	return true;
@@ -2702,7 +2702,9 @@ void nokia_radio_peer_device::emit_report()
 				(m_incoming_sms_after_registration || m_host_incoming_sms_pending) ?
 					nokia_gsm_session_device::incoming_service::sms :
 				m_host_incoming_ussd_pending ?
-					nokia_gsm_session_device::incoming_service::ussd_notification :
+						(m_gsm_network->host_incoming_ussd_is_request() ?
+							nokia_gsm_session_device::incoming_service::ussd_request :
+							nokia_gsm_session_device::incoming_service::ussd_notification) :
 				m_incoming_ussd_profile == 1 ?
 					nokia_gsm_session_device::incoming_service::ussd_request :
 				m_incoming_ussd_profile == 2 ?

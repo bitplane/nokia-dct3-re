@@ -257,6 +257,10 @@ request under a new transport epoch.
 The reverse direction accepts a packed host notification only while registered
 and idle. The radio peer then owns paging and dedicated-channel admission, and
 the host sees `delivered` only after the firmware ReturnResult and ordinary
-channel release. Interactive network-originated requests remain unsupported
-because this firmware rejects the tested standards-shaped form. The complete
-wire contract and gates are in `external_call_bridge.md`.
+channel release. An explicit `operation: request` instead opens the handset's
+reply editor. After a validated handset ReturnResult and RR release, the host
+receives `incoming_ussd_response` with the unchanged DCS/packed reply and then
+`answered`; handset cancellation reports `cancelled` without a fabricated reply.
+The authenticated NSB-7 physical reply is independently qualified. Arbitrary
+multi-turn continuation and host-request restoration remain unqualified.
+The complete wire contract is in `external_call_bridge.md`.

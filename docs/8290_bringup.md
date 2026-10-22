@@ -2530,6 +2530,25 @@ complete card unchanged. Capture: `tmp/nsb7-network-ussd-state`.
 This tests a pending laboratory dialogue, not restoration of an external host
 session or arbitrary continuation.
 
+The external counterpart uses `fixtures/nsb7_host_ussd_request/nsb7hle.cfg`
+and `nsb7_host_network_ussd_request.lua`, with the same own cold storage.
+Wrap the isolated MAME invocation with `run_host_incoming_ussd_gate.py
+--port 18950 --text 'Enter reply' --request --expected-reply 2
+--ready-marker 'nsb7_ussd: ready'`, enable MAME HTTP on that port and use a
+50-second limit. The fixture exits at45s. Admission follows authentication
+at24.010s. Read30/Answer32/Keypad2 at34/Send36 yield the same typed ReturnResult
+at36.532s; RR release completes36.564s. Only afterward, at36.570s, the host
+receives identity1/epoch1/DCS15/data32/empty=false and then `answered`.
+End40/Menu42 recover exact idle/menu with unchanged whole card.
+
+`nsb7_network_ussd_request_check.py IMAGE RUN --host` checks own source/journal,
+authentication, physical contacts, six reviewed frames, ordered admission/
+reply/RR/host publication and complete card equality. The Done animation has
+its own reviewed phase hash rather than weakening the frame predicate.
+Capture: `tmp/nsb7-host-network-ussd`. This is a single real host request/reply;
+the standalone bridge CLI notification default is unchanged, and host-request
+restoration/multi-turn dialogue remain separate contracts.
+
 ## Host incoming call from settled idle
 
 `nsb7_pin_host_incoming_call.lua` composes physical PIN/phone-code entry with
