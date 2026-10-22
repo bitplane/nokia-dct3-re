@@ -937,6 +937,11 @@ The disabled card registers without startup VERIFY; a physical ENABLE CHV1
 restores the cold Enter PIN code prompt. Complete card comparisons permit only
 the expected initial registration and enable-flag changes, preserving all
 credentials and retry allowances. Native speech remains unproved.
+`verify-6250-pin-change-cold` separately qualifies ordinary physical
+CHANGE CHV1 (1234->2468), then cold authentication with2468, registration and
+Messages. Thirteen own frames and full card/NVRAM/predecessor checks pass;
+PIN2, both PUKs and retry allowances remain unchanged. This is not a
+wrong-current-PIN rejection qualification.
 `verify-6250-puk2-recovery` extends the PIN2-exhaustion chain to six processes: a blocked-card
 cold boot authenticates PIN1/registers, physically enters PUK2/newPIN2 and sends
 one successful UNBLOCK CHV2 followed by firmware VERIFY of the new value. Another

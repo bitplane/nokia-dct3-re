@@ -698,6 +698,23 @@ disabled cold boot independently reaches registered idle without PIN input.
 Capture: `tmp/nhm3-pin-request-banked3`. This is own acquired-PMM research-HLE
 qualification, not factory provisioning or native speech.
 
+`make verify-6250-pin-change-cold` qualifies ordinary PIN1 replacement, not
+PUK-based recovery. The own route is Settings4 -> Security settings5 -> Change
+access codes5 -> Change PIN code2. Physical current1234/new2468/confirmation
+sends one successful CHANGE CHV1 (`A0 24 00 01 10`) after confirmation and
+displays PIN code changed. No UNBLOCK, enable/disable or record command is
+permitted. The complete card preserves PIN2, both PUKs and all retry allowances,
+with only PIN1 and the expected registration data changed.
+
+A second independent cold process inherits every NVRAM file, physically
+authenticates2468, registers through the retained-location contract and opens
+Messages with the entire rotated card unchanged. All13 own route/editor/result/
+idle/menu frames, contacts, selectors/results/order, native/initial-record and
+console-health checks pass; predecessor artifacts remain hash-identical.
+Capture: `tmp/nhm3-pin-change-banked`. Wrong-current-PIN rejection is not
+qualified by this successful-change gate. Factory provisioning and native
+speech remain outside its scope.
+
 `make verify-6250-pin2-change` independently qualifies the ordinary physical
 PIN2 change on the PIN-enabled, non-FDN card. After PIN1 authentication and
 coherent registration, the own English menu route is Settings4 -> Security
