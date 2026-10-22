@@ -13,6 +13,10 @@ def fixture():
                 parameter=0 if changed and pc in (0x28f7,0xc8ff) else 11
                 lines.append(f'efr_homing_path: pc={pc:04x} bfi=0000 flags=0000 '
                     f'recovery={int(changed):04x} parameter={parameter:04x} ar2={ar2:04x} sp={sp:04x}')
+    for pc,value,bfi,count in ((0xc8b4,0,0,92),(0xc8b4,1,1,6),
+                               (0xc8c6,0,0,7),(0x28f1,0,0,6)):
+        lines.extend([f'efr_history_write: pc={pc:04x} address=0ab9 value={value:04x} '
+                      f'bfi={bfi:04x} flags={bfi*4:04x}']*count)
     return '\n'.join(lines)
 
 
@@ -38,6 +42,7 @@ class HomingPathTest(unittest.TestCase):
         rows=fixture().splitlines()
         text='\n'.join(row.replace('sp=1ec3','sp=1ec2')
                        if 'pc=c8de ' in row or 'pc=2870 ' in row else row for row in rows)
+        text=text.replace('efr_history_write: pc=c8b4','efr_history_write: pc=c8b3')
         self.assertEqual(check_trace(text,staged=True),[1,24,47])
         with self.assertRaises(ValueError): check_trace(text)
 
@@ -47,5 +52,8 @@ class HomingPathTest(unittest.TestCase):
                     text.replace('parameter=0000','parameter=0001'),
                     text.replace('ar2=1ec2 sp=1ec0','ar2=1ec3 sp=1ec0'),
                     text.replace('recovery=0001','recovery=0000',1),
-                    text+'\nefr_homing_path: malformed'):
+                    text+'\nefr_homing_path: malformed',
+                    text.replace('value=0001 bfi=0001','value=0000 bfi=0001'),
+                    text.replace('bfi=0001 flags=0004','bfi=0001 flags=0000'),
+                    text+'\nefr_history_write: malformed'):
             with self.subTest(bad=bad),self.assertRaises(ValueError): check_trace(bad)

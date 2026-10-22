@@ -1773,7 +1773,7 @@
     },
     {
       "id": "rom4_efr_homing_recovery_patch_ownership", "owner": "rom4_native_codec", "status": "satisfied",
-      "predicate": "Acquired EFR return-address interception and clean-frame recovery mutation reproduce across atomic/staged reference-replay pairs without fixture patching",
+      "predicate": "Acquired EFR return-address interception, previous-BFI publication and clean-frame recovery mutation reproduce across atomic/staged reference-replay pairs without fixture patching",
       "current": "Six original program fragments pin c8de to24a2 to2692, return-address c8e0 selection, branch2870, clean BFI/SID and history0ab9 guards, SACCD28dc and continuation28f7 to c8ff. All49 frame pairs reproduce the intercepted route in both frontends; only1/24/47 mutate parameter45 from000b to0000 with clean BFI and history1. Full original PCM/reset characterization still reports512 sample differences and reset differences1/24/47. Frontend-specific debug-hook SP samples are declared, not interpreted as equal retirement state or physical timing. This is acquired-code ownership evidence, not conformance, silicon instruction correctness or handset speech acceptance.",
       "evidence": ["docs/cobba_control_boundary.md", "tools/c54x_rom4_efr_homing_observe.lua", "tools/c54x_rom4_efr_homing_path_check.py", "tools/test_c54x_rom4_efr_homing_path_check.py", "tools/c54x_rom4_efr_homing_error_check.py"]
     },

@@ -3121,7 +3121,7 @@ the ordinary wrapper prologue. The acquired code owns this interception;
 the fixture does not install it. Recovery eventually branches from `28f7`
 to the wrapper continuation `c8ff`.
 
-The bounded six-fragment word check in
+The bounded eight-fragment word check in
 `tools/c54x_rom4_efr_homing_path_check.py` pins this route and the clean-frame
 recovery guards: `28b0` requires BFI plus SID at `0079` to be zero, then
 requires history `0ab9` nonzero before the additional recovery logic.
@@ -3133,6 +3133,19 @@ PCM differences and the existing reset differences; neither becomes a
 conformance pass. Debug-hook SP samples differ between the frontends, so
 the checker declares its frontend explicitly rather than treating them as
 a common retirement boundary or physical pipeline timing evidence.
+
+A data-space write watch independently accounts for all111 history writes:
+the decoder tail publishes92 clean and6 bad-frame values (both original and
+replay executions), reset clears it7 times, and the acquired recovery patch
+clears it6 times. Original `c8ad..c8b3` computes `(flags[0ac8] & 4) >> 2`
+and stores it to `0ab9` in a delayed return. Thus the clean recovery entry's
+history1 comes from the preceding bad frame, not an external peer or a
+missing initialization write. No other writer occurs in this complete
+49-frame fixture; this is not a whole-ROM static absence proof. The fixture
+does not reach the separately identified conditional writer at `c79b`.
+The checker pins the tail/reset instructions, write values and BFI agreement.
+Atomic/staged write callbacks report different advanced PCs for the same
+tail store; neither sampled PC is relabeled as the opcode's owner address.
 
 Reproduce with the isolated `tms54rom4` fixture, BIOS `efr-home-errors` or
 `efr-herr-pipe`, debugger enabled and

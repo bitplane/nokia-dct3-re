@@ -1,5 +1,6 @@
 """Verify acquired EFR patch-path ownership, not codec conformance."""
 import argparse
+from collections import Counter
 from pathlib import Path
 import re
 import sys
@@ -15,10 +16,13 @@ SEQUENCES={
     0x28af:(0xea15,0x10f8,0x1343,0x00f8,0x0079,0xf844,0x28f4,
             0x10f8,0x0ab9,0xf845,0x28f4),
     0x28dc:(0x9e0f,),
+    0xc8ad:(0xe804,0x18f8,0x0ac8,0xf47e,0xfe00,0x80f8,0x0ab9),
+    0xc8c4:(0xfe00,0x8039,0x803a),
     0x28ee:(0x76f8,0x0ab9,0,0x68f8,0x09c0,0xff7f,
             0x76f8,0x0ac7,0,0xf073,0xc8ff),
 }
 ROW=re.compile(r'efr_homing_path: pc=([0-9a-f]{4}) bfi=([0-9a-f]{4}) flags=([0-9a-f]{4}) recovery=([0-9a-f]{4}) parameter=([0-9a-f]{4}) ar2=([0-9a-f]{4}) sp=([0-9a-f]{4})')
+HISTORY=re.compile(r'efr_history_write: pc=([0-9a-f]{4}) address=0ab9 value=([0-9a-f]{4}) bfi=([0-9a-f]{4}) flags=([0-9a-f]{4})')
 
 
 def check_program(image):
@@ -30,7 +34,12 @@ def check_program(image):
 
 def check_trace(text,staged=False):
     groups=[]
+    history=[]
     for line in text.splitlines():
+        if line.startswith('efr_history_write:'):
+            match=HISTORY.fullmatch(line)
+            if not match: raise ValueError('malformed history write')
+            history.append(tuple(int(value,16) for value in match.groups()))
         if not line.startswith('efr_homing_path:'): continue
         match=ROW.fullmatch(line)
         if not match: raise ValueError('malformed patch-path observation')
@@ -57,6 +66,14 @@ def check_trace(text,staged=False):
                 raise ValueError('missing original recovery-store observation')
             changed.append(frame)
     if changed!=[1,24,47]: raise ValueError('recovery frame set differs')
+    # Write callbacks report an advanced/sample PC, not necessarily the opcode.
+    tail_pc=0xc8b3 if staged else 0xc8b4
+    expected=Counter({(tail_pc,0,0):92,(tail_pc,1,1):6,
+                      (0xc8c6,0,0):7,(0x28f1,0,0):6})
+    if Counter(row[:3] for row in history)!=expected:
+        raise ValueError('previous-BFI publication/clear inventory differs')
+    if any((flags>>2)&1!=bfi for _,_,bfi,flags in history):
+        raise ValueError('history write disagrees with live BFI flag')
     return changed
 
 
