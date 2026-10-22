@@ -734,6 +734,48 @@ DECODER_INFO_HELPER_VECTOR = (0xf880,0x3518)
 DECODER_INFO_HELPER_BODY = (0xf495,0x4a0b,0x4a0c,0x4a0d,0x4a0e,0xeefc,
     0xf495,0x4e00,0x310b,0x440a,0x3501,0x240b,0xf76f,0xf601,
     0xee04,0x8a0e,0x8a0d,0x8a0c,0x8a0b,0xf4e4)
+DECODER_INFO_DIVIDE_BASE = 0x29bdd
+DECODER_INFO_DIVIDE = (
+    0xf495,0x4a0b,0x4a0c,0x4a0d,0xeefd,0xf7b8,0xf468,0xf478,0x4508,0xf1c0,
+    0x8300,0xf485,0x5708,0xf785,0x4f08,0xf520,0xf84d,0x9bfd,0xf84e,0x9c01,
+    0xf982,0x9c62,0x6100,0x8000,0xf820,0x9bf8,0xf484,0xee03,0x8a0d,0x8a0c,
+    0x8a0b,0xf4e4,0xf273,0x9bf3,0xe801,0xf495,0xf273,0x9bf8,0xf420,0xf495)
+DECODER_INFO_DIVIDE_WORKER_BASE = 0x29c62
+DECODER_INFO_DIVIDE_WORKER = (
+    0xf495,0x4a11,0xeeff,0xf6b8,0xf273,0x9c6b,0x7711,0x001f,0x6d89,
+    0xf0e1,0xf808,0x9c6a,0xe901,0x550c,0xf84b,0x9c76,0xf273,0x9c77,
+    0xf040,1,0x530c,0x6c89,0x9c7c,0xee01,0x8a11,0xf4e4,0xf3e1,0xf0e1,
+    0xf808,0x9c6f,0xf273,0x9c6f,0xf340,1)
+
+
+def decode_decoder_info_helpers(words,bootstrap):
+    body=decode_decoder_info_body(words,bootstrap)
+    for base,witness in ((DECODER_INFO_DIVIDE_BASE,DECODER_INFO_DIVIDE),
+                         (DECODER_INFO_DIVIDE_WORKER_BASE,DECODER_INFO_DIVIDE_WORKER)):
+        if any(words.get(base+offset)!=value for offset,value in enumerate(witness)):
+            raise ValueError('decoder info division wrapper/worker changed')
+    return dict(method=9,pinned_words=body['pinned_words']+74,
+        preconditions=['CPL=1 stack-relative direct operands',
+                       'valid disjoint caller stack and metadata record in ordinary RAM'],
+        helper3518=dict(entry='003518',last_word='00352b',words=20,
+            operations=['preserve four MMRs; FRAME -4; save A double word to stack',
+                        'MPYA/MACA/MPYU cross products; combine through B shift and ADD',
+                        'FRAME +4; restore MMRs; FRET'],
+            memory='caller/local stack and MMRs only; no further calls'),
+        helper29bdd=dict(entry='029bdd',last_word='029c04',words=40,
+            operations=['normalize incoming A to signed32 and retain operand-sign XOR',
+                        'ABS both arguments; write absolute divisor to caller stack',
+                        'equal-operand result1; larger-divisor result0; otherwise call029c62',
+                        'conditionally negate quotient; restore local frame/MMRs; FRET'],
+            only_call='029bf1 -> 029c62'),
+        worker29c62=dict(entry='029c62',last_word='029c83',words=34,
+            operations=['preserve AR1; clear SXM; initialize loop counter31 in delayed branch',
+                        'shift A until carry, decrementing AR1',
+                        'subtract/add divisor from caller stack and shift quotient/remainder',
+                        'restore frame/AR1; FRET'],
+            memory='stack-relative DADD/DSUB at offset12; no calls, ports or payload pointers'),
+        conclusion='Under the declared ABI, method9 and its closed local call tree update metadata/stack/MMRs only; no input-descriptor advancement, decoded-sample production or deferred-output drain',
+        scope='Static control/memory-access closure, not native method9 invocation, exact arithmetic over all operands/statuses, physical timing or closure over every other EOF control')
 
 
 def decode_decoder_info_body(words,bootstrap):
@@ -2537,6 +2579,7 @@ def contract(source):
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
     result['decoder_method_prefix'] = decode_decoder_method_prefix(rel_words)
     result['decoder_info_body'] = decode_decoder_info_body(rel_words,bootstrap_words)
+    result['decoder_info_helpers'] = decode_decoder_info_helpers(rel_words,bootstrap_words)
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
     result['recorder_stop_frontend'] = decode_recorder_stop_frontend(recorder_words)

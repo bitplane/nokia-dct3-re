@@ -53,6 +53,8 @@ from tools.mu4_context_contract import (DECODER_METHOD_PREFIX_BASE,DECODER_METHO
     DECODER_INFO_PREFIX_BASE,DECODER_INFO_PREFIX,DECODER_INFO_RESTORE_BASE,DECODER_INFO_RESTORE)
 from tools.mu4_context_contract import (DECODER_INFO_BODY,DECODER_INFO_LEVEL_BASE,
     DECODER_INFO_LEVELS,DECODER_INFO_HELPER_VECTOR,DECODER_INFO_HELPER_BODY,decode_decoder_info_body)
+from tools.mu4_context_contract import (DECODER_INFO_DIVIDE_BASE,DECODER_INFO_DIVIDE,
+    DECODER_INFO_DIVIDE_WORKER_BASE,DECODER_INFO_DIVIDE_WORKER,decode_decoder_info_helpers)
 from tools.mu4_context_contract import PCM_CONVERSION_WITNESSES, decode_pcm_conversion, reference_pcm_conversion
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
 from tools.mu4_context_contract import FILTER_PARENT_WITNESSES, FILTER_CALL_SITES, decode_filter_parent
@@ -1030,6 +1032,36 @@ class ContextContractTest(unittest.TestCase):
                     decode_decoder_info_body(*args)
         del words[DECODER_INFO_PREFIX_BASE+147]
         with self.assertRaises(ValueError):decode_decoder_info_body(words,bootstrap)
+
+    def test_decoder_info_helper_call_tree_has_bounded_stack_only_access(self):
+        levels=tuple(part for value in DECODER_INFO_LEVELS for part in (value>>16,value&0xffff))
+        words={base+offset:value for base,witness in (
+            (DECODER_INFO_PREFIX_BASE,DECODER_INFO_BODY),(DECODER_INFO_LEVEL_BASE,levels),
+            (DECODER_INFO_DIVIDE_BASE,DECODER_INFO_DIVIDE),
+            (DECODER_INFO_DIVIDE_WORKER_BASE,DECODER_INFO_DIVIDE_WORKER))
+            for offset,value in enumerate(witness)}
+        bootstrap={base+offset:value for base,witness in (
+            (0x2096,DECODER_INFO_HELPER_VECTOR),(0x3518,DECODER_INFO_HELPER_BODY))
+            for offset,value in enumerate(witness)}
+        result=decode_decoder_info_helpers(words,bootstrap)
+        self.assertEqual(result['pinned_words'],276)
+        self.assertEqual(result['helper29bdd']['words'],40)
+        self.assertEqual(result['worker29c62']['words'],34)
+        self.assertEqual(result['helper29bdd']['only_call'],'029bf1 -> 029c62')
+        self.assertIn('CPL=1',result['preconditions'][0])
+        self.assertIn('not native',result['scope'])
+        for original,other in ((words,bootstrap),(bootstrap,words)):
+            for address in original:
+                changed=dict(original)
+                changed[address]^=1
+                args=(changed,other) if original is words else (other,changed)
+                with self.subTest(address=address),self.assertRaises(ValueError):
+                    decode_decoder_info_helpers(*args)
+        for address in (0x29bfc,0x29c04,0x29c7b,0x29c83):
+            missing=dict(words)
+            del missing[address]
+            with self.subTest(missing=address),self.assertRaises(ValueError):
+                decode_decoder_info_helpers(missing,bootstrap)
 
     def test_decoder_dispatch_pins_method_gate_and_quantifies_raw_census(self):
         words = {address:value for base,witness in DECODER_DISPATCH_WITNESSES

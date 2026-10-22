@@ -702,9 +702,27 @@ The local body has no sample loop or input-buffer advance. It does call
 The first target is available in the original AA55 bootstrap:
 `2096: FB 003518`, followed by a complete20-word stack/register routine at
 3518. That resolves its source identity without inventing resident ROM.
-Arithmetic/call-side-effect closure of both helpers and native invocation of
-method9 remain separate acceptance targets. Every pinned source/table/helper
+Arithmetic qualification and native invocation of method9 remain separate
+acceptance targets. Every pinned source/table/helper
 word has a mutation test, including removal of the terminating FRET.
+
+`decoder_info_helpers` closes the local call tree with74 further AA99 words,
+276 total across method, table, bootstrap and helpers. The signed wrapper
+`029bdd..029c04` has one call, to`029c62`; its equality and larger-divisor
+branches include their delayed instruction slots. The worker
+`029c62..029c83` shifts/subtracts/adds with a counter initialized31 and returns
+without another call. The AA55 helper has only multiply/accumulate/shift/add
+operations after its stack saves.
+
+With CPL=1 and a valid, disjoint RAM caller stack/metadata record, all helper
+data accesses are stack-relative or MMR accesses. No helper follows a payload
+pointer or accesses a device, input descriptor or sample-output buffer.
+Consequently this specific method/call tree cannot perform deferred sample
+production or advance the encoded input; it reports metadata. This is static
+control/access closure, not exact arithmetic acceptance over every operand or
+status setting. In particular, incoming multiplier flags remain relevant.
+It neither proves native invocation of method9 nor closes other EOF controls,
+the original controller's stop/drain policy or complete playback.
 
 ### Declared Packet-Lookahead Control
 
