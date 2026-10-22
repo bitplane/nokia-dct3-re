@@ -1922,6 +1922,12 @@
       "evidence": ["docs/8290_bringup.md", "tools/nsb7_host_ussd_notify.lua", "tools/nsb7_host_ussd_check.py", "tools/test_nsb7_host_ussd_check.py", "tools/run_host_incoming_ussd_gate.py", "tools/test_run_host_incoming_ussd_gate.py"]
     },
     {
+      "id": "nsb7_host_ussd_request", "owner": "nsb7_host_telephony", "status": "satisfied",
+      "predicate": "A physically authenticated NSB-7 handset originates *123# and displays a correlated external host result before physical idle/menu recovery with unchanged SIM storage",
+      "current": "Own PIN/phone unlock and PCS600 registration precede physical star/123/hash26..30s and Send32. Own REGISTER33.622s carries operation59/DCS0f/aa986c3602. The host's wrong request2 is rejected, matching request1 succeeds, and RELEASE COMPLETE/RR release ends the session34.200s before End38. Reviewed Host network frames36/37, exact13:48 idle39 and Messages menu41 pass with complete3570-byte card equality and valid own flash. Shared runner identity, per-epoch uniqueness, accepted/ended ordering and complete-console health have negative tests. No firmware state is injected. This is a single mobile-originated USSD/result path, not multi-turn dialogue, NSB-7 USSD restoration, native DSP/RF or speech.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_host_ussd_request.lua", "tools/nsb7_host_ussd_observe.lua", "tools/nsb7_host_ussd_check.py", "tools/test_nsb7_host_ussd_check.py", "tools/run_host_ussd_gate.py", "tools/test_run_host_ussd_gate.py"]
+    },
+    {
       "id": "nam1_display_frontier", "owner": "nam1_firmware", "status": "satisfied",
       "predicate": "Nokia 3610 v5.11 organically reaches a deterministic firmware-rendered display boundary through product-owned GENSIO and geometry contracts",
       "current": "NAM-1 independently writes GENSIO control 0x22 at 0x2d, transfers CCONT bytes at 0x2c and polls 0x6d. Byte-write receive-ready releases that loop. Firmware then writes nine 96-byte display banks; a 96x65 visible area with reversed segment order renders the complete CONTACT SERVICE frame. Separate gates prove DSP bootstrap/service control, request-derived discovery, accepted application sequences 0x42/0x43, channel-0x5f use and a complete physical M2BUS terminal exchange. Missing product state remains the next boundary.",

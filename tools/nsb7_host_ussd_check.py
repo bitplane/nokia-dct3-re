@@ -12,10 +12,12 @@ from tools.nsb7_radio_check import contract
 from tools.nsb7_storage_check import inspect
 from tools.radio_call_lifecycle_common import require_ordered
 from tools.run_sip_handset_gate import verify_handset_health
+from tools.radio_host_ussd_trace_check import verify as verify_host_request
 
 TEXT_FRAME='a9e715ab7143dc08a35a6d502cbcfcc920802d544fe22c3c187e42798c1c1129'
 IDLE_FRAME='32c41625e02a87a0ec97ec98a250040fc87ad8c5722c78200c54b27f7de2d560'
 MENU_FRAME='76728306449ad0f2ae8cbdbd1fc5e880d3dcff054c955e8b4a2aabc87db8e7e4'
+RESPONSE_FRAME='8d5e62e06c9a690aac24175be97578644540c612ae9764899df3b88cadf74bef'
 
 
 def check(text,initial,final):
@@ -49,25 +51,69 @@ def check(text,initial,final):
         raise ValueError('notification fixture unexpectedly writes the card')
 
 
+def check_request(text,initial,final):
+    check_source(initial)
+    check_authentication(text.split('nsb7_ussd_input:',1)[0])
+    if initial!=final:
+        raise ValueError('USSD request changed persistent card contents')
+    verify_host_request(text)
+    expected=[(key,str(second)) for second,key in (
+        (26,'Keypad *'),(27,'Keypad 1'),(28,'Keypad 2'),(29,'Keypad 3'),
+        (30,'Keypad #'),(32,'Send'),(38,'End'),(40,'Left Softkey / Menu'))]
+    presses=re.findall(r'nsb7_ussd_input: key=(.*?) state=1 t=(\d+)\.000000000',text)
+    if presses!=expected:
+        raise ValueError('physical USSD dial/recovery sequence differs')
+    releases=re.findall(r'nsb7_ussd_input: key=(.*?) state=0 t=(\d+)\.200000000',text)
+    if releases!=expected:
+        raise ValueError('USSD physical contacts were not released')
+    if re.findall(r'ussd state id=1 epoch=(\d+) phase=(\w+)',text)!=[
+            ('1','accepted'),('1','ended')]:
+        raise ValueError('host USSD request state lifecycle differs')
+    if text.count('gsm_ss: request=ussd_host ')!=1:
+        raise ValueError('expected one firmware USSD request')
+    require_ordered(text,[
+        ('registered PCS',r'gsm_call_adapter: network registered=1 arfcn=600\b'),
+        ('physical Send',r'nsb7_ussd_input: key=Send state=1 t=32\.'),
+        ('own REGISTER',r'GSM service uplink sapi=0 pd=0b message=3b length=27 data=1b7b1c14a11202010102013b300a04010f0405aa986c36027f0100'),
+        ('correlated response',r'ussd response id=1 outcome=0 result=accepted'),
+        ('release complete',r'GSM service downlink kind=27 sapi=0 pd=0b message=2a length=32'),
+        ('RR release',r'LAPDm service Channel Release acknowledged'),
+        ('ended',r'ussd state id=1 epoch=1 phase=ended'),
+        ('physical End',r'nsb7_ussd_input: key=End state=1 t=38\.'),
+        ('physical Menu',r'nsb7_ussd_input: key=Left Softkey / Menu state=1 t=40\.'),
+        ('complete',r'nsb7_ussd: complete'),
+    ],'NSB-7 host USSD request')
+    if 'sim_device: update ' in text:
+        raise ValueError('USSD request unexpectedly writes SIM records')
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image',type=Path)
     parser.add_argument('run',type=Path)
     parser.add_argument('--console',type=Path,required=True)
+    parser.add_argument('--request',action='store_true',help='physical *123# with host response')
     args=parser.parse_args()
     try:
         contract(args.image.read_bytes())
         verify_handset_health(args.console.read_text())
         storage=args.run/'nvram/nsb7hle'
         inspect((storage/'flash').read_bytes())
-        check((args.run/'error.log').read_text(),(args.run/'initial_sim_card.bin').read_bytes(),
+        (check_request if args.request else check)((args.run/'error.log').read_text(),(args.run/'initial_sim_card.bin').read_bytes(),
               (storage/'sim_card').read_bytes())
-        check_frame(args.run/'snap/nsb7_ussd_key_1.png',TEXT_FRAME)
-        check_frame(args.run/'snap/nsb7_ussd_key_2.png',IDLE_FRAME)
-        check_frame(args.run/'snap/nsb7_ussd_key_3.png',MENU_FRAME)
+        if args.request:
+            for second in (36,37):
+                check_frame(args.run/f'snap/nsb7_ussd_response_{second}.png',RESPONSE_FRAME)
+            check_frame(args.run/'snap/nsb7_ussd_key_7.png',IDLE_FRAME)
+            check_frame(args.run/'snap/nsb7_ussd_key_8.png',MENU_FRAME)
+        else:
+            check_frame(args.run/'snap/nsb7_ussd_key_1.png',TEXT_FRAME)
+            check_frame(args.run/'snap/nsb7_ussd_key_2.png',IDLE_FRAME)
+            check_frame(args.run/'snap/nsb7_ussd_key_3.png',MENU_FRAME)
     except (OSError,ValueError,RuntimeError) as error:
         parser.exit(1,f'NSB-7 host USSD: FAIL: {error}\n')
-    print('PASS: host USSD notification, physical Host notice reading/idle recovery, exact unchanged card; speech_tested=0')
+    print('PASS: host USSD '+('physical *123# request/Host network response' if args.request else 'notification/Host notice reading')+
+          ', exact idle/menu recovery and unchanged card; speech_tested=0')
 
 
 if __name__=='__main__':main()

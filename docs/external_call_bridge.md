@@ -216,6 +216,13 @@ The USSD host contract preserves the BER-decoded DCS and packed payload. A
 supplementary-service component, and `verify-radio-ussd-host-adapter` requires
 the handset's organic `*123#` request, host response acceptance, firmware UI
 delivery and the ordinary LAPDm channel release.
+NSB-7 independently qualifies physical `*123#`, rejection of a wrong request
+ID, the matching `Host network` response, exact response/idle/menu frames and
+unchanged complete SIM contents through `nsb7_host_ussd_check.py --request`.
+The shared outgoing runner checks stable request identity, per-epoch
+uniqueness, accepted-before-ended ordering and complete-console health.
+NSE-8's existing `verify-radio-ussd-host-restore` remains green; this does not
+extend USSD restoration or multi-turn dialogue acceptance to NSB-7.
 
 Host-originated `incoming_ussd` is deliberately a notification, matching the
 network-initiated form this firmware accepts. It enters through registered-idle

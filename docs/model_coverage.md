@@ -78,8 +78,11 @@ product/fixture result; neither deadline nor policy is inherited across ROMs.
 NSB-7's separate host-USSD notification gate additionally proves settled
 PIN/phone-authenticated PCS600 delivery, exact `Host notice` physical
 readback, End-to-idle recovery and complete unchanged SIM contents. This is
-one-way notification acceptance, not interactive USSD reply, native radio or
-speech; see `nsb7_host_ussd_check.py` and `8290_bringup.md`.
+one-way notification acceptance. A separate physical `*123#` gate verifies a
+host-decided `Host network` response, rejection of an unrelated request ID,
+RR release before physical End and exact idle/menu recovery with unchanged
+card. Multi-turn USSD, native radio and speech remain unproved; see
+`nsb7_host_ussd_check.py` and `8290_bringup.md`.
 
 ## Promotion rules
 

@@ -2386,6 +2386,42 @@ cannot be mistaken for success. Its restore mode validates each epoch's
 ordered lifecycle and waits for restored delivery even if the reference
 already delivered; this handset notification gate does not exercise restore.
 
+### Physical mobile-originated USSD
+
+`nsb7_host_ussd_request.lua` shares the read-only authentication/radio
+observer and physical-input engine with the notification fixture. It presses
+`*`, `1`, `2`, `3`, `#` at26..30s and Send32. The own MCU emits REGISTER
+`1b7b1c14a11202010102013b300a04010f0405aa986c36027f0100` at33.622s:
+operation59, DCS0f and packed `*123#` payload `aa986c3602`.
+
+The host deliberately submits request2 first; it is rejected. The matching
+request1 succeeds and returns `Host network`. The MCU receives RELEASE
+COMPLETE, acknowledges RR release, and the host session ends34.200s before
+physical End38. Exact response frames36/37, registered idle39 and Messages
+menu41 pass. The complete SIM card remains unchanged; the own flash journal
+and initial PIN/phone authentication are independently checked.
+
+Use the same fresh-card/host-cfg preparation as the notification gate:
+
+```sh
+.venv/bin/python tools/run_host_ussd_gate.py --port 18950 -- \
+  .venv/bin/python tools/run_mame_isolated.py --mame-dir mame --run-dir RUN -- \
+  nsb7hle -rompath ../roms -video none -sound none -nothrottle \
+  -seconds_to_run 48 -log -verbose -debug -debugger none -http \
+  -http_port 18950 -autoboot_delay 0 \
+  -autoboot_script ../tools/nsb7_host_ussd_request.lua > RUN-console.log 2>&1
+.venv/bin/python tools/nsb7_host_ussd_check.py \
+  roms/noki8290/8290f522a.fls RUN --console RUN-console.log --request
+```
+
+Qualified capture: `tmp/nsb7-host-ussd-request-qualified`. This proves one
+mobile-originated request and host-decided result, not multi-turn USSD,
+arbitrary alphabet coverage, restoration on NSB-7, native DSP/RF or speech.
+The shared host runner requires a stable positive request ID, at most one
+request per epoch, correlated accepted/ended states and a healthy complete
+console. Restore fixtures require the next transport epoch and republication
+of the same request, not a new external admission.
+
 ## Host incoming call from settled idle
 
 `nsb7_pin_host_incoming_call.lua` composes physical PIN/phone-code entry with

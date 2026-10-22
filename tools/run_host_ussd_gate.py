@@ -21,22 +21,42 @@ def pack_gsm7(text: str) -> str:
 
 
 async def run(args: argparse.Namespace) -> None:
-    process = await asyncio.create_subprocess_exec(*args.command, cwd=args.cwd)
+    process = await asyncio.create_subprocess_exec(*args.command, cwd=args.cwd,
+        stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.STDOUT)
+    console=asyncio.create_task(process.stdout.read())
     try:
         websocket = await connect(args.port, process)
         async with websocket:
             epoch = None
             accepted = False
             initial_request_epoch = None
+            request_id = None
+            responded = False
+            seen_epochs = set()
             while True:
                 event = json.loads(await asyncio.wait_for(websocket.recv(), 45))
                 if event.get("type") == "call_adapter_ready":
-                    epoch = event.get("epoch")
+                    new_epoch=event.get("epoch")
+                    if type(new_epoch) is not int or new_epoch<1:
+                        raise RuntimeError('invalid USSD transport epoch')
+                    if epoch is not None and new_epoch!=epoch:
+                        if not args.require_restore or new_epoch!=epoch+1 or initial_request_epoch is None:
+                            raise RuntimeError('unexpected USSD transport restoration')
+                        accepted=False
+                        responded=False
+                    epoch = new_epoch
                 elif event.get("type") == "outgoing_ussd":
                     if event.get("epoch") != epoch:
                         raise RuntimeError(f"uncorrelated USSD request {event!r}")
                     if event.get("dcs") != 0x0f or event.get("data") != "aa986c3602":
                         raise RuntimeError(f"unexpected USSD request {event!r}")
+                    identity=event.get('request_id')
+                    if type(identity) is not int or identity<1 or (request_id is not None and identity!=request_id):
+                        raise RuntimeError('USSD request identity changed or is invalid')
+                    if epoch in seen_epochs:
+                        raise RuntimeError('duplicate USSD request in one epoch')
+                    seen_epochs.add(epoch)
+                    request_id=identity
                     if initial_request_epoch is None:
                         initial_request_epoch = epoch
                     if (args.require_restore and epoch == initial_request_epoch):
@@ -53,22 +73,34 @@ async def run(args: argparse.Namespace) -> None:
                     stale["request_id"] += 1
                     await websocket.send(json.dumps(stale))
                     await websocket.send(json.dumps(response))
+                    responded=True
                 elif event.get("type") == "outgoing_ussd_state":
-                    if event.get("epoch") != epoch:
+                    if event.get("epoch") != epoch or event.get('request_id')!=request_id or not responded:
                         raise RuntimeError(f"uncorrelated USSD state {event!r}")
                     if event.get("phase") == "accepted":
+                        if accepted:raise RuntimeError('duplicate USSD acceptance')
                         accepted = True
                     elif event.get("phase") == "ended":
                         if not accepted:
                             raise RuntimeError("USSD ended before host response acceptance")
                         break
+                    else:
+                        raise RuntimeError(f"unexpected USSD phase {event!r}")
         result = await asyncio.wait_for(process.wait(), 90)
         if result:
             raise RuntimeError(f"MAME exited with status {result}")
+        output=(await console).decode(errors='replace')
+        print(output,end='')
+        try:
+            from tools.run_sip_handset_gate import verify_handset_health
+        except ModuleNotFoundError:
+            from run_sip_handset_gate import verify_handset_health
+        verify_handset_health(output)
     finally:
         if process.returncode is None:
             process.terminate()
             await process.wait()
+        await console
 
 
 def main() -> int:
