@@ -464,7 +464,7 @@ def verify_outgoing_restore(root, remote_text, connected=False, product='3210', 
     log = (root / 'error.log').read_text(errors='replace')
     if product=='8290':
         from tools.nsb7_sip_check import check_restore
-        check_restore(log)
+        check_restore(log,connected=connected)
     number = {'6210': '1234567', '6250': '123', '8210': '1234567', '8890': '1234567'}.get(product, '5551234')
     if not re.search(outgoing_setup_pattern(product), log):
         raise RuntimeError('restored outgoing call lacks the product SETUP frame')
@@ -697,7 +697,8 @@ def main():
         not args.cancel_incoming)
     signaling_connected=signaling_connected or (
                              args.signaling_only and args.product=='8290' and
-                             (not args.incoming or args.ready_file is not None) and args.sip_response==200 and
+                             (not args.incoming or args.ready_file is not None) and
+                             (args.sip_response==200 or (args.sip_response==180 and args.restore_outgoing and not args.incoming)) and
                              args.calls==1 and not args.record_media and not args.restore_idle and
                              (not args.restore_call or (args.incoming and args.restore_phase in ('connected','alerting'))) and
                              (not args.restore_outgoing or not args.incoming) and not args.cancel_incoming)

@@ -2423,7 +2423,7 @@ audio. `sip-result.json` explicitly records `speech_tested=false` and
 The shared runner admits one signaling-only SIP200 call in either direction;
 incoming additionally requires a fresh handset-readiness artifact. Connected
 outgoing and incoming restoration have separate acceptance below. Unanswered
-incoming alerting restoration also has its own gate; pending outgoing,
+incoming alerting and pending outgoing restoration also have their own gates;
 recording/media and multiple-call modes remain rejected.
 
 After preparing the isolated run from the qualified source, reproduce with
@@ -2496,8 +2496,8 @@ card remains unchanged, the own flash journal validates and RTC ticks are contin
 An unclocked voice peer can publish erased uplink placeholders (`good=0`); these
 are not speech and are discarded by the bridge. Acceptance forbids `good=1`
 uplink and DSP speech ticks, requires discarded-epoch bridge uplink0, and keeps
-`speech_tested=false`/`native_dsp_complete=false`. Pending outgoing restoration
-remains unqualified; incoming connected and alerting restoration are checked below.
+`speech_tested=false`/`native_dsp_complete=false`. Pending outgoing and incoming
+connected/alerting restoration have separate gates below.
 
 Prepare fresh isolated storage as above, then run the same SIP command with
 `--restore-outgoing`, script `../tools/nsb7_sip_outgoing_restore.lua`, and an82s
@@ -2513,6 +2513,40 @@ The shared SIP runner captures MAME stdout/stderr in `sip-handset.log` and rejec
 Lua, validity and fatal execution errors even when the process exits zero.
 The restore checker additionally requires that healthy console and the actual
 `.sta` file; successful network clearing alone cannot qualify a broken fixture.
+
+### Pending outgoing SIP restoration
+
+The same physical dial/save60/load/End66/Menu70/End73 fixture also qualifies
+an unanswered outgoing SIP180 attempt with`--sip-response 180 --restore-outgoing`.
+All37 ARM/banked registers, PC/SP, complete-RAM digest and time restore exactly.
+The existing request1 republishes under epoch2; the bridge sends CANCEL,
+receives487 and never redials. One cause41 termination is consumed by the
+ordinary session, completing network Disconnect/handset Release/network
+Release Complete/RR clearing before physical End66. The first qualified run
+reaches ended60.580s. No CONNECT, accepted media, codec tick or connected host
+phase is allowed; discarded-epoch uplink is zero.
+
+SIP180 is provisional at the external bridge, not a synthesized GSM ALERTING
+decision. The handset remains awaiting the host result and displays Calling,
+not the connected Call1 presentation. Adapter phase publication therefore
+contains only epoch2 ended, not fabricated alerting/connected events. The two
+reviewed complete Calling animation frames are accepted only for pending
+snapshots; the legacy filename`nsb7_host_outgoing_connected.png` does not
+qualify a connection. Saved/restored display-cache phases may differ while
+architecture is identical. Exact final76s idle/menu, full unchanged card,
+own flash validity, actual snapshot and continuous RTC remain mandatory.
+
+Use fresh own-source storage and the outgoing restoration command above with
+SIP25288/HTTP18950, the unchanged`nsb7_sip_outgoing_restore.lua`, and82s guard.
+Two independent cold captures qualify; reproduction of the fresh repeat:
+
+```sh
+.venv/bin/python tools/nsb7_sip_check.py roms/noki8290/8290f522a.fls \
+  tmp/nsb7-sip-pending-repeat --restore-outgoing-pending
+```
+
+This is pending signaling restoration/external-dialog invalidation, not SIP
+dialog replay, native DSP, speech or media continuity.
 
 ### Connected incoming SIP restoration
 

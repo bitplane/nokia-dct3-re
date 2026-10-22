@@ -1345,8 +1345,12 @@ incoming alerting restoration uses`--restore-phase alerting` and
 `nsb7_sip_incoming_alerting_restore.lua`: save51/load restores exact architecture
 without Answer, the old INVITE receives603, and queued Disconnect clears CC/RR
 under epoch2 before physical End60. Only the reviewed caller animation frames
-are permitted; pending outgoing, recording/media and multiple-call combinations
-remain rejected. Its result
+are permitted. Pending outgoing restoration independently uses SIP180 and
+`--restore-outgoing`: one CANCEL/487, epoch2 request republication and CC/RR
+clearing before End66, without redial, CONNECT or media. The handset remains
+Calling/awaiting the host decision; SIP180 is not injected as GSM ALERTING.
+Only the reviewed complete Calling snapshots qualify. Recording/media and
+multiple-call combinations remain rejected. Its result
 explicitly keeps speech/native-DSP claims false and requires zero handset
 qualified uplink media. Erased `good=0` placeholders after load do not qualify as
 speech; the discarded-epoch bridge summary must report uplink0. Remote RTP receipt

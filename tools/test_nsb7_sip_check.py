@@ -112,10 +112,20 @@ class SipTest(unittest.TestCase):
                     text+'\ngsm_call_adapter: decision id=1 outcome=0 result=accepted'):
             with self.subTest(bad=bad),self.assertRaises(ValueError): check(bad)
 
+    @patch('tools.nsb7_sip_check.check_authentication')
+    def test_pending_outgoing_restore_clears_before_physical_end_without_connect(self,authentication):
+        text='\n'.join(line for line in restore_fixture().splitlines()
+                       if 'phase=media_closed' not in line and 'phase=connected' not in line)
+        check_restore(text,connected=False)
+        for wrong in (text+'\ngsm_call_adapter: state id=1 epoch=2 phase=connected',
+                      text+'\nGSM service downlink kind=12 sapi=0 pd=03 message=07 length=2',
+                      text.replace('epoch=2 digits','epoch=1 digits'),
+                      text.replace('state id=1 epoch=2 phase=ended','')+'\ngsm_call_adapter: state id=1 epoch=2 phase=ended'):
+            with self.assertRaises(ValueError):check_restore(wrong,connected=False)
+
     def test_cli_excludes_unproved_scenarios(self):
         base=['gate','--pjsua','unused','--run-dir','unused','--product','8290']
         for options in ([],['--incoming'],['--record-media'],['--restore-call'],
-                        ['--restore-outgoing','--sip-response','180'],
                         ['--incoming','--restore-outgoing'],['--restore-idle'],['--calls','2'],
                         ['--sip-response','486']):
             flags=[] if not options else ['--signaling-only']
@@ -131,6 +141,10 @@ class SipTest(unittest.TestCase):
                 patch('tools.run_sip_handset_gate.run',new_callable=AsyncMock) as run:
             main()
         self.assertTrue(run.call_args.args[0].restore_outgoing)
+        with patch('sys.argv',base+['--signaling-only','--restore-outgoing','--sip-response','180','--','true']), \
+                patch('tools.run_sip_handset_gate.run',new_callable=AsyncMock) as run:
+            main()
+        self.assertEqual(run.call_args.args[0].sip_response,180)
         with tempfile.TemporaryDirectory() as directory:
             with patch('sys.argv',base+['--signaling-only','--incoming',
                     '--ready-file',str(Path(directory)/'ready'),'--','true']), \
@@ -180,6 +194,11 @@ class SipTest(unittest.TestCase):
             self.assertEqual(frame.call_count,2)
             frame.side_effect=ValueError('wrong')
             with self.assertRaises(ValueError):check_sip_frame(Path(name),'primary',incoming=True)
+        for name in ('nsb7_sip_state_saved.png','nsb7_sip_state_restored.png','nsb7_host_outgoing_connected.png'):
+            frame.side_effect=[ValueError('phase'),None]
+            check_sip_frame(Path(name),'primary',pending_snapshot=True)
+            frame.side_effect=ValueError('wrong')
+            with self.assertRaises(ValueError):check_sip_frame(Path(name),'primary')
 
     @patch('tools.nsb7_sip_check.check_authentication')
     def test_real_alerting_restore_requires_invite_rejection_without_answer(self,authentication):
