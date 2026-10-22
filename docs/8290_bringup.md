@@ -17,6 +17,7 @@ machine implicitly.
 | UI and storage | Physical security code, menus, SIM phonebook save/cold retrieval, RTC retention and Net monitor00 clean idle. Own EEPROM journal rotation matches the complete runtime shadow. |
 | SIM security | PIN1/PIN2 change/rejection, retry persistence, exhaustion/PUK recovery and request Off/On. Permanent PUK1 rejects the card; permanent PUK2 retains ordinary PIN1/menu use. |
 | FDN | Explicit extended card; physical PIN2-authorized On/Off, Save/edit/erase/cancel and cold retrieval. Registered listed/unlisted/Off controls distinguish permitted calls from local denial. |
+| SIM Toolkit | Phase-2+ nine-byte TERMINAL PROFILE, organic STATUS/FETCH DISPLAY TEXT, physical OK/result00, exact prompt/idle frames and unchanged complete card. |
 | PCS laboratory network | Acquisition, BCCH, Location Updating/EF_LOCI, background measurements, addressed paging, physical incoming/outgoing CC/RR signaling and SMS delivery/read/delete/cancel/Reply. |
 | Authenticated composition | Physical PIN before fresh/cold registration, calls, SMS and phonebook; a long wrong-PIN control remains unregistered. |
 | Restoration | Exact ARM/banked registers, RAM/time, protocol replay and pixels at idle, connected call and active SMS boundaries, with physical continuation. |
@@ -27,7 +28,7 @@ no donor PMM, identity or firmware-state forcing is admitted. Native resident
 DSP execution, speech/COBBA, measured complete analog calibration, external
 RF and NSB-7 SIP acceptance remain unproved. Host busy/recovery is qualified;
 other failure/pending-call cases,
-AoC and SIM Toolkit are not established by these gates. Detailed contracts
+AoC and further SIM Toolkit commands are not established by these gates. Detailed contracts
 and their reproduction commands below own each coverage claim.
 
 The [Nokia 8290 user guide](https://www.instructionsmanuals.com/sites/default/files/2019-05/Nokia-8290-en.pdf)
@@ -2384,3 +2385,33 @@ The shared two-process RTC gate uses the recovered clock-load strobe, not
 a fictitious seconds-write shortcut, to program12:00 and wait a full minute
 for the alarm/IRQ. It then proves retained12:01:04 advances to05/06/07 in
 a fresh process and exercises legacy/atomic malformed-NVRAM cases.
+
+## Authenticated SIM Toolkit DISPLAY TEXT
+
+`fixtures/nsb7_toolkit/nsb7hle.cfg` selects the existing Phase-2+ external
+card with one DISPLAY TEXT command, nominal reviewed hardware inputs and
+the PCS laboratory cell. The own PIN-enabled retained-location flash/card/
+clock source is unchanged. `nsb7_toolkit_input.lua` reuses the qualified
+physical authentication and read-only radio/LAPDm observers; it captures
+the prompt at65s and presses the physical left softkey at66s.
+
+Firmware reads EF_PHASE03, sends a nine-byte TERMINAL PROFILE and continues
+to registered idle. The card makes its command pending at20.026s, but the
+first later STATUS is near62.018s: it returns9116 and the firmware FETCHes
+22 bytes. A short observation ending before that poll cannot establish
+absence of Toolkit support. The reviewed prompt says `DCT3 SAT`, with OK
+and Back softkeys. Physical OK decodes19 and sends terminal response
+`810301218002028281030100`, followed by9000; the final68s frame is the
+same reviewed13:48 registered idle. A response with result12 is a timeout,
+not successful physical dismissal.
+
+`nsb7_toolkit_check.py` requires the full authentication/registration chain,
+exactly one profile/FETCH/response exchange, decoded OK before response,
+both exact RGB frame hashes, valid own flash journal and byte-identical
+complete SIM storage. It does not claim further proactive commands, native
+DSP, external RF or speech. No driver/device behavior was changed.
+
+```sh
+.venv/bin/python tools/nsb7_toolkit_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-final
+```
