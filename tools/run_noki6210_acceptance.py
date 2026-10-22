@@ -54,6 +54,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'toolkit-call': ('npe3hle', 'toolkit_call', 105),
              'toolkit-call-decline': ('npe3hle', 'toolkit_call_decline', 105),
              'ussd': ('npe3hle', 'ussd_input', 40),
+             'ussd-continued': ('npe3hle', 'ussd_continued', 54),
              'divert': ('npe3hle', 'divert_input', 35),
              'divert-lifecycle': ('npe3hle', 'divert_lifecycle_input', 80),
              'state-divert': ('npe3hle', 'state_divert', 80),
@@ -72,7 +73,7 @@ TOOLKIT_PROFILES = {'toolkit': 1, 'toolkit-interactive': 3, 'toolkit-menu': 4,
                     'toolkit-sms': 5, 'toolkit-call': 6, 'toolkit-call-decline': 6}
 FDN_SCENARIOS=frozenset(('fdn-observe','fdn-enable','fdn-cycle','fdn-retry-cold'))
 HOST_USSD_SCENARIOS=frozenset(('host-incoming-ussd','host-incoming-ussd-request','host-incoming-ussd-restore'))
-PIN_SCENARIOS=frozenset(('security','security-retry','security-retry-cold',
+PIN_SCENARIOS=frozenset(('ussd-continued','security','security-retry','security-retry-cold',
                          'security-block-cold','security-block','pin2-change','pin2-change-cold','pin2-retry-cold','pin2-reject')) | FDN_SCENARIOS | HOST_USSD_SCENARIOS
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
@@ -403,6 +404,9 @@ def main():
             if args.scenario == 'incoming-pcm-missing':
                 ET.SubElement(ports, 'port', tag=':NETCFG', type='CONFIG',
                               mask='32', defvalue='0', value='32')
+            if args.scenario == 'ussd-continued':
+                ET.SubElement(ports,'port',tag=':USSDCFG',type='CONFIG',
+                              mask='7',defvalue='0',value='4')
             if args.coherent_cell or args.scenario == 'foreign-registration':
                 ET.SubElement(ports, 'port', tag=':NEIGHBORCFG', type='CONFIG',
                               mask='1024', defvalue='0', value='1024')
@@ -615,6 +619,11 @@ def main():
                     check_frame(frame, expected, f'divert lifecycle result {index}')
             with Image.open(run / 'snap/6210_divert_lifecycle_idle.png') as frame:
                 check_frame(frame, OPERATOR_SHA256, 'registered idle after divert lifecycle')
+        elif args.scenario=='ussd-continued':
+            from tools.noki6210_ussd_continued_check import check,check_frames
+            check(text,(run/'nvram/npe3hle/sim_card').read_bytes())
+            check_frames(run/'snap')
+            check_registration(text,(run/'nvram/npe3hle/sim_card').read_bytes(),channel_header='1202')
         elif args.scenario in ('ussd', 'divert'):
             if args.scenario == 'ussd':
                 check_ussd(text, run / 'snap')

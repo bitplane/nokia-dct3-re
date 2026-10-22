@@ -161,7 +161,13 @@ reviewed frames. Complete card contents match normal registration.
 `verify-6210-host-ussd-request` separately proves network `Choose 2`, physical
 Answer/2/Send, exact firmware ReturnResult and correlated packed reply received
 by the host after RR release, with six own-product frames and unchanged card.
-Empty replies, pending-USSD restoration and multi-turn dialogue remain unqualified.
+`verify-6210-host-ussd-restore` additionally proves exact ARM/RAM restoration
+of the pending editor and a single physical reply under a new host epoch,
+without another admission or REGISTER. `verify-6210-ussd-continued` independently
+qualifies physical `*123#`, one correlated network continuation, physical2/Send,
+final result/RR release and six own-product frames with unchanged card contents.
+Empty replies, arbitrary dialogue length and host-controlled continuation
+remain unqualified.
 
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,

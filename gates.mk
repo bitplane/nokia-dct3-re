@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 757 gates: 559 generated from typed steps, 198 copied verbatim (shell).
+# 758 gates: 560 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -107,13 +107,14 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6210-fdn-record-edit verify-6210-fdn-record-erase \
 	verify-6210-fdn-record-retry verify-6210-fdn-dial-controls \
 	verify-6210-host-ussd-notify verify-6210-host-ussd-request \
-	verify-6210-host-ussd-restore verify-6210-home-plmn-reject \
-	verify-6210-forbidden-plmn-persistence verify-6210-pin-host-incoming-call \
-	verify-6210-pin-host-incoming-sms verify-6210-pin-host-outgoing-call \
-	verify-6210-pin-host-outgoing-sms verify-6210-sms-status-persistence \
-	verify-6210-pin-phonebook verify-6210-pin-host-rejected-sms \
-	verify-6210-pin-host-silent-sms verify-6210-pin-state-idle \
-	verify-6210-pin-state-call verify-6210-pin-state-sms verify-6210-registration \
+	verify-6210-host-ussd-restore verify-6210-ussd-continued \
+	verify-6210-home-plmn-reject verify-6210-forbidden-plmn-persistence \
+	verify-6210-pin-host-incoming-call verify-6210-pin-host-incoming-sms \
+	verify-6210-pin-host-outgoing-call verify-6210-pin-host-outgoing-sms \
+	verify-6210-sms-status-persistence verify-6210-pin-phonebook \
+	verify-6210-pin-host-rejected-sms verify-6210-pin-host-silent-sms \
+	verify-6210-pin-state-idle verify-6210-pin-state-call \
+	verify-6210-pin-state-sms verify-6210-registration \
 	verify-6210-foreign-registration verify-6210-foreign-outgoing-call \
 	verify-6210-foreign-incoming-sms verify-6210-calculator verify-6210-phonebook \
 	verify-6210-menu verify-8210-call-divert verify-8210-sim-toolkit-call-decline \
@@ -950,6 +951,9 @@ verify-6210-host-ussd-request: build
 
 verify-6210-host-ussd-restore: build
 	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario host-incoming-ussd-restore --coherent-cell --mame $(MAME_DIR)/mame
+
+verify-6210-ussd-continued: build
+	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario ussd-continued --coherent-cell --mame $(MAME_DIR)/mame
 
 verify-6210-home-plmn-reject: build
 	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario home-plmn-reject --coherent-cell --mame $(MAME_DIR)/mame

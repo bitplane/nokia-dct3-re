@@ -1504,7 +1504,7 @@ is permitted. RR release, host-received JSON, all six frame hashes and the
 complete registered card match the ordinary request contract. The save file
 must exist. Capture: `tmp/npe3-host-ussd-restore-banked`.
 
-These are HLE supplementary-service contracts. Empty reply, multi-turn
+These are HLE supplementary-service contracts. Empty reply, arbitrary multi-turn
 dialogue, native DSP and speech remain unqualified. This pending-editor test
 does not establish external network process restoration or arbitrary snapshot
 timing; the adapter deliberately gives the restored handset a new epoch.
@@ -1522,6 +1522,22 @@ equivalence with NSB-7; it does not prove permanent deadlock or classify a later
 firmware/network timeout. The selected transaction's legitimate termination
 after UI dismissal remains open. No empty reply or host answered state is
 synthesized. The unsuccessful fixture/scenario is not retained as acceptance.
+
+### Continued laboratory USSD
+
+`make verify-6210-ussd-continued` separately qualifies one continued exchange,
+not repeated independent host admissions. Following physical PIN1 authentication
+and laboratory registration, physical `*123#`/Send starts invoke1. The existing
+network conformance policy (`USSDCFG=4`) sends a correlated continued FACILITY;
+Answer opens the numeric editor, physical2/Send returns invoke2 with DCS0f and
+payload32. The peer parses that response and returns its final37-byte RELEASE
+COMPLETE, followed by ordinary RR release. Physical End/Menu recover the same
+registered idle and Messages frames. The six exact images cover Requesting,
+blank editor, entered2, Nokia test network result, idle and Messages. Complete
+card contents match normal registration. Capture: `tmp/npe3-ussd-continued-banked`.
+This is one firmware-owned continued reply using the declared HLE network
+policy; arbitrary dialogue length, host-controlled continuation and native
+speech are not established.
 
 ## Host SMS acceptance
 

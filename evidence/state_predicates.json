@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_physical_continued_ussd_reply", "owner": "npe3_host_services", "status": "satisfied",
+      "predicate": "6210 physically answers a continued laboratory USSD FACILITY and receives the correlated final result with ordinary recovery",
+      "current": "Own-PMM research-HLE NPE-3 authenticates PIN1 and registers on coherent ARFCN35. Physical *123#/Send31 creates invoke1; USSDCFG4 supplies the existing continued FACILITY. Answer36 opens the editor, physical2 at40 and Send42 produce the exact21-byte ReturnResult for invoke2/DCS0f/data32. The network parses it and sends the final37-byte RELEASE COMPLETE, then releases RR. Physical End46/Menu48 recover registered idle/Messages. Six exact Requesting/editor/entered/result/idle/Menu frames and complete registered-card contents pass. Capture tmp/npe3-ussd-continued-banked. One continued exchange only; no arbitrary-length dialogue, host-controlled continuation or native-speech claim.",
+      "evidence": ["docs/6210_bringup.md", "docs/model_coverage.md", "tools/noki6210_ussd_continued.lua", "tools/noki6210_ussd_continued_check.py", "tools/test_noki6210_ussd_continued_check.py", "tools/run_noki6210_acceptance.py", "tools/radio_ussd_trace_check.py", "gates.json"]
+    },
+    {
       "id": "npe3_host_ussd_pending_editor_restore", "owner": "npe3_host_services", "status": "satisfied",
       "predicate": "6210 restores an unanswered host USSD editor exactly and returns its physical reply under a new host epoch",
       "current": "Own-PMM research-HLE run authenticates PIN1 and admits one request at20s. Answer26 opens the blank editor, save28/load restores exact time, captured ARM registers and backed-RAM checksum. The adapter republishes queued under epoch2 without another admission or network REGISTER. Physical2 at30 and Send32 return the exact21-byte ReturnResult, release RR and deliver one correlated host JSON response with epoch2/request1/DCS15/data32/empty=false. All six ordinary request frames, exact contacts, complete card and save artifact checks pass. Capture tmp/npe3-host-ussd-restore-banked. No native speech, external network-process restoration or arbitrary snapshot-timing claim.",
