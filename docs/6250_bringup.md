@@ -614,6 +614,24 @@ script hashes. Capture: `tmp/nhm3-pin-retry-cold-banked2`. The error, idle and m
 frame hashes equal the same-process control. PIN exhaustion and PUK recovery
 remain outside this gate.
 
+`make verify-6250-puk-recovery` separately runs three cold processes. The first
+physically submits9999 three times, observes `9804/9804/9840` with retries
+`2/1/0`, and retains the complete blocked card without registration. The
+second inherits that storage and physically supplies PUK12345678, new PIN2468
+and confirmation. Exactly one UNBLOCK CHV1 (`A0 2C 00 00 10`) succeeds;
+no VERIFY or unrelated credential/configuration/record write occurs in that
+phase. The new PIN, reset retry allowance and ordinary registration location
+are the only card changes. The third cold process verifies2468 through CHV1
+and performs the preserved-location registration lifecycle without modifying
+the complete card again. Physical Menu works after both successful phases.
+
+All11 stage frames, exact contacts, APDU selectors/results/order, full card
+transitions, inherited NVRAM, native upload/initial-record checks, console
+health and unchanged predecessor artifacts pass. The PUK-stage result frame
+includes a transient blank repaint; registered idle is checked separately at50s.
+Capture: `tmp/nhm3-puk-recovery-banked`. Wrong-PUK handling, PUK exhaustion,
+permanent card rejection and PIN2/PUK2 are not promoted by this gate.
+
 Run `noki6250` with private working/NVRAM/config directories, the acquired
 product ROMs, `-noreadconfig -log -video none -sound none -nothrottle`,
 `-autoboot_delay 0 -seconds_to_run 9` and

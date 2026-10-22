@@ -18,17 +18,24 @@ local function press(key,when)
 end
 local runner=coroutine.create(function()
     local mode=_G.nhm3_pin_retry_mode
-    if mode~='cold-recovery' then
-        for second=8,11 do press('Keypad 9',second) end
-        press('Left Softkey / Menu',12)
-        machine.screens[':screen']:snapshot('6250_pin_retry_error.png')
-        if mode=='wrong-only' then
+    if mode~='cold-recovery' and mode~='cold-rotated' then
+        for attempt=1,(mode=='exhaust' and 3 or 1) do
+            local start=8+(attempt-1)*8
+            for second=start,start+3 do press('Keypad 9',second) end
+            press('Left Softkey / Menu',start+4)
+            machine.screens[':screen']:snapshot('6250_pin_retry_error.png')
+            if mode=='exhaust' then
+                machine.screens[':screen']:snapshot('6250_pin_exhaust_'..attempt..'.png')
+            end
+        end
+        if mode=='wrong-only' or mode=='exhaust' then
             machine:logerror('6250_pin_retry: wrong_only_complete=1 firmware_state_forcing=0\n')
             return
         end
     end
-    local start=mode=='cold-recovery' and 7 or 17
-    for index=1,4 do press('Keypad '..index,start+index) end
+    local start=(mode=='cold-recovery' or mode=='cold-rotated') and 7 or 17
+    local digits=mode=='cold-rotated' and {2,4,6,8} or {1,2,3,4}
+    for index,digit in ipairs(digits) do press('Keypad '..digit,start+index) end
     press('Left Softkey / Menu',start+5)
     assert(emu.wait(32-machine.time:as_double()))
     machine.screens[':screen']:snapshot('6250_pin_retry_idle.png')

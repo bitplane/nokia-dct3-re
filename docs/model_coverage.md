@@ -901,7 +901,11 @@ three own-product RGB frames pass. `verify-6250-pin-retry-cold` separately
 preserves the failed allowance across two independent processes, requires
 complete predecessor/cold-input/final card transitions and byte-identical
 inherited NVRAM, then physically restores retries and registered menus. All
-predecessor artifacts remain unchanged. PUK recovery remains unqualified on NHM-3.
+predecessor artifacts remain unchanged. `verify-6250-puk-recovery` adds physical
+PIN1 exhaustion, cold PUK/new-PIN/confirmation and a third-process new-PIN
+authentication with preserved-location registration. Exact card transitions,
+CHV selectors, physical contacts and11 stage frames pass; wrong-PUK/permanent
+loss and PIN2/PUK2 remain outside this qualification.
 
 `verify-6250-ussd` separately establishes the physical USSD exchange and reviewed
 NHM-3 result/idle frames on its declared derived-PMM research comparison. The

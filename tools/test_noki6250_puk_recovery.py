@@ -1,0 +1,84 @@
+import unittest
+from tools.make_sim_card_profile import make_profile
+from tools.noki6250_pin_retry_check import registered_card
+from tools.run_noki6250_pin_retry_cold import check_puk_phase
+
+
+def fixture(name):
+    blocked=bytearray(make_profile(True)+bytes.fromhex('00f110')+b'\xff'*43)
+    blocked[3516]=0
+    rotated=bytearray(registered_card())
+    rotated[3484:3492]=b'2468\xff\xff\xff\xff'
+    if name=='blocked':
+        initial,final=make_profile(True),bytes(blocked)
+        actions=[]
+        for start in (8,16,24):
+            actions += [(start+i,'Keypad 9') for i in range(4)]+[(start+4,'Left Softkey / Menu')]
+        prefix='6250_pin_retry'
+    elif name=='puk':
+        initial,final=bytes(blocked),bytes(rotated)
+        actions=[(8+i,'Keypad '+str(i+1)) for i in range(8)]+[(16,'Left Softkey / Menu')]
+        for group in (0,1):
+            actions += [(20+group*8+i,'Keypad '+str(digit)) for i,digit in enumerate((2,4,6,8))]
+            actions.append((24+group*8,'Left Softkey / Menu'))
+        actions.append((52,'Left Softkey / Menu'))
+        prefix='6250_puk_input'
+    else:
+        initial=final=bytes(rotated)
+        actions=[(8+i,'Keypad '+str(digit)) for i,digit in enumerate((2,4,6,8))]
+        actions += [(12,'Left Softkey / Menu'),(34,'Left Softkey / Menu')]
+        prefix='6250_pin_retry'
+    lines=[]
+    for second,key in actions:
+        lines += [f'{prefix}: key={key} state=1 t={second}.000000000',
+                  f'{prefix}: key={key} state=0 t={second}.150000000']
+        if name=='blocked' and second in (12,20,28):
+            index=(second-12)//8
+            lines += ['header cla=a0 ins=20 p1=00 p2=01 p3=08',
+                      f'SIM status ins=20 sw={"9840" if index==2 else "9804"} chv={2-index}/3 puk=10/10 enabled=1']
+        if name=='puk' and second==32:
+            lines += ['header cla=a0 ins=2c p1=00 p2=00 p3=10',
+                      'SIM status ins=2c sw=9000 chv=3/3 puk=10/10 enabled=1',
+                      'LAPDm Location Updating Accept acknowledged']
+        if name=='reauth' and second==12:
+            lines += ['header cla=a0 ins=20 p1=00 p2=01 p3=08',
+                      'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1',
+                      'LAPDm Location Updating Accept acknowledged']
+    lines.append(prefix+': '+('wrong_only_complete' if name=='blocked' else 'complete')+'=1 firmware_state_forcing=0')
+    return '\n'.join(lines),initial,final
+
+
+class PukRecoveryTest(unittest.TestCase):
+    def test_three_qualified_phase_contracts(self):
+        for name in ('blocked','puk','reauth'):
+            check_puk_phase(*fixture(name),name)
+
+    def test_complete_card_transitions_are_required(self):
+        for name in ('blocked','puk','reauth'):
+            text,initial,final=fixture(name)
+            for offset in (0,3484,3516,3517,3518,len(final)-1):
+                changed=bytearray(final)
+                changed[offset]^=1
+                with self.subTest(name=name,offset=offset),self.assertRaises(ValueError):
+                    check_puk_phase(text,initial,bytes(changed),name)
+            with self.assertRaises(ValueError):
+                check_puk_phase(text,initial[:-1],final,name)
+
+    def test_wrong_selectors_results_and_contacts_fail(self):
+        for name in ('blocked','puk','reauth'):
+            text,initial,final=fixture(name)
+            changes=[('p2=00 p3=10','p2=02 p3=10')] if name=='puk' else [('p2=01 p3=08','p2=02 p3=08')]
+            changes += [('chv=3/3','chv=2/3')] if name!='blocked' else [('chv=0/3','chv=1/3')]
+            changes += [('state=0 t=8.','state=1 t=8.'),('complete=1','complete=0')]
+            for old,new in changes:
+                with self.subTest(name=name,old=old),self.assertRaises(ValueError):
+                    check_puk_phase(text.replace(old,new),initial,final,name)
+            with self.assertRaises(ValueError):
+                check_puk_phase(text+'\nSIM status ins=dc sw=9000 chv=3/3 puk=10/10 enabled=1',initial,final,name)
+
+    def test_unknown_phase_is_not_reauthentication(self):
+        with self.assertRaises(ValueError):
+            check_puk_phase(*fixture('reauth'),'unknown')
+
+
+if __name__=='__main__':unittest.main()
