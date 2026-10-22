@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_pin2_exhaustion", "owner": "npe3_sim_security", "status": "satisfied",
+      "predicate": "6210 physically exhausts PIN2 through three cold-linked Settings changes without blocking PIN1 or unrelated card services",
+      "current": "Fresh own-PMM/coherent-card physical9999 current-PIN2 changes consume3->2->1->0 across separate processes. Exact CHANGE CHV2 statuses9804,9804,9840 and whole-card equality isolate the PIN2 retry byte; final PIN2 code blocked pixels are reviewed. PIN1 authentication, retained-location registration and Menu remain live. All18 frame comparisons, distinct launches, exact copied NVRAM and unchanged predecessors pass. Capture tmp/npe3-pin2-exhaustion-banked. Exploratory blocked cold Settings exposes Enter PUK2 code, not yet qualified recovery. No PUK2 exhaustion/FDN/native speech promotion.",
+      "evidence": ["docs/6210_bringup.md", "tools/run_noki6210_pin2_exhaustion.py", "tools/noki6210_pin2_wrong_input.lua", "tools/noki6210_pin2_change_check.py", "tools/test_noki6210_pin2_change_check.py", "tools/run_noki6210_acceptance.py", "gates.json"]
+    },
+    {
       "id": "npe3_wrong_pin2_cold_recovery", "owner": "npe3_sim_security", "status": "satisfied",
       "predicate": "6210 rejects wrong current PIN2, persists exactly one consumed PIN2 attempt and cold-recovers using the unchanged original PIN2",
       "current": "Physical Settings change with current9999/new8765 returns CHANGE CHV2/9804 and reviewed Code error pixels. Whole card changes only LOCI and PIN2 retries3->2, leaving both credentials and PUK counts intact. Exact own NVRAM/config feeds a separate cold process: original5678 installs8765/9000, restores PIN2 retries3 and registers with retained LOCI. Twelve frame checks, exact contacts/protocol, complete-card checks, independent launch provenance and unchanged predecessor storage pass. Capture tmp/npe3-pin2-retry-banked. CHV-indexed parser avoids mistaking PIN1 counters for PIN2. No PIN2/PUK2 exhaustion, FDN or native speech promotion.",

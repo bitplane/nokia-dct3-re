@@ -925,6 +925,13 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "pin2-retry-cold", "--coherent-cell", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6210-pin2-exhaustion",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki6210_pin2_exhaustion.py",
+                 "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-home-plmn-reject",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",

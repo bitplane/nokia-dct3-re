@@ -39,6 +39,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'pin2-change': ('npe3hle', 'pin2_change_input', 84),
              'pin2-change-cold': ('npe3hle', 'pin2_change_input', 84),
              'pin2-retry-cold': ('npe3hle', 'pin2_wrong_input', 84),
+             'pin2-reject': ('npe3hle', 'pin2_wrong_input', 84),
              'toolkit': ('npe3hle', 'toolkit_input', 40),
              'toolkit-interactive': ('npe3hle', 'toolkit_interactive', 65),
              'toolkit-menu': ('npe3hle', 'toolkit_menu', 75),
@@ -63,7 +64,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
 TOOLKIT_PROFILES = {'toolkit': 1, 'toolkit-interactive': 3, 'toolkit-menu': 4,
                     'toolkit-sms': 5, 'toolkit-call': 6, 'toolkit-call-decline': 6}
 PIN_SCENARIOS=frozenset(('security','security-retry','security-retry-cold',
-                         'security-block-cold','security-block','pin2-change','pin2-change-cold','pin2-retry-cold'))
+                         'security-block-cold','security-block','pin2-change','pin2-change-cold','pin2-retry-cold','pin2-reject'))
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
@@ -713,9 +714,9 @@ def main():
                     verify(cold_text, runtime=True, selftest=True)
                     check_forbidden_selection(cold_text, card.read_bytes(),
                                               forbidden=forbidden, previous=retained)
-        elif args.scenario in ('pin2-change','pin2-change-cold','pin2-retry-cold'):
+        elif args.scenario in ('pin2-change','pin2-change-cold','pin2-retry-cold','pin2-reject'):
             from tools.noki6210_pin2_change_check import check as check_pin2,check_frames as check_pin2_frames
-            rejected=args.scenario=='pin2-retry-cold'
+            rejected=args.scenario in ('pin2-retry-cold','pin2-reject')
             check_pin2(text,(run/'nvram/npe3hle/sim_card').read_bytes(),
                        old_pin='9999' if rejected else '5678',rejected=rejected)
             check_registration(text,(run/'nvram/npe3hle/sim_card').read_bytes(),channel_header='1202')

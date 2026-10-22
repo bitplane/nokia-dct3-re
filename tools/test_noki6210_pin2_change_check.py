@@ -51,6 +51,15 @@ class Pin2ChangeTests(unittest.TestCase):
         check(text,bytes(card),old_pin='9999',rejected=True)
         self.assertEqual(statuses(text,0x24),[(0x9804,3,10)])
         self.assertEqual(statuses(text,0x24,2),[(0x9804,2,10)])
+        for remaining in (1,0):
+            exhausted=bytearray(card)
+            exhausted[3517]=remaining
+            result='9840' if remaining==0 else '9804'
+            transition=text.replace('ins=24 sw=9804 chv=3/2',
+                                    f'ins=24 sw={result} chv=3/{remaining}')
+            check(transition,bytes(exhausted),old_pin='9999',rejected=True,remaining=remaining)
+            with self.assertRaises(ValueError):
+                check(transition,bytes(card),old_pin='9999',rejected=True,remaining=remaining)
         for index in (3492,3516,3517,3519):
             changed=bytearray(card)
             changed[index]^=1
@@ -77,6 +86,12 @@ class Pin2ChangeTests(unittest.TestCase):
 
     def test_physical_change(self):
         check(*fixture())
+
+    def test_invalid_retry_count_is_not_a_card_transition(self):
+        text,card=fixture()
+        for remaining in (-1,3):
+            with self.assertRaisesRegex(ValueError,'remaining attempts'):
+                check(text,card,rejected=True,remaining=remaining)
 
     def test_selector_input_or_status_drift_fails(self):
         text,card=fixture()

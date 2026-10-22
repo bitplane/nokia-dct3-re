@@ -122,7 +122,9 @@ physically changes it back, with retained location, independent launch/storage
 provenance and unchanged predecessor NVRAM. `verify-6210-pin2-retry-cold`
 proves Code error/9804 for wrong current PIN2, exactly one durable PIN2 retry
 consumed, unchanged credentials and cold recovery with the original PIN2.
-PIN2/PUK2 exhaustion and FDN remain unqualified.
+`verify-6210-pin2-exhaustion` independently consumes all three PIN2 retries in
+cold-linked processes, checks the PIN2 code blocked screen and preserves PIN1
+registration/menu access. PUK2 recovery/exhaustion and FDN remain unqualified.
 
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,

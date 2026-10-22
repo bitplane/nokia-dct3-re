@@ -14,16 +14,20 @@ FRAMES={
 }
 
 
-def check_frames(directory,rejected=False):
+def check_frames(directory,rejected=False,blocked=False):
     for name,digest in FRAMES.items():
         if rejected and name=='6210_pin2_key_70.png':
             digest='c1371c4cdca6b0f72c9c1dcc6e602de981330f67719714bc5b124e1a3b4fcfcd'
+        if blocked and name=='6210_pin2_key_70.png':
+            digest='f0bcd18b7cdbc4a9f63d55c4046dfc695dab6944776f99a1f983993d6156ad2a'
         check_rgb_frame(directory/name,digest)
 
 
-def check(text,card,old_pin='5678',new_pin='8765',rejected=False):
-    result=0x9804 if rejected else 0x9000
-    if statuses(text,0x20)!=[(0x9000,3,10)] or statuses(text,0x24,2)!=[(result,2 if rejected else 3,10)]:
+def check(text,card,old_pin='5678',new_pin='8765',rejected=False,remaining=2):
+    if remaining not in (0,1,2):
+        raise ValueError('rejected PIN2 remaining attempts must be 0..2')
+    result=(0x9804 if remaining else 0x9840) if rejected else 0x9000
+    if statuses(text,0x20)!=[(0x9000,3,10)] or statuses(text,0x24,2)!=[(result,remaining if rejected else 3,10)]:
         raise ValueError('6210 must authenticate PIN1 once and change PIN2 once')
     items=[(7+i,'Keypad '+str(i)) for i in range(1,5)]+[(12,'Left Softkey / Menu')]
     items += [(20,'Left Softkey / Menu')]+[(22+i,'Scroll Down') for i in range(3)]+[(26,'Left Softkey / Menu')]
@@ -46,7 +50,7 @@ def check(text,card,old_pin='5678',new_pin='8765',rejected=False):
     ],'6210 PIN2 change')
     expected=bytearray(profile(3,True))
     if rejected:
-        expected[3517]=2
+        expected[3517]=remaining
     else:
         expected[3492:3500]=new_pin.encode('ascii').ljust(8,b'\xff')
     if card!=bytes(expected):

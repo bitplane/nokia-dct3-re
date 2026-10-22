@@ -1178,7 +1178,16 @@ installs8765 successfully, restoring PIN2 retries to3. Both six-frame sequences,
 registration, source preservation and launch provenance are checked. Capture:
 `tmp/npe3-pin2-retry-banked`. The status parser explicitly selects CHV2's
 counters; default CHV1 consumers retain their previous behavior.
-PIN2/PUK2 exhaustion and FDN control remain unqualified.
+`make verify-6210-pin2-exhaustion` runs three physical wrong-current-PIN2
+changes through separate predecessor-linked cold processes. Retry counts
+3->2->1->0 produce9804,9804,9840; the final screen is PIN2 code blocked.
+Every full card equals the registered laboratory profile except the PIN2 retry
+byte. PIN1 still authenticates, coherent registration succeeds and Menu remains
+usable. All18 reviewed frames pass, with distinct launch IDs and exact copied
+storage/source preservation. Capture: `tmp/npe3-pin2-exhaustion-banked`.
+A separate exploratory cold run exposes Enter PUK2 code at the same settings
+item; it does not yet qualify PUK2 recovery. PUK2 exhaustion and FDN control
+remain unqualified.
 
 ## SIM Toolkit
 
