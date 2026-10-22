@@ -14,7 +14,8 @@ from tools.nsm1_v523_static_check import SHA1
 from tools.sim_security_trace_check import statuses,ATTEMPTS_OFFSET,CHV_OFFSET,padded_pin
 
 
-def recovery(trace,wrong=False):
+def recovery(trace,wrong=False,attempts_before=10):
+    if not 1<=attempts_before<=10:raise ValueError('requires live PUK1 retries')
     keys=(1,2,3,4,5,6,7,9 if wrong else 8,0x19)+(4,3,2,1,0x19)*2
     contacts=re.findall(r'nsm1_puk_contact: key=([0-9a-f]+) down=([01]) ',trace)
     if contacts!=[(f'{key:02x}',down) for key in keys for down in ('1','0')]:
@@ -22,19 +23,28 @@ def recovery(trace,wrong=False):
     tx=transmitted(trace,4096,'nsm1_sim_tx')
     command=bytes.fromhex('a02c000010')+(b'12345679' if wrong else b'12345678')+padded_pin('4321')
     if tx.count(command)!=1:raise ValueError('UNBLOCK command differs')
-    if statuses(trace,0x2c)!=[(0x9804 if wrong else 0x9000,0 if wrong else 3,9 if wrong else 10)]:
+    remaining=attempts_before-1 if wrong else 10
+    result=0x9840 if wrong and remaining==0 else 0x9804 if wrong else 0x9000
+    if statuses(trace,0x2c)!=[(result,0 if wrong else 3,remaining)]:
         raise ValueError('PUK result differs')
     if any(statuses(trace,ins) for ins in (0x20,0x24,0x26,0x28)):
         raise ValueError('unexpected credential command')
 
 
 def transition(before,mode):
+    if len(before)<=ATTEMPTS_OFFSET+3:raise ValueError('truncated security counters')
     expected=bytearray(before)
-    if mode=='exhaust':expected[ATTEMPTS_OFFSET]-=1
-    elif mode=='wrong':expected[ATTEMPTS_OFFSET+2]-=1
-    elif mode=='recover':
-        expected[ATTEMPTS_OFFSET]=3
-        expected[CHV_OFFSET:CHV_OFFSET+8]=padded_pin('4321')
+    if mode=='exhaust':
+        if not 1<=before[ATTEMPTS_OFFSET]<=3:raise ValueError('requires live PIN1 retries')
+        expected[ATTEMPTS_OFFSET]-=1
+    elif mode in ('wrong','recover'):
+        if before[ATTEMPTS_OFFSET]!=0 or not 1<=before[ATTEMPTS_OFFSET+2]<=10:
+            raise ValueError('requires blocked PIN1 and live PUK1 retries')
+        if mode=='wrong':expected[ATTEMPTS_OFFSET+2]-=1
+        else:
+            expected[ATTEMPTS_OFFSET]=3
+            expected[ATTEMPTS_OFFSET+2]=10
+            expected[CHV_OFFSET:CHV_OFFSET+8]=padded_pin('4321')
     elif mode!='cold':raise ValueError('unknown phase')
     return bytes(expected)
 

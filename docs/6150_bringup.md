@@ -361,6 +361,9 @@ full menu frames match the independently reviewed6130 resources; this proves
 bounded52s UI/security operation, not hardware/mask equivalence, radio or speech.
 Every cold link checks prelaunch hashes, copied domains (NVRAM/config only),
 native record validation, own executable and complete card transitions.
+New cold links additionally require healthy captured console output; a zero
+MAME exit status cannot hide a Lua or validity error. Older seed captures
+retain their separately qualified trace-based acceptance.
 
 ```sh
 .venv/bin/python tools/nsm1_puk2_exhaust.py tmp/nsm1-pin2-wrong \
@@ -372,7 +375,35 @@ Use a fresh output without`--check-only` to execute, or`--resume` to requalify
 retained predecessors. Completed verbose logs are losslessly compressed;
 read-only qualification accepts plain or gzip logs. Source hashes prevent
 accidental input reuse, not cryptographic execution attestation. Permanent
-PUK1 loss and native RF remain separate unqualified lifecycles.
+PUK1 loss has a separate gate below; native RF remains unqualified.
+
+The permanent PUK1 gate starts with the retained first physical wrong PIN1,
+requalifies both subsequent wrong PINs and the first wrong PUK1, then performs
+nine further cold12345679/new4321 attempts. Every process receives the actual
+predecessor card/EEPROM/configuration without RAM or save state. UNBLOCK returns
+9804 until the final9840; only PUK1 retries change, ending0/3/0/10. No blocked
+counter or credential is seeded by the exhaustion harness.
+
+The terminal24s frame is **SIM card rejected**. A further cold process renders
+the exact same full frame at5s and24s, before and after the physical input
+control. It transmits no VERIFY/CHANGE/UNBLOCK or card-write command and
+preserves every card byte. Native record validation, own flash identity,
+prelaunch hashes, complete-card transitions and execution health remain required.
+The shared NSM-1 cold-copy/run helpers are reused from the PUK2 gate rather
+than introducing another machine/transport implementation.
+
+```sh
+.venv/bin/python tools/nsm1_puk1_exhaust.py tmp/nsm1-pin-wrong \
+  tmp/nsm1-pin-second-wrong tmp/nsm1-pin-exhausted tmp/nsm1-puk-wrong \
+  tmp/nsm1-puk1-exhaustion --check-only
+```
+
+Fresh execution/resume and log compression follow the PUK2 runner's rules.
+The PUK transition checker rejects exhausted counter inputs and models a
+successful recovery as restoring PUK1 retries to10 as well as PIN1 to3;
+the existing positive recovery/cold new-PIN control remains accepted. These
+bounded52s software-security results do not promote fitted-mask/clock fidelity,
+native RF, registration, calls, network SMS, speech or long-run stability.
 
 The base card does not advertise FDN. The explicit extended laboratory
 profile adds service3, EF_FDN6f3b and retained ADN validity without changing

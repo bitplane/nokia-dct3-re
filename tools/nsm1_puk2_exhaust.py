@@ -50,10 +50,10 @@ def check_link(run,previous):
     for name in ('sim_card','eeprom'):
         if (run/f'initial_{name}.bin').read_bytes()!=stored(previous,name):
             raise ValueError('cold card/EEPROM differs from predecessor')
-    check_run(run)
+    check_run(run,require_console=True)
 
 
-def check_run(run):
+def check_run(run,*,require_console=False):
     if hashlib.sha1(stored(run,'flash')).hexdigest()!=SHA1:
         raise ValueError('own executable flash differs')
     if len(stored(run,'eeprom'))!=0x4000:raise ValueError('own EEPROM extent differs')
@@ -61,6 +61,9 @@ def check_run(run):
     if re.search(r'illegal|unsupported|unhandled|fatal|\[LUA ERROR\]',trace,re.I):
         raise ValueError('execution/observer error')
     records(trace,True)
+    if require_console:
+        from tools.run_sip_handset_gate import verify_handset_health
+        verify_handset_health((run/'console.log').read_text())
 
 
 def execute(run,script='nsm1_puk2_wrong.lua'):
@@ -143,7 +146,7 @@ def main():
     try:
         chain([args.first.resolve(),args.second.resolve(),args.blocked.resolve()],args.wrong.resolve(),
               args.output.resolve(),check_only=args.check_only,resume=args.resume)
-    except (OSError,EOFError,ValueError,KeyError,subprocess.SubprocessError) as error:
+    except (OSError,EOFError,ValueError,RuntimeError,KeyError,subprocess.SubprocessError) as error:
         parser.exit(1,f'NSM-1 PUK2 exhaustion: FAIL: {error}\n')
 
 

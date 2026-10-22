@@ -4,11 +4,20 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools.nsm1_puk2_exhaust import prepare,check_link,check_permanent,chain
+from tools.nsm1_puk2_exhaust import prepare,check_link,check_permanent,chain,check_run,SHA1
 from tools.sim_security_trace_check import ATTEMPTS_OFFSET,AOC_NVRAM_SIZE
 
 
 class ColdPuk2Test(unittest.TestCase):
+    def test_new_cold_runs_reject_console_lua_errors(self):
+        from types import SimpleNamespace
+        with patch('tools.nsm1_puk2_exhaust.stored',side_effect=[b'flash',bytes(0x4000)]), \
+             patch('tools.nsm1_puk2_exhaust.hashlib.sha1',return_value=SimpleNamespace(hexdigest=lambda:SHA1)), \
+             patch('tools.nsm1_puk2_exhaust.trace_text',return_value='clean trace'), \
+             patch('tools.nsm1_puk2_exhaust.records'), \
+             patch.object(Path,'read_text',return_value='[LUA ERROR] passive fixture failed'):
+            with self.assertRaises(RuntimeError):check_run(Path('run'),require_console=True)
+
     def test_permanent_menu_requires_full_card_and_timed_physical_input(self):
         card=bytearray(AOC_NVRAM_SIZE)
         card[ATTEMPTS_OFFSET:ATTEMPTS_OFFSET+4]=bytes((3,0,10,0))
