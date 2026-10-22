@@ -1243,6 +1243,14 @@ nokia_gsm_session_device::receive_layer3(
 				information_hex.c_str(), machine().time().as_double());
 		if (message_type == 0x3a)
 		{
+			const auto result = gsm::ss::parse_ussd_facility_result(information, length);
+			if (!result.valid || result.transaction != 0x8b || result.invoke_id != 1 ||
+					(m_incoming_service == u8(incoming_service::ussd_notification) && result.has_parameters))
+				return downlink_kind::none;
+			LOGMASKED(LOG_GSM_SESSION,
+					"gsm_ss: network_result transaction=%02x invoke=%u dcs=%02x packed_length=%u empty=%u t=%.6f\n",
+					result.transaction, result.invoke_id, result.data_coding_scheme,
+					result.ussd_length, result.has_parameters ? 0 : 1, machine().time().as_double());
 			const auto release = gsm::ss::network_release_complete(0x0b);
 			m_state = u8(state::awaiting_network_ussd_release_acknowledgement);
 			return queue_downlink(downlink_kind::supplementary_release_complete,

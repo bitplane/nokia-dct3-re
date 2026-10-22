@@ -2576,16 +2576,16 @@ verify-radio-ussd-outcomes: build
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait1800,star,1,2,3,hash,wait800,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=25 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=1000' || exit; \
 	$(PYTHON) tools/radio_ussd_trace_check.py "$$out/error.log" "$$out" --outcome silence --require-state-roundtrip
 
-# shell: network-initiated USSD request rejection and notification acknowledgement
+# shell: network-initiated USSD physical reply and notification acknowledgement
 verify-radio-network-ussd: ERASED_IDENTITY_SECURITY_CODE=12345
 verify-radio-network-ussd: build
 	@set -e; \
 	for outcome in request notify; do \
-		case "$$outcome" in request) fixture=radio_network_ussd_request ;; notify) fixture=radio_network_ussd ;; esac; \
+		case "$$outcome" in request) fixture=radio_network_ussd_request; keys=1,2,3,4,5,enter,wait3000,enter,wait1200,enter,2,enter,wait2000,back ;; notify) fixture=radio_network_ussd; keys=1,2,3,4,5,enter ;; esac; \
 		out="$(RUN_DIR)_$$outcome"; \
 		$(MAKE) --no-print-directory run-prebuilt-captured RUN_DIR="$$out" SECONDS=40 RUN_VERBOSE=1 ERASED_IDENTITY_SECURITY_CODE=12345 \
 			RUN_EXTRA_ARGS="-cfg_directory ../fixtures/$$fixture" \
-			RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)' || exit; \
+			RUN_ENV="NOKIA_DCT3_POST_READY_KEYS=$$keys NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 $(DCT3_PRESS_220_280)" || exit; \
 		$(PYTHON) tools/radio_network_ussd_trace_check.py "$$out/error.log" "$$out" --outcome "$$outcome" || exit; \
 	done
 

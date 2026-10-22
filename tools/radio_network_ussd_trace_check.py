@@ -16,9 +16,12 @@ REQUEST = re.compile(
 REGISTER = re.compile(
     r"GSM service downlink kind=\d+ sapi=0 pd=0b message=3b "
     r"length=(?P<length>\d+) ")
-REQUEST_REJECTION = re.compile(
-    r"gsm_ss: network_initiated handset_response message=2a length=6 "
-    r"data=8b6a0802e0e0 ")
+REQUEST_RESULT = re.compile(
+    r"gsm_ss: network_initiated handset_response message=3a length=21 "
+    r"data=8b7a12a210020101300b02013c300604010f040132 ")
+PARSED_RESULT = re.compile(
+    r"gsm_ss: network_result transaction=8b invoke=1 dcs=0f "
+    r"packed_length=1 empty=0 ")
 NOTIFICATION_RESULT = re.compile(
     r"gsm_ss: network_initiated handset_response message=3a length=8 "
     r"data=8b7a05a203020101 ")
@@ -46,21 +49,31 @@ def verify(text: str, frame_dir: pathlib.Path, outcome: str,
         raise ValueError("missing network-originated REGISTER")
 
     if outcome == "request":
-        if register.group("length") != "32":
+        if register.group("length") != "29":
             raise ValueError("wrong network USSD request length")
-        response = REQUEST_REJECTION.search(text, register.end())
+        cursor = register.end()
+        for key in ("enter", "enter", "2", "enter"):
+            press = re.search(r"input-press: t=[0-9.]+ name=" + key + r" port=", text[cursor:])
+            if not press:
+                raise ValueError(f"missing physical request key {key}")
+            cursor += press.end()
+        response = REQUEST_RESULT.search(text, cursor)
         if not response:
-            raise ValueError("missing exact handset request rejection")
+            raise ValueError("missing exact handset request reply")
+        response = PARSED_RESULT.search(text, response.end())
+        if not response:
+            raise ValueError("missing correlated network request result")
     else:
         if register.group("length") != "35":
             raise ValueError("wrong network USSD notification length")
         response = NOTIFICATION_RESULT.search(text, register.end())
         if not response:
             raise ValueError("missing exact handset notification result")
-        release = NETWORK_RELEASE.search(text, response.end())
-        if not release:
-            raise ValueError("missing network RELEASE COMPLETE")
-        response = release
+
+    release = NETWORK_RELEASE.search(text, response.end())
+    if not release:
+        raise ValueError("missing network RELEASE COMPLETE")
+    response = release
 
     if not RR_RELEASE.search(text, response.end()):
         raise ValueError("missing RR release after network USSD")

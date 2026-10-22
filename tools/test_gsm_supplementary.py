@@ -101,10 +101,23 @@ int main()
 	if (!continued.valid || continued.has_parameters || continued.invoke_id != 2) return 31;
 	const std::uint8_t wrong_tlv[] = {0x1b,0x3a,0x1c,5,0xa2,3,2,1,2};
 	if (gsm::ss::parse_ussd_facility_result(wrong_tlv, sizeof(wrong_tlv)).valid) return 32;
+	std::uint8_t network_reply[sizeof(continued_reply)];
+	for (unsigned i = 0; i < sizeof(continued_reply); ++i) network_reply[i] = continued_reply[i];
+	network_reply[0] = 0x8b;
+	network_reply[1] = 0x7a;
+	network_reply[7] = 1;
+	continued = gsm::ss::parse_ussd_facility_result(network_reply, sizeof(network_reply));
+	if (!continued.valid || !continued.has_parameters || continued.transaction != 0x8b ||
+			continued.invoke_id != 1 || continued.ussd_length != 1 || continued.ussd[0] != 0x32)
+		return 33;
+	const std::uint8_t notification_result[] = {0x8b,0x7a,5,0xa2,3,2,1,1};
+	continued = gsm::ss::parse_ussd_facility_result(notification_result, sizeof(notification_result));
+	if (!continued.valid || continued.has_parameters || continued.transaction != 0x8b ||
+			continued.invoke_id != 1) return 34;
 	response = gsm::ss::network_unstructured_uss_request(0x0b, 1, "Enter reply");
-	if (response.length != 32 || response.data[0] != 0x0b ||
+	if (response.length != 29 || response.data[0] != 0x0b ||
 			response.data[1] != 0x3b || response.data[11] != 0x3c ||
-			response.data[29] != 0x7f)
+			response.data[3] != response.length - 4)
 		return 23;
 	for (unsigned i = 0; i < response.length; ++i)
 		std::printf("%02x", response.data[i]);
@@ -280,7 +293,7 @@ class GsmSupplementaryTest(unittest.TestCase):
             "9b2a1c0da20b020101300602010e800100\n"
             "9b2a1c13a211020101300c02013b300704010f0402cf25\n"
             "9b3a19a11702010202013c300f04010f040a4537bd2c07c9cb70761e\n"
-            "0b3b1c19a11702010102013c300f04010f040a4537bd2c07c9cb70761e7f0100\n"
+            "0b3b1c19a11702010102013c300f04010f040a4537bd2c07c9cb70761e\n"
             "0b3b1c1fa11d02010102013d301504010f0410cef73a1d06d1cb733ac85da6dfdff235\n"
             "9b2a1c1da21b020101301602010aa011040121300c300a840105850581551532f4\n",
             result.stdout)

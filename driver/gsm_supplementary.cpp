@@ -512,8 +512,7 @@ namespace
 message network_unstructured_uss(
 		std::uint8_t transaction, std::uint8_t invoke_id,
 		operation operation_code, std::uint8_t data_coding_scheme,
-		const std::uint8_t *packed, unsigned packed_length,
-		bool version_indicator)
+		const std::uint8_t *packed, unsigned packed_length)
 {
 	message result;
 	if (!packed || !packed_length || packed_length > maximum_ussd_length)
@@ -521,8 +520,7 @@ message network_unstructured_uss(
 	const unsigned parameter_length = 3 + 2 + packed_length;
 	const unsigned component_length = 3 + 3 + 2 + parameter_length;
 	const unsigned facility_length = 2 + component_length;
-	const unsigned version_length = version_indicator ? 3 : 0;
-	if (4 + facility_length + version_length > result.data.size())
+	if (4 + facility_length > result.data.size())
 		return message{};
 
 	unsigned offset = 0;
@@ -547,12 +545,7 @@ message network_unstructured_uss(
 	result.data[offset++] = packed_length;
 	for (unsigned index = 0; index < packed_length; ++index)
 		result.data[offset++] = packed[index];
-	if (version_indicator)
-	{
-		result.data[offset++] = 0x7f;
-		result.data[offset++] = 0x01;
-		result.data[offset++] = 0x00;
-	}
+	// TS 24.080 table 2.3: SS-version belongs to the mobile-originated form.
 	result.length = offset;
 	return result;
 }
@@ -566,7 +559,7 @@ message network_unstructured_uss_request(
 	const unsigned packed_length = pack_gsm7(text, packed.data(), packed.size());
 	return network_unstructured_uss(transaction, invoke_id,
 			operation::unstructured_uss_request, 0x0f,
-			packed.data(), packed_length, true);
+			packed.data(), packed_length);
 }
 
 message network_unstructured_uss_notify(
@@ -576,7 +569,7 @@ message network_unstructured_uss_notify(
 	const unsigned packed_length = pack_gsm7(text, packed.data(), packed.size());
 	return network_unstructured_uss(transaction, invoke_id,
 			operation::unstructured_uss_notify, 0x0f,
-			packed.data(), packed_length, false);
+			packed.data(), packed_length);
 }
 
 message network_unstructured_uss_notify(
@@ -586,7 +579,7 @@ message network_unstructured_uss_notify(
 {
 	return network_unstructured_uss(transaction, invoke_id,
 			operation::unstructured_uss_notify, data_coding_scheme,
-			packed, packed_length, false);
+			packed, packed_length);
 }
 
 message network_release_complete(std::uint8_t transaction)

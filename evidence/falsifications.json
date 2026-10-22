@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "network_ussd_version_rejection_proves_no_reply_editor",
+      "status": "disproven",
+      "hypothesis": "NSE-8 cannot answer network-originated UnstructuredSS-Request because the observed REGISTER receives cause60",
+      "conclusion": "The rejected32-byte REGISTER incorrectly appended the mobile-originated SS-version IE. TS24.080 table2.3 network-to-mobile REGISTER has no such field; table2.4 supplies it for the opposite direction. The corrected29-byte request presents Enter reply; physical Read/Answer/2/Send produces typed ReturnResult8b7a12a210020101300b02013c300604010f040132. Transaction8b/invoke1 are validated before network RELEASE COMPLETE and ordinary RR release. This closes one laboratory request/reply, not arbitrary host continuation or native DSP/RF.",
+      "evidence": ["docs/gsm_supplementary_services.md", "driver/gsm_supplementary.cpp", "driver/nokia_gsm_session.cpp", "tools/test_gsm_supplementary.py", "tools/radio_network_ussd_trace_check.py", "tools/test_radio_network_ussd_trace_check.py", "gates.json"]
+    },
+    {
       "id": "tagged_facility_rejection_proves_no_continued_ussd",
       "status": "disproven",
       "hypothesis": "The observed cause-60 rejection establishes that the tested DCT3 firmware cannot accept continued USSD",

@@ -224,15 +224,20 @@ arbitrary multi-turn menus and host-controlled continuation remain unclaimed.
 the ordinary IMSI paging, Paging Response and dedicated SAPI-0 path. It covers
 the two network-originated operations separately:
 
-- An `UnstructuredSS-Request` (`0x3c`) REGISTER with the phase-2 SS-version
-  indicator is rejected by NSE-8 v6.00 with RELEASE COMPLETE cause `0x60`.
-  This is an exact packet-shape negative, not general capability evidence.
-  Network-to-mobile REGISTER version-IE policy still needs an independent
-  encoding audit; no reply editor is synthesized from this rejection.
-- An `UnstructuredSS-Notify` (`0x3d`) REGISTER without the optional version IE
+- An `UnstructuredSS-Request` (`0x3c`) REGISTER presents `Enter reply` on
+  NSE-8 v6.00. Physical Read, Answer, numeric `2` and Send produce the typed
+  ReturnResult `8b7a12a210020101300b02013c300604010f040132`. The session checks
+  transaction `8b` and invoke `1`, sends RELEASE COMPLETE and releases RR.
+- An `UnstructuredSS-Notify` (`0x3d`) REGISTER
   is accepted. Firmware displays `01 Message: Nokia test network`, sends the
   empty ReturnResult FACILITY `8b 7a 05 a2 03 02 01 01`, accepts the network's
   RELEASE COMPLETE and returns to the idle common-control channel.
+
+Network-to-mobile REGISTER has no SS-version IE; that optional field belongs
+to the mobile-to-network form ([ETSI TS 124 080, tables 2.3 and 2.4](https://www.etsi.org/deliver/etsi_TS/124000_124099/124080/04.00.00_60/ts_124080v040000p.pdf)).
+The former cause-`0x60` request rejection used the wrong direction's field and
+does not establish a handset limitation. This gate qualifies one laboratory
+request/reply, not arbitrary host-controlled multi-turn dialogue.
 
 The notification result and transaction ownership match the network-initiated
 procedure in [ETSI TS 124 090](https://www.etsi.org/deliver/etsi_ts/124000_124099/124090/10.00.00_60/ts_124090v100000p.pdf).
