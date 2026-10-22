@@ -57,6 +57,30 @@ def call_fixture(decline=False):
 
 
 class ToolkitTest(unittest.TestCase):
+    @patch('tools.nsb7_toolkit_check.check_authentication')
+    def test_polling_protocol_and_bounded_ordinary_status_cadence(self,authentication):
+        text=interactive_fixture(menu=True).replace('SIM status ins=c2 sw=9000',
+            'menu selection item=1 accepted\nproactive POLL INTERVAL ready\nSIM status ins=c2 sw=910f')
+        exit_event='nsb7_toolkit_interactive: action=menu_exit\nnsb7_key_decode: key=0f observer_writes=0'
+        rows=['header cla=a0 ins=12 p1=00 p2=00 p3=0f',
+              'header cla=a0 ins=14 p1=00 p2=00 p3=10',
+              'terminal-response data=81030a03000202828103010004020105',
+              'proactive POLLING OFF ready','SIM status ins=14 sw=910b',
+              'header cla=a0 ins=12 p1=00 p2=00 p3=0b',
+              'header cla=a0 ins=14 p1=00 p2=00 p3=0c',
+              'terminal-response data=81030b040002028281030100','SIM status ins=14 sw=9000']
+        rows += [f'header cla=a0 ins=f2 p1=00 p2=00 p3=16 t={t}.0\nSIM completion ins=f2 sw=9000'
+                 for t in (93,124,155,186)]
+        rows += ['ccont_rtc: event=second time=13:50:53 day=0 t=188.0',exit_event]
+        text=text.replace(exit_event,'\n'.join(rows))
+        check(text,mode='polling')
+        for bad in (text.replace('t=124.0','t=98.0'),text.replace('t=188.0','t=100.0'),
+                    text.replace('SIM completion ins=f2 sw=9000','SIM completion ins=f2 sw=9404',1),
+                    text.replace('03010004020105','03010004020106'),
+                    text+'\nGSM outgoing request id=1 digits=5551234'):
+            with self.subTest(text=bad),self.assertRaises(ValueError):
+                check(bad,mode='polling')
+
     def test_unknown_mode_rejected(self):
         with self.assertRaisesRegex(ValueError,'unknown Toolkit'):
             check('',mode='unknown')

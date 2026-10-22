@@ -11,6 +11,7 @@ from tools.nsb7_pin_services_check import check_authentication,check_source,SMSS
 from tools.sim_toolkit_sms_trace_check import verify as verify_sms
 from tools.sim_toolkit_call_trace_check import verify as verify_call,verify_decline,DISCONNECT
 from tools.sim_toolkit_select_item_trace_check import verify as verify_select_item
+from tools.sim_toolkit_polling_trace_check import verify_commands as verify_polling_commands
 from tools.nsb7_pin_check import check_frame
 from tools.nsb7_radio_check import contract
 from tools.nsb7_storage_check import inspect
@@ -50,11 +51,13 @@ SELECT_ITEM_FRAMES={**MENU_FRAMES,
     'nsb7_toolkit_menu_select.png':'2fd7bf03bc43f6e81353678de00f40c96ef9a7dad56cf47672f8793552fe394d',
     'nsb7_toolkit_item_next.png':'1a9cdbfa614372e7d78e887b5cc3be697a8e065e46b8ab0303b0caf13cd0f0ee',
     'nsb7_toolkit_item_accept.png':MENU_FRAMES['nsb7_toolkit_menu_open.png']}
+POLLING_FRAMES={**MENU_FRAMES,
+    'nsb7_toolkit_menu_exit.png':'9da919d7d031f0e7d2f8184dab4a20d2f91d747ac025de9908bf24112faa162a'}
 
 
 MODE_FRAMES={'display':FRAMES,'interactive':INTERACTIVE_FRAMES,'menu':MENU_FRAMES,
              'sms':SMS_FRAMES,'call':CALL_FRAMES,'decline':DECLINE_FRAMES,
-             'select_item':SELECT_ITEM_FRAMES}
+             'select_item':SELECT_ITEM_FRAMES,'polling':POLLING_FRAMES}
 
 
 def check(text,mode='display'):
@@ -62,6 +65,7 @@ def check(text,mode='display'):
         raise ValueError('unknown Toolkit acceptance mode')
     sms=mode=='sms'
     select_item=mode=='select_item'
+    polling=mode=='polling'
     decline=mode=='decline'
     call=mode in ('call','decline')
     menu=mode not in ('display','interactive')
@@ -69,8 +73,10 @@ def check(text,mode='display'):
     marker='nsb7_toolkit_interactive' if interactive else 'nsb7_toolkit_physical'
     check_authentication(text.split(marker+':',1)[0])
     verifier=verify_menu if menu else verify_interactive if interactive else verify_display_text
-    if sms or call or select_item:
-        verifier(text,'nsb7',selection_status='9124' if sms else '911c' if call else '9122')
+    selection_status={'sms':'9124','call':'911c','decline':'911c',
+                      'select_item':'9122','polling':'910f'}.get(mode)
+    if selection_status:
+        verifier(text,'nsb7',selection_status=selection_status)
     else:
         verifier(text,'nsb7')
     if sms:
@@ -113,8 +119,29 @@ def check(text,mode='display'):
             ('selected item2',r'terminal-response data=810307240002028281030100100102'),
             ('physical exit',r'nsb7_toolkit_interactive: action=menu_exit'),
         ],'NSB-7 Toolkit item selection')
+    if polling:
+        verify_polling_commands(text)
+        compact=text.replace('[:sim_card] ','')
+        off=compact.index('terminal-response data=81030b040002028281030100')
+        after=compact[off:]
+        headers=list(re.finditer(r'header cla=a0 ins=f2 [^\n]*t=([0-9.]+)',after))
+        polls=[float(row[1]) for row in headers]
+        ticks=[float(t) for t in re.findall(r'ccont_rtc: event=second [^\n]*t=([0-9.]+)',compact[off:])]
+        # Measured ordinary STATUS traffic, not proof of its firmware owner
+        # or the physical timer rate. POLLING OFF leaves presence detection.
+        if len(polls)<4 or any(not 30<=b-a<=32 for a,b in zip(polls,polls[1:])):
+            raise ValueError('post-off ordinary STATUS cadence differs')
+        if not ticks or max(ticks)<188 or polls[-1]<185:
+            raise ValueError('post-off observation was truncated')
+        for index,row in enumerate(headers):
+            end=headers[index+1].start() if index+1<len(headers) else len(after)
+            if 'SIM completion ins=f2 sw=9000' not in after[row.end():end]:
+                raise ValueError('post-off STATUS did not complete successfully')
+        if 'GSM outgoing request ' in text or 'gsm_sms_submit:' in text:
+            raise ValueError('polling unexpectedly started network service')
     for instruction in ('10','12','14'):
-        expected=(5 if sms or call or select_item else 4 if menu else 3) if interactive and instruction!='10' else 1
+        count=6 if polling else 5 if sms or call or select_item else 4 if menu else 3
+        expected=count if interactive and instruction!='10' else 1
         if text.count(f'header cla=a0 ins={instruction} ')!=expected:
             raise ValueError('Toolkit profile/FETCH/terminal-response count differs')
     if text.count('header cla=a0 ins=c2 ')!=(1 if menu else 0):
@@ -163,7 +190,8 @@ def main():
     parser.add_argument('run',type=Path)
     modes=parser.add_mutually_exclusive_group()
     for flag,mode in (('--interactive','interactive'),('--menu','menu'),('--sms','sms'),
-                      ('--call','call'),('--call-decline','decline'),('--select-item','select_item')):
+                      ('--call','call'),('--call-decline','decline'),('--select-item','select_item'),
+                      ('--polling','polling')):
         modes.add_argument(flag,dest='mode',action='store_const',const=mode)
     parser.set_defaults(mode='display')
     args=parser.parse_args()

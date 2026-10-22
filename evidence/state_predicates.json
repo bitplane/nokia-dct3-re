@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_authenticated_toolkit_polling_commands",
+      "owner": "nsb7_sim_toolkit", "status": "satisfied",
+      "predicate": "NSB-7 accepts the five-second POLL INTERVAL and chained POLLING OFF responses while a bounded extended trace independently records ordinary STATUS traffic",
+      "current": "Own authenticated registered menu selection86 yields910f/FETCH. Terminal response81030a03000202828103010004020105 reports successful five-second interval; immediate910b/FETCH and81030b040002028281030100/9000 close POLLING OFF. STATUS at93.004/124.014/155.016/186.018s remains roughly31 seconds apart through End188/final189. ETSI GSM11.14 6.4.14 preserves presence detection, so no-STATUS is not a universal requirement. One profile, six FETCH/responses, one envelope, twelve decoded actions, eleven exact frames/final13:50, full registration, valid own flash and unchanged complete card pass. Actual five-second scheduling before the immediate OFF, exact STATUS owner and physical-clock fidelity remain unproved; no device change or native DSP/RF/speech claim.",
+      "evidence": ["docs/8290_bringup.md", "docs/sim_subsystem.md", "fixtures/nsb7_toolkit_polling/nsb7hle.cfg", "tools/nsb7_toolkit_polling.lua", "tools/nsb7_toolkit_check.py", "tools/test_nsb7_toolkit_check.py", "tools/sim_toolkit_polling_trace_check.py", "tools/test_sim_toolkit_polling_trace_check.py"]
+    },
+    {
       "id": "nsb7_authenticated_toolkit_select_item",
       "owner": "nsb7_sim_toolkit", "status": "satisfied",
       "predicate": "An authenticated NSB-7 physically selects the second proactive menu item and returns the exact successful item identifier without network service",

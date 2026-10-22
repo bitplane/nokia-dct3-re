@@ -2564,3 +2564,34 @@ mutually exclusive. This is firmware/card UI acceptance, not native DSP/RF.
 .venv/bin/python tools/nsb7_toolkit_check.py \
   roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-select-item --select-item
 ```
+
+### Polling commands and retained STATUS traffic
+
+`fixtures/nsb7_toolkit_polling/nsb7hle.cfg` and
+`nsb7_toolkit_polling.lua` reuse the physical menu sequence. Selection86
+returns910f, FETCH supplies POLL INTERVAL, and firmware returns
+`81030a03000202828103010004020105`: success with reported interval five
+seconds. The card immediately chains POLLING OFF through910b; response
+`81030b040002028281030100`/9000 succeeds. The full card is unchanged.
+
+The extended run observes STATUS at93.004/124.014/155.016/186.018s after
+OFF, and keeps running through physical End188/final189s. These roughly
+31-second intervals are measured research timing, not a physical-clock
+specification or proof of the caller's semantic ownership. They are not the
+negotiated five-second cadence and are compatible with separate SIM presence
+checks. [GSM 11.14 section 6.4.14](https://www.etsi.org/deliver/etsi_TS/101200_101299/101267/08.02.01_60/ts_101267v080201p.pdf)
+leaves presence detection unaffected by POLLING OFF. The older NSE-8 gate's
+no-STATUS observation therefore remains product/fixture-specific.
+
+Acceptance covers one profile, six FETCH/response pairs, one envelope,
+twelve decoded physical actions, eleven exact frames including13:50 final
+idle, full registration, valid own flash and unchanged complete card. It
+requires at least four later STATUS samples with the observed cadence and
+an untruncated RTC observation, and rejects call/SMS side effects. Because
+OFF follows immediately, actual operation of the five-second schedule and
+the precise presence-poll owner remain unproved. No device behavior changed.
+
+```sh
+.venv/bin/python tools/nsb7_toolkit_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-polling-long --polling
+```

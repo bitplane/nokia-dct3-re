@@ -460,12 +460,17 @@ delayed completion, and only then schedule the new application session.
 `make verify-sim-toolkit-refresh` protects this ordering and catches both lost
 completion state and overlapping proactive commands.
 
-`POLL INTERVAL` and `POLLING OFF` are both supported. For a requested
-five-second interval the firmware returns result `00` plus an effective-duration
-TLV of five seconds, then accepts the chained off command. No later periodic
-STATUS occurs in the bounded run. `make verify-sim-toolkit-polling` protects the
-echoed duration and the absence after disable, rather than treating a bare
-success result as proof that polling changed.
+The NSE-8 `POLL INTERVAL`/`POLLING OFF` fixture returns result `00` plus a
+five-second effective-duration TLV, then accepts the immediately chained off
+command. No later STATUS occurs in that bounded run; the existing gate
+preserves this measured silence as a fixture-specific regression.
+It is not a universal prohibition: [GSM 11.14 section 6.4.14](https://www.etsi.org/deliver/etsi_TS/101200_101299/101267/08.02.01_60/ts_101267v080201p.pdf)
+disables proactive polling without affecting SIM presence detection.
+The NSB-7 fixture accepts the same commands while ordinary STATUS continues
+at an observed roughly31-second cadence. The shared protocol checker is
+separate from those product observations. Neither immediately chained fixture
+proves that a five-second polling schedule ran before OFF; reported duration
+alone is not elapsed-time evidence.
 
 `PLAY TONE` reaches the modeled DSP audio boundary: general-beep tone `10`
 produces an organic 1750 Hz start and stop. With an alpha identifier, physical

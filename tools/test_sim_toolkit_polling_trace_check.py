@@ -25,6 +25,11 @@ class SimToolkitPollingTraceCheckTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "continued"):
             check.verify(GOOD + "\nheader cla=a0 ins=f2 p1=00 p2=00 p3=16")
 
+    def test_protocol_does_not_prohibit_independent_presence_status(self):
+        check.verify_commands(GOOD + '\nheader cla=a0 ins=f2 p1=00 p2=00 p3=16')
+        with self.assertRaises(ValueError):
+            check.verify_commands(GOOD.replace('03010004020105','03010004020106'))
+
 
 if __name__ == "__main__":
     unittest.main()
