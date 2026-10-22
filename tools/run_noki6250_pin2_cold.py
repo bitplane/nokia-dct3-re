@@ -22,7 +22,7 @@ from tools.run_sip_handset_gate import verify_handset_health
 def check_cold_input(initial,predecessor,*,retries=3):
     expected=bytearray(registered_card())
     expected[3492:3500]=b'8765\xff\xff\xff\xff'
-    if retries not in (2,3):
+    if retries not in (1,2,3):
         raise ValueError('cold PIN2 input requires its qualified live allowance')
     expected[3517]=retries
     if initial!=predecessor or initial!=bytes(expected):
@@ -34,7 +34,10 @@ def main():
     parser.add_argument('run',type=Path)
     parser.add_argument('--mame',type=Path)
     parser.add_argument('--reject-first',action='store_true',help='reject the current PIN2 in a separate cold process before recovery')
+    parser.add_argument('--exhaust-pin2',action='store_true',help='consume all three PIN2 allowances in independent cold Settings transactions')
     args=parser.parse_args()
+    if args.reject_first and args.exhaust_pin2:
+        parser.error('--exhaust-pin2 and --reject-first select different phase plans')
     root=Path(__file__).resolve().parents[1]
     binary=(args.mame or root/'mame/mame').resolve()
     try:
@@ -57,7 +60,10 @@ def main():
         protected={first:hashes(first)}
         launches=[first_launch]
         source=first
-        for name,rejected in ([('reject',True),('cold',False)] if args.reject_first else [('cold',False)]):
+        phases=[('reject',True,3),('cold',False,2)] if args.reject_first else [('cold',False,3)]
+        if args.exhaust_pin2:
+            phases=[(f'reject-{attempt}',True,4-attempt) for attempt in (1,2,3)]
+        for name,rejected,attempts in phases:
             cold=run/name
             cold.mkdir()
             for component in ('nvram','cfg','roms'):
@@ -65,7 +71,6 @@ def main():
             if hashes(cold/'nvram')!=hashes(source/'nvram'):
                 raise ValueError('cold PIN2 storage differs from predecessor')
             initial=(cold/'nvram/nhm3hle/sim_card').read_bytes()
-            attempts=2 if source.name=='reject' else 3
             check_cold_input(initial,(source/'nvram/nhm3hle/sim_card').read_bytes(),retries=attempts)
             (cold/'initial_sim_card.bin').write_bytes(initial)
             command=first_launch['mame_command'].copy()
@@ -92,18 +97,21 @@ def main():
             check(text,card,old='8764' if rejected else '8765',new='2468',
                   rejected=rejected,stored='8765',initial_retries=attempts)
             registration(text,card,preserved=True,require_host=False)
-            check_frames(cold/'snap',rejected=rejected)
+            check_frames(cold/'snap',rejected=rejected,initial_retries=attempts)
             if any(hashes(path)!=digest for path,digest in protected.items()):
                 raise ValueError('cold PIN2 run mutated predecessor artifacts')
             protected[cold]=hashes(cold)
             launches.append(launch)
             source=cold
+            print(f'6250 PIN2 phase {name}: verified',flush=True)
         (run/'acceptance.json').write_text(json.dumps({'phases':launches,
             'independent_processes':len(launches),'rejected_change':args.reject_first,
+            'pin2_exhausted':args.exhaust_pin2,
             'research_hle':True,'native_speech':False},indent=2)+'\n')
     except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as error:
         parser.exit(1,f'6250 cold PIN2 FAIL: {error}\n')
-    label=('wrong-PIN2 rejection, durable retries and cold recovery' if args.reject_first else
+    label=('physical PIN2 exhaustion across cold Settings transactions' if args.exhaust_pin2 else
+           'wrong-PIN2 rejection, durable retries and cold recovery' if args.reject_first else
            'installed PIN2 cold physical authentication/change')
     print(f'6250 {label} PASS: {run}')
 

@@ -926,7 +926,13 @@ credential acceptance via CHANGE CHV2, not standalone VERIFY.
 no installation of the proposed value, durable3->2 retry loss, cold PIN1
 authentication with PIN2 retries still2 and a successful installed-PIN2 change
 resetting retries3. All33 frames and complete card/predecessor checks pass.
-PIN2 exhaustion and PUK2 remain unqualified.
+`verify-6250-pin2-exhaustion` separately consumes all three PIN2 attempts via
+physical Settings changes across four processes, with9804/9804/9840 results,
+44 exact frames and complete-card preservation apart from retry loss. PIN1
+authentication, coherent registration and physical Menu remain usable; both
+PUK allowances stay10.
+A separate bounded cold capture retains PIN2 retries0 and observes Change PIN2
+opening Enter PUK2 code; PUK2 recovery itself remains unqualified.
 
 `verify-6250-ussd` separately establishes the physical USSD exchange and reviewed
 NHM-3 result/idle frames on its declared derived-PMM research comparison. The

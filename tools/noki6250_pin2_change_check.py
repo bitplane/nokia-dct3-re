@@ -42,14 +42,14 @@ def actions(old='5678',new='8765'):
 def check(text,card,*,old='5678',new='8765',rejected=False,stored='5678',initial_retries=3):
     if any(len(value)!=4 or not value.isascii() or not value.isdigit() for value in (old,new,stored)):
         raise ValueError('qualified PIN2 changes require four ASCII digits')
-    if initial_retries not in (2,3):
-        raise ValueError('qualified PIN2 changes require two or three initial attempts')
+    if initial_retries not in (1,2,3):
+        raise ValueError('qualified PIN2 changes require one to three initial attempts')
     expected=bytearray(registered_card())
     expected[3492:3500]=(stored if rejected else new).encode('ascii')+b'\xff'*4
     expected[3517]=initial_retries-1 if rejected else 3
     if card!=bytes(expected):
         raise ValueError('PIN2 change altered unrelated card contents or did not install the expected value')
-    result=0x9804 if rejected else 0x9000
+    result=(0x9840 if initial_retries==1 else 0x9804) if rejected else 0x9000
     if (statuses(text,0x20)!=[(0x9000,3,10)] or
             statuses(text,0x20,2)!=[(0x9000,initial_retries,10)] or
             statuses(text,0x24)!=[(result,3,10)] or
@@ -74,10 +74,12 @@ def check(text,card,*,old='5678',new='8765',rejected=False,stored='5678',initial
     ],'6250 PIN2 change')
 
 
-def check_frames(directory,*,rejected=False):
+def check_frames(directory,*,rejected=False,initial_retries=3):
     for second,digest in FRAMES.items():
         if rejected and second==70:
-            digest='c1371c4cdca6b0f72c9c1dcc6e602de981330f67719714bc5b124e1a3b4fcfcd'
+            digest=('f0bcd18b7cdbc4a9f63d55c4046dfc695dab6944776f99a1f983993d6156ad2a'
+                    if initial_retries==1 else
+                    'c1371c4cdca6b0f72c9c1dcc6e602de981330f67719714bc5b124e1a3b4fcfcd')
         check_rgb_frame(directory/f'6250_pin2_key_{second}.png',digest)
 
 

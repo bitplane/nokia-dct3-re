@@ -14,7 +14,7 @@ def fixture(old='5678',new='8765',*,rejected=False,stored='5678',initial_retries
                       'LAPDm Location Updating Accept acknowledged']
         if second==70:
             lines += ['header cla=a0 ins=24 p1=00 p2=02 p3=10',
-                      f'SIM status ins=24 sw={"9804" if rejected else "9000"} chv=3/{initial_retries-1 if rejected else 3} puk=10/10 enabled=1']
+                      f'SIM status ins=24 sw={("9840" if initial_retries==1 else "9804") if rejected else "9000"} chv=3/{initial_retries-1 if rejected else 3} puk=10/10 enabled=1']
     lines.append('6250_pin2_input: complete=1 firmware_state_forcing=0')
     card=bytearray(registered_card())
     card[3492:3500]=(stored if rejected else new).encode('ascii')+b'\xff'*4
@@ -23,6 +23,20 @@ def fixture(old='5678',new='8765',*,rejected=False,stored='5678',initial_retries
 
 
 class Pin2ChangeTest(unittest.TestCase):
+    def test_every_physical_failure_preserves_pin_and_consumes_one_attempt(self):
+        for attempts in (3,2,1):
+            options=dict(old='8764',new='2468',rejected=True,stored='8765',initial_retries=attempts)
+            text,card=fixture(**options)
+            with self.subTest(attempts=attempts):
+                check(text,card,**options)
+            changed=bytearray(card)
+            changed[3517]=attempts
+            with self.assertRaises(ValueError):
+                check(text,bytes(changed),**options)
+            if attempts==1:
+                with self.assertRaises(ValueError):
+                    check(text.replace('ins=24 sw=9840','ins=24 sw=9804'),card,**options)
+
     def test_wrong_current_pin2_does_not_install_proposed_pin(self):
         options=dict(old='8764',new='2468',rejected=True,stored='8765')
         text,card=fixture(**options)

@@ -732,6 +732,24 @@ recorded hashes between phases. Capture: `tmp/nhm3-pin2-reject-banked2`.
 This qualifies one rejected CHANGE CHV2 and cold recovery, not PIN2 exhaustion,
 PUK2 or permanent loss.
 
+`make verify-6250-pin2-exhaustion` independently installs8765, then submits
+three wrong current-PIN2 changes in separate inherited-state cold processes.
+Each authenticates PIN1 and registers before physical Settings input.
+CHANGE CHV2 returns9804/9804/9840 while PIN2 retries fall3->2->1->0. Every
+full-card transition preserves the installed8765, PIN1 and both PUK allowances;
+the proposed2468 is never installed. The final image says PIN2 code blocked,
+and physical End/Menu still recovers Messages. All44 exact frames, contacts,
+selectors/result order, inherited NVRAM and predecessor-artifact hashes pass.
+Capture: `tmp/nhm3-pin2-exhaustion-probe`.
+
+A separate bounded cold-entry capture copies the final blocked card without
+editing it: PIN1 VERIFY succeeds with PIN2 retries still0, retained-location
+registration completes and the same Settings route's Change PIN2 selection
+opens Enter PUK2 code. No CHANGE or UNBLOCK is sent; End/Menu and the complete
+unchanged card pass the observation check. Capture:
+`tmp/nhm3-pin2-blocked-entry`, frame `6250_blocked_entry_47.png`.
+This maps the recovery entrance, not a qualified PUK2 recovery transaction.
+
 Run `noki6250` with private working/NVRAM/config directories, the acquired
 product ROMs, `-noreadconfig -log -video none -sound none -nothrottle`,
 `-autoboot_delay 0 -seconds_to_run 9` and
