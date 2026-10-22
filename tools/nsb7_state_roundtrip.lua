@@ -100,7 +100,11 @@ retained[#retained+1]=emu.add_machine_post_load_notifier(function()
     assert(coroutine.resume(replay))
 end)
 local runner=coroutine.create(function()
-    assert(emu.wait(save_time))
+    if _G.nsb7_state_wait_for_save then
+        _G.nsb7_state_wait_for_save()
+    else
+        assert(emu.wait(save_time))
+    end
     machine:save('nsb7_'..scenario)
     assert(emu.wait(3))
     assert(saved,'save did not execute')

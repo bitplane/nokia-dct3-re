@@ -147,7 +147,13 @@ restoration, unchanged request1 under epoch2, explicit stale-epoch rejection,
 one accepted decision, one submission and one EF_SMSS update. Physical recovery
 and reviewed individual frames are required; neither a host callback nor an
 old-epoch generic rejection alone establishes this contract. See
-[NSB-7 pending host SMS restoration](8290_bringup.md#pending-host-sms-restoration).
+[NSB-7 pending outgoing host SMS restoration](8290_bringup.md#pending-outgoing-host-sms-restoration).
+The independent [incoming ingress-restoration gate](8290_bringup.md#incoming-host-sms-ingress-restoration)
+admits an external SMS once, saves at observed CP-DATA ingress and requires
+queued/delivered in both reference/restored epochs without resending. Exact
+architecture/protocol/card/clock replay, whole final-card content and physical
+hello reading are required. The host runner waits beyond reference delivery
+when`--require-restore` is selected and rejects unhealthy handset console output.
 
 For a text-only command-line ingress test, the standalone endpoint packs GSM
 7-bit text and submits it after the handset has registered:

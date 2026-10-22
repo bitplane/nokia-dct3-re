@@ -4,6 +4,7 @@
 import argparse
 import asyncio
 import json
+import sys
 from websockets.exceptions import ConnectionClosed
 
 try:
@@ -15,7 +16,9 @@ except ModuleNotFoundError:
 
 
 async def run(args: argparse.Namespace) -> None:
-    process = await asyncio.create_subprocess_exec(*args.command, cwd=args.cwd)
+    process = await asyncio.create_subprocess_exec(*args.command, cwd=args.cwd,
+        stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.STDOUT)
+    console=asyncio.create_task(process.stdout.read())
     try:
         websocket = await connect(args.port, process)
         async with websocket:
@@ -39,7 +42,7 @@ async def run(args: argparse.Namespace) -> None:
             phases = []
             initial_epoch = epoch
             restored = False
-            while "delivered" not in phases:
+            while "delivered" not in phases or (args.require_restore and not restored):
                 event = json.loads(await asyncio.wait_for(websocket.recv(), 30))
                 if event.get("type") == "call_adapter_ready":
                     new_epoch = event.get("epoch")
@@ -63,6 +66,13 @@ async def run(args: argparse.Namespace) -> None:
         result = await asyncio.wait_for(process.wait(), 90)
         if result:
             raise RuntimeError(f"MAME exited with status {result}")
+        output=(await console).decode(errors='replace')
+        print(output,end='')
+        try:
+            from tools.run_sip_handset_gate import verify_handset_health
+        except ModuleNotFoundError:
+            from run_sip_handset_gate import verify_handset_health
+        verify_handset_health(output)
     except ConnectionClosed as error:
         raise RuntimeError(
             "host SMS connection closed before lifecycle completion"
@@ -71,6 +81,7 @@ async def run(args: argparse.Namespace) -> None:
         if process.returncode is None:
             process.terminate()
             await process.wait()
+        await console
 
 
 def main() -> int:

@@ -2227,7 +2227,50 @@ frame hashes, CP/RP acceptance or full-card expectations. They use the own
 unedited13:47:45 source. The separate authenticated SMS save/load repeat
 above retains its CP-ACK/RP-ACK boundary and now compares CCONT replay too.
 
-### Pending host SMS restoration
+### Incoming host SMS ingress restoration
+
+`nsb7_host_incoming_sms_state.lua` uses the same PIN-enabled own-source
+storage and host configuration with automatic lab SMS disabled. The external
+host admits one`hello` from5551234 after PCS600 registration. A read-only
+task14 CP-DATA observation at`2645ec` triggers save within110microseconds,
+after PIN/phone authentication but before CP/RP acknowledgement or SIM update.
+No message, timer result or firmware state is injected by the observer.
+
+The reference executes for3s, including one exact unread SMS write and
+CP-ACK/RP-ACK; load then restores all37 ARM/banked registers, PC/SP, full-RAM
+digest and time. The full reference/restored transport, GSM, SIM, RTC and
+analog observations compare exactly (apart from already-declared diagnostic
+timestamps). Host phases are queued/delivered under epoch1, then queued/delivered
+under epoch2, with only one external admission and no host resend. The runner
+must remain attached past reference delivery to observe the restored epoch;
+it also rejects Lua/validity/fatal console errors independently of exit status.
+
+Physical Menu26/28/30/32 reads the message and produces the exact hello frame.
+The final complete card contains only the one delivered/read SMS change.
+Whole-card reading checks use the restored branch, after independently proving
+that the reference and restored branches each store/acknowledge once and replay
+identically; discarded reference execution is not counted as a second persisted
+message. Both replay-end frames equal the reviewed Nokia startup frame, not a
+message notification. A35.1s endpoint observes all35 retained RTC ticks; it does
+not claim the longer call fixture's later analog-control0f transition.
+
+Use`run_host_incoming_sms_gate.py --port 18950 --require-restore` around the
+isolated MAME command with matching HTTP port, this script and42s guard.
+Capture its stdout/stderr and require the product checker too:
+
+```sh
+.venv/bin/python tools/nsb7_host_incoming_sms_state_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-host-sms-ingress-qualified \
+  --console tmp/nsb7-host-sms-ingress-qualified-launch.log
+```
+
+The ordinary one-shot external delivery/read control passes independently with
+`nsb7_pin_sms_read.lua`, without`--require-restore`. Passive screenshot waits
+cancelled by load return normally; physical key-action failures remain errors.
+This is host-originated signaling/storage restoration, not external carrier
+delivery, SIP SMS, native DSP, speech or handset-media continuity.
+
+### Pending outgoing host SMS restoration
 
 `nsb7_host_sms_submit_state.lua` preserves the authenticated physical Reply
 while it waits for an external result. The unchanged host-SMS configuration

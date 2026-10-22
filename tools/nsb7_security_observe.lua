@@ -77,7 +77,8 @@ local input=coroutine.create(function()
     end
     for _,base in ipairs({14,18,25}) do
         local target=base+delay
-        assert(emu.wait(target-machine.time:as_double()))
+        -- Loading cancels passive capture waits; it must not report a failed key action.
+        if not emu.wait(target-machine.time:as_double()) then return end
         machine.screens[':screen']:snapshot('nsb7_security_'..target..'.png')
     end
     if not _G.nsb7_security_continue then machine:exit() end
