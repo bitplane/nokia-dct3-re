@@ -4,7 +4,7 @@ from tools.noki8890_cold_clock_check import verify, verify_minute
 
 
 TEXT = ('8890_clock_nv_result: result=00000001 flags=00 caller=00304ce9\n'
-        '8890_clock_nv_cache: kind=app_write pc=002dffdc address=00137414 '
+        '8890_clock_nv_cache: kind=app_write pc=002dffde address=00137414 '
         'data=2a000000 mask=ff000000 t=1.178\n')
 STORED = bytes((19, 47, 13, 0, 0, 30, 11, 0x50, 1))
 
@@ -16,6 +16,10 @@ class ColdClockTest(unittest.TestCase):
                 'ccont_rtc: event=second time=13:48:01 day=0 status=13 mask=50 t=61.000000000\n'
                 '8890_clock_cold: t=90\n')
         verify_minute(text)
+        retained=text.replace('t=59.', 't=40.').replace('t=60.', 't=41.').replace('t=61.', 't=42.')
+        verify_minute(retained,19)
+        with self.assertRaises(ValueError):
+            verify_minute(retained,0)
         for wrong in (text.replace('13:48:00', '13:47:00'),
                       text.replace('status=33', 'status=13'),
                       text.replace('13:48:01 day=0 status=13', '13:48:01 day=0 status=33'),
@@ -28,6 +32,7 @@ class ColdClockTest(unittest.TestCase):
 
     def test_missing_invalid_or_injected_settlement_fails(self):
         for text in (TEXT.replace('result=00000001', 'result=00000000'),
+                     TEXT.replace('pc=002dffde','pc=002dffdc'),
                      TEXT.replace('data=2a000000', 'data=34000000'),
                      TEXT + '8890_clock_physical: key=Menu\n',
                      TEXT + 'LUA ERROR\n'):
@@ -36,6 +41,7 @@ class ColdClockTest(unittest.TestCase):
 
     def test_counter_only_wrong_time_or_snapshot_fails(self):
         for stored in (STORED[:4], bytes((19, 0, 12)) + STORED[3:],
+                       bytes((60,))+STORED[1:],
                        STORED[:-1] + b'\x00'):
             with self.subTest(stored=stored), self.assertRaises(ValueError):
                 verify(TEXT, stored)

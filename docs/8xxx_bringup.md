@@ -1239,8 +1239,10 @@ time/date input. Reproduce with
 `make verify-8890-cold-clock RUN_DIR=RUN` automates both isolated processes,
 while `make verify-8890-minute-redraw RUN_DIR=RUN` extends the cold process
 through 92 emulated seconds. The latter independently passes
-`run_8890_minute_redraw_verified`: the retained user clock crosses
-13:47:59 -> 13:48:00 -> 13:48:01 at seconds 59/60/61, the minute IRQ source
+`tmp/ccont-alias-8890-cold-v2`: the retained user clock crosses
+13:47:59 -> 13:48:00 -> 13:48:01 at seconds 40/41/42 for the actual
+19-second seed counter. The checker derives these instants from the source
+NVRAM rather than assuming a boot-time seconds reset. The minute IRQ source
 is set and subsequently cleared, and the reviewed registered-idle frame
 at 90 seconds displays **13:48**. No time/date keys are supplied in the cold
 process. Acceptance requires both ordered RTC evidence and the exact
@@ -1492,7 +1494,9 @@ minute zero). The physical clock-entry run actually programs alarm `00/1e`
 and IRQ mask `50`; its saved register-`0x0d` snapshot is `0b`.
 The restored snapshot is `0b/05/aa`. Matching retained controller fields let
 the original initializer select state `2a` at `0x137414`; time getter
-`0x2dfc28` requires that state. Mismatched fields select state `34` and
+`0x2dfc28` requires that state. The observed application store is
+`0x2dffde` (`strb r0,[r4,#4]`); `0x2dffdc` only loads constant `0x2a`
+and is not the store-site identity. Mismatched fields select state `34` and
 `0x2e0124` reinitialization. Counter-only persistence is therefore insufficient:
 the firmware validates the complete retained clock domain. No application-state
 override is needed. Offline calendar advance and battery-removal behavior remain

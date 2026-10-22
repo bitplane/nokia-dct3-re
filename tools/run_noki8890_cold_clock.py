@@ -62,7 +62,7 @@ def main():
         check_frame(run / 'seed/snap/8890_date_after.png')
         check_frame(run / 'cold/snap/8890_clock_cold_30.png')
         if args.minute_redraw:
-            verify_minute((run / 'cold/error.log').read_text(errors='replace'))
+            verify_minute((run / 'cold/error.log').read_text(errors='replace'),stored[0])
             check_frame(run / 'cold/snap/8890_clock_cold_90.png', advanced=True)
         (run / 'acceptance.json').write_text(json.dumps({
             'result': 'pass', 'machine': 'nsb6hle', 'mcu_sha1': profile[2],
