@@ -935,7 +935,11 @@ PUK allowances stay10.
 cold boot authenticates PIN1/registers, physically enters PUK2/newPIN2 and sends
 one successful UNBLOCK CHV2 followed by firmware VERIFY of the new value. Another
 cold process accepts that value in a physical Settings change. All66 frames,
-complete card transitions and immutable predecessor checks pass. Wrong-PUK2 and
+complete card transitions and immutable predecessor checks pass.
+`verify-6250-wrong-puk2-recovery` adds physical wrong-PUK2 rejection with no
+replacement installation/verification, durable10->9 PUK2 retry loss, correct
+cold recovery and another cold new-PIN2 change. All77 frames and complete
+card/predecessor checks pass across seven processes. PUK2 exhaustion and
 permanent loss remain unqualified.
 
 `verify-6250-ussd` separately establishes the physical USSD exchange and reviewed

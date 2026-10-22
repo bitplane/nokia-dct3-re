@@ -13,44 +13,60 @@ FRAMES={**{second:CHANGE_FRAMES[second] for second in (26,31,34,39,45)},
         80:CHANGE_FRAMES[76],82:CHANGE_FRAMES[78]}
 
 
-def check_frames(directory):
+def check_frames(directory,*,rejected=False):
     for second,digest in FRAMES.items():
+        if rejected and second==74:
+            digest='c1371c4cdca6b0f72c9c1dcc6e602de981330f67719714bc5b124e1a3b4fcfcd'
         check_rgb_frame(directory/f'6250_pin2_key_{second}.png',digest)
 
 
-def check(text,initial,final):
+def check(text,initial,final,*,rejected=False,puk_attempts=10):
+    if puk_attempts not in (9,10):
+        raise ValueError('qualified PUK2 recovery requires nine or ten initial attempts')
     expected=bytearray(registered_card())
     expected[3492:3500]=b'8765\xff\xff\xff\xff'
     expected[3517]=0
+    expected[3519]=puk_attempts
     if initial!=bytes(expected):
         raise ValueError('PUK2 recovery requires the complete physically exhausted predecessor card')
-    expected[3492:3500]=b'2468\xff\xff\xff\xff'
-    expected[3517]=3
+    if rejected:
+        expected[3519]-=1
+    else:
+        expected[3492:3500]=b'2468\xff\xff\xff\xff'
+        expected[3517]=3
+        expected[3519]=10
     if final!=bytes(expected):
         raise ValueError('PUK2 recovery changed unrelated card data or failed to install2468')
-    if (statuses(text,0x20)!=[(0x9000,3,10)]*2 or
-            statuses(text,0x20,2)!=[(0x9000,0,10),(0x9000,3,10)] or
-            statuses(text,0x2c)!=[(0x9000,3,10)] or statuses(text,0x2c,2)!=[(0x9000,3,10)]):
+    result=0x9804 if rejected else 0x9000
+    verifies=[(0x9000,3,10)]*(1 if rejected else 2)
+    pin2_verifies=[(0x9000,0,puk_attempts)]+([] if rejected else [(0x9000,3,10)])
+    if (statuses(text,0x20)!=verifies or statuses(text,0x20,2)!=pin2_verifies or
+            statuses(text,0x2c)!=[(result,3,10)] or
+            statuses(text,0x2c,2)!=[(result,0 if rejected else 3,puk_attempts-1 if rejected else 10)]):
         raise ValueError('PUK2 recovery requires PIN1, one UNBLOCK and new-PIN2 verification')
-    if (re.findall(r'header cla=a0 ins=20 p1=00 p2=(\w\w) p3=08',text)!=['01','02'] or
+    if (re.findall(r'header cla=a0 ins=20 p1=00 p2=(\w\w) p3=08',text)!=(['01'] if rejected else ['01','02']) or
             re.findall(r'header cla=a0 ins=2c p1=00 p2=(\w\w) p3=10',text)!=['02']):
         raise ValueError('PUK2 selectors differ')
     if any(statuses(text,ins) for ins in (4,0x24,0x26,0x28,0x44,0xdc)):
         raise ValueError('PUK2 recovery unexpectedly changed other card state')
     items=[(second,key) for second,key in actions() if second<50]
-    for start,digits in ((50,'87654321'),(62,'2468'),(70,'2468')):
+    for start,digits in ((50,'99999999' if rejected else '87654321'),(62,'2468'),(70,'2468')):
         items += [(start+i,'Keypad '+digit) for i,digit in enumerate(digits)]+[(start+len(digits),'Left Softkey / Menu')]
     items += [(80,'End'),(82,'Left Softkey / Menu')]
     contacts(text,'6250_pin2_input',items)
-    require_ordered(text,[
+    order=[
         ('PIN1',r'header cla=a0 ins=20 p1=00 p2=01 p3=08'),
         ('registered',r'LAPDm Location Updating Accept acknowledged'),
         ('confirm',r'6250_pin2_input: key=Left Softkey / Menu state=1 t=74\.'),
         ('UNBLOCK CHV2',r'header cla=a0 ins=2c p1=00 p2=02 p3=10'),
-        ('unblocked',r'SIM status ins=2c sw=9000'),
-        ('new PIN2 VERIFY',r'header cla=a0 ins=20 p1=00 p2=02 p3=08'),
-        ('verified',r'SIM status ins=20 sw=9000'),
+        ('result',rf'SIM status ins=2c sw={result:04x}'),
+    ]
+    if not rejected:
+        order += [('new PIN2 VERIFY',r'header cla=a0 ins=20 p1=00 p2=02 p3=08'),
+                  ('verified',r'SIM status ins=20 sw=9000')]
+    order += [
         ('End',r'6250_pin2_input: key=End state=1 t=80\.'),
         ('Menu',r'6250_pin2_input: key=Left Softkey / Menu state=1 t=82\.'),
         ('complete',r'6250_pin2_input: complete=1 firmware_state_forcing=0'),
-    ],'6250 PUK2 recovery')
+    ]
+    require_ordered(text,order,'6250 PUK2 recovery')

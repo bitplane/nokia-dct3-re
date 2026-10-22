@@ -7,6 +7,22 @@ from tools import run_noki6250_pin2_cold as runner
 
 
 class ColdPin2InputTest(unittest.TestCase):
+    def test_wrong_puk2_requires_its_exhaustion_and_recovery_plan(self):
+        with patch('sys.argv',['runner','unused','--wrong-puk2-first']), \
+                patch('sys.stderr',new_callable=io.StringIO) as output:
+            with self.assertRaises(SystemExit) as error:
+                runner.main()
+        self.assertEqual(error.exception.code,2)
+        self.assertIn('--wrong-puk2-first requires --recover-puk2',output.getvalue())
+
+    def test_wrong_puk2_allowance_is_not_regenerated_on_cold_input(self):
+        card=bytearray(self.card())
+        card[3517]=0
+        card[3519]=9
+        check_cold_input(bytes(card),bytes(card),retries=0,puk2=9)
+        with self.assertRaises(ValueError):
+            check_cold_input(bytes(card),bytes(card),retries=0)
+
     def test_puk2_recovery_requires_physical_exhaustion_plan(self):
         with patch('sys.argv',['runner','unused','--recover-puk2']), \
                 patch('sys.stderr',new_callable=io.StringIO) as output:

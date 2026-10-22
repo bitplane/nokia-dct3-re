@@ -758,8 +758,23 @@ not another standalone VERIFY. All66 frame hashes cover the own menu route,
 PUK2/new/confirmation editors, Code accepted, idle/Menu and ordinary change
 results. Exact contacts/APDUs, complete card/NVRAM links, native upload/initial-
 record, console-health and predecessor-integrity checks pass. Capture:
-`tmp/nhm3-puk2-recovery-banked`. Wrong-PUK2 handling and permanent PUK2 loss
-remain unqualified; native speech and factory provisioning are not promoted.
+`tmp/nhm3-puk2-recovery-banked`. That successful-recovery gate excludes rejected
+PUK2 and permanent loss; native speech and factory provisioning are not promoted.
+
+`make verify-6250-wrong-puk2-recovery` adds an independent wrong-PUK2 process
+before recovery. Physical99999999/proposed2468/confirmation returns9804 and
+Code error, consumes PUK2 attempts10->9 and leaves PIN2 blocked at0 with its
+stored value8765 unchanged. PIN1 and all unrelated card fields are preserved;
+no replacement PIN2 VERIFY is sent after the rejection. The next cold process
+must inherit that exact nine-attempt card, including the lost allowance in its
+initial PIN1 VERIFY status. Correct PUK2 recovery resets allowances, installs2468
+and firmware VERIFYs it; another cold process changes2468->1357 physically.
+
+All77 exact frames, physical contacts, CHV selectors/results/order, complete
+card/NVRAM links, registration, native/initial-record and console-health checks
+pass across seven processes. Every predecessor artifact remains unchanged.
+Capture: `tmp/nhm3-wrong-puk2-probe`. This proves one wrong-PUK2 rejection and
+durable retry loss, not PUK2 exhaustion or permanent rejection.
 
 Run `noki6250` with private working/NVRAM/config directories, the acquired
 product ROMs, `-noreadconfig -log -video none -sound none -nothrottle`,
