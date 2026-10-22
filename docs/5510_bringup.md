@@ -2642,6 +2642,12 @@ acquired schematic is retained locally, ignored, at
 `roms/reference-docs/npm5/nokia_5510_npm-5_schematics.pdf`, SHA-256
 `e642943045b2f1ae8dfd6cf0ebee3a0c0d7cb7026de4543c7b48bd8da97f3d58`.
 This source does not provide the controller's firmware or packet grammar.
+Sheet 3 connects MSP430 U301 P4.6 (pin 42), net `UC_DSP_INT`, to the
+DSP U101 active-low INT2 input (pin 66 on sheet 4). This is a separate
+controller-to-DSP signal from the serial data/clock/frame nets; its normal
+firmware-driven waveform remains unknown. The source-pinned resident IDLE3
+routine below selects this interrupt, rather than ordinary command RX, as
+its only enabled maskable wake source.
 The primary User Interface Module manual, pages 10/11 (connector table 2),
 and MU4 MCU sheet 3 identify these MA4/MU4 interface nets:
 
@@ -9554,6 +9560,25 @@ reference-prefix drift, any cold/restored capture difference, incomplete
 continuation or unhealthy process exit. This qualifies this native control's
 restoration; it does not promote automatic EOF, full audio completion, native
 handset speech or complete 5510 support.
+
+The `resident_idle3` source contract pins all 22 words at `028914..028929`
+and ten caller words around `03ac0b`. The caller enables IMR bit 2 through
+`AR1=0; ORM 4,*AR1`; the routine pushes IMR/IFR, selects `IMR=0004`, writes
+`CLKMD=0`, polls CLKMD bit 0 until clear, writes zero again and executes
+`028922:f5e1`. Its tail writes the saved IFR word through W1C acknowledgement
+semantics, restores IMR and returns. Do not describe POPM IFR as restoring
+the old pending-bit set.
+
+All 186,290 mapped words in AA55/AA22/AA99/AA88 are scanned for the adjacent
+`f982 8914` far-call pattern; only AA22 `03ac0b` matches. This is not
+code/data classification, an indirect-call census or proof of every caller.
+The runtime IDLE3 context's return words `0003/ac0d` agree with this caller.
+The selected mask excludes this bench's command RX IRQ6; NMI and reset are
+separate architectural inputs, not IMR bits. Combined with `UC_DSP_INT` on
+the schematic, this identifies a controller interrupt boundary worth testing,
+not permission to infer its timing from a serial packet or rename `30/04` as
+an official power-off command. No INT2 waveform has yet been qualified on
+the native workload; ordinary EOF/draining remains separate.
 
 The bounded native playback fixture now observes 402 complete software
 notification groups: publication `0292c1`, callback `020981`, vector

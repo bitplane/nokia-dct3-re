@@ -1958,6 +1958,12 @@
       "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "tools/mu4_playback_serial_restore.lua", "tools/mu4_playback_serial_restore_check.py", "tools/test_mu4_playback_serial_restore_check.py"]
     },
     {
+      "id": "mu4_resident_idle3_wake_contract", "owner": "native_music_dsp", "status": "satisfied",
+      "predicate": "The source-pinned original resident IDLE3 routine selects INT2 and the board schematic independently names its MSP430-controlled input",
+      "current": "The complete22-word AA22 routine028914..028929 and10 caller words around03ac0b are pinned. The caller enables IMRbit2; the routine saves IMR/IFR, selects IMR0004, writes CLKMD0, polls bit0 until clear, writes0 again and executes f5e1 at028922. Its tail acknowledges IFR by writing the saved word through W1C semantics, restores IMR and FRET. An186290-word four-image raw adjacent f982/8914 census has one match at03ac0b, not all-call closure. Native idle context return words0003/ac0d agree with that caller. NPM-5 MU4 schematic sheets3/4 connect U301 MSP430 P4.6 pin42 via UC_DSP_INT to U101 active-low INT2 pin66. This is distinct from command RX IRQ6 and selects the only enabled maskable wake source, not NMI/reset. Normal MCU waveform, actual native INT2 wake continuation, official command semantics and automatic EOF remain unqualified.",
+      "evidence": ["docs/5510_bringup.md", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py"]
+    },
+    {
       "id": "c54x_staged_idle_modes", "owner": "tms320c54x", "status": "satisfied",
       "predicate": "Staged IDLE1/2/3 share a drained Decode barrier and mode-specific timer/wake behavior with retained fresh continuation and save/load",
       "current": "The focused idle-modes profile fails unchanged at case32/tick3 with illegal1 on its first IDLE2. The corrected core passes96 cases across three modes, external IRQ, INTM-blocked IRQ, masked-then-enabled IRQ and NMI, two source pages and four checkpoints. IDLE1 timer movement contrasts with frozen IDLE2/3; changed continuation RAM is refetched only after wake, real ISR stack/return paths are checked and all cases replay. ReservedNN11 and control-delay IDLE remain excluded. The native serial-control probe independently reached original AA22 f5e1 at028922; that workload is not qualified by this isolated gate. Physical clock/restart latency, every peripheral composition, EOF/drain and complete handset behavior remain unproved.",

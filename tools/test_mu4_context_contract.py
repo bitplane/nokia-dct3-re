@@ -24,6 +24,7 @@ from tools.mu4_context_contract import PLAYBACK_REFILL_CONTROL, decode_playback_
 from tools.mu4_context_contract import PLAYBACK_PENDING_CONTROL, decode_playback_pending_control
 from tools.mu4_context_contract import PLAYBACK_PENDING16_PRODUCERS,decode_playback_pending16_producers
 from tools.mu4_context_contract import PLAYBACK_INPUT3_SENDERS,decode_playback_input3_senders
+from tools.mu4_context_contract import RESIDENT_IDLE3,decode_resident_idle3
 from tools.mu4_context_contract import PLAYBACK_REFILL_COMPLETION, decode_playback_refill_completion, reference_refill_completion
 from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
@@ -209,6 +210,39 @@ class ContextContractTest(unittest.TestCase):
         images['aa99'].update({base+offset:value for base,witness in PLAYBACK_INPUT3_SENDERS.items()
                               for offset,value in enumerate(witness)})
         return images
+
+    def idle3_images(self):
+        images={tag:{} for tag in ('aa55','aa22','aa99','aa88')}
+        images['aa22']={base+offset:value for base,witness in RESIDENT_IDLE3.items()
+                        for offset,value in enumerate(witness)}
+        return images
+
+    def test_resident_idle3_selects_int2_not_command_rx(self):
+        result=decode_resident_idle3(self.idle3_images())
+        self.assertEqual(result['pinned_words'],32)
+        self.assertEqual(result['mask']['value'],4)
+        self.assertEqual(result['mask']['enabled_bits'],[2])
+        self.assertFalse(result['mask']['value'] & (1<<6))
+        self.assertEqual(result['idle'],dict(address='028922',word='f5e1',mode=3))
+        self.assertEqual(result['literal_far_calls'],dict(aa55=[],aa22=['03ac0b'],aa99=[],aa88=[]))
+        self.assertIn('W1C',result['tail']['ifr'])
+        self.assertIn('not code/data',result['scope'])
+
+    def test_resident_idle3_rejects_every_pinned_word_change(self):
+        images=self.idle3_images()
+        for address in images['aa22']:
+            changed={tag:dict(words) for tag,words in images.items()}
+            changed['aa22'][address]^=1
+            with self.subTest(address=address),self.assertRaises(ValueError):decode_resident_idle3(changed)
+
+    def test_resident_idle3_census_rejects_missing_images_and_new_call_patterns(self):
+        images=self.idle3_images()
+        for tag in images:
+            with self.subTest(missing=tag),self.assertRaises(ValueError):
+                decode_resident_idle3({name:words for name,words in images.items() if name!=tag})
+            changed={name:dict(words) for name,words in images.items()}
+            changed[tag].update({0x1234:0xf982,0x1235:0x8914})
+            with self.subTest(added=tag),self.assertRaises(ValueError):decode_resident_idle3(changed)
 
     def test_input3_sender_maps_selector30_not36_and_distinguishes_target_words(self):
         result=decode_playback_input3_senders(self.input3_images())

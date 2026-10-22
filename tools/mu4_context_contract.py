@@ -2283,6 +2283,44 @@ def decode_bootstrap_repeat(words):
     }
 
 
+RESIDENT_IDLE3 = {
+    0x28914: (0x4a00,0x4a01,0x7700,0x0004,0xf495,0x7758,0x0000,
+              0x61f8,0x0058,0x0001,0xf830,0x891b,0x7758,0x0000,
+              0xf5e1,0xf495,0xf495,0x8a01,0x8a00,0xf495,0xf495,0xf4e4),
+    0x3ac07: (0x7711,0x0000,0x6981,0x0004,0xf982,0x8914,
+              0xf020,0x07d0,0xf983,0xacdf),
+}
+
+
+def decode_resident_idle3(images):
+    if set(images)!={'aa55','aa22','aa99','aa88'}:
+        raise ValueError('resident IDLE3 census requires all four images')
+    words=images['aa22']
+    for base,witness in RESIDENT_IDLE3.items():
+        for offset,expected in enumerate(witness):
+            if words.get(base+offset)!=expected:
+                raise ValueError(f'resident IDLE3 source changed at {base+offset:06x}')
+    calls={marker:[f'{address:06x}' for address,value in sorted(image.items())
+                   if value==0xf982 and image.get(address+1)==0x8914]
+           for marker,image in images.items()}
+    expected={'aa55':[],'aa22':['03ac0b'],'aa99':[],'aa88':[]}
+    if calls!=expected:raise ValueError('resident IDLE3 literal far-call pattern census changed')
+    mask=words[0x28917]
+    return dict(segment='aa22',pinned_words=sum(map(len,RESIDENT_IDLE3.values())),
+                routine=['028914','028929'],idle={'address':'028922','word':'f5e1','mode':3},
+                mask={'store':'028916','value':mask,'enabled_bits':[bit for bit in range(16) if mask & (1<<bit)]},
+                clock=[{'address':'028919','register':'CLKMD','value':0},
+                       {'address':'02891b','operation':'BITF CLKMD,1; BC TC,02891b'},
+                       {'address':'028920','register':'CLKMD','value':0}],
+                tail={'ifr':'POPM IFR writes saved word through W1C acknowledgement, not a pending-bit restore',
+                      'imr':'POPM IMR restores caller mask','return':'FRET'},
+                caller={'address':'03ac0b','prelude':'AR1=0; ORM 4,*AR1 enables IMR bit2'},
+                mapped_words={marker:len(image) for marker,image in images.items()},
+                literal_far_calls=calls,
+                scope='Complete 22-word routine and 10-word caller span; raw adjacent far-call patterns only, '
+                      'not code/data classification, indirect-call closure, MSP430 timing or automatic EOF')
+
+
 def idle_route(flag):
     if not isinstance(flag, int) or not 0 <= flag <= 0xFFFF:
         raise ValueError('idle flag must be an unsigned 16-bit word')
@@ -2688,6 +2726,8 @@ def contract(source):
     result['playback_pending16_producers'] = decode_playback_pending16_producers(
         dict(aa55=bootstrap_words,aa22=words,aa99=rel_words,aa88=recorder_words))
     result['playback_input3_senders'] = decode_playback_input3_senders(
+        dict(aa55=bootstrap_words,aa22=words,aa99=rel_words,aa88=recorder_words))
+    result['resident_idle3'] = decode_resident_idle3(
         dict(aa55=bootstrap_words,aa22=words,aa99=rel_words,aa88=recorder_words))
     result['recorder_stop_frontend'] = decode_recorder_stop_frontend(recorder_words)
     result['recorder_stop_mailbox'] = decode_recorder_stop_mailbox(recorder_words)
