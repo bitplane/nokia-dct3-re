@@ -171,6 +171,20 @@ def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=Fa
         raise ValueError("acquired ROM input failed validation")
 
 
+def check_rf_bitmap(text,returncode,staged=False):
+    marker='TMS320C54x ROM4 RF bitmap: PASS cases=515 basis=512 controls=empty,full,alternating replay=515 ram_words=65440 rf_acquisition_claim=0'
+    complete='Fatal error: TMS320C54x ROM4 RF bitmap complete'
+    lines=text.splitlines()
+    if lines and re.fullmatch(r'Average speed: \d+(?:\.\d+)?% \(\d+ seconds\)',lines[-1]): lines.pop()
+    if returncode!=3 or lines[-2:]!=[marker,complete] or lines.count(marker)!=1:
+        raise ValueError('incomplete native RF bitmap basis/replay')
+    if staged: check_staged_frontend(text,'RF bitmap')
+    if any(token in text for token in ('NOT FOUND','WRONG CHECKSUMS','Errors:')) or re.search(r'^Driver .+: [1-9]\d* errors?,',text,re.MULTILINE):
+        raise ValueError('invalid native RF bitmap inputs or machine')
+    if any(line.startswith('Fatal error:') and line!=complete for line in lines):
+        raise ValueError('unexpected native RF bitmap failure')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mame", type=Path, required=True)
@@ -178,6 +192,7 @@ def main():
     parser.add_argument("--output-root", type=Path,
                         default=Path(__file__).resolve().parents[1] / 'tmp')
     mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--rf-bitmap',action='store_true',help='execute the original 512-bit search-list decoder and replay controls')
     mode.add_argument("--packed", action="store_true", help="validate the outer packed-input CRC routine")
     mode.add_argument("--fr-packing", action="store_true", help="validate FR parameter packing, CRC and unpacking")
     mode.add_argument("--fr-decoder", action="store_true", help="compare native FR decoding against independent PCM")
@@ -195,15 +210,15 @@ def main():
     mode.add_argument('--efr-homing-errors', action='store_true', help='compare the full native homing/error PCM and reset sequence against the reference')
     mode.add_argument("--efr-homing-encoder", action="store_true", help="compare native EFR encoder homing and repeated speech with the external reference")
     parser.add_argument('--observe-homing-errors', action='store_true', help='capture all homing/error differences without claiming conformance')
-    parser.add_argument('--staged', action='store_true', help='run FR/EFR speech or EFR lifecycle vectors on the staged CPU, not a handset speech claim')
+    parser.add_argument('--staged', action='store_true', help='run supported codec or RF bitmap fixtures on the staged CPU, not a handset speech claim')
     parser.add_argument('--trace-fr', action='store_true', help='retain decoder frame 8 or encoder frame 0 encoding instructions, entry RAM and actual data accesses')
     parser.add_argument('--trace-efr', '--trace-efr-reset', dest='trace_efr_reset', action='store_true', help='observe at most 8192 EFR reset and 200000 first-frame instructions, without changing acceptance')
     parser.add_argument('--trace-efr-loss', action='store_true', help='capture loss-frame-8 entry RAM and bounded execution/data traces without conformance promotion')
     args = parser.parse_args()
     if args.staged and not (args.fr_decoder or args.fr_encoder or args.efr_encoder or args.efr_decoder or
                            args.efr_dtx_encoder or args.efr_dtx_decoder or args.efr_homing_encoder or args.efr_homing_decoder or args.efr_invalid_sid or
-                           args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_errors):
-        parser.error('--staged requires FR/EFR speech or a supported EFR lifecycle mode')
+                           args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_errors or args.rf_bitmap):
+        parser.error('--staged requires a supported codec or RF bitmap mode')
     if args.trace_fr and not (args.fr_decoder or args.fr_encoder):
         parser.error('--trace-fr requires --fr-decoder or --fr-encoder')
     if args.trace_efr_reset and not args.efr_encoder:
@@ -215,6 +230,7 @@ def main():
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_rom4_crc_", dir=args.output_root))
     bios = "fr-encoder" if args.fr_encoder else "fr-decoder" if args.fr_decoder else "fr-packing" if args.fr_packing else "crc-packed" if args.packed else "crc-helper"
+    if args.rf_bitmap: bios='rf-bitmap'
     if args.efr_crc:
         bios = "efr-crc"
     if args.efr_packing:
@@ -331,6 +347,8 @@ def main():
             if not args.observe_homing_errors:
                 check_homing_errors(text, result.returncode, reference, strict=True, staged=args.staged)
             print(f"ROM4 EFR homing/error characterized: total_mismatches={report['total_mismatches']} reset_mismatch_frames={report['reset_mismatch_frames']} conformance_claim=0")
+        elif args.rf_bitmap:
+            check_rf_bitmap(text,result.returncode,staged=args.staged)
         else:
             check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder, args.efr_crc, args.efr_packing, args.efr_decoder, args.efr_encoder, args.efr_dtx_decoder, args.efr_dtx_encoder, args.efr_erasure_decoder, args.efr_homing_decoder, args.efr_homing_encoder, efr_invalid_sid=args.efr_invalid_sid, staged=args.staged, verbose_teardown=args.trace_fr or args.trace_efr_reset)
     except ValueError as error:

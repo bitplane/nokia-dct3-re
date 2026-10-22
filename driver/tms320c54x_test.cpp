@@ -20521,6 +20521,12 @@ private:
 			start_rom4_crc_helper(0);
 			return;
 		}
+		if (!strcmp(machine().system().name, "tms54rom4") && rom4_codec_is("rf-bitmap"))
+		{
+			enable_rom4_codec_pipeline("RF bitmap");
+			start_rom4_bitmap(0);
+			return;
+		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
 				(!strcmp(machine().options().bios(), "cold") || !strcmp(machine().options().bios(), "cold-pipeline")))
 		{
@@ -22234,6 +22240,40 @@ private:
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
 
+	static bool rom4_bitmap_bit(unsigned index, unsigned bit)
+	{
+		return index < 512 ? bit == index : index == 513 || (index == 514 && !(bit & 1));
+	}
+	void start_rom4_bitmap(unsigned index)
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 514; ++i) data.write_word(0x0fff + i, 0xa55a);
+		for (unsigned word = 0; word < 32; ++word)
+		{
+			u16 value = 0;
+			for (unsigned bit = 0; bit < 16; ++bit)
+				if (rom4_bitmap_bit(index, word * 16 + bit)) value |= 1U << bit;
+			data.write_word(0x141f - word, value);
+		}
+		// Isolated algorithm caller: only this return sentinel is fixture code.
+		memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
+		expect(memregion("dspprg")->as_u16(0x2428) == 0xfc00 &&
+			memregion("dspprg")->as_u16(0x48f7) == 0xf074,
+			"Acquired bitmap entry and optional hook are unchanged");
+		data.write_word(0x1ec3, 0x0f00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x48f7);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x141f);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x55aa);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 710000 + index;
+		m_check_timer->adjust(attotime::from_msec(1));
+		save_rom4_codec_frame(index);
+	}
 	void start_rom4_crc_helper(unsigned index)
 	{
 		// Only the return sentinel is fixture code; 8179..8180 stays acquired ROM.
@@ -54412,6 +54452,43 @@ private:
 			osd_printf_info("TMS320C54x ROM4 EFR encoder: PASS frames=163 parameters=9291 flags=326 packed_words=2771 mismatches=0 handset_audio_claim=0\n");
 			throw emu_fatalerror(0, "TMS320C54x ROM4 EFR encoder complete");
 		}
+		if (m_phase >= 710000 && m_phase < 710515)
+		{
+			unsigned const index = m_phase - 710000;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1ec4,
+				"Original RF bitmap helper returns with balanced stack");
+			if (replay_rom4_codec_frame(710000 + index, 1)) return;
+			unsigned count = 0;
+			for (unsigned bit = 0; bit < 512; ++bit)
+				if (rom4_bitmap_bit(index, bit))
+				{
+					u16 const expected = bit < 128 ? bit + 1 : bit + 384;
+					expect(data.read_word(0x1000 + count++) == expected,
+						"Original RF decoder maps each selected bit to its ordered list entry");
+				}
+			for (unsigned i = count; i <= 512; ++i)
+				expect(data.read_word(0x1000 + i) == 0xa55a, "RF decoder preserves unwritten output and guard");
+			expect(data.read_word(0x0fff) == 0xa55a &&
+				(m_cpu->state_int(tms320c54x_device::STATE_B) & 0xffff) == count &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x1000 + count &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x13ff &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x55aa,
+				"RF bitmap count, consumed extent, output pointer and saved AR7 agree");
+			for (unsigned word = 0; word < 32; ++word)
+			{
+				u16 expected = 0;
+				for (unsigned bit = 0; bit < 16; ++bit)
+					if (rom4_bitmap_bit(index, word * 16 + bit)) expected |= 1U << bit;
+				expect(data.read_word(0x141f - word) == expected, "RF bitmap input remains unchanged");
+			}
+			if (index < 514) { start_rom4_bitmap(index + 1); return; }
+			expect(m_rom4_codec_replays == 515, "Every native RF bitmap case replays full ordinary RAM");
+			osd_printf_info("TMS320C54x ROM4 RF bitmap: PASS cases=515 basis=512 controls=empty,full,alternating replay=515 ram_words=65440 rf_acquisition_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x ROM4 RF bitmap complete");
+		}
 		if (m_phase >= 302000 && m_phase < 302519)
 		{
 			bool const dtx = rom4_codec_is("efr-dtx-decoder");
@@ -57163,7 +57240,15 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(29, "efr-erasure-pipe", "Strict acquired ROM EFR erasure comparison on staged CPU")
 	ROM_SYSTEM_BIOS(30, "efr-loss-pipe", "Characterize staged EFR loss differences without conformance promotion")
 	ROM_SYSTEM_BIOS(31, "efr-herr-pipe", "Characterize staged EFR homing error reset and PCM differences")
+	ROM_SYSTEM_BIOS(32, "rf-bitmap", "Original RF search bitmap decoder basis and replay")
+	ROM_SYSTEM_BIOS(33, "rf-bitmap-pipe", "Original RF search bitmap decoder on staged CPU")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(32))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(33))
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(31))
@@ -57261,6 +57346,12 @@ ROM_START(tms54rom4)
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(18))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(32))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(33))
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(31))

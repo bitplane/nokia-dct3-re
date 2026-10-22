@@ -950,13 +950,33 @@ walks those scratch words backwards, testing bits low-to-high. Its first
 eight words select entries 1..128; the remaining 24 select 512..895.
 The captured bit therefore selects entry 109 (`006d`), matching both
 the live selected-list word and the native response body. This is a
-static general mapping with one live single-bit corroboration, not an
-executed native basis test. The later control `0011` request bypasses
+static general mapping with one live single-bit corroboration. The isolated
+native basis fixture below independently validates its complete bit domain;
+it does not extend the live handset's RF acceptance. The later control `0011` request bypasses
 bitmap expansion and must not be decoded by this rule.
 `c54x_rom4_rf_delivery_check.py --search-list` checks this request-to-list
 correlation; the isolated cold-control runner also requires it. Physical
 band/channel interpretation still requires the MCU request producer and
 RF tuning contract, independently of these numeric list entries.
+
+The isolated original `48f7/4909` decoder now passes all512 single-bit
+inputs plus empty, full and alternating controls on both atomic and staged
+frontends. Its first eight descending words select list entries1..128;
+the remaining24 select512..895, with low-to-high bit order in each word.
+Each of515 cases checks the complete ordered output, B count, final AR2/AR3,
+saved AR7, untouched input and all unwritten output words/guards. Every case
+also restores its prepared input and replays all65,440 ordinary RAM words.
+The optional acquired hook2428 remains RET; only a private IDLE return
+sentinel is fixture code. Explicit algorithm input and calling registers do
+not change a running handset or supply an RF result.
+
+```sh
+make check-c54x-rom4-rf-bitmap
+make check-c54x-rom4-rf-bitmap-staged
+```
+
+This qualifies the original bitmap/list algorithm, not native request
+scheduling, ARFCN band semantics, tuning, RF samples, registration or speech.
 
 Publisher entry alone proves call arguments, not delivery. A separate
 fresh eight-second capture reaches the publisher's port-1 doorbell

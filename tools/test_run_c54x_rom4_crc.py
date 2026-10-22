@@ -23,9 +23,28 @@ from tools.run_c54x_rom4_crc import EFR_ERASURE_PASS, EFR_ERASURE_COMPLETE, EFR_
 from tools.run_c54x_rom4_crc import EFR_HOMING_PASS, EFR_HOMING_COMPLETE, EFR_HOMING_REPLAY
 from tools.run_c54x_rom4_crc import EFR_ENCODER_HOMING_PASS, EFR_ENCODER_HOMING_COMPLETE, EFR_ENCODER_HOMING_REPLAY
 from tools.run_c54x_rom4_crc import EFR_INVALID_SID_PASS, EFR_INVALID_SID_COMPLETE, EFR_INVALID_SID_REPLAY
+from tools.run_c54x_rom4_crc import check_rf_bitmap
 
 
 class Rom4HelperResultTest(unittest.TestCase):
+    def test_native_rf_bitmap_basis_and_replay(self):
+        marker='TMS320C54x ROM4 RF bitmap: PASS cases=515 basis=512 controls=empty,full,alternating replay=515 ram_words=65440 rf_acquisition_claim=0'
+        complete='Fatal error: TMS320C54x ROM4 RF bitmap complete'
+        text=marker+'\n'+complete+'\n'
+        check_rf_bitmap(text,3)
+        staged='ROM4 RF bitmap frontend: staged handset_audio_claim=0\n'+text
+        check_rf_bitmap(staged,3,staged=True)
+        for bad in (text.replace('basis=512','basis=511'),
+                    text.replace('replay=515','replay=514'),
+                    text.replace('ram_words=65440','ram_words=1'),
+                    text+marker+'\n',text+'Fatal error: other\n',
+                    'Driver tms54rom4: 1 errors, 0 warnings\n'+text,
+                    'NOT FOUND\n'+text):
+            with self.subTest(bad=bad),self.assertRaises(ValueError):
+                check_rf_bitmap(bad,3)
+        with self.assertRaises(ValueError): check_rf_bitmap(text,0)
+        with self.assertRaises(ValueError): check_rf_bitmap(text,3,staged=True)
+
     def test_efr_lifecycle_frontends_load_the_same_vectors(self):
         source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
         body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
