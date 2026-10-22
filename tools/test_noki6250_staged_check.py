@@ -28,7 +28,7 @@ class StagedBoundaryTest(unittest.TestCase):
 
     def fixture(self):
         return ("release entry=0f00 words=223 prom_input=0006 clock=13000000 stage=verifier\n"
-                "publication word0=0000 word1=0006 word2=0006 word3=0006 pc=0f65\n"
+                "publication word0=0000 word1=0006 word2=0006 word3=0006 pc=0f64\n"
                 "release entry=0f00 words=126 prom_input=0006 clock=13000000 stage=loader\n"
                 "request selector=0014\n" + "request selector=0001\n" * 124 +
                 "loader2_verified words=613 entry=0a00\n"
@@ -37,6 +37,10 @@ class StagedBoundaryTest(unittest.TestCase):
 
     def test_reviewed_boundary(self):
         check(self.fixture())
+
+    def test_publication_requires_retained_idle_pc(self):
+        with self.assertRaises(ValueError):
+            check(self.fixture().replace('pc=0f64','pc=0f65'))
 
     def test_runtime_requires_own_uploads_and_exclusive_handoff(self):
         runtime = self.fixture().replace('observation_halt pc=2c75 ownership_retained=1',

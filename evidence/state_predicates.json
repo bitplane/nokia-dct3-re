@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nhm3_physical_wrong_pin_recovery", "owner": "nhm3_sim_security", "status": "satisfied",
+      "predicate": "6250 rejects one physical wrong PIN1, resets retries on correct physical authentication and recovers coherent registered menus",
+      "current": "Fresh own initial-record PMM research-HLE comparison uses a PIN-enabled synthetic SIM and coherent ARFCN19. Physical9999/OK12 returns9804 with retries2 and renders Code error. Physical1234/OK22 returns9000 with retries3, then laboratory registration completes and physicalMenu34 opens Messages. Exact press/release contacts, two CHV1 selectors, rejection/acceptance/registration order, three96x60 RGB frames and complete registered card match. No credential/configuration/record write occurs. Capture tmp/nhm3-pin-retry-banked. The ordinary slow-PIN baseline independently reproduces the owned verifier's retained IDLE1 publication PC0f64; its previous0f65 expectation was stale. No cold-retry/PUK/factory-provisioning/native-speech promotion.",
+      "evidence": ["docs/6250_bringup.md", "docs/model_coverage.md", "tools/noki6250_pin_retry.lua", "tools/noki6250_pin_retry_check.py", "tools/test_noki6250_pin_retry_check.py", "tools/noki6250_staged_check.py", "tools/test_noki6250_staged_check.py", "tools/run_noki6250_acceptance.py", "gates.json"]
+    },
+    {
       "id": "npe3_physical_continued_ussd_reply", "owner": "npe3_host_services", "status": "satisfied",
       "predicate": "6210 physically answers a continued laboratory USSD FACILITY and receives the correlated final result with ordinary recovery",
       "current": "Own-PMM research-HLE NPE-3 authenticates PIN1 and registers on coherent ARFCN35. Physical *123#/Send31 creates invoke1; USSDCFG4 supplies the existing continued FACILITY. Answer36 opens the editor, physical2 at40 and Send42 produce the exact21-byte ReturnResult for invoke2/DCS0f/data32. The network parses it and sends the final37-byte RELEASE COMPLETE, then releases RR. Physical End46/Menu48 recover registered idle/Messages. Six exact Requesting/editor/entered/result/idle/Menu frames and complete registered-card contents pass. Capture tmp/npe3-ussd-continued-banked. One continued exchange only; no arbitrary-length dialogue, host-controlled continuation or native-speech claim.",

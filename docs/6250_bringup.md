@@ -586,6 +586,20 @@ parked DSP identity values are inherited from another product.
 
 ## Reproduction
 
+### SIM PIN rejection and recovery
+
+`make verify-6250-pin-retry` cold-starts the declared own initial-record PMM
+comparison with an ordinary PIN-enabled synthetic SIM and coherent carrier19.
+Physical9999/OK returns `9804`, reduces PIN1 retries3->2 and renders Code error.
+Physical1234/OK then returns `9000`, restores retries3 and completes laboratory
+registration. Physical Menu remains responsive. The checker pins all press/
+release contacts, two CHV1 selectors, APDU result ordering, the complete final
+card image and three96x60 RGB frames (error, registered idle and Messages).
+Capture: `tmp/nhm3-pin-retry-banked`. No credential/configuration/record writes
+are permitted; the only lasting card change is the normal location update.
+This proves same-process retry recovery, not retry persistence across a cold
+restart, PIN exhaustion/PUK recovery, factory provisioning or native speech.
+
 Run `noki6250` with private working/NVRAM/config directories, the acquired
 product ROMs, `-noreadconfig -log -video none -sound none -nothrottle`,
 `-autoboot_delay 0 -seconds_to_run 9` and
@@ -609,6 +623,14 @@ peripheral read `002d`, PC `0f9f`. Explicit COBBA and PROM-version
 sensitivity fixtures complete at `0f64`, with computed fingerprint
 `c62d430c` and PMST `ffa8`. These inputs are comparisons, not measured
 6250 silicon identity or an accepted phone self-test result.
+
+The live staged observer samples the retained IDLE1 PC at `0f64`, not its
+following branch at `0f65`. The hash-pinned upload has publication words
+`7cf8/0801/ff87` at `0f61..0f63`, IDLE1 `f4e1` at `0f64` and branch
+`f073/0f64` at `0f65..0f66`. Fresh ordinary slow-PIN and wrong-PIN recovery
+runs reproduce the same `0000/0006/0006/0006` publication at `0f64` after
+the core's retained-idle implementation. The live acceptance check pins that
+boundary; it does not broaden the allowed publication values or loader stream.
 
 Reproduce with `tools/nsm3_verifier_check.py mame/mame
 roms/noki6250/6250-503mcuppmc.fls /tmp/6250-verifier --product 6250`.

@@ -894,6 +894,12 @@ control. It uses unchanged own provisioning and separately reviewed idle pixels.
 These gates do not establish
 native DSP, speech or displayed forwarding-number content.
 
+`verify-6250-pin-retry` independently proves physical9999 rejection, PIN1
+retry loss, physical1234 recovery/reset and coherent registered idle/Menu.
+Two CHV1 selectors, exact contacts/protocol order, complete card contents and
+three own-product RGB frames pass. This does not establish cold retry
+persistence or PUK recovery on NHM-3.
+
 `verify-6250-ussd` separately establishes the physical USSD exchange and reviewed
 NHM-3 result/idle frames on its declared derived-PMM research comparison. The
 default-cell signaling gate is not an ARFCN19/20 coherence promotion.
