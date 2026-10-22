@@ -921,8 +921,12 @@ five. `verify-6250-pin2-change-cold` additionally inherits the complete installe
 card/state in a separate process and accepts8765 as the current PIN2 in another
 successful physical change to2468. All22 frames, retained-location registration,
 complete card transitions and unchanged predecessor artifacts pass. This is
-credential acceptance via CHANGE CHV2, not standalone VERIFY. Rejection/
-exhaustion and PUK2 remain unqualified.
+credential acceptance via CHANGE CHV2, not standalone VERIFY.
+`verify-6250-pin2-retry-cold` separately proves wrong-current-PIN2 rejection,
+no installation of the proposed value, durable3->2 retry loss, cold PIN1
+authentication with PIN2 retries still2 and a successful installed-PIN2 change
+resetting retries3. All33 frames and complete card/predecessor checks pass.
+PIN2 exhaustion and PUK2 remain unqualified.
 
 `verify-6250-ussd` separately establishes the physical USSD exchange and reviewed
 NHM-3 result/idle frames on its declared derived-PMM research comparison. The

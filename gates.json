@@ -16100,6 +16100,13 @@
                  "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-pin2-retry-cold",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki6250_pin2_cold.py",
+                 "arguments": ["$(RUN_DIR)", "--reject-first", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6250-pin-host-incoming-call",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",

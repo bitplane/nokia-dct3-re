@@ -12,6 +12,15 @@ class ColdPin2InputTest(unittest.TestCase):
     def test_entire_installed_card_is_the_cold_input(self):
         check_cold_input(self.card(),self.card())
 
+    def test_failed_allowance_is_retained_not_repaired(self):
+        failed=bytearray(self.card())
+        failed[3517]=2
+        check_cold_input(bytes(failed),bytes(failed),retries=2)
+        with self.assertRaises(ValueError):
+            check_cold_input(bytes(failed),bytes(failed))
+        with self.assertRaises(ValueError):
+            check_cold_input(self.card(),bytes(failed),retries=2)
+
     def test_default_or_repaired_card_is_not_a_cold_installation(self):
         with self.assertRaises(ValueError):
             check_cold_input(registered_card(),self.card())

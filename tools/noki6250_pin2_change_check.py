@@ -39,14 +39,21 @@ def actions(old='5678',new='8765'):
     return items+[(76,'End'),(78,'Left Softkey / Menu')]
 
 
-def check(text,card,*,old='5678',new='8765'):
-    if any(len(value)!=4 or not value.isascii() or not value.isdigit() for value in (old,new)):
+def check(text,card,*,old='5678',new='8765',rejected=False,stored='5678',initial_retries=3):
+    if any(len(value)!=4 or not value.isascii() or not value.isdigit() for value in (old,new,stored)):
         raise ValueError('qualified PIN2 changes require four ASCII digits')
+    if initial_retries not in (2,3):
+        raise ValueError('qualified PIN2 changes require two or three initial attempts')
     expected=bytearray(registered_card())
-    expected[3492:3500]=new.encode('ascii')+b'\xff'*4
+    expected[3492:3500]=(stored if rejected else new).encode('ascii')+b'\xff'*4
+    expected[3517]=initial_retries-1 if rejected else 3
     if card!=bytes(expected):
         raise ValueError('PIN2 change altered unrelated card contents or did not install the expected value')
-    if any(statuses(text,ins,chv)!=[(0x9000,3,10)] for ins in (0x20,0x24) for chv in (1,2)):
+    result=0x9804 if rejected else 0x9000
+    if (statuses(text,0x20)!=[(0x9000,3,10)] or
+            statuses(text,0x20,2)!=[(0x9000,initial_retries,10)] or
+            statuses(text,0x24)!=[(result,3,10)] or
+            statuses(text,0x24,2)!=[(result,initial_retries-1 if rejected else 3,10)]):
         raise ValueError('NHM-3 requires successful PIN1 authentication and one CHANGE CHV2')
     if re.findall(r'header cla=a0 ins=20 p1=00 p2=(\w\w) p3=08',text)!=['01'] or \
             re.findall(r'header cla=a0 ins=24 p1=00 p2=(\w\w) p3=10',text)!=['02']:
@@ -60,11 +67,18 @@ def check(text,card,*,old='5678',new='8765'):
         ('Menu',r'6250_pin2_input: key=Left Softkey / Menu state=1 t=20\.'),
         ('confirmation',r'6250_pin2_input: key=Left Softkey / Menu state=1 t=70\.'),
         ('CHANGE CHV2',r'header cla=a0 ins=24 p1=00 p2=02 p3=10'),
-        ('changed',r'SIM status ins=24 sw=9000'),
+        ('result',rf'SIM status ins=24 sw={result:04x}'),
         ('End',r'6250_pin2_input: key=End state=1 t=76\.'),
         ('Menu again',r'6250_pin2_input: key=Left Softkey / Menu state=1 t=78\.'),
         ('complete',r'6250_pin2_input: complete=1 firmware_state_forcing=0'),
     ],'6250 PIN2 change')
+
+
+def check_frames(directory,*,rejected=False):
+    for second,digest in FRAMES.items():
+        if rejected and second==70:
+            digest='c1371c4cdca6b0f72c9c1dcc6e602de981330f67719714bc5b124e1a3b4fcfcd'
+        check_rgb_frame(directory/f'6250_pin2_key_{second}.png',digest)
 
 
 def main():
@@ -77,8 +91,7 @@ def main():
         card=(args.run/'nvram/nhm3hle/sim_card').read_bytes()
         check(text,card)
         registration(text,card,require_host=False)
-        for second,digest in FRAMES.items():
-            check_rgb_frame(args.run/f'snap/6250_pin2_key_{second}.png',digest)
+        check_frames(args.run/'snap')
     except (OSError,ValueError,RuntimeError) as error:
         parser.exit(1,f'6250 PIN2 change FAIL: {error}\n')
     print('6250 physical PIN2 change PASS; research HLE only')

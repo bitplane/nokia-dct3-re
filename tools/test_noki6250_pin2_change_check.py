@@ -3,25 +3,46 @@ from tools.noki6250_pin_retry_check import registered_card
 from tools.noki6250_pin2_change_check import actions,check
 
 
-def fixture(old='5678',new='8765'):
+def fixture(old='5678',new='8765',*,rejected=False,stored='5678',initial_retries=3):
     lines=[]
     for second,key in actions(old,new):
         lines += [f'6250_pin2_input: key={key} state=1 t={second}.000000000',
                   f'6250_pin2_input: key={key} state=0 t={second}.150000000']
         if second==12:
             lines += ['header cla=a0 ins=20 p1=00 p2=01 p3=08',
-                      'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1',
+                      f'SIM status ins=20 sw=9000 chv=3/{initial_retries} puk=10/10 enabled=1',
                       'LAPDm Location Updating Accept acknowledged']
         if second==70:
             lines += ['header cla=a0 ins=24 p1=00 p2=02 p3=10',
-                      'SIM status ins=24 sw=9000 chv=3/3 puk=10/10 enabled=1']
+                      f'SIM status ins=24 sw={"9804" if rejected else "9000"} chv=3/{initial_retries-1 if rejected else 3} puk=10/10 enabled=1']
     lines.append('6250_pin2_input: complete=1 firmware_state_forcing=0')
     card=bytearray(registered_card())
-    card[3492:3500]=new.encode('ascii')+b'\xff'*4
+    card[3492:3500]=(stored if rejected else new).encode('ascii')+b'\xff'*4
+    card[3517]=initial_retries-1 if rejected else 3
     return '\n'.join(lines),bytes(card)
 
 
 class Pin2ChangeTest(unittest.TestCase):
+    def test_wrong_current_pin2_does_not_install_proposed_pin(self):
+        options=dict(old='8764',new='2468',rejected=True,stored='8765')
+        text,card=fixture(**options)
+        check(text,card,**options)
+        changed=bytearray(card)
+        changed[3492:3500]=b'2468\xff\xff\xff\xff'
+        with self.assertRaises(ValueError):
+            check(text,bytes(changed),**options)
+        with self.assertRaises(ValueError):
+            check(text.replace('chv=3/2','chv=3/3'),card,**options)
+
+    def test_cold_success_preserves_initial_retry_loss_until_change(self):
+        options=dict(old='8765',new='2468',initial_retries=2)
+        text,card=fixture(**options)
+        check(text,card,**options)
+        with self.assertRaises(ValueError):
+            check(text.replace('ins=20 sw=9000 chv=3/2','ins=20 sw=9000 chv=3/3'),card,**options)
+        with self.assertRaises(ValueError):
+            check(text,card,old='8765',new='2468')
+
     def test_installed_pin2_can_be_the_cold_current_credential(self):
         text,card=fixture('8765','2468')
         check(text,card,old='8765',new='2468')

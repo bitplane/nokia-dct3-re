@@ -712,7 +712,25 @@ process; both CHV/PUK allowances remain3/10, and the already-valid location stay
 unchanged. All predecessor artifacts remain hash-identical. Distinct launch
 identities, actual commands, MAME/base-fixture/wrapper hashes and complete cold
 input-storage hashes are recorded. Capture: `tmp/nhm3-pin2-cold-banked`.
-Wrong-PIN2 rejection, exhaustion and PUK2 recovery remain separate targets.
+That two-process gate excludes rejection, exhaustion and PUK2 recovery.
+
+`make verify-6250-pin2-retry-cold` inserts an independent rejected-change process
+between installation and cold recovery. After installing8765, physical current
+PIN2=8764/proposed2468/confirmation returns9804 and Code error. Exactly one PIN2
+attempt is consumed3->2; the stored PIN2 remains8765 and every unrelated card
+byte, including PIN1 and PUK allowances, stays unchanged. The proposed2468 is
+not installed. The next process must inherit that entire two-attempt card.
+Its initial successful PIN1 VERIFY still reports PIN2 retries2, proving startup
+did not repair them. Physical8765/new2468/confirmation then succeeds, resetting
+PIN2 retries3 and changing only PIN2; registration follows the retained-location
+contract in both cold phases. No standalone CHV2 VERIFY is claimed.
+
+All33 route/editor/result/idle/Menu frames, exact contacts/selectors/order,
+complete initial/final-card transitions, copied NVRAM and immutable predecessor
+artifacts pass. Both the binary and shared physical fixture must retain their
+recorded hashes between phases. Capture: `tmp/nhm3-pin2-reject-banked2`.
+This qualifies one rejected CHANGE CHV2 and cold recovery, not PIN2 exhaustion,
+PUK2 or permanent loss.
 
 Run `noki6250` with private working/NVRAM/config directories, the acquired
 product ROMs, `-noreadconfig -log -video none -sound none -nothrottle`,
