@@ -841,11 +841,13 @@ if rtc_fixture_at >= 0 then
 			space:write_u8(0x2002c, reg << 3)
 			space:write_u8(0x2002c, value)
 		end
-		-- Cross 12:00:58 -> 12:01 and assert the matching alarm. This is a
-		-- controller conformance fixture, not a firmware clock-state shortcut.
-		ccont_write(0x07, 58)
-		ccont_write(0x08, 0)
-		ccont_write(0x09, 12)
+		-- Load 12:00 through the recovered clock-load strobes, then wait a
+		-- full minute for the alarm. Write address 7 is analog control,
+		-- not a writable alias for the seconds read counter.
+		ccont_write(0x0b, 0)
+		ccont_write(0x0c, 0x8c)
+		space:write_u8(0x2002d, old_control)
+		emu.wait(0.002)
 		ccont_write(0x0b, 1)
 		ccont_write(0x0c, 12)
 		ccont_write(0x0f, 0x50) -- unmask alarm bit 7 for this controller test

@@ -40,6 +40,7 @@ private:
 	devcb_write_line m_power_cb;
 	uint8_t m_cmd = 0;
 	uint8_t m_watchdog = 0;
+	uint8_t m_analog_acquisition_control = 0;
 	uint8_t m_regs[0x10] = {0};
 	uint16_t m_adc_source[8] = {0};
 	uint16_t m_adc_result = 0;

@@ -54,6 +54,7 @@ void nokia_ccont_device::device_start()
 	nvram_default();
 	save_item(NAME(m_cmd));
 	save_item(NAME(m_watchdog));
+	save_item(NAME(m_analog_acquisition_control));
 	save_item(NAME(m_regs));
 	save_item(NAME(m_adc_source));
 	save_item(NAME(m_adc_result));
@@ -76,6 +77,7 @@ void nokia_ccont_device::device_reset()
 	uint8_t const rtc_mask = m_regs[IRQ_MASK] & 0xf0;
 	m_cmd = 0;
 	m_watchdog = 0;
+	m_analog_acquisition_control = 0;
 	m_adc_result = 0;
 	m_adc_channel = 0;
 	std::fill(std::begin(m_regs), std::end(m_regs), 0);
@@ -336,6 +338,14 @@ void nokia_ccont_device::serial_w(uint8_t data)
 			}
 			break;
 		case RTC_SECOND:
+			// Read address 7 is RTC seconds; its independent write selector
+			// controls analog acquisition (NSB-7 0x30813a/0x30818a).
+			// Electrical effects remain unknown; never rewrite the RTC here.
+			m_analog_acquisition_control = data;
+			if (m_rtc_trace)
+				LOGMASKED(LOG_CCONT, "ccont_analog: event=control_write reg=%02x data=%02x t=%.9f\n",
+					address, data, machine().time().as_double());
+			break;
 		case RTC_MINUTE:
 		case RTC_HOUR:
 		case RTC_DAY:

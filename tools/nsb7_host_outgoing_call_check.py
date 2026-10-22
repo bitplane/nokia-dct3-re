@@ -11,16 +11,29 @@ from tools.nsb7_outgoing_call_check import check as check_call,check_inputs
 from tools.nsb7_pin_check import check_frame
 from tools.nsb7_radio_check import contract
 from tools.nsb7_storage_check import inspect
-from tools.nsb7_netmonitor_check import IDLE_HASH
 from tools.radio_call_lifecycle_common import require_ordered
 
 FRAMES={
-    'nsb7_host_outgoing_ready.png':IDLE_HASH,
-    'nsb7_outgoing_call_52.png':'223ffbdc6b19f01641f293b0a168a65b8715c37b71a97ecc5bb972b8d15baea1',
-    'nsb7_outgoing_call_54.png':'067a6a8ee85b4989a4295780ab87d1fe2eccbab47271107e8550dacc02883091',
-    'nsb7_host_outgoing_connected.png':'a8e9a74c4cccefe0bfa934225e5551e574e43da80e02f36d447b7622653c2e29',
-    'nsb7_outgoing_call_final.png':IDLE_HASH,
+    # Retained 13:47:45 source; address-7 analog writes do not reset seconds.
+    'nsb7_host_outgoing_ready.png':'32c41625e02a87a0ec97ec98a250040fc87ad8c5722c78200c54b27f7de2d560',
+    'nsb7_outgoing_call_52.png':'17d4e52d7293047858f0c0156b24ae42a406358686e02ad45ad46c3460c78bd0',
+    'nsb7_outgoing_call_54.png':'c351864a51840950319536e3d491c284c5722ba66ee25112b7dad855a016634e',
+    'nsb7_host_outgoing_connected.png':'9cabd1e512ce5e4467808054cbabf5c5f1306e7c6ab681e3fa193661cc441c7e',
+    'nsb7_outgoing_call_final.png':'29dcc2200f6f5c170afea80e751d1d3afefd83332964c4bdc0f2a843be5e2567',
 }
+
+
+def check_clock(text):
+    rows=re.findall(r'ccont_rtc: event=second time=(\d+):(\d+):(\d+) day=(\d+).*? t=([\d.]+)',text)
+    if len(rows)!=76:
+        raise ValueError('expected all 76 retained-clock ticks')
+    for index,(hour,minute,second,day,time) in enumerate(rows,1):
+        absolute=int(day)*86400+int(hour)*3600+int(minute)*60+int(second)
+        if float(time)!=index or absolute!=13*3600+47*60+45+index:
+            raise ValueError('retained clock reset or skipped during outgoing call')
+    for value in ('00','0f'):
+        if not re.search(rf'ccont_analog: event=control_write reg=07 data={value}\b',text):
+            raise ValueError('missing independent analog-control write')
 
 
 def check(text, restored=False):
@@ -39,7 +52,6 @@ def check(text, restored=False):
         ('host publication',r'gsm_call_adapter: request id=1 epoch=1 digits=5551234 clients=1'),
         ('wrong ID',r'gsm_call_adapter: decision id=2 outcome=1 result=rejected'),
         ('queued decision',r'outgoing decision queued id=1 outcome=0'),
-        ('consumed decision',r'outgoing decision consumed id=1 outcome=0'),
         ('accepted decision',r'gsm_call_adapter: decision id=1 outcome=0 result=accepted'),
         ('duplicate decision',r'gsm_call_adapter: decision id=1 outcome=0 result=rejected'),
         ('host connected',r'gsm_call_adapter: state id=1 epoch=1 phase=connected'),
@@ -47,6 +59,13 @@ def check(text, restored=False):
         ('host closed',rf'gsm_call_adapter: state id=1 epoch={2 if restored else 1} phase=media_closed'),
         ('host ended',rf'gsm_call_adapter: state id=1 epoch={2 if restored else 1} phase=ended'),
     ],'NSB-7 host outgoing signaling')
+    # Adapter acknowledgment and emulation-thread consumption can interleave.
+    # Both follow queueing; consumption must precede the connected handset.
+    require_ordered(text,[
+        ('queued decision',r'outgoing decision queued id=1 outcome=0'),
+        ('consumed decision',r'outgoing decision consumed id=1 outcome=0'),
+        ('host connected',r'gsm_call_adapter: state id=1 epoch=1 phase=connected'),
+    ],'NSB-7 host outgoing decision consumption')
     for marker in ('outgoing decision queued id=1 outcome=0',
                    'outgoing decision consumed id=1 outcome=0',
                    'gsm_call_adapter: decision id=1 outcome=0 result=accepted'):
@@ -74,7 +93,9 @@ def main():
     args=parser.parse_args()
     try:
         contract(args.image.read_bytes())
-        check((args.run/'error.log').read_text())
+        text=(args.run/'error.log').read_text()
+        check(text)
+        check_clock(text)
         storage=args.run/'nvram/nsb7hle'
         initial=(args.run/'initial_sim_card.bin').read_bytes()
         check_source(initial)

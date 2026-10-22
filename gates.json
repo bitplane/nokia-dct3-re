@@ -13654,13 +13654,13 @@
           "run_target": "run",
           "tokens": [
             "RUN_DIR=$(RUN_DIR)_rtc",
-            "SECONDS=19",
+            "SECONDS=79",
             "RUN_VERBOSE=1",
             "RUN_ENV='NOKIA_DCT3_CCONT_RTC_FIXTURE_AT=15'"
           ],
           "parameters": {
             "RUN_DIR": "$(RUN_DIR)_rtc",
-            "SECONDS": "19",
+            "SECONDS": "79",
             "RUN_VERBOSE": "1",
             "RUN_ENV": "'NOKIA_DCT3_CCONT_RTC_FIXTURE_AT=15'"
           }

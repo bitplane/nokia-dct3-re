@@ -8,15 +8,15 @@ import subprocess
 
 
 def verify(text, stored):
-    if stored != bytes((3, 1, 12, 1, 1, 12, 0, 0x50, 0)):
+    if stored != bytes((4, 1, 12, 1, 1, 12, 0, 0x50, 0)):
         raise ValueError('mapped RTC fixture did not persist its exact retained domain')
     if '[LUA ERROR]' in text or 'LUA error' in text:
         raise ValueError('runtime Lua failure')
     writes = re.findall(r'ccont_rtc: event=counter_write reg=([0-9a-f]+) data=([0-9a-f]+)', text)
-    if writes != [('07', '00')]:
-        raise ValueError('cold boot rewrote retained counters beyond its seconds reset')
+    if writes:
+        raise ValueError('cold boot rewrote retained counters')
     ticks = re.findall(r'ccont_rtc: event=second time=(\d+):(\d+):(\d+) day=(\d+)', text)
-    if ticks != [('12', '01', '01', '1'), ('12', '01', '02', '1'), ('12', '01', '03', '1')]:
+    if ticks != [('12', '01', '05', '1'), ('12', '01', '06', '1'), ('12', '01', '07', '1')]:
         raise ValueError('cold process did not resume the retained minute/day')
     for register, value in (('0b', '01'), ('0c', '0c')):
         if not re.search(rf'ccont_rtc: event=read reg={register} data={value}\b', text):
@@ -64,7 +64,8 @@ def main():
             console = (directory / 'console.log').read_text(errors='replace')
             minute = '01' if name == 'legacy' else '00'
             ticks = re.findall(r'ccont_rtc: event=second time=(\d+):(\d+):(\d+) day=(\d+)', text)
-            if ticks != [('12', minute, f'0{s}', '1') for s in range(1, 4)]:
+            seconds = range(5, 8) if name == 'legacy' else range(1, 4)
+            if ticks != [('12', minute, f'0{s}', '1') for s in seconds]:
                 raise ValueError(f'{name}: non-atomic load or lost legacy counters')
             rejected = 'Error reading NVRAM file' in console
             if rejected != (name != 'legacy'):

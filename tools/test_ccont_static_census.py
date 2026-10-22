@@ -40,6 +40,16 @@ class CcontStaticCensusTest(unittest.TestCase):
             payload["roms"][0]["mapped_registers"],
         )
 
+    def test_nsb7_independent_read_write_alias(self):
+        report = ccont_static_census.analyze(
+            "8290-v5.22", ROOT / "roms/noki8290/8290f522a.fls"
+        )
+        self.assertEqual("0x00343ee0", report["descriptor_table"])
+        self.assertEqual("0x38", report["descriptors"][8]["write_command"])
+        self.assertIsNone(report["descriptors"][8]["register"])
+        self.assertEqual(7, report["descriptors"][9]["register"])
+        self.assertIsNone(report["descriptors"][9]["write_command"])
+
 
 if __name__ == "__main__":
     unittest.main()

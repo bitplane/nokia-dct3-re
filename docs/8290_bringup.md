@@ -2328,17 +2328,30 @@ is unchanged. No firmware state or outcome is substituted.
 
 ### CCONT seconds-write boundary exposed by the controls
 
-Both busy and connected controls start with RTC13:47:01 at emulated1s.
-During the connected control, firmware repeatedly writes CCONT register07
-with00/0f at roughly one-second intervals. The current writable-seconds model
-then reads13:47:16 throughout57..66s and13:47:10 at76s. The busy control
-has only the boot-time07 write and reaches13:48:16 at76s; its exact idle frame
-therefore differs from the connected control. These are traced device-state
-differences, not host wall-clock randomness or merely an animated UI phase.
+CCONT address07 has separate read/write roles. The own-ROM command tables
+at343ee0 expose write-only selector08 and read-only selector09, both encoding
+address07. The analog acquisition caller2aeba6 supplies channel8/value500;
+3080ba encodes this as0f, and30818a temporarily clears/restores it around
+other ADC reads. The actual GENSIO stream confirms control22/command38/data.
+This is not a firmware request to set the RTC seconds counter.
 
-The physical meaning of those connected-call writes is unresolved. A
-read-side seconds interpretation does not independently prove write-side
-counter semantics for this traffic. Keep the model and both exact oracles
-explicit; next decode the own writer and its GENSIO transaction before
-changing CCONT, fitting clock values or claiming wall-clock fidelity during
-calls. This does not invalidate the separately checked CC/RR busy outcome.
+The device now retains that write in a separate, save-state-registered
+acquisition-control latch. Its electrical effects remain unknown. RTC reads
+continue to expose seconds, and the recovered minute/hour clock-load strobe
+remains responsible for setting time. The former writable-seconds model
+incorrectly reset retained seconds at boot and stalled the clock during calls;
+its busy-versus-connected clock divergence is not a valid hardware oracle.
+
+The independently repeated connected run in `tmp/nsb7-ccont-alias` starts
+from the same retained13:47:45 source without editing it. All76 one-second
+ticks are continuous despite39 control writes. Reviewed exact pixels show
+13:48 ready and13:49 after physical End; authentication, host correlation,
+CC/RR release and unchanged complete card pass. The outgoing checker banks
+those exact frames without masking the clock and enforces every tick.
+Other clock-sensitive NSB-7 workflows still require requalification before
+their old exact hashes can be treated as current-device evidence.
+
+The shared two-process RTC gate uses the recovered clock-load strobe, not
+a fictitious seconds-write shortcut, to program12:00 and wait a full minute
+for the alarm/IRQ. It then proves retained12:01:04 advances to05/06/07 in
+a fresh process and exercises legacy/atomic malformed-NVRAM cases.

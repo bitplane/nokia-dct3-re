@@ -126,11 +126,12 @@ advance or battery-removal behavior.
 Register `0xd` remains a clock-gate latch with unknown side effects.
 
 NSB-7 connected-call traffic separately exposes an unresolved write-side
-contract: repeated register07 writes00/0f move the modeled seconds counter
-backward, while a matched busy control advances normally. Both start with
-the same RTC state. The binary read-surface evidence does not by itself
-validate those write effects; do not infer counter/control symmetry or alter
-it without decoding the own writer/serial transaction. An own-ROM NSB-7
+contract: repeated register07 writes00/0f moved the former modeled seconds
+counter backward, while a matched busy control advanced normally. Both
+started with the same RTC state. The binary read-surface evidence did not
+validate those write effects. The device now stores address07 writes in a
+separate acquisition-control latch, save-state registered but not retained
+as RTC NVRAM; reads still expose RTC seconds. An own-ROM NSB-7
 observation now confirms deliberate writes, not a stale ADC response: helper
 `0x305748` receives selector/mask `0x08ff`, then emits control `0x22`,
 command `0x38` and data `0x0f`/`0x00`. Callers `0x30813a` and `0x30818a`
@@ -146,6 +147,15 @@ evidence. The converter at `0x3080ba` emits zero below signed input 92;
 otherwise it emits `2 * min((input - 31) / 61, 127) + 1` using integer
 division. Helper `0x30dcb8` returns the quotient in R1 and remainder in R0.
 This establishes the encoding, not its electrical units.
+The direct caller at `0x2aeba6` supplies logical channel 8 and input 500
+(`0xff + 0xf5`), which encodes as `0x0f`. Completion at `0x29e6da`
+calls `0x30805c(11)` to finish the saved active channel. A halfword-aligned
+Thumb BL scan of the own image finds these direct calls to the activation
+and completion helpers, and no direct call to `0x3080e8`; this does not
+exclude indirect callers or establish code/data boundaries for every scan
+hit. Together with the runtime capture, the fixed acquisition parameter and
+pause/restore sequence rule out interpreting those writes as intentional
+wall-clock setting. The circuit controlled by the write remains unnamed.
 `tools/nsb7_ccont_write_observe.lua` observes only seconds 54..67, caps its
 records at 4,096 and performs no firmware writes. Its captured run passes
 `nsb7_host_outgoing_call_check.py`; this validates the call under observation,
@@ -155,7 +165,7 @@ and independent signaling checks live in
 
 `tools/run_ccont_rtc_retention.py RUN_DIR` runs the existing mapped-register
 RTC/IRQ fixture, then a new isolated process with a private copy of its NVRAM.
-It requires retained minute/day values, the firmware-owned seconds reset,
+It requires retained second/minute/day values without an analog-write reset,
 three ordered ticks and retained alarm latches. This is MMIO conformance,
 not proof of battery-removal behavior or cold handset clock provisioning.
 The loader accepts exactly the legacy four-byte counter record or the
@@ -400,8 +410,10 @@ firmware keypad path. Wake assertion has no recovered debounce/delay model.
 LCD, a ticking CCONT during CPU rail-off, physical PWRONX restart and a
 firmware status read containing ready/PWRONX without charger cause. Both
 native upload/HLE handoffs and subsequent physical security entry to idle
-are checked. NSB-6 firmware explicitly resets RTC seconds after wake;
-retained device state is not a claim of untouched software time or cold
+are checked. The earlier claim that NSB-6 resets RTC seconds after wake
+depended on the disproven address07 read/write symmetry; requalify that
+workflow's counter expectations under the independent acquisition latch.
+Retained device state is not a claim of untouched software time or cold
 calendar persistence. The DSP backend power-off boundary stops HLE service,
 packet, response, keepalive and speech timers, native DSP execution and its
 frame/slot timers, and the radio peer's burst clock. Wake uses the existing
