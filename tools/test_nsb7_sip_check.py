@@ -38,6 +38,24 @@ class SipTest(unittest.TestCase):
                 patch('tools.run_sip_handset_gate.run',new_callable=AsyncMock) as run:
             main()
         self.assertEqual(run.call_args.args[0].product,'8290')
+        with tempfile.TemporaryDirectory() as directory:
+            with patch('sys.argv',base+['--signaling-only','--incoming',
+                    '--ready-file',str(Path(directory)/'ready'),'--','true']), \
+                    patch('tools.run_sip_handset_gate.run',new_callable=AsyncMock) as run:
+                main()
+            self.assertTrue(run.call_args.args[0].incoming)
+
+    def test_incoming_identity_and_physical_answer(self):
+        from tools.test_nsb7_host_incoming_call_check import fixture as incoming_fixture
+        text=incoming_fixture().replace('length=19','length=17').replace(
+            '4d030504046002008134015c0781447700091032',
+            '45030504046002008134015c0581551532f4')
+        with patch('tools.nsb7_host_incoming_call_check.check_authentication'):
+            check(text,incoming=True)
+            for bad in (text.replace('key=0e observer_writes=0','key=0f observer_writes=0'),
+                        text.replace('81551532f4','81551532f5'),text+'\nmedia_uplink_sequence=1'):
+                with self.subTest(bad=bad),self.assertRaises(ValueError):
+                    check(bad,incoming=True)
 
     def test_real_sip_result_requires_explicit_no_speech_scope(self):
         with tempfile.TemporaryDirectory() as directory:

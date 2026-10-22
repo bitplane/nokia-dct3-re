@@ -14,7 +14,7 @@ from tools.radio_call_lifecycle_common import (
     ALERTING, TRAFFIC_SABM, TRAFFIC_UA, ASSIGNMENT_COMPLETE, CONNECT,
     CONNECT_ACKNOWLEDGE, DISCONNECT, NETWORK_RELEASE, RELEASE_COMPLETE,
     RR_CHANNEL_RELEASE, TRAFFIC_RELEASE_UA, RELEASE_CONFIRMATION, IDLE_PCH,
-    require_count, require_ordered,
+    require_count, require_ordered, laboratory_incoming_setup,
 )
 from tools.noki8890_registration_check import verify as verify_registration
 
@@ -42,13 +42,8 @@ CHECKPOINTS = (
 
 
 def host_setup_pattern(caller):
-    if not caller or len(caller) > 20 or any(digit not in '0123456789' for digit in caller):
-        raise ValueError('host caller must contain 1..20 decimal digits')
-    digits = caller + ('f' if len(caller) % 2 else '')
-    bcd = bytes(int(digits[index + 1] + digits[index], 16)
-                for index in range(0, len(digits), 2))
     # One unsegmented SAPI-0 SETUP: bearer capability, signal, calling number.
-    setup = bytes.fromhex('030504046002008134015c') + bytes([len(bcd) + 1, 0x81]) + bcd
+    setup = laboratory_incoming_setup(caller)
     return re.compile(r'RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}'
                       r'03[0-9a-f]{2}' + f'{len(setup) * 4 + 1:02x}' + setup.hex())
 

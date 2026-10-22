@@ -11,7 +11,7 @@ from tools.nsb7_radio_check import contract
 from tools.nsb7_storage_check import inspect
 from tools.nsb7_pin_check import check_frame
 from tools.nsb7_host_outgoing_call_check import check_clock
-from tools.radio_call_lifecycle_common import require_ordered
+from tools.radio_call_lifecycle_common import require_ordered,laboratory_incoming_setup
 
 FRAMES={
     # Same retained 13:47:45 source as the outgoing fixture, without reset.
@@ -22,7 +22,8 @@ FRAMES={
 }
 
 
-def check(text, restored=False):
+def check(text, restored=False, *, caller='447700900123'):
+    setup=laboratory_incoming_setup(caller)
     check_authentication(text.split('nsb7_call_ready:',1)[0])
     if '[LUA ERROR]' in text:
         raise ValueError('host incoming physical fixture failed')
@@ -47,7 +48,9 @@ def check(text, restored=False):
         ('host acceptance',r'gsm_call_adapter: incoming id=1 result=accepted'),
         ('host queued',r'incoming state id=1 epoch=1 phase=queued'),
         ('host paging',r'incoming state id=1 epoch=1 phase=paging'),
-        ('incoming SETUP',r'GSM service downlink kind=9 sapi=0 pd=03 message=05 length=19'),
+        ('incoming SETUP',rf'GSM service downlink kind=9 sapi=0 pd=03 message=05 length={len(setup)}(?:\s|$)'),
+        ('task4 calling number',rf'nsb7_lapdm_downlink: pc=002e49e6 task=4 selector=80 block=03[0-9a-f]{{2}}{len(setup)*4+1:02x}{setup.hex()}[0-9a-f]* '),
+        ('task14 calling number',rf'nsb7_lapdm_downlink: pc=002645ec task=14 selector=80 block=03[0-9a-f]{{2}}{len(setup)*4+1:02x}{setup.hex()}[0-9a-f]* '),
         ('Call Confirmed',r'GSM service uplink sapi=0 pd=03 message=08 length=11 data=8308040460020180150101'),
         ('Alerting',r'GSM service uplink sapi=0 pd=03 message=01 length=2 data=8341'),
         ('host alerting',r'incoming state id=1 epoch=1 phase=alerting'),

@@ -230,7 +230,10 @@ def verify_success(root, remote_text, args):
                 if position < 0 or bridge_text.count(marker) != 1:
                     raise RuntimeError('missing unique ordered incoming SIP identity/Answer/confirmation')
                 cursor = position + len(marker)
-            if args.product == '6250':
+            if args.product == '8290':
+                from tools.nsb7_sip_check import check as verify_call
+                verify_call(log,incoming=True)
+            elif args.product == '6250':
                 from tools.noki6250_call_check import verify as verify_call
                 verify_call(log, configured_carrier=True)
             elif args.product == '8890':
@@ -671,13 +674,14 @@ def main():
         (not args.restore_outgoing or not args.incoming) and not args.restore_idle and
         not args.cancel_incoming)
     signaling_connected=signaling_connected or (
-                             args.signaling_only and args.product=='8290' and not args.incoming and args.sip_response==200 and
+                             args.signaling_only and args.product=='8290' and
+                             (not args.incoming or args.ready_file is not None) and args.sip_response==200 and
                              args.calls==1 and not args.record_media and not args.restore_idle and
                              not args.restore_call and not args.restore_outgoing and not args.cancel_incoming)
     if args.signaling_only and not signaling_connected:
         parser.error('--signaling-only requires a single verified product SIP-200 fixture, with connected restoration only')
     if args.product=='8290' and not signaling_connected:
-        parser.error('8290 supports only its outgoing signaling-only SIP-200 fixture; speech is unproved')
+        parser.error('8290 supports only its single signaling-only SIP-200 fixtures; speech is unproved')
     if args.ready_file and not args.incoming:
         parser.error('--ready-file requires --incoming')
     if args.ready_file and args.ready_file.exists():

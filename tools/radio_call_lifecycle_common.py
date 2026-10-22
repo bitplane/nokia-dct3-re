@@ -6,6 +6,15 @@ from typing import Iterable, Pattern
 
 PatternLike = str | Pattern[str]
 
+
+def laboratory_incoming_setup(caller: str) -> bytes:
+    """The laboratory peer's fixed bearer/signal SETUP with a decimal caller."""
+    if not caller or len(caller)>20 or any(digit not in '0123456789' for digit in caller):
+        raise ValueError('laboratory caller must contain 1..20 decimal digits')
+    digits=caller+('f' if len(caller)%2 else '')
+    bcd=bytes(int(digits[index+1]+digits[index],16) for index in range(0,len(digits),2))
+    return bytes.fromhex('030504046002008134015c')+bytes((len(bcd)+1,0x81))+bcd
+
 REGISTRATION_RELEASE = re.compile(
     r"LAPDm .*Channel Release acknowledged nr=.")
 IMSI_PAGE = re.compile(r"PCH IMSI page transmitted channel=60 fn=")

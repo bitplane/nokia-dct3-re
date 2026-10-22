@@ -12,6 +12,8 @@ def fixture():
         'gsm_call_adapter: incoming state id=1 epoch=1 phase=queued',
         'gsm_call_adapter: incoming state id=1 epoch=1 phase=paging',
         'GSM service downlink kind=9 sapi=0 pd=03 message=05 length=19',
+        'nsb7_lapdm_downlink: pc=002e49e6 task=4 selector=80 block=03244d030504046002008134015c07814477000910322b2b t=46.4',
+        'nsb7_lapdm_downlink: pc=002645ec task=14 selector=80 block=03244d030504046002008134015c07814477000910322b2b t=46.5',
         'GSM service uplink sapi=0 pd=03 message=08 length=11 data=8308040460020180150101',
         'GSM service uplink sapi=0 pd=03 message=01 length=2 data=8341',
         'gsm_call_adapter: incoming state id=1 epoch=1 phase=alerting',
@@ -35,6 +37,18 @@ def fixture():
 
 
 class HostIncomingTest(unittest.TestCase):
+    @patch('tools.nsb7_host_incoming_call_check.check_authentication')
+    def test_caller_bytes_reach_both_consumers(self,authentication):
+        text=fixture().replace('length=19','length=17').replace(
+            '4d030504046002008134015c0781447700091032',
+            '45030504046002008134015c0581551532f4')
+        check(text,caller='5551234')
+        with self.assertRaises(ValueError): check(text)
+        for bad in (text.replace('81551532f4','81551532f5',1),
+                    text.replace('pc=002645ec','pc=002645ee'),
+                    text.replace('length=17','length=19')):
+            with self.subTest(bad=bad),self.assertRaises(ValueError):
+                check(bad,caller='5551234')
     @patch('tools.nsb7_host_incoming_call_check.check_authentication')
     def test_restored_epoch_rejects_stale_termination(self, authentication):
         text=fixture().replace('epoch=1 phase=media_closed','epoch=2 phase=media_closed').replace(

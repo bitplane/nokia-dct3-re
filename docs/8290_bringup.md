@@ -26,8 +26,8 @@ machine implicitly.
 All provisioning is own-derived or explicitly synthetic external card data;
 no donor PMM, identity or firmware-state forcing is admitted. Native resident
 DSP execution, speech/COBBA, measured complete analog calibration, external
-RF and NSB-7 SIP media remain unproved. A physical outgoing localhost SIP
-dialog is qualified separately without speech acceptance. Host busy and unanswered-alerting
+RF and NSB-7 SIP media remain unproved. Physical incoming/outgoing localhost SIP
+dialogs are qualified separately without speech acceptance. Host busy and unanswered-alerting
 physical recovery are qualified; other failure/pending-call cases,
 AoC and further SIM Toolkit commands are not established by these gates. The supplied
 SET UP EVENT LIST and TIMER MANAGEMENT fixtures are explicitly rejected, not supported.
@@ -2380,9 +2380,9 @@ The observed bridge counters are uplink0, downlink120, PCM transmitted0,
 PCM received127, dropped0. Received remote media is not proof of handset
 audio. `sip-result.json` explicitly records `speech_tested=false` and
 `native_dsp_complete=false`. No unproved NSB-7 PCM clock is enabled.
-The shared runner admits only one outgoing signaling-only SIP200 case;
-incoming, restoration, recording/media and multiple-call modes remain
-rejected for this product.
+The shared runner admits one signaling-only SIP200 call in either direction;
+incoming additionally requires a fresh handset-readiness artifact. Restoration,
+recording/media and multiple-call modes remain rejected for this product.
 
 After preparing the isolated run from the qualified source, reproduce with
 the build paths from [the host bridge contract](external_call_bridge.md).
@@ -2407,6 +2407,35 @@ The final checker independently revalidates SIP confirmation/normal release
 and zero-uplink scope alongside the product's physical/protocol/storage/UI
 contract. This does not qualify native speech, bidirectional handset audio,
 an external carrier or a public SIP service.
+
+### Incoming physical Answer
+
+An independent own-source run waits for the firmware's exact45s registered
+idle snapshot before the remote PJSIP endpoint sends an INVITE as5551234.
+The adapter queues one request1/epoch1, pages on the qualified PCS600 cell,
+and delivers the exact calling-party SETUP through both task4 and task14
+consumers. The51s ringing frame displays5551234. Physical Send52 owns
+Answer and SIP200 confirmation; physical End60 closes CC/RR and SIP normally.
+Exact ready/caller/connected/final pixels, unchanged full card, valid own
+flash journal and continuous RTC through68s pass independently.
+
+Bridge counters are uplink0/downlink100/PCM transmitted0/received102/dropped0;
+the explicit no-speech/no-native-DSP result remains mandatory. The long-caller
+host fixture retains its original447700900123 frame. The shared laboratory
+SETUP payload helper derives each caller's length/BCD bytes, while NSB-7
+acceptance requires them at both real MCU consumers; a length-only match is
+insufficient. Existing long-caller and connected host-restoration captures
+also pass the strengthened check.
+
+Use the same isolated preparation and SIP command above with
+`tmp/nsb7-sip-incoming`, SIP25272/HTTP18942, and add
+`--incoming --ready-file tmp/nsb7-sip-incoming/snap/nsb7_call_ready.png`.
+Select `nsb7_pin_host_incoming_call.lua` and a78s guard; the script exits at68s.
+The readiness path must not exist before launch.
+
+```sh
+.venv/bin/python tools/nsb7_sip_check.py roms/noki8290/8290f522a.fls tmp/nsb7-sip-incoming --incoming
+```
 
 ## Connected host-call restoration
 
