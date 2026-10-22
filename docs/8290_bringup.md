@@ -2359,6 +2359,15 @@ explicit stale-epoch rejection, then physical End66 and exact13:49 idle.
 Its ready/active/final hashes use the same reviewed retained-clock contract
 as the ordinary outgoing run; image equality alone is not acceptance.
 
+Incoming host controls are independently repeated in
+`tmp/nsb7-ccont-incoming` and `tmp/nsb7-ccont-incoming-state`. The ordinary
+run checks every retained-clock tick through68s, exact13:48 ready/caller/
+active/final pixels, physical Answer52/End60 and unchanged complete card.
+The restore run saves55s, reproduces CPU/RAM/time and three-second
+radio/SIM/L1/CCONT replay, republishes connected under epoch2, rejects the
+old-epoch termination and physically releases to the same exact idle frame.
+These remain signaling/session tests, not native speech or SIP restoration.
+
 The shared two-process RTC gate uses the recovered clock-load strobe, not
 a fictitious seconds-write shortcut, to program12:00 and wait a full minute
 for the alarm/IRQ. It then proves retained12:01:04 advances to05/06/07 in

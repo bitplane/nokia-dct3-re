@@ -37,7 +37,7 @@ def check(text, call=False, sms=False, incoming_call=False, card=None, pin=False
     tokens = ('TX packet', 'RX enqueue', 'GSM service', 'sim_device:')
     if call or incoming_call:
         tokens += ('radio_l1:',)
-    if host and call:
+    if host and (call or incoming_call):
         tokens += ('ccont_rtc:', 'ccont_analog:')
     verify_roundtrip(text, tokens, 'NSB-7 '+scenario)
     if incoming_call:
@@ -124,6 +124,9 @@ def main():
             if args.host_call:
                 from tools.nsb7_host_outgoing_call_check import FRAMES as outgoing_frames
                 final_hash=outgoing_frames['nsb7_outgoing_call_final.png']
+            elif args.host_incoming_call:
+                from tools.nsb7_host_incoming_call_check import FRAMES as incoming_frames
+                final_hash=incoming_frames['nsb7_call_final.png']
             frame(args.run / f'snap/nsb7_state_{kind}_final.png', final_hash)
             if host:
                 if args.incoming_call:

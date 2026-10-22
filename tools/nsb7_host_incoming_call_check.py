@@ -10,14 +10,15 @@ from tools.nsb7_pin_services_check import check_source,check_authentication
 from tools.nsb7_radio_check import contract
 from tools.nsb7_storage_check import inspect
 from tools.nsb7_pin_check import check_frame
-from tools.nsb7_netmonitor_check import IDLE_HASH
+from tools.nsb7_host_outgoing_call_check import check_clock
 from tools.radio_call_lifecycle_common import require_ordered
 
 FRAMES={
-    'nsb7_call_ready.png':IDLE_HASH,
-    'nsb7_call_ringing.png':'336dce3cac1d091ec4ea1d5ed0b41467a3b4dc9d548e75a63d568f22589b6059',
-    'nsb7_call_Send.png':'a8e9a74c4cccefe0bfa934225e5551e574e43da80e02f36d447b7622653c2e29',
-    'nsb7_call_final.png':IDLE_HASH,
+    # Same retained 13:47:45 source as the outgoing fixture, without reset.
+    'nsb7_call_ready.png':'32c41625e02a87a0ec97ec98a250040fc87ad8c5722c78200c54b27f7de2d560',
+    'nsb7_call_ringing.png':'cf0be19d9695137a07460b23c9fa590c21e6427d684e28e2bc1051f588cac110',
+    'nsb7_call_Send.png':'9cabd1e512ce5e4467808054cbabf5c5f1306e7c6ab681e3fa193661cc441c7e',
+    'nsb7_call_final.png':'32c41625e02a87a0ec97ec98a250040fc87ad8c5722c78200c54b27f7de2d560',
 }
 
 
@@ -82,7 +83,9 @@ def main():
     args=parser.parse_args()
     try:
         contract(args.image.read_bytes())
-        check((args.run/'error.log').read_text())
+        text=(args.run/'error.log').read_text()
+        check(text)
+        check_clock(text,finish=68)
         storage=args.run/'nvram/nsb7hle'
         initial=(args.run/'initial_sim_card.bin').read_bytes()
         check_source(initial)
