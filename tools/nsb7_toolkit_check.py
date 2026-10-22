@@ -14,6 +14,8 @@ from tools.sim_toolkit_select_item_trace_check import verify as verify_select_it
 from tools.sim_toolkit_polling_trace_check import verify_commands as verify_polling_commands
 from tools.sim_toolkit_refresh_trace_check import verify as verify_refresh
 from tools.sim_toolkit_trace_check import require_in_order
+from tools.sim_toolkit_event_list_trace_check import verify as verify_event_rejection
+from tools.sim_toolkit_timer_trace_check import verify as verify_timer_rejection
 from tools.nsb7_pin_check import check_frame
 from tools.nsb7_radio_check import contract
 from tools.nsb7_storage_check import inspect
@@ -69,7 +71,8 @@ REFRESH_FRAMES={**MENU_FRAMES,
 
 MODE_FRAMES={'display':FRAMES,'interactive':INTERACTIVE_FRAMES,'menu':MENU_FRAMES,
              'sms':SMS_FRAMES,'call':CALL_FRAMES,'decline':DECLINE_FRAMES,
-             'select_item':SELECT_ITEM_FRAMES,'polling':POLLING_FRAMES,'refresh':REFRESH_FRAMES}
+             'select_item':SELECT_ITEM_FRAMES,'polling':POLLING_FRAMES,'refresh':REFRESH_FRAMES,
+             'events':MENU_FRAMES,'timer':MENU_FRAMES}
 
 
 def check(text,mode='display'):
@@ -79,6 +82,7 @@ def check(text,mode='display'):
     select_item=mode=='select_item'
     polling=mode=='polling'
     refresh=mode=='refresh'
+    rejected=mode in ('events','timer')
     decline=mode=='decline'
     call=mode in ('call','decline')
     menu=mode not in ('display','interactive')
@@ -87,7 +91,8 @@ def check(text,mode='display'):
     check_authentication(text.split(marker+':',1)[0])
     verifier=verify_menu if menu else verify_interactive if interactive else verify_display_text
     selection_status={'sms':'9124','call':'911c','decline':'911c',
-                      'select_item':'9122','polling':'910f','refresh':'910b'}.get(mode)
+                      'select_item':'9122','polling':'910f','refresh':'910b',
+                      'events':'910f','timer':'9113'}.get(mode)
     if selection_status:
         verifier(text,'nsb7',selection_status=selection_status)
     else:
@@ -176,8 +181,18 @@ def check(text,mode='display'):
             'proactive SET UP MENU ready','header cla=a0 ins=12 p1=00 p2=00 p3=28',
             'terminal-response data=810304250002028281030100','SIM status ins=14 sw=9000',
             'nsb7_toolkit_interactive: action=menu_exit'))
+    if rejected:
+        (verify_event_rejection if mode=='events' else verify_timer_rejection)(text)
+        compact=text.replace('[:sim_card] ','')
+        if 'envelope data=d6' in compact or 'envelope data=d7' in compact:
+            raise ValueError('rejected command produced a download envelope')
+        if 'GSM outgoing request ' in text or 'gsm_sms_submit:' in text:
+            raise ValueError('rejected command started network service')
+        ticks=[float(t) for t in re.findall(r'ccont_rtc: event=second [^\n]*t=([0-9.]+)',text)]
+        if not ticks or max(ticks)<108:
+            raise ValueError('capability-rejection observation was truncated')
     for instruction in ('10','12','14'):
-        count=9 if refresh else 6 if polling else 5 if sms or call or select_item else 4 if menu else 3
+        count=9 if refresh else 6 if polling else 5 if sms or call or select_item or rejected else 4 if menu else 3
         expected=count if interactive and instruction!='10' else 1
         if refresh and instruction=='10': expected=2
         if text.count(f'header cla=a0 ins={instruction} ')!=expected:
@@ -233,7 +248,8 @@ def main():
     modes=parser.add_mutually_exclusive_group()
     for flag,mode in (('--interactive','interactive'),('--menu','menu'),('--sms','sms'),
                       ('--call','call'),('--call-decline','decline'),('--select-item','select_item'),
-                      ('--polling','polling'),('--refresh','refresh')):
+                      ('--polling','polling'),('--refresh','refresh'),
+                      ('--events-rejected','events'),('--timer-rejected','timer')):
         modes.add_argument(flag,dest='mode',action='store_const',const=mode)
     parser.set_defaults(mode='display')
     args=parser.parse_args()
@@ -248,7 +264,8 @@ def main():
             check_frame(args.run/'snap'/name,digest)
     except (OSError,ValueError) as error:
         parser.exit(1,f'NSB-7 Toolkit: FAIL: {error}\n')
-    print(f'PASS: authenticated registered Toolkit {args.mode}, physical successful responses, exact card/UI')
+    outcome='explicit result31 rejection' if args.mode in ('events','timer') else 'physical successful responses'
+    print(f'PASS: authenticated registered Toolkit {args.mode}, {outcome}, exact card/UI')
 
 
 if __name__=='__main__':

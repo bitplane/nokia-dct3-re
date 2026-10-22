@@ -59,6 +59,29 @@ def call_fixture(decline=False):
 
 class ToolkitTest(unittest.TestCase):
     @patch('tools.nsb7_toolkit_check.check_authentication')
+    def test_explicit_capability_rejections_and_clean_recovery(self,authentication):
+        for mode,name,length,response in (
+                ('events','SET UP EVENT LIST','0f','810308050002028281030131'),
+                ('timer','TIMER MANAGEMENT','13','81030f270002028281030131')):
+            text=interactive_fixture(menu=True).replace('SIM status ins=c2 sw=9000',
+                f'menu selection item=1 accepted\nproactive {name} ready\nSIM status ins=c2 sw=91{length}')
+            exit_event='nsb7_toolkit_interactive: action=menu_exit'
+            tail='\n'.join((f'header cla=a0 ins=12 p1=00 p2=00 p3={length}',
+                'header cla=a0 ins=14 p1=00 p2=00 p3=0c',
+                f'terminal-response data={response}','SIM status ins=14 sw=9000',
+                'ccont_rtc: event=second time=13:49:33 day=0 t=108.0',exit_event))
+            text=text.replace(exit_event,tail)
+            with self.subTest(mode=mode):
+                check(text,mode=mode)
+            for bad in (text.replace(response,response[:-2]+'00'),
+                        text+'\nenvelope data=d60100',text+'\nenvelope data=d70100',
+                        text+'\nGSM outgoing request id=1 digits=5551234',
+                        text+'\ngsm_sms_submit: unexpected',
+                        text.replace('t=108.0','t=100.0')):
+                with self.subTest(mode=mode,bad=bad),self.assertRaises(ValueError):
+                    check(bad,mode=mode)
+
+    @patch('tools.nsb7_toolkit_check.check_authentication')
     def test_refresh_reprofiles_and_completes_new_application(self,authentication):
         from tools.test_sim_toolkit_refresh_trace_check import GOOD
         text=interactive_fixture(menu=True).replace('SIM status ins=c2 sw=9000',

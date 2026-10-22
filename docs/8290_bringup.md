@@ -28,8 +28,30 @@ no donor PMM, identity or firmware-state forcing is admitted. Native resident
 DSP execution, speech/COBBA, measured complete analog calibration, external
 RF and NSB-7 SIP acceptance remain unproved. Host busy/recovery is qualified;
 other failure/pending-call cases,
-AoC and further SIM Toolkit commands are not established by these gates. Detailed contracts
+AoC and further SIM Toolkit commands are not established by these gates. The supplied
+SET UP EVENT LIST and TIMER MANAGEMENT fixtures are explicitly rejected, not supported.
+Detailed contracts
 and their reproduction commands below own each coverage claim.
+
+### Toolkit capability rejection controls
+
+On the authenticated registered `nsb7hle` profile, the supplied SET UP EVENT LIST
+(user activity/idle events) and TIMER MANAGEMENT (start timer 1 for five seconds)
+commands both return terminal-result byte `31`. Each capture completes five
+FETCH/TERMINAL RESPONSE exchanges and one physical menu-selection ENVELOPE;
+neither emits an event/timer download ENVELOPE or starts a network call/SMS.
+Observation continues through 108 seconds, followed by physical End-key recovery.
+The complete card and exact menu/idle frames remain unchanged. These results
+qualify rejection of these particular requests, not every variant of either command.
+
+Use `tools/nsb7_toolkit_capability.lua` with
+`fixtures/nsb7_toolkit_events/nsb7hle.cfg` or
+`fixtures/nsb7_toolkit_timer/nsb7hle.cfg`, respectively. Validate isolated captures:
+
+```sh
+.venv/bin/python tools/nsb7_toolkit_check.py roms/noki8290/8290f522a.fls RUN_DIR --events-rejected
+.venv/bin/python tools/nsb7_toolkit_check.py roms/noki8290/8290f522a.fls RUN_DIR --timer-rejected
+```
 
 The [Nokia 8290 user guide](https://www.instructionsmanuals.com/sites/default/files/2019-05/Nokia-8290-en.pdf)
 identifies NSB-7/GSM1900; the [NSB-7 service manual](https://www.manualslib.com/manual/2171641/Nokia-Nsb-7-Series.html)
