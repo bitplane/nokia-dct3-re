@@ -32,7 +32,54 @@ def interactive_fixture(menu=False):
     return '\n'.join(expanded)
 
 
+def call_fixture(decline=False):
+    text=interactive_fixture(menu=True).replace('SIM status ins=c2 sw=9000',
+        'menu selection item=1 accepted\nproactive SET UP CALL ready\nSIM status ins=c2 sw=911c')
+    exit_event='nsb7_toolkit_interactive: action=menu_exit\nnsb7_key_decode: key=0f observer_writes=0'
+    header='header cla=a0 ins=12 p1=00 p2=00 p3=1c'
+    if decline:
+        tail='\n'.join((header,'nsb7_toolkit_interactive: action=call_decline',
+            'nsb7_key_decode: key=1a observer_writes=0',
+            'header cla=a0 ins=14 p1=00 p2=00 p3=0c',
+            'terminal-response data=810306100002028281030122',
+            'SIM status ins=14 sw=9000',exit_event))
+    else:
+        from tools.test_sim_toolkit_call_trace_check import GOOD
+        tail=header+GOOD.split(header,1)[1]
+        setup='GSM service uplink sapi=0 pd=03 message=05 '
+        tail=tail.replace(setup,'nsb7_toolkit_interactive: action=call_accept\n'
+            'nsb7_key_decode: key=19 observer_writes=0\n'+setup)
+        tail=tail.replace('terminal-response data=810306',
+            'header cla=a0 ins=14 p1=00 p2=00 p3=0c\nterminal-response data=810306')
+        disconnect='GSM service uplink sapi=0 pd=03 message=25 '
+        tail=tail.replace(disconnect,exit_event+'\n'+disconnect)
+    return text.replace(exit_event,tail)
+
+
 class ToolkitTest(unittest.TestCase):
+    @patch('tools.nsb7_toolkit_check.check_authentication')
+    def test_call_consent_network_and_physical_release(self,authentication):
+        text=call_fixture()
+        check(text,call=True)
+        setup=next(line for line in text.splitlines() if 'message=05 length=15' in line)
+        early=text.replace(setup+'\n','').replace('nsb7_toolkit_interactive: action=call_accept',
+            setup+'\nnsb7_toolkit_interactive: action=call_accept')
+        for bad in (early,text.replace('action=call_accept','action=missing'),
+                    text.replace('810306100002028281030100','810306100002028281030120'),
+                    text.replace('message=25 length=5','message=24 length=5'),
+                    text+'\nGSM outgoing request id=2 digits=5551234'):
+            with self.subTest(text=bad),self.assertRaises(ValueError):
+                check(bad,call=True)
+
+    @patch('tools.nsb7_toolkit_check.check_authentication')
+    def test_declined_call_must_not_start_network(self,authentication):
+        text=call_fixture(decline=True)
+        check(text,decline=True)
+        for bad in (text.replace('030122','030100'),text.replace('key=1a','key=19'),
+                    text+'\nGSM outgoing request id=1 digits=5551234'):
+            with self.subTest(text=bad),self.assertRaises(ValueError):
+                check(bad,decline=True)
+
     def test_sms_storage_allows_only_exact_reference_change(self):
         from tools.nsb7_pin_check import serialized_profile
         from tools.nsb7_pin_registration_check import LOCI

@@ -31,11 +31,17 @@ local input=coroutine.create(function()
     assert(emu.wait(76-machine.time:as_double()))
     machine.screens[':screen']:snapshot('nsb7_toolkit_interactive_final.png')
     if _G.nsb7_toolkit_menu then
-        for _,step in ipairs({{78,'Left Softkey / Menu','menu'},
+        local steps={{78,'Left Softkey / Menu','menu'},
                 {80,'Scroll Up','menu_skip_netmonitor'},{82,'Scroll Up','menu_last'},
                 {84,'Left Softkey / Menu','menu_open'},
                 {86,'Left Softkey / Menu','menu_select'},
-                {88+(_G.nsb7_toolkit_network_wait or 0),'End','menu_exit'}}) do
+                {88+(_G.nsb7_toolkit_network_wait or 0),'End','menu_exit'}}
+        if _G.nsb7_toolkit_call then
+            table.insert(steps,6,{90,
+                _G.nsb7_toolkit_decline and 'Right Softkey / C' or 'Left Softkey / Menu',
+                _G.nsb7_toolkit_decline and 'call_decline' or 'call_accept'})
+        end
+        for _,step in ipairs(steps) do
             press(step[1],step[2],step[3])
             assert(emu.wait(step[1]+1-machine.time:as_double()))
             machine.screens[':screen']:snapshot('nsb7_toolkit_'..step[3]..'.png')

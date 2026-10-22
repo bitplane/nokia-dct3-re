@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_authenticated_toolkit_call_consent",
+      "owner": "nsb7_sim_toolkit", "status": "satisfied",
+      "predicate": "NSB-7 Toolkit SET UP CALL starts GSM only after physical consent and a matched physical Cancel emits rejection without any network call",
+      "current": "Own PIN/phone-code/retained-location controls share the interactive/menu path and one911c/FETCH request for5551234. Accept90 decodes19 before SETUP and one outgoing request; one traffic assignment, Alerting and CONNECT/ACK precede terminal response810306100002028281030100/result00. Exact100s connected SAT call and physical End108/Disconnect/Release/RR closure return to13:49 idle. Separate right-softkey Cancel90 decodes1a and returns810306100002028281030122/result22 without outgoing request/SETUP/assignment/CONNECT; End108 exits its item screen to the same idle. Both require13 decoded actions,13 exact frames, full registration, valid own flash and byte-identical complete card. No driver/device change or speech/native DSP/host SIP claim.",
+      "evidence": ["docs/8290_bringup.md", "fixtures/nsb7_toolkit_call/nsb7hle.cfg", "tools/nsb7_toolkit_call.lua", "tools/nsb7_toolkit_call_decline.lua", "tools/nsb7_toolkit_interactive.lua", "tools/nsb7_toolkit_check.py", "tools/test_nsb7_toolkit_check.py", "tools/sim_toolkit_call_trace_check.py"]
+    },
+    {
       "id": "nsb7_authenticated_toolkit_send_sms",
       "owner": "nsb7_sim_toolkit", "status": "satisfied",
       "predicate": "A physically selected NSB-7 Toolkit SEND SHORT MESSAGE completes through laboratory CP/RP/RR with exact terminal response and bounded persistent changes",

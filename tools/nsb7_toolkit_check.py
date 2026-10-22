@@ -9,6 +9,7 @@ if __package__ in (None,''):
 from tools.dct3_toolkit_check import verify_display_text,verify_interactive,verify_menu
 from tools.nsb7_pin_services_check import check_authentication,check_source,SMSS_OFFSET
 from tools.sim_toolkit_sms_trace_check import verify as verify_sms
+from tools.sim_toolkit_call_trace_check import verify as verify_call,verify_decline,DISCONNECT
 from tools.nsb7_pin_check import check_frame
 from tools.nsb7_radio_check import contract
 from tools.nsb7_storage_check import inspect
@@ -36,16 +37,28 @@ MENU_FRAMES={
 }
 SMS_FRAMES={**MENU_FRAMES,
     'nsb7_toolkit_menu_select.png':'1141f7a02395b10c1029cf16f26935cbbbbb7ae853cde9c5ad21a4ab096a723a'}
+CALL_FRAMES={**MENU_FRAMES,
+    'nsb7_toolkit_menu_select.png':'630c788b0a678db6f5fd04c7dce3c30774a512211a09f37ba2284fbaa0e965a1',
+    'nsb7_toolkit_call_accept.png':'9521157fb28adca04d612231bb5d05c161476c1895fbf793b4fdab8e7efdaeb0',
+    'nsb7_toolkit_call_active.png':'cfd5053b6d0589d7cc7cce673ffb8913bc32b18e7ae49f51e0f72195eddcf8ed'}
+DECLINE_FRAMES={**MENU_FRAMES,
+    'nsb7_toolkit_menu_select.png':CALL_FRAMES['nsb7_toolkit_menu_select.png'],
+    'nsb7_toolkit_call_decline.png':MENU_FRAMES['nsb7_toolkit_menu_open.png'],
+    'nsb7_toolkit_call_active.png':MENU_FRAMES['nsb7_toolkit_menu_open.png']}
 
 
-def check(text, interactive=False, menu=False, sms=False):
-    menu=menu or sms
+def check(text, interactive=False, menu=False, sms=False, call=False, decline=False):
+    call=call or decline
+    menu=menu or sms or call
     interactive=interactive or menu
     marker='nsb7_toolkit_interactive' if interactive else 'nsb7_toolkit_physical'
     check_authentication(text.split(marker+':',1)[0])
     verifier=verify_menu if menu else verify_interactive if interactive else verify_display_text
+    if sms or call:
+        verifier(text,'nsb7',selection_status='9124' if sms else '911c')
+    else:
+        verifier(text,'nsb7')
     if sms:
-        verifier(text,'nsb7',selection_status='9124')
         verify_sms(text,cp=0x39)
         if text.count('update-binary fid=6f43 offset=0 length=2 ')!=1:
             raise ValueError('expected one Toolkit SMS reference update')
@@ -54,10 +67,26 @@ def check(text, interactive=False, menu=False, sms=False):
             ('radio release',r'LAPDm service Channel Release acknowledged nr=2'),
             ('physical exit',r'nsb7_toolkit_interactive: action=menu_exit'),
         ],'NSB-7 Toolkit SMS completion before exit')
-    else:
-        verifier(text,'nsb7')
+    if call:
+        if decline:
+            verify_decline(text,'nsb7')
+        else:
+            verify_call(text)
+            if text.count('GSM outgoing request ')!=1:
+                raise ValueError('expected exactly one Toolkit call request')
+            require_ordered(text.replace('[:sim_card] ',''),[
+                ('physical consent',r'nsb7_toolkit_interactive: action=call_accept'),
+                ('decoded consent',r'nsb7_key_decode: key=19 observer_writes=0'),
+                ('SETUP',r'GSM service uplink sapi=0 pd=03 message=05 '),
+                ('call request',r'GSM outgoing request id=1 digits=5551234'),
+                ('Connect acknowledgment',r'GSM service uplink sapi=0 pd=03 message=0f length=2'),
+                ('successful response',r'terminal-response data=810306100002028281030100'),
+                ('physical End',r'nsb7_toolkit_interactive: action=menu_exit'),
+                ('decoded End',r'nsb7_key_decode: key=0f observer_writes=0'),
+                ('Disconnect',DISCONNECT),
+            ],'NSB-7 Toolkit call consent and release')
     for instruction in ('10','12','14'):
-        expected=(5 if sms else 4 if menu else 3) if interactive and instruction!='10' else 1
+        expected=(5 if sms or call else 4 if menu else 3) if interactive and instruction!='10' else 1
         if text.count(f'header cla=a0 ins={instruction} ')!=expected:
             raise ValueError('Toolkit profile/FETCH/terminal-response count differs')
     if text.count('header cla=a0 ins=c2 ')!=(1 if menu else 0):
@@ -69,6 +98,8 @@ def check(text, interactive=False, menu=False, sms=False):
         if menu:
             expected += [('menu','19'),('menu_skip_netmonitor','17'),('menu_last','17'),
                          ('menu_open','19'),('menu_select','19'),('menu_exit','0f')]
+        if call:
+            expected.insert(len(expected)-1,('call_decline','1a') if decline else ('call_accept','19'))
         if [action[1] for action in actions]!=[name for name,_ in expected]:
             raise ValueError('physical Toolkit input sequence differs')
         for index,(_,code) in enumerate(expected):
@@ -104,21 +135,28 @@ def main():
     mode.add_argument('--interactive',action='store_true')
     mode.add_argument('--menu',action='store_true')
     mode.add_argument('--sms',action='store_true')
+    mode.add_argument('--call',action='store_true')
+    mode.add_argument('--call-decline',action='store_true')
     args=parser.parse_args()
     try:
         contract(args.image.read_bytes())
-        check((args.run/'error.log').read_text(),interactive=args.interactive,menu=args.menu,sms=args.sms)
+        check((args.run/'error.log').read_text(),interactive=args.interactive,menu=args.menu,
+              sms=args.sms,call=args.call,decline=args.call_decline)
         initial=(args.run/'initial_sim_card.bin').read_bytes()
         storage=args.run/'nvram/nsb7hle'
         check_card(initial,(storage/'sim_card').read_bytes(),sms=args.sms)
         inspect((storage/'flash').read_bytes())
-        frames=SMS_FRAMES if args.sms else MENU_FRAMES if args.menu else INTERACTIVE_FRAMES if args.interactive else FRAMES
+        frames=(DECLINE_FRAMES if args.call_decline else CALL_FRAMES if args.call else
+                SMS_FRAMES if args.sms else MENU_FRAMES if args.menu else
+                INTERACTIVE_FRAMES if args.interactive else FRAMES)
         for name,digest in frames.items():
             check_frame(args.run/'snap'/name,digest)
     except (OSError,ValueError) as error:
         parser.exit(1,f'NSB-7 Toolkit: FAIL: {error}\n')
     print('PASS: authenticated registered Toolkit '+
-          ('SEND SHORT MESSAGE' if args.sms else 'menu selection' if args.menu else 'DISPLAY TEXT/GET INKEY/GET INPUT' if args.interactive else 'DISPLAY TEXT')+
+          ('SET UP CALL decline' if args.call_decline else 'SET UP CALL signaling' if args.call else
+           'SEND SHORT MESSAGE' if args.sms else 'menu selection' if args.menu else
+           'DISPLAY TEXT/GET INKEY/GET INPUT' if args.interactive else 'DISPLAY TEXT')+
           ', physical successful responses, exact card/UI')
 
 

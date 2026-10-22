@@ -17,7 +17,7 @@ machine implicitly.
 | UI and storage | Physical security code, menus, SIM phonebook save/cold retrieval, RTC retention and Net monitor00 clean idle. Own EEPROM journal rotation matches the complete runtime shadow. |
 | SIM security | PIN1/PIN2 change/rejection, retry persistence, exhaustion/PUK recovery and request Off/On. Permanent PUK1 rejects the card; permanent PUK2 retains ordinary PIN1/menu use. |
 | FDN | Explicit extended card; physical PIN2-authorized On/Off, Save/edit/erase/cancel and cold retrieval. Registered listed/unlisted/Off controls distinguish permitted calls from local denial. |
-| SIM Toolkit | Phase-2+ nine-byte TERMINAL PROFILE; DISPLAY TEXT, GET INKEY, GET INPUT, SET UP MENU and menu-driven SEND SHORT MESSAGE. Exact physical/protocol/UI acceptance; non-SMS cases preserve the full card, SMS permits only its exact EF_SMSS reference update. |
+| SIM Toolkit | Phase-2+ nine-byte TERMINAL PROFILE; DISPLAY TEXT, GET INKEY, GET INPUT, SET UP MENU, menu-driven SEND SHORT MESSAGE and SET UP CALL accept/Cancel. Exact physical/protocol/UI acceptance; non-SMS cases preserve the full card, SMS permits only its exact EF_SMSS reference update. |
 | PCS laboratory network | Acquisition, BCCH, Location Updating/EF_LOCI, background measurements, addressed paging, physical incoming/outgoing CC/RR signaling and SMS delivery/read/delete/cancel/Reply. |
 | Authenticated composition | Physical PIN before fresh/cold registration, calls, SMS and phonebook; a long wrong-PIN control remains unregistered. |
 | Restoration | Exact ARM/banked registers, RAM/time, protocol replay and pixels at idle, connected call and active SMS boundaries, with physical continuation. |
@@ -2488,4 +2488,35 @@ different from the plain menu fixture. No driver/device behavior changed.
 ```sh
 .venv/bin/python tools/nsb7_toolkit_check.py \
   roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-sms --sms
+```
+
+### Call consent and cancellation
+
+`fixtures/nsb7_toolkit_call/nsb7hle.cfg` selects the existing SET UP CALL
+card application. Both own-source controls install/select the menu through
+the same physical sequence; Select86 returns911c and FETCH supplies the
+request for5551234. The reviewed prompt says `SAT call`, with Call/Cancel.
+
+`nsb7_toolkit_call.lua` physically accepts at90s. Decoded consent precedes
+SETUP and one outgoing request. CC/RR completes Call Proceeding, one traffic
+assignment, Assignment Complete, Alerting, CONNECT and CONNECT ACKNOWLEDGE.
+Only then does the card receive terminal response
+`810306100002028281030100`/9000. A separate100s snapshot shows connected
+`SAT call`; physical End108 precedes DISCONNECT/Release/Release Complete
+and RR release, with exact13:49 idle afterward.
+
+`nsb7_toolkit_call_decline.lua` instead presses the physical right softkey
+at90s. It returns `810306100002028281030122`/9000 and the reviewed Toolkit
+item screen, without any GSM outgoing request, SETUP, traffic assignment or
+CONNECT. End108 exits to the same exact idle frame. Both controls enforce
+thirteen decoded actions, thirteen exact frames, full authentication/
+registration, valid own flash and byte-identical complete SIM storage.
+This is laboratory call signaling and consent, not speech, host/SIP calls
+or native resident DSP execution. No driver/device behavior changed.
+
+```sh
+.venv/bin/python tools/nsb7_toolkit_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-call-v2 --call
+.venv/bin/python tools/nsb7_toolkit_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-call-decline --call-decline
 ```
