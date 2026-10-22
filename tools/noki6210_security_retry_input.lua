@@ -22,6 +22,10 @@ local runner=coroutine.create(function()
     press('Left Softkey / Menu',12)
     assert(emu.wait(2))
     machine.screens[':screen']:snapshot('6210_pin_retry_rejected.png')
+    if _G.npe3_pin_retry_wrong_only then
+        machine:logerror('6210_pin_retry_input: wrong_complete=1 firmware_state_forcing=0\n')
+        return
+    end
     for index=1,4 do press('Keypad '..index,15+index) end
     press('Left Softkey / Menu',20)
     assert(emu.wait(39-machine.time:as_double()))

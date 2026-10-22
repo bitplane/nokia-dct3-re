@@ -1044,9 +1044,25 @@ also checks own-upload/HLE provenance, launch health, coherent registration and
 the Messages-menu pixels. The fixture is `noki6210_security_retry_input.lua`;
 qualified capture: `tmp/npe3-pin-retry-final`.
 
-This establishes same-process wrong-PIN recovery and delayed registration,
-not cold persistence of a failed retry, PIN exhaustion/PUK recovery or native
-DSP/radio support. Those require separate product gates.
+This establishes same-process wrong-PIN recovery and delayed registration.
+PIN exhaustion/PUK recovery and native DSP/radio support remain separate.
+
+`make verify-6210-pin-retry-cold` separately stops after9999/OK and copies
+only that run's own NVRAM/configuration into a new process. The full3570-byte
+predecessor card equals the deterministic initial profile except PIN1 retries
+3->2; it has never authenticated or registered. The copied input must equal
+that predecessor byte-for-byte. A separate physical1234/OK process then
+returns9000, resets retries to3, registers on the coherent cell and reaches
+the exact Messages-menu frame. Its full card may differ only by the expected
+retry reset and documented LOCI update; the predecessor remains unchanged.
+Prompt/error frames are checked independently using their RGB hashes.
+
+The cold launch has its own invocation ID, script hash, command, complete
+initial-storage hash map and predecessor-card hash in `cold-recovery/launch.json`
+and the acceptance report. No CPU/RAM/save-state snapshot crosses processes.
+Fixture: `noki6210_security_retry_cold_input.lua`; scenario:
+`security-retry-cold --coherent-cell`. This qualifies failed-retry durability
+and recovery, not arbitrary restart states or PUK behavior.
 
 ## SIM Toolkit
 

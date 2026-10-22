@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_failed_pin_cold_recovery", "owner": "npe3_sim_security", "status": "satisfied",
+      "predicate": "A 6210 failed physical PIN persists exactly one retry change across a separate process before physical authentication and registered Menu recovery",
+      "current": "Fresh own-PMM/PIN-card predecessor physically enters9999/OK and returns9804; complete3570-byte card differs from initial defaults only at PIN1 retry3->2, with no authentication/registration. Cold process receives byte-identical own NVRAM/config only, physically enters1234/OK and returns9000/retries3, coherently registers and reaches exact Messages Menu. Final card differs only by retry reset and expected LOCI; predecessor remains unchanged. Prompt/error RGB frames and own-upload/HLE/health checks pass. Independent cold launch records invocation/script/storage/source-card identities. No copied RAM/state, donor provisioning, PUK or native DSP/RF/speech claim.",
+      "evidence": ["docs/6210_bringup.md", "tools/noki6210_security_retry_cold_input.lua", "tools/noki6210_security_retry_input.lua", "tools/noki6210_security_retry_check.py", "tools/test_noki6210_security_retry_check.py", "tools/run_noki6210_acceptance.py", "gates.json"]
+    },
+    {
       "id": "npe3_physical_pin_retry_recovery", "owner": "npe3_sim_security", "status": "satisfied",
       "predicate": "Fresh research-HLE 6210 rejects one physical wrong PIN, recovers with the correct PIN and registers without unrelated card mutation",
       "current": "Fresh own-PMM/coherent35/36 run physically enters9999/OK8..12s: VERIFY9804 chv2/3 and exact Code error14s. Physical1234/OK16..20s returns9000 chv3/3; Location Updating accepted20.980s. Exact prompt/error/registered idle39s and Menu40/Messages pixels pass. Every contact and complete3570-byte card are checked; only expected EF_LOCI bytes differ from original defaults. Own-upload/HLE and console-health gates pass. No failed-retry cold persistence/PIN exhaustion/PUK/native DSP/RF/speech promotion.",

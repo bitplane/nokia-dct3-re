@@ -1,7 +1,7 @@
 import unittest
 
 from tools.make_sim_card_profile import make_profile
-from tools.noki6210_security_retry_check import KEYS,check
+from tools.noki6210_security_retry_check import KEYS,check,check_wrong,check_cold
 
 
 def fixture():
@@ -49,6 +49,33 @@ class PinRetryTests(unittest.TestCase):
             check(text+'\nSIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1',card)
         with self.assertRaises(ValueError):
             check(text,card[:-1])
+
+    def test_failed_retry_is_exact_cold_input(self):
+        lines=[]
+        for second,key in KEYS[:5]:
+            lines.extend([f'6210_pin_retry_input: key={key} state=1 t={second}.000000000',
+                          f'6210_pin_retry_input: key={key} state=0 t={second}.150000000'])
+        lines.extend(['SIM status ins=20 sw=9804 chv=2/3 puk=10/10 enabled=1',
+                      '6210_pin_retry_input: wrong_complete=1 firmware_state_forcing=0'])
+        wrong='\n'.join(lines)
+        initial=bytearray(make_profile(True)+bytes.fromhex('00f110')+b'\xff'*43)
+        initial[3516]=2
+        check_wrong(wrong,bytes(initial))
+        cold=('6210_security_physical: action=confirm\n'
+              'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1\n'
+              'LAPDm Location Updating Accept acknowledged nr=1\n'
+              '6210_security_physical: action=menu\n')
+        final=fixture()[1]
+        check_cold(cold,bytes(initial),final)
+        for index in (0,3484,3516,3520,3569):
+            mutated=bytearray(initial)
+            mutated[index]^=1
+            with self.subTest(index=index),self.assertRaises(ValueError):
+                check_cold(cold,bytes(mutated),final)
+        with self.assertRaises(ValueError):
+            check_wrong(wrong,final)
+        with self.assertRaises(ValueError):
+            check_cold(cold.replace('sw=9000','sw=9804'),bytes(initial),final)
 
 
 if __name__=='__main__':

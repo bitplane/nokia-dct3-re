@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 736 gates: 538 generated from typed steps, 198 copied verbatim (shell).
+# 737 gates: 539 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -98,13 +98,13 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6210-call-divert verify-6210-call-divert-lifecycle \
 	verify-6210-state-divert verify-6210-sim-toolkit verify-6210-security \
 	verify-6210-slow-pin-registration verify-6210-pin-retry \
-	verify-6210-home-plmn-reject verify-6210-forbidden-plmn-persistence \
-	verify-6210-pin-host-incoming-call verify-6210-pin-host-incoming-sms \
-	verify-6210-pin-host-outgoing-call verify-6210-pin-host-outgoing-sms \
-	verify-6210-sms-status-persistence verify-6210-pin-phonebook \
-	verify-6210-pin-host-rejected-sms verify-6210-pin-host-silent-sms \
-	verify-6210-pin-state-idle verify-6210-pin-state-call \
-	verify-6210-pin-state-sms verify-6210-registration \
+	verify-6210-pin-retry-cold verify-6210-home-plmn-reject \
+	verify-6210-forbidden-plmn-persistence verify-6210-pin-host-incoming-call \
+	verify-6210-pin-host-incoming-sms verify-6210-pin-host-outgoing-call \
+	verify-6210-pin-host-outgoing-sms verify-6210-sms-status-persistence \
+	verify-6210-pin-phonebook verify-6210-pin-host-rejected-sms \
+	verify-6210-pin-host-silent-sms verify-6210-pin-state-idle \
+	verify-6210-pin-state-call verify-6210-pin-state-sms verify-6210-registration \
 	verify-6210-foreign-registration verify-6210-foreign-outgoing-call \
 	verify-6210-foreign-incoming-sms verify-6210-calculator verify-6210-phonebook \
 	verify-6210-menu verify-8210-call-divert verify-8210-sim-toolkit-call-decline \
@@ -878,6 +878,9 @@ verify-6210-slow-pin-registration: build
 
 verify-6210-pin-retry: build
 	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario security-retry --coherent-cell --mame $(MAME_DIR)/mame
+
+verify-6210-pin-retry-cold: build
+	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario security-retry-cold --coherent-cell --mame $(MAME_DIR)/mame
 
 verify-6210-home-plmn-reject: build
 	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario home-plmn-reject --coherent-cell --mame $(MAME_DIR)/mame

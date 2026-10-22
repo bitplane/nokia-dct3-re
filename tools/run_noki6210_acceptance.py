@@ -33,6 +33,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'outgoing-sms': ('npe3hle', 'outgoing_sms_input', 43),
              'security': ('npe3hle', 'security_input', 37),
              'security-retry': ('npe3hle', 'security_retry_input', 45),
+             'security-retry-cold': ('npe3hle', 'security_retry_cold_input', 18),
              'toolkit': ('npe3hle', 'toolkit_input', 40),
              'toolkit-interactive': ('npe3hle', 'toolkit_interactive', 65),
              'toolkit-menu': ('npe3hle', 'toolkit_menu', 75),
@@ -279,7 +280,7 @@ def main():
     parser.add_argument('--pin-enabled', action='store_true',
                         help='authenticate a PIN-enabled SIM before the host service')
     args = parser.parse_args()
-    if args.scenario=='security-retry' and not args.coherent_cell:
+    if args.scenario in ('security-retry','security-retry-cold') and not args.coherent_cell:
         parser.error('security-retry requires --coherent-cell')
     if args.foreign_cell:
         if args.scenario not in ('outgoing-call', 'incoming-sms'):
@@ -302,7 +303,7 @@ def main():
         run = args.run_directory.resolve()
         run.mkdir(parents=True, exist_ok=False)
         machine, script, seconds = SCENARIOS[args.scenario]
-        if args.scenario in ('security','security-retry') or args.pin_enabled:
+        if args.scenario in ('security','security-retry','security-retry-cold') or args.pin_enabled:
             from tools.make_sim_card_profile import make_profile
             card = run / f'nvram/{machine}/sim_card'
             card.parent.mkdir(parents=True)
@@ -316,6 +317,7 @@ def main():
             plmn = '32f451' if args.scenario == 'foreign-registration' or args.foreign_cell else '00f120'
             card.write_bytes(make_profile(pin_enabled=False) + bytes.fromhex(plmn) +
                              b'\xff' * 21 + b'\xff' * 12)
+        cold_retry = None
         host = args.scenario.startswith('host-')
         configured = args.scenario in ('incoming-call', 'incoming-pcm-missing', 'incoming-sms', 'state-sms') or args.scenario in TOOLKIT_PROFILES or host
         if configured or args.coherent_cell or args.scenario in ('plmn-reject', 'home-plmn-reject', 'foreign-registration'):
@@ -664,6 +666,43 @@ def main():
                     verify(cold_text, runtime=True, selftest=True)
                     check_forbidden_selection(cold_text, card.read_bytes(),
                                               forbidden=forbidden, previous=retained)
+        elif args.scenario=='security-retry-cold':
+            from tools.noki6210_security_retry_check import check_wrong,check_cold,check_frames as retry_frames
+            from PIL import Image
+            card=run/'nvram/npe3hle/sim_card'
+            checkpoint=card.read_bytes()
+            check_wrong(text,checkpoint)
+            retry_frames(run/'snap',wrong_only=True)
+            cold=run/'cold-recovery'
+            cold.mkdir()
+            shutil.copytree(run/'nvram',cold/'nvram')
+            shutil.copytree(run/'cfg',cold/'cfg')
+            initial=(cold/'nvram/npe3hle/sim_card').read_bytes()
+            if initial!=checkpoint:
+                raise ValueError('cold PIN recovery input differs from predecessor')
+            cold_command=list(command)
+            cold_command[cold_command.index('-autoboot_script')+1]=str(root/'tools/noki6210_security_input.lua')
+            cold_command[cold_command.index('-seconds_to_run')+1]='37'
+            cold_retry={
+                'invocation_id':str(uuid.uuid4()),'run_directory':str(cold),'command':cold_command,
+                'source_card_sha256':hashlib.sha256(checkpoint).hexdigest(),
+                'script_sha256':hashlib.sha256((root/'tools/noki6210_security_input.lua').read_bytes()).hexdigest(),
+                'initial_storage':{str(path.relative_to(cold/'nvram')):hashlib.sha256(path.read_bytes()).hexdigest()
+                                   for path in sorted((cold/'nvram').rglob('*')) if path.is_file()},
+            }
+            (cold/'launch.json').write_text(json.dumps(cold_retry,indent=2)+'\n')
+            with (cold/'console.log').open('w') as output:
+                subprocess.run(cold_command,cwd=cold,stdout=output,stderr=subprocess.STDOUT,
+                               check=True,timeout=180,env=environment)
+            check_output((cold/'console.log').read_text(errors='replace'))
+            cold_text=events(cold/'error.log')
+            verify(cold_text,runtime=True,selftest=True)
+            check_cold(cold_text,initial,(cold/'nvram/npe3hle/sim_card').read_bytes())
+            check_registration(cold_text,(cold/'nvram/npe3hle/sim_card').read_bytes(),channel_header='1202')
+            with Image.open(cold/'snap/6210_security_then_menu.png') as frame:
+                check_frame(frame,SECURITY_MENU_SHA256,'cold Messages after PIN recovery')
+            if card.read_bytes()!=checkpoint:
+                raise ValueError('cold process changed its predecessor card')
         elif args.scenario in ('security','security-retry'):
             import re
             from tools.radio_call_lifecycle_common import require_ordered
@@ -753,10 +792,11 @@ def main():
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': machine, 'scenario': args.scenario, 'passed': True,
             'launch': launch,
+            **({'cold_pin_retry_recovery': cold_retry} if cold_retry else {}),
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
             'sim_profile': ('foreign two-digit-MNC preferred laboratory card' if args.scenario == 'foreign-registration' or args.foreign_cell
                             else 'visited-test-PLMN preferred laboratory card' if args.scenario == 'plmn-reject'
-                            else 'PIN-enabled laboratory card' if args.scenario in ('security','security-retry') or args.pin_enabled
+                            else 'PIN-enabled laboratory card' if args.scenario in ('security','security-retry','security-retry-cold') or args.pin_enabled
                             else 'default laboratory card'),
             'plmn_rejection': ({'cause': 11, 'visited_plmn': '001-02',
                                 'firmware_sim_update': True, 'cold_window_seconds': 30,
