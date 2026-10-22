@@ -219,7 +219,10 @@ Its complete card matches normal registration, not another handset's profile.
 Its separate `verify-6210-host-ussd-request` admits a network request after
 the same ready boundary, physically replies2 and requires the original
 ReturnResult, RR release, exact correlated JSON received by the host and six
-own-product UI frames. Pending-USSD restoration remains unqualified on NPE-3.
+own-product UI frames. `verify-6210-host-ussd-restore` additionally saves the
+unanswered editor, checks exact ARM/RAM restoration and requires one physical
+reply under the new host epoch, without another request admission or REGISTER.
+This restores the handset/session state, not an external network process.
 
 The USSD host contract preserves the BER-decoded DCS and packed payload. A
 `success` response carries `dcs` and hexadecimal `data`; `return_error` and

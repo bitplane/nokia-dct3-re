@@ -34,11 +34,12 @@ def check_card_authentication(text,card):
         raise ValueError('host USSD must authenticate PIN1 exactly once')
 
 
-def check_admission(text,terminal):
+def check_admission(text,terminal,restored=False):
     admissions=re.findall(r'incoming ussd id=(\d+) result=accepted t=([\d.]+)',text)
     if len(admissions)!=1 or admissions[0][0]!='1' or not 20<=float(admissions[0][1])<24:
         raise ValueError('host USSD must be admitted once after ready and before its capture')
-    if re.findall(r'incoming ussd state id=1 epoch=(\d+) phase=(\w+)',text)!=[('1','queued'),('1',terminal)]:
+    phases=[('1','queued'),('2','queued'),('2',terminal)] if restored else [('1','queued'),('1',terminal)]
+    if re.findall(r'incoming ussd state id=1 epoch=(\d+) phase=(\w+)',text)!=phases:
         raise ValueError('host USSD epoch or terminal phases differ')
 
 
@@ -67,9 +68,20 @@ def check_notification(text,card):
     ],'6210 host USSD notification')
 
 
-def check_request(text,card,console):
+def check_request(text,card,console,restored=False):
     check_card_authentication(text,card)
-    check_admission(text,'answered')
+    check_admission(text,'answered',restored=restored)
+    epoch=2 if restored else 1
+    if restored:
+        require_ordered(text,[
+            ('Answer',r'key=Left Softkey / Menu state=1 t=26\.'),
+            ('saved',r'6210_ussd_restore: saved t=28\.000000000'),
+            ('restored',r'6210_ussd_restore: architecture=pass'),
+            ('republished',r'incoming ussd state id=1 epoch=2 phase=queued'),
+            ('digit',r'key=Keypad 2 state=1 t=30\.'),
+        ],'6210 pending USSD restoration')
+        if text.count('6210_ussd_restore: architecture=pass')!=1:
+            raise ValueError('pending USSD requires exactly one verified architectural restore')
     items=[(8+i,'Keypad '+d) for i,d in enumerate('1234')]
     items += [(12,'Left Softkey / Menu'),(26,'Left Softkey / Menu'),(30,'Keypad 2'),
               (32,'Left Softkey / Menu'),(36,'End'),(38,'Left Softkey / Menu')]
@@ -77,12 +89,12 @@ def check_request(text,card,console):
     if text.count('gsm_ss: network_initiated operation=request ')!=1:
         raise ValueError('host USSD request is absent or duplicated')
     received=[json.loads(line.split(': ',1)[1]) for line in console.splitlines() if line.startswith('host_ussd_reply: ')]
-    expected={'type':'incoming_ussd_response','epoch':1,'request_id':1,'dcs':15,'data':'32','empty':False}
+    expected={'type':'incoming_ussd_response','epoch':epoch,'request_id':1,'dcs':15,'data':'32','empty':False}
     if (received!=[expected] or type(received[0].get('empty')) is not bool or
             any(type(received[0].get(key)) is not int for key in ('epoch','request_id','dcs'))):
         raise ValueError('host did not receive the exact correlated packed USSD reply')
     replies=re.findall(r'incoming ussd reply id=(\d+) epoch=(\d+) dcs=(\w+) data=(\w*) empty=(\d)',text)
-    if replies!=[('1','1','0f','32','0')]:
+    if replies!=[('1',str(epoch),'0f','32','0')]:
         raise ValueError('adapter USSD reply differs or is duplicated')
     require_ordered(text,[
         ('PIN1',r'SIM status ins=20 sw=9000'),
@@ -97,8 +109,8 @@ def check_request(text,card,console):
         ('ReturnResult',r'GSM service uplink sapi=0 pd=0b message=3a length=21 data=8b3a12a210020101300b02013c300604010f040132'),
         ('RELEASE COMPLETE',r'GSM service downlink kind=27 sapi=0 pd=0b message=2a length=2'),
         ('RR release',r'LAPDm service Channel Release acknowledged'),
-        ('host reply',r'incoming ussd reply id=1 epoch=1 dcs=0f data=32 empty=0'),
-        ('answered',r'incoming ussd state id=1 epoch=1 phase=answered'),
+        ('host reply',rf'incoming ussd reply id=1 epoch={epoch} dcs=0f data=32 empty=0'),
+        ('answered',rf'incoming ussd state id=1 epoch={epoch} phase=answered'),
         ('End',r'key=End state=1 t=36\.'),
         ('Menu',r'key=Left Softkey / Menu state=1 t=38\.'),
         ('complete',r'6210_host_ussd: complete=1 firmware_state_forcing=0'),

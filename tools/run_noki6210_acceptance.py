@@ -46,6 +46,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'fdn-retry-cold': ('npe3hle', 'fdn_enable_wrong', 66),
              'host-incoming-ussd': ('npe3hle', 'host_ussd_notify', 38),
              'host-incoming-ussd-request': ('npe3hle', 'host_ussd_request', 44),
+             'host-incoming-ussd-restore': ('npe3hle', 'host_ussd_restore', 44),
              'toolkit': ('npe3hle', 'toolkit_input', 40),
              'toolkit-interactive': ('npe3hle', 'toolkit_interactive', 65),
              'toolkit-menu': ('npe3hle', 'toolkit_menu', 75),
@@ -70,7 +71,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
 TOOLKIT_PROFILES = {'toolkit': 1, 'toolkit-interactive': 3, 'toolkit-menu': 4,
                     'toolkit-sms': 5, 'toolkit-call': 6, 'toolkit-call-decline': 6}
 FDN_SCENARIOS=frozenset(('fdn-observe','fdn-enable','fdn-cycle','fdn-retry-cold'))
-HOST_USSD_SCENARIOS=frozenset(('host-incoming-ussd','host-incoming-ussd-request'))
+HOST_USSD_SCENARIOS=frozenset(('host-incoming-ussd','host-incoming-ussd-request','host-incoming-ussd-restore'))
 PIN_SCENARIOS=frozenset(('security','security-retry','security-retry-cold',
                          'security-block-cold','security-block','pin2-change','pin2-change-cold','pin2-retry-cold','pin2-reject')) | FDN_SCENARIOS | HOST_USSD_SCENARIOS
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
@@ -433,6 +434,9 @@ def main():
                 'host-incoming-ussd-request': ('run_host_incoming_ussd_gate', [
                     '--text','Choose 2','--request','--expected-reply','2',
                     '--ready-marker','6210_host_ussd: ready']),
+                'host-incoming-ussd-restore': ('run_host_incoming_ussd_gate', [
+                    '--text','Choose 2','--request','--expected-reply','2','--require-restore',
+                    '--ready-marker','6210_host_ussd: ready']),
             }[args.scenario]
             host_command = [sys.executable, str(root / f'tools/{runner}.py'),
                             '--port', str(args.port), '--cwd', str(run)] + options + ['--'] + command
@@ -732,8 +736,11 @@ def main():
                                               forbidden=forbidden, previous=retained)
         elif args.scenario in HOST_USSD_SCENARIOS:
             from tools.noki6210_host_ussd_check import check_notification,check_request,check_frames as check_ussd_frames
-            if args.scenario=='host-incoming-ussd-request':
-                check_request(text,(run/'nvram/npe3hle/sim_card').read_bytes(),(run/'console.log').read_text(errors='replace'))
+            if args.scenario in ('host-incoming-ussd-request','host-incoming-ussd-restore'):
+                restored=args.scenario=='host-incoming-ussd-restore'
+                check_request(text,(run/'nvram/npe3hle/sim_card').read_bytes(),(run/'console.log').read_text(errors='replace'),restored=restored)
+                if restored and not (run/'sta/npe3hle/npe3_ussd_pending.sta').is_file():
+                    raise ValueError('pending USSD save artifact is absent')
                 check_ussd_frames(run/'snap',request=True)
             else:
                 check_notification(text,(run/'nvram/npe3hle/sim_card').read_bytes())

@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_host_ussd_pending_editor_restore", "owner": "npe3_host_services", "status": "satisfied",
+      "predicate": "6210 restores an unanswered host USSD editor exactly and returns its physical reply under a new host epoch",
+      "current": "Own-PMM research-HLE run authenticates PIN1 and admits one request at20s. Answer26 opens the blank editor, save28/load restores exact time, captured ARM registers and backed-RAM checksum. The adapter republishes queued under epoch2 without another admission or network REGISTER. Physical2 at30 and Send32 return the exact21-byte ReturnResult, release RR and deliver one correlated host JSON response with epoch2/request1/DCS15/data32/empty=false. All six ordinary request frames, exact contacts, complete card and save artifact checks pass. Capture tmp/npe3-host-ussd-restore-banked. No native speech, external network-process restoration or arbitrary snapshot-timing claim.",
+      "evidence": ["docs/6210_bringup.md", "tools/noki6210_host_ussd_restore.lua", "tools/noki6210_host_ussd_notify.lua", "tools/noki6210_host_ussd_check.py", "tools/test_noki6210_host_ussd_check.py", "tools/run_noki6210_acceptance.py", "tools/run_host_incoming_ussd_gate.py", "gates.json"]
+    },
+    {
       "id": "npe3_host_network_ussd_physical_reply", "owner": "npe3_host_services", "status": "satisfied",
       "predicate": "6210 physically answers one host-originated USSD request and returns the exact correlated packed reply to the host after RR release",
       "current": "Fresh own-PMM research-HLE NPE-3 authenticates PIN1, registers on ARFCN35 and admits request1/epoch1 at idle-ready20s. Choose2 opens Service reply; Answer26 directly opens the numeric editor, physical2 at30 and Send32 yield the exact21-byte ReturnResult carrying DCS0f/data32. RR release precedes adapter reply and answered state. The external runner records exactly one received JSON reply with matching typed identity, DCS15, data32 and empty=false; missing/mutated/duplicate host evidence is rejected independently of adapter logs. Six reviewed prompt/editor/entered/Done/idle/Menu frames, exact contacts/order and complete registered-card checks pass. Capture tmp/npe3-host-ussd-request-banked. Notification regression also passes. No empty-reply/pending-restore/multi-turn/native-speech promotion.",

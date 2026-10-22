@@ -1495,8 +1495,19 @@ idle and Messages. Exact contacts, single admission/request, response and
 release ordering, host JSON types/identity/data and complete expected card
 bytes pass. Capture: `tmp/npe3-host-ussd-request-banked`. The ordinary
 notification gate independently passes after the shared fixture/checker changes.
-These are HLE supplementary-service contracts. Empty reply, pending-USSD
-restoration, multi-turn dialogue, native DSP and speech remain unqualified.
+`make verify-6210-host-ussd-restore` saves the unanswered blank editor at28s,
+loads it after one second and checks exact emulated time, all captured ARM
+registers and the complete backed-RAM checksum. The original single request
+is republished as queued under host epoch2; physical2/Send then returns the
+same exact payload once under epoch2. No second admission or network REGISTER
+is permitted. RR release, host-received JSON, all six frame hashes and the
+complete registered card match the ordinary request contract. The save file
+must exist. Capture: `tmp/npe3-host-ussd-restore-banked`.
+
+These are HLE supplementary-service contracts. Empty reply, multi-turn
+dialogue, native DSP and speech remain unqualified. This pending-editor test
+does not establish external network process restoration or arbitrary snapshot
+timing; the adapter deliberately gives the restored handset a new epoch.
 
 Dismissal is not an empty-reply proof on this product. In bounded 42-second
 captures of the same host `Choose 2` request, Answer26 followed by End30

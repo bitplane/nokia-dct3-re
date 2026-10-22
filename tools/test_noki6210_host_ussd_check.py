@@ -63,6 +63,30 @@ def request_fixture():
 
 
 class HostNotificationTests(unittest.TestCase):
+    def test_pending_editor_restores_under_new_host_epoch(self):
+        text,card,console=request_fixture()
+        text=text.replace('epoch=1 phase=answered','epoch=2 phase=answered').replace(
+            'reply id=1 epoch=1','reply id=1 epoch=2')
+        marker='6210_host_ussd_input: key=Keypad 2 state=1 t=30.'
+        boundary=('6210_ussd_restore: saved t=28.000000000 pc=0000001c ram=02f11025\n'
+                  '6210_ussd_restore: architecture=pass\n'
+                  'incoming ussd state id=1 epoch=2 phase=queued\n')
+        text=text.replace(marker,boundary+marker)
+        console=console.replace('"epoch": 1','"epoch": 2')
+        check_request(text,card,console,restored=True)
+        for old,new in (('architecture=pass','architecture=fail'),
+                        ('epoch=2 phase=queued','epoch=1 phase=queued'),
+                        ('reply id=1 epoch=2','reply id=1 epoch=1'),
+                        ('saved t=28.000000000','saved t=31.000000000')):
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_request(text.replace(old,new),card,console,restored=True)
+        with self.assertRaises(ValueError):
+            check_request(text,card,console.replace('"epoch": 2','"epoch": 1'),restored=True)
+
+    def test_ordinary_request_cannot_stand_in_for_restoration(self):
+        with self.assertRaises(ValueError):
+            check_request(*request_fixture(),restored=True)
+
     def test_interactive_request_returns_exact_host_reply(self):
         check_request(*request_fixture())
 

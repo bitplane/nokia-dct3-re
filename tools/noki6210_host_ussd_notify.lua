@@ -28,6 +28,10 @@ local runner=coroutine.create(function()
     for _,action in ipairs(_G.npe3_host_ussd_actions or {{26,'Right Softkey / C'},{30,'Left Softkey / Menu'}}) do
         press(action[2],action[1])
     end
+    if _G.npe3_host_ussd_after_actions then
+        _G.npe3_host_ussd_after_actions()
+        return
+    end
     assert(emu.wait((_G.npe3_host_ussd_finish or 35)-machine.time:as_double()))
     machine:logerror('6210_host_ussd: complete=1 firmware_state_forcing=0\n')
 end)
