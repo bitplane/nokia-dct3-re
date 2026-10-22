@@ -38,9 +38,10 @@ class StagedBoundaryTest(unittest.TestCase):
     def test_reviewed_boundary(self):
         check(self.fixture())
 
-    def test_publication_requires_retained_idle_pc(self):
+    def test_publication_requires_owned_post_store_window(self):
+        check(self.fixture().replace('pc=0f64','pc=0f65'))
         with self.assertRaises(ValueError):
-            check(self.fixture().replace('pc=0f64','pc=0f65'))
+            check(self.fixture().replace('pc=0f64','pc=0f66'))
 
     def test_runtime_requires_own_uploads_and_exclusive_handoff(self):
         runtime = self.fixture().replace('observation_halt pc=2c75 ownership_retained=1',

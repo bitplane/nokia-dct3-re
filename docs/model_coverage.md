@@ -908,7 +908,12 @@ CHV selectors, physical contacts and11 stage frames pass.
 `verify-6250-wrong-puk-recovery` separately proves one wrong PUK's durable
 10->9 retry loss without installing its proposed PIN, cold correct-PUK
 recovery and cold new-PIN authentication across four processes and15 exact
-frames. Permanent loss and PIN2/PUK2 remain outside this qualification.
+frames. `verify-6250-permanent-puk-loss` independently consumes all ten PUK1
+allowances after physical PIN1 exhaustion, preserves the complete card through
+twelve cold processes and validates48 own-product frames. The final card stays
+at zero allowances with no credential APDU or service attempt from the tested
+physical sequence; its actual UI is SIM blocked/unlabelled numeric entry, not
+an inherited sibling rejection screen. PIN2/PUK2 remain outside this qualification.
 
 `verify-6250-ussd` separately establishes the physical USSD exchange and reviewed
 NHM-3 result/idle frames on its declared derived-PMM research comparison. The

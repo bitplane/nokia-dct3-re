@@ -16079,6 +16079,13 @@
                  "arguments": ["$(RUN_DIR)", "--puk-recovery", "--wrong-puk-first", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-permanent-puk-loss",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki6250_pin_retry_cold.py",
+                 "arguments": ["$(RUN_DIR)", "--puk-recovery", "--exhaust-puk", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6250-pin-host-incoming-call",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",

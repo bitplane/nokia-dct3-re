@@ -649,6 +649,37 @@ path-specific image separately; both require the same later registered idle
 and Messages frames. One wrong PUK and its durable retry loss are qualified,
 not PUK exhaustion or permanent rejection.
 
+`make verify-6250-permanent-puk-loss` physically exhausts PIN1, then consumes
+all ten PUK1 allowances in separate cold processes and tests the resulting
+card in a twelfth process. Each failed UNBLOCK preserves the stored PIN1234,
+PIN2/PUK2 and every unrelated card byte, consuming exactly one PUK1 attempt.
+The first nine return9804; the tenth returns9840 with PIN1/PUK1 allowances0/0.
+All eleven transitions are complete-card comparisons with inherited NVRAM,
+not synthesized blocked-card inputs. No failed phase registers.
+
+The final cold process retains the entire zero-allowance card. Its screen says
+SIM blocked, not SIM card rejected. A delayed credential-shaped physical input
+sequence enters an unlabelled numeric context, never the qualified PUK/new-PIN
+editors, and produces no VERIFY/UNBLOCK, registration or outgoing call. End
+returns to SIM blocked. This is the observed bounded refusal of that input
+sequence, not a claim that every possible UI path is disabled. Fixture filenames
+`new_pin`/`confirm` describe capture stages, not semantic ownership in this phase.
+The tenth failed transaction's early frame still shows masked new-PIN confirmation;
+its9840 status and the separate cold card/UI checks establish permanent loss.
+
+All48 frame hashes, exact contacts/selectors/result ordering, complete card
+transitions, launch provenance, native-upload/initial-record checks, console
+health and unchanged predecessor artifacts pass. Capture:
+`tmp/nhm3-permanent-puk-banked`. That capture was explicitly resumed after
+checker corrections: completed phases were revalidated, not re-entered or
+replaced. `--resume` requires matching commands, executable/script hashes,
+unique launch IDs, complete predecessor-storage hashes and the retained
+initial-card hash before rerunning every protocol/card/frame check; missing
+phases alone launch new MAME processes. Ordinary named gates still require a
+new directory. Raw MMIO remains in each error.log but is excluded from the
+security checker's query text; protocol, native boundary and error lines remain.
+No PIN2/PUK2, factory-provisioning or native-speech support is implied.
+
 Run `noki6250` with private working/NVRAM/config directories, the acquired
 product ROMs, `-noreadconfig -log -video none -sound none -nothrottle`,
 `-autoboot_delay 0 -seconds_to_run 9` and
@@ -669,17 +700,18 @@ flags have already fallen to zero at the observer's half-second snapshot.
 The isolated `nhm3verify` core fixture consumes this product's 232 sparse
 flash blocks (stride `20`, final two words `ffff`) and stops honestly at
 peripheral read `002d`, PC `0f9f`. Explicit COBBA and PROM-version
-sensitivity fixtures complete at `0f64`, with computed fingerprint
+sensitivity fixtures publish before the `0f64/0f65` idle/branch loop, with computed fingerprint
 `c62d430c` and PMST `ffa8`. These inputs are comparisons, not measured
 6250 silicon identity or an accepted phone self-test result.
 
-The live staged observer samples the retained IDLE1 PC at `0f64`, not its
-following branch at `0f65`. The hash-pinned upload has publication words
+The live staged observer samples the published result periodically, rather
+than synchronously at its store. Independent cold runs observe either IDLE1
+at `0f64` or its following branch at `0f65`. The hash-pinned upload has publication words
 `7cf8/0801/ff87` at `0f61..0f63`, IDLE1 `f4e1` at `0f64` and branch
-`f073/0f64` at `0f65..0f66`. Fresh ordinary slow-PIN and wrong-PIN recovery
-runs reproduce the same `0000/0006/0006/0006` publication at `0f64` after
-the core's retained-idle implementation. The live acceptance check pins that
-boundary; it does not broaden the allowed publication values or loader stream.
+`f073/0f64` at `0f65..0f66`. The live acceptance check permits only these two
+observed post-store instruction PCs, exactly one `0000/0006/0006/0006`
+publication and the unchanged complete loader stream. It rejects `0f66`,
+which is the branch operand, not another accepted instruction boundary.
 
 Reproduce with `tools/nsm3_verifier_check.py mame/mame
 roms/noki6250/6250-503mcuppmc.fls /tmp/6250-verifier --product 6250`.

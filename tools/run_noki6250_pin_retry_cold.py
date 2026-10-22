@@ -90,15 +90,19 @@ def check_puk_phase(text,initial,final,name,*,puk_attempts=10):
             raise ValueError('exhausted PIN must not register')
     elif name in ('puk','wrong-puk'):
         wrong=name=='wrong-puk'
-        if not wrong:
+        if wrong:
+            if not 1<=puk_attempts<=10:
+                raise ValueError('wrong PUK requires one of the ten live allowances')
+            blocked[3518]=puk_attempts
+        else:
             if puk_attempts not in (9,10):
                 raise ValueError('unsupported qualified pre-recovery PUK allowance')
             blocked[3518]=puk_attempts
         rejected=bytearray(blocked)
-        rejected[3518]=9
+        rejected[3518]=puk_attempts-1
         if initial!=bytes(blocked) or final!=(bytes(rejected) if wrong else bytes(rotated)):
             raise ValueError('PUK recovery did not preserve unrelated fields or install the new PIN')
-        expected=[(0x9804,0,9)] if wrong else [(0x9000,3,10)]
+        expected=[(0x9840 if puk_attempts==1 else 0x9804,0,puk_attempts-1)] if wrong else [(0x9000,3,10)]
         if statuses(text,0x20) or statuses(text,0x2c)!=expected:
             raise ValueError('PUK phase requires its exact UNBLOCK result/allowance and no VERIFY')
         items=[(8+i,'Keypad '+str(9 if wrong else i+1)) for i in range(8)]+[(16,'Left Softkey / Menu')]
@@ -111,7 +115,7 @@ def check_puk_phase(text,initial,final,name,*,puk_attempts=10):
         if re.findall(r'header cla=a0 ins=2c p1=00 p2=(\w\w) p3=10',text)!=['00']:
             raise ValueError('PUK recovery must address UNBLOCK CHV1 exactly once')
         ordered=[('confirm',r'6250_puk_input: key=Left Softkey / Menu state=1 t=32\.'),
-                 ('result',rf'SIM status ins=2c sw={"9804" if wrong else "9000"}')]
+                 ('result',rf'SIM status ins=2c sw={("9840" if puk_attempts==1 else "9804") if wrong else "9000"}')]
         if wrong:
             if 'LAPDm Location Updating Accept acknowledged' in text:
                 raise ValueError('wrong PUK must not register')
@@ -120,6 +124,25 @@ def check_puk_phase(text,initial,final,name,*,puk_attempts=10):
             ordered += [('registered',r'LAPDm Location Updating Accept acknowledged'),
                         ('Menu',r'6250_puk_input: key=Left Softkey / Menu state=1 t=52\.'),
                         ('complete',r'6250_puk_input: complete=1 firmware_state_forcing=0')]
+    elif name=='permanent':
+        blocked[3518]=0
+        if initial!=bytes(blocked) or final!=bytes(blocked):
+            raise ValueError('permanently rejected cold card must remain completely unchanged')
+        if statuses(text,0x20) or statuses(text,0x2c):
+            raise ValueError('permanent rejection must not attempt more credentials')
+        if any(token in text for token in ('LAPDm Location Updating Accept acknowledged',
+                                          'GSM outgoing request','gsm_mm: cm_service_request')):
+            raise ValueError('permanent credential input must not start registration or a call')
+        items=[(10+i,'Keypad 9') for i in range(8)]+[(18,'Left Softkey / Menu')]
+        for group in (0,1):
+            items += [(22+group*8+i,'Keypad '+str(digit)) for i,digit in enumerate((2,4,6,8))]
+            items.append((26+group*8,'Left Softkey / Menu'))
+        items.append((38,'End'))
+        contacts(text,'6250_puk_input',items)
+        selectors=[]
+        ordered=[('first physical input',r'6250_puk_input: key=Keypad 9 state=1 t=10\.'),
+                 ('End',r'6250_puk_input: key=End state=1 t=38\.'),
+                 ('complete',r'6250_puk_input: permanent_complete=1 firmware_state_forcing=0')]
     elif name=='reauth':
         if initial!=bytes(rotated) or final!=bytes(rotated):
             raise ValueError('cold reauthentication did not retain the entire rotated card')
@@ -153,7 +176,7 @@ PUK_FRAMES={
 }
 
 
-def check_puk_frames(phase,name,*,after_wrong=False):
+def check_puk_frames(phase,name,*,after_wrong=False,remaining=9):
     if name=='blocked':
         for index in (1,2,3):
             check_rgb_frame(phase/f'snap/6250_pin_exhaust_{index}.png',
@@ -165,12 +188,48 @@ def check_puk_frames(phase,name,*,after_wrong=False):
             check_rgb_frame(phase/f'snap/6250_puk_{frame}.png',digest)
     elif name=='wrong-puk':
         for frame in ('prompt','new_pin','confirm','result'):
-            digest=('2f5d94d74625776d287cd5d7d452943865fee0755ba56b93920a94b85408d029'
+            digest=(('caf22794fcff62acbed78a4c3ca92c745b64565b225ba3c6ea1c3390919b0be1' if remaining==0 else
+                     '2f5d94d74625776d287cd5d7d452943865fee0755ba56b93920a94b85408d029')
                     if frame=='result' else PUK_FRAMES[frame])
+            check_rgb_frame(phase/f'snap/6250_puk_{frame}.png',digest)
+    elif name=='permanent':
+        # These fixture-stage filenames are not PUK-editor ownership claims.
+        frames={'prompt':PUK_FRAMES['prompt'],
+                'new_pin':'75f87a3ff51cf07847b36fd97efb2f2ed8bf128147d96dd384b0ed38a97cc432',
+                'confirm':'a64e3f1a7c4f7206f56c8c668706edd6eccec4a46593ec2433b8fc8f58fb202e',
+                'result':'02d7b33102fdfc682bb0b863290d377ca584d294409d5e3d003abf7d8025a9a5',
+                'permanent_after':'2f5d94d74625776d287cd5d7d452943865fee0755ba56b93920a94b85408d029'}
+        for frame,digest in frames.items():
             check_rgb_frame(phase/f'snap/6250_puk_{frame}.png',digest)
     else:
         for frame in ('idle','menu'):
             check_rgb_frame(phase/f'snap/6250_pin_retry_{frame}.png',FRAMES[frame])
+
+
+def validate_retained_launch(recorded,expected,storage,seen):
+    if not isinstance(recorded,dict):
+        raise ValueError('retained launch provenance must be an object')
+    identity=recorded.get('invocation_id')
+    try:
+        uuid.UUID(identity)
+    except (ValueError,TypeError,AttributeError) as error:
+        raise ValueError('retained phase has no valid independent launch identity') from error
+    if identity in seen:
+        raise ValueError('retained phases reuse a launch identity')
+    for key in ('phase','command','mame_sha256','script_sha256'):
+        if recorded.get(key)!=expected[key]:
+            raise ValueError('retained launch provenance differs: '+key)
+    if recorded.get('initial_storage')!=storage:
+        raise ValueError('retained launch did not inherit complete predecessor storage')
+
+
+def read_evidence(path):
+    # Keep raw MMIO in the artifact, not in every protocol regex traversal.
+    # No acceptance checker consumes mad2_ledger records; preserve errors even
+    # if their line also happens to contain that diagnostic prefix.
+    with path.open(errors='replace') as stream:
+        return ''.join(line for line in stream if 'mad2_ledger:' not in line or
+                       any(token in line for token in ('ERROR','fatal','unimplemented','exception')))
 
 
 def main():
@@ -179,14 +238,18 @@ def main():
     parser.add_argument('--mame',type=Path)
     parser.add_argument('--puk-recovery',action='store_true',help='physically exhaust PIN1, recover with PUK and cold-authenticate the new PIN')
     parser.add_argument('--wrong-puk-first',action='store_true',help='reject one PUK in an independent cold process before recovery')
+    parser.add_argument('--exhaust-puk',action='store_true',help='physically consume every PUK1 allowance and test cold permanent rejection')
+    parser.add_argument('--resume',action='store_true',help='revalidate existing phase evidence and launch only missing phases; never replay completed credential input')
     args=parser.parse_args()
     if args.wrong_puk_first and not args.puk_recovery:
         parser.error('--wrong-puk-first requires --puk-recovery')
+    if args.exhaust_puk and (not args.puk_recovery or args.wrong_puk_first):
+        parser.error('--exhaust-puk requires --puk-recovery without --wrong-puk-first')
     root=Path(__file__).resolve().parents[1]
     binary=(args.mame or root/'mame/mame').resolve()
     try:
         run=args.run.resolve()
-        run.mkdir(parents=True,exist_ok=False)
+        run.mkdir(parents=True,exist_ok=args.resume)
         previous=None
         launches=[]
         phases=(
@@ -198,21 +261,30 @@ def main():
                     (True,'reauth','noki6250_pin_rotated.lua',40))
             if args.wrong_puk_first:
                 phases=(phases[0],(False,'wrong-puk','noki6250_puk_wrong.lua',40),*phases[1:])
+            if args.exhaust_puk:
+                phases=(phases[0],*((False,f'wrong-puk-{attempt:02d}','noki6250_puk_wrong.lua',40)
+                                   for attempt in range(1,11)),
+                        (False,'permanent','noki6250_puk_permanent.lua',46))
         for recovery,name,script,seconds in phases:
             phase=run/name
-            prepare_run(phase,root)
-            apply_coherent_config(phase/'cfg/nhm3hle.cfg',root/'fixtures/noki6250_host_gsm900/nhm3hle.cfg')
+            retained=phase.exists()
+            if retained and not args.resume:
+                raise ValueError('existing cold phase requires explicit --resume')
+            if not retained:
+                prepare_run(phase,root)
+                apply_coherent_config(phase/'cfg/nhm3hle.cfg',root/'fixtures/noki6250_host_gsm900/nhm3hle.cfg')
             card=phase/'nvram/nhm3hle/sim_card'
             if previous:
                 before=hashes(previous)
-                shutil.copytree(previous/'nvram',phase/'nvram',dirs_exist_ok=True)
-                if hashes(phase/'nvram')!=hashes(previous/'nvram'):
-                    raise ValueError('cold input storage differs from predecessor')
-            else:
+                if not retained:
+                    shutil.copytree(previous/'nvram',phase/'nvram',dirs_exist_ok=True)
+                    if hashes(phase/'nvram')!=hashes(previous/'nvram'):
+                        raise ValueError('cold input storage differs from predecessor')
+            elif not retained:
                 card.parent.mkdir(parents=True)
                 card.write_bytes(make_profile(True))
-            initial=card.read_bytes()
-            (phase/'initial_sim_card.bin').write_bytes(initial)
+            initial=(phase/'initial_sim_card.bin').read_bytes() if retained else card.read_bytes()
+            if not retained:(phase/'initial_sim_card.bin').write_bytes(initial)
             command=[str(binary),'nhm3hle','-rompath',f'{phase / "roms"};{root / "roms"}',
                      '-nvram_directory','nvram','-cfg_directory','cfg','-noreadconfig',
                      '-autoboot_script',str(root/'tools'/script),'-autoboot_delay','0',
@@ -222,20 +294,32 @@ def main():
                     'initial_storage':hashes(phase/'nvram'),
                     'mame_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),
                     'script_sha256':hashlib.sha256((root/'tools'/script).read_bytes()).hexdigest()}
-            (phase/'launch.json').write_text(json.dumps(launch,indent=2)+'\n')
-            environment=os.environ.copy()
-            environment.pop('NOKIA_DCT3_6250_PIN_ENTRY',None)
-            with (phase/'console.log').open('w') as output:
-                subprocess.run(command,cwd=phase,stdout=output,stderr=subprocess.STDOUT,
-                               check=True,timeout=180,env=environment)
+            if retained:
+                recorded=json.loads((phase/'launch.json').read_text())
+                expected_storage=(hashes(previous/'nvram') if previous else
+                                  {'nhm3hle/sim_card':hashlib.sha256(make_profile(True)).hexdigest()})
+                validate_retained_launch(recorded,launch,expected_storage,
+                                         {item['invocation_id'] for item in launches})
+                if recorded['initial_storage'].get('nhm3hle/sim_card')!=hashlib.sha256(initial).hexdigest():
+                    raise ValueError('retained initial card differs from launch provenance')
+                launch=recorded
+            else:
+                (phase/'launch.json').write_text(json.dumps(launch,indent=2)+'\n')
+                environment=os.environ.copy()
+                environment.pop('NOKIA_DCT3_6250_PIN_ENTRY',None)
+                with (phase/'console.log').open('w') as output:
+                    subprocess.run(command,cwd=phase,stdout=output,stderr=subprocess.STDOUT,
+                                   check=True,timeout=180,env=environment)
             verify_handset_health((phase/'console.log').read_text(errors='replace'))
-            text=(phase/'error.log').read_text(errors='replace')
+            text=read_evidence(phase/'error.log')
             uploads(text,runtime=True)
             check_initial_fixture(text)
             if args.puk_recovery:
-                check_puk_phase(text,initial,card.read_bytes(),name,
-                                puk_attempts=9 if name=='puk' and args.wrong_puk_first else 10)
-                check_puk_frames(phase,name,after_wrong=args.wrong_puk_first)
+                kind='wrong-puk' if name.startswith('wrong-puk-') else name
+                allowance=(11-int(name.rsplit('-',1)[1]) if name.startswith('wrong-puk-') else
+                           9 if name=='puk' and args.wrong_puk_first else 10)
+                check_puk_phase(text,initial,card.read_bytes(),kind,puk_attempts=allowance)
+                check_puk_frames(phase,kind,after_wrong=args.wrong_puk_first,remaining=allowance-1)
             else:
                 check_phase(text,initial,card.read_bytes(),recovery=recovery)
                 for frame in (('idle','menu') if recovery else ('error',)):
@@ -246,13 +330,16 @@ def main():
                 raise ValueError('cold run mutated predecessor artifacts')
             launches.append(launch)
             previous=phase
+            print(f'6250 cold phase {name}: '+('retained evidence verified' if retained else 'fresh process verified'),flush=True)
         (run/'acceptance.json').write_text(json.dumps({'phases':launches,
-            'lifecycle':('wrong-puk-recovery' if args.wrong_puk_first else
+            'lifecycle':('permanent-puk-loss' if args.exhaust_puk else
+                         'wrong-puk-recovery' if args.wrong_puk_first else
                          'puk-recovery' if args.puk_recovery else 'pin-retry'),
-            'research_hle':True,'native_speech':False},indent=2)+'\n')
+            'resumed':args.resume,'research_hle':True,'native_speech':False},indent=2)+'\n')
     except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as error:
         parser.exit(1,f'6250 cold PIN retry FAIL: {error}\n')
-    print(f'6250 '+('PIN exhaustion/PUK recovery/new-PIN cold authentication' if args.puk_recovery else
+    print(f'6250 '+('PUK1 exhaustion and cold permanent rejection' if args.exhaust_puk else
+                     'PIN exhaustion/PUK recovery/new-PIN cold authentication' if args.puk_recovery else
                      'durable wrong-PIN retry and cold physical recovery')+f' PASS: {run}')
 
 

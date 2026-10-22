@@ -1,5 +1,7 @@
 import unittest
-from tools.run_noki6250_pin_retry_cold import check_phase
+import tempfile
+from pathlib import Path
+from tools.run_noki6250_pin_retry_cold import check_phase,validate_retained_launch,read_evidence
 from tools.noki6250_pin_retry_check import registered_card
 from tools.make_sim_card_profile import make_profile
 
@@ -26,6 +28,37 @@ def fixture(recovery=False):
 
 
 class ColdPinRetryTest(unittest.TestCase):
+    def test_query_filter_keeps_protocol_and_failures_and_preserves_raw_artifact(self):
+        text=('mad2_ledger: R off=01 data=00\n'
+              'staged_dsp: publication word0=0000\n'
+              'SIM status ins=2c sw=9840\n'
+              '6250_puk_input: complete=1\n'
+              'mad2_ledger: fatal error\n'
+              '[LUA ERROR] mad2_ledger: observer failed\n')
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'error.log'
+            path.write_text(text)
+            self.assertEqual(read_evidence(path),text.split('\n',1)[1])
+            self.assertEqual(path.read_text(),text)
+
+    def test_retained_launch_requires_identity_inputs_and_complete_storage(self):
+        storage={'nhm3hle/sim_card':'card','nhm3hle/flash':'flash'}
+        launch={'phase':'wrong','invocation_id':'a8bd7b1c-dbe0-4579-a836-212743d51c10',
+                'command':['mame','nhm3hle'],'mame_sha256':'binary','script_sha256':'script',
+                'initial_storage':storage}
+        validate_retained_launch(launch,launch,storage,set())
+        for key,value in [('phase','other'),('command',['mame','other']),
+                          ('mame_sha256','other'),('script_sha256','other'),
+                          ('initial_storage',{'nhm3hle/sim_card':'card'}),
+                          ('invocation_id','not-a-uuid')]:
+            changed={**launch,key:value}
+            with self.subTest(key=key),self.assertRaises(ValueError):
+                validate_retained_launch(changed,launch,storage,set())
+        with self.assertRaises(ValueError):
+            validate_retained_launch(launch,launch,storage,{launch['invocation_id']})
+        with self.assertRaises(ValueError):
+            validate_retained_launch([],launch,storage,set())
+
     def test_independent_wrong_and_recovery_contracts(self):
         for recovery in (False,True):
             check_phase(*fixture(recovery),recovery=recovery)

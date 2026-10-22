@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nhm3_periodic_publication_observer_has_unique_pc",
+      "status": "disproven",
+      "hypothesis": "The live 6250 verifier publication observer always samples one unique instruction PC, so either0f64 or0f65 alone is a complete acceptance boundary",
+      "conclusion": "Independent own-PMM cold boots publish identical0000/0006/0006/0006 words with observerPC0f64 or0f65. The hash-pinned upload stores the publication at0f61..0f63, executes IDLE1 f4e1 at0f64 and contains its following branch f073/0f64 at0f65..0f66. check_execution is a periodic timer, not a synchronous publication-write tap. The fourth wrong-PUK cold boot in tmp/nhm3-permanent-puk-probe supplies the0f65 counterexample to exclusive0f64; ordinary slow-PIN and retry captures supply0f64. The checker therefore requires one exact payload and the full unchanged loader/ownership sequence, with PC restricted to the two observed post-store instruction boundaries. It rejects0f66, a branch operand. This is an observation-boundary correction, not evidence for changing DSP execution or firmware scheduling.",
+      "evidence": ["docs/6250_bringup.md", "tools/extract_nsm3_verifier.py", "driver/nokia_dsp_staged.cpp", "tools/noki6250_staged_check.py", "tools/test_noki6250_staged_check.py"]
+    },
+    {
       "id": "npe3_blank_ussd_editor_dismissal_is_immediate_empty_reply",
       "status": "disproven",
       "hypothesis": "Like the qualified NSB-7 fixture, dismissing the 6210's blank network-USSD reply editor immediately returns an empty USSD result to the host",

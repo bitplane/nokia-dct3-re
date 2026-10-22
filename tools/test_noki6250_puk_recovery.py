@@ -61,6 +61,16 @@ class PukRecoveryTest(unittest.TestCase):
         self.assertEqual(error.exception.code,2)
         self.assertIn('--wrong-puk-first requires --puk-recovery',output.getvalue())
 
+    def test_exhaustion_cli_rejects_ambiguous_phase_plans(self):
+        for arguments in (['--exhaust-puk'],
+                          ['--exhaust-puk','--puk-recovery','--wrong-puk-first']):
+            with self.subTest(arguments=arguments),patch('sys.argv',['runner','unused',*arguments]), \
+                    patch('sys.stderr',new_callable=io.StringIO) as output:
+                with self.assertRaises(SystemExit) as error:
+                    runner.main()
+            self.assertEqual(error.exception.code,2)
+            self.assertIn('--exhaust-puk requires --puk-recovery without --wrong-puk-first',output.getvalue())
+
     def test_wrong_puk_preserves_pin_and_decrements_only_puk_allowance(self):
         text,initial,_=fixture('puk')
         before,after=text.split('6250_puk_input: key=Left Softkey / Menu state=1 t=16.',1)
@@ -81,6 +91,44 @@ class PukRecoveryTest(unittest.TestCase):
             check_puk_phase(text.replace('puk=9/10','puk=10/10'),initial,bytes(failed),'wrong-puk')
         with self.assertRaises(ValueError):
             check_puk_phase(text+'\nLAPDm Location Updating Accept acknowledged',initial,bytes(failed),'wrong-puk')
+
+        for allowance in range(1,11):
+            source=bytearray(initial)
+            source[3518]=allowance
+            target=bytearray(source)
+            target[3518]-=1
+            outcome='9840' if allowance==1 else '9804'
+            trace=text.replace('sw=9804 chv=0/3 puk=9/10',
+                               f'sw={outcome} chv=0/3 puk={allowance-1}/10')
+            with self.subTest(allowance=allowance):
+                check_puk_phase(trace,bytes(source),bytes(target),'wrong-puk',puk_attempts=allowance)
+            with self.assertRaises(ValueError):
+                check_puk_phase(trace,bytes(source),bytes(source),'wrong-puk',puk_attempts=allowance)
+
+    def test_permanent_cold_rejection_refuses_physical_credential_patterns(self):
+        initial=bytearray(make_profile(True)+bytes.fromhex('00f110')+b'\xff'*43)
+        initial[3516]=initial[3518]=0
+        actions=[(10+i,'Keypad 9') for i in range(8)]+[(18,'Left Softkey / Menu')]
+        for group in (0,1):
+            actions += [(22+group*8+i,'Keypad '+str(digit)) for i,digit in enumerate((2,4,6,8))]
+            actions.append((26+group*8,'Left Softkey / Menu'))
+        actions.append((38,'End'))
+        lines=[]
+        for second,key in actions:
+            lines += [f'6250_puk_input: key={key} state=1 t={second}.000000000',
+                      f'6250_puk_input: key={key} state=0 t={second}.150000000']
+        lines.append('6250_puk_input: permanent_complete=1 firmware_state_forcing=0')
+        text='\n'.join(lines)
+        check_puk_phase(text,bytes(initial),bytes(initial),'permanent')
+        for event in ('SIM status ins=2c sw=9840 chv=0/3 puk=0/10 enabled=1',
+                      'SIM status ins=20 sw=9840 chv=0/3 puk=0/10 enabled=1',
+                      'LAPDm Location Updating Accept acknowledged','GSM outgoing request'):
+            with self.subTest(event=event),self.assertRaises(ValueError):
+                check_puk_phase(text+'\n'+event,bytes(initial),bytes(initial),'permanent')
+        changed=bytearray(initial)
+        changed[3518]=1
+        with self.assertRaises(ValueError):
+            check_puk_phase(text,bytes(initial),bytes(changed),'permanent')
 
     def test_recovery_inherits_nine_puk_attempts_and_resets_them(self):
         text,initial,final=fixture('puk')
