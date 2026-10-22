@@ -145,7 +145,9 @@ PIN2-protected12345->12346 edit and exact cold Details, preserving the rest of
 the card across five processes. `verify-6210-fdn-record-erase` additionally proves
 PIN2-protected erase cancellation, confirmed record deletion and cold empty-list
 display, with exact card preservation and22 frames across six processes.
-Rejected record writes and local listed/unlisted dialing restrictions remain
+`verify-6210-fdn-record-retry` additionally proves wrong-PIN2 Add denial with no
+UPDATE, durable retry loss, cold correct-PIN2 save and cold Details, preserving
+all unrelated card data. Local listed/unlisted dialing restrictions remain
 unqualified.
 
 `verify-5210-sim-pin-registration` independently proves early physical

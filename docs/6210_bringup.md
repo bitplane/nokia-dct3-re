@@ -1290,8 +1290,18 @@ or record write, and preserves the complete card. All six own-storage processes,
 22 reviewed frames, protocol/card transitions, registration and unchanged
 predecessors pass. Capture: `tmp/npe3-fdn-erase-banked`.
 
-Rejected record writes and local listed/unlisted dial-permission controls remain
-unqualified. These gates are not connected-call or native-radio/speech claims.
+`make verify-6210-fdn-record-retry` denies Number list/Add with wrong PIN2
+5675. VERIFY CHV2 returns9804 and Code error; no UPDATE is attempted. The entire
+FDN-On card remains unchanged except PIN2 retries3->2. A separate cold process
+must observe that exact two-attempt predecessor, authenticate5678, restore the
+allowance and save A/12345. Another cold process renders the saved number with
+the full card unchanged. All four processes,15 reviewed frames, complete-card
+checks, APDU order/results, registration and independent preserved predecessors
+pass. Capture: `tmp/npe3-fdn-record-retry-banked`. This is Add authorization
+denial, not a SIM UPDATE command being rejected after submission.
+
+Local listed/unlisted dial-permission controls remain unqualified. These gates
+are not connected-call or native-radio/speech claims.
 
 ## SIM Toolkit
 

@@ -7,5 +7,10 @@ _G.npe3_fdn_record_steps={{42,'Scroll Down'},{43,'Scroll Down'},
     {62,'Keypad 3'},{63,'Keypad 4'},{64,'Keypad 5'},
     {65,'Left Softkey / Menu'},{68,'Keypad 2'},{71,'Left Softkey / Menu'}}
 _G.npe3_fdn_record_finish=78
+if _G.npe3_fdn_write_wrong then
+    _G.npe3_fdn_record_steps[9]={56,'Keypad 5'}
+    while #_G.npe3_fdn_record_steps>10 do table.remove(_G.npe3_fdn_record_steps) end
+    _G.npe3_fdn_record_finish=64
+end
 local directory=assert(debug.getinfo(1,'S').source:match('^@(.*/)'))
 dofile(directory..'noki6210_fdn_input.lua')
