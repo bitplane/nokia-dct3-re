@@ -42,6 +42,7 @@ local input=coroutine.create(function()
                 _G.nsb7_toolkit_decline and 'call_decline' or 'call_accept'})
         end
         for _,step in ipairs(steps) do
+            if _G.nsb7_toolkit_menu_hold and step[3]=='menu_select' then return end
             press(step[1],step[2],step[3])
             assert(emu.wait(step[1]+1-machine.time:as_double()))
             machine.screens[':screen']:snapshot('nsb7_toolkit_'..step[3]..'.png')

@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_authenticated_toolkit_menu_restoration",
+      "owner": "nsb7_sim_toolkit", "status": "satisfied",
+      "predicate": "An open NSB-7 Toolkit menu restores exact architecture and replays a physically selected envelope identically with unchanged persistent card",
+      "current": "Own PIN/phone-code/retained-location startup and four-command Toolkit/menu installation precede save85.25s. Reference/restored intervals each physically select0.5s later and contain one d30702020181100101/9000 exchange. All37 ARM/banked registers, RAM checksum, exact time and three-second SIM command/body/status, RTC/control and radio replay match. End90 follows restored replay and reaches exact13:49 idle. Twelve exact frames, own flash validity and unchanged complete card pass. No firmware-state forcing, native DSP/RF/speech or host-dialog restoration claim.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_toolkit_menu_state.lua", "tools/nsb7_state_roundtrip.lua", "tools/nsb7_state_check.py", "tools/nsb7_toolkit_state_check.py", "tools/test_nsb7_toolkit_state_check.py", "fixtures/nsb7_toolkit_menu/nsb7hle.cfg"]
+    },
+    {
       "id": "nsb7_authenticated_toolkit_call_consent",
       "owner": "nsb7_sim_toolkit", "status": "satisfied",
       "predicate": "NSB-7 Toolkit SET UP CALL starts GSM only after physical consent and a matched physical Cancel emits rejection without any network call",

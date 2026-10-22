@@ -20,7 +20,7 @@ machine implicitly.
 | SIM Toolkit | Phase-2+ nine-byte TERMINAL PROFILE; DISPLAY TEXT, GET INKEY, GET INPUT, SET UP MENU, menu-driven SEND SHORT MESSAGE and SET UP CALL accept/Cancel. Exact physical/protocol/UI acceptance; non-SMS cases preserve the full card, SMS permits only its exact EF_SMSS reference update. |
 | PCS laboratory network | Acquisition, BCCH, Location Updating/EF_LOCI, background measurements, addressed paging, physical incoming/outgoing CC/RR signaling and SMS delivery/read/delete/cancel/Reply. |
 | Authenticated composition | Physical PIN before fresh/cold registration, calls, SMS and phonebook; a long wrong-PIN control remains unregistered. |
-| Restoration | Exact ARM/banked registers, RAM/time, protocol replay and pixels at idle, connected call and active SMS boundaries, with physical continuation. |
+| Restoration | Exact ARM/banked registers, RAM/time, protocol replay and pixels at idle, connected call, active SMS and open Toolkit-menu boundaries, with physical continuation. |
 | External host | Independent incoming SMS/read and outgoing Reply decisions; incoming/outgoing call signaling from clean idle; connected-call restoration republishes a new epoch and rejects stale commands. |
 
 All provisioning is own-derived or explicitly synthetic external card data;
@@ -2519,4 +2519,27 @@ or native resident DSP execution. No driver/device behavior changed.
   roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-call-v2 --call
 .venv/bin/python tools/nsb7_toolkit_check.py \
   roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-call-decline --call-decline
+```
+
+### Open-menu restoration
+
+`nsb7_toolkit_menu_state.lua` holds the same four-command card's installed
+menu open after physical Select84, then saves at85.25s with no held contact.
+A bounded physical-action callback presses Select0.5s after both reference
+and restored starts. Each three-second interval contains exactly one
+`d30702020181100101` envelope accepted with9000. Full SIM command/body/
+status, CCONT RTC/control and radio records are identical, as are all37
+exported ARM/banked registers, RAM checksum and emulated time.
+
+Physical End90 after restored replay returns to exact13:49 idle. Twelve
+exact frames include the existing authenticated input/menu captures, both
+post-selection replay frames and final idle. The full card is unchanged and
+the own flash journal remains valid. This validates stateful card/firmware
+menu composition, not merely a screenshot match or host-dialog restoration.
+The shared architecture checker is also used by the existing call/SMS gates;
+the replay callback is absent from ordinary fixtures.
+
+```sh
+.venv/bin/python tools/nsb7_toolkit_state_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-menu-state
 ```

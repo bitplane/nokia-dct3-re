@@ -13,15 +13,7 @@ from tools.nsb7_menu_check import FRAMES
 from tools.radio_state_roundtrip import verify_roundtrip
 
 
-def check(text, call=False, sms=False, incoming_call=False, card=None, pin=False, host=False):
-    if host and not ((call or incoming_call) and pin):
-        raise ValueError('host-call restoration requires call state and pre-save PIN authentication')
-    if pin:
-        from tools.nsb7_pin_services_check import check_authentication
-        check_authentication(text.split('nsb7_state: event=saved', 1)[0])
-    if sum((bool(call), bool(sms), bool(incoming_call))) > 1:
-        raise ValueError('choose one state scenario')
-    scenario = 'incoming_call' if incoming_call else 'call' if call else 'sms' if sms else 'idle'
+def check_architecture(text,scenario,tokens):
     if f'state_roundtrip: result=pass scenario=nsb7_{scenario} ' not in text:
         raise ValueError('state scenario marker differs')
     if '[LUA ERROR]' in text or 'nsb7_state: FAIL' in text:
@@ -34,12 +26,24 @@ def check(text, call=False, sms=False, incoming_call=False, card=None, pin=False
         raise ValueError('incomplete ARM/banked register inventory')
     if rows[0][1:] != rows[1][1:]:
         raise ValueError('CPU/RAM/time restoration differs')
+    verify_roundtrip(text, tokens, 'NSB-7 '+scenario)
+
+
+def check(text, call=False, sms=False, incoming_call=False, card=None, pin=False, host=False):
+    if host and not ((call or incoming_call) and pin):
+        raise ValueError('host-call restoration requires call state and pre-save PIN authentication')
+    if pin:
+        from tools.nsb7_pin_services_check import check_authentication
+        check_authentication(text.split('nsb7_state: event=saved', 1)[0])
+    if sum((bool(call), bool(sms), bool(incoming_call))) > 1:
+        raise ValueError('choose one state scenario')
+    scenario = 'incoming_call' if incoming_call else 'call' if call else 'sms' if sms else 'idle'
     tokens = ('TX packet', 'RX enqueue', 'GSM service', 'sim_device:')
     if call or incoming_call:
         tokens += ('radio_l1:',)
     if sms or (host and (call or incoming_call)):
         tokens += ('ccont_rtc:', 'ccont_analog:')
-    verify_roundtrip(text, tokens, 'NSB-7 '+scenario)
+    check_architecture(text,scenario,tokens)
     if incoming_call:
         from tools.nsb7_pin_services_check import check_incoming
         if card is None:

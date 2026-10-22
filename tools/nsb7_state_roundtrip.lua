@@ -3,7 +3,7 @@ _G.nsb7_security_continue=true
 local source=debug.getinfo(1,'S').source:sub(2)
 local directory=assert(source:match('^(.*[/\\])'))
 local scenario=_G.nsb7_state_scenario or 'idle'
-assert(scenario=='idle' or scenario=='call' or scenario=='sms' or scenario=='incoming_call')
+assert(scenario=='idle' or scenario=='call' or scenario=='sms' or scenario=='incoming_call' or scenario=='toolkit_menu')
 local observer=_G.nsb7_state_observer or (scenario=='call' and 'nsb7_outgoing_call_observe.lua' or
     scenario=='incoming_call' and 'nsb7_call_observe.lua' or 'nsb7_page_observe.lua')
 dofile(directory..observer)
@@ -22,6 +22,7 @@ end
 retained[#retained+1]=emu.add_machine_pre_save_notifier(function()
     saved=snapshot('saved')
     machine:logerror(string.format('state_replay: phase=reference event=begin t=%.9f\n',saved.time))
+    if _G.nsb7_state_replay_action then _G.nsb7_state_replay_action('reference') end
 end)
 retained[#retained+1]=emu.add_machine_post_load_notifier(function()
     local restored=snapshot('restored')
@@ -31,6 +32,7 @@ retained[#retained+1]=emu.add_machine_post_load_notifier(function()
     end
     machine:logerror(string.format('state_roundtrip: result=pass scenario=nsb7_%s requested_at=%.9f t=%.9f\n',scenario,saved.time,restored.time))
     machine:logerror(string.format('state_replay: phase=restored event=begin t=%.9f\n',restored.time))
+    if _G.nsb7_state_replay_action then _G.nsb7_state_replay_action('restored') end
     local replay=coroutine.create(function()
         assert(emu.wait(3))
         machine:logerror(string.format('state_replay: phase=restored event=end t=%.9f\n',machine.time:as_double()))
@@ -55,11 +57,12 @@ retained[#retained+1]=emu.add_machine_post_load_notifier(function()
             machine:exit()
             return
         end
-        if scenario=='call' or scenario=='incoming_call' then
+        if scenario=='call' or scenario=='incoming_call' or scenario=='toolkit_menu' then
             local incoming=scenario=='incoming_call'
             local end_time=_G.nsb7_state_end_time or (incoming and 27 or 40)
             local finish_time=_G.nsb7_state_finish_time or (incoming and 35 or 50)
-            local prefix=incoming and 'nsb7_call_input' or 'nsb7_outgoing_call_input'
+            local prefix=scenario=='toolkit_menu' and 'nsb7_toolkit_state_input' or
+                incoming and 'nsb7_call_input' or 'nsb7_outgoing_call_input'
             assert(emu.wait(end_time-machine.time:as_double()))
             local key
             for _,port in pairs(machine.ioport.ports) do key=key or port.fields['End'] end
@@ -71,7 +74,7 @@ retained[#retained+1]=emu.add_machine_post_load_notifier(function()
             machine:logerror(string.format('%s: key=End state=0 t=%.9f\n',prefix,machine.time:as_double()))
             assert(emu.wait(finish_time-machine.time:as_double()))
             machine.screens[':screen']:snapshot('nsb7_state_'..scenario..'_final.png')
-            if not incoming then
+            if scenario=='call' then
                 machine:logerror(string.format('nsb7_outgoing_call_done: t=%.9f\n',machine.time:as_double()))
             end
             complete=true
