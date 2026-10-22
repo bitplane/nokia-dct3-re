@@ -1232,14 +1232,12 @@ presses physical End and verifies release and resumed paging; the SMS fixture
 opens the delivered message and verifies its persistent read status and frame.
 These remain signaling/storage checks, not speech validation.
 
-All three restoration scenarios and the independent accessory cold-repeat
-comparison reproduce on source checkpoint `622c86c1`. Retained evidence is
-under `tmp/6210-{idle,call,sms}-after-native-bsp/` and
-`tmp/6210-cold-after-native-bsp/{first,second}/`, with per-run
-`acceptance.json` and raw logs. The cold comparison checks identical
-protocol, CCONT/flash/SIM storage and idle/Menu pixels; it is not a comparison
-of copies of one completed run. Each state scenario requires a distinct evidence directory; the
-runner refuses an existing directory rather than overwriting a previous run.
+Each state scenario requires a distinct evidence directory; the runner refuses
+an existing directory rather than overwriting a previous run. Per-run
+`acceptance.json` records the launch directory/identity, primary input hashes
+and initial persistent-storage inventory. The independent accessory cold-repeat
+gate requires separate launches as well as matching protocol, CCONT/flash/SIM
+storage and idle/Menu pixels; its provenance requirements are specified below.
 The acceptance covers
 exact saved architectural state/time, selected protocol replay and the
 scenario-specific physical-input continuation; it does not establish
@@ -1515,8 +1513,8 @@ and state `0f`, the reviewed registered unattached idle frame, and physical
 Menu decoding with the reviewed Messages frame. It does not inject firmware
 state, change the PMM, or synthesize an accessory event. The idle oracle was
 deliberately re-banked to remove the false attachment indication; menu and
-application oracles remain unchanged. All 15 product scenarios, including
-call/SMS save-load continuation, pass with this profile.
+application oracles remain unchanged. Call/SMS save-load continuation has
+independent acceptance under this profile.
 
 Two independently fresh accessory scenarios also reproduce identical selected
 protocol traces, CCONT/flash/SIM persisted bytes and registered-idle/Menu pixels.
@@ -1531,6 +1529,16 @@ the measured composition on this build, not cross-host determinism or native
 DSP behavior. Generate each input with `run_noki6210_acceptance.py --scenario
 accessory` in a distinct directory; copying a completed run is not a cold-boot
 experiment.
+
+Accepted runs bind their metadata to the canonical launch directory and a fresh
+UUID. The cold comparator requires distinct launch identities, identical SHA-256
+identities for the executable, MCU, PMM and top-level input script, and empty
+initial persistent storage. Copied results are rejected even when their output
+bytes match; editing only a copied directory field does not establish another
+launch. A changed primary input also prevents a repeatability claim. These
+records guard accidental artifact reuse, not cryptographic execution attestation
+or a hash closure over every transitive Lua dependency. Older captures without
+this metadata cannot satisfy the current cold-repeat gate; generate a fresh pair.
 
 Do not import the selector-7/EAD interpretation from the NSE-8 documentation:
 raising NPE-3 selector 7 does not remove `Headset`. The ADC audit observed

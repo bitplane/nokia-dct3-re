@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import shutil
+import uuid
 import xml.etree.ElementTree as ET
 
 if __package__ in (None, ''):
@@ -366,6 +367,18 @@ def main():
             }[args.scenario]
             host_command = [sys.executable, str(root / f'tools/{runner}.py'),
                             '--port', str(args.port), '--cwd', str(run)] + options + ['--'] + command
+        # Bind accepted artifacts to this launch, not merely to equal final bytes.
+        launch = {
+            'run_directory': str(run), 'invocation_id': str(uuid.uuid4()),
+            'input_sha256': {name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for name, path in {
+                    'mame': Path(command[0]), 'mcu': root/'roms/noki6210/6210_556c.fls',
+                    'pmm': root/'roms/noki6210/6210 virgin eeprom 005fa000.fls',
+                    'script': root/f'tools/noki6210_{script}.lua'}.items()},
+            'initial_storage': {str(path.relative_to(run/'nvram')):
+                hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in sorted((run/'nvram').rglob('*')) if path.is_file()},
+        }
         with (run / 'console.log').open('w') as output:
             environment = os.environ.copy()
             environment.pop('NOKIA_DCT3_6210_PIN_ENTRY', None)
@@ -729,6 +742,7 @@ def main():
                 check_host_sms_sent(frame)
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': machine, 'scenario': args.scenario, 'passed': True,
+            'launch': launch,
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
             'sim_profile': ('foreign two-digit-MNC preferred laboratory card' if args.scenario == 'foreign-registration' or args.foreign_cell
                             else 'visited-test-PLMN preferred laboratory card' if args.scenario == 'plmn-reject'
