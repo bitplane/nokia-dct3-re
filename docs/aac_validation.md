@@ -670,6 +670,19 @@ upstream producer, file-byte padding or live descriptor ownership. The
 input-16 reply path likewise copies fixed record `3708..3710`, not a region
 indexed by its argument. Neither operation supplies a missing EOF mechanism.
 
+The selected AAC table prefix`c686..c6a1` and three method spans now have a
+57-word source contract. Method12, called after each frame through`029f2b`,
+points to`023d5a`: two NOPs and FRET. It consumes the return stack but performs
+no payload/object access, sample production or input advancement; it cannot
+be a deferred-output drain. Method10's complete13-word body at`023ef8` only
+copies caller record word10 to object word1. Method9's first13 words at
+`023e64` publish object word1 back to record word10 and set record word1 to
+`0400`; its remaining metadata computation is not decoded by this contract.
+Neither a no-op post-frame call nor that one-field restoration is evidence
+for an EOF operation. The table prefix is not a proven total table bound,
+and other controls/upstream end-buffer ownership remain open; this result
+does not authorize changing object word1 or invoking reset to discard a tail.
+
 ### Declared Packet-Lookahead Control
 
 `tools/mu4_aac_lookahead_fixture.py` preserves all original 65339 bytes and

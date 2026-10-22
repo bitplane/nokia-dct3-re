@@ -48,6 +48,9 @@ from tools.mu4_context_contract import CATALOGUE_MEDIA_WITNESSES, decode_catalog
 from tools.mu4_context_contract import DECODER_SYNC_BASE, DECODER_SYNC_WITNESS, decode_decoder_sync, native_adts_sync_word
 from tools.mu4_context_contract import DECODER_MAPPED_ALU_BASE, DECODER_MAPPED_ALU_WITNESS, decode_decoder_mapped_alu
 from tools.mu4_context_contract import DECODER_DISPATCH_WITNESSES, decode_decoder_dispatch, reference_decoder_local_gate
+from tools.mu4_context_contract import (DECODER_METHOD_PREFIX_BASE,DECODER_METHOD_PREFIX,
+    DECODER_POST_FRAME_BASE,DECODER_POST_FRAME,decode_decoder_method_prefix,
+    DECODER_INFO_PREFIX_BASE,DECODER_INFO_PREFIX,DECODER_INFO_RESTORE_BASE,DECODER_INFO_RESTORE)
 from tools.mu4_context_contract import PCM_CONVERSION_WITNESSES, decode_pcm_conversion, reference_pcm_conversion
 from tools.mu4_context_contract import RECORDER_MAC_BASE, RECORDER_MAC_WITNESS, decode_recorder_memory_mac
 from tools.mu4_context_contract import FILTER_PARENT_WITNESSES, FILTER_CALL_SITES, decode_filter_parent
@@ -975,6 +978,29 @@ class ContextContractTest(unittest.TestCase):
             changed[address] ^= 1
             with self.subTest(address=address),self.assertRaises(ValueError):
                 decode_decoder_output(changed)
+
+    def test_decoder_method12_is_complete_noop_not_a_drain(self):
+        words={base+offset:value for base,witness in
+               ((DECODER_METHOD_PREFIX_BASE,DECODER_METHOD_PREFIX),
+                (DECODER_POST_FRAME_BASE,DECODER_POST_FRAME),
+                (DECODER_INFO_PREFIX_BASE,DECODER_INFO_PREFIX),
+                (DECODER_INFO_RESTORE_BASE,DECODER_INFO_RESTORE))
+               for offset,value in enumerate(witness)}
+        result=decode_decoder_method_prefix(words)
+        self.assertEqual(result['pinned_words'],57)
+        self.assertEqual(result['methods']['6'],'023d27')
+        self.assertEqual(result['methods']['11'],'023d41')
+        self.assertEqual(result['methods']['12'],'023d5a')
+        self.assertEqual(result['methods']['13'],'023d5d')
+        self.assertEqual(result['post_frame']['instructions'],['NOP','NOP','FRET'])
+        self.assertEqual(result['info_restore']['operations'],'object[1] <- record[10]')
+        for address in words:
+            changed=dict(words)
+            changed[address]^=1
+            with self.subTest(address=address),self.assertRaises(ValueError):
+                decode_decoder_method_prefix(changed)
+        del words[DECODER_POST_FRAME_BASE+2]
+        with self.assertRaises(ValueError):decode_decoder_method_prefix(words)
 
     def test_decoder_dispatch_pins_method_gate_and_quantifies_raw_census(self):
         words = {address:value for base,witness in DECODER_DISPATCH_WITNESSES

@@ -701,6 +701,42 @@ PLAYBACK_INFO_QUERY_WITNESSES = (
     (0x298b8,(0x8812,0xf845,0x98c4,0xf741,0x0182,0x8912,0xf495,0xf495,0x5782,0xf84d,0x98c4,0xf5e6,0xf020,0xffff)),
 )
 
+DECODER_METHOD_PREFIX_BASE = 0xc686
+DECODER_METHOD_PREFIX = (
+    0xc686,0,0,0,0,0,0,0,0,0,0,0,2,0x3d27,0,0,0,0,
+    2,0x3e64,2,0x3ef8,2,0x3d41,2,0x3d5a,2,0x3d5d)
+DECODER_POST_FRAME_BASE = 0x23d5a
+DECODER_POST_FRAME = (0xf495,0xf495,0xf4e4)
+DECODER_INFO_PREFIX_BASE = 0x23e64
+DECODER_INFO_PREFIX = (0x4a11,0xeefb,0xf495,0x7108,0x0014,0x8811,
+                      0x76e4,1,0x0400,0x10e1,1,0x80e4,10)
+DECODER_INFO_RESTORE_BASE = 0x23ef8
+DECODER_INFO_RESTORE = (0x4a11,0xeeff,0xf495,0x7104,0x0012,0x8811,
+                       0x10e2,10,0x80e1,1,0xee01,0x8a11,0xf4e4)
+
+
+def decode_decoder_method_prefix(words):
+    for base,witness in ((DECODER_METHOD_PREFIX_BASE,DECODER_METHOD_PREFIX),
+                         (DECODER_POST_FRAME_BASE,DECODER_POST_FRAME),
+                         (DECODER_INFO_PREFIX_BASE,DECODER_INFO_PREFIX),
+                         (DECODER_INFO_RESTORE_BASE,DECODER_INFO_RESTORE)):
+        if any(words.get(base+offset)!=value for offset,value in enumerate(witness)):
+            raise ValueError('decoder method prefix or post-frame no-op changed')
+    methods={str(index):f'{words[DECODER_METHOD_PREFIX_BASE+2*index]<<16 | words[DECODER_METHOD_PREFIX_BASE+2*index+1]:06x}'
+             for index in range(1,14)}
+    return dict(table='00c686',pinned_words=sum(map(len,(DECODER_METHOD_PREFIX,DECODER_POST_FRAME,
+                                                     DECODER_INFO_PREFIX,DECODER_INFO_RESTORE))),
+                methods=methods,post_frame=dict(method=12,entry='023d5a',
+                    instructions=['NOP','NOP','FRET'],
+                    data_effects='return-stack consumption only; no payload/object access, sample production or buffer advancement'),
+                info_prefix=dict(method=9,entry='023e64',object='A -> AR1',record='caller SP[0] -> AR4',
+                                 operations='record[1] <- 0400; record[10] <- object[1]',
+                                 scope='First13 words only; remaining rate/channel metadata path not decoded here'),
+                info_restore=dict(method=10,entry='023ef8',object='A -> AR1',record='caller SP[0] -> AR2',
+                                  operations='object[1] <- record[10]',
+                                  scope='Complete13-word body; no call, sample loop or EOF predicate'),
+                scope='Original table prefix through method13, complete methods10/12 and method9 prefix; not a proven table bound, all other method bodies or absence of all EOF/drain controls')
+
 PLAYBACK_BUFFER_REFRESH_BASE = 0x296ac
 PLAYBACK_BUFFER_REFRESH_WITNESS = (
     0x4a11,0x4a16,0x4a17,0xeefd,0x8816,0xf495,0xf495,0x71e6,
@@ -2451,6 +2487,7 @@ def contract(source):
     result['decoder_sync'] = decode_decoder_sync(rel_words)
     result['decoder_mapped_alu'] = decode_decoder_mapped_alu(rel_words)
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
+    result['decoder_method_prefix'] = decode_decoder_method_prefix(rel_words)
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
     result['recorder_stop_frontend'] = decode_recorder_stop_frontend(recorder_words)
