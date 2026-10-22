@@ -22,6 +22,7 @@ from tools.mu4_context_contract import PLAYBACK_CLEANUP_INGRESS, decode_playback
 from tools.mu4_context_contract import PLAYBACK_INPUT_UNITS_AA55, PLAYBACK_INPUT_UNITS_AA99, decode_playback_input_units
 from tools.mu4_context_contract import PLAYBACK_REFILL_CONTROL, decode_playback_refill_control, reference_refill_control
 from tools.mu4_context_contract import PLAYBACK_PENDING_CONTROL, decode_playback_pending_control
+from tools.mu4_context_contract import PLAYBACK_PENDING16_PRODUCERS,decode_playback_pending16_producers
 from tools.mu4_context_contract import PLAYBACK_REFILL_COMPLETION, decode_playback_refill_completion, reference_refill_completion
 from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
@@ -165,6 +166,42 @@ class ContextContractTest(unittest.TestCase):
                 decode_playback_pending_control(changed)
         with self.assertRaises(ValueError):
             decode_playback_pending_control({})
+
+    def pending16_images(self):
+        return dict(aa55={},aa22={},aa88={},aa99={base+offset:value
+            for base,witness in PLAYBACK_PENDING16_PRODUCERS.items()
+            for offset,value in enumerate(witness)})
+
+    def test_pending16_census_includes_internal_constant_producers(self):
+        images=self.pending16_images()
+        result=decode_playback_pending16_producers(images)
+        self.assertEqual(result['pinned_words'],141)
+        self.assertEqual(result['classification']['constant3'],['0208e5','020915'])
+        self.assertEqual(result['classification']['frame3_copy'],['020800'])
+        self.assertEqual(len(result['raw_literal_hits']['aa99']),6)
+        self.assertIn('unconditionally',result['routes']['1']['pending'])
+        self.assertIn('frame[3] == 0',result['routes']['3']['pending'])
+        self.assertIn('not a code/data split',result['scope'])
+
+    def test_pending16_census_rejects_each_changed_route_word(self):
+        images=self.pending16_images()
+        for address in images['aa99']:
+            changed={tag:dict(words) for tag,words in images.items()}
+            changed['aa99'][address]^=1
+            with self.subTest(address=address),self.assertRaises(ValueError):
+                decode_playback_pending16_producers(changed)
+
+    def test_pending16_census_requires_all_images_and_new_hit_review(self):
+        images=self.pending16_images()
+        for tag in images:
+            missing=dict(images)
+            del missing[tag]
+            with self.subTest(missing=tag),self.assertRaises(ValueError):
+                decode_playback_pending16_producers(missing)
+            changed={name:dict(words) for name,words in images.items()}
+            changed[tag][0x7000]=0x12fb
+            with self.subTest(added=tag),self.assertRaises(ValueError):
+                decode_playback_pending16_producers(changed)
 
     def test_input_units_pins_descriptor_and_word_reader_argument_flow(self):
         images = [{base+i: value for base, witness in spans.items()

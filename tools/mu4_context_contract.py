@@ -1714,6 +1714,55 @@ def decode_playback_pending_control(words):
                       'hook immutability, an EOF/drain command or an all-producer closure')
 
 
+PLAYBACK_PENDING16_PRODUCERS = {
+    0x20780:(0x7102,0x0011,0x10f8,0x0011,0xf010,0x0013,0xf846,0x07bc,
+        0x10f8,0x0011,0xf010,0x0013,0xf845,0x083c,0x10f8,0x0011,0xf010,4,
+        0xf846,0x07ab,0x10f8,0x0011,0xf010,4,0xf845,0x08ad,
+        0x7710,1,0xf4a9,0xf830,0x0907,0x7710,2,0xf4a9,0xf830,0x08f0,
+        0x7710,3,0xf4a9,0xf830,0x08ce,0xf073,0x0866),
+    0x208ce:(0xe800,0x80f8,0x15da,0x80f8,0x12f9,0xe900,0x1003,0xf844,
+        0x08d8,0xe901,0x81f8,0x15db,0x10f8,0x12fd,0xf845,0x08e8,
+        0x10f8,0x15db,0xf845,0x08e8,0x71f8,0x15de,0x15db,
+        0x76f8,0x12fb,3,0x6004,1,0xf820,0x093d,0x7717,1,0xf073,0x093d),
+    0x20907:(0xe800,0x80f8,0x15da,0x80f8,0x12f9,0x76f8,0x15db,1,
+        0x76f8,0x15e1,0,0x76f8,0x12fc,0,0x76f8,0x12fb,3,
+        0x76f8,0x15e0,0,0x7711,0xaa4c,0x76e1,2,0,0x76e1,3,0,
+        0x76e1,4,0,0x76e1,5,0,0x76e1,6,0,0x76f8,0xaa53,0x001e,
+        0x76f8,0x12fd,0,0x7602,0x8000,0x4818,0xf000,2,0x7600,1,
+        0xf982,0x929c,0x7602,0x8001),
+    0x2065e:(0x7211,0x12fb),
+    0x2072e:(0x76f8,0x12fb,0),
+    0x20800:(0x7103,0x12fb),
+    0x278ba:(0x76f8,0x12fb,0),
+}
+
+
+def decode_playback_pending16_producers(images):
+    if set(images)!= {'aa55','aa22','aa99','aa88'}:
+        raise ValueError('pending16 census requires all four original mapped images')
+    words=images['aa99']
+    for base,witness in PLAYBACK_PENDING16_PRODUCERS.items():
+        if any(words.get(base+offset)!=value for offset,value in enumerate(witness)):
+            raise ValueError('pending16 producer/dispatcher source changed')
+    expected={'aa55':[],'aa22':[],'aa88':[],
+              'aa99':[0x2065f,0x2072f,0x20801,0x208e6,0x20916,0x278bb]}
+    hits={tag:sorted(address for address,value in image.items() if value==0x12fb)
+          for tag,image in images.items()}
+    if hits!=expected:
+        raise ValueError('pending16 raw literal inventory changed; reclassify added/missing hits')
+    return dict(mapped_words_scanned={tag:len(image) for tag,image in images.items()},
+        raw_literal_hits={tag:[f'{address:06x}' for address in addresses] for tag,addresses in hits.items()},
+        pinned_words=sum(map(len,PLAYBACK_PENDING16_PRODUCERS.values())),
+        classification=dict(read=['02065e'],clear=['02072e','0278ba'],
+                            frame3_copy=['020800'],constant3=['0208e5','020915'],unclassified=[]),
+        routes={'1':dict(entry='020907',pending='12fb <- 3 unconditionally',
+                         other='clear12fc/15e0/15e1/12fd; initialize15db=1 and AA4C fields; publish reply'),
+                '3':dict(entry='0208ce',pending='12fb <- 3 iff 12fd != 0 and caller frame[3] == 0',
+                         other='clear15da/12f9; 15db <- (frame[3] == 0), then selected15de; frame[4]==1 sets AR7'),
+                '16':dict(entry='0207fa',pending='12fb <- caller frame[3]')},
+        scope='Raw mapped-word census plus pinned local routes; not a code/data split, computed-alias/bulk-writer closure, incoming command producer or runtime/EOF acceptance')
+
+
 def decode_playback_refill_control(words):
     for base, witness in PLAYBACK_REFILL_CONTROL.items():
         for offset, expected in enumerate(witness):
@@ -2582,6 +2631,8 @@ def contract(source):
     result['decoder_info_helpers'] = decode_decoder_info_helpers(rel_words,bootstrap_words)
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
+    result['playback_pending16_producers'] = decode_playback_pending16_producers(
+        dict(aa55=bootstrap_words,aa22=words,aa99=rel_words,aa88=recorder_words))
     result['recorder_stop_frontend'] = decode_recorder_stop_frontend(recorder_words)
     result['recorder_stop_mailbox'] = decode_recorder_stop_mailbox(recorder_words)
     result['recording_escape_store_prefix'] = decode_escape_store_prefix(recorder_words)

@@ -9401,8 +9401,10 @@ in caller frame words 0 and 1. This call copies fixed record `3708..3710`
 to reply frame words 5..13, not a parameter-indexed region. The acquired
 image's hook at `0291d3` is `NOP; NOP; FRET`; runtime replacement and live argument ownership are not
 closed. These source fragments distinguish a reply-copy control from an
-established EOF/drain operation. Next resolve the input-16 argument producer
-and original controller's end-of-input protocol before changing cleanup.
+established EOF/drain operation. The pending-argument producer census below
+maps additional internal routes; their live incoming-command ownership and
+the original controller's end-of-input protocol remain to be established
+before changing cleanup.
 Every pinned word has a mutation test; no message or state is injected.
 
 The verified vector target, not that frame setup, identifies the wrapper
@@ -9417,6 +9419,35 @@ computed aliases and runtime replacement are not closed. This is not evidence
 that a missing external HPI interrupt explains the final pending request.
 Those source fragments do not close live message ownership or the input-16
 argument's upstream producer.
+
+`playback_pending16_producers` scans all186290 mapped words: AA55=10760,
+AA22=51921, AA99=49843 and AA88=73766. All six exact`12fb` literals are in
+AA99, and each is classified:
+
+| Local site | Operation |
+| --- | --- |
+| `02065e` | Read pending argument into AR1 for the sender. |
+| `02072e` / `0278ba` | Clear pending argument. |
+| `020800` | Input16 handler copies incoming frame word3. |
+| `0208e5` | Input3 handler supplies constant3 if`12fd != 0` and frame word3 is zero. |
+| `020915` | Input1 handler supplies constant3 unconditionally. |
+
+The141-word contract includes the controller's input1/2/3/4 dispatch and
+both complete local constant-producing branches. Input1 clears`12fc`,
+`15e0`, `15e1` and`12fd`, sets`15db=1`, initializes AA4C fields and publishes
+a reply. Input3 clears`15da/12f9`; its zero frame-word3 selects`15db=1`,
+then the active`12fd` branch substitutes`15de` and sets pending3. Its
+frame-word4 equality test separately controls AR7.
+
+Thus pending input16 is not restricted to an externally supplied argument:
+the controller has two source-owned constant producers. The known
+first-session notification inventory below contains neither input1 nor3,
+so it does not exercise those routes. This is a raw mapped-word census plus
+pinned local instructions, not a code/data split, computed-alias/bulk-writer
+closure or runtime proof that either incoming command is issued at EOF.
+The acquired receiver hook remains a no-op; no command, argument, hook or
+pending state should be synthesized to turn this source finding into a
+playback-completion claim.
 
 The bounded native playback fixture now observes 402 complete software
 notification groups: publication `0292c1`, callback `020981`, vector
