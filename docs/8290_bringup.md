@@ -2227,6 +2227,46 @@ frame hashes, CP/RP acceptance or full-card expectations. They use the own
 unedited13:47:45 source. The separate authenticated SMS save/load repeat
 above retains its CP-ACK/RP-ACK boundary and now compares CCONT replay too.
 
+### Pending host SMS restoration
+
+`nsb7_host_sms_submit_state.lua` preserves the authenticated physical Reply
+while it waits for an external result. The unchanged host-SMS configuration
+delivers the source `hello` through the ordinary laboratory path; physical
+read/Reply submits one `A` to5551234. Firmware publishes CP-ACK and request1/
+epoch1 at47.53s. The host runner's `--require-restore` withholds its decision.
+
+Save48/load after0.5s restores all37 ARM/banked registers, PC/SP, RAM digest
+and emulated time exactly. No RP result may precede save. The pending request
+republishes unchanged under epoch2; explicit stale-epoch, wrong-ID and
+duplicate rejection controls surround exactly one accepted new-epoch decision.
+The adapter's stale-SMS trace records the supplied/current epochs without
+changing its existing rejection behavior. One original SMS-SUBMIT, ordered
+RP-ACK/CP closure/RR release and epoch2 ended are mandatory.
+
+Whole-card acceptance permits only the incoming record/read status and one
+exact EF_SMSS update after the original submission. Snapshots independently
+pin the saved/restored composer cursor phases,49s `Message sent`,74s composer,
+82s menu and88s registered idle. The screen cache can retain the cursor phase
+rendered before load; these are reviewed individual frames, not a framebuffer
+or external-event replay claim. Physical End78/Menu82/End85 must decode, and
+all retained RTC ticks, own flash journal, healthy console and actual `.sta`
+file are checked. No card contents or firmware state are forced.
+
+Prepare the same fresh own-source storage/configuration as ordinary outgoing
+host SMS. Use `run_host_sms_gate.py --port 18949 --user-data 41
+--user-data-length 1 --require-restore`, the isolated MAME command with matching
+HTTP port, script `../tools/nsb7_host_sms_submit_state.lua`, and94s guard:
+
+```sh
+.venv/bin/python tools/nsb7_host_sms_submit_state_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-host-sms-submit-state-epoch
+```
+
+The independent non-restored control uses `tmp/nsb7-host-sms-submit-control`,
+ordinary `nsb7_pin_sms_reply.lua` and no `--require-restore`. This qualifies
+pending host-decision restoration, not an external SMS carrier, SIP SMS,
+every CP/RP timeout phase or native DSP/RF behavior.
+
 ### Host SMS rejection and silence
 
 Fresh independent copies of the same PIN-enabled source qualify RP-ERROR and

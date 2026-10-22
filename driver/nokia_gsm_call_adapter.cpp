@@ -766,7 +766,13 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 	}
 	for (const auto &decision : sms_decisions)
 	{
-		const bool accepted = decision.epoch == m_transport_epoch.load() &&
+		const u32 epoch = m_transport_epoch.load();
+		if (decision.epoch != epoch)
+			LOGMASKED(LOG_CALL_ADAPTER,
+					"gsm_call_adapter: stale epoch=%u current=%u type=outgoing_sms_decision "
+					"id=%u result=rejected t=%.6f\n",
+					decision.epoch, epoch, decision.request_id, machine().time().as_double());
+		const bool accepted = decision.epoch == epoch &&
 				m_session->submit_outgoing_sms_decision(
 						decision.request_id, decision.outcome);
 		LOGMASKED(LOG_CALL_ADAPTER,
