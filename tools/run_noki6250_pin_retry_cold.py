@@ -66,7 +66,7 @@ def hashes(directory):
     return result
 
 
-def check_puk_phase(text,initial,final,name):
+def check_puk_phase(text,initial,final,name,*,puk_attempts=10):
     blocked=bytearray(make_profile(True)+bytes.fromhex('00f110')+b'\xff'*43)
     blocked[3516]=0
     rotated=bytearray(registered_card())
@@ -88,25 +88,38 @@ def check_puk_phase(text,initial,final,name):
         ordered.append(('complete',r'6250_pin_retry: wrong_only_complete=1 firmware_state_forcing=0'))
         if 'LAPDm Location Updating Accept acknowledged' in text:
             raise ValueError('exhausted PIN must not register')
-    elif name=='puk':
-        if initial!=bytes(blocked) or final!=bytes(rotated):
+    elif name in ('puk','wrong-puk'):
+        wrong=name=='wrong-puk'
+        if not wrong:
+            if puk_attempts not in (9,10):
+                raise ValueError('unsupported qualified pre-recovery PUK allowance')
+            blocked[3518]=puk_attempts
+        rejected=bytearray(blocked)
+        rejected[3518]=9
+        if initial!=bytes(blocked) or final!=(bytes(rejected) if wrong else bytes(rotated)):
             raise ValueError('PUK recovery did not preserve unrelated fields or install the new PIN')
-        if statuses(text,0x20) or statuses(text,0x2c)!=[(0x9000,3,10)]:
-            raise ValueError('PUK recovery requires one successful UNBLOCK and no VERIFY')
-        items=[(8+i,'Keypad '+str(i+1)) for i in range(8)]+[(16,'Left Softkey / Menu')]
+        expected=[(0x9804,0,9)] if wrong else [(0x9000,3,10)]
+        if statuses(text,0x20) or statuses(text,0x2c)!=expected:
+            raise ValueError('PUK phase requires its exact UNBLOCK result/allowance and no VERIFY')
+        items=[(8+i,'Keypad '+str(9 if wrong else i+1)) for i in range(8)]+[(16,'Left Softkey / Menu')]
         for group in (0,1):
             items += [(20+group*8+i,'Keypad '+str(digit)) for i,digit in enumerate((2,4,6,8))]
             items.append((24+group*8,'Left Softkey / Menu'))
-        items.append((52,'Left Softkey / Menu'))
+        if not wrong:items.append((52,'Left Softkey / Menu'))
         contacts(text,'6250_puk_input',items)
         selectors=[]
         if re.findall(r'header cla=a0 ins=2c p1=00 p2=(\w\w) p3=10',text)!=['00']:
             raise ValueError('PUK recovery must address UNBLOCK CHV1 exactly once')
         ordered=[('confirm',r'6250_puk_input: key=Left Softkey / Menu state=1 t=32\.'),
-                 ('unblocked',r'SIM status ins=2c sw=9000'),
-                 ('registered',r'LAPDm Location Updating Accept acknowledged'),
-                 ('Menu',r'6250_puk_input: key=Left Softkey / Menu state=1 t=52\.'),
-                 ('complete',r'6250_puk_input: complete=1 firmware_state_forcing=0')]
+                 ('result',rf'SIM status ins=2c sw={"9804" if wrong else "9000"}')]
+        if wrong:
+            if 'LAPDm Location Updating Accept acknowledged' in text:
+                raise ValueError('wrong PUK must not register')
+            ordered.append(('complete',r'6250_puk_input: wrong_complete=1 firmware_state_forcing=0'))
+        else:
+            ordered += [('registered',r'LAPDm Location Updating Accept acknowledged'),
+                        ('Menu',r'6250_puk_input: key=Left Softkey / Menu state=1 t=52\.'),
+                        ('complete',r'6250_puk_input: complete=1 firmware_state_forcing=0')]
     elif name=='reauth':
         if initial!=bytes(rotated) or final!=bytes(rotated):
             raise ValueError('cold reauthentication did not retain the entire rotated card')
@@ -125,7 +138,7 @@ def check_puk_phase(text,initial,final,name):
         raise ValueError('unknown PUK lifecycle phase')
     if re.findall(r'header cla=a0 ins=20 p1=00 p2=(\w\w) p3=08',text)!=selectors:
         raise ValueError('PUK lifecycle VERIFY selectors/count differ')
-    forbidden=(4,0x24,0x26,0x28,0x44,0xdc)+( () if name=='puk' else (0x2c,))
+    forbidden=(4,0x24,0x26,0x28,0x44,0xdc)+(() if name in ('puk','wrong-puk') else (0x2c,))
     if any(statuses(text,ins) for ins in forbidden):
         raise ValueError('PUK lifecycle changed unrelated card configuration or records')
     require_ordered(text,ordered,'6250 PUK lifecycle')
@@ -140,13 +153,20 @@ PUK_FRAMES={
 }
 
 
-def check_puk_frames(phase,name):
+def check_puk_frames(phase,name,*,after_wrong=False):
     if name=='blocked':
         for index in (1,2,3):
             check_rgb_frame(phase/f'snap/6250_pin_exhaust_{index}.png',
                             FRAMES['error'] if index<3 else PUK_FRAMES['prompt'])
     elif name=='puk':
         for frame,digest in PUK_FRAMES.items():
+            if after_wrong and frame=='result':
+                digest='b358d01988adefc3dfc51a5352b485d1802d16f9e5f600e047c723a43cf514a6'
+            check_rgb_frame(phase/f'snap/6250_puk_{frame}.png',digest)
+    elif name=='wrong-puk':
+        for frame in ('prompt','new_pin','confirm','result'):
+            digest=('2f5d94d74625776d287cd5d7d452943865fee0755ba56b93920a94b85408d029'
+                    if frame=='result' else PUK_FRAMES[frame])
             check_rgb_frame(phase/f'snap/6250_puk_{frame}.png',digest)
     else:
         for frame in ('idle','menu'):
@@ -158,7 +178,10 @@ def main():
     parser.add_argument('run',type=Path)
     parser.add_argument('--mame',type=Path)
     parser.add_argument('--puk-recovery',action='store_true',help='physically exhaust PIN1, recover with PUK and cold-authenticate the new PIN')
+    parser.add_argument('--wrong-puk-first',action='store_true',help='reject one PUK in an independent cold process before recovery')
     args=parser.parse_args()
+    if args.wrong_puk_first and not args.puk_recovery:
+        parser.error('--wrong-puk-first requires --puk-recovery')
     root=Path(__file__).resolve().parents[1]
     binary=(args.mame or root/'mame/mame').resolve()
     try:
@@ -173,6 +196,8 @@ def main():
             phases=((False,'blocked','noki6250_pin_exhaust.lua',36),
                     (True,'puk','noki6250_puk_recovery.lua',58),
                     (True,'reauth','noki6250_pin_rotated.lua',40))
+            if args.wrong_puk_first:
+                phases=(phases[0],(False,'wrong-puk','noki6250_puk_wrong.lua',40),*phases[1:])
         for recovery,name,script,seconds in phases:
             phase=run/name
             prepare_run(phase,root)
@@ -208,8 +233,9 @@ def main():
             uploads(text,runtime=True)
             check_initial_fixture(text)
             if args.puk_recovery:
-                check_puk_phase(text,initial,card.read_bytes(),name)
-                check_puk_frames(phase,name)
+                check_puk_phase(text,initial,card.read_bytes(),name,
+                                puk_attempts=9 if name=='puk' and args.wrong_puk_first else 10)
+                check_puk_frames(phase,name,after_wrong=args.wrong_puk_first)
             else:
                 check_phase(text,initial,card.read_bytes(),recovery=recovery)
                 for frame in (('idle','menu') if recovery else ('error',)):
@@ -221,7 +247,8 @@ def main():
             launches.append(launch)
             previous=phase
         (run/'acceptance.json').write_text(json.dumps({'phases':launches,
-            'lifecycle':'puk-recovery' if args.puk_recovery else 'pin-retry',
+            'lifecycle':('wrong-puk-recovery' if args.wrong_puk_first else
+                         'puk-recovery' if args.puk_recovery else 'pin-retry'),
             'research_hle':True,'native_speech':False},indent=2)+'\n')
     except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as error:
         parser.exit(1,f'6250 cold PIN retry FAIL: {error}\n')

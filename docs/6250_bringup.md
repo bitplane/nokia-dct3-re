@@ -632,6 +632,23 @@ includes a transient blank repaint; registered idle is checked separately at50s.
 Capture: `tmp/nhm3-puk-recovery-banked`. Wrong-PUK handling, PUK exhaustion,
 permanent card rejection and PIN2/PUK2 are not promoted by this gate.
 
+`make verify-6250-wrong-puk-recovery` adds an independent wrong-PUK process
+between exhaustion and recovery. Physical99999999 plus proposed PIN2468 and
+confirmation sends UNBLOCK CHV1, returns `9804` and renders SIM blocked. Only
+PUK1 retries change10->9: PIN1 stays blocked at zero, the stored PIN remains1234
+and every unrelated card byte is preserved. The following cold process must
+inherit that exact nine-attempt card, not a repaired default. Correct PUK/new
+PIN/confirmation resets allowances and registers; another cold process verifies
+the installed2468 with the complete card unchanged. All15 frames, input/APDU
+ordering, full-card transitions, own upload/initial-record and predecessor
+integrity checks pass. Capture: `tmp/nhm3-wrong-puk-banked`.
+
+The post-rejection recovery's34s result is exactly Code accepted, unlike the
+blank repaint at that time in the no-rejection control. The gate pins this
+path-specific image separately; both require the same later registered idle
+and Messages frames. One wrong PUK and its durable retry loss are qualified,
+not PUK exhaustion or permanent rejection.
+
 Run `noki6250` with private working/NVRAM/config directories, the acquired
 product ROMs, `-noreadconfig -log -video none -sound none -nothrottle`,
 `-autoboot_delay 0 -seconds_to_run 9` and

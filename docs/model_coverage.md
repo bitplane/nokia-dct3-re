@@ -904,8 +904,11 @@ inherited NVRAM, then physically restores retries and registered menus. All
 predecessor artifacts remain unchanged. `verify-6250-puk-recovery` adds physical
 PIN1 exhaustion, cold PUK/new-PIN/confirmation and a third-process new-PIN
 authentication with preserved-location registration. Exact card transitions,
-CHV selectors, physical contacts and11 stage frames pass; wrong-PUK/permanent
-loss and PIN2/PUK2 remain outside this qualification.
+CHV selectors, physical contacts and11 stage frames pass.
+`verify-6250-wrong-puk-recovery` separately proves one wrong PUK's durable
+10->9 retry loss without installing its proposed PIN, cold correct-PUK
+recovery and cold new-PIN authentication across four processes and15 exact
+frames. Permanent loss and PIN2/PUK2 remain outside this qualification.
 
 `verify-6250-ussd` separately establishes the physical USSD exchange and reviewed
 NHM-3 result/idle frames on its declared derived-PMM research comparison. The

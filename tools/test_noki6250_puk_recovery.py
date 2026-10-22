@@ -1,7 +1,11 @@
 import unittest
+import re
+import io
+from unittest.mock import patch
 from tools.make_sim_card_profile import make_profile
 from tools.noki6250_pin_retry_check import registered_card
 from tools.run_noki6250_pin_retry_cold import check_puk_phase
+from tools import run_noki6250_pin_retry_cold as runner
 
 
 def fixture(name):
@@ -49,6 +53,49 @@ def fixture(name):
 
 
 class PukRecoveryTest(unittest.TestCase):
+    def test_wrong_puk_cli_requires_full_recovery_lifecycle(self):
+        with patch('sys.argv',['runner','unused','--wrong-puk-first']), \
+                patch('sys.stderr',new_callable=io.StringIO) as output:
+            with self.assertRaises(SystemExit) as error:
+                runner.main()
+        self.assertEqual(error.exception.code,2)
+        self.assertIn('--wrong-puk-first requires --puk-recovery',output.getvalue())
+
+    def test_wrong_puk_preserves_pin_and_decrements_only_puk_allowance(self):
+        text,initial,_=fixture('puk')
+        before,after=text.split('6250_puk_input: key=Left Softkey / Menu state=1 t=16.',1)
+        before=re.sub(r'key=Keypad \d','key=Keypad 9',before)
+        text=before+'6250_puk_input: key=Left Softkey / Menu state=1 t=16.'+after
+        text=text.replace('sw=9000 chv=3/3 puk=10/10','sw=9804 chv=0/3 puk=9/10')
+        text=text.replace('LAPDm Location Updating Accept acknowledged','')
+        text=re.sub(r'6250_puk_input: key=Left Softkey / Menu state=[01] t=52\.[^\n]*\n','',text)
+        text=text.replace('6250_puk_input: complete=1','6250_puk_input: wrong_complete=1')
+        failed=bytearray(initial)
+        failed[3518]=9
+        check_puk_phase(text,initial,bytes(failed),'wrong-puk')
+        changed=bytearray(failed)
+        changed[3484:3492]=b'2468\xff\xff\xff\xff'
+        with self.assertRaises(ValueError):
+            check_puk_phase(text,initial,bytes(changed),'wrong-puk')
+        with self.assertRaises(ValueError):
+            check_puk_phase(text.replace('puk=9/10','puk=10/10'),initial,bytes(failed),'wrong-puk')
+        with self.assertRaises(ValueError):
+            check_puk_phase(text+'\nLAPDm Location Updating Accept acknowledged',initial,bytes(failed),'wrong-puk')
+
+    def test_recovery_inherits_nine_puk_attempts_and_resets_them(self):
+        text,initial,final=fixture('puk')
+        failed=bytearray(initial)
+        failed[3518]=9
+        check_puk_phase(text,bytes(failed),final,'puk',puk_attempts=9)
+        with self.assertRaises(ValueError):
+            check_puk_phase(text,initial,final,'puk',puk_attempts=9)
+        with self.assertRaises(ValueError):
+            check_puk_phase(text,bytes(failed),final,'puk')
+        changed=bytearray(final)
+        changed[3518]=9
+        with self.assertRaises(ValueError):
+            check_puk_phase(text,bytes(failed),bytes(changed),'puk',puk_attempts=9)
+
     def test_three_qualified_phase_contracts(self):
         for name in ('blocked','puk','reauth'):
             check_puk_phase(*fixture(name),name)

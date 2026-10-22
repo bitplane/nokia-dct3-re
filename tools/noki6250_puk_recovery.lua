@@ -18,7 +18,7 @@ end
 local runner=coroutine.create(function()
     assert(emu.wait(7))
     machine.screens[':screen']:snapshot('6250_puk_prompt.png')
-    for index=1,8 do press('Keypad '..index,7+index) end
+    for index=1,8 do press('Keypad '..(_G.nhm3_wrong_puk and 9 or index),7+index) end
     press('Left Softkey / Menu',16)
     assert(emu.wait(2))
     machine.screens[':screen']:snapshot('6250_puk_new_pin.png')
@@ -27,6 +27,10 @@ local runner=coroutine.create(function()
         press('Left Softkey / Menu',24+group*8)
         assert(emu.wait(2))
         machine.screens[':screen']:snapshot(group==0 and '6250_puk_confirm.png' or '6250_puk_result.png')
+    end
+    if _G.nhm3_wrong_puk then
+        machine:logerror('6250_puk_input: wrong_complete=1 firmware_state_forcing=0\n')
+        return
     end
     assert(emu.wait(50-machine.time:as_double()))
     machine.screens[':screen']:snapshot('6250_puk_idle.png')
