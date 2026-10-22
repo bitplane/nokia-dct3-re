@@ -303,12 +303,13 @@ The product's uploaded verifier/loaders have been executed and compared;
 they do not contain that mask routine. Runtime HLE is explicitly exclusive
 after suspension, not proof that the missing instructions are emulated.
 
-Speech command ownership is recovered, but the product PCM clock/framing
-and codec route are not. The available original-manual text preview loses
-numeric fields; checked public download links return HTML instead of the
-archive, and the alternate PDF host was inaccessible. These results do not
-justify donor bus settings. An intact product source or independently
-evidenced firmware contract is required to resume that work.
+Speech command ownership is recovered, but product PCM clock/framing and
+selected codec controls remain unproved. The complete own service archive is
+acquired; source-pinned font-aware extraction and rendered-page review recover
+its analogue audio levels and gain conditions. Those are not a speech serial
+format or a command-to-codec mapping. The documented 13 MHz RFI clock and 8-bit
+Tx/12-bit Rx I/Q samples must not be repurposed as a speech PCM profile. Product-owned
+initialization or explicit speech timing/control evidence is still required.
 
 Reproducible research acceptance covers physical menus/calculator, SIM
 phonebook save and cold retrieval, fresh/preserved network registration,
@@ -1637,11 +1638,38 @@ SHA256 `be8080882c1014d885d5dd504167e59bd919d14fe3c1898081d458d3e9059414`.
 Use the public download-start flow for each file ID `26151..26156`, retaining
 its session cookie and following the advertised download link; the initial
 HTML is a landing page, not the archive. This retires the retrieval gap,
-not the audio contract gap. Font extraction remains damaged, and the reviewed
-material does not establish PCM clock rates, sample framing, codec gains or
-the selected internal microphone. Product-owned initialization or explicit
-timing documentation is still required before enabling speech cadence;
-do not substitute a sibling handset's configuration.
+not the audio contract gap. Ordinary extraction misinterprets the subset Nokia
+fonts and drops numeric control-code glyphs. The source-pinned manual instrument
+below recovers their reviewed ASCII mapping; this is not missing PDF content.
+
+```sh
+/usr/bin/python3 tools/nhm3_manual_text.py \
+  'roms/research/nhm3/service-manual/System ModuleOriginal.pdf' --json
+```
+
+The optional system-Python `pikepdf` parser reads actual font Differences and
+content operators, including nested Form resources and graphics-state font
+restores. Only the pinned source's Nokia `/G3`..`/G97` glyph numbers map to ASCII
+by adding 29 (`/G20` is `1`);
+ordinary fonts are not shifted and unreviewed glyphs remain explicit. The
+50-page capture contains 2,297 text-show spans and 64,123 glyphs, with 120 unmapped
+symbols/extended/Type3 glyphs. Output is content-order text, not table layout;
+it neither OCRs images nor proves coverage of image-only labels. Evidence:
+`tmp/nhm3-manual-text.json`; decoded values were checked against rendered
+printed pages 15 and 21, not inferred from concatenated table cells.
+
+Printed page 21's Audio Connections table specifies EAR N/P outputs at 14 mV
+typical and 220 mV maximum, with maximum volume specified at codec gain -11 dB. System
+connector pins 6/7 feed MIC2P/N; their inputs are 2 mV typical and 12.5 mV maximum,
+with the maximum specified at 1 kHz/0 dBm0 and input gain 32 dB. These are documented
+analogue test conditions, not recovered programmable gain codes or a selected
+internal-microphone route.
+
+Printed page 15 separately labels a five-pin **Serial RF Interface**: RFIclk
+is 13 MHz, and Idata/Qdata transfer 8-bit Tx/12-bit Rx I/Q samples. That table is
+not speech PCM framing evidence. Product-owned speech initialization or explicit
+timing/control documentation remains required before enabling speech cadence;
+no sibling configuration is substituted and no emulation setting changes here.
 
 The same archive's `troubleOriginal.pdf` (Original 11/00, printed pages
 12–13; SHA256
