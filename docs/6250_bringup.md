@@ -586,7 +586,7 @@ parked DSP identity values are inherited from another product.
 
 ## Reproduction
 
-### SIM PIN rejection and recovery
+### SIM security
 
 `make verify-6250-pin-retry` cold-starts the declared own initial-record PMM
 comparison with an ordinary PIN-enabled synthetic SIM and coherent carrier19.
@@ -679,6 +679,24 @@ phases alone launch new MAME processes. Ordinary named gates still require a
 new directory. Raw MMIO remains in each error.log but is excluded from the
 security checker's query text; protocol, native boundary and error lines remain.
 No PIN2/PUK2, factory-provisioning or native-speech support is implied.
+
+`make verify-6250-pin2-change` independently qualifies the ordinary physical
+PIN2 change on the PIN-enabled, non-FDN card. After PIN1 authentication and
+coherent registration, the own English menu route is Settings4 -> Security
+settings5 -> Change access codes5 -> Change PIN2 code3. From the first Settings
+item Security needs four Down presses; five selects Restore factory settings,
+so the6210 sequence must not be copied verbatim. Exact contacts and eleven
+96x60 RGB frames pin the route, old/new/confirmation editors, PIN2 code changed,
+registered idle and Messages.
+
+Physical5678/new8765/confirmation sends exactly one successful CHANGE CHV2
+(`A0 24 00 02 10`) after the final confirmation, with no separate CHV2 VERIFY.
+The initial CHV1 VERIFY is independently required. Both CHV/PUK allowances stay
+3/10, and complete-card comparison permits only installed PIN2=8765 and the
+normal location update; PIN1 and all unrelated fields remain unchanged. Native
+upload/initial-record, console-health and coherent registration checks pass.
+Capture: `tmp/nhm3-pin2-change-banked`. This is not cold authentication of the
+installed PIN2, wrong-PIN2 handling, exhaustion or PUK2 recovery.
 
 Run `noki6250` with private working/NVRAM/config directories, the acquired
 product ROMs, `-noreadconfig -log -video none -sound none -nothrottle`,

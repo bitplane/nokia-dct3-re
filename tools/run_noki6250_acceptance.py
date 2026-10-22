@@ -216,7 +216,7 @@ def main():
     parser.add_argument("--mame", type=Path)
     parser.add_argument("--scenario", choices=("calculator", "ussd", "divert", "divert-lifecycle", "toolkit", "toolkit-interactive", "toolkit-menu", "toolkit-sms", "toolkit-call", "toolkit-call-decline", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
-                                              "phonebook", "registration", "coherent-registration", "slow-pin-registration", "pin-retry", "power-cycle", "accessory", "idle-state", "call-state", "sms-state", "divert-state",
+                                              "phonebook", "registration", "coherent-registration", "slow-pin-registration", "pin-retry", "pin2-change", "power-cycle", "accessory", "idle-state", "call-state", "sms-state", "divert-state",
                                               "host-incoming-call", "host-incoming-sms", "host-incoming-sms-text", "host-outgoing-sms",
                                               "host-rejected-sms", "host-silent-sms", "host-outgoing-call"),
                         default="calculator")
@@ -241,7 +241,7 @@ def main():
         if not mame.is_file():
             raise ValueError(f"missing MAME executable: {mame}")
         accessory_contract, audit_members = prepare_run(run, root)
-        if args.scenario in ('slow-pin-registration','pin-retry') or args.pin_enabled:
+        if args.scenario in ('slow-pin-registration','pin-retry','pin2-change') or args.pin_enabled:
             from tools.make_sim_card_profile import make_profile
             card = run / 'nvram/nhm3hle/sim_card'
             card.parent.mkdir(parents=True)
@@ -275,7 +275,7 @@ def main():
             ET.SubElement(inputs, "port", tag=":CALLHOST", type="CONFIG",
                           mask="1", defvalue="0", value="1")
             ET.ElementTree(config).write(config_path, encoding="utf-8", xml_declaration=True)
-        if args.scenario in ('coherent-registration', 'slow-pin-registration', 'pin-retry', 'power-cycle') or args.coherent_cell:
+        if args.scenario in ('coherent-registration', 'slow-pin-registration', 'pin-retry', 'pin2-change', 'power-cycle') or args.coherent_cell:
             apply_coherent_config(run / 'cfg/nhm3hle.cfg', root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg')
         if args.coherent_cell and args.scenario in ('idle-state', 'call-state', 'sms-state'):
             config_path = run / 'cfg/nhm3hle.cfg'
@@ -293,6 +293,8 @@ def main():
             script = 'noki6250_slow_pin_observe.lua'
         if args.scenario == 'pin-retry':
             script = 'noki6250_pin_retry.lua'
+        if args.scenario == 'pin2-change':
+            script = 'noki6250_pin2_change.lua'
         if args.scenario == "idle-state":
             script = "noki6250_state_idle.lua"
         if args.scenario == "call-state":
@@ -322,6 +324,8 @@ def main():
         if args.scenario == "host-silent-sms":
             script = "noki6250_sms_silence_input.lua"
         seconds = "50" if args.scenario in ("sms-reply", "host-outgoing-sms") else "35" if call or sms else "45"
+        if args.scenario=='pin2-change':
+            seconds='84'
         if args.scenario == 'toolkit-menu':
             seconds = '75'
         if args.scenario == 'toolkit-sms':
@@ -392,8 +396,8 @@ def main():
             "machine": "nhm3hle", "scenario": args.scenario, "command": command,
             "provisioning": "derived acquired initial-record PMM comparison",
             "audio": "not tested", "normal_machine_boot": "not tested",
-            "laboratory_carrier": 19 if args.scenario in ('coherent-registration', 'slow-pin-registration', 'pin-retry', 'power-cycle') or args.coherent_cell else None,
-            "slow_physical_pin": args.pin_enabled or args.scenario in ('slow-pin-registration','pin-retry'),
+            "laboratory_carrier": 19 if args.scenario in ('coherent-registration', 'slow-pin-registration', 'pin-retry', 'pin2-change', 'power-cycle') or args.coherent_cell else None,
+            "slow_physical_pin": args.pin_enabled or args.scenario in ('slow-pin-registration','pin-retry','pin2-change'),
             "shared_rom_audit_members": audit_members,
             "accessory_contract": accessory_contract,
             "host_command": host_command,
@@ -471,6 +475,8 @@ def main():
         elif args.scenario == 'coherent-registration':
             checker = [sys.executable, str(root / 'tools/noki6250_coherent_registration_check.py'),
                        str(run / 'error.log'), str(run / 'nvram/nhm3hle/sim_card')]
+        elif args.scenario=='pin2-change':
+            checker=[sys.executable,str(root/'tools/noki6250_pin2_change_check.py'),str(run)]
         elif args.scenario == 'pin-retry':
             checker = [sys.executable,str(root/'tools/noki6250_pin_retry_check.py'),str(run)]
         elif args.scenario == 'slow-pin-registration':

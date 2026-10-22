@@ -913,7 +913,11 @@ allowances after physical PIN1 exhaustion, preserves the complete card through
 twelve cold processes and validates48 own-product frames. The final card stays
 at zero allowances with no credential APDU or service attempt from the tested
 physical sequence; its actual UI is SIM blocked/unlabelled numeric entry, not
-an inherited sibling rejection screen. PIN2/PUK2 remain outside this qualification.
+an inherited sibling rejection screen. `verify-6250-pin2-change` separately
+proves ordinary physical5678->8765 CHANGE CHV2, unchanged allowances and exact
+complete-card preservation, with eleven own route/editor/result/idle/Menu
+frames. Its Settings security item needs four Down presses, not the6210's
+five. Cold new-PIN2 authentication, rejection/exhaustion and PUK2 remain unqualified.
 
 `verify-6250-ussd` separately establishes the physical USSD exchange and reviewed
 NHM-3 result/idle frames on its declared derived-PMM research comparison. The
