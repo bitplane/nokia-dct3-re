@@ -2,8 +2,10 @@
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 import struct
+import subprocess
 import sys
 
 from mu4_aac_abi_check import check_refill_input, rows
@@ -16,6 +18,28 @@ from noki5510_a00_inventory import uploaded_word_image
 INPUT_SHA = '3117cfade03058ffceaf8953727bf84e03ba9c98652cb14bd7523bda4dcb72a6'
 REFERENCE_SHA = 'a30567dea5f0869a8a1fa9ac04c3f97876d39671ae61acf11bf7ba41b69f048a'
 STOP = 'MU4 AAC wrapper returned without a new decoded block'
+
+
+def compare_host_pcm(raw, host, expected_host_samples):
+    """Fixed zero-offset diagnostic; never fit timing/gain or award conformance."""
+    if not raw or len(raw)%8 or len(host)!=expected_host_samples*4:
+        raise ValueError('native or host PCM extent differs')
+    native=struct.unpack(f'<{len(raw)//4}i',raw)[::2]
+    values=struct.unpack(f'<{len(host)//4}f',host)
+    if len(values)<len(native) or not all(math.isfinite(value) for value in values):
+        raise ValueError('short or nonfinite host PCM')
+    # Original argument-14 conversion maps raw/2^14 to s16 sample units.
+    errors=[sample/16384-values[index]*32768 for index,sample in enumerate(native)]
+    return dict(native_samples=len(native),host_samples=len(values),
+                compared_samples=len(errors),uncompared_host_tail=len(values)-len(native),
+                offset_samples=0,fitted_gain=False,fitted_offset=False,
+                raw_to_s16_divisor=16384,
+                rms_s16=math.sqrt(math.fsum(value*value for value in errors)/len(errors)),
+                maximum_s16=max(map(abs,errors)),
+                native_first_nonzero=next((i for i,value in enumerate(native) if value),None),
+                host_first_nonzero=next((i for i,value in enumerate(values) if value),None),
+                host_pcm_sha256=hashlib.sha256(host).hexdigest(),
+                conformance=False,iso_reference_alignment=False,handset_playback=False)
 
 
 def original_assets(encoded, reference, source):
@@ -125,6 +149,7 @@ def main():
     parser.add_argument('--input', type=Path, required=True)
     parser.add_argument('--reference', type=Path, required=True)
     parser.add_argument('--source-a00', type=Path, required=True)
+    parser.add_argument('--ffmpeg',help='optional independent zero-offset PCM diagnostic; not a conformance gate')
     args = parser.parse_args()
     try:
         encoded = args.input.read_bytes()
@@ -135,7 +160,16 @@ def main():
         result = check_stream((args.run/'error.log').read_text(),
             (args.run/'mu4_aac_abi_raw.s32le').read_bytes(),
             (args.run/'mu4_aac_abi_converted.s16le').read_bytes(), encoded)
-    except (OSError, ValueError, KeyError, TypeError) as error:
+        if args.ffmpeg:
+            command=[args.ffmpeg,'-v','error','-i',str(args.input),'-map','0:a:0',
+                     '-c:a','pcm_f32le','-f','f32le','pipe:1']
+            host=subprocess.run(command,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            version=subprocess.run([args.ffmpeg,'-version'],check=True,stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE).stdout.decode().splitlines()[0]
+            result['host_diagnostic']=compare_host_pcm(
+                (args.run/'mu4_aac_abi_raw.s32le').read_bytes(),host.stdout,343*1024)
+            result['host_diagnostic'].update(command=command,version=version)
+    except (OSError, ValueError, KeyError, TypeError,subprocess.SubprocessError) as error:
         parser.exit(1, f'ISO AL09 native probe: FAIL: {error}\n')
     print(json.dumps(result, indent=2))
 

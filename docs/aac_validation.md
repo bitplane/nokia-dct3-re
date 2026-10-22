@@ -149,6 +149,28 @@ conversion/dataflow result, not comparison against the ISO reference waveform.
 Alignment, applicable accuracy criteria, unquantized normalization and final
 packet handling remain open.
 
+The optional`--ffmpeg ffmpeg` diagnostic decodes the same pinned ADTS input
+to mono float PCM and compares the complete native prefix at **zero offset**,
+without fitted gain, lag search, silence removal or source changes. Original
+argument-14 conversion fixes raw-to-s16 scaling at1/16384; this comparison
+uses the first raw source before additional s16 quantization. With FFmpeg
+8.0.1-3ubuntu2, both independent native captures compare350208 samples with
+RMS0.8229531220323921 and maximum3.81201171875 in s16 units. FFmpeg emits
+351232 samples; its final1024 samples remain explicitly uncompared. The host
+PCM SHA256 is`6897eab6a00afead65511d8fa496e6006618420a5d016d7721256b1ee5f619e6`.
+Both outputs start with a full1024-sample zero block; their first nonzero
+indices are native1025/host1024. Thus the native startup silence is not unique
+to this caller, but its cause and alignment with the shorter ISO reference
+remain unproved. A zero-offset ISO-reference comparison is not aligned and
+must not be promoted to a conformance result.
+
+The MPEG-2-specific [2003 AAC conformance corrigendum,2.6.6](https://cdn.standards.iteh.ai/samples/37966/c71be35413b7498fa6124a389eee4a8c/ISO-IEC-13818-4-1998-Amd-1-1999-Cor-1-2003.pdf)
+also specifies the K-bit RMS/maximum procedure with default K16. This does not
+authorize applying those limits to a host-decoder comparison or selecting a
+lower K to fit the measured errors. Exact AL09 applicability, the normative
+reference alignment and complete-stream handling remain required. Host
+metrics are reported, not thresholded into a PASS.
+
 Place the unchanged container and ADTS file in a private `mu4aac/` ROM
 directory. From an isolated working directory, run the MAME binary with
 `mu4aac -bios isoal09stream -rompath PRIVATE_ROMS -video none -sound none
@@ -162,6 +184,10 @@ console output as `console.log`. Exit 3 must report exactly
   --reference roms/research/mpeg2-aac-conformance/al09_44.wav \
   --source-a00 roms/5510-mu4-reference/InitData_R060.a00
 ```
+
+Append`--ffmpeg ffmpeg` for the optional diagnostic; its JSON records the
+executable version, exact decode command, output identity and compared/tail
+extents. This does not change packet-acceptance or conformance status.
 
 ### MPEG-4 AL00 ABI prerequisites
 

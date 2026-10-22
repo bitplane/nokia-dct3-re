@@ -3,7 +3,7 @@ import unittest
 
 from mu4_context_contract import (MONO_OUTPUT_BASE, MONO_OUTPUT_WITNESS,
                                   decode_mono_output)
-from mu4_iso_aac_check import check_stream, original_assets
+from mu4_iso_aac_check import check_stream, original_assets,compare_host_pcm
 
 
 def fixture(calls=6):
@@ -43,6 +43,28 @@ def fixture(calls=6):
 
 
 class IsoAacCheckTest(unittest.TestCase):
+    def test_host_pcm_diagnostic_uses_first_source_and_no_fit(self):
+        raw=struct.pack('<6i',0,999,16384,999,-32768,999)
+        host=struct.pack('<4f',0,1/32768,-2/32768,0.25)
+        result=compare_host_pcm(raw,host,4)
+        self.assertEqual(0,result['rms_s16'])
+        self.assertEqual(0,result['maximum_s16'])
+        self.assertEqual(3,result['compared_samples'])
+        self.assertEqual(1,result['uncompared_host_tail'])
+        for field in ('conformance','iso_reference_alignment','handset_playback',
+                      'fitted_gain','fitted_offset'):
+            self.assertIs(result[field],False)
+        shifted=struct.pack('<4f',1/32768,0,-2/32768,0.25)
+        self.assertGreater(compare_host_pcm(raw,shifted,4)['rms_s16'],0)
+
+    def test_host_pcm_diagnostic_rejects_incomplete_and_nonfinite_samples(self):
+        raw=struct.pack('<4i',0,0,16384,0)
+        for native,host,count in ((b'',bytes(8),2),(raw[:-1],bytes(8),2),
+                                  (raw,bytes(4),2),(raw,bytes(4),1),
+                                  (raw,struct.pack('<2f',float('nan'),0),2),
+                                  (raw,struct.pack('<2f',0,float('inf')),2)):
+            with self.assertRaises(ValueError):compare_host_pcm(native,host,count)
+
     def test_packet_boundary_is_not_conformance_or_complete_stream(self):
         result = check_stream(*fixture(), calls=6)
         self.assertEqual(result['calls'], 6)
