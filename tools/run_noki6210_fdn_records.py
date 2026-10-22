@@ -13,7 +13,7 @@ from tools.noki6210_fdn_check import check as check_activation,check_frames as a
 from tools.noki6210_fdn_record_check import check,check_frames
 
 
-def run_chain(root,output,mame):
+def run_chain(root,output,mame,edit=False):
     output.mkdir(parents=True,exist_ok=False)
     source=output/'activated'
     with (output/'activation-launch.log').open('w') as console:
@@ -28,7 +28,10 @@ def run_chain(root,output,mame):
     activation_frames(source/'snap',0)
     ids=[first['launch']['invocation_id']]
     command=build_command(root,mame,'npe3hle','fdn_write',86)
-    for mode,script,seconds in (('write','fdn_write',86),('read','fdn_read',68)):
+    stages=[('write','fdn_write',86),('read','fdn_read',68)]
+    if edit:
+        stages += [('edit','fdn_edit',88),('edited-read','fdn_read',68)]
+    for mode,script,seconds in stages:
         target=output/mode
         before=(source/'nvram/npe3hle/sim_card').read_bytes()
         text,initial,launch=run_retained_security(source,target,command,
@@ -41,17 +44,19 @@ def run_chain(root,output,mame):
         check_frames(target/'snap',mode)
         check_registration(text,card,preserved_location=True,channel_header='1202')
         source=target
-    (output/'acceptance.json').write_text(json.dumps({'passed':True,'launches':ids,
-        'scope':'physical FDN activation, protected A/12345 save and cold Details; no dial-permission claim'},indent=2)+'\n')
+    (output/'acceptance.json').write_text(json.dumps({'passed':True,'launches':ids,'edited':edit,
+        'scope':('physical FDN activation, protected save/edit and cold Details' if edit else
+                 'physical FDN activation, protected save and cold Details')+'; no dial-permission claim'},indent=2)+'\n')
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory',type=Path)
     parser.add_argument('--mame',type=Path,default=Path('mame/mame'))
+    parser.add_argument('--edit',action='store_true',help='edit the saved number and cold-read it again')
     args=parser.parse_args()
     try:
-        run_chain(Path(__file__).resolve().parents[1],args.run_directory.resolve(),args.mame.resolve())
+        run_chain(Path(__file__).resolve().parents[1],args.run_directory.resolve(),args.mame.resolve(),args.edit)
     except (OSError,ValueError,subprocess.SubprocessError) as error:
         print(f'6210 FDN records FAIL: {error}',file=sys.stderr)
         return 1

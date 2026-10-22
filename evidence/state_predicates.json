@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_fdn_record_edit_cold_details", "owner": "npe3_sim_storage", "status": "satisfied",
+      "predicate": "6210 physically edits a PIN2-protected FDN number and retrieves the replacement number after a cold restart",
+      "current": "Five own-PMM/coherent-cell processes activate FDN, save A/12345, cold-read it, physically edit to A/12346 and cold-read the edited entry. Edit asks for name before number, unlike Add. Successful PIN2 verification precedes one EF_FDN record1 UPDATE and confirming READ RECORD. Whole-card equality permits only the final digit's BCD nibble change; name, credentials, retries, validity and other records are preserved. Cold Details displays A/12346 with no PIN2 verification or write. All 20 frames, exact contacts/protocol/card checks, registration, independent launches and unchanged predecessors pass. Capture tmp/npe3-fdn-edit-banked. No erase/cancel/rejected-write/dial-permission/native-speech promotion.",
+      "evidence": ["docs/6210_bringup.md", "tools/noki6210_fdn_edit.lua", "tools/noki6210_fdn_read.lua", "tools/noki6210_fdn_record_check.py", "tools/test_noki6210_fdn_record_check.py", "tools/run_noki6210_fdn_records.py", "gates.json"]
+    },
+    {
       "id": "npe3_fdn_record_save_cold_details", "owner": "npe3_sim_storage", "status": "satisfied",
       "predicate": "6210 physically saves a PIN2-protected FDN record and retrieves its exact name/number after an own-storage cold restart",
       "current": "Three fresh own-PMM/coherent-cell processes activate FDN, physically Number list/Add A/12345 and cold Search/Details. The NPE-3 editor asks for number before name. Successful VERIFY CHV2 precedes the sole UPDATE RECORD A0DC010420 to EF_FDN record1 and its confirming READ RECORD; whole-card equality permits only the expected32 bytes. Cold read loads all ten records, performs no PIN2 verification or update and renders A/12345 with the complete saved card unchanged. All12 reviewed frames, exact contacts/selectors/order/statuses, registration, distinct launches and unchanged predecessors pass. Capture tmp/npe3-fdn-records-qualified. No edit/erase/cancel/rejected-write/dial-permission/native-speech promotion.",

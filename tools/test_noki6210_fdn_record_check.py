@@ -15,20 +15,21 @@ def fixture(mode):
                           'SIM status ins=44 sw=9000 chv=3/3 puk=10/10 enabled=1']
             lines += ['LAPDm Location Updating Accept acknowledged nr=1']
             lines += [f'header cla=a0 ins=b2 p1={i:02x} p2=04 p3=20 selected=6f3b' for i in range(1,11)]
-        if second==57 and mode=='write':
+        if (second==57 and mode=='write') or (second==61 and mode=='edit'):
             lines += ['header cla=a0 ins=20 p1=00 p2=02 p3=08',
                       'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1']
-        if second==71:
+        if (second==71 and mode=='write') or (second==73 and mode=='edit'):
             lines += ['header cla=a0 ins=dc p1=01 p2=04 p3=20 selected=6f3b',
                       'SIM status ins=dc sw=9000 chv=3/3 puk=10/10 enabled=1',
                       'header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3b']
     lines.append('6210_fdn_input: complete=1 firmware_state_forcing=0')
-    return '\n'.join(lines),expected_card(mode=='read'),expected_card(True)
+    return ('\n'.join(lines),expected_card(mode!='write',mode=='edited-read'),
+            expected_card(True,mode in ('edit','edited-read')))
 
 
 class FdnRecordTests(unittest.TestCase):
     def test_protected_write_and_cold_read(self):
-        for mode in ('write','read'):
+        for mode in ('write','read','edit','edited-read'):
             with self.subTest(mode=mode):
                 check(*fixture(mode),mode)
 
@@ -44,9 +45,9 @@ class FdnRecordTests(unittest.TestCase):
                 check(text.replace(old,new),initial,final,'write')
 
     def test_whole_source_and_result_are_checked(self):
-        for mode in ('write','read'):
+        for mode in ('write','read','edit','edited-read'):
             text,initial,final=fixture(mode)
-            for index in (0,1604,3484,3517,3575,3578,3596,3610):
+            for index in (0,1604,3484,3517,3575,3578,3596,3600,3610):
                 changed=bytearray(final)
                 changed[index]^=1
                 with self.subTest(mode=mode,index=index),self.assertRaises(ValueError):
@@ -60,6 +61,17 @@ class FdnRecordTests(unittest.TestCase):
                       'header cla=a0 ins=20 p1=00 p2=02 p3=08'):
             with self.subTest(extra=extra),self.assertRaises(ValueError):
                 check(text+'\n'+extra,initial,final,'read')
+
+    def test_edit_requires_protected_number_before_the_update(self):
+        text,initial,final=fixture('edit')
+        for old,new in (('key=Right Softkey / C','key=Scroll Down'),
+                        ('key=Keypad 6 state=1 t=70.','key=Keypad 5 state=1 t=70.'),
+                        ('t=73.000000000','t=74.000000000'),
+                        ('ins=20 p1=00 p2=02','ins=20 p1=00 p2=01')):
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check(text.replace(old,new),initial,final,'edit')
+        with self.assertRaises(ValueError):
+            check(text,initial,expected_card(True),'edit')
 
 
 if __name__=='__main__':

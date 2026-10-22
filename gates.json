@@ -974,6 +974,13 @@
                  "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6210-fdn-record-edit",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki6210_fdn_records.py",
+                 "arguments": ["$(RUN_DIR)", "--edit", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-home-plmn-reject",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",

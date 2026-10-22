@@ -1269,7 +1269,17 @@ unchanged. Registration, exact contacts/APDU order/results,12 reviewed frames,
 independent launches and unchanged predecessor NVRAM pass. Capture:
 `tmp/npe3-fdn-records-qualified`.
 
-FDN record edit/erase/cancel, rejected record writes and local listed/unlisted
+`make verify-6210-fdn-record-edit` extends that chain with protected Edit and
+another cold Details read. Unlike Add, Edit asks for the existing name before
+the number. Physical input retains A, removes the last digit of12345 and saves
+12346 after PIN2 authentication. The sole UPDATE RECORD and confirming reread
+target EF_FDN record1; whole-card equality permits only the final digit's BCD
+nibble to change. Cold Details renders A/12346 without writing or verifying
+PIN2. All five processes and20 reviewed frame comparisons pass, with the same
+registration and predecessor-preservation checks. Capture:
+`tmp/npe3-fdn-edit-banked`.
+
+FDN record erase/cancel, rejected record writes and local listed/unlisted
 dial-permission controls remain unqualified. These gates are not connected-call
 or native-radio/speech claims.
 
