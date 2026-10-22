@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_physical_pin2_change", "owner": "npe3_sim_security", "status": "satisfied",
+      "predicate": "Registered own-PMM research-HLE 6210 changes PIN2 through physical settings input without changing PIN1 or unrelated card data",
+      "current": "Physical PIN1 authentication and coherent registration precede explicit scroll/Select through the card-dependent Security/Access-codes menu. Current5678 at50..54s, new8765 at58..62s and confirmation66..70s produce one A024000210/9000 at70.034s and exact PIN2 code changed pixels. End76/Menu78 recover exact fixture-specific Messages animation phase. Complete3570-byte card changes only PIN2 and the normal LOCI update; other credentials/retries/records are unchanged. Six reviewed frames and exact contact/selector/order checks pass. No cold PIN2 use, wrong PIN2, PIN2/PUK2 exhaustion, FDN or native DSP/RF/speech promotion.",
+      "evidence": ["docs/6210_bringup.md", "tools/noki6210_pin2_change_input.lua", "tools/noki6210_pin2_change_check.py", "tools/test_noki6210_pin2_change_check.py", "tools/run_noki6210_acceptance.py", "gates.json"]
+    },
+    {
       "id": "npe3_permanent_puk_exhaustion_cold_control", "owner": "npe3_sim_security", "status": "satisfied",
       "predicate": "6210 physically exhausts all ten PUK1 retries through exact predecessor-linked cold processes and preserves permanent loss across passive and active cold controls",
       "current": "Thirteen launches: physical PIN exhaustion, ten separately cold wrong-PUK sequences, passive cold observation and active correct-PUK-pattern input. Each failed UNBLOCK changes only the PUK1 retry byte;1..9 return9804,10 returns9840 with SIM card rejected. Cold UI instead shows SIM blocked. The active control's same physical PUK/new-PIN pattern reaches numeric dialling UI, not credentials; no VERIFY/UNBLOCK/call/mobility service occurs, End restores blocked pixels and complete zero-PUK card remains unchanged. All launch IDs/input hashes/predecessors and47 reviewed frame comparisons are checked. No RAM/state copying, forced retries, PIN2/FDN/native DSP/RF/speech promotion.",

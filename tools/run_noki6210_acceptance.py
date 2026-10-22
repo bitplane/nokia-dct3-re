@@ -36,6 +36,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'security-retry-cold': ('npe3hle', 'security_retry_cold_input', 18),
              'security-block-cold': ('npe3hle', 'security_block_input', 33),
              'security-block': ('npe3hle', 'security_block_input', 33),
+             'pin2-change': ('npe3hle', 'pin2_change_input', 84),
              'toolkit': ('npe3hle', 'toolkit_input', 40),
              'toolkit-interactive': ('npe3hle', 'toolkit_interactive', 65),
              'toolkit-menu': ('npe3hle', 'toolkit_menu', 75),
@@ -59,6 +60,8 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'host-outgoing-call': ('npe3hle', 'outgoing_call_input', 48)}
 TOOLKIT_PROFILES = {'toolkit': 1, 'toolkit-interactive': 3, 'toolkit-menu': 4,
                     'toolkit-sms': 5, 'toolkit-call': 6, 'toolkit-call-decline': 6}
+PIN_SCENARIOS=frozenset(('security','security-retry','security-retry-cold',
+                         'security-block-cold','security-block','pin2-change'))
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
@@ -296,7 +299,7 @@ def main():
     args = parser.parse_args()
     if args.wrong_puk_first and args.scenario!='security-block-cold':
         parser.error('--wrong-puk-first requires security-block-cold')
-    if args.scenario in ('security-retry','security-retry-cold','security-block-cold','security-block') and not args.coherent_cell:
+    if args.scenario in PIN_SCENARIOS-{'security'} and not args.coherent_cell:
         parser.error('security-retry requires --coherent-cell')
     if args.foreign_cell:
         if args.scenario not in ('outgoing-call', 'incoming-sms'):
@@ -319,7 +322,7 @@ def main():
         run = args.run_directory.resolve()
         run.mkdir(parents=True, exist_ok=False)
         machine, script, seconds = SCENARIOS[args.scenario]
-        if args.scenario in ('security','security-retry','security-retry-cold','security-block-cold','security-block') or args.pin_enabled:
+        if args.scenario in PIN_SCENARIOS or args.pin_enabled:
             from tools.make_sim_card_profile import make_profile
             card = run / f'nvram/{machine}/sim_card'
             card.parent.mkdir(parents=True)
@@ -676,6 +679,11 @@ def main():
                     verify(cold_text, runtime=True, selftest=True)
                     check_forbidden_selection(cold_text, card.read_bytes(),
                                               forbidden=forbidden, previous=retained)
+        elif args.scenario=='pin2-change':
+            from tools.noki6210_pin2_change_check import check as check_pin2,check_frames as check_pin2_frames
+            check_pin2(text,(run/'nvram/npe3hle/sim_card').read_bytes())
+            check_registration(text,(run/'nvram/npe3hle/sim_card').read_bytes(),channel_header='1202')
+            check_pin2_frames(run/'snap')
         elif args.scenario=='security-block':
             from tools.noki6210_security_retry_check import check_frames as retry_frames
             from tools.noki6210_puk_check import check_blocked,check_frames as puk_frames
@@ -892,7 +900,7 @@ def main():
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
             'sim_profile': ('foreign two-digit-MNC preferred laboratory card' if args.scenario == 'foreign-registration' or args.foreign_cell
                             else 'visited-test-PLMN preferred laboratory card' if args.scenario == 'plmn-reject'
-                            else 'PIN-enabled laboratory card' if args.scenario in ('security','security-retry','security-retry-cold','security-block-cold','security-block') or args.pin_enabled
+                            else 'PIN-enabled laboratory card' if args.scenario in PIN_SCENARIOS or args.pin_enabled
                             else 'default laboratory card'),
             'plmn_rejection': ({'cause': 11, 'visited_plmn': '001-02',
                                 'firmware_sim_update': True, 'cold_window_seconds': 30,

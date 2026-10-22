@@ -1136,6 +1136,32 @@ The shared command builder preserves the existing 6210 launch arguments.
 This qualifies permanent PIN1/PUK1 card rejection and responsive noncredential
 input, not PIN2/FDN or native radio/speech.
 
+## SIM PIN2 settings
+
+`make verify-6210-pin2-change` authenticates the PIN-enabled laboratory card,
+registers on the coherent cell and physically changes PIN2 from5678 to8765.
+The [Nokia-authored user guide, mirrored PDF](https://manuals.plus/m/6bb77733be85dbf473e9cdb264eefd193dbc61e6ef4bd6382a5fef5d30ca7144.pdf)
+lists Change of access codes under Security settings. On the tested card,
+Fixed dialling is absent, so Access codes is the fifth security item rather
+than the guide's sixth. The fixture explicitly scrolls and selects through
+Settings, Security settings, Access codes and Change PIN2. These conditional
+menu positions belong only to the input fixture, not the driver.
+
+Physical current-PIN2 entry50..54s, new8765 entry58..62s and confirmation66..70s
+produce exactly one CHANGE CHV2 (`A0 24 00 02 10`) and9000 at70.034s. Firmware
+displays PIN2 code changed. End76/Menu78 recover the reviewed Messages screen.
+The complete3570-byte card equals the original defaults plus the documented
+location update and new PIN2; PIN1, both PUKs, retry counters and all other
+records are unchanged.
+
+`noki6210_pin2_change_check.py` checks exact contacts, CHV2 selection and
+protocol order, whole-card equality and six reviewed access-code/current/new/
+confirmation/success/Menu frames. This fixture has its own exact Messages
+animation-phase hash; older menu oracles are unchanged. The scenario is
+`pin2-change --coherent-cell`, with `noki6210_pin2_change_input.lua`.
+This proves an ordinary physical PIN2 change, not cold use of the installed
+PIN2, wrong-PIN2 rejection, PIN2/PUK2 exhaustion or FDN control.
+
 ## SIM Toolkit
 
 `make verify-6210-sim-toolkit RUN_DIR=run_6210_toolkit` uses unchanged

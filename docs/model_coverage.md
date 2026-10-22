@@ -114,7 +114,10 @@ without changing credentials, and the retained failed-PUK card cold-recovers
 normally. `verify-6210-puk-permanent` adds all ten physically consumed PUK
 attempts through separate cold processes, exact permanent-card preservation,
 cold blocked presentation and a live input control that cannot reopen the
-credential path. PIN2/FDN are not inherited from other products.
+credential path. `verify-6210-pin2-change` independently proves physical
+current/new/confirmation input, CHANGE CHV2 success, exact settings/success/Menu
+frames and complete card preservation except PIN2/LOCI. Cold PIN2 use,
+PIN2/PUK2 exhaustion and FDN remain unqualified.
 
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,
