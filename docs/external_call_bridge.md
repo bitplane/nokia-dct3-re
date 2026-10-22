@@ -1317,6 +1317,18 @@ independent radio clock remain unchanged. Normal-call acceptance also requires
 at least 100 consecutive, handset-accepted downlink sequence numbers and no
 rejected frames: sent-frame counts alone cannot establish downlink delivery.
 
+### NSB-7 signaling-only boundary
+
+The explicit8290 `nsb7hle` profile qualifies one physical outgoing local
+SIP200 dialog through the same backend. PIN/registration, physical dialing
+and End, CC/RR clearing, exact UI/storage and retained-clock checks are
+product-owned by `nsb7_sip_check.py`; reproduction lives in
+[the NSB-7 contract](8290_bringup.md#outgoing-real-sip-signaling).
+The runner requires `--product 8290 --signaling-only` and rejects incoming,
+restoration, recording/media and multiple-call combinations. Its result
+explicitly keeps speech/native-DSP claims false and requires zero handset
+uplink media. Remote RTP receipt is not handset audio acceptance.
+
 ### Failed calls and automatic redial
 
 The tested NHM-5 v6.39 profile automatically retries a rejected outgoing call

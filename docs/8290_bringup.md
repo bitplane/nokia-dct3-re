@@ -26,7 +26,8 @@ machine implicitly.
 All provisioning is own-derived or explicitly synthetic external card data;
 no donor PMM, identity or firmware-state forcing is admitted. Native resident
 DSP execution, speech/COBBA, measured complete analog calibration, external
-RF and NSB-7 SIP acceptance remain unproved. Host busy and unanswered-alerting
+RF and NSB-7 SIP media remain unproved. A physical outgoing localhost SIP
+dialog is qualified separately without speech acceptance. Host busy and unanswered-alerting
 physical recovery are qualified; other failure/pending-call cases,
 AoC and further SIM Toolkit commands are not established by these gates. The supplied
 SET UP EVENT LIST and TIMER MANAGEMENT fixtures are explicitly rejected, not supported.
@@ -2363,6 +2364,49 @@ this Lua script and an82s guard; require the handset checker too:
 
 This qualifies host-decided outgoing signaling with physical/UI continuity,
 not host speech, SIP media, native RF or restoration of an external dialog.
+
+## Outgoing real SIP signaling
+
+The qualified physical host-dial script also completes a real localhost
+PJSIP2.16 dialog through `dct3_sip_bridge.py`. Fresh own-source PIN-enabled
+storage and `fixtures/nsb7_host/nsb7hle.cfg` remain unchanged. Physical
+PIN/phone-code entry and registration precede45s settled idle; physical
+5551234/Send54 publishes request1/epoch1. The SIP bridge owns its single
+connect decision, the remote confirms200, and physical End66 closes both
+CC/RR and SIP normally. Exact ready/digit/Calling/Call1/final pixels,
+complete unchanged card, valid own journal and continuous RTC all pass.
+
+The observed bridge counters are uplink0, downlink120, PCM transmitted0,
+PCM received127, dropped0. Received remote media is not proof of handset
+audio. `sip-result.json` explicitly records `speech_tested=false` and
+`native_dsp_complete=false`. No unproved NSB-7 PCM clock is enabled.
+The shared runner admits only one outgoing signaling-only SIP200 case;
+incoming, restoration, recording/media and multiple-call modes remain
+rejected for this product.
+
+After preparing the isolated run from the qualified source, reproduce with
+the build paths from [the host bridge contract](external_call_bridge.md).
+The current local binding is CPython3.14:
+
+```sh
+SIP="$PWD/tmp/sip-build/pjproject-2.16/pjsip-apps/src/swig/python"
+PYTHONPATH="$SIP:$SIP/build/lib.linux-x86_64-cpython-314" \
+  .venv/bin/python tools/run_sip_handset_gate.py \
+  --pjsua tmp/sip-build/pjproject-2.16/pjsip-apps/bin/pjsua-x86_64-pc-linux-gnu \
+  --run-dir tmp/nsb7-sip-outgoing --sip-port 25270 --http-port 18941 \
+  --product 8290 --signaling-only -- \
+  .venv/bin/python tools/run_mame_isolated.py --mame-dir mame \
+  --run-dir tmp/nsb7-sip-outgoing -- nsb7hle -rompath ../roms \
+  -video none -sound none -nothrottle -seconds_to_run 82 -log -verbose \
+  -debug -debugger none -http -http_port 18941 -autoboot_delay 0 \
+  -autoboot_script ../tools/nsb7_pin_host_outgoing_call.lua
+.venv/bin/python tools/nsb7_sip_check.py roms/noki8290/8290f522a.fls tmp/nsb7-sip-outgoing
+```
+
+The final checker independently revalidates SIP confirmation/normal release
+and zero-uplink scope alongside the product's physical/protocol/storage/UI
+contract. This does not qualify native speech, bidirectional handset audio,
+an external carrier or a public SIP service.
 
 ## Connected host-call restoration
 
