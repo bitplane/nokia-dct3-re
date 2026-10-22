@@ -11,6 +11,32 @@ from tools.run_noki6250_pin_retry_cold import validate_retained_launch
 
 
 class ColdPin2InputTest(unittest.TestCase):
+    def test_complete_puk2_retry_range_requires_exact_predecessor(self):
+        for remaining in range(11):
+            card=bytearray(registered_card())
+            card[3492:3500]=b'8765\xff\xff\xff\xff'
+            card[3517]=0
+            card[3519]=remaining
+            with self.subTest(remaining=remaining):
+                check_cold_input(bytes(card),bytes(card),retries=0,puk2=remaining)
+                with self.assertRaises(ValueError):
+                    check_cold_input(bytes(card),bytes(card),retries=0,puk2=(remaining+1)%11)
+        for invalid in (-1,11,False,'1'):
+            with self.subTest(invalid=invalid),self.assertRaises(ValueError):
+                check_cold_input(bytes(card),bytes(card),retries=0,puk2=invalid)
+
+    def test_puk2_campaign_rejects_impossible_or_ambiguous_plans(self):
+        for options in (['--puk2-rejections','1'],
+                        ['--permanent-recheck'],
+                        ['--exhaust-pin2','--puk2-rejections','11'],
+                        ['--exhaust-pin2','--puk2-rejections','-1'],
+                        ['--exhaust-pin2','--recover-puk2','--puk2-rejections','10'],
+                        ['--exhaust-pin2','--recover-puk2','--wrong-puk2-first','--puk2-rejections','1']):
+            with self.subTest(options=options),patch('sys.argv',['runner','unused',*options]), \
+                    patch('sys.stderr',new_callable=io.StringIO),self.assertRaises(SystemExit) as error:
+                runner.main()
+            self.assertEqual(error.exception.code,2)
+
     def test_phase_command_binds_model_storage_roms_script_and_duration(self):
         command=runner.mame_command(Path('/mame'),Path('/repo'),Path('/capture/puk2'),Path('/repo/puk.lua'),90)
         self.assertEqual(command[:2],['/mame','nhm3hle'])

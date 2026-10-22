@@ -776,6 +776,27 @@ pass across seven processes. Every predecessor artifact remains unchanged.
 Capture: `tmp/nhm3-wrong-puk2-probe`. This proves one wrong-PUK2 rejection and
 durable retry loss, not PUK2 exhaustion or permanent rejection.
 
+`make verify-6250-puk2-permanent` qualifies the full retry-loss chain in fifteen
+independent processes: PIN2 installation, three rejected PIN2 changes, ten
+wrong-PUK2 transactions and a cold inspection of the permanently blocked card.
+Each complete PUK2/new-PIN2/confirmation transaction consumes exactly one saved
+PUK2 allowance; nine `9804` replies precede `9840` at zero. Stored PIN2 remains
+8765 and the rejected replacement is never verified. PIN1 retains three
+attempts, PUK1 ten, and every unrelated card byte is preserved.
+
+The final rejection displays **PIN2 code rejected**. Its immediate post-End
+frames are blank input-like screens, not registered-idle or Menu proof. The
+subsequent cold process independently authenticates PIN1 and registers with
+both PIN2/PUK2 allowances still zero. Selecting the PIN2 setting gives an
+unlabelled notice without a credential APDU; no editor ownership or general
+UI-disable claim is inferred. End then returns to registered idle and Menu
+opens Messages. All162 reviewed frames, physical contacts, selectors/results,
+whole-card/NVRAM links, native/initial-record/console-health checks and immutable
+predecessor checks pass. Capture: `tmp/nhm3-puk2-exhaustion`. Completed phases
+were revalidated through explicit resume after review of the distinct final
+rejection frames; no credential input was repeated. This establishes the
+research-HLE card-security lifecycle, not native speech or factory provisioning.
+
 The PIN2 cold runner accepts explicit `--resume`; without it, existing output
 directories are rejected. Retained phases must match their original commands,
 executable, shared fixture and phase-script hashes, unique launch identities,

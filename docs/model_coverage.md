@@ -939,8 +939,14 @@ complete card transitions and immutable predecessor checks pass.
 `verify-6250-wrong-puk2-recovery` adds physical wrong-PUK2 rejection with no
 replacement installation/verification, durable10->9 PUK2 retry loss, correct
 cold recovery and another cold new-PIN2 change. All77 frames and complete
-card/predecessor checks pass across seven processes. PUK2 exhaustion and
-permanent loss remain unqualified.
+card/predecessor checks pass across seven processes.
+`verify-6250-puk2-permanent` consumes all ten PUK2 allowances through physical
+transactions, ending with9840/PIN2 code rejected. A subsequent cold boot retains
+the entire zero-allowance card while PIN1 authentication, laboratory registration,
+registered idle and Messages Menu still work. The cold PIN2 selection is an
+unlabelled notice with no credential APDU, not a qualified editor. All162 frames
+and complete storage/predecessor checks pass across fifteen processes. No
+factory-provisioning or native-speech promotion follows.
 
 `verify-6250-ussd` separately establishes the physical USSD exchange and reviewed
 NHM-3 result/idle frames on its declared derived-PMM research comparison. The

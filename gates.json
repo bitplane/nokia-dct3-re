@@ -16128,6 +16128,13 @@
                  "arguments": ["$(RUN_DIR)", "--exhaust-pin2", "--recover-puk2", "--wrong-puk2-first", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-puk2-permanent",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki6250_pin2_cold.py",
+                 "arguments": ["$(RUN_DIR)", "--exhaust-pin2", "--puk2-rejections", "10", "--permanent-recheck", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6250-pin-host-incoming-call",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
