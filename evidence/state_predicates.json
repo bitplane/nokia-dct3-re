@@ -3,17 +3,24 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_authenticated_toolkit_menu_selection",
+      "owner": "nsb7_sim_toolkit", "status": "satisfied",
+      "predicate": "An authenticated registered NSB-7 installs a proactive menu and emits the exact selection envelope only after physical navigation",
+      "current": "Four-command external card composes DISPLAY TEXT, GET INKEY5/OK and GET INPUT42/OK with SET UP MENU. One profile and four FETCH/response pairs end in successful menu installation. Physical Menu78/Up80/Up82/Select84 reaches DCT3 menu/Continue; the first Up passes this provisioning's Net monitor entry. Physical Select86 emits one d30702020181100101 envelope answered9000. End88 returns to exact13:49 idle. Twelve decoded actions, eleven exact frames, full authentication/retained-location registration, own flash validity and unchanged complete card pass. No driver/device change, forced UI state or injected envelope; other proactive families remain unqualified.",
+      "evidence": ["docs/8290_bringup.md", "fixtures/nsb7_toolkit_menu/nsb7hle.cfg", "tools/nsb7_toolkit_menu.lua", "tools/nsb7_toolkit_interactive.lua", "tools/nsb7_toolkit_check.py", "tools/test_nsb7_toolkit_check.py"]
+    },
+    {
       "id": "nsb7_authenticated_toolkit_interactive_input",
       "owner": "nsb7_sim_toolkit", "status": "satisfied",
       "predicate": "An authenticated registered NSB-7 physically completes DISPLAY TEXT, GET INKEY and GET INPUT with exact successful responses and unchanged card",
-      "current": "Existing Phase-2+ three-command card and physical authentication preserve full own registration acceptance. DISPLAY TEXT OK66 is followed by GET INKEY physical5/OK69/70; this product requires explicit confirmation. Successful response returns35. GET INPUT physical4/2/OK72/73/74 returns3432 with result00 then9000. One profile and three FETCH/responses, six decoded physical actions before their responses, exact prompt/empty/filled editor/final13:49 idle frames, valid own journal and unchanged complete card pass. No driver/device change. SET UP MENU, other proactive commands and native DSP/RF/speech remain unproved.",
+      "current": "Existing Phase-2+ three-command card and physical authentication preserve full own registration acceptance. DISPLAY TEXT OK66 is followed by GET INKEY physical5/OK69/70; this product requires explicit confirmation. Successful response returns35. GET INPUT physical4/2/OK72/73/74 returns3432 with result00 then9000. One profile and three FETCH/responses, six decoded physical actions before their responses, exact prompt/empty/filled editor/final13:49 idle frames, valid own journal and unchanged complete card pass. No driver/device change. This fixture covers only these three commands; separate predicates own further Toolkit acceptance. Native DSP/RF/speech remain unproved.",
       "evidence": ["docs/8290_bringup.md", "fixtures/nsb7_toolkit_interactive/nsb7hle.cfg", "tools/nsb7_toolkit_interactive.lua", "tools/nsb7_toolkit_input.lua", "tools/nsb7_toolkit_check.py", "tools/test_nsb7_toolkit_check.py"]
     },
     {
       "id": "nsb7_authenticated_toolkit_display_text",
       "owner": "nsb7_sim_toolkit", "status": "satisfied",
       "predicate": "An own authenticated registered NSB-7 fetches a Phase-2+ proactive DISPLAY TEXT and physically dismisses it successfully with unchanged card",
-      "current": "EF_PHASE03 and nine-byte TERMINAL PROFILE precede card readiness20.026s; own STATUS polling near62.018s returns9116 and FETCHes22 bytes. Exact65s prompt says DCT3 SAT. Physical OK66 decodes19 before terminal response810301218002028281030100/result00 and9000. Exact68s13:48 idle, full PIN/phone-code/retained-location radio/LAPDm acceptance, valid own flash journal and byte-identical complete card pass. Result12 timeout is rejected. No firmware-state writes or device changes; further proactive commands and native DSP/RF/speech remain unproved.",
+      "current": "EF_PHASE03 and nine-byte TERMINAL PROFILE precede card readiness20.026s; own STATUS polling near62.018s returns9116 and FETCHes22 bytes. Exact65s prompt says DCT3 SAT. Physical OK66 decodes19 before terminal response810301218002028281030100/result00 and9000. Exact68s13:48 idle, full PIN/phone-code/retained-location radio/LAPDm acceptance, valid own flash journal and byte-identical complete card pass. Result12 timeout is rejected. No firmware-state writes or device changes; this fixture covers DISPLAY TEXT only. Separate predicates own further Toolkit acceptance; native DSP/RF/speech remain unproved.",
       "evidence": ["docs/8290_bringup.md", "fixtures/nsb7_toolkit/nsb7hle.cfg", "tools/nsb7_toolkit_input.lua", "tools/nsb7_toolkit_check.py", "tools/test_nsb7_toolkit_check.py"]
     },
     {

@@ -17,7 +17,7 @@ machine implicitly.
 | UI and storage | Physical security code, menus, SIM phonebook save/cold retrieval, RTC retention and Net monitor00 clean idle. Own EEPROM journal rotation matches the complete runtime shadow. |
 | SIM security | PIN1/PIN2 change/rejection, retry persistence, exhaustion/PUK recovery and request Off/On. Permanent PUK1 rejects the card; permanent PUK2 retains ordinary PIN1/menu use. |
 | FDN | Explicit extended card; physical PIN2-authorized On/Off, Save/edit/erase/cancel and cold retrieval. Registered listed/unlisted/Off controls distinguish permitted calls from local denial. |
-| SIM Toolkit | Phase-2+ nine-byte TERMINAL PROFILE; DISPLAY TEXT, GET INKEY and GET INPUT; physical successful responses, exact prompts/filled editor/idle and unchanged complete card. |
+| SIM Toolkit | Phase-2+ nine-byte TERMINAL PROFILE; DISPLAY TEXT, GET INKEY, GET INPUT and SET UP MENU; physical successful responses/selection ENVELOPE, exact prompts/editors/menu/idle and unchanged complete card. |
 | PCS laboratory network | Acquisition, BCCH, Location Updating/EF_LOCI, background measurements, addressed paging, physical incoming/outgoing CC/RR signaling and SMS delivery/read/delete/cancel/Reply. |
 | Authenticated composition | Physical PIN before fresh/cold registration, calls, SMS and phonebook; a long wrong-PIN control remains unregistered. |
 | Restoration | Exact ARM/banked registers, RAM/time, protocol replay and pixels at idle, connected call and active SMS boundaries, with physical continuation. |
@@ -2429,7 +2429,8 @@ Physical4/2 at72/73s fills the reviewed `Enter 42` editor; OK74 returns
 `8103032300020282810301000d03043432`, then9000. The exact76s frame is
 registered13:49 idle. Full authentication/retained-location acceptance and
 the unchanged complete card pass independently. No driver/device changes
-were needed. This does not yet qualify SET UP MENU or other commands.
+were needed. SET UP MENU is qualified separately below; other commands
+are not established by this three-command fixture.
 
 The interactive checker requires one profile and three FETCH/response
 exchanges, all six physical actions with decoded contacts before their
@@ -2440,4 +2441,26 @@ timeout results and wrong returned input bytes.
 ```sh
 .venv/bin/python tools/nsb7_toolkit_check.py \
   roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-interactive-v2 --interactive
+```
+
+### Installed menu and selection envelope
+
+The four-command profile in `fixtures/nsb7_toolkit_menu/nsb7hle.cfg` and
+`nsb7_toolkit_menu.lua` preserves the same authenticated input sequence.
+Successful GET INPUT returns9128; firmware FETCHes SET UP MENU and answers
+`810304250002028281030100`/9000. Physical Menu78, Up80/82 and Select84
+open the installed `DCT3 menu`/`Continue` item. This own provisioning also
+exposes Net monitor after the Toolkit entry, so one Up from the main menu
+reaches Net monitor rather than Toolkit; both navigation steps are explicit.
+
+Physical Select86 emits exactly one ENVELOPE
+`d30702020181100101` (item1), answered9000. End88 returns to exact13:49
+idle. The full authentication/registration chain, four FETCH/response pairs,
+twelve decoded physical actions, eleven exact frames, valid own journal and
+unchanged full card pass. No firmware state, menu selection or envelope is
+injected. Other proactive command families remain independent targets.
+
+```sh
+.venv/bin/python tools/nsb7_toolkit_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-menu-v2 --menu
 ```

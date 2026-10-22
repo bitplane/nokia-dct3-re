@@ -30,6 +30,16 @@ local input=coroutine.create(function()
     press(74,'Left Softkey / Menu','confirm')
     assert(emu.wait(76-machine.time:as_double()))
     machine.screens[':screen']:snapshot('nsb7_toolkit_interactive_final.png')
+    if _G.nsb7_toolkit_menu then
+        for _,step in ipairs({{78,'Left Softkey / Menu','menu'},
+                {80,'Scroll Up','menu_skip_netmonitor'},{82,'Scroll Up','menu_last'},
+                {84,'Left Softkey / Menu','menu_open'},
+                {86,'Left Softkey / Menu','menu_select'},{88,'End','menu_exit'}}) do
+            press(step[1],step[2],step[3])
+            assert(emu.wait(step[1]+1-machine.time:as_double()))
+            machine.screens[':screen']:snapshot('nsb7_toolkit_'..step[3]..'.png')
+        end
+    end
     machine:exit()
 end)
 _G.nsb7_toolkit_interactive_input=input
