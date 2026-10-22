@@ -1,7 +1,7 @@
 import unittest
 from tools.nsk3_pin_check import check_trace,check_cards
 from tools.make_sim_card_profile import make_profile
-from tools.sim_security_trace_check import ATTEMPTS_OFFSET,AOC_NVRAM_SIZE
+from tools.sim_security_trace_check import ATTEMPTS_OFFSET,AOC_NVRAM_SIZE,NVRAM_SIZE
 
 
 class PinCheckTest(unittest.TestCase):
@@ -24,6 +24,7 @@ class PinCheckTest(unittest.TestCase):
 
     def test_cold_card_restores_only_retry(self):
         wrong=bytearray(make_profile(True).ljust(AOC_NVRAM_SIZE,b'\xff'))
+        wrong[NVRAM_SIZE:NVRAM_SIZE+3]=bytes.fromhex('00f110')
         wrong[ATTEMPTS_OFFSET]=2
         correct=bytearray(wrong)
         correct[ATTEMPTS_OFFSET]=3
@@ -33,6 +34,14 @@ class PinCheckTest(unittest.TestCase):
             bad[offset]^=1
             with self.assertRaises(ValueError):check_cards(wrong,wrong,bad)
         with self.assertRaises(ValueError):check_cards(wrong,correct,correct)
+        # An unrelated initial-tail mutation must not pass merely because it
+        # survives the subsequent cold authentication unchanged.
+        for offset in (NVRAM_SIZE,NVRAM_SIZE+2,len(wrong)-1):
+            bad=bytearray(wrong)
+            bad[offset]^=1
+            recovered=bytearray(bad)
+            recovered[ATTEMPTS_OFFSET]=3
+            with self.assertRaises(ValueError):check_cards(bad,bad,recovered)
 
     def test_exhaustion_requires_exact_previous_attempt_count(self):
         trace=self.trace(False)

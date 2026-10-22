@@ -7,7 +7,7 @@ import sys
 if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from tools.make_sim_card_profile import make_profile
-from tools.sim_security_trace_check import statuses,ATTEMPTS_OFFSET,AOC_NVRAM_SIZE
+from tools.sim_security_trace_check import statuses,ATTEMPTS_OFFSET,AOC_NVRAM_SIZE,NVRAM_SIZE
 from tools.nsk3_static_check import inspect
 from tools.nsk3_boot_check import check_upload_handoffs
 from tools.nsk1_phonebook_roundtrip import frame_check
@@ -40,11 +40,12 @@ def check_trace(trace,correct,pin=None,prefix='nsk3',tx_limit=1024,allowed_mutat
 
 
 def check_cards(wrong,initial,correct):
-    expected=bytearray(make_profile(True))
+    expected=bytearray(make_profile(True).ljust(AOC_NVRAM_SIZE,b'\xff'))
     expected[ATTEMPTS_OFFSET]=2
     # The shared generator emits the legacy prefix; the device appends its
     # later PLMN/SMSS/AoC storage defaults on serialization.
-    if len(wrong)!=AOC_NVRAM_SIZE or wrong[:len(expected)]!=expected or initial!=wrong:
+    expected[NVRAM_SIZE:NVRAM_SIZE+3]=bytes.fromhex('00f110')
+    if wrong!=expected or initial!=wrong:
         raise ValueError('wrong retry or cold input persistence differs')
     expected=bytearray(wrong)
     expected[ATTEMPTS_OFFSET]=3

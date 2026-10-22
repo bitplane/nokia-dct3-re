@@ -450,7 +450,10 @@ The gate checks own unchanged executable flash, native upload, physical contacts
 VERIFY bytes/status, exact PIN/error/phone-code frames, pre-launch card identity
 and the whole persistent retry transition. The shared card generator uses an
 older serialized prefix; the device appends its later storage defaults, which
-the cold comparison preserves byte-for-byte. No unexpected credential-changing
+the cold comparison preserves byte-for-byte. The first rejected card is also
+bound to all3570 bytes, including preferred PLMN00f110 and the unchanged
+SMSS/AoC defaults; an unrelated tail mutation cannot qualify merely by
+persisting across cold authentication. No unexpected credential-changing
 APDU is admitted. The gates below extend PUK, ordinary PIN/PIN2 change and
 request settings and PUK1/PUK2 permanent loss. Physical PIN1 exhaustion and
 recovery also have a separate cold-chain gate below.
