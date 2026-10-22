@@ -37,6 +37,8 @@ def check(text, call=False, sms=False, incoming_call=False, card=None, pin=False
     tokens = ('TX packet', 'RX enqueue', 'GSM service', 'sim_device:')
     if call or incoming_call:
         tokens += ('radio_l1:',)
+    if host and call:
+        tokens += ('ccont_rtc:', 'ccont_analog:')
     verify_roundtrip(text, tokens, 'NSB-7 '+scenario)
     if incoming_call:
         from tools.nsb7_pin_services_check import check_incoming
@@ -118,7 +120,11 @@ def main():
                 if reference.size != (84, 48) or restored.size != reference.size or \
                         reference.convert('RGB').tobytes() != restored.convert('RGB').tobytes():
                     raise ValueError('connected-call reference/restored pixels differ')
-            frame(args.run / f'snap/nsb7_state_{kind}_final.png', IDLE_HASH)
+            final_hash=IDLE_HASH
+            if args.host_call:
+                from tools.nsb7_host_outgoing_call_check import FRAMES as outgoing_frames
+                final_hash=outgoing_frames['nsb7_outgoing_call_final.png']
+            frame(args.run / f'snap/nsb7_state_{kind}_final.png', final_hash)
             if host:
                 if args.incoming_call:
                     from tools.nsb7_host_incoming_call_check import FRAMES as host_frames
@@ -126,7 +132,7 @@ def main():
                 else:
                     from tools.nsb7_host_outgoing_call_check import FRAMES as host_frames
                     ready,active='nsb7_host_outgoing_ready.png','nsb7_host_outgoing_connected.png'
-                frame(args.run/'snap'/ready,IDLE_HASH)
+                frame(args.run/'snap'/ready,host_frames[ready])
                 for phase in ('reference','restored'):
                     frame(args.run/f'snap/nsb7_state_{kind}_{phase}.png',host_frames[active])
         elif args.sms:

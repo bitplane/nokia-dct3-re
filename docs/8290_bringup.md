@@ -2351,6 +2351,14 @@ those exact frames without masking the clock and enforces every tick.
 Other clock-sensitive NSB-7 workflows still require requalification before
 their old exact hashes can be treated as current-device evidence.
 
+Outgoing host save/load is independently requalified in
+`tmp/nsb7-ccont-state-v2` with `--observe-restore`: save at60s, exact
+CPU/RAM/time restoration, identical three-second radio/SIM/L1 plus CCONT
+RTC/acquisition replay, republished connected request under epoch2 and
+explicit stale-epoch rejection, then physical End66 and exact13:49 idle.
+Its ready/active/final hashes use the same reviewed retained-clock contract
+as the ordinary outgoing run; image equality alone is not acceptance.
+
 The shared two-process RTC gate uses the recovered clock-load strobe, not
 a fictitious seconds-write shortcut, to program12:00 and wait a full minute
 for the alarm/IRQ. It then proves retained12:01:04 advances to05/06/07 in
