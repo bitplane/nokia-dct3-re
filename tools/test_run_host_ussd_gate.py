@@ -25,7 +25,9 @@ class OutgoingUssdRunnerTest(unittest.IsolatedAsyncioTestCase):
             await gate.run(args)
         self.assertEqual(socket.recv.await_count,len(events))
         sent=[json.loads(call.args[0]) for call in socket.send.await_args_list]
-        self.assertEqual([event['request_id'] for event in sent],[2,1])
+        self.assertEqual([event['request_id'] for event in sent],[1,2,1] if restore else [2,1])
+        if restore:
+            self.assertEqual([event['epoch'] for event in sent],[1,2,2])
         self.assertEqual(sent[-1]['data'],gate.pack_gsm7('Host network'))
 
     async def test_correlated_request_and_restored_republication(self):

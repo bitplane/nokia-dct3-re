@@ -81,7 +81,11 @@ readback, End-to-idle recovery and complete unchanged SIM contents. This is
 one-way notification acceptance. A separate physical `*123#` gate verifies a
 host-decided `Host network` response, rejection of an unrelated request ID,
 RR release before physical End and exact idle/menu recovery with unchanged
-card. Multi-turn USSD, native radio and speech remain unproved; see
+card. Pending `*123#` restoration additionally proves exact CPU/RAM/time,
+same-request republication, stale-epoch/wrong-ID rejection, retained RTC and
+physical response/idle/menu recovery. Its branches intentionally differ in
+host input; equal protocol replay is not claimed. Multi-turn USSD, native
+radio and speech remain unproved; see
 `nsb7_host_ussd_check.py` and `8290_bringup.md`.
 
 ## Promotion rules

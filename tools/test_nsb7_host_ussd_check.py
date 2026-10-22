@@ -90,5 +90,31 @@ gsm_call_adapter: ussd state id=1 epoch=1 phase=ended
         with self.assertRaises(ValueError):
             self.verify(self.trace().replace('key=End state=1','key=Send state=1'))
 
+    def restored_trace(self):
+        cpu=','.join(['00000000']*37)
+        def snapshot(event):
+            return f'nsb7_state: event={event} pc=002f8300 sp=00130df8 ram=567b1438 cpu={cpu} t=33.800000000\n'
+        needle='gsm_call_adapter: ussd request id=1 epoch=1 dcs=0f packed_length=5\n'
+        replacement=(needle+snapshot('saved')+snapshot('restored')+
+            'state_roundtrip: result=pass scenario=nsb7_ussd requested_at=33.800000000 t=33.800000000\n'+
+            needle.replace('epoch=1','epoch=2')+
+            'gsm_call_adapter: ussd response id=1 outcome=0 result=rejected\n')
+        return self.trace().replace(needle,replacement).replace('epoch=1 phase=','epoch=2 phase=')
+
+    def verify_restored(self,text):
+        with patch.object(check,'check_source'),patch.object(check,'check_authentication'), \
+             patch.object(check,'check_clock'):
+            check.check_request(text,b'card',b'card',restored=True)
+
+    def test_pending_restore_is_architectural_not_equal_traffic_replay(self):
+        self.verify_restored(self.restored_trace())
+
+    def test_restore_requires_exact_architecture_and_stale_rejection(self):
+        text=self.restored_trace()
+        for bad in (text.replace('event=restored pc=002f8300','event=restored pc=002f8302'),
+                    text.replace('ussd response id=1 outcome=0 result=rejected','ussd response id=1 outcome=0 result=accepted'),
+                    text.replace('ussd request id=1 epoch=2','ussd request id=2 epoch=2')):
+            with self.assertRaises(ValueError):self.verify_restored(bad)
+
 
 if __name__=='__main__':unittest.main()

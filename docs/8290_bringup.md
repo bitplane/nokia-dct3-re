@@ -2416,11 +2416,45 @@ Use the same fresh-card/host-cfg preparation as the notification gate:
 
 Qualified capture: `tmp/nsb7-host-ussd-request-qualified`. This proves one
 mobile-originated request and host-decided result, not multi-turn USSD,
-arbitrary alphabet coverage, restoration on NSB-7, native DSP/RF or speech.
+arbitrary alphabet coverage, native DSP/RF or speech. Pending restoration
+has its separate gate below.
 The shared host runner requires a stable positive request ID, at most one
 request per epoch, correlated accepted/ended states and a healthy complete
 console. Restore fixtures require the next transport epoch and republication
 of the same request, not a new external admission.
+
+### Pending USSD host decision across save/load
+
+`nsb7_host_ussd_restore.lua` saves at33.8s after the physical `*123#`
+request is published but before any host response. The runner withholds
+the epoch1 decision, observes one second of pending reference execution and
+loads the actual `nsb7_ussd.sta`. All37 ARM/banked registers, PC/SP, full-RAM
+digest and emulated time restore exactly.
+The discarded reference has its own exact reviewed `Requesting` frame,
+distinct from the restored result.
+
+Request1 republishes once under epoch2. The runner submits the old-epoch
+response, a wrong request2 response and then the matching response; the
+first two are rejected and only the third succeeds. The qualified run ends
+the USSD/RR session34.200s, before physical End38. The existing exact
+`Host network`36/37, idle39 and menu41 frames, unchanged complete card and
+valid own journal pass. After excluding the discarded reference interval,
+all43 retained RTC ticks remain consecutive.
+
+Use the same fresh input preparation and command as the ordinary request
+gate, adding `--require-restore` to `run_host_ussd_gate.py` and replacing
+the Lua script with `nsb7_host_ussd_restore.lua`. Qualification:
+
+```sh
+.venv/bin/python tools/nsb7_host_ussd_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-host-ussd-request-restore \
+  --console tmp/nsb7-host-ussd-request-restore-launch.log --request --restore
+```
+
+This proves pending-session restoration and epoch-safe host completion.
+Reference and restored protocol traffic are intentionally unequal: only the
+restored branch receives a host result. No equal-traffic replay, external
+dialogue continuity, multi-turn USSD or native DSP/RF/speech is claimed.
 
 ## Host incoming call from settled idle
 

@@ -13,7 +13,7 @@ from tools.nsb7_menu_check import FRAMES
 from tools.radio_state_roundtrip import verify_roundtrip
 
 
-def check_architecture(text,scenario,tokens):
+def check_architecture_snapshot(text,scenario):
     if f'state_roundtrip: result=pass scenario=nsb7_{scenario} ' not in text:
         raise ValueError('state scenario marker differs')
     if '[LUA ERROR]' in text or 'nsb7_state: FAIL' in text:
@@ -26,6 +26,10 @@ def check_architecture(text,scenario,tokens):
         raise ValueError('incomplete ARM/banked register inventory')
     if rows[0][1:] != rows[1][1:]:
         raise ValueError('CPU/RAM/time restoration differs')
+
+
+def check_architecture(text,scenario,tokens):
+    check_architecture_snapshot(text,scenario)
     verify_roundtrip(text, tokens, 'NSB-7 '+scenario)
 
 

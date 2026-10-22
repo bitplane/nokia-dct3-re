@@ -221,8 +221,12 @@ ID, the matching `Host network` response, exact response/idle/menu frames and
 unchanged complete SIM contents through `nsb7_host_ussd_check.py --request`.
 The shared outgoing runner checks stable request identity, per-epoch
 uniqueness, accepted-before-ended ordering and complete-console health.
-NSE-8's existing `verify-radio-ussd-host-restore` remains green; this does not
-extend USSD restoration or multi-turn dialogue acceptance to NSB-7.
+NSE-8's existing `verify-radio-ussd-host-restore` remains green. NSB-7 has a
+separate `--request --restore` qualification: exact CPU/RAM/time at its pending
+request checkpoint, same-request republication under epoch2, stale-epoch and
+wrong-ID rejection, response/idle/menu frames, unchanged card and retained RTC.
+Only the restored branch receives the host result, so equal protocol replay
+is not claimed. Neither gate proves multi-turn dialogue continuity.
 
 Host-originated `incoming_ussd` is deliberately a notification, matching the
 network-initiated form this firmware accepts. It enters through registered-idle

@@ -71,6 +71,9 @@ async def run(args: argparse.Namespace) -> None:
                     }
                     stale = dict(response)
                     stale["request_id"] += 1
+                    if args.require_restore:
+                        previous=dict(response,epoch=initial_request_epoch)
+                        await websocket.send(json.dumps(previous))
                     await websocket.send(json.dumps(stale))
                     await websocket.send(json.dumps(response))
                     responded=True
