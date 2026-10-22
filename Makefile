@@ -770,11 +770,11 @@ normalize-6110-v548:
 
 
 roms: $(if $(filter noki3210,$(PHONE)),eeprom-profile) $(if $(filter noki5110,$(PHONE)),rom4-dsp-inputs)
-	@for src in roms/noki*/; do \
+	@set -e; for src in roms/noki*/; do \
 		[ -d "$$src" ] || continue; \
 		dst="$(MAME_DIR)/roms/$$(basename "$$src")"; \
 		mkdir -p "$$dst"; \
-		cp -a "$$src". "$$dst"/; \
+		cp -af "$$src". "$$dst"/; \
 	done
 
 .PHONY: rom4-dsp-inputs
