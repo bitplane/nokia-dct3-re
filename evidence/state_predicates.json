@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_resident_pending_status_restore", "owner": "native_mu4", "status": "satisfied",
+      "predicate": "Native MU4 restores a partially received post-INT2 status command and reproduces its reply and complete diagnostic output",
+      "current": "Checkpoint11.205s follows declared status ingress11.201 but precedes ACK04/response6. All36 exposed registers,65408 non-MMIO words and16MiB program backing restore exactly. Both150ms branches publish14 identical timed DXR writes: ACK7f0455 then1e05aa017101000002c255. Nine preserved prefixes total95886186bytes; nine complete files equal the independent cold status run at173513990bytes. Input NAND unchanged, final native resident idle028923, strict audio-completion rejection retained. No recovered MSP430 policy/EOF/drain/full music/native speech claim.",
+      "evidence": ["docs/5510_bringup.md", "tools/mu4_resident_status_restore.lua", "tools/mu4_playback_serial_restore.lua", "tools/mu4_playback_serial_restore_check.py", "tools/test_mu4_playback_serial_restore_check.py"]
+    },
+    {
       "id": "nsb7_pending_network_ussd_restore", "owner": "gsm_network", "status": "satisfied",
       "predicate": "NSB-7 restores a pending network-originated laboratory USSD editor and replays the physical reply identically",
       "current": "Save29.25s precedes numeric2 at29.75 and Send30.75 in each replay. All37 ARM/banked registers, RAM checksum and time restore exactly; three-second radio/SIM/RTC/SS traces match. Each branch emits one exact8b3a12a210020101300b02013c300604010f040132 at31.223902s, validates transaction8b/invoke1 and completes network/RR release. Done pixels match; restored End36 reaches exact idle38. Own flash/journal, authentication and unchanged whole card pass. No external host-session or native speech/RF/DSP claim.",

@@ -49,7 +49,7 @@ def check_independent_captures(run,cold):
     return dict(cold_capture_bytes=total,exact_cold_files=9)
 
 
-def check(text,console):
+def check(text,console,resident_status=False):
     endpoint='Fatal error: '+COMPLETION
     if console.count(endpoint)!=1:raise ValueError('strict native diagnostic endpoint absent')
     verify_handset_health(console.replace(endpoint,'').replace('Ignoring MAME exception: '+COMPLETION,''))
@@ -69,12 +69,21 @@ def check(text,console):
     registers=[field.split(':') for field in saved['cpu'].split(',')]
     if [name for name,value in registers]!=REGISTERS or any(not re.fullmatch('[0-9a-f]{10}',value) for name,value in registers):
         raise ValueError('exposed CPU register inventory differs')
-    if dict(registers)['IDLE']!='0000000000' or dict(registers)['ILLEGAL']!='0000000000':
+    if dict(registers)['ILLEGAL']!='0000000000' or (not resident_status and dict(registers)['IDLE']!='0000000000'):
         raise ValueError('checkpoint is not active clean native execution')
-    if not 1.04<=float(saved['t'])<=1.07:raise ValueError('pending-control checkpoint time differs')
+    lower,upper=(11.204,11.206) if resident_status else (1.04,1.07)
+    if not lower<=float(saved['t'])<=upper:raise ValueError('pending-control checkpoint time differs')
     begin=text.index('mu4_control_state: phase=saved')
     loaded=text.index('mu4_control_state: phase=restored')
-    if 'phase=status49' not in text[:begin] or 'selector=71 ' in text[:begin] or 'phase=control30_04' in text[:begin]:
+    if resident_status:
+        if ('phase=resident_status49' not in text[:begin] or
+                'mu4_native_recorder_control_ack: token=04' in text[:begin] or
+                'mu4_native_recorder_response: index=6 ' in text[:begin]):
+            raise ValueError('resident status must be pending before ACK/response at save')
+        ingress=re.findall(r'mu4_native_command_input: cursor=(\d+) total=37\b',text[:begin])
+        if ingress!=['30','31','32','33','34']:
+            raise ValueError('resident checkpoint must retain five of eight command bytes')
+    elif 'phase=status49' not in text[:begin] or 'selector=71 ' in text[:begin] or 'phase=control30_04' in text[:begin]:
         raise ValueError('status must be pending, before response/control at save')
     branches={'reference':[],'restored':[]}
     for event in rows(text,'mu4_control_replay_event'):
@@ -98,20 +107,31 @@ def check(text,console):
     # Discard the reference continuation only for parsing the restored branch's
     # complete wire frames. Keep it above for independent ordered comparison.
     frames=response_frames(text[:begin]+text[loaded:])
-    status=[frame for frame in frames if (frame['selector'],frame['token'],frame['class'])==(0x71,3,1)]
+    token=2 if resident_status else 3
+    status=[frame for frame in frames if (frame['selector'],frame['token'],frame['class'])==(0x71,token,1)]
     if len(status)!=1:
         raise ValueError('restored correlated status response absent')
-    if [int(event[2],16) for event in reference]!=status[0]['data']+[0x7f,3,0x55]:
+    expected=([0x7f,4,0x55]+status[0]['data']) if resident_status else (status[0]['data']+[0x7f,3,0x55])
+    if [int(event[2],16) for event in reference]!=expected:
         raise ValueError('replayed native TX differs from the status frame/control ACK')
-    require_ordered(text[loaded:],[
-        ('status response',r'mu4_native_recorder_response: index=3 selector=71 words=11 token=03 class=1'),
-        ('control',r'phase=control30_04'),('control ACK',r'mu4_native_recorder_control_ack: token=03'),
-        ('pending sender',r'kind=send16 pc=020727[^\n]*pending=0003'),
-        ('resident idle',r'kind=resident_idle3 pc=028922 opcode=f5e1'),
-        ('clean capture',r'mu4_playback_capture_terminal: closed=1 illegal=0'),
-        ('final native control',r'mu4_playback_control_terminal: status_reply=1 input_cursor=29 decoded_calls=5 idle=1 pc=028923'),
-        ('restore terminal',r'mu4_control_restore_terminal: complete=1 observer_writes=0 audio_acceptance=0'),
-    ],'restored native serial control')
+    if resident_status:
+        require_ordered(text[loaded:],[
+            ('command ACK',r'mu4_native_recorder_control_ack: token=04'),
+            ('status response',r'mu4_native_recorder_response: index=6 selector=71 words=11 token=02 class=1'),
+            ('clean capture',r'mu4_playback_capture_terminal: closed=1 illegal=0'),
+            ('final native control',r'mu4_playback_control_terminal: status_reply=1 input_cursor=37 decoded_calls=5 idle=1 pc=028923'),
+            ('restore terminal',r'mu4_control_restore_terminal: complete=1 observer_writes=0 audio_acceptance=0'),
+        ],'restored resident serial status')
+    else:
+        require_ordered(text[loaded:],[
+            ('status response',r'mu4_native_recorder_response: index=3 selector=71 words=11 token=03 class=1'),
+            ('control',r'phase=control30_04'),('control ACK',r'mu4_native_recorder_control_ack: token=03'),
+            ('pending sender',r'kind=send16 pc=020727[^\n]*pending=0003'),
+            ('resident idle',r'kind=resident_idle3 pc=028922 opcode=f5e1'),
+            ('clean capture',r'mu4_playback_capture_terminal: closed=1 illegal=0'),
+            ('final native control',r'mu4_playback_control_terminal: status_reply=1 input_cursor=29 decoded_calls=5 idle=1 pc=028923'),
+            ('restore terminal',r'mu4_control_restore_terminal: complete=1 observer_writes=0 audio_acceptance=0'),
+        ],'restored native serial control')
     return dict(registers=len(registers),tx_events=len(reference),ram_checksum_equal=True,
                 program_checksum_equal=True,audio_completion=False)
 
@@ -124,6 +144,7 @@ def main():
     parser.add_argument('--input-nand',type=Path,required=True)
     parser.add_argument('--cold-control',type=Path,required=True)
     parser.add_argument('--cold-console',type=Path,required=True)
+    parser.add_argument('--resident-status',action='store_true',help='post-wake partial serial command restoration')
     args=parser.parse_args()
     try:
         contract(args.source.read_bytes())
@@ -132,9 +153,13 @@ def main():
             raise ValueError('complete input NAND differs or is truncated')
         if original!=(args.cold_control/'nvram/mu4nand_30/nand').read_bytes():
             raise ValueError('cold control uses different input NAND')
-        check_cold((args.cold_control/'error.log').read_text(),args.cold_console.read_text())
+        if args.resident_status:
+            from tools.mu4_resident_status_check import check as check_status
+            check_status((args.cold_control/'error.log').read_text(),args.cold_console.read_text(),True)
+        else:
+            check_cold((args.cold_control/'error.log').read_text(),args.cold_console.read_text())
         text=(args.run/'error.log').read_text()
-        result=check(text,args.console.read_text())
+        result=check(text,args.console.read_text(),args.resident_status)
         result.update(check_captures(args.run,text))
         result.update(check_independent_captures(args.run,args.cold_control))
     except (OSError,ValueError,RuntimeError,KeyError) as error:parser.exit(1,f'MU4 control restore: FAIL: {error}\n')

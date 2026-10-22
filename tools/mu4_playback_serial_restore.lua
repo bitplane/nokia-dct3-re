@@ -1,6 +1,6 @@
 -- Save/load only; native serial peer and firmware retain all protocol ownership.
 local directory=assert(debug.getinfo(1,'S').source:match('^@(.*/)'))
-dofile(directory..'mu4_playback_serial_control_observe.lua')
+dofile(directory..(_G.mu4_serial_restore_observer or 'mu4_playback_serial_control_observe.lua'))
 local machine=manager.machine
 local cpu=assert(machine.devices[':cpu'])
 local data=assert(cpu.spaces['data'])
@@ -60,7 +60,7 @@ retained[#retained+1]=emu.register_frame_done(function()
         #events.reference,#events.restored,window,cap))
 end)
 local runner=coroutine.create(function()
-    assert(emu.wait(1.05))
+    assert(emu.wait(_G.mu4_serial_restore_time or 1.05))
     machine:save('mu4_control_pending')
     assert(emu.wait(0.25))
     assert(saved,'native control checkpoint did not execute')

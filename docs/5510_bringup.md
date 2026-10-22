@@ -9690,6 +9690,26 @@ rejecting audio endpoint and unchanged complete input NAND. This proves
 the original resident command interface is usable after the declared wake,
 not normal MCU policy, automatic EOF, complete music or native phone speech.
 
+`mu4_resident_status_restore.lua` separately checkpoints at 11.205 seconds,
+after five of the eight status bytes have entered, but before native ACK04
+or response6. It composes the same declared INT2/status inputs with the existing
+serial restore observer; no DSP memory or counters are changed. All 36 exposed
+registers, 65,408 non-MMIO data words and the 16 MiB program backing match
+exactly after load. Both branches emit the same fourteen DXR writes and
+timestamps over 150 ms: ACK `7f0455`, then native status frame
+`1e05aa017101000002c255`. The firmware eventually returns to resident
+`028923`, not permanently to worker `0298ea`.
+
+The nine preserved diagnostic prefixes match (95,886,186 bytes), and all nine
+final files match the independent cold status run exactly (173,513,990 bytes).
+The complete retained input NAND is unchanged. Capture:
+`tmp/mu4-resident-status-restore`; cold control: `tmp/mu4-resident-status`.
+Use `mu4_playback_serial_restore_check.py --resident-status` with its existing
+source/input/cold-control arguments. The original default pre-control restore
+contract remains distinct and unchanged. Both paths deliberately retain the
+rejecting audio-completion endpoint; this is native serial/device restoration,
+not normal MSP430 policy, automatic EOF or complete music acceptance.
+
 The post-wake caller is not another receive wait. The separately pinned
 52-word `resident_wake_tail` contract loads `07d0`, calls `03acdf`, then writes
 zero to `b558` at `03ac11`. Helper `03acdf..03acf1` passes stack literal

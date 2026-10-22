@@ -37,6 +37,28 @@ mu4_control_restore_terminal: complete=1 observer_writes=0 audio_acceptance=0
 ''')
 
 
+def resident_fixture():
+    text = fixture()
+    prefix = text[:text.index('mu4_control_state: phase=saved')]
+    prefix += ''.join(frame(i,0x60+i,i) for i in range(3,6))
+    prefix += 'mu4_playback_control_input: phase=resident_status49\n'
+    prefix += ''.join(f'mu4_native_command_input: cursor={i} total=37\n' for i in range(30,35))
+    cpu = ','.join(f'{name}:{(1 if name == "IDLE" else 0):010x}' for name in gate.REGISTERS)
+    snapshot = f't=11.205000000 cpu={cpu} ram=12345678 program=abcdef01 data_words=65408 program_bytes=16777216 observer_writes=0\n'
+    values = [0x7f,4,0x55,0x1e,5,0xaa,1,0x71,1,0,0,2,0xc2,0x55]
+    text = prefix
+    for phase in ('reference', 'restored'):
+        text += f'mu4_control_state: phase={"saved" if phase == "reference" else "restored"} '+snapshot
+        text += ''.join(f'mu4_control_replay_event: phase={phase} index={i} t={11.22+i*0.001:.9f} address=0033 value={v:04x} mask=ffff observer_writes=0\n'
+                        for i,v in enumerate(values))
+        text += 'mu4_native_recorder_control_ack: token=04 pin_output=1\n'+frame(6,0x71,2)
+    return text+'''mu4_control_replay: result=pass reference_events=14 restored_events=14 window=0.150000000 cap=4096 observer_writes=0 audio_acceptance=0
+mu4_playback_capture_terminal: closed=1 illegal=0
+mu4_playback_control_terminal: status_reply=1 input_cursor=37 decoded_calls=5 idle=1 pc=028923
+mu4_control_restore_terminal: complete=1 observer_writes=0 audio_acceptance=0
+'''
+
+
 class NativeControlRestoreTest(unittest.TestCase):
     def verify(self,text):return gate.check(text,'Fatal error: '+gate.COMPLETION+'\n')
 
@@ -45,6 +67,25 @@ class NativeControlRestoreTest(unittest.TestCase):
         self.assertEqual(result['registers'],36)
         self.assertEqual(result['tx_events'],14)
         self.assertFalse(result['audio_completion'])
+
+    def test_resident_status_replay(self):
+        result=gate.check(resident_fixture(),'Fatal error: '+gate.COMPLETION+'\n',True)
+        self.assertEqual(result['tx_events'],14)
+        self.assertFalse(result['audio_completion'])
+
+    def test_resident_status_pending_identity_and_replay_are_strict(self):
+        original=resident_fixture()
+        for old,new in [('phase=resident_status49','phase=other'), ('t=11.205000000','t=11.305000000'),
+                        ('token=02 class=1','token=03 class=1'), ('token=04 pin_output=1','token=05 pin_output=1'),
+                        ('input_cursor=37','input_cursor=29'), ('idle=1 pc=028923','idle=1 pc=0298ea')]:
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                gate.check(original.replace(old,new),'Fatal error: '+gate.COMPLETION+'\n',True)
+        with self.assertRaisesRegex(ValueError,'five of eight'):
+            gate.check(original.replace('cursor=34 total=37','cursor=35 total=37'),
+                       'Fatal error: '+gate.COMPLETION+'\n',True)
+        with self.assertRaisesRegex(ValueError,'pending'):
+            gate.check('mu4_native_recorder_control_ack: token=04 pin_output=1\n'+original,
+                       'Fatal error: '+gate.COMPLETION+'\n',True)
 
     def test_rejects_state_and_scope_changes(self):
         for old,new in [('ram=12345678','ram=00000000'),('program=abcdef01','program=00000000'),
