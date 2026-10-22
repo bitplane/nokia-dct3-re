@@ -23,6 +23,7 @@ from tools.mu4_context_contract import PLAYBACK_INPUT_UNITS_AA55, PLAYBACK_INPUT
 from tools.mu4_context_contract import PLAYBACK_REFILL_CONTROL, decode_playback_refill_control, reference_refill_control
 from tools.mu4_context_contract import PLAYBACK_PENDING_CONTROL, decode_playback_pending_control
 from tools.mu4_context_contract import PLAYBACK_PENDING16_PRODUCERS,decode_playback_pending16_producers
+from tools.mu4_context_contract import PLAYBACK_INPUT3_SENDERS,decode_playback_input3_senders
 from tools.mu4_context_contract import PLAYBACK_REFILL_COMPLETION, decode_playback_refill_completion, reference_refill_completion
 from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
@@ -202,6 +203,36 @@ class ContextContractTest(unittest.TestCase):
             changed[tag][0x7000]=0x12fb
             with self.subTest(added=tag),self.assertRaises(ValueError):
                 decode_playback_pending16_producers(changed)
+
+    def input3_images(self):
+        images=self.pending16_images()
+        images['aa99'].update({base+offset:value for base,witness in PLAYBACK_INPUT3_SENDERS.items()
+                              for offset,value in enumerate(witness)})
+        return images
+
+    def test_input3_sender_maps_selector30_not36_and_distinguishes_target_words(self):
+        result=decode_playback_input3_senders(self.input3_images())
+        self.assertEqual(result['pinned_words'],285)
+        self.assertEqual(result['serial']['selector'],0x30)
+        self.assertEqual(int(result['serial']['table'],16)+0x30-0x29,
+                         int(result['serial']['entry'],16))
+        self.assertEqual(result['serial']['target'],'038d03')
+        self.assertEqual(result['serial']['parameter3']['arguments'],[1,0,1])
+        self.assertIn('A825 == 1',result['serial']['parameter3']['gate'])
+        self.assertEqual(result['serial']['parameter4']['arguments'],[0,0,1])
+        self.assertEqual(result['direct_calls'],['028481','0284a4','02859a'])
+        self.assertEqual(result['raw_target_words']['aa99'],['028482','0284a5','02859b'])
+        self.assertIn('not live',result['scope'])
+
+    def test_input3_sender_rejects_source_mutation_and_added_references(self):
+        images=self.input3_images()
+        for address in images['aa99']:
+            changed={tag:dict(words) for tag,words in images.items()}
+            changed['aa99'][address]^=1
+            with self.subTest(address=address),self.assertRaises(ValueError):
+                decode_playback_input3_senders(changed)
+        images['aa55'][0x7777]=0x905d
+        with self.assertRaises(ValueError):decode_playback_input3_senders(images)
 
     def test_input_units_pins_descriptor_and_word_reader_argument_flow(self):
         images = [{base+i: value for base, witness in spans.items()

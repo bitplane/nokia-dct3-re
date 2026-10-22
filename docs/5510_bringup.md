@@ -9449,6 +9449,31 @@ The acquired receiver hook remains a no-op; no command, argument, hook or
 pending state should be synthesized to turn this source finding into a
 playback-completion claim.
 
+The companion`playback_input3_senders` contract extends the source coverage
+to285 words. Builder`02905d` writes BA56 as`{03, A, caller-SP[0],
+caller-SP[1]}` and sends four words through`0292a7`. Its three direct calls
+are`028481`, `0284a4` and`02859a`; the following words contain the target
+literal, not another instruction entry.
+
+The AA99 serial dispatcher indexes the table at`023d09` by selector minus
+`29`. Selector`30` selects index7/word`023d10=8d03`, reaching`038d03` in
+the current program page. This is **selector30, not recorder selector36**.
+Parameter03 calls`02846f`, which requires`A825=1`, sets it to2 and supplies
+builder arguments`{1,0,1}`; the
+controller's frame-word3 is nonzero, so this route does not set pending3.
+Parameter04 calls`028498`, whose builder arguments are`{0,0,1}`; with
+active`12fd`, this reaches the input03 pending3 producer. The third caller
+also supplies`{0,0,1}`, but its upstream owner remains unresolved.
+
+The dispatcher rejects a matching previous class/selector when the selector
+is above`28`. A declared external control test must respect this guard
+rather than force its previous-command state; the existing status-query
+transition is the candidate intervening exchange. These are source-derived
+control routes, not measured serial acceptance, official command names or
+an automatic EOF sequence. Next exercise the original serial/control path
+with a declared status/30-04 sequence and observe its input03/input16 effects;
+do not equate an explicit user stop with draining the protected EOF tail.
+
 The bounded native playback fixture now observes 402 complete software
 notification groups: publication `0292c1`, callback `020981`, vector
 `022064`, wrapper `020742`, and request-frame read `020780`. All groups

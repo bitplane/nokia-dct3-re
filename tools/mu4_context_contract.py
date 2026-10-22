@@ -1763,6 +1763,60 @@ def decode_playback_pending16_producers(images):
         scope='Raw mapped-word census plus pinned local routes; not a code/data split, computed-alias/bulk-writer closure, incoming command producer or runtime/EOF acceptance')
 
 
+PLAYBACK_INPUT3_SENDERS = {
+    0x2905d:(0x4a11,0xeefd,0xf495,0x1106,0x7107,0x0012,0x7711,0xba56,
+        0x7681,3,0x80e1,1,0x81e1,2,0x70e1,3,0x0012,0x4811,0x7600,4,
+        0xf982,0x92a7,0xee03,0x8a11,0xf4e4),
+    0x38ba8:(0x10f8,0x3767,0x08e6,2,0xf844,0x8bba,0x10f8,0x3766,
+        0x08f8,0x1187,0xf844,0x8bba,0xf7b8,0xe828,0x08f8,0x1188,0xf843,0x8f85),
+    0x38bf1:(0xf110,0x0029,0xf062,2,0x11f8,0x000b,0xf040,0x3d09,
+        0xf600,0x7ef8,0x0008,0xf4e2),
+    0x23d10:(0x8d03,),
+    0x38d03:(0x7105,0x3763,0x60f8,0x1189,2,0xf830,0x8d72,
+        0x60f8,0x1189,3,0xf830,0x8d4b,0x60f8,0x1189,4,0xf830,0x8d3b,
+        0x60f8,0x1189,0x0010,0xf830,0x8d2a),
+    0x38d3b:(0x76f8,0x3762,3,0x76f8,0x3750,0,0xe800,0x4ef8,0x375e,
+        0xe801,0x4ef8,0x3760,0xf982,0x8498,0xf073,0x8f85,0xf982,0x846f),
+    0x2846f:(0x4a11,0xeefd,0x60f8,0xa825,1,0xf820,0x8494,
+        0x76f8,0xa825,2,0xe801,0xf982,0x9189),
+    0x2847c:(0x7600,0,0x7601,1,0xe801,0xf982,0x905d),
+    0x28498:(0xeeaa,0x76f8,0xa825,0,0x76f8,0x375c,0,0xe800,
+        0x7600,0,0x7601,1,0xf982,0x905d),
+    0x28591:(0xeefe,0x76f8,0xa825,0,0xe800,0x7600,0,0x7601,1,
+        0xf982,0x905d,0xee02,0xf495,0xf4e4),
+}
+
+
+def decode_playback_input3_senders(images):
+    pending=decode_playback_pending16_producers(images)
+    words=images['aa99']
+    for base,witness in PLAYBACK_INPUT3_SENDERS.items():
+        if any(words.get(base+offset)!=value for offset,value in enumerate(witness)):
+            raise ValueError('playback input3 sender/serial selector source changed')
+    raw={tag:sorted(address for address,value in image.items() if value==0x905d)
+         for tag,image in images.items()}
+    if raw!={'aa55':[],'aa22':[],'aa88':[],
+             'aa99':[0x28482,0x284a5,0x2859b]}:
+        raise ValueError('input3 builder raw reference inventory changed')
+    return dict(pinned_words=pending['pinned_words']+sum(map(len,PLAYBACK_INPUT3_SENDERS.values())),
+        mapped_words_scanned=pending['mapped_words_scanned'],
+        builder=dict(entry='02905d',record='BA56',input=3,
+            arguments='record[1] <- A; record[2] <- caller SP[0]; record[3] <- caller SP[1]',
+            send='029071 -> 0292a7, count4'),
+        direct_calls=['028481','0284a4','02859a'],
+        raw_target_words={tag:[f'{address:06x}' for address in addresses] for tag,addresses in raw.items()},
+        serial=dict(selector=0x30,table='023d09',index=7,entry='023d10',target='038d03',
+            parameter3=dict(call='038d4b -> 02846f',builder_call='028481',arguments=[1,0,1],
+                            gate='A825 == 1; set A825 <- 2 before builder',
+                            pending_effect='frame3 is1, so the known input3 constant3 predicate is false'),
+            parameter4=dict(call='038d47 -> 028498',builder_call='0284a4',arguments=[0,0,1],
+                            pending_effect='frame3 is0; active12fd selects pending3'),
+            duplicate_guard='matching previous class3766/selector3767 with selector>28 exits before dispatch'),
+        additional_call=dict(site='02859a',entry='028591',arguments=[0,0,1],
+                             owner='not established by this census'),
+        scope='Pinned source sender/selector route and raw references across all four images; not live serial admission, complete external command grammar, all indirect callers or organic EOF acceptance')
+
+
 def decode_playback_refill_control(words):
     for base, witness in PLAYBACK_REFILL_CONTROL.items():
         for offset, expected in enumerate(witness):
@@ -2632,6 +2686,8 @@ def contract(source):
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
     result['playback_pending16_producers'] = decode_playback_pending16_producers(
+        dict(aa55=bootstrap_words,aa22=words,aa99=rel_words,aa88=recorder_words))
+    result['playback_input3_senders'] = decode_playback_input3_senders(
         dict(aa55=bootstrap_words,aa22=words,aa99=rel_words,aa88=recorder_words))
     result['recorder_stop_frontend'] = decode_recorder_stop_frontend(recorder_words)
     result['recorder_stop_mailbox'] = decode_recorder_stop_mailbox(recorder_words)
