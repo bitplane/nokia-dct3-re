@@ -9513,6 +9513,48 @@ ordered source opcodes, uncapped read-only observations and the clean final
 diagnostic. This is an explicit user control, **not automatic EOF draining,
 protected-tail recovery, audio-completion acceptance or complete 5510 boot**.
 
+`mu4_playback_serial_restore.lua` adds a separate same-process checkpoint at
+1.05 seconds, after the status request but before its response and the next
+control. It restores 36 exposed CPU registers and checksums over 65,408
+non-MMIO data words and the 16-MiB program backing. The reference and restored
+0.15-second windows each contain exactly 14 native TX-register writes: the
+complete status response followed by control ACK03, with identical values,
+order and timestamps. The restored continuation reaches the same pending3
+sender, resident IDLE3 and rejecting terminal diagnostic as the cold control.
+
+The external peer's ACK count belongs to the shared media-command save state,
+not only recorder profiles. Binary diagnostic streams require separate host
+file handling: before loading, preserve each complete reference as
+`.before-load-1`, then rewind its active file and capture counters together.
+Nine preserved reference prefixes (3,631,970 bytes) match the replay; all nine
+complete restored captures additionally match the independent cold control
+byte-for-byte (173,513,990 bytes). This covers TX, codec input, DMA source,
+slot/time records, DXR writes/events, decoded-return blocks and the ideal
+headphone diagnostic stream, not measured analogue output.
+
+Restored metadata says `save_restore=same_process_rewind`; cold captures retain
+`unsupported`. Existing cold-only audio checkers deliberately do not accept the
+new scope. Loading into another process, loading after capture closure and
+portable capture files remain unsupported; missing, closed or shorter active
+captures fail closed. File-position checks are not a process-identity proof.
+Files are external
+diagnostics, not emulated storage; NVRAM retention under `-nonvram_save` still
+does not prove runtime NAND write absence. Reproduce using the restore Lua in
+place of the cold observer, then require both independent runs:
+
+```sh
+.venv/bin/python tools/mu4_playback_serial_restore_check.py RESTORED_RUN \
+  --console RESTORED_CONSOLE --cold-control COLD_RUN --cold-console COLD_CONSOLE \
+  --source roms/5510-mu4-reference/InitData_R060.a00 --input-nand INPUT_NAND
+```
+
+The checker rejects missing registers/checksums, non-pending checkpoints,
+changed replay timing or bytes, altered wire framing, capped observations,
+reference-prefix drift, any cold/restored capture difference, incomplete
+continuation or unhealthy process exit. This qualifies this native control's
+restoration; it does not promote automatic EOF, full audio completion, native
+handset speech or complete 5510 support.
+
 The bounded native playback fixture now observes 402 complete software
 notification groups: publication `0292c1`, callback `020981`, vector
 `022064`, wrapper `020742`, and request-frame read `020780`. All groups

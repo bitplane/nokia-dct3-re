@@ -14,6 +14,7 @@
 #include <vector>
 #include <sstream>
 #include <fstream>
+#include <filesystem>
 #include <map>
 
 namespace {
@@ -959,8 +960,11 @@ private:
 	std::array<u32, 3> m_playback_execute_entries{};
 	std::array<u32, 2> m_playback_audio_words{}, m_playback_audio_nonzero{};
 	std::array<u32, 2> m_playback_audio_hash{2166136261U, 2166136261U};
-	// Observation-only streams are deliberately not save-state outputs.
+	// Diagnostic files are external: same-process loads preserve the reference
+	// sidecars and rewind to saved positions; cross-process capture is unsupported.
 	std::array<std::ofstream, 3> m_playback_word_capture;
+	std::array<u64, 9> m_playback_capture_positions{};
+	unsigned m_playback_capture_loads = 0; // Artifact names, not emulated state.
 	std::ofstream m_playback_slot_capture;
 	std::ofstream m_playback_tx_time_capture;
 	u32 m_playback_tx_time_hash = 2166136261U;
@@ -1507,42 +1511,43 @@ private:
 	void finish_playback_capture()
 	{
 		if (m_playback_capture_finished) return;
+		char const *const restore_scope = m_playback_capture_loads ? "same_process_rewind" : "unsupported";
 		std::array<u32,3> const counts{m_playback_audio_words[0],m_playback_audio_words[1],m_playback_dma_reads};
 		std::array<u32,3> const hashes{m_playback_audio_hash[0],m_playback_audio_hash[1],m_playback_dma_hash};
 		for (unsigned i=0;i<3;++i)
 		{
 			auto &stream=m_playback_word_capture[i]; stream.flush(); auto const bytes=stream.tellp(); stream.close();
 			if (!stream || bytes != std::streamoff(counts[i])*2) fatalerror("MU4 playback observation capture is incomplete");
-			logerror("mu4_playback_word_capture: boundary=%s words=%u bytes=%u hash=%08x encoding=le16 file=%s save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
-				std::array<char const *,3>{"mcbsp_tx","codec_din","dma_source"}[i],counts[i],counts[i]*2,hashes[i],PLAYBACK_CAPTURE_FILES[i]);
+			logerror("mu4_playback_word_capture: boundary=%s words=%u bytes=%u hash=%08x encoding=le16 file=%s save_restore=%s observer_writes=0 audio_acceptance=0\n",
+				std::array<char const *,3>{"mcbsp_tx","codec_din","dma_source"}[i],counts[i],counts[i]*2,hashes[i],PLAYBACK_CAPTURE_FILES[i],restore_scope);
 		}
 		m_playback_slot_capture.flush(); auto const slot_bytes=m_playback_slot_capture.tellp(); m_playback_slot_capture.close();
 		if (!m_playback_slot_capture || slot_bytes != std::streamoff(counts[1])*9) fatalerror("MU4 playback slot observation is incomplete");
-		logerror("mu4_playback_slot_capture: records=%u bytes=%u fnv1a=%08x encoding=le64ns_u8slot file=mu4_playback_din.slots save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
-			counts[1],counts[1]*9,m_playback_slot_hash);
+		logerror("mu4_playback_slot_capture: records=%u bytes=%u fnv1a=%08x encoding=le64ns_u8slot file=mu4_playback_din.slots save_restore=%s observer_writes=0 audio_acceptance=0\n",
+			counts[1],counts[1]*9,m_playback_slot_hash,restore_scope);
 		m_playback_tx_time_capture.flush(); auto const tx_bytes=m_playback_tx_time_capture.tellp(); m_playback_tx_time_capture.close();
 		if (!m_playback_tx_time_capture || tx_bytes != std::streamoff(counts[0])*8) fatalerror("MU4 playback TX time observation is incomplete");
-		logerror("mu4_playback_tx_time_capture: records=%u bytes=%u fnv1a=%08x encoding=le64ns file=mu4_playback_tx.times save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
-			counts[0],counts[0]*8,m_playback_tx_time_hash);
+		logerror("mu4_playback_tx_time_capture: records=%u bytes=%u fnv1a=%08x encoding=le64ns file=mu4_playback_tx.times save_restore=%s observer_writes=0 audio_acceptance=0\n",
+			counts[0],counts[0]*8,m_playback_tx_time_hash,restore_scope);
 		m_playback_dxr_capture.flush(); auto const dxr_bytes=m_playback_dxr_capture.tellp(); m_playback_dxr_capture.close();
 		if (!m_playback_dxr_capture || dxr_bytes != std::streamoff(m_playback_dxr_writes)*16) fatalerror("MU4 playback DXR observation is incomplete");
-		logerror("mu4_playback_dxr_capture: records=%u bytes=%u fnv1a=%08x encoding=le64ns_u32ordinal_u16word_u8owner_u8reserved file=mu4_playback_dxr.writes save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
-			m_playback_dxr_writes,m_playback_dxr_writes*16,m_playback_dxr_hash);
+		logerror("mu4_playback_dxr_capture: records=%u bytes=%u fnv1a=%08x encoding=le64ns_u32ordinal_u16word_u8owner_u8reserved file=mu4_playback_dxr.writes save_restore=%s observer_writes=0 audio_acceptance=0\n",
+			m_playback_dxr_writes,m_playback_dxr_writes*16,m_playback_dxr_hash,restore_scope);
 		m_playback_tx_event_capture.flush(); auto const event_bytes=m_playback_tx_event_capture.tellp(); m_playback_tx_event_capture.close();
 		u32 const captured_events = std::min(m_playback_tx_events,PLAYBACK_TX_EVENT_CAP);
 		if (!m_playback_tx_event_capture || event_bytes != std::streamoff(captured_events)*16) fatalerror("MU4 playback TX event observation is incomplete");
-		logerror("mu4_tx_event_capture: records=%u bytes=%u fnv1a=%08x capped=%u encoding=le64ns_u16word_u8event_u8owner_u32source file=mu4_playback_tx.events save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
-			captured_events,captured_events*16,m_playback_tx_event_hash,unsigned(m_playback_tx_events>PLAYBACK_TX_EVENT_CAP));
+		logerror("mu4_tx_event_capture: records=%u bytes=%u fnv1a=%08x capped=%u encoding=le64ns_u16word_u8event_u8owner_u32source file=mu4_playback_tx.events save_restore=%s observer_writes=0 audio_acceptance=0\n",
+			captured_events,captured_events*16,m_playback_tx_event_hash,unsigned(m_playback_tx_events>PLAYBACK_TX_EVENT_CAP),restore_scope);
 		m_playback_dac_capture.flush(); auto const dac_bytes=m_playback_dac_capture.tellp(); m_playback_dac_capture.close();
 		u32 const captured_dac = std::min(m_playback_dac_capture_frames,PLAYBACK_DAC_FRAME_CAP);
 		if (!m_playback_dac_capture || dac_bytes != std::streamoff(captured_dac)*32) fatalerror("MU4 full DAC observation is incomplete");
-		logerror("mu4_dac_capture: frames=%u bytes=%u fnv1a=%08x capped=%u encoding=le64ns_i16left_i16right_u8lvol_u8rvol_u16reserved_f64left_f64right file=mu4_headphone.frames save_restore=unsupported observer_writes=0 analog_filter=0 audio_acceptance=0\n",
-			captured_dac,captured_dac*32,m_playback_dac_capture_hash,unsigned(m_playback_dac_capture_frames>PLAYBACK_DAC_FRAME_CAP));
+		logerror("mu4_dac_capture: frames=%u bytes=%u fnv1a=%08x capped=%u encoding=le64ns_i16left_i16right_u8lvol_u8rvol_u16reserved_f64left_f64right file=mu4_headphone.frames save_restore=%s observer_writes=0 analog_filter=0 audio_acceptance=0\n",
+			captured_dac,captured_dac*32,m_playback_dac_capture_hash,unsigned(m_playback_dac_capture_frames>PLAYBACK_DAC_FRAME_CAP),restore_scope);
 		m_playback_decoded_capture.flush(); auto const decoded_bytes=m_playback_decoded_capture.tellp(); m_playback_decoded_capture.close();
 		if (!m_playback_decoded_capture || decoded_bytes != std::streamoff(m_playback_decoded_words)*2) fatalerror("MU4 decoded-return observation is incomplete");
-		logerror("mu4_decoded_return_capture: calls=%u returns=%u blocks=%u words=%u bytes=%u fnv1a=%08x bad=%u pending=%u capped=%u encoding=le16 file=mu4_decoded_returns.le16 retirement=unclaimed save_restore=unsupported observer_writes=0 audio_acceptance=0\n",
+		logerror("mu4_decoded_return_capture: calls=%u returns=%u blocks=%u words=%u bytes=%u fnv1a=%08x bad=%u pending=%u capped=%u encoding=le16 file=mu4_decoded_returns.le16 retirement=unclaimed save_restore=%s observer_writes=0 audio_acceptance=0\n",
 			m_playback_processing[0],m_playback_processing[1],m_playback_processing[2],m_playback_decoded_words,m_playback_decoded_words*2,m_playback_decoded_hash,m_playback_processing[3],
-			unsigned(m_playback_processing_pending || m_playback_conversion_active || m_playback_conversion_pending),unsigned(m_playback_processing[0]>=512));
+			unsigned(m_playback_processing_pending || m_playback_conversion_active || m_playback_conversion_pending),unsigned(m_playback_processing[0]>=512),restore_scope);
 		m_playback_capture_finished = true;
 		logerror("mu4_playback_capture_terminal: closed=1 illegal=%u t=%.9f observer_writes=0 audio_acceptance=0\n",
 			unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), machine().time().as_double());
@@ -3327,6 +3332,14 @@ private:
 			save_item(NAME(m_playback_requests)); save_item(NAME(m_playback_inspections)); save_item(NAME(m_playback_decoder_loads));
 			save_item(NAME(m_playback_overlay_checked));
 			save_item(NAME(m_playback_status_replied));
+			save_item(NAME(m_playback_capture_positions));
+			save_item(NAME(m_playback_tx_time_hash));
+			save_item(NAME(m_playback_dxr_hash)); save_item(NAME(m_playback_dxr_writes));
+			save_item(NAME(m_playback_tx_event_hash)); save_item(NAME(m_playback_tx_events));
+			save_item(NAME(m_playback_decoded_hash)); save_item(NAME(m_playback_decoded_words));
+			save_item(NAME(m_playback_dac_capture_frames)); save_item(NAME(m_playback_dac_capture_hash));
+			save_item(NAME(m_playback_tx_lifecycle_events)); save_item(NAME(m_playback_tx_startup_events));
+			save_item(NAME(m_playback_startup_frames));
 			save_item(NAME(m_playback_execute_entries)); save_item(NAME(m_playback_execute_steps)); save_item(NAME(m_playback_filter));
 			save_item(NAME(m_playback_audio_words)); save_item(NAME(m_playback_audio_nonzero)); save_item(NAME(m_playback_audio_hash));
 			save_item(NAME(m_playback_audio_last_nonzero));
@@ -3369,13 +3382,14 @@ private:
 			if (media_command_profile())
 			{
 				save_item(NAME(m_recorder_response_begin)); save_item(NAME(m_recorder_responses));
+				save_item(NAME(m_recorder_control_acks));
 			}
 			if (recorder_profile())
 			{
 				save_item(NAME(m_recorder_dispatches)); save_item(NAME(m_recorder_loader_calls));
 				save_item(NAME(m_recorder_overlay_checked));
 				save_item(NAME(m_recorder_startup_entries));
-				save_item(NAME(m_recorder_control_entries)); save_item(NAME(m_recorder_control_acks));
+				save_item(NAME(m_recorder_control_entries));
 				save_item(NAME(m_recorder_metadata_result));
 				save_item(NAME(m_recorder_application_calls)); save_item(NAME(m_recorder_application_messages));
 				save_item(NAME(m_recorder_processing_waits)); save_item(NAME(m_recorder_processing_returns));
@@ -3450,6 +3464,18 @@ private:
 		m_saved_command_decoded_count = m_command_wire_decoded.size();
 		std::copy(m_command_tx_words.begin(), m_command_tx_words.end(), m_saved_command_tx.begin());
 		std::copy(m_command_wire_decoded.begin(), m_command_wire_decoded.end(), m_saved_command_decoded.begin());
+		if (playback_profile())
+		{
+			auto const captures = playback_capture_streams();
+			for (unsigned i = 0; i < captures.size(); ++i)
+			{
+				auto &stream = *captures[i].first;
+				stream.flush();
+				auto const offset = stream.tellp();
+				if (!stream || offset < 0) fatalerror("MU4 playback checkpoint has no open diagnostic capture");
+				m_playback_capture_positions[i] = u64(offset);
+			}
+		}
 	}
 	void restore_command_peer()
 	{
@@ -3457,6 +3483,42 @@ private:
 			fatalerror("MU4 command peer snapshot has invalid capture count");
 		m_command_tx_words.assign(m_saved_command_tx.begin(), m_saved_command_tx.begin() + m_saved_command_tx_count);
 		m_command_wire_decoded.assign(m_saved_command_decoded.begin(), m_saved_command_decoded.begin() + m_saved_command_decoded_count);
+		if (playback_profile())
+		{
+			++m_playback_capture_loads;
+			auto const captures = playback_capture_streams();
+			for (unsigned i = 0; i < captures.size(); ++i)
+			{
+				auto &stream = *captures[i].first;
+				stream.flush();
+				auto const offset = stream.tellp();
+				if (!stream || offset < 0 || u64(offset) < m_playback_capture_positions[i])
+					fatalerror("MU4 playback diagnostic rewind requires the same open capture process");
+				stream.close();
+				std::string const reference = std::string(captures[i].second) + ".before-load-" + std::to_string(m_playback_capture_loads);
+				std::error_code error;
+				std::filesystem::copy_file(captures[i].second, reference, std::filesystem::copy_options::none, error);
+				if (error) fatalerror("MU4 playback reference capture could not be preserved: %s", error.message());
+				std::filesystem::resize_file(captures[i].second, m_playback_capture_positions[i], error);
+				if (error) fatalerror("MU4 playback capture could not be rewound: %s", error.message());
+				stream.open(captures[i].second, std::ios::binary | std::ios::app);
+				if (!stream) fatalerror("MU4 playback capture could not be reopened");
+				logerror("mu4_playback_capture_rewind: index=%u bytes=%llu reference=%s same_process=1 firmware_state_forcing=0 observer_writes=0 audio_acceptance=0\n",
+					i, static_cast<unsigned long long>(m_playback_capture_positions[i]), reference);
+			}
+		}
+	}
+	std::array<std::pair<std::ofstream *, char const *>, 9> playback_capture_streams()
+	{
+		return {{{&m_playback_word_capture[0], PLAYBACK_CAPTURE_FILES[0]},
+			{&m_playback_word_capture[1], PLAYBACK_CAPTURE_FILES[1]},
+			{&m_playback_word_capture[2], PLAYBACK_CAPTURE_FILES[2]},
+			{&m_playback_slot_capture, "mu4_playback_din.slots"},
+			{&m_playback_tx_time_capture, "mu4_playback_tx.times"},
+			{&m_playback_dxr_capture, "mu4_playback_dxr.writes"},
+			{&m_playback_tx_event_capture, "mu4_playback_tx.events"},
+			{&m_playback_decoded_capture, "mu4_decoded_returns.le16"},
+			{&m_playback_dac_capture, "mu4_headphone.frames"}}};
 	}
 	void capture_native_ram(char const *stage)
 	{
