@@ -2344,6 +2344,48 @@ is needed.
 These are laboratory HLE signaling and UI/storage results, not an external
 SMSC, SIP SMS, fitted resident DSP or hardware RF qualification.
 
+## Host-originated USSD notification
+
+The own PIN-enabled registered card and `fixtures/nsb7_host/nsb7hle.cfg`
+also qualify one external supplementary-service notification. The physical
+PIN/phone-code fixture emits a host readiness marker at24s; the host then
+admits `Host notice` once, without a firmware write or fabricated handset
+message. PCS600 registration and both MCU location-update consumers remain
+required by the existing authentication checker.
+
+The qualified run admits the request at24.010s, receives the network notify
+at25.735s, returns result `8b3a05a203020101` at26.284s and completes RR
+release/delivery at26.320s. Physical Menu30 opens the full `Host notice` text;
+End32 returns to exact13:48 `DCT3 LAB` idle, and Menu34 continues navigation.
+The whole3570-byte card remains unchanged and the own flash journal is valid.
+Reviewed RGB hashes are pinned by `nsb7_host_ussd_check.py`; an adapter-level
+delivered event alone is insufficient.
+
+Starting with a fresh copy of `tmp/nsb7-pin-registration-cold/nvram`, copy
+the host cfg to `RUN/cfg/nsb7hle.cfg` and retain the initial card as
+`RUN/initial_sim_card.bin`. Do not copy RAM or save states. Then run:
+
+```sh
+.venv/bin/python tools/run_host_incoming_ussd_gate.py --port 18950 \
+  --text 'Host notice' --ready-marker 'nsb7_ussd: ready' -- \
+  .venv/bin/python tools/run_mame_isolated.py --mame-dir mame --run-dir RUN -- \
+  nsb7hle -rompath ../roms -video none -sound none -nothrottle \
+  -seconds_to_run 42 -log -verbose -debug -debugger none -http \
+  -http_port 18950 -autoboot_delay 0 \
+  -autoboot_script ../tools/nsb7_host_ussd_notify.lua > RUN-console.log 2>&1
+.venv/bin/python tools/nsb7_host_ussd_check.py \
+  roms/noki8290/8290f522a.fls RUN --console RUN-console.log
+```
+
+Qualified capture: `tmp/nsb7-host-ussd-authenticated`. The console marker is
+fixture coordination after physical input, not a device readiness claim.
+This is a one-way notification with physical reading/dismissal, not an
+interactive USSD reply session, mobile-originated USSD, native DSP/RF or speech.
+The shared runner drains and checks the complete console, so a Lua input error
+cannot be mistaken for success. Its restore mode validates each epoch's
+ordered lifecycle and waits for restored delivery even if the reference
+already delivered; this handset notification gate does not exercise restore.
+
 ## Host incoming call from settled idle
 
 `nsb7_pin_host_incoming_call.lua` composes physical PIN/phone-code entry with

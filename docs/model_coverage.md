@@ -75,6 +75,12 @@ packet-timeout reset selection. It is not evidence of factory policy or RF
 acquisition. The6130's separately measured reason68 restart remains a distinct
 product/fixture result; neither deadline nor policy is inherited across ROMs.
 
+NSB-7's separate host-USSD notification gate additionally proves settled
+PIN/phone-authenticated PCS600 delivery, exact `Host notice` physical
+readback, End-to-idle recovery and complete unchanged SIM contents. This is
+one-way notification acceptance, not interactive USSD reply, native radio or
+speech; see `nsb7_host_ussd_check.py` and `8290_bringup.md`.
+
 ## Promotion rules
 
 `verify-5210-sim-pin-registration` independently proves early physical

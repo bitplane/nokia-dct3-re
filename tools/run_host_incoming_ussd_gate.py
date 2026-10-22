@@ -13,8 +13,21 @@ except ModuleNotFoundError:
     from run_host_ussd_gate import pack_gsm7
 
 
+async def read_console(stream, ready, marker):
+    chunks=[]
+    while line:=await stream.readline():
+        chunks.append(line)
+        if marker and marker in line.decode(errors='replace'):
+            ready.set()
+    return b''.join(chunks).decode(errors='replace')
+
+
 async def run(args: argparse.Namespace) -> None:
-    process = await asyncio.create_subprocess_exec(*args.command, cwd=args.cwd)
+    process = await asyncio.create_subprocess_exec(*args.command, cwd=args.cwd,
+        stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.STDOUT)
+    ready=asyncio.Event()
+    marker=getattr(args,'ready_marker',None)
+    console=asyncio.create_task(read_console(process.stdout,ready,marker))
     try:
         websocket = await connect(args.port, process)
         async with websocket:
@@ -27,6 +40,8 @@ async def run(args: argparse.Namespace) -> None:
                 elif (event.get("type") == "network_state" and
                         event.get("epoch") == epoch):
                     registered = event.get("registered") is True
+            if marker:
+                await asyncio.wait_for(ready.wait(),40)
             await websocket.send(json.dumps({
                 "type": "incoming_ussd",
                 "epoch": epoch,
@@ -37,23 +52,24 @@ async def run(args: argparse.Namespace) -> None:
             phases = []
             initial_epoch = epoch
             restored = False
-            while "delivered" not in phases:
+            while "delivered" not in phases or (args.require_restore and not restored):
                 event = json.loads(await asyncio.wait_for(websocket.recv(), 40))
                 if event.get("type") == "call_adapter_ready":
                     new_epoch = event.get("epoch")
                     if (args.require_restore and isinstance(new_epoch, int) and
                             new_epoch != initial_epoch):
+                        if restored or new_epoch <= initial_epoch:
+                            raise RuntimeError(f"unexpected USSD restore epoch {new_epoch!r}")
                         epoch = new_epoch
                         phases = []
                         restored = True
                     continue
                 if event.get("type") == "incoming_ussd_state":
                     if event.get("epoch") != epoch or event.get("request_id") != 1:
-                        if (args.require_restore and not restored and
-                                event.get("epoch") == initial_epoch):
-                            continue
                         raise RuntimeError(f"uncorrelated incoming USSD state {event!r}")
                     phases.append(event.get("phase"))
+                    if phases != ["queued", "delivered"][:len(phases)]:
+                        raise RuntimeError(f"unexpected incoming USSD phases {phases!r}")
             if phases != ["queued", "delivered"]:
                 raise RuntimeError(f"unexpected incoming USSD phases {phases!r}")
             if args.require_restore and not restored:
@@ -61,10 +77,18 @@ async def run(args: argparse.Namespace) -> None:
         result = await asyncio.wait_for(process.wait(), 90)
         if result:
             raise RuntimeError(f"MAME exited with status {result}")
+        output=await console
+        print(output,end='')
+        try:
+            from tools.run_sip_handset_gate import verify_handset_health
+        except ModuleNotFoundError:
+            from run_sip_handset_gate import verify_handset_health
+        verify_handset_health(output)
     finally:
         if process.returncode is None:
             process.terminate()
             await process.wait()
+        await console
 
 
 def main() -> int:
@@ -72,6 +96,7 @@ def main() -> int:
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--cwd")
     parser.add_argument("--require-restore", action="store_true")
+    parser.add_argument("--ready-marker", help="wait for this fixture console marker before admission")
     parser.add_argument("--text", default="Host notice")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()

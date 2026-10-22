@@ -200,6 +200,16 @@ the host request; the new epoch must independently reach delivery. Handset
 console health and product-specific protocol/storage checks remain separate
 requirements.
 
+`run_host_incoming_ussd_gate.py` applies the same console-health and
+per-epoch notification-order checks. Its optional `--ready-marker` waits for
+a flushed fixture console marker before host admission; it neither writes
+handset state nor changes device timing. NSB-7 uses this to send `Host notice`
+after physical PIN/phone unlock, then qualifies exact text, idle/menu
+continuation and unchanged card with `nsb7_host_ussd_check.py`. This is
+notification acceptance, not an interactive USSD reply session. The existing
+NSE-8 `verify-radio-incoming-ussd-host-restore` also passes with the shared
+runner's restored-epoch handling.
+
 The USSD host contract preserves the BER-decoded DCS and packed payload. A
 `success` response carries `dcs` and hexadecimal `data`; `return_error` and
 `reject` may carry `error_code`. The session builds the correlated GSM
