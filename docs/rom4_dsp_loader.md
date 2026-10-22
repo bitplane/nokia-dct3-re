@@ -2914,7 +2914,27 @@ sources, repeat/control composition and simultaneous peripheral arbitration
 remain excluded. The original AA22 INT2 handler's `0288cb:71f8 1420 0058`
 is a concrete native consumer: it restores the model's PLL selection after
 deep-idle wake. This does not establish physical lock time or completed native
-wake continuation; the later POPM IFR remains a separate staged boundary.
+wake continuation by itself. The following interrupt-register stack operations
+are covered separately below.
+
+`pop-irq` covers 192 staged `POPM IMR` / `POPM IFR` cases and restores:
+four saved words, four pending-IFR patterns, two program pages and three
+snapshot boundaries. The stack is read/incremented once in Read; Execute
+publishes the retained word through the existing register implementation.
+IMR is replaced, whereas IFR is **write-one-to-clear**, not restored as a
+pending-bit snapshot. Changing the stack word after Read does not change the
+publication, and neither destination is read as an instruction operand.
+Interrupt delivery is masked in this isolated fixture: it does not qualify
+general unmasked POPM/IRQ arbitration. TI SPRU172C section 4-128 identifies
+POPM as a one-word class-17A stack-to-MMR operation with no status-bit effects.
+
+`pop-irq-edge` checks 24 fail-closed cases/restores: both destinations,
+single repeat and both branch-delay positions, two pages and two snapshot
+boundaries. These unsupported compositions stop before stack reads, SP
+changes, mask writes or pending-bit acknowledgements. The decoder captures
+delay ownership before consuming the final delay word; testing only the
+remaining count afterward would incorrectly admit the last delay slot.
+This prototype exclusion is not a claim that physical silicon traps there.
 
 Standalone extended MVPD now retains its absolute or long-offset data
 destination separately from its program source. Absolute form consumes

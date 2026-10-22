@@ -3574,12 +3574,26 @@ private:
 		m_phase = 251430; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	struct irq_pop_fixture
+	{
+		u16 destination, value, pending, mask;
+		u32 base;
+		unsigned checkpoint;
+	};
+	static irq_pop_fixture irq_pop_case(unsigned variant)
+	{
+		return {u16(variant % 2),std::array<u16,4>{0,1,0x5a5a,0xffff}[(variant / 2) % 4],
+			std::array<u16,4>{0,4,0xa5a5,0xffff}[(variant / 8) % 4],0x1357,
+			(variant / 32) % 2 ? 0x10000U : 0U,4 + variant / 64};
+	}
 	void start_pipeline_mmr_pop(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant;
-		u16 const destination = variant / 6 < 18 ? 6 + variant / 6 : 0x19;
-		u32 const base = BIT(variant, 0) ? 0x10000 : 0;
+		bool const irq = !strcmp(machine().options().bios(),"pop-irq") || !strcmp(machine().options().bios(),"pop-irq-edge"); auto const f = irq_pop_case(variant);
+		u16 const destination = irq ? f.destination : variant / 6 < 18 ? 6 + variant / 6 : 0x19;
+		u16 const value = irq ? f.value : 0x6aa5;
+		u32 const base = irq ? f.base : BIT(variant, 0) ? 0x10000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : 0x8a00 | destination);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
@@ -3590,29 +3604,53 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-		m_cpu->space(AS_DATA).write_word(0x1000, 0x6aa5);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, irq ? f.pending : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, irq ? f.mask : 0);
+		m_cpu->space(AS_DATA).write_word(0x1000, value);
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600);
 		u16 const initial = m_cpu->space(AS_DATA).read_word(destination);
 		m_cpu->set_pipeline_frontend(true);
 		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
 		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_extensions_reads = 0;
+		if (irq) m_pipeline_fetch_tap = m_cpu->space(AS_DATA).install_read_tap(0,1,"irq_pop_no_destination_read",[this](offs_t,u16 &,u16) { if (!machine().side_effects_disabled()) ++m_pipeline_extensions_reads; });
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x1000, 0x1000, "staged_pop_stack",
-			[this](offs_t, u16 &value, u16) {
+			[this, value](offs_t, u16 &word, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(value == 0x6aa5 && m_cpu->pipeline_cycles() == 5, "POPM samples its stack word once in Read");
+				expect(word == value && m_cpu->pipeline_cycles() == 5, "POPM samples its stack word once in Read");
 				++m_pipeline_operand_reads;
 			});
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(destination, destination, "staged_pop_destination",
-			[this, destination, initial](offs_t, u16 &value, u16) {
+			[this, destination, initial, value, irq](offs_t, u16 &word, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(value == 0x6aa5 && m_cpu->pipeline_cycles() == (destination >= 0x10 ? 5 : 6) &&
-					m_cpu->space(AS_DATA).read_word(destination) == initial, "POPM writes DAGEN in Read and other destinations in Execute");
+				u16 const before = irq ? m_cpu->state_int(destination ? tms320c54x_device::STATE_IFR : tms320c54x_device::STATE_IMR) : m_cpu->space(AS_DATA).read_word(destination);
+				expect(word == value && m_cpu->pipeline_cycles() == (destination >= 0x10 ? 5 : 6) &&
+					before == initial, "POPM writes DAGEN in Read and other destinations in Execute");
 				++m_pipeline_store_writes;
 			});
 		m_phase = 251450; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_interrupt_pop_edge(unsigned variant = 0)
+	{
+		unsigned const destination = variant % 2, context = (variant / 2) % 3;
+		u32 const base = (variant / 6) % 2 ? 0x10000 : 0;
+		start_pipeline_mmr_pop(4 + destination + (base ? 32 : 0));
+		m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_pipeline_peripheral_case = variant;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i=0;i<16;++i) program.write_word(base+0x600+i,0xf495);
+		unsigned pc=base+0x600;
+		program.write_word(pc++,context ? 0xf273 : 0xec01);
+		if (context) program.write_word(pc++,0x680);
+		if (context==2) program.write_word(pc++,0xf495);
+		program.write_word(pc,0x8a00|destination);
+		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
+		m_pipeline_operand_reads=m_pipeline_store_writes=0;
+		m_pipeline_operand_tap=m_cpu->space(AS_DATA).install_read_tap(0,0xffff,"irq_pop_edge_reads",[this](offs_t,u16 &,u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
+		m_pipeline_write_tap=m_cpu->space(AS_DATA).install_write_tap(0,0xffff,"irq_pop_edge_writes",[this](offs_t,u16 &,u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
+		m_pipeline_replay=false; m_idle_fixture_tick=0; m_phase=62080;
+		m_cpu->set_state_int(STATE_GENPC,base+0x600); m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
 	}
 	void start_pipeline_pop_dagen_conflict(unsigned variant = 0)
 	{
@@ -20088,6 +20126,8 @@ private:
 	virtual void machine_reset() override
 	{
 		if (!strcmp(machine().options().bios(), "idle-modes")) { start_pipeline_idle1(); return; }
+		if (!strcmp(machine().options().bios(), "pop-irq")) { start_pipeline_mmr_pop(); return; }
+		if (!strcmp(machine().options().bios(), "pop-irq-edge")) { start_interrupt_pop_edge(); return; }
 		if (!strcmp(machine().options().bios(), "clock-mvdk-edge")) { start_clkmd_move_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mvpd-extended")) { start_extended_mvpd(); return; }
 		if (!strcmp(machine().options().bios(), "mvpd-ext-edge")) { start_extended_mvpd_edge(); return; }
@@ -42580,19 +42620,55 @@ private:
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251430;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
+		if (m_phase == 62080)
+		{
+			unsigned const variant=m_pipeline_peripheral_case,tick=++m_idle_fixture_tick,checkpoint=2+variant/12;
+			if (tick==checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline)==STATERR_NONE,"Save excluded interrupt POPM before stack effects");
+			}
+			if (tick==12)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads && !m_pipeline_store_writes &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP)==0x1000 && m_cpu->state_int(tms320c54x_device::STATE_IMR)==0x1357 &&
+					!m_cpu->state_int(tms320c54x_device::STATE_IFR),"Excluded interrupt POPM has no stack, mask or acknowledgement effects");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay=true; m_idle_fixture_tick=checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
+					expect(machine().save().read_stream(m_saved_pipeline)==STATERR_NONE,"Restore excluded interrupt POPM");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_phase=62081; m_check_timer->enable(true); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant<23) { start_interrupt_pop_edge(variant+1); return; }
+				osd_printf_info("TMS320C54x interrupt POPM exclusions: PASS cases=24 restore=24 destinations=IMR,IFR contexts=RPT,BD_first,BD_last pages=2 snapshots=2 reads=0 writes=0 stack_changes=0 mask_changes=0 acknowledgements=0 hardware_trap_claim=0\n");
+				throw emu_fatalerror(0,"TMS320C54x isolated interrupt POPM exclusions complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return;
+		}
+		if (m_phase==62081) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase=62080; m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return; }
 		if (m_phase == 251450)
 		{
+			bool const irq = !strcmp(machine().options().bios(),"pop-irq"); auto const f = irq_pop_case(m_pipeline_peripheral_case);
 			u64 const cycle = m_cpu->pipeline_cycles();
-			u64 const checkpoint = 4 + (m_pipeline_peripheral_case % 6) / 2;
-			u16 const destination = m_pipeline_peripheral_case / 6 < 18 ? 6 + m_pipeline_peripheral_case / 6 : 0x19;
+			u64 const checkpoint = irq ? f.checkpoint : 4 + (m_pipeline_peripheral_case % 6) / 2;
+			u16 const destination = irq ? f.destination : m_pipeline_peripheral_case / 6 < 18 ? 6 + m_pipeline_peripheral_case / 6 : 0x19;
 			unsigned const write_clock = destination >= 0x10 ? 5 : 6;
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
 				m_pipeline_operand_reads == unsigned(cycle >= 5) && m_pipeline_store_writes == unsigned(cycle >= write_clock) &&
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= 5 ? 0x1001 : 0x1000),
 				"POPM retains one stack read, increment and register write across replay");
-			if (cycle >= write_clock)
+			if (irq && cycle >= write_clock)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IMR) == (destination ? f.mask : f.value) &&
+					m_cpu->state_int(tms320c54x_device::STATE_IFR) == (destination ? u16(f.pending & ~f.value) : f.pending) &&
+					!m_pipeline_extensions_reads && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xe && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
+					"POPM IMR replaces its mask; POPM IFR acknowledges saved one bits without destination reads or status changes");
+			}
+			if (!irq && cycle >= write_clock)
 				expect(m_cpu->space(AS_DATA).read_word(destination) == (destination == 0x0a || destination == 0x0d ? 0xa5 : 0x6aa5) &&
 					m_xf_pin == bool(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST1), 13)), "POPM destination applies its normal register mask and XF output");
+			if (irq && cycle == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x1000,0xdead); }
 			if (cycle == checkpoint && !m_pipeline_replay)
 			{
 				m_saved_pipeline.str({}); m_saved_pipeline.clear();
@@ -42610,8 +42686,13 @@ private:
 					m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251460;
 					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 				}
-				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (m_pipeline_peripheral_case < 113) { start_pipeline_mmr_pop(m_pipeline_peripheral_case + 1); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); if (irq) m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < (irq ? 191U : 113U)) { start_pipeline_mmr_pop(m_pipeline_peripheral_case + 1); return; }
+				if (irq)
+				{
+					osd_printf_info("TMS320C54x staged interrupt POPM: PASS cases=192 restore=192 destinations=IMR,IFR values=4 pending_patterns=4 pages=2 snapshots=3 stack_read=5 register_write=6 w1c=1 source_retained=1 destination_reads=0 irq_delivery=unvalidated physical_phase_claim=0\n");
+					throw emu_fatalerror(0,"TMS320C54x isolated interrupt POPM complete");
+				}
 				osd_printf_info("TMS320C54x staged MMR pop: PASS cases=114 destinations=19 pages=2 stack_read=5 dagen_write=5 other_write=6 restore=114 duplicate_accesses=0 silicon_phase_claim=0\n");
 				start_pipeline_pop_dagen_conflict(); return;
 			}
@@ -57391,6 +57472,8 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(205, "idle-modes", "Staged IDLE1/2/3 barriers, timer clocks, interrupt wake and replay")
 	ROM_SYSTEM_BIOS(206, "clock-mvdk", "Retained RAM-to-CLKMD moves and peripheral access across restore")
 	ROM_SYSTEM_BIOS(207, "clock-mvdk-edge", "Excluded repeated/delayed CLKMD moves have no operand or clock effects")
+	ROM_SYSTEM_BIOS(208, "pop-irq", "Retained IMR/IFR stack writes and W1C acknowledgement across restore")
+	ROM_SYSTEM_BIOS(209, "pop-irq-edge", "Excluded repeated/delayed interrupt pops have no stack or acknowledgement effects")
 ROM_END
 
 ROM_START(tms54rom4)

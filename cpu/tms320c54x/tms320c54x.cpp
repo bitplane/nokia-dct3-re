@@ -343,7 +343,7 @@ constexpr bool staged_direct_push(u16 word)
 
 constexpr bool staged_direct_pop(u16 word)
 {
-	return (word & 0xff00) == 0x8a00 && ((u8(word) >= 6 && u8(word) <= 0x1d) || (u8(word) >= 0x60 && u8(word) <= 0x7f));
+	return (word & 0xff00) == 0x8a00 && (u8(word) <= 1 || (u8(word) >= 6 && u8(word) <= 0x1d) || (u8(word) >= 0x60 && u8(word) <= 0x7f));
 }
 
 constexpr bool staged_data_copy(u16 word)
@@ -3286,6 +3286,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_annulled[2] = true;
 		--m_pipeline_xc_skip_words;
 	}
+	bool const decoding_control_delay = m_pipeline_valid[2] && m_pipeline_delay_decode_words;
 	bool const completing_shift_delay = m_pipeline_valid[2] && m_pipeline_delay_decode_words &&
 		m_pipeline_decode_remaining == 1 && staged_shifted_smem(m_pipeline_decode_word);
 	bool const completing_move_delay = m_pipeline_valid[2] && m_pipeline_delay_decode_words &&
@@ -3574,6 +3575,11 @@ void tms320c54x_device::pipeline_step()
 		}
 		bool const data_pop = (word & 0xff00) == 0x8b00 && (u8(word) < 0x98 || staged_extended_pop(word));
 		bool const direct_pop = staged_direct_pop(word);
+		if (m_pipeline_valid[2] && (word == 0x8a00 || word == 0x8a01) &&
+			(decoding_control_delay || m_pipeline_repeat_active || m_pipeline_xc_active || m_pipeline_block_body[2]))
+		{
+			logerror("%s: staged interrupt-register POPM repeat/control composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		if (word >= 0x8a1a && word <= 0x8a1c && m_pipeline_block_active && m_pipeline_block_body[2])
 		{
 			logerror("%s: staged POPM active repeat-control write is unsupported instruction=%06x word=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word);

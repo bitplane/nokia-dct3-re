@@ -413,6 +413,7 @@ public:
 		SAMSUNG_K9K1208U0A(config, m_nand);
 		m_nand->rnb_wr_callback().set(FUNC(mu4_storage_test_state::ready_w));
 	}
+	DECLARE_INPUT_CHANGED_MEMBER(mcu_dsp_interrupt);
 private:
 	std::array<u32, 4> m_ac_generated{}, m_ac_received{};
 	u32 m_ac_other = 0, m_ac_other_owners = 0;
@@ -5956,6 +5957,19 @@ private:
 	}
 };
 static INPUT_PORTS_START(mu4_storage_test) INPUT_PORTS_END
+INPUT_CHANGED_MEMBER(mu4_storage_test_state::mcu_dsp_interrupt)
+{
+	// Logical assertion of the active-low board net, not an inferred MCU action.
+	m_cpu->set_input_line(2, newval ? ASSERT_LINE : CLEAR_LINE);
+	logerror("mu4_mcu_int2_input: asserted=%u net=UC_DSP_INT cpu_irq=2 t=%.9f source=bench_pin firmware_state_forcing=0\n",
+		unsigned(bool(newval)), machine().time().as_double());
+}
+static INPUT_PORTS_START(mu4_native_control)
+	PORT_INCLUDE(mu4_storage_test)
+	PORT_START("MCU_CONTROL")
+	PORT_BIT(0x01, IP_ACTIVE_HIGH, IPT_OTHER) PORT_NAME("MCU DSP interrupt asserted")
+		PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(mu4_storage_test_state::mcu_dsp_interrupt), 0)
+INPUT_PORTS_END
 // Isolated codec ABI probe. This does not alter a running handset or recorder.
 class mu4_aac_test_state : public driver_device
 {
@@ -6296,7 +6310,7 @@ ROM_START(mu4nand)
 	ROM_LOAD16_WORD_SWAP("mu4_initdata_library.bin", 0, 11160, CRC(f3b1ddd5) SHA1(e6d082993f823ebbff46f33bc36402a8e8c0c5d8))
 ROM_END
 } // anonymous namespace
-CONS(2026, mu4nand, 0, 0, test, mu4_storage_test, mu4_storage_test_state, empty_init,
+CONS(2026, mu4nand, 0, 0, test, mu4_native_control, mu4_storage_test_state, empty_init,
 		"Test", "MU4 original NAND routine boundary", MACHINE_IMPERFECT_SOUND)
 CONS(2026, mu4aac, 0, 0, test, mu4_storage_test, mu4_aac_test_state, empty_init,
 		"Test", "MU4 original AAC isolated ABI probe", MACHINE_NO_SOUND_HW)

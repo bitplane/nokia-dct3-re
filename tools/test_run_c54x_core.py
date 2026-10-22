@@ -14,6 +14,24 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_interrupt_pop_exclusions_require_no_ack_or_stack_side_effects(self):
+        marker,ending=EXTRA_PROFILES['pop-irq-edge']
+        text=marker+'\n'+ending
+        check_result(text,3,profile='pop-irq-edge')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field),self.assertRaises(ValueError):
+                    check_result(text.replace(field,field.split('=')[0]+'=invalid'),3,profile='pop-irq-edge')
+
+    def test_interrupt_pop_requires_w1c_retained_stack_and_restore_scope(self):
+        marker,ending=EXTRA_PROFILES['pop-irq']
+        text=marker+'\n'+ending
+        check_result(text,3,profile='pop-irq')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field),self.assertRaises(ValueError):
+                    check_result(text.replace(field,field.split('=')[0]+'=invalid'),3,profile='pop-irq')
+
     def test_clkmd_move_exclusions_require_no_operand_or_clock_effects(self):
         marker,ending=EXTRA_PROFILES['clock-mvdk-edge']
         text=marker+'\n'+ending

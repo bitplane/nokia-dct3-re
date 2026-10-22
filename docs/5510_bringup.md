@@ -9577,8 +9577,43 @@ The selected mask excludes this bench's command RX IRQ6; NMI and reset are
 separate architectural inputs, not IMR bits. Combined with `UC_DSP_INT` on
 the schematic, this identifies a controller interrupt boundary worth testing,
 not permission to infer its timing from a serial packet or rename `30/04` as
-an official power-off command. No INT2 waveform has yet been qualified on
-the native workload; ordinary EOF/draining remains separate.
+an official power-off command. A declared logical pin fixture now qualifies
+the native wake continuation; the normal MSP430 waveform and ordinary
+EOF/draining remain separate unknowns.
+
+#### Declared resident INT2 wake fixture
+
+`mu4_resident_int2_observe.lua` asserts the schematic `UC_DSP_INT` input
+through the bench input port, without writing firmware state. Its paired
+`mu4_resident_int2_control.lua` observes the same boot without an edge.
+Both start at 11 seconds in resident `028923`, IMR `0004`, IFR `0c38`.
+The control remains there with zero IMR/IFR writes in the observation window.
+The pulse is sampled at 11.016666667 and released at 11.066666667 seconds;
+this is a declared 50 ms logical assertion, not a measured MCU waveform.
+
+The positive branch executes the original INT2 handler, restores the model
+PLL selection, reaches `028925:8a01` / `028926:8a00`, and returns to
+`03ac0d`. The data-write tap observes IFR `0c38` written with saved word
+`0438`, then IMR restored to `0ac5`. The next Execute-entry observation
+has IFR `0808`: newly pending bits survive, including the still-asserted
+INT2 level. A later interrupt runs before the caller observation, so that
+observation is not an immediate post-POPM pending-bit snapshot.
+The worker reaches IDLE1 at `0298ea` cleanly and later enters resident
+IDLE3 again. The bounded register observer records 258 writes below its
+1024 cap; path observations record five events below their 32 cap.
+Execute-entry context is not a guarantee of pre-instruction SP state.
+
+Check both branches, original-image contract, retained whole input NAND and
+the unchanged rejecting audio endpoint with:
+
+```sh
+python3 tools/mu4_resident_int2_check.py SOURCE_A00 INPUT_NAND CONTROL_RUN PULSE_RUN
+```
+
+Each run's console is `RUN-launch.log`. Unchanged `-nonvram_save` input
+files do not prove runtime NAND write absence. This paired fixture proves
+the declared wake input's native continuation, not automatic EOF, complete
+audio, normal MSP430 control or full 5510 graphical boot.
 
 The bounded native playback fixture now observes 402 complete software
 notification groups: publication `0292c1`, callback `020981`, vector
