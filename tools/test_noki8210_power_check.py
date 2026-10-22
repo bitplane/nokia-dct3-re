@@ -7,16 +7,19 @@ def sample():
     text = ('update-binary fid=6f7e offset=10 length=1\n'
             '8210_power_physical: action=shutdown_press\n'
             '8210_power_physical: action=shutdown_release\n'
+            'ccont_rtc: event=second time=12:00:31 day=1 status=13 t=31.0\n'
             'ccont_power: event=off t=31.59\n')
     for second in range(32, 44):
         text += f'ccont_rtc: event=second time=12:00:{second} day=1 status=13 t={second}.0\n'
     text += ('8210_power_physical: action=restart_press\n'
              'ccont_power: event=wake cause=02 t=43.02\n'
              'ccont_power: event=cause_read data=13\n'
-             'ccont_rtc: event=counter_write reg=07 data=00\n'
+             'ccont_analog: event=control_write reg=07 data=00\n'
              '8210_power_physical: action=restart_release\n'
              'read-binary fid=6f7e offset=0 length=11\n'
              'TX packet type=1b data=0080013f4905087200f110000133080910101032547698\n')
+    for second in range(44,47):
+        text+=f'ccont_rtc: event=second time=12:00:{second} day=1 status=13 t={second}.0\n'
     for index, name in enumerate(('Keypad 1', 'Keypad 2', 'Keypad 3', 'Keypad 4', 'Keypad 5', 'Menu')):
         text += f'8210_power_security: key={name}\n8210_keypad_decoded: key={0x19 if index == 5 else index + 1:02x}\n'
     return text
@@ -46,7 +49,8 @@ class PowerTest(unittest.TestCase):
         for old, new in (
                 ('cause=02', 'cause=04'),
                 ('cause_read data=13', 'cause_read data=15'),
-                ('counter_write reg=07 data=00', 'counter_write reg=07 data=01'),
+                ('control_write reg=07 data=00', 'control_write reg=07 data=01'),
+                ('time=12:00:44', 'time=12:00:01'),
                 ('05087200f1100001', '05087000f000fffe'),
                 ('8210_keypad_decoded: key=19', '8210_keypad_decoded: key=0d'),
                 ('action=restart_press', 'action=charger_connect')):

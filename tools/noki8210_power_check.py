@@ -32,17 +32,29 @@ def verify(text, storage):
     if float(wake[2]) - float(off[1]) < 8:
         raise ValueError('NSM-3 off interval is too short')
     interval = text[off.end():wake.start()]
-    ticks = re.findall(r'ccont_rtc: event=second time=12:00:(\d+) day=1[^\n]*t=([0-9.]+)', interval)
-    if len(ticks) < 8 or any(int(second) != float(when) for second, when in ticks) or any(
-            float(right[1]) - float(left[1]) != 1 for left, right in zip(ticks, ticks[1:])):
+    tick_pattern=r'ccont_rtc: event=second time=(\d+):(\d+):(\d+) day=(\d+)[^\n]*t=([0-9.]+)'
+    before_ticks=re.findall(tick_pattern,text[:off.start()])
+    ticks=re.findall(tick_pattern,interval)
+    def seconds(row):
+        hour,minute,second,day,_=map(float,row)
+        return day*86400+hour*3600+minute*60+second
+    def continuous(rows):
+        return all(int(h)<24 and int(m)<60 and int(s)<60 for h,m,s,_,_ in rows) and all(
+            float(right[4])-float(left[4])==1 and seconds(right)-seconds(left)==1
+            for left,right in zip(rows,rows[1:]))
+    if not before_ticks or len(ticks)<8 or not continuous(before_ticks[-1:]+ticks) or any(
+            not float(off[1])<float(row[4])<float(wake[2]) for row in ticks):
         raise ValueError('NSM-3 RTC did not keep ticking while off')
     require_endpoint_silence(interval, 'NSM-3 DSP/radio generated activity while off')
     before, after = text[:off.start()], text[wake.end():]
     cause = re.search(r'ccont_power: event=cause_read data=(\w+)', after)
     if not cause or int(cause[1], 16) & 7 != 3:
         raise ValueError('NSM-3 did not consume ready/PWRONX without charger')
-    if not re.search(r'ccont_rtc: event=counter_write reg=07 data=00\b', after):
-        raise ValueError('NSM-3 firmware seconds reinitialization absent')
+    if not re.search(r'ccont_analog: event=control_write reg=07 data=00\b', after):
+        raise ValueError('NSM-3 acquisition-control initialization absent')
+    after_ticks=re.findall(tick_pattern,after)[:3]
+    if len(after_ticks)!=3 or not continuous(ticks[-1:]+after_ticks):
+        raise ValueError('NSM-3 RTC did not remain continuous after wake')
     for boot in (before, after):
         check_host_registration(boot, storage)
     read = re.search(r'read-binary fid=6f7e offset=0 length=11', after)

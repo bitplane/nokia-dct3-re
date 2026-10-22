@@ -219,7 +219,11 @@ Updating with body `05087200f110000133080910101032547698`. It rewrites the LAI
 after acceptance but does not redundantly rewrite the already-valid location
 status byte. The security editor reappears; physical `12345` and Menu decode
 organically and return to reviewed operator-idle pixels. The RTC runs while
-off, but firmware writes seconds register `07=00` after wake. Cold-process RTC
+off and remains continuous through three checked post-wake ticks. Firmware
+initializes the independent acquisition-control write address `07=00`, not
+the RTC seconds read counter. The checker anchors progression to the last
+pre-off sample rather than equating RTC seconds with elapsed run time.
+Cold-process RTC
 persistence, measured wake latency, all-peripheral rail gating and native
 speech remain unproved. No charger pulse, donor storage or firmware-state
 write participates in this fixture.
