@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nhm3_wrong_pin_cold_retry_persistence", "owner": "nhm3_sim_security", "status": "satisfied",
+      "predicate": "6250 retains a physical wrong-PIN retry loss across an independent cold process and resets it only after correct physical authentication",
+      "current": "Two own initial-record PMM research-HLE processes use coherent ARFCN19. First physically9999/OK returns9804 with two attempts and exits without registration; complete serialized card equals canonical defaults plus that retry loss. Second inherits every NVRAM file byte-for-byte, physically1234/OK returns9000 with three attempts and completes laboratory registration and physicalMenu. Exact CHV1 selectors, contacts, result/order/card transitions, own native uploads/initial-record checks and console health pass. Three error/idle/Menu frames equal the same-process control. Distinct invocation provenance and initial-storage/executable/script hashes are recorded; all predecessor artifacts remain unchanged. Capture tmp/nhm3-pin-retry-cold-banked2. No PUK/factory-provisioning/native-speech promotion.",
+      "evidence": ["docs/6250_bringup.md", "docs/model_coverage.md", "tools/noki6250_pin_retry.lua", "tools/noki6250_pin_wrong.lua", "tools/noki6250_pin_cold_recovery.lua", "tools/run_noki6250_pin_retry_cold.py", "tools/test_run_noki6250_pin_retry_cold.py", "gates.json"]
+    },
+    {
       "id": "nhm3_physical_wrong_pin_recovery", "owner": "nhm3_sim_security", "status": "satisfied",
       "predicate": "6250 rejects one physical wrong PIN1, resets retries on correct physical authentication and recovers coherent registered menus",
       "current": "Fresh own initial-record PMM research-HLE comparison uses a PIN-enabled synthetic SIM and coherent ARFCN19. Physical9999/OK12 returns9804 with retries2 and renders Code error. Physical1234/OK22 returns9000 with retries3, then laboratory registration completes and physicalMenu34 opens Messages. Exact press/release contacts, two CHV1 selectors, rejection/acceptance/registration order, three96x60 RGB frames and complete registered card match. No credential/configuration/record write occurs. Capture tmp/nhm3-pin-retry-banked. The ordinary slow-PIN baseline independently reproduces the owned verifier's retained IDLE1 publication PC0f64; its previous0f65 expectation was stale. No cold-retry/PUK/factory-provisioning/native-speech promotion.",

@@ -897,8 +897,11 @@ native DSP, speech or displayed forwarding-number content.
 `verify-6250-pin-retry` independently proves physical9999 rejection, PIN1
 retry loss, physical1234 recovery/reset and coherent registered idle/Menu.
 Two CHV1 selectors, exact contacts/protocol order, complete card contents and
-three own-product RGB frames pass. This does not establish cold retry
-persistence or PUK recovery on NHM-3.
+three own-product RGB frames pass. `verify-6250-pin-retry-cold` separately
+preserves the failed allowance across two independent processes, requires
+complete predecessor/cold-input/final card transitions and byte-identical
+inherited NVRAM, then physically restores retries and registered menus. All
+predecessor artifacts remain unchanged. PUK recovery remains unqualified on NHM-3.
 
 `verify-6250-ussd` separately establishes the physical USSD exchange and reviewed
 NHM-3 result/idle frames on its declared derived-PMM research comparison. The

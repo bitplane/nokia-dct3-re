@@ -17,11 +17,19 @@ local function press(key,when)
     assert(emu.wait(0.85))
 end
 local runner=coroutine.create(function()
-    for second=8,11 do press('Keypad 9',second) end
-    press('Left Softkey / Menu',12)
-    machine.screens[':screen']:snapshot('6250_pin_retry_error.png')
-    for index=1,4 do press('Keypad '..index,17+index) end
-    press('Left Softkey / Menu',22)
+    local mode=_G.nhm3_pin_retry_mode
+    if mode~='cold-recovery' then
+        for second=8,11 do press('Keypad 9',second) end
+        press('Left Softkey / Menu',12)
+        machine.screens[':screen']:snapshot('6250_pin_retry_error.png')
+        if mode=='wrong-only' then
+            machine:logerror('6250_pin_retry: wrong_only_complete=1 firmware_state_forcing=0\n')
+            return
+        end
+    end
+    local start=mode=='cold-recovery' and 7 or 17
+    for index=1,4 do press('Keypad '..index,start+index) end
+    press('Left Softkey / Menu',start+5)
     assert(emu.wait(32-machine.time:as_double()))
     machine.screens[':screen']:snapshot('6250_pin_retry_idle.png')
     press('Left Softkey / Menu',34)

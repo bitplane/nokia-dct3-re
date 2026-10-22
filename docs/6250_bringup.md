@@ -600,6 +600,20 @@ are permitted; the only lasting card change is the normal location update.
 This proves same-process retry recovery, not retry persistence across a cold
 restart, PIN exhaustion/PUK recovery, factory provisioning or native speech.
 
+`make verify-6250-pin-retry-cold` separately proves durable retry loss in two
+independent processes. The first submits only9999, retains two attempts and
+exits without registration; its complete serialized card includes the ordinary
+default extension but no credential or unrelated-field change. The second
+copies every NVRAM file byte-for-byte, physically submits1234 and recovers three
+attempts, coherent registration and the reviewed idle/Messages frames. Both
+processes require their own native-upload/initial-record checks, console health,
+exact CHV1 selectors, press/release contacts and complete card transitions.
+All predecessor artifacts remain hash-identical after the cold run. Each launch
+has a distinct invocation ID, command, initial-storage hashes and executable/
+script hashes. Capture: `tmp/nhm3-pin-retry-cold-banked2`. The error, idle and menu
+frame hashes equal the same-process control. PIN exhaustion and PUK recovery
+remain outside this gate.
+
 Run `noki6250` with private working/NVRAM/config directories, the acquired
 product ROMs, `-noreadconfig -log -video none -sound none -nothrottle`,
 `-autoboot_delay 0 -seconds_to_run 9` and
