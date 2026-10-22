@@ -1614,7 +1614,7 @@ own ROM plus a 35-second run using `noki6250_speech_control_check.py ROM LOG`.
 The normal call-signaling checker also passes after this configuration.
 
 This does not establish working audio. The conservative 6250 profile has
-no independently evidenced PCM bus clock/shape or COBBA analog route; its
+no independently evidenced PCM bus clock/shape or selected COBBA analog route; its
 zero frame clock leaves the HLE speech cadence disabled. Recover those
 contracts from product documentation/firmware before supplying a donor
 profile or claiming audible voice. Native mask execution remains a separate
@@ -1664,6 +1664,42 @@ connector pins 6/7 feed MIC2P/N; their inputs are 2 mV typical and 12.5 mV maxim
 with the maximum specified at 1 kHz/0 dBm0 and input gain 32 dB. These are documented
 analogue test conditions, not recovered programmable gain codes or a selected
 internal-microphone route.
+
+### Schematic PCM wiring
+
+The acquired `sm4v15.pdf` (Original 11/00; SHA256
+`13c35c4caed216d97f7c32f5482072e13de5ce463ae3210e289e643eea8640ea`)
+independently identifies the four-wire PCM connection. Printed sheets A-3
+(CPU) and A-6 (Audio) agree on these endpoints:
+
+| Net | MAD2 endpoint | COBBA endpoint |
+| --- | --- | --- |
+| PCM(0) | A9, PCMRxData | B5, PCMTx |
+| PCM(1) | B8, PCMDClk | C6, PCMDCLK |
+| PCM(2) | A8, PCMSClk | C5, PCMSCLK |
+| PCM(3) | B9, PCMTxData | D5, PCMRx |
+
+Thus the data directions are established by both endpoint names, not by a
+sibling handset profile. The schematic does not establish clock frequency,
+clock master, active edge, frame length, sample encoding or the selected
+firmware codec controls. Those remain prerequisites for a live PCM profile.
+
+On A-6, COBBA RFIClk D8 instead connects to the separate `COBBACLK` net and
+test point J200. The manual's 13 MHz RF-interface specification therefore
+does not specify either PCM clock. E299 on PCMSCLK is explicitly a solderpad
+that *can* be shorted to E199 on the Power sheet for MBUS connection; this is
+an optional diagnostic bridge, not evidence of a normally connected bus.
+
+The same Audio sheet connects EARN D2 and EARP D1 through R247 (2 x 22 ohm)
+to speaker B200. R248, the 22-ohm bridge across the speaker pair, is marked
+`Not Assembled`. This establishes the physical differential speaker path,
+not its runtime gain/mute selection or the internal microphone selection.
+
+These are visual readings of the vector schematic: ordinary text extraction
+omits its custom-font net labels. Reproduce legible source renders with
+`pdftoppm -f 3 -l 3 -scale-to 6000 -png -singlefile sm4v15.pdf cpu` and the
+equivalent page-6 command; retained crops are
+`tmp/nhm3-sm4-mad2-pcm3.png` and `tmp/nhm3-sm4-cobba6.png`.
 
 Printed page 15 separately labels a five-pin **Serial RF Interface**: RFIclk
 is 13 MHz, and Idata/Qdata transfer 8-bit Tx/12-bit Rx I/Q samples. That table is
