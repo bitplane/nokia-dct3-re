@@ -1054,7 +1054,9 @@ private:
 	u8 m_command_ack_token = 0, m_command_wire_byte = 0;
 	u16 m_command_tx_register = 0;
 	std::vector<u16> m_command_tx_words, m_command_wire_decoded;
-	std::array<u16, 64> m_saved_command_tx{}, m_saved_command_decoded{};
+	// Bounded diagnostic history, not a hardware FIFO. Late resident checkpoints
+	// include multiple complete replies and can exceed a single 64-word frame.
+	std::array<u16, 4096> m_saved_command_tx{}, m_saved_command_decoded{};
 	unsigned m_saved_command_tx_count = 0, m_saved_command_decoded_count = 0;
 	bool m_command_rx_ready = false, m_command_rx_busy = false, m_command_rx_clock = true;
 	u8 m_command_rx_byte = 0;
@@ -3460,7 +3462,8 @@ private:
 	void save_command_peer()
 	{
 		if (m_command_tx_words.size() > m_saved_command_tx.size() || m_command_wire_decoded.size() > m_saved_command_decoded.size())
-			fatalerror("MU4 command peer snapshot capture capacity exceeded");
+			fatalerror("MU4 command peer snapshot capture capacity exceeded: tx=%u decoded=%u capacity=%u",
+				unsigned(m_command_tx_words.size()), unsigned(m_command_wire_decoded.size()), unsigned(m_saved_command_tx.size()));
 		m_saved_command_tx_count = m_command_tx_words.size();
 		m_saved_command_decoded_count = m_command_wire_decoded.size();
 		std::copy(m_command_tx_words.begin(), m_command_tx_words.end(), m_saved_command_tx.begin());

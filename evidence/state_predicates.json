@@ -1964,6 +1964,12 @@
       "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
+      "id": "mu4_resident_int2_pending_restore", "owner": "native_music_dsp", "status": "satisfied",
+      "predicate": "A same-process native resident checkpoint before declared INT2 reproduces CPU/memory state, physical fixture edges and timed interrupt-register publications without firmware mutation",
+      "current": "The10.95s deep-idle checkpoint restores all36 exposed registers,65408-word non-MMIO RAM checksum and16MiB program checksum exactly. Both legs assert the logical UC_DSP_INT pin at11s and release11.05s, produce identical282 IMR/IFR writes in a0.25s window and reach the native worker idle. Nine preserved diagnostic prefixes total93569510 bytes and match restored captures. The old64-word saved command-history bound rejected this late checkpoint;4096-word bounded histories now preserve it, with explicit overflow failures retained. These are diagnostic histories, not hardware FIFO capacities. Original serial-control and strict rejecting audio endpoint remain required. No independent final-file equality for differently timed cold pulses, cross-process capture restoration, normal MCU waveform, automatic EOF or complete audio is claimed.",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "tools/mu4_resident_int2_restore.lua", "tools/mu4_resident_int2_restore_check.py", "tools/test_mu4_resident_int2_restore_check.py"]
+    },
+    {
       "id": "mu4_resident_post_wake_bookkeeping", "owner": "native_music_dsp", "status": "satisfied",
       "predicate": "The original post-IDLE3 caller invokes an unsigned countdown lower-bound update and clears bookkeeping rather than synchronously waiting for another peer reply",
       "current": "Twenty-six AA22 source words pin caller03ac0d..03ac13 and helper03acdf..03acf1. Argument07d0 and stack literal000a feed00:2098; its result is retained inAR1 and compared unsigned GT with b582 inAR0. f820 is BC NTC, so MVMD AR1,b582 occurs only when the result exceeds the old counter. There is no backward branch or receive operation in this helper. The native declared-wake data window records b582=00c8, b558=0 and later decrement00c7. Nested helper implementation, physical countdown units, official command meaning and normal MCU waveform remain unqualified. Earlier Execute-entry breakpoint observations outside the post-wake window are not function-ownership evidence.",

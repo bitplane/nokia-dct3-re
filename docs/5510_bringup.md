@@ -9615,6 +9615,31 @@ files do not prove runtime NAND write absence. This paired fixture proves
 the declared wake input's native continuation, not automatic EOF, complete
 audio, normal MSP430 control or full 5510 graphical boot.
 
+`mu4_resident_int2_restore.lua` qualifies a same-process checkpoint at
+10.95 seconds, before a declared INT2 assertion. It compares 36 exposed
+CPU registers, a checksum of all 65,408 non-MMIO data words and the complete
+16 MiB program backing before and after load. Both legs assert the logical
+pin at 11.000000000 and clear it at 11.050000000 seconds; 282 IMR/IFR
+writes match in order, value and absolute time within the 0.25-second
+window. Both return to the native worker's clean idle. All nine preserved
+diagnostic streams match their restored prefixes (93,569,510 bytes total).
+This does not claim independent final-file equality with a differently
+timed cold pulse, cross-process capture restoration or normal MCU timing.
+
+The command peer's saved history now holds 4,096 words instead of 64:
+late checkpoints include more than one frame's historical output. This
+is a bounded diagnostic history, not an emulated serial FIFO. Overflow
+still fails with explicit TX/decoded counts; no history is silently truncated.
+
+```sh
+python3 tools/mu4_resident_int2_restore_check.py SOURCE_A00 INPUT_NAND RESTORE_RUN
+```
+
+The checker requires the original image contract, complete retained input,
+ordinary native serial-control acceptance and rejecting audio endpoint,
+matching checkpoint state, actual board-pin edges, replay publications,
+all nine preserved capture prefixes and an uncapped completion marker.
+
 The post-wake caller is not another receive wait. The separately pinned
 26-word `resident_wake_tail` span loads `07d0`, calls `03acdf`, then writes
 zero to `b558` at `03ac11`. Helper `03acdf..03acf1` passes stack literal
