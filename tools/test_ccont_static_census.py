@@ -26,6 +26,15 @@ class CcontStaticCensusTest(unittest.TestCase):
         payload = ccont_static_census.build_payload(ccont_static_census.DEFAULT_ROMS)
         self.assertTrue(payload["cross_rom_descriptor_identity"])
         self.assertEqual(5, payload["coverage"]["roms_decoded"])
+        for rom in payload["roms"]:
+            descriptors = rom["descriptors"]
+            self.assertEqual("0xff", descriptors[8]["command"])
+            self.assertEqual("0x38", descriptors[8]["write_command"])
+            self.assertEqual(7, descriptors[8]["write_register"])
+            self.assertEqual("0x38", descriptors[9]["command"])
+            self.assertIsNone(descriptors[9]["write_command"])
+            self.assertEqual("0x50", descriptors[12]["command"])
+            self.assertEqual("0x50", descriptors[12]["write_command"])
         self.assertEqual(
             [2, 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15],
             payload["roms"][0]["mapped_registers"],

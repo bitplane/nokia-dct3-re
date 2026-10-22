@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "method": "unique byte-lane-correct descriptor signature and literal-reference census",
   "coverage": {
     "roms_requested": 5,
@@ -9,10 +9,10 @@
   },
   "cross_rom_descriptor_identity": true,
   "special_direct_paths": {
-    "register_0": "ADC request helper, outside descriptor table",
-    "register_5": "watchdog/power helper, outside descriptor table",
-    "register_1": "outside descriptor table; direct boot writes observed",
-    "register_6": "outside descriptor table; direct boot writes observed"
+    "register_0": "ADC request helper also accesses this write-table address directly",
+    "register_5": "watchdog/power helper also accesses this write-table address directly",
+    "register_1": "write-table address; direct boot writes also observed",
+    "register_6": "write-table address; direct boot writes also observed"
   },
   "roms": [
     {
@@ -29,109 +29,127 @@
           "logical": 0,
           "command": "0xff",
           "register": null,
-          "default": "0x00"
+          "write_command": "0x00",
+          "write_register": 0
         },
         {
           "logical": 1,
           "command": "0xff",
           "register": null,
-          "default": "0x08"
+          "write_command": "0x08",
+          "write_register": 1
         },
         {
           "logical": 2,
           "command": "0x10",
           "register": 2,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 3,
           "command": "0x20",
           "register": 4,
-          "default": "0x18"
+          "write_command": "0x18",
+          "write_register": 3
         },
         {
           "logical": 4,
           "command": "0x18",
           "register": 3,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 5,
           "command": "0xff",
           "register": null,
-          "default": "0x20"
+          "write_command": "0x20",
+          "write_register": 4
         },
         {
           "logical": 6,
           "command": "0xff",
           "register": null,
-          "default": "0x28"
+          "write_command": "0x28",
+          "write_register": 5
         },
         {
           "logical": 7,
           "command": "0xff",
           "register": null,
-          "default": "0x30"
+          "write_command": "0x30",
+          "write_register": 6
         },
         {
           "logical": 8,
           "command": "0xff",
           "register": null,
-          "default": "0x38"
+          "write_command": "0x38",
+          "write_register": 7
         },
         {
           "logical": 9,
           "command": "0x38",
           "register": 7,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 10,
           "command": "0x40",
           "register": 8,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 11,
           "command": "0x48",
           "register": 9,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 12,
           "command": "0x50",
           "register": 10,
-          "default": "0x50"
+          "write_command": "0x50",
+          "write_register": 10
         },
         {
           "logical": 13,
           "command": "0x58",
           "register": 11,
-          "default": "0x58"
+          "write_command": "0x58",
+          "write_register": 11
         },
         {
           "logical": 14,
           "command": "0x60",
           "register": 12,
-          "default": "0x60"
+          "write_command": "0x60",
+          "write_register": 12
         },
         {
           "logical": 15,
           "command": "0x68",
           "register": 13,
-          "default": "0x68"
+          "write_command": "0x68",
+          "write_register": 13
         },
         {
           "logical": 16,
           "command": "0x70",
           "register": 14,
-          "default": "0x70"
+          "write_command": "0x70",
+          "write_register": 14
         },
         {
           "logical": 17,
           "command": "0x78",
           "register": 15,
-          "default": "0x78"
+          "write_command": "0x78",
+          "write_register": 15
         }
       ],
       "mapped_registers": [
@@ -171,109 +189,127 @@
           "logical": 0,
           "command": "0xff",
           "register": null,
-          "default": "0x00"
+          "write_command": "0x00",
+          "write_register": 0
         },
         {
           "logical": 1,
           "command": "0xff",
           "register": null,
-          "default": "0x08"
+          "write_command": "0x08",
+          "write_register": 1
         },
         {
           "logical": 2,
           "command": "0x10",
           "register": 2,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 3,
           "command": "0x20",
           "register": 4,
-          "default": "0x18"
+          "write_command": "0x18",
+          "write_register": 3
         },
         {
           "logical": 4,
           "command": "0x18",
           "register": 3,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 5,
           "command": "0xff",
           "register": null,
-          "default": "0x20"
+          "write_command": "0x20",
+          "write_register": 4
         },
         {
           "logical": 6,
           "command": "0xff",
           "register": null,
-          "default": "0x28"
+          "write_command": "0x28",
+          "write_register": 5
         },
         {
           "logical": 7,
           "command": "0xff",
           "register": null,
-          "default": "0x30"
+          "write_command": "0x30",
+          "write_register": 6
         },
         {
           "logical": 8,
           "command": "0xff",
           "register": null,
-          "default": "0x38"
+          "write_command": "0x38",
+          "write_register": 7
         },
         {
           "logical": 9,
           "command": "0x38",
           "register": 7,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 10,
           "command": "0x40",
           "register": 8,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 11,
           "command": "0x48",
           "register": 9,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 12,
           "command": "0x50",
           "register": 10,
-          "default": "0x50"
+          "write_command": "0x50",
+          "write_register": 10
         },
         {
           "logical": 13,
           "command": "0x58",
           "register": 11,
-          "default": "0x58"
+          "write_command": "0x58",
+          "write_register": 11
         },
         {
           "logical": 14,
           "command": "0x60",
           "register": 12,
-          "default": "0x60"
+          "write_command": "0x60",
+          "write_register": 12
         },
         {
           "logical": 15,
           "command": "0x68",
           "register": 13,
-          "default": "0x68"
+          "write_command": "0x68",
+          "write_register": 13
         },
         {
           "logical": 16,
           "command": "0x70",
           "register": 14,
-          "default": "0x70"
+          "write_command": "0x70",
+          "write_register": 14
         },
         {
           "logical": 17,
           "command": "0x78",
           "register": 15,
-          "default": "0x78"
+          "write_command": "0x78",
+          "write_register": 15
         }
       ],
       "mapped_registers": [
@@ -313,109 +349,127 @@
           "logical": 0,
           "command": "0xff",
           "register": null,
-          "default": "0x00"
+          "write_command": "0x00",
+          "write_register": 0
         },
         {
           "logical": 1,
           "command": "0xff",
           "register": null,
-          "default": "0x08"
+          "write_command": "0x08",
+          "write_register": 1
         },
         {
           "logical": 2,
           "command": "0x10",
           "register": 2,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 3,
           "command": "0x20",
           "register": 4,
-          "default": "0x18"
+          "write_command": "0x18",
+          "write_register": 3
         },
         {
           "logical": 4,
           "command": "0x18",
           "register": 3,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 5,
           "command": "0xff",
           "register": null,
-          "default": "0x20"
+          "write_command": "0x20",
+          "write_register": 4
         },
         {
           "logical": 6,
           "command": "0xff",
           "register": null,
-          "default": "0x28"
+          "write_command": "0x28",
+          "write_register": 5
         },
         {
           "logical": 7,
           "command": "0xff",
           "register": null,
-          "default": "0x30"
+          "write_command": "0x30",
+          "write_register": 6
         },
         {
           "logical": 8,
           "command": "0xff",
           "register": null,
-          "default": "0x38"
+          "write_command": "0x38",
+          "write_register": 7
         },
         {
           "logical": 9,
           "command": "0x38",
           "register": 7,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 10,
           "command": "0x40",
           "register": 8,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 11,
           "command": "0x48",
           "register": 9,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 12,
           "command": "0x50",
           "register": 10,
-          "default": "0x50"
+          "write_command": "0x50",
+          "write_register": 10
         },
         {
           "logical": 13,
           "command": "0x58",
           "register": 11,
-          "default": "0x58"
+          "write_command": "0x58",
+          "write_register": 11
         },
         {
           "logical": 14,
           "command": "0x60",
           "register": 12,
-          "default": "0x60"
+          "write_command": "0x60",
+          "write_register": 12
         },
         {
           "logical": 15,
           "command": "0x68",
           "register": 13,
-          "default": "0x68"
+          "write_command": "0x68",
+          "write_register": 13
         },
         {
           "logical": 16,
           "command": "0x70",
           "register": 14,
-          "default": "0x70"
+          "write_command": "0x70",
+          "write_register": 14
         },
         {
           "logical": 17,
           "command": "0x78",
           "register": 15,
-          "default": "0x78"
+          "write_command": "0x78",
+          "write_register": 15
         }
       ],
       "mapped_registers": [
@@ -455,109 +509,127 @@
           "logical": 0,
           "command": "0xff",
           "register": null,
-          "default": "0x00"
+          "write_command": "0x00",
+          "write_register": 0
         },
         {
           "logical": 1,
           "command": "0xff",
           "register": null,
-          "default": "0x08"
+          "write_command": "0x08",
+          "write_register": 1
         },
         {
           "logical": 2,
           "command": "0x10",
           "register": 2,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 3,
           "command": "0x20",
           "register": 4,
-          "default": "0x18"
+          "write_command": "0x18",
+          "write_register": 3
         },
         {
           "logical": 4,
           "command": "0x18",
           "register": 3,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 5,
           "command": "0xff",
           "register": null,
-          "default": "0x20"
+          "write_command": "0x20",
+          "write_register": 4
         },
         {
           "logical": 6,
           "command": "0xff",
           "register": null,
-          "default": "0x28"
+          "write_command": "0x28",
+          "write_register": 5
         },
         {
           "logical": 7,
           "command": "0xff",
           "register": null,
-          "default": "0x30"
+          "write_command": "0x30",
+          "write_register": 6
         },
         {
           "logical": 8,
           "command": "0xff",
           "register": null,
-          "default": "0x38"
+          "write_command": "0x38",
+          "write_register": 7
         },
         {
           "logical": 9,
           "command": "0x38",
           "register": 7,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 10,
           "command": "0x40",
           "register": 8,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 11,
           "command": "0x48",
           "register": 9,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 12,
           "command": "0x50",
           "register": 10,
-          "default": "0x50"
+          "write_command": "0x50",
+          "write_register": 10
         },
         {
           "logical": 13,
           "command": "0x58",
           "register": 11,
-          "default": "0x58"
+          "write_command": "0x58",
+          "write_register": 11
         },
         {
           "logical": 14,
           "command": "0x60",
           "register": 12,
-          "default": "0x60"
+          "write_command": "0x60",
+          "write_register": 12
         },
         {
           "logical": 15,
           "command": "0x68",
           "register": 13,
-          "default": "0x68"
+          "write_command": "0x68",
+          "write_register": 13
         },
         {
           "logical": 16,
           "command": "0x70",
           "register": 14,
-          "default": "0x70"
+          "write_command": "0x70",
+          "write_register": 14
         },
         {
           "logical": 17,
           "command": "0x78",
           "register": 15,
-          "default": "0x78"
+          "write_command": "0x78",
+          "write_register": 15
         }
       ],
       "mapped_registers": [
@@ -597,109 +669,127 @@
           "logical": 0,
           "command": "0xff",
           "register": null,
-          "default": "0x00"
+          "write_command": "0x00",
+          "write_register": 0
         },
         {
           "logical": 1,
           "command": "0xff",
           "register": null,
-          "default": "0x08"
+          "write_command": "0x08",
+          "write_register": 1
         },
         {
           "logical": 2,
           "command": "0x10",
           "register": 2,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 3,
           "command": "0x20",
           "register": 4,
-          "default": "0x18"
+          "write_command": "0x18",
+          "write_register": 3
         },
         {
           "logical": 4,
           "command": "0x18",
           "register": 3,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 5,
           "command": "0xff",
           "register": null,
-          "default": "0x20"
+          "write_command": "0x20",
+          "write_register": 4
         },
         {
           "logical": 6,
           "command": "0xff",
           "register": null,
-          "default": "0x28"
+          "write_command": "0x28",
+          "write_register": 5
         },
         {
           "logical": 7,
           "command": "0xff",
           "register": null,
-          "default": "0x30"
+          "write_command": "0x30",
+          "write_register": 6
         },
         {
           "logical": 8,
           "command": "0xff",
           "register": null,
-          "default": "0x38"
+          "write_command": "0x38",
+          "write_register": 7
         },
         {
           "logical": 9,
           "command": "0x38",
           "register": 7,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 10,
           "command": "0x40",
           "register": 8,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 11,
           "command": "0x48",
           "register": 9,
-          "default": null
+          "write_command": null,
+          "write_register": null
         },
         {
           "logical": 12,
           "command": "0x50",
           "register": 10,
-          "default": "0x50"
+          "write_command": "0x50",
+          "write_register": 10
         },
         {
           "logical": 13,
           "command": "0x58",
           "register": 11,
-          "default": "0x58"
+          "write_command": "0x58",
+          "write_register": 11
         },
         {
           "logical": 14,
           "command": "0x60",
           "register": 12,
-          "default": "0x60"
+          "write_command": "0x60",
+          "write_register": 12
         },
         {
           "logical": 15,
           "command": "0x68",
           "register": 13,
-          "default": "0x68"
+          "write_command": "0x68",
+          "write_register": 13
         },
         {
           "logical": 16,
           "command": "0x70",
           "register": 14,
-          "default": "0x70"
+          "write_command": "0x70",
+          "write_register": 14
         },
         {
           "logical": 17,
           "command": "0x78",
           "register": 15,
-          "default": "0x78"
+          "write_command": "0x78",
+          "write_register": 15
         }
       ],
       "mapped_registers": [

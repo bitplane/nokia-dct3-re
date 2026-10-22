@@ -130,7 +130,26 @@ contract: repeated register07 writes00/0f move the modeled seconds counter
 backward, while a matched busy control advances normally. Both start with
 the same RTC state. The binary read-surface evidence does not by itself
 validate those write effects; do not infer counter/control symmetry or alter
-it without decoding the own writer/serial transaction. The bounded evidence
+it without decoding the own writer/serial transaction. An own-ROM NSB-7
+observation now confirms deliberate writes, not a stale ADC response: helper
+`0x305748` receives selector/mask `0x08ff`, then emits control `0x22`,
+command `0x38` and data `0x0f`/`0x00`. Callers `0x30813a` and `0x30818a`
+activate, temporarily clear and restore this value around ADC acquisition;
+`0x30805c` clears it when that acquisition finishes. This establishes an
+analog-acquisition lifecycle, not the physical meaning of the write.
+The 18-entry read table at `0x343ee0` and following 18-entry write table
+separate write-only selector `0x08` (command `0x38`) from read-only selector
+`0x09` (also command `0x38`). Selector `0x0c` is symmetric (`0x50` in both
+tables); there is no one-entry shift to apply to the table. Read-register
+identities must not be promoted into write-register identities without further
+evidence. The converter at `0x3080ba` emits zero below signed input 92;
+otherwise it emits `2 * min((input - 31) / 61, 127) + 1` using integer
+division. Helper `0x30dcb8` returns the quotient in R1 and remainder in R0.
+This establishes the encoding, not its electrical units.
+`tools/nsb7_ccont_write_observe.lua` observes only seconds 54..67, caps its
+records at 4,096 and performs no firmware writes. Its captured run passes
+`nsb7_host_outgoing_call_check.py`; this validates the call under observation,
+not the unresolved physical register semantics. The bounded evidence
 and independent signaling checks live in
 [the NSB-7 contract](8290_bringup.md#ccont-seconds-write-boundary-exposed-by-the-controls).
 
@@ -186,17 +205,23 @@ existing five-second input schedule.
 
 The complete v6.00 CCONT helper block `0x2b061c..0x2b0a16` aligns with v5.01
 `0x2ada48..0x2ade42`. This covers register reads/writes, RTC helpers, watchdog
-commands, power helpers and the IRQ acknowledge loop. The ROM shadow/default
-tables at v6.00 `0x2e2da8` and v5.01 `0x2d777c` are byte-identical. These are
+commands, power helpers and the IRQ acknowledge loop. The ROM read/write command
+tables at v6.00 `0x2e2da8` and v5.01 `0x2d777c` are byte-identical. The v6.00
+masked writer `0x2afa74` loads its command at table offset `0x12`
+(`0x2afa92`), independently confirming the second table's write-command role;
+reader `0x2afb44` loads from the first table. These are
 same-product controls for the register grammar, not independent chip
 documentation; command meanings that firmware never observes remain inferred.
 
 All five supported firmware controls contain one byte-lane-correct, 18-entry
 descriptor table and two literal references to it. All 90 decoded entries are
-identical: logical descriptors expose physical registers `0x2`, `0x3`, `0x4`
-and `0x7..0xf`; six logical slots are absent. ADC register `0x0`, watchdog
-register `0x5`, and boot writes to `0x1`/`0x6` use direct special paths outside
-that table. `docs/data/ccont_static_census.json` records every entry and table
+identical on the read side: logical descriptors expose physical registers
+`0x2`, `0x3`, `0x4` and `0x7..0xf`; six read slots are absent. The parallel
+write-command table also includes registers `0x0`, `0x1`, `0x4`, `0x5`,
+`0x6` and write-only logical selector `0x08` at physical address `0x07`.
+Special direct helpers can access the same serial addresses without using
+the descriptor table. `docs/data/ccont_static_census.json` records both
+command directions for every entry and table
 address. This establishes addressability, not semantics.
 
 Independent two-second organic traces of the same five ROMs decode 933 complete

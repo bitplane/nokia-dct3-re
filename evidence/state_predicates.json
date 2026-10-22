@@ -14,7 +14,7 @@
       "owner": "nsb7_ccont_write_semantics", "status": "unresolved",
       "predicate": "Physical semantics of connected-call register07 writes are independently established rather than inferred from the seconds read surface",
       "current": "Matched host busy/connected controls begin13:47:01 at1s. Connected firmware repeatedly writes CCONT07=00/0f; the current writable-seconds model reads13:47:16 through57..66s and13:47:10 at76s. Busy has only boot-time07 write and reads13:48:16 at76s. The write-side hardware meaning and own writer/GENSIO ownership require decoding; do not tune inputs, mask clock pixels or promote these compatibility writes as validated wall-clock fidelity. Protocol outcome and UI recovery are checked separately.",
-      "evidence": ["docs/8290_bringup.md", "docs/ccont_subsystem.md", "driver/nokia_ccont.cpp", "tools/nsb7_pin_host_outgoing_call.lua", "tools/nsb7_pin_host_busy.lua"]
+      "evidence": ["docs/8290_bringup.md", "docs/ccont_subsystem.md", "driver/nokia_ccont.cpp", "tools/nsb7_pin_host_outgoing_call.lua", "tools/nsb7_pin_host_busy.lua", "tools/nsb7_ccont_write_observe.lua", "tools/ccont_static_census.py", "docs/data/ccont_static_census.json"]
     },
     {
       "id": "nsb7_connected_host_call_restoration_both_directions",

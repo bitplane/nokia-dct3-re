@@ -65,7 +65,7 @@ def table_entries(image: bytes, address: int) -> list[int]:
     return [cpu_byte(image, offset + index) for index in range(DESCRIPTOR_COUNT)]
 
 
-def table_defaults(image: bytes, address: int) -> list[int]:
+def table_write_commands(image: bytes, address: int) -> list[int]:
     offset = address - FLASH_BASE + DESCRIPTOR_COUNT
     return [cpu_byte(image, offset + index) for index in range(DESCRIPTOR_COUNT)]
 
@@ -86,7 +86,7 @@ def analyze(label: str, path: Path) -> dict:
     image = swap16(path.read_bytes())
     table = locate_descriptor_table(image)
     entries = table_entries(image, table)
-    defaults = table_defaults(image, table)
+    writes = table_write_commands(image, table)
     return {
         "label": label,
         "rom": str(path.relative_to(ROOT) if path.is_relative_to(ROOT) else path),
@@ -98,7 +98,8 @@ def analyze(label: str, path: Path) -> dict:
                 "logical": index,
                 "command": f"0x{command:02x}",
                 "register": physical_register(command),
-                "default": None if defaults[index] == 0xff else f"0x{defaults[index]:02x}",
+                "write_command": None if writes[index] == 0xff else f"0x{writes[index]:02x}",
+                "write_register": physical_register(writes[index]),
             }
             for index, command in enumerate(entries)
         ],
@@ -116,7 +117,7 @@ def build_payload(roms) -> dict:
     reports = [analyze(label, path) for label, path in roms]
     common = reports[0]["descriptors"]
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "method": "unique byte-lane-correct descriptor signature and literal-reference census",
         "coverage": {
             "roms_requested": len(roms),
@@ -126,10 +127,10 @@ def build_payload(roms) -> dict:
         },
         "cross_rom_descriptor_identity": all(report["descriptors"] == common for report in reports[1:]),
         "special_direct_paths": {
-            "register_0": "ADC request helper, outside descriptor table",
-            "register_5": "watchdog/power helper, outside descriptor table",
-            "register_1": "outside descriptor table; direct boot writes observed",
-            "register_6": "outside descriptor table; direct boot writes observed",
+            "register_0": "ADC request helper also accesses this write-table address directly",
+            "register_5": "watchdog/power helper also accesses this write-table address directly",
+            "register_1": "write-table address; direct boot writes also observed",
+            "register_6": "write-table address; direct boot writes also observed",
         },
         "roms": reports,
     }
