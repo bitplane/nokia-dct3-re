@@ -34,6 +34,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'security': ('npe3hle', 'security_input', 37),
              'security-retry': ('npe3hle', 'security_retry_input', 45),
              'security-retry-cold': ('npe3hle', 'security_retry_cold_input', 18),
+             'security-block-cold': ('npe3hle', 'security_block_input', 33),
              'toolkit': ('npe3hle', 'toolkit_input', 40),
              'toolkit-interactive': ('npe3hle', 'toolkit_interactive', 65),
              'toolkit-menu': ('npe3hle', 'toolkit_menu', 75),
@@ -280,7 +281,7 @@ def main():
     parser.add_argument('--pin-enabled', action='store_true',
                         help='authenticate a PIN-enabled SIM before the host service')
     args = parser.parse_args()
-    if args.scenario in ('security-retry','security-retry-cold') and not args.coherent_cell:
+    if args.scenario in ('security-retry','security-retry-cold','security-block-cold') and not args.coherent_cell:
         parser.error('security-retry requires --coherent-cell')
     if args.foreign_cell:
         if args.scenario not in ('outgoing-call', 'incoming-sms'):
@@ -303,7 +304,7 @@ def main():
         run = args.run_directory.resolve()
         run.mkdir(parents=True, exist_ok=False)
         machine, script, seconds = SCENARIOS[args.scenario]
-        if args.scenario in ('security','security-retry','security-retry-cold') or args.pin_enabled:
+        if args.scenario in ('security','security-retry','security-retry-cold','security-block-cold') or args.pin_enabled:
             from tools.make_sim_card_profile import make_profile
             card = run / f'nvram/{machine}/sim_card'
             card.parent.mkdir(parents=True)
@@ -666,13 +667,18 @@ def main():
                     verify(cold_text, runtime=True, selftest=True)
                     check_forbidden_selection(cold_text, card.read_bytes(),
                                               forbidden=forbidden, previous=retained)
-        elif args.scenario=='security-retry-cold':
+        elif args.scenario in ('security-retry-cold','security-block-cold'):
             from tools.noki6210_security_retry_check import check_wrong,check_cold,check_frames as retry_frames
+            blocked=args.scenario=='security-block-cold'
+            if blocked:
+                from tools.noki6210_puk_check import check_blocked,check_unblocked,check_reauthenticated,check_frames as puk_frames
             from PIL import Image
             card=run/'nvram/npe3hle/sim_card'
             checkpoint=card.read_bytes()
-            check_wrong(text,checkpoint)
+            (check_blocked if blocked else check_wrong)(text,checkpoint)
             retry_frames(run/'snap',wrong_only=True)
+            if blocked:
+                puk_frames(run/'snap',('6210_pin_blocked.png',))
             cold=run/'cold-recovery'
             cold.mkdir()
             shutil.copytree(run/'nvram',cold/'nvram')
@@ -681,12 +687,13 @@ def main():
             if initial!=checkpoint:
                 raise ValueError('cold PIN recovery input differs from predecessor')
             cold_command=list(command)
-            cold_command[cold_command.index('-autoboot_script')+1]=str(root/'tools/noki6210_security_input.lua')
-            cold_command[cold_command.index('-seconds_to_run')+1]='37'
+            recovery_script=root/('tools/noki6210_puk_input.lua' if blocked else 'tools/noki6210_security_input.lua')
+            cold_command[cold_command.index('-autoboot_script')+1]=str(recovery_script)
+            cold_command[cold_command.index('-seconds_to_run')+1]='57' if blocked else '37'
             cold_retry={
                 'invocation_id':str(uuid.uuid4()),'run_directory':str(cold),'command':cold_command,
                 'source_card_sha256':hashlib.sha256(checkpoint).hexdigest(),
-                'script_sha256':hashlib.sha256((root/'tools/noki6210_security_input.lua').read_bytes()).hexdigest(),
+                'script_sha256':hashlib.sha256(recovery_script.read_bytes()).hexdigest(),
                 'initial_storage':{str(path.relative_to(cold/'nvram')):hashlib.sha256(path.read_bytes()).hexdigest()
                                    for path in sorted((cold/'nvram').rglob('*')) if path.is_file()},
             }
@@ -697,12 +704,46 @@ def main():
             check_output((cold/'console.log').read_text(errors='replace'))
             cold_text=events(cold/'error.log')
             verify(cold_text,runtime=True,selftest=True)
-            check_cold(cold_text,initial,(cold/'nvram/npe3hle/sim_card').read_bytes())
+            (check_unblocked if blocked else check_cold)(cold_text,initial,(cold/'nvram/npe3hle/sim_card').read_bytes())
             check_registration(cold_text,(cold/'nvram/npe3hle/sim_card').read_bytes(),channel_header='1202')
             with Image.open(cold/'snap/6210_security_then_menu.png') as frame:
                 check_frame(frame,SECURITY_MENU_SHA256,'cold Messages after PIN recovery')
             if card.read_bytes()!=checkpoint:
                 raise ValueError('cold process changed its predecessor card')
+            if blocked:
+                puk_frames(cold/'snap',('6210_puk_prompt.png','6210_puk_new_pin.png','6210_puk_confirm.png','6210_puk_idle.png'))
+                reauth=run/'cold-new-pin'
+                reauth.mkdir()
+                shutil.copytree(cold/'nvram',reauth/'nvram')
+                shutil.copytree(cold/'cfg',reauth/'cfg')
+                recovered=(cold/'nvram/npe3hle/sim_card').read_bytes()
+                if (reauth/'nvram/npe3hle/sim_card').read_bytes()!=recovered:
+                    raise ValueError('new-PIN cold input differs from recovered card')
+                reauth_command=list(cold_command)
+                reauth_script=root/'tools/noki6210_puk_reauth_input.lua'
+                reauth_command[reauth_command.index('-autoboot_script')+1]=str(reauth_script)
+                reauth_command[reauth_command.index('-seconds_to_run')+1]='39'
+                reauth_launch={'invocation_id':str(uuid.uuid4()),'command':reauth_command,
+                    'run_directory':str(reauth),'source_card_sha256':hashlib.sha256(recovered).hexdigest(),
+                    'script_sha256':hashlib.sha256(reauth_script.read_bytes()).hexdigest(),
+                    'initial_storage':{str(path.relative_to(reauth/'nvram')):hashlib.sha256(path.read_bytes()).hexdigest()
+                        for path in sorted((reauth/'nvram').rglob('*')) if path.is_file()}}
+                (reauth/'launch.json').write_text(json.dumps(reauth_launch,indent=2)+'\n')
+                with (reauth/'console.log').open('w') as output:
+                    subprocess.run(reauth_command,cwd=reauth,stdout=output,stderr=subprocess.STDOUT,
+                                   check=True,timeout=180,env=environment)
+                check_output((reauth/'console.log').read_text(errors='replace'))
+                reauth_text=events(reauth/'error.log')
+                verify(reauth_text,runtime=True,selftest=True)
+                check_reauthenticated(reauth_text,recovered,(reauth/'nvram/npe3hle/sim_card').read_bytes())
+                check_registration(reauth_text,(reauth/'nvram/npe3hle/sim_card').read_bytes(),
+                                   preserved_location=True,channel_header='1202')
+                puk_frames(reauth/'snap',('6210_puk_idle.png',))
+                with Image.open(reauth/'snap/6210_security_then_menu.png') as frame:
+                    check_frame(frame,SECURITY_MENU_SHA256,'Messages after cold new-PIN authentication')
+                if (cold/'nvram/npe3hle/sim_card').read_bytes()!=recovered:
+                    raise ValueError('new-PIN process changed its recovered predecessor')
+                cold_retry['new_pin_authentication']=reauth_launch
         elif args.scenario in ('security','security-retry'):
             import re
             from tools.radio_call_lifecycle_common import require_ordered
@@ -796,7 +837,7 @@ def main():
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
             'sim_profile': ('foreign two-digit-MNC preferred laboratory card' if args.scenario == 'foreign-registration' or args.foreign_cell
                             else 'visited-test-PLMN preferred laboratory card' if args.scenario == 'plmn-reject'
-                            else 'PIN-enabled laboratory card' if args.scenario in ('security','security-retry','security-retry-cold') or args.pin_enabled
+                            else 'PIN-enabled laboratory card' if args.scenario in ('security','security-retry','security-retry-cold','security-block-cold') or args.pin_enabled
                             else 'default laboratory card'),
             'plmn_rejection': ({'cause': 11, 'visited_plmn': '001-02',
                                 'firmware_sim_update': True, 'cold_window_seconds': 30,

@@ -105,8 +105,11 @@ registration and exact error/idle/Menu frames. Whole-card comparison admits
 only the documented location update. `verify-6210-pin-retry-cold` independently
 preserves one failed retry through a separate process, then physically
 authenticates, resets retries and recovers registered Menu. Full predecessor,
-cold input and final cards are checked. PUK exhaustion is not inherited from
-other products.
+cold input and final cards are checked. `verify-6210-puk-recovery` adds three
+physical PIN failures, exact blocked-card cold continuation, physical PUK/new
+PIN/confirmation and a third-process VERIFY with the installed PIN, retained
+location, exact idle/Menu and unchanged card. Wrong-PUK/permanent rejection
+and PIN2/FDN are not inherited from other products.
 
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,

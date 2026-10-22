@@ -1045,7 +1045,8 @@ the Messages-menu pixels. The fixture is `noki6210_security_retry_input.lua`;
 qualified capture: `tmp/npe3-pin-retry-final`.
 
 This establishes same-process wrong-PIN recovery and delayed registration.
-PIN exhaustion/PUK recovery and native DSP/radio support remain separate.
+PIN exhaustion/PUK recovery has its separate cold-process gate below; native
+DSP/radio support remains unproved.
 
 `make verify-6210-pin-retry-cold` separately stops after9999/OK and copies
 only that run's own NVRAM/configuration into a new process. The full3570-byte
@@ -1062,7 +1063,33 @@ initial-storage hash map and predecessor-card hash in `cold-recovery/launch.json
 and the acceptance report. No CPU/RAM/save-state snapshot crosses processes.
 Fixture: `noki6210_security_retry_cold_input.lua`; scenario:
 `security-retry-cold --coherent-cell`. This qualifies failed-retry durability
-and recovery, not arbitrary restart states or PUK behavior.
+and recovery, not arbitrary restart states.
+
+`make verify-6210-puk-recovery` extends the same own-PMM/coherent-cell setup
+through three independently launched processes:
+
+1. Physical9999/OK at8..12,16..20 and24..28s produces9804/retries2,
+   9804/retries1 and9840/retries0. The complete blocked card differs from the
+   deterministic original only at the PIN1 retry byte. The exact display is
+   SIM blocked; no authentication, UNBLOCK or registration is admitted.
+2. Cold `cold-recovery` starts from that exact own card/NVRAM. Physical
+   PUK12345678/OK, new PIN2468/OK and repeated2468/OK produce one successful
+   UNBLOCK CHV1, no VERIFY shortcut, and laboratory registration at33.233s.
+   The complete card differs only by the new PIN, restored retries and LOCI.
+   Blocked/new-PIN/confirmation/idle and Messages frames are checked.
+3. A separate `cold-new-pin` process copies the recovered own persistent
+   storage, enters2468/OK physically, VERIFYs once and completes retained-LOCI
+   registration. Exact idle/Messages and whole-card equality demonstrate
+   that the installed PIN works across restart, without a second UNBLOCK.
+
+Both cold launches record independent invocation IDs, commands, script and
+initial-storage hashes, plus the exact predecessor-card hash. Predecessors
+are rechecked unchanged. No RAM or save state is copied. Ten reviewed frames
+and all physical press/release sequences are acceptance predicates. Scripts
+are `noki6210_security_block_input.lua`, `noki6210_puk_input.lua` and
+`noki6210_puk_reauth_input.lua`; card/protocol checks live in
+`noki6210_puk_check.py`. This proves ordinary PIN1 exhaustion and successful
+PUK1 recovery, not wrong-PUK/permanent blocking, PIN2/FDN or native radio.
 
 ## SIM Toolkit
 

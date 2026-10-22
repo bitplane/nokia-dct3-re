@@ -18,10 +18,14 @@ end
 local runner=coroutine.create(function()
     assert(emu.wait(7))
     machine.screens[':screen']:snapshot('6210_pin_retry_prompt.png')
-    for index=0,3 do press('Keypad 9',8+index) end
-    press('Left Softkey / Menu',12)
-    assert(emu.wait(2))
-    machine.screens[':screen']:snapshot('6210_pin_retry_rejected.png')
+    for attempt=1,(_G.npe3_pin_retry_attempts or 1) do
+        local start=8+(attempt-1)*8
+        for index=0,3 do press('Keypad 9',start+index) end
+        press('Left Softkey / Menu',start+4)
+        assert(emu.wait(2))
+        if attempt==1 then machine.screens[':screen']:snapshot('6210_pin_retry_rejected.png') end
+        if attempt==3 then machine.screens[':screen']:snapshot('6210_pin_blocked.png') end
+    end
     if _G.npe3_pin_retry_wrong_only then
         machine:logerror('6210_pin_retry_input: wrong_complete=1 firmware_state_forcing=0\n')
         return
