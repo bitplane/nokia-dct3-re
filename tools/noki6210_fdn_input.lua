@@ -1,4 +1,4 @@
--- Discover FDN through physical Settings navigation on an explicit FDN card.
+-- Physical FDN Settings navigation on an explicit laboratory card.
 local directory=assert(debug.getinfo(1,'S').source:match('^@(.*/)'))
 dofile(directory..'noki6210_staged_observe.lua')
 local machine=manager.machine
@@ -28,7 +28,10 @@ local runner=coroutine.create(function()
     for i=0,1 do press('Scroll Down',36+i) end
     press('Left Softkey / Menu',40)
     local finish=50
-    if _G.npe3_fdn_enable or _G.npe3_fdn_disable then
+    if _G.npe3_fdn_record_steps then
+        for _,step in ipairs(_G.npe3_fdn_record_steps) do press(step[2],step[1]) end
+        finish=assert(_G.npe3_fdn_record_finish)
+    elseif _G.npe3_fdn_enable or _G.npe3_fdn_disable then
         press(_G.npe3_fdn_disable and 'Scroll Down' or 'Scroll Up',42)
         press('Left Softkey / Menu',44)
         local pin=_G.npe3_fdn_pin2 or '5678'

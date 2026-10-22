@@ -138,8 +138,10 @@ handshake on an explicit extended card, with exact complete-card preservation
 and12 reviewed frames. `verify-6210-fdn-retry-cold` additionally proves wrong
 PIN2 activation denial with unchanged FDN validity/credentials, durable retry
 loss and cold correct-PIN2 activation through the complete lifecycle.
-FDN record operations and local listed/unlisted dialing restrictions remain
-unqualified.
+`verify-6210-fdn-records` adds physical PIN2-protected A/12345 record save and
+exact cold Details retrieval, with complete-card preservation and12 reviewed
+frames across three processes. Record edit/erase/cancel, rejected record writes
+and local listed/unlisted dialing restrictions remain unqualified.
 
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,

@@ -1257,9 +1257,21 @@ All five processes,16 reviewed frames, exact card/protocol transitions,
 registration, launch identities and unchanged predecessors are checked.
 Capture: `tmp/npe3-fdn-retry-banked`.
 
-FDN record save/edit/erase and local listed/unlisted dial-permission controls
-remain unqualified. These gates are not connected-call or native-radio/speech
-claims.
+`make verify-6210-fdn-records` freshly activates FDN, cold-starts into Number
+list/Add and physically saves `A / 12345` after PIN2 authentication. This
+6210 editor requests number before name. Firmware sends exactly one successful
+UPDATE RECORD to EF_FDN record1 (`A0 DC 01 04 20`), then rereads record1;
+the complete card differs only in that32-byte record. A third cold process
+reads all ten EF_FDN records,
+retrieves the saved entry through Search/Details and renders A/12345 without
+another PIN2 verification or any record write. The whole saved card remains
+unchanged. Registration, exact contacts/APDU order/results,12 reviewed frames,
+independent launches and unchanged predecessor NVRAM pass. Capture:
+`tmp/npe3-fdn-records-qualified`.
+
+FDN record edit/erase/cancel, rejected record writes and local listed/unlisted
+dial-permission controls remain unqualified. These gates are not connected-call
+or native-radio/speech claims.
 
 ## SIM Toolkit
 

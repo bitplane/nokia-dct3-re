@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_fdn_record_save_cold_details", "owner": "npe3_sim_storage", "status": "satisfied",
+      "predicate": "6210 physically saves a PIN2-protected FDN record and retrieves its exact name/number after an own-storage cold restart",
+      "current": "Three fresh own-PMM/coherent-cell processes activate FDN, physically Number list/Add A/12345 and cold Search/Details. The NPE-3 editor asks for number before name. Successful VERIFY CHV2 precedes the sole UPDATE RECORD A0DC010420 to EF_FDN record1 and its confirming READ RECORD; whole-card equality permits only the expected32 bytes. Cold read loads all ten records, performs no PIN2 verification or update and renders A/12345 with the complete saved card unchanged. All12 reviewed frames, exact contacts/selectors/order/statuses, registration, distinct launches and unchanged predecessors pass. Capture tmp/npe3-fdn-records-qualified. No edit/erase/cancel/rejected-write/dial-permission/native-speech promotion.",
+      "evidence": ["docs/6210_bringup.md", "tools/run_noki6210_fdn_records.py", "tools/noki6210_fdn_write.lua", "tools/noki6210_fdn_read.lua", "tools/noki6210_fdn_input.lua", "tools/noki6210_fdn_record_check.py", "tools/test_noki6210_fdn_record_check.py", "gates.json"]
+    },
+    {
       "id": "npe3_fdn_activation_rejection_cold_retry", "owner": "npe3_sim_security", "status": "satisfied",
       "predicate": "6210 rejects wrong-PIN2 FDN activation without changing validity and cold-recovers using the exact retry-depleted card",
       "current": "Five own-PMM/coherent-cell processes use an explicit FDN card. Wrong5675 produces VERIFY CHV2/9804 and Code error, no validity APDU, valid ADN, unchanged credentials/records and only PIN2 retries3->2 beyond normal location. Exact own storage cold-activates with5678, restores retries3 and invalidates ADN. Cold On/physical Off/cold Off complete the lifecycle. All16 reviewed frames, CHV1/CHV2 counter distinctions, exact contacts/order/card transitions, registration, independent launches and unchanged predecessors pass. Capture tmp/npe3-fdn-retry-banked. No FDN-record/dial-permission/connected-call/native-speech promotion.",
