@@ -9258,6 +9258,24 @@ header-shaped buffered bytes alone do not prove that every remaining packet
 belongs in the intended output. Resolve recording metadata/encoder extent or
 an independent playback contract before treating this policy as a device bug.
 
+The original R061 image does not change this pinned final-input policy.
+`mu4_playback_version_check.py` checks both complete source hashes and all
+235 mapped policy words: 234 are identical at the same addresses; the sole
+difference is the page-3 FCALL at `02958a`, whose target changes from
+`039005` to `039019`. The complete 28-word destination body through FRET
+is identical after relocation. No other policy-word normalization is allowed.
+Mutation tests cover every policy word in both versions and both target bodies.
+The images have 5,617 raw destination differences overall, so this is not
+whole-image equivalence or proof that their native runtime behavior is equal.
+It rules out a direct change to these known short-read/cleanup operations,
+not all possible R061 decoder, request-size or lifecycle differences.
+
+```sh
+python3 tools/mu4_playback_version_check.py \
+  roms/5510-mu4-reference/InitData_R060.a00 \
+  roms/5510-mu4-reference/InitData_R061.a00
+```
+
 `playback_input_units` pins 116 source words across AA55/AA99.
 Descriptor arithmetic is `36b0 + index*002c`; index 2 is `3708`, and its
 size pair at offset `0012` is `371a`. The local logical right shift by one
@@ -9641,7 +9659,7 @@ matching checkpoint state, actual board-pin edges, replay publications,
 all nine preserved capture prefixes and an uncapped completion marker.
 
 The post-wake caller is not another receive wait. The separately pinned
-26-word `resident_wake_tail` span loads `07d0`, calls `03acdf`, then writes
+52-word `resident_wake_tail` contract loads `07d0`, calls `03acdf`, then writes
 zero to `b558` at `03ac11`. Helper `03acdf..03acf1` passes stack literal
 `000a` to resident `00:2098`, retains its result in AR1, reads `b582` into
 AR0, and performs unsigned `CMPR GT,AR1`. Its `f820` is **BC NTC**, not
@@ -9650,12 +9668,31 @@ Otherwise it publishes AR1 to `b582`. There is no backward branch or
 receive operation in this helper: the effect is a countdown lower bound,
 not a synchronous delay or a cap on the old value.
 
+The separate AA55 bootstrap supplies the nested call's source: `002098`
+branches to `00352c`, whose five words clear SXM, load AL into A, repeat
+`SUBC SP(2),A` sixteen times and return. The retained low word is the
+unsigned low-16-bit argument divided by the caller's ten. Consequently the
+bounded software model is `max(old_b582, low16(argument) / 10)`; the native
+call's `07d0` produces `00c8`. All 65,536 argument values are checked against
+the model at zero, quotient-adjacent and maximum counter values. These
+host arithmetic checks do not replace the executable CPU SUBC/repeat
+fixtures or measure physical countdown units.
+`SP(2)` assumes the CPL-addressed ABI, present in the native wake context's
+`ST1=6113`; this is not a context-free interpretation of the direct operand.
+
+The same contract pins the consumer at `03ac03`: `b582 != 0` branches
+to `03ac11`, bypassing the resident deep-idle call. Worker prefix
+`03a8c9..03a8d7` decrements a nonzero counter, then tests `bb94 & 0002`;
+when set it adds one back (including changing zero to one). This is an
+asynchronous idle-inhibition countdown, not a receive-completion latch.
+The worker's cadence and ownership of the inhibiting flag remain unknown.
+
 A read-only data-tap window after the declared wake observes `b582` being
 set to `00c8`, followed by `b558=0`; ordinary activity subsequently
 decrements `b582` to `00c7`. This supports asynchronous bookkeeping, not
-another missing MSP430 acknowledgement. The nested resident helper's full
-implementation, the countdown's physical units and its official lifecycle
-meaning remain unqualified. Source ownership comes from the pinned upload,
+another missing MSP430 acknowledgement. The countdown's physical units
+and its official lifecycle meaning remain
+unqualified. Source ownership comes from the pinned upload,
 not data-tap context PCs or earlier same-address overlay observations.
 
 The bounded native playback fixture now observes 402 complete software

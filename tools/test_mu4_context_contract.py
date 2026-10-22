@@ -25,7 +25,7 @@ from tools.mu4_context_contract import PLAYBACK_PENDING_CONTROL, decode_playback
 from tools.mu4_context_contract import PLAYBACK_PENDING16_PRODUCERS,decode_playback_pending16_producers
 from tools.mu4_context_contract import PLAYBACK_INPUT3_SENDERS,decode_playback_input3_senders
 from tools.mu4_context_contract import RESIDENT_IDLE3,decode_resident_idle3
-from tools.mu4_context_contract import RESIDENT_WAKE_TAIL,decode_resident_wake_tail
+from tools.mu4_context_contract import RESIDENT_WAKE_TAIL,RESIDENT_WAKE_DIVIDE,decode_resident_wake_tail,resident_wake_countdown
 from tools.mu4_context_contract import PLAYBACK_REFILL_COMPLETION, decode_playback_refill_completion, reference_refill_completion
 from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
@@ -232,17 +232,40 @@ class ContextContractTest(unittest.TestCase):
     def test_resident_wake_tail_raises_counter_instead_of_waiting(self):
         words={base+offset:word for base,witness in RESIDENT_WAKE_TAIL.items()
                for offset,word in enumerate(witness)}
-        result=decode_resident_wake_tail(words)
-        self.assertEqual(result['pinned_words'],len(words))
+        bootstrap={base+offset:word for base,witness in RESIDENT_WAKE_DIVIDE.items()
+                   for offset,word in enumerate(witness)}
+        result=decode_resident_wake_tail(words,bootstrap)
+        self.assertEqual(result['pinned_words'],len(words)+len(bootstrap))
         self.assertEqual(result['caller']['argument'],'07d0')
         self.assertEqual(result['helper']['nested_call'],'00:2098')
         self.assertIn('GT',result['helper']['compare'])
         self.assertIn('no backward branch',result['helper']['effect'])
-        for address in words:
-            changed=dict(words)
-            changed[address]^=1
-            with self.subTest(address=address),self.assertRaises(ValueError):
-                decode_resident_wake_tail(changed)
+        self.assertEqual(result['divide']['caller_result'],'07d0 / 000a = 00c8')
+        self.assertIn('ANEQ',result['idle_gate']['branch'])
+        self.assertIn('ffff',result['decrement']['subtract'])
+        self.assertIn('NTC',result['decrement']['inhibit'])
+        for index,image in enumerate((words,bootstrap)):
+            for address in image:
+                images=[dict(words),dict(bootstrap)]
+                images[index][address]^=1
+                with self.subTest(image=index,address=address),self.assertRaises(ValueError):
+                    decode_resident_wake_tail(*images)
+
+    def test_resident_countdown_unsigned_range(self):
+        for argument in range(65536):
+            quotient,remainder=0,0
+            for bit in range(15,-1,-1):
+                remainder=(remainder<<1)|((argument>>bit)&1)
+                quotient<<=1
+                if remainder>=10:
+                    remainder-=10
+                    quotient|=1
+            for counter in (0,max(0,quotient-1),quotient,min(65535,quotient+1),65535):
+                self.assertEqual(resident_wake_countdown(counter,argument),max(counter,quotient))
+        self.assertEqual(resident_wake_countdown(0,2000),200)
+        self.assertEqual(resident_wake_countdown(599,2000),599)
+        for value in (-1,65536,True,1.5):
+            with self.subTest(value=value),self.assertRaises(ValueError):resident_wake_countdown(value,2000)
 
     def test_resident_idle3_rejects_every_pinned_word_change(self):
         images=self.idle3_images()

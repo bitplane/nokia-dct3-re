@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "mu4_r061_changes_pinned_final_input_policy",
+      "status": "disproven",
+      "hypothesis": "The acquired original R061 image directly repairs the mapped R060 short-read cleanup policy by changing its pinned branch or cleanup operation",
+      "conclusion": "Hash-qualified R060/R061 AA99 maps agree at234 of235 pinned final-input policy words. The only difference is page3 FCALL02958a's low target word9005->9019; both complete28-word target bodies match at039005/039019 through FRET. Every policy/target word has mutation coverage and no other normalization is admitted. There are5617 raw destination differences across the full49843/49863-word maps, so this is not whole-image equivalence, native R061 acceptance or a claim that decoder/request-size/lifecycle differences cannot affect playback. The known final-input operations themselves do not supply a new drain implementation.",
+      "evidence": ["docs/5510_bringup.md", "tools/mu4_playback_version_check.py", "tools/test_mu4_playback_version_check.py"]
+    },
+    {
       "id": "nsb7_idle_x_fields_are_lcd_pixel_corruption",
       "status": "disproven",
       "hypothesis": "The repeated x/zero/CCCH marks in the NSB-7 idle main area are caused by LCD or font pixel corruption",

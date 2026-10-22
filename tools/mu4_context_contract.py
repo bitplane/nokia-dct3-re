@@ -2292,19 +2292,29 @@ RESIDENT_IDLE3 = {
 }
 
 RESIDENT_WAKE_TAIL = {
+    0x3ac03: (0x10f8,0xb582,0xf844,0xac11),
     0x3ac0d: (0xf020,0x07d0,0xf983,0xacdf,0x76f8,0xb558,0x0000),
     0x3acdf: (0x4a11,0xeefd,0xf495,0x7600,0x000a,0xf980,0x2098,
               0x8811,0x7210,0xb582,0xf495,0xf6a9,0xf820,0xacef,
               0x7311,0xb582,0xee03,0x8a11,0xf4e4),
+    0x3a8c9: (0x10f8,0xb582,0xf845,0xa8d0,0x6bf8,0xb582,0xffff,
+              0x60f8,0xbb94,0x0002,0xf820,0xa8da,0x6bf8,0xb582,0x0001),
+}
+RESIDENT_WAKE_DIVIDE = {
+    0x2098: (0xf880,0x352c),
+    0x352c: (0xf6b8,0x4808,0xec0f,0x1e02,0xf4e4),
 }
 
 
-def decode_resident_wake_tail(words):
-    for base, witness in RESIDENT_WAKE_TAIL.items():
-        for offset, expected in enumerate(witness):
-            if words.get(base+offset) != expected:
-                raise ValueError(f'resident wake tail changed at {base+offset:06x}')
-    return dict(segment='aa22', pinned_words=26,
+def decode_resident_wake_tail(words,bootstrap):
+    for image,spans in ((words,RESIDENT_WAKE_TAIL),(bootstrap,RESIDENT_WAKE_DIVIDE)):
+        for base, witness in spans.items():
+            for offset, expected in enumerate(witness):
+                if image.get(base+offset) != expected:
+                    raise ValueError(f'resident wake tail changed at {base+offset:06x}')
+    return dict(segment='aa22+aa55', pinned_words=52,
+                idle_gate={'load':'03ac03','branch':'03ac05: BC ANEQ,03ac11',
+                           'effect':'nonzero b582 bypasses resident deep-idle call'},
                 caller={'entry':'03ac0d','argument':'07d0','call':'03ac0f','target':'03acdf',
                         'following_store':{'pc':'03ac11','address':'b558','value':'0000'}},
                 helper={'entry':'03acdf','last_word':'03acf1','stack_literal':'000a',
@@ -2312,8 +2322,24 @@ def decode_resident_wake_tail(words):
                         'compare':'03acea: CMPR GT,AR1; BC NTC,03acef',
                         'conditional_update':'03aced: MVMD AR1,b582; written only when AR1 > AR0',
                         'effect':'raise b582 to at least the nested helper result; no backward branch'},
-                scope='Pinned caller/helper grammar; nested 00:2098 implementation, counter units, '
+                divide={'stub':'002098: B 00352c',
+                        'body':'RSBX SXM; LDM AL,A; RPT #15; SUBC SP(2),A; FRET',
+                        'addressing':'ST1.CPL=1 ABI; native wake context ST1=6113',
+                        'quotient':'low16 of unsigned low16(A) / SP(2)',
+                        'caller_result':'07d0 / 000a = 00c8'},
+                decrement={'entry':'03a8c9','zero_skip':'03a8cb: BC AEQ,03a8d0',
+                           'subtract':'03a8cd: ADDM ffff,b582',
+                           'inhibit':'03a8d0: BITF bb94,2; BC NTC,03a8da',
+                           'add_back':'03a8d5: ADDM 1,b582',
+                           'scope':'source prefix only; worker cadence and flag ownership unqualified'},
+                scope='Pinned caller/helper/divide grammar; counter units, '
                       'physical delay and official command semantics unqualified')
+
+
+def resident_wake_countdown(counter,argument):
+    if any(type(value) is not int or not 0<=value<=0xffff for value in (counter,argument)):
+        raise ValueError('countdown model requires unsigned 16-bit inputs')
+    return max(counter,argument//10)
 
 
 def decode_resident_idle3(images):
@@ -2753,7 +2779,7 @@ def contract(source):
         dict(aa55=bootstrap_words,aa22=words,aa99=rel_words,aa88=recorder_words))
     result['resident_idle3'] = decode_resident_idle3(
         dict(aa55=bootstrap_words,aa22=words,aa99=rel_words,aa88=recorder_words))
-    result['resident_wake_tail'] = decode_resident_wake_tail(words)
+    result['resident_wake_tail'] = decode_resident_wake_tail(words,bootstrap_words)
     result['recorder_stop_frontend'] = decode_recorder_stop_frontend(recorder_words)
     result['recorder_stop_mailbox'] = decode_recorder_stop_mailbox(recorder_words)
     result['recording_escape_store_prefix'] = decode_escape_store_prefix(recorder_words)
