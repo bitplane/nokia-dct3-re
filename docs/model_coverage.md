@@ -129,8 +129,10 @@ firmware's automatic replacement-PIN2 VERIFY and cold use of that PIN2 to
 change back, with exact card preservation and30 frames across five processes.
 `verify-6210-puk2-retry-cold` adds a physical wrong-PUK2 rejection with exactly
 one durable attempt consumed, unchanged credentials, cold recovery and cold
-replacement-PIN2 use across six processes. Permanent PUK2 exhaustion and FDN
-remain unqualified.
+replacement-PIN2 use across six processes. `verify-6210-puk2-permanent` proves
+all ten physically consumed PUK2 attempts, exact permanent-card preservation
+and a responsive cold control that cannot reopen PIN2 recovery, while PIN1
+registration/menu access remains usable. FDN remains unqualified.
 
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,

@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_permanent_puk2_loss", "owner": "npe3_sim_security", "status": "satisfied",
+      "predicate": "6210 permanently exhausts PUK2 across physical cold-linked failures and preserves PIN1 registration and responsive menus",
+      "current": "Fourteen distinct processes: physical PIN2 exhaustion, ten separately cold wrong-PUK2 failures and a cold correct-PUK2-pattern control. First9 UNBLOCKs return9804/Code error;10 returns9840/PIN2 code rejected. Whole-card transitions change only PUK2 retry byte. Final cold Settings immediately rejects PIN2; credential-shaped contacts reach ordinary dialing/options, not a recovery editor, with no PIN2 VERIFY/UNBLOCK or call/SMS service. PIN1 authenticates, retained-location registration and End/Menu remain live; complete zero-PUK2 card is unchanged. All84 frames and exact predecessor/launch/protocol checks pass. Capture tmp/npe3-puk2-permanent-banked. Resume rejects changed/partial evidence. No FDN/native-speech promotion.",
+      "evidence": ["docs/6210_bringup.md", "tools/run_noki6210_puk2_exhaustion.py", "tools/test_noki6210_puk2_exhaustion.py", "tools/noki6210_pin2_change_check.py", "tools/test_noki6210_pin2_change_check.py", "tools/noki6210_puk2_wrong_input.lua", "tools/noki6210_puk2_input.lua", "gates.json"]
+    },
+    {
       "id": "npe3_wrong_puk2_cold_recovery", "owner": "npe3_sim_security", "status": "satisfied",
       "predicate": "6210 rejects physical wrong PUK2 without replacing PIN2, persists the consumed attempt and cold-recovers from that exact card",
       "current": "Six cold-linked own-PMM/coherent-card processes: physical PIN2 exhaustion, wrong PUK2, correct recovery and replacement-PIN2 use. Wrong99999999/new2468/confirmation yields UNBLOCK CHV2/9804 and Code error; whole card differs only at PUK2 retries10->9, PIN2 remains5678/blocked and no automatic VERIFY follows. Exact failed-PUK storage cold-recovers with87654321, restoring PIN2/PUK2 allowances and installing2468; sixth process physically cold-uses2468 and changes back to5678. All36 frames, exact contacts/protocol/card transitions, registration, independent launches and unchanged predecessors pass. Capture tmp/npe3-puk2-retry-banked. No permanent PUK2/FDN/native-speech promotion.",

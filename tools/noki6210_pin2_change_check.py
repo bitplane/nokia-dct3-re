@@ -1,4 +1,5 @@
 """6210 physical PIN2 change without modifying PIN1 or unrelated card records."""
+import re
 from tools.noki6210_puk_check import profile,contacts,check_rgb_frame
 from tools.sim_security_trace_check import statuses
 from tools.radio_call_lifecycle_common import require_ordered
@@ -62,6 +63,14 @@ def check(text,card,old_pin='5678',new_pin='8765',rejected=False,remaining=2):
         raise ValueError('PIN2 change altered PIN1 or unrelated card data')
 
 
+def puk2_contacts(rejected=False):
+    items=settings_contacts()
+    for start,digits in ((50,'99999999' if rejected else '87654321'),(62,'2468'),(70,'2468')):
+        items.extend((start+i,'Keypad '+d) for i,d in enumerate(digits))
+        items.append((start+len(digits),'Left Softkey / Menu'))
+    return items+[(80,'End'),(82,'Left Softkey / Menu')]
+
+
 def check_puk2(text,initial,card,rejected=False,puk_attempts=10):
     if puk_attempts not in range(1,11):
         raise ValueError('PUK2 predecessor allowance must be 1..10')
@@ -77,12 +86,7 @@ def check_puk2(text,initial,card,rejected=False,puk_attempts=10):
         raise ValueError('PUK2 recovery must authenticate PIN1 and unblock CHV2 exactly once')
     if rejected and 'header cla=a0 ins=20 p1=00 p2=02 p3=08' in text:
         raise ValueError('rejected PUK2 must not VERIFY a replacement PIN2')
-    items=settings_contacts()
-    for start,digits in ((50,'99999999' if rejected else '87654321'),(62,'2468'),(70,'2468')):
-        items.extend((start+i,'Keypad '+d) for i,d in enumerate(digits))
-        items.append((start+len(digits),'Left Softkey / Menu'))
-    items += [(80,'End'),(82,'Left Softkey / Menu')]
-    contacts(text,'6210_pin2_input',items)
+    contacts(text,'6210_pin2_input',puk2_contacts(rejected))
     order=[
         ('VERIFY PIN1',r'header cla=a0 ins=20 p1=00 p2=01 p3=08'),
         ('PIN1',r'SIM status ins=20 sw=9000'),
@@ -109,7 +113,7 @@ def check_puk2(text,initial,card,rejected=False,puk_attempts=10):
         raise ValueError('PUK2 recovery changed unrelated card data')
 
 
-def check_puk2_frames(directory,rejected=False):
+def check_puk2_frames(directory,rejected=False,permanent=False):
     frames={
         '6210_pin2_key_42.png':FRAMES['6210_pin2_key_42.png'],
         '6210_pin2_key_47.png':'e71767f126d0131b950ce770072638de16a2ca8979efa4df184bda8d09157bd8',
@@ -120,5 +124,44 @@ def check_puk2_frames(directory,rejected=False):
     }
     if rejected:
         frames['6210_pin2_key_74.png']='c1371c4cdca6b0f72c9c1dcc6e602de981330f67719714bc5b124e1a3b4fcfcd'
+    if permanent:
+        frames['6210_pin2_key_74.png']='6357f9b5bc04027166bc3529fa4abd4ca429af4c953db90b97e6697f44984152'
+    for name,digest in frames.items():
+        check_rgb_frame(directory/name,digest)
+
+
+def check_permanent_puk2(text,initial,card):
+    expected=bytearray(profile(3,True))
+    expected[3517]=expected[3519]=0
+    if initial!=bytes(expected) or card!=initial:
+        raise ValueError('permanent PUK2 input control changed the exhausted card')
+    if (statuses(text,0x20)!=[(0x9000,3,10)] or
+            any(statuses(text,ins) for ins in (0x24,0x26,0x28,0x2c)) or
+            'header cla=a0 ins=20 p1=00 p2=02' in text or
+            'header cla=a0 ins=2c' in text):
+        raise ValueError('permanent PUK2 control entered a credential transaction')
+    if (re.search(r'GSM service (?:establish|uplink) sapi=\d+ pd=(?:03|09) ',text) or
+            re.search(r'GSM service (?:establish|uplink) sapi=\d+ pd=05 message=24 ',text)):
+        raise ValueError('permanent PUK2 input control started call or SMS service')
+    contacts(text,'6210_pin2_input',puk2_contacts())
+    require_ordered(text,[
+        ('PIN1',r'SIM status ins=20 sw=9000'),
+        ('registration',r'LAPDm Location Updating Accept acknowledged nr=1'),
+        ('Settings',r'key=Left Softkey / Menu state=1 t=47\.'),
+        ('End',r'key=End state=1 t=80\.'),
+        ('Menu',r'key=Left Softkey / Menu state=1 t=82\.'),
+        ('complete',r'6210_pin2_input: complete=1 firmware_state_forcing=0'),
+    ],'6210 permanent PUK2 input control')
+
+
+def check_permanent_puk2_frames(directory):
+    frames={
+        '6210_pin2_key_42.png':FRAMES['6210_pin2_key_42.png'],
+        '6210_pin2_key_47.png':'6357f9b5bc04027166bc3529fa4abd4ca429af4c953db90b97e6697f44984152',
+        '6210_pin2_key_58.png':'2d344a4cb647173525e721e94e08de1b49aa83454937036947cfd1ef0b8dad72',
+        '6210_pin2_key_66.png':'d9d0c8fceb5a66f15e4b28cd9ac78b0d8bad769f7bdb4b580ce1661e74957303',
+        '6210_pin2_key_74.png':'55b5c9d6cbd20f2dc9b19decc5f4eebefa7998bd90eefcf80ffddfccdd37832b',
+        '6210_security_then_menu.png':FRAMES['6210_security_then_menu.png'],
+    }
     for name,digest in frames.items():
         check_rgb_frame(directory/name,digest)

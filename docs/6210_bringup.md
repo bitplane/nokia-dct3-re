@@ -1209,7 +1209,22 @@ process, which correct-PUK2 recovers and restores both CHV2/PUK2 allowances;
 a sixth process then cold-uses2468 and changes back to5678. All36 frames,
 full-card transitions, registration, independent launches and unchanged
 predecessor storage are checked. Capture: `tmp/npe3-puk2-retry-banked`.
-Permanent PUK2 exhaustion and FDN control remain unqualified for6210.
+`make verify-6210-puk2-permanent` exhausts PUK2 through14 independent processes:
+three physical PIN2 failures, ten cold-linked wrong-PUK2 attempts and a cold
+correct-PUK2-pattern control. The first nine UNBLOCK failures return9804 and
+Code error; the tenth returns9840 and PIN2 code rejected. Complete cards differ
+only by the PUK2 retry byte on each failure. PIN1 remains authenticated and
+laboratory registration continues throughout.
+
+On the final cold boot, selecting Change PIN2 immediately displays PIN2 code
+rejected. The correct-PUK2-shaped physical input reaches ordinary dialing/options
+UI rather than a recovery editor; no PIN2 VERIFY/UNBLOCK or call/SMS service
+occurs. End/Menu returns to the reviewed Messages frame. The complete zero-PUK2
+card is unchanged. All84 frame comparisons and predecessor storage hashes pass.
+Capture: `tmp/npe3-puk2-permanent-banked`. `--resume` validates completed stages'
+commands, script hashes, complete predecessor NVRAM, distinct launch IDs,
+protocol/card transitions and frames before continuing missing stages; partial
+or changed evidence is rejected. FDN control remains unqualified for6210.
 
 ## SIM Toolkit
 

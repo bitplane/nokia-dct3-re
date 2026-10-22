@@ -1,6 +1,6 @@
 import unittest
 
-from tools.noki6210_pin2_change_check import check,check_puk2,settings_contacts
+from tools.noki6210_pin2_change_check import check,check_puk2,settings_contacts,check_permanent_puk2
 from tools.noki6210_puk_check import profile
 from tools.sim_security_trace_check import statuses
 
@@ -61,6 +61,28 @@ class Pin2ChangeTests(unittest.TestCase):
     def test_physical_puk2_recovery(self):
         check_puk2(*self.puk2_fixture())
 
+    def test_permanent_puk2_control_keeps_pin1_but_has_no_pin2_or_service_transaction(self):
+        text,initial,_=self.puk2_fixture()
+        text='\n'.join(line for line in text.splitlines() if
+                       not ('ins=2c' in line or 'p2=02' in line or 'sw=9000 chv=3/3' in line))
+        text=text.replace('chv=3/0 puk=10/10','chv=3/0 puk=10/0')
+        card=bytearray(initial)
+        card[3519]=0
+        card=bytes(card)
+        check_permanent_puk2(text,card,card)
+        for extra in ('header cla=a0 ins=2c p1=00 p2=02 p3=10',
+                      'header cla=a0 ins=20 p1=00 p2=02 p3=08',
+                      'GSM service establish sapi=0 pd=03 message=05 ',
+                      'GSM service uplink sapi=3 pd=09 message=01 ',
+                      'GSM service establish sapi=0 pd=05 message=24 '):
+            with self.subTest(extra=extra),self.assertRaises(ValueError):
+                check_permanent_puk2(text+'\n'+extra,card,card)
+        for index in (3492,3516,3517,3518,3519):
+            changed=bytearray(card)
+            changed[index]^=1
+            with self.assertRaises(ValueError):
+                check_permanent_puk2(text,card,bytes(changed))
+
     def test_wrong_puk2_is_durable_and_does_not_replace_credentials(self):
         text,initial,_=self.puk2_fixture()
         for second,digit in enumerate('87654321',50):
@@ -73,6 +95,13 @@ class Pin2ChangeTests(unittest.TestCase):
         final=bytearray(initial)
         final[3519]=9
         check_puk2(text,initial,bytes(final),rejected=True)
+        last_initial=bytearray(initial)
+        last_initial[3519]=1
+        permanent=bytearray(last_initial)
+        permanent[3519]=0
+        terminal=text.replace('sw=9804 chv=3/0 puk=10/9','sw=9840 chv=3/0 puk=10/0')
+        terminal=terminal.replace('sw=9000 chv=3/0 puk=10/10','sw=9000 chv=3/0 puk=10/1')
+        check_puk2(terminal,bytes(last_initial),bytes(permanent),rejected=True,puk_attempts=1)
         with self.assertRaisesRegex(ValueError,'must not VERIFY'):
             check_puk2(text+'\nheader cla=a0 ins=20 p1=00 p2=02 p3=08',
                        initial,bytes(final),rejected=True)
