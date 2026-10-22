@@ -17,7 +17,7 @@ machine implicitly.
 | UI and storage | Physical security code, menus, SIM phonebook save/cold retrieval, RTC retention and Net monitor00 clean idle. Own EEPROM journal rotation matches the complete runtime shadow. |
 | SIM security | PIN1/PIN2 change/rejection, retry persistence, exhaustion/PUK recovery and request Off/On. Permanent PUK1 rejects the card; permanent PUK2 retains ordinary PIN1/menu use. |
 | FDN | Explicit extended card; physical PIN2-authorized On/Off, Save/edit/erase/cancel and cold retrieval. Registered listed/unlisted/Off controls distinguish permitted calls from local denial. |
-| SIM Toolkit | Phase-2+ nine-byte TERMINAL PROFILE; DISPLAY TEXT, GET INKEY, GET INPUT, SET UP MENU, menu-driven SEND SHORT MESSAGE and SET UP CALL accept/Cancel. Exact physical/protocol/UI acceptance; non-SMS cases preserve the full card, SMS permits only its exact EF_SMSS reference update. |
+| SIM Toolkit | Phase-2+ nine-byte TERMINAL PROFILE; DISPLAY TEXT, GET INKEY, GET INPUT, SET UP MENU, SELECT ITEM, menu-driven SEND SHORT MESSAGE and SET UP CALL accept/Cancel. Exact physical/protocol/UI acceptance; non-SMS cases preserve the full card, SMS permits only its exact EF_SMSS reference update. |
 | PCS laboratory network | Acquisition, BCCH, Location Updating/EF_LOCI, background measurements, addressed paging, physical incoming/outgoing CC/RR signaling and SMS delivery/read/delete/cancel/Reply. |
 | Authenticated composition | Physical PIN before fresh/cold registration, calls, SMS and phonebook; a long wrong-PIN control remains unregistered. |
 | Restoration | Exact ARM/banked registers, RAM/time, protocol replay and pixels at idle, connected call, active SMS and open Toolkit-menu boundaries, with physical continuation. |
@@ -2542,4 +2542,25 @@ the replay callback is absent from ordinary fixtures.
 ```sh
 .venv/bin/python tools/nsb7_toolkit_state_check.py \
   roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-menu-state
+```
+
+### Proactive item selection
+
+`fixtures/nsb7_toolkit_select_item/nsb7hle.cfg` and
+`nsb7_toolkit_select_item.lua` compose the same own authenticated menu path
+with SELECT ITEM. Selection86 returns9122; FETCH supplies the Alpha/Beta
+dialog. Physical Down90 selects Beta and OK92 returns
+`810307240002028281030100100102`/9000, including item identifier02.
+End98 returns to exact13:49 idle. No GSM call or SMS submission is allowed.
+
+Acceptance requires one profile, five FETCH/response pairs, one envelope,
+fourteen decoded physical actions before their responses, thirteen exact
+frames, full registration, a valid own journal and unchanged complete card.
+Wrong item, wrong Down key and response-before-OK controls are rejected.
+The checker uses a single named mode internally; its CLI options remain
+mutually exclusive. This is firmware/card UI acceptance, not native DSP/RF.
+
+```sh
+.venv/bin/python tools/nsb7_toolkit_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-select-item --select-item
 ```

@@ -3,8 +3,11 @@
 
 import argparse
 from pathlib import Path
+import sys
 
-from sim_toolkit_trace_check import require_in_order
+if __package__ in (None,''):
+    sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from tools.sim_toolkit_trace_check import require_in_order
 
 
 def verify(log: str) -> None:

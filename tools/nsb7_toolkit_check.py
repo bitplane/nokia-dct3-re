@@ -10,6 +10,7 @@ from tools.dct3_toolkit_check import verify_display_text,verify_interactive,veri
 from tools.nsb7_pin_services_check import check_authentication,check_source,SMSS_OFFSET
 from tools.sim_toolkit_sms_trace_check import verify as verify_sms
 from tools.sim_toolkit_call_trace_check import verify as verify_call,verify_decline,DISCONNECT
+from tools.sim_toolkit_select_item_trace_check import verify as verify_select_item
 from tools.nsb7_pin_check import check_frame
 from tools.nsb7_radio_check import contract
 from tools.nsb7_storage_check import inspect
@@ -45,17 +46,31 @@ DECLINE_FRAMES={**MENU_FRAMES,
     'nsb7_toolkit_menu_select.png':CALL_FRAMES['nsb7_toolkit_menu_select.png'],
     'nsb7_toolkit_call_decline.png':MENU_FRAMES['nsb7_toolkit_menu_open.png'],
     'nsb7_toolkit_call_active.png':MENU_FRAMES['nsb7_toolkit_menu_open.png']}
+SELECT_ITEM_FRAMES={**MENU_FRAMES,
+    'nsb7_toolkit_menu_select.png':'2fd7bf03bc43f6e81353678de00f40c96ef9a7dad56cf47672f8793552fe394d',
+    'nsb7_toolkit_item_next.png':'1a9cdbfa614372e7d78e887b5cc3be697a8e065e46b8ab0303b0caf13cd0f0ee',
+    'nsb7_toolkit_item_accept.png':MENU_FRAMES['nsb7_toolkit_menu_open.png']}
 
 
-def check(text, interactive=False, menu=False, sms=False, call=False, decline=False):
-    call=call or decline
-    menu=menu or sms or call
-    interactive=interactive or menu
+MODE_FRAMES={'display':FRAMES,'interactive':INTERACTIVE_FRAMES,'menu':MENU_FRAMES,
+             'sms':SMS_FRAMES,'call':CALL_FRAMES,'decline':DECLINE_FRAMES,
+             'select_item':SELECT_ITEM_FRAMES}
+
+
+def check(text,mode='display'):
+    if mode not in MODE_FRAMES:
+        raise ValueError('unknown Toolkit acceptance mode')
+    sms=mode=='sms'
+    select_item=mode=='select_item'
+    decline=mode=='decline'
+    call=mode in ('call','decline')
+    menu=mode not in ('display','interactive')
+    interactive=mode!='display'
     marker='nsb7_toolkit_interactive' if interactive else 'nsb7_toolkit_physical'
     check_authentication(text.split(marker+':',1)[0])
     verifier=verify_menu if menu else verify_interactive if interactive else verify_display_text
-    if sms or call:
-        verifier(text,'nsb7',selection_status='9124' if sms else '911c')
+    if sms or call or select_item:
+        verifier(text,'nsb7',selection_status='9124' if sms else '911c' if call else '9122')
     else:
         verifier(text,'nsb7')
     if sms:
@@ -85,8 +100,21 @@ def check(text, interactive=False, menu=False, sms=False, call=False, decline=Fa
                 ('decoded End',r'nsb7_key_decode: key=0f observer_writes=0'),
                 ('Disconnect',DISCONNECT),
             ],'NSB-7 Toolkit call consent and release')
+    if select_item:
+        verify_select_item(text)
+        if 'GSM outgoing request ' in text or 'gsm_sms_submit:' in text:
+            raise ValueError('item selection unexpectedly started network service')
+        require_ordered(text.replace('[:sim_card] ',''),[
+            ('physical next item',r'nsb7_toolkit_interactive: action=item_next'),
+            ('decoded Down',r'nsb7_key_decode: key=18 observer_writes=0'),
+            ('physical OK',r'nsb7_toolkit_interactive: action=item_accept'),
+            ('decoded OK',r'nsb7_key_decode: key=19 observer_writes=0'),
+            ('response header',r'header cla=a0 ins=14 p1=00 p2=00 p3=0f'),
+            ('selected item2',r'terminal-response data=810307240002028281030100100102'),
+            ('physical exit',r'nsb7_toolkit_interactive: action=menu_exit'),
+        ],'NSB-7 Toolkit item selection')
     for instruction in ('10','12','14'):
-        expected=(5 if sms or call else 4 if menu else 3) if interactive and instruction!='10' else 1
+        expected=(5 if sms or call or select_item else 4 if menu else 3) if interactive and instruction!='10' else 1
         if text.count(f'header cla=a0 ins={instruction} ')!=expected:
             raise ValueError('Toolkit profile/FETCH/terminal-response count differs')
     if text.count('header cla=a0 ins=c2 ')!=(1 if menu else 0):
@@ -100,6 +128,8 @@ def check(text, interactive=False, menu=False, sms=False, call=False, decline=Fa
                          ('menu_open','19'),('menu_select','19'),('menu_exit','0f')]
         if call:
             expected.insert(len(expected)-1,('call_decline','1a') if decline else ('call_accept','19'))
+        if select_item:
+            expected[-1:-1]=[('item_next','18'),('item_accept','19')]
         if [action[1] for action in actions]!=[name for name,_ in expected]:
             raise ValueError('physical Toolkit input sequence differs')
         for index,(_,code) in enumerate(expected):
@@ -131,33 +161,24 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image',type=Path)
     parser.add_argument('run',type=Path)
-    mode=parser.add_mutually_exclusive_group()
-    mode.add_argument('--interactive',action='store_true')
-    mode.add_argument('--menu',action='store_true')
-    mode.add_argument('--sms',action='store_true')
-    mode.add_argument('--call',action='store_true')
-    mode.add_argument('--call-decline',action='store_true')
+    modes=parser.add_mutually_exclusive_group()
+    for flag,mode in (('--interactive','interactive'),('--menu','menu'),('--sms','sms'),
+                      ('--call','call'),('--call-decline','decline'),('--select-item','select_item')):
+        modes.add_argument(flag,dest='mode',action='store_const',const=mode)
+    parser.set_defaults(mode='display')
     args=parser.parse_args()
     try:
         contract(args.image.read_bytes())
-        check((args.run/'error.log').read_text(),interactive=args.interactive,menu=args.menu,
-              sms=args.sms,call=args.call,decline=args.call_decline)
+        check((args.run/'error.log').read_text(),mode=args.mode)
         initial=(args.run/'initial_sim_card.bin').read_bytes()
         storage=args.run/'nvram/nsb7hle'
-        check_card(initial,(storage/'sim_card').read_bytes(),sms=args.sms)
+        check_card(initial,(storage/'sim_card').read_bytes(),sms=args.mode=='sms')
         inspect((storage/'flash').read_bytes())
-        frames=(DECLINE_FRAMES if args.call_decline else CALL_FRAMES if args.call else
-                SMS_FRAMES if args.sms else MENU_FRAMES if args.menu else
-                INTERACTIVE_FRAMES if args.interactive else FRAMES)
-        for name,digest in frames.items():
+        for name,digest in MODE_FRAMES[args.mode].items():
             check_frame(args.run/'snap'/name,digest)
     except (OSError,ValueError) as error:
         parser.exit(1,f'NSB-7 Toolkit: FAIL: {error}\n')
-    print('PASS: authenticated registered Toolkit '+
-          ('SET UP CALL decline' if args.call_decline else 'SET UP CALL signaling' if args.call else
-           'SEND SHORT MESSAGE' if args.sms else 'menu selection' if args.menu else
-           'DISPLAY TEXT/GET INKEY/GET INPUT' if args.interactive else 'DISPLAY TEXT')+
-          ', physical successful responses, exact card/UI')
+    print(f'PASS: authenticated registered Toolkit {args.mode}, physical successful responses, exact card/UI')
 
 
 if __name__=='__main__':

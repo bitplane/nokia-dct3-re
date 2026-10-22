@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_authenticated_toolkit_select_item",
+      "owner": "nsb7_sim_toolkit", "status": "satisfied",
+      "predicate": "An authenticated NSB-7 physically selects the second proactive menu item and returns the exact successful item identifier without network service",
+      "current": "Own registration and complete interactive/menu startup precede item1 envelope86/9122 and SELECT ITEM FETCH. Exact Alpha/Beta dialog, physical Down90 and OK92 return810307240002028281030100100102/result00, then9000. End98 reaches exact13:49 idle. One profile, five FETCH/responses, one envelope, fourteen decoded actions, thirteen exact frames, valid own flash and unchanged complete card pass. Wrong item/key, response-before-confirmation and GSM call/SMS side effects are rejected. No driver/device or native DSP/RF claim.",
+      "evidence": ["docs/8290_bringup.md", "fixtures/nsb7_toolkit_select_item/nsb7hle.cfg", "tools/nsb7_toolkit_select_item.lua", "tools/nsb7_toolkit_interactive.lua", "tools/nsb7_toolkit_check.py", "tools/test_nsb7_toolkit_check.py", "tools/sim_toolkit_select_item_trace_check.py"]
+    },
+    {
       "id": "nsb7_authenticated_toolkit_menu_restoration",
       "owner": "nsb7_sim_toolkit", "status": "satisfied",
       "predicate": "An open NSB-7 Toolkit menu restores exact architecture and replays a physically selected envelope identically with unchanged persistent card",

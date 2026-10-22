@@ -57,10 +57,35 @@ def call_fixture(decline=False):
 
 
 class ToolkitTest(unittest.TestCase):
+    def test_unknown_mode_rejected(self):
+        with self.assertRaisesRegex(ValueError,'unknown Toolkit'):
+            check('',mode='unknown')
+
+    @patch('tools.nsb7_toolkit_check.check_authentication')
+    def test_select_item_requires_physical_second_item(self,authentication):
+        text=interactive_fixture(menu=True).replace('SIM status ins=c2 sw=9000',
+            'menu selection item=1 accepted\nproactive SELECT ITEM ready\nSIM status ins=c2 sw=9122')
+        exit_event='nsb7_toolkit_interactive: action=menu_exit\nnsb7_key_decode: key=0f observer_writes=0'
+        header='header cla=a0 ins=14 p1=00 p2=00 p3=0f'
+        tail='\n'.join(('header cla=a0 ins=12 p1=00 p2=00 p3=22',
+            'nsb7_toolkit_interactive: action=item_next','nsb7_key_decode: key=18 observer_writes=0',
+            'nsb7_toolkit_interactive: action=item_accept','nsb7_key_decode: key=19 observer_writes=0',
+            header,'terminal-response data=810307240002028281030100100102',
+            'SIM status ins=14 sw=9000',exit_event))
+        text=text.replace(exit_event,tail)
+        check(text,mode='select_item')
+        early=text.replace(header+'\n','').replace('nsb7_toolkit_interactive: action=item_accept',
+            header+'\nnsb7_toolkit_interactive: action=item_accept')
+        for bad in (early,text.replace('030100100102','030100100101'),
+                    text.replace('key=18','key=17'),
+                    text+'\nGSM outgoing request id=1 digits=5551234'):
+            with self.subTest(text=bad),self.assertRaises(ValueError):
+                check(bad,mode='select_item')
+
     @patch('tools.nsb7_toolkit_check.check_authentication')
     def test_call_consent_network_and_physical_release(self,authentication):
         text=call_fixture()
-        check(text,call=True)
+        check(text,mode='call')
         setup=next(line for line in text.splitlines() if 'message=05 length=15' in line)
         early=text.replace(setup+'\n','').replace('nsb7_toolkit_interactive: action=call_accept',
             setup+'\nnsb7_toolkit_interactive: action=call_accept')
@@ -69,16 +94,16 @@ class ToolkitTest(unittest.TestCase):
                     text.replace('message=25 length=5','message=24 length=5'),
                     text+'\nGSM outgoing request id=2 digits=5551234'):
             with self.subTest(text=bad),self.assertRaises(ValueError):
-                check(bad,call=True)
+                check(bad,mode='call')
 
     @patch('tools.nsb7_toolkit_check.check_authentication')
     def test_declined_call_must_not_start_network(self,authentication):
         text=call_fixture(decline=True)
-        check(text,decline=True)
+        check(text,mode='decline')
         for bad in (text.replace('030122','030100'),text.replace('key=1a','key=19'),
                     text+'\nGSM outgoing request id=1 digits=5551234'):
             with self.subTest(text=bad),self.assertRaises(ValueError):
-                check(bad,decline=True)
+                check(bad,mode='decline')
 
     def test_sms_storage_allows_only_exact_reference_change(self):
         from tools.nsb7_pin_check import serialized_profile
@@ -108,7 +133,7 @@ class ToolkitTest(unittest.TestCase):
         tail+='\nupdate-binary fid=6f43 offset=0 length=2 t=87.0\n'
         text=text.replace('nsb7_toolkit_interactive: action=menu_exit',
                           tail+'nsb7_toolkit_interactive: action=menu_exit')
-        check(text,sms=True)
+        check(text,mode='sms')
         exit_event='nsb7_toolkit_interactive: action=menu_exit\nnsb7_key_decode: key=0f observer_writes=0'
         early=text.replace(exit_event,'').replace('GSM service downlink kind=18',
                     exit_event+'\nGSM service downlink kind=18')
@@ -117,30 +142,30 @@ class ToolkitTest(unittest.TestCase):
                     text.replace('fid=6f43 offset=0 length=2','fid=6f43 offset=0 length=1'),
                     text+'\ngsm_sms_submit:',early):
             with self.subTest(text=bad),self.assertRaises(ValueError):
-                check(bad,sms=True)
+                check(bad,mode='sms')
 
     @patch('tools.nsb7_toolkit_check.check_authentication')
     def test_menu_envelope_and_product_navigation(self,authentication):
         text=interactive_fixture(menu=True)
-        check(text,menu=True)
+        check(text,mode='menu')
         for bad in (text.replace('d30702020181100101','d30702020181100102'),
                     text.replace('action=menu_skip_netmonitor','action=missing'),
                     text.replace('key=17','key=18'),
                     text+'\nheader cla=a0 ins=c2 p1=00 p2=00 p3=09'):
             with self.subTest(text=bad),self.assertRaises(ValueError):
-                check(bad,menu=True)
+                check(bad,mode='menu')
 
     @patch('tools.nsb7_toolkit_check.check_authentication')
     def test_interactive_product_specific_confirmation(self,authentication):
         text=interactive_fixture()
-        check(text,interactive=True)
+        check(text,mode='interactive')
         for bad in (text.replace('action=inkey_confirm','action=missing'),
                     text.replace('key=02','key=03'),
                     text.replace('nsb7_key_decode: key=19 observer_writes=0','',1)+
                     '\nnsb7_key_decode: key=19 observer_writes=0',
                     text.replace('0d03043432','0d03043433')):
             with self.subTest(text=bad),self.assertRaises(ValueError):
-                check(bad,interactive=True)
+                check(bad,mode='interactive')
 
     @patch('tools.nsb7_toolkit_check.check_authentication')
     def test_successful_physical_dismissal(self,authentication):

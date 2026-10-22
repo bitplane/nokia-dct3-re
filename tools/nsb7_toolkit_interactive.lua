@@ -41,6 +41,10 @@ local input=coroutine.create(function()
                 _G.nsb7_toolkit_decline and 'Right Softkey / C' or 'Left Softkey / Menu',
                 _G.nsb7_toolkit_decline and 'call_decline' or 'call_accept'})
         end
+        if _G.nsb7_toolkit_select_item then
+            table.insert(steps,6,{90,'Scroll Down','item_next'})
+            table.insert(steps,7,{92,'Left Softkey / Menu','item_accept'})
+        end
         for _,step in ipairs(steps) do
             if _G.nsb7_toolkit_menu_hold and step[3]=='menu_select' then return end
             press(step[1],step[2],step[3])
