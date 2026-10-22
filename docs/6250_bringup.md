@@ -1659,8 +1659,8 @@ it neither OCRs images nor proves coverage of image-only labels. Evidence:
 printed pages 15 and 21, not inferred from concatenated table cells.
 
 Printed page 21's Audio Connections table specifies EAR N/P outputs at 14 mV
-typical and 220 mV maximum, with maximum volume specified at codec gain -11 dB. System
-connector pins 6/7 feed MIC2P/N; their inputs are 2 mV typical and 12.5 mV maximum,
+typical and 220 mV maximum, with maximum volume specified at codec gain -11 dB. Its
+MICP/MICN rows identify MIC2P/N; their inputs are 2 mV typical and 12.5 mV maximum,
 with the maximum specified at 1 kHz/0 dBm0 and input gain 32 dB. These are documented
 analogue test conditions, not recovered programmable gain codes or a selected
 internal-microphone route.
@@ -1698,9 +1698,13 @@ not its runtime gain/mute selection or the internal microphone selection.
 A-6 also confirms the manual's connector-microphone mapping electrically:
 `MICP` passes through L204 and C237 (100 nF) to MIC2P B3; `MICN` passes
 through L204 and C238 (100 nF) to MIC2N A3. A-1 identifies those board nets
-at system connector X100 pins 18 and 17 respectively. These board-connector
-pin numbers must not be conflated with the manual's external system-connector
-pins 6/7. Neither identifies a selected internal-microphone route. The UI
+at system connector X100 pins 18 and 17 respectively. Connector numbering is
+not settled across the sources: System Module page 9 instead lists MICP/MICN
+at FPC 17/18 and external SC 5/6, while page 21 says external SC 6/7.
+The tables also give different microphone maximum levels (100 mV on page 9,
+12.5 mV under the explicit gain condition on page 21). Preserve the named
+MIC2 connection, but do not choose a physical cable pinout or gain code from
+these conflicting summaries. Neither identifies a selected internal-microphone route. The UI
 sheet A-11 contains the buzzer, keypad, lighting and display circuitry, not
 an independently identified built-in microphone attachment. Do not promote
 the documented connector route to an internal-microphone profile by default.
@@ -1712,6 +1716,8 @@ equivalent page-6 command; retained crops are
 `tmp/nhm3-sm4-mad2-pcm3.png` and `tmp/nhm3-sm4-cobba6.png`.
 The microphone trace is legible in `tmp/nhm3-sm4-inputnets6.png`, with the
 board connector in `tmp/nhm3-sm4-overview1.png`.
+The conflicting manual table is rendered in `tmp/nhm3-system-syscon9.png`;
+`tmp/nhm3-sm4-syscon1.png` gives the schematic connector at higher resolution.
 
 Printed page 15 separately labels a five-pin **Serial RF Interface**: RFIclk
 is 13 MHz, and Idata/Qdata transfer 8-bit Tx/12-bit Rx I/Q samples. That table is
