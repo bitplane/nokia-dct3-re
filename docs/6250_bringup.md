@@ -1695,11 +1695,23 @@ to speaker B200. R248, the 22-ohm bridge across the speaker pair, is marked
 `Not Assembled`. This establishes the physical differential speaker path,
 not its runtime gain/mute selection or the internal microphone selection.
 
+A-6 also confirms the manual's connector-microphone mapping electrically:
+`MICP` passes through L204 and C237 (100 nF) to MIC2P B3; `MICN` passes
+through L204 and C238 (100 nF) to MIC2N A3. A-1 identifies those board nets
+at system connector X100 pins 18 and 17 respectively. These board-connector
+pin numbers must not be conflated with the manual's external system-connector
+pins 6/7. Neither identifies a selected internal-microphone route. The UI
+sheet A-11 contains the buzzer, keypad, lighting and display circuitry, not
+an independently identified built-in microphone attachment. Do not promote
+the documented connector route to an internal-microphone profile by default.
+
 These are visual readings of the vector schematic: ordinary text extraction
 omits its custom-font net labels. Reproduce legible source renders with
 `pdftoppm -f 3 -l 3 -scale-to 6000 -png -singlefile sm4v15.pdf cpu` and the
 equivalent page-6 command; retained crops are
 `tmp/nhm3-sm4-mad2-pcm3.png` and `tmp/nhm3-sm4-cobba6.png`.
+The microphone trace is legible in `tmp/nhm3-sm4-inputnets6.png`, with the
+board connector in `tmp/nhm3-sm4-overview1.png`.
 
 Printed page 15 separately labels a five-pin **Serial RF Interface**: RFIclk
 is 13 MHz, and Idata/Qdata transfer 8-bit Tx/12-bit Rx I/Q samples. That table is
