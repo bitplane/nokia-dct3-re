@@ -19,10 +19,13 @@ KEYS=PREFIX+(8,7,6,5,4,3,2,1,0x19)+(8,7,6,5,0x19)*2
 
 
 def recovery(trace,before,after,accepted=True):
+    if len(before)!=AOC_NVRAM_SIZE or before[ATTEMPTS_OFFSET:ATTEMPTS_OFFSET+3]!=bytes((3,0,10)) or not 1<=before[ATTEMPTS_OFFSET+3]<=10:
+        raise ValueError('recovery input is not the exhausted lab PIN2 card')
     puk='87654321' if accepted else '87654322'
     keys=PREFIX+tuple(map(int,puk))+(0x19,)+(8,7,6,5,0x19)*2
     check_phone(trace,True,keys)
-    if statuses(trace,0x20)!=[(0x9000,3,10)]*(2 if accepted else 1) or statuses(trace,0x2c)!=[(0x9000 if accepted else 0x9804,3,10)]:
+    result=0x9000 if accepted else 0x9840 if before[ATTEMPTS_OFFSET+3]==1 else 0x9804
+    if statuses(trace,0x20)!=[(0x9000,3,10)]*(2 if accepted else 1) or statuses(trace,0x2c)!=[(result,3,10)]:
         raise ValueError('startup PIN1 or UNBLOCK CHV2 result differs')
     if any(statuses(trace,ins) for ins in (0x24,0x26,0x28)):
         raise ValueError('unexpected credential operation during recovery')
@@ -36,8 +39,6 @@ def recovery(trace,before,after,accepted=True):
         raise ValueError('physical PUK2/new-PIN2 and automatic VERIFY payloads differ')
     positions=[tx.index(command) for command in commands]
     if positions!=sorted(positions):raise ValueError('PUK2 recovery/VERIFY ordering differs')
-    if len(before)!=AOC_NVRAM_SIZE or before[ATTEMPTS_OFFSET:ATTEMPTS_OFFSET+3]!=bytes((3,0,10)) or not 2<=before[ATTEMPTS_OFFSET+3]<=10:
-        raise ValueError('recovery input is not the exhausted lab PIN2 card')
     expected=bytearray(before)
     if accepted:
         expected[CHV_OFFSET+8:CHV_OFFSET+16]=padded_pin('8765')

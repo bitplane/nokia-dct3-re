@@ -35,6 +35,17 @@ class Puk2Test(unittest.TestCase):
         rejected_trace+='\n'+'\n'.join(f'nsk3_sim_tx: index={i} value={v:02x}' for i,v in enumerate(rejected_command,1))
         rejected_after=bytearray(before);rejected_after[ATTEMPTS_OFFSET+3]=9
         recovery(rejected_trace,before,rejected_after,False)
+        for remaining in (2,1):
+            last_before=bytearray(before);last_before[ATTEMPTS_OFFSET+3]=remaining
+            last_after=bytearray(last_before);last_after[ATTEMPTS_OFFSET+3]-=1
+            last_trace=rejected_trace.replace('ins=2c sw=9804',
+                'ins=2c sw=9840' if remaining==1 else 'ins=2c sw=9804')
+            with self.subTest(remaining=remaining):
+                recovery(last_trace,last_before,last_after,False)
+            if remaining==1:
+                with self.assertRaises(ValueError):recovery(rejected_trace,last_before,last_after,False)
+        permanent=bytearray(before);permanent[ATTEMPTS_OFFSET+3]=0
+        with self.assertRaises(ValueError):recovery(rejected_trace,permanent,permanent,False)
         changed=bytearray(rejected_after);changed[ATTEMPTS_OFFSET]=2
         with self.assertRaises(ValueError):recovery(rejected_trace,before,changed,False)
         for bad in (trace.replace('ins=2c sw=9000','ins=2c sw=9804'),trace.replace('value=2c','value=24'),trace.replace('key=18','key=17')):

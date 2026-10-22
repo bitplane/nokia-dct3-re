@@ -101,6 +101,9 @@ Ordinary physical Change PIN also persists4321 and authenticates after cold boot
 Physical Change PIN2 now persists8765 and authenticates an ordinary change
 back to5678 after a separate cold boot. Physical PIN2 exhaustion, cold PUK2
 prompt/recovery and recovered-PIN2 cold authentication are separately checked.
+An independent cold chain also exhausts all ten PUK2 retries, preserves the
+permanent block across restart and proves physical PIN1/phone unlock plus
+responsive security-menu navigation without a new credential APDU.
 Physical offline SMS composition saves an unsent A draft to EF_SMS; a cold
 Outbox read displays it without changing card bytes. Network SMS is unproved.
 Physical Erase/cancel and a cold empty-Outbox check also pass.
@@ -449,7 +452,8 @@ and the whole persistent retry transition. The shared card generator uses an
 older serialized prefix; the device appends its later storage defaults, which
 the cold comparison preserves byte-for-byte. No unexpected credential-changing
 APDU is admitted. The gates below extend PUK, ordinary PIN/PIN2 change and
-request settings and PUK2 recovery; permanent blocking remains unaccepted.
+request settings and PUK2 recovery/permanent loss. Permanent PIN1 blocking
+remains unaccepted.
 
 ### PUK recovery and new-PIN persistence
 
@@ -474,7 +478,7 @@ uploads and own unchanged executable flash are checked:
 
 This accepts a physical PUK recovery lifecycle under the declared research
 inputs. Other gates cover ordinary CHANGE CHV and PIN-request settings;
-permanent PUK blocking, radio and fitted hardware remain unaccepted.
+permanent PUK1 blocking, radio and fitted hardware remain unaccepted.
 
 ### PIN-request enable
 
@@ -520,7 +524,8 @@ The fixture composes startup PIN and phone-code input through one idempotent
 passive SIM observer; timing offsets schedule physical contacts only. All
 hardware defaults and declared native/analog/provisioning hypotheses remain
 unchanged. PIN-request disable and PIN2 change have separate gates below;
-PUK2 has its own gate below; permanent blocking remains unaccepted.
+PUK2 recovery and permanent loss have separate gates below; permanent PUK1
+blocking remains unaccepted.
 
 ### PIN-request disable
 
@@ -580,8 +585,8 @@ CHV retry/cold-state tests, not direct APDU injection.
 ```
 
 The checker verifies complete rejected/cold card transitions and the exact
-error/success frames. Exhaustion and PUK2 are qualified below; permanent
-blocking remains open.
+error/success frames. Exhaustion, PUK2 recovery and permanent PUK2 loss are
+qualified below.
 
 ### PIN2 exhaustion and PUK2 recovery
 
@@ -612,8 +617,40 @@ frames. The optional `--wrong tmp/nsk3-puk2-wrong --retry-cold
 tmp/nsk3-puk2-retry-cold` pair qualifies wrong PUK2 87654322 returning 9804:
 only its retry counter changes from 10 to 9, with PIN2 still blocked. Correct
 PUK2 after a separate cold boot restores PIN2/PUK2 counters to 3/10 and stores
-PIN2 8765, producing the same saved card as direct recovery. PUK2 exhaustion
-and permanent blocking remain unaccepted.
+PIN2 8765, producing the same saved card as direct recovery.
+
+### Permanent PUK2 loss
+
+`tools/nsk3_puk2_exhaust.py` requalifies the three physical wrong-PIN2
+attempts and first wrong PUK2, then continues from each actual saved card
+through nine more independent cold processes. Each physically submits
+87654322 and proposed PIN2 8765; no retry counter or credential is edited.
+Statuses remain `9804` until the final attempt returns `9840`. Only PUK2's
+counter changes, reaching zero with PIN2 still blocked; PIN1 remains valid.
+
+Two further cold processes use that terminal card. Physical PIN1 1234 and
+the separate phone code 12345 authenticate. Selecting Change PIN2 opens no
+credential dialog and issues no CHANGE/UNBLOCK or other card mutation;
+the exact Change PIN2 menu pixels remain displayed. A separate physical
+Down at 34 s is decoded as `18` and moves to **Change barring password**
+(frame SHA256 `052dcbc2adb5dfd2acfc763260ab9dcb46a44ffc5ff1e57028e6146384008f95`).
+The entire card remains unchanged in both processes. This is bounded menu
+operation through 52 s, not resolution of the 93.967-s packet-supervision
+restart or proof of radio service, fitted DSP compatibility or hardware timing.
+
+```sh
+.venv/bin/python tools/nsk3_puk2_exhaust.py roms/noki6130/source \
+  tmp/nsk3-pin2-wrong tmp/nsk3-pin2-wrong-second tmp/nsk3-pin2-blocked \
+  tmp/nsk3-puk2-wrong tmp/nsk3-puk2-exhaustion --check-only
+```
+
+For a fresh chain, use a new output directory without `--check-only`;
+`--resume` requalifies completed predecessors before continuing. Optional
+`--compress-logs` verifies exact decompression before replacing completed
+verbose logs with `error.log.gz`; the checker accepts either format. Its
+source/card/EEPROM hashes guard accidental input reuse, not cryptographic
+execution attestation. Permanent PUK1 loss remains a separate unqualified
+product lifecycle.
 
 ### Offline SMS draft
 
