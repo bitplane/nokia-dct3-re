@@ -1186,6 +1186,11 @@ nokia_gsm_session_device::receive_layer3(
 		const bool continued = m_network->configured_ussd_outcome() ==
 				nokia_gsm_network_device::ussd_outcome::continuation_request &&
 				request.operation_code == gsm::ss::operation::process_uss_request;
+		if (continued)
+		{
+			m_ussd_transaction = request.transaction;
+			m_ussd_invoke_id = request.invoke_id;
+		}
 		m_state = u8(continued ?
 				state::awaiting_supplementary_facility_acknowledgement :
 				state::awaiting_supplementary_release_acknowledgement);
@@ -1206,7 +1211,25 @@ nokia_gsm_session_device::receive_layer3(
 				machine().time().as_double());
 		if (message_type == 0x2a)
 			return begin_channel_release();
-		return downlink_kind::none;
+		const auto result = gsm::ss::parse_ussd_facility_result(information, length);
+		if (!result.valid || result.transaction != m_ussd_transaction ||
+				result.invoke_id != u8(m_ussd_invoke_id + 1))
+			return downlink_kind::none;
+		LOGMASKED(LOG_GSM_SESSION,
+				"gsm_ss: continued_result transaction=%02x invoke=%u dcs=%02x packed_length=%u empty=%u t=%.6f\n",
+				result.transaction, result.invoke_id, result.data_coding_scheme,
+				result.ussd_length, result.has_parameters ? 0 : 1, machine().time().as_double());
+		gsm::ss::request original;
+		original.valid = true;
+		original.transaction = m_ussd_transaction;
+		original.invoke_id = m_ussd_invoke_id;
+		original.operation_code = gsm::ss::operation::process_uss_request;
+		const auto response = result.has_parameters ?
+				gsm::ss::process_uss_request_result(original, "Nokia test network") :
+				gsm::ss::network_release_complete(m_ussd_transaction ^ 0x80);
+		m_state = u8(state::awaiting_supplementary_release_acknowledgement);
+		return queue_downlink(downlink_kind::supplementary_release_complete,
+				response.data.data(), response.length);
 	}
 	if (sapi == 0 && m_state == u8(state::awaiting_network_ussd_response) &&
 			protocol_discriminator == 0x0b)

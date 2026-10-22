@@ -61,8 +61,20 @@ struct message
 	std::array<std::uint8_t, maximum_message_length> data{};
 };
 
+struct ussd_result
+{
+	bool valid = false;
+	bool has_parameters = false;
+	std::uint8_t transaction = 0;
+	std::uint8_t invoke_id = 0;
+	std::uint8_t data_coding_scheme = 0;
+	unsigned ussd_length = 0;
+	std::array<std::uint8_t, maximum_ussd_length> ussd{};
+};
+
 bool basic_service_matches_speech(basic_service_kind kind, std::uint8_t code);
 request parse_register(const std::uint8_t *data, unsigned length);
+ussd_result parse_ussd_facility_result(const std::uint8_t *data, unsigned length);
 request parse_call_related_facility(const std::uint8_t *data, unsigned length);
 message call_related_result(const request &request);
 message call_related_error(const request &request, std::uint8_t error_code);

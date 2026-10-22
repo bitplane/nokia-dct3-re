@@ -74,8 +74,14 @@ state. Success returns a correlated ReturnResult and an incompatible request
 returns `SS-Incompatibility`. Releasing either of the two represented legs
 dissolves the conference state without releasing the surviving CC leg.
 
-This is a standards-conformance boundary, covered by the isolated
-`gsm_supplementary` codec and session-invariant tests. It is not an organic
+CC FACILITY also carries its mandatory Facility field as LV, with an optional
+mobile-originated SS-version IE after it; it is not REGISTER-style TLV.
+The parser and result/error builders follow
+[GSM 04.08 section 9.3.9](https://www.etsi.org/deliver/etsi_ts/100500_100599/100557/04.25.00_60/ts_100557v042500p.pdf).
+Executable codec tests cover this layout and reject the old tagged form.
+
+This protocol boundary has isolated executable `gsm_supplementary` codec
+tests and session source-invariant tests, not runtime session acceptance. It is not an organic
 NSE-8 feature claim: the v6.00 two-call menu exposes no Conference or Private
 action and emits no call-related FACILITY request across all six menu
 positions. The bounded product census therefore closes the organic v6.00

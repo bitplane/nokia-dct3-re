@@ -162,18 +162,61 @@ request parse_register(const std::uint8_t *data, unsigned length)
 	return result;
 }
 
+ussd_result parse_ussd_facility_result(const std::uint8_t *data, unsigned length)
+{
+	ussd_result result;
+	if (!data || length < 8 || length > maximum_message_length ||
+			(data[0] & 0x0f) != 0x0b || (data[1] & 0x3f) != 0x3a || data[2] != length - 3)
+		return result;
+	unsigned offset = 3, component = 0, size = 0;
+	if (!read_tlv(data, length, offset, 0xa2, component, size) || offset != length)
+		return result;
+	unsigned field = component, value = 0, count = 0;
+	if (!read_tlv(data, component + size, field, 0x02, value, count) || count != 1)
+		return result;
+	result.transaction = data[0];
+	result.invoke_id = data[value];
+	if (field == component + size)
+	{
+		result.valid = true;
+		return result;
+	}
+	unsigned sequence = 0, sequence_size = 0;
+	if (!read_tlv(data, component + size, field, 0x30, sequence, sequence_size) || field != component + size)
+		return ussd_result{};
+	field = sequence;
+	if (!read_tlv(data, sequence + sequence_size, field, 0x02, value, count) || count != 1 ||
+			data[value] != std::uint8_t(operation::unstructured_uss_request))
+		return ussd_result{};
+	unsigned parameters = 0, parameters_size = 0;
+	if (!read_tlv(data, sequence + sequence_size, field, 0x30, parameters, parameters_size) || field != sequence + sequence_size)
+		return ussd_result{};
+	field = parameters;
+	if (!read_tlv(data, parameters + parameters_size, field, 0x04, value, count) || count != 1)
+		return ussd_result{};
+	result.data_coding_scheme = data[value];
+	if (!read_tlv(data, parameters + parameters_size, field, 0x04, value, count) ||
+			!count || count > result.ussd.size() || field != parameters + parameters_size)
+		return ussd_result{};
+	for (unsigned index = 0; index < count; ++index)
+		result.ussd[index] = data[value + index];
+	result.ussd_length = count;
+	result.has_parameters = true;
+	result.valid = true;
+	return result;
+}
+
 request parse_call_related_facility(const std::uint8_t *data, unsigned length)
 {
 	request result;
-	if (!data || length < 10 || (data[0] & 0x0f) != 0x03 ||
+	if (!data || length < 11 || length > maximum_message_length || (data[0] & 0x0f) != 0x03 ||
 			(data[1] & 0x3f) != 0x3a)
 		return result;
 
-	unsigned offset = 2;
-	unsigned facility_offset = 0;
-	unsigned facility_length = 0;
-	if (!read_tlv(data, length, offset, 0x1c,
-			facility_offset, facility_length))
+	// TS 24.008 9.3.9 also makes the mandatory Facility field LV.
+	unsigned const facility_offset = 3, facility_length = data[2];
+	unsigned offset = facility_offset + facility_length;
+	if ((facility_length & 0x80) || offset > length)
 		return result;
 	// The SS version indicator may follow the Facility IE, but no additional
 	// call-related information element is accepted before it.
@@ -220,7 +263,7 @@ message call_related_result(const request &request)
 		return result;
 	const std::uint8_t encoded[] = {
 		std::uint8_t(request.transaction ^ 0x80), 0x3a,
-		0x1c, 0x0a, 0xa2, 0x08,
+		0x0a, 0xa2, 0x08,
 		0x02, 0x01, request.invoke_id,
 		0x30, 0x03, 0x02, 0x01, std::uint8_t(request.operation_code)
 	};
@@ -237,7 +280,7 @@ message call_related_error(const request &request, std::uint8_t error_code)
 		return result;
 	const std::uint8_t encoded[] = {
 		std::uint8_t(request.transaction ^ 0x80), 0x3a,
-		0x1c, 0x08, 0xa3, 0x06,
+		0x08, 0xa3, 0x06,
 		0x02, 0x01, request.invoke_id,
 		0x02, 0x01, error_code
 	};
@@ -434,13 +477,13 @@ message unstructured_uss_request(const request &request,
 	const unsigned parameter_length = 3 + 2 + packed_length;
 	const unsigned component_length = 3 + 3 + 2 + parameter_length;
 	const unsigned facility_length = 2 + component_length;
-	if (4 + facility_length > result.data.size())
+	if (3 + facility_length > result.data.size())
 		return message{};
 
 	unsigned offset = 0;
 	result.data[offset++] = request.transaction ^ 0x80;
 	result.data[offset++] = 0x3a;
-	result.data[offset++] = 0x1c;
+	// TS 24.080 table 2.2: call-independent FACILITY is LV, unlike REGISTER.
 	result.data[offset++] = facility_length;
 	result.data[offset++] = 0xa1;
 	result.data[offset++] = component_length;

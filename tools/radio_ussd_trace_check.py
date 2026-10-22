@@ -17,16 +17,19 @@ RESPONSE = re.compile(
     r"GSM service downlink kind=27 sapi=0 pd=0b message=2a length=(?P<length>\d+) ")
 RETURN_ERROR = re.compile(
     r"RX enqueue type=80 .*data="
-    r"80120000132c000100000342319b2a1c08a306020101020122")
+    r"80120000[0-9a-f]{4}000100000342319b2a1c08a306020101020122")
 REJECT = re.compile(
     r"RX enqueue type=80 .*data="
-    r"80120000132c000100000342319b2a1c08a406020101800100")
+    r"80120000[0-9a-f]{4}000100000342319b2a1c08a406020101800100")
+# Bytes 4/5 carry the changing report frame number, not an SS component field.
 RR_RELEASE = re.compile(r"radio_phase=release_channel_change")
 CONTINUED_FACILITY = re.compile(
-    r"GSM service downlink kind=\d+ sapi=0 pd=0b message=3a length=29 ")
-CONTINUED_REJECTION = re.compile(
-    r"gsm_ss: continued handset_response message=2a length=6 "
-    r"data=1b2a0802e0e0 ")
+    r"GSM service downlink kind=\d+ sapi=0 pd=0b message=3a length=28 ")
+CONTINUED_CANCEL = re.compile(
+    r"gsm_ss: continued handset_response message=2a length=2 data=1b2a ")
+CONTINUED_REPLY = re.compile(
+    r"gsm_ss: continued handset_response message=3a length=21 "
+    r"data=1b3a12a210020102300b02013c300604010f040132 ")
 RESULT_FRAME = "cf2e4a3461da27d5c49c2077810f57cc2caf6e295b089021c25157000b6324b7"
 
 
@@ -41,7 +44,7 @@ def verify(text: str, frame_dir: pathlib.Path, outcome: str = "success",
         raise ValueError("missing correlated USSD DCS/payload decode")
     expected_outcome = {
         "success": "0", "error": "1", "reject": "2", "silence": "3",
-        "continued-rejected": "4"
+        "continued-cancelled": "4", "continued-reply": "4"
     }[outcome]
     if decoded.group("outcome") != expected_outcome:
         raise ValueError(f"wrong configured USSD outcome for {outcome}")
@@ -57,15 +60,23 @@ def verify(text: str, frame_dir: pathlib.Path, outcome: str = "success",
                 raise ValueError("missing active USSD state save/load round trip")
         return {"frames": len(list(frame_dir.glob("*.pgm")))}
 
-    if outcome == "continued-rejected":
+    if outcome in ("continued-cancelled", "continued-reply"):
         facility = CONTINUED_FACILITY.search(text, decoded.end())
         if not facility:
             raise ValueError("missing network continued-USSD FACILITY")
-        rejection = CONTINUED_REJECTION.search(text, facility.end())
-        if not rejection:
-            raise ValueError("missing exact handset continued-USSD rejection")
-        if not RR_RELEASE.search(text, rejection.end()):
-            raise ValueError("missing RR release after continued-USSD rejection")
+        handset = (CONTINUED_CANCEL if outcome == "continued-cancelled" else CONTINUED_REPLY).search(text, facility.end())
+        if not handset:
+            raise ValueError("missing exact handset continued-USSD cancellation/reply")
+        end=handset.end()
+        if outcome == "continued-reply":
+            result=re.search(r'gsm_ss: continued_result transaction=1b invoke=2 dcs=0f packed_length=1 empty=0 ',text[end:])
+            if not result:raise ValueError('continued reply was not parsed and correlated')
+            end+=result.end()
+            response=RESPONSE.search(text,end)
+            if not response or response['length']!='37':raise ValueError('continued reply has no final result')
+            end=response.end()
+        if not RR_RELEASE.search(text, end):
+            raise ValueError("missing RR release after continued-USSD cancellation/reply")
         return {"frames": len(list(frame_dir.glob("*.pgm")))}
 
     response = RESPONSE.search(text, decoded.end())
@@ -95,7 +106,7 @@ def main() -> int:
     parser.add_argument("log", type=pathlib.Path)
     parser.add_argument("frame_dir", type=pathlib.Path)
     parser.add_argument("--outcome", choices=(
-        "success", "error", "reject", "silence", "continued-rejected"),
+        "success", "error", "reject", "silence", "continued-cancelled", "continued-reply"),
                         default="success")
     parser.add_argument("--require-state-roundtrip", action="store_true")
     parser.add_argument("--result-frame", default=RESULT_FRAME)

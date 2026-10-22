@@ -198,23 +198,25 @@ supplementary session remains pending for at least the 38-second acceptance
 window. No emulator timeout is invented where the firmware has not yet shown
 one.
 
-The network can also issue the phase-2 continuation shape specified by
-[ETSI TS 124 090](https://www.etsi.org/deliver/etsi_ts/124000_124099/124090/10.00.00_60/ts_124090v100000p.pdf):
-a FACILITY message containing an `UnstructuredSS-Request` (`0x3c`) Invoke in
-the still-active mobile-originated transaction. NSE-8 v6.00 does not
-accept the standards-shaped request tested here. It replies with RELEASE
-COMPLETE and cause `0x60` (invalid mandatory information), for both short and
-segmented text and with either tested Invoke identifier. The emulator therefore
-records this as a product-capability negative; it does not synthesize an
-interactive continuation that the firmware has not demonstrated.
+The network can also issue a phase-2 continuation: a FACILITY message
+containing an `UnstructuredSS-Request` (`0x3c`) Invoke in the still-active
+mobile-originated transaction. The mandatory Facility field is **LV**, not
+TLV: [ETSI TS 124 080 table 2.2](https://www.etsi.org/deliver/etsi_TS/124000_124099/124080/04.00.00_60/ts_124080v040000p.pdf).
+REGISTER and RELEASE COMPLETE retain their tagged Facility fields. The old
+tagged-FACILITY rejection was an encoder defect, not handset-capability evidence.
+Correct framing is accepted on both NSE-8 v6.00 and NSB-7 v5.22.
+Physical NSE-8 Back sends RELEASE COMPLETE `1b2a` and releases the channel.
+NSB-7 additionally proves physical Answer, numeric reply `2`, Send, correlated
+ReturnResult Invoke 2, the network's final result for original Invoke 1,
+RR release and idle/menu recovery. See `8290_bringup.md` for product acceptance.
 
 `make verify-radio-ussd-outcomes` validates the exact ReturnError and Reject
-components and their releases, the exact continued-request rejection and its
+components and their releases, physical continued-request cancellation and
 release, then saves and reloads MAME in the silent active dialogue and requires
 that neither a response nor a release appears after restore. These remain
-terminal-response, conformance-negative, and no-response contracts. A working
-continued dialogue requires an organic handset FACILITY response and remains
-unclaimed.
+terminal-response, cancellation, and no-response contracts. The separate
+NSB-7 continued-dialogue gate requires the organic typed FACILITY response;
+arbitrary multi-turn menus and host-controlled continuation remain unclaimed.
 
 ## Network-initiated USSD
 
@@ -224,8 +226,9 @@ the two network-originated operations separately:
 
 - An `UnstructuredSS-Request` (`0x3c`) REGISTER with the phase-2 SS-version
   indicator is rejected by NSE-8 v6.00 with RELEASE COMPLETE cause `0x60`.
-  This is retained as an exact product-capability negative; no reply editor is
-  synthesized.
+  This is an exact packet-shape negative, not general capability evidence.
+  Network-to-mobile REGISTER version-IE policy still needs an independent
+  encoding audit; no reply editor is synthesized from this rejection.
 - An `UnstructuredSS-Notify` (`0x3d`) REGISTER without the optional version IE
   is accepted. Firmware displays `01 Message: Nokia test network`, sends the
   empty ReturnResult FACILITY `8b 7a 05 a2 03 02 01 01`, accepts the network's

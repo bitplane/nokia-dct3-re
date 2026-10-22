@@ -84,8 +84,10 @@ RR release before physical End and exact idle/menu recovery with unchanged
 card. Pending `*123#` restoration additionally proves exact CPU/RAM/time,
 same-request republication, stale-epoch/wrong-ID rejection, retained RTC and
 physical response/idle/menu recovery. Its branches intentionally differ in
-host input; equal protocol replay is not claimed. Multi-turn USSD, native
-radio and speech remain unproved; see
+host input; equal protocol replay is not claimed. One continued laboratory
+dialogue additionally proves physical Answer, numeric reply, correlated final
+result and idle/menu recovery with unchanged card; it does not promote
+host-controlled multi-turn USSD. Native radio and speech remain unproved; see
 `nsb7_host_ussd_check.py` and `8290_bringup.md`.
 
 ## Promotion rules

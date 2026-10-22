@@ -70,13 +70,37 @@ int main()
 			packed_response.data[22] != 0x25)
 		return 27;
 	response = gsm::ss::unstructured_uss_request(request, 2, "Enter reply");
-	if (response.length != 29 || response.data[1] != 0x3a ||
-			response.data[4] != 0xa1 || response.data[8] != 2 ||
-			response.data[11] != 0x3c)
+	if (response.length != 28 || response.data[1] != 0x3a ||
+			response.data[2] != response.length - 3 ||
+			response.data[3] != 0xa1 || response.data[7] != 2 ||
+			response.data[10] != 0x3c)
 		return 22;
 	for (unsigned i = 0; i < response.length; ++i)
 		std::printf("%02x", response.data[i]);
 	std::puts("");
+	const std::uint8_t continued_reply[] = {
+		0x1b,0x3a,0x12,0xa2,0x10,0x02,0x01,0x02,0x30,0x0b,0x02,
+		0x01,0x3c,0x30,0x06,0x04,0x01,0x0f,0x04,0x01,0x32
+	};
+	auto continued = gsm::ss::parse_ussd_facility_result(continued_reply, sizeof(continued_reply));
+	if (!continued.valid || !continued.has_parameters || continued.transaction != 0x1b ||
+			continued.invoke_id != 2 || continued.data_coding_scheme != 0x0f ||
+			continued.ussd_length != 1 || continued.ussd[0] != 0x32)
+		return 28;
+	for (unsigned size = 0; size < sizeof(continued_reply); ++size)
+		if (gsm::ss::parse_ussd_facility_result(continued_reply, size).valid) return 29;
+	for (unsigned index : {2,3,4,5,6,8,9,10,11,12,13,14,15,16,18,19})
+	{
+		std::uint8_t malformed[sizeof(continued_reply)];
+		for (unsigned i = 0; i < sizeof(continued_reply); ++i) malformed[i] = continued_reply[i];
+		malformed[index] ^= 0x40;
+		if (gsm::ss::parse_ussd_facility_result(malformed, sizeof(malformed)).valid) return 30;
+	}
+	const std::uint8_t continued_empty[] = {0x1b,0x3a,5,0xa2,3,2,1,2};
+	continued = gsm::ss::parse_ussd_facility_result(continued_empty, sizeof(continued_empty));
+	if (!continued.valid || continued.has_parameters || continued.invoke_id != 2) return 31;
+	const std::uint8_t wrong_tlv[] = {0x1b,0x3a,0x1c,5,0xa2,3,2,1,2};
+	if (gsm::ss::parse_ussd_facility_result(wrong_tlv, sizeof(wrong_tlv)).valid) return 32;
 	response = gsm::ss::network_unstructured_uss_request(0x0b, 1, "Enter reply");
 	if (response.length != 32 || response.data[0] != 0x0b ||
 			response.data[1] != 0x3b || response.data[11] != 0x3c ||
@@ -196,7 +220,7 @@ int main()
 		return 13;
 
 	const std::uint8_t build_mpty[] = {
-		0x83, 0x3a, 0x1c, 0x08, 0xa1, 0x06,
+		0x83, 0x3a, 0x08, 0xa1, 0x06,
 		0x02, 0x01, 0x03, 0x02, 0x01, 0x7c, 0x7f, 0x01, 0x00
 	};
 	request = gsm::ss::parse_call_related_facility(
@@ -204,13 +228,19 @@ int main()
 	if (!request.valid || request.transaction != 0x83 || request.invoke_id != 3 ||
 			request.operation_code != gsm::ss::operation::build_mpty)
 		return 14;
+	for (unsigned size = 0; size < sizeof(build_mpty); ++size)
+		if (size != 11 && gsm::ss::parse_call_related_facility(build_mpty, size).valid) return 33;
+	if (!gsm::ss::parse_call_related_facility(build_mpty, 11).valid) return 34;
+	const std::uint8_t wrong_call_tlv[] = {0x83,0x3a,0x1c,8,0xa1,6,2,1,3,2,1,0x7c};
+	if (gsm::ss::parse_call_related_facility(wrong_call_tlv, sizeof(wrong_call_tlv)).valid) return 35;
 	response = gsm::ss::call_related_result(request);
-	if (response.length != 14 || response.data[1] != 0x3a ||
-			response.data[4] != 0xa2 || response.data[13] != 0x7c)
+	if (response.length != 13 || response.data[1] != 0x3a ||
+			response.data[2] != response.length - 3 ||
+			response.data[3] != 0xa2 || response.data[12] != 0x7c)
 		return 15;
 	response = gsm::ss::call_related_error(request, 0x14);
-	if (response.length != 12 || response.data[4] != 0xa3 ||
-			response.data[11] != 0x14)
+	if (response.length != 11 || response.data[3] != 0xa3 ||
+			response.data[10] != 0x14)
 		return 16;
 	response = gsm::ss::reject_result(request, 0x00);
 	if (response.length != 12 || response.data[4] != 0xa4 ||
@@ -221,7 +251,7 @@ int main()
 		std::uint8_t facility[sizeof(build_mpty)];
 		for (unsigned i = 0; i < sizeof(build_mpty); ++i)
 			facility[i] = build_mpty[i];
-		facility[11] = operation;
+		facility[10] = operation;
 		request = gsm::ss::parse_call_related_facility(
 				facility, sizeof(facility));
 		if (!request.valid || std::uint8_t(request.operation_code) != operation)
@@ -249,7 +279,7 @@ class GsmSupplementaryTest(unittest.TestCase):
         self.assertEqual(
             "9b2a1c0da20b020101300602010e800100\n"
             "9b2a1c13a211020101300c02013b300704010f0402cf25\n"
-            "9b3a1c19a11702010202013c300f04010f040a4537bd2c07c9cb70761e\n"
+            "9b3a19a11702010202013c300f04010f040a4537bd2c07c9cb70761e\n"
             "0b3b1c19a11702010102013c300f04010f040a4537bd2c07c9cb70761e7f0100\n"
             "0b3b1c1fa11d02010102013d301504010f0410cef73a1d06d1cb733ac85da6dfdff235\n"
             "9b2a1c1da21b020101301602010aa011040121300c300a840105850581551532f4\n",

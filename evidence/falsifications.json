@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "tagged_facility_rejection_proves_no_continued_ussd",
+      "status": "disproven",
+      "hypothesis": "The observed cause-60 rejection establishes that the tested DCT3 firmware cannot accept continued USSD",
+      "conclusion": "The peer incorrectly encoded the mandatory Facility field of call-independent FACILITY as TLV with tag1c. TS24.080 table2.2 specifies LV; REGISTER and RELEASE COMPLETE use tagged fields. Framing correction alone opens NSB-7's physical reply editor and yields its typed numeric2 ReturnResult; the added correlated session handler supplies the final network result and complete RR/idle/menu recovery. NSE-8 v6.00 accepts the corrected request and physically cancels with plain RELEASE COMPLETE1b2a. The old cause60 observation proves rejection of that malformed packet only, not general handset capability. Network-initiated REGISTER/version handling and host-controlled arbitrary continuation remain separate contracts.",
+      "evidence": ["docs/gsm_supplementary_services.md", "docs/8290_bringup.md", "driver/gsm_supplementary.cpp", "tools/test_gsm_supplementary.py", "tools/radio_ussd_trace_check.py", "tools/nsb7_ussd_continued_check.py", "tools/test_nsb7_ussd_continued_check.py"]
+    },
+    {
       "id": "mu4_r061_changes_pinned_final_input_policy",
       "status": "disproven",
       "hypothesis": "The acquired original R061 image directly repairs the mapped R060 short-read cleanup policy by changing its pinned branch or cleanup operation",

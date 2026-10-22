@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_physical_continued_ussd_reply", "owner": "gsm_network", "status": "satisfied",
+      "predicate": "PIN/phone-authenticated research-HLE NSB-7 completes one continued laboratory USSD dialogue through physical Answer, numeric reply and Send with ordinary release and unchanged storage",
+      "current": "Physical *123#/Send32 yields the own27-byte REGISTER. Correct28-byte LV FACILITY presents Enter reply with Invoke2. Physical Answer36, Keypad2 at38 and Send40 produce exact21-byte ReturnResult1b3a12a210020102300b02013c300604010f040132. The bounded parser validates component/DCS/payload shape and the session checks original transaction1b and next Invoke2 before returning the final result for Invoke1. RR release completes40.373s; End44 and Menu46 recover the reviewed idle/menu pixels. Six exact frames, pre-service authentication, own source/journal and complete unchanged3570-byte card pass independently. Shared NSE-8 error/reject/cancel/silent-save-state outcomes remain green. Host-controlled continuation, arbitrary repeated prompts, native RF/DSP and speech are not promoted.",
+      "evidence": ["docs/8290_bringup.md", "docs/gsm_supplementary_services.md", "driver/gsm_supplementary.cpp", "driver/nokia_gsm_session.cpp", "fixtures/nsb7_ussd_continued/nsb7hle.cfg", "tools/nsb7_ussd_continued.lua", "tools/nsb7_ussd_continued_check.py", "tools/test_nsb7_ussd_continued_check.py"]
+    },
+    {
       "id": "nsb7_authenticated_toolkit_refresh_resume",
       "owner": "nsb7_sim_toolkit", "status": "satisfied",
       "predicate": "NSB-7 completes qualifier0 REFRESH across re-profiling and physically completes a renewed proactive application session",

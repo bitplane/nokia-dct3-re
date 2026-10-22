@@ -2456,6 +2456,40 @@ Reference and restored protocol traffic are intentionally unequal: only the
 restored branch receives a host result. No equal-traffic replay, external
 dialogue continuity, multi-turn USSD or native DSP/RF/speech is claimed.
 
+### Laboratory continued USSD
+
+`fixtures/nsb7_ussd_continued/nsb7hle.cfg` selects the laboratory continuation
+outcome without enabling the host backend. Start from the same own,
+PIN-enabled registered cold NVRAM used above; copy no RAM or save states.
+Retain the starting card as `RUN/initial_sim_card.bin`, and copy the cfg to
+`RUN/cfg/nsb7hle.cfg`.
+
+`nsb7_ussd_continued.lua` physically dials `*123#` and presses Send at 32 s.
+The network's FACILITY uses mandatory LV framing (not the tagged Facility
+IE of REGISTER), with Invoke 2 and `Enter reply`. Answer at 36 s opens the real
+editor; Keypad 2 at 38 s enters numeric `2`; Send at 40 s emits the handset's exact
+ReturnResult `1b3a12a210020102300b02013c300604010f040132`.
+The session checks transaction/Invoke correlation, returns `Nokia test network`
+for the original Invoke 1, and completes RR release at 40.373 s. End at 44 s and
+Menu at 46 s recover the existing exact idle/menu frames. The entire 3,570-byte
+card is unchanged; source flash/journal and physical authentication are checked.
+
+```sh
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame --run-dir RUN -- \
+  nsb7hle -rompath ../roms -video none -sound none -nothrottle \
+  -joystickprovider none -midiprovider none -seconds_to_run 54 -log -verbose \
+  -debug -debugger none -autoboot_delay 0 \
+  -autoboot_script ../tools/nsb7_ussd_continued.lua > RUN-launch.log 2>&1
+.venv/bin/python tools/nsb7_ussd_continued_check.py \
+  roms/noki8290/8290f522a.fls RUN
+```
+
+The checker pins six reviewed frames: prompt, empty editor, numeric reply,
+final network text, idle and Menu, plus exact physical contacts and protocol
+order. Qualified capture: `tmp/nsb7-ussd-continued-complete`.
+This is one continued laboratory dialogue on research HLE, not host-controlled
+multi-turn USSD, arbitrary repeated prompts or native RF/DSP/speech.
+
 ## Host incoming call from settled idle
 
 `nsb7_pin_host_incoming_call.lua` composes physical PIN/phone-code entry with
