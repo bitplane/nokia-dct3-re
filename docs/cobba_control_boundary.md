@@ -3110,6 +3110,46 @@ as the reference EHF mask merely because reset occurs at its end.
 defines homing/reset behavior; the generated fixture is not a published
 conformance vector and proves no handset audio transport.
 
+#### Acquired recovery patch ownership
+
+Read-only static and runtime checks establish the route preceding the mutation:
+`c8de CALL 24a2`, `24a2 B 2692`, then the return-address-sensitive helper
+at `2692..269f`. It saves AR2/ST0, locates the return address through SP+2
+and compares it with `c8e0`. For that caller it restores the registers,
+discards the helper return and branches to `2870`, rather than returning to
+the ordinary wrapper prologue. The acquired code owns this interception;
+the fixture does not install it. Recovery eventually branches from `28f7`
+to the wrapper continuation `c8ff`.
+
+The bounded six-fragment word check in
+`tools/c54x_rom4_efr_homing_path_check.py` pins this route and the clean-frame
+recovery guards: `28b0` requires BFI plus SID at `0079` to be zero, then
+requires history `0ab9` nonzero before the additional recovery logic.
+Across all49 reference/replay frame pairs, both atomic and staged execution
+take the intercepted path. Only frames1/24/47 change parameter45 from000b
+to0000; each enters with BFI0 and recovery-history1. Original SACCD execution
+at28dc is observed with AR2=1371. Both captured frontends retain exactly512
+PCM differences and the existing reset differences; neither becomes a
+conformance pass. Debug-hook SP samples differ between the frontends, so
+the checker declares its frontend explicitly rather than treating them as
+a common retirement boundary or physical pipeline timing evidence.
+
+Reproduce with the isolated `tms54rom4` fixture, BIOS `efr-home-errors` or
+`efr-herr-pipe`, debugger enabled and
+`tools/c54x_rom4_efr_homing_observe.lua` as the zero-delay autoboot script.
+Then check the acquired big-endian program and isolated `error.log`:
+
+```sh
+.venv/bin/python tools/c54x_rom4_efr_homing_path_check.py mame/roms/tms54rom4/dsp_full.bin RUN_DIR/error.log
+# Add --staged for efr-herr-pipe.
+```
+
+The independent full-PCM/reset checker remains mandatory alongside this
+path observation. This narrows the next question to recovery history and
+parameter reconstruction in the acquired patch; it does not prove that
+every contributing instruction is silicon-correct or justify bypassing
+the patch, restoring its edited parameter or injecting a homing reset.
+
 ### Native EFR encoder homing
 
 **Accepted boundary:** `make check-c54x-rom4-efr-homing-encoder` reproduces
