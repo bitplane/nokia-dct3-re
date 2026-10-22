@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_connected_host_call_restoration_both_directions",
+      "owner": "nsb7_host_services", "status": "satisfied",
+      "predicate": "Connected incoming/outgoing host calls restore exact handset state and republish one request under a new epoch while rejecting stale commands",
+      "current": "Outgoing save60 and incoming save55 restore all37 ARM/banked registers, RAM checksum and exact emulated time, with identical three-second packet/SIM/L1 replay and exact active-call pixels. Physical authentication/registration precede save and45s ready pixels equal clean idle. Request1 republishes connected under epoch2; old-epoch decision(outgoing) or termination(incoming) is explicitly rejected before physical End66/60. Same-epoch CC/RR/host release returns to exact76/68s idle with unchanged full card. Original single-transaction checks remain active. This is cooperating WebSocket/emulated signaling restoration, not external SIP dialog resurrection, audio restoration, native RF or speech.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_pin_host_outgoing_state.lua", "tools/nsb7_pin_host_incoming_state.lua", "tools/nsb7_state_roundtrip.lua", "tools/nsb7_state_check.py", "tools/nsb7_host_outgoing_call_check.py", "tools/nsb7_host_incoming_call_check.py", "tools/test_nsb7_state_check.py", "tools/test_nsb7_host_outgoing_call_check.py", "tools/test_nsb7_host_incoming_call_check.py"]
+    },
+    {
       "id": "nsb7_host_outgoing_call_settled_idle",
       "owner": "nsb7_host_services", "status": "satisfied",
       "predicate": "Physical dialing from authenticated settled idle publishes one correlated host-decided outgoing call and physical End releases it",

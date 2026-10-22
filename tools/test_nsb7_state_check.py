@@ -26,6 +26,32 @@ def fixture():
 
 
 class StateCheckTest(unittest.TestCase):
+    def test_host_incoming_composes_card_and_epoch_checks(self):
+        state=fixture().split('nsb7_state_physical:')[0].replace('nsb7_idle','nsb7_incoming_call')
+        text='GSM service downlink kind=20 sapi=0 pd=03 message=0f length=2\n'+state
+        text+='\nnsb7_call_input: key=End state=1 t=60.000000000'
+        with patch('tools.nsb7_pin_services_check.check_authentication') as authentication, patch(
+                'tools.nsb7_pin_services_check.check_source') as source, patch(
+                'tools.nsb7_host_incoming_call_check.check') as host:
+            check(text,incoming_call=True,pin=True,host=True,card=b'actual card')
+            authentication.assert_called_once_with(text.split('nsb7_state: event=saved',1)[0])
+            source.assert_called_once_with(b'actual card')
+            host.assert_called_once_with(text,restored=True)
+
+    def test_host_call_requires_pre_save_authentication(self):
+        with self.assertRaises(ValueError):
+            check(fixture(),call=True,host=True)
+
+    def test_host_call_composes_restoration_and_host_epoch_checks(self):
+        state=fixture().split('nsb7_state_physical:')[0].replace('nsb7_idle','nsb7_call')
+        text='GSM service uplink sapi=0 pd=03 message=0f length=2\n'+state
+        text+='\nnsb7_outgoing_call_input: key=End state=1 t=66.000000000'
+        with patch('tools.nsb7_pin_services_check.check_authentication') as authentication, patch(
+                'tools.nsb7_host_outgoing_call_check.check') as host:
+            check(text,call=True,pin=True,host=True)
+            authentication.assert_called_once_with(text.split('nsb7_state: event=saved',1)[0])
+            host.assert_called_once_with(text,restored=True)
+
     def incoming_fixture(self):
         state = fixture().split('nsb7_state_physical:')[0].replace(
             'nsb7_idle', 'nsb7_incoming_call').replace('27.', '23.').replace('30.', '26.')

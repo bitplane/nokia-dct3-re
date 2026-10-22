@@ -37,7 +37,8 @@ Independent host-originated incoming SMS/read and host-decided outgoing Reply
 also pass through the shared WebSocket adapter without new device behavior.
 Host-originated incoming and host-decided outgoing call signaling separately
 pass from reviewed clean idle through physical Answer/dial/End, exact UI and
-correlated release.
+correlated release. Connected incoming/outgoing host-call restoration also
+preserves exact handset state and rejects old-epoch commands before physical End.
 The opt-in PCS peer qualifies band measurements, candidate synchronization
 receiver-configuration acknowledgement and complete BCCH system-information
 parsing, CCCH setup, timed random-access completion and an accepted
@@ -2255,8 +2256,8 @@ Require the handset checker as well as runner success:
 ```
 
 This validates external host signaling and physical UI acceptance, not host
-media, native speech, an external carrier or a SIP-connected call. Host-call
-restoration remains a separate target.
+media, native speech, an external carrier or a SIP-connected call. Connected
+host-call restoration is qualified separately below.
 
 ## Host-decided outgoing call
 
@@ -2290,3 +2291,41 @@ this Lua script and an82s guard; require the handset checker too:
 
 This qualifies host-decided outgoing signaling with physical/UI continuity,
 not host speech, SIP media, native RF or restoration of an external dialog.
+
+## Connected host-call restoration
+
+Two isolated PIN-authenticated runs compose the settled-idle host-call
+fixtures with the shared exact architecture/replay harness. Observers, save,
+End and finish times are explicit fixture inputs; ordinary idle/call/SMS
+defaults remain unchanged.
+
+| Direction | Save / replay | Post-load ownership and continuation |
+| --- | --- | --- |
+| Outgoing | Save60, compare reference/restored60..63 | Request1 republishes connected under epoch2. An old-epoch connect decision is explicitly rejected. Physical End66 clears CC/RR and epoch2 host state; final76 pixels equal idle. |
+| Incoming | Save55, compare reference/restored55..58 | Request1 republishes connected under epoch2. An old-epoch termination is explicitly rejected. Physical End60 clears CC/RR and epoch2 host state; final68 pixels equal idle. |
+
+Both require all37 ARM/banked registers, RAM checksum and exact emulated time
+to match; ordered packet, SIM and L1-clock observations replay identically.
+Reference/restored pixels must equal each other and the independently reviewed
+active-call frame, not merely two blank images. The45s ready frame must equal
+clean idle. Physical PIN acceptance and registration must precede save;
+the whole final card remains identical to its own input. Existing call checks
+still require the single original SETUP/assignment and no new host request.
+
+Use `nsb7_pin_host_outgoing_state.lua` with the existing host runner's
+`--decision connect --observe-restore` (qualified local port18934), and
+`nsb7_pin_host_incoming_state.lua` with the incoming signaling runner's
+`--observe-restore` and fresh readiness artifact (port18935). Then require:
+
+```sh
+.venv/bin/python tools/nsb7_state_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin-host-outgoing-state \
+  tmp/nsb7-pin-registration-cold --host-call
+.venv/bin/python tools/nsb7_state_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin-host-incoming-state \
+  tmp/nsb7-pin-registration-cold --host-incoming-call
+```
+
+This qualifies epoch-safe restoration of the emulated signaling/session state
+with a cooperating WebSocket observer. It is not resurrection of an external
+SIP dialog, host audio/PCM restoration, native speech or external RF.

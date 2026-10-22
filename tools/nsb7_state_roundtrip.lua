@@ -4,11 +4,11 @@ local source=debug.getinfo(1,'S').source:sub(2)
 local directory=assert(source:match('^(.*[/\\])'))
 local scenario=_G.nsb7_state_scenario or 'idle'
 assert(scenario=='idle' or scenario=='call' or scenario=='sms' or scenario=='incoming_call')
-local observer=scenario=='call' and 'nsb7_outgoing_call_observe.lua' or
-    scenario=='incoming_call' and 'nsb7_call_observe.lua' or 'nsb7_page_observe.lua'
+local observer=_G.nsb7_state_observer or (scenario=='call' and 'nsb7_outgoing_call_observe.lua' or
+    scenario=='incoming_call' and 'nsb7_call_observe.lua' or 'nsb7_page_observe.lua')
 dofile(directory..observer)
 local machine=manager.machine
--- With the own test00 setting, CP-ACK is at19.3474 and RP-ACK at19.3632.
+-- Default PIN-disabled SMS: CP-ACK19.3474 precedes RP-ACK19.3632.
 local save_time=_G.nsb7_state_save_time or ({idle=27,call=33,sms=19.35,incoming_call=23})[scenario]
 local capture=dofile(directory..'arm_architecture_snapshot.lua')
 local saved,complete
@@ -57,8 +57,8 @@ retained[#retained+1]=emu.add_machine_post_load_notifier(function()
         end
         if scenario=='call' or scenario=='incoming_call' then
             local incoming=scenario=='incoming_call'
-            local end_time=incoming and 27 or 40
-            local finish_time=incoming and 35 or 50
+            local end_time=_G.nsb7_state_end_time or (incoming and 27 or 40)
+            local finish_time=_G.nsb7_state_finish_time or (incoming and 35 or 50)
             local prefix=incoming and 'nsb7_call_input' or 'nsb7_outgoing_call_input'
             assert(emu.wait(end_time-machine.time:as_double()))
             local key

@@ -36,6 +36,21 @@ def fixture():
 
 class HostIncomingTest(unittest.TestCase):
     @patch('tools.nsb7_host_incoming_call_check.check_authentication')
+    def test_restored_epoch_rejects_stale_termination(self, authentication):
+        text=fixture().replace('epoch=1 phase=media_closed','epoch=2 phase=media_closed').replace(
+            'epoch=1 phase=ended','epoch=2 phase=ended')
+        end='nsb7_call_input: key=End state=1 t=60.000000000'
+        restored='\n'.join(['nsb7_state: event=saved','nsb7_state: event=restored',
+            'gsm_call_adapter: incoming state id=1 epoch=2 phase=connected',
+            'gsm_call_adapter: stale epoch=1 current=2 type=termination id=1 result=rejected'])
+        text=text.replace(end,restored+'\n'+end)
+        check(text,restored=True)
+        with self.assertRaises(ValueError):
+            check(text)
+        with self.assertRaises(ValueError):
+            check(text.replace('type=termination id=1 result=rejected','type=termination id=1 result=accepted'),restored=True)
+
+    @patch('tools.nsb7_host_incoming_call_check.check_authentication')
     def test_complete_and_authentication_scope(self, authentication):
         text=fixture()
         check(text)

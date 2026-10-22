@@ -21,7 +21,7 @@ FRAMES={
 }
 
 
-def check(text):
+def check(text, restored=False):
     check_authentication(text.split('nsb7_call_ready:',1)[0])
     if '[LUA ERROR]' in text:
         raise ValueError('host incoming physical fixture failed')
@@ -34,7 +34,10 @@ def check(text):
         if f'nsb7_key_decode: key={code:02x} observer_writes=0' not in text[rows[2*index].end():rows[2*index+1].start()]:
             raise ValueError('host incoming physical contact did not decode')
     states=re.findall(r'gsm_call_adapter: incoming state id=1 epoch=(\d+) phase=(\w+)',text)
-    expected_states=[('1',phase) for phase in ('queued','paging','alerting','connected','media_closed','ended')]
+    expected_states=[('1',phase) for phase in ('queued','paging','alerting','connected')]
+    if restored:
+        expected_states.append(('2','connected'))
+    expected_states += [(str(2 if restored else 1),phase) for phase in ('media_closed','ended')]
     if states!=expected_states:
         raise ValueError('host incoming identity/epoch/lifecycle differs')
     require_ordered(text,[
@@ -55,10 +58,18 @@ def check(text):
         ('Disconnect',r'GSM service uplink sapi=0 pd=03 message=25 length=5 data=836502e090'),
         ('Release',r'GSM service downlink kind=25 sapi=0 pd=03 message=2d length=2'),
         ('Release Complete',r'GSM service uplink sapi=0 pd=03 message=2a length=2 data=832a'),
-        ('host ended',r'incoming state id=1 epoch=1 phase=ended'),
+        ('host ended',rf'incoming state id=1 epoch={2 if restored else 1} phase=ended'),
         ('common control',r'nsb7_radio_tx: [^\n]*type=02 length=20 data=0412020200000016600002580000000001297000'),
         ('background measurement',r'nsb7_radio_tx: [^\n]*type=57 length=4 data=03050000'),
     ],'NSB-7 host incoming signaling')
+    if restored:
+        require_ordered(text,[
+            ('connected predecessor',r'incoming state id=1 epoch=1 phase=connected'),
+            ('save',r'nsb7_state: event=saved'),('restore',r'nsb7_state: event=restored'),
+            ('new epoch',r'incoming state id=1 epoch=2 phase=connected'),
+            ('stale termination rejection',r'gsm_call_adapter: stale epoch=1 current=2 type=termination id=1 result=rejected'),
+            ('physical End',r'nsb7_call_input: key=End state=1 t=60\.'),
+        ],'NSB-7 incoming host restoration')
     if len(re.findall(r'gsm_call_adapter: incoming id=\d+ result=accepted',text))!=1 or \
             'GSM service establish sapi=0 pd=05 message=24 ' in text:
         raise ValueError('expected one externally originated call, not physical outgoing establishment')

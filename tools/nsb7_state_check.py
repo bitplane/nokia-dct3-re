@@ -1,4 +1,4 @@
-"""Exact NSB-7 settled-idle restoration and physical post-load Menu."""
+"""Exact NSB-7 architecture/protocol/pixel restoration and physical continuation."""
 import argparse
 from pathlib import Path
 import re
@@ -13,7 +13,9 @@ from tools.nsb7_menu_check import FRAMES
 from tools.radio_state_roundtrip import verify_roundtrip
 
 
-def check(text, call=False, sms=False, incoming_call=False, card=None, pin=False):
+def check(text, call=False, sms=False, incoming_call=False, card=None, pin=False, host=False):
+    if host and not ((call or incoming_call) and pin):
+        raise ValueError('host-call restoration requires call state and pre-save PIN authentication')
     if pin:
         from tools.nsb7_pin_services_check import check_authentication
         check_authentication(text.split('nsb7_state: event=saved', 1)[0])
@@ -40,7 +42,13 @@ def check(text, call=False, sms=False, incoming_call=False, card=None, pin=False
         from tools.nsb7_pin_services_check import check_incoming
         if card is None:
             raise ValueError('incoming-call restoration requires actual SIM storage')
-        check_incoming(text, card)
+        if host:
+            from tools.nsb7_host_incoming_call_check import check as check_host
+            from tools.nsb7_pin_services_check import check_source
+            check_source(card)
+            check_host(text,restored=True)
+        else:
+            check_incoming(text, card)
         if not re.search(r'GSM service downlink kind=\d+ sapi=0 pd=03 message=0f[^\n]*[\s\S]*'
                          r'nsb7_state: event=saved[\s\S]*'
                          r'state_replay: phase=restored event=end[\s\S]*'
@@ -60,8 +68,12 @@ def check(text, call=False, sms=False, incoming_call=False, card=None, pin=False
             raise ValueError('missing post-load SMS reading')
         return
     if call:
-        from tools.nsb7_outgoing_call_check import check as check_call
-        check_call(text)
+        if host:
+            from tools.nsb7_host_outgoing_call_check import check as check_host
+            check_host(text,restored=True)
+        else:
+            from tools.nsb7_outgoing_call_check import check as check_call
+            check_call(text)
         if not re.search(r'GSM service uplink sapi=0 pd=03 message=0f[^\n]*[\s\S]*'
                          r'nsb7_state: event=saved[\s\S]*'
                          r'state_replay: phase=restored event=end[\s\S]*'
@@ -84,14 +96,20 @@ def main():
     scenario.add_argument('--call', action='store_true', help='established outgoing call restoration')
     scenario.add_argument('--sms', action='store_true', help='incoming CP/RP completion and physical reading')
     scenario.add_argument('--incoming-call', action='store_true', help='PIN-authenticated connected incoming call')
+    scenario.add_argument('--host-call', action='store_true', help='PIN-authenticated established outgoing host-call restoration')
+    scenario.add_argument('--host-incoming-call', action='store_true', help='PIN-authenticated connected incoming host-call restoration')
     parser.add_argument('--pin', action='store_true', help='require physical PIN/cold registration before save')
     args = parser.parse_args()
+    args.call = args.call or args.host_call
+    args.incoming_call = args.incoming_call or args.host_incoming_call
+    host = args.host_call or args.host_incoming_call
+    args.pin = args.pin or host
     try:
         contract(args.image.read_bytes())
         text = (args.run / 'error.log').read_text()
         check_security(text)
         card = (args.run / 'nvram/nsb7hle/sim_card').read_bytes()
-        check(text, call=args.call, sms=args.sms, incoming_call=args.incoming_call, card=card, pin=args.pin)
+        check(text, call=args.call, sms=args.sms, incoming_call=args.incoming_call, card=card, pin=args.pin, host=host)
         if args.call or args.incoming_call:
             kind = 'incoming_call' if args.incoming_call else 'call'
             from PIL import Image
@@ -101,6 +119,16 @@ def main():
                         reference.convert('RGB').tobytes() != restored.convert('RGB').tobytes():
                     raise ValueError('connected-call reference/restored pixels differ')
             frame(args.run / f'snap/nsb7_state_{kind}_final.png', IDLE_HASH)
+            if host:
+                if args.incoming_call:
+                    from tools.nsb7_host_incoming_call_check import FRAMES as host_frames
+                    ready,active='nsb7_call_ready.png','nsb7_call_Send.png'
+                else:
+                    from tools.nsb7_host_outgoing_call_check import FRAMES as host_frames
+                    ready,active='nsb7_host_outgoing_ready.png','nsb7_host_outgoing_connected.png'
+                frame(args.run/'snap'/ready,IDLE_HASH)
+                for phase in ('reference','restored'):
+                    frame(args.run/f'snap/nsb7_state_{kind}_{phase}.png',host_frames[active])
         elif args.sms:
             from tools.nsb7_sms_check import check_read, check_read_frame
             from tools.radio_sms_acceptance_common import FIRST_SMS_DELIVER_BODY, SMS_NVRAM_OFFSET

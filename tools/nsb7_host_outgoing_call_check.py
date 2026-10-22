@@ -23,7 +23,7 @@ FRAMES={
 }
 
 
-def check(text):
+def check(text, restored=False):
     check_authentication(text.split('nsb7_host_outgoing_ready:',1)[0])
     check_call(text,delay=26)
     rows=check_inputs(text,delay=26)
@@ -44,16 +44,26 @@ def check(text):
         ('duplicate decision',r'gsm_call_adapter: decision id=1 outcome=0 result=rejected'),
         ('host connected',r'gsm_call_adapter: state id=1 epoch=1 phase=connected'),
         ('physical End',r'nsb7_outgoing_call_input: key=End state=1 t=66\.'),
-        ('host closed',r'gsm_call_adapter: state id=1 epoch=1 phase=media_closed'),
-        ('host ended',r'gsm_call_adapter: state id=1 epoch=1 phase=ended'),
+        ('host closed',rf'gsm_call_adapter: state id=1 epoch={2 if restored else 1} phase=media_closed'),
+        ('host ended',rf'gsm_call_adapter: state id=1 epoch={2 if restored else 1} phase=ended'),
     ],'NSB-7 host outgoing signaling')
     for marker in ('outgoing decision queued id=1 outcome=0',
                    'outgoing decision consumed id=1 outcome=0',
                    'gsm_call_adapter: decision id=1 outcome=0 result=accepted'):
         if text.count(marker)!=1:
             raise ValueError('host outgoing decision was consumed more than once')
-    if re.findall(r'gsm_call_adapter: state id=1 epoch=(\d+) phase=(\w+)',text)!=[
-            ('1','connected'),('1','media_closed'),('1','ended')]:
+    expected=[('1','connected')]
+    if restored:
+        expected.append(('2','connected'))
+        require_ordered(text,[
+            ('connected predecessor',r'gsm_call_adapter: state id=1 epoch=1 phase=connected'),
+            ('save',r'nsb7_state: event=saved'),('restore',r'nsb7_state: event=restored'),
+            ('new epoch',r'gsm_call_adapter: state id=1 epoch=2 phase=connected'),
+            ('stale decision rejection',r'gsm_call_adapter: stale epoch=1 current=2 type=decision id=1 result=rejected'),
+            ('physical End',r'nsb7_outgoing_call_input: key=End state=1 t=66\.'),
+        ],'NSB-7 host call restoration')
+    expected += [(str(2 if restored else 1),'media_closed'),(str(2 if restored else 1),'ended')]
+    if re.findall(r'gsm_call_adapter: state id=1 epoch=(\d+) phase=(\w+)',text)!=expected:
         raise ValueError('host outgoing identity/epoch lifecycle differs')
 
 
