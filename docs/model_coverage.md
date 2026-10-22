@@ -111,7 +111,10 @@ PIN/confirmation and a third-process VERIFY with the installed PIN, retained
 location, exact idle/Menu and unchanged card. `verify-6210-puk-retry-cold`
 adds a fourth process: one physical wrong PUK consumes exactly one attempt
 without changing credentials, and the retained failed-PUK card cold-recovers
-normally. Permanent rejection and PIN2/FDN are not inherited from other products.
+normally. `verify-6210-puk-permanent` adds all ten physically consumed PUK
+attempts through separate cold processes, exact permanent-card preservation,
+cold blocked presentation and a live input control that cannot reopen the
+credential path. PIN2/FDN are not inherited from other products.
 
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,

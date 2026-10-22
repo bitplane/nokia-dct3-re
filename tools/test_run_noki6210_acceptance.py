@@ -1,6 +1,7 @@
 import hashlib
 import io
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 from PIL import Image
 from tools import run_noki6210_acceptance as runner
@@ -185,6 +186,19 @@ class ApplicationAcceptanceTest(unittest.TestCase):
                            '6210_phonebook_read_physical: action=contact', 'ins=dc'))
         with self.assertRaisesRegex(ValueError, 'without writing SIM'):
             runner.check_phonebook(write, read, b'', Image.new('L', (96, 60), 255))
+
+
+class CommandConstructionTest(unittest.TestCase):
+    def test_shared_cold_runner_preserves_existing_mame_arguments(self):
+        root=Path('/example/nokia')
+        for throttle in (False,True):
+            expected=[str(root/'mame/mame'),'npe3hle','-rompath',str(root/'roms'),
+                      '-nvram_directory','nvram','-cfg_directory','cfg','-noreadconfig',
+                      '-debug','-debugger','none','-autoboot_script',
+                      str(root/'tools/noki6210_security_input.lua'),'-autoboot_delay','0',
+                      '-seconds_to_run','37','-video','none','-sound','none',
+                      '-throttle' if throttle else '-nothrottle','-log','-verbose']
+            self.assertEqual(runner.build_command(root,None,'npe3hle','security_input',37,throttle),expected)
 
 
 if __name__ == '__main__':

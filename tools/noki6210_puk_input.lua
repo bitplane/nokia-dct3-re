@@ -39,8 +39,13 @@ local runner=coroutine.create(function()
         assert(emu.wait(2))
         machine.screens[':screen']:snapshot(group==0 and '6210_puk_confirm.png' or '6210_puk_result.png')
     end
-    if _G.npe3_puk_wrong_only then
-        machine:logerror('6210_puk_input: wrong_complete=1 firmware_state_forcing=0\n')
+    if _G.npe3_puk_wrong_only or _G.npe3_puk_permanent_retry then
+        if _G.npe3_puk_permanent_retry then
+            press('End',36)
+            assert(emu.wait(2))
+            machine.screens[':screen']:snapshot('6210_puk_permanent_after.png')
+        end
+        machine:logerror('6210_puk_input: '..(_G.npe3_puk_permanent_retry and 'permanent_complete' or 'wrong_complete')..'=1 firmware_state_forcing=0\n')
         return
     end
     assert(emu.wait(50-machine.time:as_double()))

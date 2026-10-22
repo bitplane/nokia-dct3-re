@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_permanent_puk_exhaustion_cold_control", "owner": "npe3_sim_security", "status": "satisfied",
+      "predicate": "6210 physically exhausts all ten PUK1 retries through exact predecessor-linked cold processes and preserves permanent loss across passive and active cold controls",
+      "current": "Thirteen launches: physical PIN exhaustion, ten separately cold wrong-PUK sequences, passive cold observation and active correct-PUK-pattern input. Each failed UNBLOCK changes only the PUK1 retry byte;1..9 return9804,10 returns9840 with SIM card rejected. Cold UI instead shows SIM blocked. The active control's same physical PUK/new-PIN pattern reaches numeric dialling UI, not credentials; no VERIFY/UNBLOCK/call/mobility service occurs, End restores blocked pixels and complete zero-PUK card remains unchanged. All launch IDs/input hashes/predecessors and47 reviewed frame comparisons are checked. No RAM/state copying, forced retries, PIN2/FDN/native DSP/RF/speech promotion.",
+      "evidence": ["docs/6210_bringup.md", "tools/run_noki6210_puk_exhaustion.py", "tools/noki6210_security_block_input.lua", "tools/noki6210_puk_wrong_input.lua", "tools/noki6210_puk_permanent_input.lua", "tools/noki6210_puk_permanent_retry_input.lua", "tools/noki6210_puk_input.lua", "tools/noki6210_puk_check.py", "tools/test_noki6210_puk_check.py", "tools/run_noki6210_acceptance.py", "tools/test_run_noki6210_acceptance.py", "gates.json"]
+    },
+    {
       "id": "npe3_wrong_puk_cold_recovery", "owner": "npe3_sim_security", "status": "satisfied",
       "predicate": "6210 wrong-PUK rejection consumes one durable attempt without replacing credentials, then cold correct-PUK recovery and new-PIN authentication succeed",
       "current": "Fresh physical PIN exhaustion supplies exact own blocked card. Separate wrong-PUK process enters99999999/new PIN2468/confirmation: one9804 UNBLOCK, PIN1 remains0 retries and PUK1 falls10->9. Whole card differs only at PUK1 retry byte; four reviewed input/result frames pass. Exact failed-PUK storage feeds a third process, which correct-PUK recovers/installs2468/registers; fourth process VERIFYs2468 with unchanged recovered card and exact idle/Menu. Independent launch/script/storage/source-card identities and unchanged predecessors are required. No permanent PUK blocking, PIN2/FDN/native DSP/RF/speech promotion.",

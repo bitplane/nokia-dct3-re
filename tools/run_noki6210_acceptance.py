@@ -35,6 +35,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'security-retry': ('npe3hle', 'security_retry_input', 45),
              'security-retry-cold': ('npe3hle', 'security_retry_cold_input', 18),
              'security-block-cold': ('npe3hle', 'security_block_input', 33),
+             'security-block': ('npe3hle', 'security_block_input', 33),
              'toolkit': ('npe3hle', 'toolkit_input', 40),
              'toolkit-interactive': ('npe3hle', 'toolkit_interactive', 65),
              'toolkit-menu': ('npe3hle', 'toolkit_menu', 75),
@@ -68,6 +69,16 @@ SMS_SENT_SHA256 = '67f74edfd9817c67b2301a1118c32a5764da7ed54e5b1ec09caf9eb332abc
 SECURITY_MENU_SHA256 = 'dca943c465ed8b7cc2c766e9ac0f6f69ce86228c04aa68cd52d1b20a75a8bf3f'
 USSD_RESULT_SHA256 = '7282a48b0f972545caac4db1a02189d25775dd13e02b11857cba98cfd58b3112'
 DIVERT_RESULT_SHA256 = '0218f879565b696f4768f55215c45166b725b1897d0d78715da54278c74244b4'
+
+
+def build_command(root,mame,machine,script,seconds,throttle=False):
+    return [str((mame or root/'mame/mame').resolve()),machine,
+            '-rompath',str(root/'roms'),'-nvram_directory','nvram',
+            '-cfg_directory','cfg','-noreadconfig','-debug','-debugger','none',
+            '-autoboot_script',str(root/f'tools/noki6210_{script}.lua'),
+            '-autoboot_delay','0','-seconds_to_run',str(seconds),
+            '-video','none','-sound','none','-throttle' if throttle else '-nothrottle',
+            '-log','-verbose']
 
 
 def check_ussd(text, frames):
@@ -285,7 +296,7 @@ def main():
     args = parser.parse_args()
     if args.wrong_puk_first and args.scenario!='security-block-cold':
         parser.error('--wrong-puk-first requires security-block-cold')
-    if args.scenario in ('security-retry','security-retry-cold','security-block-cold') and not args.coherent_cell:
+    if args.scenario in ('security-retry','security-retry-cold','security-block-cold','security-block') and not args.coherent_cell:
         parser.error('security-retry requires --coherent-cell')
     if args.foreign_cell:
         if args.scenario not in ('outgoing-call', 'incoming-sms'):
@@ -308,7 +319,7 @@ def main():
         run = args.run_directory.resolve()
         run.mkdir(parents=True, exist_ok=False)
         machine, script, seconds = SCENARIOS[args.scenario]
-        if args.scenario in ('security','security-retry','security-retry-cold','security-block-cold') or args.pin_enabled:
+        if args.scenario in ('security','security-retry','security-retry-cold','security-block-cold','security-block') or args.pin_enabled:
             from tools.make_sim_card_profile import make_profile
             card = run / f'nvram/{machine}/sim_card'
             card.parent.mkdir(parents=True)
@@ -355,13 +366,7 @@ def main():
                 ET.SubElement(ports, 'port', tag=':AUTHCFG', type='CONFIG',
                               mask='12', defvalue='0', value='8')
             ET.ElementTree(config).write(run / f'cfg/{machine}.cfg', encoding='utf-8', xml_declaration=True)
-        command = [str((args.mame or root / 'mame/mame').resolve()), machine,
-                   '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
-                   '-cfg_directory', 'cfg', '-noreadconfig', '-debug', '-debugger', 'none',
-                   '-autoboot_script', str(root / f'tools/noki6210_{script}.lua'),
-                   '-autoboot_delay', '0', '-seconds_to_run', str(seconds),
-                   '-video', 'none', '-sound', 'none',
-                   '-throttle' if args.throttle else '-nothrottle', '-log', '-verbose']
+        command = build_command(root,args.mame,machine,script,seconds,args.throttle)
         host_command = None
         if host:
             command.extend(['-http', '-http_port', str(args.port)])
@@ -671,6 +676,12 @@ def main():
                     verify(cold_text, runtime=True, selftest=True)
                     check_forbidden_selection(cold_text, card.read_bytes(),
                                               forbidden=forbidden, previous=retained)
+        elif args.scenario=='security-block':
+            from tools.noki6210_security_retry_check import check_frames as retry_frames
+            from tools.noki6210_puk_check import check_blocked,check_frames as puk_frames
+            check_blocked(text,(run/'nvram/npe3hle/sim_card').read_bytes())
+            retry_frames(run/'snap',wrong_only=True)
+            puk_frames(run/'snap',('6210_pin_blocked.png',))
         elif args.scenario in ('security-retry-cold','security-block-cold'):
             from tools.noki6210_security_retry_check import check_wrong,check_cold,check_frames as retry_frames
             blocked=args.scenario=='security-block-cold'
@@ -881,7 +892,7 @@ def main():
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
             'sim_profile': ('foreign two-digit-MNC preferred laboratory card' if args.scenario == 'foreign-registration' or args.foreign_cell
                             else 'visited-test-PLMN preferred laboratory card' if args.scenario == 'plmn-reject'
-                            else 'PIN-enabled laboratory card' if args.scenario in ('security','security-retry','security-retry-cold','security-block-cold') or args.pin_enabled
+                            else 'PIN-enabled laboratory card' if args.scenario in ('security','security-retry','security-retry-cold','security-block-cold','security-block') or args.pin_enabled
                             else 'default laboratory card'),
             'plmn_rejection': ({'cause': 11, 'visited_plmn': '001-02',
                                 'firmware_sim_update': True, 'cold_window_seconds': 30,

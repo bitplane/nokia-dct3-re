@@ -1106,8 +1106,35 @@ the complete recovered card unchanged. All predecessor cards are preserved.
 The acceptance report links the wrong-PUK launch identity, input hashes and
 source-card hash alongside the other three launches. This proves a consumed
 PUK retry survives cold restart and rejection is atomic with respect to
-credentials, not permanent PUK exhaustion. The additional fixture is
+credentials. The additional fixture is
 `noki6210_puk_wrong_input.lua`; the runner option is `--wrong-puk-first`.
+
+`make verify-6210-puk-permanent` covers permanent PUK1 loss through thirteen
+independent processes. Its first process physically exhausts PIN1. Each of
+the next ten cold processes inherits the exact previous NVRAM/configuration
+and enters one wrong PUK/new-PIN/confirmation sequence. Each card transition
+changes exactly the PUK1 retry byte; credentials and unrelated bytes remain
+unchanged. Attempts1..9 return9804, while attempt10 returns9840 and displays
+the exact SIM card rejected frame.
+
+Cold presentation is different: the twelfth process displays SIM blocked
+with the same exhausted card, no credential APDUs, no registration and no
+card mutation. A thirteenth process provides an active negative control:
+the physical key sequence that normally enters the correct PUK/new PIN now
+goes into the numeric dialling UI, not a credential editor. It produces no
+VERIFY/UNBLOCK or call/mobility service, and End returns to exact SIM blocked
+pixels. The entire zero-PUK card remains unchanged. The two banner strings
+must not be used interchangeably as a permanent-state oracle.
+
+The chain records distinct launch IDs, binary/script identities and complete
+initial-storage hashes, checks every predecessor unchanged, and requires47
+reviewed frame comparisons. No RAM, save state or fabricated retry count is
+used. `run_noki6210_puk_exhaustion.py OUTPUT --check-only` revalidates retained
+evidence without running MAME; `--resume` validates complete predecessors
+before starting a missing continuation and never overwrites a partial run.
+The shared command builder preserves the existing 6210 launch arguments.
+This qualifies permanent PIN1/PUK1 card rejection and responsive noncredential
+input, not PIN2/FDN or native radio/speech.
 
 ## SIM Toolkit
 

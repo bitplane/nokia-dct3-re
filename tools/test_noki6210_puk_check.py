@@ -1,7 +1,7 @@
 import unittest
 import re
 
-from tools.noki6210_puk_check import check_blocked,check_unblocked,check_reauthenticated,check_wrong_puk,profile
+from tools.noki6210_puk_check import check_blocked,check_unblocked,check_reauthenticated,check_wrong_puk,check_permanent,check_permanent_retry,profile
 
 
 def keys(prefix,items):
@@ -40,6 +40,44 @@ def reauthenticated():
 
 
 class PukTests(unittest.TestCase):
+    def test_permanent_physical_input_is_not_credential_recovery(self):
+        text=recovered()
+        text=re.sub(r'SIM status ins=2c[^\n]*\n','',text)
+        text=text.replace('LAPDm Location Updating Accept acknowledged nr=1\n','')
+        text=text.replace(keys('6210_puk_input',[(52,'Left Softkey / Menu')]),keys('6210_puk_input',[(36,'End')]))
+        text=text.replace('complete=1','permanent_complete=1')
+        card=profile(puk_attempts=0)
+        check_permanent_retry(text,card,card)
+        for extra in ('\nSIM status ins=2c sw=9840 chv=0/3 puk=0/10 enabled=1',
+                      '\nGSM service establish sapi=0 pd=05 message=24 ',
+                      '\nGSM service uplink sapi=0 pd=03 message=05 '):
+            with self.subTest(extra=extra),self.assertRaises(ValueError):
+                check_permanent_retry(text+extra,card,card)
+        with self.assertRaises(ValueError):
+            check_permanent_retry(text.replace('key=End','key=Send'),card,card)
+
+    def test_all_ten_wrong_puk_transitions_and_permanent_rejection(self):
+        text=recovered()
+        text=re.sub(r'key=Keypad [1-8]( state=[01] t=(?:8|9|1[0-5])\.)',r'key=Keypad 9\1',text)
+        text=text.replace('LAPDm Location Updating Accept acknowledged nr=1\n','')
+        text=re.sub(r'6210_puk_input: key=Left Softkey / Menu state=[01] t=52\.[0-9]+\n','',text)
+        text=text.replace('complete=1','wrong_complete=1')
+        for attempt in range(1,11):
+            status=f'ins=2c sw={"9840" if attempt==10 else "9804"} chv=0/3 puk={10-attempt}/10'
+            current=text.replace('ins=2c sw=9000 chv=3/3 puk=10/10',status)
+            check_wrong_puk(current,profile(puk_attempts=11-attempt),profile(puk_attempts=10-attempt),attempt)
+            with self.subTest(attempt=attempt),self.assertRaises(ValueError):
+                check_wrong_puk(current,profile(puk_attempts=11-attempt),profile(puk_attempts=11-attempt),attempt)
+        permanent='6210_puk_permanent: complete=1 credential_input=0 firmware_state_forcing=0'
+        card=profile(puk_attempts=0)
+        check_permanent(permanent,card,card)
+        for extra in ('\nSIM status ins=2c sw=9840 chv=0/3 puk=0/10 enabled=1',
+                      '\nLAPDm Location Updating Accept acknowledged nr=1'):
+            with self.assertRaises(ValueError):
+                check_permanent(permanent+extra,card,card)
+        with self.assertRaises(ValueError):
+            check_permanent(permanent,card,profile(puk_attempts=1))
+
     def test_wrong_puk_preserves_credentials_and_cold_recovery(self):
         text=recovered()
         text=re.sub(r'key=Keypad [1-8]( state=[01] t=(?:8|9|1[0-5])\.)',r'key=Keypad 9\1',text)
