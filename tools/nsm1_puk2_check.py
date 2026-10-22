@@ -37,7 +37,8 @@ def recovery(trace,before,after,accepted):
         raise ValueError('startup physical PIN differs')
     if statuses(trace,0x20)!=[(0x9000,3,10)]*(2 if accepted else 1):
         raise ValueError('startup/automatic PIN verification differs')
-    if statuses(trace,0x2c)!=[(0x9000 if accepted else 0x9804,3,10)]:
+    result=0x9000 if accepted else 0x9840 if before[ATTEMPTS_OFFSET+3]==1 else 0x9804
+    if statuses(trace,0x2c)!=[(result,3,10)]:
         raise ValueError('PUK2 result differs')
     if any(statuses(trace,ins) for ins in (0x24,0x26,0x28)):
         raise ValueError('unexpected credential operation')

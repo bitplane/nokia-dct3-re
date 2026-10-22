@@ -346,6 +346,34 @@ EEPROM links, native record validity and executable flash. Retry counters
 are never initialized by these fixtures. Protected application operations
 remain separate targets; network services are not accepted.
 
+Permanent PUK2 loss has a separate physical cold-chain gate. It requalifies
+the three wrong PIN2 attempts and first wrong PUK2 above, then performs nine
+more independent cold attempts with87654322/new8765, always using the actual
+predecessor's complete saved card/EEPROM and unchanged own flash. Exact UNBLOCK
+commands return9804 until terminal9840. Only PUK2 retries change, ending
+PIN1/PIN2/PUK1/PUK2=3/0/10/0; no counter or credential is edited by the harness.
+
+A further cold process authenticates PIN1 and the separate phone code, then
+selects Change PIN2. It admits no CHANGE/UNBLOCK or other storage mutation,
+retains every card byte and shows the reviewed Change PIN2 item at32s.
+Physical Down34..34.2 moves to Change barring password at38s and47s. These
+full menu frames match the independently reviewed6130 resources; this proves
+bounded52s UI/security operation, not hardware/mask equivalence, radio or speech.
+Every cold link checks prelaunch hashes, copied domains (NVRAM/config only),
+native record validation, own executable and complete card transitions.
+
+```sh
+.venv/bin/python tools/nsm1_puk2_exhaust.py tmp/nsm1-pin2-wrong \
+  tmp/nsm1-pin2-second-wrong tmp/nsm1-pin2-exhausted tmp/nsm1-puk2-rejected \
+  tmp/nsm1-puk2-exhaustion --check-only
+```
+
+Use a fresh output without`--check-only` to execute, or`--resume` to requalify
+retained predecessors. Completed verbose logs are losslessly compressed;
+read-only qualification accepts plain or gzip logs. Source hashes prevent
+accidental input reuse, not cryptographic execution attestation. Permanent
+PUK1 loss and native RF remain separate unqualified lifecycles.
+
 The base card does not advertise FDN. The explicit extended laboratory
 profile adds service3, EF_FDN6f3b and retained ADN validity without changing
 the legacy card layout. Physical menu4-5-3 opens On/Off/Numbers; selecting
