@@ -206,7 +206,8 @@ def check_puk_frames(phase,name,*,after_wrong=False,remaining=9):
             check_rgb_frame(phase/f'snap/6250_pin_retry_{frame}.png',FRAMES[frame])
 
 
-def validate_retained_launch(recorded,expected,storage,seen):
+def validate_retained_launch(recorded,expected,storage,seen,*,
+                             fields=('phase','command','mame_sha256','script_sha256')):
     if not isinstance(recorded,dict):
         raise ValueError('retained launch provenance must be an object')
     identity=recorded.get('invocation_id')
@@ -216,7 +217,7 @@ def validate_retained_launch(recorded,expected,storage,seen):
         raise ValueError('retained phase has no valid independent launch identity') from error
     if identity in seen:
         raise ValueError('retained phases reuse a launch identity')
-    for key in ('phase','command','mame_sha256','script_sha256'):
+    for key in fields:
         if recorded.get(key)!=expected[key]:
             raise ValueError('retained launch provenance differs: '+key)
     if recorded.get('initial_storage')!=storage:

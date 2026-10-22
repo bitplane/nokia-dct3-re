@@ -776,6 +776,28 @@ pass across seven processes. Every predecessor artifact remains unchanged.
 Capture: `tmp/nhm3-wrong-puk2-probe`. This proves one wrong-PUK2 rejection and
 durable retry loss, not PUK2 exhaustion or permanent rejection.
 
+The PIN2 cold runner accepts explicit `--resume`; without it, existing output
+directories are rejected. Retained phases must match their original commands,
+executable, shared fixture and phase-script hashes, unique launch identities,
+complete predecessor NVRAM hashes and initial card. All protocol, registration,
+console, frame and predecessor-integrity checks run again; retained phases do
+not repeat credential input or count as new emulator processes.
+
+New phases record `process_exit.json` only after their subprocess succeeds.
+An incomplete capture without that record fails closed. Older captures lacking
+exit records are reusable only when their launch identities belong to an
+already completed acceptance manifest. The seven-process wrong-PUK2 capture
+passes an integration replay with subprocess launch forbidden: original launch
+identities and every phase artifact remain unchanged. Evidence:
+`tmp/nhm3-puk2-resume-hardened.log`. This is harness qualification, not another
+SIM-security or native-DSP milestone.
+
+A fresh two-process PIN2 change/cold-change capture also passes with successful
+exit records. Removing only its top-level acceptance summary and resuming
+revalidates both retained phases using those records, without credential input.
+Capture: `tmp/nhm3-pin2-resume-fresh`; replay evidence:
+`tmp/nhm3-pin2-resume-partial.log`.
+
 Run `noki6250` with private working/NVRAM/config directories, the acquired
 product ROMs, `-noreadconfig -log -video none -sound none -nothrottle`,
 `-autoboot_delay 0 -seconds_to_run 9` and

@@ -1,12 +1,67 @@
 import unittest
 import io
+import json
+import tempfile
+from pathlib import Path
 from unittest.mock import patch
 from tools.noki6250_pin_retry_check import registered_card
 from tools.run_noki6250_pin2_cold import check_cold_input
 from tools import run_noki6250_pin2_cold as runner
+from tools.run_noki6250_pin_retry_cold import validate_retained_launch
 
 
 class ColdPin2InputTest(unittest.TestCase):
+    def test_phase_command_binds_model_storage_roms_script_and_duration(self):
+        command=runner.mame_command(Path('/mame'),Path('/repo'),Path('/capture/puk2'),Path('/repo/puk.lua'),90)
+        self.assertEqual(command[:2],['/mame','nhm3hle'])
+        for option,value in (('-rompath','/capture/puk2/roms;/repo/roms'),
+                             ('-nvram_directory','nvram'),('-cfg_directory','cfg'),
+                             ('-autoboot_script','/repo/puk.lua'),('-seconds_to_run','90')):
+            self.assertEqual(command[command.index(option)+1],value)
+
+    def test_retained_installation_binds_shared_fixture_and_actual_command(self):
+        recorded={'phase':'install','command':['python','install'],
+                  'invocation_id':'4511042c-2632-4b03-94a0-c80104462fd4',
+                  'mame_sha256':'binary','fixture_base_sha256':'fixture',
+                  'mame_command':['mame','nhm3hle']}
+        fields=('phase','command','mame_sha256','fixture_base_sha256','mame_command')
+        validate_retained_launch(recorded,recorded,None,set(),fields=fields)
+        for key,value in (('fixture_base_sha256','other'),('mame_command',['mame','other'])):
+            with self.subTest(key=key),self.assertRaises(ValueError):
+                validate_retained_launch({**recorded,key:value},recorded,None,set(),fields=fields)
+
+    def test_exit_evidence_is_required_for_unfinished_capture(self):
+        identity='4511042c-2632-4b03-94a0-c80104462fd4'
+        with tempfile.TemporaryDirectory() as directory:
+            phase=Path(directory)
+            with self.assertRaises(ValueError):
+                runner.verify_process_completion(phase,identity,set())
+            runner.verify_process_completion(phase,identity,{identity})
+            runner.record_process_completion(phase,identity)
+            runner.verify_process_completion(phase,identity,set())
+            for code in (1,False,'0',None):
+                (phase/'process_exit.json').write_text(json.dumps({'invocation_id':identity,'returncode':code}))
+                with self.subTest(code=code),self.assertRaises(ValueError):
+                    runner.verify_process_completion(phase,identity,{identity})
+            (phase/'process_exit.json').write_text(json.dumps({'invocation_id':'other','returncode':0}))
+            with self.assertRaises(ValueError):
+                runner.verify_process_completion(phase,identity,{identity})
+
+    def test_legacy_completion_requires_whole_unique_accepted_chain(self):
+        identity='4511042c-2632-4b03-94a0-c80104462fd4'
+        with tempfile.TemporaryDirectory() as directory:
+            run=Path(directory)
+            self.assertEqual(runner.completed_legacy_launches(run),set())
+            manifest={'independent_processes':1,'phases':[{'invocation_id':identity}]}
+            (run/'acceptance.json').write_text(json.dumps(manifest))
+            self.assertEqual(runner.completed_legacy_launches(run),{identity})
+            for broken in ([],{**manifest,'independent_processes':True},
+                           {**manifest,'independent_processes':2},
+                           {'independent_processes':2,'phases':manifest['phases']*2}):
+                (run/'acceptance.json').write_text(json.dumps(broken))
+                with self.subTest(broken=broken),self.assertRaises(ValueError):
+                    runner.completed_legacy_launches(run)
+
     def test_wrong_puk2_requires_its_exhaustion_and_recovery_plan(self):
         with patch('sys.argv',['runner','unused','--wrong-puk2-first']), \
                 patch('sys.stderr',new_callable=io.StringIO) as output:

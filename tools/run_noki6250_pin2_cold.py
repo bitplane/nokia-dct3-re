@@ -14,7 +14,7 @@ if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from tools.noki6250_pin2_change_check import check,check_frames
 from tools.noki6250_pin_retry_check import registered_card
-from tools.run_noki6250_pin_retry_cold import hashes,read_evidence
+from tools.run_noki6250_pin_retry_cold import hashes,read_evidence,validate_retained_launch
 from tools.noki6250_coherent_registration_check import verify as registration
 from tools.run_sip_handset_gate import verify_handset_health
 
@@ -34,6 +34,64 @@ def check_cold_input(initial,predecessor,*,retries=3,pin2='8765',puk2=10):
         raise ValueError('cold PIN2 input must retain the complete physically installed predecessor card')
 
 
+def mame_command(binary,root,phase,script,seconds=84):
+    return [str(binary),'nhm3hle','-rompath',f'{phase / "roms"};{root / "roms"}',
+            '-nvram_directory','nvram','-cfg_directory','cfg','-noreadconfig',
+            '-autoboot_script',str(script),'-autoboot_delay','0','-seconds_to_run',str(seconds),
+            '-video','none','-sound','none','-nothrottle','-log','-verbose']
+
+
+def verify_install_capture(first,command):
+    manifest=json.loads((first/'acceptance.json').read_text())
+    if (not isinstance(manifest,dict) or manifest.get('machine')!='nhm3hle' or manifest.get('scenario')!='pin2-change' or
+            manifest.get('command')!=command):
+        raise ValueError('PIN2 installation manifest differs from the own first-phase command')
+    verify_handset_health((first/'console.log').read_text(errors='replace'))
+    text=read_evidence(first/'error.log')
+    card=(first/'nvram/nhm3hle/sim_card').read_bytes()
+    check(text,card)
+    registration(text,card,require_host=False)
+    check_frames(first/'snap')
+
+
+def completed_legacy_launches(run):
+    path=run/'acceptance.json'
+    if not path.exists():return set()
+    manifest=json.loads(path.read_text())
+    if not isinstance(manifest,dict):
+        raise ValueError('retained acceptance manifest must be an object')
+    phases=manifest.get('phases')
+    if (not isinstance(phases,list) or type(manifest.get('independent_processes')) is not int or
+            manifest['independent_processes']!=len(phases)):
+        raise ValueError('retained acceptance manifest is not a completed phase chain')
+    identities=[]
+    for phase in phases:
+        try:
+            identity=phase['invocation_id']
+            uuid.UUID(identity)
+        except (KeyError,TypeError,ValueError,AttributeError) as error:
+            raise ValueError('retained acceptance has an invalid launch identity') from error
+        identities.append(identity)
+    if len(set(identities))!=len(identities):
+        raise ValueError('retained acceptance reuses independent launch identities')
+    return set(identities)
+
+
+def verify_process_completion(phase,identity,legacy):
+    path=phase/'process_exit.json'
+    if path.exists():
+        result=json.loads(path.read_text())
+        if (not isinstance(result,dict) or result.get('invocation_id')!=identity or
+                type(result.get('returncode')) is not int or result['returncode']!=0):
+            raise ValueError('retained phase has no matching successful process exit')
+    elif identity not in legacy:
+        raise ValueError('retained phase has no completed-process evidence')
+
+
+def record_process_completion(phase,identity):
+    (phase/'process_exit.json').write_text(json.dumps({'invocation_id':identity,'returncode':0})+'\n')
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run',type=Path)
@@ -42,6 +100,7 @@ def main():
     parser.add_argument('--exhaust-pin2',action='store_true',help='consume all three PIN2 allowances in independent cold Settings transactions')
     parser.add_argument('--recover-puk2',action='store_true',help='recover the physically exhausted PIN2 and cold-use the installed replacement')
     parser.add_argument('--wrong-puk2-first',action='store_true',help='reject one PUK2 in a separate cold process before recovery')
+    parser.add_argument('--resume',action='store_true',help='revalidate completed phase captures and launch only absent phases; never repeat retained credential input')
     args=parser.parse_args()
     if args.reject_first and args.exhaust_pin2:
         parser.error('--exhaust-pin2 and --reject-first select different phase plans')
@@ -53,21 +112,34 @@ def main():
     binary=(args.mame or root/'mame/mame').resolve()
     try:
         run=args.run.resolve()
-        run.mkdir(parents=True,exist_ok=False)
+        run.mkdir(parents=True,exist_ok=args.resume)
+        legacy=completed_legacy_launches(run) if args.resume else set()
         first=run/'install'
+        first_retained=first.exists()
+        if first_retained and not args.resume:
+            raise ValueError('existing PIN2 installation requires explicit --resume')
         first_command=[sys.executable,str(root/'tools/run_noki6250_acceptance.py'),
                        str(first),'--scenario','pin2-change','--mame',str(binary)]
         first_launch={'phase':'install','invocation_id':str(uuid.uuid4()),'command':first_command,
                       'mame_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),
-                      'fixture_base_sha256':hashlib.sha256((root/'tools/noki6250_pin2_change.lua').read_bytes()).hexdigest()}
-        (run/'install_launch.json').write_text(json.dumps(first_launch,indent=2)+'\n')
+                      'fixture_base_sha256':hashlib.sha256((root/'tools/noki6250_pin2_change.lua').read_bytes()).hexdigest(),
+                      'mame_command':mame_command(binary,root,first,root/'tools/noki6250_pin2_change.lua')}
         environment=os.environ.copy()
         environment.pop('NOKIA_DCT3_6250_PIN_ENTRY',None)
-        with (run/'install_launcher.log').open('w') as output:
-            subprocess.run(first_command,stdout=output,stderr=subprocess.STDOUT,
-                           check=True,timeout=180,env=environment)
-        first_launch['mame_command']=json.loads((first/'acceptance.json').read_text())['command']
-        (run/'install_launch.json').write_text(json.dumps(first_launch,indent=2)+'\n')
+        if first_retained:
+            recorded=json.loads((run/'install_launch.json').read_text())
+            validate_retained_launch(recorded,first_launch,None,set(),
+                fields=('phase','command','mame_sha256','fixture_base_sha256','mame_command'))
+            first_launch=recorded
+            verify_process_completion(first,first_launch['invocation_id'],legacy)
+        else:
+            (run/'install_launch.json').write_text(json.dumps(first_launch,indent=2)+'\n')
+            with (run/'install_launcher.log').open('w') as output:
+                subprocess.run(first_command,stdout=output,stderr=subprocess.STDOUT,
+                               check=True,timeout=180,env=environment)
+            record_process_completion(first,first_launch['invocation_id'])
+        verify_install_capture(first,first_launch['mame_command'])
+        print('6250 PIN2 phase install: '+('retained evidence verified' if first_retained else 'fresh process verified'),flush=True)
         protected={first:hashes(first)}
         launches=[first_launch]
         source=first
@@ -83,20 +155,22 @@ def main():
         for name,kind,attempts,puk_attempts in phases:
             rejected=kind=='reject'
             cold=run/name
-            cold.mkdir()
-            for component in ('nvram','cfg','roms'):
-                shutil.copytree(source/component,cold/component)
-            if hashes(cold/'nvram')!=hashes(source/'nvram'):
-                raise ValueError('cold PIN2 storage differs from predecessor')
-            initial=(cold/'nvram/nhm3hle/sim_card').read_bytes()
+            retained=cold.exists()
+            if retained and not args.resume:
+                raise ValueError('existing PIN2 phase requires explicit --resume')
+            if not retained:
+                cold.mkdir()
+                for component in ('nvram','cfg','roms'):
+                    shutil.copytree(source/component,cold/component)
+                if hashes(cold/'nvram')!=hashes(source/'nvram'):
+                    raise ValueError('cold PIN2 storage differs from predecessor')
+            initial=((cold/'initial_sim_card.bin').read_bytes() if retained else
+                     (cold/'nvram/nhm3hle/sim_card').read_bytes())
             check_cold_input(initial,(source/'nvram/nhm3hle/sim_card').read_bytes(),retries=attempts,
                              pin2='2468' if kind=='recheck' else '8765',puk2=puk_attempts)
-            (cold/'initial_sim_card.bin').write_bytes(initial)
-            command=first_launch['mame_command'].copy()
-            command[command.index('-rompath')+1]=f'{cold / "roms"};{root / "roms"}'
+            if not retained:(cold/'initial_sim_card.bin').write_bytes(initial)
             script=root/'tools'/scripts[kind]
-            command[command.index('-autoboot_script')+1]=str(script)
-            if kind in ('puk2','puk2-reject'):command[command.index('-seconds_to_run')+1]='90'
+            command=mame_command(binary,root,cold,script,90 if kind in ('puk2','puk2-reject') else 84)
             if (hashlib.sha256(binary.read_bytes()).hexdigest()!=first_launch['mame_sha256'] or
                     hashlib.sha256((root/'tools/noki6250_pin2_change.lua').read_bytes()).hexdigest()!=first_launch['fixture_base_sha256']):
                 raise ValueError('PIN2 executable or shared fixture changed between phases')
@@ -105,12 +179,23 @@ def main():
                     'mame_sha256':first_launch['mame_sha256'],
                     'fixture_base_sha256':first_launch['fixture_base_sha256'],
                     'script_sha256':hashlib.sha256(script.read_bytes()).hexdigest()}
-            if launch['invocation_id'] in {item['invocation_id'] for item in launches}:
-                raise ValueError('cold PIN2 launch must be independent')
-            (cold/'launch.json').write_text(json.dumps(launch,indent=2)+'\n')
-            with (cold/'console.log').open('w') as output:
-                subprocess.run(command,cwd=cold,stdout=output,stderr=subprocess.STDOUT,
-                               check=True,timeout=180,env=environment)
+            seen={item['invocation_id'] for item in launches}
+            if retained:
+                recorded=json.loads((cold/'launch.json').read_text())
+                validate_retained_launch(recorded,launch,hashes(source/'nvram'),seen,
+                    fields=('phase','command','mame_sha256','fixture_base_sha256','script_sha256'))
+                if recorded['initial_storage'].get('nhm3hle/sim_card')!=hashlib.sha256(initial).hexdigest():
+                    raise ValueError('retained PIN2 initial card differs from launch provenance')
+                launch=recorded
+                verify_process_completion(cold,launch['invocation_id'],legacy)
+            else:
+                if launch['invocation_id'] in seen:
+                    raise ValueError('cold PIN2 launch must be independent')
+                (cold/'launch.json').write_text(json.dumps(launch,indent=2)+'\n')
+                with (cold/'console.log').open('w') as output:
+                    subprocess.run(command,cwd=cold,stdout=output,stderr=subprocess.STDOUT,
+                                   check=True,timeout=180,env=environment)
+                record_process_completion(cold,launch['invocation_id'])
             verify_handset_health((cold/'console.log').read_text(errors='replace'))
             text=read_evidence(cold/'error.log')
             card=(cold/'nvram/nhm3hle/sim_card').read_bytes()
@@ -129,12 +214,13 @@ def main():
             protected[cold]=hashes(cold)
             launches.append(launch)
             source=cold
-            print(f'6250 PIN2 phase {name}: verified',flush=True)
+            print(f'6250 PIN2 phase {name}: '+('retained evidence verified' if retained else 'fresh process verified'),flush=True)
         (run/'acceptance.json').write_text(json.dumps({'phases':launches,
             'independent_processes':len(launches),'rejected_change':args.reject_first,
             'pin2_exhausted':args.exhaust_pin2,
             'puk2_recovered':args.recover_puk2,
             'wrong_puk2_first':args.wrong_puk2_first,
+            'resumed':args.resume,
             'research_hle':True,'native_speech':False},indent=2)+'\n')
     except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as error:
         parser.exit(1,f'6250 cold PIN2 FAIL: {error}\n')
