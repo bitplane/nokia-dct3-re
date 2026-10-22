@@ -216,7 +216,10 @@ NPE-3 independently uses that ready-marker contract in
 registration precede admission, original firmware acknowledges/releases the
 notification, and physical Back/Menu restore reviewed idle/menu pixels.
 Its complete card matches normal registration, not another handset's profile.
-Interactive reply and pending-USSD restoration remain separate obligations.
+Its separate `verify-6210-host-ussd-request` admits a network request after
+the same ready boundary, physically replies2 and requires the original
+ReturnResult, RR release, exact correlated JSON received by the host and six
+own-product UI frames. Pending-USSD restoration remains unqualified on NPE-3.
 
 The USSD host contract preserves the BER-decoded DCS and packed payload. A
 `success` response carries `dcs` and hexadecimal `data`; `return_error` and

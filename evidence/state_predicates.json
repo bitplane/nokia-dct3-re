@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_host_network_ussd_physical_reply", "owner": "npe3_host_services", "status": "satisfied",
+      "predicate": "6210 physically answers one host-originated USSD request and returns the exact correlated packed reply to the host after RR release",
+      "current": "Fresh own-PMM research-HLE NPE-3 authenticates PIN1, registers on ARFCN35 and admits request1/epoch1 at idle-ready20s. Choose2 opens Service reply; Answer26 directly opens the numeric editor, physical2 at30 and Send32 yield the exact21-byte ReturnResult carrying DCS0f/data32. RR release precedes adapter reply and answered state. The external runner records exactly one received JSON reply with matching typed identity, DCS15, data32 and empty=false; missing/mutated/duplicate host evidence is rejected independently of adapter logs. Six reviewed prompt/editor/entered/Done/idle/Menu frames, exact contacts/order and complete registered-card checks pass. Capture tmp/npe3-host-ussd-request-banked. Notification regression also passes. No empty-reply/pending-restore/multi-turn/native-speech promotion.",
+      "evidence": ["docs/6210_bringup.md", "docs/external_call_bridge.md", "tools/noki6210_host_ussd_request.lua", "tools/noki6210_host_ussd_notify.lua", "tools/noki6210_host_ussd_check.py", "tools/test_noki6210_host_ussd_check.py", "tools/run_noki6210_acceptance.py", "tools/run_host_incoming_ussd_gate.py", "gates.json"]
+    },
+    {
       "id": "npe3_host_ussd_notification", "owner": "npe3_host_services", "status": "satisfied",
       "predicate": "6210 receives one host-originated USSD notification after physical PIN authentication and registration and recovers through physical Back/Menu",
       "current": "Fresh own-PMM research-HLE 6210 physically VERIFYs PIN1, registers on ARFCN35 and admits request1/epoch1 after idle-ready at20s. External packed Host notice traverses network notify REGISTER, exact firmware ReturnResult and RR release before host queued->delivered. Service reply / Host notice renders automatically; Back26 and Menu30 recover exact idle/Messages pixels. Three reviewed96x60 frames, exact contacts, single admission/operation, identity/phase/order and complete expected registered-card checks pass. Capture tmp/npe3-host-ussd-notify-banked. Event filtering now preserves adapter lines; existing PIN-authenticated host incoming-SMS regression passes. No interactive reply/pending-USSD-restore/native-speech promotion.",

@@ -157,8 +157,11 @@ prefix and special-dial-string behavior remains outside their scope.
 `verify-6210-host-ussd-notify` independently proves host-originated Host notice
 after PIN authentication and settled registration, firmware-owned supplementary
 service acknowledgement/RR release, physical Back/Menu recovery and three
-reviewed frames. Complete card contents match normal registration. Interactive
-replies and pending-USSD restoration are not established by this gate.
+reviewed frames. Complete card contents match normal registration.
+`verify-6210-host-ussd-request` separately proves network `Choose 2`, physical
+Answer/2/Send, exact firmware ReturnResult and correlated packed reply received
+by the host after RR release, with six own-product frames and unchanged card.
+Empty replies, pending-USSD restoration and multi-turn dialogue remain unqualified.
 
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,

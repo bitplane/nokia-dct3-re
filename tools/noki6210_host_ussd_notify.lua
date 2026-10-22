@@ -24,10 +24,11 @@ local runner=coroutine.create(function()
     print('6210_host_ussd: ready')
     io.stdout:flush()
     assert(emu.wait(24-machine.time:as_double()))
-    machine.screens[':screen']:snapshot('6210_host_ussd_notice.png')
-    press('Right Softkey / C',26)
-    press('Left Softkey / Menu',30)
-    assert(emu.wait(35-machine.time:as_double()))
+    machine.screens[':screen']:snapshot(_G.npe3_host_ussd_capture or '6210_host_ussd_notice.png')
+    for _,action in ipairs(_G.npe3_host_ussd_actions or {{26,'Right Softkey / C'},{30,'Left Softkey / Menu'}}) do
+        press(action[2],action[1])
+    end
+    assert(emu.wait((_G.npe3_host_ussd_finish or 35)-machine.time:as_double()))
     machine:logerror('6210_host_ussd: complete=1 firmware_state_forcing=0\n')
 end)
 _G.npe3_host_ussd_runner=runner

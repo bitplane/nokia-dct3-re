@@ -1463,7 +1463,7 @@ PJSIP 480. The firmware consumes the no-answer termination with cause 18,
 completes CC/RR release and returns to the exact registered-idle frame.
 CONNECT and bridge media are rejected, as in the busy fixture.
 
-## Host USSD notification
+## Host USSD
 
 `make verify-6210-host-ussd-notify` cold-authenticates the ordinary PIN-enabled
 laboratory card, registers on the coherent ARFCN35 cell and admits one external
@@ -1481,8 +1481,22 @@ from fresh input are the ordinary registration/location update. Capture:
 lines explicitly; the existing PIN-authenticated host incoming-SMS gate also
 passes after that tooling change.
 
-This is notification delivery and physical recovery, not interactive USSD
-reply, pending-USSD restoration, native DSP execution or speech acceptance.
+`make verify-6210-host-ussd-request` separately admits network request
+`Choose 2` after the same physical authentication and idle-ready boundary.
+Answer opens the numeric Message editor directly. Physical `2` and Send return
+the exact 21-byte USSD ReturnResult with DCS `0f` and packed payload `32`; firmware
+releases RR before the adapter publishes that reply and state answered.
+The external WebSocket runner independently records exactly one received
+`incoming_ussd_response` with epoch 1/request 1, integer DCS 15, data `32` and
+`empty=false`. Adapter logs alone are insufficient for this host-delivery check.
+
+Six reviewed frames pin the prompt, blank editor, entered2, Done, registered
+idle and Messages. Exact contacts, single admission/request, response and
+release ordering, host JSON types/identity/data and complete expected card
+bytes pass. Capture: `tmp/npe3-host-ussd-request-banked`. The ordinary
+notification gate independently passes after the shared fixture/checker changes.
+These are HLE supplementary-service contracts. Empty reply, pending-USSD
+restoration, multi-turn dialogue, native DSP and speech remain unqualified.
 
 ## Host SMS acceptance
 
