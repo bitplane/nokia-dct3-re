@@ -6,7 +6,7 @@
       "id": "nsb7_host_busy_physical_recovery",
       "owner": "nsb7_host_services", "status": "satisfied",
       "predicate": "A correlated host busy decision clears without traffic/CONNECT and physical Menu/End recovers the handset with unchanged card",
-      "current": "Settled45s authenticated idle precedes physical5551234/Send54. One host busy decision queues/consumes; wrong-ID/duplicate are rejected. Network DISCONNECT, handset RELEASE and network RELEASE COMPLETE/RR release occur with no assignment/Alerting/CONNECT/speech or connected host phase. Exact60s pixels show Call1 with crossed-call indicator, not a Busy banner or active call. Physical End66/Menu70/End73 reaches exact Messages and76s idle; complete card is unchanged. RTC divergence from connected control is separately unresolved, not masked in this gate.",
+      "current": "Settled45s authenticated idle precedes physical5551234/Send54. One host busy decision queues/consumes; wrong-ID/duplicate are rejected. Network DISCONNECT, handset RELEASE and network RELEASE COMPLETE/RR release occur with no assignment/Alerting/CONNECT/speech or connected host phase. Exact60s pixels show Call1 with crossed-call indicator, not a Busy banner or active call. Physical End66/Menu70/End73 reaches exact Messages and76s idle; complete card is unchanged. Under the corrected CCONT read/write alias, all76 retained-clock ticks are continuous and exact13:49 final idle matches the independent connected control. No clock pixels are masked.",
       "evidence": ["docs/8290_bringup.md", "tools/nsb7_pin_host_busy.lua", "tools/nsb7_host_busy_check.py", "tools/test_nsb7_host_busy_check.py", "tools/nsb7_outgoing_call_observe.lua", "tools/run_host_call_adapter_gate.py"]
     },
     {

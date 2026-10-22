@@ -23,7 +23,7 @@ FRAMES={
 }
 
 
-def check_clock(text, finish=76):
+def check_clock(text, finish=76, control_values=('00','0f')):
     rows=re.findall(r'ccont_rtc: event=second time=(\d+):(\d+):(\d+) day=(\d+).*? t=([\d.]+)',text)
     if len(rows)!=finish:
         raise ValueError(f'expected all {finish} retained-clock ticks')
@@ -31,7 +31,7 @@ def check_clock(text, finish=76):
         absolute=int(day)*86400+int(hour)*3600+int(minute)*60+int(second)
         if float(time)!=index or absolute!=13*3600+47*60+45+index:
             raise ValueError('retained clock reset or skipped during call')
-    for value in ('00','0f'):
+    for value in control_values:
         if not re.search(rf'ccont_analog: event=control_write reg=07 data={value}\b',text):
             raise ValueError('missing independent analog-control write')
 

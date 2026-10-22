@@ -13,14 +13,14 @@ from tools.radio_outgoing_call_outcome_trace_check import check as check_outcome
 from tools.nsb7_pin_check import check_frame
 from tools.nsb7_radio_check import contract
 from tools.nsb7_storage_check import inspect
-from tools.nsb7_netmonitor_check import IDLE_HASH
+from tools.nsb7_host_outgoing_call_check import check_clock,FRAMES as CONNECTED_FRAMES
 from tools.radio_call_lifecycle_common import require_ordered
 
 FRAMES={
-    'nsb7_host_outgoing_ready.png':IDLE_HASH,
-    'nsb7_host_outgoing_failure.png':'febf89c2bb239174dcae95b30a991baa1038544ec411a8f64857cf965029bd5b',
+    'nsb7_host_outgoing_ready.png':CONNECTED_FRAMES['nsb7_host_outgoing_ready.png'],
+    'nsb7_host_outgoing_failure.png':'bacc3afa15e65b9564a873d421beb22166a3495dbdf5c97c94eb69d08a9d4303',
     'nsb7_outgoing_call_70.png':'76728306449ad0f2ae8cbdbd1fc5e880d3dcff054c955e8b4a2aabc87db8e7e4',
-    'nsb7_outgoing_call_final.png':'32c41625e02a87a0ec97ec98a250040fc87ad8c5722c78200c54b27f7de2d560',
+    'nsb7_outgoing_call_final.png':CONNECTED_FRAMES['nsb7_outgoing_call_final.png'],
 }
 
 
@@ -65,7 +65,9 @@ def main():
     args=parser.parse_args()
     try:
         contract(args.image.read_bytes())
-        check((args.run/'error.log').read_text())
+        text=(args.run/'error.log').read_text()
+        check(text)
+        check_clock(text,control_values=('00',))
         storage=args.run/'nvram/nsb7hle'
         initial=(args.run/'initial_sim_card.bin').read_bytes()
         check_source(initial)

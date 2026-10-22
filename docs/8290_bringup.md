@@ -2320,10 +2320,16 @@ The exact60s result frame shows `Call 1` with a crossed-call indicator, not
 a Busy banner and not an active call. Physical Menu70 opens the reviewed
 Messages screen; End73 returns to the exact76s idle frame. The full SIM card
 is unchanged. No firmware state or outcome is substituted.
+The current retained-clock repeat is `tmp/nsb7-ccont-busy`: all76 ticks are
+continuous from the unedited13:47:45 source, the ready/result frames show
+13:48, and final13:49 idle exactly matches the connected control at76s.
+The Messages frame is unchanged. The checker requires the boot analog
+control write but does not require connected-call acquisition pulses in
+this no-traffic negative control.
 
 ```sh
 .venv/bin/python tools/nsb7_host_busy_check.py \
-  roms/noki8290/8290f522a.fls tmp/nsb7-pin-host-busy
+  roms/noki8290/8290f522a.fls tmp/nsb7-ccont-busy
 ```
 
 ### CCONT seconds-write boundary exposed by the controls
