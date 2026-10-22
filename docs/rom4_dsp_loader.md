@@ -2896,6 +2896,26 @@ latency or frequency. Unsupported younger Decode can halt before older
 slots retire: accepting an opcode alone is not evidence that its write
 occurred; the integration observer checks the actual SWWSR state.
 
+`clock-mvdk` covers 72 retained RAM-to-CLKMD transfers: direct DP, indirect
+postincrement and absolute sources, four control words, program pages 0/2
+and three save/load boundaries. Source/address literals are overwritten after
+capture to reject rereads. Each leg samples once, pays one peripheral-access
+clock and publishes the retained word once, then reaches the same continuation
+with unchanged status. The existing CLKMD register owns writable/status-bit
+behavior; no PLL reference is configured in this isolated fixture.
+TI SPRU172C sections 3-40/3-42 and 4-108 identify the class-19 memory transfer
+and extra peripheral cycle. Placement of that extra clock in the staged
+prototype is not measured silicon phase timing.
+
+`clock-mvdk-edge` checks 24 repeated/delayed compositions across three source
+forms, two pages and two save/load points. They fail before data reads/writes,
+pointer changes or CLKMD changes. Other control destinations, mapped peripheral
+sources, repeat/control composition and simultaneous peripheral arbitration
+remain excluded. The original AA22 INT2 handler's `0288cb:71f8 1420 0058`
+is a concrete native consumer: it restores the model's PLL selection after
+deep-idle wake. This does not establish physical lock time or completed native
+wake continuation; the later POPM IFR remains a separate staged boundary.
+
 Standalone extended MVPD now retains its absolute or long-offset data
 destination separately from its program source. Absolute form consumes
 destination then `pmad`; long-offset forms consume `pmad` then offset.

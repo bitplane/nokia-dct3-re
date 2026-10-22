@@ -321,6 +321,11 @@ constexpr bool staged_accumulator_destination_move(u16 word, u16 destination)
 	return (word & 0xff00) == 0x7100 && staged_move(word) && destination >= 8 && destination <= 0x0d;
 }
 
+constexpr bool staged_clock_destination_move(u16 word, u16 destination)
+{
+	return (word & 0xff00) == 0x7100 && staged_move(word) && destination == 0x58;
+}
+
 constexpr bool staged_t_register_move(u16 word, u16 destination)
 {
 	return staged_move(word) && (destination == 0x0e || destination == 0x0f) && word != 0x7308 && word != 0x730b;
@@ -3042,6 +3047,14 @@ void tms320c54x_device::pipeline_step()
 	bool const write_peripheral = m_pipeline_valid[4] &&
 		(((staged_store(m_pipeline_word[4]) || staged_accumulator_mmr_store(m_pipeline_word[4]) || staged_rmw(m_pipeline_word[4]) || staged_data_copy(m_pipeline_word[4]) || staged_mvdd(m_pipeline_word[4]) || (m_pipeline_word[4] & 0xff00) == 0x7600) &&
 		m_pipeline_operand_address[4] >= 0x20 && m_pipeline_operand_address[4] <= 0x5f) || staged_bus_control(m_pipeline_word[4]) || (staged_timer_control(m_pipeline_word[4]) || staged_serial_control(m_pipeline_word[4]) || staged_clock_control(m_pipeline_word[4])));
+	bool const move_peripheral = m_pipeline_valid[3] && staged_clock_destination_move(m_pipeline_word[3], m_pipeline_immediate[3]);
+	// Class 19A/B owns its retained write one stage earlier than STM. Pay
+	// the peripheral clock before advancing Access to that write stage.
+	if (move_peripheral && (read_peripheral || write_peripheral))
+	{
+		logerror("%s: simultaneous staged CLKMD move/peripheral arbitration is unsupported\n", machine().describe_context());
+		m_illegal = true; return;
+	}
 	// The boot echo loop can read the previous BDRR while BDXR accepts
 	// another retry. These independent serial endpoints retain one access
 	// wait apiece; neither access synthesizes a serial-ready edge. Other
@@ -3058,8 +3071,8 @@ void tms320c54x_device::pipeline_step()
 		m_illegal = true;
 		return;
 	}
-	unsigned const access_stage = serial_retry_pair && !m_pipeline_peripheral_wait_paid[4] ? 4 : read_peripheral ? 3 : 4;
-	if ((read_peripheral || write_peripheral) && !m_pipeline_peripheral_wait_paid[access_stage])
+	unsigned const access_stage = serial_retry_pair && !m_pipeline_peripheral_wait_paid[4] ? 4 : read_peripheral || move_peripheral ? 3 : 4;
+	if ((read_peripheral || write_peripheral || move_peripheral) && !m_pipeline_peripheral_wait_paid[access_stage])
 	{
 		// SPRU172C establishes one extra peripheral-access clock. Holding
 		// pipeline advancement at the bus access is this prototype's declared
@@ -3508,12 +3521,17 @@ void tms320c54x_device::pipeline_step()
 		}
 		bool const accumulator_status_move = (word == 0x7308 || word == 0x730b) && m_pipeline_immediate[2] == 7;
 		bool const brc_move = direct_move && m_pipeline_immediate[2] == 0x1a;
+		bool const clock_move = staged_clock_destination_move(word, m_pipeline_immediate[2]);
+		if (m_pipeline_valid[2] && clock_move && (completing_move_delay || m_pipeline_delay_decode_words || m_pipeline_xc_active || m_pipeline_block_body[2] || m_pipeline_repeat_active))
+		{
+			logerror("%s: staged CLKMD move repeat/control composition is unsupported\n", machine().describe_context()); m_illegal = true; return;
+		}
 		bool const ordinary_delay_brc_move = completing_move_delay && m_pipeline_control_word != 0xf272;
 		if (m_pipeline_valid[2] && brc_move && ((!ordinary_delay_brc_move && (completing_move_delay || m_pipeline_delay_decode_words)) || m_pipeline_block_body[2]))
 		{
 			logerror("%s: staged memory move BRC in repeat body or control delay is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		if (m_pipeline_valid[2] && direct_move && !brc_move && !accumulator_status_move && !staged_accumulator_destination_move(word, m_pipeline_immediate[2]) && !staged_t_register_move(word, m_pipeline_immediate[2]) && m_pipeline_immediate[2] < 0x60 &&
+		if (m_pipeline_valid[2] && direct_move && !brc_move && !clock_move && !accumulator_status_move && !staged_accumulator_destination_move(word, m_pipeline_immediate[2]) && !staged_t_register_move(word, m_pipeline_immediate[2]) && m_pipeline_immediate[2] < 0x60 &&
 			(m_pipeline_immediate[2] < 0x10 || m_pipeline_immediate[2] > 0x19))
 		{
 			logerror("%s: staged memory move control/peripheral destination is unsupported instruction=%06x word=%04x destination=%04x\n", machine().describe_context(), unsigned(m_pipeline_address[2]), word, m_pipeline_immediate[2]);
@@ -4066,7 +4084,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			logerror("%s: staged MVMD control/peripheral destination is unsupported\n", machine().describe_context()); m_illegal = true; return;
 		}
-		if ((extended || staged_circular_move(m_pipeline_word[3]) || staged_indexed_move(m_pipeline_word[3])) && !brc && !staged_accumulator_destination_move(m_pipeline_word[3], destination) && !staged_t_register_move(m_pipeline_word[3], destination) && destination < 0x60 && (destination < 0x10 || destination > 0x19))
+		if ((extended || staged_circular_move(m_pipeline_word[3]) || staged_indexed_move(m_pipeline_word[3])) && !brc && !staged_clock_destination_move(m_pipeline_word[3], destination) && !staged_accumulator_destination_move(m_pipeline_word[3], destination) && !staged_t_register_move(m_pipeline_word[3], destination) && destination < 0x60 && (destination < 0x10 || destination > 0x19))
 		{
 			logerror("%s: staged extended/circular MVDK control/peripheral destination is unsupported\n", machine().describe_context());
 			m_illegal = true; return;
@@ -5328,10 +5346,11 @@ void tms320c54x_device::pipeline_step()
 		if (staged_memory_immediate_multiply(m_pipeline_word[4])) m_t = m_pipeline_operand[4];
 	}
 	if (m_pipeline_valid[4] && staged_move(m_pipeline_word[4]) &&
-		(m_pipeline_immediate[4] >= 0x60 || staged_t_register_move(m_pipeline_word[4], m_pipeline_immediate[4]) || staged_accumulator_destination_move(m_pipeline_word[4], m_pipeline_immediate[4])))
+		(m_pipeline_immediate[4] >= 0x60 || staged_clock_destination_move(m_pipeline_word[4], m_pipeline_immediate[4]) || staged_t_register_move(m_pipeline_word[4], m_pipeline_immediate[4]) || staged_accumulator_destination_move(m_pipeline_word[4], m_pipeline_immediate[4])))
 		// Retained MVDK data writes use the same clock for RAM and accumulator
 		// fields; register_write preserves siblings and masks AG/BG to 8 bits.
 		// Table 7-3: non-accumulator T moves are visible to the next consumer.
+		// CLKMD uses this retained write after its separately paid access clock.
 		m_data.write_word(m_pipeline_immediate[4], m_pipeline_operand[4]);
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] == 0x7308 || m_pipeline_word[4] == 0x730b) && m_pipeline_immediate[4] == 7)
 		// Publish at the move's Read clock, not its later Execute clock:

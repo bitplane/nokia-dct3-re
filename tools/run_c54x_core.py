@@ -572,6 +572,14 @@ EXTRA_PROFILES = {
         "TMS320C54x staged CLKMD STM: PASS cases=12 restore=12 literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 pll_reference=unconfigured physical_clock_claim=0",
         "Fatal error: TMS320C54x isolated staged CLKMD STM complete",
     ),
+    "clock-mvdk": (
+        "TMS320C54x staged CLKMD MVDK: PASS cases=72 restore=72 forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 peripheral_extra_clock=1 retained_source=1 retained_literals=1 pll_reference=unconfigured physical_clock_claim=0",
+        "Fatal error: TMS320C54x isolated staged CLKMD MVDK complete",
+    ),
+    "clock-mvdk-edge": (
+        "TMS320C54x CLKMD MVDK exclusions: PASS cases=24 restore=24 contexts=RPT,BD_delay source_forms=3 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 clock_changes=0 hardware_trap_claim=0",
+        "Fatal error: TMS320C54x isolated CLKMD MVDK exclusions complete",
+    ),
     "std-swwsr": (
         "TMS320C54x standard SWWSR: PASS encodings=65536 reserved_bit15=0 multiplier=0 separate_BSCR_SWCR=1 partial_writes=1 restore=1 reset=1 program_data_wait_claim=0 physical_mapping=unvalidated",
         "Fatal error: TMS320C54x isolated standard SWWSR complete",
@@ -2302,10 +2310,11 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("mvdd-follow", "st-acc-mvmm", "shift16-load-age", "addsub-ar-age", "bd-read-a", "mac-map-imm", "tc-delay-call", "tmac-repeat", "tmac-rpt-edge", "lms", "lms-edge", "addm-ar-short", "bd-maca-long", "bd-maca-edge", "push-mvmm-sp"):
         machine = "tms54xtra"
-    if args.profile in ("pmac-mod3-edge","delay-mod3-edge","store-observe","push-observe","dual-sub-native","idle-modes"):
+    if args.profile in ("pmac-mod3-edge","delay-mod3-edge","store-observe","push-observe","dual-sub-native","idle-modes","clock-mvdk","clock-mvdk-edge"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
-               "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
+               "-video", "none", "-sound", "none", "-joystickprovider", "none",
+               "-midiprovider", "none", "-nothrottle", "-noreadconfig",
                # This is a stop bound, not acceptance: every marker and the
                # intentional test-completion exit remain mandatory.
                "-log", "-seconds_to_run", "5"]

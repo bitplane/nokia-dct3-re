@@ -1964,6 +1964,12 @@
       "evidence": ["docs/5510_bringup.md", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py"]
     },
     {
+      "id": "c54x_staged_clkmd_memory_move", "owner": "tms320c54x", "status": "satisfied",
+      "predicate": "Staged RAM-to-CLKMD MVDK retains its source and literals, publishes once after the extra peripheral clock and replays without repeated effects",
+      "current": "The unchanged core fails clock-mvdk case0/tick4 before data effects. The corrected core passes72 cases: direct DP/indirect postincrement/absolute RAM, four words, two pages and three checkpoints. Captured source/literals are overwritten to reject rereads; each leg has one read and one write, one extra peripheral clock and preserved flags/continuation. Twenty-four RPT/BD-delay controls fail with zero reads/writes/pointer/clock changes across restore. Existing clock-stm, mapped-source exclusions and staged IDLE modes remain green. TI SPRU172C class19A/B and MVDK define transfer/extra-clock behavior; stage placement and physical PLL timing remain partial. Original AA22 INT2 handler0288cb uses71f8/1420/0058 and now restores the configured model PLL selection before the separate unsupported POPM IFR continuation. This is not full native wake, automatic EOF or speech acceptance.",
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+    },
+    {
       "id": "c54x_staged_idle_modes", "owner": "tms320c54x", "status": "satisfied",
       "predicate": "Staged IDLE1/2/3 share a drained Decode barrier and mode-specific timer/wake behavior with retained fresh continuation and save/load",
       "current": "The focused idle-modes profile fails unchanged at case32/tick3 with illegal1 on its first IDLE2. The corrected core passes96 cases across three modes, external IRQ, INTM-blocked IRQ, masked-then-enabled IRQ and NMI, two source pages and four checkpoints. IDLE1 timer movement contrasts with frozen IDLE2/3; changed continuation RAM is refetched only after wake, real ISR stack/return paths are checked and all cases replay. ReservedNN11 and control-delay IDLE remain excluded. The native serial-control probe independently reached original AA22 f5e1 at028922; that workload is not qualified by this isolated gate. Physical clock/restart latency, every peripheral composition, EOF/drain and complete handset behavior remain unproved.",

@@ -14,6 +14,24 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_clkmd_move_exclusions_require_no_operand_or_clock_effects(self):
+        marker,ending=EXTRA_PROFILES['clock-mvdk-edge']
+        text=marker+'\n'+ending
+        check_result(text,3,profile='clock-mvdk-edge')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field),self.assertRaises(ValueError):
+                    check_result(text.replace(field,field.split('=')[0]+'=invalid'),3,profile='clock-mvdk-edge')
+
+    def test_clkmd_move_requires_retained_access_wait_and_restore(self):
+        marker,ending=EXTRA_PROFILES['clock-mvdk']
+        text=marker+'\n'+ending
+        check_result(text,3,profile='clock-mvdk')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field),self.assertRaises(ValueError):
+                    check_result(text.replace(field,field.split('=')[0]+'=invalid'),3,profile='clock-mvdk')
+
     def test_staged_idle_modes_require_clock_wake_and_replay_scope(self):
         marker,ending=EXTRA_PROFILES['idle-modes']
         text=marker+'\n'+ending
