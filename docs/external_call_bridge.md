@@ -192,6 +192,13 @@ acknowledgement and SIM-backed storage before reporting `delivered`.
 `verify-radio-incoming-sms-host-restore` saves during that admitted delivery;
 the adapter republishes `queued` under the new epoch and reports exactly one
 post-restore completion.
+The runner validates each epoch's SMS events as an ordered prefix of
+`queued`, `delivered`, with the admitted request identity. A reference branch
+may end before delivery, but duplicates, reversed phases, unrelated requests
+and regressing or repeated restore epochs fail. Restoration does not resend
+the host request; the new epoch must independently reach delivery. Handset
+console health and product-specific protocol/storage checks remain separate
+requirements.
 
 The USSD host contract preserves the BER-decoded DCS and packed payload. A
 `success` response carries `dcs` and hexadecimal `data`; `return_error` and
