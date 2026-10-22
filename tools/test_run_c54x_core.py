@@ -14,6 +14,15 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_circular_mvdk_requires_executed_opcode_attribution(self):
+        marker, ending = EXTRA_PROFILES['mvdk-circular']
+        text = marker + '\n' + ending
+        check_result(text, 3, profile='mvdk-circular')
+        for bad in (text.replace(' asserted_encodings=32', ''),
+                    text.replace('asserted_encodings=32', 'asserted_encodings=31')):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='mvdk-circular')
+
     def test_native_dual_sub_requires_exact_scope_and_completion(self):
         marker, ending = EXTRA_PROFILES['dual-sub-native']
         text = marker + '\n' + ending

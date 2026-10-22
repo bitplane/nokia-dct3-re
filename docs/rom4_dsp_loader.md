@@ -1723,6 +1723,16 @@ reads or writes. Unsupported literal destinations reject in Decode;
 unsupported resolved sources reject in Access. Physical phase timing and
 interrupt/repeat composition remain unvalidated.
 
+Successful, nonexcluded cases emit exact-word assertion attribution for
+`71c0..71df`; excluded cases do not earn execution credit. The completion gate
+requires `asserted_encodings=32` after checking that every encoding reached its
+transfer assertion. This associates the existing source-sample, pointer-update,
+destination-publication and replay tests with exact native words such as `71c2`.
+It does not expand the operand matrix, alter CPU execution, or establish RF
+sample encoding or acquisition. Reproduce with `tools/run_c54x_core.py
+--profile mvdk-circular --verbose` and retain both its successful completion and
+the run's `error.log` before using the assertion inventory in a coverage report.
+
 The resident sequence `ec05 7192 13d0` at `7f8d..7f8f` is qualified:
 `RPT #5; MVDK *AR2+,13d0`. TI SPRU172C page 4-108 specifies six
 copies, incrementing the destination EAR as well as the source's explicit
@@ -4614,10 +4624,12 @@ differential evidence, not a Nokia MAD2 reset contract.
 
 `make check-c54x-rom4-coherent` protects the short coherent boot and interface
 initialization. `make check-c54x-rom4-rf-boundary` separately runs for 30
-emulated seconds and protects the newly reached receiver boundary: it requires
-at least 6,000 CTSI frame expiries, terminal `IMR=0x035f`, serviced INT0, more
-than 1,000 RF reads and no port-`0x32`, `0x38` or `0x39` activity. This is a
-receiver-activity gate, not a synthesizer-tuning or acquisition gate. With
+emulated seconds and protects the current receiver boundary: 20,280 CTSI frame
+expiries, 648,032 RF reads, 1,537 port-`0x32` writes with the reviewed ordered
+prefix and queue producers, terminal `IMR=0x035f`, serviced INT0 and no
+port-`0x38/0x39` reads. The earlier zero-port-32 observation above is not a
+current gate invariant. This is a receiver/programming-activity gate, not an
+acquisition gate. With
 the current evidence, a generated FCCH signal would require guessing both
 the active receive interface and the COBBA sample representation; neither
 is admitted as a hardware model.

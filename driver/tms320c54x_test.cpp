@@ -53190,7 +53190,9 @@ private:
 			}
 			if (tick == 12)
 			{
-				expect(bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !c.excluded && m_pipeline_operand_reads == unsigned(!c.excluded) && m_pipeline_store_writes == unsigned(!c.excluded) && m_pipeline_extensions_reads == 1, "Circular MVDK owns one sample, literal and publication");
+				bool const transfers = bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !c.excluded && m_pipeline_operand_reads == unsigned(!c.excluded) && m_pipeline_store_writes == unsigned(!c.excluded) && m_pipeline_extensions_reads == 1;
+				if (!c.excluded) expect_opcode(0x7100 | f.mode, transfers, "Circular MVDK owns one sample, literal and publication");
+				else expect(transfers, "Excluded circular MVDK performs no transfer");
 				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == c.a && m_cpu->state_int(tms320c54x_device::STATE_B) == c.b && m_cpu->state_int(tms320c54x_device::STATE_T) == c.t && m_cpu->state_int(tms320c54x_device::STATE_TRN) == c.trn && m_cpu->state_int(tms320c54x_device::STATE_SP) == c.sp && m_cpu->state_int(tms320c54x_device::STATE_BK) == c.bk && m_cpu->state_int(tms320c54x_device::STATE_BRC) == c.brc && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst, "Circular MVDK preserves unselected fields and raw values independently of ALU modes");
 				for (unsigned ar = 0; ar < 8; ++ar) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (!c.excluded && ar == f.selected ? 0x2200 : c.final[ar]), "Circular MVDK does not re-read or reapply pointer/destination updates");
 				if (!m_pipeline_replay)
@@ -53206,7 +53208,8 @@ private:
 					osd_printf_info("TMS320C54x indexed MVDK: PASS cases=294336 restore=294336 excluded=8064 encodings=16 destination_kinds=21 mapped_sources=18 indices=1,-1,BK,-BK snapshots=2,3 raw_words=1 alias_order=sample,modify,publish reset_before_restore=1 physical_phase_claim=0 interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated indexed MVDK complete");
 				}
 				if (edge) { osd_printf_info("TMS320C54x circular MVDK exclusions: PASS cases=19712 restore=19712 encodings=32 destinations=77 compatibility_states=2 pages=2 snapshots=2 reads=0 writes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated circular MVDK exclusions complete"); }
-				osd_printf_info("TMS320C54x circular MVDK: PASS cases=294336 restore=294336 excluded=8064 encodings=32 destination_kinds=21 mapped_sources=18 native_bk=82 snapshots=2,3 raw_words=1 alias_order=sample,modify,publish physical_phase_claim=0 interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated circular MVDK complete");
+				for (u16 mode = 0xc0; mode <= 0xdf; ++mode) expect(m_asserted_opcodes.test(0x7100 | mode), "Every circular MVDK encoding has an executed transfer assertion");
+				osd_printf_info("TMS320C54x circular MVDK: PASS cases=294336 restore=294336 excluded=8064 encodings=32 asserted_encodings=32 destination_kinds=21 mapped_sources=18 native_bk=82 snapshots=2,3 raw_words=1 alias_order=sample,modify,publish physical_phase_claim=0 interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated circular MVDK complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}

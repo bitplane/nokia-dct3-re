@@ -1854,7 +1854,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated indexed MVDK exclusions complete",
     ),
     "mvdk-circular": (
-        "TMS320C54x circular MVDK: PASS cases=294336 restore=294336 excluded=8064 encodings=32 destination_kinds=21 mapped_sources=18 native_bk=82 snapshots=2,3 raw_words=1 alias_order=sample,modify,publish physical_phase_claim=0 interrupt_repeat_composition=unvalidated",
+        "TMS320C54x circular MVDK: PASS cases=294336 restore=294336 excluded=8064 encodings=32 asserted_encodings=32 destination_kinds=21 mapped_sources=18 native_bk=82 snapshots=2,3 raw_words=1 alias_order=sample,modify,publish physical_phase_claim=0 interrupt_repeat_composition=unvalidated",
         "Fatal error: TMS320C54x isolated circular MVDK complete",
     ),
     "mvdk-repeat": (
