@@ -9,7 +9,7 @@ local capture=coroutine.create(function()
     machine.screens[':screen']:snapshot('nsb7_host_outgoing_ready.png')
     machine:logerror('nsb7_host_outgoing_ready: t=45.000000000\n')
     assert(emu.wait(15))
-    machine.screens[':screen']:snapshot('nsb7_host_outgoing_connected.png')
+    machine.screens[':screen']:snapshot(_G.nsb7_host_outgoing_capture_name or 'nsb7_host_outgoing_connected.png')
 end)
 _G.nsb7_host_outgoing_capture=capture
 assert(coroutine.resume(capture))

@@ -15,6 +15,7 @@ local input=coroutine.create(function()
     for index=1,#digits do steps[#steps+1]={19+index,'Keypad '..digits:sub(index,index)} end
     steps[#steps+1]={28,'Send'}
     steps[#steps+1]={40,'End'}
+    for _,step in ipairs(_G.nsb7_outgoing_call_followup or {}) do steps[#steps+1]=step end
     for _,step in ipairs(steps) do
         assert(emu.wait(step[1]+delay-machine.time:as_double()))
         local field=assert(fields[step[2]])

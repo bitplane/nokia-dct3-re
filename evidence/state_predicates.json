@@ -3,6 +3,20 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_host_busy_physical_recovery",
+      "owner": "nsb7_host_services", "status": "satisfied",
+      "predicate": "A correlated host busy decision clears without traffic/CONNECT and physical Menu/End recovers the handset with unchanged card",
+      "current": "Settled45s authenticated idle precedes physical5551234/Send54. One host busy decision queues/consumes; wrong-ID/duplicate are rejected. Network DISCONNECT, handset RELEASE and network RELEASE COMPLETE/RR release occur with no assignment/Alerting/CONNECT/speech or connected host phase. Exact60s pixels show Call1 with crossed-call indicator, not a Busy banner or active call. Physical End66/Menu70/End73 reaches exact Messages and76s idle; complete card is unchanged. RTC divergence from connected control is separately unresolved, not masked in this gate.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_pin_host_busy.lua", "tools/nsb7_host_busy_check.py", "tools/test_nsb7_host_busy_check.py", "tools/nsb7_outgoing_call_observe.lua", "tools/run_host_call_adapter_gate.py"]
+    },
+    {
+      "id": "nsb7_connected_call_ccont_seconds_writes",
+      "owner": "nsb7_ccont_write_semantics", "status": "unresolved",
+      "predicate": "Physical semantics of connected-call register07 writes are independently established rather than inferred from the seconds read surface",
+      "current": "Matched host busy/connected controls begin13:47:01 at1s. Connected firmware repeatedly writes CCONT07=00/0f; the current writable-seconds model reads13:47:16 through57..66s and13:47:10 at76s. Busy has only boot-time07 write and reads13:48:16 at76s. The write-side hardware meaning and own writer/GENSIO ownership require decoding; do not tune inputs, mask clock pixels or promote these compatibility writes as validated wall-clock fidelity. Protocol outcome and UI recovery are checked separately.",
+      "evidence": ["docs/8290_bringup.md", "docs/ccont_subsystem.md", "driver/nokia_ccont.cpp", "tools/nsb7_pin_host_outgoing_call.lua", "tools/nsb7_pin_host_busy.lua"]
+    },
+    {
       "id": "nsb7_connected_host_call_restoration_both_directions",
       "owner": "nsb7_host_services", "status": "satisfied",
       "predicate": "Connected incoming/outgoing host calls restore exact handset state and republish one request under a new epoch while rejecting stale commands",

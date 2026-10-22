@@ -125,6 +125,15 @@ time/date input. This proves powered RTC-domain continuity, not offline calendar
 advance or battery-removal behavior.
 Register `0xd` remains a clock-gate latch with unknown side effects.
 
+NSB-7 connected-call traffic separately exposes an unresolved write-side
+contract: repeated register07 writes00/0f move the modeled seconds counter
+backward, while a matched busy control advances normally. Both start with
+the same RTC state. The binary read-surface evidence does not by itself
+validate those write effects; do not infer counter/control symmetry or alter
+it without decoding the own writer/serial transaction. The bounded evidence
+and independent signaling checks live in
+[the NSB-7 contract](8290_bringup.md#ccont-seconds-write-boundary-exposed-by-the-controls).
+
 `tools/run_ccont_rtc_retention.py RUN_DIR` runs the existing mapped-register
 RTC/IRQ fixture, then a new isolated process with a private copy of its NVRAM.
 It requires retained minute/day values, the firmware-owned seconds reset,

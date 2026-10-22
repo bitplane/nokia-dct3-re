@@ -25,7 +25,8 @@ machine implicitly.
 All provisioning is own-derived or explicitly synthetic external card data;
 no donor PMM, identity or firmware-state forcing is admitted. Native resident
 DSP execution, speech/COBBA, measured complete analog calibration, external
-RF and NSB-7 SIP acceptance remain unproved. Host failure/pending-call cases,
+RF and NSB-7 SIP acceptance remain unproved. Host busy/recovery is qualified;
+other failure/pending-call cases,
 AoC and SIM Toolkit are not established by these gates. Detailed contracts
 and their reproduction commands below own each coverage claim.
 
@@ -2303,3 +2304,41 @@ Use `nsb7_pin_host_outgoing_state.lua` with the existing host runner's
 This qualifies epoch-safe restoration of the emulated signaling/session state
 with a cooperating WebSocket observer. It is not resurrection of an external
 SIP dialog, host audio/PCM restoration, native speech or external RF.
+
+## Host busy result and physical recovery
+
+`nsb7_pin_host_busy.lua` retains the settled45s start, physical5551234/Send54
+and End66, then adds physical Menu70 and End73. The shared host runner uses
+`--decision busy` (qualified localhost port18936), not a connect decision or
+media echo. Wrong-ID and duplicate decisions are rejected; one matching busy
+decision queues/consumes once.
+
+The handset completes CM/SETUP/Call Proceeding, then receives network
+DISCONNECT, emits RELEASE and receives RELEASE COMPLETE/RR release. There is
+no traffic assignment, Alerting, CONNECT, speech or connected host phase.
+The exact60s result frame shows `Call 1` with a crossed-call indicator, not
+a Busy banner and not an active call. Physical Menu70 opens the reviewed
+Messages screen; End73 returns to the exact76s idle frame. The full SIM card
+is unchanged. No firmware state or outcome is substituted.
+
+```sh
+.venv/bin/python tools/nsb7_host_busy_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-pin-host-busy
+```
+
+### CCONT seconds-write boundary exposed by the controls
+
+Both busy and connected controls start with RTC13:47:01 at emulated1s.
+During the connected control, firmware repeatedly writes CCONT register07
+with00/0f at roughly one-second intervals. The current writable-seconds model
+then reads13:47:16 throughout57..66s and13:47:10 at76s. The busy control
+has only the boot-time07 write and reaches13:48:16 at76s; its exact idle frame
+therefore differs from the connected control. These are traced device-state
+differences, not host wall-clock randomness or merely an animated UI phase.
+
+The physical meaning of those connected-call writes is unresolved. A
+read-side seconds interpretation does not independently prove write-side
+counter semantics for this traffic. Keep the model and both exact oracles
+explicit; next decode the own writer and its GENSIO transaction before
+changing CCONT, fitting clock values or claiming wall-clock fidelity during
+calls. This does not invalidate the separately checked CC/RR busy outcome.
