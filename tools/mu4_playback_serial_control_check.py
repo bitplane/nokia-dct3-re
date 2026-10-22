@@ -53,7 +53,9 @@ def response_frames(text):
     return result
 
 
-def check(text,console):
+def check(text,console,*,resident_status=None):
+    if resident_status not in (None,'answered','blocked'):
+        raise ValueError('unknown resident status fixture scope')
     expected='Fatal error: '+COMPLETION
     if console.count(expected)!=1:raise ValueError('strict audio diagnostic endpoint absent')
     verify_handset_health(console.replace(expected,'').replace('Ignoring MAME exception: '+COMPLETION,''))
@@ -65,7 +67,9 @@ def check(text,console):
     status=[frame for frame in frames if (frame['selector'],frame['token'],frame['class'])==(0x71,3,1)]
     if len(status)!=1:raise ValueError('one correlated status49 reply is required')
     phases=list(re.finditer(r'mu4_playback_control_input: phase=(\w+) decoded_calls=(\d+) replies=(\d+) t=([0-9.]+) firmware_state_forcing=0 audio_acceptance=0',text))
-    if [phase[1] for phase in phases]!=['play30_02','status49','control30_04']:
+    expected_phases=['play30_02','status49','control30_04']
+    if resident_status is not None:expected_phases.append('resident_status49')
+    if [phase[1] for phase in phases]!=expected_phases:
         raise ValueError('native control peer phase sequence differs')
     if not 0<int(phases[1][2])<=int(phases[2][2]) or status[0]['end']>phases[2].start():
         raise ValueError('control preceded completed native decoding/correlated status reply')
@@ -77,6 +81,7 @@ def check(text,console):
             raise ValueError('native control observation identity differs')
         if (int(event['pc'],16),int(event['opcode'],16))!=SITES.get(event['kind']):
             raise ValueError('native control source instruction differs')
+    expected_cursor=37 if resident_status=='answered' else 30 if resident_status=='blocked' else 29
     require_ordered(text,[
         ('upload',r'mu4_original_bootstrap_upload: records=7 words=10760 program_only=1'),
         ('AA99',r'mu4_native_playback_overlay: PASS marker=aa99 records=3127 words=49843 checked_ram_words=49839 excluded_register_words=4 before_execution=1'),
@@ -93,10 +98,15 @@ def check(text,console):
         ('input16 sender',r'kind=send16 pc=020727[^\n]* pending=0003'),
         ('resident IDLE3',r'kind=resident_idle3 pc=028922 opcode=f5e1'),
         ('clean capture',r'mu4_playback_capture_terminal: closed=1 illegal=0'),
-        ('final control',r'mu4_playback_control_terminal: status_reply=1 input_cursor=29 decoded_calls=[1-9]\d* idle=\d+ pc=[0-9a-f]{6} t=20\.000000000 firmware_state_forcing=0 audio_acceptance=0'),
+        ('final control',rf'mu4_playback_control_terminal: status_reply=1 input_cursor={expected_cursor} decoded_calls=[1-9]\d* idle=\d+ pc=[0-9a-f]{{6}} t=20\.000000000 firmware_state_forcing=0 audio_acceptance=0'),
     ],'native explicit serial playback control')
     if re.findall(r'mu4_native_command_input: cursor=(\d+) total=29',text)!=[str(index) for index in range(1,30)]:
         raise ValueError('physical serial input byte inventory differs')
+    suffix=re.findall(r'mu4_native_command_input: cursor=(\d+) total=37',text)
+    if suffix!=([str(index) for index in range(30,expected_cursor+1)] if resident_status else []):
+        raise ValueError('resident query byte inventory differs')
+    if text.count('mu4_native_command_input:')!=expected_cursor:
+        raise ValueError('unclassified or duplicated serial input record')
     terminal=rows(text,'mu4_play_control_terminal')
     if (len(terminal)!=1 or int(terminal[0]['events'])!=len(events) or
             terminal[0].get('cap')!='1024' or terminal[0].get('observer_writes')!='0' or

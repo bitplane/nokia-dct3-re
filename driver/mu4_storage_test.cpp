@@ -414,6 +414,7 @@ public:
 		m_nand->rnb_wr_callback().set(FUNC(mu4_storage_test_state::ready_w));
 	}
 	DECLARE_INPUT_CHANGED_MEMBER(mcu_dsp_interrupt);
+	DECLARE_INPUT_CHANGED_MEMBER(mcu_status_request);
 private:
 	std::array<u32, 4> m_ac_generated{}, m_ac_received{};
 	u32 m_ac_other = 0, m_ac_other_owners = 0;
@@ -957,6 +958,7 @@ private:
 	bool m_cold_title_verified = false;
 	unsigned m_playback_requests = 0, m_playback_inspections = 0, m_playback_decoder_loads = 0;
 	bool m_playback_status_replied = false;
+	bool m_manual_status_requested = false;
 	bool m_playback_overlay_checked = false;
 	std::array<u32, 3> m_playback_execute_entries{};
 	std::array<u32, 2> m_playback_audio_words{}, m_playback_audio_nonzero{};
@@ -2519,7 +2521,8 @@ private:
 		unsigned const packet_size = first_size + (recorder_control_profile() ? std::size(recorder_control) : 0) +
 			(recorder_poll_profile() ? std::size(recorder_poll) : 0) +
 			(recorder_save_profile() ? std::size(recorder_resident_poll) + metadata_size : 0) +
-			(playback_stop_profile() ? std::size(recorder_poll) + std::size(playback_control) : 0);
+			(playback_stop_profile() ? std::size(recorder_poll) + std::size(playback_control) +
+				(m_manual_status_requested ? std::size(recorder_resident_poll) : 0) : 0);
 		unsigned packet_start = 0;
 		bool const ack = m_native_command_cursor >= first_size && m_command_ack_pending && m_command_ack_cursor != 3;
 		if (playback_stop_profile() && m_native_command_cursor >= first_size && !ack)
@@ -2537,6 +2540,11 @@ private:
 				{ m_command->adjust(attotime::from_msec(1)); return; }
 				packet_start += std::size(recorder_poll);
 				packet = playback_control;
+				if (m_native_command_cursor >= packet_start + std::size(playback_control))
+				{
+					packet_start += std::size(playback_control);
+					packet = recorder_resident_poll;
+				}
 			}
 		}
 		else if (recorder_control_profile() && m_native_command_cursor >= first_size && !ack)
@@ -2590,7 +2598,8 @@ private:
 				unsigned const index = m_native_command_cursor - packet_start;
 				if (!index && playback_stop_profile())
 					logerror("mu4_playback_control_input: phase=%s decoded_calls=%u replies=%u t=%.9f firmware_state_forcing=0 audio_acceptance=0\n",
-						packet == playback_control ? "control30_04" : packet == recorder_poll ? "status49" : "play30_02",
+						packet == playback_control ? "control30_04" : packet == recorder_poll ? "status49" :
+						packet == recorder_resident_poll ? "resident_status49" : "play30_02",
 						m_playback_processing[2], m_recorder_responses, machine().time().as_double());
 				if (!index && recorder_save_profile() && packet == recorder_metadata)
 					serialize_recorder_media("mu4_recorder_before_metadata.nand");
@@ -3335,6 +3344,7 @@ private:
 			save_item(NAME(m_playback_requests)); save_item(NAME(m_playback_inspections)); save_item(NAME(m_playback_decoder_loads));
 			save_item(NAME(m_playback_overlay_checked));
 			save_item(NAME(m_playback_status_replied));
+			save_item(NAME(m_manual_status_requested));
 			save_item(NAME(m_playback_capture_positions));
 			save_item(NAME(m_playback_tx_time_hash));
 			save_item(NAME(m_playback_dxr_hash)); save_item(NAME(m_playback_dxr_writes));
@@ -3667,6 +3677,7 @@ private:
 		m_cold_title_publications = 0; m_cold_title_verified = false;
 		m_playback_requests = m_playback_inspections = m_playback_decoder_loads = 0;
 		m_playback_status_replied = false;
+		m_manual_status_requested = false;
 		m_playback_overlay_checked = false;
 		m_playback_execute_entries = {}; m_playback_execute_steps = 0; m_playback_filter = {};
 		m_playback_audio_words = {}; m_playback_audio_nonzero = {}; m_playback_audio_hash = {2166136261U, 2166136261U};
@@ -5967,11 +5978,24 @@ INPUT_CHANGED_MEMBER(mu4_storage_test_state::mcu_dsp_interrupt)
 	logerror("mu4_mcu_int2_input: asserted=%u net=UC_DSP_INT cpu_irq=2 t=%.9f source=bench_pin firmware_state_forcing=0\n",
 		unsigned(bool(newval)), machine().time().as_double());
 }
+INPUT_CHANGED_MEMBER(mu4_storage_test_state::mcu_status_request)
+{
+	if (!newval || m_manual_status_requested) return;
+	if (!playback_stop_profile() || m_phase != 30 || m_native_command_cursor != 29)
+		fatalerror("MU4 manual status query requires completed playback-control ingress");
+	// Explicit serial-peer command, not an inferred MSP430 policy or guest poke.
+	m_manual_status_requested = true;
+	m_command->adjust(attotime::from_msec(1));
+	logerror("mu4_manual_status_input: request=1 token=04 t=%.9f source=bench_serial_command firmware_state_forcing=0\n",
+		machine().time().as_double());
+}
 static INPUT_PORTS_START(mu4_native_control)
 	PORT_INCLUDE(mu4_storage_test)
 	PORT_START("MCU_CONTROL")
 	PORT_BIT(0x01, IP_ACTIVE_HIGH, IPT_OTHER) PORT_NAME("MCU DSP interrupt asserted")
 		PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(mu4_storage_test_state::mcu_dsp_interrupt), 0)
+	PORT_BIT(0x02, IP_ACTIVE_HIGH, IPT_OTHER) PORT_NAME("MCU status request")
+		PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(mu4_storage_test_state::mcu_status_request), 0)
 INPUT_PORTS_END
 // Isolated codec ABI probe. This does not alter a running handset or recorder.
 class mu4_aac_test_state : public driver_device

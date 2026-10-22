@@ -14,9 +14,10 @@ for _,site in ipairs({
 }) do
     local low=site[1]%0x10000
     local physical=low<0x8000 and low or site[1]
+    -- Debugger literals are hexadecimal: 400 is the declared 1024 events.
     handles[#handles+1]=cpu.debug:bpset(site[1],
-        site[2]=='resident_idle3' and 'temp0<1024' or
-            'temp0<1024 && pw@2942c==76f8 && pw@2942d==a9f8',
+        site[2]=='resident_idle3' and 'temp0<400' or
+            'temp0<400 && pw@2942c==76f8 && pw@2942d==a9f8',
         'temp0=temp0+1;logerror "mu4_play_control: ordinal=%d kind='..site[2]..
         ' pc=%06x opcode=%04x cycles=%d sp=%04x f2=%04x f3=%04x f4=%04x f5=%04x pending=%04x active=%04x state=%04x lifecycle=%04x parameter=%04x identity=Execute_entry operands=context_only observer_writes=0\\n",'..
         string.format('temp0,curpc,pw@%x,totalcycles,sp,dw@(sp+2),dw@(sp+3),dw@(sp+4),dw@(sp+5),dw@12fb,dw@12fd,dw@a825,dw@373e,dw@1189;g',physical))

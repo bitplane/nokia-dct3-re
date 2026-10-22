@@ -14,8 +14,11 @@ SITES = {'enter': ('028914', '4a00'), 'resume': ('028925', '8a01'),
          'restore_mask': ('028926', '8a00'), 'caller': ('03ac0d', 'f020')}
 
 
-def check_branch(text, console, pulse):
-    serial_check(text, console)
+def check_branch(text, console, pulse, *, resident_status=None):
+    if resident_status is None:
+        serial_check(text, console)
+    else:
+        serial_check(text, console, resident_status=resident_status)
     states = rows(text, 'mu4_int2_state')
     if [row['phase'] for row in states] != ['before', 'released', 'after']:
         raise ValueError('wake snapshot sequence differs')

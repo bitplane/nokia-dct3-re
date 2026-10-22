@@ -1,6 +1,8 @@
 from functools import reduce
 from operator import xor
 import unittest
+from pathlib import Path
+import re
 from tools import mu4_playback_serial_control_check as gate
 
 
@@ -36,12 +38,22 @@ mu4_play_control_terminal: events=7 cap=1024 observer_writes=0 audio_acceptance=
 
 
 class NativeSerialControlTest(unittest.TestCase):
+    def test_debugger_hex_limits_match_reported_decimal_cap(self):
+        source=Path(__file__).with_name('mu4_playback_serial_control_observe.lua').read_text()
+        limits=re.findall(r'temp0<([0-9a-f]+)',source)
+        self.assertEqual(len(limits),2)
+        self.assertTrue(all(int(limit,16)==1024 for limit in limits))
+
     def verify(self,text):return gate.check(text,'Fatal error: '+gate.COMPLETION+'\n')
 
     def test_complete_explicit_control_is_not_audio_acceptance(self):
         result=self.verify(fixture())
         self.assertFalse(result['audio_completion'])
         self.assertFalse(result['receive16_observed'])
+
+    def test_unclassified_input_total_is_not_ignored(self):
+        with self.assertRaises(ValueError):
+            self.verify(fixture()+'\nmu4_native_command_input: cursor=30 total=99\n')
 
     def test_rejects_early_control_even_when_reply_counter_is_high(self):
         text=fixture().replace('replies=4','replies=400')

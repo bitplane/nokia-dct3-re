@@ -9658,6 +9658,38 @@ ordinary native serial-control acceptance and rejecting audio endpoint,
 matching checkpoint state, actual board-pin edges, replay publications,
 all nine preserved capture prefixes and an uncapped completion marker.
 
+#### Resident command interface after wake
+
+`mu4_resident_status_observe.lua` adds a declared serial-peer status query
+after the paired INT2 fixture, using the existing selector `49` packet with
+request token `04`. The bench input `MCU status request` queues this packet
+through the ordinary timed command receiver; it does not write DSP memory,
+select a PC or claim a recovered MSP430 command policy. Its one-shot request latch is
+saved with the other playback peer state. The matched
+`mu4_resident_status_control.lua` sends the same query without an INT2 edge.
+
+Both request the packet at 11.2 seconds and begin ingress at 11.201.
+After wake, all eight bytes are consumed (37 total fixture bytes), native
+firmware emits ACK `7f 04 55` and a complete XOR-checked status frame:
+`1e 05 aa 01 71 01 00 00 02 c2 55`. The request token `04` and native
+TX token `02` belong to opposite directions; the latter follows the
+resident reload and must not be forced to match the request token.
+Without wake, only the first additional byte is offered (30 total), no
+ACK04 or response follows, and the DSP remains at resident `028923`
+through the 20-second diagnostic. This is a bounded negative control,
+not a permanent-stall or all-wake-source claim.
+
+```sh
+python3 tools/mu4_resident_status_check.py SOURCE_A00 INPUT_NAND CONTROL_RUN WAKE_RUN
+```
+
+The checker composes the existing native serial/wake contracts with exact
+query byte inventory, acknowledgement ordering, reply framing/payload and
+the sleeping control's lack of a response. Both legs retain the strict
+rejecting audio endpoint and unchanged complete input NAND. This proves
+the original resident command interface is usable after the declared wake,
+not normal MCU policy, automatic EOF, complete music or native phone speech.
+
 The post-wake caller is not another receive wait. The separately pinned
 52-word `resident_wake_tail` contract loads `07d0`, calls `03acdf`, then writes
 zero to `b558` at `03ac11`. Helper `03acdf..03acf1` passes stack literal
