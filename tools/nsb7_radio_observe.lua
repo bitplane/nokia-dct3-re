@@ -6,6 +6,12 @@ local cpu=machine.devices[':maincpu']
 local memory=cpu.spaces.program
 local cursor=0
 local count=0
+-- Physical power fixtures may reset diagnostic cursor state while rails are off.
+-- Keep the capture index monotonic; no guest memory or device state is touched.
+_G.nsb7_radio_observer_reset=function()
+    cursor=0
+    machine:logerror(string.format('nsb7_radio_capture: reset_cursor t=%.9f observer_writes=0\n',machine.time:as_double()))
+end
 _G.nsb7_radio_tx_tap=memory:install_write_tap(0x100a4,0x100a7,'nsb7_radio_tx',function(_,value,mask)
     if mask&0xffff0000==0 or count>=256 then return end
     local producer=(value>>16)&0xffff

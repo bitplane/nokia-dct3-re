@@ -5,7 +5,7 @@ import re
 POWERED_ENDPOINT_ACTIVITY = re.compile(
     r'dspif_transport: (?:RX enqueue|FIQ0 notify|peer RAM W)|'
     r'rom4_(?:timing_port|port_write):|staged_dsp: publication|'
-    r'radio_peer: LAPDm|dsp_hle: speech')
+    r'radio_peer: LAPDm|dsp_hle: (?:speech|TX packet|RX enqueue|LAPDm|GSM service)')
 
 
 def require_endpoint_silence(text, message):

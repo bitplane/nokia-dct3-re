@@ -7,7 +7,8 @@ class EndpointSilenceTest(unittest.TestCase):
         for event in ('dspif_transport: RX enqueue', 'dspif_transport: FIQ0 notify',
                       'dspif_transport: peer RAM W', 'rom4_timing_port:',
                       'rom4_port_write:', 'staged_dsp: publication',
-                      'radio_peer: LAPDm', 'dsp_hle: speech'):
+                      'radio_peer: LAPDm', 'dsp_hle: speech', 'dsp_hle: TX packet',
+                      'dsp_hle: RX enqueue', 'dsp_hle: LAPDm', 'dsp_hle: GSM service'):
             with self.subTest(event=event), self.assertRaisesRegex(ValueError, '^product-specific reason$'):
                 require_endpoint_silence(event, 'product-specific reason')
 

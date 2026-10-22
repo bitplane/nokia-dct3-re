@@ -14,7 +14,7 @@ machine implicitly.
 
 | Research-HLE contract | Qualified coverage |
 | --- | --- |
-| UI and storage | Physical security code, menus, SIM phonebook save/cold retrieval, RTC retention and Net monitor00 clean idle. Own EEPROM journal rotation matches the complete runtime shadow. |
+| UI and storage | Physical security code, menus, SIM phonebook save/cold retrieval, RTC retention and Net monitor00 clean idle. Physical rail-off/PWRONX restart retains RTC/card and reauthenticates before warm registration and menu recovery. Own EEPROM journal rotation matches the complete runtime shadow. |
 | SIM security | PIN1/PIN2 change/rejection, retry persistence, exhaustion/PUK recovery and request Off/On. Permanent PUK1 rejects the card; permanent PUK2 retains ordinary PIN1/menu use. |
 | FDN | Explicit extended card; physical PIN2-authorized On/Off, Save/edit/erase/cancel and cold retrieval. Registered listed/unlisted/Off controls distinguish permitted calls from local denial. |
 | SIM Toolkit | Phase-2+ nine-byte TERMINAL PROFILE; DISPLAY TEXT, GET INKEY, GET INPUT, SET UP MENU, SELECT ITEM, menu-driven SEND SHORT MESSAGE and SET UP CALL accept/Cancel. Exact physical/protocol/UI acceptance; non-SMS cases preserve the full card, SMS permits only its exact EF_SMSS reference update. |
@@ -2296,6 +2296,40 @@ Require the handset checker as well as runner success:
 This validates external host signaling and physical UI acceptance, not host
 media, native speech, an external carrier or a SIP-connected call. Connected
 host-call restoration is qualified separately below.
+
+## Physical power-off and authenticated restart
+
+The explicit `nsb7hle` composition now qualifies physical Power45..49,
+firmware CCONT rail-off at51.442157231s, a blank55s frame and physical
+PWRONX65..67. Wake occurs at65.016666667s with cause02; firmware reads
+ready/PWRONX without charger. Every RTC second remains continuous through
+the13.57s off interval and the subsequent boot. The checked DSP/radio
+endpoints produce no activity while rails are off.
+
+Restart requires fresh physical PIN1234/OK73..77, accepted before the
+retained-LAI Location Updating transaction completes at78.239702s.
+Phone code12345/OK81..86 is independently accepted. The90s frame is still
+the Nokia startup presentation, not settled idle. Physical Menu95/End98
+proves restored interaction; the exact101s frame is registered13:49 idle.
+The complete SIM card is unchanged, no retained-location file write occurs,
+and the own flash journal remains valid. This is the research-HLE product,
+not promotion of normal `noki8290`, native speech or active-call power loss.
+
+Use the qualified PIN-enabled registered source and
+`fixtures/nsb7_host/nsb7hle.cfg` with `nsb7_power_cycle.lua`, an isolated
+MAME launch and110s guard. The script exits at101s. Validate with:
+
+```sh
+.venv/bin/python tools/nsb7_power_check.py roms/noki8290/8290f522a.fls tmp/nsb7-power-cycle-clean
+```
+
+The ring observer resets only its diagnostic cursor at55s, while rails are
+off; its capture index remains monotonic. Retaining the old cursor would
+misread reset-cleared words as zero-length packets. No guest memory,
+device state or decoded result is supplied by that reset. Boot-time context
+clears are also outside the separately delimited new Location Updating
+transaction; the shared consumer checker still requires its complete
+ordered downlink, acknowledgement and release-state sequence.
 
 ## Host-decided outgoing call
 
