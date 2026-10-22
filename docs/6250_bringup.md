@@ -700,6 +700,26 @@ checks and immutable predecessor artifacts pass. Capture:
 listed/unlisted/Off dial permissions are not qualified by this lifecycle gate;
 neither connected calls nor native speech follow from it.
 
+`make verify-6250-fdn-record-cold` adds physical protected Save and independent
+cold Search/Details to that complete validity regression. The record branch
+copies the complete organically activated On-phase NVRAM, not the later Off
+state with a rewritten flag; each launch records its source phase. Number list
+-> Add requires PIN25678, then number12345 and nameA. Final physical Save sends
+one UPDATE RECORD (`A0 DC 01 04 20`, selected6f3b), returns9000, rereads record1
+and displays Saved to SIM card. The cold process reads all ten FDN records,
+shows A/12345 through ordinary Search/Details and performs no PIN2 VERIFY or
+record write.
+
+The entire Save card differs only in the six encoded bytes of FDN record1;
+cold retrieval preserves it byte-for-byte. FDN validity, credentials, retries,
+ordinary ADN and the other nine FDN records stay unchanged. Six independent
+processes,42 reviewed validity/Save/detail/idle/menu frames, exact physical
+contacts, APDU targets/results/order, full inherited NVRAM, native/initial-record/
+registration/console-health checks and immutable predecessor artifacts pass.
+Capture: `tmp/nhm3-fdn-record-banked`. Edit, erase, cancellation, rejected
+record writes and dial permissions remain separate tests; no connected-call
+or native-speech claim is made.
+
 `make verify-6250-pin-request` qualifies physical Off/On persistence across
 three independent cold processes. The own route is Settings4 -> Security
 settings5 -> PIN code request1, then PIN1234, the On/Off list and confirmation.

@@ -938,6 +938,13 @@ processes authenticate/register, read ten FDN records and preserve complete
 card contents except expected location/validity transitions. Thirty reviewed
 frames and full NVRAM/predecessor checks pass. Protected record editing,
 rejected activation, dial permissions and connected calls are separate targets.
+`verify-6250-fdn-record-cold` additionally proves PIN2-protected physical Save
+of A/12345 to EF_FDN record1 and cold Search/Details without another PIN2
+verification or write. Its record branch inherits the organically activated
+On-phase NVRAM; full-card checks permit only six encoded record bytes to change
+and preserve the cold card exactly. Six processes and42 reviewed frames include
+the complete validity regression. Edit/erase/cancel/rejected writes and dial
+permissions remain separate targets.
 `verify-6250-pin-request` independently qualifies physical PIN-request Off/On
 and final cold PIN authentication in three processes with25 reviewed frames.
 The disabled card registers without startup VERIFY; a physical ENABLE CHV1

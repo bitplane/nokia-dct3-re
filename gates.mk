@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 773 gates: 575 generated from typed steps, 198 copied verbatim (shell).
+# 774 gates: 576 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -437,7 +437,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6250-pin2-retry-cold verify-6250-pin2-exhaustion \
 	verify-6250-puk2-recovery verify-6250-wrong-puk2-recovery \
 	verify-6250-puk2-permanent verify-6250-pin-request \
-	verify-6250-pin-change-cold verify-6250-fdn-cycle \
+	verify-6250-pin-change-cold verify-6250-fdn-cycle verify-6250-fdn-record-cold \
 	verify-6250-pin-host-incoming-call verify-6250-pin-host-incoming-sms \
 	verify-6250-pin-host-outgoing-call verify-6250-pin-host-outgoing-sms \
 	verify-6250-pin-phonebook verify-6250-pin-host-rejected-sms \
@@ -5201,6 +5201,9 @@ verify-6250-pin-change-cold: build
 
 verify-6250-fdn-cycle: build
 	$(VENV)/bin/python tools/run_noki6250_fdn.py $(RUN_DIR) --mame $(MAME_DIR)/mame
+
+verify-6250-fdn-record-cold: build
+	$(VENV)/bin/python tools/run_noki6250_fdn.py $(RUN_DIR) --records --mame $(MAME_DIR)/mame
 
 verify-6250-pin-host-incoming-call: build
 	$(VENV)/bin/python tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario host-incoming-call --coherent-cell --pin-enabled --mame $(MAME_DIR)/mame

@@ -27,7 +27,12 @@ local runner=coroutine.create(function()
     press('Left Softkey / Menu',34)
     for second=36,37 do press('Scroll Down',second) end
     press('Left Softkey / Menu',40)
-    if _G.nhm3_fdn_toggle then
+    if _G.nhm3_fdn_record_steps then
+        for _,step in ipairs(_G.nhm3_fdn_record_steps) do press(step[2],step[1]) end
+        local finish=assert(_G.nhm3_fdn_record_finish)
+        press('End',finish)
+        press('Left Softkey / Menu',finish+2)
+    elseif _G.nhm3_fdn_toggle then
         press(_G.nhm3_fdn_disable and 'Scroll Down' or 'Scroll Up',42)
         press('Left Softkey / Menu',44)
         for index=1,4 do press('Keypad '..('5678'):sub(index,index),46+index) end
