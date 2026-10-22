@@ -1,67 +1,37 @@
-# Nokia 8290 / NSB-7 inputs
+# Nokia 8290 / NSB-7 contracts
 
 ## Current boundary
 
-The acquired NSB-7 v5.22 package now has a qualified, contiguous MCU/PPM-A
-image. `noki8290` is a fail-closed MCU research configuration: it reaches
-the supervisor and renders the firmware's complete `CONTACT SERVICE`
-failure frame. Idle, organic keypad/SIM, registration, calls and SMS are
-not established for that fail-closed machine. The separate `nsb7hle`
-research composition, with own checksum-only journal repairs and a declared
-nominal VBATT input, reaches `Insert SIM card` and physically enters digit
-`1` into the dial editor with an empty socket. With the synthetic card
-inserted, SIMI startup file reads and the phone Security code editor
-reproduce across cold runs. A separate one-byte erased-retry fixture permits
-physical acceptance of the own-ROM default phone code and menu navigation.
-A separate PIN-enabled synthetic-card fixture qualifies physical wrong
-PIN, saved retry decrement and cold correct-PIN recovery to the phone-code
-prompt. Physical PIN exhaustion, failed-PUK retry, PUK recovery with a new
-PIN and cold replacement-PIN acceptance are also qualified. Physical
-SIM-card-security Off/On, cold PIN-request behavior and ordinary PIN1
-change/rejection/cold reuse pass. PIN2 change, rejected-current-PIN2
-isolation and cold reuse also pass, along with physical PIN2 exhaustion,
-failed-PUK2 retry retention and cold PUK2 recovery/reuse. Permanent PUK1
-exhaustion and cold card rejection are qualified. Permanent PUK2 exhaustion
-also retains ordinary PIN1 authentication and menus. An explicit extended
-card qualifies physical PIN2-authorized FDN On/cold-On/Off/cold-Off and
-protected Save/cold Details/rejected-write isolation, edit/cold edited-number
-retrieval and cancel/erase/cold-empty. Registered listed/unlisted/Off controls
-qualify FDN dial enforcement and permitted laboratory call signaling. AoC
-authorization remains separate work.
-PIN-enabled fresh/cold laboratory registration and a long wrong-PIN
-non-registration control are qualified as one coherent composition.
-The authenticated composition also qualifies physical incoming/outgoing calls,
-incoming SMS read/Reply, active incoming-call/SMS restoration and persistent
-phonebook save/cold Details retrieval with exact card and UI outcomes.
-Independent host-originated incoming SMS/read and host-decided outgoing Reply
-also pass through the shared WebSocket adapter without new device behavior.
-Host-originated incoming and host-decided outgoing call signaling separately
-pass from reviewed clean idle through physical Answer/dial/End, exact UI and
-correlated release. Connected incoming/outgoing host-call restoration also
-preserves exact handset state and rejects old-epoch commands before physical End.
-The opt-in PCS peer qualifies band measurements, candidate synchronization
-receiver-configuration acknowledgement and complete BCCH system-information
-parsing, CCCH setup, timed random-access completion and an accepted
-Immediate Assignment, dedicated-channel setup and an emitted Location
-Updating Request inside LAPDm SABM, followed by accepted contention-resolution
-UA and firmware link state `2 -> 4`. Location Updating Accept and Channel
-Release are acknowledged by firmware; EF_LOCI is updated over SIMI and
-retained, and the receiver returns to common control. Repeated empty paging
-blocks reach its RR decoder. An addressed page now produces the handset's
-own Paging Response after background measurement completion. Stable
-lab-registered idle presentation is qualified after physically selecting
-Net monitor test `00`, with own cold settings retention. Incoming SMS delivery,
-physical reading/deletion, cancellation, cold status retention and outgoing
-Reply submission are qualified below. Incoming-call
-control through physical Answer/End, CONNECT acknowledgement and release,
-plus physical outgoing dial/Send/End signalling, is qualified below;
-speech is not established.
-In the normal machine, DSP exchange/service replies are disabled; own internal
-ROM regions are explicitly undumped rather than attached sibling files.
-No PMM, resident DSP mask, hardware profile or provisioning is supplied by
-this normalization. The [Nokia 8290 user guide](https://www.instructionsmanuals.com/sites/default/files/2019-05/Nokia-8290-en.pdf)
-identifies the product as NSB-7 and GSM1900; the [NSB-7 service manual](https://www.manualslib.com/manual/2171641/Nokia-Nsb-7-Series.html)
-is the independent hardware-reference starting point.
+The qualified input is own NSB-7 v5.22 MCU/PPM-A. Product profiles have
+different acceptance boundaries; research results never promote the normal
+machine implicitly.
+
+| Profile | Demonstrated boundary |
+| --- | --- |
+| `noki8290` | Fail-closed supervisor and exact CONTACT SERVICE frame; DSP/service replies disabled, resident masks undumped. No phone-service acceptance. |
+| `nsb7stage` | Executes own verifier/loaders to missing resident DSP routine `2c75`; no fabricated completion. |
+| `nsb7hle` | Explicit own-upload-to-runtime HLE, own checksum/retry fixtures and nominal ADC2 hypothesis; physical and laboratory services qualified below. |
+
+| Research-HLE contract | Qualified coverage |
+| --- | --- |
+| UI and storage | Physical security code, menus, SIM phonebook save/cold retrieval, RTC retention and Net monitor00 clean idle. Own EEPROM journal rotation matches the complete runtime shadow. |
+| SIM security | PIN1/PIN2 change/rejection, retry persistence, exhaustion/PUK recovery and request Off/On. Permanent PUK1 rejects the card; permanent PUK2 retains ordinary PIN1/menu use. |
+| FDN | Explicit extended card; physical PIN2-authorized On/Off, Save/edit/erase/cancel and cold retrieval. Registered listed/unlisted/Off controls distinguish permitted calls from local denial. |
+| PCS laboratory network | Acquisition, BCCH, Location Updating/EF_LOCI, background measurements, addressed paging, physical incoming/outgoing CC/RR signaling and SMS delivery/read/delete/cancel/Reply. |
+| Authenticated composition | Physical PIN before fresh/cold registration, calls, SMS and phonebook; a long wrong-PIN control remains unregistered. |
+| Restoration | Exact ARM/banked registers, RAM/time, protocol replay and pixels at idle, connected call and active SMS boundaries, with physical continuation. |
+| External host | Independent incoming SMS/read and outgoing Reply decisions; incoming/outgoing call signaling from clean idle; connected-call restoration republishes a new epoch and rejects stale commands. |
+
+All provisioning is own-derived or explicitly synthetic external card data;
+no donor PMM, identity or firmware-state forcing is admitted. Native resident
+DSP execution, speech/COBBA, measured complete analog calibration, external
+RF and NSB-7 SIP acceptance remain unproved. Host failure/pending-call cases,
+AoC and SIM Toolkit are not established by these gates. Detailed contracts
+and their reproduction commands below own each coverage claim.
+
+The [Nokia 8290 user guide](https://www.instructionsmanuals.com/sites/default/files/2019-05/Nokia-8290-en.pdf)
+identifies NSB-7/GSM1900; the [NSB-7 service manual](https://www.manualslib.com/manual/2171641/Nokia-Nsb-7-Series.html)
+provides independent hardware-reference evidence, not missing provisioning.
 
 ## Qualified package contract
 
@@ -253,8 +223,8 @@ retained flash; the accepted checksum persists without another fixture write.
 The calibration-only fixture's screen remains CONTACT SERVICE: checksum
 validity is not sufficient to establish idle, nor does it make erased
 calibration into authentic factory data. The unprovisioned baseline remains
-protected separately. Next trace the surviving startup result and its owner,
-not another guessed DSP completion.
+protected separately. The independently required prefix checksum is defined
+below; a guessed DSP completion cannot replace either integrity contract.
 
 ## Prefix checksum and complete startup-result table
 
@@ -283,12 +253,12 @@ and full-shadow replay remain valid after a cold restart with the own
 retained flash. Flags at six seconds are `40`; the rendered frame is blank
 rather than CONTACT SERVICE, and the frame remains blank at 15 and 30 seconds
 with control `05` and flags `40`. Neither that flag nor blank pixels establish
-idle or input delivery. The remaining task is to recover the own keypad
-contract and test application activity physically, alongside the surviving
-startup continuation. The normal erased-storage baseline and native
-missing-resident-code boundary are unchanged.
+idle or input delivery. This checksum-only negative control lacks the nominal
+ADC input qualified below. The own keypad map and its physical acceptance
+are separate contracts; the normal erased-storage and native missing-code
+boundaries remain unchanged.
 
-## Keypad startup boundary
+## Keypad contract and full-scale-input negative control
 
 Own scanner `308240` scans five rows with no row-pin shift. Its normal
 table at `343d7c` and special table at `343d98` match the existing five-row
@@ -306,9 +276,9 @@ scanner IRQ or decode breakpoint. Global control remains `05`.
 
 `tools/nsb7_input_observe.lua` reproduces those physical contacts and
 read-only mask/initialization observations with the debugger enabled. It
-does not unmask columns or write guest state. The next question is which
-startup dependency releases that keypad state. Interactive boot remains
-unproven.
+does not unmask columns or write guest state. This masked-input control is
+not the selected nominal-ADC research profile; organic input delivery is
+qualified under that profile below.
 
 The saved return address at the mask write is `29eee7`, identifying direct
 caller `29eee2` (the other direct BL sites are `29ee14` and `29f0d6`). This
@@ -319,8 +289,8 @@ to be `0f`. Only after those tests does it call `30acf2` at `29efde`.
 Runtime writes establish state `6` at 2.189 seconds and readiness `0e`
 at 2.853 seconds. The report decoder maps `14/16/15/17` to bits `1/2/4/8`;
 the missing bit therefore belongs to report `14`, not a guessed key event.
-This identifies the next producer question without claiming that the
-readiness gate is the sole remaining UI dependency.
+This identifies the report-14 dependency of the full-scale-input control,
+not a missing report in the qualified nominal-ADC profile.
 
 `tools/nsb7_keypad_conformance.lua`, on a separate fresh `noki8290` run,
 tests 20 physical matrix contacts against all five row drives (100 scans),
@@ -329,7 +299,7 @@ is explicitly conformance evidence, not organic input delivery. Those
 checks pass; the normal failure-frame oracle and native `2c75` controlled
 stop also reproduce after the keypad configuration change.
 
-### Missing analog readiness report
+### Analog report-14 ownership
 
 Own wrapper `301f6c` clears its local diagnostic flag, then posts task
 `1` / report `14` through `289a38`. An aligned Thumb BL scan of the entire
@@ -350,9 +320,9 @@ that the physical charger input was asserted.
 
 State 3 entry `2472e0` distinguishes events `49` and `41`. On `49`, it
 tests its countdown and context byte `+0d`, then predicate `305800` before
-proceeding. Decode that predicate and the preceding power/ADC branch before
-changing board inputs; do not synthesize report `14`, unmask the keypad,
-or assert a charger cause to escape the branch. Raw analog defaults remain
+proceeding. The nominal channel-2 input below allows organic readiness;
+report `14`, keypad unmasking and charger causes must not be synthesized.
+The full electrical transfer and other raw analog defaults remain
 provisional. The NSB-7 service manual independently describes BLB-2 battery
 identification and a 100 kohm BSI pull-up, but does not establish the current
 emulator tuple as a measured NSB-7 electrical profile.
@@ -516,9 +486,9 @@ acceptance in each run, physical time-entry decodes and confirmation
 pixels, independently replayable own flash, the CCONT minute/hour
 contrast, and the fresh-controller time prompt. The retained-run pixel
 check deliberately covers only the top-right clock `(52,0)-(78,8)`;
-the remaining idle presentation is not promoted to an oracle.
-This qualifies own RTC/settings behavior, not full idle, calendar or alarm
-support. No device behavior, RTC seed, NV field or guest RAM was patched
+this clock-only gate makes no full-frame claim. The separate Net monitor00
+and settled-idle gates qualify clean idle pixels. Clock setting does not
+establish calendar or alarm support. No device behavior, RTC seed, NV field or guest RAM was patched
 to make the time-setting transaction succeed.
 
 ## Persistent SIM phonebook acceptance
@@ -1051,7 +1021,12 @@ still contains the radio-status overlay despite working softkey text and
 clock. The ordinary lab-registered idle frame is qualified separately
 after physical Net monitor disable below.
 
-### Addressed page: own identity accepted, RR continuation unresolved
+### Addressed-page identity/dispatch control without background completion
+
+This bounded control withholds background-measurement completion. It protects
+identity and RR-dispatch evidence, not the currently selected complete peer.
+The validated access continuation is defined in the background-measurement
+contract below.
 
 `fixtures/nsb7_page/nsb7hle.cfg` queues one laboratory page through the
 existing NETCFG input; it does not enable an incoming call or SMS. At
@@ -1072,9 +1047,9 @@ event `083e` at `2b3130`. Empty paging blocks return zero there.
 In the observed run, dispatch-record bytes begin `00fe010005eb000000`
 at that return boundary. The meaning of the `fe` byte is not assigned.
 There is no new type-0c CHANNEL REQUEST through 25 seconds: the runtime
-TX inventory remains 49 packets. The unresolved question is how the
-firmware's RR lifecycle advances after `083e`, not whether the page carries
-the correct subscriber identity or reaches the RR parser.
+TX inventory remains 49 packets. Identity matching and `083e` dispatch alone
+are insufficient for access; the required background completion is qualified
+below. The page identity and RR parser are not missing-peer hypotheses.
 
 `tools/nsb7_page_observe.lua` captures transport posts, pointed-to
 information, task-17 receive return, identity comparison and parser
@@ -1095,12 +1070,9 @@ outer state 4 and re-enters receive call `260c26`. Events `083f` and
 
 `tmp/nsb7-page-dispatch-qualified` proves the wrapper return, selected
 branch, flag update and cleared saved pointer, in addition to the IMSI
-match. The observer retains only these focused taps; the temporary
-time-window instruction-path trace and unconfirmed snapshot-restore
-hook were removed. `--addressed-page` now requires this continuation.
-The next question is which lifecycle exit from this state should initiate
-access, or whether a prerequisite to entering the ordinary paging-ready
-state remains incomplete. No missing hardware response is yet identified.
+match. `--addressed-page` requires this continuation.
+This bounded negative control does not satisfy the background-measurement
+prerequisite and must not be treated as the live paging frontier.
 
 A two-byte-aligned PC-relative literal-reference scan of own-ROM
 `25d000..261000` finds six comparisons against `083e`, at `25e666`,
@@ -1109,16 +1081,16 @@ load used to synthesize that event at `260af0`. This bounds the checked
 direct-literal surface, not indirect or arithmetic event selection.
 The alternative path at `260af4` can call `25f6de` only when API
 `200690(1)` returns 1, record `+3` is zero and record `+6` is not 1.
-The current `260c4c` path does not evaluate those conditions. Their
-ownership and the lifecycle selecting that alternative remain open.
+The `260c4c` path does not evaluate those conditions. The alternate branch's
+complete lifecycle is not decoded; it is not needed to explain the qualified
+background-completion path below.
 
 The serving-RSSI sufficiency experiment is falsified. In
 `tmp/nsb7-page-rssi`, the existing shared type-83 payload reaches own
 forwarder `2e49b4` and task 13 as message `1802`, with signed serving
 samples `c3/c4/c5`. The matching page still returns `083e`, sets the
 same flag and releases the same saved record, without a new access
-request through 25 seconds. The trial scheduling change was removed;
-the observer retains the bounded routing tap. This is not a proof that
+request through 25 seconds. This is not a proof that
 all task-13 readiness inputs are irrelevant or that measurement timing
 is correct. See `nsb7_serving_rssi_alone_unblocks_addressed_paging` in
 the falsification ledger.
@@ -1154,9 +1126,12 @@ task names or a claim that `07d4` means a particular GSM primitive.
 `tmp/nsb7-page-mm-request` and `--addressed-page` require this request
 chain, the writer and all three readiness values alongside the accepted
 IMSI and `083e` continuation. The `09c8` completion boundary is described
-below. Forcing `+6` clear would bypass that unanswered contract.
+below. Forcing `+6` clear would bypass the firmware-owned completion contract.
 
 ### Post-release service completion boundary
+
+The timeout observations here belong to the background-disabled control,
+not the qualified complete paging composition.
 
 Task 18's generic sender `22e28c` receives `09c8` from call `232052`
 (Thumb return `232057`) both before registration and after release.
@@ -1185,11 +1160,9 @@ prove that another DSP packet is required.
 
 `--addressed-page` additionally requires the two own caller observations,
 two service submissions, single completion, and `1584` then `1599`
-returns from the same task-18 record. The next investigation is what
-prevents task 13 completing the post-release `03ec`, compared with the
-earlier successful lifecycle. That boundary is resolved by the background
-measurement contract below; the bounded timeout fixture remains a negative
-control, not the currently selected peer coverage.
+returns from the same task-18 record in this withheld-completion control.
+The background-measurement contract below resolves the missing completion;
+the bounded timeout fixture is not the currently selected peer coverage.
 
 ### Background measurement completes paging-response access
 
@@ -1220,12 +1193,12 @@ The page-only network then releases the channel; this is not call setup.
 chain, the exact own Paging Response, both contention-echo consumers,
 69 bounded TX packets, no service timeout, and retained laboratory
 EF_LOCI. The cycle continues with another background request after the
-page-only release. Subsequent service-completion stability, incoming
-call/SMS and usable idle graphics remain separate acceptance work.
+page-only release. This page-only gate does not itself establish call/SMS
+or idle presentation; those independently qualified contracts follow below.
 The earlier serving-type-83 sufficiency falsification remains valid:
 this correction answers type 57 with type 8b, not periodic serving RSSI.
 
-### Incoming call setup: traffic configuration withheld
+### Incoming call setup and bounded pre-traffic evidence
 
 `fixtures/nsb7_incoming_call/nsb7hle.cfg` selects the existing laboratory
 incoming-call input instead of a page-only transaction. After the own
@@ -1300,8 +1273,8 @@ descriptor clear, UA and CONNECT ACK at both MCU consumers, ordered
 release parameter and common-control return. This proves laboratory
 incoming-call control and physical Answer/End, not native DSP speech,
 audio fidelity, external telephony or a usable call-screen image.
-The next independent service target is SMS delivery; extended repeated
-call/save-state qualification and display correctness remain separate.
+This signaling-only gate does not qualify call-screen pixels or restoration;
+the independent authenticated/host and state gates below supply those checks.
 
 ### Incoming SMS delivery and cold SIM readback
 
@@ -1771,9 +1744,9 @@ independently at startup in every run.
 Acceptance reuses the observed physical change parser with selector 2,
 adds explicit PIN2/PUK2 retry accounting, complete initial/final card
 comparisons and exact PIN2 success/error frames. The shared PIN1 branch
-is separately rerun. Exhaustion/PUK2 recovery are qualified below;
-FDN/AoC authorization and PIN2-specific save-state restoration remain
-separate work.
+is separately rerun. Exhaustion/PUK2 recovery and FDN authorization are
+qualified by their own contracts below, not by this credential-change gate.
+AoC authorization and PIN2-transaction save-state restoration are not covered.
 
 ### Physical PIN2 exhaustion and PUK2 recovery
 
@@ -1813,8 +1786,9 @@ in guest memory or preseeded to force an exhausted state.
 Acceptance covers decoded physical inputs, selectors 1/2, exact
 CHANGE/UNBLOCK/automatic-VERIFY commands, both credential families'
 retry fields, all six complete cold card pairs, own flash journals and
-blocked/error/accepted/changed pixel oracles. Permanent PUK2 exhaustion,
-FDN/AoC authorization and PIN2-specific save-state replay are not promoted.
+blocked/error/accepted/changed pixel oracles. Permanent PUK2 exhaustion and
+FDN authorization have separate acceptance below. This six-process gate does
+not establish AoC authorization or PIN2-transaction save-state replay.
 
 ## PIN-authenticated fresh and cold registration
 
