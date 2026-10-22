@@ -1925,9 +1925,9 @@ budget or be attributed to the descriptor.
 ### PIN-authenticated active SMS restoration
 
 `nsb7_pin_sms_state.lua` composes the same physical PIN/phone-code and cold
-registration with a save at 21.96 seconds, between the measured CP-ACK
-(21.952335) and RP-ACK (21.968092). Exact ARM/banked registers, RAM checksum,
-emulated time, three seconds of protocol replay and notification pixels
+registration with a save at 22.03 seconds, between the retained-clock CP-ACK
+(22.024441) and RP-ACK (22.040198). Exact ARM/banked registers, RAM checksum,
+emulated time, three seconds of protocol/CCONT replay and notification pixels
 match after restoration. Physical Menu at 26/28/30/32 seconds reads `hello`;
 the complete final card differs only by the delivered/read SMS record.
 The `--pin` checker bounds authentication and registration before the save,
@@ -1935,7 +1935,7 @@ not merely somewhere in the combined reference/replayed trace.
 
 ```sh
 .venv/bin/python tools/nsb7_state_check.py \
-  roms/noki8290/8290f522a.fls tmp/nsb7-pin-sms-state \
+  roms/noki8290/8290f522a.fls tmp/nsb7-ccont-sms-state-v2 \
   tmp/nsb7-pin-registration-cold --sms --pin
 ```
 
@@ -2193,9 +2193,15 @@ runner success alone is insufficient: require the combined checker too.
 
 ```sh
 .venv/bin/python tools/nsb7_host_sms_check.py \
-  roms/noki8290/8290f522a.fls tmp/nsb7-pin-host-sms-incoming \
-  tmp/nsb7-pin-host-sms-reply
+  roms/noki8290/8290f522a.fls tmp/nsb7-ccont-sms-in \
+  tmp/nsb7-ccont-sms-out
 ```
+
+The independent retained-clock repeats `tmp/nsb7-ccont-sms-in` and
+`tmp/nsb7-ccont-sms-out` pass this same checker without changing any message
+frame hashes, CP/RP acceptance or full-card expectations. They use the own
+unedited13:47:45 source. The separate authenticated SMS save/load repeat
+above retains its CP-ACK/RP-ACK boundary and now compares CCONT replay too.
 
 ## Host incoming call from settled idle
 

@@ -37,7 +37,7 @@ def check(text, call=False, sms=False, incoming_call=False, card=None, pin=False
     tokens = ('TX packet', 'RX enqueue', 'GSM service', 'sim_device:')
     if call or incoming_call:
         tokens += ('radio_l1:',)
-    if host and (call or incoming_call):
+    if sms or (host and (call or incoming_call)):
         tokens += ('ccont_rtc:', 'ccont_analog:')
     verify_roundtrip(text, tokens, 'NSB-7 '+scenario)
     if incoming_call:
