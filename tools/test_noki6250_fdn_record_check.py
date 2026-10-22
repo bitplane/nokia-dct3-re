@@ -7,12 +7,15 @@ from tools.noki6250_fdn_record_check import actions,check,check_frames,expected_
 
 def fixture(mode):
     initial=bytearray(initial_card(1))
-    final=bytearray(initial)
     record=bytearray(b'\xff'*32)
     record[0]=ord('A')
     record[18:23]=bytes.fromhex('04812143f5')
-    final[3578:3610]=record
-    if mode=='read':initial=bytearray(final)
+    if mode not in ('write','empty'):initial[3578:3610]=record
+    if mode in ('edited-read','cancel','erase'):initial[3600]=0xf6
+    final=bytearray(initial)
+    if mode=='write':final[3578:3610]=record
+    if mode=='edit':final[3600]=0xf6
+    if mode=='erase':final[3578:3610]=b'\xff'*32
     lines=[]
     for second,key in actions(mode):
         lines += [f'6250_fdn: key={key} state=1 t={second}.000000000',
@@ -25,27 +28,27 @@ def fixture(mode):
                           'SIM status ins=44 sw=9000 chv=3/3 puk=10/10 enabled=1']
             lines += [f'header cla=a0 ins=b2 p1={index:02x} p2=04 p3=20 selected=6f3b' for index in range(1,11)]
             lines.append('LAPDm Location Updating Accept acknowledged')
-        if mode=='write' and second==57:
+        if mode in ('write','edit','cancel','erase') and second=={'write':57,'edit':61,'cancel':62,'erase':62}[mode]:
             lines += ['header cla=a0 ins=20 p1=00 p2=02 p3=08',
                       'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1']
-        if mode=='write' and second==71:
+        if mode in ('write','edit','erase') and second=={'write':71,'edit':73,'erase':65}[mode]:
             lines += ['header cla=a0 ins=dc p1=01 p2=04 p3=20 selected=6f3b',
-                      'SIM status ins=dc sw=9000 chv=3/3 puk=10/10 enabled=1',
-                      'header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3b']
+                      'SIM status ins=dc sw=9000 chv=3/3 puk=10/10 enabled=1']
+            if mode!='erase':lines.append('header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3b')
     lines.append('6250_fdn: complete=1 firmware_state_forcing=0')
     return '\n'.join(lines),bytes(initial),bytes(final)
 
 
 class ProtectedFdnRecordTest(unittest.TestCase):
     def test_save_and_cold_details_preserve_the_exact_card(self):
-        for mode in ('write','read'):
+        for mode in ('write','read','edit','edited-read','cancel','erase','empty'):
             with self.subTest(mode=mode):check(*fixture(mode),mode)
         self.assertEqual(expected_card(True),fixture('write')[2])
-        for mode in ('edit','erase','wrong'):
+        for mode in ('bad','wrong'):
             with self.subTest(mode=mode),self.assertRaises(ValueError):actions(mode)
 
     def test_credentials_validity_other_records_and_required_contact_are_preserved(self):
-        for mode in ('write','read'):
+        for mode in ('write','read','edit','edited-read','cancel','erase','empty'):
             text,initial,final=fixture(mode)
             for which in ('initial','final'):
                 source=initial if which=='initial' else final
@@ -75,10 +78,20 @@ class ProtectedFdnRecordTest(unittest.TestCase):
             check(text+'\n'+header,initial,final,'read')
 
     def test_own_saved_and_cold_number_frames(self):
-        for mode,count in (('write',7),('read',5)):
+        for mode,count in (('write',7),('read',5),('edit',7),('edited-read',5),('cancel',6),('erase',6),('empty',4)):
             with patch('tools.noki6250_fdn_record_check.check_rgb_frame') as renderer:
                 check_frames(Path('/capture'),mode)
             self.assertEqual(len(renderer.call_args_list),count)
+
+    def test_cancel_never_updates_and_confirmed_erase_writes_only_blank_record(self):
+        text,initial,final=fixture('cancel')
+        self.assertEqual(initial,final)
+        for mutation in (text.replace('key=Right Softkey / C state=1 t=65.','key=Left Softkey / Menu state=1 t=65.'),
+                         text+'\nheader cla=a0 ins=dc p1=01 p2=04 p3=20 selected=6f3b'):
+            with self.assertRaises(ValueError):check(mutation,initial,final,'cancel')
+        text,initial,final=fixture('erase')
+        self.assertEqual(final[3578:3610],b'\xff'*32)
+        self.assertEqual(initial[:3578]+initial[3610:],final[:3578]+final[3610:])
 
 
 if __name__=='__main__':unittest.main()

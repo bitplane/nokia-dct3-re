@@ -696,9 +696,8 @@ retry allowances and record contents remain unchanged. Thirty reviewed own
 route/options/PIN2/result/idle/menu frames, physical contacts, file targets,
 selectors/results/order, full NVRAM inheritance, native/initial-record/console
 checks and immutable predecessor artifacts pass. Capture:
-`tmp/nhm3-fdn-banked`. Protected record editing, rejected activation and actual
-listed/unlisted/Off dial permissions are not qualified by this lifecycle gate;
-neither connected calls nor native speech follow from it.
+`tmp/nhm3-fdn-banked`. This validity-only gate does not qualify record writes
+or dial permissions; neither connected calls nor native speech follow from it.
 
 `make verify-6250-fdn-record-cold` adds physical protected Save and independent
 cold Search/Details to that complete validity regression. The record branch
@@ -716,9 +715,27 @@ ordinary ADN and the other nine FDN records stay unchanged. Six independent
 processes,42 reviewed validity/Save/detail/idle/menu frames, exact physical
 contacts, APDU targets/results/order, full inherited NVRAM, native/initial-record/
 registration/console-health checks and immutable predecessor artifacts pass.
-Capture: `tmp/nhm3-fdn-record-banked`. Edit, erase, cancellation, rejected
-record writes and dial permissions remain separate tests; no connected-call
-or native-speech claim is made.
+Capture: `tmp/nhm3-fdn-record-banked`. Editing and deletion have the separate
+record-lifecycle gate below; rejected writes and dial permissions remain open.
+
+`make verify-6250-fdn-record-lifecycle` extends the validity/Save/cold-read
+regression through protected Edit, cold edited Details, erase cancellation,
+confirmed erase and cold empty Search. Edit requires PIN2 and asks for name
+before number, unlike Add. Physical Clear/6/Save changes12345->12346 by exactly
+one encoded record byte; cold Details displays12346. Cancel authenticates PIN2
+and reaches Erase A?, but physical Back sends no UPDATE and preserves the
+complete edited card. Confirmed erase updates only record1 to32 erased bytes;
+the next cold process shows Fixed dialling list empty with FDN still On.
+
+Eleven independent processes and70 reviewed frames pass, including both smaller
+FDN gate paths. Whole-card/NVRAM/source/predecessor checks preserve credentials,
+retry allowances, ADN validity and all unrelated records. Every process retains
+its own native/initial-record, registration and console-health checks. The
+runner uses an explicit typed source/operation/timing plan, with tests protecting
+the original four-/six-process paths and the full cold-storage graph. Capture:
+`tmp/nhm3-fdn-record-lifecycle-banked`. Wrong-PIN2 record rejection, rejected
+activation and actual dial permissions remain unqualified; native speech and
+connected-call acceptance are not inferred from these storage tests.
 
 `make verify-6250-pin-request` qualifies physical Off/On persistence across
 three independent cold processes. The own route is Settings4 -> Security

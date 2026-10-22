@@ -16163,6 +16163,13 @@
                  "arguments": ["$(RUN_DIR)", "--records", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-fdn-record-lifecycle",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki6250_fdn.py",
+                 "arguments": ["$(RUN_DIR)", "--record-lifecycle", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6250-pin-host-incoming-call",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
