@@ -25,23 +25,28 @@ def actions(phase,*,rejected=False):
     return items
 
 
-def initial_card(phase,*,pin2_attempts=3,preserved=False):
+def initial_card(phase,*,pin2_attempts=3,preserved=False,record=None):
     actions(phase)
     if type(pin2_attempts) is not int or pin2_attempts not in (2,3):
         raise ValueError('FDN retry predecessor must have two or three PIN2 attempts')
     card=bytearray(extend(make_profile(True)+bytes.fromhex('00f110')+b'\xff'*43) if phase==0 and not preserved else extend(registered_card()))
     card[3575]=int(phase in (0,3))
     card[3517]=pin2_attempts
+    if record is not None:
+        if len(record)!=32:raise ValueError('FDN record must have32 bytes')
+        card[3578:3610]=record
     return bytes(card)
 
 
-def check(text,initial,final,phase,*,rejected=False,pin2_attempts=3,preserved=False):
+def check(text,initial,final,phase,*,rejected=False,pin2_attempts=3,preserved=False,record=None):
     items=actions(phase,rejected=rejected)
     expected=bytearray(extend(registered_card()))
     expected[3575]=int(phase>=2 or rejected)
     if phase%2:expected[3517]=pin2_attempts
     if rejected:expected[3517]=pin2_attempts-1
-    if initial!=initial_card(phase,pin2_attempts=pin2_attempts,preserved=preserved) or final!=bytes(expected):
+    expected_input=initial_card(phase,pin2_attempts=pin2_attempts,preserved=preserved,record=record)
+    if record is not None:expected[3578:3610]=record
+    if initial!=expected_input or final!=bytes(expected):
         raise ValueError('FDN lifecycle changed unrelated storage or lost inherited validity')
     result=0x9804 if rejected else 0x9000
     verifies=[(0x9000,3,10)]+([(result,3,10)] if phase%2==0 else [])

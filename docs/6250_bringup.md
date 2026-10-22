@@ -680,6 +680,12 @@ new directory. Raw MMIO remains in each error.log but is excluded from the
 security checker's query text; protocol, native boundary and error lines remain.
 No PIN2/PUK2, factory-provisioning or native-speech support is implied.
 
+#### Fixed dialling
+
+Validity, protected records and listed/unlisted/Off permissions are qualified
+on the explicit laboratory card. Allowed calls use the isolated automatic
+laboratory peer; these are research-HLE signaling results, not native speech.
+
 `make verify-6250-fdn-cycle` qualifies the own fixed-dialling validity lifecycle
 on the explicit extended laboratory SIM, not factory subscriber data. Settings4
 -> Security settings5 -> Fixed dialling3 opens the On/Off/Number list menu.
@@ -715,8 +721,8 @@ ordinary ADN and the other nine FDN records stay unchanged. Six independent
 processes,42 reviewed validity/Save/detail/idle/menu frames, exact physical
 contacts, APDU targets/results/order, full inherited NVRAM, native/initial-record/
 registration/console-health checks and immutable predecessor artifacts pass.
-Capture: `tmp/nhm3-fdn-record-banked`. Editing/deletion and rejected Add have
-separate gates below; dial permissions remain open.
+Capture: `tmp/nhm3-fdn-record-banked`. Editing/deletion, rejected Add and dialing
+have separate gates below.
 
 `make verify-6250-fdn-record-lifecycle` extends the validity/Save/cold-read
 regression through protected Edit, cold edited Details, erase cancellation,
@@ -733,9 +739,8 @@ retry allowances, ADN validity and all unrelated records. Every process retains
 its own native/initial-record, registration and console-health checks. The
 runner uses an explicit typed source/operation/timing plan, with tests protecting
 the original four-/six-process paths and the full cold-storage graph. Capture:
-`tmp/nhm3-fdn-record-lifecycle-banked`. Wrong-PIN2 activation/Add have the
-separate rejection gate below. Actual dial permissions remain unqualified;
-native speech and connected-call acceptance are not inferred from storage tests.
+`tmp/nhm3-fdn-record-lifecycle-banked`. Wrong-PIN2 activation/Add and dialing have
+separate gates below; call acceptance is not inferred from storage tests.
 
 `make verify-6250-fdn-rejections` qualifies wrong-PIN2 activation and protected
 Add, each followed by independent cold recovery of the actual lost allowance.
@@ -754,8 +759,29 @@ All eight independent processes,56 reviewed frames, exact contacts/selectors/
 results/order, complete card/NVRAM/source links, native/initial-record/
 registration/console-health and immutable predecessor checks pass. Capture:
 `tmp/nhm3-fdn-rejections-banked`. No completed credential phase was repeated.
-These are activation/Add rejection controls, not a claim about every editor;
-actual listed/unlisted/Off dial permissions remain a separate target.
+These are activation/Add rejection controls, not a claim about every editor.
+
+`make verify-6250-fdn-dial-controls` composes fresh validity and physical
+Save/cold Details with three independent dial controls. With FDN On and saved
+A/12345, physical12345/Send reaches the complete outgoing laboratory CC/RR
+lifecycle. Physical12346/Send on the same saved-On card displays Call not
+allowed and emits no CM Service Request, SETUP, traffic assignment, Connect
+or outgoing call-control message. A separate physical PIN2-protected Off
+preserves the contact; the next cold process dials12346 successfully through
+the complete outgoing lifecycle.
+
+Allowed cases check the actual SETUP digits, carrier19 traffic/release grammar,
+Connect/Acknowledge, physical End, clean release confirmation and returned
+paging. Every dial preserves the complete card, uses only startup PIN1 VERIFY,
+reads the ten FDN records and returns to Messages. Ten processes,60 reviewed
+frames and complete NVRAM/source/predecessor/native/initial-record/registration/
+console checks pass. Dial phases explicitly set only private `CALLHOST=0` to
+select the automatic lab peer, including when MAME omits that default port
+from saved config; other inputs and handset NVRAM are preserved. Capture:
+`tmp/nhm3-fdn-dial-banked`. This is not SIP, external RF or native speech
+acceptance, nor exhaustive prefix/wildcard/international-number coverage.
+
+#### PIN settings
 
 `make verify-6250-pin-request` qualifies physical Off/On persistence across
 three independent cold processes. The own route is Settings4 -> Security

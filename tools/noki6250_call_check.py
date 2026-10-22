@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check NHM-3 incoming-call signaling, not speech/audio fidelity."""
+"""Check NHM-3 call signaling, not speech/audio fidelity."""
 
 import argparse
 import hashlib
@@ -74,10 +74,12 @@ def verify(text: str, *, configured_carrier=False) -> None:
         raise ValueError("speech traffic continued after release confirmation")
 
 
-def verify_outgoing(text: str, number: str = "123", *, configured_carrier=False) -> None:
+def verify_outgoing(text: str, number: str = "123", *, configured_carrier=False,
+                    physical_send=r"6250_call_input: step=7 pressed=1",
+                    physical_end=r"6250_call_input: step=9 pressed=1") -> None:
     traffic, release = configured_radio_patterns()
     call.require_ordered(text, (
-        ("physical Send", r"6250_call_input: step=7 pressed=1"),
+        ("physical Send", physical_send),
         ("CM Service Request", outgoing.CM_SERVICE_REQUEST),
         ("CM Service Accept", outgoing.CM_SERVICE_ACCEPT),
         ("SETUP", outgoing.SETUP),
@@ -88,7 +90,7 @@ def verify_outgoing(text: str, number: str = "123", *, configured_carrier=False)
         ("remote Alerting", outgoing.ALERTING),
         ("network Connect", outgoing.CONNECT),
         ("Connect Acknowledge", outgoing.CONNECT_ACKNOWLEDGE),
-        ("physical End", r"6250_call_input: step=9 pressed=1"),
+        ("physical End", physical_end),
         ("Disconnect", outgoing.DISCONNECT),
         ("Release", outgoing.RELEASE),
         ("Release Complete", outgoing.RELEASE_COMPLETE),

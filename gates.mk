@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 776 gates: 578 generated from typed steps, 198 copied verbatim (shell).
+# 777 gates: 579 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -439,10 +439,11 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6250-puk2-permanent verify-6250-pin-request \
 	verify-6250-pin-change-cold verify-6250-fdn-cycle verify-6250-fdn-record-cold \
 	verify-6250-fdn-record-lifecycle verify-6250-fdn-rejections \
-	verify-6250-pin-host-incoming-call verify-6250-pin-host-incoming-sms \
-	verify-6250-pin-host-outgoing-call verify-6250-pin-host-outgoing-sms \
-	verify-6250-pin-phonebook verify-6250-pin-host-rejected-sms \
-	verify-6250-pin-host-silent-sms verify-6250-coherent-host-incoming-call \
+	verify-6250-fdn-dial-controls verify-6250-pin-host-incoming-call \
+	verify-6250-pin-host-incoming-sms verify-6250-pin-host-outgoing-call \
+	verify-6250-pin-host-outgoing-sms verify-6250-pin-phonebook \
+	verify-6250-pin-host-rejected-sms verify-6250-pin-host-silent-sms \
+	verify-6250-coherent-host-incoming-call \
 	verify-6250-coherent-host-outgoing-call \
 	verify-6250-coherent-host-incoming-sms verify-6250-coherent-host-outgoing-sms \
 	verify-6250-coherent-host-rejected-sms verify-6250-coherent-host-silent-sms \
@@ -5211,6 +5212,9 @@ verify-6250-fdn-record-lifecycle: build
 
 verify-6250-fdn-rejections: build
 	$(VENV)/bin/python tools/run_noki6250_fdn.py $(RUN_DIR) --rejections --mame $(MAME_DIR)/mame
+
+verify-6250-fdn-dial-controls: build
+	$(VENV)/bin/python tools/run_noki6250_fdn.py $(RUN_DIR) --dial-controls --mame $(MAME_DIR)/mame
 
 verify-6250-pin-host-incoming-call: build
 	$(VENV)/bin/python tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario host-incoming-call --coherent-cell --pin-enabled --mame $(MAME_DIR)/mame

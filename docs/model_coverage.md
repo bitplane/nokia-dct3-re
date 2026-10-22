@@ -936,8 +936,8 @@ on an explicit extended lab card. PIN2 gates ADN invalidation/rehabilitation;
 cold active-FDN boots perform their own identity-file rehabilitation. All four
 processes authenticate/register, read ten FDN records and preserve complete
 card contents except expected location/validity transitions. Thirty reviewed
-frames and full NVRAM/predecessor checks pass. Protected record editing,
-rejected activation, dial permissions and connected calls are separate targets.
+frames and full NVRAM/predecessor checks pass. That validity-only gate does
+not qualify record writes or calls; separate gates below do.
 `verify-6250-fdn-record-cold` additionally proves PIN2-protected physical Save
 of A/12345 to EF_FDN record1 and cold Search/Details without another PIN2
 verification or write. Its record branch inherits the organically activated
@@ -955,7 +955,15 @@ PIN2 attempt and cold-recovers from each complete two-attempt predecessor.
 Correct activation/Save reset allowances, and final cold Details retrieves
 A/12345. Eight processes and56 reviewed frames pass with full source/storage
 and immutable predecessor checks. This covers activation/Add rejection, not
-every editor. Actual listed/unlisted/Off dial permissions remain unqualified.
+every editor.
+`verify-6250-fdn-dial-controls` independently proves listed12345 reaches the
+complete outgoing lab CC/RR lifecycle, unlisted12346 with FDN On is locally
+rejected without call-control setup, and physical PIN2-protected Off allows
+12346 while preserving the saved contact. Ten processes and60 reviewed frames
+compose validity/Save/cold Details with complete card/source/predecessor checks.
+Dial cases explicitly use the private automatic lab peer (`CALLHOST=0`), not
+SIP or external RF. Native speech and exhaustive number-format coverage remain
+unproved.
 `verify-6250-pin-request` independently qualifies physical PIN-request Off/On
 and final cold PIN authentication in three processes with25 reviewed frames.
 The disabled card registers without startup VERIFY; a physical ENABLE CHV1

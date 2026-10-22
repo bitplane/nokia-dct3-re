@@ -5,6 +5,7 @@ from tools.make_sim_card_profile import make_profile
 from tools.sim_fdn_profile import extend
 from tools.noki6250_pin_retry_check import registered_card
 from tools.noki6250_fdn_check import actions,check,check_frames
+from tools.nsk3_phonebook_check import expected_record
 
 
 def fixture(phase,*,rejected=False,pin2_attempts=3,preserved=False):
@@ -40,6 +41,16 @@ def fixture(phase,*,rejected=False,pin2_attempts=3,preserved=False):
 
 
 class FdnLifecycleTest(unittest.TestCase):
+    def test_physical_off_preserves_a_saved_fdn_record(self):
+        text,initial,final=fixture(2)
+        before,after=bytearray(initial),bytearray(final)
+        before[3578:3610]=after[3578:3610]=expected_record()
+        check(text,bytes(before),bytes(after),2,preserved=True,record=expected_record())
+        with self.assertRaises(ValueError):check(text,bytes(before),bytes(after),2,preserved=True)
+        after[3578:3610]=b'\xff'*32
+        with self.assertRaises(ValueError):
+            check(text,bytes(before),bytes(after),2,preserved=True,record=expected_record())
+
     def test_rejected_activation_cannot_invalidate_adn_or_repair_pin2_attempts(self):
         text,initial,final=fixture(0,rejected=True)
         check(text,initial,final,0,rejected=True)
