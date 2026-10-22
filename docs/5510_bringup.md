@@ -90,6 +90,12 @@ pointer change, accumulator/T or status effect; stack and transfer banks
 also observe stack, program and I/O effects as applicable. These are
 fail-closed emulator contracts, not claims about silicon traps.
 
+The shared rejection fixture selects CMPT through ST1 bit 5. Its older
+setup instead toggled PMST bit 14, so prior `cmpt=2` output did not establish
+compatibility-mode coverage. All twelve profiles in the table below pass
+with the corrected setup. This correction does not alter the encoded-source
+legality rule or establish CMPT coverage for unrelated fixture helpers.
+
 | Profile | Rejection cases/restores | Selected scope |
 | --- | --- | --- |
 | `load-mod3-edge` | 9,728 | LD/LDU/LD TS/LDR/shift-16/DLD/variable LD; all ARs and destinations, all 32 variable shifts. |
@@ -102,6 +108,7 @@ fail-closed emulator contracts, not claims about silicon traps.
 | `logic-short` | 2,816 | AND/OR/XOR plus source-side MVDK, MVMD, PORTW, WRITA and MVDP; 576 positive logic cases run separately. |
 | `stack-mod3-edge` | 512 | LDM A/B, PSHM and PSHD; atomic prefix includes `489a` rejection; AR upper bits and SP retained. |
 | `pmac-mod3-edge` (`tms54xtra`) | 512 | MACP/MACD A/B; all ARs, CMPT modes, pages, frontends and two checkpoints; no data access or program/I/O write. |
+| `delay-mod3-edge` (`tms54xtra`) | 512 | LTD/DELAY source operands; all ARs, CMPT/TC settings, pages, frontends and two checkpoints; no source read, implicit successor write or pointer/T change. |
 
 Corrected positive load domains are:
 
@@ -132,6 +139,25 @@ These totals describe selected fixture domains, not every legal operand.
 Circular-input constraints have their own
 [contract](#circular-fixture-domains); modulo expectations alone are not
 silicon evidence.
+
+LTD and DELAY read `Smem` and copy to `Smem+1`; LTD also loads T
+([SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf), pages4-81/4-41).
+The implicit successor write does not make the encoded source a write operand.
+Their atomic handlers reject short `98..9f` before address modification or
+operand access. The unchanged core fails the matrix's first atomic case at
+the no-data-transaction assertion. An older default fixture had incorrectly
+treated `4d9b` as a valid preincrement read; its positive control now uses
+legal long MOD=13, `4deb 0001`, preserving the distinct two-cycle contract.
+This is fail-closed source admission, not a silicon-trap claim or new positive
+staged LTD/long-DELAY support. Other implicit-copy/RMW families still require
+their own role/encoding audit.
+
+After the guard, `delay-copy` and `delay-copy-ctrl` pass 15,360 and 73,728
+legal cases/restores. Native 5110 save/load and the 30-second RF boundary
+remain unchanged (20,280 frames, 648,032 reads, 1,537 port-32 writes);
+the default 3210 semantic acceptance also passes. The full pre-guard core
+control passed with the corrected legal long-DELAY fixture; it is not a
+post-guard full-core result.
 
 Operand role is essential. MVKD/MVDM, PORTR, MVPD and POPD encode a
 destination and must not inherit a read-only Smem restriction. In particular,

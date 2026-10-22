@@ -328,6 +328,10 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "delay-mod3-edge": (
+        "TMS320C54x delay MOD3 exclusions: PASS cases=512 restore=512 opcode_classes=2 arf=8 cmpt=2 initial_tc=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated delay MOD3 exclusions complete",
+    ),
     "pmac-mod3-edge": (
         "TMS320C54x program multiply MOD3 exclusions: PASS cases=512 restore=512 opcode_classes=4 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated program multiply MOD3 exclusions complete",
@@ -2294,7 +2298,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("mvdd-follow", "st-acc-mvmm", "shift16-load-age", "addsub-ar-age", "bd-read-a", "mac-map-imm", "tc-delay-call", "tmac-repeat", "tmac-rpt-edge", "lms", "lms-edge", "addm-ar-short", "bd-maca-long", "bd-maca-edge", "push-mvmm-sp"):
         machine = "tms54xtra"
-    if args.profile in ("pmac-mod3-edge","store-observe","push-observe","dual-sub-native"):
+    if args.profile in ("pmac-mod3-edge","delay-mod3-edge","store-observe","push-observe","dual-sub-native"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
