@@ -677,11 +677,34 @@ no payload/object access, sample production or input advancement; it cannot
 be a deferred-output drain. Method10's complete13-word body at`023ef8` only
 copies caller record word10 to object word1. Method9's first13 words at
 `023e64` publish object word1 back to record word10 and set record word1 to
-`0400`; its remaining metadata computation is not decoded by this contract.
+`0400`. Its complete local body is separately pinned below.
 Neither a no-op post-frame call nor that one-field restoration is evidence
 for an EOF operation. The table prefix is not a proven total table bound,
 and other controls/upstream end-buffer ownership remain open; this result
 does not authorize changing object word1 or invoking reset to discard a tail.
+
+`decoder_info_body` extends method9 through its FRET at`023ef7`:148 local
+words,32 numeric-table words and22 AA55 helper-identity words,202 total.
+The local body reads object words1/4/8 and writes caller record words1..10.
+When BA4F is zero or BA51 is nonzero, it publishes fixed record fields:
+word1=`0400`, word2=`0485`, word3=0, double words4..5=128000 and6..7=44100,
+word8=2, word9=0 and word10=object[1]. The other path multiplies A89E by6
+into AR2 and reads a double word at`AR2+C152`; the incoming multiplier
+status, including FRCT, remains an unclosed ABI input to that offset.
+It conditionally copies A874 and walks adjacent numeric
+levels at`c6a2` using AR3 initialized14. The16 pinned levels run from8000
+through384000 followed by`7fffffff`; these are source quantities, not a
+new physical-rate or format-conformance claim. The final path updates
+record word2 through helper`029bdd`, copies A89C to word8 and object[8] to9.
+
+The local body has no sample loop or input-buffer advance. It does call
+`002096` and`029bdd`, so this is not a whole-call write/EOF absence proof.
+The first target is available in the original AA55 bootstrap:
+`2096: FB 003518`, followed by a complete20-word stack/register routine at
+3518. That resolves its source identity without inventing resident ROM.
+Arithmetic/call-side-effect closure of both helpers and native invocation of
+method9 remain separate acceptance targets. Every pinned source/table/helper
+word has a mutation test, including removal of the terminating FRET.
 
 ### Declared Packet-Lookahead Control
 

@@ -713,6 +713,54 @@ DECODER_INFO_PREFIX = (0x4a11,0xeefb,0xf495,0x7108,0x0014,0x8811,
 DECODER_INFO_RESTORE_BASE = 0x23ef8
 DECODER_INFO_RESTORE = (0x4a11,0xeeff,0xf495,0x7104,0x0012,0x8811,
                        0x10e2,10,0x80e1,1,0xee01,0x8a11,0xf4e4)
+DECODER_INFO_BODY = DECODER_INFO_PREFIX + (
+    0x7712,0,0x10f8,0xba4f,0xf845,0x3e7d,0x10f8,0xba51,0xf844,0x3e7d,0x7712,1,
+    0x70e4,3,0x0012,0x6c82,0x3e99,0xf6b8,0xf495,0xf020,0xac44,0x4ee4,6,
+    0xf062,1,0xf040,0xf400,0x4ee4,4,0x76e4,2,0x0485,0x76e4,8,2,
+    0x76e4,9,0,0xf073,0x3ef5,0x62f8,0xa89e,6,0x8812,0xf495,0xf495,
+    0x56e2,0xc152,0x4ee4,6,0x10f8,0xba4e,0xf845,0x3eb1,0x57f8,0xa874,
+    0xf7b8,0xf640,0xf468,0xf478,0xf845,0x3eb1,0x4fe4,4,0x71e1,4,0x0012,
+    0x6c82,0x3ebb,0x76e4,3,0,0xf073,0x3ee4,0xf7b8,0x10f8,0x0012,0x4e00,
+    0x56e4,6,0xf980,0x2096,0xf7b8,0xf468,0xf478,0xf57b,0xf3f6,0xf3f0,0xf600,
+    0xf47a,0x4e02,0x7712,0xc6a2,0x7713,0x000e,0x5602,0x5702,0x58e2,2,
+    0x5582,0xf468,0xf768,0xf478,0xf778,0xf520,0xf84b,0x3ee1,0x6dea,2,
+    0x6ceb,0xffff,0x3ed0,0x5682,0x4ee4,4,0xe860,0x4e00,0x56e4,4,
+    0xf982,0x9bdd,0xf000,1,0x80e4,2,0x70e4,8,0xa89c,0x10e1,8,
+    0x80e4,9,0xee05,0x8a11,0xf4e4)
+DECODER_INFO_LEVEL_BASE = 0xc6a2
+DECODER_INFO_LEVELS = (8000,16000,24000,32000,40000,48000,56000,64000,
+                       80000,128000,160000,192000,256000,320000,384000,0x7fffffff)
+DECODER_INFO_HELPER_VECTOR = (0xf880,0x3518)
+DECODER_INFO_HELPER_BODY = (0xf495,0x4a0b,0x4a0c,0x4a0d,0x4a0e,0xeefc,
+    0xf495,0x4e00,0x310b,0x440a,0x3501,0x240b,0xf76f,0xf601,
+    0xee04,0x8a0e,0x8a0d,0x8a0c,0x8a0b,0xf4e4)
+
+
+def decode_decoder_info_body(words,bootstrap):
+    levels=tuple(part for value in DECODER_INFO_LEVELS for part in (value>>16,value&0xffff))
+    for image,base,witness in (
+            (words,DECODER_INFO_PREFIX_BASE,DECODER_INFO_BODY),
+            (words,DECODER_INFO_LEVEL_BASE,levels),
+            (bootstrap,0x2096,DECODER_INFO_HELPER_VECTOR),
+            (bootstrap,0x3518,DECODER_INFO_HELPER_BODY)):
+        if any(image.get(base+offset)!=value for offset,value in enumerate(witness)):
+            raise ValueError('decoder info body, numeric table or bootstrap helper changed')
+    return dict(method=9,entry='023e64',last_word='023ef7',body_words=len(DECODER_INFO_BODY),
+        pinned_words=len(DECODER_INFO_BODY)+len(levels)+2+len(DECODER_INFO_HELPER_BODY),
+        local_record_writes=[1,2,3,4,5,6,7,8,9,10],
+        local_object_reads=[1,4,8],
+        fallback=dict(condition='BA4F == 0 or BA51 != 0',
+                      record_fields={'1':0x400,'2':0x485,'3':0,'4..5':128000,
+                                     '6..7':44100,'8':2,'9':0,'10':'object[1]'}),
+        active=dict(record3='BA4F != 0 and BA51 == 0; later cleared if object[4] == 0',
+                    record6='MPY A89E,#6 -> AR2; DLD *AR2(C152); offset depends on incoming multiplier status (FRCT included)',
+                    optional_record4='A874 double word when BA4E and its signed low32 projection are nonzero',
+                    numeric_table=dict(base='00c6a2',values=list(DECODER_INFO_LEVELS),
+                                       loop='AR2 starts C6A2, AR3 starts14; compare adjacent double words, advance by2'),
+                    tail='record[2] <- helper029bdd(record[4..5],96)+1; record[8] <- A89C; record[9] <- object[8]'),
+        calls=[dict(site='023ec1',target='002096',source='AA55 trampoline2096 -> 003518',
+                    witness_words=22),dict(site='023ee8',target='029bdd',source='AA99')],
+        scope='Complete local body/table and first helper source identity; metadata-oriented local flow, not native execution, helper arithmetic closure, whole-call write closure or absence of all EOF/drain controls')
 
 
 def decode_decoder_method_prefix(words):
@@ -731,7 +779,7 @@ def decode_decoder_method_prefix(words):
                     data_effects='return-stack consumption only; no payload/object access, sample production or buffer advancement'),
                 info_prefix=dict(method=9,entry='023e64',object='A -> AR1',record='caller SP[0] -> AR4',
                                  operations='record[1] <- 0400; record[10] <- object[1]',
-                                 scope='First13 words only; remaining rate/channel metadata path not decoded here'),
+                                 scope='First13-word sub-contract; complete local body is decoder_info_body'),
                 info_restore=dict(method=10,entry='023ef8',object='A -> AR1',record='caller SP[0] -> AR2',
                                   operations='object[1] <- record[10]',
                                   scope='Complete13-word body; no call, sample loop or EOF predicate'),
@@ -2488,6 +2536,7 @@ def contract(source):
     result['decoder_mapped_alu'] = decode_decoder_mapped_alu(rel_words)
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
     result['decoder_method_prefix'] = decode_decoder_method_prefix(rel_words)
+    result['decoder_info_body'] = decode_decoder_info_body(rel_words,bootstrap_words)
     result['pcm_conversion'] = decode_pcm_conversion(rel_words)
     recorder_words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa88')
     result['recorder_stop_frontend'] = decode_recorder_stop_frontend(recorder_words)

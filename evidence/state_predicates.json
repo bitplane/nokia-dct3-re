@@ -1934,6 +1934,12 @@
       "evidence": ["docs/8290_bringup.md", "tools/nsb7_host_ussd_restore.lua", "tools/nsb7_host_ussd_observe.lua", "tools/nsb7_host_ussd_check.py", "tools/nsb7_state_check.py", "tools/test_nsb7_host_ussd_check.py", "tools/run_host_ussd_gate.py", "tools/test_run_host_ussd_gate.py"]
     },
     {
+      "id": "mu4_aac_decoder_info_body_contract", "owner": "native_music_dsp", "status": "satisfied",
+      "predicate": "Original AAC method9 has a complete local source/metadata-table contract and an independently located AA55 helper source, without claiming helper arithmetic or full EOF closure",
+      "current": "The source-hash-qualified report pins148 AA99 words023e64..023ef7,32 numeric-table words atc6a2 and22 AA55 words for2096 FB003518 plus the complete20-word helper body. Local object reads1/4/8 and record writes1..10, the fixed44100/128000 fallback, active table walk and two calls002096/029bdd are explicit. The table-offset MPY retains an unclosed incoming FRCT/status dependency. The bootstrap source resolves the first call without a fabricated resident image. Every one of202 words rejects mutation and a missing final FRET fails. This is static local/source-identity coverage, not native method9 execution, helper arithmetic/side-effect closure, codec conformance or absence of all EOF/drain mechanisms. Existing strict audio-completion failure and source-input boundary remain unchanged.",
+      "evidence": ["docs/aac_validation.md", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py"]
+    },
+    {
       "id": "nam1_display_frontier", "owner": "nam1_firmware", "status": "satisfied",
       "predicate": "Nokia 3610 v5.11 organically reaches a deterministic firmware-rendered display boundary through product-owned GENSIO and geometry contracts",
       "current": "NAM-1 independently writes GENSIO control 0x22 at 0x2d, transfers CCONT bytes at 0x2c and polls 0x6d. Byte-write receive-ready releases that loop. Firmware then writes nine 96-byte display banks; a 96x65 visible area with reversed segment order renders the complete CONTACT SERVICE frame. Separate gates prove DSP bootstrap/service control, request-derived discovery, accepted application sequences 0x42/0x43, channel-0x5f use and a complete physical M2BUS terminal exchange. Missing product state remains the next boundary.",
