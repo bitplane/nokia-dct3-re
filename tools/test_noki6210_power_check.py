@@ -14,11 +14,14 @@ def sample(wake_time=40):
     text += ('6210_power_physical: action=restart_press\n'
              f'ccont_power: event=wake cause=02 t={wake_time}.02\n'
              'ccont_power: event=cause_read data=13\n'
-             'ccont_rtc: event=counter_write reg=07 data=00\n'
+             'ccont_analog: event=control_write reg=07 data=00\n'
              '6210_power_physical: action=restart_release\n'
              '6210_power_physical: action=menu\n'
              '6210_keypad_decoded: key=19\n')
-    return text
+    resumed=''.join(f'ccont_rtc: event=second time=12:{second//60:02d}:{second%60:02d} '
+                    f'day=0 status=13 mask=70 t={second}.0\n'
+                    for second in range(wake_time+1,wake_time+4))
+    return text.replace('6210_power_physical: action=menu',resumed+'6210_power_physical: action=menu')
 
 
 class PowerTest(unittest.TestCase):
@@ -69,12 +72,16 @@ class PowerTest(unittest.TestCase):
                 sample().replace('cause=02', 'cause=04'),
                 sample().replace('cause_read data=13', 'cause_read data=15'),
                 sample().replace('event=off t=31.68', 'event=off t=33.68'),
-                sample().replace('counter_write reg=07 data=00', 'counter_write reg=07 data=01'),
+                sample().replace('control_write reg=07 data=00', 'control_write reg=07 data=01'),
                 sample().replace('key=19', 'key=0d'),
                 sample().replace('action=restart_press', 'action=charger_connect'),
                 sample() + '[LUA ERROR] broken\n'):
             with self.subTest(text=broken), self.assertRaises(ValueError):
                 self.verify(broken)
+
+    def test_post_wake_seconds_reset_rejected(self):
+        with self.assertRaisesRegex(ValueError,'continuous after wake'):
+            self.verify(sample().replace('time=12:00:41','time=12:00:01'))
 
 
 if __name__ == '__main__':

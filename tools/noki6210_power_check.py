@@ -52,8 +52,15 @@ def verify(text, storage, *, minimum_off=8):
     cause = re.search(r'ccont_power: event=cause_read data=(\w+)', after)
     if not cause or int(cause[1], 16) & 7 != 3:
         raise ValueError('NPE-3 did not consume ready/PWRONX without charger')
-    if not re.search(r'ccont_rtc: event=counter_write reg=07 data=00\b', after):
-        raise ValueError('NPE-3 seconds reinitialization is absent')
+    if not re.search(r'ccont_analog: event=control_write reg=07 data=00\b', after):
+        raise ValueError('NPE-3 acquisition-control initialization is absent')
+    after_ticks=re.findall(tick_pattern,after)[:3]
+    resumed=ticks[-1:]+after_ticks
+    if len(after_ticks)!=3 or any(
+            float(right[4])-float(left[4])!=1 or
+            rtc_seconds(right)-rtc_seconds(left)!=1
+            for left,right in zip(resumed,resumed[1:])):
+        raise ValueError('NPE-3 RTC did not remain continuous after wake')
     for boot in (before, after):
         verify_stage(boot, runtime=True, selftest=True)
     check_registration(before, storage)

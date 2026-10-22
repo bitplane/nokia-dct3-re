@@ -1265,6 +1265,8 @@ FIQ0 notifications, native port activity or radio LAPDm output. This exceeds
 the last 49-second watchdog reload and prevents an old counter from silently
 rebooting the supposedly off domain. RTC progression is anchored to the last
 pre-shutdown tick, including minute rollover, not an assumed clock origin.
+The same continuity is required for three ticks after wake. The independent
+address07 acquisition-control initialization must not reset RTC seconds.
 
 A separate physical Power press at 90 s restores the digital domain through
 PWRONX cause `02`, not a charger event. Firmware consumes ready/PWRONX
@@ -1306,8 +1308,9 @@ processes must pass the own upload/self-test and registration checks; the
 cold process must consume retained EF_LOCI. Both retain CCONT hour/minute
 `13:47` and render the reviewed Calendar hash
 `fcf0327cc0cc4edb952d0dc37621e467c0810b867738de6c91f39354a9c3a3b3`.
-Firmware resets seconds during cold initialization, but does not replace
-hour/minute. This proves deterministic retained time/date, not elapsed
+The earlier seconds-reset interpretation of address07 was invalid: its
+write side is acquisition control, independent of the RTC seconds read.
+Retained minute/hour and calendar claims do not establish elapsed
 offline time or boundary-date arithmetic. Eight checker tests cover
 missing/reordered inputs, missing time-register programming, cold replacement,
 bad RTC data and midnight/day-consumption ordering.

@@ -71,22 +71,30 @@ def verify(text, storage, *, restore_off=False):
     interval = text[off.end():wake.start()]
     if float(wake[2]) - float(off[1]) < 6:
         raise ValueError('digital rail-off interval is too short to test sustained silence')
-    rtc = re.search(r'ccont_rtc: event=second time=12:00:52 day=0[^\n]*t=([0-9.]+)', interval)
-    if not rtc or not float(off[1]) < float(rtc[1]) < float(wake[2]):
-        raise ValueError('RTC did not tick with the digital rail off')
-    ticks = re.findall(r'ccont_rtc: event=second time=12:00:(\d+) day=0[^\n]*t=([0-9.]+)', interval)
-    if len(ticks) < 6 or any(int(second) != float(when) for second, when in ticks) or any(
-            float(right[1]) - float(left[1]) != 1 for left, right in zip(ticks, ticks[1:])):
+    tick_pattern=r'ccont_rtc: event=second time=(\d+):(\d+):(\d+) day=(\d+)[^\n]*t=([0-9.]+)'
+    before_ticks=re.findall(tick_pattern,text[:off.start()])
+    ticks=re.findall(tick_pattern,interval)
+    timeline=before_ticks[-1:]+ticks
+    def seconds(row):
+        hour,minute,second,day,_=map(float,row)
+        return day*86400+hour*3600+minute*60+second
+    def continuous(rows):
+        return all(int(h)<24 and int(m)<60 and int(s)<60 for h,m,s,_,_ in rows) and all(
+            float(right[4])-float(left[4])==1 and seconds(right)-seconds(left)==1
+            for left,right in zip(rows,rows[1:]))
+    if not before_ticks or len(ticks)<6 or not continuous(timeline) or any(
+            not float(off[1])<float(row[4])<float(wake[2]) for row in ticks):
         raise ValueError('always-powered RTC did not continue across the sustained off interval')
     require_endpoint_silence(interval, 'DSP/radio endpoint generated activity while its rail was off')
     after = text[wake.end():]
     cause = re.search(r'ccont_power: event=cause_read data=(\w+)', after)
     if not cause or int(cause[1], 16) & 7 != 3:
         raise ValueError('firmware did not consume ready/PWRONX without charger cause')
-    # This ROM deliberately resets seconds through GENSIO after waking.
-    # Retained hardware counters are not a claim of untouched software time.
-    if not re.search(r'ccont_rtc: event=counter_write reg=07 data=00\b', after):
-        raise ValueError('missing firmware-owned seconds reinitialization')
+    if not re.search(r'ccont_analog: event=control_write reg=07 data=00\b', after):
+        raise ValueError('missing acquisition-control initialization')
+    after_ticks=re.findall(tick_pattern,after)[:3]
+    if len(after_ticks)!=3 or not continuous(ticks[-1:]+after_ticks):
+        raise ValueError('RTC did not remain continuous after wake')
     verify_stage(text[:wake.start()], runtime=True, selftest=True)
     verify_stage(after, runtime=True, selftest=True)
     verify_registration(text[:wake.start()], configured_gsm900=True)

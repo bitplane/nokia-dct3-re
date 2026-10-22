@@ -1506,7 +1506,11 @@ CCONT ticks while the CPU is off and supplies PWRONX cause `02`; firmware
 reads ready/PWRONX/RTC status `13`, re-executes its own native uploads before
 the explicit missing-mask HLE handoff and clears self-test faults normally.
 Passive debugger log caps are re-armed for the second boot, never firmware
-registers or RAM. The ROM explicitly writes RTC seconds `07=00` after wake.
+registers or RAM. The ROM writes acquisition control `07=00` after wake;
+the RTC read counter at the same address is independent. The checker anchors
+off-state ticks to the last pre-off sample and requires three continuous
+post-wake samples, including minute rollover, rather than assuming RTC
+seconds equal elapsed emulation time or accepting a seconds reset.
 Physical `12345`/Menu then reaches the reviewed ordinary idle frame without
 re-entering time/date. This is modeled in-process state retention, not
 battery-backed cold-process clock or calendar persistence.

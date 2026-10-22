@@ -9,6 +9,7 @@ from tools import noki8890_power_check as check
 def sample():
     text = '''8890_power_physical: action=shutdown_press
 8890_power_physical: action=shutdown_release
+ccont_rtc: event=second time=12:00:51 day=0 status=13 mask=50 t=51.0
 ccont_power: event=off t=51.4
 '''
     for second in range(52, 59):
@@ -17,9 +18,11 @@ ccont_power: event=off t=51.4
 8890_power_physical: action=restart_press
 ccont_power: event=wake cause=02 t=58.02
 ccont_power: event=cause_read data=13
-ccont_rtc: event=counter_write reg=07 data=00
+ccont_analog: event=control_write reg=07 data=00
 8890_power_physical: action=restart_release
 '''
+    for second in range(59,62):
+        text+=f'ccont_rtc: event=second time=12:{second//60:02d}:{second%60:02d} day=0 status=13 mask=50 t={second}.0\n'
     for index in range(1, 6):
         text += f'8890_power_security: key=Keypad {index}\n8890_keypad_decoded: key={index:02x}\n'
     return text + '8890_power_security: key=Menu\n8890_keypad_decoded: key=19\n'
@@ -93,7 +96,8 @@ class PowerTest(unittest.TestCase):
             sample().replace('cause_read data=13', 'cause_read data=15'),
             sample().replace('event=off t=51.4', 'event=off t=52.01'),
             sample().replace('time=12:00:52', 'time=12:00:00'),
-            sample().replace('counter_write reg=07 data=00', 'counter_write reg=07 data=01'),
+            sample().replace('control_write reg=07 data=00', 'control_write reg=07 data=01'),
+            sample().replace('time=12:00:59', 'time=12:00:01'),
             sample().replace('action=restart_press', 'action=charger_connect'),
             sample().replace('key=03', 'key=04'),
             sample() + 'ccont_power: event=wake cause=02 t=80.0\n',

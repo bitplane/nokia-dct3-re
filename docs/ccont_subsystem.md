@@ -410,9 +410,10 @@ firmware keypad path. Wake assertion has no recovered debounce/delay model.
 LCD, a ticking CCONT during CPU rail-off, physical PWRONX restart and a
 firmware status read containing ready/PWRONX without charger cause. Both
 native upload/HLE handoffs and subsequent physical security entry to idle
-are checked. The earlier claim that NSB-6 resets RTC seconds after wake
-depended on the disproven address07 read/write symmetry; requalify that
-workflow's counter expectations under the independent acquisition latch.
+are checked. The requalified NPE-3 and NSB-6 power gates require continuous
+RTC progression through wake and the independent acquisition-control write;
+neither accepts the former address07 seconds-reset interpretation. NSB-6's
+powered-off restore additionally retains exact RTC replay and endpoint silence.
 Retained device state is not a claim of untouched software time or cold
 calendar persistence. The DSP backend power-off boundary stops HLE service,
 packet, response, keepalive and speech timers, native DSP execution and its
