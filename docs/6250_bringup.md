@@ -680,6 +680,26 @@ new directory. Raw MMIO remains in each error.log but is excluded from the
 security checker's query text; protocol, native boundary and error lines remain.
 No PIN2/PUK2, factory-provisioning or native-speech support is implied.
 
+`make verify-6250-fdn-cycle` qualifies the own fixed-dialling validity lifecycle
+on the explicit extended laboratory SIM, not factory subscriber data. Settings4
+-> Security settings5 -> Fixed dialling3 opens the On/Off/Number list menu.
+Physical On and PIN25678 invalidate EF_ADN (`A0 04`, selected6f3a) and display
+Fixed dialling on. A cold process inherits that exact card and displays On;
+firmware rehabilitates EF_LOCI/EF_IMSI during bring-up. Physical Off and PIN2
+rehabilitate EF_ADN (`A0 44`, selected6f3a); another cold process displays Off
+without the active-FDN identity rehabilitation.
+
+All four processes authenticate PIN1 and register. Only toggles VERIFY CHV2,
+and all ten FDN records are read and preserved. Complete-card comparisons allow
+only the expected initial registration and ADN-validity transitions; credentials,
+retry allowances and record contents remain unchanged. Thirty reviewed own
+route/options/PIN2/result/idle/menu frames, physical contacts, file targets,
+selectors/results/order, full NVRAM inheritance, native/initial-record/console
+checks and immutable predecessor artifacts pass. Capture:
+`tmp/nhm3-fdn-banked`. Protected record editing, rejected activation and actual
+listed/unlisted/Off dial permissions are not qualified by this lifecycle gate;
+neither connected calls nor native speech follow from it.
+
 `make verify-6250-pin-request` qualifies physical Off/On persistence across
 three independent cold processes. The own route is Settings4 -> Security
 settings5 -> PIN code request1, then PIN1234, the On/Off list and confirmation.

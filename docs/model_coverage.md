@@ -931,6 +931,13 @@ physical Settings changes across four processes, with9804/9804/9840 results,
 44 exact frames and complete-card preservation apart from retry loss. PIN1
 authentication, coherent registration and physical Menu remain usable; both
 PUK allowances stay10.
+`verify-6250-fdn-cycle` independently proves physical FDN On/cold-On/Off/cold-Off
+on an explicit extended lab card. PIN2 gates ADN invalidation/rehabilitation;
+cold active-FDN boots perform their own identity-file rehabilitation. All four
+processes authenticate/register, read ten FDN records and preserve complete
+card contents except expected location/validity transitions. Thirty reviewed
+frames and full NVRAM/predecessor checks pass. Protected record editing,
+rejected activation, dial permissions and connected calls are separate targets.
 `verify-6250-pin-request` independently qualifies physical PIN-request Off/On
 and final cold PIN authentication in three processes with25 reviewed frames.
 The disabled card registers without startup VERIFY; a physical ENABLE CHV1
