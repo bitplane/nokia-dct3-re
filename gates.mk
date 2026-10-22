@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 747 gates: 549 generated from typed steps, 198 copied verbatim (shell).
+# 748 gates: 550 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -102,7 +102,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6210-puk-retry-cold verify-6210-puk-permanent verify-6210-pin2-change \
 	verify-6210-pin2-change-cold verify-6210-pin2-retry-cold \
 	verify-6210-pin2-exhaustion verify-6210-puk2-recovery \
-	verify-6210-puk2-retry-cold verify-6210-puk2-permanent \
+	verify-6210-puk2-retry-cold verify-6210-puk2-permanent verify-6210-fdn-cycle \
 	verify-6210-home-plmn-reject verify-6210-forbidden-plmn-persistence \
 	verify-6210-pin-host-incoming-call verify-6210-pin-host-incoming-sms \
 	verify-6210-pin-host-outgoing-call verify-6210-pin-host-outgoing-sms \
@@ -916,6 +916,9 @@ verify-6210-puk2-retry-cold: build
 
 verify-6210-puk2-permanent: build
 	$(VENV)/bin/python tools/run_noki6210_puk2_exhaustion.py $(RUN_DIR) --mame $(MAME_DIR)/mame
+
+verify-6210-fdn-cycle: build
+	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario fdn-cycle --coherent-cell --mame $(MAME_DIR)/mame
 
 verify-6210-home-plmn-reject: build
 	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario home-plmn-reject --coherent-cell --mame $(MAME_DIR)/mame

@@ -40,6 +40,9 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'pin2-change-cold': ('npe3hle', 'pin2_change_input', 84),
              'pin2-retry-cold': ('npe3hle', 'pin2_wrong_input', 84),
              'pin2-reject': ('npe3hle', 'pin2_wrong_input', 84),
+             'fdn-observe': ('npe3hle', 'fdn_input', 58),
+             'fdn-enable': ('npe3hle', 'fdn_enable', 66),
+             'fdn-cycle': ('npe3hle', 'fdn_enable', 66),
              'toolkit': ('npe3hle', 'toolkit_input', 40),
              'toolkit-interactive': ('npe3hle', 'toolkit_interactive', 65),
              'toolkit-menu': ('npe3hle', 'toolkit_menu', 75),
@@ -63,8 +66,9 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'host-outgoing-call': ('npe3hle', 'outgoing_call_input', 48)}
 TOOLKIT_PROFILES = {'toolkit': 1, 'toolkit-interactive': 3, 'toolkit-menu': 4,
                     'toolkit-sms': 5, 'toolkit-call': 6, 'toolkit-call-decline': 6}
+FDN_SCENARIOS=frozenset(('fdn-observe','fdn-enable','fdn-cycle'))
 PIN_SCENARIOS=frozenset(('security','security-retry','security-retry-cold',
-                         'security-block-cold','security-block','pin2-change','pin2-change-cold','pin2-retry-cold','pin2-reject'))
+                         'security-block-cold','security-block','pin2-change','pin2-change-cold','pin2-retry-cold','pin2-reject')) | FDN_SCENARIOS
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
@@ -362,6 +366,9 @@ def main():
             card = run / f'nvram/{machine}/sim_card'
             card.parent.mkdir(parents=True)
             card.write_bytes(make_profile(pin_enabled=True))
+            if args.scenario in FDN_SCENARIOS:
+                from tools.sim_fdn_profile import extend
+                card.write_bytes(extend(make_profile(True)+bytes.fromhex('00f110')+b'\xff'*43))
         if args.scenario in ('plmn-reject', 'foreign-registration') or args.foreign_cell:
             from tools.make_sim_card_profile import make_profile
             card = run / f'nvram/{machine}/sim_card'
@@ -714,6 +721,33 @@ def main():
                     verify(cold_text, runtime=True, selftest=True)
                     check_forbidden_selection(cold_text, card.read_bytes(),
                                               forbidden=forbidden, previous=retained)
+        elif args.scenario in FDN_SCENARIOS:
+            from tools.noki6210_fdn_check import check as check_fdn,check_frames as check_fdn_frames
+            phase=3 if args.scenario=='fdn-observe' else 0
+            card=(run/'nvram/npe3hle/sim_card').read_bytes()
+            check_fdn(text,card,phase)
+            check_fdn_frames(run/'snap',phase)
+            check_registration(text,card,channel_header='1202')
+            if args.scenario=='fdn-cycle':
+                source=run
+                cold_retry={'phases':[]}
+                ids={launch['invocation_id']}
+                for phase,name,script,seconds in ((1,'cold-on','fdn_input',58),
+                                                (2,'off','fdn_disable',66),
+                                                (3,'cold-off','fdn_input',58)):
+                    cold=run/name
+                    before=(source/'nvram/npe3hle/sim_card').read_bytes()
+                    cold_text,initial,continuation=run_retained_security(source,cold,command,
+                        root/f'tools/noki6210_{script}.lua',seconds,environment)
+                    if initial!=before or continuation['invocation_id'] in ids:
+                        raise ValueError('FDN cold input or launch identity differs')
+                    ids.add(continuation['invocation_id'])
+                    card=(cold/'nvram/npe3hle/sim_card').read_bytes()
+                    check_fdn(cold_text,card,phase)
+                    check_fdn_frames(cold/'snap',phase)
+                    check_registration(cold_text,card,preserved_location=True,channel_header='1202')
+                    cold_retry['phases'].append(continuation)
+                    source=cold
         elif args.scenario in ('pin2-change','pin2-change-cold','pin2-retry-cold','pin2-reject'):
             from tools.noki6210_pin2_change_check import check as check_pin2,check_frames as check_pin2_frames
             rejected=args.scenario in ('pin2-retry-cold','pin2-reject')
@@ -927,10 +961,11 @@ def main():
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': machine, 'scenario': args.scenario, 'passed': True,
             'launch': launch,
-            **({('cold_pin2_change' if args.scenario in ('pin2-change-cold','pin2-retry-cold') else 'cold_pin_retry_recovery'): cold_retry} if cold_retry else {}),
+            **({('fdn_cold_lifecycle' if args.scenario=='fdn-cycle' else 'cold_pin2_change' if args.scenario in ('pin2-change-cold','pin2-retry-cold') else 'cold_pin_retry_recovery'): cold_retry} if cold_retry else {}),
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
             'sim_profile': ('foreign two-digit-MNC preferred laboratory card' if args.scenario == 'foreign-registration' or args.foreign_cell
                             else 'visited-test-PLMN preferred laboratory card' if args.scenario == 'plmn-reject'
+                            else 'PIN-enabled extended FDN laboratory card' if args.scenario in FDN_SCENARIOS
                             else 'PIN-enabled laboratory card' if args.scenario in PIN_SCENARIOS or args.pin_enabled
                             else 'default laboratory card'),
             'plmn_rejection': ({'cause': 11, 'visited_plmn': '001-02',

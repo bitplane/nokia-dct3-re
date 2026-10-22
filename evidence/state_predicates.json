@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_fdn_validity_lifecycle", "owner": "npe3_sim_security", "status": "satisfied",
+      "predicate": "6210 physically activates and deactivates FDN using PIN2 and preserves both states across own-storage cold boots",
+      "current": "Four own-PMM/coherent-cell processes use an explicit3898-byte laboratory FDN card. All ten EF_FDN records are read. Physical On verifies PIN2, invalidates ADN, rehabilitates LOCI/IMSI and displays Fixed dialling on. Cold On retains invalid ADN and rehabilitates identity without PIN2. Physical Off verifies PIN2 and rehabilitates ADN with Fixed dialling off; cold Off performs no validity transaction. Whole-card checks allow only expected location/ADN validity, preserving credentials/retries/records. Exact contacts/order/statuses,12 frames, registration, independent launches and unchanged predecessor storage pass. Capture tmp/npe3-fdn-cycle-banked. No record-write/rejected-PIN2/dial-permission/connected-call/native-speech promotion.",
+      "evidence": ["docs/6210_bringup.md", "tools/noki6210_fdn_input.lua", "tools/noki6210_fdn_enable.lua", "tools/noki6210_fdn_disable.lua", "tools/noki6210_fdn_check.py", "tools/test_noki6210_fdn_check.py", "tools/run_noki6210_acceptance.py", "tools/test_run_noki6210_acceptance.py", "tools/sim_fdn_profile.py", "gates.json"]
+    },
+    {
       "id": "npe3_permanent_puk2_loss", "owner": "npe3_sim_security", "status": "satisfied",
       "predicate": "6210 permanently exhausts PUK2 across physical cold-linked failures and preserves PIN1 registration and responsive menus",
       "current": "Fourteen distinct processes: physical PIN2 exhaustion, ten separately cold wrong-PUK2 failures and a cold correct-PUK2-pattern control. First9 UNBLOCKs return9804/Code error;10 returns9840/PIN2 code rejected. Whole-card transitions change only PUK2 retry byte. Final cold Settings immediately rejects PIN2; credential-shaped contacts reach ordinary dialing/options, not a recovery editor, with no PIN2 VERIFY/UNBLOCK or call/SMS service. PIN1 authenticates, retained-location registration and End/Menu remain live; complete zero-PUK2 card is unchanged. All84 frames and exact predecessor/launch/protocol checks pass. Capture tmp/npe3-puk2-permanent-banked. Resume rejects changed/partial evidence. No FDN/native-speech promotion.",

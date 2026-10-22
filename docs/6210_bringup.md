@@ -1224,7 +1224,32 @@ card is unchanged. All84 frame comparisons and predecessor storage hashes pass.
 Capture: `tmp/npe3-puk2-permanent-banked`. `--resume` validates completed stages'
 commands, script hashes, complete predecessor NVRAM, distinct launch IDs,
 protocol/card transitions and frames before continuing missing stages; partial
-or changed evidence is rejected. FDN control remains unqualified for6210.
+or changed evidence is rejected.
+
+## SIM Fixed Dialling
+
+`make verify-6210-fdn-cycle` uses an explicit extended laboratory card with
+EF_FDN present, ten empty32-byte records and normal PIN1/PIN2 credentials.
+The acquired phone PMM is unchanged. The firmware reads all ten records and
+exposes Fixed dialling under Security settings; this extra card-dependent menu
+item is fixture knowledge, not driver behavior.
+
+Four own-storage processes prove On, cold On, Off and cold Off. Physical On
+with PIN2 verifies CHV2, invalidates EF_ADN and rehabilitates EF_LOCI/EF_IMSI;
+the screen confirms Fixed dialling on. Cold On retains invalid ADN while
+rehabilitating identity files, without another PIN2 verification. Physical Off
+verifies PIN2 and rehabilitates ADN, displaying Fixed dialling off. Cold Off
+has no validity transaction. Each complete3898-byte card matches the registered
+profile with only the expected ADN-validity flag changed; credentials, retry
+counts and all records are preserved.
+
+The gate checks exact contacts, APDU selectors/order/results, record census,
+coherent registration,12 reviewed frame comparisons, independent launch IDs,
+copied-storage provenance and unchanged predecessors. Capture:
+`tmp/npe3-fdn-cycle-banked`. No RAM/save state or forced handset event is used.
+FDN record save/edit/erase, rejected PIN2 activation and local listed/unlisted
+dial-permission controls remain unqualified. This is not a connected-call or
+native-radio/speech claim.
 
 ## SIM Toolkit
 

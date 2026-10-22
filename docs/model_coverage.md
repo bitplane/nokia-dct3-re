@@ -132,7 +132,11 @@ one durable attempt consumed, unchanged credentials, cold recovery and cold
 replacement-PIN2 use across six processes. `verify-6210-puk2-permanent` proves
 all ten physically consumed PUK2 attempts, exact permanent-card preservation
 and a responsive cold control that cannot reopen PIN2 recovery, while PIN1
-registration/menu access remains usable. FDN remains unqualified.
+registration/menu access remains usable. `verify-6210-fdn-cycle` adds physical
+PIN2-protected On/Off, cold-state persistence and the identity/ADN validity
+handshake on an explicit extended card, with exact complete-card preservation
+and12 reviewed frames. FDN record operations, rejected activation and local
+listed/unlisted dialing restrictions remain unqualified.
 
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,
