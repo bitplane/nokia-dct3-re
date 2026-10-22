@@ -452,8 +452,8 @@ and the whole persistent retry transition. The shared card generator uses an
 older serialized prefix; the device appends its later storage defaults, which
 the cold comparison preserves byte-for-byte. No unexpected credential-changing
 APDU is admitted. The gates below extend PUK, ordinary PIN/PIN2 change and
-request settings and PUK2 recovery/permanent loss. Permanent PIN1 blocking
-remains unaccepted.
+request settings and PUK1/PUK2 permanent loss. PUK1 exhaustion below starts
+from the explicitly blocked laboratory PIN1, not physical PIN1 exhaustion.
 
 ### PUK recovery and new-PIN persistence
 
@@ -463,7 +463,9 @@ and confirmation produce `a0 2c 00 00 10` with the entered credential bytes.
 The card returns9000, stores PIN4321, restores CHV1 attempts3/PUK1 attempts10,
 and the UI reaches the separate phone code. A wrong-PUK12345679 control returns
 9804, preserves the original PIN, keeps CHV1 blocked and decrements only PUK1
-attempts to9. The complete generated credential/retry prefix is checked in both.
+attempts to9. The entire saved card is checked, including the appended
+laboratory preferred-PLMN/default fields; cold continuations use their actual
+predecessor card rather than regenerating its contents.
 
 The qualified cold copy records the recovered card before execution. Physical
 4321 authentication succeeds and the full current card remains byte-identical;
@@ -478,7 +480,35 @@ uploads and own unchanged executable flash are checked:
 
 This accepts a physical PUK recovery lifecycle under the declared research
 inputs. Other gates cover ordinary CHANGE CHV and PIN-request settings;
-permanent PUK1 blocking, radio and fitted hardware remain unaccepted.
+radio and fitted hardware remain unaccepted. Permanent PUK1 loss has a separate
+cold-chain gate below.
+
+### Permanent PUK1 loss
+
+Starting with the qualified first wrong PUK1 above, nine independent cold
+processes physically enter12345679 and proposed PIN4321. Each starts with the
+actual predecessor's card/EEPROM and own executable, copying no RAM or save
+state. Exact UNBLOCK payloads return9804 until the final9840; only PUK1's
+attempt counter changes. Final PIN1/PIN2/PUK1/PUK2 attempts are0/3/0/10.
+No credential, other counter or unrelated card byte is edited by the harness.
+
+The terminal frame says **SIM card rejected**. A further independent cold
+process preserves every card byte and renders the same exact frame at5s and24s,
+before and after the physical credential-entry control. It issues no
+VERIFY/CHANGE/UNBLOCK or card-write command. This52s compatibility result
+does not qualify physical PIN1 exhaustion, radio, fitted DSP compatibility
+or resolution of the93.967s packet-supervision restart.
+
+```sh
+.venv/bin/python tools/nsk3_puk1_exhaust.py roms/noki6130/source \
+  tmp/nsk3-puk-wrong tmp/nsk3-puk1-exhaustion --check-only
+```
+
+Omit`--check-only` with a fresh output to execute the chain;`--resume`
+requalifies retained predecessors. Completed logs are losslessly compressed
+and accepted in either plain or gzip form. The runner verifies cold source
+hashes, complete card transitions, own flash/uploads and reviewed rejection
+pixels; source hashes guard accidental input reuse, not execution attestation.
 
 ### PIN-request enable
 
@@ -525,7 +555,7 @@ passive SIM observer; timing offsets schedule physical contacts only. All
 hardware defaults and declared native/analog/provisioning hypotheses remain
 unchanged. PIN-request disable and PIN2 change have separate gates below;
 PUK2 recovery and permanent loss have separate gates below; permanent PUK1
-blocking remains unaccepted.
+loss is qualified separately above.
 
 ### PIN-request disable
 
@@ -649,8 +679,7 @@ For a fresh chain, use a new output directory without `--check-only`;
 `--compress-logs` verifies exact decompression before replacing completed
 verbose logs with `error.log.gz`; the checker accepts either format. Its
 source/card/EEPROM hashes guard accidental input reuse, not cryptographic
-execution attestation. Permanent PUK1 loss remains a separate unqualified
-product lifecycle.
+execution attestation. Permanent PUK1 loss has its own cold rejection gate above.
 
 ### Offline SMS draft
 

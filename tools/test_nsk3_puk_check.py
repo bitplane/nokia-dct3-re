@@ -13,6 +13,7 @@ class PukCheckTest(unittest.TestCase):
             *[f'nsk3_sim_tx: index={i} value={value:02x}' for i,value in enumerate(command,1)],
             f'SIM status ins=2c sw={"9804" if wrong else "9000"} chv={0 if wrong else 3}/3 puk={9 if wrong else 10}/10 enabled=1'])
         card=bytearray(make_profile(True).ljust(AOC_NVRAM_SIZE,b'\xff'))
+        card[3524:3527]=bytes.fromhex('00f110')
         if wrong:
             card[ATTEMPTS_OFFSET]=0
             card[ATTEMPTS_OFFSET+2]=9
@@ -29,6 +30,39 @@ class PukCheckTest(unittest.TestCase):
             mutated=bytearray(card)
             mutated[CHV_OFFSET]^=1
             with self.assertRaises(ValueError):check_recovery(trace,mutated,wrong)
+
+    def test_cold_retry_and_terminal_status(self):
+        trace,card=self.fixture(True)
+        for count in range(1,11):
+            initial=bytearray(make_profile(True).ljust(AOC_NVRAM_SIZE,b'\xff'))
+            initial[ATTEMPTS_OFFSET]=0
+            initial[ATTEMPTS_OFFSET+2]=count
+            expected=bytearray(initial)
+            expected[ATTEMPTS_OFFSET+2]=count-1
+            status='9840' if count==1 else '9804'
+            current=trace.replace('sw=9804','sw='+status).replace('puk=9/10',f'puk={count-1}/10')
+            check_recovery(current,expected,True,initial)
+            with self.assertRaises(ValueError):check_recovery(current,initial,True,initial)
+            expected[-1]^=1
+            with self.assertRaises(ValueError):check_recovery(current,expected,True,initial)
+        for bad in (b'', bytes(AOC_NVRAM_SIZE)):
+            with self.assertRaises(ValueError):check_recovery(trace,card,True,bad)
+
+    def test_default_card_tail_is_not_ignored(self):
+        trace,card=self.fixture(False)
+        card[-1]^=1
+        with self.assertRaises(ValueError):check_recovery(trace,card)
+
+    def test_recovery_restores_retries_and_preserves_other_storage(self):
+        trace,expected=self.fixture(False)
+        initial=bytearray(make_profile(True).ljust(AOC_NVRAM_SIZE,b'\xff'))
+        initial[3524:3527]=bytes.fromhex('00f110')
+        initial[ATTEMPTS_OFFSET]=0
+        initial[ATTEMPTS_OFFSET+2]=4
+        initial[-1]=expected[-1]=0x73
+        check_recovery(trace,expected,False,initial)
+        expected[ATTEMPTS_OFFSET+2]=4
+        with self.assertRaises(ValueError):check_recovery(trace,expected,False,initial)
 
 
 if __name__=='__main__':unittest.main()
