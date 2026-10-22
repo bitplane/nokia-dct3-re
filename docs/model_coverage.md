@@ -147,8 +147,12 @@ PIN2-protected erase cancellation, confirmed record deletion and cold empty-list
 display, with exact card preservation and22 frames across six processes.
 `verify-6210-fdn-record-retry` additionally proves wrong-PIN2 Add denial with no
 UPDATE, durable retry loss, cold correct-PIN2 save and cold Details, preserving
-all unrelated card data. Local listed/unlisted dialing restrictions remain
-unqualified.
+all unrelated card data. `verify-6210-fdn-dial-controls` proves listed-number
+HLE call signaling, local unlisted-number denial and successful signaling for
+that same unlisted number after physical Off. Exact card preservation, decoded
+inputs and23 frames pass across seven processes. These are exact-number lab
+controls, not native speech, physical RF or external end-to-end calls; emergency,
+prefix and special-dial-string behavior remains outside their scope.
 
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,

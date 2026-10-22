@@ -995,6 +995,13 @@
                  "arguments": ["$(RUN_DIR)", "--wrong-write-first", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6210-fdn-dial-controls",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki6210_fdn_dial.py",
+                 "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-home-plmn-reject",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",

@@ -1300,8 +1300,23 @@ checks, APDU order/results, registration and independent preserved predecessors
 pass. Capture: `tmp/npe3-fdn-record-retry-banked`. This is Add authorization
 denial, not a SIM UPDATE command being rejected after submission.
 
-Local listed/unlisted dial-permission controls remain unqualified. These gates
-are not connected-call or native-radio/speech claims.
+`make verify-6210-fdn-dial-controls` freshly prepares that physical A/12345
+record, then tests three cold dial controls. With FDN On, physical12345/Send
+completes the existing 6210 laboratory outgoing signaling lifecycle through
+Connect/Connect Acknowledge and physical End/release. Physical12346/Send from
+an independent copy of the same saved state displays Call not allowed, then
+returns to the dialed number; no CM Service Request, SETUP, traffic assignment
+or call-control message is emitted. Physical PIN2-authenticated Off preserves
+the record while rehabilitating ADN. The same12346 then completes and releases
+the laboratory call lifecycle.
+
+All seven processes,23 reviewed frames, decoded physical contacts, exact called
+digits, whole-card preservation, identity/ADN validity transactions, registration,
+independent launches and unchanged predecessors pass. Capture:
+`tmp/npe3-fdn-dial-banked`. This proves these exact-number permission controls
+and connected HLE laboratory signaling, not native DSP/RF, speech or an external
+end-to-end call. Emergency exceptions, prefix matching and special dial strings
+are outside this gate's scope.
 
 ## SIM Toolkit
 

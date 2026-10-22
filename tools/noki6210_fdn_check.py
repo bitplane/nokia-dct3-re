@@ -39,7 +39,7 @@ def input_contacts(phase,rejected=False):
     return items
 
 
-def check(text,card,phase,rejected=False,initial_pin2_attempts=3):
+def check(text,card,phase,rejected=False,initial_pin2_attempts=3,record=None):
     if rejected and phase!=0:
         raise ValueError('only activation rejection is qualified')
     if initial_pin2_attempts not in (2,3):
@@ -47,6 +47,10 @@ def check(text,card,phase,rejected=False,initial_pin2_attempts=3):
     items=input_contacts(phase,rejected)
     contacts(text,'6210_fdn_input',items)
     expected=bytearray(extend(profile(3,True)))
+    if record is not None:
+        if len(record)!=32:
+            raise ValueError('FDN fixture record must have 32 bytes')
+        expected[3578:3610]=record
     expected[3575]=0 if phase<2 and not rejected else 1
     if rejected:
         expected[3517]=initial_pin2_attempts-1

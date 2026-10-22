@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_fdn_listed_unlisted_off_dial_controls", "owner": "npe3_sim_security", "status": "satisfied",
+      "predicate": "6210 permits a physically saved FDN number, locally rejects an unlisted number and permits that same number after physical FDN Off",
+      "current": "Seven fresh own-PMM/coherent-cell processes physically activate/save/cold-read A/12345 and independently test listed12345, unlisted12346, PIN2-protected Off and Off12346. Listed and Off-unlisted complete the existing own-6210 HLE outgoing signaling verifier through connected acknowledgment and physical End/release. On-unlisted displays Call not allowed and returns to dialed digits with no CM Service Request, SETUP, traffic assignment or uplink call-control signaling. Calls preserve complete cards; Off changes only ADN validity while preserving the FDN record. All 23 frames, decoded physical edges, exact called digits, registration, seven distinct launches and unchanged predecessor NVRAM pass. Capture tmp/npe3-fdn-dial-banked. No native DSP/RF/speech, external end-to-end call, emergency/prefix/special-string promotion.",
+      "evidence": ["docs/6210_bringup.md", "tools/run_noki6210_fdn_dial.py", "tools/noki6210_fdn_dial.lua", "tools/noki6210_fdn_dial_unlisted.lua", "tools/noki6210_fdn_dial_check.py", "tools/test_noki6210_fdn_dial_check.py", "tools/noki6210_fdn_check.py", "tools/test_noki6210_fdn_check.py", "tools/noki6210_outgoing_call_check.py", "gates.json"]
+    },
+    {
       "id": "npe3_fdn_add_denial_cold_retry", "owner": "npe3_sim_storage", "status": "satisfied",
       "predicate": "6210 denies FDN Add with wrong PIN2, persists only retry loss and cold-recovers into protected save and Details retrieval",
       "current": "Four own-PMM/coherent-cell processes activate FDN, physically reject Add with5675, cold-save with5678 and cold-read A/12345. Rejected VERIFY CHV2/9804 displays Code error and causes no UPDATE; the entire FDN-On card changes only PIN2 retries3->2. Cold startup retains that allowance; correct PIN2 restores3 before the successful EF_FDN record1 UPDATE and confirming read. Final cold Details renders A/12345 without another PIN2 verification or write. All 15 frames, exact contacts/CHV selectors/counters/APDU order/card transitions, registration, independent launches and unchanged predecessors pass. Capture tmp/npe3-fdn-record-retry-banked. This is Add authorization denial, not rejection of a submitted UPDATE. No dial-permission/native-speech promotion.",

@@ -2,6 +2,7 @@ import unittest
 from tools.noki6210_fdn_check import check,input_contacts
 from tools.noki6210_puk_check import profile
 from tools.sim_fdn_profile import extend
+from tools.nsk3_phonebook_check import expected_record
 
 
 def validity(instruction,fid):
@@ -34,6 +35,16 @@ def fixture(phase):
 
 
 class FdnLifecycleTests(unittest.TestCase):
+    def test_disable_preserves_the_existing_fdn_record(self):
+        text,card=fixture(2)
+        populated=bytearray(card)
+        populated[3578:3610]=expected_record()
+        check(text,bytes(populated),2,record=expected_record())
+        with self.assertRaises(ValueError):
+            check(text,bytes(populated),2)
+        with self.assertRaises(ValueError):
+            check(text,bytes(populated),2,record=b'A')
+
     def test_wrong_pin2_activation_only_consumes_its_retry(self):
         text,_=fixture(0)
         text='\n'.join(line for line in text.splitlines() if 'ins=04' not in line and 'ins=44' not in line)
