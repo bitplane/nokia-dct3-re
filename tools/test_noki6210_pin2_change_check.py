@@ -1,6 +1,6 @@
 import unittest
 
-from tools.noki6210_pin2_change_check import check
+from tools.noki6210_pin2_change_check import check,check_puk2,settings_contacts
 from tools.noki6210_puk_check import profile
 from tools.sim_security_trace_check import statuses
 
@@ -32,6 +32,51 @@ def fixture():
 
 
 class Pin2ChangeTests(unittest.TestCase):
+    def puk2_fixture(self):
+        items=settings_contacts()
+        for start,digits in ((50,'87654321'),(62,'2468'),(70,'2468')):
+            items.extend((start+i,'Keypad '+d) for i,d in enumerate(digits))
+            items.append((start+len(digits),'Left Softkey / Menu'))
+        items += [(80,'End'),(82,'Left Softkey / Menu')]
+        lines=[]
+        for second,key in items:
+            lines.extend([f'6210_pin2_input: key={key} state=1 t={second}.000000000',
+                          f'6210_pin2_input: key={key} state=0 t={second}.150000000'])
+            if second==12:
+                lines.extend(['header cla=a0 ins=20 p1=00 p2=01 p3=08',
+                              'SIM status ins=20 sw=9000 chv=3/0 puk=10/10 enabled=1',
+                              'LAPDm Location Updating Accept acknowledged nr=1'])
+            if second==74:
+                lines.extend(['header cla=a0 ins=2c p1=00 p2=02 p3=10',
+                              'SIM status ins=2c sw=9000 chv=3/3 puk=10/10 enabled=1',
+                              'header cla=a0 ins=20 p1=00 p2=02 p3=08',
+                              'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1'])
+        lines.append('6210_pin2_input: complete=1 firmware_state_forcing=0')
+        initial=bytearray(profile(3,True))
+        initial[3517]=0
+        final=bytearray(profile(3,True))
+        final[3492:3500]=b'2468\xff\xff\xff\xff'
+        return '\n'.join(lines),bytes(initial),bytes(final)
+
+    def test_physical_puk2_recovery(self):
+        check_puk2(*self.puk2_fixture())
+
+    def test_puk2_selector_status_input_and_other_credentials_are_required(self):
+        text,initial,final=self.puk2_fixture()
+        for old,new in (('p2=02','p2=01'),('sw=9000 chv=3/3','sw=9804 chv=3/3'),
+                        ('t=74.000000000','t=75.000000000'),('key=Keypad 8','key=Keypad 9')):
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_puk2(text.replace(old,new),initial,final)
+        for index in (3484,3492,3508,3516,3517,3519):
+            changed=bytearray(final)
+            changed[index]^=1
+            with self.assertRaises(ValueError):
+                check_puk2(text,initial,bytes(changed))
+        with self.assertRaises(ValueError):
+            check_puk2(text,final,final)
+        with self.assertRaises(ValueError):
+            check_puk2(text.replace('header cla=a0 ins=20 p1=00 p2=02 p3=08','missing'),initial,final)
+
     def test_status_selector_keeps_both_credential_namespaces_distinct(self):
         text='SIM status ins=24 sw=9804 chv=3/2 puk=9/8 enabled=1'
         self.assertEqual(statuses(text,0x24),[(0x9804,3,9)])

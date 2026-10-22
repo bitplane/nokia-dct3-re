@@ -10,11 +10,11 @@ import sys
 if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from tools.run_noki6210_acceptance import build_command,run_retained_security,events,check_registration
-from tools.noki6210_pin2_change_check import check,check_frames
+from tools.noki6210_pin2_change_check import check,check_frames,check_puk2,check_puk2_frames
 from tools.noki6210_puk_check import profile
 
 
-def run_chain(root,output,mame):
+def run_chain(root,output,mame,recover=False):
     output.mkdir(parents=True,exist_ok=False)
     source=output/'wrong-1'
     with (output/'first-launch.log').open('w') as console:
@@ -48,9 +48,29 @@ def run_chain(root,output,mame):
         check_registration(text,final,preserved_location=True,channel_header='1202')
         check_frames(target/'snap',rejected=True,blocked=attempt==3)
         source=target
-    report={'passed':True,'launches':launches,'pin2_retries':0,
+    if recover:
+        for name,script,seconds in (('puk2-recovery','puk2_input',88),
+                                    ('new-pin2-cold','puk2_reauth_input',84)):
+            target=output/name
+            before=(source/'nvram/npe3hle/sim_card').read_bytes()
+            text,initial,launch=run_retained_security(source,target,command,
+                root/f'tools/noki6210_{script}.lua',seconds,dict(os.environ))
+            if initial!=before or launch['invocation_id'] in launches:
+                raise ValueError('PUK2 recovery launch identity or initial card differs')
+            launches.append(launch['invocation_id'])
+            final=(target/'nvram/npe3hle/sim_card').read_bytes()
+            if name=='puk2-recovery':
+                check_puk2(text,initial,final)
+                check_puk2_frames(target/'snap')
+            else:
+                check(text,final,old_pin='2468',new_pin='5678')
+                check_frames(target/'snap')
+            check_registration(text,final,preserved_location=True,channel_header='1202')
+            source=target
+    report={'passed':True,'launches':launches,'pin2_retries':3 if recover else 0,
             'card_sha256':hashlib.sha256((source/'nvram/npe3hle/sim_card').read_bytes()).hexdigest(),
-            'scope':'physical PIN2 exhaustion only; PUK2 recovery is not qualified'}
+            'scope':('physical PIN2 exhaustion, PUK2 recovery and cold replacement-PIN2 use' if recover
+                     else 'physical PIN2 exhaustion only; this run does not exercise PUK2 recovery')}
     (output/'acceptance.json').write_text(json.dumps(report,indent=2)+'\n')
 
 
@@ -58,13 +78,15 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory',type=Path)
     parser.add_argument('--mame',type=Path,default=Path('mame/mame'))
+    parser.add_argument('--recover',action='store_true',help='recover with PUK2 and cold-use the installed PIN2')
     args=parser.parse_args()
+    label='6210 PUK2 recovery' if args.recover else '6210 PIN2 exhaustion'
     try:
-        run_chain(Path(__file__).resolve().parents[1],args.run_directory.resolve(),args.mame.resolve())
+        run_chain(Path(__file__).resolve().parents[1],args.run_directory.resolve(),args.mame.resolve(),args.recover)
     except (OSError,ValueError,subprocess.SubprocessError) as error:
-        print(f'6210 PIN2 exhaustion FAIL: {error}',file=sys.stderr)
+        print(f'{label} FAIL: {error}',file=sys.stderr)
         return 1
-    print(f'6210 PIN2 exhaustion PASS: {args.run_directory}')
+    print(f'{label} PASS: {args.run_directory}')
     return 0
 
 

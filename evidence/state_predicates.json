@@ -3,9 +3,15 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_puk2_recovery_and_cold_pin2", "owner": "npe3_sim_security", "status": "satisfied",
+      "predicate": "6210 physically recovers an exhausted PIN2 with PUK2 and cold-uses the installed replacement PIN2",
+      "current": "Five own-PMM/coherent-card processes: three physical failed PIN2 changes, cold PUK2 recovery and cold replacement-PIN2 use. Physical87654321/2468/confirmation produces UNBLOCK CHV2/9000 followed by firmware-owned VERIFY CHV2/9000 and Code accepted pixels. Whole-card checks permit only PIN2/retry changes; final cold2468->5678 change succeeds, retained location registers and exact Menu remains live. All30 frames, contacts/order, launch identities, exact retained storage and predecessor preservation pass. Capture tmp/npe3-puk2-recovery-banked. No RAM/save/firmware-state transfer or wrong-PUK2/permanent-PUK2/FDN/native-speech promotion.",
+      "evidence": ["docs/6210_bringup.md", "tools/run_noki6210_pin2_exhaustion.py", "tools/noki6210_puk2_input.lua", "tools/noki6210_puk2_reauth_input.lua", "tools/noki6210_pin2_change_input.lua", "tools/noki6210_pin2_change_check.py", "tools/test_noki6210_pin2_change_check.py", "gates.json"]
+    },
+    {
       "id": "npe3_pin2_exhaustion", "owner": "npe3_sim_security", "status": "satisfied",
       "predicate": "6210 physically exhausts PIN2 through three cold-linked Settings changes without blocking PIN1 or unrelated card services",
-      "current": "Fresh own-PMM/coherent-card physical9999 current-PIN2 changes consume3->2->1->0 across separate processes. Exact CHANGE CHV2 statuses9804,9804,9840 and whole-card equality isolate the PIN2 retry byte; final PIN2 code blocked pixels are reviewed. PIN1 authentication, retained-location registration and Menu remain live. All18 frame comparisons, distinct launches, exact copied NVRAM and unchanged predecessors pass. Capture tmp/npe3-pin2-exhaustion-banked. Exploratory blocked cold Settings exposes Enter PUK2 code, not yet qualified recovery. No PUK2 exhaustion/FDN/native speech promotion.",
+      "current": "Fresh own-PMM/coherent-card physical9999 current-PIN2 changes consume3->2->1->0 across separate processes. Exact CHANGE CHV2 statuses9804,9804,9840 and whole-card equality isolate the PIN2 retry byte; final PIN2 code blocked pixels are reviewed. PIN1 authentication, retained-location registration and Menu remain live. All18 frame comparisons, distinct launches, exact copied NVRAM and unchanged predecessors pass. Capture tmp/npe3-pin2-exhaustion-banked. Blocked cold Settings exposes Enter PUK2 code; recovery is covered separately by npe3_puk2_recovery_and_cold_pin2. No PUK2 exhaustion/FDN/native speech promotion.",
       "evidence": ["docs/6210_bringup.md", "tools/run_noki6210_pin2_exhaustion.py", "tools/noki6210_pin2_wrong_input.lua", "tools/noki6210_pin2_change_check.py", "tools/test_noki6210_pin2_change_check.py", "tools/run_noki6210_acceptance.py", "gates.json"]
     },
     {

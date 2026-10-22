@@ -31,12 +31,13 @@ local runner=coroutine.create(function()
     for i=0,1 do press('Scroll Down',44+i) end
     press('Left Softkey / Menu',47)
     local old,new=_G.npe3_pin2_old or '5678',_G.npe3_pin2_new or '8765'
-    for _,phase in ipairs({{50,old},{58,new},{66,new}}) do
-        for i=1,4 do press('Keypad '..phase[2]:sub(i,i),phase[1]+i-1) end
-        press('Left Softkey / Menu',phase[1]+4)
+    for _,phase in ipairs(_G.npe3_pin2_phases or {{50,old},{58,new},{66,new}}) do
+        for i=1,#phase[2] do press('Keypad '..phase[2]:sub(i,i),phase[1]+i-1) end
+        press('Left Softkey / Menu',phase[1]+#phase[2])
     end
-    press('End',76)
-    press('Left Softkey / Menu',78)
+    local finish=_G.npe3_pin2_finish or 76
+    press('End',finish)
+    press('Left Softkey / Menu',finish+2)
     assert(emu.wait(2))
     machine.screens[':screen']:snapshot('6210_security_then_menu.png')
     machine:logerror('6210_pin2_input: complete=1 firmware_state_forcing=0\n')

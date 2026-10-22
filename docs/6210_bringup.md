@@ -1185,9 +1185,21 @@ Every full card equals the registered laboratory profile except the PIN2 retry
 byte. PIN1 still authenticates, coherent registration succeeds and Menu remains
 usable. All18 reviewed frames pass, with distinct launch IDs and exact copied
 storage/source preservation. Capture: `tmp/npe3-pin2-exhaustion-banked`.
-A separate exploratory cold run exposes Enter PUK2 code at the same settings
-item; it does not yet qualify PUK2 recovery. PUK2 exhaustion and FDN control
-remain unqualified.
+`make verify-6210-puk2-recovery` extends this to five processes. The fourth
+cold boot exposes Enter PUK2 code at the same settings item. Physical PUK2
+87654321, replacement2468 and confirmation produce UNBLOCK CHV2
+(`A0 2C 00 02 10`)/9000 at74.033s, followed by firmware-owned VERIFY CHV2
+(`A0 20 00 02 08`)/9000 at74.041s. The reviewed result is Code accepted.
+The full card changes only PIN2 to2468 and its retry allowance back to3;
+PIN1, both PUKs and all other card records remain intact.
+
+The fifth cold process physically uses2468 to change PIN2 back to5678.
+Both continuations retain location and require coherent registration, exact
+contacts/protocol ordering, independent launches, copied-storage hashes,
+unchanged predecessor NVRAM and six reviewed frames each. The complete chain
+checks30 frames. Capture: `tmp/npe3-puk2-recovery-banked`.
+No RAM/save transfer or credential-state forcing is used. Wrong-PUK2 handling,
+PUK2 exhaustion and FDN control remain unqualified for6210.
 
 ## SIM Toolkit
 

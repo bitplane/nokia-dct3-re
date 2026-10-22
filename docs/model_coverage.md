@@ -124,7 +124,10 @@ proves Code error/9804 for wrong current PIN2, exactly one durable PIN2 retry
 consumed, unchanged credentials and cold recovery with the original PIN2.
 `verify-6210-pin2-exhaustion` independently consumes all three PIN2 retries in
 cold-linked processes, checks the PIN2 code blocked screen and preserves PIN1
-registration/menu access. PUK2 recovery/exhaustion and FDN remain unqualified.
+registration/menu access. `verify-6210-puk2-recovery` adds physical PUK2 recovery,
+firmware's automatic replacement-PIN2 VERIFY and cold use of that PIN2 to
+change back, with exact card preservation and30 frames across five processes.
+Wrong-PUK2 handling, PUK2 exhaustion and FDN remain unqualified.
 
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,
