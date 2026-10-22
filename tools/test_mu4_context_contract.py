@@ -25,6 +25,7 @@ from tools.mu4_context_contract import PLAYBACK_PENDING_CONTROL, decode_playback
 from tools.mu4_context_contract import PLAYBACK_PENDING16_PRODUCERS,decode_playback_pending16_producers
 from tools.mu4_context_contract import PLAYBACK_INPUT3_SENDERS,decode_playback_input3_senders
 from tools.mu4_context_contract import RESIDENT_IDLE3,decode_resident_idle3
+from tools.mu4_context_contract import RESIDENT_WAKE_TAIL,decode_resident_wake_tail
 from tools.mu4_context_contract import PLAYBACK_REFILL_COMPLETION, decode_playback_refill_completion, reference_refill_completion
 from tools.mu4_context_contract import MEASUREMENT_RESPONSE_BASE, MEASUREMENT_RESPONSE_WITNESS, decode_measurement_response, measurement_result
 from tools.mu4_context_contract import DMA_PAUSE_WITNESSES, decode_dma_pause
@@ -227,6 +228,21 @@ class ContextContractTest(unittest.TestCase):
         self.assertEqual(result['literal_far_calls'],dict(aa55=[],aa22=['03ac0b'],aa99=[],aa88=[]))
         self.assertIn('W1C',result['tail']['ifr'])
         self.assertIn('not code/data',result['scope'])
+
+    def test_resident_wake_tail_raises_counter_instead_of_waiting(self):
+        words={base+offset:word for base,witness in RESIDENT_WAKE_TAIL.items()
+               for offset,word in enumerate(witness)}
+        result=decode_resident_wake_tail(words)
+        self.assertEqual(result['pinned_words'],len(words))
+        self.assertEqual(result['caller']['argument'],'07d0')
+        self.assertEqual(result['helper']['nested_call'],'00:2098')
+        self.assertIn('GT',result['helper']['compare'])
+        self.assertIn('no backward branch',result['helper']['effect'])
+        for address in words:
+            changed=dict(words)
+            changed[address]^=1
+            with self.subTest(address=address),self.assertRaises(ValueError):
+                decode_resident_wake_tail(changed)
 
     def test_resident_idle3_rejects_every_pinned_word_change(self):
         images=self.idle3_images()

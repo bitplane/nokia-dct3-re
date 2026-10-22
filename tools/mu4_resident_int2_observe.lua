@@ -8,7 +8,8 @@ local pulse=_G.mu4_int2_fixture_assert~=false
 local retained={}
 machine.debugger:command('temp1=0')
 for _,site in ipairs({{0x28914,'enter'},{0x28925,'resume'},{0x28926,'restore_mask'},{0x3ac0d,'caller'}}) do
-    retained[#retained+1]=cpu.debug:bpset(site[1],'temp1<32 && pw@28922==f5e1',
+    -- Debugger integer literals are hexadecimal: 20 is the declared 32 events.
+    retained[#retained+1]=cpu.debug:bpset(site[1],'temp1<20 && pw@28922==f5e1',
         'temp1=temp1+1;logerror "mu4_int2_path: ordinal=%d kind='..site[2]..
         ' pc=%06x opcode=%04x imr=%04x ifr=%04x sp=%04x st1=%04x identity=Execute_entry operands=context_only observer_writes=0\\n",temp1,curpc,pw@curpc,imr,ifr,sp,st1;g')
 end

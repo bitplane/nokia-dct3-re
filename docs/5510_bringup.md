@@ -9615,6 +9615,24 @@ files do not prove runtime NAND write absence. This paired fixture proves
 the declared wake input's native continuation, not automatic EOF, complete
 audio, normal MSP430 control or full 5510 graphical boot.
 
+The post-wake caller is not another receive wait. The separately pinned
+26-word `resident_wake_tail` span loads `07d0`, calls `03acdf`, then writes
+zero to `b558` at `03ac11`. Helper `03acdf..03acf1` passes stack literal
+`000a` to resident `00:2098`, retains its result in AR1, reads `b582` into
+AR0, and performs unsigned `CMPR GT,AR1`. Its `f820` is **BC NTC**, not
+BC TC: it skips the store when AR1 is not greater than the old value.
+Otherwise it publishes AR1 to `b582`. There is no backward branch or
+receive operation in this helper: the effect is a countdown lower bound,
+not a synchronous delay or a cap on the old value.
+
+A read-only data-tap window after the declared wake observes `b582` being
+set to `00c8`, followed by `b558=0`; ordinary activity subsequently
+decrements `b582` to `00c7`. This supports asynchronous bookkeeping, not
+another missing MSP430 acknowledgement. The nested resident helper's full
+implementation, the countdown's physical units and its official lifecycle
+meaning remain unqualified. Source ownership comes from the pinned upload,
+not data-tap context PCs or earlier same-address overlay observations.
+
 The bounded native playback fixture now observes 402 complete software
 notification groups: publication `0292c1`, callback `020981`, vector
 `022064`, wrapper `020742`, and request-frame read `020780`. All groups

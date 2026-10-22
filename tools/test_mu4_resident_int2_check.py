@@ -1,4 +1,6 @@
 import unittest
+from pathlib import Path
+import re
 from unittest.mock import patch
 
 from tools.mu4_resident_int2_check import SITES, check_branch
@@ -36,6 +38,12 @@ def fixture(pulse):
 
 
 class ResidentInt2Tests(unittest.TestCase):
+    def test_debugger_hex_cap_matches_declared_decimal_cap(self):
+        source=Path(__file__).with_name('mu4_resident_int2_observe.lua').read_text()
+        limit=re.search(r"temp1<([0-9a-f]+) &&",source)
+        self.assertIsNotNone(limit)
+        self.assertEqual(int(limit[1],16),32)
+
     def check(self, text, pulse):
         with patch('tools.mu4_resident_int2_check.serial_check') as serial:
             result = check_branch(text, 'console', pulse)

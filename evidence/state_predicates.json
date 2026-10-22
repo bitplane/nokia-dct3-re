@@ -1964,6 +1964,12 @@
       "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
+      "id": "mu4_resident_post_wake_bookkeeping", "owner": "native_music_dsp", "status": "satisfied",
+      "predicate": "The original post-IDLE3 caller invokes an unsigned countdown lower-bound update and clears bookkeeping rather than synchronously waiting for another peer reply",
+      "current": "Twenty-six AA22 source words pin caller03ac0d..03ac13 and helper03acdf..03acf1. Argument07d0 and stack literal000a feed00:2098; its result is retained inAR1 and compared unsigned GT with b582 inAR0. f820 is BC NTC, so MVMD AR1,b582 occurs only when the result exceeds the old counter. There is no backward branch or receive operation in this helper. The native declared-wake data window records b582=00c8, b558=0 and later decrement00c7. Nested helper implementation, physical countdown units, official command meaning and normal MCU waveform remain unqualified. Earlier Execute-entry breakpoint observations outside the post-wake window are not function-ownership evidence.",
+      "evidence": ["docs/5510_bringup.md", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py"]
+    },
+    {
       "id": "mu4_declared_resident_int2_wake", "owner": "native_music_dsp", "status": "satisfied",
       "predicate": "A declared logical UC_DSP_INT pulse wakes original AA22 firmware, restores its clock/interrupt context and returns to the worker while a matched no-pulse control remains asleep",
       "current": "Both branches start at11s PC028923 IMR0004 IFR0c38 with illegal0. No-pulse stays there and records zero register writes. A frame-sampled50ms logical assertion on schematic INT2 runs the original handler, retained RAM-to-CLKMD move and POPM IFR/IMR, then returns03ac0d and worker IDLE1 at0298ea before later resident IDLE3. The data tap records IFR0c38 written with0438 and IMR restored0ac5; next Execute-entry IFR0808 retains new/level pending bits. There are five path observations below32 and258 register writes below1024. Source A00 contract, complete unchanged input NAND and existing strict rejecting audio endpoint pass independently on both runs. This is a bench pin waveform, not normal MSP430 behavior, automatic EOF, complete audio or full5510 boot; retained nonvram_save input is not durability evidence.",
