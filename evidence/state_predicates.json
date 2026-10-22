@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_physical_pin_retry_recovery", "owner": "npe3_sim_security", "status": "satisfied",
+      "predicate": "Fresh research-HLE 6210 rejects one physical wrong PIN, recovers with the correct PIN and registers without unrelated card mutation",
+      "current": "Fresh own-PMM/coherent35/36 run physically enters9999/OK8..12s: VERIFY9804 chv2/3 and exact Code error14s. Physical1234/OK16..20s returns9000 chv3/3; Location Updating accepted20.980s. Exact prompt/error/registered idle39s and Menu40/Messages pixels pass. Every contact and complete3570-byte card are checked; only expected EF_LOCI bytes differ from original defaults. Own-upload/HLE and console-health gates pass. No failed-retry cold persistence/PIN exhaustion/PUK/native DSP/RF/speech promotion.",
+      "evidence": ["docs/6210_bringup.md", "tools/noki6210_security_retry_input.lua", "tools/noki6210_security_retry_check.py", "tools/test_noki6210_security_retry_check.py", "tools/run_noki6210_acceptance.py", "gates.json"]
+    },
+    {
       "id": "nsb7_host_network_ussd_empty_result", "owner": "gsm_network", "status": "satisfied",
       "predicate": "NSB-7 physical editor dismissal preserves an empty ReturnResult at the external host boundary without fabricating typed text",
       "current": "Host admission24.010s follows authentication. Read30/Answer32/End34 produce8b3a05a203020101 at34.470s; bounded parser verifies transaction8b/invoke1 with no parameters. RR release34.501s precedes one host response DCS0/data empty/emptytrue then answered34.510s. Exact prompt/editor and idle/menu frames, physical contacts, own source/journal and unchanged whole card pass. This is an empty ReturnResult, not no-result RELEASE COMPLETE/cancelled, typed text, multi-turn dialogue or native RF/DSP/speech.",

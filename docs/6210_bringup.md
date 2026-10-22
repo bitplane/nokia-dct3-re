@@ -1026,6 +1026,28 @@ mask routine `2c75` remain research assumptions. Native mask execution,
 measured DSP self-test values, speech/audio parity and electrical ADC units
 remain separate work, not implied by the phone-service gates.
 
+## SIM PIN rejection and recovery
+
+`make verify-6210-pin-retry` uses a fresh PIN-enabled laboratory card, the
+unchanged acquired product PMM and the coherent ARFCN35/36 network. Physical
+9999/OK at8..12s emits VERIFY CHV1 failure9804 and consumes exactly one retry
+(3 to2). The reviewed14s frame says Code error. Physical1234/OK at16..20s
+then returns9000, resets retries to3 and permits Location Updating at20.980s.
+The39s frame shows registered DCT3 LAB idle; physical Menu40 reaches the
+existing exact Messages frame. No driver or device behavior is changed.
+
+`noki6210_security_retry_check.py` requires every press/release, the exact two
+VERIFY outcomes and their ordering before registration/Menu, complete card
+equality against the original deterministic profile plus the documented LOCI
+update, and reviewed prompt/error/idle pixels. The generic acceptance runner
+also checks own-upload/HLE provenance, launch health, coherent registration and
+the Messages-menu pixels. The fixture is `noki6210_security_retry_input.lua`;
+qualified capture: `tmp/npe3-pin-retry-final`.
+
+This establishes same-process wrong-PIN recovery and delayed registration,
+not cold persistence of a failed retry, PIN exhaustion/PUK recovery or native
+DSP/radio support. Those require separate product gates.
+
 ## SIM Toolkit
 
 `make verify-6210-sim-toolkit RUN_DIR=run_6210_toolkit` uses unchanged

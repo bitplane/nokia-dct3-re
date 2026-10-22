@@ -32,6 +32,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'incoming-sms': ('npe3hle', 'incoming_sms_input', 30),
              'outgoing-sms': ('npe3hle', 'outgoing_sms_input', 43),
              'security': ('npe3hle', 'security_input', 37),
+             'security-retry': ('npe3hle', 'security_retry_input', 45),
              'toolkit': ('npe3hle', 'toolkit_input', 40),
              'toolkit-interactive': ('npe3hle', 'toolkit_interactive', 65),
              'toolkit-menu': ('npe3hle', 'toolkit_menu', 75),
@@ -278,6 +279,8 @@ def main():
     parser.add_argument('--pin-enabled', action='store_true',
                         help='authenticate a PIN-enabled SIM before the host service')
     args = parser.parse_args()
+    if args.scenario=='security-retry' and not args.coherent_cell:
+        parser.error('security-retry requires --coherent-cell')
     if args.foreign_cell:
         if args.scenario not in ('outgoing-call', 'incoming-sms'):
             parser.error('--foreign-cell requires outgoing-call or incoming-sms')
@@ -299,7 +302,7 @@ def main():
         run = args.run_directory.resolve()
         run.mkdir(parents=True, exist_ok=False)
         machine, script, seconds = SCENARIOS[args.scenario]
-        if args.scenario == 'security' or args.pin_enabled:
+        if args.scenario in ('security','security-retry') or args.pin_enabled:
             from tools.make_sim_card_profile import make_profile
             card = run / f'nvram/{machine}/sim_card'
             card.parent.mkdir(parents=True)
@@ -661,19 +664,24 @@ def main():
                     verify(cold_text, runtime=True, selftest=True)
                     check_forbidden_selection(cold_text, card.read_bytes(),
                                               forbidden=forbidden, previous=retained)
-        elif args.scenario == 'security':
+        elif args.scenario in ('security','security-retry'):
             import re
             from tools.radio_call_lifecycle_common import require_ordered
-            require_ordered(text, (
-                ('physical PIN', re.compile(r'6210_security_physical: action=confirm')),
-                ('VERIFY CHV1', re.compile(r'sim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08')),
-                ('accepted PIN', re.compile(r'SIM status ins=20 sw=9000')),
-                ('physical Menu', re.compile(r'6210_security_physical: action=menu')),
-            ), '6210 security')
+            if args.scenario=='security-retry':
+                from tools.noki6210_security_retry_check import check as check_retry, check_frames as check_retry_frames
+                check_retry(text,(run/'nvram/npe3hle/sim_card').read_bytes())
+                check_retry_frames(run/'snap')
+            else:
+                require_ordered(text, (
+                    ('physical PIN', re.compile(r'6210_security_physical: action=confirm')),
+                    ('VERIFY CHV1', re.compile(r'sim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08')),
+                    ('accepted PIN', re.compile(r'SIM status ins=20 sw=9000')),
+                    ('physical Menu', re.compile(r'6210_security_physical: action=menu')),
+                ), '6210 security')
             from PIL import Image
             with Image.open(run / 'snap/6210_security_then_menu.png') as frame:
                 check_frame(frame, SECURITY_MENU_SHA256, 'Messages after PIN verification')
-            if args.coherent_cell:
+            if args.coherent_cell and args.scenario=='security':
                 require_ordered(text, (
                     ('background request', re.compile(r'TX packet type=57 payload=4 .*data=03050000')),
                     ('serving-cell measurement', re.compile(r'RX enqueue type=8b payload=166 .*data=0010002300c4')),
@@ -685,6 +693,8 @@ def main():
                 ), '6210 delayed-PIN registration')
                 check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes(),
                                    channel_header='1202')
+            if args.coherent_cell and args.scenario=='security-retry':
+                check_registration(text,(run/'nvram/npe3hle/sim_card').read_bytes(),channel_header='1202')
         elif args.scenario.startswith('state-'):
             from tools.noki6210_state_check import verify as check_state
             check_state(text, args.scenario.removeprefix('state-'),
@@ -746,7 +756,7 @@ def main():
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
             'sim_profile': ('foreign two-digit-MNC preferred laboratory card' if args.scenario == 'foreign-registration' or args.foreign_cell
                             else 'visited-test-PLMN preferred laboratory card' if args.scenario == 'plmn-reject'
-                            else 'PIN-enabled laboratory card' if args.scenario == 'security' or args.pin_enabled
+                            else 'PIN-enabled laboratory card' if args.scenario in ('security','security-retry') or args.pin_enabled
                             else 'default laboratory card'),
             'plmn_rejection': ({'cause': 11, 'visited_plmn': '001-02',
                                 'firmware_sim_update': True, 'cold_window_seconds': 30,

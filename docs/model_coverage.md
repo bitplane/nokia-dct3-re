@@ -99,6 +99,12 @@ Native radio and speech remain unproved; see
 
 ## Promotion rules
 
+`verify-6210-pin-retry` additionally proves physical9999 rejection with one
+consumed PIN1 retry, physical1234 recovery/reset, delayed coherent laboratory
+registration and exact error/idle/Menu frames. Whole-card comparison admits
+only the documented location update; failed-retry cold persistence and PUK
+exhaustion are not inherited from other products.
+
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,
 reviewed masked-code/menu/idle frames and physical recovery.
