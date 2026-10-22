@@ -1089,7 +1089,25 @@ and all physical press/release sequences are acceptance predicates. Scripts
 are `noki6210_security_block_input.lua`, `noki6210_puk_input.lua` and
 `noki6210_puk_reauth_input.lua`; card/protocol checks live in
 `noki6210_puk_check.py`. This proves ordinary PIN1 exhaustion and successful
-PUK1 recovery, not wrong-PUK/permanent blocking, PIN2/FDN or native radio.
+PUK1 recovery, not permanent blocking, PIN2/FDN or native radio.
+
+`make verify-6210-puk-retry-cold` adds a separate wrong-PUK process between
+the blocked predecessor and successful recovery. Its physical99999999 PUK,
+new PIN2468 and repeated confirmation return9804, with PIN1 still blocked and
+PUK1 retries10->9. The complete card differs from the blocked predecessor at
+exactly that retry byte: no new PIN is installed on rejection. Four reviewed
+frames cover blocked presentation, new-PIN input/confirmation and return to
+SIM blocked. No registration or VERIFY shortcut is accepted.
+
+Only this own failed-PUK NVRAM/configuration is copied into `cold-recovery`.
+The correct physical PUK then resets retries, installs2468 and registers;
+`cold-new-pin` authenticates the installed PIN in a fourth process and keeps
+the complete recovered card unchanged. All predecessor cards are preserved.
+The acceptance report links the wrong-PUK launch identity, input hashes and
+source-card hash alongside the other three launches. This proves a consumed
+PUK retry survives cold restart and rejection is atomic with respect to
+credentials, not permanent PUK exhaustion. The additional fixture is
+`noki6210_puk_wrong_input.lua`; the runner option is `--wrong-puk-first`.
 
 ## SIM Toolkit
 

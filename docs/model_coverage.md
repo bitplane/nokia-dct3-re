@@ -108,8 +108,10 @@ authenticates, resets retries and recovers registered Menu. Full predecessor,
 cold input and final cards are checked. `verify-6210-puk-recovery` adds three
 physical PIN failures, exact blocked-card cold continuation, physical PUK/new
 PIN/confirmation and a third-process VERIFY with the installed PIN, retained
-location, exact idle/Menu and unchanged card. Wrong-PUK/permanent rejection
-and PIN2/FDN are not inherited from other products.
+location, exact idle/Menu and unchanged card. `verify-6210-puk-retry-cold`
+adds a fourth process: one physical wrong PUK consumes exactly one attempt
+without changing credentials, and the retained failed-PUK card cold-recovers
+normally. Permanent rejection and PIN2/FDN are not inherited from other products.
 
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,

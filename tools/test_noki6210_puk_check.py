@@ -1,6 +1,7 @@
 import unittest
+import re
 
-from tools.noki6210_puk_check import check_blocked,check_unblocked,check_reauthenticated,profile
+from tools.noki6210_puk_check import check_blocked,check_unblocked,check_reauthenticated,check_wrong_puk,profile
 
 
 def keys(prefix,items):
@@ -39,6 +40,26 @@ def reauthenticated():
 
 
 class PukTests(unittest.TestCase):
+    def test_wrong_puk_preserves_credentials_and_cold_recovery(self):
+        text=recovered()
+        text=re.sub(r'key=Keypad [1-8]( state=[01] t=(?:8|9|1[0-5])\.)',r'key=Keypad 9\1',text)
+        text=text.replace('ins=2c sw=9000 chv=3/3 puk=10/10','ins=2c sw=9804 chv=0/3 puk=9/10')
+        text=text.replace('LAPDm Location Updating Accept acknowledged nr=1\n','')
+        text=re.sub(r'6210_puk_input: key=Left Softkey / Menu state=[01] t=52\.[0-9]+\n','',text)
+        text=text.replace('complete=1','wrong_complete=1')
+        failed=profile(puk_attempts=9)
+        check_wrong_puk(text,profile(),failed)
+        check_unblocked(recovered(),failed,profile(3,True,b'2468\xff\xff\xff\xff'),puk_attempts=9)
+        for old,new in [('puk=9/10','puk=8/10'),('chv=0/3','chv=3/3'),
+                        ('sw=9804','sw=9000'),('t=32.000000000','t=33.000000000')]:
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                check_wrong_puk(text.replace(old,new),profile(),failed)
+        for index in (0,3484,3492,3500,3516,3518,3520,3569):
+            bad=bytearray(failed)
+            bad[index]^=1
+            with self.subTest(index=index),self.assertRaises(ValueError):
+                check_wrong_puk(text,profile(),bytes(bad))
+
     def test_complete_card_transitions(self):
         check_blocked(blocked(),profile())
         final=profile(3,True,b'2468\xff\xff\xff\xff')

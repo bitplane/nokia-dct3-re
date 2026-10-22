@@ -12,6 +12,8 @@ FRAMES={
     '6210_puk_new_pin.png':'2175c020da9e667de3adf54a2fad22991e9cb713f10459a71e40d7dcfbdfce7d',
     '6210_puk_confirm.png':'56857396bfdf762074a04bc14a8d1d23654b87460003c51a6c0548a18367293e',
     '6210_puk_idle.png':'570411100c4ce1b58be8303a8c912a08b698eaa6328605d110d54615be409eca',
+    # Only the wrong-PUK fixture asserts this result frame; successful recovery differs.
+    '6210_puk_result.png':'2f5d94d74625776d287cd5d7d452943865fee0755ba56b93920a94b85408d029',
 }
 
 
@@ -23,9 +25,10 @@ def check_frames(directory,names):
                 raise ValueError('6210 PUK frame differs: '+name)
 
 
-def profile(retries=0,registered=False,pin=b'1234\xff\xff\xff\xff'):
+def profile(retries=0,registered=False,pin=b'1234\xff\xff\xff\xff',puk_attempts=10):
     card=bytearray(make_profile(True)+bytes.fromhex('00f110')+b'\xff'*43)
     card[3516]=retries
+    card[3518]=puk_attempts
     card[3484:3492]=pin
     if registered:
         card[1604:1609]=bytes.fromhex('00f1100001')
@@ -54,8 +57,8 @@ def check_blocked(text,card):
         raise ValueError('blocked predecessor unexpectedly unblocked or registered')
 
 
-def check_unblocked(text,initial,final):
-    if initial!=profile():
+def check_unblocked(text,initial,final,puk_attempts=10):
+    if initial!=profile(puk_attempts=puk_attempts):
         raise ValueError('PUK recovery must start from the exact blocked predecessor')
     if statuses(text,0x20) or statuses(text,0x2c)!=[(0x9000,3,10)]:
         raise ValueError('cold PUK recovery must unblock once without VERIFY shortcut')
@@ -74,6 +77,25 @@ def check_unblocked(text,initial,final):
     ],'6210 PUK recovery')
     if final!=profile(3,True,b'2468\xff\xff\xff\xff'):
         raise ValueError('PUK recovery changed unrelated card data or failed to replace PIN1')
+
+
+def check_wrong_puk(text,initial,final):
+    if initial!=profile() or final!=profile(puk_attempts=9):
+        raise ValueError('wrong PUK must consume exactly one retry without changing PIN or unrelated card data')
+    if statuses(text,0x20) or statuses(text,0x2c)!=[(0x9804,0,9)]:
+        raise ValueError('wrong PUK must reject exactly one UNBLOCK without VERIFY')
+    items=[(8+i,'Keypad 9') for i in range(8)]+[(16,'Left Softkey / Menu')]
+    for start in (20,28):
+        items.extend((start+i,'Keypad '+str(d)) for i,d in enumerate((2,4,6,8)))
+        items.append((start+4,'Left Softkey / Menu'))
+    contacts(text,'6210_puk_input',items)
+    require_ordered(text,[
+        ('confirm',r'key=Left Softkey / Menu state=1 t=32\.'),
+        ('failed UNBLOCK',r'SIM status ins=2c sw=9804'),
+        ('complete',r'6210_puk_input: wrong_complete=1 firmware_state_forcing=0'),
+    ],'6210 wrong PUK')
+    if 'Location Updating Accept acknowledged' in text:
+        raise ValueError('wrong PUK unexpectedly registered the handset')
 
 
 def check_reauthenticated(text,initial,final):

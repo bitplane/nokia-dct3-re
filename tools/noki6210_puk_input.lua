@@ -29,7 +29,7 @@ local runner=coroutine.create(function()
         machine:logerror('6210_puk_input: reauthenticated=1 firmware_state_forcing=0\n')
         return
     end
-    for i=1,8 do press('Keypad '..i,7+i) end
+    for i=1,8 do press('Keypad '..(_G.npe3_puk_wrong_only and 9 or i),7+i) end
     press('Left Softkey / Menu',16)
     assert(emu.wait(2))
     machine.screens[':screen']:snapshot('6210_puk_new_pin.png')
@@ -38,6 +38,10 @@ local runner=coroutine.create(function()
         press('Left Softkey / Menu',24+group*8)
         assert(emu.wait(2))
         machine.screens[':screen']:snapshot(group==0 and '6210_puk_confirm.png' or '6210_puk_result.png')
+    end
+    if _G.npe3_puk_wrong_only then
+        machine:logerror('6210_puk_input: wrong_complete=1 firmware_state_forcing=0\n')
+        return
     end
     assert(emu.wait(50-machine.time:as_double()))
     machine.screens[':screen']:snapshot('6210_puk_idle.png')

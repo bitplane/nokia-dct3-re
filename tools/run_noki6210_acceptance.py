@@ -280,7 +280,11 @@ def main():
                         help='use the laboratory 234-15 cell for outgoing-call or incoming-sms')
     parser.add_argument('--pin-enabled', action='store_true',
                         help='authenticate a PIN-enabled SIM before the host service')
+    parser.add_argument('--wrong-puk-first',action='store_true',
+                        help='reject a physical PUK in a separate process before cold recovery')
     args = parser.parse_args()
+    if args.wrong_puk_first and args.scenario!='security-block-cold':
+        parser.error('--wrong-puk-first requires security-block-cold')
     if args.scenario in ('security-retry','security-retry-cold','security-block-cold') and not args.coherent_cell:
         parser.error('security-retry requires --coherent-cell')
     if args.foreign_cell:
@@ -679,12 +683,44 @@ def main():
             retry_frames(run/'snap',wrong_only=True)
             if blocked:
                 puk_frames(run/'snap',('6210_pin_blocked.png',))
+            recovery_source=run
+            recovery_checkpoint=checkpoint
+            wrong_launch=None
+            if args.wrong_puk_first:
+                from tools.noki6210_puk_check import check_wrong_puk
+                wrong=run/'wrong-puk'
+                wrong.mkdir()
+                shutil.copytree(run/'nvram',wrong/'nvram')
+                shutil.copytree(run/'cfg',wrong/'cfg')
+                if (wrong/'nvram/npe3hle/sim_card').read_bytes()!=checkpoint:
+                    raise ValueError('wrong-PUK cold input differs from blocked predecessor')
+                wrong_script=root/'tools/noki6210_puk_wrong_input.lua'
+                wrong_command=list(command)
+                wrong_command[wrong_command.index('-autoboot_script')+1]=str(wrong_script)
+                wrong_command[wrong_command.index('-seconds_to_run')+1]='37'
+                wrong_launch={'invocation_id':str(uuid.uuid4()),'command':wrong_command,
+                    'run_directory':str(wrong),'source_card_sha256':hashlib.sha256(checkpoint).hexdigest(),
+                    'script_sha256':hashlib.sha256(wrong_script.read_bytes()).hexdigest(),
+                    'initial_storage':{str(path.relative_to(wrong/'nvram')):hashlib.sha256(path.read_bytes()).hexdigest()
+                        for path in sorted((wrong/'nvram').rglob('*')) if path.is_file()}}
+                (wrong/'launch.json').write_text(json.dumps(wrong_launch,indent=2)+'\n')
+                with (wrong/'console.log').open('w') as output:
+                    subprocess.run(wrong_command,cwd=wrong,stdout=output,stderr=subprocess.STDOUT,
+                                   check=True,timeout=180,env=environment)
+                check_output((wrong/'console.log').read_text(errors='replace'))
+                wrong_text=events(wrong/'error.log')
+                verify(wrong_text,runtime=True,selftest=True)
+                recovery_checkpoint=(wrong/'nvram/npe3hle/sim_card').read_bytes()
+                check_wrong_puk(wrong_text,checkpoint,recovery_checkpoint)
+                puk_frames(wrong/'snap',('6210_puk_prompt.png','6210_puk_new_pin.png',
+                                        '6210_puk_confirm.png','6210_puk_result.png'))
+                recovery_source=wrong
             cold=run/'cold-recovery'
             cold.mkdir()
-            shutil.copytree(run/'nvram',cold/'nvram')
-            shutil.copytree(run/'cfg',cold/'cfg')
+            shutil.copytree(recovery_source/'nvram',cold/'nvram')
+            shutil.copytree(recovery_source/'cfg',cold/'cfg')
             initial=(cold/'nvram/npe3hle/sim_card').read_bytes()
-            if initial!=checkpoint:
+            if initial!=recovery_checkpoint:
                 raise ValueError('cold PIN recovery input differs from predecessor')
             cold_command=list(command)
             recovery_script=root/('tools/noki6210_puk_input.lua' if blocked else 'tools/noki6210_security_input.lua')
@@ -692,7 +728,7 @@ def main():
             cold_command[cold_command.index('-seconds_to_run')+1]='57' if blocked else '37'
             cold_retry={
                 'invocation_id':str(uuid.uuid4()),'run_directory':str(cold),'command':cold_command,
-                'source_card_sha256':hashlib.sha256(checkpoint).hexdigest(),
+                'source_card_sha256':hashlib.sha256(recovery_checkpoint).hexdigest(),
                 'script_sha256':hashlib.sha256(recovery_script.read_bytes()).hexdigest(),
                 'initial_storage':{str(path.relative_to(cold/'nvram')):hashlib.sha256(path.read_bytes()).hexdigest()
                                    for path in sorted((cold/'nvram').rglob('*')) if path.is_file()},
@@ -704,12 +740,20 @@ def main():
             check_output((cold/'console.log').read_text(errors='replace'))
             cold_text=events(cold/'error.log')
             verify(cold_text,runtime=True,selftest=True)
-            (check_unblocked if blocked else check_cold)(cold_text,initial,(cold/'nvram/npe3hle/sim_card').read_bytes())
+            if blocked:
+                check_unblocked(cold_text,initial,(cold/'nvram/npe3hle/sim_card').read_bytes(),
+                                puk_attempts=9 if args.wrong_puk_first else 10)
+            else:
+                check_cold(cold_text,initial,(cold/'nvram/npe3hle/sim_card').read_bytes())
             check_registration(cold_text,(cold/'nvram/npe3hle/sim_card').read_bytes(),channel_header='1202')
             with Image.open(cold/'snap/6210_security_then_menu.png') as frame:
                 check_frame(frame,SECURITY_MENU_SHA256,'cold Messages after PIN recovery')
             if card.read_bytes()!=checkpoint:
                 raise ValueError('cold process changed its predecessor card')
+            if (recovery_source/'nvram/npe3hle/sim_card').read_bytes()!=recovery_checkpoint:
+                raise ValueError('cold recovery changed its wrong-PUK predecessor')
+            if wrong_launch:
+                cold_retry['wrong_puk_predecessor']=wrong_launch
             if blocked:
                 puk_frames(cold/'snap',('6210_puk_prompt.png','6210_puk_new_pin.png','6210_puk_confirm.png','6210_puk_idle.png'))
                 reauth=run/'cold-new-pin'
