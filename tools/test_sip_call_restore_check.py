@@ -26,12 +26,17 @@ REMOTE = 'state changed to CONFIRMED\nRequest msg BYE/\n'
 
 class SipRestoreCheckTest(unittest.TestCase):
     def test_6210_alerting_restore_rejects_media_or_missing_alert(self):
-        log = LOG.replace('phase=connected', 'phase=alerting')
+        log = LOG.replace('phase=connected', 'phase=alerting')+'6210_sip_cancel: physical Exit\n'
         remote = 'Response msg 603/INVITE/\n'
         self.check(log=log, remote=remote, phase='alerting', product='6210')
         for wrong in (LOG, log + 'gsm_call_adapter: media direction=downlink id=1 result=accepted\n'):
             with self.assertRaises(RuntimeError):
                 self.check(log=wrong, remote=remote, phase='alerting', product='6210')
+        for wrong in (log.replace('6210_sip_cancel: physical Exit',''),
+                      log.replace('6210_sip_cancel: physical Exit\n','').replace(
+                          'termination id=1','6210_sip_cancel: physical Exit\ntermination id=1')):
+            with self.assertRaisesRegex(RuntimeError,'physical Exit'):
+                self.check(log=wrong,remote=remote,phase='alerting',product='6210')
 
     def test_8850_requires_own_decoded_physical_answer(self):
         prefix = ('8850_incoming_physical: action=Call / Send\n'

@@ -1114,8 +1114,14 @@ ringing incoming call and restores exact PC, SP, RAM checksum and time.
 The outstanding SIP INVITE is rejected rather than replayed; one cause-41
 clear completes CC/RR release under the new epoch. Physical Exit dismisses
 the single missed-call notification and returns to exact registered idle.
-Answer, CONNECT and accepted media are forbidden; connected-call SIP
-restoration and speech remain unproved.
+Network clearing must complete **before** physical Exit; the key dismisses
+the notification, not the call. A fresh run against the shared Disconnect
+scheduler correction accepts termination at40.090s and reaches ended40.110s,
+before the fixture's later Exit. Missing Exit evidence or clearing after it
+is rejected. The independent3310 SIP CANCEL gate also retains ordinary
+unanswered clearing under the same radio scheduler.
+Answer, CONNECT and accepted media are forbidden in this gate; connected-call
+SIP restoration has separate gates below, and speech remains unproved.
 
 `make verify-6210-sip-cancel RUN_DIR=run_6210_sip_cancel` runs the unchanged
 acquired PMM in `npe3hle`, with fresh private NVRAM/configuration and the

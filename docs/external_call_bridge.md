@@ -1353,6 +1353,12 @@ speech; the discarded-epoch bridge summary must report uplink0. Remote RTP recei
 is not handset audio acceptance. The shared runner records `sip-handset.log` and
 rejects Lua/validity/fatal errors independently of the process exit status.
 
+The shared Disconnect scheduling correction also passes fresh NPE-3 incoming
+alerting restoration and NHM-5 v6.39 ordinary SIP CANCEL gates. NPE-3 requires
+ended before its physical Exit (not just eventual release after a key); its
+missed-call/registered-idle frames remain checked. These are cross-product
+HLE signaling regressions, not evidence of native DSP or physical RF behavior.
+
 ### Failed calls and automatic redial
 
 The tested NHM-5 v6.39 profile automatically retries a rejected outgoing call

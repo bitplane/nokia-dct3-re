@@ -582,6 +582,11 @@ def verify_restore(root, remote_text, phase='connected', product='3210', *, sign
         if not match:
             raise RuntimeError(f'missing handset restoration checkpoint: {pattern}')
         cursor += match.end()
+    if phase=='alerting' and product=='6210':
+        cleanup=log.find('6210_sip_cancel: physical Exit')
+        ended=re.search(r'incoming state id=1 epoch=2 phase=ended\b',log)
+        if cleanup<0 or ended is None or ended.end()>cleanup:
+            raise RuntimeError('6210 alerting restoration waited for physical Exit to clear')
     if signaling_only:
         summaries = re.findall(r'SIP epoch media discarded (\{[^\n]+\})', bridge)
         if len(summaries) != 1 or json.loads(summaries[0]).get('uplink') != 0 or 'dsp_hle: speech tick' in log:
