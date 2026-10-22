@@ -39,7 +39,8 @@ async def run(args):
     write_tone(root / 'sip-source.wav', 660)
     processes = []
     try:
-        with (root / 'sip-remote.log').open('w') as remote_log, (root / 'sip-bridge.log').open('w') as bridge_log:
+        with (root / 'sip-remote.log').open('w') as remote_log, (root / 'sip-bridge.log').open('w') as bridge_log, \
+                (root / 'sip-handset.log').open('w') as handset_log:
             remote_command = [str(args.pjsua.resolve()),
                 '--null-audio', '--no-tcp', '--no-vad', '--clock-rate=8000',
                 '--bound-addr=127.0.0.1', '--ip-addr=127.0.0.1', f'--local-port={args.sip_port}',
@@ -61,7 +62,8 @@ async def run(args):
                     await asyncio.sleep(0.05)
                 else:
                     raise RuntimeError('SIP endpoint did not become ready')
-            handset = await asyncio.create_subprocess_exec(*args.command)
+            handset = await asyncio.create_subprocess_exec(*args.command,
+                stdout=handset_log,stderr=asyncio.subprocess.STDOUT)
             processes.append(handset)
             for _ in range(300):
                 if handset.returncode is not None:
@@ -127,6 +129,8 @@ async def run(args):
                 raise RuntimeError('handset SIP bridge failed; inspect sip-bridge.log')
             if await asyncio.wait_for(handset.wait(), 90):
                 raise RuntimeError('handset exited unsuccessfully')
+            handset_log.flush()
+            verify_handset_health((root/'sip-handset.log').read_text(errors='replace'))
     finally:
         for process in reversed(processes):
             if process.returncode is None:
@@ -156,6 +160,13 @@ async def run(args):
         verify_failure(root, remote_text, args.sip_response, args.product, args.calls)
         return
     verify_success(root, remote_text, args)
+
+
+def verify_handset_health(text):
+    if any(marker in text for marker in ('[LUA ERROR]','Error running autoboot script','Fatal error:',
+            'Disk quota exceeded','Error writing NVRAM file','Error generating PNG')) or \
+            re.search(r'^Driver .+: [1-9]\d* errors?,',text,re.MULTILINE):
+        raise RuntimeError('handset console reports a script, validity or execution failure')
 
 
 def verify_downlink_lifecycle(log):
@@ -451,10 +462,13 @@ def verify_failure(root, remote_text, status, product='3210', calls=1):
 def verify_outgoing_restore(root, remote_text, connected=False, product='3210', *, signaling_only=False):
     bridge = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
+    if product=='8290':
+        from tools.nsb7_sip_check import check_restore
+        check_restore(log)
     number = {'6210': '1234567', '6250': '123', '8210': '1234567', '8890': '1234567'}.get(product, '5551234')
     if not re.search(outgoing_setup_pattern(product), log):
         raise RuntimeError('restored outgoing call lacks the product SETUP frame')
-    if product in ('6210', '6250', '8210', '8850', '8890'):
+    if product in ('6210', '6250', '8210', '8290', '8850', '8890'):
         try:
             from tools.radio_outgoing_call_trace_check import SETUP, decode_called_digits
         except ModuleNotFoundError:
@@ -677,7 +691,7 @@ def main():
                              args.signaling_only and args.product=='8290' and
                              (not args.incoming or args.ready_file is not None) and args.sip_response==200 and
                              args.calls==1 and not args.record_media and not args.restore_idle and
-                             not args.restore_call and not args.restore_outgoing and not args.cancel_incoming)
+                             not args.restore_call and (not args.restore_outgoing or not args.incoming) and not args.cancel_incoming)
     if args.signaling_only and not signaling_connected:
         parser.error('--signaling-only requires a single verified product SIP-200 fixture, with connected restoration only')
     if args.product=='8290' and not signaling_connected:

@@ -2381,8 +2381,9 @@ PCM received127, dropped0. Received remote media is not proof of handset
 audio. `sip-result.json` explicitly records `speech_tested=false` and
 `native_dsp_complete=false`. No unproved NSB-7 PCM clock is enabled.
 The shared runner admits one signaling-only SIP200 call in either direction;
-incoming additionally requires a fresh handset-readiness artifact. Restoration,
-recording/media and multiple-call modes remain rejected for this product.
+incoming additionally requires a fresh handset-readiness artifact. Connected
+outgoing restoration has separate acceptance below. Incoming restoration,
+pending-call restoration, recording/media and multiple-call modes remain rejected.
 
 After preparing the isolated run from the qualified source, reproduce with
 the build paths from [the host bridge contract](external_call_bridge.md).
@@ -2436,6 +2437,41 @@ The readiness path must not exist before launch.
 ```sh
 .venv/bin/python tools/nsb7_sip_check.py roms/noki8290/8290f522a.fls tmp/nsb7-sip-incoming --incoming
 ```
+
+## Connected outgoing SIP restoration
+
+`nsb7_sip_outgoing_restore.lua` uses the same own-source authenticated physical
+dial sequence and saves the connected handset at60s. Loading after0.5s restores
+all37 ARM/banked registers, complete-RAM digest, PC/SP and emulated time exactly;
+both snapshots retain the reviewed Call1 pixels. This checks handset architecture,
+not replay of an external SIP dialog or a protocol-replay interval.
+
+The existing request1 republishes under epoch2. The bridge closes the old real
+dialog with BYE, submits one cause41 termination and never redials. Ordered GSM
+Disconnect/Release/Release Complete and RR closure end the restored call.
+Physical End66, Menu70 and End73 leave exact registered idle at76s. The complete
+card remains unchanged, the own flash journal validates and RTC ticks are continuous.
+
+An unclocked voice peer can publish erased uplink placeholders (`good=0`); these
+are not speech and are discarded by the bridge. Acceptance forbids `good=1`
+uplink and DSP speech ticks, requires discarded-epoch bridge uplink0, and keeps
+`speech_tested=false`/`native_dsp_complete=false`. Incoming and provisional-call
+restoration remain unqualified.
+
+Prepare fresh isolated storage as above, then run the same SIP command with
+`--restore-outgoing`, script `../tools/nsb7_sip_outgoing_restore.lua`, and an82s
+guard. The qualified capture uses `tmp/nsb7-sip-outgoing-restore-clean`, SIP25276
+and HTTP18944. Revalidate with:
+
+```sh
+.venv/bin/python tools/nsb7_sip_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-sip-outgoing-restore-clean --restore-outgoing
+```
+
+The shared SIP runner captures MAME stdout/stderr in `sip-handset.log` and rejects
+Lua, validity and fatal execution errors even when the process exits zero.
+The restore checker additionally requires that healthy console and the actual
+`.sta` file; successful network clearing alone cannot qualify a broken fixture.
 
 ## Connected host-call restoration
 

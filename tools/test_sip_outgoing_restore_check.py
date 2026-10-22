@@ -1,6 +1,7 @@
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from tools.run_sip_handset_gate import verify_outgoing_restore
 
@@ -28,6 +29,25 @@ REMOTE = 'Response msg 180/INVITE/\nRequest msg CANCEL/\nResponse msg 487/INVITE
 
 
 class SipOutgoingRestoreCheckTest(unittest.TestCase):
+    def test_8290_connected_restore_composes_product_and_sip_checks(self):
+        from tools.test_nsb7_sip_check import restore_fixture
+        log=('GSM service uplink sapi=0 pd=03 message=05 length=18 '
+             'data=03450404600201805e0581551532f4150101\n'+restore_fixture())
+        log=log.replace('termination id=1 cause=41 result=accepted',
+            'outgoing termination consumed id=1 cause=41\ntermination id=1 cause=41 result=accepted')
+        bridge=BRIDGE+'SIP epoch media discarded {"uplink":0}\n'
+        remote='state changed to CONFIRMED\nRequest msg BYE/\n'
+        with patch('tools.nsb7_sip_check.check_authentication'):
+            result=self.check(log=log,bridge=bridge,remote=remote,connected=True,
+                              product='8290',signaling_only=True)
+            self.assertIn('"speech_tested": false',result)
+            self.assertIn('"native_dsp_complete": false',result)
+            for bad in (log+'\ntermination id=1 cause=41 result=accepted',
+                        log.replace('81551532f4','81551532f5')):
+                with self.assertRaises((RuntimeError,ValueError)):
+                    self.check(log=bad,bridge=bridge,remote=remote,connected=True,
+                               product='8290',signaling_only=True)
+
     def test_6210_requires_own_physically_dialed_number(self):
         log = LOG.replace('5551234', '1234567').replace(
             '03450401a05e0581551532f4150101', '03450401a05e0581214365f7150101')

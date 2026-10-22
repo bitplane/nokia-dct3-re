@@ -16,18 +16,19 @@ local input=coroutine.create(function()
     steps[#steps+1]={28,'Send'}
     steps[#steps+1]={40,'End'}
     for _,step in ipairs(_G.nsb7_outgoing_call_followup or {}) do steps[#steps+1]=step end
+    -- Save/load cancels these waits; restoration fixtures own their new input sequence.
     for _,step in ipairs(steps) do
-        assert(emu.wait(step[1]+delay-machine.time:as_double()))
+        if not emu.wait(step[1]+delay-machine.time:as_double()) then return end
         local field=assert(fields[step[2]])
         machine:logerror(string.format('nsb7_outgoing_call_input: key=%s state=1 t=%.9f\n',step[2],machine.time:as_double()))
         field:set_value(1)
-        assert(emu.wait(0.2))
+        if not emu.wait(0.2) then field:set_value(0); return end
         field:set_value(0)
         machine:logerror(string.format('nsb7_outgoing_call_input: key=%s state=0 t=%.9f\n',step[2],machine.time:as_double()))
-        assert(emu.wait(0.8))
+        if not emu.wait(0.8) then return end
         machine.screens[':screen']:snapshot('nsb7_outgoing_call_'..(step[1]+delay)..'.png')
     end
-    assert(emu.wait(50+delay-machine.time:as_double()))
+    if not emu.wait(50+delay-machine.time:as_double()) then return end
     machine.screens[':screen']:snapshot('nsb7_outgoing_call_final.png')
     machine:logerror(string.format('nsb7_outgoing_call_done: t=%.9f\n',machine.time:as_double()))
     machine:exit()

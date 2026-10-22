@@ -1325,10 +1325,17 @@ physical Answer or dialing and End, CC/RR clearing, exact UI/storage and retaine
 product-owned by `nsb7_sip_check.py`; reproduction lives in
 [the NSB-7 contract](8290_bringup.md#outgoing-real-sip-signaling).
 The runner requires `--product 8290 --signaling-only`; incoming also requires
-a fresh handset-readiness artifact. Restoration, recording/media and
-multiple-call combinations remain rejected. Its result
+a fresh handset-readiness artifact. Connected outgoing restoration is separately
+qualified by `nsb7_sip_outgoing_restore.lua` and `--restore-outgoing`: exact37-register/
+RAM/time restoration invalidates the original SIP dialog with BYE, one cause41
+clear under the new epoch and no redial. Physical End/Menu recovery, exact pixels,
+whole-card persistence and retained RTC remain required. Incoming/provisional
+restoration, recording/media and multiple-call combinations remain rejected. Its result
 explicitly keeps speech/native-DSP claims false and requires zero handset
-uplink media. Remote RTP receipt is not handset audio acceptance.
+qualified uplink media. Erased `good=0` placeholders after load do not qualify as
+speech; the discarded-epoch bridge summary must report uplink0. Remote RTP receipt
+is not handset audio acceptance. The shared runner records `sip-handset.log` and
+rejects Lua/validity/fatal errors independently of the process exit status.
 
 ### Failed calls and automatic redial
 
