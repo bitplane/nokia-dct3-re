@@ -841,6 +841,19 @@ def decode_pcm_conversion(words):
             'scope':'Argument-14 source contract only, not other shift arguments, decoder sample correctness or native audio acceptance'}
 
 
+MONO_OUTPUT_BASE = 0x23df6
+MONO_OUTPUT_WITNESS = (0x60f8, 0xa89c, 1, 0xf820, 0x3dfd, 0x1006, 0x8005)
+
+
+def decode_mono_output(words):
+    for offset, expected in enumerate(MONO_OUTPUT_WITNESS):
+        if words.get(MONO_OUTPUT_BASE + offset) != expected:
+            raise ValueError('original mono output-selection witness changed')
+    return dict(channel_count='a89c', mono_value=1, source_stack_word=6,
+                duplicated_stack_word=5, pinned_words=len(MONO_OUTPUT_WITNESS),
+                scope='Mono aliases the second conversion source to the first after the return-pointer observation; not two independently decoded channels')
+
+
 DECODER_FRAMING_BASE = 0x23D73
 DECODER_INPUT_DESCRIPTOR_WITNESSES = (
     (0x2973c,(0x4a11,0xeeff,0x8811,0xf495,0xf495,0x10e1,1,0x0881,0xee01,0x8a11,0xf4e4)),

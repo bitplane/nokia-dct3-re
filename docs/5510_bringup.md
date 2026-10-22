@@ -72,6 +72,14 @@ lengths, file offsets or completions, replay RAM, fit a lag, change the
 converter or substitute reference samples. These results establish neither
 whole-handset boot, complete music playback, analog audio nor native speech.
 
+A separate original ISO MPEG-2 LC mono vector now has an isolated native
+ABI prefix: 342 packets / 350208 mono samples, exact consumed-input coverage
+and source-derived mono conversion/duplication. The unchanged final packet
+remains behind the wrapper's short-input boundary. The original 24-bit
+reference is acquired and checksum-qualified, but waveform alignment and
+codec conformance are not established. See
+[original AL09 acceptance](aac_validation.md#original-mpeg-2-al09-input).
+
 CPU admission remains fail-closed. In particular, short Smem MOD=3
 preincrement is write-only (SPRU131G table 5-4). The
 corrections below cover selected read families, not the entire ISA. Remaining

@@ -114,6 +114,57 @@ AL00 is a baseline sine-sweep candidate: the acquired MP4 is AAC-LC, mono,
 unresolved delay/trimming contract, not permission to search for a best fit.
 Neither file has yet been executed through the native decoder.
 
+### Original MPEG-2 AL09 input
+
+The separate original ISO/IEC 13818-4:2004 suite remains available through
+its [AAC directory](https://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_IEC_13818-4_2004_Conformance_Testing/AAC/).
+The local ignored collection `roms/research/mpeg2-aac-conformance/` contains
+unchanged `compressedAdts/al09_44.adts`, `referencesWav/al09_44.wav`, the
+publisher's individual MD5 files, README and retrieval provenance. Both MD5s
+match the original files. These are ISO research assets, not project-licensed
+MAME ROMs or generated replacements.
+
+| Original file | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `al09_44.adts` | 64048 | `3117cfade03058ffceaf8953727bf84e03ba9c98652cb14bd7523bda4dcb72a6` |
+| `al09_44.wav` | 1047764 | `a30567dea5f0869a8a1fa9ac04c3f97876d39671ae61acf11bf7ba41b69f048a` |
+
+The source has 343 complete CRC-bearing MPEG-2 LC mono packets at 44.1 kHz.
+The reference has 349184 mono 24-bit samples (341 blocks); this difference
+does not authorize fitting or silently dropping samples. The separately named
+`mu4aac -bios isoal09` performs one native call; `-bios isoal09stream`
+attempts all packets without appended lookahead or reservoir modifications.
+The strict stream completes 342 calls / 63901 consumed bytes, with all 35011
+observed input reads bound to the unchanged source, then returns `ffff`
+before decoding the last 147-byte packet. The qualifier accepts this known
+short-input boundary, **not** full-stream success, CRC checking or conformance.
+
+At return, the observer sees source pointers `e800,f000`. Original AA99
+`023df6..023dfc` compares channel count `a89c` with one and aliases stack
+word 5 to word 6 for mono before conversion. Consequently only the first raw
+pointer is a decoded-channel source; the other raw capture is not a second
+channel. All 350208 first-source words independently reproduce both native
+converted copies using the established argument-14 conversion. This is a
+conversion/dataflow result, not comparison against the ISO reference waveform.
+Alignment, applicable accuracy criteria, unquantized normalization and final
+packet handling remain open.
+
+Place the unchanged container and ADTS file in a private `mu4aac/` ROM
+directory. From an isolated working directory, run the MAME binary with
+`mu4aac -bios isoal09stream -rompath PRIVATE_ROMS -video none -sound none
+-nothrottle -noreadconfig -log -nonvram_save -seconds_to_run 46`, recording
+console output as `console.log`. Exit 3 must report exactly
+`MU4 AAC wrapper returned without a new decoded block`; then qualify with:
+
+```sh
+.venv/bin/python tools/mu4_iso_aac_check.py RUN \
+  --input roms/research/mpeg2-aac-conformance/al09_44.adts \
+  --reference roms/research/mpeg2-aac-conformance/al09_44.wav \
+  --source-a00 roms/5510-mu4-reference/InitData_R060.a00
+```
+
+### MPEG-4 AL00 ABI prerequisites
+
 The MP4 AudioSpecificConfig bytes are `12 00 05 04 00 00 00 00`:
 audio object type 2, sampling index 4, channel configuration zero. The
 decoded mono layout therefore must not be substituted for a fixed channel

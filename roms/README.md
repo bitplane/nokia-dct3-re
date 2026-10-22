@@ -169,6 +169,20 @@ handset ROMs. `--fixture-dir` exports them only into ignored private fixture
 storage; the native acceptance scope is documented in
 `docs/cobba_control_boundary.md#native-efr-dtx-conversation`.
 
+### Original ISO MPEG-2 AAC research input
+
+`roms/research/mpeg2-aac-conformance/` retains original `al09_44.adts` and
+its 24-bit mono `al09_44.wav` reference from the
+[ISO/IEC 13818-4:2004 AAC suite](https://standards.iso.org/ittf/PubliclyAvailableStandards/ISO_IEC_13818-4_2004_Conformance_Testing/AAC/).
+Both files match the separately acquired publisher MD5 files; the local
+`provenance.json` records URLs, byte sizes and SHA-256. The original README
+classifies compressed ADTS and reference waveforms as normative inputs.
+Keep these assets unmodified, ignored and subject to ISO's original terms;
+they are not project-licensed MAME ROMs. Acquisition and native packet
+acceptance do not establish audio conformance or handset playback. See
+`docs/aac_validation.md#original-mpeg-2-al09-input` for exact identities and
+the still-open alignment/end-buffer contract.
+
 ### Nokia 5110 DSP ROM4 research input
 
 A complete 5110 ROM4 DSP mask image was historically published by AlexD in
