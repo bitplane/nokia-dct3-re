@@ -5,6 +5,16 @@ from pathlib import Path
 import re
 
 
+# Big-endian Thumb, reviewed against the acquired NHM-3 v5.03 image.
+# Pin the consuming operations as well as their pool/table constants.
+CONTROL_CODE = (
+    (0x3fbc40, '49ea880940018029', 'inactive keep-mask/store'),
+    (0x3fbc54, '48e588008829400804000c008028', 'active keep-mask/store'),
+    (0x3fbc62, '49f17c2200525a8943018029', 'selector-indexed OR/store'),
+    (0x429de6, '4ad405230d1b431a04120c144ad2e7f5', 'command-8 wire encoding'),
+)
+
+
 def recover(image):
     def u16(address):
         offset = address - 0x200000
@@ -25,6 +35,11 @@ def recover(image):
     keep = u16(0x263160)
     if adds != [0x200]*5 or keep != 0xfdff:
         raise ValueError("speech add/remove field differs")
+    for address, encoding, meaning in CONTROL_CODE:
+        expected = bytes.fromhex(encoding)
+        offset = address - 0x200000
+        if image[offset:offset + len(expected)] != expected:
+            raise ValueError(f"speech instruction contract differs: {meaning} at {address:06x}")
     return 0x200
 
 

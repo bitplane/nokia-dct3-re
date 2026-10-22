@@ -1611,6 +1611,10 @@ speech requests on field `0200`; no physical bit meaning is assigned.
 `noki6250_audio_observe.lua` passively traces helper calls, field selection
 and writes during the incoming physical Answer/End fixture. Validate the
 own ROM plus a 35-second run using `noki6250_speech_control_check.py ROM LOG`.
+The static check pins the big-endian Thumb keep-mask, selector-indexed OR/store
+and command-8 encoding instructions as well as their literal/table values;
+matching constants alone cannot qualify a changed consumer. Runtime acceptance
+separately requires the ordered Answer/End control publications.
 The normal call-signaling checker also passes after this configuration.
 
 This does not establish working audio. The conservative 6250 profile has
