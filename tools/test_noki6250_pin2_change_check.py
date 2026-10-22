@@ -3,9 +3,9 @@ from tools.noki6250_pin_retry_check import registered_card
 from tools.noki6250_pin2_change_check import actions,check
 
 
-def fixture():
+def fixture(old='5678',new='8765'):
     lines=[]
-    for second,key in actions():
+    for second,key in actions(old,new):
         lines += [f'6250_pin2_input: key={key} state=1 t={second}.000000000',
                   f'6250_pin2_input: key={key} state=0 t={second}.150000000']
         if second==12:
@@ -17,11 +17,23 @@ def fixture():
                       'SIM status ins=24 sw=9000 chv=3/3 puk=10/10 enabled=1']
     lines.append('6250_pin2_input: complete=1 firmware_state_forcing=0')
     card=bytearray(registered_card())
-    card[3492:3500]=b'8765\xff\xff\xff\xff'
+    card[3492:3500]=new.encode('ascii')+b'\xff'*4
     return '\n'.join(lines),bytes(card)
 
 
 class Pin2ChangeTest(unittest.TestCase):
+    def test_installed_pin2_can_be_the_cold_current_credential(self):
+        text,card=fixture('8765','2468')
+        check(text,card,old='8765',new='2468')
+        with self.assertRaises(ValueError):
+            check(text,card,old='5678',new='2468')
+
+    def test_pin2_values_require_four_ascii_digits(self):
+        text,card=fixture()
+        for value in ('123','12345','12x4','\uff11\uff12\uff13\uff14'):
+            with self.subTest(value=value),self.assertRaises(ValueError):
+                check(text,card,new=value)
+
     def test_physical_change_contract(self):
         check(*fixture())
 

@@ -917,7 +917,12 @@ an inherited sibling rejection screen. `verify-6250-pin2-change` separately
 proves ordinary physical5678->8765 CHANGE CHV2, unchanged allowances and exact
 complete-card preservation, with eleven own route/editor/result/idle/Menu
 frames. Its Settings security item needs four Down presses, not the6210's
-five. Cold new-PIN2 authentication, rejection/exhaustion and PUK2 remain unqualified.
+five. `verify-6250-pin2-change-cold` additionally inherits the complete installed
+card/state in a separate process and accepts8765 as the current PIN2 in another
+successful physical change to2468. All22 frames, retained-location registration,
+complete card transitions and unchanged predecessor artifacts pass. This is
+credential acceptance via CHANGE CHV2, not standalone VERIFY. Rejection/
+exhaustion and PUK2 remain unqualified.
 
 `verify-6250-ussd` separately establishes the physical USSD exchange and reviewed
 NHM-3 result/idle frames on its declared derived-PMM research comparison. The

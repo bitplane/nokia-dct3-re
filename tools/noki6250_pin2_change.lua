@@ -29,7 +29,8 @@ local runner=coroutine.create(function()
     press('Left Softkey / Menu',42)
     for second=44,45 do press('Scroll Down',second) end
     press('Left Softkey / Menu',47)
-    for _,phase in ipairs({{50,'5678'},{58,'8765'},{66,'8765'}}) do
+    local old,new=_G.nhm3_pin2_old or '5678',_G.nhm3_pin2_new or '8765'
+    for _,phase in ipairs({{50,old},{58,new},{66,new}}) do
         for index=1,4 do press('Keypad '..phase[2]:sub(index,index),phase[1]+index-1) end
         press('Left Softkey / Menu',phase[1]+4)
     end

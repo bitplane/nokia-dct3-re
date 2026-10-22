@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 764 gates: 566 generated from typed steps, 198 copied verbatim (shell).
+# 765 gates: 567 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -433,11 +433,11 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6250-coherent-registration verify-6250-slow-pin-registration \
 	verify-6250-pin-retry verify-6250-pin-retry-cold verify-6250-puk-recovery \
 	verify-6250-wrong-puk-recovery verify-6250-permanent-puk-loss \
-	verify-6250-pin2-change verify-6250-pin-host-incoming-call \
-	verify-6250-pin-host-incoming-sms verify-6250-pin-host-outgoing-call \
-	verify-6250-pin-host-outgoing-sms verify-6250-pin-phonebook \
-	verify-6250-pin-host-rejected-sms verify-6250-pin-host-silent-sms \
-	verify-6250-coherent-host-incoming-call \
+	verify-6250-pin2-change verify-6250-pin2-change-cold \
+	verify-6250-pin-host-incoming-call verify-6250-pin-host-incoming-sms \
+	verify-6250-pin-host-outgoing-call verify-6250-pin-host-outgoing-sms \
+	verify-6250-pin-phonebook verify-6250-pin-host-rejected-sms \
+	verify-6250-pin-host-silent-sms verify-6250-coherent-host-incoming-call \
 	verify-6250-coherent-host-outgoing-call \
 	verify-6250-coherent-host-incoming-sms verify-6250-coherent-host-outgoing-sms \
 	verify-6250-coherent-host-rejected-sms verify-6250-coherent-host-silent-sms \
@@ -5170,6 +5170,9 @@ verify-6250-permanent-puk-loss: build
 
 verify-6250-pin2-change: build
 	$(VENV)/bin/python tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario pin2-change --mame $(MAME_DIR)/mame
+
+verify-6250-pin2-change-cold: build
+	$(VENV)/bin/python tools/run_noki6250_pin2_cold.py $(RUN_DIR) --mame $(MAME_DIR)/mame
 
 verify-6250-pin-host-incoming-call: build
 	$(VENV)/bin/python tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario host-incoming-call --coherent-cell --pin-enabled --mame $(MAME_DIR)/mame

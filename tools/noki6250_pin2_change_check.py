@@ -29,21 +29,23 @@ FRAMES={
 }
 
 
-def actions():
+def actions(old='5678',new='8765'):
     items=[(8+i,'Keypad '+digit) for i,digit in enumerate('1234')]
     items += [(12,'Left Softkey / Menu'),(20,'Left Softkey / Menu')]
     for times,select in ((range(22,25),26),(range(28,32),34),(range(36,40),42),(range(44,46),47)):
         items += [(second,'Scroll Down') for second in times]+[(select,'Left Softkey / Menu')]
-    for start,digits in ((50,'5678'),(58,'8765'),(66,'8765')):
+    for start,digits in ((50,old),(58,new),(66,new)):
         items += [(start+i,'Keypad '+digit) for i,digit in enumerate(digits)]+[(start+4,'Left Softkey / Menu')]
     return items+[(76,'End'),(78,'Left Softkey / Menu')]
 
 
-def check(text,card):
+def check(text,card,*,old='5678',new='8765'):
+    if any(len(value)!=4 or not value.isascii() or not value.isdigit() for value in (old,new)):
+        raise ValueError('qualified PIN2 changes require four ASCII digits')
     expected=bytearray(registered_card())
-    expected[3492:3500]=b'8765\xff\xff\xff\xff'
+    expected[3492:3500]=new.encode('ascii')+b'\xff'*4
     if card!=bytes(expected):
-        raise ValueError('PIN2 change altered unrelated card contents or did not install8765')
+        raise ValueError('PIN2 change altered unrelated card contents or did not install the expected value')
     if any(statuses(text,ins,chv)!=[(0x9000,3,10)] for ins in (0x20,0x24) for chv in (1,2)):
         raise ValueError('NHM-3 requires successful PIN1 authentication and one CHANGE CHV2')
     if re.findall(r'header cla=a0 ins=20 p1=00 p2=(\w\w) p3=08',text)!=['01'] or \
@@ -51,7 +53,7 @@ def check(text,card):
         raise ValueError('PIN2 change addressed incorrect CHV selectors')
     if any(statuses(text,ins) for ins in (4,0x26,0x28,0x2c,0x44,0xdc)):
         raise ValueError('PIN2 change unexpectedly changed card validity, mode or records')
-    contacts(text,'6250_pin2_input',actions())
+    contacts(text,'6250_pin2_input',actions(old,new))
     require_ordered(text,[
         ('PIN1',r'SIM status ins=20 sw=9000'),
         ('registered',r'LAPDm Location Updating Accept acknowledged'),

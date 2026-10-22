@@ -698,6 +698,22 @@ upload/initial-record, console-health and coherent registration checks pass.
 Capture: `tmp/nhm3-pin2-change-banked`. This is not cold authentication of the
 installed PIN2, wrong-PIN2 handling, exhaustion or PUK2 recovery.
 
+`make verify-6250-pin2-change-cold` separately runs the installation gate and an
+independent cold Settings change. Every NVRAM/config/local-ROM file is copied
+from the completed installation; the entire cold card must equal its saved
+predecessor with PIN2=8765. Physical PIN1 authentication precedes the retained-
+location registration lifecycle. The same own menu route then uses8765 as the
+current PIN2 and successfully changes it to2468. No standalone CHV2 VERIFY is
+claimed: acceptance of the installed credential is through CHANGE CHV2.
+
+Both processes require all eleven own-product frames, exact contacts/selectors/
+result ordering and complete-card preservation. Only PIN2 changes in the cold
+process; both CHV/PUK allowances remain3/10, and the already-valid location stays
+unchanged. All predecessor artifacts remain hash-identical. Distinct launch
+identities, actual commands, MAME/base-fixture/wrapper hashes and complete cold
+input-storage hashes are recorded. Capture: `tmp/nhm3-pin2-cold-banked`.
+Wrong-PIN2 rejection, exhaustion and PUK2 recovery remain separate targets.
+
 Run `noki6250` with private working/NVRAM/config directories, the acquired
 product ROMs, `-noreadconfig -log -video none -sound none -nothrottle`,
 `-autoboot_delay 0 -seconds_to_run 9` and
