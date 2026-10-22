@@ -3,7 +3,7 @@ _G.nsb7_security_continue=true
 local source=debug.getinfo(1,'S').source:sub(2)
 local directory=assert(source:match('^(.*[/\\])'))
 local scenario=_G.nsb7_state_scenario or 'idle'
-assert(scenario=='idle' or scenario=='call' or scenario=='sms' or scenario=='incoming_call' or scenario=='toolkit_menu')
+assert(scenario=='idle' or scenario=='call' or scenario=='sms' or scenario=='incoming_call' or scenario=='toolkit_menu' or scenario=='ussd')
 local observer=_G.nsb7_state_observer or (scenario=='call' and 'nsb7_outgoing_call_observe.lua' or
     scenario=='incoming_call' and 'nsb7_call_observe.lua' or 'nsb7_page_observe.lua')
 dofile(directory..observer)
@@ -57,11 +57,11 @@ retained[#retained+1]=emu.add_machine_post_load_notifier(function()
             machine:exit()
             return
         end
-        if scenario=='call' or scenario=='incoming_call' or scenario=='toolkit_menu' then
+        if scenario=='call' or scenario=='incoming_call' or scenario=='toolkit_menu' or scenario=='ussd' then
             local incoming=scenario=='incoming_call'
             local end_time=_G.nsb7_state_end_time or (incoming and 27 or 40)
             local finish_time=_G.nsb7_state_finish_time or (incoming and 35 or 50)
-            local prefix=scenario=='toolkit_menu' and 'nsb7_toolkit_state_input' or
+            local prefix=scenario=='ussd' and 'nsb7_ussd_state_input' or scenario=='toolkit_menu' and 'nsb7_toolkit_state_input' or
                 incoming and 'nsb7_call_input' or 'nsb7_outgoing_call_input'
             assert(emu.wait(end_time-machine.time:as_double()))
             local key

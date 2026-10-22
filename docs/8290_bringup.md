@@ -2519,6 +2519,17 @@ multi-turn dialogue or native DSP/RF/speech. Without the physical End dismissal,
 the same early request remains pending behind the startup presentation and the
 planned Read key enters the menu instead; that run is not reply acceptance.
 
+For pending-editor restoration, use the same fixture/cold storage and run
+`tools/nsb7_network_ussd_state.lua`, then the checker above with `--state`.
+Save at 29.25 seconds follows physical Answer and precedes all reply input.
+Both branches physically press 2 at 29.75 and Send at 30.75. The exact reply
+occurs at 31.223902 in each branch; all 37 ARM/banked registers, RAM checksum,
+time and the three-second radio/SIM/RTC/SS replay agree. Both branches show the
+same Done frame; restored End at 36 seconds recovers exact idle at 38 with the
+complete card unchanged. Capture: `tmp/nsb7-network-ussd-state`.
+This tests a pending laboratory dialogue, not restoration of an external host
+session or arbitrary continuation.
+
 ## Host incoming call from settled idle
 
 `nsb7_pin_host_incoming_call.lua` composes physical PIN/phone-code entry with

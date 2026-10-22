@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_pending_network_ussd_restore", "owner": "gsm_network", "status": "satisfied",
+      "predicate": "NSB-7 restores a pending network-originated laboratory USSD editor and replays the physical reply identically",
+      "current": "Save29.25s precedes numeric2 at29.75 and Send30.75 in each replay. All37 ARM/banked registers, RAM checksum and time restore exactly; three-second radio/SIM/RTC/SS traces match. Each branch emits one exact8b3a12a210020101300b02013c300604010f040132 at31.223902s, validates transaction8b/invoke1 and completes network/RR release. Done pixels match; restored End36 reaches exact idle38. Own flash/journal, authentication and unchanged whole card pass. No external host-session or native speech/RF/DSP claim.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_network_ussd_state.lua", "tools/nsb7_state_roundtrip.lua", "tools/nsb7_network_ussd_request_check.py", "tools/test_nsb7_network_ussd_request_check.py"]
+    },
+    {
       "id": "nsb7_network_ussd_physical_reply", "owner": "gsm_network", "status": "satisfied",
       "predicate": "Authenticated NSB-7 physically answers one network-originated laboratory request and recovers exact idle/Menu with unchanged card",
       "current": "Correct29-byte REGISTER arrives21.455s. Physical End24 dismisses startup presentation; Read26/Answer28/Keypad2 at30/Send32 yield8b3a12a210020101300b02013c300604010f040132 at32.247s. Parser verifies transaction8b/invoke1; RELEASE COMPLETE precedes RR release32.279s and firmware Done. End36/Menu38 recover exact frames. Six reviewed frames, own flash/journal, pre-request authentication and complete unchanged3570-byte card pass. No arbitrary host continuation/native RF/DSP/speech claim.",
