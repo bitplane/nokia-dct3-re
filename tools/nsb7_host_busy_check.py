@@ -24,7 +24,7 @@ FRAMES={
 }
 
 
-def check(text):
+def check_physical_recovery(text):
     check_authentication(text.split('nsb7_host_outgoing_ready:',1)[0])
     boundary='nsb7_outgoing_call_input: key=Left Softkey / Menu state=1 t=70.'
     primary=check_inputs(text.split(boundary,1)[0],delay=26)
@@ -38,6 +38,8 @@ def check(text):
         code=0x19 if key=='Left Softkey / Menu' else 0x0e if key=='Send' else 0x0f if key=='End' else int(key[-1])
         if f'nsb7_key_decode: key={code:02x} observer_writes=0' not in text[rows[index].end():rows[index+1].start()]:
             raise ValueError('busy/recovery physical contact did not decode')
+def check(text):
+    check_physical_recovery(text)
     check_host(text)
     check_outcome(text,'busy',require_deferred_decision=True)
     require_ordered(text,[

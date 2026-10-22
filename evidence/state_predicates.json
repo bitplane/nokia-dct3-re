@@ -1766,6 +1766,12 @@
       "evidence": ["docs/8290_bringup.md", "fixtures/nsb7_toolkit_events/nsb7hle.cfg", "fixtures/nsb7_toolkit_timer/nsb7hle.cfg", "tools/nsb7_toolkit_capability.lua", "tools/nsb7_toolkit_check.py", "tools/test_nsb7_toolkit_check.py"]
     },
     {
+      "id": "nsb7_host_unanswered_physical_release", "owner": "nsb7_host_telephony", "status": "satisfied",
+      "predicate": "Authenticated NSB-7 host-decided alerting remains unconnected and clears through physical End with exact UI/storage recovery",
+      "current": "An isolated own-source cold research-HLE run authenticates PIN before registration and settled45s idle. Physical5551234/Send publishes request1/epoch1; wrong-ID and duplicate decisions reject while exactly one outcome2 is accepted. One assignment reaches ALERTING without CONNECT/ACK. Physical End66 initiates full CC/RR release; host phases are exactly alerting/ended with zero media sequences. Physical Menu70/End73, exact ready/alerting/menu/final frames, continuous retained RTC, valid own flash journal and complete unchanged card pass. The Call1 pixels at60s do not establish connection. Remote timeout, speech and native DSP remain unproved.",
+      "evidence": ["docs/8290_bringup.md", "fixtures/nsb7_host/nsb7hle.cfg", "tools/nsb7_pin_host_busy.lua", "tools/nsb7_host_no_answer_check.py", "tools/test_nsb7_host_no_answer_check.py", "tools/run_host_call_adapter_gate.py"]
+    },
+    {
       "id": "nam1_display_frontier", "owner": "nam1_firmware", "status": "satisfied",
       "predicate": "Nokia 3610 v5.11 organically reaches a deterministic firmware-rendered display boundary through product-owned GENSIO and geometry contracts",
       "current": "NAM-1 independently writes GENSIO control 0x22 at 0x2d, transfers CCONT bytes at 0x2c and polls 0x6d. Byte-write receive-ready releases that loop. Firmware then writes nine 96-byte display banks; a 96x65 visible area with reversed segment order renders the complete CONTACT SERVICE frame. Separate gates prove DSP bootstrap/service control, request-derived discovery, accepted application sequences 0x42/0x43, channel-0x5f use and a complete physical M2BUS terminal exchange. Missing product state remains the next boundary.",

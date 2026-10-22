@@ -26,8 +26,8 @@ machine implicitly.
 All provisioning is own-derived or explicitly synthetic external card data;
 no donor PMM, identity or firmware-state forcing is admitted. Native resident
 DSP execution, speech/COBBA, measured complete analog calibration, external
-RF and NSB-7 SIP acceptance remain unproved. Host busy/recovery is qualified;
-other failure/pending-call cases,
+RF and NSB-7 SIP acceptance remain unproved. Host busy and unanswered-alerting
+physical recovery are qualified; other failure/pending-call cases,
 AoC and further SIM Toolkit commands are not established by these gates. The supplied
 SET UP EVENT LIST and TIMER MANAGEMENT fixtures are explicitly rejected, not supported.
 Detailed contracts
@@ -2333,6 +2333,33 @@ Use `nsb7_pin_host_outgoing_state.lua` with the existing host runner's
 This qualifies epoch-safe restoration of the emulated signaling/session state
 with a cooperating WebSocket observer. It is not resurrection of an external
 SIP dialog, host audio/PCM restoration, native speech or external RF.
+
+## Host unanswered alerting and physical recovery
+
+An independent cold copy of the qualified PIN-enabled registered source uses
+`fixtures/nsb7_host/nsb7hle.cfg` and `nsb7_pin_host_busy.lua` with the external
+runner's `--decision no_answer` on localhost port18937. The shared script's
+failure-named screenshot is only a capture filename: at60s the firmware shows
+`Call 1` with Options/End call, while protocol and host state remain alerting,
+not connected. Pixels alone must not promote connection.
+
+The host rejects wrong request2, accepts exactly one outcome2 for request1/epoch1
+and rejects its duplicate. One traffic assignment reaches ALERTING without
+CONNECT/ACK. Physical End66 precedes handset DISCONNECT, network RELEASE,
+handset RELEASE COMPLETE and RR closure. Host phases are exactly alerting then
+ended, both with zero media sequences. Physical Menu70/End73 restores ordinary
+navigation and exact registered idle at76s. Complete SIM equality, own flash
+journal validity, continuous retained RTC and exact ready/alerting/menu/final
+frames pass. This qualifies cancellation of an unanswered host-decided call,
+not a remote no-answer timeout, speech or native DSP execution.
+
+```sh
+.venv/bin/python tools/nsb7_host_no_answer_check.py roms/noki8290/8290f522a.fls RUN_DIR
+```
+
+The observed capture is `tmp/nsb7-host-no-answer`; use the isolated launch
+recipe above with `--decision no_answer`, the busy/recovery Lua script and
+an82s guard. No firmware or device behavior changed.
 
 ## Host busy result and physical recovery
 
