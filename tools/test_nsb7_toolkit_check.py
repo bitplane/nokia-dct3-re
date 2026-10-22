@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 from tools.dct3_toolkit_check import display_text_events,interactive_events,menu_events
-from tools.nsb7_toolkit_check import check
+from tools.nsb7_toolkit_check import check,check_card,SMSS_OFFSET
 
 
 def fixture():
@@ -33,6 +33,45 @@ def interactive_fixture(menu=False):
 
 
 class ToolkitTest(unittest.TestCase):
+    def test_sms_storage_allows_only_exact_reference_change(self):
+        from tools.nsb7_pin_check import serialized_profile
+        from tools.nsb7_pin_registration_check import LOCI
+        initial=bytearray(serialized_profile())
+        initial[1600:1611]=LOCI
+        final=initial.copy()
+        final[SMSS_OFFSET]=0
+        check_card(bytes(initial),bytes(final),sms=True)
+        check_card(bytes(initial),bytes(initial))
+        wrong=final.copy()
+        wrong[0]^=1
+        for bad in (bytes(initial),bytes(wrong),bytes(final[:-1])):
+            with self.subTest(card=bad[:8]),self.assertRaises(ValueError):
+                check_card(bytes(initial),bad,sms=True)
+
+    @patch('tools.nsb7_toolkit_check.check_authentication')
+    def test_menu_sms_requires_network_and_terminal_completion(self,authentication):
+        from tools.test_sim_toolkit_sms_trace_check import GOOD
+        text=interactive_fixture(menu=True).replace('SIM status ins=c2 sw=9000',
+            'menu selection item=1 accepted\nproactive SEND SHORT MESSAGE ready\nSIM status ins=c2 sw=9124')
+        header='header cla=a0 ins=12 p1=00 p2=00 p3=24'
+        tail=header+GOOD.split(header,1)[1]
+        tail=tail.replace('data=2901','data=3901').replace('cp=29','cp=39').replace('data=2904','data=3904')
+        tail=tail.replace('terminal-response data=810305',
+            'header cla=a0 ins=14 p1=00 p2=00 p3=0c\nterminal-response data=810305')
+        tail+='\nupdate-binary fid=6f43 offset=0 length=2 t=87.0\n'
+        text=text.replace('nsb7_toolkit_interactive: action=menu_exit',
+                          tail+'nsb7_toolkit_interactive: action=menu_exit')
+        check(text,sms=True)
+        exit_event='nsb7_toolkit_interactive: action=menu_exit\nnsb7_key_decode: key=0f observer_writes=0'
+        early=text.replace(exit_event,'').replace('GSM service downlink kind=18',
+                    exit_event+'\nGSM service downlink kind=18')
+        for bad in (text.replace('downlink kind=18','downlink kind=19'),
+                    text.replace('810305130002028281030100','810305130002028281030120'),
+                    text.replace('fid=6f43 offset=0 length=2','fid=6f43 offset=0 length=1'),
+                    text+'\ngsm_sms_submit:',early):
+            with self.subTest(text=bad),self.assertRaises(ValueError):
+                check(bad,sms=True)
+
     @patch('tools.nsb7_toolkit_check.check_authentication')
     def test_menu_envelope_and_product_navigation(self,authentication):
         text=interactive_fixture(menu=True)

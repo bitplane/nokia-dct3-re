@@ -3,10 +3,17 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_authenticated_toolkit_send_sms",
+      "owner": "nsb7_sim_toolkit", "status": "satisfied",
+      "predicate": "A physically selected NSB-7 Toolkit SEND SHORT MESSAGE completes through laboratory CP/RP/RR with exact terminal response and bounded persistent changes",
+      "current": "Own PIN/phone-code/retained-location acceptance composes the complete interactive/menu path. Select86 emits one item1 envelope, answered9124; FETCH supplies SEND SHORT MESSAGE. One CP39/RP01 submission carries TP-MR00, destination5551234/SMSC1234567890 and8-bit SAT. Laboratory CP/RP acknowledgments precede terminal response810305130002028281030100/result00, final CP-ACK and RR release. One EF_SMSS UPDATE BINARY offset0/length2 changes only full-card byte3560 ff to00; all other3570-byte content is identical. Eleven exact frames include SAT SMS and final13:49 idle after End108. No driver/device changes, external carrier, native RF or speech claim.",
+      "evidence": ["docs/8290_bringup.md", "fixtures/nsb7_toolkit_sms/nsb7hle.cfg", "tools/nsb7_toolkit_sms.lua", "tools/nsb7_toolkit_interactive.lua", "tools/nsb7_toolkit_check.py", "tools/test_nsb7_toolkit_check.py", "tools/sim_toolkit_sms_trace_check.py"]
+    },
+    {
       "id": "nsb7_authenticated_toolkit_menu_selection",
       "owner": "nsb7_sim_toolkit", "status": "satisfied",
       "predicate": "An authenticated registered NSB-7 installs a proactive menu and emits the exact selection envelope only after physical navigation",
-      "current": "Four-command external card composes DISPLAY TEXT, GET INKEY5/OK and GET INPUT42/OK with SET UP MENU. One profile and four FETCH/response pairs end in successful menu installation. Physical Menu78/Up80/Up82/Select84 reaches DCT3 menu/Continue; the first Up passes this provisioning's Net monitor entry. Physical Select86 emits one d30702020181100101 envelope answered9000. End88 returns to exact13:49 idle. Twelve decoded actions, eleven exact frames, full authentication/retained-location registration, own flash validity and unchanged complete card pass. No driver/device change, forced UI state or injected envelope; other proactive families remain unqualified.",
+      "current": "Four-command external card composes DISPLAY TEXT, GET INKEY5/OK and GET INPUT42/OK with SET UP MENU. One profile and four FETCH/response pairs end in successful menu installation. Physical Menu78/Up80/Up82/Select84 reaches DCT3 menu/Continue; the first Up passes this provisioning's Net monitor entry. Physical Select86 emits one d30702020181100101 envelope answered9000. End88 returns to exact13:49 idle. Twelve decoded actions, eleven exact frames, full authentication/retained-location registration, own flash validity and unchanged complete card pass. No driver/device change, forced UI state or injected envelope. This fixture covers menu installation/selection; separate predicates own additional proactive command acceptance.",
       "evidence": ["docs/8290_bringup.md", "fixtures/nsb7_toolkit_menu/nsb7hle.cfg", "tools/nsb7_toolkit_menu.lua", "tools/nsb7_toolkit_interactive.lua", "tools/nsb7_toolkit_check.py", "tools/test_nsb7_toolkit_check.py"]
     },
     {

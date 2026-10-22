@@ -7,7 +7,8 @@ import sys
 if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from tools.dct3_toolkit_check import verify_display_text,verify_interactive,verify_menu
-from tools.nsb7_pin_services_check import check_authentication,check_source
+from tools.nsb7_pin_services_check import check_authentication,check_source,SMSS_OFFSET
+from tools.sim_toolkit_sms_trace_check import verify as verify_sms
 from tools.nsb7_pin_check import check_frame
 from tools.nsb7_radio_check import contract
 from tools.nsb7_storage_check import inspect
@@ -33,16 +34,30 @@ MENU_FRAMES={
     'nsb7_toolkit_menu_select.png':'a5a9b402a8ca6111d5b4fd24ab253a6bc98f73f8119d11bc3bca646915e66b8f',
     'nsb7_toolkit_menu_exit.png':INTERACTIVE_FRAMES['nsb7_toolkit_interactive_final.png'],
 }
+SMS_FRAMES={**MENU_FRAMES,
+    'nsb7_toolkit_menu_select.png':'1141f7a02395b10c1029cf16f26935cbbbbb7ae853cde9c5ad21a4ab096a723a'}
 
 
-def check(text, interactive=False, menu=False):
+def check(text, interactive=False, menu=False, sms=False):
+    menu=menu or sms
     interactive=interactive or menu
     marker='nsb7_toolkit_interactive' if interactive else 'nsb7_toolkit_physical'
     check_authentication(text.split(marker+':',1)[0])
     verifier=verify_menu if menu else verify_interactive if interactive else verify_display_text
-    verifier(text,'nsb7')
+    if sms:
+        verifier(text,'nsb7',selection_status='9124')
+        verify_sms(text,cp=0x39)
+        if text.count('update-binary fid=6f43 offset=0 length=2 ')!=1:
+            raise ValueError('expected one Toolkit SMS reference update')
+        require_ordered(text.replace('[:sim_card] ',''),[
+            ('SMS completion',r'terminal-response data=810305130002028281030100'),
+            ('radio release',r'LAPDm service Channel Release acknowledged nr=2'),
+            ('physical exit',r'nsb7_toolkit_interactive: action=menu_exit'),
+        ],'NSB-7 Toolkit SMS completion before exit')
+    else:
+        verifier(text,'nsb7')
     for instruction in ('10','12','14'):
-        expected=(4 if menu else 3) if interactive and instruction!='10' else 1
+        expected=(5 if sms else 4 if menu else 3) if interactive and instruction!='10' else 1
         if text.count(f'header cla=a0 ins={instruction} ')!=expected:
             raise ValueError('Toolkit profile/FETCH/terminal-response count differs')
     if text.count('header cla=a0 ins=c2 ')!=(1 if menu else 0):
@@ -72,29 +87,38 @@ def check(text, interactive=False, menu=False):
     ],'NSB-7 physical Toolkit dismissal')
 
 
+def check_card(initial,final,sms=False):
+    check_source(initial)
+    expected=bytearray(initial)
+    if sms:
+        expected[SMSS_OFFSET]=0
+    if final!=bytes(expected):
+        raise ValueError('Toolkit persistent SIM storage differs')
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image',type=Path)
     parser.add_argument('run',type=Path)
-    parser.add_argument('--interactive',action='store_true')
-    parser.add_argument('--menu',action='store_true')
+    mode=parser.add_mutually_exclusive_group()
+    mode.add_argument('--interactive',action='store_true')
+    mode.add_argument('--menu',action='store_true')
+    mode.add_argument('--sms',action='store_true')
     args=parser.parse_args()
     try:
         contract(args.image.read_bytes())
-        check((args.run/'error.log').read_text(),interactive=args.interactive,menu=args.menu)
+        check((args.run/'error.log').read_text(),interactive=args.interactive,menu=args.menu,sms=args.sms)
         initial=(args.run/'initial_sim_card.bin').read_bytes()
-        check_source(initial)
         storage=args.run/'nvram/nsb7hle'
-        if (storage/'sim_card').read_bytes()!=initial:
-            raise ValueError('Toolkit changed persistent SIM storage')
+        check_card(initial,(storage/'sim_card').read_bytes(),sms=args.sms)
         inspect((storage/'flash').read_bytes())
-        frames=MENU_FRAMES if args.menu else INTERACTIVE_FRAMES if args.interactive else FRAMES
+        frames=SMS_FRAMES if args.sms else MENU_FRAMES if args.menu else INTERACTIVE_FRAMES if args.interactive else FRAMES
         for name,digest in frames.items():
             check_frame(args.run/'snap'/name,digest)
     except (OSError,ValueError) as error:
         parser.exit(1,f'NSB-7 Toolkit: FAIL: {error}\n')
     print('PASS: authenticated registered Toolkit '+
-          ('menu selection' if args.menu else 'DISPLAY TEXT/GET INKEY/GET INPUT' if args.interactive else 'DISPLAY TEXT')+
+          ('SEND SHORT MESSAGE' if args.sms else 'menu selection' if args.menu else 'DISPLAY TEXT/GET INKEY/GET INPUT' if args.interactive else 'DISPLAY TEXT')+
           ', physical successful responses, exact card/UI')
 
 

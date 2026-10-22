@@ -17,7 +17,7 @@ machine implicitly.
 | UI and storage | Physical security code, menus, SIM phonebook save/cold retrieval, RTC retention and Net monitor00 clean idle. Own EEPROM journal rotation matches the complete runtime shadow. |
 | SIM security | PIN1/PIN2 change/rejection, retry persistence, exhaustion/PUK recovery and request Off/On. Permanent PUK1 rejects the card; permanent PUK2 retains ordinary PIN1/menu use. |
 | FDN | Explicit extended card; physical PIN2-authorized On/Off, Save/edit/erase/cancel and cold retrieval. Registered listed/unlisted/Off controls distinguish permitted calls from local denial. |
-| SIM Toolkit | Phase-2+ nine-byte TERMINAL PROFILE; DISPLAY TEXT, GET INKEY, GET INPUT and SET UP MENU; physical successful responses/selection ENVELOPE, exact prompts/editors/menu/idle and unchanged complete card. |
+| SIM Toolkit | Phase-2+ nine-byte TERMINAL PROFILE; DISPLAY TEXT, GET INKEY, GET INPUT, SET UP MENU and menu-driven SEND SHORT MESSAGE. Exact physical/protocol/UI acceptance; non-SMS cases preserve the full card, SMS permits only its exact EF_SMSS reference update. |
 | PCS laboratory network | Acquisition, BCCH, Location Updating/EF_LOCI, background measurements, addressed paging, physical incoming/outgoing CC/RR signaling and SMS delivery/read/delete/cancel/Reply. |
 | Authenticated composition | Physical PIN before fresh/cold registration, calls, SMS and phonebook; a long wrong-PIN control remains unregistered. |
 | Restoration | Exact ARM/banked registers, RAM/time, protocol replay and pixels at idle, connected call and active SMS boundaries, with physical continuation. |
@@ -2463,4 +2463,29 @@ injected. Other proactive command families remain independent targets.
 ```sh
 .venv/bin/python tools/nsb7_toolkit_check.py \
   roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-menu-v2 --menu
+```
+
+### Menu-driven SMS
+
+`fixtures/nsb7_toolkit_sms/nsb7hle.cfg` selects the existing SEND SHORT
+MESSAGE card application. `nsb7_toolkit_sms.lua` reuses the complete physical
+authentication and interactive/menu sequence; Select86 advertises9124,
+then FETCH supplies the card's command. Firmware submits exactly one8-bit
+`SAT` message to5551234 through SMSC1234567890, CP39/RP01 and TP-MR00.
+The laboratory peer sends CP-ACK/RP-ACK, and firmware returns successful
+terminal response `810305130002028281030100`/9000, acknowledges CP and
+releases the radio channel. This is decoded laboratory CP/RP/RR delivery,
+not an external SMS carrier or native RF claim.
+
+The SIMI path performs one UPDATE BINARY of EF_SMSS offset0/length2. The
+complete3570-byte final card equals the own source except TP-MR byte3560
+changesff to00; byte3561 and every other byte remain identical. The checker
+requires this exact change, not an arbitrary allowance for SMS metadata.
+The reviewed87s frame says `SAT SMS`; End108 returns to exact13:49 idle.
+All eleven frame checks remain active, with only the selected-command frame
+different from the plain menu fixture. No driver/device behavior changed.
+
+```sh
+.venv/bin/python tools/nsb7_toolkit_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-sms --sms
 ```
