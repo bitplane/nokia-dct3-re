@@ -43,6 +43,7 @@ async def run(args: argparse.Namespace) -> None:
             if marker:
                 await asyncio.wait_for(ready.wait(),40)
             request_mode = getattr(args, 'request', False)
+            empty_reply = getattr(args, 'empty_reply', False)
             admission = {
                 "type": "incoming_ussd",
                 "epoch": epoch,
@@ -73,8 +74,9 @@ async def run(args: argparse.Namespace) -> None:
                     continue
                 if event.get('type') == 'incoming_ussd_response':
                     expected = {'type': 'incoming_ussd_response', 'epoch': epoch,
-                                'request_id': 1, 'dcs': 0x0f,
-                                'data': pack_gsm7(getattr(args, 'expected_reply', '2')), 'empty': False}
+                                'request_id': 1, 'dcs': 0 if empty_reply else 0x0f,
+                                'data': '' if empty_reply else pack_gsm7(getattr(args, 'expected_reply', '2')),
+                                'empty': empty_reply}
                     if not request_mode or response_seen or phases != ['queued'] or event != expected:
                         raise RuntimeError(f'unexpected incoming USSD reply {event!r}')
                     response_seen = True
@@ -116,9 +118,12 @@ def main() -> int:
     parser.add_argument("--ready-marker", help="wait for this fixture console marker before admission")
     parser.add_argument("--text", default="Host notice")
     parser.add_argument('--request', action='store_true', help='request a physical reply instead of notification')
+    parser.add_argument('--empty-reply', action='store_true', help='require empty ReturnResult after physical editor dismissal')
     parser.add_argument('--expected-reply', default='2', help='exact physical reply text required in request mode')
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    if args.empty_reply and not args.request:
+        parser.error('--empty-reply requires --request')
     if not args.text:
         parser.error('--text must not be empty')
     try:

@@ -27,13 +27,16 @@ KEYS = [(24, 'End'), (26, 'Left Softkey / Menu'), (28, 'Left Softkey / Menu'),
         (38, 'Left Softkey / Menu')]
 
 
-def check(text, initial, final, host=False):
+def check(text, initial, final, host=False, empty_reply=False):
     check_source(initial)
     check_authentication(text.split('gsm_ss: network_initiated ', 1)[0])
     if initial != final:
         raise ValueError('network USSD changed persistent card contents')
     keys = [(24,'End'),(30,'Left Softkey / Menu'),(32,'Left Softkey / Menu'),
             (34,'Keypad 2'),(36,'Left Softkey / Menu'),(40,'End'),(42,'Left Softkey / Menu')] if host else KEYS
+    if empty_reply:
+        keys=[(24,'End'),(30,'Left Softkey / Menu'),(32,'Left Softkey / Menu'),
+              (34,'End'),(40,'End'),(42,'Left Softkey / Menu')]
     for state, fraction in ((1, '000000000'), (0, '200000000')):
         observed = re.findall(rf'nsb7_ussd_input: key=(.*?) state={state} t=(\d+)\.{fraction}', text)
         if observed != [(key, str(second)) for second, key in keys]:
@@ -43,9 +46,12 @@ def check(text, initial, final, host=False):
         ('Paging Response', r'GSM service establish sapi=0 pd=06 message=27 length=16'),
         ('request', r'gsm_ss: network_initiated operation=request transaction=0b invoke=1 dcs=0f'),
         ('REGISTER', r'GSM service downlink kind=32 sapi=0 pd=0b message=3b length=29 '),
-        ('physical Send', rf'nsb7_ussd_input: key=Left Softkey / Menu state=1 t={36 if host else 32}\.'),
-        ('reply', r'handset_response message=3a length=21 data=8b3a12a210020101300b02013c300604010f040132 '),
-        ('correlation', r'network_result transaction=8b invoke=1 dcs=0f packed_length=1 empty=0 '),
+        ('physical completion', r'nsb7_ussd_input: key=End state=1 t=34\.' if empty_reply else
+         rf'nsb7_ussd_input: key=Left Softkey / Menu state=1 t={36 if host else 32}\.'),
+        ('reply', r'handset_response message=3a length=8 data=8b3a05a203020101 ' if empty_reply else
+         r'handset_response message=3a length=21 data=8b3a12a210020101300b02013c300604010f040132 '),
+        ('correlation', r'network_result transaction=8b invoke=1 dcs=00 packed_length=0 empty=1 ' if empty_reply else
+         r'network_result transaction=8b invoke=1 dcs=0f packed_length=1 empty=0 '),
         ('release', r'GSM service downlink kind=27 sapi=0 pd=0b message=2a length=2 '),
         ('RR release', r'LAPDm service Channel Release acknowledged'),
         ('idle recovery', rf'nsb7_ussd_input: key=End state=1 t={40 if host else 36}\.'),
@@ -62,7 +68,8 @@ def check(text, initial, final, host=False):
             ('queued', r'incoming ussd state id=1 epoch=1 phase=queued'),
             ('page', r'PCH IMSI page transmitted channel=60 fn='),
             ('RR release', r'LAPDm service Channel Release acknowledged'),
-            ('host reply', r'incoming ussd reply id=1 epoch=1 dcs=0f data=32 empty=0'),
+            ('host reply', r'incoming ussd reply id=1 epoch=1 dcs=00 data= empty=1' if empty_reply else
+             r'incoming ussd reply id=1 epoch=1 dcs=0f data=32 empty=0'),
             ('answered', r'incoming ussd state id=1 epoch=1 phase=answered'),
         ], 'host network USSD')
         if text.count('gsm_call_adapter: incoming ussd reply ') != 1:
@@ -120,6 +127,7 @@ def main():
     parser.add_argument('run', type=Path)
     parser.add_argument('--state', action='store_true', help='pending reply editor save/load replay')
     parser.add_argument('--host', action='store_true', help='WebSocket-originated request and correlated reply')
+    parser.add_argument('--empty-reply',action='store_true',help='physical editor dismissal with empty ReturnResult')
     args = parser.parse_args()
     try:
         contract(args.image.read_bytes())
@@ -129,16 +137,22 @@ def main():
         text=(args.run / 'error.log').read_text()
         initial=(args.run / 'initial_sim_card.bin').read_bytes()
         final=(storage / 'sim_card').read_bytes()
+        if args.empty_reply and (not args.host or args.state):
+            raise ValueError('empty reply requires the non-restored host fixture')
         if args.state:
             check_state(text,initial,final,args.host)
         else:
-            check(text,initial,final,args.host)
+            check(text,initial,final,args.host,args.empty_reply)
         if args.state:
             for phase in ('reference', 'restored'):
                 check_frame(args.run / f'snap/nsb7_state_ussd_{phase}.png', FRAMES[33])
             check_frame(args.run / 'snap/nsb7_state_ussd_final.png', FRAMES[37])
             for second in (25, 29):
                 check_frame(args.run / f'snap/nsb7_ussd_response_{second + (4 if args.host else 0)}.png', FRAMES[second])
+        elif args.empty_reply:
+            for second,digest in ((29,FRAMES[25]),(33,FRAMES[29]),
+                                  (35,FRAMES[37]),(37,FRAMES[37]),(41,FRAMES[37]),(43,FRAMES[39])):
+                check_frame(args.run/f'snap/nsb7_ussd_response_{second}.png',digest)
         else:
             for second, digest in FRAMES.items():
                 if args.host and second==33:

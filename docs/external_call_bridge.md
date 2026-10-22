@@ -246,6 +246,11 @@ host multi-turn continuation is not qualified. A separate NSB-7 pending-editor
 save/load gate replays the identical physical reply under epochs 1 and 2;
 each host response follows its own branch's RR release, and the saved request
 is republished as queued under the new epoch without a second admission.
+NSB-7 End at the open editor instead sends an empty ReturnResult. Its host
+response preserves `empty:true`, DCS0 and empty data, followed by `answered`;
+it must not be mistaken for a typed response or the distinct no-result
+RELEASE COMPLETE/`cancelled` path. This is separately checked with runner
+`--request --empty-reply` and the physical dismissal fixture in `8290_bringup.md`.
 CLI USSD text uses the same GSM tables but its own padding: a spare septet is
 CR rather than zero (`@`), and an intended final CR on an octet boundary is
 protected by another CR. USSD does not carry an SMS TP-UDL. These boundary

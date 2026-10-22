@@ -10,7 +10,7 @@ from tools import run_host_incoming_ussd_gate as gate
 class IncomingUssdRunnerTest(unittest.IsolatedAsyncioTestCase):
     async def run_fixture(self, reference=('queued','delivered'), *, restore=True,
                           output=b'clean handset\n', wrong_request=False,
-                          request=False, reply='32', include_reply=True):
+                          request=False, reply='32', include_reply=True, empty_reply=False):
         process=SimpleNamespace(returncode=0,wait=AsyncMock(return_value=0),
             stdout=SimpleNamespace(readline=AsyncMock(side_effect=[output,b''])))
         socket=AsyncMock()
@@ -20,7 +20,7 @@ class IncomingUssdRunnerTest(unittest.IsolatedAsyncioTestCase):
         for phase in reference:
             if request and phase=='answered' and include_reply:
                 events.append(dict(type='incoming_ussd_response',epoch=1,request_id=1,
-                                   dcs=15,data=reply,empty=False))
+                                   dcs=0 if empty_reply else 15,data=reply,empty=empty_reply))
             events.append(dict(type='incoming_ussd_state',epoch=1,
                                request_id=2 if wrong_request else 1,phase=phase))
         if restore:
@@ -32,7 +32,7 @@ class IncomingUssdRunnerTest(unittest.IsolatedAsyncioTestCase):
                                phase='answered' if request else 'delivered'))
         socket.recv.side_effect=[json.dumps(event) for event in events]
         args=SimpleNamespace(command=['mame'],cwd=None,port=18990,
-                             text='Host notice',require_restore=restore,request=request,expected_reply='2')
+                             text='Host notice',require_restore=restore,request=request,expected_reply='2',empty_reply=empty_reply)
         with patch.object(gate.asyncio,'create_subprocess_exec',AsyncMock(return_value=process)), \
              patch.object(gate,'connect',AsyncMock(return_value=socket)),patch('builtins.print'):
             await gate.run(args)
@@ -47,6 +47,11 @@ class IncomingUssdRunnerTest(unittest.IsolatedAsyncioTestCase):
         for kwargs in ({'reply':'33'}, {'include_reply':False}, {'wrong_request':True}):
             with self.subTest(kwargs=kwargs),self.assertRaises(RuntimeError):
                 await self.run_fixture(('queued','answered'),restore=False,request=True,**kwargs)
+
+    async def test_empty_result_is_not_a_typed_reply(self):
+        await self.run_fixture(('queued','answered'),restore=False,request=True,empty_reply=True,reply='')
+        with self.assertRaises(RuntimeError):
+            await self.run_fixture(('queued','answered'),restore=False,request=True,empty_reply=True,reply='32')
 
     async def test_reference_delivery_does_not_skip_restore(self):
         await self.run_fixture()

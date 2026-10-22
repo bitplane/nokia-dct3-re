@@ -41,10 +41,28 @@ def host_fixture():
 
 
 class NetworkUssdTests(unittest.TestCase):
-    def verify(self, text, final=b'card', host=False):
+    def verify(self, text, final=b'card', host=False, empty_reply=False):
         with patch('tools.nsb7_network_ussd_request_check.check_source'), \
                 patch('tools.nsb7_network_ussd_request_check.check_authentication'):
-            check(text, b'card', final, host)
+            check(text, b'card', final, host, empty_reply)
+
+    def test_empty_host_result_preserves_absent_parameters(self):
+        text=host_fixture()
+        text=text.replace('nsb7_ussd_input: key=Keypad 2 state=1 t=34.000000000',
+                          'nsb7_ussd_input: key=End state=1 t=34.000000000')
+        text=text.replace('nsb7_ussd_input: key=Keypad 2 state=0 t=34.200000000',
+                          'nsb7_ussd_input: key=End state=0 t=34.200000000')
+        text=re.sub(r'nsb7_ussd_input: key=Left Softkey / Menu state=[01] t=36\.[0-9]+\n','',text)
+        text=text.replace('length=21 data=8b3a12a210020101300b02013c300604010f040132',
+                          'length=8 data=8b3a05a203020101')
+        text=text.replace('dcs=0f packed_length=1 empty=0','dcs=00 packed_length=0 empty=1')
+        text=text.replace('dcs=0f data=32 empty=0','dcs=00 data= empty=1')
+        self.verify(text,host=True,empty_reply=True)
+        for old,new in [('data= empty=1','data=32 empty=1'),
+                        ('data=8b3a05a203020101','data=8b3a05a203020102'),
+                        ('packed_length=0 empty=1','packed_length=1 empty=0')]:
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                self.verify(text.replace(old,new),host=True,empty_reply=True)
 
     def test_host_response_follows_release(self):
         self.verify(host_fixture(),host=True)

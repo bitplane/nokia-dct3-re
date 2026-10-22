@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_host_network_ussd_empty_result", "owner": "gsm_network", "status": "satisfied",
+      "predicate": "NSB-7 physical editor dismissal preserves an empty ReturnResult at the external host boundary without fabricating typed text",
+      "current": "Host admission24.010s follows authentication. Read30/Answer32/End34 produce8b3a05a203020101 at34.470s; bounded parser verifies transaction8b/invoke1 with no parameters. RR release34.501s precedes one host response DCS0/data empty/emptytrue then answered34.510s. Exact prompt/editor and idle/menu frames, physical contacts, own source/journal and unchanged whole card pass. This is an empty ReturnResult, not no-result RELEASE COMPLETE/cancelled, typed text, multi-turn dialogue or native RF/DSP/speech.",
+      "evidence": ["docs/8290_bringup.md", "docs/external_call_bridge.md", "tools/nsb7_host_network_ussd_empty.lua", "tools/nsb7_network_ussd_request_check.py", "tools/test_nsb7_network_ussd_request_check.py", "tools/run_host_incoming_ussd_gate.py", "tools/test_run_host_incoming_ussd_gate.py"]
+    },
+    {
       "id": "nsb7_pending_host_network_ussd_restore", "owner": "gsm_network", "status": "satisfied",
       "predicate": "NSB-7 restores a pending WebSocket-originated reply editor and reports one exact physical reply under each transport epoch",
       "current": "Save33.25s precedes physical2 at33.75 and Send34.75. Exact37 ARM/banked registers/RAM/time and three-second radio/SIM/RTC/SS replay match; each branch emits8b3a12a210020101300b02013c300604010f040132 at34.997178s. One initial admission is followed by queued/answered for epoch1 and restored epoch2, each response data32/DCS15/emptyfalse after its own RR release. Done frames and End40/final42 idle match, own source/journal/authentication and complete unchanged card pass. Same-process host dialogue only; no arbitrary continuation/external carrier/native DSP/RF/speech promotion.",

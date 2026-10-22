@@ -2562,6 +2562,19 @@ card preservation. Capture: `tmp/nsb7-host-network-ussd-state`. This establishes
 same-process pending-dialogue restoration, not external network continuity or
 arbitrary multi-turn continuation.
 
+Physical editor dismissal is independently checked by
+`nsb7_host_network_ussd_empty.lua` with the same host fixture/seed. The runner
+uses `--request --empty-reply`; the checker uses `--host --empty-reply`.
+After Read30/Answer32, End34 sends the firmware's empty ReturnResult
+`8b3a05a203020101` at34.470s, not RELEASE COMPLETE or a typed empty string.
+RR release completes34.501s. The host receives DCS0/data empty/empty=true and
+then `answered` at34.510s, preserving the wire result rather than inventing
+text or relabelling it as a no-result termination. Exact prompt/editor and
+four idle/menu frames pass, with unchanged complete card. Capture:
+`tmp/nsb7-host-network-ussd-empty`. The generic host `cancelled` phase remains
+the distinct RELEASE-COMPLETE-without-result implementation path, not the
+behavior qualified by this NSB-7 End-key fixture.
+
 ## Host incoming call from settled idle
 
 `nsb7_pin_host_incoming_call.lua` composes physical PIN/phone-code entry with
