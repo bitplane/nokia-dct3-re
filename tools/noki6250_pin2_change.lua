@@ -30,12 +30,13 @@ local runner=coroutine.create(function()
     for second=44,45 do press('Scroll Down',second) end
     press('Left Softkey / Menu',47)
     local old,new=_G.nhm3_pin2_old or '5678',_G.nhm3_pin2_new or '8765'
-    for _,phase in ipairs({{50,old},{58,new},{66,new}}) do
-        for index=1,4 do press('Keypad '..phase[2]:sub(index,index),phase[1]+index-1) end
-        press('Left Softkey / Menu',phase[1]+4)
+    for _,phase in ipairs(_G.nhm3_pin2_phases or {{50,old},{58,new},{66,new}}) do
+        for index=1,#phase[2] do press('Keypad '..phase[2]:sub(index,index),phase[1]+index-1) end
+        press('Left Softkey / Menu',phase[1]+#phase[2])
     end
-    press('End',76)
-    press('Left Softkey / Menu',78)
+    local finish=_G.nhm3_pin2_finish or 76
+    press('End',finish)
+    press('Left Softkey / Menu',finish+2)
     machine:logerror('6250_pin2_input: complete=1 firmware_state_forcing=0\n')
 end)
 _G.noki6250_pin2_change=runner

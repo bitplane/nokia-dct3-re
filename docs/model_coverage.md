@@ -931,8 +931,12 @@ physical Settings changes across four processes, with9804/9804/9840 results,
 44 exact frames and complete-card preservation apart from retry loss. PIN1
 authentication, coherent registration and physical Menu remain usable; both
 PUK allowances stay10.
-A separate bounded cold capture retains PIN2 retries0 and observes Change PIN2
-opening Enter PUK2 code; PUK2 recovery itself remains unqualified.
+`verify-6250-puk2-recovery` extends that chain to six processes: a blocked-card
+cold boot authenticates PIN1/registers, physically enters PUK2/newPIN2 and sends
+one successful UNBLOCK CHV2 followed by firmware VERIFY of the new value. Another
+cold process accepts that value in a physical Settings change. All66 frames,
+complete card transitions and immutable predecessor checks pass. Wrong-PUK2 and
+permanent loss remain unqualified.
 
 `verify-6250-ussd` separately establishes the physical USSD exchange and reviewed
 NHM-3 result/idle frames on its declared derived-PMM research comparison. The

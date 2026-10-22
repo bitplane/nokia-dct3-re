@@ -742,13 +742,24 @@ and physical End/Menu still recovers Messages. All44 exact frames, contacts,
 selectors/result order, inherited NVRAM and predecessor-artifact hashes pass.
 Capture: `tmp/nhm3-pin2-exhaustion-probe`.
 
-A separate bounded cold-entry capture copies the final blocked card without
-editing it: PIN1 VERIFY succeeds with PIN2 retries still0, retained-location
-registration completes and the same Settings route's Change PIN2 selection
-opens Enter PUK2 code. No CHANGE or UNBLOCK is sent; End/Menu and the complete
-unchanged card pass the observation check. Capture:
-`tmp/nhm3-pin2-blocked-entry`, frame `6250_blocked_entry_47.png`.
-This maps the recovery entrance, not a qualified PUK2 recovery transaction.
+`make verify-6250-puk2-recovery` extends the physical exhaustion chain with a
+fifth cold process for recovery and a sixth for new-PIN2 reuse. The complete
+blocked card is inherited unchanged. PIN1 authentication and retained-location
+registration still work with PIN2 retries0. Selecting Change PIN2 on the same
+own Settings route opens Enter PUK2 code. Physical87654321/new2468/confirmation
+sends one successful UNBLOCK CHV2 (`A0 2C 00 02 10`); firmware then VERIFYs the
+new PIN2 through CHV2. Exactly those operations, their selectors and their order
+after physical confirmation are required. PIN2 retries reset3 and both PUK
+allowances remain10, with only PIN2 changed in the complete registered card.
+
+The sixth process inherits that exact recovered card and accepts2468 as current
+PIN2 in a physical change to1357. This cold credential proof is through CHANGE,
+not another standalone VERIFY. All66 frame hashes cover the own menu route,
+PUK2/new/confirmation editors, Code accepted, idle/Menu and ordinary change
+results. Exact contacts/APDUs, complete card/NVRAM links, native upload/initial-
+record, console-health and predecessor-integrity checks pass. Capture:
+`tmp/nhm3-puk2-recovery-banked`. Wrong-PUK2 handling and permanent PUK2 loss
+remain unqualified; native speech and factory provisioning are not promoted.
 
 Run `noki6250` with private working/NVRAM/config directories, the acquired
 product ROMs, `-noreadconfig -log -video none -sound none -nothrottle`,

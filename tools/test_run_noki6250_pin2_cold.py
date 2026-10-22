@@ -7,6 +7,24 @@ from tools import run_noki6250_pin2_cold as runner
 
 
 class ColdPin2InputTest(unittest.TestCase):
+    def test_puk2_recovery_requires_physical_exhaustion_plan(self):
+        with patch('sys.argv',['runner','unused','--recover-puk2']), \
+                patch('sys.stderr',new_callable=io.StringIO) as output:
+            with self.assertRaises(SystemExit) as error:
+                runner.main()
+        self.assertEqual(error.exception.code,2)
+        self.assertIn('--recover-puk2 requires --exhaust-pin2',output.getvalue())
+
+    def test_blocked_and_recovered_inputs_retain_their_actual_credentials(self):
+        blocked=bytearray(self.card())
+        blocked[3517]=0
+        check_cold_input(bytes(blocked),bytes(blocked),retries=0)
+        recovered=bytearray(self.card())
+        recovered[3492:3500]=b'2468\xff\xff\xff\xff'
+        check_cold_input(bytes(recovered),bytes(recovered),pin2='2468')
+        with self.assertRaises(ValueError):
+            check_cold_input(bytes(recovered),bytes(recovered))
+
     def test_incompatible_phase_plans_are_rejected_before_launch(self):
         with patch('sys.argv',['runner','unused','--reject-first','--exhaust-pin2']), \
                 patch('sys.stderr',new_callable=io.StringIO) as output:
