@@ -680,6 +680,24 @@ new directory. Raw MMIO remains in each error.log but is excluded from the
 security checker's query text; protocol, native boundary and error lines remain.
 No PIN2/PUK2, factory-provisioning or native-speech support is implied.
 
+`make verify-6250-pin-request` qualifies physical Off/On persistence across
+three independent cold processes. The own route is Settings4 -> Security
+settings5 -> PIN code request1, then PIN1234, the On/Off list and confirmation.
+Off sends one successful DISABLE CHV1 (`A0 26 00 01 08`); the next cold boot
+registers without startup VERIFY and physically re-enables the request through
+one successful ENABLE CHV1 (`A0 28 00 01 08`). The final cold boot displays
+Enter PIN code before any input, physically authenticates1234 and opens Messages.
+
+The first card has only the expected registration changes and disabled flag;
+thereafter the enable byte is the only card change, and final authentication
+preserves the entire card. Exact contacts, selectors, results and ordering,
+25 reviewed boot/startup/setting/result/idle/menu frames, full inherited NVRAM,
+own native/initial-record/console-health checks and immutable predecessor
+artifacts pass. The enabled-card startup graphic is not an idle oracle; the
+disabled cold boot independently reaches registered idle without PIN input.
+Capture: `tmp/nhm3-pin-request-banked3`. This is own acquired-PMM research-HLE
+qualification, not factory provisioning or native speech.
+
 `make verify-6250-pin2-change` independently qualifies the ordinary physical
 PIN2 change on the PIN-enabled, non-FDN card. After PIN1 authentication and
 coherent registration, the own English menu route is Settings4 -> Security

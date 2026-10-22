@@ -931,7 +931,13 @@ physical Settings changes across four processes, with9804/9804/9840 results,
 44 exact frames and complete-card preservation apart from retry loss. PIN1
 authentication, coherent registration and physical Menu remain usable; both
 PUK allowances stay10.
-`verify-6250-puk2-recovery` extends that chain to six processes: a blocked-card
+`verify-6250-pin-request` independently qualifies physical PIN-request Off/On
+and final cold PIN authentication in three processes with25 reviewed frames.
+The disabled card registers without startup VERIFY; a physical ENABLE CHV1
+restores the cold Enter PIN code prompt. Complete card comparisons permit only
+the expected initial registration and enable-flag changes, preserving all
+credentials and retry allowances. Native speech remains unproved.
+`verify-6250-puk2-recovery` extends the PIN2-exhaustion chain to six processes: a blocked-card
 cold boot authenticates PIN1/registers, physically enters PUK2/newPIN2 and sends
 one successful UNBLOCK CHV2 followed by firmware VERIFY of the new value. Another
 cold process accepts that value in a physical Settings change. All66 frames,

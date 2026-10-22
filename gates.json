@@ -16135,6 +16135,13 @@
                  "arguments": ["$(RUN_DIR)", "--exhaust-pin2", "--puk2-rejections", "10", "--permanent-recheck", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-pin-request",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki6250_pin_request.py",
+                 "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6250-pin-host-incoming-call",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
