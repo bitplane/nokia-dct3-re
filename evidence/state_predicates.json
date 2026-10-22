@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_wrong_puk2_cold_recovery", "owner": "npe3_sim_security", "status": "satisfied",
+      "predicate": "6210 rejects physical wrong PUK2 without replacing PIN2, persists the consumed attempt and cold-recovers from that exact card",
+      "current": "Six cold-linked own-PMM/coherent-card processes: physical PIN2 exhaustion, wrong PUK2, correct recovery and replacement-PIN2 use. Wrong99999999/new2468/confirmation yields UNBLOCK CHV2/9804 and Code error; whole card differs only at PUK2 retries10->9, PIN2 remains5678/blocked and no automatic VERIFY follows. Exact failed-PUK storage cold-recovers with87654321, restoring PIN2/PUK2 allowances and installing2468; sixth process physically cold-uses2468 and changes back to5678. All36 frames, exact contacts/protocol/card transitions, registration, independent launches and unchanged predecessors pass. Capture tmp/npe3-puk2-retry-banked. No permanent PUK2/FDN/native-speech promotion.",
+      "evidence": ["docs/6210_bringup.md", "tools/run_noki6210_pin2_exhaustion.py", "tools/noki6210_puk2_wrong_input.lua", "tools/noki6210_puk2_input.lua", "tools/noki6210_pin2_change_check.py", "tools/test_noki6210_pin2_change_check.py", "gates.json"]
+    },
+    {
       "id": "npe3_puk2_recovery_and_cold_pin2", "owner": "npe3_sim_security", "status": "satisfied",
       "predicate": "6210 physically recovers an exhausted PIN2 with PUK2 and cold-uses the installed replacement PIN2",
       "current": "Five own-PMM/coherent-card processes: three physical failed PIN2 changes, cold PUK2 recovery and cold replacement-PIN2 use. Physical87654321/2468/confirmation produces UNBLOCK CHV2/9000 followed by firmware-owned VERIFY CHV2/9000 and Code accepted pixels. Whole-card checks permit only PIN2/retry changes; final cold2468->5678 change succeeds, retained location registers and exact Menu remains live. All30 frames, contacts/order, launch identities, exact retained storage and predecessor preservation pass. Capture tmp/npe3-puk2-recovery-banked. No RAM/save/firmware-state transfer or wrong-PUK2/permanent-PUK2/FDN/native-speech promotion.",

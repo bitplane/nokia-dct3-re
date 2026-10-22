@@ -62,39 +62,54 @@ def check(text,card,old_pin='5678',new_pin='8765',rejected=False,remaining=2):
         raise ValueError('PIN2 change altered PIN1 or unrelated card data')
 
 
-def check_puk2(text,initial,card):
+def check_puk2(text,initial,card,rejected=False,puk_attempts=10):
+    if puk_attempts not in range(1,11):
+        raise ValueError('PUK2 predecessor allowance must be 1..10')
     expected=bytearray(profile(3,True))
     expected[3517]=0
+    expected[3519]=puk_attempts
     if initial!=bytes(expected):
         raise ValueError('PUK2 input is not the exact physically exhausted PIN2 card')
-    if (statuses(text,0x20)!=[(0x9000,3,10),(0x9000,3,10)] or statuses(text,0x24) or
-            statuses(text,0x2c,2)!=[(0x9000,3,10)]):
+    result=(0x9804 if puk_attempts>1 else 0x9840) if rejected else 0x9000
+    verify=[(0x9000,3,10)]*(1 if rejected else 2)
+    if (statuses(text,0x20)!=verify or statuses(text,0x24) or
+            statuses(text,0x2c,2)!=[(result,0 if rejected else 3,puk_attempts-1 if rejected else 10)]):
         raise ValueError('PUK2 recovery must authenticate PIN1 and unblock CHV2 exactly once')
+    if rejected and 'header cla=a0 ins=20 p1=00 p2=02 p3=08' in text:
+        raise ValueError('rejected PUK2 must not VERIFY a replacement PIN2')
     items=settings_contacts()
-    for start,digits in ((50,'87654321'),(62,'2468'),(70,'2468')):
+    for start,digits in ((50,'99999999' if rejected else '87654321'),(62,'2468'),(70,'2468')):
         items.extend((start+i,'Keypad '+d) for i,d in enumerate(digits))
         items.append((start+len(digits),'Left Softkey / Menu'))
     items += [(80,'End'),(82,'Left Softkey / Menu')]
     contacts(text,'6210_pin2_input',items)
-    require_ordered(text,[
+    order=[
         ('VERIFY PIN1',r'header cla=a0 ins=20 p1=00 p2=01 p3=08'),
         ('PIN1',r'SIM status ins=20 sw=9000'),
         ('registration',r'LAPDm Location Updating Accept acknowledged nr=1'),
         ('confirmation',r'key=Left Softkey / Menu state=1 t=74\.'),
         ('UNBLOCK CHV2',r'header cla=a0 ins=2c p1=00 p2=02 p3=10'),
-        ('success',r'SIM status ins=2c sw=9000'),
-        ('VERIFY new PIN2',r'header cla=a0 ins=20 p1=00 p2=02 p3=08'),
-        ('verified',r'SIM status ins=20 sw=9000'),
+        ('result',rf'SIM status ins=2c sw={result:04x}'),
+    ]
+    if not rejected:
+        order += [('VERIFY new PIN2',r'header cla=a0 ins=20 p1=00 p2=02 p3=08'),
+                  ('verified',r'SIM status ins=20 sw=9000')]
+    order += [
         ('Menu',r'key=Left Softkey / Menu state=1 t=82\.'),
         ('complete',r'6210_pin2_input: complete=1 firmware_state_forcing=0'),
-    ],'6210 physical PUK2 recovery')
-    expected[3517]=3
-    expected[3492:3500]=b'2468\xff\xff\xff\xff'
+    ]
+    require_ordered(text,order,'6210 physical PUK2 recovery')
+    if rejected:
+        expected[3519]=puk_attempts-1
+    else:
+        expected[3517]=3
+        expected[3519]=10
+        expected[3492:3500]=b'2468\xff\xff\xff\xff'
     if card!=bytes(expected):
         raise ValueError('PUK2 recovery changed unrelated card data')
 
 
-def check_puk2_frames(directory):
+def check_puk2_frames(directory,rejected=False):
     frames={
         '6210_pin2_key_42.png':FRAMES['6210_pin2_key_42.png'],
         '6210_pin2_key_47.png':'e71767f126d0131b950ce770072638de16a2ca8979efa4df184bda8d09157bd8',
@@ -103,5 +118,7 @@ def check_puk2_frames(directory):
         '6210_pin2_key_74.png':'b358d01988adefc3dfc51a5352b485d1802d16f9e5f600e047c723a43cf514a6',
         '6210_security_then_menu.png':FRAMES['6210_security_then_menu.png'],
     }
+    if rejected:
+        frames['6210_pin2_key_74.png']='c1371c4cdca6b0f72c9c1dcc6e602de981330f67719714bc5b124e1a3b4fcfcd'
     for name,digest in frames.items():
         check_rgb_frame(directory/name,digest)

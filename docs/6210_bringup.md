@@ -1198,8 +1198,18 @@ Both continuations retain location and require coherent registration, exact
 contacts/protocol ordering, independent launches, copied-storage hashes,
 unchanged predecessor NVRAM and six reviewed frames each. The complete chain
 checks30 frames. Capture: `tmp/npe3-puk2-recovery-banked`.
-No RAM/save transfer or credential-state forcing is used. Wrong-PUK2 handling,
-PUK2 exhaustion and FDN control remain unqualified for6210.
+No RAM/save transfer or credential-state forcing is used.
+
+`make verify-6210-puk2-retry-cold` inserts a separate cold wrong-PUK2 attempt
+before recovery. Physical99999999/new2468/confirmation returns UNBLOCK
+CHV2/9804 and Code error; PIN2 remains blocked with its original5678 value,
+and the complete card differs only at PUK2 retries10->9. No automatic PIN2
+VERIFY follows the rejection. The exact failed-PUK card feeds the next cold
+process, which correct-PUK2 recovers and restores both CHV2/PUK2 allowances;
+a sixth process then cold-uses2468 and changes back to5678. All36 frames,
+full-card transitions, registration, independent launches and unchanged
+predecessor storage are checked. Capture: `tmp/npe3-puk2-retry-banked`.
+Permanent PUK2 exhaustion and FDN control remain unqualified for6210.
 
 ## SIM Toolkit
 

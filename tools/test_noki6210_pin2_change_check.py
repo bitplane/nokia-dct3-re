@@ -61,6 +61,36 @@ class Pin2ChangeTests(unittest.TestCase):
     def test_physical_puk2_recovery(self):
         check_puk2(*self.puk2_fixture())
 
+    def test_wrong_puk2_is_durable_and_does_not_replace_credentials(self):
+        text,initial,_=self.puk2_fixture()
+        for second,digit in enumerate('87654321',50):
+            for state in (0,1):
+                text=text.replace(f'key=Keypad {digit} state={state} t={second}.',
+                                  f'key=Keypad 9 state={state} t={second}.')
+        text=text.replace('ins=2c sw=9000 chv=3/3 puk=10/10','ins=2c sw=9804 chv=3/0 puk=10/9')
+        text=text.replace('header cla=a0 ins=20 p1=00 p2=02 p3=08\n','')
+        text=text.replace('SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1\n','')
+        final=bytearray(initial)
+        final[3519]=9
+        check_puk2(text,initial,bytes(final),rejected=True)
+        with self.assertRaisesRegex(ValueError,'must not VERIFY'):
+            check_puk2(text+'\nheader cla=a0 ins=20 p1=00 p2=02 p3=08',
+                       initial,bytes(final),rejected=True)
+        for index in (3492,3517,3518,3519):
+            changed=bytearray(final)
+            changed[index]^=1
+            with self.assertRaises(ValueError):
+                check_puk2(text,initial,bytes(changed),rejected=True)
+
+    def test_correct_puk2_recovers_after_a_persisted_failure(self):
+        text,initial,final=self.puk2_fixture()
+        initial=bytearray(initial)
+        initial[3519]=9
+        text=text.replace('chv=3/0 puk=10/10','chv=3/0 puk=10/9')
+        check_puk2(text,bytes(initial),final,puk_attempts=9)
+        with self.assertRaises(ValueError):
+            check_puk2(text,bytes(initial),final)
+
     def test_puk2_selector_status_input_and_other_credentials_are_required(self):
         text,initial,final=self.puk2_fixture()
         for old,new in (('p2=02','p2=01'),('sw=9000 chv=3/3','sw=9804 chv=3/3'),
