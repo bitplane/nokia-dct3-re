@@ -2490,6 +2490,35 @@ order. Qualified capture: `tmp/nsb7-ussd-continued-complete`.
 This is one continued laboratory dialogue on research HLE, not host-controlled
 multi-turn USSD, arbitrary repeated prompts or native RF/DSP/speech.
 
+## Network-originated laboratory USSD request
+
+`fixtures/nsb7_network_ussd_request/nsb7hle.cfg` selects the network request
+without a host backend. Use the same own PIN-enabled cold NVRAM preparation as
+the continued-dialogue fixture above, but copy this cfg and run
+`tools/nsb7_network_ussd_request.lua` with a 46-second limit. The script exits
+at 41 seconds. It presses End at 24 seconds to dismiss the startup presentation
+before Read at 26, Answer at 28, numeric 2 at 30 and Send at 32.
+
+The 29-byte REGISTER arrives at 21.455 seconds; the actual handset returns
+`8b3a12a210020101300b02013c300604010f040132` at 32.247 seconds. Unlike NSE-8,
+NSB-7 does not set the FACILITY sequence bit here; both encodings are accepted
+by the bounded parser. Transaction 8b/invoke 1 are checked before RELEASE
+COMPLETE and RR release at 32.279 seconds. Firmware displays Done. End at 36
+and Menu at 38 recover the exact existing idle and Messages-menu frames.
+
+```sh
+.venv/bin/python tools/nsb7_network_ussd_request_check.py \
+  roms/noki8290/8290f522a.fls RUN
+```
+
+The checker requires own source/journal, pre-request authentication, all physical
+contacts, ordered protocol exchange, six reviewed frames and the unchanged
+complete card. Qualified capture: `tmp/nsb7-network-ussd-request-clean`.
+This proves one network-originated laboratory reply, not host-controlled
+multi-turn dialogue or native DSP/RF/speech. Without the physical End dismissal,
+the same early request remains pending behind the startup presentation and the
+planned Read key enters the menu instead; that run is not reply acceptance.
+
 ## Host incoming call from settled idle
 
 `nsb7_pin_host_incoming_call.lua` composes physical PIN/phone-code entry with

@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_network_ussd_physical_reply", "owner": "gsm_network", "status": "satisfied",
+      "predicate": "Authenticated NSB-7 physically answers one network-originated laboratory request and recovers exact idle/Menu with unchanged card",
+      "current": "Correct29-byte REGISTER arrives21.455s. Physical End24 dismisses startup presentation; Read26/Answer28/Keypad2 at30/Send32 yield8b3a12a210020101300b02013c300604010f040132 at32.247s. Parser verifies transaction8b/invoke1; RELEASE COMPLETE precedes RR release32.279s and firmware Done. End36/Menu38 recover exact frames. Six reviewed frames, own flash/journal, pre-request authentication and complete unchanged3570-byte card pass. No arbitrary host continuation/native RF/DSP/speech claim.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_network_ussd_request.lua", "tools/nsb7_network_ussd_request_check.py", "tools/test_nsb7_network_ussd_request_check.py", "fixtures/nsb7_network_ussd_request/nsb7hle.cfg"]
+    },
+    {
       "id": "nse8_network_ussd_physical_reply", "owner": "gsm_network", "status": "satisfied",
       "predicate": "Registered NSE-8 answers one network-originated laboratory USSD request through physical Read/Answer/numeric input/Send and returns to the common-control channel",
       "current": "Correct29-byte network REGISTER opens Enter reply after IMSI paging and Paging Response. Physical Read/Answer/2/Send produces21-byte FACILITY8b7a12a210020101300b02013c300604010f040132 at22.693s; bounded parsing verifies transaction8b/invoke1/DCS0f and packed32. Network RELEASE COMPLETE precedes ordinary RR release. Notification uses its unchanged35-byte REGISTER and empty ReturnResult. No handset state or messages injected; no host multi-turn/native DSP/RF/speech claim.",
