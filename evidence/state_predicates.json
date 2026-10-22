@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_host_ussd_notification", "owner": "npe3_host_services", "status": "satisfied",
+      "predicate": "6210 receives one host-originated USSD notification after physical PIN authentication and registration and recovers through physical Back/Menu",
+      "current": "Fresh own-PMM research-HLE 6210 physically VERIFYs PIN1, registers on ARFCN35 and admits request1/epoch1 after idle-ready at20s. External packed Host notice traverses network notify REGISTER, exact firmware ReturnResult and RR release before host queued->delivered. Service reply / Host notice renders automatically; Back26 and Menu30 recover exact idle/Messages pixels. Three reviewed96x60 frames, exact contacts, single admission/operation, identity/phase/order and complete expected registered-card checks pass. Capture tmp/npe3-host-ussd-notify-banked. Event filtering now preserves adapter lines; existing PIN-authenticated host incoming-SMS regression passes. No interactive reply/pending-USSD-restore/native-speech promotion.",
+      "evidence": ["docs/6210_bringup.md", "tools/noki6210_host_ussd_notify.lua", "tools/noki6210_host_ussd_check.py", "tools/test_noki6210_host_ussd_check.py", "tools/run_noki6210_acceptance.py", "tools/test_run_noki6210_acceptance.py", "tools/run_host_incoming_ussd_gate.py", "gates.json"]
+    },
+    {
       "id": "npe3_fdn_listed_unlisted_off_dial_controls", "owner": "npe3_sim_security", "status": "satisfied",
       "predicate": "6210 permits a physically saved FDN number, locally rejects an unlisted number and permits that same number after physical FDN Off",
       "current": "Seven fresh own-PMM/coherent-cell processes physically activate/save/cold-read A/12345 and independently test listed12345, unlisted12346, PIN2-protected Off and Off12346. Listed and Off-unlisted complete the existing own-6210 HLE outgoing signaling verifier through connected acknowledgment and physical End/release. On-unlisted displays Call not allowed and returns to dialed digits with no CM Service Request, SETUP, traffic assignment or uplink call-control signaling. Calls preserve complete cards; Off changes only ADN validity while preserving the FDN record. All 23 frames, decoded physical edges, exact called digits, registration, seven distinct launches and unchanged predecessor NVRAM pass. Capture tmp/npe3-fdn-dial-banked. No native DSP/RF/speech, external end-to-end call, emergency/prefix/special-string promotion.",

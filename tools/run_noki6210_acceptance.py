@@ -44,6 +44,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'fdn-enable': ('npe3hle', 'fdn_enable', 66),
              'fdn-cycle': ('npe3hle', 'fdn_enable', 66),
              'fdn-retry-cold': ('npe3hle', 'fdn_enable_wrong', 66),
+             'host-incoming-ussd': ('npe3hle', 'host_ussd_notify', 38),
              'toolkit': ('npe3hle', 'toolkit_input', 40),
              'toolkit-interactive': ('npe3hle', 'toolkit_interactive', 65),
              'toolkit-menu': ('npe3hle', 'toolkit_menu', 75),
@@ -69,7 +70,7 @@ TOOLKIT_PROFILES = {'toolkit': 1, 'toolkit-interactive': 3, 'toolkit-menu': 4,
                     'toolkit-sms': 5, 'toolkit-call': 6, 'toolkit-call-decline': 6}
 FDN_SCENARIOS=frozenset(('fdn-observe','fdn-enable','fdn-cycle','fdn-retry-cold'))
 PIN_SCENARIOS=frozenset(('security','security-retry','security-retry-cold',
-                         'security-block-cold','security-block','pin2-change','pin2-change-cold','pin2-retry-cold','pin2-reject')) | FDN_SCENARIOS
+                         'security-block-cold','security-block','pin2-change','pin2-change-cold','pin2-retry-cold','pin2-reject','host-incoming-ussd')) | FDN_SCENARIOS
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
@@ -242,7 +243,7 @@ def events(path):
     with path.open(errors='replace') as stream:
         return ''.join(line for line in stream if any(token in line for token in
                       ('staged_dsp:', '6210_', 'dspif_transport:', 'sim_device:',
-                       'SIM status', 'SIM completion', 'radio peer', 'dsp_hle:', 'gsm_sms_submit:', 'gsm_ss:',
+                       'SIM status', 'SIM completion', 'radio peer', 'dsp_hle:', 'gsm_sms_submit:', 'gsm_ss:', 'gsm_call_adapter:',
                        'state_replay:', 'state_roundtrip:', '[LUA ERROR]')))
 
 
@@ -425,6 +426,8 @@ def main():
                 'host-rejected-sms': ('run_host_sms_gate', ['--user-data', '41', '--user-data-length', '1', '--decision', 'rp_error']),
                 'host-silent-sms': ('run_host_sms_gate', ['--user-data', '41', '--user-data-length', '1', '--decision', 'rp_silence']),
                 'host-outgoing-call': ('run_host_call_adapter_gate', ['--number', '1234567', '--decision', 'connect']),
+                'host-incoming-ussd': ('run_host_incoming_ussd_gate', [
+                    '--text','Host notice','--ready-marker','6210_host_ussd: ready']),
             }[args.scenario]
             host_command = [sys.executable, str(root / f'tools/{runner}.py'),
                             '--port', str(args.port), '--cwd', str(run)] + options + ['--'] + command
@@ -722,6 +725,11 @@ def main():
                     verify(cold_text, runtime=True, selftest=True)
                     check_forbidden_selection(cold_text, card.read_bytes(),
                                               forbidden=forbidden, previous=retained)
+        elif args.scenario=='host-incoming-ussd':
+            from tools.noki6210_host_ussd_check import check_notification,check_frames as check_ussd_frames
+            check_notification(text,(run/'nvram/npe3hle/sim_card').read_bytes())
+            check_ussd_frames(run/'snap')
+            check_registration(text,(run/'nvram/npe3hle/sim_card').read_bytes(),channel_header='1202')
         elif args.scenario in FDN_SCENARIOS:
             from tools.noki6210_fdn_check import check as check_fdn,check_frames as check_fdn_frames
             phase=3 if args.scenario=='fdn-observe' else 0

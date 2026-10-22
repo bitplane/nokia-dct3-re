@@ -211,6 +211,13 @@ notification acceptance, not an interactive USSD reply session. The existing
 NSE-8 `verify-radio-incoming-ussd-host-restore` also passes with the shared
 runner's restored-epoch handling.
 
+NPE-3 independently uses that ready-marker contract in
+`verify-6210-host-ussd-notify`: physical PIN1 authentication and coherent
+registration precede admission, original firmware acknowledges/releases the
+notification, and physical Back/Menu restore reviewed idle/menu pixels.
+Its complete card matches normal registration, not another handset's profile.
+Interactive reply and pending-USSD restoration remain separate obligations.
+
 The USSD host contract preserves the BER-decoded DCS and packed payload. A
 `success` response carries `dcs` and hexadecimal `data`; `return_error` and
 `reject` may carry `error_code`. The session builds the correlated GSM

@@ -1463,6 +1463,27 @@ PJSIP 480. The firmware consumes the no-answer termination with cause 18,
 completes CC/RR release and returns to the exact registered-idle frame.
 CONNECT and bridge media are rejected, as in the busy fixture.
 
+## Host USSD notification
+
+`make verify-6210-host-ussd-notify` cold-authenticates the ordinary PIN-enabled
+laboratory card, registers on the coherent ARFCN35 cell and admits one external
+notification after the fixture's idle-ready marker at20 seconds. The shared
+WebSocket runner sends packed GSM7 `Host notice`, not a firmware message or
+handset-memory edit. Own firmware consumes the network REGISTER, returns the
+correlated result and releases RR before host state becomes delivered.
+
+The display automatically opens Service reply / Host notice. Physical Back
+returns to registered idle; Menu opens the reviewed Messages frame. All three
+96x60 frames, exact contacts, host identity/epoch/phases, notification/result/
+release ordering and complete expected card bytes pass. The only SIM changes
+from fresh input are the ordinary registration/location update. Capture:
+`tmp/npe3-host-ussd-notify-banked`. The event filter retains adapter lifecycle
+lines explicitly; the existing PIN-authenticated host incoming-SMS gate also
+passes after that tooling change.
+
+This is notification delivery and physical recovery, not interactive USSD
+reply, pending-USSD restoration, native DSP execution or speech acceptance.
+
 ## Host SMS acceptance
 
 Named gates use the same isolated own-PMM runners and require new run

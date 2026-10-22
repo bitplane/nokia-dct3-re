@@ -112,10 +112,12 @@ supported, and it passes the reference and portability checks.
    when an exercised firmware consumer or hardware measurement supplies units.
 3. Extend SIMI/card timing, error, removal, CHV, and file behavior from organic
    firmware requests or focused protocol conformance tests.
-4. Keep DSPIF as a transport-only attachment point while expanding the HLE only
-   from evidenced traffic; a future C54x backend replaces that HLE at the same seam.
-5. Use the validated 3210, 3310, 3330, and 3410 profiles to distinguish shared
-   DCT3 behavior from product-specific display, flash, storage, and peer contracts.
+4. Keep DSPIF transport-only. Extend the existing native C54x backend from
+   acquired ROMs, uploads and independently supported peripheral contracts;
+   retain explicit HLE compositions where native inputs remain unavailable.
+5. Use each product's own firmware and storage evidence to distinguish shared
+   DCT3 behavior from product-specific display, flash, storage and peer contracts.
+   The [coverage matrix](docs/model_coverage.md) records qualified models and boundaries.
 
 New phone support is initially a portability probe. A ROM that fails early is still valuable when
 it identifies a 3210-specific assumption.

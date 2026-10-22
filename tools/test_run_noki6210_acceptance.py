@@ -78,6 +78,13 @@ class MenuAcceptanceTest(unittest.TestCase):
 
 
 class ApplicationAcceptanceTest(unittest.TestCase):
+    def test_event_filter_retains_host_transaction_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'error.log'
+            line='gsm_call_adapter: incoming ussd state id=1 epoch=1 phase=delivered\n'
+            path.write_text('unrelated verbose output\n'+line)
+            self.assertEqual(runner.events(path),line)
+
     def test_fdn_profiles_require_coherent_cell_and_are_admitted(self):
         for scenario in runner.FDN_SCENARIOS:
             with self.subTest(scenario=scenario), \
