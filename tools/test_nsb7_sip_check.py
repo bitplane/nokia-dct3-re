@@ -5,9 +5,9 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock,patch
-from tools.nsb7_sip_check import check,check_restore
+from tools.nsb7_sip_check import check,check_restore,check_incoming_restore,check_sip_frame
 from tools.test_nsb7_host_outgoing_call_check import fixture
-from tools.run_sip_handset_gate import main,verify_success,verify_handset_health
+from tools.run_sip_handset_gate import main,verify_success,verify_restore,verify_handset_health
 
 
 def restore_fixture():
@@ -41,6 +41,29 @@ def restore_fixture():
                      f'{prefix}: key={key} state=0 t={time}.200000000'])
     rows.append('nsb7_outgoing_call_done: t=76.000000000')
     return '\n'.join(rows)
+
+
+def incoming_restore_fixture():
+    from tools.test_nsb7_host_incoming_call_check import fixture as incoming_fixture
+    text=incoming_fixture().replace('length=19','length=17').replace(
+        '4d030504046002008134015c0781447700091032',
+        '45030504046002008134015c0581551532f4')
+    architecture=restore_fixture().split('nsb7_sip_state: event=saved',1)[1].split(
+        'gsm_call_adapter: request id=1 epoch=2',1)[0]
+    architecture=('nsb7_sip_state: event=saved'+architecture).replace('60.000000000','55.000000000').replace(
+        'scenario=nsb7_sip_outgoing','scenario=nsb7_sip_incoming')
+    end='nsb7_call_input: key=End state=1 t=60.000000000'
+    text=text.replace(end,architecture+'\ngsm_call_adapter: incoming state id=1 epoch=2 phase=connected\n'+end)
+    text=text.replace('GSM service uplink sapi=0 pd=03 message=25 length=5 data=836502e090',
+        'termination id=1 cause=41 result=accepted\nGSM service downlink kind=13 sapi=0 pd=03 message=25')
+    text=text.replace('gsm_call_adapter: incoming state id=1 epoch=1 phase=media_closed',
+        'LAPDm service Channel Release acknowledged\ngsm_call_adapter: incoming state id=1 epoch=2 phase=media_closed')
+    text=text.replace('epoch=1 phase=ended','epoch=2 phase=ended')
+    for key,time,code in [('Left Softkey / Menu',62,'19'),('End',65,'0f')]:
+        text+=f'\nnsb7_sip_cleanup_input: key={key} state=1 t={time}.000000000\n'
+        text+=f'nsb7_key_decode: key={code} observer_writes=0\n'
+        text+=f'nsb7_sip_cleanup_input: key={key} state=0 t={time}.200000000\n'
+    return text+'\nnsb7_sip_done: direction=incoming t=68.000000000'
 
 
 class SipTest(unittest.TestCase):
@@ -82,6 +105,63 @@ class SipTest(unittest.TestCase):
                     patch('tools.run_sip_handset_gate.run',new_callable=AsyncMock) as run:
                 main()
             self.assertTrue(run.call_args.args[0].incoming)
+            with patch('sys.argv',base+['--signaling-only','--incoming','--restore-call',
+                    '--ready-file',str(Path(directory)/'ready'),'--','true']), \
+                    patch('tools.run_sip_handset_gate.run',new_callable=AsyncMock) as run:
+                main()
+            self.assertTrue(run.call_args.args[0].restore_call)
+
+    @patch('tools.nsb7_sip_check.check_authentication')
+    def test_incoming_restore_requires_own_caller_answer_and_epoch(self,authentication):
+        text=incoming_restore_fixture()
+        check_incoming_restore(text)
+        for bad in (text.replace('81551532f4','81551532f5',1),
+                    text.replace('key=0e observer_writes=0','key=0f observer_writes=0'),
+                    text.replace('epoch=2 phase=connected','epoch=1 phase=connected'),
+                    text.replace('55.000000000','54.000000000',1),
+                    text.replace('key=19 observer_writes=0','key=18 observer_writes=0'),
+                    text.replace('pc=002645ec','pc=002645ee'),
+                    text+'\ngsm_call_adapter: incoming id=2 result=accepted',
+                    text+'\ngsm_call_adapter: media direction=uplink id=1 good=1'):
+            with self.subTest(bad=bad[-100:]),self.assertRaises(ValueError): check_incoming_restore(bad)
+
+    @patch('tools.nsb7_sip_check.check_frame')
+    def test_only_reviewed_ringing_animation_gets_alternate_frame(self,frame):
+        path=Path('nsb7_call_ringing.png')
+        frame.side_effect=[ValueError('phase'),None]
+        check_sip_frame(path,'primary',incoming=True)
+        self.assertEqual(frame.call_count,2)
+        frame.side_effect=ValueError('wrong pixels')
+        with self.assertRaises(ValueError): check_sip_frame(path,'primary',incoming=True)
+        frame.reset_mock()
+        with self.assertRaises(ValueError): check_sip_frame(Path('final.png'),'primary',incoming=True)
+        self.assertEqual(frame.call_count,1)
+
+    @patch('tools.nsb7_sip_check.check_authentication')
+    def test_incoming_sip_restore_requires_bye_one_clear_and_no_speech(self,authentication):
+        text=incoming_restore_fixture()
+        bridge='\n'.join(['SIP incoming identity=(1, 1) caller=5551234',
+            'SIP physical answer identity=(1, 1)','SIP confirmed status=200 identity=(1, 1)',
+            'SIP epoch changed old=1 new=2','SIP restored call cleared identity=(2, 1)',
+            'SIP epoch media discarded {"uplink":0}'])
+        remote='state changed to CONFIRMED\nRequest msg BYE/'
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            (root/'error.log').write_text(text)
+            (root/'sip-bridge.log').write_text(bridge)
+            verify_restore(root,remote,'connected','8290',signaling_only=True)
+            result=json.loads((root/'sip-result.json').read_text())
+            self.assertFalse(result['speech_tested'])
+            self.assertFalse(result['native_dsp_complete'])
+            for bad_bridge,bad_log,bad_remote in (
+                    (bridge.replace('"uplink":0','"uplink":1'),text,remote),
+                    (bridge+'\nSIP incoming identity=(2, 1)',text,remote),
+                    (bridge,text+'\ntermination id=1 cause=41 result=accepted',remote),
+                    (bridge,text,remote.replace('Request msg BYE/',''))):
+                (root/'error.log').write_text(bad_log)
+                (root/'sip-bridge.log').write_text(bad_bridge)
+                with self.assertRaises((ValueError,RuntimeError)):
+                    verify_restore(root,bad_remote,'connected','8290',signaling_only=True)
 
     @patch('tools.nsb7_sip_check.check_authentication')
     def test_connected_restore_requires_architecture_epoch_and_physical_recovery(self,authentication):

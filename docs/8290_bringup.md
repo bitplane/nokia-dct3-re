@@ -2382,8 +2382,8 @@ audio. `sip-result.json` explicitly records `speech_tested=false` and
 `native_dsp_complete=false`. No unproved NSB-7 PCM clock is enabled.
 The shared runner admits one signaling-only SIP200 call in either direction;
 incoming additionally requires a fresh handset-readiness artifact. Connected
-outgoing restoration has separate acceptance below. Incoming restoration,
-pending-call restoration, recording/media and multiple-call modes remain rejected.
+outgoing and incoming restoration have separate acceptance below. Pending-call restoration,
+recording/media and multiple-call modes remain rejected.
 
 After preparing the isolated run from the qualified source, reproduce with
 the build paths from [the host bridge contract](external_call_bridge.md).
@@ -2455,8 +2455,8 @@ card remains unchanged, the own flash journal validates and RTC ticks are contin
 An unclocked voice peer can publish erased uplink placeholders (`good=0`); these
 are not speech and are discarded by the bridge. Acceptance forbids `good=1`
 uplink and DSP speech ticks, requires discarded-epoch bridge uplink0, and keeps
-`speech_tested=false`/`native_dsp_complete=false`. Incoming and provisional-call
-restoration remain unqualified.
+`speech_tested=false`/`native_dsp_complete=false`. Provisional-call restoration
+remains unqualified; connected incoming restoration is independently checked below.
 
 Prepare fresh isolated storage as above, then run the same SIP command with
 `--restore-outgoing`, script `../tools/nsb7_sip_outgoing_restore.lua`, and an82s
@@ -2472,6 +2472,37 @@ The shared SIP runner captures MAME stdout/stderr in `sip-handset.log` and rejec
 Lua, validity and fatal execution errors even when the process exits zero.
 The restore checker additionally requires that healthy console and the actual
 `.sta` file; successful network clearing alone cannot qualify a broken fixture.
+
+### Connected incoming SIP restoration
+
+`nsb7_sip_incoming_restore.lua` shares only the architectural snapshot/physical
+cleanup harness with outgoing restoration. Its own direction checker requires
+settled45s readiness before caller5551234 is paged on PCS600, exact calling-number
+SETUP delivery through task4/task14, and physical Send52 before CONNECT/ACK and
+SIP200 confirmation. Save55/load after0.5s restores all37 CPU registers, RAM and
+time exactly; both saved/restored frames equal reviewed Call1 pixels.
+
+One incoming dialog is closed with BYE on epoch change, never re-admitted.
+Exactly one cause41 termination and normal CC/RR release end request1/epoch2.
+Physical End60/Menu62/End65 leave exact68s idle; the full card, own flash journal,
+continuous RTC and zero qualified uplink retain their existing checks. This
+qualifies connected signaling restoration, not native speech or media continuity.
+
+The51s ringing snapshot permits exactly two reviewed complete frames displaying
+5551234: Calling/Decline visible, or their alternate animation phase. Localhost
+INVITE arrival is not phase-locked to firmware animation. Caller bytes in both
+MCU consumers, physical Answer and connected pixels remain independent mandatory
+checks; no arbitrary frame, mask or missing-caller image is accepted.
+
+Use the same fresh own-source storage and SIP command with `--incoming
+--restore-call --ready-file RUN/snap/nsb7_call_ready.png`, script
+`../tools/nsb7_sip_incoming_restore.lua` and78s guard. Qualified capture
+`tmp/nsb7-sip-incoming-restore` uses SIP25280/HTTP18946:
+
+```sh
+.venv/bin/python tools/nsb7_sip_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-sip-incoming-restore --restore-incoming
+```
 
 ## Connected host-call restoration
 

@@ -1329,7 +1329,10 @@ a fresh handset-readiness artifact. Connected outgoing restoration is separately
 qualified by `nsb7_sip_outgoing_restore.lua` and `--restore-outgoing`: exact37-register/
 RAM/time restoration invalidates the original SIP dialog with BYE, one cause41
 clear under the new epoch and no redial. Physical End/Menu recovery, exact pixels,
-whole-card persistence and retained RTC remain required. Incoming/provisional
+whole-card persistence and retained RTC remain required. Connected incoming has
+independent `nsb7_sip_incoming_restore.lua`/`--incoming --restore-call` acceptance:
+fresh readiness, exact caller SETUP, physical Answer and connected architecture
+precede one BYE/new-epoch cause41 clear, with no repeated admission. Provisional
 restoration, recording/media and multiple-call combinations remain rejected. Its result
 explicitly keeps speech/native-DSP claims false and requires zero handset
 qualified uplink media. Erased `good=0` placeholders after load do not qualify as

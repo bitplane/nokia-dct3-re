@@ -534,6 +534,9 @@ def verify_outgoing_restore(root, remote_text, connected=False, product='3210', 
 def verify_restore(root, remote_text, phase='connected', product='3210', *, signaling_only=False):
     bridge = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
+    if product=='8290':
+        from tools.nsb7_sip_check import check_incoming_restore
+        check_incoming_restore(log)
     if phase == 'connected':
         if not re.search(r'state changed to CONFIRMED.*?Request msg BYE/',
                          remote_text, re.DOTALL):
@@ -691,7 +694,8 @@ def main():
                              args.signaling_only and args.product=='8290' and
                              (not args.incoming or args.ready_file is not None) and args.sip_response==200 and
                              args.calls==1 and not args.record_media and not args.restore_idle and
-                             not args.restore_call and (not args.restore_outgoing or not args.incoming) and not args.cancel_incoming)
+                             (not args.restore_call or (args.incoming and args.restore_phase=='connected')) and
+                             (not args.restore_outgoing or not args.incoming) and not args.cancel_incoming)
     if args.signaling_only and not signaling_connected:
         parser.error('--signaling-only requires a single verified product SIP-200 fixture, with connected restoration only')
     if args.product=='8290' and not signaling_connected:
