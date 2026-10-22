@@ -3,18 +3,21 @@
 
 import argparse
 from pathlib import Path
+import sys
 
-from sim_toolkit_trace_check import require_in_order
+if __package__ in (None,''):
+    sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from tools.sim_toolkit_trace_check import require_in_order
 
 
-def verify(log: str) -> None:
+def verify(log: str, *, profile_length=5) -> None:
     compact = log.replace("[:sim_card] ", "")
     require_in_order(compact, [
         "proactive REFRESH ready",
         "SIM status ins=c2 sw=910b",
         "header cla=a0 ins=12 p1=00 p2=00 p3=0b",
-        "header cla=a0 ins=10 p1=00 p2=00 p3=05",
-        "body ins=10 length=5",
+        f"header cla=a0 ins=10 p1=00 p2=00 p3={profile_length:02x}",
+        f"body ins=10 length={profile_length}",
         "SIM status ins=10 sw=9000",
         "terminal-response data=810309010002028281030100",
         "SIM status ins=14 sw=9000",

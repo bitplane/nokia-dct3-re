@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_authenticated_toolkit_refresh_resume",
+      "owner": "nsb7_sim_toolkit", "status": "satisfied",
+      "predicate": "NSB-7 completes qualifier0 REFRESH across re-profiling and physically completes a renewed proactive application session",
+      "current": "Own authenticated menu selection86 yields910b/FETCH. A second nine-byte TERMINAL PROFILE near86.182s precedes one successful810309010002028281030100 near91.012s. The card-ready timer now publishes ID21/number1 before pending, fixing the former readiness-log/9100/zero-FETCH bug. Real9116/FETCH near124.069s is followed by physical DISPLAY TEXT OK130, GET INKEY5/OK134/136 and GET INPUT42/OK140/142/144, then a fresh successful SET UP MENU and End148/exact13:50 idle. Two profiles, nine FETCH/responses, one envelope, eighteen decoded actions and exact frames, full initial registration, valid own flash and unchanged complete card pass. Default3210 and legacy NSE-8 REFRESH gates pass. No handset-state forcing or native DSP/RF claim.",
+      "evidence": ["docs/8290_bringup.md", "docs/sim_subsystem.md", "driver/nokia_sim_card.cpp", "fixtures/nsb7_toolkit_refresh/nsb7hle.cfg", "tools/nsb7_toolkit_refresh.lua", "tools/nsb7_toolkit_interactive.lua", "tools/nsb7_toolkit_check.py", "tools/test_nsb7_toolkit_check.py", "tools/sim_toolkit_refresh_trace_check.py", "tools/test_sim_toolkit_refresh_trace_check.py"]
+    },
+    {
       "id": "nsb7_authenticated_toolkit_polling_commands",
       "owner": "nsb7_sim_toolkit", "status": "satisfied",
       "predicate": "NSB-7 accepts the five-second POLL INTERVAL and chained POLLING OFF responses while a bounded extended trace independently records ordinary STATUS traffic",

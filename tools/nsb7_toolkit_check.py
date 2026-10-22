@@ -12,6 +12,8 @@ from tools.sim_toolkit_sms_trace_check import verify as verify_sms
 from tools.sim_toolkit_call_trace_check import verify as verify_call,verify_decline,DISCONNECT
 from tools.sim_toolkit_select_item_trace_check import verify as verify_select_item
 from tools.sim_toolkit_polling_trace_check import verify_commands as verify_polling_commands
+from tools.sim_toolkit_refresh_trace_check import verify as verify_refresh
+from tools.sim_toolkit_trace_check import require_in_order
 from tools.nsb7_pin_check import check_frame
 from tools.nsb7_radio_check import contract
 from tools.nsb7_storage_check import inspect
@@ -53,11 +55,21 @@ SELECT_ITEM_FRAMES={**MENU_FRAMES,
     'nsb7_toolkit_item_accept.png':MENU_FRAMES['nsb7_toolkit_menu_open.png']}
 POLLING_FRAMES={**MENU_FRAMES,
     'nsb7_toolkit_menu_exit.png':'9da919d7d031f0e7d2f8184dab4a20d2f91d747ac025de9908bf24112faa162a'}
+REFRESH_FRAMES={**MENU_FRAMES,
+    'nsb7_toolkit_menu_select.png':'4ae624eb4a175cd58c4fb8b0a6b0c74e612da2a9b2958a85cd1a75957aa2bbf9',
+    'nsb7_toolkit_menu_exit.png':POLLING_FRAMES['nsb7_toolkit_menu_exit.png'],
+    'nsb7_toolkit_refresh_display.png':FRAMES['nsb7_toolkit_display.png'],
+    'nsb7_toolkit_refresh_dismiss.png':'0c320ff7bbdd1dc904aea3b70ac3320f93a5787130732a72e1ca05aa6575835e',
+    'nsb7_toolkit_refresh_inkey5.png':'fec0cd87203f42163c39c4938c6078971d3479d8aa0ef70e42853407c3881598',
+    'nsb7_toolkit_refresh_inkey_confirm.png':INTERACTIVE_FRAMES['nsb7_toolkit_input.png'],
+    'nsb7_toolkit_refresh_input4.png':'590b4acd0270a990148edba76f785e8f60394bff63edeb6d8a6eeb25752ed186',
+    'nsb7_toolkit_refresh_input2.png':'169b9f1bb144e9cd4e061a74980b1479956c9431c17482149b7701300b6e83b0',
+    'nsb7_toolkit_refresh_confirm.png':POLLING_FRAMES['nsb7_toolkit_menu_exit.png']}
 
 
 MODE_FRAMES={'display':FRAMES,'interactive':INTERACTIVE_FRAMES,'menu':MENU_FRAMES,
              'sms':SMS_FRAMES,'call':CALL_FRAMES,'decline':DECLINE_FRAMES,
-             'select_item':SELECT_ITEM_FRAMES,'polling':POLLING_FRAMES}
+             'select_item':SELECT_ITEM_FRAMES,'polling':POLLING_FRAMES,'refresh':REFRESH_FRAMES}
 
 
 def check(text,mode='display'):
@@ -66,6 +78,7 @@ def check(text,mode='display'):
     sms=mode=='sms'
     select_item=mode=='select_item'
     polling=mode=='polling'
+    refresh=mode=='refresh'
     decline=mode=='decline'
     call=mode in ('call','decline')
     menu=mode not in ('display','interactive')
@@ -74,7 +87,7 @@ def check(text,mode='display'):
     check_authentication(text.split(marker+':',1)[0])
     verifier=verify_menu if menu else verify_interactive if interactive else verify_display_text
     selection_status={'sms':'9124','call':'911c','decline':'911c',
-                      'select_item':'9122','polling':'910f'}.get(mode)
+                      'select_item':'9122','polling':'910f','refresh':'910b'}.get(mode)
     if selection_status:
         verifier(text,'nsb7',selection_status=selection_status)
     else:
@@ -139,9 +152,34 @@ def check(text,mode='display'):
                 raise ValueError('post-off STATUS did not complete successfully')
         if 'GSM outgoing request ' in text or 'gsm_sms_submit:' in text:
             raise ValueError('polling unexpectedly started network service')
+    if refresh:
+        verify_refresh(text,profile_length=9)
+        compact=text.replace('[:sim_card] ','')
+        if 'header cla=a0 ins=12 p1=00 p2=00 p3=00' in compact or 'SIM completion ins=f2 sw=9100' in compact:
+            raise ValueError('REFRESH resumed an empty proactive command')
+        if 'GSM outgoing request ' in text or 'gsm_sms_submit:' in text:
+            raise ValueError('REFRESH unexpectedly started network service')
+        require_in_order(compact,(
+            'terminal-response data=810309010002028281030100',
+            'proactive DISPLAY TEXT ready','header cla=a0 ins=12 p1=00 p2=00 p3=16',
+            'nsb7_toolkit_interactive: action=refresh_dismiss',
+            'terminal-response data=810301218002028281030100',
+            'proactive GET INKEY ready','header cla=a0 ins=12 p1=00 p2=00 p3=15',
+            'nsb7_toolkit_interactive: action=refresh_inkey5',
+            'nsb7_toolkit_interactive: action=refresh_inkey_confirm',
+            'terminal-response data=8103022200020282810301000d020435',
+            'proactive GET INPUT ready','header cla=a0 ins=12 p1=00 p2=00 p3=1a',
+            'nsb7_toolkit_interactive: action=refresh_input4',
+            'nsb7_toolkit_interactive: action=refresh_input2',
+            'nsb7_toolkit_interactive: action=refresh_confirm',
+            'terminal-response data=8103032300020282810301000d03043432',
+            'proactive SET UP MENU ready','header cla=a0 ins=12 p1=00 p2=00 p3=28',
+            'terminal-response data=810304250002028281030100','SIM status ins=14 sw=9000',
+            'nsb7_toolkit_interactive: action=menu_exit'))
     for instruction in ('10','12','14'):
-        count=6 if polling else 5 if sms or call or select_item else 4 if menu else 3
+        count=9 if refresh else 6 if polling else 5 if sms or call or select_item else 4 if menu else 3
         expected=count if interactive and instruction!='10' else 1
+        if refresh and instruction=='10': expected=2
         if text.count(f'header cla=a0 ins={instruction} ')!=expected:
             raise ValueError('Toolkit profile/FETCH/terminal-response count differs')
     if text.count('header cla=a0 ins=c2 ')!=(1 if menu else 0):
@@ -157,6 +195,10 @@ def check(text,mode='display'):
             expected.insert(len(expected)-1,('call_decline','1a') if decline else ('call_accept','19'))
         if select_item:
             expected[-1:-1]=[('item_next','18'),('item_accept','19')]
+        if refresh:
+            expected[-1:-1]=[('refresh_dismiss','19'),('refresh_inkey5','05'),
+                ('refresh_inkey_confirm','19'),('refresh_input4','04'),
+                ('refresh_input2','02'),('refresh_confirm','19')]
         if [action[1] for action in actions]!=[name for name,_ in expected]:
             raise ValueError('physical Toolkit input sequence differs')
         for index,(_,code) in enumerate(expected):
@@ -191,7 +233,7 @@ def main():
     modes=parser.add_mutually_exclusive_group()
     for flag,mode in (('--interactive','interactive'),('--menu','menu'),('--sms','sms'),
                       ('--call','call'),('--call-decline','decline'),('--select-item','select_item'),
-                      ('--polling','polling')):
+                      ('--polling','polling'),('--refresh','refresh')):
         modes.add_argument(flag,dest='mode',action='store_const',const=mode)
     parser.set_defaults(mode='display')
     args=parser.parse_args()

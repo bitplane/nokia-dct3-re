@@ -783,6 +783,10 @@ TIMER_CALLBACK_MEMBER(nokia_sim_card_device::toolkit_command_ready)
 	if (m_toolkit_profile == toolkit_profile::none || !m_terminal_profile_received ||
 			m_proactive_fetched)
 		return;
+	// REFRESH completion clears the old command. Publish a complete new
+	// application command before advertising its length in 91xx.
+	m_proactive_command = 0x21;
+	m_proactive_command_number = 1;
 	m_proactive_pending = true;
 	LOGMASKED(LOG_SIM, "sim_device: proactive DISPLAY TEXT ready t=%.8f\n",
 			machine().time().as_double());

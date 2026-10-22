@@ -27,6 +27,12 @@ class SimToolkitRefreshTraceCheckTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "ins=10"):
             check.verify(GOOD.replace("header cla=a0 ins=10", "header cla=a0 ins=11"))
 
+    def test_nine_byte_reprofile(self):
+        text=GOOD.replace('p3=05','p3=09').replace('length=5','length=9')
+        check.verify(text,profile_length=9)
+        with self.assertRaises(ValueError):
+            check.verify(text)
+
 
 if __name__ == "__main__":
     unittest.main()

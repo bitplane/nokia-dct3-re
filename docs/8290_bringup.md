@@ -2595,3 +2595,34 @@ the precise presence-poll owner remain unproved. No device behavior changed.
 .venv/bin/python tools/nsb7_toolkit_check.py \
   roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-polling-long --polling
 ```
+
+### REFRESH and renewed application session
+
+`fixtures/nsb7_toolkit_refresh/nsb7hle.cfg` and `nsb7_toolkit_refresh.lua`
+use the existing qualifier0 REFRESH card application. Physical selection86
+returns910b; FETCH supplies REFRESH. The 8290 sends a second nine-byte
+TERMINAL PROFILE near86.182s before successful terminal response
+`810309010002028281030100` near91.012s. That outstanding response must
+survive re-profiling; it is not a new card request to cancel it.
+
+The card-ready callback initializes DISPLAY TEXT ID21/number1 before marking
+the next command pending. REFRESH completion clears the prior ID; without
+that initialization the old model logged readiness but advertised9100 and
+accepted no subsequent FETCH. The corrected model advertises9116 and the
+handset FETCHes22 bytes near124.069s. This is a card-application state fix,
+not firmware-state forcing or a change to the handset's poll timing.
+
+The extended fixture captures the renewed prompt129s, then physically
+completes DISPLAY TEXT OK130, GET INKEY5/OK134/136 and GET INPUT4/2/OK140/
+142/144. A fresh SET UP MENU is acknowledged; End148 returns to exact13:50
+idle. The checker requires two profiles, nine FETCH/response pairs, one
+envelope, eighteen decoded actions, eighteen exact frames, full initial
+registration, valid own journal and unchanged complete card. It rejects
+9100/zero-length FETCH, missing re-profile, failed REFRESH and incomplete
+renewed input. No GSM call or SMS submission is permitted. The default3210
+and existing NSE-8 REFRESH gates remain green; native DSP/RF remain unproved.
+
+```sh
+.venv/bin/python tools/nsb7_toolkit_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-refresh-fixed --refresh
+```

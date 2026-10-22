@@ -1,4 +1,5 @@
 import unittest
+import re
 from unittest.mock import patch
 from tools.dct3_toolkit_check import display_text_events,interactive_events,menu_events
 from tools.nsb7_toolkit_check import check,check_card,SMSS_OFFSET
@@ -57,6 +58,34 @@ def call_fixture(decline=False):
 
 
 class ToolkitTest(unittest.TestCase):
+    @patch('tools.nsb7_toolkit_check.check_authentication')
+    def test_refresh_reprofiles_and_completes_new_application(self,authentication):
+        from tools.test_sim_toolkit_refresh_trace_check import GOOD
+        text=interactive_fixture(menu=True).replace('SIM status ins=c2 sw=9000',
+            'proactive REFRESH ready\nSIM status ins=c2 sw=910b')
+        exit_event='nsb7_toolkit_interactive: action=menu_exit\nnsb7_key_decode: key=0f observer_writes=0'
+        header='header cla=a0 ins=12 p1=00 p2=00 p3=0b'
+        refresh=header+GOOD.split(header,1)[1]
+        refresh=refresh.replace('p3=05','p3=09').replace('length=5','length=9')
+        refresh=refresh.replace('terminal-response data=810309',
+            'header cla=a0 ins=14 p1=00 p2=00 p3=0c\nterminal-response data=810309')
+        fetch='header cla=a0 ins=12 p1=00 p2=00 p3=16'
+        resumed=fetch+interactive_fixture(menu=True).split(fetch,1)[1]
+        resumed=resumed.split('nsb7_toolkit_interactive: action=menu',1)[0]
+        names={'dismiss':'refresh_dismiss','inkey_5':'refresh_inkey5',
+               'inkey_confirm':'refresh_inkey_confirm','input_4':'refresh_input4',
+               'input_2':'refresh_input2','confirm':'refresh_confirm'}
+        resumed=re.sub(r'action=(\w+)',lambda match:'action='+names[match[1]],resumed)
+        text=text.replace(exit_event,refresh+'\n'+resumed+'\n'+exit_event)
+        check(text,mode='refresh')
+        for bad in (text.replace('p3=16','p3=00'),
+                    text.replace('header cla=a0 ins=10 p1=00 p2=00 p3=09','missing',1),
+                    text.replace('action=refresh_confirm','action=missing'),
+                    text.replace('810309010002028281030100','810309010002028281030120'),
+                    text+'\nSIM completion ins=f2 sw=9100'):
+            with self.subTest(text=bad),self.assertRaises(ValueError):
+                check(bad,mode='refresh')
+
     @patch('tools.nsb7_toolkit_check.check_authentication')
     def test_polling_protocol_and_bounded_ordinary_status_cadence(self,authentication):
         text=interactive_fixture(menu=True).replace('SIM status ins=c2 sw=9000',

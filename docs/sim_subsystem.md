@@ -458,7 +458,12 @@ TERMINAL PROFILE before returning the REFRESH TERMINAL RESPONSE. The card must
 therefore preserve that in-flight command across re-profiling, accept its one
 delayed completion, and only then schedule the new application session.
 `make verify-sim-toolkit-refresh` protects this ordering and catches both lost
-completion state and overlapping proactive commands.
+completion state and overlapping proactive commands. The command-ready timer
+must publish DISPLAY TEXT's command ID and number before setting pending;
+REFRESH completion cleared the old ID, so merely logging readiness previously
+advertised9100 and caused zero-length FETCH attempts. The NSB-7 REFRESH gate
+now proves a real post-refresh FETCH and a complete second interactive/menu
+session, not only the timer's readiness log.
 
 The NSE-8 `POLL INTERVAL`/`POLLING OFF` fixture returns result `00` plus a
 five-second effective-duration TLV, then accepts the immediately chained off

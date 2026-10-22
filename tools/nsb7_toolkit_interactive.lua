@@ -45,6 +45,15 @@ local input=coroutine.create(function()
             table.insert(steps,6,{90,'Scroll Down','item_next'})
             table.insert(steps,7,{92,'Left Softkey / Menu','item_accept'})
         end
+        if _G.nsb7_toolkit_refresh then
+            for index,step in ipairs({{130,'Left Softkey / Menu','refresh_dismiss'},
+                    {134,'Keypad 5','refresh_inkey5'},
+                    {136,'Left Softkey / Menu','refresh_inkey_confirm'},
+                    {140,'Keypad 4','refresh_input4'},{142,'Keypad 2','refresh_input2'},
+                    {144,'Left Softkey / Menu','refresh_confirm'}}) do
+                table.insert(steps,5+index,step)
+            end
+        end
         for _,step in ipairs(steps) do
             if _G.nsb7_toolkit_menu_hold and step[3]=='menu_select' then return end
             press(step[1],step[2],step[3])
