@@ -9468,11 +9468,50 @@ also supplies`{0,0,1}`, but its upstream owner remains unresolved.
 The dispatcher rejects a matching previous class/selector when the selector
 is above`28`. A declared external control test must respect this guard
 rather than force its previous-command state; the existing status-query
-transition is the candidate intervening exchange. These are source-derived
-control routes, not measured serial acceptance, official command names or
-an automatic EOF sequence. Next exercise the original serial/control path
-with a declared status/30-04 sequence and observe its input03/input16 effects;
-do not equate an explicit user stop with draining the protected EOF tail.
+transition supplies the intervening exchange in the explicit control fixture
+below. These are source-derived routes, not official command names or an
+automatic EOF sequence.
+
+The `bootplaystop` bench profile now qualifies explicit serial control after
+native decoder progress. It sends playback `30/02`, then status `49`, waits
+for the complete status response, acknowledges it, and sends `30/04` through
+the existing serial input. No firmware RAM, CPU PC or internal message is
+injected. Request token `02` receives ACK `02`; the DSP status response has
+its independent TX token `03`. Equating those tokens incorrectly parks the
+peer and must not replace semantic response and framing checks.
+
+The qualified run observes the source-identified route
+`038d03 -> 028498 -> 02905d -> 0208ce -> 0208e5 -> 020727`.
+The input03 frame contains `{03,0,0,1}`, and the input16 sender sees pending
+argument `3`. Original resident AA22 is then reloaded and executes IDLE3
+`028922:f5e1`; the staged core previously rejected that instruction. At
+20 seconds the CPU is clean, idle at `028923`, with five decoder calls,
+29 serial input bytes and six complete native response frames. Sixteen
+read-only observations stay below the 1024-event cap. The AA99 `receive16`
+and `hook16` sites are **not observed**; the sender alone does not prove
+their execution after the overlay transition.
+
+Use `tools/mu4_playback_serial_control_observe.lua` with `bootplaystop` and
+the existing finalized recorder NAND/ROM setup, plus `-debug -debugger none
+-autoboot_delay 0`. Headless host options `-joystickprovider none
+-midiprovider none` avoid unnecessary physical host-device initialization;
+they do not alter the emulated serial protocol. The run retains the expected
+rejecting endpoint `MU4 playback coverage diagnostic: audio completion is
+not validated`. Check it with:
+
+```sh
+.venv/bin/python tools/mu4_playback_serial_control_check.py \
+  roms/5510-mu4-reference/InitData_R060.a00 RUN_DIR INPUT_NAND --console CONSOLE_LOG
+```
+
+The full input NAND SHA256 is
+`ca1a96666fb527b41a40796c123bd6a6ec5c486b0d4cbf373d2368d58af75923`.
+Under `-nonvram_save`, unchanged on-disk NAND establishes input retention,
+not absence of runtime NAND writes or durable persistence. The checker
+independently verifies wire bytes/checksums, opposite-direction tokens,
+ordered source opcodes, uncapped read-only observations and the clean final
+diagnostic. This is an explicit user control, **not automatic EOF draining,
+protected-tail recovery, audio-completion acceptance or complete 5510 boot**.
 
 The bounded native playback fixture now observes 402 complete software
 notification groups: publication `0292c1`, callback `020981`, vector
