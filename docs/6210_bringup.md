@@ -1167,8 +1167,18 @@ the cold process retains LOCI. Independent launch IDs, script hashes and full
 initial NVRAM hashes identify the continuation, and the predecessor's complete
 NVRAM must remain unchanged. The verified capture is
 `tmp/npe3-pin2-cold-final` (regenerable local evidence, not a shipped fixture).
-No RAM or save state is transferred. Wrong-PIN2 rejection, PIN2/PUK2 exhaustion
-and FDN control remain unqualified.
+No RAM or save state is transferred.
+
+`make verify-6210-pin2-retry-cold` instead enters wrong current PIN2 `9999`
+and requests8765. CHANGE CHV2 returns9804 and the phone displays Code error.
+The complete card changes only the normal LOCI update and PIN2 retry byte
+(3 to2); neither credential nor any PUK counter changes. A separate cold
+process receives exactly that storage, authenticates the unchanged5678 and
+installs8765 successfully, restoring PIN2 retries to3. Both six-frame sequences,
+registration, source preservation and launch provenance are checked. Capture:
+`tmp/npe3-pin2-retry-banked`. The status parser explicitly selects CHV2's
+counters; default CHV1 consumers retain their previous behavior.
+PIN2/PUK2 exhaustion and FDN control remain unqualified.
 
 ## SIM Toolkit
 

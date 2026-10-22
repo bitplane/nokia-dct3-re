@@ -38,6 +38,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'security-block': ('npe3hle', 'security_block_input', 33),
              'pin2-change': ('npe3hle', 'pin2_change_input', 84),
              'pin2-change-cold': ('npe3hle', 'pin2_change_input', 84),
+             'pin2-retry-cold': ('npe3hle', 'pin2_wrong_input', 84),
              'toolkit': ('npe3hle', 'toolkit_input', 40),
              'toolkit-interactive': ('npe3hle', 'toolkit_interactive', 65),
              'toolkit-menu': ('npe3hle', 'toolkit_menu', 75),
@@ -62,7 +63,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
 TOOLKIT_PROFILES = {'toolkit': 1, 'toolkit-interactive': 3, 'toolkit-menu': 4,
                     'toolkit-sms': 5, 'toolkit-call': 6, 'toolkit-call-decline': 6}
 PIN_SCENARIOS=frozenset(('security','security-retry','security-retry-cold',
-                         'security-block-cold','security-block','pin2-change','pin2-change-cold'))
+                         'security-block-cold','security-block','pin2-change','pin2-change-cold','pin2-retry-cold'))
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
@@ -712,19 +713,23 @@ def main():
                     verify(cold_text, runtime=True, selftest=True)
                     check_forbidden_selection(cold_text, card.read_bytes(),
                                               forbidden=forbidden, previous=retained)
-        elif args.scenario in ('pin2-change','pin2-change-cold'):
+        elif args.scenario in ('pin2-change','pin2-change-cold','pin2-retry-cold'):
             from tools.noki6210_pin2_change_check import check as check_pin2,check_frames as check_pin2_frames
-            check_pin2(text,(run/'nvram/npe3hle/sim_card').read_bytes())
+            rejected=args.scenario=='pin2-retry-cold'
+            check_pin2(text,(run/'nvram/npe3hle/sim_card').read_bytes(),
+                       old_pin='9999' if rejected else '5678',rejected=rejected)
             check_registration(text,(run/'nvram/npe3hle/sim_card').read_bytes(),channel_header='1202')
-            check_pin2_frames(run/'snap')
-            if args.scenario=='pin2-change-cold':
+            check_pin2_frames(run/'snap',rejected=rejected)
+            if args.scenario in ('pin2-change-cold','pin2-retry-cold'):
                 cold=run/'cold-pin2'
                 first=(run/'nvram/npe3hle/sim_card').read_bytes()
+                script='noki6210_pin2_change_input.lua' if rejected else 'noki6210_pin2_change_cold_input.lua'
                 cold_text,initial,cold_retry=run_retained_security(run,cold,command,
-                    root/'tools/noki6210_pin2_change_cold_input.lua',84,environment)
+                    root/'tools'/script,84,environment)
                 if initial!=first:
                     raise ValueError('cold PIN2 change must use the exact installed-PIN2 card')
-                check_pin2(cold_text,(cold/'nvram/npe3hle/sim_card').read_bytes(),'8765','5678')
+                check_pin2(cold_text,(cold/'nvram/npe3hle/sim_card').read_bytes(),
+                           '5678' if rejected else '8765','8765' if rejected else '5678')
                 check_registration(cold_text,(cold/'nvram/npe3hle/sim_card').read_bytes(),
                                    preserved_location=True,channel_header='1202')
                 check_pin2_frames(cold/'snap')
@@ -921,7 +926,7 @@ def main():
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': machine, 'scenario': args.scenario, 'passed': True,
             'launch': launch,
-            **({('cold_pin2_change' if args.scenario=='pin2-change-cold' else 'cold_pin_retry_recovery'): cold_retry} if cold_retry else {}),
+            **({('cold_pin2_change' if args.scenario in ('pin2-change-cold','pin2-retry-cold') else 'cold_pin_retry_recovery'): cold_retry} if cold_retry else {}),
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
             'sim_profile': ('foreign two-digit-MNC preferred laboratory card' if args.scenario == 'foreign-registration' or args.foreign_cell
                             else 'visited-test-PLMN preferred laboratory card' if args.scenario == 'plmn-reject'

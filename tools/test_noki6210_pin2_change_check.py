@@ -2,6 +2,7 @@ import unittest
 
 from tools.noki6210_pin2_change_check import check
 from tools.noki6210_puk_check import profile
+from tools.sim_security_trace_check import statuses
 
 
 def fixture():
@@ -31,6 +32,31 @@ def fixture():
 
 
 class Pin2ChangeTests(unittest.TestCase):
+    def test_status_selector_keeps_both_credential_namespaces_distinct(self):
+        text='SIM status ins=24 sw=9804 chv=3/2 puk=9/8 enabled=1'
+        self.assertEqual(statuses(text,0x24),[(0x9804,3,9)])
+        self.assertEqual(statuses(text,0x24,2),[(0x9804,2,8)])
+        with self.assertRaises(ValueError):
+            statuses(text,0x24,0)
+
+    def test_wrong_pin2_changes_only_its_retry_counter(self):
+        # Only the current-code phase changes; replacement and PIN1 stay intact.
+        text,_=fixture()
+        for time,digit in enumerate('5678',50):
+            text=text.replace(f'key=Keypad {digit} state=1 t={time}.',f'key=Keypad 9 state=1 t={time}.')
+            text=text.replace(f'key=Keypad {digit} state=0 t={time}.',f'key=Keypad 9 state=0 t={time}.')
+        text=text.replace('ins=24 sw=9000 chv=3/3','ins=24 sw=9804 chv=3/2')
+        card=bytearray(profile(3,True))
+        card[3517]=2
+        check(text,bytes(card),old_pin='9999',rejected=True)
+        self.assertEqual(statuses(text,0x24),[(0x9804,3,10)])
+        self.assertEqual(statuses(text,0x24,2),[(0x9804,2,10)])
+        for index in (3492,3516,3517,3519):
+            changed=bytearray(card)
+            changed[index]^=1
+            with self.assertRaises(ValueError):
+                check(text,bytes(changed),old_pin='9999',rejected=True)
+
     def test_cold_installed_pin2_is_used_to_change_back(self):
         text,_=fixture()
         # Change the actual keyed old/new phases, not the rest of the workflow.

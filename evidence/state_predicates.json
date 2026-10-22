@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_wrong_pin2_cold_recovery", "owner": "npe3_sim_security", "status": "satisfied",
+      "predicate": "6210 rejects wrong current PIN2, persists exactly one consumed PIN2 attempt and cold-recovers using the unchanged original PIN2",
+      "current": "Physical Settings change with current9999/new8765 returns CHANGE CHV2/9804 and reviewed Code error pixels. Whole card changes only LOCI and PIN2 retries3->2, leaving both credentials and PUK counts intact. Exact own NVRAM/config feeds a separate cold process: original5678 installs8765/9000, restores PIN2 retries3 and registers with retained LOCI. Twelve frame checks, exact contacts/protocol, complete-card checks, independent launch provenance and unchanged predecessor storage pass. Capture tmp/npe3-pin2-retry-banked. CHV-indexed parser avoids mistaking PIN1 counters for PIN2. No PIN2/PUK2 exhaustion, FDN or native speech promotion.",
+      "evidence": ["docs/6210_bringup.md", "tools/noki6210_pin2_wrong_input.lua", "tools/noki6210_pin2_change_input.lua", "tools/noki6210_pin2_change_check.py", "tools/test_noki6210_pin2_change_check.py", "tools/sim_security_trace_check.py", "tools/run_noki6210_acceptance.py", "gates.json"]
+    },
+    {
       "id": "npe3_cold_pin2_change", "owner": "npe3_sim_security", "status": "satisfied",
       "predicate": "6210 cold-authenticates physically installed PIN2 and changes it back through settings using only retained own NVRAM/config",
       "current": "Fresh physical5678->8765 change feeds a separate cold process which physically authenticates8765 and changes back to5678. Both processes require exact CHANGE CHV2/9000, six reviewed frames, coherent registration and whole-card equality; cold registration retains LOCI. Initial complete NVRAM hashes, distinct launch identities and script hashes record provenance; predecessor NVRAM remains unchanged. Verified capture tmp/npe3-pin2-cold-final. No RAM/save transfer, wrong-PIN2, PIN2/PUK2 exhaustion, FDN or native speech promotion.",

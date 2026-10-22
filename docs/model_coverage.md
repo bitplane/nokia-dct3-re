@@ -119,7 +119,9 @@ current/new/confirmation input, CHANGE CHV2 success, exact settings/success/Menu
 frames and complete card preservation except PIN2/LOCI.
 `verify-6210-pin2-change-cold` then cold-authenticates the installed PIN2 and
 physically changes it back, with retained location, independent launch/storage
-provenance and unchanged predecessor NVRAM. Wrong-PIN2 rejection,
+provenance and unchanged predecessor NVRAM. `verify-6210-pin2-retry-cold`
+proves Code error/9804 for wrong current PIN2, exactly one durable PIN2 retry
+consumed, unchanged credentials and cold recovery with the original PIN2.
 PIN2/PUK2 exhaustion and FDN remain unqualified.
 
 `verify-5210-sim-pin-registration` independently proves early physical

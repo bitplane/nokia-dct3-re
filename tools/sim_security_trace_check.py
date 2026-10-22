@@ -21,11 +21,13 @@ def padded_pin(pin: str) -> bytes:
     return pin.encode("ascii").ljust(8, b"\xff")
 
 
-def statuses(trace: str, instruction: int) -> list[tuple[int, int, int]]:
+def statuses(trace: str, instruction: int, chv: int = 1) -> list[tuple[int, int, int]]:
+    if chv not in (1, 2):
+        raise ValueError('CHV selector must be 1 or 2')
     pattern = re.compile(
         rf"SIM status ins={instruction:02x} sw=([0-9a-f]{{4}}) "
         r"chv=(\d+)/(\d+) puk=(\d+)/(\d+) enabled=(\d+)", re.I)
-    return [(int(match[1], 16), int(match[2]), int(match[4]))
+    return [(int(match[1], 16), int(match[1 + chv]), int(match[3 + chv]))
             for match in pattern.finditer(trace)]
 
 
