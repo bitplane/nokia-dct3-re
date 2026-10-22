@@ -1103,6 +1103,12 @@
       "evidence": ["docs/cobba_control_boundary.md", "tools/c54x_rom4_codec_contract.py", "tools/c54x_rom4_tone_observe.lua", "tools/run_c54x_rom4_tone_levels.py"]
     },
     {
+      "id": "rom4_pair_tc_set_reduces_arithmetic", "status": "disproven",
+      "hypothesis": "TC-set selects reduced arithmetic in the resident adjacent-pair correlation helper, so the TC-clear dot/cross formula cannot be applied",
+      "conclusion": "Original words47e6..47f5 contain a delayed conditional branch at47ee. Both following MAS/MAC words execute on either path. Independent isolated atomic and staged fixtures each pass32 cases/restores over eight bounded signed vectors, both TC states and FRCT off/on: A is the complete dot product and B the complete cross product in both modes. TC-set instead selects RETD47f3 and its two MVDD history copies; TC-clear returns at47f2 without those writes. This corrects a control-flow interpretation, not CPU arithmetic or a physical RF model. Overflow/saturation, caller-level TC meaning, I/Q assignment, sample clock and acquisition remain unproved.",
+      "evidence": ["docs/cobba_control_boundary.md", "tools/c54x_rom4_codec_contract.py", "driver/tms320c54x_test.cpp", "tools/run_c54x_rom4_crc.py", "tools/test_run_c54x_rom4_crc.py"]
+    },
+    {
       "id": "c54x_short_source_fixture_pmst_selects_cmpt", "status": "disproven",
       "hypothesis": "The shared short-source rejection fixture exercises both compatibility modes by toggling PMST bit 14",
       "conclusion": "CMPT is ST1 bit 5; the previous setup varied PMST while holding ST1.CMPT clear. Its cmpt=2 markers therefore overstated mode coverage, without invalidating the observed noncompatibility rejection results. The shared helper now varies ST1 bit 5 and asserts its preservation. All twelve documented source-rejection profiles pass again, including LTD/DELAY, MACP/MACD, loads, arithmetic, multiply, stack and transfers. This repair does not establish mode coverage for unrelated fixture helpers.",

@@ -23,10 +23,27 @@ from tools.run_c54x_rom4_crc import EFR_ERASURE_PASS, EFR_ERASURE_COMPLETE, EFR_
 from tools.run_c54x_rom4_crc import EFR_HOMING_PASS, EFR_HOMING_COMPLETE, EFR_HOMING_REPLAY
 from tools.run_c54x_rom4_crc import EFR_ENCODER_HOMING_PASS, EFR_ENCODER_HOMING_COMPLETE, EFR_ENCODER_HOMING_REPLAY
 from tools.run_c54x_rom4_crc import EFR_INVALID_SID_PASS, EFR_INVALID_SID_COMPLETE, EFR_INVALID_SID_REPLAY
-from tools.run_c54x_rom4_crc import check_rf_bitmap
+from tools.run_c54x_rom4_crc import check_rf_bitmap, check_rf_pairs
 
 
 class Rom4HelperResultTest(unittest.TestCase):
+    def test_native_rf_pair_math_and_history_require_both_tc_paths(self):
+        marker='TMS320C54x ROM4 RF pairs: PASS cases=32 vectors=8 tc=2 frct=2 replay=32 ram_words=65440 dot_cross_both_tc=1 history_copy_tc_only=1 rf_acquisition_claim=0'
+        complete='Fatal error: TMS320C54x ROM4 RF pairs complete'
+        text=marker+'\n'+complete+'\n'
+        check_rf_pairs(text,3)
+        staged='ROM4 RF pairs frontend: staged handset_audio_claim=0\n'+text
+        check_rf_pairs(staged,3,staged=True)
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field),self.assertRaises(ValueError):
+                    check_rf_pairs(text.replace(field,field.split('=')[0]+'=invalid'),3)
+        for bad in ('c54x_failure: phase=711000\n'+text, 'NOT FOUND\n'+text, complete+'\n'+text,
+                    text+marker+'\n', 'Fatal error: other\n'+text, staged):
+            with self.assertRaises(ValueError):check_rf_pairs(bad,3)
+        with self.assertRaises(ValueError):check_rf_pairs(text,0)
+        with self.assertRaises(ValueError):check_rf_pairs(text,3,staged=True)
+
     def test_native_rf_bitmap_basis_and_replay(self):
         marker='TMS320C54x ROM4 RF bitmap: PASS cases=515 basis=512 controls=empty,full,alternating replay=515 ram_words=65440 rf_acquisition_claim=0'
         complete='Fatal error: TMS320C54x ROM4 RF bitmap complete'

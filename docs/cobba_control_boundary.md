@@ -312,18 +312,33 @@ must be explicit assumptions in any independent waveform experiment.
 The downstream queue helper is not adequately described as an energy
 detector. Byte-pinned `0x47e6..0x47f5` reads previous pair `(x1,y1)`
 from `0x1252/1253` and current pair `(x2,y2)` from `0x1254/1255`.
-With TC clear, it forms A=`x2*x1 + y2*y1` and
-B=`x2*y1 - y2*x1`, subject to the core's multiply modes.
+It forms A=`x2*x1 + y2*y1` and B=`x2*y1 - y2*x1`, subject to the
+core's multiply modes, on both TC paths.
 These are adjacent-pair dot/cross products, consistent with a complex
 lag correlation without identifying which physical lane is I.
-TC set selects a different, reduced path and copies the current pair
-back into the previous-pair storage; do not apply the TC-clear formula
-to that path. The byte-pinned result tail `0x4778..0x4797` normalizes,
+TC selects history publication, not reduced arithmetic. The conditional
+branch at `47ee` is delayed: both the MAS at `47f0` and MAC at `47f1`
+execute before either return path. TC-set reaches the delayed return at
+`47f3`, whose two MVDD delay words copy the current pair back into
+`1252/1253`; TC-clear returns at `47f2` without those writes.
+
+`tools/run_c54x_rom4_crc.py --mame mame/mame --rompath mame/roms
+--rf-pairs` executes the unchanged 16-word helper in an isolated ROM
+algorithm fixture. Eight bounded signed vectors, both TC states and FRCT
+off/on give 32 cases and full 65440-word ordinary-RAM replays. Each case
+checks the independently computed dot/cross result, T, history/current-pair
+words, guards, final AR2/AR3, TC and balanced caller stack. `--staged`
+independently repeats the same matrix on the staged frontend. No input or
+result is injected into a handset. The vectors avoid overflow with OVM and
+SMUL clear; saturation, other mode combinations, physical timing, I/Q
+identity and sample cadence are not established by this fixture.
+
+The byte-pinned result tail `0x4778..0x4797` normalizes,
 squares and combines accumulated terms, then performs 15 SUBC steps
 against a nonzero denominator. Accordingly the uploaded caller's
 threshold comparison is a processed correlation-score boundary, not
 an established raw ADC-energy or dBm threshold. Exact score units and
-the active TC-mode interpretation remain to be validated numerically.
+the caller's physical interpretation of TC remain unresolved.
 
 ### Current RF-control reproducibility boundary
 

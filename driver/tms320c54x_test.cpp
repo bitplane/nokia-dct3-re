@@ -20523,6 +20523,12 @@ private:
 			start_rom4_crc_helper(0);
 			return;
 		}
+		if (!strcmp(machine().system().name, "tms54rom4") && rom4_codec_is("rf-pairs"))
+		{
+			enable_rom4_codec_pipeline("RF pairs");
+			start_rom4_pairs(0);
+			return;
+		}
 		if (!strcmp(machine().system().name, "tms54rom4") && rom4_codec_is("rf-bitmap"))
 		{
 			enable_rom4_codec_pipeline("RF bitmap");
@@ -22242,6 +22248,41 @@ private:
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
 
+	static std::array<s16, 4> rom4_pair_vector(unsigned index)
+	{
+		static constexpr s16 vectors[8][4] = {
+			{0,0,0,0}, {1,0,1,0}, {1,0,0,1}, {0,1,1,0},
+			{123,-456,789,321}, {-16384,8192,4096,-2048},
+			{16384,-8192,-4096,2048}, {32767,0,1,-1}
+		};
+		return {vectors[index/4][0], vectors[index/4][1], vectors[index/4][2], vectors[index/4][3]};
+	}
+	void start_rom4_pairs(unsigned index)
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		static constexpr u16 witness[] = {0x7712,0x1254,0x7713,0x1255,0x308a,0x218a,0x2082,0x3083,
+			0xfa30,0x47f3,0x2d92,0x2882,0xfc00,0xfe00,0xe554,0xe510};
+		for (unsigned i=0; i<std::size(witness); ++i)
+			expect(memregion("dspprg")->as_u16(0x47e6+i)==witness[i], "Original adjacent-pair helper is unchanged");
+		auto const values=rom4_pair_vector(index);
+		for (unsigned i=0; i<4; ++i) data.write_word(0x1252+i, u16(values[i]));
+		data.write_word(0x1251,0xa55a); data.write_word(0x1256,0x5aa5);
+		// Isolated algorithm inputs and caller return, never a handset state hook.
+		memregion("dspprg")->as_u16(0x0f00)=0xf4e1;
+		data.write_word(0x1ec3,0x0f00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC,0x47e6);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP,0x1ec3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0,0x081f | (index&1 ? 0x1000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1,0x0900 | (index&2 ? 0x40 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST,0xffac);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A,0x123456);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B,0xabcdef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T,0xa55a);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0);
+		m_phase=711000+index;
+		m_check_timer->adjust(attotime::from_msec(1));
+		save_rom4_codec_frame(index);
+	}
 	static bool rom4_bitmap_bit(unsigned index, unsigned bit)
 	{
 		return index < 512 ? bit == index : index == 513 || (index == 514 && !(bit & 1));
@@ -54466,6 +54507,37 @@ private:
 			osd_printf_info("TMS320C54x ROM4 EFR encoder: PASS frames=163 parameters=9291 flags=326 packed_words=2771 mismatches=0 handset_audio_claim=0\n");
 			throw emu_fatalerror(0, "TMS320C54x ROM4 EFR encoder complete");
 		}
+		if (m_phase >= 711000 && m_phase < 711032)
+		{
+			unsigned const index=m_phase-711000;
+			bool const tc=index&1;
+			auto const values=rom4_pair_vector(index);
+			s64 const scale=index&2 ? 2 : 1;
+			s64 const dot=(s64(values[2])*values[0]+s64(values[3])*values[1])*scale;
+			s64 const cross=(s64(values[2])*values[1]-s64(values[3])*values[0])*scale;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC)==0x0f01 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP)==0x1ec4,
+				"Original pair helper returns with balanced caller stack");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A)==(u64(dot)&0xffffffffffULL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B)==(u64(cross)&0xffffffffffULL),
+				"Both TC paths compute complete signed dot and cross products");
+			for (unsigned i=0; i<4; ++i)
+				expect(data.read_word(0x1252+i)==u16(values[i<2 && tc ? i+2 : i]),
+					"Only the TC-set return copies the current pair into history");
+			expect(data.read_word(0x1251)==0xa55a && data.read_word(0x1256)==0x5aa5 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2)==(tc ? 0x1252 : 0x1253) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3)==(tc ? 0x1254 : 0x1255) &&
+				m_cpu->state_int(tms320c54x_device::STATE_T)==u16(values[3]) &&
+				bool(m_cpu->state_int(tms320c54x_device::STATE_ST0)&0x1000)==tc,
+				"Pair history guards, pointers, T and TC agree with original operations");
+			if (replay_rom4_codec_frame(711000+index,1)) return;
+			if (index<31) { start_rom4_pairs(index+1); return; }
+			expect(m_rom4_codec_replays==32,"Every original pair case replays full ordinary RAM");
+			osd_printf_info("TMS320C54x ROM4 RF pairs: PASS cases=32 vectors=8 tc=2 frct=2 replay=32 ram_words=65440 dot_cross_both_tc=1 history_copy_tc_only=1 rf_acquisition_claim=0\n");
+			throw emu_fatalerror(0,"TMS320C54x ROM4 RF pairs complete");
+		}
 		if (m_phase >= 710000 && m_phase < 710515)
 		{
 			unsigned const index = m_phase - 710000;
@@ -57257,7 +57329,15 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(31, "efr-herr-pipe", "Characterize staged EFR homing error reset and PCM differences")
 	ROM_SYSTEM_BIOS(32, "rf-bitmap", "Original RF search bitmap decoder basis and replay")
 	ROM_SYSTEM_BIOS(33, "rf-bitmap-pipe", "Original RF search bitmap decoder on staged CPU")
+	ROM_SYSTEM_BIOS(34, "rf-pairs", "Original adjacent RF pair products and TC history policy")
+	ROM_SYSTEM_BIOS(35, "rf-pairs-pipe", "Original adjacent RF pair products on staged CPU")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(34))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(35))
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(32))
@@ -57361,6 +57441,12 @@ ROM_START(tms54rom4)
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(18))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(34))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(35))
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(32))
