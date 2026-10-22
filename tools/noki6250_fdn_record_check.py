@@ -9,14 +9,15 @@ from tools.radio_call_lifecycle_common import require_ordered
 
 
 def actions(mode):
-    if mode not in ('write','read','edit','edited-read','cancel','erase','empty'):
+    if mode not in ('write','read','edit','edited-read','cancel','erase','empty','wrong'):
         raise ValueError('unknown own FDN record mode')
     items=[item for item in fdn_actions(1) if item[0]<=40]
     items += [(42,'Scroll Down'),(43,'Scroll Down'),(46,'Left Softkey / Menu')]
-    if mode=='write':
+    if mode in ('write','wrong'):
         items += [(48,'Scroll Down'),(50,'Left Softkey / Menu')]
-        items += [(53+i,'Keypad '+digit) for i,digit in enumerate('5678')]
+        items += [(53+i,'Keypad '+digit) for i,digit in enumerate('5675' if mode=='wrong' else '5678')]
         items += [(57,'Left Softkey / Menu')]
+        if mode=='wrong':return items+[(64,'End'),(66,'Left Softkey / Menu')]
         items += [(60+i,'Keypad '+digit) for i,digit in enumerate('12345')]
         items += [(65,'Left Softkey / Menu'),(68,'Keypad 2'),(71,'Left Softkey / Menu'),
                   (78,'End'),(80,'Left Softkey / Menu')]
@@ -42,22 +43,27 @@ def actions(mode):
     return items
 
 
-def expected_card(saved,edited=False):
-    card=bytearray(initial_card(1))
+def expected_card(saved,edited=False,*,pin2_attempts=3):
+    card=bytearray(initial_card(1,pin2_attempts=pin2_attempts))
     if saved:card[3578:3610]=expected_record()
     if saved and edited:card[3600]=0xf6
     return bytes(card)
 
 
-def check(text,initial,final,mode):
+def check(text,initial,final,mode,*,pin2_attempts=3):
     items=actions(mode)
     writing=mode in ('write','edit','erase')
-    protected=mode in ('write','edit','cancel','erase')
-    if (initial!=expected_card(mode not in ('write','empty'),mode in ('edited-read','cancel','erase')) or
-            final!=expected_card(mode not in ('erase','empty'),mode in ('edit','edited-read','cancel'))):
+    protected=mode in ('write','edit','cancel','erase','wrong')
+    expected_final=bytearray(expected_card(mode not in ('erase','empty','wrong'),mode in ('edit','edited-read','cancel')))
+    if not protected:expected_final[3517]=pin2_attempts
+    if mode=='wrong':expected_final[3517]=pin2_attempts-1
+    if (initial!=expected_card(mode not in ('write','empty','wrong'),mode in ('edited-read','cancel','erase'),pin2_attempts=pin2_attempts) or
+            final!=bytes(expected_final)):
         raise ValueError('FDN record phase must preserve the exact whole-card transition')
-    verifies=[(0x9000,3,10)]*(2 if protected else 1)
-    if statuses(text,0x20)!=verifies or statuses(text,0x20,2)!=verifies:
+    result=0x9804 if mode=='wrong' else 0x9000
+    verifies=[(0x9000,3,10)]+([(result,3,10)] if protected else [])
+    pin2=[(0x9000,pin2_attempts,10)]+([(result,pin2_attempts-1 if mode=='wrong' else 3,10)] if protected else [])
+    if statuses(text,0x20)!=verifies or statuses(text,0x20,2)!=pin2:
         raise ValueError('FDN record authentication results differ')
     if re.findall(r'header cla=a0 ins=20 p1=00 p2=(\w\w) p3=08',text)!=(['01','02'] if protected else ['01']):
         raise ValueError('FDN record CHV selectors differ')
@@ -76,10 +82,10 @@ def check(text,initial,final,mode):
            ('registered',r'LAPDm Location Updating Accept acknowledged'),
            ('Number list',r'6250_fdn: key=Left Softkey / Menu state=1 t=46\.')]
     if protected:
-        confirm={'write':57,'edit':61,'cancel':62,'erase':62}[mode]
+        confirm={'write':57,'edit':61,'cancel':62,'erase':62,'wrong':57}[mode]
         order += [('PIN2 confirm',rf'6250_fdn: key=Left Softkey / Menu state=1 t={confirm}\.'),
                   ('PIN2',r'header cla=a0 ins=20 p1=00 p2=02 p3=08'),
-                  ('verified',r'SIM status ins=20 sw=9000')]
+                  ('verified',rf'SIM status ins=20 sw={result:04x}')]
     if writing:
         save={'write':71,'edit':73,'erase':65}[mode]
         order += [('Save/erase',rf'6250_fdn: key=Left Softkey / Menu state=1 t={save}\.'),
@@ -88,7 +94,7 @@ def check(text,initial,final,mode):
         if mode in ('write','edit'):
             order += [('readback',r'header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3b')]
     if mode=='cancel':order += [('cancel',r'6250_fdn: key=Right Softkey / C state=1 t=65\.')]
-    menu={'write':80,'edit':82,'cancel':74,'erase':74,'empty':56}.get(mode,62)
+    menu={'write':80,'edit':82,'cancel':74,'erase':74,'empty':56,'wrong':66}.get(mode,62)
     order += [('Menu',rf'6250_fdn: key=Left Softkey / Menu state=1 t={menu}\.'),
               ('complete',r'6250_fdn: complete=1 firmware_state_forcing=0')]
     require_ordered(text,order,'6250 FDN record')
@@ -127,6 +133,10 @@ def check_frames(directory,mode):
         62:'8f65425c18203075a14d304fc337aec6dfde47cd76eef7cdea1786acd8eefa39',
         65:'606cb1d89b0c4c116e071bd6857b7de4455ad3dc1d6ff78139ad4030fc94476f',
         72:FRAMES[76],74:FRAMES[78],
+    },'wrong':{
+        50:'de9dd2e4fb6d913c2a51dc9fd1c2b4d1f88bdd1b2ae4281a031bcbb7a7816612',
+        57:'c1371c4cdca6b0f72c9c1dcc6e602de981330f67719714bc5b124e1a3b4fcfcd',
+        64:FRAMES[76],66:FRAMES[78],
     },'empty':{
         46:'31ad5d7d50e7fa052cdad00312b163ac872c32860172637839b35f4b60eb95b0',
         54:FRAMES[76],56:FRAMES[78],

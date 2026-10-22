@@ -35,7 +35,8 @@ local runner=coroutine.create(function()
     elseif _G.nhm3_fdn_toggle then
         press(_G.nhm3_fdn_disable and 'Scroll Down' or 'Scroll Up',42)
         press('Left Softkey / Menu',44)
-        for index=1,4 do press('Keypad '..('5678'):sub(index,index),46+index) end
+        local pin=_G.nhm3_fdn_pin2 or '5678'
+        for index=1,4 do press('Keypad '..pin:sub(index,index),46+index) end
         press('Left Softkey / Menu',51)
         press('End',58)
         press('Left Softkey / Menu',60)

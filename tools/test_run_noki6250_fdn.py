@@ -25,5 +25,17 @@ class FdnPhasePlanTest(unittest.TestCase):
                          [('edit','read'),('edited-read','edit'),('cancel','edited-read'),('erase','cancel'),('empty','erase')])
         self.assertEqual(phases,phase_plan(records=True,lifecycle=True))
 
+    def test_rejections_recover_only_from_their_own_retry_loss(self):
+        phases=phase_plan(rejections=True)
+        self.assertEqual(len(phases),8)
+        by_name={p.name:p for p in phases}
+        self.assertTrue(by_name['reject-on'].rejected)
+        self.assertIsNone(by_name['reject-on'].source)
+        self.assertEqual((by_name['on'].source,by_name['on'].pin2_attempts),('reject-on',2))
+        self.assertEqual((by_name['wrong'].source,by_name['wrong'].record_mode),('on','wrong'))
+        self.assertEqual((by_name['write'].source,by_name['write'].pin2_attempts),('wrong',2))
+        self.assertEqual(by_name['read'].source,'write')
+        self.assertEqual(len(phase_plan(rejections=True,lifecycle=True)),13)
+
 
 if __name__=='__main__':unittest.main()

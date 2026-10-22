@@ -948,8 +948,14 @@ the complete validity regression.
 cold12346 Details, canceled erase with no UPDATE, confirmed erase of only
 record1 and cold empty Search with FDN still On. Eleven processes and70 reviewed
 frames include both smaller gate paths and preserve complete credentials,
-retry allowances and unrelated records. Wrong-PIN2 record rejection, rejected
-activation and dial permissions remain separate targets.
+retry allowances and unrelated records.
+`verify-6250-fdn-rejections` separately rejects activation and protected Add
+with physical wrong PIN2, preserves validity/records, consumes exactly one
+PIN2 attempt and cold-recovers from each complete two-attempt predecessor.
+Correct activation/Save reset allowances, and final cold Details retrieves
+A/12345. Eight processes and56 reviewed frames pass with full source/storage
+and immutable predecessor checks. This covers activation/Add rejection, not
+every editor. Actual listed/unlisted/Off dial permissions remain unqualified.
 `verify-6250-pin-request` independently qualifies physical PIN-request Off/On
 and final cold PIN authentication in three processes with25 reviewed frames.
 The disabled card registers without startup VERIFY; a physical ENABLE CHV1

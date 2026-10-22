@@ -28,15 +28,19 @@ class Phase(NamedTuple):
     seconds:int
     validity:int|None=None
     record_mode:str|None=None
+    pin2_attempts:int=3
+    rejected:bool=False
 
 
-def phase_plan(*,records=False,lifecycle=False):
-    phases=[Phase('on','noki6250_fdn_enable.lua',None,68,0),
+def phase_plan(*,records=False,lifecycle=False,rejections=False):
+    phases=([Phase('reject-on','noki6250_fdn_enable_wrong.lua',None,68,0,rejected=True)] if rejections else [])
+    phases += [Phase('on','noki6250_fdn_enable.lua','reject-on' if rejections else None,68,0,pin2_attempts=2 if rejections else 3),
             Phase('cold-on','noki6250_fdn.lua','on',58,1),
             Phase('off','noki6250_fdn_disable.lua','cold-on',68,2),
             Phase('cold-off','noki6250_fdn.lua','off',58,3)]
-    if records or lifecycle:
-        phases += [Phase('write','noki6250_fdn_write.lua','on',88,record_mode='write'),
+    if records or lifecycle or rejections:
+        if rejections:phases += [Phase('wrong','noki6250_fdn_write_wrong.lua','on',76,record_mode='wrong')]
+        phases += [Phase('write','noki6250_fdn_write.lua','wrong' if rejections else 'on',88,record_mode='write',pin2_attempts=2 if rejections else 3),
                    Phase('read','noki6250_fdn_read.lua','write',70,record_mode='read')]
     if lifecycle:
         phases += [Phase('edit','noki6250_fdn_edit.lua','read',90,record_mode='edit'),
@@ -53,6 +57,7 @@ def main():
     parser.add_argument('--mame',type=Path)
     parser.add_argument('--records',action='store_true',help='add PIN2-protected FDN Save and cold Details after the validity cycle')
     parser.add_argument('--record-lifecycle',action='store_true',help='also qualify protected Edit, cold edited Details, erase cancellation, confirmed erase and cold empty list')
+    parser.add_argument('--rejections',action='store_true',help='reject activation and protected Add with wrong PIN2, then cold-recover each retained retry loss')
     args=parser.parse_args()
     root=Path(__file__).resolve().parents[1]
     binary=(args.mame or root/'mame/mame').resolve()
@@ -65,7 +70,7 @@ def main():
         binary_hash=hashlib.sha256(binary.read_bytes()).hexdigest()
         shared=root/'tools/noki6250_fdn.lua'
         fixture_hash=hashlib.sha256(shared.read_bytes()).hexdigest()
-        phases=phase_plan(records=args.records,lifecycle=args.record_lifecycle)
+        phases=phase_plan(records=args.records,lifecycle=args.record_lifecycle,rejections=args.rejections)
         for phase in phases:
             name,script=phase.name,phase.script
             previous=run/phase.source if phase.source is not None else None
@@ -87,8 +92,8 @@ def main():
             if phase.record_mode is not None:
                 from tools.noki6250_fdn_record_check import expected_card
                 mode=phase.record_mode
-                expected_input=expected_card(mode not in ('write','empty'),mode in ('edited-read','cancel','erase'))
-            else:expected_input=initial_card(phase.validity)
+                expected_input=expected_card(mode not in ('write','empty','wrong'),mode in ('edited-read','cancel','erase'),pin2_attempts=phase.pin2_attempts)
+            else:expected_input=initial_card(phase.validity,pin2_attempts=phase.pin2_attempts,preserved=previous is not None)
             if initial!=expected_input:
                 raise ValueError('FDN cold input does not match its whole-card predecessor contract')
             (directory/'initial_sim_card.bin').write_bytes(initial)
@@ -110,11 +115,11 @@ def main():
             final=card.read_bytes()
             if phase.record_mode is not None:
                 from tools.noki6250_fdn_record_check import check as check_record,check_frames as check_record_frames
-                check_record(text,initial,final,phase.record_mode)
+                check_record(text,initial,final,phase.record_mode,pin2_attempts=phase.pin2_attempts)
                 check_record_frames(directory/'snap',phase.record_mode)
             else:
-                check(text,initial,final,phase.validity)
-                check_frames(directory/'snap',phase.validity)
+                check(text,initial,final,phase.validity,rejected=phase.rejected,pin2_attempts=phase.pin2_attempts,preserved=previous is not None)
+                check_frames(directory/'snap',phase.validity,rejected=phase.rejected)
             registration(text,final,preserved=previous is not None,require_host=False)
             if any(hashes(path)!=digest for path,digest in protected.items()):
                 raise ValueError('FDN lifecycle mutated predecessor artifacts')
@@ -122,12 +127,13 @@ def main():
             previous=directory
             launches.append(launch)
             print(f'6250 FDN {name}: verified',flush=True)
-        (run/'acceptance.json').write_text(json.dumps({'phases':launches,'independent_processes':len(phases),'fdn_records':args.records or args.record_lifecycle,
-            'fdn_record_lifecycle':args.record_lifecycle,
+        (run/'acceptance.json').write_text(json.dumps({'phases':launches,'independent_processes':len(phases),'fdn_records':args.records or args.record_lifecycle or args.rejections,
+            'fdn_record_lifecycle':args.record_lifecycle,'fdn_rejections':args.rejections,
             'research_hle':True,'native_speech':False},indent=2)+'\n')
     except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as error:
         parser.exit(1,f'6250 FDN lifecycle FAIL: {error}\n')
-    label=('FDN protected record lifecycle' if args.record_lifecycle else
+    label=('FDN rejection and cold retry recovery'+(' with complete record lifecycle' if args.record_lifecycle else '') if args.rejections else
+           'FDN protected record lifecycle' if args.record_lifecycle else
            'FDN validity plus protected Save/cold Details' if args.records else 'FDN On/cold-On/Off/cold-Off')
     print(f'6250 physical {label} PASS: {run}')
 

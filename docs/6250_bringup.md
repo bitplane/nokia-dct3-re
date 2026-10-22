@@ -715,8 +715,8 @@ ordinary ADN and the other nine FDN records stay unchanged. Six independent
 processes,42 reviewed validity/Save/detail/idle/menu frames, exact physical
 contacts, APDU targets/results/order, full inherited NVRAM, native/initial-record/
 registration/console-health checks and immutable predecessor artifacts pass.
-Capture: `tmp/nhm3-fdn-record-banked`. Editing and deletion have the separate
-record-lifecycle gate below; rejected writes and dial permissions remain open.
+Capture: `tmp/nhm3-fdn-record-banked`. Editing/deletion and rejected Add have
+separate gates below; dial permissions remain open.
 
 `make verify-6250-fdn-record-lifecycle` extends the validity/Save/cold-read
 regression through protected Edit, cold edited Details, erase cancellation,
@@ -733,9 +733,29 @@ retry allowances, ADN validity and all unrelated records. Every process retains
 its own native/initial-record, registration and console-health checks. The
 runner uses an explicit typed source/operation/timing plan, with tests protecting
 the original four-/six-process paths and the full cold-storage graph. Capture:
-`tmp/nhm3-fdn-record-lifecycle-banked`. Wrong-PIN2 record rejection, rejected
-activation and actual dial permissions remain unqualified; native speech and
-connected-call acceptance are not inferred from these storage tests.
+`tmp/nhm3-fdn-record-lifecycle-banked`. Wrong-PIN2 activation/Add have the
+separate rejection gate below. Actual dial permissions remain unqualified;
+native speech and connected-call acceptance are not inferred from storage tests.
+
+`make verify-6250-fdn-rejections` qualifies wrong-PIN2 activation and protected
+Add, each followed by independent cold recovery of the actual lost allowance.
+Activation with physical5675 returns9804/Code error, leaves FDN Off and sends
+no ADN invalidation or identity rehabilitation. Only PIN2 attempts3->2 and
+ordinary initial registration change the complete card. The next cold process
+must inherit that registered two-attempt card; correct PIN2 activates FDN and
+restores three attempts.
+
+The protected-Add branch inherits the organically activated On card. Wrong5675
+again returns9804/Code error, changes only PIN2 attempts3->2 and sends no UPDATE
+or validity command. Cold correct Save must inherit that exact failed card,
+report its two attempts during startup PIN1 verification, then authenticate
+PIN2 and save A/12345. A final cold process retrieves the exact contact.
+All eight independent processes,56 reviewed frames, exact contacts/selectors/
+results/order, complete card/NVRAM/source links, native/initial-record/
+registration/console-health and immutable predecessor checks pass. Capture:
+`tmp/nhm3-fdn-rejections-banked`. No completed credential phase was repeated.
+These are activation/Add rejection controls, not a claim about every editor;
+actual listed/unlisted/Off dial permissions remain a separate target.
 
 `make verify-6250-pin-request` qualifies physical Off/On persistence across
 three independent cold processes. The own route is Settings4 -> Security
