@@ -19,7 +19,7 @@ def check_frames(directory):
         check_rgb_frame(directory/name,digest)
 
 
-def check(text,card):
+def check(text,card,old_pin='5678',new_pin='8765'):
     if statuses(text,0x20)!=[(0x9000,3,10)] or statuses(text,0x24)!=[(0x9000,3,10)]:
         raise ValueError('6210 must authenticate PIN1 once and change PIN2 once')
     items=[(7+i,'Keypad '+str(i)) for i in range(1,5)]+[(12,'Left Softkey / Menu')]
@@ -27,7 +27,7 @@ def check(text,card):
     items += [(28+i,'Scroll Down') for i in range(5)]+[(34,'Left Softkey / Menu')]
     items += [(36+i,'Scroll Down') for i in range(4)]+[(42,'Left Softkey / Menu')]
     items += [(44+i,'Scroll Down') for i in range(2)]+[(47,'Left Softkey / Menu')]
-    for start,digits in ((50,'5678'),(58,'8765'),(66,'8765')):
+    for start,digits in ((50,old_pin),(58,new_pin),(66,new_pin)):
         items.extend((start+i,'Keypad '+d) for i,d in enumerate(digits))
         items.append((start+4,'Left Softkey / Menu'))
     items += [(76,'End'),(78,'Left Softkey / Menu')]
@@ -42,6 +42,6 @@ def check(text,card):
         ('complete',r'6210_pin2_input: complete=1 firmware_state_forcing=0'),
     ],'6210 PIN2 change')
     expected=bytearray(profile(3,True))
-    expected[3492:3500]=b'8765\xff\xff\xff\xff'
+    expected[3492:3500]=new_pin.encode('ascii').ljust(8,b'\xff')
     if card!=bytes(expected):
         raise ValueError('PIN2 change altered PIN1 or unrelated card data')

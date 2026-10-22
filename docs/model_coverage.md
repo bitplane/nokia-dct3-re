@@ -116,7 +116,10 @@ attempts through separate cold processes, exact permanent-card preservation,
 cold blocked presentation and a live input control that cannot reopen the
 credential path. `verify-6210-pin2-change` independently proves physical
 current/new/confirmation input, CHANGE CHV2 success, exact settings/success/Menu
-frames and complete card preservation except PIN2/LOCI. Cold PIN2 use,
+frames and complete card preservation except PIN2/LOCI.
+`verify-6210-pin2-change-cold` then cold-authenticates the installed PIN2 and
+physically changes it back, with retained location, independent launch/storage
+provenance and unchanged predecessor NVRAM. Wrong-PIN2 rejection,
 PIN2/PUK2 exhaustion and FDN remain unqualified.
 
 `verify-5210-sim-pin-registration` independently proves early physical

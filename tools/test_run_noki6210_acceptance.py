@@ -1,10 +1,52 @@
 import hashlib
 import io
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 from PIL import Image
 from tools import run_noki6210_acceptance as runner
+
+
+class RetainedSecurityTest(unittest.TestCase):
+    def exercise(self, corrupt=False):
+        with tempfile.TemporaryDirectory() as directory:
+            base=Path(directory)
+            source=base/'source'
+            storage=source/'nvram/npe3hle'
+            storage.mkdir(parents=True)
+            (storage/'sim_card').write_bytes(b'card')
+            (storage/'flash').write_bytes(b'flash')
+            (source/'cfg').mkdir()
+            script=base/'input.lua'
+            script.write_text('-- physical input\n')
+            target=base/'cold'
+
+            def launch(*args, **kwargs):
+                self.assertEqual((target/'nvram/npe3hle/flash').read_bytes(),b'flash')
+                (target/'error.log').write_text('trace')
+                if corrupt:
+                    (storage/'flash').write_bytes(b'changed')
+
+            with patch.object(runner.subprocess,'run',side_effect=launch), \
+                    patch.object(runner,'check_output'), \
+                    patch.object(runner,'events',return_value='trace'), \
+                    patch.object(runner,'verify'):
+                result=runner.run_retained_security(source,target,
+                    ['mame','-autoboot_script','old','-seconds_to_run','1'],script,84,{})
+            self.assertEqual(result[0],'trace')
+            self.assertEqual(result[1],b'card')
+            self.assertEqual(set(result[2]['initial_storage']),
+                             {'npe3hle/sim_card','npe3hle/flash'})
+            self.assertEqual(result[2]['command'][-1],'84')
+            self.assertEqual(result[2]['command'][2],str(script))
+
+    def test_exact_storage_copy(self):
+        self.exercise()
+
+    def test_predecessor_flash_mutation_is_rejected(self):
+        with self.assertRaisesRegex(ValueError,'changed predecessor storage'):
+            self.exercise(corrupt=True)
 
 
 class MenuAcceptanceTest(unittest.TestCase):

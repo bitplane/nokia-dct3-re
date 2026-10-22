@@ -1159,8 +1159,16 @@ protocol order, whole-card equality and six reviewed access-code/current/new/
 confirmation/success/Menu frames. This fixture has its own exact Messages
 animation-phase hash; older menu oracles are unchanged. The scenario is
 `pin2-change --coherent-cell`, with `noki6210_pin2_change_input.lua`.
-This proves an ordinary physical PIN2 change, not cold use of the installed
-PIN2, wrong-PIN2 rejection, PIN2/PUK2 exhaustion or FDN control.
+`make verify-6210-pin2-change-cold` additionally copies only that process's
+own NVRAM/config into a separate cold process. Physical current-PIN2 entry
+8765 then changes it back to5678 through the same settings route. Each process
+checks all six frames, coherent registration and complete expected card bytes;
+the cold process retains LOCI. Independent launch IDs, script hashes and full
+initial NVRAM hashes identify the continuation, and the predecessor's complete
+NVRAM must remain unchanged. The verified capture is
+`tmp/npe3-pin2-cold-final` (regenerable local evidence, not a shipped fixture).
+No RAM or save state is transferred. Wrong-PIN2 rejection, PIN2/PUK2 exhaustion
+and FDN control remain unqualified.
 
 ## SIM Toolkit
 

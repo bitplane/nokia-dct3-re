@@ -31,6 +31,24 @@ def fixture():
 
 
 class Pin2ChangeTests(unittest.TestCase):
+    def test_cold_installed_pin2_is_used_to_change_back(self):
+        text,_=fixture()
+        # Change the actual keyed old/new phases, not the rest of the workflow.
+        import re
+        def rotate(match):
+            digit,state,second,fraction=match.groups()
+            time=int(second)
+            digits='8765' if 50<=time<=53 else '5678' if 58<=time<=61 or 66<=time<=69 else None
+            if digits is None:
+                return match[0]
+            start=50 if time<=53 else 58 if time<=61 else 66
+            return f'key=Keypad {digits[time-start]} state={state} t={second}.{fraction}'
+        text=re.sub(r'key=Keypad (\d) state=([01]) t=(\d+)\.(\d+)',rotate,text)
+        card=profile(3,True)
+        check(text,card,'8765','5678')
+        with self.assertRaises(ValueError):
+            check(text,card)
+
     def test_physical_change(self):
         check(*fixture())
 

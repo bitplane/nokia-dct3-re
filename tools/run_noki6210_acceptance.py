@@ -37,6 +37,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'security-block-cold': ('npe3hle', 'security_block_input', 33),
              'security-block': ('npe3hle', 'security_block_input', 33),
              'pin2-change': ('npe3hle', 'pin2_change_input', 84),
+             'pin2-change-cold': ('npe3hle', 'pin2_change_input', 84),
              'toolkit': ('npe3hle', 'toolkit_input', 40),
              'toolkit-interactive': ('npe3hle', 'toolkit_interactive', 65),
              'toolkit-menu': ('npe3hle', 'toolkit_menu', 75),
@@ -61,7 +62,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
 TOOLKIT_PROFILES = {'toolkit': 1, 'toolkit-interactive': 3, 'toolkit-menu': 4,
                     'toolkit-sms': 5, 'toolkit-call': 6, 'toolkit-call-decline': 6}
 PIN_SCENARIOS=frozenset(('security','security-retry','security-retry-cold',
-                         'security-block-cold','security-block','pin2-change'))
+                         'security-block-cold','security-block','pin2-change','pin2-change-cold'))
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
@@ -82,6 +83,38 @@ def build_command(root,mame,machine,script,seconds,throttle=False):
             '-autoboot_delay','0','-seconds_to_run',str(seconds),
             '-video','none','-sound','none','-throttle' if throttle else '-nothrottle',
             '-log','-verbose']
+
+
+def run_retained_security(source,target,command,script,seconds,environment):
+    target.mkdir()
+    source_hashes={str(p.relative_to(source/'nvram')):hashlib.sha256(p.read_bytes()).hexdigest()
+                   for p in sorted((source/'nvram').rglob('*')) if p.is_file()}
+    shutil.copytree(source/'nvram',target/'nvram')
+    shutil.copytree(source/'cfg',target/'cfg')
+    copied_hashes={str(p.relative_to(target/'nvram')):hashlib.sha256(p.read_bytes()).hexdigest()
+                   for p in sorted((target/'nvram').rglob('*')) if p.is_file()}
+    if copied_hashes!=source_hashes:
+        raise ValueError('retained security storage copy differs from predecessor')
+    initial=(target/'nvram/npe3hle/sim_card').read_bytes()
+    if hashlib.sha256(initial).hexdigest()!=source_hashes['npe3hle/sim_card']:
+        raise ValueError('retained security input differs from predecessor')
+    cold_command=list(command)
+    cold_command[cold_command.index('-autoboot_script')+1]=str(script)
+    cold_command[cold_command.index('-seconds_to_run')+1]=str(seconds)
+    launch={'invocation_id':str(uuid.uuid4()),'run_directory':str(target),'command':cold_command,
+            'source_card_sha256':hashlib.sha256(initial).hexdigest(),
+            'script_sha256':hashlib.sha256(script.read_bytes()).hexdigest(),'initial_storage':source_hashes}
+    (target/'launch.json').write_text(json.dumps(launch,indent=2)+'\n')
+    with (target/'console.log').open('w') as output:
+        subprocess.run(cold_command,cwd=target,stdout=output,stderr=subprocess.STDOUT,
+                       check=True,timeout=180,env=environment)
+    check_output((target/'console.log').read_text(errors='replace'))
+    text=events(target/'error.log')
+    verify(text,runtime=True,selftest=True)
+    if source_hashes!={str(p.relative_to(source/'nvram')):hashlib.sha256(p.read_bytes()).hexdigest()
+                       for p in sorted((source/'nvram').rglob('*')) if p.is_file()}:
+        raise ValueError('retained security continuation changed predecessor storage')
+    return text,initial,launch
 
 
 def check_ussd(text, frames):
@@ -679,11 +712,22 @@ def main():
                     verify(cold_text, runtime=True, selftest=True)
                     check_forbidden_selection(cold_text, card.read_bytes(),
                                               forbidden=forbidden, previous=retained)
-        elif args.scenario=='pin2-change':
+        elif args.scenario in ('pin2-change','pin2-change-cold'):
             from tools.noki6210_pin2_change_check import check as check_pin2,check_frames as check_pin2_frames
             check_pin2(text,(run/'nvram/npe3hle/sim_card').read_bytes())
             check_registration(text,(run/'nvram/npe3hle/sim_card').read_bytes(),channel_header='1202')
             check_pin2_frames(run/'snap')
+            if args.scenario=='pin2-change-cold':
+                cold=run/'cold-pin2'
+                first=(run/'nvram/npe3hle/sim_card').read_bytes()
+                cold_text,initial,cold_retry=run_retained_security(run,cold,command,
+                    root/'tools/noki6210_pin2_change_cold_input.lua',84,environment)
+                if initial!=first:
+                    raise ValueError('cold PIN2 change must use the exact installed-PIN2 card')
+                check_pin2(cold_text,(cold/'nvram/npe3hle/sim_card').read_bytes(),'8765','5678')
+                check_registration(cold_text,(cold/'nvram/npe3hle/sim_card').read_bytes(),
+                                   preserved_location=True,channel_header='1202')
+                check_pin2_frames(cold/'snap')
         elif args.scenario=='security-block':
             from tools.noki6210_security_retry_check import check_frames as retry_frames
             from tools.noki6210_puk_check import check_blocked,check_frames as puk_frames
@@ -735,30 +779,11 @@ def main():
                                         '6210_puk_confirm.png','6210_puk_result.png'))
                 recovery_source=wrong
             cold=run/'cold-recovery'
-            cold.mkdir()
-            shutil.copytree(recovery_source/'nvram',cold/'nvram')
-            shutil.copytree(recovery_source/'cfg',cold/'cfg')
-            initial=(cold/'nvram/npe3hle/sim_card').read_bytes()
+            recovery_script=root/('tools/noki6210_puk_input.lua' if blocked else 'tools/noki6210_security_input.lua')
+            cold_text,initial,cold_retry=run_retained_security(recovery_source,cold,command,
+                recovery_script,57 if blocked else 37,environment)
             if initial!=recovery_checkpoint:
                 raise ValueError('cold PIN recovery input differs from predecessor')
-            cold_command=list(command)
-            recovery_script=root/('tools/noki6210_puk_input.lua' if blocked else 'tools/noki6210_security_input.lua')
-            cold_command[cold_command.index('-autoboot_script')+1]=str(recovery_script)
-            cold_command[cold_command.index('-seconds_to_run')+1]='57' if blocked else '37'
-            cold_retry={
-                'invocation_id':str(uuid.uuid4()),'run_directory':str(cold),'command':cold_command,
-                'source_card_sha256':hashlib.sha256(recovery_checkpoint).hexdigest(),
-                'script_sha256':hashlib.sha256(recovery_script.read_bytes()).hexdigest(),
-                'initial_storage':{str(path.relative_to(cold/'nvram')):hashlib.sha256(path.read_bytes()).hexdigest()
-                                   for path in sorted((cold/'nvram').rglob('*')) if path.is_file()},
-            }
-            (cold/'launch.json').write_text(json.dumps(cold_retry,indent=2)+'\n')
-            with (cold/'console.log').open('w') as output:
-                subprocess.run(cold_command,cwd=cold,stdout=output,stderr=subprocess.STDOUT,
-                               check=True,timeout=180,env=environment)
-            check_output((cold/'console.log').read_text(errors='replace'))
-            cold_text=events(cold/'error.log')
-            verify(cold_text,runtime=True,selftest=True)
             if blocked:
                 check_unblocked(cold_text,initial,(cold/'nvram/npe3hle/sim_card').read_bytes(),
                                 puk_attempts=9 if args.wrong_puk_first else 10)
@@ -782,7 +807,7 @@ def main():
                 recovered=(cold/'nvram/npe3hle/sim_card').read_bytes()
                 if (reauth/'nvram/npe3hle/sim_card').read_bytes()!=recovered:
                     raise ValueError('new-PIN cold input differs from recovered card')
-                reauth_command=list(cold_command)
+                reauth_command=list(cold_retry['command'])
                 reauth_script=root/'tools/noki6210_puk_reauth_input.lua'
                 reauth_command[reauth_command.index('-autoboot_script')+1]=str(reauth_script)
                 reauth_command[reauth_command.index('-seconds_to_run')+1]='39'
@@ -896,7 +921,7 @@ def main():
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': machine, 'scenario': args.scenario, 'passed': True,
             'launch': launch,
-            **({'cold_pin_retry_recovery': cold_retry} if cold_retry else {}),
+            **({('cold_pin2_change' if args.scenario=='pin2-change-cold' else 'cold_pin_retry_recovery'): cold_retry} if cold_retry else {}),
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
             'sim_profile': ('foreign two-digit-MNC preferred laboratory card' if args.scenario == 'foreign-registration' or args.foreign_cell
                             else 'visited-test-PLMN preferred laboratory card' if args.scenario == 'plmn-reject'
