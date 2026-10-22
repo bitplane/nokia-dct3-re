@@ -18,13 +18,17 @@ PIN='a12b3c3fdb4a3d1e8ffeb5fc8986c3bc008bb86b1f2e927440848fe0420ffc0c'
 ERROR='fd5b8fb1ab0c3397bf958d567a46aee84a72f75123802a00d5bc802a1814543e'
 
 
-def check_trace(trace,correct,pin=None,prefix='nsk3',tx_limit=1024,allowed_mutations=()):
+def check_trace(trace,correct,pin=None,prefix='nsk3',tx_limit=1024,allowed_mutations=(),attempts_before=3):
+    if not 1<=attempts_before<=3:
+        raise ValueError('requires live PIN1 attempts')
     pin=pin if pin is not None else (b'1234' if correct else b'4321')
     keys=tuple(int(chr(digit)) for digit in pin)+(0x19,)
     rows=re.findall(re.escape(prefix)+r'_pin_contact: correct=(\d) key=([0-9a-f]+) down=([01]) ',trace)
     if rows!=[(str(int(correct)),f'{key:02x}',down) for key in keys for down in ('1','0')]:
         raise ValueError('physical PIN contacts differ')
-    if statuses(trace,0x20)!=[(0x9000 if correct else 0x9804,3 if correct else 2,10)]:
+    remaining=3 if correct else attempts_before-1
+    status=0x9000 if correct else 0x9840 if remaining==0 else 0x9804
+    if statuses(trace,0x20)!=[(status,remaining,10)]:
         raise ValueError('VERIFY status/retry transition differs')
     if any(statuses(trace,ins) for ins in (0x24,0x26,0x28,0x2c) if ins not in allowed_mutations):
         raise ValueError('unexpected credential mutation')

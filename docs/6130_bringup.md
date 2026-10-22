@@ -452,8 +452,34 @@ and the whole persistent retry transition. The shared card generator uses an
 older serialized prefix; the device appends its later storage defaults, which
 the cold comparison preserves byte-for-byte. No unexpected credential-changing
 APDU is admitted. The gates below extend PUK, ordinary PIN/PIN2 change and
-request settings and PUK1/PUK2 permanent loss. PUK1 exhaustion below starts
-from the explicitly blocked laboratory PIN1, not physical PIN1 exhaustion.
+request settings and PUK1/PUK2 permanent loss. Physical PIN1 exhaustion and
+recovery also have a separate cold-chain gate below.
+
+### Physical PIN1 exhaustion and recovery
+
+`tools/nsk3_pin_exhaust.py` requalifies the first physical wrong PIN4321,
+then uses its actual saved card in two independent cold processes. Both
+physically enter4321; VERIFY CHV1 returns9804 then9840 as attempts2->1->0.
+Only PIN1's retry counter changes across the complete card. No blocked-state
+fixture or credential edit is used for these transitions.
+
+A further cold process starts from that exhausted card, shows **Enter PUK
+code**, and physically enters12345678/new4321/confirmation. Exact UNBLOCK
+bytes return9000, restore PIN1 attempts3/PUK1 attempts10 and change only PIN1.
+Another cold process authenticates4321 through VERIFY9000, preserves the whole
+card and reaches the reviewed separate phone-code prompt. Each link checks
+prelaunch card/EEPROM identity, own unchanged flash and native uploads; no RAM
+or save state is copied.
+
+```sh
+.venv/bin/python tools/nsk3_pin_exhaust.py roms/noki6130/source \
+  tmp/nsk3-pin-wrong tmp/nsk3-pin1-exhaustion --check-only
+```
+
+A fresh output without`--check-only` executes the chain;`--resume` requalifies
+retained predecessors. Completed logs are losslessly compressed. This bounded
+52s software-security result does not qualify radio, fitted-mask compatibility,
+factory provisioning or long-run packet-supervision behavior.
 
 ### PUK recovery and new-PIN persistence
 
@@ -496,7 +522,7 @@ The terminal frame says **SIM card rejected**. A further independent cold
 process preserves every card byte and renders the same exact frame at5s and24s,
 before and after the physical credential-entry control. It issues no
 VERIFY/CHANGE/UNBLOCK or card-write command. This52s compatibility result
-does not qualify physical PIN1 exhaustion, radio, fitted DSP compatibility
+does not itself qualify physical PIN1 exhaustion (separately tested above), radio, fitted DSP compatibility
 or resolution of the93.967s packet-supervision restart.
 
 ```sh

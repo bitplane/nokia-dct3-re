@@ -34,5 +34,16 @@ class PinCheckTest(unittest.TestCase):
             with self.assertRaises(ValueError):check_cards(wrong,wrong,bad)
         with self.assertRaises(ValueError):check_cards(wrong,correct,correct)
 
+    def test_exhaustion_requires_exact_previous_attempt_count(self):
+        trace=self.trace(False)
+        for count in (1,2,3):
+            current=trace.replace('chv=2/3',f'chv={count-1}/3')
+            if count==1:current=current.replace('sw=9804','sw=9840')
+            check_trace(current,False,attempts_before=count)
+            if count!=3:
+                with self.assertRaises(ValueError):check_trace(current,False)
+        for count in (0,4):
+            with self.assertRaises(ValueError):check_trace(trace,False,attempts_before=count)
+
 
 if __name__=='__main__':unittest.main()
