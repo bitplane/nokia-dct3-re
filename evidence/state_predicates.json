@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_fdn_record_erase_cancel_cold_empty", "owner": "npe3_sim_storage", "status": "satisfied",
+      "predicate": "6210 preserves an FDN entry on erase cancellation, deletes only that record on confirmation and cold-renders the empty list",
+      "current": "Six own-PMM/coherent-cell processes activate FDN, save/read A/12345, physically cancel PIN2-protected Erase? A, confirm the erase in another cold process and cold-check the empty list. Cancellation makes no UPDATE and preserves the entire card. Confirmation sends one successful EF_FDN record1 UPDATE with32 FF bytes, displays Erased and leaves all unrelated bytes unchanged; unlike Save/Edit it does not reread record1. Final cold startup reads all ten empty records and displays Fixed dialling list empty with no PIN2 verification or write. All 22 frames, exact contacts/protocol/card checks, registration, independent launches and unchanged predecessors pass. Capture tmp/npe3-fdn-erase-banked. No rejected-write/dial-permission/native-speech promotion.",
+      "evidence": ["docs/6210_bringup.md", "tools/noki6210_fdn_erase.lua", "tools/noki6210_fdn_cancel.lua", "tools/noki6210_fdn_empty.lua", "tools/noki6210_fdn_record_check.py", "tools/test_noki6210_fdn_record_check.py", "tools/run_noki6210_fdn_records.py", "gates.json"]
+    },
+    {
       "id": "npe3_fdn_record_edit_cold_details", "owner": "npe3_sim_storage", "status": "satisfied",
       "predicate": "6210 physically edits a PIN2-protected FDN number and retrieves the replacement number after a cold restart",
       "current": "Five own-PMM/coherent-cell processes activate FDN, save A/12345, cold-read it, physically edit to A/12346 and cold-read the edited entry. Edit asks for name before number, unlike Add. Successful PIN2 verification precedes one EF_FDN record1 UPDATE and confirming READ RECORD. Whole-card equality permits only the final digit's BCD nibble change; name, credentials, retries, validity and other records are preserved. Cold Details displays A/12346 with no PIN2 verification or write. All 20 frames, exact contacts/protocol/card checks, registration, independent launches and unchanged predecessors pass. Capture tmp/npe3-fdn-edit-banked. No erase/cancel/rejected-write/dial-permission/native-speech promotion.",

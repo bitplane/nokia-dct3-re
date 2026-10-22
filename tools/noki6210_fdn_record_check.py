@@ -1,4 +1,4 @@
-"""6210 PIN2-protected FDN save/edit and cold physical Details retrieval."""
+"""6210 protected FDN records with cold Details and empty-list checks."""
 import re
 from tools.noki6210_fdn_check import input_contacts as fdn_contacts
 from tools.noki6210_puk_check import profile,contacts,check_rgb_frame
@@ -28,6 +28,17 @@ FRAMES={
         '6210_fdn_key_50.png':'99cc0b0c75030851acbbcc1624bb2e89eb491a4cb328f4ff3e9a3a5cfa9b49b0',
         '6210_fdn_key_53.png':'99cc0b0c75030851acbbcc1624bb2e89eb491a4cb328f4ff3e9a3a5cfa9b49b0',
     },
+    'cancel':{
+        '6210_fdn_key_55.png':'de9dd2e4fb6d913c2a51dc9fd1c2b4d1f88bdd1b2ae4281a031bcbb7a7816612',
+        '6210_fdn_key_62.png':'8f65425c18203075a14d304fc337aec6dfde47cd76eef7cdea1786acd8eefa39',
+        '6210_fdn_key_65.png':'0886bf2512ae194b2fabbf467ff2023401690afcd4c2e43d7500523a79fed747',
+    },
+    'erase':{
+        '6210_fdn_key_55.png':'de9dd2e4fb6d913c2a51dc9fd1c2b4d1f88bdd1b2ae4281a031bcbb7a7816612',
+        '6210_fdn_key_62.png':'8f65425c18203075a14d304fc337aec6dfde47cd76eef7cdea1786acd8eefa39',
+        '6210_fdn_key_65.png':'606cb1d89b0c4c116e071bd6857b7de4455ad3dc1d6ff78139ad4030fc94476f',
+    },
+    'empty':{'6210_fdn_key_46.png':'31ad5d7d50e7fa052cdad00312b163ac872c32860172637839b35f4b60eb95b0'},
 }
 
 
@@ -40,7 +51,7 @@ def check_frames(directory,mode):
 
 
 def input_contacts(mode):
-    if mode not in ('write','read','edit','edited-read'):
+    if mode not in ('write','read','edit','edited-read','cancel','erase','empty'):
         raise ValueError('unknown 6210 FDN record mode')
     items=[row for row in fdn_contacts(1) if row[0]<=40]
     items += [(42,'Scroll Down'),(43,'Scroll Down'),(46,'Left Softkey / Menu')]
@@ -58,6 +69,15 @@ def input_contacts(mode):
         items += [(61,'Left Softkey / Menu'),(64,'Left Softkey / Menu'),
                   (67,'Right Softkey / C'),(70,'Keypad 6'),(73,'Left Softkey / Menu'),
                   (80,'End'),(82,'Left Softkey / Menu')]
+    elif mode in ('cancel','erase'):
+        items += [(48,'Left Softkey / Menu'),(50,'Scroll Down'),(51,'Scroll Down'),
+                  (52,'Scroll Down'),(55,'Left Softkey / Menu')]
+        items += [(58+i,'Keypad '+d) for i,d in enumerate('5678')]
+        items += [(62,'Left Softkey / Menu'),
+                  (65,'Right Softkey / C' if mode=='cancel' else 'Left Softkey / Menu'),
+                  (72,'End'),(74,'Left Softkey / Menu')]
+    elif mode=='empty':
+        items += [(54,'End'),(56,'Left Softkey / Menu')]
     else:
         items += [(48,'Left Softkey / Menu'),(50,'Left Softkey / Menu'),
                   (53,'Left Softkey / Menu'),(60,'End'),(62,'Left Softkey / Menu')]
@@ -76,14 +96,15 @@ def expected_card(saved,edited=False):
 
 def check(text,initial,final,mode):
     items=input_contacts(mode)
-    writing=mode in ('write','edit')
+    writing=mode in ('write','edit','erase')
+    protected=mode in ('write','edit','cancel','erase')
     edited=mode in ('edit','edited-read')
-    if initial!=expected_card(mode!='write',mode=='edited-read') or final!=expected_card(True,edited):
+    if initial!=expected_card(mode not in ('write','empty'),mode=='edited-read') or final!=expected_card(mode not in ('erase','empty'),edited):
         raise ValueError('FDN record source/result differs from the exact record transition')
     contacts(text,'6210_fdn_input',items)
-    if statuses(text,0x20)!=[(0x9000,3,10)]*(2 if writing else 1):
+    if statuses(text,0x20)!=[(0x9000,3,10)]*(2 if protected else 1):
         raise ValueError('FDN record PIN1/PIN2 verification differs')
-    if re.findall(r'header cla=a0 ins=20 p1=00 p2=(\w\w) p3=08',text)!=(['01','02'] if writing else ['01']):
+    if re.findall(r'header cla=a0 ins=20 p1=00 p2=(\w\w) p3=08',text)!=(['01','02'] if protected else ['01']):
         raise ValueError('FDN record CHV selectors differ')
     if any(statuses(text,ins) for ins in (4,0x24,0x26,0x28,0x2c)):
         raise ValueError('FDN record changed validity or credentials')
@@ -94,20 +115,27 @@ def check(text,initial,final,mode):
     if updates!=([('01','04','20','6f3b')] if writing else []) or statuses(text,0xdc)!=([(0x9000,3,10)] if writing else []):
         raise ValueError('FDN record UPDATE target/result differs')
     records=re.findall(r'header cla=a0 ins=b2 p1=(\w\w) p2=04 p3=20 selected=6f3b',text)
-    if records!=[f'{i:02x}' for i in range(1,11)]+(['01'] if writing else []):
+    # Save/Edit reread the updated record; Erase completes without that readback.
+    if records!=[f'{i:02x}' for i in range(1,11)]+(['01'] if mode in ('write','edit') else []):
         raise ValueError('FDN record startup did not read all ten records')
     order=[('PIN1',r'SIM status ins=20 sw=9000'),
            ('registration',r'LAPDm Location Updating Accept acknowledged nr=1'),
            ('Number list',r'key=Left Softkey / Menu state=1 t=46\.')]
-    if writing:
-        order += [('PIN2 confirm',rf'key=Left Softkey / Menu state=1 t={61 if edited else 57}\.'),
+    if protected:
+        confirm={'write':57,'edit':61,'cancel':62,'erase':62}[mode]
+        order += [('PIN2 confirm',rf'key=Left Softkey / Menu state=1 t={confirm}\.'),
                   ('VERIFY PIN2',r'header cla=a0 ins=20 p1=00 p2=02 p3=08'),
-                  ('verified',r'SIM status ins=20 sw=9000'),
-                  ('save',rf'key=Left Softkey / Menu state=1 t={73 if edited else 71}\.'),
+                  ('verified',r'SIM status ins=20 sw=9000')]
+    if writing:
+        save={'write':71,'edit':73,'erase':65}[mode]
+        order += [('save',rf'key=Left Softkey / Menu state=1 t={save}\.'),
                   ('UPDATE',r'header cla=a0 ins=dc p1=01 p2=04 p3=20 selected=6f3b'),
-                  ('saved',r'SIM status ins=dc sw=9000'),
-                  ('readback',r'header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3b')]
-    menu=82 if mode=='edit' else 80 if writing else 62
+                  ('saved',r'SIM status ins=dc sw=9000')]
+        if mode in ('write','edit'):
+            order += [('readback',r'header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3b')]
+    if mode=='cancel':
+        order += [('cancel',r'key=Right Softkey / C state=1 t=65\.')]
+    menu={'write':80,'edit':82,'cancel':74,'erase':74,'empty':56}.get(mode,62)
     order += [('Menu',rf'key=Left Softkey / Menu state=1 t={menu}\.'),
               ('complete',r'6210_fdn_input: complete=1 firmware_state_forcing=0')]
     require_ordered(text,order,'6210 FDN record')

@@ -1279,9 +1279,19 @@ PIN2. All five processes and20 reviewed frame comparisons pass, with the same
 registration and predecessor-preservation checks. Capture:
 `tmp/npe3-fdn-edit-banked`.
 
-FDN record erase/cancel, rejected record writes and local listed/unlisted
-dial-permission controls remain unqualified. These gates are not connected-call
-or native-radio/speech claims.
+`make verify-6210-fdn-record-erase` separately follows the saved entry through
+PIN2-protected Erase cancellation, confirmed Erase and cold empty-list display.
+The prompt is Erase? A. Physical Back preserves the entire card with no UPDATE;
+physical OK sends one successful UPDATE RECORD replacing only record 1 with
+32 `FF` bytes and displays Erased. This path does not issue the confirming
+record reread used by Save/Edit. The final cold process reads all ten empty
+FDN records, displays Fixed dialling list empty, performs no PIN2 verification
+or record write, and preserves the complete card. All six own-storage processes,
+22 reviewed frames, protocol/card transitions, registration and unchanged
+predecessors pass. Capture: `tmp/npe3-fdn-erase-banked`.
+
+Rejected record writes and local listed/unlisted dial-permission controls remain
+unqualified. These gates are not connected-call or native-radio/speech claims.
 
 ## SIM Toolkit
 

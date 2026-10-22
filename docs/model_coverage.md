@@ -142,8 +142,11 @@ loss and cold correct-PIN2 activation through the complete lifecycle.
 exact cold Details retrieval, with complete-card preservation and12 reviewed
 frames across three processes. `verify-6210-fdn-record-edit` extends this to a
 PIN2-protected12345->12346 edit and exact cold Details, preserving the rest of
-the card across five processes. Erase/cancel, rejected record writes and local
-listed/unlisted dialing restrictions remain unqualified.
+the card across five processes. `verify-6210-fdn-record-erase` additionally proves
+PIN2-protected erase cancellation, confirmed record deletion and cold empty-list
+display, with exact card preservation and22 frames across six processes.
+Rejected record writes and local listed/unlisted dialing restrictions remain
+unqualified.
 
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,

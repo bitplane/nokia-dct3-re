@@ -15,21 +15,24 @@ def fixture(mode):
                           'SIM status ins=44 sw=9000 chv=3/3 puk=10/10 enabled=1']
             lines += ['LAPDm Location Updating Accept acknowledged nr=1']
             lines += [f'header cla=a0 ins=b2 p1={i:02x} p2=04 p3=20 selected=6f3b' for i in range(1,11)]
-        if (second==57 and mode=='write') or (second==61 and mode=='edit'):
+        if ((second==57 and mode=='write') or (second==61 and mode=='edit') or
+                (second==62 and mode in ('cancel','erase'))):
             lines += ['header cla=a0 ins=20 p1=00 p2=02 p3=08',
                       'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1']
-        if (second==71 and mode=='write') or (second==73 and mode=='edit'):
+        if ((second==71 and mode=='write') or (second==73 and mode=='edit') or
+                (second==65 and mode=='erase')):
             lines += ['header cla=a0 ins=dc p1=01 p2=04 p3=20 selected=6f3b',
-                      'SIM status ins=dc sw=9000 chv=3/3 puk=10/10 enabled=1',
-                      'header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3b']
+                      'SIM status ins=dc sw=9000 chv=3/3 puk=10/10 enabled=1']
+            if mode in ('write','edit'):
+                lines.append('header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3b')
     lines.append('6210_fdn_input: complete=1 firmware_state_forcing=0')
-    return ('\n'.join(lines),expected_card(mode!='write',mode=='edited-read'),
-            expected_card(True,mode in ('edit','edited-read')))
+    return ('\n'.join(lines),expected_card(mode not in ('write','empty'),mode=='edited-read'),
+            expected_card(mode not in ('erase','empty'),mode in ('edit','edited-read')))
 
 
 class FdnRecordTests(unittest.TestCase):
     def test_protected_write_and_cold_read(self):
-        for mode in ('write','read','edit','edited-read'):
+        for mode in ('write','read','edit','edited-read','cancel','erase','empty'):
             with self.subTest(mode=mode):
                 check(*fixture(mode),mode)
 
@@ -45,7 +48,7 @@ class FdnRecordTests(unittest.TestCase):
                 check(text.replace(old,new),initial,final,'write')
 
     def test_whole_source_and_result_are_checked(self):
-        for mode in ('write','read','edit','edited-read'):
+        for mode in ('write','read','edit','edited-read','cancel','erase','empty'):
             text,initial,final=fixture(mode)
             for index in (0,1604,3484,3517,3575,3578,3596,3600,3610):
                 changed=bytearray(final)
@@ -72,6 +75,20 @@ class FdnRecordTests(unittest.TestCase):
                 check(text.replace(old,new),initial,final,'edit')
         with self.assertRaises(ValueError):
             check(text,initial,expected_card(True),'edit')
+
+    def test_erase_and_cancel_have_distinct_confirmations_and_mutations(self):
+        for mode in ('cancel','erase'):
+            text,initial,final=fixture(mode)
+            wrong='Left Softkey / Menu' if mode=='cancel' else 'Right Softkey / C'
+            right='Right Softkey / C' if mode=='cancel' else 'Left Softkey / Menu'
+            with self.subTest(mode=mode),self.assertRaises(ValueError):
+                check(text.replace(f'key={right} state=1 t=65.',f'key={wrong} state=1 t=65.'),initial,final,mode)
+            other=expected_card(mode=='erase')
+            with self.assertRaises(ValueError):
+                check(text,initial,other,mode)
+        text,initial,final=fixture('cancel')
+        with self.assertRaises(ValueError):
+            check(text+'\nheader cla=a0 ins=dc p1=01 p2=04 p3=20 selected=6f3b',initial,final,'cancel')
 
 
 if __name__=='__main__':

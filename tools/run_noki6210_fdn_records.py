@@ -1,4 +1,4 @@
-"""Fresh physical 6210 FDN activation, protected save and cold Details readback."""
+"""Physical 6210 FDN record lifecycles with exact cold-storage checks."""
 import argparse
 import json
 import os
@@ -13,7 +13,9 @@ from tools.noki6210_fdn_check import check as check_activation,check_frames as a
 from tools.noki6210_fdn_record_check import check,check_frames
 
 
-def run_chain(root,output,mame,edit=False):
+def run_chain(root,output,mame,edit=False,erase=False):
+    if edit and erase:
+        raise ValueError('edit and erase qualification chains are separate')
     output.mkdir(parents=True,exist_ok=False)
     source=output/'activated'
     with (output/'activation-launch.log').open('w') as console:
@@ -31,6 +33,8 @@ def run_chain(root,output,mame,edit=False):
     stages=[('write','fdn_write',86),('read','fdn_read',68)]
     if edit:
         stages += [('edit','fdn_edit',88),('edited-read','fdn_read',68)]
+    if erase:
+        stages += [('cancel','fdn_cancel',80),('erase','fdn_erase',80),('empty','fdn_empty',62)]
     for mode,script,seconds in stages:
         target=output/mode
         before=(source/'nvram/npe3hle/sim_card').read_bytes()
@@ -44,8 +48,9 @@ def run_chain(root,output,mame,edit=False):
         check_frames(target/'snap',mode)
         check_registration(text,card,preserved_location=True,channel_header='1202')
         source=target
-    (output/'acceptance.json').write_text(json.dumps({'passed':True,'launches':ids,'edited':edit,
-        'scope':('physical FDN activation, protected save/edit and cold Details' if edit else
+    (output/'acceptance.json').write_text(json.dumps({'passed':True,'launches':ids,'edited':edit,'erased':erase,
+        'scope':('physical FDN save, erase cancellation, confirmed erase and cold empty list' if erase else
+                 'physical FDN activation, protected save/edit and cold Details' if edit else
                  'physical FDN activation, protected save and cold Details')+'; no dial-permission claim'},indent=2)+'\n')
 
 
@@ -53,10 +58,12 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory',type=Path)
     parser.add_argument('--mame',type=Path,default=Path('mame/mame'))
-    parser.add_argument('--edit',action='store_true',help='edit the saved number and cold-read it again')
+    lifecycle=parser.add_mutually_exclusive_group()
+    lifecycle.add_argument('--edit',action='store_true',help='edit the saved number and cold-read it again')
+    lifecycle.add_argument('--erase',action='store_true',help='cancel erase, confirm erase and cold-read the empty list')
     args=parser.parse_args()
     try:
-        run_chain(Path(__file__).resolve().parents[1],args.run_directory.resolve(),args.mame.resolve(),args.edit)
+        run_chain(Path(__file__).resolve().parents[1],args.run_directory.resolve(),args.mame.resolve(),args.edit,args.erase)
     except (OSError,ValueError,subprocess.SubprocessError) as error:
         print(f'6210 FDN records FAIL: {error}',file=sys.stderr)
         return 1
