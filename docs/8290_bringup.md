@@ -17,7 +17,7 @@ machine implicitly.
 | UI and storage | Physical security code, menus, SIM phonebook save/cold retrieval, RTC retention and Net monitor00 clean idle. Own EEPROM journal rotation matches the complete runtime shadow. |
 | SIM security | PIN1/PIN2 change/rejection, retry persistence, exhaustion/PUK recovery and request Off/On. Permanent PUK1 rejects the card; permanent PUK2 retains ordinary PIN1/menu use. |
 | FDN | Explicit extended card; physical PIN2-authorized On/Off, Save/edit/erase/cancel and cold retrieval. Registered listed/unlisted/Off controls distinguish permitted calls from local denial. |
-| SIM Toolkit | Phase-2+ nine-byte TERMINAL PROFILE, organic STATUS/FETCH DISPLAY TEXT, physical OK/result00, exact prompt/idle frames and unchanged complete card. |
+| SIM Toolkit | Phase-2+ nine-byte TERMINAL PROFILE; DISPLAY TEXT, GET INKEY and GET INPUT; physical successful responses, exact prompts/filled editor/idle and unchanged complete card. |
 | PCS laboratory network | Acquisition, BCCH, Location Updating/EF_LOCI, background measurements, addressed paging, physical incoming/outgoing CC/RR signaling and SMS delivery/read/delete/cancel/Reply. |
 | Authenticated composition | Physical PIN before fresh/cold registration, calls, SMS and phonebook; a long wrong-PIN control remains unregistered. |
 | Restoration | Exact ARM/banked registers, RAM/time, protocol replay and pixels at idle, connected call and active SMS boundaries, with physical continuation. |
@@ -2414,4 +2414,30 @@ DSP, external RF or speech. No driver/device behavior was changed.
 ```sh
 .venv/bin/python tools/nsb7_toolkit_check.py \
   roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-final
+```
+
+### Interactive inputs
+
+`fixtures/nsb7_toolkit_interactive/nsb7hle.cfg` selects the existing three-
+command card. `nsb7_toolkit_interactive.lua` composes the same authentication
+and DISPLAY TEXT path, then enters physical5 at69s and OK at70s. This
+product requires explicit OK for GET INKEY; the digit alone remains in its
+one-character editor. The card receives successful terminal response
+`8103022200020282810301000d020435` and offers GET INPUT.
+
+Physical4/2 at72/73s fills the reviewed `Enter 42` editor; OK74 returns
+`8103032300020282810301000d03043432`, then9000. The exact76s frame is
+registered13:49 idle. Full authentication/retained-location acceptance and
+the unchanged complete card pass independently. No driver/device changes
+were needed. This does not yet qualify SET UP MENU or other commands.
+
+The interactive checker requires one profile and three FETCH/response
+exchanges, all six physical actions with decoded contacts before their
+corresponding response, and five reviewed exact frames. It rejects missing
+GET INKEY confirmation, wrong/missing decoded keys, late decode evidence,
+timeout results and wrong returned input bytes.
+
+```sh
+.venv/bin/python tools/nsb7_toolkit_check.py \
+  roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-interactive-v2 --interactive
 ```

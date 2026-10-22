@@ -16,13 +16,13 @@ local input=coroutine.create(function()
         end
     end
     field=assert(field)
-    machine:logerror('nsb7_toolkit_physical: action=dismiss\n')
+    machine:logerror((_G.nsb7_toolkit_marker or 'nsb7_toolkit_physical')..': action=dismiss\n')
     field:set_value(1)
     if not emu.wait(0.2) then field:set_value(0); return end
     field:set_value(0)
     assert(emu.wait(1.8))
     machine.screens[':screen']:snapshot('nsb7_toolkit_after_dismiss.png')
-    machine:exit()
+    if not _G.nsb7_toolkit_continue then machine:exit() end
 end)
 _G.nsb7_toolkit_input=input
 assert(coroutine.resume(input))

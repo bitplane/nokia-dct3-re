@@ -3,6 +3,13 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_authenticated_toolkit_interactive_input",
+      "owner": "nsb7_sim_toolkit", "status": "satisfied",
+      "predicate": "An authenticated registered NSB-7 physically completes DISPLAY TEXT, GET INKEY and GET INPUT with exact successful responses and unchanged card",
+      "current": "Existing Phase-2+ three-command card and physical authentication preserve full own registration acceptance. DISPLAY TEXT OK66 is followed by GET INKEY physical5/OK69/70; this product requires explicit confirmation. Successful response returns35. GET INPUT physical4/2/OK72/73/74 returns3432 with result00 then9000. One profile and three FETCH/responses, six decoded physical actions before their responses, exact prompt/empty/filled editor/final13:49 idle frames, valid own journal and unchanged complete card pass. No driver/device change. SET UP MENU, other proactive commands and native DSP/RF/speech remain unproved.",
+      "evidence": ["docs/8290_bringup.md", "fixtures/nsb7_toolkit_interactive/nsb7hle.cfg", "tools/nsb7_toolkit_interactive.lua", "tools/nsb7_toolkit_input.lua", "tools/nsb7_toolkit_check.py", "tools/test_nsb7_toolkit_check.py"]
+    },
+    {
       "id": "nsb7_authenticated_toolkit_display_text",
       "owner": "nsb7_sim_toolkit", "status": "satisfied",
       "predicate": "An own authenticated registered NSB-7 fetches a Phase-2+ proactive DISPLAY TEXT and physically dismisses it successfully with unchanged card",

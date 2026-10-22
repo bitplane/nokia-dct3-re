@@ -1,0 +1,36 @@
+-- Extend the same physical authentication/DISPLAY TEXT path with card input.
+_G.nsb7_toolkit_continue=true
+_G.nsb7_toolkit_marker='nsb7_toolkit_interactive'
+local source=debug.getinfo(1,'S').source:sub(2)
+dofile(assert(source:match('^(.*[/\\])'))..'nsb7_toolkit_input.lua')
+local machine=manager.machine
+local fields={}
+for _,port in pairs(machine.ioport.ports) do
+    for _,field in pairs(port.fields) do fields[field.name]=field end
+end
+local function press(time,key,action)
+    assert(emu.wait(time-machine.time:as_double()))
+    machine:logerror('nsb7_toolkit_interactive: action='..action..'\n')
+    local field=assert(fields[key])
+    field:set_value(1)
+    if not emu.wait(0.2) then field:set_value(0); error('input interrupted') end
+    field:set_value(0)
+end
+local input=coroutine.create(function()
+    assert(emu.wait(68.5))
+    machine.screens[':screen']:snapshot('nsb7_toolkit_inkey.png')
+    press(69,'Keypad 5','inkey_5')
+    press(70,'Left Softkey / Menu','inkey_confirm')
+    assert(emu.wait(71-machine.time:as_double()))
+    machine.screens[':screen']:snapshot('nsb7_toolkit_input.png')
+    press(72,'Keypad 4','input_4')
+    press(73,'Keypad 2','input_2')
+    assert(emu.wait(73.5-machine.time:as_double()))
+    machine.screens[':screen']:snapshot('nsb7_toolkit_input_filled.png')
+    press(74,'Left Softkey / Menu','confirm')
+    assert(emu.wait(76-machine.time:as_double()))
+    machine.screens[':screen']:snapshot('nsb7_toolkit_interactive_final.png')
+    machine:exit()
+end)
+_G.nsb7_toolkit_interactive_input=input
+assert(coroutine.resume(input))
