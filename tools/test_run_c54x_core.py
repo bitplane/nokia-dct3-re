@@ -14,6 +14,16 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_staged_idle_modes_require_clock_wake_and_replay_scope(self):
+        marker,ending=EXTRA_PROFILES['idle-modes']
+        text=marker+'\n'+ending
+        check_result(text,3,profile='idle-modes')
+        for field in ('cases=96','modes=3','restore=96','timer_stop=1','real_irq_return=1'):
+            with self.subTest(field=field),self.assertRaises(ValueError):
+                check_result(text.replace(field,field.split('=')[0]+'=0'),3,profile='idle-modes')
+        with self.assertRaises(ValueError):
+            check_result('c54x_failure: phase=252230\n'+text,3,profile='idle-modes')
+
     def test_delay_mod3_requires_no_source_or_implicit_destination_effect(self):
         marker, ending = EXTRA_PROFILES['delay-mod3-edge']
         text = marker + '\n' + ending

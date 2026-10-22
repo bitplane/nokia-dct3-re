@@ -5634,9 +5634,26 @@ execution. ISR cases verify continuation PC and page stack traffic; blocked
 cases retain IFR without an IACK. The saved barrier/resume state reproduces
 each leg. This verifies the declared restart/refetch model, not a measured
 silicon restart bus phase or execution of the original 44-word call.
-Staged IDLE2/3 and IDLE in a control-delay window remain fail-closed.
-The atomic frontend retains its existing IDLE1/2/3 behavior, and no handset
-or MU4 profile is promoted to staged execution by this fixture.
+Staged IDLE2/3 use the same drain/refetch barrier and the shared mode-specific
+clock-stop/wake implementation as the atomic frontend. The focused
+`idle-modes` profile covers 96 cases: all three modes, enabled external IRQ,
+INTM-blocked IRQ, a masked request followed by enabled IRQ, NMI, pages 0/2
+and four save/load boundaries. Its timer continues in IDLE1 and freezes in
+IDLE2/3; continuation replacement, real ISR stack/return traffic and replay
+are checked. The unchanged core fails at the first IDLE2 case with `illegal=1`;
+the corrected staged decoder passes all 96. IDLE in a control-delay window
+and reserved NN=11 remain excluded. Physical clock/restart latency is not
+established by this fixture.
+
+```sh
+.venv/bin/python tools/run_c54x_core.py --mame mame/mame \
+  --rompath mame/roms --profile idle-modes --output-root tmp/c54x-idle-modes
+```
+
+The original AA22 instruction `028922: f5e1` is a concrete native consumer
+after a serial playback-control transition; AA99 has different contents at
+that address. Instruction admission does not itself qualify that complete
+control transaction, EOF draining or handset boot.
 
 The complete original 44-word idle routine/wrapper executes in eight staged
 cases with INTM set: zero/nonzero local flag, even/odd caller SP and two

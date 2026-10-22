@@ -5613,17 +5613,24 @@ private:
 		m_phase = 252210; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	unsigned pipeline_idle_kind(unsigned variant) const
+	{
+		return !strcmp(machine().options().bios(), "idle-modes") ?
+			std::array<unsigned,4>{0,1,2,5}[variant % 4] : variant % 6;
+	}
 	void start_pipeline_idle1(unsigned variant = 0)
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-		unsigned const kind = variant % 6;
+		bool const modes = !strcmp(machine().options().bios(), "idle-modes");
+		unsigned const kind = pipeline_idle_kind(variant);
+		u16 const idle = modes ? std::array<u16,3>{0xf4e1,0xf6e1,0xf5e1}[variant / 32] : 0xf4e1;
 		bool const blocked = kind == 1 || kind == 4;
 		unsigned const source = kind == 3 || kind == 4 ? 3 : 0;
-		u32 const base = BIT(variant / 6, 0) ? 0x20000 : 0;
+		u32 const base = BIT(variant / (modes ? 4 : 6), 0) ? 0x20000 : 0;
 		u16 const vector = kind == 5 ? 4 : 0x40 + source * 4;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 256; ++i) program.write_word(base + 0x600 + i, 0xf495);
-		program.write_word(base + 0x600, 0xf4e1); program.write_word(base + 0x601, 0xe811);
+		program.write_word(base + 0x600, idle); program.write_word(base + 0x601, 0xe811);
 		program.write_word(base + vector, 0x4a1e); program.write_word(base + vector + 1, 0xe955); program.write_word(base + vector + 2, 0xf4e5);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
@@ -5636,6 +5643,12 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, kind == 5 ? 0 : 1 << source);
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
+		if (modes)
+		{
+			m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0xffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_TIM, 0x7fff);
+		}
 		if (source == 3)
 		{
 			m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0xffff);
@@ -20041,6 +20054,7 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().options().bios(), "idle-modes")) { start_pipeline_idle1(); return; }
 		if (!strcmp(machine().options().bios(), "mvpd-extended")) { start_extended_mvpd(); return; }
 		if (!strcmp(machine().options().bios(), "mvpd-ext-edge")) { start_extended_mvpd_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mvpd-controls")) { start_pipeline_mvpd(); return; }
@@ -44534,18 +44548,25 @@ private:
 		}
 		if (m_phase == 252230)
 		{
-			unsigned const variant = m_pipeline_peripheral_case, kind = variant % 6;
+			bool const modes = !strcmp(machine().options().bios(), "idle-modes");
+			unsigned const variant = m_pipeline_peripheral_case;
+			unsigned const kind = pipeline_idle_kind(variant);
 			bool const blocked = kind == 1 || kind == 4;
 			unsigned const source = kind == 3 || kind == 4 ? 3 : 0;
-			u32 const base = BIT(variant / 6, 0) ? 0x20000 : 0;
+			u32 const base = BIT(variant / (modes ? 4 : 6), 0) ? 0x20000 : 0;
 			unsigned const tick = ++m_idle_fixture_tick;
-			unsigned const checkpoint = std::array<unsigned, 4>{4, 10, 18, 80}[variant / 12];
+			unsigned const checkpoint = std::array<unsigned, 4>{4, 10, 18, 80}[modes ? (variant / 8) % 4 : variant / 12];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Staged IDLE1 barriers and wake do not decode suspended younger words");
 			if (tick >= 6 && tick < 20)
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->pipeline_cycles() == 6 &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0 &&
 					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000, "IDLE1 halts CPU execution while pending masked sources remain inert");
 			if (kind == 2 && tick == 12) { m_cpu->set_input_line(1, ASSERT_LINE); m_cpu->set_input_line(1, CLEAR_LINE); }
+			if (modes && tick == 8) m_pipeline_expected_cycle = m_cpu->state_int(tms320c54x_device::STATE_TIM);
+			if (modes && tick == 16)
+				expect(variant / 32 ? m_cpu->state_int(tms320c54x_device::STATE_TIM) == m_pipeline_expected_cycle :
+					m_cpu->state_int(tms320c54x_device::STATE_TIM) < m_pipeline_expected_cycle,
+					"Staged IDLE2/3 stop the timer while IDLE1 retains its running clock");
 			if (tick == 16)
 			{
 				auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xe844);
@@ -44584,7 +44605,12 @@ private:
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
 				m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_pipeline_frontend(false);
-				if (variant < 47) { start_pipeline_idle1(variant + 1); return; }
+				if (variant < (modes ? 95U : 47U)) { start_pipeline_idle1(variant + 1); return; }
+				if (modes)
+				{
+					osd_printf_info("TMS320C54x staged idle modes: PASS cases=96 modes=3 wake_profiles=4 pages=2 restore=96 timer_stop=1 suspended_younger_words=1 real_irq_return=1 physical_clock_claim=0\n");
+					fatalerror("TMS320C54x isolated staged idle modes complete");
+				}
 				osd_printf_info("TMS320C54x staged IDLE1: PASS cases=48 wake_profiles=6 source_pages=2 restore=48 suspended_younger_words=1 timer_runs=1 real_irq_return=1\n");
 				start_pipeline_original_idle(); return;
 			}
@@ -55405,7 +55431,7 @@ void tms320c54x_test_state::test(machine_config &config)
 		}
 		if (m_phase == 252230)
 		{
-			unsigned const kind = m_pipeline_peripheral_case % 6;
+			unsigned const kind = pipeline_idle_kind(m_pipeline_peripheral_case);
 			expect(line == (kind == 5 ? INPUT_LINE_NMI : kind == 3 ? 3 : 0) && m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x601,
 				"IDLE1 wake acknowledges the actual source with its unexecuted continuation");
 			++m_vector_acks;
@@ -57292,6 +57318,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(202, "push-observe", "Retained direct-PSHM stack and source inspection across restore")
 	ROM_SYSTEM_BIOS(203, "dual-sub-native", "Exact native dual-memory subtraction and pointer updates")
 	ROM_SYSTEM_BIOS(204, "delay-mod3-edge", "Write-only short-preincrement LTD DELAY source exclusions")
+	ROM_SYSTEM_BIOS(205, "idle-modes", "Staged IDLE1/2/3 barriers, timer clocks, interrupt wake and replay")
 ROM_END
 
 ROM_START(tms54rom4)
