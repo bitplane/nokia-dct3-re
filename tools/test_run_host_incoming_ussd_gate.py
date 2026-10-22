@@ -1,5 +1,6 @@
 import asyncio
 import json
+import io
 from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, patch
@@ -77,6 +78,19 @@ class IncomingUssdRunnerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await gate.read_console(stream,ready,'fixture ready'),
                          'boot\nfixture ready\n')
         self.assertTrue(ready.is_set())
+
+
+class IncomingUssdCliTest(unittest.TestCase):
+    def test_connection_close_fails_cleanly_without_a_traceback(self):
+        def closed(coroutine):
+            coroutine.close()
+            raise gate.ConnectionClosed(None,None)
+        with patch('sys.argv',['runner','--port','18990','--','mame']), \
+                patch.object(gate.asyncio,'run',side_effect=closed), \
+                patch('sys.stdout',new_callable=io.StringIO) as output:
+            self.assertEqual(gate.main(),1)
+        self.assertIn('FAIL - no close frame received or sent',output.getvalue())
+        self.assertNotIn('OK -',output.getvalue())
 
 
 if __name__=='__main__':unittest.main()

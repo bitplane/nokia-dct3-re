@@ -4,6 +4,7 @@
 import argparse
 import asyncio
 import json
+from websockets.exceptions import ConnectionClosed
 
 try:
     from tools.run_host_call_adapter_gate import connect
@@ -136,7 +137,7 @@ def main() -> int:
         args.command = args.command[1:]
     try:
         asyncio.run(run(args))
-    except (RuntimeError, asyncio.TimeoutError) as error:
+    except (RuntimeError, asyncio.TimeoutError, ConnectionClosed) as error:
         print(f"FAIL - {error}")
         return 1
     print("OK - host USSD request/reply completed" if args.request else

@@ -1498,6 +1498,20 @@ notification gate independently passes after the shared fixture/checker changes.
 These are HLE supplementary-service contracts. Empty reply, pending-USSD
 restoration, multi-turn dialogue, native DSP and speech remain unqualified.
 
+Dismissal is not an empty-reply proof on this product. In bounded 42-second
+captures of the same host `Choose 2` request, Answer26 followed by End30
+returns to idle without a supplementary-service component. Separately,
+Answer26/Back30 returns from the blank editor to the prompt, and Back34 returns
+to idle. Neither run sends a ReturnResult or RELEASE COMPLETE, releases the
+dedicated channel or advances host request1 beyond queued through the observed
+end. The physical Menu remains responsive and card contents remain normal.
+Captures: `tmp/npe3-host-ussd-empty-probe` and
+`tmp/npe3-host-ussd-empty-back-probe`. This disproves immediate empty-reply
+equivalence with NSB-7; it does not prove permanent deadlock or classify a later
+firmware/network timeout. The selected transaction's legitimate termination
+after UI dismissal remains open. No empty reply or host answered state is
+synthesized. The unsuccessful fixture/scenario is not retained as acceptance.
+
 ## Host SMS acceptance
 
 Named gates use the same isolated own-PMM runners and require new run
