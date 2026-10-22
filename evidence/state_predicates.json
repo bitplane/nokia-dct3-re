@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_fdn_activation_rejection_cold_retry", "owner": "npe3_sim_security", "status": "satisfied",
+      "predicate": "6210 rejects wrong-PIN2 FDN activation without changing validity and cold-recovers using the exact retry-depleted card",
+      "current": "Five own-PMM/coherent-cell processes use an explicit FDN card. Wrong5675 produces VERIFY CHV2/9804 and Code error, no validity APDU, valid ADN, unchanged credentials/records and only PIN2 retries3->2 beyond normal location. Exact own storage cold-activates with5678, restores retries3 and invalidates ADN. Cold On/physical Off/cold Off complete the lifecycle. All16 reviewed frames, CHV1/CHV2 counter distinctions, exact contacts/order/card transitions, registration, independent launches and unchanged predecessors pass. Capture tmp/npe3-fdn-retry-banked. No FDN-record/dial-permission/connected-call/native-speech promotion.",
+      "evidence": ["docs/6210_bringup.md", "tools/noki6210_fdn_enable_wrong.lua", "tools/noki6210_fdn_input.lua", "tools/noki6210_fdn_check.py", "tools/test_noki6210_fdn_check.py", "tools/run_noki6210_acceptance.py", "gates.json"]
+    },
+    {
       "id": "npe3_fdn_validity_lifecycle", "owner": "npe3_sim_security", "status": "satisfied",
       "predicate": "6210 physically activates and deactivates FDN using PIN2 and preserves both states across own-storage cold boots",
       "current": "Four own-PMM/coherent-cell processes use an explicit3898-byte laboratory FDN card. All ten EF_FDN records are read. Physical On verifies PIN2, invalidates ADN, rehabilitates LOCI/IMSI and displays Fixed dialling on. Cold On retains invalid ADN and rehabilitates identity without PIN2. Physical Off verifies PIN2 and rehabilitates ADN with Fixed dialling off; cold Off performs no validity transaction. Whole-card checks allow only expected location/ADN validity, preserving credentials/retries/records. Exact contacts/order/statuses,12 frames, registration, independent launches and unchanged predecessor storage pass. Capture tmp/npe3-fdn-cycle-banked. No record-write/rejected-PIN2/dial-permission/connected-call/native-speech promotion.",

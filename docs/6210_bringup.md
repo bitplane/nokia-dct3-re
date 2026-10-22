@@ -1247,9 +1247,19 @@ The gate checks exact contacts, APDU selectors/order/results, record census,
 coherent registration,12 reviewed frame comparisons, independent launch IDs,
 copied-storage provenance and unchanged predecessors. Capture:
 `tmp/npe3-fdn-cycle-banked`. No RAM/save state or forced handset event is used.
-FDN record save/edit/erase, rejected PIN2 activation and local listed/unlisted
-dial-permission controls remain unqualified. This is not a connected-call or
-native-radio/speech claim.
+`make verify-6210-fdn-retry-cold` first enters wrong PIN2 `5675`. VERIFY CHV2
+returns9804 with Code error and no validity-changing APDU. The complete card
+retains valid ADN and unchanged credentials/records; only PIN2 retries3->2
+and the normal location update differ from the fresh input. The exact retained
+card feeds a cold correct-PIN2 activation, which restores retries to3 and
+invalidates ADN. Cold On, physical Off and cold Off then pass as above.
+All five processes,16 reviewed frames, exact card/protocol transitions,
+registration, launch identities and unchanged predecessors are checked.
+Capture: `tmp/npe3-fdn-retry-banked`.
+
+FDN record save/edit/erase and local listed/unlisted dial-permission controls
+remain unqualified. These gates are not connected-call or native-radio/speech
+claims.
 
 ## SIM Toolkit
 

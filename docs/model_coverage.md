@@ -135,8 +135,11 @@ and a responsive cold control that cannot reopen PIN2 recovery, while PIN1
 registration/menu access remains usable. `verify-6210-fdn-cycle` adds physical
 PIN2-protected On/Off, cold-state persistence and the identity/ADN validity
 handshake on an explicit extended card, with exact complete-card preservation
-and12 reviewed frames. FDN record operations, rejected activation and local
-listed/unlisted dialing restrictions remain unqualified.
+and12 reviewed frames. `verify-6210-fdn-retry-cold` additionally proves wrong
+PIN2 activation denial with unchanged FDN validity/credentials, durable retry
+loss and cold correct-PIN2 activation through the complete lifecycle.
+FDN record operations and local listed/unlisted dialing restrictions remain
+unqualified.
 
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,

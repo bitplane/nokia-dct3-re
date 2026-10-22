@@ -34,6 +34,32 @@ def fixture(phase):
 
 
 class FdnLifecycleTests(unittest.TestCase):
+    def test_wrong_pin2_activation_only_consumes_its_retry(self):
+        text,_=fixture(0)
+        text='\n'.join(line for line in text.splitlines() if 'ins=04' not in line and 'ins=44' not in line)
+        for state in (0,1):
+            text=text.replace(f'key=Keypad 8 state={state} t=50.',f'key=Keypad 5 state={state} t=50.')
+        before,last,after=text.rpartition('SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1')
+        self.assertTrue(last)
+        text=before+'SIM status ins=20 sw=9804 chv=3/2 puk=10/10 enabled=1'+after
+        card=bytearray(extend(profile(3,True)))
+        card[3517]=2
+        check(text,bytes(card),0,rejected=True)
+        for index in (3492,3516,3517,3575,3578):
+            changed=bytearray(card)
+            changed[index]^=1
+            with self.subTest(index=index),self.assertRaises(ValueError):
+                check(text,bytes(changed),0,rejected=True)
+        with self.assertRaises(ValueError):
+            check(text+'\n'+'\n'.join(validity(4,0x6f3a)),bytes(card),0,rejected=True)
+
+    def test_cold_activation_restores_pin2_retry_only_on_success(self):
+        text,card=fixture(0)
+        text=text.replace('ins=20 sw=9000 chv=3/3','ins=20 sw=9000 chv=3/2',1)
+        check(text,card,0,initial_pin2_attempts=2)
+        with self.assertRaises(ValueError):
+            check(text,card,0)
+
     def test_all_four_physical_phases(self):
         for phase in range(4):
             with self.subTest(phase=phase):
