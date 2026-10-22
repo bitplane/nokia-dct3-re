@@ -21,7 +21,7 @@ machine implicitly.
 | PCS laboratory network | Acquisition, BCCH, Location Updating/EF_LOCI, background measurements, addressed paging, physical incoming/outgoing CC/RR signaling and SMS delivery/read/delete/cancel/Reply. |
 | Authenticated composition | Physical PIN before fresh/cold registration, calls, SMS and phonebook; a long wrong-PIN control remains unregistered. |
 | Restoration | Exact ARM/banked registers, RAM/time, protocol replay and pixels at idle, connected call, active SMS and open Toolkit-menu boundaries, with physical continuation. |
-| External host | Independent incoming SMS/read and outgoing Reply decisions; incoming/outgoing call signaling from clean idle; connected-call restoration republishes a new epoch and rejects stale commands. |
+| External host | Independent incoming SMS/read and outgoing Reply accept/reject/silence decisions with physical failure recovery; incoming/outgoing call signaling from clean idle; connected-call restoration republishes a new epoch and rejects stale commands. |
 
 All provisioning is own-derived or explicitly synthetic external card data;
 no donor PMM, identity or firmware-state forcing is admitted. Native resident
@@ -2225,6 +2225,40 @@ The independent retained-clock repeats `tmp/nsb7-ccont-sms-in` and
 frame hashes, CP/RP acceptance or full-card expectations. They use the own
 unedited13:47:45 source. The separate authenticated SMS save/load repeat
 above retains its CP-ACK/RP-ACK boundary and now compares CCONT replay too.
+
+### Host SMS rejection and silence
+
+Fresh independent copies of the same PIN-enabled source qualify RP-ERROR and
+RP silence, not just the host-accepted Reply. Both use
+`fixtures/nsb7_host_sms_reply/nsb7hle.cfg` and the existing host SMS runner
+with `--user-data 41 --user-data-length 1`. Wrong-ID and duplicate decisions
+reject while exactly one matching decision is accepted.
+
+| Host decision | Physical script / local port | Firmware outcome and recovery |
+| --- | --- | --- |
+| `rp_error` | `nsb7_pin_host_sms_failure.lua` /18938 | RP-ERROR, handset CP-ACK and release; exact `Message not sent, try again` frame at48.3s. End78/Menu82/End85 restores exact registered idle at88s. |
+| `rp_silence` | `nsb7_pin_host_sms_silent.lua` /18940 | No RP-ACK or RP-ERROR; exact `Message not sent` frame at105s, handset timeout/DISC/UA/deconfiguration and host ended at114.58s. End168/Menu172/End175 restores exact registered idle at178s. |
+
+Observation must extend beyond the firmware timeout; an88s run leaves the
+silent transaction pending and is not accepted as completion. Use95/185s
+launch guards respectively. The physical scripts terminate at88/178s.
+
+Both complete cards equal the incoming/read message projection with the
+original EF_SMSS bytes retained. Unlike successful Reply, neither failure
+writes EF_SMSS or advances its reference. The checker enforces that
+distinction, single submission/completion, physical decoded contacts, exact
+failure/menu/final frames, valid own flash journal and every retained RTC
+tick. The successful host SMS gate retains its original mandatory reference
+update. No driver behavior, state forcing or host-side success substitution
+is needed.
+
+```sh
+.venv/bin/python tools/nsb7_host_sms_failure_check.py roms/noki8290/8290f522a.fls tmp/nsb7-host-sms-reject
+.venv/bin/python tools/nsb7_host_sms_failure_check.py roms/noki8290/8290f522a.fls tmp/nsb7-host-sms-silent-long --rp-silence
+```
+
+These are laboratory HLE signaling and UI/storage results, not an external
+SMSC, SIP SMS, fitted resident DSP or hardware RF qualification.
 
 ## Host incoming call from settled idle
 

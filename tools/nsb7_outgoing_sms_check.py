@@ -10,7 +10,7 @@ if __package__ in (None, ''):
 from tools.nsb7_radio_check import contract
 
 
-def check(text, delay=0):
+def check_inputs(text, delay=0):
     if not isinstance(delay, int) or delay < 0:
         raise ValueError('physical input delay must be a nonnegative integer')
     if '[LUA ERROR]' in text:
@@ -24,6 +24,10 @@ def check(text, delay=0):
                 for state, fraction in [('1', '000000000'), ('0', '200000000')]]
     if keys != expected:
         raise ValueError('physical Reply input sequence differs')
+
+
+def check(text, delay=0):
+    check_inputs(text,delay)
     submit = ('gsm_sms_submit: cp=39 rp=01 smsc=1234567890 destination=5551234 '
               'alphabet=0 user_length=1 outcome=0 status_report=0')
     if text.count('gsm_sms_submit:') != 1 or submit not in text:

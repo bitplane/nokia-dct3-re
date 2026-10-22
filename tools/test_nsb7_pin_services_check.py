@@ -3,7 +3,7 @@ import re
 import unittest
 from unittest.mock import patch
 
-from tools.nsb7_pin_services_check import check_sms, check_authentication, SMSS_OFFSET
+from tools.nsb7_pin_services_check import check_sms, check_sms_storage, check_authentication, SMSS_OFFSET
 from tools.nsb7_pin_check import serialized_profile
 from tools.nsb7_pin_registration_check import LOCI
 from tools.radio_sms_acceptance_common import FIRST_SMS_DELIVER_BODY, SMS_NVRAM_OFFSET
@@ -34,6 +34,23 @@ def fixture():
 
 
 class PinServicesTest(unittest.TestCase):
+    def test_failed_submission_preserves_smss(self):
+        text,initial,final=fixture()
+        final=bytearray(final)
+        final[SMSS_OFFSET]=initial[SMSS_OFFSET]
+        wire=re.findall(r'nsb7_sim_tx: index=(\d+) value=([0-9a-f]{2})',text)
+        removed={index for index,_ in wire[-7:]}
+        text='\n'.join(row for row in text.splitlines()
+                       if not row.startswith('sim_device: update-binary fid=6f43') and
+                       not any(row.startswith(f'nsb7_sim_tx: index={index} ') for index in removed))
+        check_sms_storage(text,initial,bytes(final),update_reference=False)
+        with self.assertRaises(ValueError):
+            check_sms_storage(text+'\nsim_device: update-binary fid=6f43 offset=1 length=1 t=48',
+                              initial,bytes(final),update_reference=False)
+        final[SMSS_OFFSET]=0
+        with self.assertRaises(ValueError):
+            check_sms_storage(text,initial,bytes(final),update_reference=False)
+
     def test_complete_sms_and_smss(self):
         check_sms(*fixture())
 

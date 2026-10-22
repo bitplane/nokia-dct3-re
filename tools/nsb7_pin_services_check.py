@@ -49,27 +49,35 @@ def check_incoming(text, card):
 
 
 def check_sms(text, initial, final):
-    check_source(initial)
     check_submit(text, delay=4)
+    check_sms_storage(text,initial,final)
+
+
+def check_sms_storage(text, initial, final, *, update_reference=True):
+    check_source(initial)
     delivered = bytearray(initial)
     record = b'\x03'+FIRST_SMS_DELIVER_BODY
     record += b'\xff'*(176-len(record))
     delivered[SMS_NVRAM_OFFSET:SMS_NVRAM_OFFSET+176] = record
-    # Validate the read transaction independently of the later, separately
-    # checked sender's EF_SMSS write. This is an artifact projection, not a
+    # Validate the read independently of the sender's success-only EF_SMSS
+    # update, checked separately below. This is an artifact projection, not a
     # modification of the card or guest state.
     read_view = bytearray(final)
     read_view[SMSS_OFFSET:SMSS_OFFSET+2] = initial[SMSS_OFFSET:SMSS_OFFSET+2]
     check_read(text, bytes(read_view), bytes(delivered), read_times=(23,25,27,29))
     expected = bytearray(delivered)
     expected[SMS_NVRAM_OFFSET] = 1
-    expected[SMSS_OFFSET] = 0
+    if update_reference: expected[SMSS_OFFSET] = 0
     if final != bytes(expected):
         raise ValueError('authenticated reply changed unexpected card contents')
     wire = tx_bytes(text)
+    updates = re.findall(r'sim_device: update-binary fid=6f43 offset=0 length=2 t=([0-9.]+)', text)
+    if not update_reference:
+        if re.search(r'sim_device: update-binary fid=6f43\b',text) or bytes.fromhex('a0d600000200ff') in wire:
+            raise ValueError('failed submission must not update EF_SMSS')
+        return
     if wire.count(bytes.fromhex('a0d600000200ff')) != 1:
         raise ValueError('expected one exact EF_SMSS update')
-    updates = re.findall(r'sim_device: update-binary fid=6f43 offset=0 length=2 t=([0-9.]+)', text)
     submit = re.search(r'gsm_sms_submit: [^\n]* t=([0-9.]+)', text)
     if len(updates) != 1 or not submit or float(updates[0]) <= float(submit[1]):
         raise ValueError('EF_SMSS update must follow the accepted submission')

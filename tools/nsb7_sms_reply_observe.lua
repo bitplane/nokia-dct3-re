@@ -28,7 +28,7 @@ local input=coroutine.create(function()
         machine.screens[':screen']:snapshot('nsb7_sms_reply_final_'..(target+delay)..'.png')
     end
     machine:logerror(string.format('nsb7_sms_reply_done: t=%.9f\n',machine.time:as_double()))
-    machine:exit()
+    if not _G.nsb7_sms_reply_continue then machine:exit() end
 end)
 _G.nsb7_sms_reply_input=input
 assert(coroutine.resume(input))

@@ -1784,6 +1784,12 @@
       "evidence": ["docs/cobba_control_boundary.md", "driver/tms320c54x_test.cpp", "tools/run_c54x_rom4_crc.py", "tools/test_run_c54x_rom4_crc.py", "Makefile"]
     },
     {
+      "id": "nsb7_host_sms_failure_recovery", "owner": "nsb7_host_telephony", "status": "satisfied",
+      "predicate": "Own authenticated NSB-7 distinguishes host RP rejection and silence, preserves the failed-submit reference and recovers through physical input",
+      "current": "Independent fresh own-source HLE runs physically read hello and Reply A to5551234. Wrong-ID and duplicate decisions reject; exactly one RP-ERROR or RP-silence decision accepts. Rejection renders Message not sent, try again and closes CP/RP/RR. Silence supplies no RP result, renders Message not sent at105s and closes through handset timeout/DISC/UA/deconfiguration with host ended114.58s. An88s silent control remains pending and is not promoted. End/Menu/End restores exact registered idle at88/178s. Whole cards retain only incoming/read changes with original EF_SMSS and no reference write; successful Reply's mandatory reference update remains independently gated. Exact failure/read/menu/final frames, all RTC ticks, own flash journal and decoded physical contacts pass. No native DSP, hardware RF or external SMSC acceptance follows.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_pin_host_sms_failure.lua", "tools/nsb7_pin_host_sms_silent.lua", "tools/nsb7_host_sms_failure_check.py", "tools/test_nsb7_host_sms_failure_check.py", "tools/nsb7_pin_services_check.py", "tools/test_nsb7_pin_services_check.py"]
+    },
+    {
       "id": "nam1_display_frontier", "owner": "nam1_firmware", "status": "satisfied",
       "predicate": "Nokia 3610 v5.11 organically reaches a deterministic firmware-rendered display boundary through product-owned GENSIO and geometry contracts",
       "current": "NAM-1 independently writes GENSIO control 0x22 at 0x2d, transfers CCONT bytes at 0x2c and polls 0x6d. Byte-write receive-ready releases that loop. Firmware then writes nine 96-byte display banks; a 96x65 visible area with reversed segment order renders the complete CONTACT SERVICE frame. Separate gates prove DSP bootstrap/service control, request-derived discovery, accepted application sequences 0x42/0x43, channel-0x5f use and a complete physical M2BUS terminal exchange. Missing product state remains the next boundary.",
