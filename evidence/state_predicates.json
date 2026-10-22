@@ -1886,6 +1886,12 @@
       "evidence": ["docs/aac_validation.md", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py"]
     },
     {
+      "id": "nsb7_alerting_incoming_sip_restore", "owner": "nsb7_host_telephony", "status": "satisfied",
+      "predicate": "Unanswered physical-authenticated NSB-7 incoming SIP save/load restores architecture and clears the original dialog and GSM call before any cleanup key",
+      "current": "Own-source authenticated PCS600 readiness45s precedes one caller5551234 SETUP at both MCU consumers and alerting without Send/CONNECT. Save51/load after0.5s restores37 ARM/banked registers, PC/SP, complete-RAM digest and time. Epoch2 republishes alerting; real INVITE603 and one cause41 termination clear CC/RR to ended51.140s before End60. A Disconnect-only idle-uplink scheduling correction removes the old physical-End-dependent stall without changing setup/assignment admission. Exact ready/menu/final68s pixels, the two reviewed complete caller animation frames, unchanged full card, valid own journal and retained RTC pass. Snapshot cache phases may differ; framebuffer or external-dialog replay is not claimed. Speech/native DSP remain false, qualified media/Answer/duplicate paging are rejected and discarded-epoch bridge uplink is zero.",
+      "evidence": ["docs/8290_bringup.md", "docs/external_call_bridge.md", "driver/nokia_radio_peer.cpp", "tools/nsb7_sip_incoming_alerting_restore.lua", "tools/nsb7_sip_restore.lua", "tools/nsb7_sip_check.py", "tools/run_sip_handset_gate.py", "tools/test_nsb7_sip_check.py"]
+    },
+    {
       "id": "nam1_display_frontier", "owner": "nam1_firmware", "status": "satisfied",
       "predicate": "Nokia 3610 v5.11 organically reaches a deterministic firmware-rendered display boundary through product-owned GENSIO and geometry contracts",
       "current": "NAM-1 independently writes GENSIO control 0x22 at 0x2d, transfers CCONT bytes at 0x2c and polls 0x6d. Byte-write receive-ready releases that loop. Firmware then writes nine 96-byte display banks; a 96x65 visible area with reversed segment order renders the complete CONTACT SERVICE frame. Separate gates prove DSP bootstrap/service control, request-derived discovery, accepted application sequences 0x42/0x43, channel-0x5f use and a complete physical M2BUS terminal exchange. Missing product state remains the next boundary.",

@@ -23,15 +23,16 @@ SIP_INCOMING_FRAMES={**INCOMING_FRAMES,
 SIP_RINGING_ALTERNATE='b0e2787482bcc037d9d415f390b8fc4199379d8dfa1fd3628777195917d85a44'
 
 
-def check_sip_frame(path,digest,*,incoming=False):
+def check_sip_frame(path,digest,*,incoming=False,alerting_snapshot=False):
     try:
         check_frame(path,digest)
     except ValueError:
-        if not incoming or path.name!='nsb7_call_ringing.png': raise
+        if not incoming or (path.name!='nsb7_call_ringing.png' and not (
+                alerting_snapshot and path.name in ('nsb7_sip_state_saved.png','nsb7_sip_state_restored.png'))): raise
         check_frame(path,SIP_RINGING_ALTERNATE)
 
 
-def check_restored_architecture(text,*,incoming=False):
+def check_restored_architecture(text,*,incoming=False,alerting=False):
     check_authentication(text.split('nsb7_sip_state: event=saved',1)[0])
     if '[LUA ERROR]' in text or 'nsb7_sip_state: FAIL' in text:
         raise ValueError('SIP restore harness failed')
@@ -41,16 +42,18 @@ def check_restored_architecture(text,*,incoming=False):
             any(not re.fullmatch(r'[0-9a-f]{8}(?:,[0-9a-f]{8}){36}',row[4]) for row in rows):
         raise ValueError('SIP restore must reproduce all ARM/banked registers, RAM and time')
     direction='incoming' if incoming else 'outgoing'
-    if rows[0][5]!=('55.000000000' if incoming else '60.000000000') or \
+    if rows[0][5]!=('51.000000000' if alerting else '55.000000000' if incoming else '60.000000000') or \
             text.count('state_roundtrip: result=pass scenario=nsb7_sip_'+direction)!=1:
         raise ValueError('missing unique connected save/load boundary')
 
 
-def check_incoming_restore(text):
-    check_restored_architecture(text,incoming=True)
+def check_incoming_restore(text,phase='connected'):
+    if phase not in ('connected','alerting'):raise ValueError('unknown incoming restore phase')
+    alerting=phase=='alerting'
+    check_restored_architecture(text,incoming=True,alerting=alerting)
     setup=laboratory_incoming_setup('5551234')
     rows=list(re.finditer(r'nsb7_call_input: key=(Send|End) state=([01]) t=([0-9.]+)',text))
-    expected=[(key,edge,f'{second}.{fraction}') for key,second in [('Send',52),('End',60)]
+    expected=[(key,edge,f'{second}.{fraction}') for key,second in ([('End',60)] if alerting else [('Send',52),('End',60)])
               for edge,fraction in [('1','000000000'),('0','200000000')]]
     if [row.groups() for row in rows]!=expected:
         raise ValueError('restored incoming Answer/End sequence differs')
@@ -59,13 +62,13 @@ def check_incoming_restore(text):
             for key,second in [('Left Softkey / Menu',62),('End',65)]
             for edge,fraction in [('1','000000000'),('0','200000000')]]:
         raise ValueError('restored incoming Menu recovery differs')
-    for inputs,codes in ((rows,('0e','0f')),(cleanup,('19','0f'))):
+    for inputs,codes in ((rows,('0f',) if alerting else ('0e','0f')),(cleanup,('19','0f'))):
         for index,code in enumerate(codes):
             if f'nsb7_key_decode: key={code} observer_writes=0' not in text[inputs[index*2].end():inputs[index*2+1].start()]:
                 raise ValueError('restored incoming physical contact did not decode')
     if re.findall(r'gsm_call_adapter: incoming state id=1 epoch=(\d+) phase=(\w+)',text)!=[
-            ('1','queued'),('1','paging'),('1','alerting'),('1','connected'),
-            ('2','connected'),('2','media_closed'),('2','ended')]:
+            ('1','queued'),('1','paging'),('1','alerting')]+([] if alerting else [('1','connected')])+[
+            ('2',phase)]+([] if alerting else [('2','media_closed')])+[('2','ended')]:
         raise ValueError('restored incoming identity/epoch sequence differs')
     require_ordered(text,[
         ('registered',r'gsm_call_adapter: network registered=1 arfcn=600\b'),
@@ -77,12 +80,14 @@ def check_incoming_restore(text):
         ('task14 caller',rf'nsb7_lapdm_downlink: pc=002645ec task=14 selector=80 block=03[0-9a-f]{{2}}{len(setup)*4+1:02x}{setup.hex()}[0-9a-f]* '),
         ('Call Confirmed',r'GSM service uplink sapi=0 pd=03 message=08 length=11 data=8308040460020180150101'),
         ('Alerting',r'GSM service uplink sapi=0 pd=03 message=01 length=2 data=8341'),
+    ]+([] if alerting else [
         ('physical Answer',r'nsb7_call_input: key=Send state=1 t=52\.'),
         ('Connect',r'GSM service uplink sapi=0 pd=03 message=07 length=2 data=8307'),
         ('Connect ACK',r'GSM service downlink kind=20 sapi=0 pd=03 message=0f length=2'),
         ('connected',r'incoming state id=1 epoch=1 phase=connected'),
+    ])+[
         ('save',r'sip_state: saved'),('load',r'sip_state: restored'),
-        ('new epoch',r'incoming state id=1 epoch=2 phase=connected'),
+        ('new epoch',rf'incoming state id=1 epoch=2 phase={phase}'),
         ('termination',r'termination id=1 cause=41 result=accepted'),
         ('Disconnect',r'GSM service downlink kind=13 sapi=0 pd=03 message=25'),
         ('Release Complete',r'GSM service uplink sapi=0 pd=03 message=2a'),
@@ -91,6 +96,11 @@ def check_incoming_restore(text):
         ('Menu',r'nsb7_sip_cleanup_input: key=Left Softkey / Menu state=1 t=62\.'),
         ('done',r'nsb7_sip_done: direction=incoming t=68\.000000000'),
     ],'NSB-7 restored incoming SIP')
+    if alerting and (re.search(r'GSM service uplink sapi=0 pd=03 message=07\b',text) or
+                     re.search(r'phase=connected\b',text)):
+        raise ValueError('alerting restore answered or connected')
+    if alerting and text.index('incoming state id=1 epoch=2 phase=ended')>rows[0].start():
+        raise ValueError('network termination waited for physical End')
     if len(re.findall(r'gsm_call_adapter: incoming id=\d+ result=accepted',text))!=1 or \
             'GSM service establish sapi=0 pd=05 message=24 ' in text or \
             re.search(r'media direction=uplink [^\n]*good=1\b',text) or 'dsp_hle: speech tick' in text:
@@ -173,13 +183,15 @@ def main():
     modes.add_argument('--incoming',action='store_true')
     modes.add_argument('--restore-outgoing',action='store_true')
     modes.add_argument('--restore-incoming',action='store_true')
+    modes.add_argument('--restore-incoming-alerting',action='store_true')
     args=parser.parse_args()
-    incoming=args.incoming or args.restore_incoming
-    restoring=args.restore_outgoing or args.restore_incoming
+    incoming=args.incoming or args.restore_incoming or args.restore_incoming_alerting
+    restoring=args.restore_outgoing or args.restore_incoming or args.restore_incoming_alerting
+    phase='alerting' if args.restore_incoming_alerting else 'connected'
     try:
         contract(args.image.read_bytes())
         text=(args.run/'error.log').read_text()
-        if args.restore_incoming: check_incoming_restore(text)
+        if args.restore_incoming or args.restore_incoming_alerting: check_incoming_restore(text,phase=phase)
         elif args.restore_outgoing: check_restore(text)
         else: check(text,incoming=incoming)
         check_clock(text,finish=68 if incoming else 76)
@@ -196,7 +208,13 @@ def main():
                 'nsb7_sip_state_restored.png':FRAMES['nsb7_host_outgoing_connected.png'],
                 ('nsb7_sip_cleanup_62.png' if incoming else 'nsb7_sip_cleanup_70.png'):
                     '76728306449ad0f2ae8cbdbd1fc5e880d3dcff054c955e8b4a2aabc87db8e7e4'}
-        for name,digest in frames.items(): check_sip_frame(args.run/'snap'/name,digest,incoming=incoming)
+            if args.restore_incoming_alerting:
+                frames.pop('nsb7_call_Send.png')
+                frames['nsb7_sip_state_saved.png']=SIP_INCOMING_FRAMES['nsb7_call_ringing.png']
+                frames['nsb7_sip_state_restored.png']=SIP_INCOMING_FRAMES['nsb7_call_ringing.png']
+        for name,digest in frames.items():
+            check_sip_frame(args.run/'snap'/name,digest,incoming=incoming,
+                            alerting_snapshot=args.restore_incoming_alerting)
         result=json.loads((args.run/'sip-result.json').read_text())
         if result.get('passed') is not True or result.get('speech_tested') is not False or \
                 result.get('native_dsp_complete') is not False or (not restoring and
@@ -210,15 +228,16 @@ def main():
             direction='incoming' if incoming else 'outgoing'
             if not (args.run/f'sta/nsb7hle/nsb7_sip_{direction}.sta').is_file():
                 raise ValueError('actual handset snapshot file absent')
-            if incoming: verify_restore(args.run,remote,'connected','8290',signaling_only=True)
+            if incoming: verify_restore(args.run,remote,phase,'8290',signaling_only=True)
             else: verify_outgoing_restore(args.run,remote,True,'8290',signaling_only=True)
         else:
             verify_success(args.run,remote,SimpleNamespace(product='8290',incoming=incoming,signaling_only=True))
     except (OSError,ValueError,RuntimeError) as error:
         parser.exit(1,f'NSB-7 SIP signaling: FAIL: {error}\n')
-    print('PASS: physical PIN/'+('Answer' if incoming else 'dial')+
+    print('PASS: physical PIN/'+('unanswered ringing' if args.restore_incoming_alerting else 'Answer' if incoming else 'dial')+
           '/End, real local SIP confirmation and CC/RR release'+
-          ('; exact connected restore, BYE and no replay' if restoring else '')+
+          ('; exact alerting restore, SIP rejection and no replay' if args.restore_incoming_alerting else
+           '; exact connected restore, BYE and no replay' if restoring else '')+
           '; speech_tested=0')
 
 

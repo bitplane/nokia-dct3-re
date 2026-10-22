@@ -3462,18 +3462,14 @@ void nokia_radio_peer_device::tick()
 	// link is waiting for the mobile's next uplink opportunity. Promote that
 	// saved session message into the ordinary decoded downlink/FACCH path;
 	// the producer never owns radio scheduling.
-	if (m_traffic_channel_active &&
-			current_phase() == phase::service_uplink_request &&
-			m_gsm_session->pending_downlink_kind() !=
-					nokia_gsm_session_device::downlink_kind::none)
-	{
-		set_phase(phase::service_downlink);
-		m_reports_remaining = 1;
-		m_wait_ticks = 0;
-		m_report_deferred = true;
-	}
-	if (!m_traffic_channel_active &&
-			current_phase() == phase::service_uplink_wait &&
+	// Alerting can retain either uplink phase after assignment. A queued
+	// network Disconnect must not wait for a physical key/uplink to unstick it.
+	const bool queued_disconnect = m_gsm_session->pending_downlink_kind() ==
+			nokia_gsm_session_device::downlink_kind::call_disconnect;
+	if ((((m_traffic_channel_active || queued_disconnect) &&
+				current_phase() == phase::service_uplink_request) ||
+			((!m_traffic_channel_active || queued_disconnect) &&
+				current_phase() == phase::service_uplink_wait)) &&
 			m_gsm_session->pending_downlink_kind() !=
 					nokia_gsm_session_device::downlink_kind::none)
 	{

@@ -2,10 +2,27 @@
 local source=debug.getinfo(1,'S').source:sub(2)
 local directory=assert(source:match('^(.*[/\\])'))
 local incoming=_G.nsb7_sip_restore_incoming or false
+local alerting=_G.nsb7_sip_restore_alerting or false
+assert(not alerting or incoming,'alerting requires incoming fixture')
 local direction=incoming and 'incoming' or 'outgoing'
-local save_time=incoming and 55 or 60
+local save_time=alerting and 51 or incoming and 55 or 60
 local finish=incoming and 68 or 76
-dofile(directory..(incoming and 'nsb7_pin_host_incoming_call.lua' or 'nsb7_pin_host_outgoing_call.lua'))
+if alerting then
+    _G.nsb7_security_with_pin=true
+    _G.nsb7_security_continue=true
+    dofile(directory..'nsb7_page_observe.lua')
+    local ready=coroutine.create(function()
+        assert(emu.wait(45))
+        manager.machine.screens[':screen']:snapshot('nsb7_call_ready.png')
+        manager.machine:logerror('nsb7_call_ready: t=45.000000000\n')
+        assert(emu.wait(5))
+        manager.machine.screens[':screen']:snapshot('nsb7_call_ringing.png')
+    end)
+    _G.nsb7_alerting_ready=ready
+    assert(coroutine.resume(ready))
+else
+    dofile(directory..(incoming and 'nsb7_pin_host_incoming_call.lua' or 'nsb7_pin_host_outgoing_call.lua'))
+end
 local machine=manager.machine
 local capture=dofile(directory..'arm_architecture_snapshot.lua')
 local fields={}

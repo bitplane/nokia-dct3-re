@@ -2422,7 +2422,8 @@ audio. `sip-result.json` explicitly records `speech_tested=false` and
 `native_dsp_complete=false`. No unproved NSB-7 PCM clock is enabled.
 The shared runner admits one signaling-only SIP200 call in either direction;
 incoming additionally requires a fresh handset-readiness artifact. Connected
-outgoing and incoming restoration have separate acceptance below. Pending-call restoration,
+outgoing and incoming restoration have separate acceptance below. Unanswered
+incoming alerting restoration also has its own gate; pending outgoing,
 recording/media and multiple-call modes remain rejected.
 
 After preparing the isolated run from the qualified source, reproduce with
@@ -2495,8 +2496,8 @@ card remains unchanged, the own flash journal validates and RTC ticks are contin
 An unclocked voice peer can publish erased uplink placeholders (`good=0`); these
 are not speech and are discarded by the bridge. Acceptance forbids `good=1`
 uplink and DSP speech ticks, requires discarded-epoch bridge uplink0, and keeps
-`speech_tested=false`/`native_dsp_complete=false`. Provisional-call restoration
-remains unqualified; connected incoming restoration is independently checked below.
+`speech_tested=false`/`native_dsp_complete=false`. Pending outgoing restoration
+remains unqualified; incoming connected and alerting restoration are checked below.
 
 Prepare fresh isolated storage as above, then run the same SIP command with
 `--restore-outgoing`, script `../tools/nsb7_sip_outgoing_restore.lua`, and an82s
@@ -2543,6 +2544,38 @@ Use the same fresh own-source storage and SIP command with `--incoming
 .venv/bin/python tools/nsb7_sip_check.py \
   roms/noki8290/8290f522a.fls tmp/nsb7-sip-incoming-restore --restore-incoming
 ```
+
+### Unanswered incoming SIP restoration
+
+`nsb7_sip_incoming_alerting_restore.lua` physically authenticates and waits
+for the same45s registered-readiness artifact, but never presses Send. Save51
+and load after0.5s reproduce all37 CPU registers, PC/SP, complete-RAM digest
+and time while the caller is alerting. Saved/restored caller snapshots permit
+only the two reviewed full ringing frames above; animation/cache phase may
+differ, so framebuffer identity is not claimed.
+
+The bridge rejects the old real INVITE with603, republishes request1 as
+alerting under epoch2 and submits one cause41 termination. The radio peer
+now schedules a pending network Disconnect from either idle-uplink phase
+without changing setup/assignment admission. The original traffic-dependent
+phase restriction stranded that Disconnect until physical End60; the
+acceptance gate explicitly rejects such delayed cleanup. The corrected run
+queues termination at51.120s, delivers Disconnect at51.127216s and reaches
+ended at51.140s, before any cleanup key. No CONNECT, Answer, qualified media
+or repeated admission is allowed. Physical End60/Menu62/End65 recover exact
+68s idle, with unchanged complete card, valid own flash and continuous RTC.
+
+Use fresh storage and the incoming command above with`--restore-phase alerting`,
+script`../tools/nsb7_sip_incoming_alerting_restore.lua`, SIP25288/HTTP18950
+and78s guard. Qualified capture:`tmp/nsb7-sip-alerting-disconnect`.
+
+```sh
+.venv/bin/python tools/nsb7_sip_check.py roms/noki8290/8290f522a.fls \
+  tmp/nsb7-sip-alerting-disconnect --restore-incoming-alerting
+```
+
+This proves unanswered signaling restoration and external-dialog invalidation,
+not restoration of a SIP dialog, native speech or media continuity.
 
 ## Connected host-call restoration
 

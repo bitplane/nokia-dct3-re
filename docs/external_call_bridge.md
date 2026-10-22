@@ -1340,8 +1340,13 @@ clear under the new epoch and no redial. Physical End/Menu recovery, exact pixel
 whole-card persistence and retained RTC remain required. Connected incoming has
 independent `nsb7_sip_incoming_restore.lua`/`--incoming --restore-call` acceptance:
 fresh readiness, exact caller SETUP, physical Answer and connected architecture
-precede one BYE/new-epoch cause41 clear, with no repeated admission. Provisional
-restoration, recording/media and multiple-call combinations remain rejected. Its result
+precede one BYE/new-epoch cause41 clear, with no repeated admission. Independent
+incoming alerting restoration uses`--restore-phase alerting` and
+`nsb7_sip_incoming_alerting_restore.lua`: save51/load restores exact architecture
+without Answer, the old INVITE receives603, and queued Disconnect clears CC/RR
+under epoch2 before physical End60. Only the reviewed caller animation frames
+are permitted; pending outgoing, recording/media and multiple-call combinations
+remain rejected. Its result
 explicitly keeps speech/native-DSP claims false and requires zero handset
 qualified uplink media. Erased `good=0` placeholders after load do not qualify as
 speech; the discarded-epoch bridge summary must report uplink0. Remote RTP receipt

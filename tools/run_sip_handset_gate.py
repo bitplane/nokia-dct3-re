@@ -536,7 +536,7 @@ def verify_restore(root, remote_text, phase='connected', product='3210', *, sign
     log = (root / 'error.log').read_text(errors='replace')
     if product=='8290':
         from tools.nsb7_sip_check import check_incoming_restore
-        check_incoming_restore(log)
+        check_incoming_restore(log,phase=phase)
     if phase == 'connected':
         if not re.search(r'state changed to CONFIRMED.*?Request msg BYE/',
                          remote_text, re.DOTALL):
@@ -587,9 +587,9 @@ def verify_restore(root, remote_text, phase='connected', product='3210', *, sign
         if len(summaries) != 1 or json.loads(summaries[0]).get('uplink') != 0 or 'dsp_hle: speech tick' in log:
             raise RuntimeError('signaling-only incoming restoration lacks zero-uplink/no-codec evidence')
         cursor = 0
-        for marker in ('SIP incoming identity=(1, 1) caller=5551234',
-                       'SIP physical answer identity=(1, 1)',
-                       'SIP confirmed status=200 identity=(1, 1)',
+        for marker in ('SIP incoming identity=(1, 1) caller=5551234',) + (
+                       ('SIP physical answer identity=(1, 1)',
+                        'SIP confirmed status=200 identity=(1, 1)') if phase=='connected' else ()) + (
                        'SIP epoch changed old=1 new=2',
                        'SIP restored call cleared identity=(2, 1)'):
             if bridge.count(marker) != 1 or (index := bridge.find(marker, cursor)) < 0:
@@ -694,10 +694,10 @@ def main():
                              args.signaling_only and args.product=='8290' and
                              (not args.incoming or args.ready_file is not None) and args.sip_response==200 and
                              args.calls==1 and not args.record_media and not args.restore_idle and
-                             (not args.restore_call or (args.incoming and args.restore_phase=='connected')) and
+                             (not args.restore_call or (args.incoming and args.restore_phase in ('connected','alerting'))) and
                              (not args.restore_outgoing or not args.incoming) and not args.cancel_incoming)
     if args.signaling_only and not signaling_connected:
-        parser.error('--signaling-only requires a single verified product SIP-200 fixture, with connected restoration only')
+        parser.error('--signaling-only requires a single supported product SIP fixture and qualified restoration phase')
     if args.product=='8290' and not signaling_connected:
         parser.error('8290 supports only its single signaling-only SIP-200 fixtures; speech is unproved')
     if args.ready_file and not args.incoming:
@@ -745,7 +745,7 @@ def main():
     if args.cancel_incoming and not args.incoming:
         parser.error('--cancel-incoming requires --incoming')
     if args.restore_call and (not args.incoming or args.cancel_incoming):
-        parser.error('--restore-call requires an answered incoming call')
+        parser.error('--restore-call requires an incoming call without --cancel-incoming')
     if args.restore_idle and (not args.incoming or args.cancel_incoming or args.restore_call):
         parser.error('--restore-idle requires a fresh incoming call after idle restoration')
     if args.restore_outgoing and (args.incoming or args.restore_idle or args.restore_call or args.sip_response not in (180, 200)):
