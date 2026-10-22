@@ -1805,7 +1805,7 @@ check-c54x-observed-coverage: build
 		mkdir -p "$$tmp/core" "$$tmp/rom4/nvram/noki5110" "$$tmp/menu/nvram/noki5110" "$$tmp/power/nvram/noki5110"; \
 		status=0; \
 		(cd "$$tmp/core"; $(abspath $(MAME_DIR))/mame tms54test \
-			-rompath $(abspath $(MAME_DIR))/roms -video none -sound none \
+			-rompath $(abspath $(MAME_DIR))/roms -video none -sound none -joystickprovider none -midiprovider none \
 			-log -verbose -noreadconfig -nothrottle -seconds_to_run 5 >output.log 2>&1) || status=$$?; \
 		$(PYTHON) -c 'from pathlib import Path; import sys; from tools.run_c54x_core import check_result; check_result(Path(sys.argv[1]).read_text(), int(sys.argv[2]), verbose_teardown=True)' \
 			"$$tmp/core/output.log" "$$status"; \
@@ -1817,14 +1817,14 @@ check-c54x-observed-coverage: build
 		cp "$$tmp/rom4/nvram/noki5110/eeprom" "$$tmp/power/nvram/noki5110/eeprom"; \
 		(cd "$$tmp/rom4"; $(abspath $(MAME_DIR))/mame noki5110 \
 			-rompath $(abspath $(MAME_DIR))/roms \
-			-nvram_directory "$$tmp/rom4/nvram" -video none -sound none \
+			-nvram_directory "$$tmp/rom4/nvram" -video none -sound none -joystickprovider none -midiprovider none \
 			-log -verbose -skip_gameinfo -nothrottle -seconds_to_run 30 >/dev/null 2>&1); \
 		(cd "$$tmp/menu"; NOKIA_DCT3_POST_READY_KEYS=menu \
 			NOKIA_DCT3_POST_READY_KEY_DELAY_MS=8000 \
 			NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
 			$(abspath $(MAME_DIR))/mame noki5110 \
 			-rompath $(abspath $(MAME_DIR))/roms \
-			-nvram_directory "$$tmp/menu/nvram" -video none -sound none \
+			-nvram_directory "$$tmp/menu/nvram" -video none -sound none -joystickprovider none -midiprovider none \
 			-log -verbose -skip_gameinfo -nothrottle -seconds_to_run 30 \
 			-autoboot_script $(abspath mame_nokia_dct3_input_exerciser.lua) >/dev/null 2>&1); \
 		grep -q 'input-press: .* name=menu' "$$tmp/menu/error.log"; \
@@ -1834,7 +1834,7 @@ check-c54x-observed-coverage: build
 			NOKIA_DCT3_POST_READY_KEY_DURATION_MS=4000 \
 			$(abspath $(MAME_DIR))/mame noki5110 \
 			-rompath $(abspath $(MAME_DIR))/roms \
-			-nvram_directory "$$tmp/power/nvram" -video none -sound none \
+			-nvram_directory "$$tmp/power/nvram" -video none -sound none -joystickprovider none -midiprovider none \
 			-log -verbose -skip_gameinfo -nothrottle -seconds_to_run 14 \
 			-autoboot_script $(abspath mame_nokia_dct3_input_exerciser.lua) >/dev/null 2>&1); \
 		$(PYTHON) $(abspath tools/power_5110_trace_check.py) long "$$tmp/power/error.log"; \

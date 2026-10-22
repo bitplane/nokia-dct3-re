@@ -8334,6 +8334,10 @@ the ROM4 idle word set changes or any observed word lacks an assertion. It is
 also part of `make check-c54x-cross-rom`; the gate does not validate unobserved
 instruction variants or silicon-level timing. The tool is given the current
 core source for a separate static decoder inventory.
+All four MAME invocations disable host joystick and MIDI providers: these
+headless scenarios use scripted emulated keypad inputs, not physical host
+devices. This avoids irrelevant host-device initialization without changing
+handset inputs or CPU/peripheral semantics.
 Its core-fixture leg uses the standalone runner's five-emulated-second stop
 bound and `check_result` contract: every required conformance marker, the
 intentional completion exit, and the terminal completion message are mandatory.
