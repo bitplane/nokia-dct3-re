@@ -25,8 +25,11 @@ class IncomingUssdRunnerTest(unittest.IsolatedAsyncioTestCase):
                                request_id=2 if wrong_request else 1,phase=phase))
         if restore:
             events += [dict(type='call_adapter_ready',epoch=2)]
-            events += [dict(type='incoming_ussd_state',epoch=2,request_id=1,phase=phase)
-                       for phase in ('queued','delivered')]
+            events.append(dict(type='incoming_ussd_state',epoch=2,request_id=1,phase='queued'))
+            if request:
+                events.append(dict(type='incoming_ussd_response',epoch=2,request_id=1,dcs=15,data=reply,empty=False))
+            events.append(dict(type='incoming_ussd_state',epoch=2,request_id=1,
+                               phase='answered' if request else 'delivered'))
         socket.recv.side_effect=[json.dumps(event) for event in events]
         args=SimpleNamespace(command=['mame'],cwd=None,port=18990,
                              text='Host notice',require_restore=restore,request=request,expected_reply='2')
@@ -40,6 +43,7 @@ class IncomingUssdRunnerTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_request_requires_actual_correlated_reply(self):
         await self.run_fixture(('queued','answered'),restore=False,request=True)
+        await self.run_fixture(('queued','answered'),restore=True,request=True)
         for kwargs in ({'reply':'33'}, {'include_reply':False}, {'wrong_request':True}):
             with self.subTest(kwargs=kwargs),self.assertRaises(RuntimeError):
                 await self.run_fixture(('queued','answered'),restore=False,request=True,**kwargs)

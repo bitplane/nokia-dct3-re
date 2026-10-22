@@ -261,6 +261,7 @@ channel release. An explicit `operation: request` instead opens the handset's
 reply editor. After a validated handset ReturnResult and RR release, the host
 receives `incoming_ussd_response` with the unchanged DCS/packed reply and then
 `answered`; handset cancellation reports `cancelled` without a fabricated reply.
-The authenticated NSB-7 physical reply is independently qualified. Arbitrary
-multi-turn continuation and host-request restoration remain unqualified.
+The authenticated NSB-7 physical reply and pending-editor restoration are
+independently qualified, including new-epoch host reply ownership. Arbitrary
+multi-turn continuation remains unqualified.
 The complete wire contract is in `external_call_bridge.md`.

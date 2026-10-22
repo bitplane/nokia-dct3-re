@@ -242,8 +242,10 @@ before state `answered`. A handset RELEASE COMPLETE without a result ends as
 The backward-compatible standalone bridge CLI still sends notifications;
 the request acceptance runner uses `--request --expected-reply 2`.
 Authenticated NSB-7 acceptance is documented in `8290_bringup.md`. Arbitrary
-host multi-turn continuation and pending host-request save/load are not yet
-qualified by this gate.
+host multi-turn continuation is not qualified. A separate NSB-7 pending-editor
+save/load gate replays the identical physical reply under epochs 1 and 2;
+each host response follows its own branch's RR release, and the saved request
+is republished as queued under the new epoch without a second admission.
 CLI USSD text uses the same GSM tables but its own padding: a spare septet is
 CR rather than zero (`@`), and an intended final CR on an octet boundary is
 protected by another CR. USSD does not carry an SMS TP-UDL. These boundary

@@ -1,14 +1,15 @@
 -- Save the real reply editor, then replay identical physical replies.
 _G.nsb7_security_with_pin=true
+local offset=_G.nsb7_ussd_state_host and 4 or 0
 _G.nsb7_ussd_snapshots={23}
-_G.nsb7_ussd_actions={{24,'End'},{26,'Left Softkey / Menu'},{28,'Left Softkey / Menu'}}
-_G.nsb7_ussd_response_times={25,29}
+_G.nsb7_ussd_actions={{24,'End'},{26+offset,'Left Softkey / Menu'},{28+offset,'Left Softkey / Menu'}}
+_G.nsb7_ussd_response_times={25+offset,29+offset}
 _G.nsb7_ussd_finish=1000
 _G.nsb7_state_scenario='ussd'
 _G.nsb7_state_observer='nsb7_host_ussd_observe.lua'
-_G.nsb7_state_save_time=29.25
-_G.nsb7_state_end_time=36
-_G.nsb7_state_finish_time=38
+_G.nsb7_state_save_time=29.25+offset
+_G.nsb7_state_end_time=36+offset
+_G.nsb7_state_finish_time=38+offset
 local retained={}
 _G.nsb7_state_replay_action=function(phase)
     local action=coroutine.create(function()

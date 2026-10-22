@@ -69,7 +69,7 @@ def check(text, initial, final, host=False):
             raise ValueError('host USSD response duplicated')
 
 
-def check_state(text, initial, final):
+def check_state(text, initial, final, host=False):
     check_source(initial)
     check_authentication(text.split('nsb7_state: event=saved', 1)[0])
     if initial != final or 'sim_device: update ' in text:
@@ -80,15 +80,16 @@ def check_state(text, initial, final):
         raise ValueError('network request duplicated across restoration')
     if 'network_result ' in text.split('nsb7_state: event=saved', 1)[0]:
         raise ValueError('USSD must remain pending at save')
+    offset=4 if host else 0
     for phase in ('reference', 'restored'):
         begin = text.index(f'state_replay: phase={phase} event=begin')
         end = text.index(f'state_replay: phase={phase} event=end', begin)
         interval = text[begin:end]
         require_ordered(interval, [
-            ('digit', rf'nsb7_ussd_replay: phase={phase} key=Keypad 2 state=1 t=29\.750000000'),
-            ('digit release', rf'nsb7_ussd_replay: phase={phase} key=Keypad 2 state=0 t=29\.950000000'),
-            ('Send', rf'nsb7_ussd_replay: phase={phase} key=Left Softkey / Menu state=1 t=30\.750000000'),
-            ('Send release', rf'nsb7_ussd_replay: phase={phase} key=Left Softkey / Menu state=0 t=30\.950000000'),
+            ('digit', rf'nsb7_ussd_replay: phase={phase} key=Keypad 2 state=1 t={29+offset}\.750000000'),
+            ('digit release', rf'nsb7_ussd_replay: phase={phase} key=Keypad 2 state=0 t={29+offset}\.950000000'),
+            ('Send', rf'nsb7_ussd_replay: phase={phase} key=Left Softkey / Menu state=1 t={30+offset}\.750000000'),
+            ('Send release', rf'nsb7_ussd_replay: phase={phase} key=Left Softkey / Menu state=0 t={30+offset}\.950000000'),
             ('reply', r'handset_response message=3a length=21 data=8b3a12a210020101300b02013c300604010f040132 '),
             ('correlation', r'network_result transaction=8b invoke=1 dcs=0f packed_length=1 empty=0 '),
             ('release', r'GSM service downlink kind=27 sapi=0 pd=0b message=2a length=2 '),
@@ -96,7 +97,20 @@ def check_state(text, initial, final):
         ], f'NSB-7 USSD {phase} replay')
         if interval.count('gsm_ss: network_result ') != 1:
             raise ValueError('restored USSD completion duplicated')
-    if 'nsb7_ussd_state_input: key=End state=1 t=36.000000000' not in text:
+        if host:
+            epoch=1 if phase=='reference' else 2
+            require_ordered(interval,[
+                ('RR release',r'LAPDm service Channel Release acknowledged'),
+                ('host reply',rf'incoming ussd reply id=1 epoch={epoch} dcs=0f data=32 empty=0'),
+                ('answered',rf'incoming ussd state id=1 epoch={epoch} phase=answered'),
+            ],f'host USSD {phase}')
+    if host:
+        states=re.findall(r'incoming ussd state id=1 epoch=(\d+) phase=(\w+)',text)
+        if states!=[('1','queued'),('1','answered'),('2','queued'),('2','answered')]:
+            raise ValueError('host USSD restored epochs/phases differ')
+        if re.findall(r'incoming ussd reply id=(\d+) epoch=(\d+)',text)!=[('1','1'),('1','2')]:
+            raise ValueError('host USSD response identity/epoch inventory differs')
+    if f'nsb7_ussd_state_input: key=End state=1 t={36+offset}.000000000' not in text:
         raise ValueError('missing restored physical idle recovery')
 
 
@@ -112,13 +126,11 @@ def main():
         verify_handset_health(Path(str(args.run) + '-launch.log').read_text())
         storage = args.run / 'nvram/nsb7hle'
         inspect((storage / 'flash').read_bytes())
-        if args.state and args.host:
-            raise ValueError('host restoration is a separate unqualified contract')
         text=(args.run / 'error.log').read_text()
         initial=(args.run / 'initial_sim_card.bin').read_bytes()
         final=(storage / 'sim_card').read_bytes()
         if args.state:
-            check_state(text,initial,final)
+            check_state(text,initial,final,args.host)
         else:
             check(text,initial,final,args.host)
         if args.state:
@@ -126,7 +138,7 @@ def main():
                 check_frame(args.run / f'snap/nsb7_state_ussd_{phase}.png', FRAMES[33])
             check_frame(args.run / 'snap/nsb7_state_ussd_final.png', FRAMES[37])
             for second in (25, 29):
-                check_frame(args.run / f'snap/nsb7_ussd_response_{second}.png', FRAMES[second])
+                check_frame(args.run / f'snap/nsb7_ussd_response_{second + (4 if args.host else 0)}.png', FRAMES[second])
         else:
             for second, digest in FRAMES.items():
                 if args.host and second==33:

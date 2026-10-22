@@ -75,30 +75,48 @@ class NetworkUssdTests(unittest.TestCase):
             self.verify(fixture() + '\ngsm_ss: network_result duplicate')
 
 
-def state_fixture():
+def state_fixture(host=False):
     text = 'gsm_ss: network_initiated operation=request transaction=0b\nnsb7_state: event=saved\n'
+    if host:
+        text='gsm_call_adapter: incoming ussd state id=1 epoch=1 phase=queued\n'+text
     for phase in ('reference', 'restored'):
         text += f'state_replay: phase={phase} event=begin\n'
+        epoch=1 if phase=='reference' else 2
+        if host and phase=='restored':
+            text+='gsm_call_adapter: incoming ussd state id=1 epoch=2 phase=queued\n'
         for key, second in (('Keypad 2', '29'), ('Left Softkey / Menu', '30')):
             for state, fraction in ((1, '750000000'), (0, '950000000')):
-                text += f'nsb7_ussd_replay: phase={phase} key={key} state={state} t={second}.{fraction}\n'
+                text += f'nsb7_ussd_replay: phase={phase} key={key} state={state} t={int(second)+(4 if host else 0)}.{fraction}\n'
         text += ('gsm_ss: network_initiated handset_response message=3a length=21 data=8b3a12a210020101300b02013c300604010f040132 t=31\n'
                  'gsm_ss: network_result transaction=8b invoke=1 dcs=0f packed_length=1 empty=0 t=31\n'
                  'GSM service downlink kind=27 sapi=0 pd=0b message=2a length=2 t=31\n'
                  'LAPDm service Channel Release acknowledged\n')
+        if host:
+            text+=f'gsm_call_adapter: incoming ussd reply id=1 epoch={epoch} dcs=0f data=32 empty=0\n'
+            text+=f'gsm_call_adapter: incoming ussd state id=1 epoch={epoch} phase=answered\n'
         text += f'state_replay: phase={phase} event=end\n'
-    return text + 'nsb7_ussd_state_input: key=End state=1 t=36.000000000\n'
+    return text + f'nsb7_ussd_state_input: key=End state=1 t={40 if host else 36}.000000000\n'
 
 
 class NetworkUssdStateTests(unittest.TestCase):
-    def verify(self, text, final=b'card'):
+    def verify(self, text, final=b'card', host=False):
         with patch('tools.nsb7_network_ussd_request_check.check_source'), \
                 patch('tools.nsb7_network_ussd_request_check.check_authentication'), \
                 patch('tools.nsb7_network_ussd_request_check.check_architecture'):
-            check_state(text, b'card', final)
+            check_state(text, b'card', final, host)
 
     def test_replayed_reply(self):
         self.verify(state_fixture())
+
+    def test_host_replay_epochs_and_reply_inventory(self):
+        self.verify(state_fixture(True),host=True)
+        for old,new in [('reply id=1 epoch=2','reply id=1 epoch=1'),
+                        ('epoch=2 phase=queued','epoch=1 phase=queued'),
+                        ('data=32 empty=0','data=33 empty=0')]:
+            with self.subTest(old=old),self.assertRaises(ValueError):
+                self.verify(state_fixture(True).replace(old,new),host=True)
+        with self.assertRaises(ValueError):
+            self.verify(state_fixture(True)+'gsm_call_adapter: incoming ussd reply id=1 epoch=2\n',host=True)
 
     def test_missing_reply_contact_release_or_recovery_fails(self):
         for old, new in [('key=Keypad 2', 'key=Keypad 3'), ('transaction=8b invoke=1', 'transaction=8b invoke=2'),

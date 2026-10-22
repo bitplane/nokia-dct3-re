@@ -2546,8 +2546,21 @@ authentication, physical contacts, six reviewed frames, ordered admission/
 reply/RR/host publication and complete card equality. The Done animation has
 its own reviewed phase hash rather than weakening the frame predicate.
 Capture: `tmp/nsb7-host-network-ussd`. This is a single real host request/reply;
-the standalone bridge CLI notification default is unchanged, and host-request
-restoration/multi-turn dialogue remain separate contracts.
+the standalone bridge CLI notification default is unchanged, and multi-turn
+dialogue remains unqualified.
+
+Pending host-editor restoration uses the same host fixture and cold storage,
+but runs `nsb7_host_network_ussd_state.lua` with runner `--require-restore` and
+checker `--host --state`. Save33.25s precedes physical2 at33.75 and Send34.75
+in each branch. Both branches emit the identical handset result at34.997178s;
+all37 ARM/banked registers, RAM checksum, time and three-second radio/SIM/RTC/SS
+replay agree. The host receives one data32 response after each branch's RR
+release at35.03s, first under epoch1 and then epoch2. Queued/answered phases
+are independently required per epoch; only one initial request is admitted.
+Both Done frames and restored End40/final42 idle match exactly, with complete
+card preservation. Capture: `tmp/nsb7-host-network-ussd-state`. This establishes
+same-process pending-dialogue restoration, not external network continuity or
+arbitrary multi-turn continuation.
 
 ## Host incoming call from settled idle
 

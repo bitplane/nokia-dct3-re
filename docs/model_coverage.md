@@ -92,7 +92,9 @@ request proves physical Read/Answer/2/Send, correlated release and exact idle/
 menu; pending-editor restoration reproduces architecture, time and protocol.
 An explicit WebSocket host request also delivers the unchanged typed reply
 after RR release, with matching identity/epoch and unchanged card. That host
-request's restoration remains unqualified. Native radio and speech remain unproved; see
+request's pending editor additionally restores exact architecture and protocol,
+with one host response after each branch's RR release under distinct epochs.
+Native radio and speech remain unproved; see
 `nsb7_host_ussd_check.py` and `8290_bringup.md`.
 
 ## Promotion rules
