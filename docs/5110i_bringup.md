@@ -1256,11 +1256,22 @@ PC `277f7a`, LR `277fcb`; their RAM stacks contain worker return `28de47`.
 Own-image Thumb decode at `28de30..28de46` reads the queued object's length
 at offset 2, checks ring capacity through `2780f4`, and passes its bytes
 at offset 3 to sender `277f96`. Thus the worker and native forwarding
-path are connected, but the upstream object constructors are not yet
-attributed. Keep that producer boundary separate from physical wire delivery.
+path are connected. Keep that producer boundary separate from physical wire delivery.
 The observer selects the high halfword at `100a4` (DSP producer `0852`),
 not the adjacent low-halfword DSP consumer `0853`; recording initialization
 of the latter would not establish MCU publication.
+Worker snapshots distinguish dynamic object `101438`, beginning
+`00020a051eff00d000030101e000`, from ROM object `2b0754`, beginning
+`000208051e1400f400010300`. Only the object extents, not trailing heap/ROM
+bytes, are compared. The dynamic object is constructed at `279a64..279b28`:
+header-byte stores set class/length/type (type `05` at `279a72`), copies
+through `29ad08` supply the frame header/body, and sequence/flag stores
+produce the trailing `e0` byte before queue publication through `28fcb2`.
+The runtime data-write trace witnesses that type store and both complete
+worker objects; `inspect_word_worker_objects` rejects changed sources or
+contents. The static object's own ROM bytes match its worker snapshot.
+This recovers the immediate packet-construction boundary; the higher-level
+caller's purpose, service peer contract and delivery dependency remain open.
 
 Vector `ffd0` branches to ISR `3416`. Its `34da` path reads port `36`,
 tests mask `2000`, and can write port `34` at `34e8` or `34f4` while

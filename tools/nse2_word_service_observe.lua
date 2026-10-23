@@ -6,6 +6,26 @@ local cpu=assert(machine.devices[':dsp_c54x:cpu'])
 local retained,last={},{}
 local mcu=assert(machine.devices[':maincpu'])
 local host_posts=0
+local worker_objects=0
+retained[#retained+1]=mcu.spaces.program:install_read_tap(0x28de3c,0x28de43,'word_worker_object',function()
+    if mcu.state.R15.value~=0x28de34 then return end
+    worker_objects=worker_objects+1
+    if worker_objects>4 then return end
+    local pointer=mcu.state.R4.value
+    if not ((pointer>=0x100000 and pointer+24<=0x110000) or (pointer>=0x200000 and pointer+24<=0x400000)) then
+        machine:logerror(string.format('nse2_word_worker_unqualified: pc=%08x pointer=%08x observer_writes=0\n',mcu.state.R15.value,pointer))
+        return
+    end
+    local bytes={}
+    for i=0,23 do bytes[#bytes+1]=string.format('%02x',mcu.spaces.program:read_u8(pointer+i)) end
+    machine:logerror(string.format('nse2_word_worker_object: n=%d pc=%08x pointer=%08x bytes=%s t=%.9f observer_writes=0\n',worker_objects,mcu.state.R15.value,pointer,table.concat(bytes),machine.time:as_double()))
+end)
+local object_writes=0
+retained[#retained+1]=mcu.spaces.program:install_write_tap(0x101438,0x101447,'word_discovery_object',function(address,value,mask)
+    object_writes=object_writes+1
+    if object_writes>32 then return end
+    machine:logerror(string.format('nse2_word_object_write: address=%08x value=%08x mask=%08x pc=%08x lr=%08x t=%.9f observer_writes=0\n',address,value,mask,mcu.state.R15.value,mcu.state.R14.value,machine.time:as_double()))
+end)
 retained[#retained+1]=mcu.spaces.program:install_write_tap(0x100a4,0x100a7,'word_host_post',function(_,value,mask)
     -- DSP 0852 / MCU 100a4 is the producer; 0853 is the DSP consumer.
     if mask&0xffff0000==0 then return end

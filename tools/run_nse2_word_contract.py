@@ -15,6 +15,7 @@ from tools.nse2_sampling_check import (inspect_word_configuration_contract,
                                       inspect_word_host_command,
                                       inspect_word_pending_frames,
                                       inspect_word_frame_source,
+                                      inspect_word_worker_objects,
                                       inspect_word_service_observation)
 
 
@@ -69,6 +70,7 @@ def main():
                 text=(target/'error.log').read_text(errors='replace')
                 results['service']=inspect_word_service_observation(text)
                 results['frame_source']=inspect_word_frame_source(program,data,text)
+                results['worker_objects']=inspect_word_worker_objects(text)
         results['physical_completion_proved']=False
         results['long_run_stability_proved']=False
         (run/'acceptance.json').write_text(json.dumps(results,indent=2)+'\n')

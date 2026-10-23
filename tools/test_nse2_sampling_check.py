@@ -3,6 +3,18 @@ from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripher
 
 
 class SamplingCheckTest(unittest.TestCase):
+    def test_worker_object_sources_and_dynamic_constructor(self):
+        from tools.nse2_sampling_check import inspect_word_worker_objects
+        rows=[f'nse2_word_worker_object: n={n} pc=0028de34 pointer={pointer} bytes={prefix.ljust(48,"0")} t=0.3385 observer_writes=0'
+              for n,pointer,prefix in [(1,'00101438','00020a051eff00d000030101e000'),
+                                       (2,'002b0754','000208051e1400f400010300')]]
+        rows.append('nse2_word_object_write: address=00101438 value=00000005 mask=000000ff pc=00279a72 lr=00256759 t=0.33753 observer_writes=0')
+        text='\n'.join(rows)
+        self.assertEqual(inspect_word_worker_objects(text)['static_object'],'2b0754')
+        for bad in (text.replace('002b0754','00101438'),text.replace('1eff00d0','1eff00f4'),text.replace('pc=00279a72','pc=00279a70')):
+            with self.assertRaises(ValueError):
+                inspect_word_worker_objects(bad)
+
     def test_frame_source_requires_native_forwarder_and_both_caller_records(self):
         import struct
         from tools.nse2_sampling_check import inspect_word_frame_source

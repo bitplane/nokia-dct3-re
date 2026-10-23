@@ -127,6 +127,19 @@ def inspect_word_pending_frames(data):
                 physical_baud_proved=False,receive_supervision_link_proved=False)
 
 
+def inspect_word_worker_objects(text):
+    rows=re.findall(r'nse2_word_worker_object: n=([12]) pc=0028de34 pointer=([0-9a-f]{8}) bytes=([0-9a-f]{48}) t=([0-9.]+) observer_writes=0',text)
+    expected=[('1','00101438','00020a051eff00d000030101e000'),
+              ('2','002b0754','000208051e1400f400010300')]
+    if len(rows)!=2 or any(row[:2]!=(n,pointer) or not row[2].startswith(prefix)
+                           for row,(n,pointer,prefix) in zip(rows,expected)):
+        raise ValueError('MCU word worker objects differ')
+    if not re.search(r'nse2_word_object_write: address=00101438 value=00000005 mask=000000ff pc=00279a72 lr=00256759 t=[0-9.]+ observer_writes=0',text):
+        raise ValueError('MCU dynamic type-05 construction absent')
+    return dict(dynamic_object='101438',dynamic_constructor_store='279a72',
+                static_object='2b0754',host_type='05',physical_delivery_proved=False)
+
+
 def inspect_word_frame_source(program,data,text):
     if len(data)!=0x20000 or struct.unpack_from('>H',data,(0xb00f+5)*2)[0]!=0x3ee7:
         raise ValueError('word host-forward command table differs')
