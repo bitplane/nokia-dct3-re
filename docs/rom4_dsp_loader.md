@@ -101,9 +101,10 @@ and physical cycle timing are outside this fixture's claim.
 ```
 
 The qualified run contains the `a245` assertion and 512 actual executions.
-No CPU arithmetic implementation change is needed. The current complete
-default core run separately passes 294 markers; its assertions alone must
-not be promoted to exact execution attribution without an opcode inventory.
+No CPU arithmetic implementation change is needed. The default core runner
+separately requires every marker in `run_c54x_core.REQUIRED`; its assertions
+alone must not be promoted to exact execution attribution without an opcode
+inventory.
 
 ## Paired-memory assertion attribution
 
@@ -4124,6 +4125,20 @@ Accepted artifacts are under `tmp/c54x-vendor-operand-probe/`. The separate
 now verifies the corresponding early core guard and both frontend/save-state
 paths. The assembler probe itself remains a toolchain observation, not
 execution, timing or silicon-trap evidence.
+
+The post-operand-guard default regression is independently complete in
+`tmp/run_c54x_core_hwymx7ti`: all 293 required markers pass, the fixture
+returns its intentional completion status 3, and the runner reports native
+conformance success. This covers the default instruction-model regression
+after the RMW guard, in addition to the focused rejection matrices above.
+It does not replace the separate optional profiles, provide an exact-opcode
+execution inventory, or establish fitted silicon, RF acquisition or speech.
+Large replay matrices make this a long-running gate:
+
+```sh
+.venv/bin/python tools/run_c54x_core.py --mame mame/mame \
+  --rompath mame/roms --output-root tmp
+```
 
 ### Isolated simulator setup boundary
 
