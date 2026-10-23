@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from tools.nse2_sim_check import (BINARY_FILES, verify_sim_reads, verify_security_attempt,
                                   verify_post_auth_menu, verify_phonebook_save, verify_phonebook_reload,
-                                  verify_sms_save, verify_sms_reload)
+                                  verify_sms_save, verify_sms_reload, verify_sms_action)
 
 
 def reads():
@@ -34,6 +34,44 @@ def contacts():
 
 
 class SimCheckTest(unittest.TestCase):
+    def test_sms_erase_cancel_and_cold_empty_preserve_exact_mutation_boundary(self):
+        from tools.sim_sms_draft import SMS_OFFSET,DRAFT,deleted_card
+        from tools.make_sim_card_profile import SMS_RECORD_SIZE,SMS_RECORDS
+        from tools.sim_phonebook_check import CURRENT_NVRAM_LENGTH
+        saved=bytearray([255]*CURRENT_NVRAM_LENGTH)
+        for index in range(SMS_RECORDS):
+            saved[SMS_OFFSET+index*SMS_RECORD_SIZE]=0
+        saved[SMS_OFFSET:SMS_OFFSET+SMS_RECORD_SIZE]=DRAFT
+        erased=deleted_card(saved)
+        hashes={name:hashlib.sha256(value).hexdigest() for name,value in (
+            ('SMS_ERASE_PROMPT_FRAME',b'prompt'),('SMS_ERASED_FRAME',b'erased'),
+            ('SMS_READ_FRAME',b'read'),('SMS_EMPTY_FRAME',b'empty'))}
+        with patch.multiple('tools.nse2_sim_check',**hashes):
+            for action,initial,final,frame in (('erase',saved,erased,b'erased'),
+                                               ('cancel',saved,saved,b'read'),('empty',erased,erased,b'empty')):
+                count=10 if action=='empty' else 18
+                text='\n'.join(f'nse2_sms_reload_contact: event={i} down={i%2} t={20+i/4:.2f} physical_only=1'
+                               for i in range(1,count+1))
+                if action=='erase':
+                    text+=('\nsim_device: header cla=a0 ins=dc p1=01 p2=04 p3=b0 selected=6f3c t=25.9\n'
+                           'sim_device: update fid=6f3c record=1 length=176\n'
+                           'SIM status ins=dc sw=9000 chv=3/3 puk=10/10 enabled=0')
+                result=verify_sms_action(text,initial,final,b'prompt',frame,action)
+                self.assertEqual(result['card_modified'],action=='erase')
+                self.assertEqual(result['cold_empty_verified'],action=='empty')
+                with self.assertRaises(ValueError):
+                    verify_sms_action(text,initial,bytes(len(final)),b'prompt',frame,action)
+                with self.assertRaises(ValueError):
+                    verify_sms_action(text,initial,final,b'prompt',b'wrong',action)
+                with self.assertRaises(ValueError):
+                    verify_sms_action(text.replace('event=1 ','event=99 '),initial,final,b'prompt',frame,action)
+                if action!='empty':
+                    with self.assertRaises(ValueError):
+                        verify_sms_action(text,initial,final,b'wrong',frame,action)
+                bad=text.replace('sw=9000','sw=9404') if action=='erase' else text+'\nSIM status ins=dc sw=9000 chv=3/3 puk=10/10 enabled=0'
+                with self.assertRaises(ValueError):
+                    verify_sms_action(bad,initial,final,b'prompt',frame,action)
+
     def test_cold_outbox_requires_saved_bytes_and_no_update(self):
         from tools.sim_sms_draft import SMS_OFFSET,DRAFT
         from tools.make_sim_card_profile import SMS_RECORD_SIZE,SMS_RECORDS

@@ -2478,6 +2478,25 @@
       ]
     },
     {
+      "name": "verify-5110i-sms-delete",
+      "prerequisites": ["verify-5110i-static", "build"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/save", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--security-code", "--phone-retry-zero", "--sms-store", "--seconds", "30"]},
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/erase", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--security-code", "--phone-retry-zero", "--sms-reload", "$(RUN_DIR)/save/nvram/nse2r4v/sim_card", "--sms-action", "erase", "--seconds", "30"]},
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/cancel", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--security-code", "--phone-retry-zero", "--sms-reload", "$(RUN_DIR)/save/nvram/nse2r4v/sim_card", "--sms-action", "cancel", "--seconds", "30"]},
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/cold", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--security-code", "--phone-retry-zero", "--sms-reload", "$(RUN_DIR)/erase/nvram/nse2r4v/sim_card", "--sms-action", "empty", "--seconds", "30"]}
+      ]
+    },
+    {
       "name": "verify-5110i-native-processing",
       "prerequisites": ["verify-5110i-static", "build"],
       "variables": {},

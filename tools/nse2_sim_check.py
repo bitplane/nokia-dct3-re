@@ -12,6 +12,9 @@ PHONEBOOK_RELOAD_FRAME = '4755eca080af19866a8da926e4185de6b1508f6271a3f4d116dc59
 PHONEBOOK_EMPTY_SEARCH_FRAME = '34478708c13e25cc3cb0778a9fa40f9cb812c6eb56636909c1ce133a1d616900'
 SMS_SAVED_FRAME = '491f056f1e92fdedbe7e334f423818c8b1770db0838a78bf25743e0ec2f0459c'
 SMS_READ_FRAME = '4877eac15193be5a99aad660db563aa3d4780c90ec47d349eb19448789fa31a9'
+SMS_ERASE_PROMPT_FRAME = '87fecc9ef97a2a8add1a94e8c6a4168577bc1726da1931ef95f0a91eaa62a441'
+SMS_ERASED_FRAME = 'a3e10fc73a63b9d342f3474168d10a19fc3bf2c582b560fe5817937d62316265'
+SMS_EMPTY_FRAME = 'ae8c6f125e67dd0878a5833b4309071851689684cef3e7b51c6bf89c3bc4e113'
 BINARY_FILES = {0x6fb7: 15, 0x6fae: 1, 0x6f05: 4, 0x6fad: 3,
                 0x6f38: 12, 0x6f07: 9, 0x6f78: 2, 0x2fe6: 4,
                 0x6f46: 17, 0x6f74: 16, 0x6f7e: 11, 0x6f30: 24,
@@ -150,6 +153,39 @@ def verify_sms_reload(text, initial, final, pixels):
         raise ValueError('NSE-2 reviewed cold SMS reader frame differs')
     return dict(offline_draft_read=True,text='A',cold_readback_verified=True,
                 card_modified=False,network_sms_proved=False,stable_long_boot=False)
+
+
+def verify_sms_action(text, initial, final, prompt_pixels, result_pixels, action):
+    from tools.sim_sms_draft import check_card,check_deleted_card,deleted_card
+    from tools.sim_security_trace_check import statuses
+    if action not in ('erase','cancel','empty'):
+        raise ValueError('unknown NSE-2 SMS lifecycle action')
+    count=10 if action=='empty' else 18
+    contacts=re.findall(r'nse2_sms_reload_contact: event=(\d+) down=([01]) t=([0-9.]+) physical_only=1',text)
+    if [(int(index),int(down)) for index,down,_ in contacts]!=[(i,i%2) for i in range(1,count+1)]:
+        raise ValueError('NSE-2 SMS confirmation contact sequence differs')
+    times=[float(time) for _,_,time in contacts]
+    if times!=sorted(times) or not 19<times[0]<times[-1]<(23 if action=='empty' else 26):
+        raise ValueError('NSE-2 SMS confirmation timing differs')
+    (check_deleted_card if action=='empty' else check_card)(initial)
+    expected=deleted_card(initial) if action=='erase' else initial
+    if final!=expected:
+        raise ValueError('NSE-2 SMS lifecycle changed unexpected card bytes')
+    writes=[match.groups() for match in HEADER.finditer(text) if int(match[2],16)==0xdc]
+    if action=='erase':
+        if (len(writes)!=1 or writes[0][:6]!=('a0','dc','01','04','b0','6f3c')
+                or text.count('sim_device: update fid=6f3c record=1 length=176')!=1
+                or statuses(text,0xdc)!=[(0x9000,3,10)]):
+            raise ValueError('NSE-2 erase lacks one successful exact EF_SMS update')
+    elif writes or statuses(text,0xdc):
+        raise ValueError('NSE-2 SMS cancel/cold-empty unexpectedly wrote a record')
+    if action!='empty' and hashlib.sha256(prompt_pixels).hexdigest()!=SMS_ERASE_PROMPT_FRAME:
+        raise ValueError('NSE-2 reviewed Erase message prompt differs')
+    expected_frame={'erase':SMS_ERASED_FRAME,'cancel':SMS_READ_FRAME,'empty':SMS_EMPTY_FRAME}[action]
+    if hashlib.sha256(result_pixels).hexdigest()!=expected_frame:
+        raise ValueError('NSE-2 SMS lifecycle result frame differs')
+    return dict(action=action,card_modified=action=='erase',cold_empty_verified=action=='empty',
+                network_sms_proved=False,stable_long_boot=False)
 
 
 def verify_security_attempt(text, pixels, *, retry_zero=False):

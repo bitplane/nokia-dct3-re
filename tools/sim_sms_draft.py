@@ -12,3 +12,18 @@ def check_card(card):
             or card[SMS_OFFSET:SMS_OFFSET+SMS_RECORD_SIZE] != DRAFT
             or card[SMS_OFFSET+SMS_RECORD_SIZE:SMS_OFFSET+SMS_RECORDS*SMS_RECORD_SIZE] != empty*(SMS_RECORDS-1)):
         raise ValueError('exact unsent A record/empty remainder or ADN differs')
+
+
+def deleted_card(saved):
+    check_card(saved)
+    result=bytearray(saved)
+    result[SMS_OFFSET]=0
+    return bytes(result)
+
+
+def check_deleted_card(card):
+    if len(card)!=CURRENT_NVRAM_LENGTH or card[SMS_OFFSET]!=0:
+        raise ValueError('erased A draft must retain a free status byte')
+    restored=bytearray(card)
+    restored[SMS_OFFSET]=7
+    check_card(restored)

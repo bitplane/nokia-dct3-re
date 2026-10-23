@@ -92,6 +92,7 @@ def main():
     parser.add_argument('--phonebook-search', action='store_true', help='physical Search A on the fresh erased card (negative control)')
     parser.add_argument('--sms-store', action='store_true', help='physical offline SMS draft experiment')
     parser.add_argument('--sms-reload', type=Path, help='card NVRAM produced by a separate accepted draft save')
+    parser.add_argument('--sms-action', choices=('erase','cancel','empty'), help='physical confirmation or erased-card Outbox check')
     parser.add_argument('--seconds', type=int, default=8, choices=range(8, 121), metavar='8..120')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -120,6 +121,8 @@ def main():
         if args.sms_reload and (not args.phone_retry_zero or args.seconds!=30 or args.sms_store or args.post_auth_menu
                                or args.native_processing or args.phonebook or args.phonebook_reload or args.phonebook_search):
             raise ValueError('cold SMS read requires a separate authenticated thirty-second run')
+        if args.sms_action and not args.sms_reload:
+            raise ValueError('SMS confirmation action requires a separate saved-card reload')
         report = prepare_native(root, run, record_checksum=args.record_checksum_only,
                                 nominal_vbat=args.nominal_vbat, insert_sim=args.insert_sim,
                                 phone_retry_zero=args.phone_retry_zero)
@@ -134,9 +137,9 @@ def main():
             report['saved_card'] = dict(source=str(args.phonebook_reload.resolve()),
                                        sha256=hashlib.sha256(saved_card).hexdigest())
         if args.sms_reload:
-            from tools.sim_sms_draft import check_card
+            from tools.sim_sms_draft import check_card,check_deleted_card
             saved_sms_card=args.sms_reload.read_bytes()
-            check_card(saved_sms_card)
+            (check_deleted_card if args.sms_action=='empty' else check_card)(saved_sms_card)
             card_path=run/'nvram'/machine/'sim_card'
             card_path.parent.mkdir(parents=True,exist_ok=True)
             card_path.write_bytes(saved_sms_card)
@@ -147,7 +150,8 @@ def main():
                    '-video', 'none', '-sound', 'none', '-joystickprovider', 'none',
                    '-midiprovider', 'none', '-nothrottle', '-noreadconfig', '-log', '-verbose',
                    '-seconds_to_run', str(args.seconds), '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools' / ('nse2_sms_reload_fixture.lua' if args.sms_reload else
+                   '-autoboot_script', str(root / 'tools' / (f'nse2_sms_{args.sms_action}_fixture.lua' if args.sms_action else
+                       'nse2_sms_reload_fixture.lua' if args.sms_reload else
                        'nse2_sms_fixture.lua' if args.sms_store else
                        'nse2_phonebook_reload_fixture.lua' if args.phonebook_reload or args.phonebook_search else
                        'nse2_phonebook_fixture.lua' if args.phonebook else
@@ -222,16 +226,26 @@ def main():
                 result['sms'] = verify_sms_save(text,(run/'nvram'/machine/'sim_card').read_bytes(),
                                                 frame.convert('L').tobytes())
         if args.sms_reload:
-            from tools.nse2_sim_check import verify_sms_reload
-            with Image.open(run/'snap/nse2_sms_reload_4.png') as frame:
-                result['sms']=verify_sms_reload(text,saved_sms_card,
-                    (run/'nvram'/machine/'sim_card').read_bytes(),frame.convert('L').tobytes())
-            result['sms_persistence']=True
+            if args.sms_action:
+                from tools.nse2_sim_check import verify_sms_action
+                index=3 if args.sms_action=='empty' else 5
+                with Image.open(run/'snap/nse2_sms_reload_4.png') as prompt, \
+                     Image.open(run/f'snap/nse2_sms_reload_{index}.png') as frame:
+                    result['sms']=verify_sms_action(text,saved_sms_card,
+                        (run/'nvram'/machine/'sim_card').read_bytes(),prompt.convert('L').tobytes(),
+                        frame.convert('L').tobytes(),args.sms_action)
+            else:
+                from tools.nse2_sim_check import verify_sms_reload
+                with Image.open(run/'snap/nse2_sms_reload_4.png') as frame:
+                    result['sms']=verify_sms_reload(text,saved_sms_card,
+                        (run/'nvram'/machine/'sim_card').read_bytes(),frame.convert('L').tobytes())
+                result['sms_persistence']=True
         (run / 'acceptance.json').write_text(json.dumps(result, indent=2) + '\n')
         if args.sms_store:
             print('NSE-2 physical offline SMS draft save PASS; cold readback/network SMS unproved')
         elif args.sms_reload:
-            print('NSE-2 cold physical Outbox read PASS; network SMS/stable long boot unproved')
+            print('NSE-2 physical SMS ' + (args.sms_action or 'cold Outbox read') +
+                  ' PASS; network SMS/stable long boot unproved')
         elif args.phonebook_reload or args.phonebook_search:
             print('NSE-2 physical contact search PASS; ' +
                   ('cold saved-card readback' if args.phonebook_reload else 'erased-card negative control'))

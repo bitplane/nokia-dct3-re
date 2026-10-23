@@ -12,16 +12,10 @@ from tools.nsk3_static_check import inspect
 from tools.nsk3_boot_check import check_upload_handoffs
 from tools.sim_security_trace_check import statuses
 from tools.nsk1_phonebook_roundtrip import frame_check
+from tools.sim_sms_draft import deleted_card
 
 CONFIRM='0efe3c5798b90f0653bb227f9cce5afca2af17cdca71701c6b6b1e31b0aeb129'
 EMPTY='cdff157a2a10f5c1528e9085b1981401a9714ae37cded35e3eddd43fd8a83fb0'
-
-
-def deleted_card(saved):
-    check_card(saved)
-    expected=bytearray(saved)
-    expected[SMS_OFFSET]=0
-    return bytes(expected)
 
 
 def check_runs(source,saved_run,erased,cancel,cold):

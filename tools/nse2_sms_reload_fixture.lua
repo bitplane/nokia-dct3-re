@@ -9,13 +9,23 @@ local function contact(column,mask)
     error('NSE-2 Outbox contact missing')
 end
 local events={}
-for _,press in ipairs({{20,1,4},{20.5,0,8},{21,1,4},{21.5,0,8},{22,1,4},{23.5,1,4}}) do
+local presses={{20,1,4},{20.5,0,8},{21,1,4},{21.5,0,8},{22,1,4}}
+if _G.nse2_sms_action~='empty' then presses[#presses+1]={23.5,1,4} end
+for _,press in ipairs(presses) do
     local field=contact(press[2],press[3])
     events[#events+1]={press[1],field,1}
     events[#events+1]={press[1]+0.15,field,0}
 end
+if _G.nse2_sms_action and _G.nse2_sms_action~='empty' then
+    for _,press in ipairs({{24.3,1,4},{24.8,1,4},
+                           {25.5,1,_G.nse2_sms_action=='cancel' and 2 or 4}}) do
+        local field=contact(press[2],press[3])
+        events[#events+1]={press[1],field,1}
+        events[#events+1]={press[1]+0.15,field,0}
+    end
+end
 local next_event,next_frame=1,1
-local frames={21.8,22.3,23.3,25,29}
+local frames={21.8,22.3,23.3,25,26.5,29}
 emu.register_frame_done(function()
     local now=machine.time:as_double()
     while next_event<=#events and now>=events[next_event][1] do

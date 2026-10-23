@@ -11,7 +11,7 @@
     {
       "id": "nse2_offline_sms_draft_cold_persistence", "owner": "nse2_sim_application", "status": "satisfied",
       "predicate": "Physical NSE-2 draft composition commits an unsent A to EF_SMS and a separate cold process displays its text without rewriting the card",
-      "current": "verify-5110i-sms-persistence runs physical Messages/Write/Options/Save, one176-byte A0 DC 01 04 B0 transaction with9000 and an exact Message saved frame. The shared SIM assertion checks the unsent A record, erased ADN and nine empty SMS slots. A fresh phone process receives that saved card, physically opens Outbox/Read and renders A, with no UPDATE RECORD and byte-identical card storage. This is offline SIM/application storage, not network SMS, native RF, speech or operation past the known restart.",
+      "current": "verify-5110i-sms-persistence runs physical Messages/Write/Options/Save, one176-byte A0 DC 01 04 B0 transaction with9000 and an exact Message saved frame. The shared SIM assertion checks the unsent A record, erased ADN and nine empty SMS slots. A fresh phone process receives that saved card, physically opens Outbox/Read and renders A, with no UPDATE RECORD and byte-identical card storage. Separate verify-5110i-sms-delete checks the common confirmation prompt, one successful erase changing only status07to00, cancellation without writes returning to A, and cold empty Outbox without card mutation. This is offline SIM/application storage, not network SMS, native RF, speech or operation past the known restart.",
       "evidence": ["docs/5110i_bringup.md", "gates.json", "tools/nse2_sim_check.py", "tools/sim_sms_draft.py", "tools/test_nse2_sim_check.py"]
     },
     {

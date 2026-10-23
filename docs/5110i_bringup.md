@@ -60,6 +60,7 @@ make verify-5110i-menu RUN_DIR=tmp/nse2-menu
 make verify-5110i-phonebook RUN_DIR=tmp/nse2-phonebook
 make verify-5110i-sms-store RUN_DIR=tmp/nse2-sms-store
 make verify-5110i-sms-persistence RUN_DIR=tmp/nse2-sms-persistence
+make verify-5110i-sms-delete RUN_DIR=tmp/nse2-sms-delete
 make verify-5110i-native-processing RUN_DIR=tmp/nse2-native-processing
 ```
 
@@ -319,8 +320,18 @@ the stored `A` (reader-frame SHA-256
 No UPDATE RECORD is issued and the entire serialized card remains identical
 to its pre-launch snapshot. The runner records the saved card's source/hash.
 This proves cold offline draft readback, not SMS-SUBMIT delivery, network
-registration or operation beyond the known restart. Deletion/cancellation
-remains a separate application/storage test.
+registration or operation beyond the known restart.
+
+The separate four-process `verify-5110i-sms-delete` gate saves a draft,
+then tests Erase and Back/cancel from independent copies of that saved
+card, and finally cold-boots the erased card. Both action runs show the
+same `Erase message?` prompt. Physical OK produces one successful
+176-byte UPDATE RECORD and changes exactly the first SMS status `07→00`,
+retaining its old payload and every other card byte. Back instead sends
+no update, preserves the complete card and returns to the exact A reader.
+The cold erased-card run sends no update and renders `No messages in outbox`.
+The shared `sim_sms_draft.py` assertions also serve NSK-3; the local frame
+hashes and physical menu sequence remain NSE-2-owned.
 
 ## Long-run native receive boundary
 
