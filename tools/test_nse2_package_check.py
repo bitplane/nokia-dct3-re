@@ -43,8 +43,11 @@ def peripheral_image():
     for address, value in ((0x233594, 0x31e), (0x278488, 0xffff), (0x27848c, 0x10ba78),
                            (0x2782f4, 0x10b9f4), (0x28dabc, 0x10b9f4),
                            (0x25c99c, 0x10c5cc), (0x25c800, 0x10ffac),
-                           (0x25caf0, 0x10c5c9)):
+                           (0x25caf0, 0x10c5c9), (0x264908, 5500), (0x264774, 1500),
+                           (0x2975f0, 0x2b3850), (0x22d6e4, 0x10bb0c),
+                           (0x264764, 0x10a558), (0x22db34, 0x10a562)):
         struct.pack_into('>I', image, address - check.BASE, value)
+    image[0xb3850:0xb385a] = bytes.fromhex('00040506070301020201')
     image[0x9907c:0x99088] = bytes.fromhex('002b3848 0010c6b6 002b382c')
     image[0xb382c:0xb382c + 25] = check.NORMAL_KEYS
     image[0xb3848:0xb3848 + 5] = bytes.fromhex('3e3e3e3e0d')
@@ -125,6 +128,9 @@ class Nse2PackageTest(unittest.TestCase):
         self.assertEqual(result['keypad']['column_irq_mask'], '0x33')
         self.assertEqual(result['keypad']['normal_keys'], list(check.NORMAL_KEYS))
         self.assertFalse(result['electrical_timing_or_runtime_delivery_proved'])
+        self.assertEqual(result['analog_readiness']['ccont_channel'], 2)
+        self.assertEqual(result['analog_readiness']['accepted_sample_max'], 5500)
+        self.assertFalse(result['analog_readiness']['physical_calibration_proved'])
 
     def test_each_peripheral_instruction_is_qualified(self):
         for name, (address, _) in check.PERIPHERAL_FRAGMENTS.items():

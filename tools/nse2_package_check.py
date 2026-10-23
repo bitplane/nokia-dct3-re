@@ -25,6 +25,10 @@ VERSION = b'V 05.53\n11-01-01\nNSE-2\n(c) NMP.\0'
 BASE = 0x200000
 TABLE = 0x29bba0
 PERIPHERAL_FRAGMENTS = {
+    'analog_source7': (0x2644e6, '2007f033f82d'),
+    'analog_sample_scale': (0x264508, '489a434821e8f035ff4d04080c008028'),
+    'analog_sample_range': (0x26458e, '2000882922e100d24291db0b4adb4291dc08882122e100d24291db034ad74291dc002001bd70'),
+    'analog_average_count': (0x2645b4, 'b500b081466846691c89f7ffff8f2800d00f49677a882800d0011e407288466888008d0a18808508466888408c0a18808408b001bd00'),
     'startup_completion_gate': (0x25c7d2, '783007000f002806d1a748c4780007000f00280fd1a1'),
     'startup_report14': (0x2969a6, 'b50020012114f7beff9abd00'),
     'startup_state_table': (0x25c59c, '0025c5fa0025c5e60025ca4e0025c97c0025cb6c0025bb0c0025c1b80025c1c20025cd660025cd060025c8560025cdac0025cb040025cb4e0025cb280025cbda0025c732'),
@@ -67,9 +71,13 @@ def peripheral_contract(mcu):
     for address, expected in ((0x233594, 0x31e), (0x278488, 0xffff), (0x27848c, 0x10ba78),
                               (0x2782f4, 0x10b9f4), (0x28dabc, 0x10b9f4),
                               (0x25c99c, 0x10c5cc), (0x25c800, 0x10ffac),
-                              (0x25caf0, 0x10c5c9)):
+                              (0x25caf0, 0x10c5c9), (0x264908, 5500), (0x264774, 1500),
+                              (0x2975f0, 0x2b3850), (0x22d6e4, 0x10bb0c),
+                              (0x264764, 0x10a558), (0x22db34, 0x10a562)):
         if struct.unpack_from('>I', mcu, address - BASE)[0] != expected:
             raise ValueError('NSE-2 NV/loader contract literal differs')
+    if mcu[0x2b3850 - BASE:0x2b385a - BASE] != bytes.fromhex('00040506070301020201'):
+        raise ValueError('NSE-2 ADC source channel map differs')
     if mcu[0x29907c - BASE:0x299088 - BASE] != bytes.fromhex('002b3848 0010c6b6 002b382c'):
         raise ValueError('NSE-2 keypad table/selector literals differ')
     if (mcu[0x2b382c - BASE:0x2b382c - BASE + 25] != NORMAL_KEYS
@@ -90,6 +98,10 @@ def peripheral_contract(mcu):
                             selector='0x10c6b6', raw_formula='row * 5 + column',
                             normal_keys=list(NORMAL_KEYS), power_column=4),
                 simi=dict(iir='0x38', initialization_contract_only=True),
+                analog_readiness=dict(source=7, ccont_channel=2, scale_numerator=1500,
+                                      scale_denominator=232, accepted_sample_min=1800,
+                                      accepted_sample_max=5500, remaining='0x10a562',
+                                      report14_engine='0x10bb0c', physical_calibration_proved=False),
                 electrical_timing_or_runtime_delivery_proved=False)
 
 

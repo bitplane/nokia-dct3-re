@@ -1,6 +1,6 @@
 -- Observe own firmware bus accesses; never write guest memory or registers.
 local machine = manager.machine
-assert(machine.system.name == 'noki5110i' or machine.system.name == 'nse2r4t')
+assert(machine.system.name == 'noki5110i' or machine.system.name == 'nse2r4t' or machine.system.name == 'nse2r4v')
 local cpu = machine.devices[':maincpu']
 local space = cpu.spaces.program
 local dsp = machine.devices[':dsp_c54x:cpu']
@@ -53,6 +53,31 @@ _G.nse2_upload_tap = space:install_write_tap(0x10008, 0x10fff, 'nse2_upload_word
     end
 end)
 local nv_reads = 0
+local average_count = 0
+_G.nse2_average_count_tap = space:install_write_tap(0x10a560, 0x10a563, 'nse2_average_count', function(_, data, mask)
+    if (mask & 0x0000ff00) == 0 or cpu.state['R15'].value ~= 0x2645d0 then return end
+    local sp = cpu.state['R13'].value
+    assert(sp >= 0x100000 and sp + 4 <= 0x110000)
+    average_count = average_count + 1
+    if average_count <= 128 then
+        machine:logerror(string.format('nse2_average_count: remaining=%02x first=%04x second=%04x pc=002645d0 t=%.9f observer_writes=0\n',
+            (data >> 8) & 255, space:read_u16(sp), space:read_u16(sp + 2), machine.time:as_double()))
+    elseif average_count == 129 then
+        machine:logerror('nse2_average_count_cap: reached=128\n')
+    end
+end)
+local sample_returns = 0
+_G.nse2_report14_samples = space:install_read_tap(0x2645b0, 0x2645b3, 'nse2_report14_samples', function()
+    if cpu.state['R15'].value ~= 0x2645b2 then return end
+    local first, second = cpu.state['R5'].value, cpu.state['R4'].value
+    if first < 0x100000 or first + 2 > 0x110000 or second < 0x100000 or second + 2 > 0x110000 then return end
+    sample_returns = sample_returns + 1
+    if sample_returns <= 16 then
+        machine:logerror(string.format('nse2_report14_sample: valid=%d first=%04x second=%04x remaining=%02x pc=002645b2 t=%.9f observer_writes=0\n',
+            cpu.state['R0'].value, space:read_u16(first), space:read_u16(second),
+            space:read_u8(0x10a562), machine.time:as_double()))
+    end
+end)
 local key_reads = 0
 _G.nse2_task_message_taps = {}
 _G.nse2_key_init_tap = space:install_read_tap(0x299048, 0x29904b, 'nse2_key_init', function()

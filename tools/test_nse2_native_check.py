@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools.nse2_native_check import verify_native, verify_menu_probe
+from tools.nse2_native_check import verify_native, verify_menu_probe, verify_nominal_voltage
 from tools.run_nse2_native import prepare_native
 from tools.test_nse2_boot_check import transcript as boot_transcript
 from tools.test_nse2_upload_check import transcript as upload_transcript
@@ -31,6 +31,8 @@ def native_transcript():
 
 def menu_transcript():
     text = 'nse2_key_mask: value=3f pc=00299066 t=0.411 observer_writes=0\n'
+    text += ('nse2_report14_sample: valid=0 first=19d6 second=19d6 remaining=0a '
+             'pc=002645b2 t=0.31 observer_writes=0\n')
     for index, down, time in ((1, 1, 3.0), (1, 0, 3.2), (2, 1, 5.0), (2, 0, 5.2)):
         old, new = ('1f', '1d') if down else ('1d', '1f')
         text += (f'nse2_menu_contact: index={index} down={down} t={time} physical_only=1\n'
@@ -44,7 +46,55 @@ def menu_transcript():
     return text
 
 
+def nominal_transcript():
+    text = 'ccont_input: adc_select=2 raw=22a ctrl=28 t=0.1\n'
+    for i, remaining in enumerate(range(9, -1, -1)):
+        text += (f'nse2_average_count: remaining={remaining:02x} first=0dfd second=0dfd '
+                 f'pc=002645d0 t=1.{i:02d} observer_writes=0\n')
+    text += ('nse2_startup_message: address=0010c662 value=0014 pc=0025c584 '
+             't=1.2 observer_writes=0\n'
+             'nse2_key_mask: value=20 pc=0025c8c0 t=1.3 observer_writes=0\n')
+    for second in range(2, 9):
+        text += (f'nse2_ui_state: t={second}.0 state_10c664=0004 flags_10c5c9=0f '
+                 'phase_10ffac=03 observer_writes=0\n')
+    return text
+
+
 class NativeTest(unittest.TestCase):
+    def test_nominal_voltage_requires_the_complete_organic_chain(self):
+        with patch('tools.nse2_native_check.NOMINAL_FRAME', hashlib.sha256(b'frame').hexdigest()):
+            result = verify_nominal_voltage(nominal_transcript(), b'frame')
+        self.assertTrue(result['graphical_boot'])
+        self.assertFalse(result['measured_board_calibration'])
+        self.assertNotIn('usable_boot', result)
+
+    def test_nominal_samples_report_order_and_frame_are_checked(self):
+        for old, new in (('remaining=09', 'remaining=0a'), ('first=0dfd', 'first=19d6'),
+                         ('raw=22a', 'raw=3ff'), ('t=1.2 ', 't=0.2 '),
+                         ('pc=0025c8c0', 'pc=00299066'), ('flags_10c5c9=0f', 'flags_10c5c9=0e')):
+            with self.subTest(old=old), \
+                    patch('tools.nse2_native_check.NOMINAL_FRAME', hashlib.sha256(b'frame').hexdigest()), \
+                    self.assertRaises(ValueError):
+                verify_nominal_voltage(nominal_transcript().replace(old, new), b'frame')
+        with self.assertRaisesRegex(ValueError, 'frame differs'):
+            verify_nominal_voltage(nominal_transcript(), b'wrong frame')
+
+    def test_nominal_input_requires_decoder_activity_during_both_contacts(self):
+        contacts = '\n'.join(row for row in menu_transcript().splitlines() if row.startswith('nse2_menu_contact:'))
+        text = nominal_transcript() + contacts + '\n'
+        with self.assertRaisesRegex(ValueError, 'own decoder'):
+            verify_nominal_voltage(text, b'', physical_menu=True)
+        for time in (3.1, 5.1):
+            text += f'nse2_key_decode: raw=11 key=19 pc=00299044 t={time} observer_writes=0\n'
+        result = verify_nominal_voltage(text, b'', physical_menu=True)
+        self.assertTrue(result['physical_key_delivery'])
+        self.assertNotIn('graphical_boot', result)
+
+    def test_long_observation_cannot_pass_with_only_eight_seconds(self):
+        text, payload = native_transcript()
+        with self.assertRaisesRegex(ValueError, 'horizon'):
+            self.check(text, payload, minimum_time=30)
+
     def test_physical_probe_distinguishes_columns_from_decoded_delivery(self):
         result = verify_menu_probe(menu_transcript())
         self.assertTrue(result['gpio_columns_respond'])
@@ -119,6 +169,18 @@ class NativeTest(unittest.TestCase):
             self.assertEqual({path.name for path in (run / 'roms/nse2r4t').iterdir()},
                              {'5110i_5.53A.fls', 'program.bin', 'data.bin'})
             self.assertEqual({path.name for path in (run / 'nvram/nse2r4t').iterdir()}, {'eeprom'})
+            nominal = root / 'nominal'
+            with patch('tools.run_nse2_native.MASK_INPUTS', specs), \
+                    patch('tools.run_nse2_boundary.inspect', side_effect=[
+                        (b'own flash', {'archive_sha256': 'zip'}),
+                        (b'own flash', {'archive_sha256': 'exe'})]):
+                nominal_report = prepare_native(root, nominal, record_checksum=True, nominal_vbat=True)
+            self.assertEqual(nominal_report['machine'], 'nse2r4v')
+            self.assertEqual(nominal_report['adc2_input']['raw'], 554)
+            self.assertFalse(nominal_report['adc2_input']['measured_nse2_calibration'])
+            self.assertEqual((nominal / 'nvram/nse2r4v/eeprom').read_bytes(),
+                             (run / 'nvram/nse2r4t/eeprom').read_bytes())
+            self.assertEqual((nominal / 'roms/nse2r4v/5110i_5.53A.fls').read_bytes(), b'own flash')
 
     def test_wrong_mask_rejected_before_preparing_any_run(self):
         with tempfile.TemporaryDirectory() as directory:

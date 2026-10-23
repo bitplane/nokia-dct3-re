@@ -1,12 +1,60 @@
 """Verify native NSE-1 ROM4 compatibility execution of the own NSE-2 verifier."""
+import hashlib
 import re
 
 from tools.nse2_boot_check import STATE, verify_nv, verify_record, verify_upload
+
+NOMINAL_FRAME = '7da9bef12e0bf163dfdf8770e215957b58b4911baa9ba987c05ddf8fadfeae8a'
+
+
+def verify_nominal_voltage(text, pixels, *, physical_menu=False):
+    if 'nse2_average_count_cap:' in text or 'nse2_startup_message_cap:' in text:
+        raise ValueError('NSE-2 nominal evidence capped')
+    rows = re.findall(r'nse2_average_count: remaining=([0-9a-f]{2}) first=([0-9a-f]{4}) '
+                      r'second=([0-9a-f]{4}) pc=002645d0 t=([0-9.]+) observer_writes=0', text)
+    if [(int(a, 16), int(b, 16), int(c, 16)) for a, b, c, _ in rows[:10]] != [
+            (remaining, 554 * 1500 // 232, 554 * 1500 // 232) for remaining in range(9, -1, -1)]:
+        raise ValueError('NSE-2 valid nominal samples did not drain the averaging counter')
+    times = [float(row[3]) for row in rows[:10]]
+    if times != sorted(set(times)) or not 0 < times[0] < times[-1] < 3:
+        raise ValueError('NSE-2 nominal averaging order differs')
+    if not re.search(r'ccont_input: adc_select=2 raw=22a ctrl=28 t=', text):
+        raise ValueError('NSE-2 nominal raw ADC2 input unobserved')
+    reports = re.findall(r'nse2_startup_message: address=0010c662 value=0014 pc=0025c584 '
+                         r't=([0-9.]+) observer_writes=0', text)
+    unmask = re.findall(r'nse2_key_mask: value=20 pc=0025c8c0 t=([0-9.]+) observer_writes=0', text)
+    if (len(reports) != 1 or len(unmask) != 1
+            or not times[-1] < float(reports[0]) < float(unmask[0]) < 3):
+        raise ValueError('NSE-2 organic report14 and keyboard unmask missing or unordered')
+    states = re.findall(r'nse2_ui_state: t=([0-9.]+) state_10c664=0004 '
+                        r'flags_10c5c9=0f phase_10ffac=03 observer_writes=0', text)
+    if len(states) < 7 or float(states[-1]) < 8:
+        raise ValueError('NSE-2 completed startup state missing')
+    result = dict(nominal_adc2=554, averaging_completed=True, startup_report14_received=True,
+                  keyboard_unmasked=True, measured_board_calibration=False)
+    if physical_menu:
+        contacts = re.findall(r'nse2_menu_contact: index=([12]) down=([01]) t=([0-9.]+) physical_only=1', text)
+        if [(a, b) for a, b, _ in contacts] != [('1', '1'), ('1', '0'), ('2', '1'), ('2', '0')]:
+            raise ValueError('NSE-2 nominal physical Menu contacts missing')
+        decoded = re.findall(r'nse2_key_decode: raw=11 key=19 pc=00299044 t=([0-9.]+) observer_writes=0', text)
+        for i in (0, 2):
+            start, end = float(contacts[i][2]), float(contacts[i + 1][2])
+            if not start < end or not any(start <= float(time) <= end for time in decoded):
+                raise ValueError('NSE-2 physical Menu contact did not reach own decoder')
+        result['physical_key_delivery'] = True
+    elif hashlib.sha256(pixels).hexdigest() != NOMINAL_FRAME:
+        raise ValueError('NSE-2 reviewed Insert SIM card frame differs')
+    else:
+        result['graphical_boot'] = True
+    return result
 
 
 def verify_menu_probe(text):
     if 'nse2_startup_message_cap:' in text:
         raise ValueError('NSE-2 startup message evidence capped')
+    if not re.search(r'nse2_report14_sample: valid=0 first=19d6 second=19d6 remaining=0a '
+                     r'pc=002645b2 t=[0-9.]+ observer_writes=0', text):
+        raise ValueError('NSE-2 open-pin invalid sample pair unobserved')
     contacts = re.findall(r'nse2_menu_contact: index=([12]) down=([01]) t=([0-9.]+) physical_only=1', text)
     if [(row[0], row[1]) for row in contacts] != [('1', '1'), ('1', '0'), ('2', '1'), ('2', '0')]:
         raise ValueError('NSE-2 physical Menu contact sequence missing')
@@ -38,7 +86,7 @@ def verify_menu_probe(text):
                 unobserved_startup_report='0x14')
 
 
-def verify_native(text, payload, pixels, size, *, record_checksum=False):
+def verify_native(text, payload, pixels, size, *, record_checksum=False, minimum_time=8):
     if text.count('Soft reset\n') != 1 or 'dsp_hle:' in text:
         raise ValueError('NSE-2 native reset/HLE boundary differs')
     staged = verify_upload(text, payload, native_response=True)
@@ -59,13 +107,13 @@ def verify_native(text, payload, pixels, size, *, record_checksum=False):
         raise ValueError('NSE-2 native loader took the silent-profile failure tail')
     samples = re.findall(r'nse2_native_state: t=([0-9.]+) pc=([0-9a-f]{4}) '
                          r'illegal=([01]) idle=([01]) observer_writes=0', text)
-    if len(samples) < 8 or float(samples[-1][0]) < 8 or any(row[2] != '0' for row in samples):
+    if len(samples) < 8 or float(samples[-1][0]) < minimum_time or any(row[2] != '0' for row in samples):
         raise ValueError('NSE-2 native execution horizon missing or illegal')
     times = [float(row[0]) for row in samples]
     if times != sorted(set(times)):
         raise ValueError('NSE-2 native sample order differs')
     mcu = STATE.findall(text)
-    if (len(mcu) < 8 or float(mcu[-1][0]) < 8
+    if (len(mcu) < 8 or float(mcu[-1][0]) < minimum_time
             or any(not (0x200040 <= int(row[1], 16) < 0x390000
                         and 0x100000 <= int(row[3], 16) < 0x110000) for row in mcu)):
         raise ValueError('NSE-2 own MCU execution horizon missing')

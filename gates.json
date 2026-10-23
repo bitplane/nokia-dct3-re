@@ -2393,6 +2393,22 @@
                  "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--physical-menu"]}]
     },
     {
+      "name": "verify-5110i-nominal-boot",
+      "prerequisites": ["verify-5110i-static", "build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_nse2_native.py",
+                 "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat"]}]
+    },
+    {
+      "name": "verify-5110i-nominal-input",
+      "prerequisites": ["verify-5110i-static", "build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_nse2_native.py",
+                 "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--physical-menu"]}]
+    },
+    {
       "name": "verify-6150-static",
       "prerequisites": [],
       "variables": {},

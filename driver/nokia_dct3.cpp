@@ -1369,6 +1369,7 @@ public:
 	void noki5110(machine_config &config);
 	void noki5110i(machine_config &config);
 	void nse2r4t(machine_config &config);
+	void nse2r4v(machine_config &config);
 	void noki5190(machine_config &config);
 	void nsb1r4t(machine_config &config);
 	void nsk1r4t(machine_config &config);
@@ -4317,6 +4318,21 @@ void nokia_dct3_state::nse2r4t(machine_config &config)
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
 
+void nokia_dct3_state::nse2r4v(machine_config &config)
+{
+	noki5110i(config);
+	// Own source-7 map selects ADC2 and converts it with 1500/232 before
+	// validating 1800..5500. Test the independently derived nominal input:
+	// NSE-1's 3.6 V pack / CCONT's typical 6.5 mV per bit = 554.
+	// This is an explicit cross-product battery hypothesis, not NSE-2 calibration.
+	nokia_product_config research = PRODUCT_5110I;
+	research.ccont_board.channel_defaults[2] = 554;
+	apply_product_config(research);
+	config.device_remove("dsp_hle");
+	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
+}
+
 void nokia_dct3_state::nsb1r4t(machine_config &config)
 {
 	noki5190(config);
@@ -4744,6 +4760,8 @@ ROM_START( nse2r4t )
 	ROM_LOAD("nse1_rom4_dsp_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))
 ROM_END
+
+#define rom_nse2r4v rom_nse2r4t
 
 ROM_START( noki5190 )
 	ROM_SYSTEM_BIOS(0, "671a", "v6.71 PPM A (USA)")
@@ -5383,6 +5401,7 @@ SYST( 2026, nam2c3, noki2100, 0, nam2c3, noki2100, nokia_dct3_state, empty_init,
 SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
 SYST( 2001, noki5110i, 0, 0, noki5110i, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110i (NSE-2 v5.53 research)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, nse2r4t, noki5110i, 0, nse2r4t, noki5110, nokia_dct3_state, empty_init, "Research", "NSE-2 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2001, nse2r4v, noki5110i, 0, nse2r4v, noki5110, nokia_dct3_state, empty_init, "Research", "NSE-2 ROM4 nominal VBATT experiment (unmeasured board)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki5190, 0, 0, noki5190, noki5110, nokia_dct3_state, empty_init, "Nokia", "5190 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsb1r4t, noki5190, 0, nsb1r4t, nsb1r4t, nokia_dct3_state, empty_init, "Research", "NSB-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsk1r4t, 0, 0, nsk1r4t, nsk1r4t, nokia_dct3_state, empty_init, "Research", "NSK-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

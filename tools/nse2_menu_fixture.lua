@@ -2,7 +2,7 @@
 local directory = debug.getinfo(1, 'S').source:sub(2):match('^(.*[/\\])')
 dofile(directory .. 'nse2_boot_observe.lua')
 local machine = manager.machine
-assert(machine.system.name == 'nse2r4t')
+assert(machine.system.name == 'nse2r4t' or machine.system.name == 'nse2r4v')
 local menu
 for _, field in pairs(machine.ioport.ports[':COL.1'].fields) do
     if field.mask == 4 then menu = field end
