@@ -98,6 +98,8 @@ def inspect_word_host_command(program,data):
         raise ValueError('word host command requires full DSP data space')
     fragments={
         0x398d:'f000b00f4a1188117710000110818a11f4e2',
+        0x3924:'f07423d461f806e10004f820394ff0748dd0',
+        0x3f4e:'f07423d4f0748dd077100001e7368814fc45',
         0x8e4b:'12f806f5f150fffffa4d8e690af806b3',
         0x8e6e:'6bf806c400016bf806b30001',
         0x9185:'13f806c40bf806f6f84b9191',

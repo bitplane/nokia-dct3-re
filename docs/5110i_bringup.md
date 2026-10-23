@@ -1178,6 +1178,15 @@ not measured silicon timing. Program-read taps at service entries returned
 zero despite the observed stores: cached opcode fetches make that instrument
 unsuitable for proving execution absence here. Use actual data/IO accesses
 or a separately validated execution observer instead.
+Static callers explain the software cadence: host-processing entry `3924`
+calls service `8dd0` only when `06e1 & 0004` is set, otherwise proceeding
+to host-ring handling at `394f`. Alternate processing entry `3f4e` calls
+the same service unconditionally, with protocol dispatch looping back to
+`3f50`. These byte-checked call sites do not identify which caller supplied
+each runtime increment. Neither is evidence for a dedicated physical
+word-clock interrupt. The service can run while the separate transmit
+completion remains missing; its counter activity must not be mistaken for
+successful port-`34` transmission or incoming peer traffic.
 
 Vector `ffd0` branches to ISR `3416`. Its `34da` path reads port `36`,
 tests mask `2000`, and can write port `34` at `34e8` or `34f4` while
