@@ -1,4 +1,4 @@
--- Save after real UPDATE header flush, before body TX; observation only.
+-- Save after a real APDU header/partial-body flush; observation only.
 local directory=debug.getinfo(1,'S').source:sub(2):match('^(.*[/\\])')
 local machine=manager.machine
 local space=machine.devices[':maincpu'].spaces.program
@@ -6,13 +6,14 @@ local capture=dofile(directory..'arm_architecture_snapshot.lua')
 local card=machine.devices[':sim_card']
 local simi=machine.devices[':simi']
 local sms=_G.nse2_sim_state_sms==true
-local pin=_G.nse2_sim_state_pin==true
-local pin_retries=_G.nse2_pin_state_retries or 3
-assert(pin_retries==1 or pin_retries==3,'unreviewed PIN checkpoint input')
+local puk=_G.nse2_sim_state_puk==true
+local pin=_G.nse2_sim_state_pin==true or puk
+local pin_retries=_G.nse2_pin_state_retries or (puk and 0 or 3)
+assert((puk and pin_retries==0) or pin_retries==1 or pin_retries==3,'unreviewed PIN checkpoint input')
 assert(not (sms and pin),'one SIM transaction per fixture')
-local length=pin and 8 or sms and 176 or 32
+local length=puk and 16 or pin and 8 or sms and 176 or 32
 local partial=sms and 60 or 0
-local capture_time=pin and 9 or sms and 26.5 or 28.3
+local capture_time=puk and 25 or pin and 9 or sms and 26.5 or 28.3
 local function item(device,name)
     local index=assert(device.items['0/'..name],'missing saved item '..name)
     return emu.item(index)
@@ -21,7 +22,10 @@ local function hex(value)
     return value:gsub('.',function(byte) return string.format('%02x',byte:byte()) end)
 end
 local function record()
-    if pin then return hex(item(card,'m_chv_attempts'):read_block(0,2)) end
+    if pin then
+        local value=hex(item(card,'m_chv_attempts'):read_block(0,2))
+        return puk and (value..hex(item(card,'m_chv'):read_block(0,16))) or value
+    end
     return hex(item(card,sms and 'm_sms' or 'm_adn'):read_block(0,length))
 end
 local function fields(device,names)
@@ -46,7 +50,7 @@ retained[#retained+1]=space:install_write_tap(0x20034,0x20037,'sim_state_tx',fun
     tail=(tail..string.char(byte)):sub(-5)
     if pending then sent=sent+1 end
     observe('tx',byte)
-    local header=pin and string.char(0xa0,0x20,0,1,8) or string.char(0xa0,0xdc,1,4,length)
+    local header=puk and string.char(0xa0,0x2c,0,0,16) or pin and string.char(0xa0,0x20,0,1,8) or string.char(0xa0,0xdc,1,4,length)
     if not requested and tail==header then pending=true end
 end)
 retained[#retained+1]=space:install_write_tap(0x2003c,0x2003f,'sim_state_flush',function(_,value,mask)
@@ -65,6 +69,7 @@ local function snapshot(label)
     local controller=fields(simi,{'m_rx_count','m_rx_ready','m_iir','m_tx_ready_pending','m_uart_tx_count'})
     local stored=record()
     local free=pin and string.format('%02x03',pin_retries) or sms and ('00'..string.rep('ff',175)) or string.rep('ff',32)
+    if puk then free=free..'31323334ffffffff35363738ffffffff' end
     assert(stored==free,'SIM record was not rolled back before commit')
     local body=partial>0 and hex(item(card,'m_tx'):read_block(0,partial)) or ''
     local result=string.format('t=%.9f pc=%08x sp=%08x ram=%08x cpu=%s card=%s simi=%s record=%s partial=%s',s.time,s.pc,s.sp,s.ram,s.cpu,protocol,controller,stored,body)
@@ -73,7 +78,7 @@ local function snapshot(label)
 end
 retained[#retained+1]=emu.add_machine_pre_save_notifier(function()
     assert(requested and sent==partial,'SIM checkpoint body count differs')
-    assert(machine.time:as_double()>(pin and 7.6 or sms and 25.9 or 27.57),'submit contact boundary differs')
+    assert(machine.time:as_double()>(puk and 18.2 or pin and 7.6 or sms and 25.9 or 27.57),'submit contact boundary differs')
     saved=snapshot('saved')
     anchor,phase=machine.time:as_double(),'reference'
 end)
@@ -94,13 +99,13 @@ emu.register_frame_done(function()
         restored=true
         machine:logerror('nse2_sim_state: committed=restored record='..record()..'\n')
         machine.screens[':screen']:snapshot('nse2_sim_state_restored.png')
-        assert(#traffic.reference>0 and #traffic.reference==#traffic.restored,'SIM replay count differs')
-        for i,event in ipairs(traffic.reference) do assert(event==traffic.restored[i],'SIM replay mismatch '..i) end
         local file=assert(io.open('nse2_sim_state_events.log','w'))
         for _,label in ipairs({'reference','restored'}) do
             for i,event in ipairs(traffic[label]) do file:write(label..':'..i..':'..event..'\n') end
         end
         file:close()
+        assert(#traffic.reference>0 and #traffic.reference==#traffic.restored,'SIM replay count differs')
+        for i,event in ipairs(traffic.reference) do assert(event==traffic.restored[i],'SIM replay mismatch '..i) end
         complete=true
         machine:logerror(string.format('nse2_sim_state: completed=1 reference=%d restored=%d sent_before_save=%d\n',#traffic.reference,#traffic.restored,partial))
     end
@@ -108,7 +113,8 @@ end)
 retained[#retained+1]=emu.add_machine_stop_notifier(function() if not complete then machine:logerror('nse2_sim_state: FAIL incomplete\n') end end)
 _G.nse2_sim_state=retained
 
-if pin then _G.nse2_pin_replay_on_load=true
+if puk then _G.nse2_puk_replay_on_load=true
+elseif pin then _G.nse2_pin_replay_on_load=true
 elseif sms then _G.nse2_sms_save_hold=.07 else _G.nse2_phonebook_save_hold=.07 end
-dofile(directory..(pin and 'nse2_pin_wrong_fixture.lua' or sms and 'nse2_sms_fixture.lua' or 'nse2_phonebook_fixture.lua'))
+dofile(directory..(puk and 'nse2_puk_fixture.lua' or pin and 'nse2_pin_wrong_fixture.lua' or sms and 'nse2_sms_fixture.lua' or 'nse2_phonebook_fixture.lua'))
 

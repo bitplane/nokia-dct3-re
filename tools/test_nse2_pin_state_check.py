@@ -2,8 +2,8 @@ import hashlib
 import unittest
 from unittest.mock import patch
 from tools.make_sim_card_profile import make_profile
-from tools.nse2_pin_state_check import check_pin_state
-from tools.sim_security_trace_check import ATTEMPTS_OFFSET
+from tools.nse2_pin_state_check import check_pin_state,check_puk_state
+from tools.sim_security_trace_check import ATTEMPTS_OFFSET,CHV_OFFSET
 
 
 def fixture(last_retry=False):
@@ -31,6 +31,40 @@ def fixture(last_retry=False):
 
 
 class PinStateTest(unittest.TestCase):
+    def test_puk_recovery_restores_old_credentials_before_commit(self):
+        before=bytearray(make_profile(True).ljust(3570,b'\xff'))
+        before[ATTEMPTS_OFFSET]=0
+        after=bytearray(before)
+        after[ATTEMPTS_OFFSET]=3
+        after[CHV_OFFSET:CHV_OFFSET+8]=b'2468\xff\xff\xff\xff'
+        old='0003'+before[CHV_OFFSET:CHV_OFFSET+16].hex()
+        new='0303'+after[CHV_OFFSET:CHV_OFFSET+16].hex()
+        snapshot='t=18.265665615 pc=00291a1c sp=0010f7a0 ram=12345678 cpu='+','.join(['00000000']*37)
+        snapshot+=' card=m_ins:2c,m_tx_len:0,m_tx_expected:10,m_receiving_body:1,m_selected_file:6fad'
+        snapshot+=' simi=m_rx_count:1,m_rx_ready:0,m_iir:0,m_tx_ready_pending:1,m_uart_tx_count:0 record='+old+' partial='
+        status='SIM status ins=2c sw=9000 chv=3/3 puk=10/10 enabled=1'
+        release='nse2_puk_contact: event=38 down=0 t=18.350000000 physical_only=1'
+        text='\n'.join(['nse2_sim_state: phase=saved '+snapshot,status,release,
+                        'nse2_sim_state: committed=reference record='+new,
+                        'nse2_sim_state: phase=restored '+snapshot,
+                        'nse2_puk_contact_replay: restored=1 physical_only=1',status,release,
+                        'nse2_sim_state: committed=restored record='+new,
+                        'nse2_sim_state: completed=1 reference=19 restored=19 sent_before_save=0'])
+        events=[('rx',0x2c)]+[('tx',v) for v in b'123456782468\xff\xff\xff\xff']+[('rx',0x90),('rx',0)]
+        wire='\n'.join(f'{phase}:{i}:{i*.0001:.9f}:{kind}:{value:02x}'
+                       for phase in ('reference','restored') for i,(kind,value) in enumerate(events,1))
+        with patch('tools.nse2_pin_state_check.SECURITY_FRAME',hashlib.sha256(b'security').hexdigest()):
+            result=check_puk_state(text,wire,before,after,b'security',b'security')
+            self.assertEqual(result['replacement_pin'],'2468')
+            for bad in (text.replace('record='+old,'record='+new),text.replace('puk=10/10','puk=9/10'),
+                        text.replace('m_tx_expected:10','m_tx_expected:8')):
+                with self.assertRaises(ValueError):
+                    check_puk_state(bad,wire,before,after,b'security',b'security')
+            changed=after.copy()
+            changed[CHV_OFFSET+8]^=1
+            with self.assertRaises(ValueError):
+                check_puk_state(text,wire,before,changed,b'security',b'security')
+
     def test_last_retry_blocks_once_and_rejects_wrong_branch(self):
         text,wire,before,after=fixture(last_retry=True)
         with patch('tools.nse2_pin_state_check.PIN_BLOCKED_FRAME',hashlib.sha256(b'blocked').hexdigest()):

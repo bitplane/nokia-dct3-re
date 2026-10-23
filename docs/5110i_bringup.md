@@ -86,6 +86,7 @@ make verify-5110i-sim-write-state RUN_DIR=tmp/nse2-sim-write-state
 make verify-5110i-sms-write-state RUN_DIR=tmp/nse2-sms-write-state
 make verify-5110i-pin-state RUN_DIR=tmp/nse2-pin-state
 make verify-5110i-pin-block-state RUN_DIR=tmp/nse2-pin-block-state
+make verify-5110i-puk-state RUN_DIR=tmp/nse2-puk-state
 ```
 
 The nominal boot gate requires the reviewed unattended seven-second frame
@@ -1490,6 +1491,27 @@ retry decrement, preserving PUK attempts and credentials. An independent
 cold process renders the PUK prompt without a VERIFY or PUK attempt and
 retains the card unchanged. This five-process boundary is distinct from
 the ordinary `3 -> 2` retry outcome and its subsequent STATUS traffic.
+
+`verify-5110i-puk-state` independently reaches an exhausted PIN through
+three physical wrong attempts, then restores a real pending
+`A0 2C 00 00 10` command at 18.265665615 seconds. Before its body, both
+snapshots contain the old `1234` credential, zero PIN retries, pending
+16-byte body, and the exact ARM/RAM/SIMI state. Each leg sends the real
+PUK and replacement `2468`, receives `90 00`, resumes SIM initialization
+and reaches the reviewed phone-side Security code prompt. All 560 timed
+wire events match. Full card comparison permits only PIN1's credential
+and retry restoration to three; PUK/CHV2 credentials and unrelated storage
+are preserved. The sixth cold process authenticates with `2468` and retains
+the complete resulting card unchanged. This is not phone-code acceptance
+or native radio acceptance.
+
+Physical-contact replay uses stable `column:mask` identities, not Lua field
+wrapper identity: repeated field lookups can produce distinct wrappers for
+one real contact. A held final OK must override all earlier releases of
+that same contact. The PUK replay's repeated OK sequence and strict timed
+wire comparison exercise this requirement. Wire artifacts are retained
+before an equality assertion, so a failure still provides its first
+divergent event instead of losing the evidence.
 
 ## Remaining work
 

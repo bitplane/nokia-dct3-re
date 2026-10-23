@@ -7,8 +7,8 @@ local events={}
 local function press(when,column,mask)
     for _,field in pairs(machine.ioport.ports[':COL.' .. column].fields) do
         if field.mask==mask then
-            events[#events+1]={when,field,1}
-            events[#events+1]={when+0.15,field,0}
+            events[#events+1]={when,field,1,column..':'..mask}
+            events[#events+1]={when+0.15,field,0,column..':'..mask}
             return
         end
     end
@@ -22,19 +22,8 @@ press(7.6,1,4)
 local next_event,next_frame=1,1
 local frames={5.5,9,11}
 if _G.nse2_pin_replay_on_load then
-    _G.nse2_pin_load_notifier=emu.add_machine_post_load_notifier(function()
-        local now=machine.time:as_double()
-        local levels={}
-        next_event=1
-        while next_event<=#events and events[next_event][1]<=now do
-            local event=events[next_event]
-            levels[event[2]]=event[3]
-            next_event=next_event+1
-        end
-        -- Forced physical contacts are harness state, not handset save items.
-        for field,value in pairs(levels) do field:set_value(value) end
-        machine:logerror('nse2_pin_contact_replay: restored=1 physical_only=1\n')
-    end)
+    _G.nse2_pin_load_notifier=dofile(directory..'restore_contact_timeline.lua')(
+        events,function(index) next_event=index end,'nse2_pin_contact_replay')
 end
 emu.register_frame_done(function()
     local now=machine.time:as_double()

@@ -7,8 +7,8 @@ local events={}
 local function press(t,col,mask)
     for _,field in pairs(machine.ioport.ports[':COL.'..col].fields) do
         if field.mask==mask then
-            events[#events+1]={t,field,1}
-            events[#events+1]={t+0.15,field,0}
+            events[#events+1]={t,field,1,col..':'..mask}
+            events[#events+1]={t+0.15,field,0,col..':'..mask}
             return
         end
     end
@@ -28,6 +28,10 @@ digits(16.6,'2468',0.35)
 press(18.2,1,4)
 local frames={11,14.1,16.3,20,25}
 local event,frame=1,1
+if _G.nse2_puk_replay_on_load then
+    _G.nse2_puk_load_notifier=dofile(directory..'restore_contact_timeline.lua')(
+        events,function(index) event=index end,'nse2_puk_contact_replay')
+end
 emu.register_frame_done(function()
     local now=machine.time:as_double()
     while event<=#events and now>=events[event][1] do

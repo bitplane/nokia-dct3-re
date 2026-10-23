@@ -244,6 +244,10 @@ or was expensive to discover. Current examples include:
 - Lua waits waking early on state load: external physical-input fixtures must
   recheck absolute emulated deadlines, not mistake an early key release for
   failed device restoration;
+- repeated Lua field lookups returning different wrappers for one physical
+  contact: restore input timelines by stable port/mask identity, not userdata
+  identity or unordered wrapper iteration. Include repeated presses and a held
+  key at save in replay controls before blaming a timing mismatch on hardware;
 - debugger register exports exposing cached values: compare named PC with
   architectural GENPC before attributing a mismatch to CPU save-state loss;
 - banked ARM7 state: MAME's `R8..R14` exports are the user bank, not an
