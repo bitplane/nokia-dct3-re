@@ -16,7 +16,8 @@ nineteen seconds a Menu softkey is visible. Physical Menu presses then open
 workflow now saves `A / 123` through a successful SIM UPDATE RECORD and
 checks its serialized card storage. A separate cold boot reads the saved
 card and physically searches for `A`; an erased-card control instead shows
-**No phone numbers**. Registration, calls and SMS are not accepted.
+**No phone numbers**. Physical Messages / Write / Save also stores an
+unsent `A` draft on the SIM. Registration, calls and network SMS are not accepted.
 Longer execution is not stable: both menu-only and contact-entry runs
 request reason-`68` reset at about 31.97 seconds. The short menu gates do
 not cover this boundary.
@@ -55,6 +56,7 @@ make verify-5110i-phonecode-boundary RUN_DIR=tmp/nse2-phonecode-boundary
 make verify-5110i-phonecode-accept RUN_DIR=tmp/nse2-phonecode-accept
 make verify-5110i-menu RUN_DIR=tmp/nse2-menu
 make verify-5110i-phonebook RUN_DIR=tmp/nse2-phonebook
+make verify-5110i-sms-store RUN_DIR=tmp/nse2-sms-store
 make verify-5110i-native-processing RUN_DIR=tmp/nse2-native-processing
 ```
 
@@ -291,6 +293,24 @@ search. Finally the same physical search on an erased card produces
 Thus readback differs from editor text or a fabricated contact. This proves
 cold SIM contact persistence and firmware retrieval, not displayed number
 formatting, call signaling, registration or operation past the restart.
+
+### Offline SMS draft save
+
+Physical Menu / Messages / Write messages / Options / Save commits one
+unsent `A` draft at 25.943 seconds. Firmware selects EF_SMS and issues
+`A0 DC 01 04 B0`, with successful `9000` status. The 176-byte record
+starts `07 02 81 f0 01 ff 00 81 00 00 01 41` and is padded with `ff`:
+unsent status, one GSM7 character, no recipient yet. ADN remains erased
+and the other nine SMS slots remain empty. The assertion is shared with
+the independently accepted NSK-3 draft fixture in `sim_sms_draft.py`;
+no product-specific address or radio behavior is shared by that helper.
+Repeated native runs reproduce the `Message saved` frame (SHA-256
+`491f056f1e92fdedbe7e334f423818c8b1770db0838a78bf25743e0ec2f0459c`).
+
+`verify-5110i-sms-store` checks physical contacts, exact EF/record/length,
+single successful commit, serialized draft/empty remainder and frame.
+This is offline storage only. Cold Outbox readback, deletion/cancellation,
+SMS-SUBMIT delivery and network registration remain separate acceptance.
 
 ## Long-run native receive boundary
 

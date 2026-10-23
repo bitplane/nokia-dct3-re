@@ -13,21 +13,12 @@ from tools.nsk1_phonebook_roundtrip import frame_check
 from tools.make_sim_card_profile import ADN_SIZE,LOCI_SIZE,KC_SIZE,BCCH_SIZE,SMS_RECORD_SIZE,SMS_RECORDS
 from tools.sim_phonebook_check import CURRENT_NVRAM_LENGTH
 from tools.sim_security_trace_check import statuses
+from tools.sim_sms_draft import SMS_OFFSET,DRAFT,check_card
 
-SMS_OFFSET=ADN_SIZE+LOCI_SIZE+KC_SIZE+BCCH_SIZE
-DRAFT=bytes.fromhex('070281f001ff008100000141').ljust(SMS_RECORD_SIZE,b'\xff')
 SAVE_KEYS=(0x19,0x19,0x18,0x18,0x19,2,0x19,0x18,0x18,0x19)
 READ_KEYS=(0x19,0x19,0x18,0x19,0x19)
 EDITOR='5e1c7514b1bbee44ee0acc3563cf74595023ed6cacc203147c0b4ed78c47b5f0'
 READ='126383b4fff9fc2d2e776b939ad18b3ae6d7194e9370a41a38d7313c7eca79cb'
-
-
-def check_card(card):
-    empty=b'\0'+b'\xff'*(SMS_RECORD_SIZE-1)
-    if (len(card)!=CURRENT_NVRAM_LENGTH or card[:ADN_SIZE]!=b'\xff'*ADN_SIZE
-            or card[SMS_OFFSET:SMS_OFFSET+SMS_RECORD_SIZE]!=DRAFT
-            or card[SMS_OFFSET+SMS_RECORD_SIZE:SMS_OFFSET+SMS_RECORDS*SMS_RECORD_SIZE]!=empty*(SMS_RECORDS-1)):
-        raise ValueError('exact unsent A record/empty remainder or ADN differs')
 
 
 def check_streams(write_trace,cold_trace,write_stream,cold_stream):

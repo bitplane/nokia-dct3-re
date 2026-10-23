@@ -3,7 +3,8 @@ import unittest
 from unittest.mock import patch
 
 from tools.nse2_sim_check import (BINARY_FILES, verify_sim_reads, verify_security_attempt,
-                                  verify_post_auth_menu, verify_phonebook_save, verify_phonebook_reload)
+                                  verify_post_auth_menu, verify_phonebook_save, verify_phonebook_reload,
+                                  verify_sms_save)
 
 
 def reads():
@@ -33,6 +34,31 @@ def contacts():
 
 
 class SimCheckTest(unittest.TestCase):
+    def test_offline_sms_save_requires_physical_commit_and_exact_card(self):
+        from tools.sim_sms_draft import SMS_OFFSET,DRAFT
+        from tools.make_sim_card_profile import SMS_RECORD_SIZE,SMS_RECORDS
+        from tools.sim_phonebook_check import CURRENT_NVRAM_LENGTH
+        card=bytearray([255]*CURRENT_NVRAM_LENGTH)
+        for index in range(SMS_RECORDS):
+            card[SMS_OFFSET+index*SMS_RECORD_SIZE]=0
+        card[SMS_OFFSET:SMS_OFFSET+SMS_RECORD_SIZE]=DRAFT
+        text='\n'.join(f'nse2_sms_contact: event={i} down={i%2} t={20+i/4:.2f} physical_only=1'
+                       for i in range(1,23))
+        text+=('\nsim_device: header cla=a0 ins=dc p1=01 p2=04 p3=b0 selected=6f3c t=25.9\n'
+               'sim_device: update fid=6f3c record=1 length=176\n'
+               'SIM status ins=dc sw=9000 chv=3/3 puk=10/10 enabled=0')
+        with patch('tools.nse2_sim_check.SMS_SAVED_FRAME',hashlib.sha256(b'saved').hexdigest()):
+            result=verify_sms_save(text,card,b'saved')
+            self.assertFalse(result['network_sms_proved'])
+            self.assertFalse(result['cold_readback_verified'])
+            for bad in (text.replace('event=22','event=23'),text.replace('p3=b0','p3=20'),
+                        text.replace('selected=6f3c','selected=6f3a'),text.replace('sw=9000','sw=9404')):
+                with self.subTest(bad=bad[:40]), self.assertRaises(ValueError):
+                    verify_sms_save(bad,card,b'saved')
+            card[SMS_OFFSET+11]^=1
+            with self.assertRaises(ValueError):
+                verify_sms_save(text,card,b'saved')
+
     def test_cold_contact_readback_differs_from_empty_card_without_writes(self):
         from tools.sim_phonebook_check import CURRENT_NVRAM_LENGTH
         empty = bytes([255])*CURRENT_NVRAM_LENGTH

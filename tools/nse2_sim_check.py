@@ -10,6 +10,7 @@ PHONEBOOK_SUBMENU_FRAME = '8e39080ec840c45849dbc34110a5b800de17726429b62d58f0fc2
 PHONEBOOK_SAVED_FRAME = '8f9188505262676c92fd1ec55e94d6e9dbf2854bc5d14fc4d2ac3dc0903d6909'
 PHONEBOOK_RELOAD_FRAME = '4755eca080af19866a8da926e4185de6b1508f6271a3f4d116dc590d12d0e76a'
 PHONEBOOK_EMPTY_SEARCH_FRAME = '34478708c13e25cc3cb0778a9fa40f9cb812c6eb56636909c1ce133a1d616900'
+SMS_SAVED_FRAME = '491f056f1e92fdedbe7e334f423818c8b1770db0838a78bf25743e0ec2f0459c'
 BINARY_FILES = {0x6fb7: 15, 0x6fae: 1, 0x6f05: 4, 0x6fad: 3,
                 0x6f38: 12, 0x6f07: 9, 0x6f78: 2, 0x2fe6: 4,
                 0x6f46: 17, 0x6f74: 16, 0x6f7e: 11, 0x6f30: 24,
@@ -106,6 +107,28 @@ def verify_phonebook_reload(text, initial, final, pixels):
     return dict(contact_present=present, cold_reload_verified=present,
                 empty_card_control=not present, card_modified=False,
                 number_displayed=False, call_signaling_proved=False, stable_long_boot=False)
+
+
+def verify_sms_save(text, card, pixels):
+    from tools.sim_sms_draft import check_card
+    from tools.sim_security_trace_check import statuses
+    contacts = re.findall(r'nse2_sms_contact: event=(\d+) down=([01]) t=([0-9.]+) physical_only=1',text)
+    if [(int(index),int(down)) for index,down,_ in contacts] != [(i,i%2) for i in range(1,23)]:
+        raise ValueError('NSE-2 physical draft contact sequence differs')
+    times = [float(time) for _,_,time in contacts]
+    if times != sorted(times) or not 19 < times[0] < times[-1] < 27:
+        raise ValueError('NSE-2 offline draft exceeded its pre-restart window')
+    writes = [match.groups() for match in HEADER.finditer(text) if int(match[2],16)==0xdc]
+    if len(writes)!=1 or writes[0][:6]!=('a0','dc','01','04','b0','6f3c'):
+        raise ValueError('NSE-2 exact EF_SMS UPDATE RECORD header missing')
+    if (text.count('sim_device: update fid=6f3c record=1 length=176')!=1
+            or statuses(text,0xdc)!=[(0x9000,3,10)]):
+        raise ValueError('NSE-2 successful single SMS draft commit missing')
+    check_card(card)
+    if hashlib.sha256(pixels).hexdigest()!=SMS_SAVED_FRAME:
+        raise ValueError('NSE-2 reviewed Message saved frame differs')
+    return dict(offline_draft_saved=True, text='A', cold_readback_verified=False,
+                network_sms_proved=False, stable_long_boot=False)
 
 
 def verify_security_attempt(text, pixels, *, retry_zero=False):

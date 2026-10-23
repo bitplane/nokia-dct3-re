@@ -90,6 +90,7 @@ def main():
     parser.add_argument('--phonebook', action='store_true', help='physical Add name and real SIM write experiment')
     parser.add_argument('--phonebook-reload', type=Path, help='card NVRAM produced by a separate accepted contact save')
     parser.add_argument('--phonebook-search', action='store_true', help='physical Search A on the fresh erased card (negative control)')
+    parser.add_argument('--sms-store', action='store_true', help='physical offline SMS draft experiment')
     parser.add_argument('--seconds', type=int, default=8, choices=range(8, 121), metavar='8..120')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -112,6 +113,9 @@ def main():
             raise ValueError('phonebook reload requires separate post-auth Menu run, thirty seconds and no save/census')
         if args.phonebook_search and (not args.post_auth_menu or args.seconds != 30 or args.native_processing or args.phonebook or args.phonebook_reload):
             raise ValueError('erased-card search requires a separate thirty-second post-auth run')
+        if args.sms_store and (not args.phone_retry_zero or args.seconds != 30 or args.post_auth_menu
+                              or args.native_processing or args.phonebook or args.phonebook_reload or args.phonebook_search):
+            raise ValueError('SMS experiment requires authenticated thirty-second run without another application fixture')
         report = prepare_native(root, run, record_checksum=args.record_checksum_only,
                                 nominal_vbat=args.nominal_vbat, insert_sim=args.insert_sim,
                                 phone_retry_zero=args.phone_retry_zero)
@@ -130,7 +134,8 @@ def main():
                    '-video', 'none', '-sound', 'none', '-joystickprovider', 'none',
                    '-midiprovider', 'none', '-nothrottle', '-noreadconfig', '-log', '-verbose',
                    '-seconds_to_run', str(args.seconds), '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools' / ('nse2_phonebook_reload_fixture.lua' if args.phonebook_reload or args.phonebook_search else
+                   '-autoboot_script', str(root / 'tools' / ('nse2_sms_fixture.lua' if args.sms_store else
+                       'nse2_phonebook_reload_fixture.lua' if args.phonebook_reload or args.phonebook_search else
                        'nse2_phonebook_fixture.lua' if args.phonebook else
                        'nse2_processing_fixture.lua' if args.native_processing else
                        'nse2_post_auth_fixture.lua' if args.post_auth_menu else
@@ -197,8 +202,15 @@ def main():
                     saved_card if args.phonebook_reload else None,
                     (run / 'nvram' / machine / 'sim_card').read_bytes(),frame.convert('L').tobytes())
             result['contact_persistence'] = bool(args.phonebook_reload)
+        if args.sms_store:
+            from tools.nse2_sim_check import verify_sms_save
+            with Image.open(run / 'snap/nse2_sms_8.png') as frame:
+                result['sms'] = verify_sms_save(text,(run/'nvram'/machine/'sim_card').read_bytes(),
+                                                frame.convert('L').tobytes())
         (run / 'acceptance.json').write_text(json.dumps(result, indent=2) + '\n')
-        if args.phonebook_reload or args.phonebook_search:
+        if args.sms_store:
+            print('NSE-2 physical offline SMS draft save PASS; cold readback/network SMS unproved')
+        elif args.phonebook_reload or args.phonebook_search:
             print('NSE-2 physical contact search PASS; ' +
                   ('cold saved-card readback' if args.phonebook_reload else 'erased-card negative control'))
         elif args.phonebook:

@@ -2457,6 +2457,14 @@
       ]
     },
     {
+      "name": "verify-5110i-sms-store",
+      "prerequisites": ["verify-5110i-static", "build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_nse2_native.py",
+                 "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--security-code", "--phone-retry-zero", "--sms-store", "--seconds", "30"]}]
+    },
+    {
       "name": "verify-5110i-native-processing",
       "prerequisites": ["verify-5110i-static", "build"],
       "variables": {},
