@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 815 gates: 617 generated from typed steps, 198 copied verbatim (shell).
+# 816 gates: 618 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -179,14 +179,15 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5110i-sim-pin-blocked verify-5110i-sim-puk-recovery verify-5110i-fdn \
 	verify-5110i-fdn-records verify-5110i-fdn-edit-lifecycle \
 	verify-5110i-fdn-dial-policy verify-5110i-pin2-change verify-5110i-puk1-retry \
-	verify-5110i-puk1-exhaustion verify-5110i-pin1-change \
-	verify-5110i-pin-request-lifecycle verify-5110i-pin2-retry \
-	verify-5110i-pin2-blocked verify-5110i-puk2-recovery verify-5110i-puk2-retry \
-	verify-5110i-puk2-exhaustion verify-5110i-native-processing \
-	verify-6150-static verify-6110-bootstrap-capture verify-dct3-type-1f-static \
-	verify-3210-v501 verify-dsp-memory-upload verify verify-ccont \
-	verify-ccont-watchdog verify-gensio verify-display verify-dsp-transport \
-	verify-cobba-control verify-dsp-bootstrap-3310 verify-3310-radio-boundary \
+	verify-5110i-puk1-exhaustion verify-5110i-native-ui-state \
+	verify-5110i-pin1-change verify-5110i-pin-request-lifecycle \
+	verify-5110i-pin2-retry verify-5110i-pin2-blocked verify-5110i-puk2-recovery \
+	verify-5110i-puk2-retry verify-5110i-puk2-exhaustion \
+	verify-5110i-native-processing verify-6150-static \
+	verify-6110-bootstrap-capture verify-dct3-type-1f-static verify-3210-v501 \
+	verify-dsp-memory-upload verify verify-ccont verify-ccont-watchdog \
+	verify-gensio verify-display verify-dsp-transport verify-cobba-control \
+	verify-dsp-bootstrap-3310 verify-3310-radio-boundary \
 	verify-3330-radio-boundary verify-3310-radio-registration \
 	verify-3330-radio-registration verify-3330-radio-registration-preserved \
 	verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells \
@@ -1482,6 +1483,9 @@ verify-5110i-puk1-retry: verify-5110i-static build
 
 verify-5110i-puk1-exhaustion: verify-5110i-static build
 	$(VENV)/bin/python tools/run_nse2_puk1_retry.py $(RUN_DIR) --mame $(MAME_DIR)/mame --exhaust
+
+verify-5110i-native-ui-state: verify-5110i-static build
+	$(VENV)/bin/python tools/run_nse2_native_state.py $(RUN_DIR) --mame $(MAME_DIR)/mame
 
 verify-5110i-pin1-change: verify-5110i-static build
 	$(VENV)/bin/python tools/run_nse2_pin1_change.py $(RUN_DIR) --mame $(MAME_DIR)/mame

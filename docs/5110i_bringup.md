@@ -81,6 +81,7 @@ make verify-5110i-puk1-retry RUN_DIR=tmp/nse2-puk1-retry
 make verify-5110i-puk1-exhaustion RUN_DIR=tmp/nse2-puk1-exhaustion
 make verify-5110i-fdn-dial-policy RUN_DIR=tmp/nse2-fdn-policy
 make verify-5110i-native-processing RUN_DIR=tmp/nse2-native-processing
+make verify-5110i-native-ui-state RUN_DIR=tmp/nse2-native-ui-state
 ```
 
 The nominal boot gate requires the reviewed unattended seven-second frame
@@ -1161,6 +1162,36 @@ removed. A passed deadline in this FIQ5-serviced queue is not alone proof
 of late service or a hardware-clock defect. Resume at the native activity/
 completion contract rather than changing queue state or timer rates.
 
+## Bounded native/UI save-state continuation
+
+`verify-5110i-native-ui-state` prepares a fresh laboratory card, then runs a
+separate phone-authenticated native process. At 18.5 seconds it saves the
+emulator state; physical Menu at 20 seconds opens Phone book. Loading that
+checkpoint and repeating the same contact reproduces the exact frame hash
+`601a551845a9a2dd5a2df5f54f2add55b8ce4ec2edcdab445fb886b84eb414fd`.
+The entire serialized SIM card remains unchanged. Initial SIM read bootstrap
+and phone-code acceptance retain their separate checks.
+
+Pre-save and post-load observations match time, all 37 exposed MCU register
+values, the checksum of mapped 64-KiB MCU RAM, all 36 exposed C54x register
+values, the checksum of data words `0080..7fff` and all 65,536 page-zero
+program words. DSP mapped registers are excluded from the RAM checksum;
+their exposed values are observed separately. A 2.7-second native I/O-write
+window compares every recorded relative timestamp (nine decimal places),
+port, value and mask. The qualified run has 8,180 matching writes in each
+leg; that count is an observation, not a required hardware constant. The
+16,384-entry diagnostic cap fails closed on saturation/overflow. Exact
+restoration of these observed fields and replay is not exhaustive hidden
+pipeline-state or electrical-clock proof.
+
+`tools/run_nse2_native_state.py` uses run-local save storage, checks that a
+nonempty state artifact exists, hashes it, and requires completed replay,
+physical contacts, exact frames and unchanged card storage. Execution ends
+at emulated time 26 seconds, before the known receive-supervision restart.
+It does not establish sustained operation, registration, connected calls or
+speech; the forty-second repeated-startup diagnostic remains a negative
+control. No native clock, firmware state or peer response is changed.
+
 ## Remaining work
 
 | Boundary | Established | Required evidence / next action |
@@ -1168,5 +1199,5 @@ completion contract rather than changing queue state or timer rates.
 | Native receive supervision | Initial RX is delivered and consumed; full scan advances; timer-`dd` tests generic activity and expires with zero. | Identify a legitimate later producer or peripheral completion. No guessed heartbeat, shortened bitmap or policy disable. |
 | Pending word peripheral | Ports `34/35/36`, state/mask/ack grammar and pending first TX are mapped. | Recover clock/framing/completion ownership from software or measured traces; adjacent setup exposes no evidenced divisor. Its relationship to supervision remains unproved. |
 | Provisioning | Own checksum and explicit retry-byte fixtures permit physical phone authentication. | Own semantic/factory evidence, not donor EEPROM or promotion of a diagnostic byte to a factory default. |
-| Bounded software continuation | SIM security, persistent contacts/drafts and FDN policy have independent short cold-process gates. | Add native/UI save-state continuation within the accepted pre-restart interval; this cannot promote sustained boot. |
+| Bounded software continuation | SIM security, persistent contacts/drafts, FDN policy and native/UI replay have independent pre-restart gates. | Extend restoration into an actual in-flight SIM write or security transaction; idle/UI replay cannot prove transaction ownership. |
 | Sustained handset service | The reason-`68` restart is retained as a negative control. | Prove operation beyond that boundary before promoting native registration, network SMS, calls or speech. Fitted DSP/clock and electrical calibration remain separate prerequisites. |
