@@ -93,6 +93,8 @@ def main():
     parser.add_argument('--sms-store', action='store_true', help='physical offline SMS draft experiment')
     parser.add_argument('--sms-reload', type=Path, help='card NVRAM produced by a separate accepted draft save')
     parser.add_argument('--sms-action', choices=('erase','cancel','empty'), help='physical confirmation or erased-card Outbox check')
+    parser.add_argument('--pin-enabled', action='store_true', help='separate PIN-enabled synthetic-card boot observation')
+    parser.add_argument('--pin-action', choices=('verify','wrong'), help='one physical correct/wrong SIM PIN attempt')
     parser.add_argument('--seconds', type=int, default=8, choices=range(8, 121), metavar='8..120')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -123,10 +125,23 @@ def main():
             raise ValueError('cold SMS read requires a separate authenticated thirty-second run')
         if args.sms_action and not args.sms_reload:
             raise ValueError('SMS confirmation action requires a separate saved-card reload')
+        if args.pin_enabled and (not args.insert_sim or args.seconds!=14 or args.physical_menu or args.security_code or args.phone_retry_zero
+                                 or args.post_auth_menu or args.native_processing or args.sms_store or args.sms_reload):
+            raise ValueError('PIN-enabled observation requires inserted card, fourteen seconds and no phone-code/application fixture')
+        if args.pin_action and not args.pin_enabled:
+            raise ValueError('SIM PIN input requires the explicit PIN-enabled card')
         report = prepare_native(root, run, record_checksum=args.record_checksum_only,
                                 nominal_vbat=args.nominal_vbat, insert_sim=args.insert_sim,
                                 phone_retry_zero=args.phone_retry_zero)
         machine = report['machine']
+        if args.pin_enabled:
+            from tools.make_sim_card_profile import make_profile
+            pin_card=make_profile(True)
+            card_path=run/'nvram'/machine/'sim_card'
+            card_path.parent.mkdir(parents=True,exist_ok=True)
+            card_path.write_bytes(pin_card)
+            report['pin_card']=dict(pin_enabled=True,sha256=hashlib.sha256(pin_card).hexdigest(),
+                                    source='laboratory profile; not handset EEPROM provisioning')
         if args.phonebook_reload:
             from tools.sim_phonebook_check import validate_phonebook_storage
             saved_card = args.phonebook_reload.read_bytes()
@@ -150,7 +165,8 @@ def main():
                    '-video', 'none', '-sound', 'none', '-joystickprovider', 'none',
                    '-midiprovider', 'none', '-nothrottle', '-noreadconfig', '-log', '-verbose',
                    '-seconds_to_run', str(args.seconds), '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools' / (f'nse2_sms_{args.sms_action}_fixture.lua' if args.sms_action else
+                   '-autoboot_script', str(root / 'tools' / (f'nse2_pin_{args.pin_action}_fixture.lua' if args.pin_action else
+                       f'nse2_sms_{args.sms_action}_fixture.lua' if args.sms_action else
                        'nse2_sms_reload_fixture.lua' if args.sms_reload else
                        'nse2_sms_fixture.lua' if args.sms_store else
                        'nse2_phonebook_reload_fixture.lua' if args.phonebook_reload or args.phonebook_search else
@@ -185,8 +201,25 @@ def main():
             result['menu_probe'] = verify_menu_probe((run / 'error.log').read_text(errors='replace'))
         if args.insert_sim:
             text = (run / 'error.log').read_text(errors='replace')
-            with Image.open(run / 'snap/nse2_7.png') as frame:
-                result.update(verify_sim_reads(text, frame.convert('L').tobytes()))
+            if args.pin_enabled:
+                from tools.nse2_sim_check import verify_pin_boot
+                prompt_name='nse2_pin_1.png' if args.pin_action else 'nse2_7.png'
+                with Image.open(run/'snap'/prompt_name) as prompt:
+                    if args.pin_action:
+                        with Image.open(run/'snap/nse2_pin_2.png') as outcome, \
+                             Image.open(run/'snap/nse2_pin_3.png') as continuation:
+                            result.update(verify_pin_boot(text,(run/'nvram'/machine/'sim_card').read_bytes(),
+                                prompt.convert('L').tobytes(),outcome.convert('L').tobytes(),
+                                continuation.convert('L').tobytes(),action=args.pin_action))
+                            if args.pin_action=='verify':
+                                result.update(verify_sim_reads(text,continuation.convert('L').tobytes(),
+                                                             pin_authenticated=True,bootstrap_horizon=14))
+                    else:
+                        result.update(verify_pin_boot(text,(run/'nvram'/machine/'sim_card').read_bytes(),
+                                                     prompt.convert('L').tobytes()))
+            else:
+                with Image.open(run / 'snap/nse2_7.png') as frame:
+                    result.update(verify_sim_reads(text, frame.convert('L').tobytes()))
             if args.security_code:
                 with Image.open(run / 'snap/nse2_security_result.png') as frame:
                     result.update(verify_security_attempt(text, frame.convert('L').tobytes(), retry_zero=args.phone_retry_zero))
@@ -241,7 +274,10 @@ def main():
                         (run/'nvram'/machine/'sim_card').read_bytes(),frame.convert('L').tobytes())
                 result['sms_persistence']=True
         (run / 'acceptance.json').write_text(json.dumps(result, indent=2) + '\n')
-        if args.sms_store:
+        if args.pin_enabled:
+            print('NSE-2 physical SIM PIN ' + (args.pin_action or 'wait') +
+                  ' PASS; phone-side code remains locked')
+        elif args.sms_store:
             print('NSE-2 physical offline SMS draft save PASS; cold readback/network SMS unproved')
         elif args.sms_reload:
             print('NSE-2 physical SMS ' + (args.sms_action or 'cold Outbox read') +

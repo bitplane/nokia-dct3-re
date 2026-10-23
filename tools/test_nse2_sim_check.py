@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from tools.nse2_sim_check import (BINARY_FILES, verify_sim_reads, verify_security_attempt,
                                   verify_post_auth_menu, verify_phonebook_save, verify_phonebook_reload,
-                                  verify_sms_save, verify_sms_reload, verify_sms_action)
+                                  verify_sms_save, verify_sms_reload, verify_sms_action, verify_pin_boot)
 
 
 def reads():
@@ -34,6 +34,42 @@ def contacts():
 
 
 class SimCheckTest(unittest.TestCase):
+    def test_pin_wait_verify_and_wrong_pin_are_separate_from_phone_lock(self):
+        from tools.make_sim_card_profile import make_profile
+        from tools.sim_security_trace_check import AOC_NVRAM_SIZE,ATTEMPTS_OFFSET
+        hashes={name:hashlib.sha256(value).hexdigest() for name,value in (
+            ('PIN_PROMPT_FRAME',b'pin'),('PIN_ACCEPTED_FRAME',b'accepted'),
+            ('SECURITY_FRAME',b'phone'),('CODE_ERROR_FRAME',b'wrong'))}
+        with patch.multiple('tools.nse2_sim_check',**hashes):
+            for action in (None,'verify','wrong'):
+                card=bytearray(make_profile(True).ljust(AOC_NVRAM_SIZE,b'\xff'))
+                text=''
+                if action:
+                    text='\n'.join(f'nse2_pin_contact: event={i} down={i%2} t={6+i*.15:.2f} physical_only=1' for i in range(1,11))
+                    status='9000' if action=='verify' else '9804'
+                    retries=3 if action=='verify' else 2
+                    card[ATTEMPTS_OFFSET]=retries
+                    text+=('\nsim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08 selected=6fad t=7.7\n'
+                           f'SIM status ins=20 sw={status} chv={retries}/3 puk=10/10 enabled=1')
+                result=verify_pin_boot(text,card,b'pin',b'accepted' if action=='verify' else b'wrong',
+                                       b'phone' if action=='verify' else b'pin',action=action)
+                self.assertEqual(result['sim_pin_verified'],action=='verify')
+                self.assertFalse(result['phone_code_authenticated'])
+                card[ATTEMPTS_OFFSET]=0
+                with self.assertRaises(ValueError):
+                    verify_pin_boot(text,card,b'pin',action=action)
+
+    def test_pin_authenticated_reads_require_verify_before_protected_files(self):
+        status=('sim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08 selected=6fad t=7.7\n'
+                'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1\n')
+        text=status+reads().replace('t=4.2','t=8.2')
+        with patch('tools.nse2_sim_check.SECURITY_FRAME',hashlib.sha256(b'phone').hexdigest()):
+            self.assertTrue(verify_sim_reads(text,b'phone',pin_authenticated=True,bootstrap_horizon=14)['sim_pin_verified'])
+            for bad in (text.replace('sw=9000 chv','sw=9804 chv'),
+                        text.replace('t=8.2','t=7.0'),reads()+status):
+                with self.assertRaises(ValueError):
+                    verify_sim_reads(bad,b'phone',pin_authenticated=True,bootstrap_horizon=14)
+
     def test_sms_erase_cancel_and_cold_empty_preserve_exact_mutation_boundary(self):
         from tools.sim_sms_draft import SMS_OFFSET,DRAFT,deleted_card
         from tools.make_sim_card_profile import SMS_RECORD_SIZE,SMS_RECORDS

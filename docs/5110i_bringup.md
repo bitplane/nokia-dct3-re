@@ -20,6 +20,8 @@ card and physically searches for `A`; an erased-card control instead shows
 unsent `A` draft on the SIM; a fresh cold process opens it in Outbox and
 reads `A` without rewriting the card. Registration, calls and network SMS
 are not accepted.
+A separate PIN-enabled-card gate proves physical CHV1 authentication and
+wrong-PIN rejection; both leave the unrelated phone-side lock untouched.
 Longer execution is not stable: both menu-only and contact-entry runs
 request reason-`68` reset at about 31.97 seconds. The short menu gates do
 not cover this boundary.
@@ -61,6 +63,7 @@ make verify-5110i-phonebook RUN_DIR=tmp/nse2-phonebook
 make verify-5110i-sms-store RUN_DIR=tmp/nse2-sms-store
 make verify-5110i-sms-persistence RUN_DIR=tmp/nse2-sms-persistence
 make verify-5110i-sms-delete RUN_DIR=tmp/nse2-sms-delete
+make verify-5110i-sim-pin RUN_DIR=tmp/nse2-sim-pin
 make verify-5110i-native-processing RUN_DIR=tmp/nse2-native-processing
 ```
 
@@ -89,7 +92,7 @@ The archive calls the phone 5110i; both headers identify `NSE-2`, `05.53`,
 | GENSIO/CCONT | Own `296704`: select `22` at `28`, TX `2a`, RX `2d`, status `29` bit 2. | Shared serial grammar, not measured electrical timing. |
 | LCD | Own `296e46/296eac`: command/data `2c/2b`, ready bit 0. | Observed 84x48 presentation; fitted controller identity remains unproved. |
 | Keypad | Scanner `29806c`, decoder `299010`, maps `2b382c/2b3848`, selector `10c6b6`; five rows, signal/direction `31/2f`, columns `30`, IRQ mask `33`. | Existing NSE-1 contact layout matches own table; digits 1--5 and Menu have runtime decode acceptance. |
-| SIMI | Own `286520` initializes standard IIR/FIFO controls; inserted synthetic card completes read bootstrap, organic ADN write and cold contact readback. | SIM PIN authentication remains unaccepted; the tested phone code is phone-side. |
+| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/rejection, organic ADN write and cold contact readback pass. | PIN1/2 changes, PUK recovery/exhaustion and cold retry replay remain separate tests; the Nokia phone code is phone-side. |
 
 EEPROM START/STOP entry points are `295814/295886`, identified by SDA
 transitions while SCL is high. Block reader `293d92` takes address,
@@ -258,6 +261,29 @@ only the animated icon rectangle `(0,20,76,18)`, retaining title, softkey and
 scrollbar; the static submenu is checked byte-exactly. This establishes
 application navigation, not contact writes, registration or speech. The
 ordinary silent and open-pin controls remain unchanged.
+
+### SIM PIN authentication
+
+`verify-5110i-sim-pin` uses the laboratory card's persistent PIN-enabled
+profile, not a handset EEPROM change. Its three fresh processes establish:
+
+- With no key input, `Enter PIN code` remains visible; no VERIFY occurs and
+  the credential/retry prefix is unchanged.
+- Physical `1234` and OK issue `A0 20 00 01 08` at 7.663 seconds. The card
+  returns `9000`, retains three retries and unchanged credentials; firmware
+  shows `Code accepted`, then the separate Nokia `Security code` prompt.
+- Physical `1111` issues one VERIFY returning `9804`. Only persistent CHV1
+  retries change, from three to two. Firmware shows `Code error` and returns
+  to `Enter PIN code`.
+
+The successful run additionally checks all 16 binary files, 50 ADN records
+and ten SMS records. Protected IMSI/ADN/SMS reads must follow successful
+VERIFY. The fourteen-second capture accounts for the physical PIN-entry
+delay; ordinary PIN-disabled bootstrap retains its ten-second bound.
+The accepted frame/status/credential contrast is not phone-code unlocking,
+PIN management, PUK recovery or network registration. Legacy card profile
+serialization is expanded by the card device; the checker pins its complete
+credential/retry prefix rather than claiming a byte-identical file length.
 
 ### Physical contact save
 

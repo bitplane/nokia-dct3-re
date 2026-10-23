@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nse2_physical_chv1_boot_contrast", "owner": "nse2_sim_security", "status": "satisfied",
+      "predicate": "A PIN-enabled laboratory card requires physical CHV1 verification, accepts its real PIN and persistently accounts for a wrong attempt without unlocking the Nokia phone code",
+      "current": "verify-5110i-sim-pin runs independent no-input,1234/OK and1111/OK controls. No input leaves Enter PIN code with no VERIFY. Correct entry issues A0 20 00 01 08, returns9000 with unchanged credentials/retries3 and displays Code accepted followed by Security code. The protected IMSI/ADN/SMS reads follow VERIFY and all16 binary/50 ADN/10 SMS bootstrap reads complete within the declared14-second physical-entry capture. Wrong entry returns9804, changes only CHV1 retry3to2 in the legacy profile prefix and returns via Code error to Enter PIN code. Phone-side lock remains active; cold retry replay, PIN management, PUK lifecycle, network registration, fitted DSP/clock and long-run stability are not qualified.",
+      "evidence": ["docs/5110i_bringup.md", "gates.json", "tools/nse2_sim_check.py", "tools/nse2_pin_fixture.lua", "tools/test_nse2_sim_check.py"]
+    },
+    {
       "id": "nse2_physical_contact_cold_persistence", "owner": "nse2_sim_application", "status": "satisfied",
       "predicate": "The declared native-compatibility NSE-2 fixture creates a SIM contact through physical input and retrieves it after a fresh process boot",
       "current": "verify-5110i-phonebook saves A/123 through A0 DC 01 04 20 with status9000 and an exact Saved frame. A fresh phone imports only the saved synthetic SIM, physically searches for A and renders the contact with byte-identical complete card storage and no UPDATE RECORD. The erased-card control instead renders No phone numbers. Own checksum/retry fixtures, nominal ADC2 hypothesis and borrowed NSE-1 ROM4 remain explicit. No factory-image, fitted DSP, registration, speech or stable-long-boot acceptance follows.",

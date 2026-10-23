@@ -15,6 +15,8 @@ SMS_READ_FRAME = '4877eac15193be5a99aad660db563aa3d4780c90ec47d349eb19448789fa31
 SMS_ERASE_PROMPT_FRAME = '87fecc9ef97a2a8add1a94e8c6a4168577bc1726da1931ef95f0a91eaa62a441'
 SMS_ERASED_FRAME = 'a3e10fc73a63b9d342f3474168d10a19fc3bf2c582b560fe5817937d62316265'
 SMS_EMPTY_FRAME = 'ae8c6f125e67dd0878a5833b4309071851689684cef3e7b51c6bf89c3bc4e113'
+PIN_PROMPT_FRAME = '02d05af86d04ea0db15a0f55824bc395cd221bdaed95d3712b3d9c3bd5f22678'
+PIN_ACCEPTED_FRAME = 'd14c9f37fc63a2fba3dc668f80e9b795b6e0babddd8c29f54f7eae5031e44473'
 BINARY_FILES = {0x6fb7: 15, 0x6fae: 1, 0x6f05: 4, 0x6fad: 3,
                 0x6f38: 12, 0x6f07: 9, 0x6f78: 2, 0x2fe6: 4,
                 0x6f46: 17, 0x6f74: 16, 0x6f7e: 11, 0x6f30: 24,
@@ -25,23 +27,32 @@ HEADER = re.compile(r'sim_device: header cla=([0-9a-f]{2}) ins=([0-9a-f]{2}) '
 COMPLETION = re.compile(r'SIM completion ins=([0-9a-f]{2}) sw=([0-9a-f]{4})')
 
 
-def verify_sim_reads(text, pixels):
+def verify_sim_reads(text, pixels, *, pin_authenticated=False, bootstrap_horizon=10):
+    if pin_authenticated:
+        from tools.sim_security_trace_check import statuses
+        if statuses(text,0x20)!=[(0x9000,3,10)]:
+            raise ValueError('NSE-2 PIN-authenticated bootstrap lacks a successful VERIFY')
     pending, records, binary = None, [], []
     later_reads = 0
+    pin_ready_time = None
     for line in text.splitlines():
         header = HEADER.search(line)
         if header:
             values = header.groups()
             pending = tuple(int(value, 16) for value in values[:6]) + (float(values[6]),)
-            if pending[1] == 0x20:
+            if pending[1] == 0x20 and not pin_authenticated:
                 raise ValueError('NSE-2 PIN-disabled fixture unexpectedly issued VERIFY CHV')
+        if pin_authenticated and 'SIM status ins=20 sw=9000 ' in line:
+            if pending is None or pending[1]!=0x20:
+                raise ValueError('NSE-2 successful PIN status lacks its VERIFY header')
+            pin_ready_time=pending[-1]
         completion = COMPLETION.search(line)
         if not completion:
             continue
         ins, status = (int(value, 16) for value in completion.groups())
         if ins not in (0xb0, 0xb2):
             continue
-        if pending is not None and pending[-1] >= 10:
+        if pending is not None and pending[-1] >= bootstrap_horizon:
             # Later application reads are not extra bootstrap records. The
             # complete initial file/record sets below must still be present.
             later_reads += 1
@@ -50,6 +61,8 @@ def verify_sim_reads(text, pixels):
         if pending is None or pending[0] != 0xa0 or pending[1] != ins or status != 0x9000:
             raise ValueError('NSE-2 SIM read completion missing its header or successful status')
         _, _, p1, p2, length, fid, time = pending
+        if pin_authenticated and fid in (0x6f07,0x6f3a,0x6f3c) and (pin_ready_time is None or time<=pin_ready_time):
+            raise ValueError('NSE-2 protected SIM read preceded successful PIN verification')
         if ins == 0xb0:
             binary.append((fid, p1 * 256 + p2, length))
         else:
@@ -61,13 +74,13 @@ def verify_sim_reads(text, pixels):
         rows = [row for row in records if row[0] == fid]
         if [(row[1], row[2], row[3]) for row in rows] != [(i, 4, size) for i in range(1, count + 1)]:
             raise ValueError(f'NSE-2 complete successful record reads missing for {fid:04x}')
-    if len(records) != 60 or not 4 < max(row[4] for row in records) < 10:
+    if len(records) != 60 or not 4 < max(row[4] for row in records) < bootstrap_horizon:
         raise ValueError('NSE-2 SIM record bootstrap horizon differs')
     if hashlib.sha256(pixels).hexdigest() != SECURITY_FRAME:
         raise ValueError('NSE-2 reviewed phone Security code frame differs')
     return dict(sim_read_bootstrap=True, adn_records_read=50, sms_records_read=10,
-                bootstrap_read_horizon_seconds=10, later_application_reads=later_reads,
-                binary_files_read=16, phone_code_authenticated=False, sim_pin_verified=False)
+                bootstrap_read_horizon_seconds=bootstrap_horizon, later_application_reads=later_reads,
+                binary_files_read=16, phone_code_authenticated=False, sim_pin_verified=pin_authenticated)
 
 
 def verify_phonebook_save(text, data, pixels):
@@ -186,6 +199,45 @@ def verify_sms_action(text, initial, final, prompt_pixels, result_pixels, action
         raise ValueError('NSE-2 SMS lifecycle result frame differs')
     return dict(action=action,card_modified=action=='erase',cold_empty_verified=action=='empty',
                 network_sms_proved=False,stable_long_boot=False)
+
+
+def verify_pin_boot(text, card, prompt_pixels, result_pixels=None, final_pixels=None, *, action=None):
+    from tools.make_sim_card_profile import make_profile
+    from tools.sim_security_trace_check import statuses,ATTEMPTS_OFFSET,AOC_NVRAM_SIZE
+    if action not in (None,'verify','wrong'):
+        raise ValueError('unknown NSE-2 PIN action')
+    if action is not None and (result_pixels is None or final_pixels is None):
+        raise ValueError('NSE-2 PIN result and continuation frames are required')
+    expected=bytearray(make_profile(True))
+    if action=='wrong': expected[ATTEMPTS_OFFSET]=2
+    if len(card)!=AOC_NVRAM_SIZE or card[:len(expected)]!=expected:
+        raise ValueError('NSE-2 PIN attempt changed unexpected persistent credentials/retries')
+    if hashlib.sha256(prompt_pixels).hexdigest()!=PIN_PROMPT_FRAME:
+        raise ValueError('NSE-2 reviewed Enter PIN code frame differs')
+    verify_headers=[match.groups() for match in HEADER.finditer(text) if int(match[2],16)==0x20]
+    contacts=re.findall(r'nse2_pin_contact: event=(\d+) down=([01]) t=([0-9.]+) physical_only=1',text)
+    if action is None:
+        if verify_headers or contacts or statuses(text,0x20):
+            raise ValueError('NSE-2 PIN wait unexpectedly submitted a code')
+    else:
+        if [(int(index),int(down)) for index,down,_ in contacts]!=[(i,i%2) for i in range(1,11)]:
+            raise ValueError('NSE-2 physical SIM PIN contact sequence differs')
+        times=[float(time) for _,_,time in contacts]
+        if times!=sorted(times) or not 5.9<=times[0]<times[-1]<8:
+            raise ValueError('NSE-2 physical SIM PIN timing differs')
+        if len(verify_headers)!=1 or verify_headers[0][:5]!=('a0','20','00','01','08'):
+            raise ValueError('NSE-2 absolute CHV1 VERIFY header missing')
+        expected_status=0x9000 if action=='verify' else 0x9804
+        if statuses(text,0x20)!=[(expected_status,3 if action=='verify' else 2,10)]:
+            raise ValueError('NSE-2 SIM PIN status/retry contrast differs')
+        expected_result=PIN_ACCEPTED_FRAME if action=='verify' else CODE_ERROR_FRAME
+        expected_final=SECURITY_FRAME if action=='verify' else PIN_PROMPT_FRAME
+        if (hashlib.sha256(result_pixels).hexdigest()!=expected_result
+                or hashlib.sha256(final_pixels).hexdigest()!=expected_final):
+            raise ValueError('NSE-2 PIN result/continuation frame differs')
+    return dict(sim_pin_verified=action=='verify',pin_wait=action is None,
+                wrong_pin_rejected=action=='wrong',pin_attempts_remaining=2 if action=='wrong' else 3,
+                phone_code_authenticated=False,network_registration=False)
 
 
 def verify_security_attempt(text, pixels, *, retry_zero=False):

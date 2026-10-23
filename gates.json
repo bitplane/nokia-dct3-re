@@ -2497,6 +2497,22 @@
       ]
     },
     {
+      "name": "verify-5110i-sim-pin",
+      "prerequisites": ["verify-5110i-static", "build"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/wait", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--pin-enabled", "--seconds", "14"]},
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/verify", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--pin-enabled", "--pin-action", "verify", "--seconds", "14"]},
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/wrong", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--pin-enabled", "--pin-action", "wrong", "--seconds", "14"]}
+      ]
+    },
+    {
       "name": "verify-5110i-native-processing",
       "prerequisites": ["verify-5110i-static", "build"],
       "variables": {},
