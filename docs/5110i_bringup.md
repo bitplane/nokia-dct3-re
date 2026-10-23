@@ -65,6 +65,7 @@ make verify-5110i-sms-persistence RUN_DIR=tmp/nse2-sms-persistence
 make verify-5110i-sms-delete RUN_DIR=tmp/nse2-sms-delete
 make verify-5110i-sim-pin RUN_DIR=tmp/nse2-sim-pin
 make verify-5110i-sim-pin-persistence RUN_DIR=tmp/nse2-sim-pin-persistence
+make verify-5110i-sim-pin-blocked RUN_DIR=tmp/nse2-sim-pin-blocked
 make verify-5110i-native-processing RUN_DIR=tmp/nse2-native-processing
 ```
 
@@ -293,9 +294,16 @@ card and physical `1234` restores three attempts with `9000`. These saved
 cards use the complete current serialization, so the latter two runs
 compare every byte against the input, allowing only the retry reset on
 successful VERIFY. Input path/hash and before/after retry counts are recorded.
-The fixture accepts only the declared laboratory credentials and qualified
-nonblocked retry states; a final wrong attempt is rejected by this acceptance
-path until a distinct blocked/PUK lifecycle is qualified.
+The fixture accepts only the declared laboratory credentials and explicit
+retry-state inputs. The distinct `verify-5110i-sim-pin-blocked` gate drives
+three real wrong attempts across saved cards: `9804` with two attempts,
+`9804` with one, then `9840` with zero. Each card changes only its retry byte.
+The final error displays `SIM card blocked` then `Enter PUK code`, retaining
+the original PIN and all ten PUK attempts. A fresh process receives that
+organically exhausted card, shows the transient blocked notice at seven
+seconds and reaches the PUK prompt at eleven seconds without any key input,
+VERIFY or UNBLOCK command. The full saved card remains unchanged. This is
+PIN exhaustion/cold blocking, not PUK authentication or recovery.
 
 ### Physical contact save
 

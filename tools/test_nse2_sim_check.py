@@ -34,6 +34,34 @@ def contacts():
 
 
 class SimCheckTest(unittest.TestCase):
+    def test_final_wrong_pin_and_cold_blocked_state_require_puk_frames(self):
+        from tools.make_sim_card_profile import make_profile
+        from tools.sim_security_trace_check import AOC_NVRAM_SIZE,ATTEMPTS_OFFSET
+        initial=bytearray(make_profile(True).ljust(AOC_NVRAM_SIZE,b'\xff'))
+        initial[ATTEMPTS_OFFSET]=1
+        blocked=bytearray(initial)
+        blocked[ATTEMPTS_OFFSET]=0
+        text='\n'.join(f'nse2_pin_contact: event={i} down={i%2} t={6+i*.15:.2f} physical_only=1' for i in range(1,11))
+        text+=('\nsim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08 selected=6fad t=7.7\n'
+               'SIM status ins=20 sw=9840 chv=0/3 puk=10/10 enabled=1')
+        hashes={name:hashlib.sha256(value).hexdigest() for name,value in (
+            ('PIN_PROMPT_FRAME',b'pin'),('PIN_BLOCKED_FRAME',b'blocked'),('PUK_PROMPT_FRAME',b'puk'))}
+        with patch.multiple('tools.nse2_sim_check',**hashes):
+            result=verify_pin_boot(text,blocked,b'pin',b'blocked',b'puk',action='wrong',initial_card=initial)
+            self.assertTrue(result['pin_blocked'])
+            self.assertFalse(result['puk_verified'])
+            cold=verify_pin_boot('',blocked,b'puk',action='blocked',initial_card=blocked)
+            self.assertEqual(cold['pin_attempts_remaining'],0)
+            with self.assertRaises(ValueError):
+                verify_pin_boot('',blocked,b'pin',action='blocked',initial_card=blocked)
+            with self.assertRaises(ValueError):
+                verify_pin_boot('',initial,b'puk',action='blocked',initial_card=initial)
+            with self.assertRaises(ValueError):
+                verify_pin_boot(text.replace('sw=9840','sw=9804'),blocked,b'pin',b'blocked',b'puk',action='wrong',initial_card=initial)
+            with self.assertRaises(ValueError):
+                verify_pin_boot('sim_device: header cla=a0 ins=2c p1=00 p2=00 p3=10 selected=6fad t=7.7',
+                                blocked,b'puk',action='blocked',initial_card=blocked)
+
     def test_cold_pin_retry_state_and_restore_preserve_the_full_card(self):
         from tools.make_sim_card_profile import make_profile
         from tools.sim_security_trace_check import AOC_NVRAM_SIZE,ATTEMPTS_OFFSET

@@ -94,7 +94,7 @@ def main():
     parser.add_argument('--sms-reload', type=Path, help='card NVRAM produced by a separate accepted draft save')
     parser.add_argument('--sms-action', choices=('erase','cancel','empty'), help='physical confirmation or erased-card Outbox check')
     parser.add_argument('--pin-enabled', action='store_true', help='separate PIN-enabled synthetic-card boot observation')
-    parser.add_argument('--pin-action', choices=('verify','wrong'), help='one physical correct/wrong SIM PIN attempt')
+    parser.add_argument('--pin-action', choices=('verify','wrong','blocked'), help='physical PIN attempt or cold PUK-prompt control')
     parser.add_argument('--pin-card', type=Path, help='persistent PIN-enabled laboratory card from an earlier process')
     parser.add_argument('--seconds', type=int, default=8, choices=range(8, 121), metavar='8..120')
     args = parser.parse_args()
@@ -133,6 +133,8 @@ def main():
             raise ValueError('SIM PIN input requires the explicit PIN-enabled card')
         if args.pin_card and not args.pin_enabled:
             raise ValueError('persistent PIN card requires the PIN-enabled boot fixture')
+        if args.pin_action=='blocked' and not args.pin_card:
+            raise ValueError('blocked PIN control requires the card saved by actual PIN exhaustion')
         report = prepare_native(root, run, record_checksum=args.record_checksum_only,
                                 nominal_vbat=args.nominal_vbat, insert_sim=args.insert_sim,
                                 phone_retry_zero=args.phone_retry_zero)
@@ -141,7 +143,7 @@ def main():
             from tools.make_sim_card_profile import make_profile
             from tools.nse2_sim_check import verify_pin_input
             pin_card=args.pin_card.read_bytes() if args.pin_card else make_profile(True)
-            verify_pin_input(pin_card)
+            verify_pin_input(pin_card,blocked=args.pin_action=='blocked')
             card_path=run/'nvram'/machine/'sim_card'
             card_path.parent.mkdir(parents=True,exist_ok=True)
             card_path.write_bytes(pin_card)
@@ -170,7 +172,7 @@ def main():
                    '-video', 'none', '-sound', 'none', '-joystickprovider', 'none',
                    '-midiprovider', 'none', '-nothrottle', '-noreadconfig', '-log', '-verbose',
                    '-seconds_to_run', str(args.seconds), '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools' / (f'nse2_pin_{args.pin_action}_fixture.lua' if args.pin_action else
+                   '-autoboot_script', str(root / 'tools' / (f'nse2_pin_{args.pin_action}_fixture.lua' if args.pin_action in ('verify','wrong','blocked') else
                        f'nse2_sms_{args.sms_action}_fixture.lua' if args.sms_action else
                        'nse2_sms_reload_fixture.lua' if args.sms_reload else
                        'nse2_sms_fixture.lua' if args.sms_store else
@@ -208,9 +210,10 @@ def main():
             text = (run / 'error.log').read_text(errors='replace')
             if args.pin_enabled:
                 from tools.nse2_sim_check import verify_pin_boot
-                prompt_name='nse2_pin_1.png' if args.pin_action else 'nse2_7.png'
+                prompt_name=('nse2_pin_1.png' if args.pin_action in ('verify','wrong') else
+                             'nse2_pin_blocked.png' if args.pin_action=='blocked' else 'nse2_7.png')
                 with Image.open(run/'snap'/prompt_name) as prompt:
-                    if args.pin_action:
+                    if args.pin_action in ('verify','wrong'):
                         with Image.open(run/'snap/nse2_pin_2.png') as outcome, \
                              Image.open(run/'snap/nse2_pin_3.png') as continuation:
                             result.update(verify_pin_boot(text,(run/'nvram'/machine/'sim_card').read_bytes(),
@@ -221,7 +224,7 @@ def main():
                                                              pin_authenticated=True,bootstrap_horizon=14))
                     else:
                         result.update(verify_pin_boot(text,(run/'nvram'/machine/'sim_card').read_bytes(),
-                                                     prompt.convert('L').tobytes(),initial_card=pin_card))
+                                                     prompt.convert('L').tobytes(),initial_card=pin_card,action=args.pin_action))
             else:
                 with Image.open(run / 'snap/nse2_7.png') as frame:
                     result.update(verify_sim_reads(text, frame.convert('L').tobytes()))

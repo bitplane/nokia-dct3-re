@@ -17,6 +17,8 @@ SMS_ERASED_FRAME = 'a3e10fc73a63b9d342f3474168d10a19fc3bf2c582b560fe5817937d6231
 SMS_EMPTY_FRAME = 'ae8c6f125e67dd0878a5833b4309071851689684cef3e7b51c6bf89c3bc4e113'
 PIN_PROMPT_FRAME = '02d05af86d04ea0db15a0f55824bc395cd221bdaed95d3712b3d9c3bd5f22678'
 PIN_ACCEPTED_FRAME = 'd14c9f37fc63a2fba3dc668f80e9b795b6e0babddd8c29f54f7eae5031e44473'
+PIN_BLOCKED_FRAME = 'b60f2dfc2e7bfde5aadfb61423c726f2a57cfb1f760cb1aa3d80fb4abce7f8c6'
+PUK_PROMPT_FRAME = '4d0f73d4e4c35b48ad96c8535094a1f4bd05895ff9b51bdfd07c98a3a727c9bd'
 BINARY_FILES = {0x6fb7: 15, 0x6fae: 1, 0x6f05: 4, 0x6fad: 3,
                 0x6f38: 12, 0x6f07: 9, 0x6f78: 2, 0x2fe6: 4,
                 0x6f46: 17, 0x6f74: 16, 0x6f7e: 11, 0x6f30: 24,
@@ -201,14 +203,14 @@ def verify_sms_action(text, initial, final, prompt_pixels, result_pixels, action
                 network_sms_proved=False,stable_long_boot=False)
 
 
-def verify_pin_input(card):
+def verify_pin_input(card, *, blocked=False):
     from tools.make_sim_card_profile import make_profile
     from tools.sim_security_trace_check import ATTEMPTS_OFFSET,AOC_NVRAM_SIZE
     if len(card) not in (len(make_profile(True)),AOC_NVRAM_SIZE):
         raise ValueError('NSE-2 PIN input card has an unsupported storage size')
     initial=bytearray(make_profile(True))
     retries=card[ATTEMPTS_OFFSET]
-    if retries not in (1,2,3):
+    if retries not in ((0,) if blocked else (1,2,3)):
         raise ValueError('NSE-2 PIN fixture has not qualified this initial retry lifecycle')
     initial[ATTEMPTS_OFFSET]=retries
     if card[:len(initial)]!=initial:
@@ -219,24 +221,25 @@ def verify_pin_input(card):
 def verify_pin_boot(text, card, prompt_pixels, result_pixels=None, final_pixels=None, *, action=None,initial_card=None):
     from tools.make_sim_card_profile import make_profile
     from tools.sim_security_trace_check import statuses,ATTEMPTS_OFFSET,AOC_NVRAM_SIZE
-    if action not in (None,'verify','wrong'):
+    if action not in (None,'verify','wrong','blocked'):
         raise ValueError('unknown NSE-2 PIN action')
-    if action is not None and (result_pixels is None or final_pixels is None):
+    if action in ('verify','wrong') and (result_pixels is None or final_pixels is None):
         raise ValueError('NSE-2 PIN result and continuation frames are required')
     initial_card=make_profile(True) if initial_card is None else initial_card
-    before=verify_pin_input(initial_card)
-    if action=='wrong' and before==1:
-        raise ValueError('NSE-2 final PIN attempt requires separate blocked/PUK acceptance')
+    before=verify_pin_input(initial_card,blocked=action=='blocked')
     remaining=3 if action=='verify' else before-1 if action=='wrong' else before
     expected=bytearray(initial_card)
     expected[ATTEMPTS_OFFSET]=remaining
     if len(card)!=AOC_NVRAM_SIZE or card[:len(expected)]!=expected:
         raise ValueError('NSE-2 PIN attempt changed unexpected persistent credentials/retries')
-    if hashlib.sha256(prompt_pixels).hexdigest()!=PIN_PROMPT_FRAME:
-        raise ValueError('NSE-2 reviewed Enter PIN code frame differs')
+    expected_prompt=PUK_PROMPT_FRAME if action=='blocked' else PIN_PROMPT_FRAME
+    if hashlib.sha256(prompt_pixels).hexdigest()!=expected_prompt:
+        raise ValueError('NSE-2 reviewed SIM authentication prompt frame differs')
     verify_headers=[match.groups() for match in HEADER.finditer(text) if int(match[2],16)==0x20]
+    if any(int(match[2],16)==0x2c for match in HEADER.finditer(text)) or statuses(text,0x2c):
+        raise ValueError('NSE-2 PIN-only fixture unexpectedly attempted PUK unblocking')
     contacts=re.findall(r'nse2_pin_contact: event=(\d+) down=([01]) t=([0-9.]+) physical_only=1',text)
-    if action is None:
+    if action in (None,'blocked'):
         if verify_headers or contacts or statuses(text,0x20):
             raise ValueError('NSE-2 PIN wait unexpectedly submitted a code')
     else:
@@ -247,16 +250,17 @@ def verify_pin_boot(text, card, prompt_pixels, result_pixels=None, final_pixels=
             raise ValueError('NSE-2 physical SIM PIN timing differs')
         if len(verify_headers)!=1 or verify_headers[0][:5]!=('a0','20','00','01','08'):
             raise ValueError('NSE-2 absolute CHV1 VERIFY header missing')
-        expected_status=0x9000 if action=='verify' else 0x9804
+        expected_status=0x9000 if action=='verify' else 0x9840 if remaining==0 else 0x9804
         if statuses(text,0x20)!=[(expected_status,remaining,10)]:
             raise ValueError('NSE-2 SIM PIN status/retry contrast differs')
-        expected_result=PIN_ACCEPTED_FRAME if action=='verify' else CODE_ERROR_FRAME
-        expected_final=SECURITY_FRAME if action=='verify' else PIN_PROMPT_FRAME
+        expected_result=PIN_ACCEPTED_FRAME if action=='verify' else PIN_BLOCKED_FRAME if remaining==0 else CODE_ERROR_FRAME
+        expected_final=SECURITY_FRAME if action=='verify' else PUK_PROMPT_FRAME if remaining==0 else PIN_PROMPT_FRAME
         if (hashlib.sha256(result_pixels).hexdigest()!=expected_result
                 or hashlib.sha256(final_pixels).hexdigest()!=expected_final):
             raise ValueError('NSE-2 PIN result/continuation frame differs')
     return dict(sim_pin_verified=action=='verify',pin_wait=action is None,
                 wrong_pin_rejected=action=='wrong',pin_attempts_before=before,pin_attempts_remaining=remaining,
+                pin_blocked=remaining==0,puk_verified=False,
                 initial_card_bytes=len(initial_card),
                 phone_code_authenticated=False,network_registration=False)
 

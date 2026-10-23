@@ -2529,6 +2529,25 @@
       ]
     },
     {
+      "name": "verify-5110i-sim-pin-blocked",
+      "prerequisites": ["verify-5110i-static", "build"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/wrong1", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--pin-enabled", "--pin-action", "wrong", "--seconds", "14"]},
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/wrong2", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--pin-enabled", "--pin-card", "$(RUN_DIR)/wrong1/nvram/nse2r4v/sim_card", "--pin-action", "wrong", "--seconds", "14"]},
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/wrong3", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--pin-enabled", "--pin-card", "$(RUN_DIR)/wrong2/nvram/nse2r4v/sim_card", "--pin-action", "wrong", "--seconds", "14"]},
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/blocked", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--pin-enabled", "--pin-card", "$(RUN_DIR)/wrong3/nvram/nse2r4v/sim_card", "--pin-action", "blocked", "--seconds", "14"]}
+      ]
+    },
+    {
       "name": "verify-5110i-native-processing",
       "prerequisites": ["verify-5110i-static", "build"],
       "variables": {},
