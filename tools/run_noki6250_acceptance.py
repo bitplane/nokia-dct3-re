@@ -472,6 +472,8 @@ def main():
                 checker.append("--text-fixture")
             elif args.scenario != "sms-read" and not host_incoming_sms:
                 checker.append("--deleted" if args.scenario == "sms-delete" else "--sent")
+                if args.a5_1:
+                    checker.append('--a5-1')
         elif args.scenario == "phonebook":
             frames = list((run / "snap").rglob("6250_phonebook_7.png"))
             if len(frames) != 1:

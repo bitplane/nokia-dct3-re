@@ -53,6 +53,16 @@ def check(text: str, *, require_traffic: bool = True) -> list[str]:
     if re.search(r"(?:TX (?:pending|packet|consume)|DSP consume) type=14 [^\n]*data=(?!00)[0-9a-f]{20,}", text):
         errors.append("cipher-control trace exposes Kc")
 
+    commands = list(re.finditer(
+        r'GSM service downlink [^\n]*pd=06 message=35\b', text))
+    for index, command_match in enumerate(commands):
+        end = commands[index + 1].start() if index + 1 < len(commands) else len(text)
+        exchange = text[command_match.end():end]
+        activated = re.search(r'gsm_cipher: event=activated algorithm=1', exchange)
+        information = re.search(r'GSM service downlink [^\n]*pd=05 message=32\b', exchange)
+        if information and (not activated or information.start() < activated.start()):
+            errors.append('MM Information precedes cipher completion')
+
     command = text.find("063501")
     complete = text.find("message=32")
     activation = text.find("gsm_cipher: event=activated")

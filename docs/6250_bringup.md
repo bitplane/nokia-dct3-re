@@ -1495,11 +1495,26 @@ SIM-storage and physical Read/pixel checks. This is signaling acceptance,
 not TCH, native DSP, PCM or audible speech validation. The initial-record
 PMM comparison and runtime HLE remain explicit prerequisites.
 
-The same runner's `--scenario host-outgoing-sms --coherent-cell --a5-1`
-is not accepted: after the received message and physical Reply, the second
-ciphered service activates but repeated CM Service Accept deliveries do not
-produce a host SMS submission before process exit. This is an unresolved
-service-continuation boundary, not evidence of bidirectional ciphered SMS.
+`verify-6250-a51-host-outgoing-sms-signaling` independently follows the
+received message with physical Reply, recipient confirmation and exact
+`Hi` SMS-SUBMIT to `5551234`. It requires the second cipher procedure,
+MM Information, CM Service Accept, host-owned submission decision, CP/RP
+closure and RR release with N(R)=4. The reviewed ciphered `Message sent`
+frame retains its own envelope-animation phase; the A5/0 oracle is unchanged.
+The available-key CM Service Request carries `04`, not the A5/0 fixture's
+no-key `74`; both have SMS service type 4.
+
+The session waits for validated Cipher Mode Complete before queuing MM
+Information. An earlier LAPDm acknowledgement only retires the command's
+link transaction. After MM Information is acknowledged, mobile-originated
+SMS and supplementary requests share the existing CM Service Accept path
+with calls; leaving that message pending would repeat it indefinitely.
+The A5 trace checker rejects premature MM Information for every observed
+cipher procedure, not only the first one.
+[ETSI TS 144 018 V4.7.0 section 3.4.7.2](https://www.etsi.org/deliver/etsi_ts/144000_144099/144018/04.07.00_60/ts_144018v040700p.pdf)
+defines the network transmit-mode change at receipt of Cipher Mode Complete
+or another correct layer-2 frame sent in the new mode. An acknowledgement
+alone is not evidence of RR procedure completion in this session model.
 
 Authentication consumes an additional LAPDm I-frame: this path acknowledges
 Location Updating Accept with N(R)=2 and Channel Release with N(R)=3, and

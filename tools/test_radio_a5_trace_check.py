@@ -39,6 +39,15 @@ class A5TraceCheckTest(unittest.TestCase):
     def test_accepts_semantic_trace(self):
         self.assertEqual(check(GOOD), [])
 
+    def test_each_service_defers_mm_information_until_activation(self):
+        command = 'GSM service downlink kind=7 sapi=0 pd=06 message=35 length=3\n'
+        information = 'GSM service downlink kind=8 sapi=0 pd=05 message=32 length=10\n'
+        activation = 'gsm_cipher: event=activated algorithm=1\n'
+        self.assertEqual(check(GOOD + command + activation + information), [])
+        for tail in (command + information + activation, command + information):
+            with self.subTest(tail=tail):
+                self.assertIn('MM Information precedes cipher completion', check(GOOD + tail))
+
     def test_accepts_decoded_cipher_command(self):
         semantic = GOOD.replace(
             "dspif_transport: RX enqueue type=80 payload=34 producer=0d9 "

@@ -655,12 +655,10 @@ nokia_gsm_session_device::downlink_acknowledged()
 	if (m_state == u8(state::awaiting_cipher_mode_command_acknowledgement) &&
 			m_pending_downlink.kind == u8(downlink_kind::cipher_mode_command))
 	{
-		// Supply deterministic network time before entering call control or
-		// SAPI-3 SMS, matching the ordering expected by this firmware.
-		const auto information = m_network->mm_information();
-		m_state = u8(state::awaiting_mm_information_acknowledgement);
-		return queue_downlink(downlink_kind::mm_information,
-				information.data(), information.size());
+		// An LAPDm acknowledgement does not complete the RR cipher procedure.
+		// Wait for the validated Cipher Mode Complete before sending L3 data.
+		clear_pending_downlink();
+		return downlink_kind::none;
 	}
 
 	if (m_state == u8(state::awaiting_mm_information_acknowledgement) &&
@@ -711,7 +709,8 @@ nokia_gsm_session_device::downlink_acknowledged()
 			return queue_downlink(downlink_kind::supplementary_register,
 					request.data.data(), request.length);
 		}
-		if (m_mobile_originated_call)
+		if (m_mobile_originated_call || m_mobile_originated_sms ||
+				m_mobile_originated_supplementary)
 		{
 			const auto accept = m_network->cm_service_accept();
 			m_state = u8(state::awaiting_cm_service_accept_acknowledgement);
@@ -1364,6 +1363,10 @@ nokia_gsm_session_device::receive_layer3(
 			LOGMASKED(LOG_GSM_SESSION,
 					"gsm_cipher: event=activated algorithm=%u t=%.6f\n",
 					m_cipher_algorithm, machine().time().as_double());
+			const auto information = m_network->mm_information();
+			m_state = u8(state::awaiting_mm_information_acknowledgement);
+			return queue_downlink(downlink_kind::mm_information,
+					information.data(), information.size());
 		}
 		return downlink_kind::none;
 	}

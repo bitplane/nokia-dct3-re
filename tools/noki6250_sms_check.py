@@ -19,15 +19,26 @@ from tools.radio_sms_acceptance_common import (
 READ_FRAME = "ab21e640456a297698ff12e89d315fb469eca215975b8ba4cc5a1a9cb2a41be3"
 DELETED_FRAME = "3f5eadd9c60568a7eea484c60e6458682adf7e2510fe387777d119359fc782b6"
 SENT_FRAME = "67f74edfd9817c67b2301a1118c32a5764da7ed54e5b1ec09caf9eb332abc7c8"
+# Reviewed ciphered-service capture: same Message sent text, later envelope phase.
+CIPHER_SENT_FRAME = "9a2ee22b6fe9bdcf6216cedb8dd28bcedb241d30938fbcee12aa3bfda88457ab"
 TEXT_FRAME = "a037616fc91efc74c47743b5b62ebeae6ec6ba039e82d81b2ada641b8aa639bc"
 TEXT_DELIVER_BODY = bytes.fromhex(
     "06912143658709040781551532f40000627042210000000680c806b54901")
 
 
-def verify_sent(log, pixels, size):
+def verify_sent(log, pixels, size, *, ciphered=False):
+    service_request = r"GSM service establish sapi=0 pd=05 message=24 length=16 data=0524"
+    cipher_checkpoints = (
+        ('Cipher Mode Command', r'GSM service downlink kind=7 sapi=0 pd=06 message=35'),
+        ('Cipher Mode Complete', r'GSM service uplink sapi=0 pd=06 message=32 length=2 data=0632'),
+        ('cipher activation', r'gsm_cipher: event=activated algorithm=1'),
+        ('MM Information', r'GSM service downlink kind=8 sapi=0 pd=05 message=32'),
+        ('CM Service Accept', r'GSM service downlink kind=5 sapi=0 pd=05 message=21'),
+    ) if ciphered else ()
     checkpoints = (
         ("physical recipient confirmation", r"6250_sms_input: step=25 pressed=1"),
-        ("SMS service request", r"GSM service establish sapi=0 pd=05 message=24 length=16 data=052474"),
+        ("SMS service request", service_request + ('04' if ciphered else '74')),
+    ) + cipher_checkpoints + (
         ("exact Hi SMS-SUBMIT",
          r"GSM service uplink sapi=3 pd=09 message=01 length=28 "
          r"data=390119000100069121436587090e11010781551532f40000ff02c834"),
@@ -35,12 +46,12 @@ def verify_sent(log, pixels, size):
         ("network CP-ACK", r"GSM service downlink kind=17 sapi=3 pd=09 message=04"),
         ("network RP-ACK", r"GSM service downlink kind=18 sapi=3 pd=09 message=01"),
         ("final handset CP-ACK", r"GSM service uplink sapi=3 pd=09 message=04 length=2 data=3904"),
-        ("channel release", r"LAPDm service Channel Release acknowledged nr=2"),
+        ("channel release", r"LAPDm service Channel Release acknowledged nr=" + ('4' if ciphered else '2') + r'\b'),
     )
     require_ordered(log, tuple((name, re.compile(pattern)) for name, pattern in checkpoints))
     if log.count("gsm_sms_submit:") != 1:
         raise ValueError("expected exactly one outgoing SMS-SUBMIT")
-    if size != (96, 60) or sha256(pixels).hexdigest() != SENT_FRAME:
+    if size != (96, 60) or sha256(pixels).hexdigest() != (CIPHER_SENT_FRAME if ciphered else SENT_FRAME):
         raise ValueError("missing reviewed Message sent frame")
 
 
@@ -67,13 +78,17 @@ def main():
     parser.add_argument("frame", type=Path)
     parser.add_argument("--deleted", action="store_true")
     parser.add_argument("--sent", action="store_true")
+    parser.add_argument('--a5-1', action='store_true', help='require ciphered outgoing SMS service')
     parser.add_argument("--text-fixture", action="store_true",
                         help="require the reviewed @_{} default/extension-alphabet fixture")
     args = parser.parse_args()
+    if args.a5_1 and not args.sent:
+        parser.error('--a5-1 requires --sent')
     try:
         with Image.open(args.frame) as frame:
             if args.sent:
-                verify_sent(args.log.read_text(), frame.convert("L").tobytes(), frame.size)
+                verify_sent(args.log.read_text(), frame.convert("L").tobytes(), frame.size,
+                            ciphered=args.a5_1)
             else:
                 verify(args.log.read_text(), args.nvram.read_bytes(),
                        frame.convert("L").tobytes(), frame.size, args.deleted,
