@@ -19,7 +19,7 @@ environment variables.
 | persistent storage | generic flash and I2C EEPROM devices, with a temporary B3 adapter where the generic flash core lacks partition behavior | present, partly transitional |
 | display | geometry-configured PCD8544-family device | present |
 | SIM | SIMI controller plus replaceable card-side protocol device | present |
-| DSP execution | clean-room TMS320C54x core and product-correct internal ROMs | selected by the 5110; other handsets retain HLE pending their own ROMs and integration |
+| DSP execution | clean-room TMS320C54x core and product-correct internal ROMs | native 5110 plus explicitly scoped cross-product ROM4 compatibility profiles; fitted-mask identity remains product-specific, with HLE/silent alternatives retained |
 | DSP backend contract | `nokia_dsp_backend_interface` | present; transport-facing substitution seam |
 | DSP compatibility backend | `nokia_dsp_hle_device` | present and explicitly provisional implementation of that seam |
 | GSM-FR codec | `util::gsm_fr_codec` and bundled libgsm | generic utility, independently built and linked by MAME; explicit predictor snapshots |
@@ -52,7 +52,7 @@ retains a separately typed optional finder only while applying HLE-specific
 product contracts. Runtime transport, reset and tone paths use the abstract
 backend.
 
-The 5110 real-DSP backend implements that endpoint. Full product coverage still
+The native DSP backend implements that endpoint. Full product coverage still
 requires the following contracts to be validated or completed:
 
 1. TMS320C54x program, data and I/O address spaces;

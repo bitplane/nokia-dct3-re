@@ -1,15 +1,35 @@
 -- Observe own firmware bus accesses; never write guest memory or registers.
 local machine = manager.machine
-assert(machine.system.name == 'noki5110i')
+assert(machine.system.name == 'noki5110i' or machine.system.name == 'nse2r4t')
 local cpu = machine.devices[':maincpu']
 local space = cpu.spaces.program
+local dsp = machine.devices[':dsp_c54x:cpu']
+if dsp then
+    local writes = 0
+    _G.nse2_native_identity_tap = dsp.spaces.data:install_write_tap(0x803, 0x803, 'nse2_native_identity', function(_, data, mask)
+        writes = writes + 1
+        if writes <= 64 then
+            machine:logerror(string.format('nse2_native_identity: n=%d data=%04x mask=%04x pc=%04x t=%.9f observer_writes=0\n',
+                writes, data, mask, dsp.state['PC'].value, machine.time:as_double()))
+        end
+        if data == 4 and mask == 0xffff and dsp.state['PC'].value == 0xf0f then
+            local words = {}
+            for address = 0xf00, 0xfb9 do
+                words[#words + 1] = string.format('%04x', dsp.spaces.program:read_u16(address))
+            end
+            machine:logerror(string.format('nse2_native_verifier_image: words=186 body=%s observer_writes=0\n', table.concat(words)))
+        end
+    end)
+end
 local shared_writes, tx, rx, commands, pixels, signal_writes = 0, 0, 0, 0, 0, 0
 local selected = 0
 local upload_writes = 0
+local initial_native_polled = false
 local startup_polls = 0
 _G.nse2_startup_poll_tap = space:install_read_tap(0x10004, 0x10007, 'nse2_startup_polls', function(_, data, mask)
     local pc = cpu.state['R15'].value
     if (pc ~= 0x2781fa and pc ~= 0x27821a) or (mask & 0xffff0000) == 0 then return end
+    if dsp then initial_native_polled = true end
     startup_polls = startup_polls + 1
     if startup_polls <= 64 then
         machine:logerror(string.format('nse2_startup_poll: n=%d address=00010004 data=%04x mask=%04x pc=%08x t=%.9f observer_writes=0\n',
@@ -17,6 +37,9 @@ _G.nse2_startup_poll_tap = space:install_read_tap(0x10004, 0x10007, 'nse2_startu
     end
 end)
 _G.nse2_upload_tap = space:install_write_tap(0x10008, 0x10fff, 'nse2_upload_words', function(offset, data, mask)
+    -- Native success starts a large ROM checksum transfer; this tap records
+    -- only the initial verifier staging, not a silently truncated full dump.
+    if dsp and initial_native_polled then return end
     for lane = 0, 1 do
         local shift = (1 - lane) * 16
         if (mask & (0xffff << shift)) ~= 0 then
@@ -117,6 +140,10 @@ local next_sample = 1
 emu.register_frame_done(function()
     local now = machine.time:as_double()
     if now < next_sample then return end
+    if dsp then
+        machine:logerror(string.format('nse2_native_state: t=%.9f pc=%04x illegal=%d idle=%d observer_writes=0\n',
+            now, dsp.state['PC'].value, dsp.state['ILLEGAL'].value, dsp.state['IDLE'].value))
+    end
     machine:logerror(string.format('nse2_state: t=%.9f pc=%08x cpsr=%08x sp=%08x shared_writes=%d gensio_tx=%d gensio_rx=%d lcd_commands=%d lcd_bytes=%d eeprom_signal_writes=%d observer_writes=0\n',
         now, cpu.state['R15'].value, cpu.state['CPSR'].value, cpu.state['R13'].value,
         shared_writes, tx, rx, commands, pixels, signal_writes))

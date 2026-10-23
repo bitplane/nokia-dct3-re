@@ -14,10 +14,13 @@ acceptance. The archive labels the pair `5110i`; both firmware headers
 identify `NSE-2`, version `05.53`, dated `11-01-01`.
 
 Separate integrity-only EEPROM experiments clear both decoded checksum
-families but do not change the failure frame. The remaining observed
-`0e/0f` results follow the failed initial DSP-loader exchange. The next
-boundary is its actual upload and shared-memory startup protocol, not
-another guessed EEPROM identity or a synthesized DSP completion.
+families but do not change the ordinary profile's failure frame. The
+`nse2r4t` compatibility profile executes the own verifier on the acquired
+NSE-1 ROM4 backend, obtains identity `4` and reaches organic readiness state
+one. This clears `0e/0f`, but its integrity-repaired run has a blank LCD at
+eight seconds, not accepted usable boot. Its fitted mask, clock, physical
+inputs and phone services remain unproved. The next boundary is the
+firmware-owned UI/provisioning path after native readiness.
 
 `make verify-5110i-static` independently qualifies the acquired ZIP and
 Windows SFX, verifies their exact two member names/extents/hashes and
@@ -231,22 +234,65 @@ capped or incomplete captures. This proves staging, not DSP program loading,
 instruction execution or an acknowledged exchange. No extra MMIO reads are
 issued by the observer. Evidence: `tmp/nse2-upload-final`.
 
-The next backend experiment can now be constrained by this measured input.
-Keep the ordinary silent profile; use any acquired NSE-1 ROM4 mask only in
-an explicit compatibility profile, with its true provenance and the own
-NSE-2 payload unchanged. Native execution must itself produce the startup
-response; the observed sentinel is not a license to patch shared RAM.
+### Native compatibility acceptance
+
+```sh
+make verify-5110i-native-verifier RUN_DIR=tmp/nse2-native-integrity
+make verify-5110i-native-verifier-erased RUN_DIR=tmp/nse2-native-erased
+```
+
+`nse2r4t` changes only the DSP backend of the ordinary machine composition:
+the HLE device is removed and the existing native C54x device is attached.
+Own MCU/PPM, GPIO, empty SIM socket and analogue defaults remain unchanged.
+The explicit compatibility inputs retain their NSE-1 filenames and pinned
+SHA1 hashes:
+
+- Program export: `a05a1e96a8c36ec5a47e1ea059d15afa54ca5739`,
+  131070 bytes; its missing word `ffff` stays at region erase zero.
+- Data export: `024c7f970f4ef754d3e90471de48a167515f930d`, 131072 bytes.
+
+The backend initializes from these acquired program/data exports; this is a
+compatibility experiment, not proof of the fitted NSE-2 mask or physical
+power-on RAM contents. The 52 MHz DSP clock is the NSE-1 compatibility
+assumption, not an NSE-2 measurement. The shared minimal MCU boot-ROM HLE
+also remains declared. No donor EEPROM, inserted SIM, synthetic DSP peer
+response, firmware-state write or calibration adjustment is added.
+
+The native verifier writes DSP data `0803=0004` with observed DSP PC `0f0f`.
+At that store, a read-only snapshot of program `0f00..0fb9` exactly matches
+the own 186-word payload; the acquired program export initially contains
+zeros there. Thus this is own uploaded execution, not an inherited verifier
+image. The MCU subsequently reads `10004=0004` instead of the silent
+profile's sentinel, leaves the timeout branch, and later sets `10b9f4=1`
+at `2787e2`. The loader then reaches ordinary runtime; eight native samples
+through eight seconds report no illegal instruction. The integrity-repaired
+run writes success to result bytes `10fcae` and `10fcaf` and has a blank
+84x48 seven-second frame. The erased control independently completes the
+native startup exchange while retaining its NV integrity failure.
+
+Native traces stop the initial staging capture at the first actual startup
+poll; the successful path's larger ROM-checksum transfers are not silently
+claimed as a complete dump. Acceptance checks the full own initial payload,
+actual native identity store, observed MCU reply, subsequent ready-state
+store, reset count, MCU/native execution horizons and the appropriate NV
+fixture verdict. All usable-boot, physical-key, graphical-boot and fitted-mask
+claims remain false. Evidence: `tmp/nse2-native-final` and
+`tmp/nse2-native-erased-final`.
+
+Next map the own unattended UI and record selectors after readiness. The
+blank frame must be diagnosed, not replaced by a forced display type, donor
+identity or another product's initialization sequence.
 
 1. Recover the own EEPROM record catalogue and semantic requirements beyond
    the integrity-only fixtures. Establish own-product defaults or independently
    sourced storage before proposing authentic provisioning.
-2. Test the measured upload against a separately scoped native compatibility
-   backend; the loader-failure trace is not native DSP execution or a verdict.
+2. Follow the native-ready MCU lifecycle to the blank-frame/UI boundary;
+   keep runtime/native execution separate from usable graphical boot.
 3. Recover fitted flash identity, physical memory/clock and analogue inputs
    without changing returned IDs or samples merely to satisfy self-tests.
-4. Decide any explicitly separate native-mask compatibility experiment from
-   the observed upload/ABI evidence. Do not add completion constants, donor
-   provisioning, firmware state writes or radio responses to obtain a frame.
+4. Keep native-mask compatibility distinct from fitted-mask identification.
+   Do not add completion constants, donor provisioning, firmware state writes
+   or radio responses to obtain a frame.
 
 Static parser tests cover member identity/extents, catalogue bounds/null
 slots, verifier identity and resident CALL corruption. They do not establish

@@ -2369,6 +2369,22 @@
                                "roms/archive-dct3-packages/nse2_553.exe", "--output", "roms/noki5110i"]}]
     },
     {
+      "name": "verify-5110i-native-verifier",
+      "prerequisites": ["verify-5110i-static", "build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_nse2_native.py",
+                 "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only"]}]
+    },
+    {
+      "name": "verify-5110i-native-verifier-erased",
+      "prerequisites": ["verify-5110i-static", "build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_nse2_native.py",
+                 "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6150-static",
       "prerequisites": [],
       "variables": {},

@@ -50,7 +50,7 @@ def verify_record(text):
         raise ValueError('NSE-2 record checksum did not clear its own result')
 
 
-def verify_upload(text, payload):
+def verify_upload(text, payload, *, native_response=False):
     if len(payload) != 400 or payload[372:] != bytes(28):
         raise ValueError('NSE-2 own rounded verifier extent or padding differs')
     rows = re.findall(r'nse2_upload_word: n=(\d+) address=([0-9a-f]{8}) data=([0-9a-f]{4}) '
@@ -71,9 +71,10 @@ def verify_upload(text, payload):
         raise ValueError('NSE-2 startup control publication differs')
     polls = re.findall(r'nse2_startup_poll: n=(\d+) address=00010004 data=([0-9a-f]{4}) mask=ffff '
                        r'pc=(002781fa|0027821a) t=([0-9.]+) observer_writes=0', text)
-    if (len(polls) < 2 or len(polls) >= 64
+    response = '0004' if native_response else 'ffff'
+    if (len(polls) < (1 if native_response else 2) or len(polls) >= 64
             or [int(row[0]) for row in polls] != list(range(1, len(polls) + 1))
-            or any(row[1] != 'ffff' for row in polls)):
+            or any(row[1] != response for row in polls)):
         raise ValueError('NSE-2 actual startup sentinel polls missing or changed')
     times = [float(row[5]) for row in copies + control] + [float(row[3]) for row in polls]
     if times != sorted(times) or not 0 < times[0] < times[-1] < 0.01:
