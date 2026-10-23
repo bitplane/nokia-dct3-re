@@ -3573,6 +3573,14 @@ static INPUT_PORTS_START( nsm1r4t )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Right Softkey") PORT_CODE(KEYCODE_BACKSPACE) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( nse2r4v )
+	PORT_INCLUDE(noki5110)
+	PORT_MODIFY("SIM_REMOVED")
+	// A card is available, but the research machine defaults to an empty socket.
+	PORT_BIT(0x01, IP_ACTIVE_LOW, IPT_OTHER) PORT_NAME("Insert synthetic SIM card") PORT_TOGGLE
+	PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sim_removed_changed), 0)
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( nsb1r4t )
 	PORT_INCLUDE(noki5110)
 	PORT_MODIFY("SIM_REMOVED")
@@ -4327,6 +4335,7 @@ void nokia_dct3_state::nse2r4v(machine_config &config)
 	// This is an explicit cross-product battery hypothesis, not NSE-2 calibration.
 	nokia_product_config research = PRODUCT_5110I;
 	research.ccont_board.channel_defaults[2] = 554;
+	research.synthetic_sim_card = true; // Physical removed input defaults high.
 	apply_product_config(research);
 	config.device_remove("dsp_hle");
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
@@ -5401,7 +5410,7 @@ SYST( 2026, nam2c3, noki2100, 0, nam2c3, noki2100, nokia_dct3_state, empty_init,
 SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
 SYST( 2001, noki5110i, 0, 0, noki5110i, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110i (NSE-2 v5.53 research)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, nse2r4t, noki5110i, 0, nse2r4t, noki5110, nokia_dct3_state, empty_init, "Research", "NSE-2 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2001, nse2r4v, noki5110i, 0, nse2r4v, noki5110, nokia_dct3_state, empty_init, "Research", "NSE-2 ROM4 nominal VBATT experiment (unmeasured board)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2001, nse2r4v, noki5110i, 0, nse2r4v, nse2r4v, nokia_dct3_state, empty_init, "Research", "NSE-2 ROM4 nominal VBATT experiment (unmeasured board)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki5190, 0, 0, noki5190, noki5110, nokia_dct3_state, empty_init, "Nokia", "5190 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsb1r4t, noki5190, 0, nsb1r4t, nsb1r4t, nokia_dct3_state, empty_init, "Research", "NSB-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsk1r4t, 0, 0, nsk1r4t, nsk1r4t, nokia_dct3_state, empty_init, "Research", "NSK-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

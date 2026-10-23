@@ -38,7 +38,7 @@ distinction.
 | `mbus_controller.md` | Extracted MBUS controller, firmware data path, and attachment boundary. |
 | `cross_rom_confidence.md` | Cross-product and cross-ROM boot, idle, and input evidence. |
 | `model_coverage.md` | Evidence-gated per-product compatibility and fidelity matrix. |
-| `5110i_bringup.md` | Own NSE-2 inputs, NV integrity, native ROM4 compatibility and nominal-voltage graphical/Menu-decode acceptance. |
+| `5110i_bringup.md` | Own NSE-2 inputs, NV integrity, native ROM4 compatibility, graphical/input acceptance and SIM read-bootstrap/security boundary. |
 | `6110_bringup.md` | Authoritative NSE-3 hardware/firmware map and blocked resumption boundary. |
 | `6130_bringup.md` | Own NSK-3 inputs, bounded physical UI/SIM storage and security, native radio/liveness boundaries. |
 | `5130_bringup.md` | Own NSK-1 startup/storage/input contracts; native compatibility boot, physical security, persistent contacts and offline SMS save/cold read. |

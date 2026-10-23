@@ -7,7 +7,7 @@ from tools.nse2_boot_check import STATE, verify_nv, verify_record, verify_upload
 NOMINAL_FRAME = '7da9bef12e0bf163dfdf8770e215957b58b4911baa9ba987c05ddf8fadfeae8a'
 
 
-def verify_nominal_voltage(text, pixels, *, physical_menu=False):
+def verify_nominal_voltage(text, pixels, *, physical_menu=False, empty_socket_frame=True):
     if 'nse2_average_count_cap:' in text or 'nse2_startup_message_cap:' in text:
         raise ValueError('NSE-2 nominal evidence capped')
     rows = re.findall(r'nse2_average_count: remaining=([0-9a-f]{2}) first=([0-9a-f]{4}) '
@@ -42,9 +42,9 @@ def verify_nominal_voltage(text, pixels, *, physical_menu=False):
             if not start < end or not any(start <= float(time) <= end for time in decoded):
                 raise ValueError('NSE-2 physical Menu contact did not reach own decoder')
         result['physical_key_delivery'] = True
-    elif hashlib.sha256(pixels).hexdigest() != NOMINAL_FRAME:
+    elif empty_socket_frame and hashlib.sha256(pixels).hexdigest() != NOMINAL_FRAME:
         raise ValueError('NSE-2 reviewed Insert SIM card frame differs')
-    else:
+    elif empty_socket_frame:
         result['graphical_boot'] = True
     return result
 

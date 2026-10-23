@@ -5,8 +5,10 @@
 Own v5.53 MCU/PPM-A executes its verifier on the explicitly borrowed NSE-1
 ROM4 backend. The nominal-voltage research profile `nse2r4v` reaches the
 firmware's **Insert SIM card** screen. Two physical Menu presses reach the
-own decoder as raw key 11 / key `19`. The socket is empty: SIM, security,
-phonebook, application-menu, registration, calls and SMS are not accepted.
+own decoder as raw key 11 / key `19`. With the synthetic card physically
+inserted, firmware completes SIM read bootstrap and presents **Security code**.
+One physical `12345` + OK attempt produces **Code error**. Authentication,
+persistent contacts, application-menu, registration, calls and SMS are not accepted.
 Fitted mask identity, DSP clock and measured board calibration are unproved.
 
 The ordinary `noki5110i` profile remains unchanged: erased EEPROM and a
@@ -15,8 +17,7 @@ DSP but retains open-pin ADC2; it completes DSP startup while the analog
 readiness counter cannot drain. These are explicit controls, not alternative
 claims of usable boot.
 
-Next: exercise a synthetic card through the own SIMI path, then recover
-remaining own-product provisioning requirements from actual consumers.
+Next: recover the phone-side security contract from own-product consumers.
 Do not substitute donor EEPROM, force firmware state, or claim phone service
 from the graphical prompt or key decode alone.
 
@@ -35,6 +36,8 @@ make verify-5110i-native-verifier RUN_DIR=tmp/nse2-native-integrity
 make verify-5110i-input-frontier RUN_DIR=tmp/nse2-openpin-control
 make verify-5110i-nominal-boot RUN_DIR=tmp/nse2-nominal-boot
 make verify-5110i-nominal-input RUN_DIR=tmp/nse2-nominal-input
+make verify-5110i-sim-bootstrap RUN_DIR=tmp/nse2-sim-bootstrap
+make verify-5110i-phonecode-boundary RUN_DIR=tmp/nse2-phonecode-boundary
 ```
 
 The nominal boot gate requires the reviewed unattended seven-second frame
@@ -62,7 +65,7 @@ The archive calls the phone 5110i; both headers identify `NSE-2`, `05.53`,
 | GENSIO/CCONT | Own `296704`: select `22` at `28`, TX `2a`, RX `2d`, status `29` bit 2. | Shared serial grammar, not measured electrical timing. |
 | LCD | Own `296e46/296eac`: command/data `2c/2b`, ready bit 0. | Observed 84x48 presentation; fitted controller identity remains unproved. |
 | Keypad | Scanner `29806c`, decoder `299010`, maps `2b382c/2b3848`, selector `10c6b6`; five rows, signal/direction `31/2f`, columns `30`, IRQ mask `33`. | Existing NSE-1 contact layout matches own table; only Menu has runtime decode acceptance here. |
-| SIMI | Own `286520` initializes standard IIR/FIFO controls. | Socket empty in current gates; no accepted card conversation. |
+| SIMI | Own `286520` initializes standard IIR/FIFO controls; inserted synthetic card completes read bootstrap. | Phone-code authentication and persistent contacts remain unaccepted. |
 
 EEPROM START/STOP entry points are `295814/295886`, identified by SDA
 transitions while SCL is high. Block reader `293d92` takes address,
@@ -160,7 +163,8 @@ the counter only on an accepted pair. Actual writes and stack samples show:
 | Open-pin ADC2 `3ff` | `19d6/19d6` (6614 each) | Reader returns false; count stays ten; report bits remain `0e`. |
 | Nominal ADC2 554 | `0dfd/0dfd` (3581 each) | Ten valid decrements reach zero; report 14 arrives organically. |
 
-`nse2r4v` changes only ADC2 relative to `nse2r4t`. Its value is independently
+`nse2r4v` changes ADC2 and makes a synthetic card available relative to
+`nse2r4t`; its physical socket defaults empty. The ADC value is independently
 derived from the battery-family hypothesis: the original
 [NSE-1 service manual, battery connector table](https://www.eserviceinfo.com/preview_html.php?fileid=26879&previewid=13251)
 specifies nominal 3.6 V; CCONT's documented typical VBAT scale is 6.5 mV/bit
@@ -185,10 +189,32 @@ On the nominal profile, each press produces actual own-table reads
 type is forced. Native execution, completed averaging, report/unmask order,
 the reviewed graphical prompt and physical decoding have separate checks.
 
+## SIM and phone-side security boundary
+
+Insertion is a run-local configuration of the physical `SIM_REMOVED` input,
+not a firmware flag or injected message. The PIN-disabled synthetic card
+completes 16 binary-file reads, all 50 ADN records (32 bytes each), and all
+ten SMS records (176 bytes each), with status `9000`. No VERIFY CHV command
+is issued. The last record completes before ten seconds; the acceptance
+run observes at least twelve seconds. These are read-bootstrap results,
+not proof of phonebook writes, SMS operation or SIM PIN authentication.
+
+The seven-second frame is **Security code**, not a SIM PIN prompt. A
+separate fixture presses five digit contacts and OK once. All six reach
+the own decoder; the seventeen-second frame is **Code error**. Exact editor
+buffer contents remain unobserved, so this does not establish the stored
+phone code. No additional candidate codes are tried. The integrity-only
+EEPROM has no authentic phone identity or lock payload.
+
+At OK, an EEPROM `000c`/eight-byte read reaches formatter `2593b8`, whose
+nibble-to-ASCII conversion is identity-related; the read alone does not
+identify the stored security-code record. Recover the actual comparison
+and record consumers before selecting any semantic fixture.
+
 ## Remaining work
 
-1. Insert a synthetic card through the own SIMI path and verify ATR/APDU,
-   security and persistent contacts with physical input.
+1. Recover phone-side authentication and verify persistent contacts with
+   physical input; SIM read bootstrap alone does not establish either.
 2. Recover semantic EEPROM requirements from their own consumers; retain
    integrity-only fixtures as diagnostic inputs, not factory defaults.
 3. Qualify application/menu behavior and longer lifecycle/save-state tests.
