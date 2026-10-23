@@ -34,6 +34,16 @@ class OutgoingCallTraceTest(unittest.TestCase):
                 "GSM service downlink kind=15 sapi=0 pd=06 message=2e length=8\n" * 2,
             ))
 
+    def test_cipher_completion_can_accept_mm_service(self):
+        explicit = 'GSM service downlink kind=5 sapi=0 pd=05 message=21 length=2'
+        cipher = ('GSM service downlink kind=7 sapi=0 pd=06 message=35 length=3\n'
+                  'GSM service uplink sapi=0 pd=06 message=32 length=2 data=0632\n'
+                  'gsm_cipher: event=activated algorithm=1')
+        check(TRACE.replace(explicit, cipher))
+        for fragment in ('pd=06 message=35', 'data=0632', 'algorithm=1'):
+            with self.subTest(fragment=fragment), self.assertRaises(ValueError):
+                check(TRACE.replace(explicit, cipher.replace(fragment, 'missing')))
+
     def test_rejects_wrong_number(self):
         with self.assertRaisesRegex(ValueError, "expected"):
             check(TRACE, "123")

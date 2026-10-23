@@ -1482,6 +1482,34 @@ The firmware publishes CM Service Request and SETUP containing number
 Validate with `noki6250_call_check.py LOG --outgoing --number 123`.
 This uses the same evidenced channel contracts, not a new speech backend.
 
+### Coherent A5/1 host calls
+
+`verify-6250-a51-host-incoming-call-signaling` and
+`verify-6250-a51-host-outgoing-call-signaling` independently require fresh
+own-upload/PMM-comparison boots, coherent ARFCN19 registration, organic cipher
+control and bidirectional encrypted xCCH. Incoming acceptance checks caller
+`5551234`, physical Answer/End, connected presentation and returned idle.
+The pre-answer crop is deliberately re-banked for completion-before-MM
+ordering: independently captured A5/0 and A5/1 crops match exactly, while
+connected and idle crops retain the existing expectations. Outgoing acceptance checks
+physical `123` dialing, the host-owned decision, assignment, connection and
+complete release. These are research-HLE signaling gates, not native DSP,
+6250 PCM, TCH waveform, microphone or earpiece acceptance.
+
+[TS 24.008 V8.6.0 section 4.5.1.1](https://www.etsi.org/deliver/etsi_ts/124000_124099/124008/08.06.00_60/ts_124008v080600p.pdf)
+defines cipher completion as an MM service-acceptance indication. The
+ciphered mobile-originated call therefore becomes ready for SETUP after
+MM Information acknowledgement, without waiting for an additional explicit
+CM Service Accept. SETUP can itself carry that acknowledgement. The shared
+outgoing-call checker requires the ordered Cipher Mode Command, Complete
+and activation after the service request before accepting this alternative.
+The unciphered explicit-acceptance path remains separately required.
+For a pending A5/0 no-cipher command, the exact clear-mode Complete also
+advances to MM Information, without key validation or cipher activation.
+Treating all completion as A5/1 activation would strand clear-mode incoming
+calls after their valid completion; both modes therefore require runtime
+acceptance rather than inheriting one another's result.
+
 ## Incoming SMS
 
 ### Coherent A5/1 host signaling
@@ -1507,8 +1535,9 @@ no-key `74`; both have SMS service type 4.
 The session waits for validated Cipher Mode Complete before queuing MM
 Information. An earlier LAPDm acknowledgement only retires the command's
 link transaction. After MM Information is acknowledged, mobile-originated
-SMS and supplementary requests share the existing CM Service Accept path
-with calls; leaving that message pending would repeat it indefinitely.
+SMS and supplementary requests use the explicit CM Service Accept path;
+leaving that message pending would repeat it indefinitely. Ciphered outgoing
+calls instead use the implicit-acceptance contract above.
 The A5 trace checker rejects premature MM Information for every observed
 cipher procedure, not only the first one.
 [ETSI TS 144 018 V4.7.0 section 3.4.7.2](https://www.etsi.org/deliver/etsi_ts/144000_144099/144018/04.07.00_60/ts_144018v040700p.pdf)

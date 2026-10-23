@@ -20,7 +20,8 @@ def check_frames(directory, *, outgoing_call=False):
     idle = ((16, 0, 80, 16), '71ae5bf01fc32805f617bedf7a81e70c0183905c90d4921c7627ce137cb32e0a')
     frames = {
         '6250_call_1.png': ((48, 32, 96, 52), '6a142becccfac348a93b9fb805348aff2a82f8fed7fb8819d08218ee3927060c')
-            if outgoing_call else ((16, 8, 88, 32), 'eafbb25a595f8461401184d389654ca51b6865a4ae12d94015da5d9ce9f2e5ec'),
+            if outgoing_call else ((16, 8, 88, 32),
+                'aadbce7a6e9b3e1776af6987ac374285511e597c5d733bcfeebc6bf1805c4aab'),
         '6250_call_3.png' if outgoing_call else '6250_call_2.png': active,
         '6250_call_4.png' if outgoing_call else '6250_call_3.png': idle,
     }
@@ -76,12 +77,13 @@ def verify(text: str, *, configured_carrier=False) -> None:
 
 def verify_outgoing(text: str, number: str = "123", *, configured_carrier=False,
                     physical_send=r"6250_call_input: step=7 pressed=1",
-                    physical_end=r"6250_call_input: step=9 pressed=1") -> None:
+                    physical_end=r"6250_call_input: step=9 pressed=1", ciphered=False) -> None:
     traffic, release = configured_radio_patterns()
     call.require_ordered(text, (
         ("physical Send", physical_send),
         ("CM Service Request", outgoing.CM_SERVICE_REQUEST),
-        ("CM Service Accept", outgoing.CM_SERVICE_ACCEPT),
+        ("ciphered MM acceptance" if ciphered else "CM Service Accept",
+         outgoing.CIPHER_SERVICE_ACCEPTANCE if ciphered else outgoing.CM_SERVICE_ACCEPT),
         ("SETUP", outgoing.SETUP),
         ("Call Proceeding", outgoing.CALL_PROCEEDING),
         ("traffic assignment", outgoing.TRAFFIC_ASSIGNMENT),
@@ -121,13 +123,20 @@ def main() -> None:
     parser.add_argument("--number", default="123")
     parser.add_argument('--configured-carrier', action='store_true')
     parser.add_argument('--frames', type=Path)
+    parser.add_argument('--a5-1', action='store_true', help='require ciphered signaling, not speech')
     args = parser.parse_args()
     try:
         text = args.log.read_text(errors="replace")
         if args.outgoing:
-            verify_outgoing(text, args.number, configured_carrier=args.configured_carrier)
+            verify_outgoing(text, args.number, configured_carrier=args.configured_carrier,
+                            ciphered=args.a5_1)
         else:
             verify(text, configured_carrier=args.configured_carrier)
+        if args.a5_1:
+            from tools.radio_a5_trace_check import check as check_cipher
+            errors = check_cipher(text, require_traffic=False)
+            if errors:
+                raise ValueError('; '.join(errors))
         if args.frames:
             check_frames(args.frames, outgoing_call=args.outgoing)
     except (OSError, ValueError) as error:

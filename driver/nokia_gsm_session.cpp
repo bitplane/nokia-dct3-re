@@ -709,6 +709,14 @@ nokia_gsm_session_device::downlink_acknowledged()
 			return queue_downlink(downlink_kind::supplementary_register,
 					request.data.data(), request.length);
 		}
+		if (m_mobile_originated_call && m_cipher_active)
+		{
+			// RR cipher completion implicitly accepts the MM connection.
+			// SETUP can piggyback this MM Information acknowledgement.
+			clear_pending_downlink();
+			m_state = u8(state::awaiting_outgoing_call_setup);
+			return downlink_kind::none;
+		}
 		if (m_mobile_originated_call || m_mobile_originated_sms ||
 				m_mobile_originated_supplementary)
 		{
@@ -1353,16 +1361,24 @@ nokia_gsm_session_device::receive_layer3(
 	if (sapi == 0 && protocol_discriminator == 0x06 &&
 			message_type == 0x32)
 	{
-		if (gsm::a5::activation_allowed(
+		const bool activate = gsm::a5::activation_allowed(
 				gsm::a5::algorithm(m_cipher_algorithm),
 				m_cipher_key_valid, m_cipher_command_pending, sapi,
-				information, length))
+				information, length);
+		const bool clear_complete =
+				m_state == u8(state::awaiting_cipher_mode_command_acknowledgement) &&
+				m_cipher_algorithm == u8(gsm::a5::algorithm::a5_0) &&
+				length == 2 && information[0] == 0x06 && information[1] == 0x32;
+		if (activate)
 		{
 			m_cipher_active = true;
 			m_cipher_command_pending = false;
 			LOGMASKED(LOG_GSM_SESSION,
 					"gsm_cipher: event=activated algorithm=%u t=%.6f\n",
 					m_cipher_algorithm, machine().time().as_double());
+		}
+		if (activate || clear_complete)
+		{
 			const auto information = m_network->mm_information();
 			m_state = u8(state::awaiting_mm_information_acknowledgement);
 			return queue_downlink(downlink_kind::mm_information,

@@ -439,6 +439,8 @@ def main():
                 checker.extend(["--outgoing", "--number", "123"])
             if args.coherent_cell:
                 checker.extend(['--configured-carrier', '--frames', str(run / 'snap')])
+            if args.a5_1:
+                checker.append('--a5-1')
         elif args.scenario in ("idle-state", "call-state", "sms-state", "divert-state"):
             checker = [sys.executable, str(root / "tools/noki6250_state_check.py"),
                        str(run / "error.log"), str(run / "snap")]

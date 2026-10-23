@@ -19,6 +19,12 @@ CM_SERVICE_REQUEST = re.compile(
 CM_SERVICE_ACCEPT = re.compile(
     r"GSM service downlink kind=\d+ sapi=0 pd=05 message=21 length=2"
 )
+# TS 24.008 4.5.1.1: RR cipher completion is also an MM acceptance
+# indication. The consumer searches this only after its service request.
+CIPHER_SERVICE_ACCEPTANCE = re.compile(
+    r'GSM service downlink [^\n]*pd=06 message=35\b'
+    r'[\s\S]*?GSM service uplink sapi=0 pd=06 message=32 length=2 data=0632\b'
+    r'[\s\S]*?gsm_cipher: event=activated algorithm=1\b')
 SETUP = re.compile(
     r"GSM service uplink sapi=0 pd=03 message=05 length=(?P<length>\d+) "
     r"data=(?P<data>[0-9a-f]+)"
@@ -88,11 +94,13 @@ def check(
         (("handset Release Complete", RELEASE_COMPLETE),)
         if require_release_complete else ()
     )
+    acceptance = re.compile(
+        CM_SERVICE_ACCEPT.pattern + r'|' + CIPHER_SERVICE_ACCEPTANCE.pattern)
     require_ordered(
         text,
         (
             ("CM Service Request", CM_SERVICE_REQUEST),
-            ("CM Service Accept", CM_SERVICE_ACCEPT),
+            ("MM service acceptance", acceptance),
             ("SETUP", SETUP),
             ("Call Proceeding", CALL_PROCEEDING),
             ("one traffic assignment", TRAFFIC_ASSIGNMENT),
