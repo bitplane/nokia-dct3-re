@@ -857,6 +857,16 @@ firmware requirements, not measured hardware timings. The meaning of the
 framing/clock bits, transmit word duration and external peer remain unknown;
 do not choose a baud rate merely to clear the boot supervision deadline.
 
+Setup helper `9009` initializes receive-ring pointers to `0100`, transmit
+pointers to `0700`, clears software protocol counters, and selects protocol
+states from `06f3` and control-port bit `0080`. It does not program a
+separate baud/divisor register in the reviewed range. No such register
+was identified among the adjacent port candidates either; this bounded
+inspection is not a proof that no clock control exists elsewhere. Keep
+transmit timing unimplemented until a clock/framing contract or measured
+trace supports it. Independent SIM/application coverage can advance without
+fabricating this peripheral's completion or receive traffic.
+
 For a forty-second processing capture, the native runner correctly fails
 on the repeated startup. `nse2_lifecycle_check TRACE --timer-boundary`
 requires the raw arm/terminal/reset evidence and reports
