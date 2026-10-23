@@ -1295,6 +1295,18 @@ discovery, not a required response, physical baud or radio-completion
 dependency. RAM addresses in this trace are reused allocations; do not
 treat every earlier write to `101420/101438` as the same object's lifetime.
 
+The nine-second service run's native opcode fingerprint is 564 exact forms
+in 101 high-byte groups, SHA-256
+`2214638d14968de30e21a3c62fd9305a00716965ce8568658263cae6f186fede`.
+The reproduction now requires this fingerprint and supported, exact-length
+decoding of all 17 captured `6f` extension tuples. Nine synthetic
+zero-extension decoder records are unsupported; their actual fetched
+extensions pass the independent tuple check. They are not nine demonstrated
+execution failures. All observed forms occur in the existing CPU assertion
+inventory, but a fresh completed full-fixture assertion/execution comparison
+is not part of this gate. No CPU correctness, pipeline timing, silicon clock or sustained
+handset claim follows from this bounded frontend inventory.
+
 Vector `ffd0` branches to ISR `3416`. Its `34da` path reads port `36`,
 tests mask `2000`, and can write port `34` at `34e8` or `34f4` while
 maintaining software buffering state `01f9`. Thus the output port also has

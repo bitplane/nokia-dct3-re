@@ -11,6 +11,7 @@ if __package__ in (None,''):
 from tools.run_nse2_native import prepare_native
 from tools.run_nse2_puk2_exhaustion import run_stage
 from tools.c54x_rom4_port_census import classify_candidates
+from tools.c54x_opcode_coverage import summarize,require_extension_decoding
 from tools.nse2_sampling_check import (inspect_word_configuration_contract,
                                       inspect_word_host_command,
                                       inspect_word_pending_frames,
@@ -74,6 +75,15 @@ def main():
                 results['worker_objects']=inspect_word_worker_objects(text)
                 image=(target/'roms/nse2r4v/5110i_5.53A.fls').read_bytes()
                 results['startup_service']=inspect_word_startup_contract(image,text)
+                coverage=summarize(text)
+                fingerprint=(coverage['opcodes'],coverage['high_byte_groups'],coverage['set_sha256'])
+                if fingerprint!=(564,101,'2214638d14968de30e21a3c62fd9305a00716965ce8568658263cae6f186fede'):
+                    raise ValueError('bounded native word-service opcode fingerprint differs')
+                require_extension_decoding(coverage)
+                results['opcode_inventory']=dict(opcodes=fingerprint[0],groups=fingerprint[1],
+                                                sha256=fingerprint[2],actual_extensions_decoded=True,
+                                                fresh_cpu_fixture_acceptance=False,
+                                                complete_isa_proved=False)
         results['physical_completion_proved']=False
         results['long_run_stability_proved']=False
         (run/'acceptance.json').write_text(json.dumps(results,indent=2)+'\n')
