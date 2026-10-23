@@ -3,6 +3,20 @@ from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripher
 
 
 class SamplingCheckTest(unittest.TestCase):
+    def test_service_fetch_pc_offset_and_counter_correlation(self):
+        from tools.nse2_sampling_check import inspect_word_service_observation
+        rows=[f'nse2_word_service_fetch_summary: address={a} reads={n} exact=0 plusone={n} other=0 observer_writes=0'
+              for a,n in [('3924',46),('3f4e',1247),('8dd0',1247),('9232',0)]]
+        rows += [f'nse2_word_service_increment_summary: address={a} increments=1247 min=0.000065712 max=0.169602462 observer_writes=0'
+                 for a in ('06b3','06c4')]
+        text='\n'.join(rows)
+        self.assertEqual(inspect_word_service_observation(text)['observed_fetch_pc_delta'],1)
+        for bad in (text.replace('plusone=1247','plusone=0'),
+                    text.replace('increments=1247','increments=1246'),
+                    text.replace('min=0.000065712','min=0.169602462')):
+            with self.assertRaises(ValueError):
+                inspect_word_service_observation(bad)
+
     def test_word_host_command_uses_data_space_and_counter_consumers(self):
         import struct
         from tools.nse2_sampling_check import inspect_word_host_command

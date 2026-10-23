@@ -1174,10 +1174,14 @@ native run records 1,247 increments each at post-store PCs `8e71`
 and 1,251 respectively, including initialization and transmitter resets.
 The observed increments are therefore not a fixed-period serial clock.
 These are emulator scheduling observations under the current native model,
-not measured silicon timing. Program-read taps at service entries returned
-zero despite the observed stores: cached opcode fetches make that instrument
-unsuitable for proving execution absence here. Use actual data/IO accesses
-or a separately validated execution observer instead.
+not measured silicon timing. Opcode reads expose `PC=address+1` at these
+entries, not the opcode address itself: an exact-PC-only filter falsely
+reported zero. A nine-second unfiltered control records 1,247 reads each at
+`3f4e` and `8dd0`, 46 at `3924`, and none at `9232`; every observed read
+has that one-word PC offset. This rejects the earlier cache-bypass explanation.
+The observer now reports exact/plus-one/other read counts separately. These
+are fetch observations, not instruction-retirement counts or a universal
+PC convention; use actual data/IO effects to corroborate execution.
 Static callers explain the software cadence: host-processing entry `3924`
 calls service `8dd0` only when `06e1 & 0004` is set, otherwise proceeding
 to host-ring handling at `394f`. Alternate processing entry `3f4e` calls

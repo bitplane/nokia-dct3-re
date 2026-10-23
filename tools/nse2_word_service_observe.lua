@@ -1,9 +1,21 @@
 -- Read-only native service cadence; no completion or receive traffic supplied.
 local machine=manager.machine
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])
--- Program read taps are not execution counters: cached opcode fetches may
--- bypass them. Observe real counter stores and their post-instruction PC.
+-- C54x opcode reads expose PC one word ahead in the validated live run.
+-- Entry reads are fetch observations, not proof of instruction retirement.
 local retained,last={},{}
+for _,address in ipairs({0x3924,0x3f4e,0x8dd0,0x9232}) do
+    local reads,exact,plusone,other=0,0,0,0
+    retained[#retained+1]=cpu.spaces.program:install_read_tap(address,address,'word_service_fetch',function()
+        if _G.rom4_observation_read then return end
+        local pc=cpu.state.PC.value
+        reads=reads+1
+        if pc==address then exact=exact+1 elseif pc==address+1 then plusone=plusone+1 else other=other+1 end
+    end)
+    retained[#retained+1]=emu.add_machine_stop_notifier(function()
+        machine:logerror(string.format('nse2_word_service_fetch_summary: address=%04x reads=%d exact=%d plusone=%d other=%d observer_writes=0\n',address,reads,exact,plusone,other))
+    end)
+end
 for _,address in ipairs({0x06b3,0x06c4}) do
     local count,minimum,maximum=0,nil,nil
     local increments,increment_last,increment_min,increment_max=0,nil,nil,nil

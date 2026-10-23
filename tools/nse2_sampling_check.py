@@ -92,6 +92,23 @@ def inspect_word_configuration_contract(program):
                 baud_and_framing_proved=False,completion_source_proved=False)
 
 
+def inspect_word_service_observation(text):
+    """Qualify the bounded nine-second fetch/store correlation, not silicon timing."""
+    fetches=re.findall(r'nse2_word_service_fetch_summary: address=([0-9a-f]{4}) reads=(\d+) exact=(\d+) plusone=(\d+) other=(\d+) observer_writes=0',text)
+    expected=[('3924','46','0','46','0'),('3f4e','1247','0','1247','0'),
+              ('8dd0','1247','0','1247','0'),('9232','0','0','0','0')]
+    if fetches!=expected:
+        raise ValueError('word service fetch/PC observation differs')
+    increments=re.findall(r'nse2_word_service_increment_summary: address=([0-9a-f]{4}) increments=(\d+) min=([0-9.]+) max=([0-9.]+) observer_writes=0',text)
+    if [(a,n) for a,n,_,_ in increments]!=[('06b3','1247'),('06c4','1247')]:
+        raise ValueError('word service increment coverage differs')
+    for _,_,minimum,maximum in increments:
+        if not (0.00006<float(minimum)<0.00007 and 0.169<float(maximum)<0.170):
+            raise ValueError('word service variable cadence differs')
+    return dict(entry_fetches=1247,counter_increments=1247,observed_fetch_pc_delta=1,
+                fixed_counter_period_proved=False,physical_completion_proved=False)
+
+
 def inspect_word_host_command(program,data):
     """Resolve the host command using data-space, never program-space tables."""
     if len(data)!=0x20000:
