@@ -342,10 +342,12 @@ the caller's physical interpretation of TC remain unresolved.
 
 ### Current RF-control reproducibility boundary
 
-A fresh `run_c54x_rom4_rf_delivery.py --repeats 1` check against binary
-SHA-256 `bba02bfa06831197307db818903f3d47bd0d831403d96b19b53f829cd6ba4b06`
-does not reproduce the accepted-store result below. The zero control produces
-4,888 completed zero scores; the rotating control produces 4,888 nonzero scores, maximum
+A fresh `run_c54x_rom4_rf_delivery.py --repeats 1 --execution-probes` check
+against binary SHA-256
+`343ce4adb8736b95c587a8b1d639be520b032c77e90ed735723e04abc183de86`
+does not reproduce the accepted-store result below. The execution-owned
+legacy-bus zero control produces 4,888 zero scores; rotating input produces
+4,888 nonzero scores, maximum
 `0x0538`, and zero second-comparison/accepted-store entries. Threshold remains
 `0x0574`. The strict rotating-input gate fails and is not rebanked.
 The retained comparison data below therefore describes earlier captures,
@@ -363,8 +365,8 @@ Neither has an accepted score. The zero case passes its control conditions;
 the rotating case fails only score acceptance. This is not physical RF input,
 successful acquisition or registered-network evidence.
 
-The baseline remains unchanged after staged FR/EFR speech, DTX, homing and
-loss qualification. Those CPU improvements do not establish an RF adapter.
+Passing isolated CPU and codec fixtures neither proves every RF
+operand/pipeline context nor establishes a physical RF adapter.
 The retained MADos reference provides matching NHM-5 upload payloads and MCU
 interface definitions, not a measured NSE-1 receive-word stream. The parallel
 RF contract in the NSE-1 manual and the separate 1 MHz/8 kHz PCM contract
@@ -436,19 +438,20 @@ zero/DC negative control and strict rotating-input criterion. Instruction-entry
 observation is not proof that a store subsequently completed or that a physical
 signal was acquired.
 
-A fresh matched standard-SWWSR comparison uses `--machine nse1astd
---execution-probes --repeats 1` and `--machine nse1pipe --repeats 1`.
+A fresh matched comparison uses `--machine noki5110 --execution-probes`,
+`--machine nse1astd --execution-probes` and `--machine nse1pipe`, each with
+`--repeats 1`.
 Recorded binary, observer, generator and loose-ROM hashes are identical; only
-the machine/frontend profile differs. Each case consumes 991,360 input words
+the machine/frontend/bus profile differs. Each case consumes 991,360 input words
 over 60 emulated seconds and ends with the illegal flag clear.
 
-| Input | Atomic entries | Staged entries | Every observed score, both frontends | Second/store entries |
-| --- | ---: | ---: | --- | --- |
-| Zero | 4,887 | 4,885 | `0000` | 0 / 0 |
-| Rotating | 4,887 | 4,885 | `0538` | 0 / 0 |
+| Input | Legacy atomic entries | Standard atomic entries | Standard staged entries | Every observed score | Second/store entries |
+| --- | ---: | ---: | ---: | --- | --- |
+| Zero | 4,888 | 4,887 | 4,885 | `0000` | 0 / 0 |
+| Rotating | 4,888 | 4,887 | 4,885 | `0538` | 0 / 0 |
 
 Thus the staged zero-score anomaly from fetch snapshots is excluded, and the
-rotating stimulus remains below `0574` on both frontends. The entry-count
+rotating stimulus remains below `0574` across all three compositions. The entry-count
 difference is not hidden or treated as timing parity. The rotating score gate
 still fails. This establishes neither a valid physical stimulus nor acquisition.
 
