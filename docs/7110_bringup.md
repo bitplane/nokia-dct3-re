@@ -812,6 +812,10 @@ Nokia's NSE-5 System Module manual, Issue 1 (07/99), is available as a
 [readable mirror preview](https://www.eserviceinfo.com/preview_html.php?fileid=5461&previewid=3023).
 The locally acquired HTML is `roms/research/nse5/manuals/ch2sys-preview.html`;
 it is a partial text rendition, not the complete PDF or legible schematics.
+The primary PDF's page 2-36 names the underlying FlexPool and COBBA_GJP
+specifications but leaves the DSP clock multiplier `TBD`; the exact source
+identities and admission limits are indexed in `hardware_atlas.md` under
+Related-product specification leads. Neither specification has been acquired.
 
 Page 2-7 identifies three roller interrupt inputs and an independent
 slide-position interrupt. Its key inventory includes roller push, two soft

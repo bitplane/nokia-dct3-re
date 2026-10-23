@@ -44,6 +44,22 @@ not package count. The MAD2 internal blocks therefore remain separate reusable
 devices wired by the phone driver; a package-level MAD2 aggregate is deferred
 until those ownership boundaries stabilize.
 
+### Related-product specification leads
+
+Primary service manuals distinguish the ASIC blocks but generally do not
+publish their register specifications. Retain the following document identities
+as acquisition leads, not implemented contracts:
+
+| Primary source | Established information | Limit of transfer |
+| --- | --- | --- |
+| [NSE-5 System Module, Issue 1 07/99, page 2-36](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/7110/CH2SYS%20%5B82%5D.pdf) | Names `DAS00308` as the FlexPool specification and `DAS00348` as the COBBA_GJP specification for SERRFI. The DSP multiplier is explicitly `TBD`. | These are document references, not acquired register-level specifications. Do not infer a 7110 DSP clock from another product. |
+| [NSB-5 System Module, Issue 1 03/01, page 35](https://www.manualslib.com/manual/2181590/Nokia-Nsb-5-Series.html?page=35) | Names the same two specifications and describes MAD2WD1's 13 MHz reference multiplied to 78 MHz for its DSP. | This is NSB-5 evidence, not a universal MAD2 clock or proof of NSE-2 wiring. |
+| [NSE-3 System Module, Original 11/97, page 3-45](https://www.manualshelf.com/manual/nokia/6110/5-user-guide-english/page-45.html) | Connects infrared/FBUS to AccIF, with several supported serial rates. | Does not identify DSP I/O ports `34/35/36`, their status bits, packing, interrupt source or configured rate. See `5110i_bringup.md`. |
+
+The named DAS documents remain unacquired. A document title in a service
+manual is not authority to implement guessed register semantics; likewise,
+serial frame recognition does not determine the peripheral clock.
+
 ## The chip
 
 The 3210 board uses MAD2PR1, containing the emulated **ARM7TDMI MCU** and an
