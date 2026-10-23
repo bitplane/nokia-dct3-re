@@ -28,6 +28,7 @@ emu.register_frame_done(function()
                             {'peripheral_alternate',0x8e89,0x80},
                             {'peripheral_alternate_b',0xb787,0xa0},
                             {'sampling_reader',0x71d0,0x70},
+                            {'scan_request',0x3d40,0xb0},
                             {'peripheral_tx',0x9162,0x100},
                             {'vectors',0xff80,0x80}}) do
         debugger:command(string.format('dasm nse2_control_%s.dasm,%x,%x,1,:dsp_c54x:cpu',

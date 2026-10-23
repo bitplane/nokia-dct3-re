@@ -15,6 +15,8 @@ from tools.nsk1_radio_contract import (live_publisher_census, native_completion_
                                      PUBLISHER_TYPE_LOADS)
 
 FRAGMENTS = {
+    0x3d70: '7714195df13000f06884ff0f1b84818461840040f495e97cff30f120012b61840020771306bcff30f120017661840080f495f495ff30f12001f281f8028461f8000800016883fff7ff2069830008',
+    0x3d9b: '10daf03000ff771412008094ec1ee5caf8303db1e7267712121f77130286f07448f781f8028476837fffe762',
     0x092d: '60f802840001f8300939e87b881a80f80285',
     0x0952: '7712006076820546f4957582000e',
     0x0975: '60f802840001f8300a1a76f80e130001f273098a7716000776f80e130001771a007bf0720989f074407c7215028577140e1577170e14',
@@ -30,6 +32,27 @@ FRAGMENTS = {
     0x397a: 'f1100051f84f398d',
     0x398d: 'f000b00f4a1188117710000110818a11f4e2771306bd',
 }
+
+
+def inspect_scan_request_selection(text):
+    rows=re.findall(r'nse2_scan_selector: address=([0-9a-f]{4}) ar2=([0-9a-f]{4}) input=([0-9a-f]{4}) extent=([0-9a-f]{4}) flags=([0-9a-f]{4}) mode=([0-9a-f]{4}) st0=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0',text)
+    if [row[0] for row in rows]!=['3d5e','3d8f','3da3','3db1','092d']:
+        raise ValueError('scan request selector path differs or list-conversion path ran')
+    if rows[0][1:4]!=('081f','0011','0000') or rows[1][1:4]!=('0820','9800','007c'):
+        raise ValueError('scan extent does not follow the captured host request')
+    if any(row[3]!='007c' for row in rows[1:]) or rows[1][5]!='0010' or not int(rows[2][6],16)&0x1000:
+        raise ValueError('scan default extent or supplied-list branch condition differs')
+    times=[float(row[-1]) for row in rows]
+    if times!=sorted(times) or not 4.6<times[0]<times[-1]<4.9:
+        raise ValueError('scan request timing/order differs')
+    writes=re.findall(r'nse2_scan_extent: address=(028[45]) value=([0-9a-f]{4}) mask=ffff pc=([0-9a-f]{4}) n=(\d+) t=([0-9.]+) observer_writes=0',text)
+    if [(a,v,pc,int(n)) for a,v,pc,n,_ in writes]!=[
+            ('0284','0000','0f10',1),('0285','0000','0f10',1),
+            ('0284','007c','3d8f',2),('0285','007b','0936',2)]:
+        raise ValueError('scan selector/inner-count write attribution differs')
+    return dict(host_control='0011',following_word='9800',selected_extent=124,inner_banz_initial=123,
+                supplied_list_conversion=False,observed_request_decode_consistent=True,
+                fitted_mask_proved=False,physical_scan_duration_proved=False)
 MCU_REQUEST_FRAGMENTS = {
     0x2160ec: '27017507',  # R7 supplies the one-byte length.
     0x2160f4: '48a4468078002804d145',

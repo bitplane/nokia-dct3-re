@@ -20,7 +20,7 @@ from tools.nse2_lifecycle_check import (
 )
 from tools.nse2_native_result_check import (inspect_capture, inspect_control_trace,
                                            inspect_request_lifecycle, inspect_scan_pacing,
-                                           inspect_completion_counters, inspect_publisher_runtime)
+                                           inspect_completion_counters, inspect_publisher_runtime,inspect_scan_request_selection)
 from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripheral_routes,inspect_peripheral_consumers
 
 
@@ -253,6 +253,7 @@ def main():
                 (run/'nse2_native_program.bin').read_bytes())
             result['native_processing_boundary']['conditional_request'] = inspect_control_trace(text)
             result['native_processing_boundary']['request_lifecycle'] = inspect_request_lifecycle(text)
+            result['native_processing_boundary']['scan_request_selection'] = inspect_scan_request_selection(text)
             result['native_processing_boundary']['scan_pacing'] = inspect_scan_pacing(text)
             result['native_processing_boundary']['completion_counters'] = inspect_completion_counters(text)
             result['native_processing_boundary']['publisher_runtime'] = inspect_publisher_runtime(text)

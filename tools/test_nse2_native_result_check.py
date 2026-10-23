@@ -5,10 +5,25 @@ from tools.nse2_native_result_check import (FRAGMENTS, MCU_REQUEST_FRAGMENTS, NV
                                            inspect_control_trace, inspect_mcu_request, inspect_program,
                                            inspect_request_lifecycle, inspect_scan_pacing,
                                            inspect_completion_counters, compare_scan_budget, inspect_nv_policy,
-                                           inspect_publisher_runtime, PUBLISHER_TYPE_LOADS)
+                                           inspect_publisher_runtime, PUBLISHER_TYPE_LOADS,inspect_scan_request_selection)
 
 
 class ResultTest(unittest.TestCase):
+    def test_scan_extent_is_selected_by_the_actual_request(self):
+        rows=[]
+        for i,(a,p,v,e,m,s) in enumerate((('3d5e','081f','0011','0000','0000','001f'),
+                ('3d8f','0820','9800','007c','0010','001f'),('3da3','0840','0000','007c','0010','101f'),
+                ('3db1','0840','0000','007c','0010','101f'),('092d','0e12','f020','007c','0014','181f'))):
+            rows.append(f'nse2_scan_selector: address={a} ar2={p} input={v} extent={e} flags=0820 mode={m} st0={s} t={4.7+i*.01} observer_writes=0')
+        for a,v,p,n in (('0284','0000','0f10',1),('0285','0000','0f10',1),('0284','007c','3d8f',2),('0285','007b','0936',2)):
+            rows.append(f'nse2_scan_extent: address={a} value={v} mask=ffff pc={p} n={n} t=4.7 observer_writes=0')
+        text='\n'.join(rows)
+        self.assertEqual(inspect_scan_request_selection(text)['selected_extent'],124)
+        for broken in (text.replace('input=0011','input=1100'),text.replace('st0=101f','st0=001f'),
+                       text.replace('address=3db1','address=3da5'),text.replace('value=007b','value=007a')):
+            with self.assertRaises(ValueError):
+                inspect_scan_request_selection(broken)
+
     def publisher_trace(self):
         active = {0x4a11,0x4a21,0x4b1a,0x4ba8}
         rows = [f'rom4_dispatch_count: address={address:04x} count={4 if address==0x37ce else int(address in active)}'

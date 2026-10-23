@@ -682,6 +682,19 @@ uses repeat flag `0e13` to make two inner passes. `09cb` decrements the
 outer counter and branches back. This establishes the loop structure,
 not the electrical meaning of its samples or the correct physical cadence.
 
+The long extent is selected by the consumed request, not an observed
+uninitialized selector: at `3d5e`, AR2=`081f` reads control `0011`; the
+decoder writes `0284=007c` at `3d8d` (write observation PC `3d8f`) and
+sets `195d=0010`. Its next input word is `9800`. At `3da3`, TC is set,
+so execution skips supplied-list conversion `3da5..3db0` and reaches
+`3db1` with extent 124 unchanged. The uploaded scan observes that same
+extent at `092d` and writes `0285=007b` at `0934` for inclusive BANZ.
+The processing checker pins the selector bytes and observes this ordered
+path and both extent writes. This establishes consistent decoding for the
+captured request; it does not prove fitted mask identity, correct RF timing,
+or the absence of all other request/lifecycle defects. Do not shorten the
+extent or substitute a supplied list to evade receive supervision.
+
 Positive fetch observations after register restoration show AR5=`ffff`
 at each inner-loop exit. AR6 descends `7,6,5,4,3,2`, with the final
 observed inner pass at AR6=1 by 29.793511 seconds. The first paired exits
