@@ -84,6 +84,7 @@ make verify-5110i-native-processing RUN_DIR=tmp/nse2-native-processing
 make verify-5110i-native-ui-state RUN_DIR=tmp/nse2-native-ui-state
 make verify-5110i-sim-write-state RUN_DIR=tmp/nse2-sim-write-state
 make verify-5110i-sms-write-state RUN_DIR=tmp/nse2-sms-write-state
+make verify-5110i-pin-state RUN_DIR=tmp/nse2-pin-state
 ```
 
 The nominal boot gate requires the reviewed unattended seven-second frame
@@ -1454,6 +1455,29 @@ frame and complete-card assertions keep the two acceptance cases distinct.
 Each gate uses preparation, restore and cold-read processes; neither extends
 the native stability horizon. The ordinary SMS fixture retains its default
 150-ms Save hold and has a separate regression run.
+
+### Pending SIM PIN verification restoration
+
+`verify-5110i-pin-state` uses three isolated native processes: an untouched
+PIN-enabled card wait, pending physical wrong-PIN VERIFY/save/load, and
+independent cold PIN wait using the resulting complete card. The checkpoint
+at 7.663201154 seconds is after `A0 20 00 01 08` but before its body:
+card instruction `20`, body length zero/expected eight, receiving state one,
+and CHV retries `3/3`. SIMI retains one unread, not-ready procedure byte,
+IIR zero, TX-ready pending and empty TX FIFO. Both replay legs send
+`1111 ff ff ff ff`, receive `98 04`, decrement CHV1 once to two retries,
+and render the exact Code error frame. All 41 wire events in the half-second
+window match in time and bytes; the full ARM/RAM/card/controller checkpoint
+matches after load. Complete card comparison permits only that retry byte
+to change; cold restart retains the two-retry card and unchanged credentials.
+
+The snapshot occurs while physical OK is held. Its remaining release is
+replayed from the same physical contact timeline after load, rather than
+changing the ordinary key duration or leaving a stuck input. Forced contact
+values are harness state, not firmware/card pokes. The shared transaction
+observer also serves ADN and partial SMS writes; their acceptance contracts
+remain distinct. This proves bounded SIM authentication restoration, not
+native registration or stability beyond the reason-`68` boundary.
 
 ## Remaining work
 

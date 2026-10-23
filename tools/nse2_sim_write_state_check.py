@@ -8,6 +8,23 @@ from tools.sim_sms_draft import DRAFT, SMS_OFFSET
 RECORD=b'A'+b'\xff'*17+bytes.fromhex('038121f3')+b'\xff'*10
 
 
+def parse_wire_replay(wire):
+    events={'reference':[],'restored':[]}
+    for line in wire.splitlines():
+        match=re.fullmatch(r'(reference|restored):(\d+):([0-9.]+):(tx|rx):([0-9a-f]{2})',line)
+        if not match:
+            raise ValueError('SIM wire artifact has an invalid event')
+        phase,index,time,kind,value=match.groups()
+        if int(index)!=len(events[phase])+1 or not 0<=float(time)<.5:
+            raise ValueError('SIM wire order/window differs')
+        if events[phase] and float(time)<float(events[phase][-1][0]):
+            raise ValueError('SIM wire time goes backwards')
+        events[phase].append((time,kind,int(value,16)))
+    if not 0<len(events['reference'])<2048 or events['reference']!=events['restored']:
+        raise ValueError('SIM wire replay is empty, saturated or divergent')
+    return events
+
+
 def check_write_state(text,wire,before,after,reference_pixels,restored_pixels,*,sms=False):
     record=DRAFT if sms else RECORD
     length=len(record)
@@ -60,19 +77,7 @@ def check_write_state(text,wire,before,after,reference_pixels,restored_pixels,*,
             raise ValueError('SIM leg lacks exactly one post-checkpoint record commit')
         if leg.count('SIM status ins=dc sw=9000')!=1:
             raise ValueError('SIM leg lacks one successful UPDATE result')
-    events={'reference':[],'restored':[]}
-    for line in wire.splitlines():
-        match=re.fullmatch(r'(reference|restored):(\d+):([0-9.]+):(tx|rx):([0-9a-f]{2})',line)
-        if not match:
-            raise ValueError('SIM wire artifact has an invalid event')
-        phase,index,time,kind,value=match.groups()
-        if int(index)!=len(events[phase])+1 or not 0<=float(time)<.5:
-            raise ValueError('SIM wire order/window differs')
-        if events[phase] and float(time)<float(events[phase][-1][0]):
-            raise ValueError('SIM wire time goes backwards')
-        events[phase].append((time,kind,int(value,16)))
-    if not 0<len(events['reference'])<2048 or events['reference']!=events['restored']:
-        raise ValueError('SIM wire replay is empty, saturated or divergent')
+    events=parse_wire_replay(wire)
     tx=bytes(value for _,kind,value in events['reference'] if kind=='tx')
     rx=bytes(value for _,kind,value in events['reference'] if kind=='rx')
     valid=(tx==record[partial:] and rx==bytes.fromhex('9000')) if sms else (events['reference'][0][1:]==('rx',0xdc) and tx[:32]==record and rx[:3]==bytes.fromhex('dc9000'))
