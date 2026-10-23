@@ -396,6 +396,19 @@ interrupt cadence or execution-cycle model matches physical NSE-2 hardware.
 The next distinction is which processing/frame transitions account for
 those eleven wait periods; changing the clock to beat supervision would
 not answer it.
+The first completion wait now has a counter-level explanation: eleven
+`3204` entries arrive at consecutive modeled frame periods. Their
+`(mode, skip, accumulation)` sequence is
+`(c,1,1),(c,0,1),(c,2,0),(c,1,0),(c,0,1),`
+`(4,2,0),(4,1,0),(4,0,4),(4,0,3),(4,0,2),(4,0,1)`.
+Five enter the skip path `32c5`; six reach processing at `326d`.
+The second mode-`c` processing pass reaches `32b3` and clears mode bit 3;
+the fourth mode-`4` accumulation reaches `32be` with accumulation zero
+and sets the completion work bit. No missing frame is observed in this
+wait. This explains the measured pacing as firmware counter progression
+under the current model; it does not validate physical timing or the
+MCU receive-supervision policy. Compare the full scan workload with that
+policy before proposing a timing change.
 None of these static paths establishes an unconditional periodic packet.
 The separate serial publisher retains its existing queued-data contract.
 

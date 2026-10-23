@@ -3,10 +3,46 @@ import unittest
 
 from tools.nse2_native_result_check import (FRAGMENTS, MCU_REQUEST_FRAGMENTS,
                                            inspect_control_trace, inspect_mcu_request, inspect_program,
-                                           inspect_request_lifecycle, inspect_scan_pacing)
+                                           inspect_request_lifecycle, inspect_scan_pacing,
+                                           inspect_completion_counters)
 
 
 class ResultTest(unittest.TestCase):
+    def completion_trace(self):
+        period = 1351 * 12 / 13_000_000
+        frames = [(12, 1, 1), (12, 0, 1), (12, 2, 0), (12, 1, 0), (12, 0, 1),
+                  (4, 2, 0), (4, 1, 0), (4, 0, 4), (4, 0, 3), (4, 0, 2), (4, 0, 1)]
+        rows, counts = [], {}
+        def row(address, mode, skip, accumulation, time):
+            counts[address] = counts.get(address, 0) + 1
+            rows.append(f'nse2_native_scan_completion: address={address:04x} n={counts[address]} '
+                        f'mode={mode:04x} skip={skip:04x} accumulation={accumulation:04x} '
+                        f'ar2=0060 t={time:.9f} observer_writes=0')
+        for index, (mode, skip, accumulation) in enumerate(frames):
+            time = 4.744 + index * period
+            row(0x3204, mode, skip, accumulation, time)
+            row(0x32c5 if skip else 0x326d, mode, skip, accumulation, time + 0.000001)
+            if index == 4:
+                row(0x32b3, mode, 2, 0, time + 0.000002)
+        row(0x32be, 4, 0, 0, time + 0.000003)
+        return '\n'.join(rows)
+
+    def test_completion_counter_progress_is_not_physical_validation(self):
+        result = inspect_completion_counters(self.completion_trace())
+        self.assertEqual(result['frame_interrupts'], 11)
+        self.assertFalse(result['missing_frame_in_observed_wait'])
+        self.assertFalse(result['physical_timing_validated'])
+
+    def test_missing_changed_and_duplicated_completion_frames_fail(self):
+        text = self.completion_trace()
+        for changed in ('', '\n'.join(text.splitlines()[1:]),
+                        text + '\n' + text.splitlines()[0],
+                        text.replace('address=32be', 'address=ffff'),
+                        text.replace('accumulation=0004', 'accumulation=0005'),
+                        text.replace('t=4.744000000', 't=4.740000000')):
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                inspect_completion_counters(changed)
+
     def pacing_trace(self):
         period = 1351 * 12 / 13_000_000
         rows = []

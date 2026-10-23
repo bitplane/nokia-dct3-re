@@ -6,6 +6,7 @@ dofile(directory .. 'nse2_timer_queue_observe.lua')
 local machine = manager.machine
 local cpu = assert(machine.devices[':dsp_c54x:cpu'])
 local counts = {}
+local first_completion_wait = false
 local mcu = assert(machine.devices[':maincpu'])
 local mcu_space = mcu.spaces.program
 local mode_writes, constructor_entries = 0, 0
@@ -49,6 +50,21 @@ emu.register_frame_done(function()
     machine:logerror('nse2_native_program_snapshot: words=65536 byte_order=big observer_writes=0\n')
 end, 'NSE-2 passive live program snapshot')
 _G.nse2_scan_loop_taps = {}
+for _, address in ipairs({0x3204, 0x322a, 0x326d, 0x32b3, 0x32be, 0x32c5}) do
+    local observed = 0
+    _G.nse2_scan_loop_taps[#_G.nse2_scan_loop_taps + 1] =
+        cpu.spaces.program:install_read_tap(address, address, 'nse2_scan_completion', function()
+            if not first_completion_wait then return end
+            local pc = cpu.state['PC'].value
+            if pc ~= address and pc ~= address + 1 then return end
+            observed = observed + 1
+            if observed > 32 then return end
+            machine:logerror(string.format('nse2_native_scan_completion: address=%04x n=%d mode=%04x skip=%04x accumulation=%04x ar2=%04x t=%.9f observer_writes=0\n',
+                address, observed, cpu.spaces.data:read_u16(0xac),
+                cpu.spaces.data:read_u16(0xaa), cpu.spaces.data:read_u16(0xaf),
+                cpu.state['AR2'].value, machine.time:as_double()))
+        end)
+end
 -- Bound the first few channel measurements; distinguish setup waits from
 -- the processing completion wait without changing clocks or request data.
 for _, address in ipairs({0x990, 0x99d, 0x9a6, 0x9b1, 0x9c2}) do
@@ -58,6 +74,8 @@ for _, address in ipairs({0x990, 0x99d, 0x9a6, 0x9b1, 0x9c2}) do
             local pc = cpu.state['PC'].value
             if pc ~= address and pc ~= address + 1 then return end
             counts[address] = counts[address] + 1
+            if counts[address] == 1 and address == 0x9a6 then first_completion_wait = true end
+            if counts[address] == 1 and address == 0x9b1 then first_completion_wait = false end
             if counts[address] > 8 then return end
             machine:logerror(string.format('nse2_native_scan_stage: address=%04x n=%d pc=%04x mode=%04x work=%04x t=%.9f observer_writes=0\n',
                 address, counts[address], pc, cpu.spaces.data:read_u16(0xac),

@@ -184,6 +184,38 @@ def inspect_scan_pacing(text):
                 scope='first-eight observed scan timings relative to current model; not physical timing validation')
 
 
+def inspect_completion_counters(text):
+    rows = re.findall(r'nse2_native_scan_completion: address=([0-9a-f]{4}) n=(\d+) '
+                      r'mode=([0-9a-f]{4}) skip=([0-9a-f]{4}) accumulation=([0-9a-f]{4}) '
+                      r'ar2=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0', text)
+    groups = {}
+    for address, index, mode, skip, accumulation, ar2, time in rows:
+        group = groups.setdefault(int(address, 16), [])
+        if int(index) != len(group) + 1:
+            raise ValueError('NSE-2 completion counter observation sequence differs')
+        group.append((int(mode, 16), int(skip, 16), int(accumulation, 16),
+                      int(ar2, 16), float(time)))
+    frames = groups.get(0x3204, [])
+    expected = [(12, 1, 1), (12, 0, 1), (12, 2, 0), (12, 1, 0), (12, 0, 1),
+                (4, 2, 0), (4, 1, 0), (4, 0, 4), (4, 0, 3), (4, 0, 2), (4, 0, 1)]
+    if [row[:3] for row in frames] != expected:
+        raise ValueError('NSE-2 first-measurement frame counter progression differs')
+    period = 1351 * 12 / 13_000_000
+    if not all(abs((right[4] - left[4]) / period - 1) < 0.01
+               for left, right in zip(frames, frames[1:])):
+        raise ValueError('NSE-2 first-measurement frame cadence differs')
+    if (len(groups.get(0x326d, [])) != 6 or len(groups.get(0x32c5, [])) != 5
+            or len(groups.get(0x32b3, [])) != 1 or len(groups.get(0x32be, [])) != 1):
+        raise ValueError('NSE-2 first-measurement skip/process/completion coverage differs')
+    completion = groups[0x32be][0]
+    if completion[:3] != (4, 0, 0) or not 0 < completion[4] - frames[-1][4] < period:
+        raise ValueError('NSE-2 work-bit completion does not follow last accumulation')
+    return dict(frame_interrupts=11, processing_entries=6, skip_entries=5,
+                mode_sequence=[12, 4], completion_accumulation=0,
+                missing_frame_in_observed_wait=False, physical_timing_validated=False,
+                scope='first native measurement only; does not establish supervision policy correctness')
+
+
 def main():
     root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
