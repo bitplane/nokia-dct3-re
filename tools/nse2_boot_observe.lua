@@ -5,6 +5,30 @@ local cpu = machine.devices[':maincpu']
 local space = cpu.spaces.program
 local shared_writes, tx, rx, commands, pixels, signal_writes = 0, 0, 0, 0, 0, 0
 local selected = 0
+local upload_writes = 0
+local startup_polls = 0
+_G.nse2_startup_poll_tap = space:install_read_tap(0x10004, 0x10007, 'nse2_startup_polls', function(_, data, mask)
+    local pc = cpu.state['R15'].value
+    if (pc ~= 0x2781fa and pc ~= 0x27821a) or (mask & 0xffff0000) == 0 then return end
+    startup_polls = startup_polls + 1
+    if startup_polls <= 64 then
+        machine:logerror(string.format('nse2_startup_poll: n=%d address=00010004 data=%04x mask=%04x pc=%08x t=%.9f observer_writes=0\n',
+            startup_polls, (data >> 16) & 0xffff, (mask >> 16) & 0xffff, pc, machine.time:as_double()))
+    end
+end)
+_G.nse2_upload_tap = space:install_write_tap(0x10008, 0x10fff, 'nse2_upload_words', function(offset, data, mask)
+    for lane = 0, 1 do
+        local shift = (1 - lane) * 16
+        if (mask & (0xffff << shift)) ~= 0 then
+            upload_writes = upload_writes + 1
+            if upload_writes <= 4096 then
+                machine:logerror(string.format('nse2_upload_word: n=%d address=%08x data=%04x mask=%04x pc=%08x t=%.9f observer_writes=0\n',
+                    upload_writes, offset + lane * 2, (data >> shift) & 0xffff,
+                    (mask >> shift) & 0xffff, cpu.state['R15'].value, machine.time:as_double()))
+            end
+        end
+    end
+end)
 local nv_reads = 0
 local dsp_state_writes = 0
 _G.nse2_dsp_state_tap = space:install_write_tap(0x10b9f4, 0x10b9f7, 'nse2_dsp_state', function(_, data, mask)

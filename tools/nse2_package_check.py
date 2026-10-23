@@ -25,6 +25,7 @@ VERSION = b'V 05.53\n11-01-01\nNSE-2\n(c) NMP.\0'
 BASE = 0x200000
 TABLE = 0x29bba0
 PERIPHERAL_FRAGMENTS = {
+    'dsp_upload_copy': (0x29acb4, '477846c0e92d5ff0e2522001e8b01ff8e8a11ff8e25220015afffffbe8bd5ff0e12fff1e'),
     'eeprom_record_sum': (0x23315c, 'b5f0b0811c0c1c0642a6da3a1ba004000c041c20f023f9341c0725002f00d11342a6da231ba41c3046692201f060fe0346687800194004000c051c7004000c063c012c00d1efe0111c301c391c22f060fdf2e0061e6004000c045de0194004000c052c00d1f61c38f022ffe0f04dfa560a011a6904090c0d06000e001a2804000c051c28b001bdf0'),
     'eeprom_record_consumer': (0x2333ce, '200901804970f7fffec24682486ea9012202f060fcd720290100210644692202f060fcd04668888046514281d137466888c043082800d032464946407308'),
     'eeprom_record_exclusion': (0x280678, 'b500b081209d008046692202f013fb8546688800b001bd00'),
@@ -60,7 +61,7 @@ def peripheral_contract(mcu):
             raise ValueError('NSE-2 peripheral base literal differs')
     if mcu[0x27df44 - BASE:0x27df48 - BASE] != bytes.fromhex('0010fca0'):
         raise ValueError('NSE-2 EEPROM self-test result base differs')
-    for address, expected in ((0x233594, 0x31e), (0x278488, 0xffff),
+    for address, expected in ((0x233594, 0x31e), (0x278488, 0xffff), (0x27848c, 0x10ba78),
                               (0x2782f4, 0x10b9f4), (0x28dabc, 0x10b9f4)):
         if struct.unpack_from('>I', mcu, address - BASE)[0] != expected:
             raise ValueError('NSE-2 NV/loader contract literal differs')

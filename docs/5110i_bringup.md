@@ -2,7 +2,9 @@
 
 ## Current boundary
 
-The acquired v5.53 MCU/PPM-A pair is normalized and qualified. The separate
+The acquired v5.53 MCU/PPM-A pair is normalized and qualified. Its initial
+verifier upload is captured byte-for-byte, but no DSP executes it in the
+ordinary profile. The separate
 `noki5110i` research profile renders the own firmware's readable 84x48
 `CONTACT SERVICE` frame with initially erased external EEPROM and no DSP
 completion. Fresh isolated runs execute EEPROM GPIO, CCONT and LCD traffic
@@ -196,17 +198,50 @@ static qualification. The later service routine `2787ac` can set the state
 byte to one when it is zero and shared halfword `100e4` is zero; this is a
 different lifecycle, not authority to synthesize either condition.
 
-Next capture the full actual initial upload and consumer-side shared-memory
-protocol before selecting a backend. A silent transport cannot complete a
+The actual initial upload and consumer-side shared-memory protocol below
+constrain backend selection. A silent transport cannot complete a
 DSP-owned exchange. A separately labeled ROM4-mask compatibility experiment
 may be justified by the own upload ABI, but it must not promote a candidate
 mask to fitted identity or replace the exchange with completion constants.
 
+### Measured initial transfer
+
+The loader reads catalogue slot 25 via own literal `27848c = 10ba78`
+(`10ba14 + 25*4`), not slot 0. Descriptor `2a0f6c` supplies its 186-word
+verifier at `2a0f78`. The Thumb wrapper at `29acb4` enters ARM code; the
+ARM `LDM/STM` loop copies ten 32-bit registers per iteration, twenty DSP
+words. The caller rounds the count up, so the observed transfer is:
+
+| Surface | Observed own-MCU behavior |
+| --- | --- |
+| Staging destination | `10e00..10f8f`, contiguous full-halfword writes at ARM PC `29acc4`. |
+| Payload | 186 words exactly equal own ROM bytes `2a0f78..2a10eb`. |
+| Rounded tail | 14 zero words, matching own ROM `2a10ec..2a1107`; next descriptor starts at `2a1108`. |
+| Control publication | `100f6..10102` receives `0100 0300 0001 0000 0001 0001 0200`, in that order. |
+| Actual polls | 22 full-halfword reads of `10004`, all `ffff`, from `2781fa/27821a`; then the observed failure-status stores. |
+
+The rounded 400-byte transfer SHA256 is
+`c6b5ba7d61aa08e90014499f3e292bd4655b54a0b2f89722a9c52d4ad3c3c658`;
+its 372-byte verifier SHA256 is
+`0f3b131e112daa10f868c1582faf74088ba70aadea2d59027c12f2823dada7f0`.
+The runner independently compares all 200 captured words against the
+qualified own flash, including zero padding, masks, addresses and ordering.
+It checks control publication before the actual sentinel reads and rejects
+capped or incomplete captures. This proves staging, not DSP program loading,
+instruction execution or an acknowledged exchange. No extra MMIO reads are
+issued by the observer. Evidence: `tmp/nse2-upload-final`.
+
+The next backend experiment can now be constrained by this measured input.
+Keep the ordinary silent profile; use any acquired NSE-1 ROM4 mask only in
+an explicit compatibility profile, with its true provenance and the own
+NSE-2 payload unchanged. Native execution must itself produce the startup
+response; the observed sentinel is not a license to patch shared RAM.
+
 1. Recover the own EEPROM record catalogue and semantic requirements beyond
    the integrity-only fixtures. Establish own-product defaults or independently
    sourced storage before proposing authentic provisioning.
-2. Capture the own initial DSP upload and qualify its startup exchange;
-   the loader-failure trace is not native DSP execution or a verdict.
+2. Test the measured upload against a separately scoped native compatibility
+   backend; the loader-failure trace is not native DSP execution or a verdict.
 3. Recover fitted flash identity, physical memory/clock and analogue inputs
    without changing returned IDs or samples merely to satisfy self-tests.
 4. Decide any explicitly separate native-mask compatibility experiment from

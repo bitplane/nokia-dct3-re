@@ -11,7 +11,7 @@ from PIL import Image
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.nse2_package_check import inspect
-from tools.nse2_boot_check import NV_BLOCKS, verify, verify_record
+from tools.nse2_boot_check import NV_BLOCKS, verify, verify_record, verify_upload
 
 
 def checksum_fixture(*, record_checksum=False):
@@ -95,6 +95,10 @@ def main():
             text = (run / 'error.log').read_text(errors='replace')
             result = verify(text, frame.convert('L').tobytes(), frame.size,
                             checksum_only=integrity)
+            verifier = report['loader']['entries'][25]
+            source = int(verifier['descriptor'], 16) - 0x200000 + 12
+            flash = (run / 'roms/noki5110i/5110i_5.53A.fls').read_bytes()
+            result['initial_upload'] = verify_upload(text, flash[source:source + 400])
             if args.record_checksum_only:
                 verify_record(text)
                 result['record_checksum_selftest_passed'] = True

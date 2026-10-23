@@ -50,6 +50,38 @@ def verify_record(text):
         raise ValueError('NSE-2 record checksum did not clear its own result')
 
 
+def verify_upload(text, payload):
+    if len(payload) != 400 or payload[372:] != bytes(28):
+        raise ValueError('NSE-2 own rounded verifier extent or padding differs')
+    rows = re.findall(r'nse2_upload_word: n=(\d+) address=([0-9a-f]{8}) data=([0-9a-f]{4}) '
+                      r'mask=([0-9a-f]{4}) pc=([0-9a-f]{8}) t=([0-9.]+) observer_writes=0', text)
+    if [int(row[0]) for row in rows] != list(range(1, len(rows) + 1)) or len(rows) >= 4096:
+        raise ValueError('NSE-2 upload trace incomplete or capped')
+    copies = [row for row in rows if row[4] == '0029acc4']
+    expected = [(0x10e00 + i * 2, int.from_bytes(payload[i * 2:i * 2 + 2], 'big'), 'ffff')
+                for i in range(200)]
+    if [(int(row[1], 16), int(row[2], 16), row[3]) for row in copies] != expected:
+        raise ValueError('NSE-2 runtime upload differs from own verifier and padding')
+    control = [row for row in rows if 0x2781b0 <= int(row[4], 16) <= 0x2781d6]
+    expected_control = [(0x100f6 + i * 2, value, 'ffff', pc) for i, (value, pc) in enumerate(
+        ((0x100, 0x2781b0), (0x300, 0x2781b8), (1, 0x2781c2), (0, 0x2781c6),
+         (1, 0x2781ca), (1, 0x2781ce), (0x200, 0x2781d6)))]
+    if [(int(row[1], 16), int(row[2], 16), row[3], int(row[4], 16))
+            for row in control] != expected_control:
+        raise ValueError('NSE-2 startup control publication differs')
+    polls = re.findall(r'nse2_startup_poll: n=(\d+) address=00010004 data=([0-9a-f]{4}) mask=ffff '
+                       r'pc=(002781fa|0027821a) t=([0-9.]+) observer_writes=0', text)
+    if (len(polls) < 2 or len(polls) >= 64
+            or [int(row[0]) for row in polls] != list(range(1, len(polls) + 1))
+            or any(row[1] != 'ffff' for row in polls)):
+        raise ValueError('NSE-2 actual startup sentinel polls missing or changed')
+    times = [float(row[5]) for row in copies + control] + [float(row[3]) for row in polls]
+    if times != sorted(times) or not 0 < times[0] < times[-1] < 0.01:
+        raise ValueError('NSE-2 upload/control/poll order differs')
+    return dict(verifier_words=186, rounded_upload_words=200, startup_poll_reads=len(polls),
+                native_execution=False, completed_ownership_exchange=False)
+
+
 def verify(text, pixels, size, *, checksum_only=False):
     blocks = verify_nv(text, checksum_only=checksum_only)
     loader = re.findall(r'nse2_state_byte: address=(0010b9f[45]) value=([0-9a-f]{2}) '
