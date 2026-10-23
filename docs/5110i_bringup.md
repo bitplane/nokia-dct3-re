@@ -1166,6 +1166,19 @@ the configuration retains its initialization defaults at this observation,
 not a demonstrated host-command override. Do not reinterpret these software
 thresholds as physical serial divisors to invent a transmit-completion rate.
 
+Read-only `nse2_word_service_observe.lua` data-write taps qualify the
+counter service independently of opcode-fetch observation. A nine-second
+native run records 1,247 increments each at post-store PCs `8e71`
+(`06c4`) and `8e74` (`06b3`); consecutive increment intervals range from
+65.712 microseconds to 169.602462 milliseconds. Total writes are 1,249
+and 1,251 respectively, including initialization and transmitter resets.
+The observed increments are therefore not a fixed-period serial clock.
+These are emulator scheduling observations under the current native model,
+not measured silicon timing. Program-read taps at service entries returned
+zero despite the observed stores: cached opcode fetches make that instrument
+unsuitable for proving execution absence here. Use actual data/IO accesses
+or a separately validated execution observer instead.
+
 Vector `ffd0` branches to ISR `3416`. Its `34da` path reads port `36`,
 tests mask `2000`, and can write port `34` at `34e8` or `34f4` while
 maintaining software buffering state `01f9`. Thus the output port also has
