@@ -34,6 +34,10 @@ emu.register_frame_done(function()
                             {'word_control',0x90a0,0xc2},
                             {'word_setup',0x9009,0x97},
                             {'word_host_config',0x3e20,0x70},
+                            {'word_all_control',0x8d00,0x600},
+                            {'word_all_alternate',0xb780,0x180},
+                            {'word_serial_isr',0x3416,0x140},
+                            {'word_config_host',0x3b80,0x70},
                             {'vectors',0xff80,0x80}}) do
         debugger:command(string.format('dasm nse2_control_%s.dasm,%x,%x,1,:dsp_c54x:cpu',
             range[1], range[2], range[3]))

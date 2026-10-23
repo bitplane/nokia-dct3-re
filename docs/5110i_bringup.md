@@ -1134,6 +1134,32 @@ transmit timing unimplemented until a clock/framing contract or measured
 trace supports it. Independent SIM/application coverage can advance without
 fabricating this peripheral's completion or receive traffic.
 
+The wider live-program disassembly identifies configuration helper `9232`:
+`AR3=06f3` holds active flags and `AR4=06f4` pending flags. After its
+branch-dependent flag normalization, `9295..92a4` preserves control-port
+`36` bits with mask `fe01`, conditionally adds `0180` when pending flags
+match `0300`, and merges accumulator bits `007e`. It commits pending
+flags masked by `079e` to active flags before calling setup `9009`.
+Raw direct-call candidates are `3bcd` and `8e02`; these are not recovered
+caller arguments or proof that the configuration branch executes at boot.
+The `007e` field is not yet identified as a divisor or framing parameter.
+The decoded host path `3b92..3bd0` writes a request-derived word to `06f4`
+at `3bb1`, computes separate values for `06f6` and `06f5` using constants
+`015b` and `0d8b` with arithmetic shifts, and calls `9232` at `3bcd`.
+An input low byte `ff` selects `ffff` for `06f5`. This establishes a
+host-controlled configuration path, not the physical units of those values.
+Initialization writes `06f4=0`; alternate paths `b8cd/b8d3` write
+`0800/081c`. Neither alternate constant is evidence of the boot setting.
+
+Vector `ffd0` branches to ISR `3416`. Its `34da` path reads port `36`,
+tests mask `2000`, and can write port `34` at `34e8` or `34f4` while
+maintaining software buffering state `01f9`. Thus the output port also has
+an interrupt-owned consumer, not just the startup transmitter at `920a`.
+`inspect_word_configuration_contract` byte-checks these instructions and
+the vector against the live export; mutation tests reject changed sites.
+These static contracts do not establish interrupt timing, peripheral
+identity, runtime execution of the ISR branch, or a supervision fix.
+
 For a forty-second processing capture, the native runner correctly fails
 on the repeated startup. `nse2_lifecycle_check TRACE --timer-boundary`
 requires the raw arm/terminal/reset evidence and reports

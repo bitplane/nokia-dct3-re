@@ -3,6 +3,30 @@ from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripher
 
 
 class SamplingCheckTest(unittest.TestCase):
+    def test_word_configuration_and_vector_output_contract(self):
+        from tools.nse2_sampling_check import inspect_word_configuration_contract
+        program=bytearray(0x20000)
+        fragments={
+            0x9232:'f07423e877120060771306f3771406f4',
+            0x9295:'74820036118261840300f330fe01ff30f3400180f030007ef2a08082f49575820036',
+            0x92a6:'1084f030079e8083f0749009',
+            0x34da:'74f8000b0036f3302000f84d34f1',
+            0x34e8:'75f8000b0034',0x34f4:'75f800080034',0xffd0:'f2733416',
+            0x3bb1:'81f806f410d2f130ff00f77863f8000b015bf77c81f806f6',
+            0x3bc8:'80f806f5f07439004a12f07492328a12f0733924',
+        }
+        for address,encoded in fragments.items():
+            data=bytes.fromhex(encoded)
+            program[address*2:address*2+len(data)]=data
+        result=inspect_word_configuration_contract(program)
+        self.assertEqual(result['state_bits_to_control'],'007e')
+        self.assertFalse(result['completion_source_proved'])
+        for address in fragments:
+            changed=program.copy()
+            changed[address*2]^=1
+            with self.assertRaises(ValueError):
+                inspect_word_configuration_contract(changed)
+
     def test_word_control_acknowledges_after_transmitter_call(self):
         program=bytearray(0x20000)
         for a,v in ((0x8da5,'76820700f49575820001ec0ef4957482000269820700f49575820002'),

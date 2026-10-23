@@ -66,6 +66,32 @@ def inspect_word_control_contract(program):
                 baud_and_framing_proved=False,physical_ready_latency_proved=False)
 
 
+def inspect_word_configuration_contract(program):
+    """Pin decoded configuration/ISR instructions, not physical clock semantics."""
+    fragments={
+        0x9232:'f07423e877120060771306f3771406f4',
+        0x9295:'74820036118261840300f330fe01ff30f3400180f030007ef2a08082f49575820036',
+        0x92a6:'1084f030079e8083f0749009',
+        0x34da:'74f8000b0036f3302000f84d34f1',
+        0x34e8:'75f8000b0034',
+        0x34f4:'75f800080034',
+        0xffd0:'f2733416',
+        0x3bb1:'81f806f410d2f130ff00f77863f8000b015bf77c81f806f6',
+        0x3bc8:'80f806f5f07439004a12f07492328a12f0733924',
+    }
+    for address,encoded in fragments.items():
+        expected=bytes.fromhex(encoded)
+        if program[address*2:address*2+len(expected)]!=expected:
+            raise ValueError(f'word-port configuration contract differs at {address:04x}')
+    return dict(configuration_helper='9232',pending_flags='06f4',active_flags='06f3',
+                control_preserve_mask='fe01',state_bits_to_control='007e',
+                conditional_control_bits='0180',committed_state_mask='079e',
+                interrupt_vector='ffd0',interrupt_entry='3416',
+                interrupt_output_status_mask='2000',output_port='34',
+                host_pending_store='3bb1',host_timing_stores=['3bbb','3bc8'],
+                baud_and_framing_proved=False,completion_source_proved=False)
+
+
 def inspect_peripheral_routes(program):
     if len(program)!=0x20000:
         raise ValueError('peripheral routes require full live page-zero program')
