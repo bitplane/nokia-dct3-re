@@ -1318,10 +1318,26 @@ The reproduction now requires this fingerprint and supported, exact-length
 decoding of all 17 captured `6f` extension tuples. Nine synthetic
 zero-extension decoder records are unsupported; their actual fetched
 extensions pass the independent tuple check. They are not nine demonstrated
-execution failures. All observed forms occur in the existing CPU assertion
-inventory, but a fresh completed full-fixture assertion/execution comparison
-is not part of this gate. No CPU correctness, pipeline timing, silicon clock or sustained
-handset claim follows from this bounded frontend inventory.
+execution failures. A separately completed default C54x fixture passes all
+293 required markers and the intentional completion exit (MAME return code 3,
+runner return code 0). Its 5,690 distinct `[opassert]` records include all
+564 forms observed here, with no missing opcode. This is actual completed
+fixture assertion coverage, not a source-text inventory or full ISA proof.
+The word-contract gate itself still does not run that expensive fixture.
+Reproduce the separate baseline with:
+
+```sh
+python3 tools/run_c54x_core.py --mame mame/mame --rompath roms --output-root tmp
+```
+
+Allow approximately 35 minutes on the current host; large groups report only
+after tens or hundreds of thousands of save/load cases. Require the runner's
+terminal PASS, not elapsed time or partial markers, before using its
+`error.log` assertion inventory. Compare exact opcode sets against the
+bounded service log; an assertion for a neighboring encoding does not cover
+the observed form. Neither this comparison nor the fixture establishes
+physical port timing, a fitted NSE-2 mask/clock, native RF operation or
+sustained handset stability.
 For focused CPU controls, use the same runner with `--core-controls`.
 It additionally runs isolated `instr-observer` and `portr-bypass` fixtures.
 The former distinguishes execute-owned callbacks from ordinary memory reads,

@@ -2432,6 +2432,12 @@
       "evidence": ["docs/5110i_bringup.md", "tools/run_nse2_pin_state.py", "tools/nse2_pin_state_check.py", "tools/nse2_pin_write_state.lua", "tools/nse2_sim_write_state.lua", "tools/test_nse2_pin_state_check.py", "gates.json"]
     },
     {
+      "id": "nse2_completed_default_cpu_assertions", "owner": "tms320c54x", "status": "satisfied",
+      "predicate": "The completed default C54x fixture supplies exact-opcode executable assertions for every form in the bounded NSE-2 service inventory",
+      "current": "A fresh default tms54test run completes all293 required markers, emits core conformance PASS and exits intentionally with MAME code3; run_c54x_core accepts it with runner code0. Its error.log contains5690 distinct opassert records. Exact set comparison against the564-form NSE-2 service fingerprint2214638d14968de30e21a3c62fd9305a00716965ce8568658263cae6f186fede finds564 asserted and zero missing forms. This is completed fixture assertion coverage, not complete ISA, all operand combinations, pipeline silicon timing, fitted ROM compatibility, peripheral completion, registration or native speech. The separate word-contract gate retains its bounded acceptance scope and does not implicitly execute the expensive full fixture.",
+      "evidence": ["docs/5110i_bringup.md", "tools/run_c54x_core.py", "driver/tms320c54x_test.cpp", "tools/c54x_opcode_coverage.py", "tools/run_nse2_word_contract.py"]
+    },
+    {
       "id": "nse2_buffered_pin_verify_restore", "owner": "nse2_sim_security", "status": "satisfied",
       "predicate": "SIMI restores a partially buffered physical PIN VERIFY body before card delivery, with exact wire continuation and cold retry persistence",
       "current": "At7.665799425 the controller holds five bytes31313131ff while the card has zero/eight body bytes and retries3/3. Full ARM/RAM/card/controller snapshots restore exactly. The remaining threeff bytes and subsequent status traffic match35 timed wire events; both legs receive9804, consume one retry and render the exact Code error frame. Whole-card comparison permits only CHV1 retry3->2, and a fresh cold process preserves that card. The scheduled save reaches the fifth byte after requesting at the fourth write; pre-save asserts the actual FIFO prefix and count. This qualifies buffered SIMI TX, not partially received card data, registration or sustained native operation.",
