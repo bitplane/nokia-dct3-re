@@ -8,11 +8,13 @@ local simi=machine.devices[':simi']
 local sms=_G.nse2_sim_state_sms==true
 local puk=_G.nse2_sim_state_puk==true
 local pin=_G.nse2_sim_state_pin==true or puk
+local buffered=_G.nse2_sim_state_buffered==true
+assert(not buffered or (pin and not puk),'buffered checkpoint requires PIN VERIFY')
 local pin_retries=_G.nse2_pin_state_retries or (puk and 0 or 3)
 assert((puk and pin_retries==0) or pin_retries==1 or pin_retries==3,'unreviewed PIN checkpoint input')
 assert(not (sms and pin),'one SIM transaction per fixture')
 local length=puk and 16 or pin and 8 or sms and 176 or 32
-local partial=sms and 60 or 0
+local partial=buffered and 5 or sms and 60 or 0
 local capture_time=puk and 25 or pin and 9 or sms and 26.5 or 28.3
 local function item(device,name)
     local index=assert(device.items['0/'..name],'missing saved item '..name)
@@ -52,9 +54,16 @@ retained[#retained+1]=space:install_write_tap(0x20034,0x20037,'sim_state_tx',fun
     observe('tx',byte)
     local header=puk and string.char(0xa0,0x2c,0,0,16) or pin and string.char(0xa0,0x20,0,1,8) or string.char(0xa0,0xdc,1,4,length)
     if not requested and tail==header then pending=true end
+    -- Save scheduling reaches the next TX instruction; verify the resulting
+    -- FIFO count in pre-save rather than claiming the request-time count.
+    if buffered and pending and sent==partial-1 and not requested then
+        requested=true
+        machine:logerror(string.format('nse2_sim_state: requested=1 sent=%d t=%.9f\n',sent,machine.time:as_double()))
+        machine:save('nse2_sim_pending')
+    end
 end)
 retained[#retained+1]=space:install_write_tap(0x2003c,0x2003f,'sim_state_flush',function(_,value,mask)
-    if pending and sent==partial and not requested and mask&0xff00~=0 and ((value>>8)&0xff)==0 then
+    if not buffered and pending and sent==partial and not requested and mask&0xff00~=0 and ((value>>8)&0xff)==0 then
         requested=true
         machine:logerror(string.format('nse2_sim_state: requested=1 sent=%d t=%.9f\n',sent,machine.time:as_double()))
         machine:save('nse2_sim_pending')
@@ -71,13 +80,13 @@ local function snapshot(label)
     local free=pin and string.format('%02x03',pin_retries) or sms and ('00'..string.rep('ff',175)) or string.rep('ff',32)
     if puk then free=free..'31323334ffffffff35363738ffffffff' end
     assert(stored==free,'SIM record was not rolled back before commit')
-    local body=partial>0 and hex(item(card,'m_tx'):read_block(0,partial)) or ''
+    local body=partial>0 and hex(item(buffered and simi or card,buffered and 'm_uart_tx_fifo' or 'm_tx'):read_block(0,partial)) or ''
     local result=string.format('t=%.9f pc=%08x sp=%08x ram=%08x cpu=%s card=%s simi=%s record=%s partial=%s',s.time,s.pc,s.sp,s.ram,s.cpu,protocol,controller,stored,body)
     machine:logerror('nse2_sim_state: phase='..label..' '..result..'\n')
     return result
 end
 retained[#retained+1]=emu.add_machine_pre_save_notifier(function()
-    assert(requested and sent==partial,'SIM checkpoint body count differs')
+    assert(requested and sent==partial,string.format('SIM checkpoint body count differs: actual=%d expected=%d',sent,partial))
     assert(machine.time:as_double()>(puk and 18.2 or pin and 7.6 or sms and 25.9 or 27.57),'submit contact boundary differs')
     saved=snapshot('saved')
     anchor,phase=machine.time:as_double(),'reference'

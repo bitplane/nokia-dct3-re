@@ -31,6 +31,27 @@ def fixture(last_retry=False):
 
 
 class PinStateTest(unittest.TestCase):
+    def test_buffered_pin_body_restores_controller_not_card_body(self):
+        text,_,before,after=fixture()
+        text=text.replace('m_rx_count:1,m_rx_ready:0,m_iir:0,m_tx_ready_pending:1,m_uart_tx_count:0',
+                          'm_rx_count:0,m_rx_ready:0,m_iir:0,m_tx_ready_pending:0,m_uart_tx_count:5')
+        text=text.replace('partial=','partial=31313131ff')
+        text=text.replace('reference=11 restored=11 sent_before_save=0',
+                          'reference=5 restored=5 sent_before_save=5')
+        events=[('tx',0xff)]*3+[('rx',0x98),('rx',4)]
+        wire='\n'.join(f'{phase}:{i}:{i*.0001:.9f}:{kind}:{value:02x}'
+                       for phase in ('reference','restored') for i,(kind,value) in enumerate(events,1))
+        with patch('tools.nse2_pin_state_check.CODE_ERROR_FRAME',hashlib.sha256(b'error').hexdigest()):
+            result=check_pin_state(text,wire,before,after,b'error',b'error',buffered_body=True)
+            self.assertEqual(result['buffered_body_bytes'],5)
+            for bad in (text.replace('m_uart_tx_count:5','m_uart_tx_count:4'),
+                        text.replace('m_tx_len:0','m_tx_len:5'),
+                        text.replace('partial=31313131ff','partial=31313131fe')):
+                with self.assertRaises(ValueError):
+                    check_pin_state(bad,wire,before,after,b'error',b'error',buffered_body=True)
+            with self.assertRaises(ValueError):
+                check_pin_state(text,wire,before,after,b'error',b'error')
+
     def test_puk_recovery_restores_old_credentials_before_commit(self):
         before=bytearray(make_profile(True).ljust(3570,b'\xff'))
         before[ATTEMPTS_OFFSET]=0
