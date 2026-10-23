@@ -20,7 +20,7 @@ from tools.nse2_lifecycle_check import (
 )
 from tools.nse2_native_result_check import (inspect_capture, inspect_control_trace,
                                            inspect_request_lifecycle, inspect_scan_pacing,
-                                           inspect_completion_counters, inspect_publisher_runtime,inspect_scan_request_selection,inspect_scan_bitmap_source,inspect_scan_bitmap_writers)
+                                           inspect_completion_counters, inspect_publisher_runtime,inspect_scan_request_selection,inspect_scan_bitmap_source,inspect_scan_bitmap_writers,inspect_receive_activity)
 from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripheral_routes,inspect_peripheral_consumers
 
 
@@ -256,6 +256,7 @@ def main():
             result['native_processing_boundary']['scan_request_selection'] = inspect_scan_request_selection(text)
             result['native_processing_boundary']['scan_bitmap_source'] = inspect_scan_bitmap_source(flash,text)
             result['native_processing_boundary']['scan_bitmap_writers'] = inspect_scan_bitmap_writers(flash,text)
+            result['native_processing_boundary']['receive_activity'] = inspect_receive_activity(flash,text)
             result['native_processing_boundary']['scan_pacing'] = inspect_scan_pacing(text)
             result['native_processing_boundary']['completion_counters'] = inspect_completion_counters(text)
             result['native_processing_boundary']['publisher_runtime'] = inspect_publisher_runtime(text)

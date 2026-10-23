@@ -448,6 +448,19 @@ exchange, not at an assumed missing receive interrupt. They do not prove
 which external DSP input or resident software state should produce the
 next packet, nor prove the borrowed mask correct for NSE-2.
 
+Supervision is an activity test, not a scan-result validator. Own MCU
+`29909e..2990a2` increments the counter before reading the packet type at
+`2990a4`; all four initial type-`74` packets count. Timer message `dd`
+branches at `2991b2` to the counter check at `2991b8`. A nonzero counter
+rearms timer `1d` and clears the count; zero calls policy `2902c2(1)`.
+The observed failing expiry at 31.000192 seconds has message `dd` and
+count zero, before reason `68` and the known restart. Thus completing the
+scan would supply activity, but the deadline does not specifically require
+type `8b` or any other result type. The absent source may be another real
+DSP/peripheral transaction; this contract does not authorize a fabricated
+heartbeat. `--failure-trace` with `--mcu` checks this failure observation
+without accepting the repeated-startup run as stable.
+
 `nse2_lifecycle_check TRACE --transport` requires this complete window and
 the actual count-clear observation alongside the restart evidence. It
 rejects added/unconsumed RX publications or a non-drained TX ring instead

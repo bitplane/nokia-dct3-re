@@ -5,6 +5,7 @@ dofile(directory .. 'c54x_rom4_processing_observe.lua')
 dofile(directory .. 'nse2_timer_queue_observe.lua')
 dofile(directory .. 'nse2_sampling_observe.lua')
 dofile(directory .. 'nse2_scan_request_observe.lua')
+dofile(directory .. 'nse2_receive_activity_observe.lua')
 local machine = manager.machine
 local cpu = assert(machine.devices[':dsp_c54x:cpu'])
 local counts = {}

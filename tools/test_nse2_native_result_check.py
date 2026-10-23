@@ -5,10 +5,27 @@ from tools.nse2_native_result_check import (FRAGMENTS, MCU_REQUEST_FRAGMENTS, NV
                                            inspect_control_trace, inspect_mcu_request, inspect_program,
                                            inspect_request_lifecycle, inspect_scan_pacing,
                                            inspect_completion_counters, compare_scan_budget, inspect_nv_policy,
-                                           inspect_publisher_runtime, PUBLISHER_TYPE_LOADS,inspect_scan_request_selection,inspect_scan_bitmap_source,inspect_scan_bitmap_writers)
+                                           inspect_publisher_runtime, PUBLISHER_TYPE_LOADS,inspect_scan_request_selection,inspect_scan_bitmap_source,inspect_scan_bitmap_writers,inspect_receive_activity)
 
 
 class ResultTest(unittest.TestCase):
+    def test_receive_expiry_is_generic_activity_not_a_scan_result_test(self):
+        image=bytearray(0xa0000)
+        for a,v in ((0x29909e,'88603001806078e878612900d156'),(0x2991b2,'2dddd000e77288602800d100e76a201d4903f7bbfdb98067e7e3'),(0x2991cc,'0010c764000009cd')):
+            data=bytes.fromhex(v)
+            image[a-0x200000:a-0x200000+len(data)]=data
+        text='\n'.join(f'nse2_receive_activity: kind=packet n={i} base=0010c764 count={i-1:04x} message=00101628 type=74 t={.4+i*.1} observer_writes=0' for i in range(1,5))
+        self.assertFalse(inspect_receive_activity(image,text)['particular_scan_result_required'])
+        failure=text+'\nnse2_receive_activity: kind=expiry n=1 base=0010c764 count=0000 message=000000dd type=00 t=31.0 observer_writes=0'
+        self.assertTrue(inspect_receive_activity(image,failure,expiry=True)['empty_expiry_observed'])
+        for bad in (failure.replace('message=000000dd','message=000000dc'),failure.replace('count=0000 message=000000dd','count=0001 message=000000dd')):
+            with self.assertRaises(ValueError):
+                inspect_receive_activity(image,bad,expiry=True)
+        with self.assertRaises(ValueError):
+            inspect_receive_activity(image,failure)
+        with self.assertRaises(ValueError):
+            inspect_receive_activity(image,text,expiry=True)
+
     def test_bitmap_default_requires_complete_writer_provenance(self):
         image=bytearray(0x90000)
         for a,v in ((0x224a4c,'b5304ce87d202800d1104de51c2821ff2230f076fdf3203f8028207c84a01c28f060fb808ca0f060fb72bd30'),

@@ -110,6 +110,29 @@ def inspect_scan_bitmap_writers(image,text):
                 live_bitmap='10a75c',writes=48,default_setter_calls=3,
                 firmware_constructed_default=True,erased_ram_explanation=False,
                 authentic_factory_nv_required_for_this_bitmap=False)
+
+
+def inspect_receive_activity(image,text,*,expiry=False):
+    for address,encoded in {0x29909e:'88603001806078e878612900d156',
+            0x2991b2:'2dddd000e77288602800d100e76a201d4903f7bbfdb98067e7e3',
+            0x2991cc:'0010c764000009cd'}.items():
+        expected=bytes.fromhex(encoded)
+        if image[address-0x200000:address-0x200000+len(expected)]!=expected:
+            raise ValueError('receive activity-counter consumer code differs')
+    rows=re.findall(r'nse2_receive_activity: kind=(packet|expiry) n=(\d+) base=0010c764 count=([0-9a-f]{4}) message=([0-9a-f]{8}) type=([0-9a-f]{2}) t=([0-9.]+) observer_writes=0',text)
+    initial=[row for row in rows if row[0]=='packet' and float(row[-1])<30]
+    if len(initial)!=4 or [(int(n),int(count,16),kind) for _,n,count,_,kind,_ in initial]!=[(i,i-1,'74') for i in range(1,5)]:
+        raise ValueError('initial pre-classification receive activity differs')
+    deadlines=[row for row in rows if row[0]=='expiry']
+    if expiry:
+        if len(deadlines)!=1 or deadlines[0][1:5]!=('1','0000','000000dd','00') or not 30.9<float(deadlines[0][-1])<31.1:
+            raise ValueError('empty activity count at receive expiry missing')
+    elif deadlines:
+        raise ValueError('unexpected receive expiry in thirty-second acceptance')
+    return dict(counter='10c766',increment_before_packet_classification=True,
+                initial_counted_types=['74']*4,expiry_requires_any_activity=True,
+                particular_scan_result_required=False,empty_expiry_observed=expiry,
+                missing_physical_source_identified=False,stable_long_boot=False)
 MCU_REQUEST_FRAGMENTS = {
     0x2160ec: '27017507',  # R7 supplies the one-byte length.
     0x2160f4: '48a4468078002804d145',
@@ -420,6 +443,8 @@ def main():
             result['nv_policy'] = inspect_nv_policy(mcu)
         if args.failure_trace:
             result['scan_budget'] = compare_scan_budget(args.failure_trace.read_text())
+            if args.mcu:
+                result['receive_activity'] = inspect_receive_activity(mcu,args.failure_trace.read_text(),expiry=True)
         print(json.dumps(result, indent=2))
     except (OSError, ValueError) as error:
         parser.exit(1, str(error) + '\n')
