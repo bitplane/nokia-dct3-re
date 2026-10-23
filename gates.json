@@ -2548,6 +2548,19 @@
       ]
     },
     {
+      "name": "verify-5110i-sim-puk-recovery",
+      "prerequisites": ["verify-5110i-sim-pin-blocked"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/recover", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--pin-enabled", "--pin-card", "$(RUN_DIR)/wrong3/nvram/nse2r4v/sim_card", "--pin-action", "puk", "--seconds", "28"]},
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/reauth", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--pin-enabled", "--pin-card", "$(RUN_DIR)/recover/nvram/nse2r4v/sim_card", "--pin-action", "reauth", "--seconds", "14"]}
+      ]
+    },
+    {
       "name": "verify-5110i-native-processing",
       "prerequisites": ["verify-5110i-static", "build"],
       "variables": {},

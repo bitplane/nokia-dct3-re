@@ -2,7 +2,7 @@
 local directory=debug.getinfo(1,'S').source:sub(2):match('^(.*[/\\])')
 dofile(directory .. 'nse2_boot_observe.lua')
 local machine=manager.machine
-local mapping={['1']={2,2},['2']={3,2},['3']={4,2},['4']={2,4}}
+local mapping={['1']={2,2},['2']={3,2},['3']={4,2},['4']={2,4},['6']={4,4},['8']={3,8}}
 local events={}
 local function press(when,column,mask)
     for _,field in pairs(machine.ioport.ports[':COL.' .. column].fields) do

@@ -305,6 +305,25 @@ seconds and reaches the PUK prompt at eleven seconds without any key input,
 VERIFY or UNBLOCK command. The full saved card remains unchanged. This is
 PIN exhaustion/cold blocking, not PUK authentication or recovery.
 
+`verify-5110i-sim-puk-recovery` runs the complete exhaustion gate followed by
+physical recovery and cold replacement-PIN authentication. Starting with the organically exhausted
+card, entering PUK `12345678`, replacement PIN `2468`, and its confirmation
+produces `A0 2C 00 00 10` at 18.266 seconds and status `9000`. The serialized
+card changes only the four PIN1 digits and CHV1 retry byte (zero to three);
+both PUK retry counts remain ten. The phone reaches its separate Security
+code prompt. A fresh process importing that complete card accepts physical
+`2468` through VERIFY (`A0 20 00 01 08`, `9000`), completes all sixteen binary
+file reads, fifty ADN reads and ten SMS reads before fourteen seconds, and
+leaves the entire card unchanged. No phone-side authentication or sustained
+native RF operation is established by these probes.
+
+The recovery checker requires the complete saved blocked card, exactly one
+UNBLOCK command following the 38 physical contact edges, successful status,
+the PUK and phone-code frames, and the exact permitted storage delta. The
+cold authentication checker still rejects UNBLOCK commands and requires
+VERIFY before protected SIM reads. No handset state or credentials are
+rewritten by either input fixture.
+
 ### Physical contact save
 
 The separate `--phonebook` fixture selects Add name, enters `A / 123` and

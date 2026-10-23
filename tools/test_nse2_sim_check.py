@@ -34,6 +34,27 @@ def contacts():
 
 
 class SimCheckTest(unittest.TestCase):
+    def test_puk_recovery_requires_exact_storage_and_physical_unblock(self):
+        from tools.nse2_sim_check import verify_puk_recovery,verify_pin_input
+        from tools.make_sim_card_profile import make_profile
+        from tools.sim_security_trace_check import AOC_NVRAM_SIZE,ATTEMPTS_OFFSET
+        initial=bytearray(make_profile(True).ljust(AOC_NVRAM_SIZE,b'\xff'))
+        initial[ATTEMPTS_OFFSET]=0
+        final=bytearray(initial)
+        final[3484:3492]=b'2468\xff\xff\xff\xff'
+        final[ATTEMPTS_OFFSET]=3
+        text='\n'.join(f'nse2_puk_contact: event={i} down={i%2} t={11.2+i*.18:.3f} physical_only=1' for i in range(1,39))
+        text+='\nsim_device: header cla=a0 ins=2c p1=00 p2=00 p3=10 selected=6fad t=18.266\nSIM status ins=2c sw=9000 chv=3/3 puk=10/10 enabled=1'
+        with patch.multiple('tools.nse2_sim_check',PUK_PROMPT_FRAME=hashlib.sha256(b'puk').hexdigest(),SECURITY_FRAME=hashlib.sha256(b'phone').hexdigest()):
+            self.assertTrue(verify_puk_recovery(text,initial,final,b'puk',b'phone')['puk_verified'])
+            self.assertEqual(verify_pin_input(final,pin=b'2468'),3)
+            for broken in (text.replace('sw=9000','sw=9804'),text.replace('event=38','event=39'),text.replace('ins=2c p1=00','ins=20 p1=00')):
+                with self.assertRaises(ValueError):
+                    verify_puk_recovery(broken,initial,final,b'puk',b'phone')
+            final[-1]^=1
+            with self.assertRaises(ValueError):
+                verify_puk_recovery(text,initial,final,b'puk',b'phone')
+
     def test_final_wrong_pin_and_cold_blocked_state_require_puk_frames(self):
         from tools.make_sim_card_profile import make_profile
         from tools.sim_security_trace_check import AOC_NVRAM_SIZE,ATTEMPTS_OFFSET

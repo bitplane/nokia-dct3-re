@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 800 gates: 602 generated from typed steps, 198 copied verbatim (shell).
+# 801 gates: 603 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -176,11 +176,12 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5110i-phonecode-accept verify-5110i-menu verify-5110i-phonebook \
 	verify-5110i-sms-store verify-5110i-sms-persistence verify-5110i-sms-delete \
 	verify-5110i-sim-pin verify-5110i-sim-pin-persistence \
-	verify-5110i-sim-pin-blocked verify-5110i-native-processing \
-	verify-6150-static verify-6110-bootstrap-capture verify-dct3-type-1f-static \
-	verify-3210-v501 verify-dsp-memory-upload verify verify-ccont \
-	verify-ccont-watchdog verify-gensio verify-display verify-dsp-transport \
-	verify-cobba-control verify-dsp-bootstrap-3310 verify-3310-radio-boundary \
+	verify-5110i-sim-pin-blocked verify-5110i-sim-puk-recovery \
+	verify-5110i-native-processing verify-6150-static \
+	verify-6110-bootstrap-capture verify-dct3-type-1f-static verify-3210-v501 \
+	verify-dsp-memory-upload verify verify-ccont verify-ccont-watchdog \
+	verify-gensio verify-display verify-dsp-transport verify-cobba-control \
+	verify-dsp-bootstrap-3310 verify-3310-radio-boundary \
 	verify-3330-radio-boundary verify-3310-radio-registration \
 	verify-3330-radio-registration verify-3330-radio-registration-preserved \
 	verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells \
@@ -1450,6 +1451,10 @@ verify-5110i-sim-pin-blocked: verify-5110i-static build
 	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR)/wrong2 --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --pin-enabled --pin-card $(RUN_DIR)/wrong1/nvram/nse2r4v/sim_card --pin-action wrong --seconds 14
 	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR)/wrong3 --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --pin-enabled --pin-card $(RUN_DIR)/wrong2/nvram/nse2r4v/sim_card --pin-action wrong --seconds 14
 	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR)/blocked --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --pin-enabled --pin-card $(RUN_DIR)/wrong3/nvram/nse2r4v/sim_card --pin-action blocked --seconds 14
+
+verify-5110i-sim-puk-recovery: verify-5110i-sim-pin-blocked
+	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR)/recover --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --pin-enabled --pin-card $(RUN_DIR)/wrong3/nvram/nse2r4v/sim_card --pin-action puk --seconds 28
+	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR)/reauth --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --pin-enabled --pin-card $(RUN_DIR)/recover/nvram/nse2r4v/sim_card --pin-action reauth --seconds 14
 
 verify-5110i-native-processing: verify-5110i-static build
 	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR) --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --phone-retry-zero --post-auth-menu --native-processing --seconds 30

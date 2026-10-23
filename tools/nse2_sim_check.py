@@ -203,12 +203,15 @@ def verify_sms_action(text, initial, final, prompt_pixels, result_pixels, action
                 network_sms_proved=False,stable_long_boot=False)
 
 
-def verify_pin_input(card, *, blocked=False):
+def verify_pin_input(card, *, blocked=False, pin=b'1234'):
     from tools.make_sim_card_profile import make_profile
-    from tools.sim_security_trace_check import ATTEMPTS_OFFSET,AOC_NVRAM_SIZE
+    from tools.sim_security_trace_check import ATTEMPTS_OFFSET,AOC_NVRAM_SIZE,CHV_OFFSET
     if len(card) not in (len(make_profile(True)),AOC_NVRAM_SIZE):
         raise ValueError('NSE-2 PIN input card has an unsupported storage size')
     initial=bytearray(make_profile(True))
+    if pin not in (b'1234',b'2468'):
+        raise ValueError('unreviewed NSE-2 PIN credential')
+    initial[CHV_OFFSET:CHV_OFFSET+8]=pin.ljust(8,b'\xff')
     retries=card[ATTEMPTS_OFFSET]
     if retries not in ((0,) if blocked else (1,2,3)):
         raise ValueError('NSE-2 PIN fixture has not qualified this initial retry lifecycle')
@@ -218,15 +221,15 @@ def verify_pin_input(card, *, blocked=False):
     return retries
 
 
-def verify_pin_boot(text, card, prompt_pixels, result_pixels=None, final_pixels=None, *, action=None,initial_card=None):
+def verify_pin_boot(text, card, prompt_pixels, result_pixels=None, final_pixels=None, *, action=None,initial_card=None,pin=b'1234'):
     from tools.make_sim_card_profile import make_profile
-    from tools.sim_security_trace_check import statuses,ATTEMPTS_OFFSET,AOC_NVRAM_SIZE
+    from tools.sim_security_trace_check import statuses,ATTEMPTS_OFFSET,AOC_NVRAM_SIZE,CHV_OFFSET
     if action not in (None,'verify','wrong','blocked'):
         raise ValueError('unknown NSE-2 PIN action')
     if action in ('verify','wrong') and (result_pixels is None or final_pixels is None):
         raise ValueError('NSE-2 PIN result and continuation frames are required')
     initial_card=make_profile(True) if initial_card is None else initial_card
-    before=verify_pin_input(initial_card,blocked=action=='blocked')
+    before=verify_pin_input(initial_card,blocked=action=='blocked',pin=pin)
     remaining=3 if action=='verify' else before-1 if action=='wrong' else before
     expected=bytearray(initial_card)
     expected[ATTEMPTS_OFFSET]=remaining
@@ -263,6 +266,34 @@ def verify_pin_boot(text, card, prompt_pixels, result_pixels=None, final_pixels=
                 pin_blocked=remaining==0,puk_verified=False,
                 initial_card_bytes=len(initial_card),
                 phone_code_authenticated=False,network_registration=False)
+
+
+def verify_puk_recovery(text, initial, final, prompt_pixels, final_pixels):
+    from tools.sim_security_trace_check import statuses,ATTEMPTS_OFFSET,AOC_NVRAM_SIZE,CHV_OFFSET
+    verify_pin_input(initial,blocked=True)
+    if len(initial)!=AOC_NVRAM_SIZE:
+        raise ValueError('PUK recovery requires a complete saved exhausted card')
+    expected=bytearray(initial)
+    expected[CHV_OFFSET:CHV_OFFSET+8]=b'2468\xff\xff\xff\xff'
+    expected[ATTEMPTS_OFFSET]=3
+    if final!=expected:
+        raise ValueError('PUK recovery changed unexpected card bytes')
+    headers=[m.groups() for m in HEADER.finditer(text) if int(m[2],16) in (0x20,0x2c)]
+    if len(headers)!=1 or headers[0][:5]!=('a0','2c','00','00','10'):
+        raise ValueError('PUK recovery requires exactly one absolute UNBLOCK and no VERIFY')
+    if statuses(text,0x2c)!=[(0x9000,3,10)]:
+        raise ValueError('PUK recovery status/retries differ')
+    contacts=re.findall(r'nse2_puk_contact: event=(\d+) down=([01]) t=([0-9.]+) physical_only=1',text)
+    if [(int(i),int(d)) for i,d,_ in contacts]!=[(i,i%2) for i in range(1,39)]:
+        raise ValueError('PUK physical contact sequence differs')
+    times=[float(t) for _,_,t in contacts]
+    if times!=sorted(times) or not 11<=times[0]<times[-1]<18.5:
+        raise ValueError('PUK contact timing differs')
+    if not times[-1]-0.2<float(headers[0][6])<19:
+        raise ValueError('UNBLOCK did not follow physical confirmation')
+    if hashlib.sha256(prompt_pixels).hexdigest()!=PUK_PROMPT_FRAME or hashlib.sha256(final_pixels).hexdigest()!=SECURITY_FRAME:
+        raise ValueError('PUK recovery prompt/continuation differs')
+    return dict(puk_verified=True,pin_attempts_remaining=3,phone_code_authenticated=False,network_registration=False)
 
 
 def verify_security_attempt(text, pixels, *, retry_zero=False):

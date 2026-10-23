@@ -94,7 +94,7 @@ def main():
     parser.add_argument('--sms-reload', type=Path, help='card NVRAM produced by a separate accepted draft save')
     parser.add_argument('--sms-action', choices=('erase','cancel','empty'), help='physical confirmation or erased-card Outbox check')
     parser.add_argument('--pin-enabled', action='store_true', help='separate PIN-enabled synthetic-card boot observation')
-    parser.add_argument('--pin-action', choices=('verify','wrong','blocked'), help='physical PIN attempt or cold PUK-prompt control')
+    parser.add_argument('--pin-action', choices=('verify','wrong','blocked','puk','reauth'), help='physical PIN/PUK attempt or cold prompt control')
     parser.add_argument('--pin-card', type=Path, help='persistent PIN-enabled laboratory card from an earlier process')
     parser.add_argument('--seconds', type=int, default=8, choices=range(8, 121), metavar='8..120')
     args = parser.parse_args()
@@ -126,14 +126,14 @@ def main():
             raise ValueError('cold SMS read requires a separate authenticated thirty-second run')
         if args.sms_action and not args.sms_reload:
             raise ValueError('SMS confirmation action requires a separate saved-card reload')
-        if args.pin_enabled and (not args.insert_sim or args.seconds!=14 or args.physical_menu or args.security_code or args.phone_retry_zero
+        if args.pin_enabled and (not args.insert_sim or args.seconds!=(28 if args.pin_action=='puk' else 14) or args.physical_menu or args.security_code or args.phone_retry_zero
                                  or args.post_auth_menu or args.native_processing or args.sms_store or args.sms_reload):
             raise ValueError('PIN-enabled observation requires inserted card, fourteen seconds and no phone-code/application fixture')
         if args.pin_action and not args.pin_enabled:
             raise ValueError('SIM PIN input requires the explicit PIN-enabled card')
         if args.pin_card and not args.pin_enabled:
             raise ValueError('persistent PIN card requires the PIN-enabled boot fixture')
-        if args.pin_action=='blocked' and not args.pin_card:
+        if args.pin_action in ('blocked','puk','reauth') and not args.pin_card:
             raise ValueError('blocked PIN control requires the card saved by actual PIN exhaustion')
         report = prepare_native(root, run, record_checksum=args.record_checksum_only,
                                 nominal_vbat=args.nominal_vbat, insert_sim=args.insert_sim,
@@ -143,7 +143,7 @@ def main():
             from tools.make_sim_card_profile import make_profile
             from tools.nse2_sim_check import verify_pin_input
             pin_card=args.pin_card.read_bytes() if args.pin_card else make_profile(True)
-            verify_pin_input(pin_card,blocked=args.pin_action=='blocked')
+            verify_pin_input(pin_card,blocked=args.pin_action in ('blocked','puk'),pin=b'2468' if args.pin_action=='reauth' else b'1234')
             card_path=run/'nvram'/machine/'sim_card'
             card_path.parent.mkdir(parents=True,exist_ok=True)
             card_path.write_bytes(pin_card)
@@ -172,7 +172,8 @@ def main():
                    '-video', 'none', '-sound', 'none', '-joystickprovider', 'none',
                    '-midiprovider', 'none', '-nothrottle', '-noreadconfig', '-log', '-verbose',
                    '-seconds_to_run', str(args.seconds), '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools' / (f'nse2_pin_{args.pin_action}_fixture.lua' if args.pin_action in ('verify','wrong','blocked') else
+                   '-autoboot_script', str(root / 'tools' / ('nse2_puk_fixture.lua' if args.pin_action=='puk' else
+                       f'nse2_pin_{args.pin_action}_fixture.lua' if args.pin_action in ('verify','wrong','blocked','reauth') else
                        f'nse2_sms_{args.sms_action}_fixture.lua' if args.sms_action else
                        'nse2_sms_reload_fixture.lua' if args.sms_reload else
                        'nse2_sms_fixture.lua' if args.sms_store else
@@ -208,18 +209,24 @@ def main():
             result['menu_probe'] = verify_menu_probe((run / 'error.log').read_text(errors='replace'))
         if args.insert_sim:
             text = (run / 'error.log').read_text(errors='replace')
-            if args.pin_enabled:
+            if args.pin_enabled and args.pin_action=='puk':
+                from tools.nse2_sim_check import verify_puk_recovery
+                with Image.open(run/'snap/nse2_puk_probe_1.png') as prompt, Image.open(run/'snap/nse2_puk_probe_5.png') as final:
+                    result.update(verify_puk_recovery(text,pin_card,(run/'nvram'/machine/'sim_card').read_bytes(),
+                                                     prompt.convert('L').tobytes(),final.convert('L').tobytes()))
+            elif args.pin_enabled:
                 from tools.nse2_sim_check import verify_pin_boot
-                prompt_name=('nse2_pin_1.png' if args.pin_action in ('verify','wrong') else
+                prompt_name=('nse2_pin_1.png' if args.pin_action in ('verify','wrong','reauth') else
                              'nse2_pin_blocked.png' if args.pin_action=='blocked' else 'nse2_7.png')
                 with Image.open(run/'snap'/prompt_name) as prompt:
-                    if args.pin_action in ('verify','wrong'):
+                    if args.pin_action in ('verify','wrong','reauth'):
                         with Image.open(run/'snap/nse2_pin_2.png') as outcome, \
                              Image.open(run/'snap/nse2_pin_3.png') as continuation:
                             result.update(verify_pin_boot(text,(run/'nvram'/machine/'sim_card').read_bytes(),
                                 prompt.convert('L').tobytes(),outcome.convert('L').tobytes(),
-                                continuation.convert('L').tobytes(),action=args.pin_action,initial_card=pin_card))
-                            if args.pin_action=='verify':
+                                continuation.convert('L').tobytes(),action='verify' if args.pin_action=='reauth' else args.pin_action,initial_card=pin_card,
+                                pin=b'2468' if args.pin_action=='reauth' else b'1234'))
+                            if args.pin_action in ('verify','reauth'):
                                 result.update(verify_sim_reads(text,continuation.convert('L').tobytes(),
                                                              pin_authenticated=True,bootstrap_horizon=14))
                     else:
