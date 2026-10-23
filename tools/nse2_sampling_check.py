@@ -23,6 +23,29 @@ def inspect_peripheral_consumers(program):
                 sampling_control_link_proved=False,physical_peripheral_identity_proved=False)
 
 
+def inspect_word_port_activity(data,text):
+    if len(data)!=0x20000 or struct.unpack_from('>6H',data,0xb3d1*2)!=(0x9185,0x9199,0x91b0,0x91be,0x91fb,0x9200):
+        raise ValueError('word-transmit state table differs')
+    writes=re.findall(r'nse2_word_port_write: port=(34|35|36) value=([0-9a-f]{4}) mask=ffff pc=([0-9a-f]{4}) n=(\d+) t=([0-9.]+) observer_writes=0',text)
+    if [(p,v,pc,int(n)) for p,v,pc,n,_ in writes]!=[('36','0080','8d98',1),('36','0080','90bc',2),('34','1eff','920d',1)]:
+        raise ValueError('word-port initialization/transmit sequence differs')
+    summaries=re.findall(r'nse2_word_port_summary: port=(34|35|36) reads=(\d+) writes=(\d+) last=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0',text)
+    if [(p,int(r),int(w),v) for p,r,w,v,_ in summaries]!=[('34',0,1,'1eff'),('35',0,0,'0000'),('36',4,2,'0080')]:
+        raise ValueError('complete word-port activity summary differs')
+    if not all(29.9<=float(t)<=30.1 for *_,t in summaries):
+        raise ValueError('word-port observation does not cover thirty seconds')
+    initial=re.findall(r'nse2_word_tx_state: state=([0-9a-f]{4}) flags=([0-9a-f]{4}) pending=([0-9a-f]{4}) pointer=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0',text)
+    final=re.findall(r'nse2_word_terminal: state=([0-9a-f]{4}) flags=([0-9a-f]{4}) pending=([0-9a-f]{4}) pointer=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0',text)
+    if len(initial)!=1 or initial[0][:4]!=('0001','0001','0009','0701') or len(final)!=1 or final[0][:4]!=('0002','0001','0009','0701'):
+        raise ValueError('word transmitter pending-state boundary differs')
+    if not 0.3<float(initial[0][-1])<0.4 or not 29.9<float(final[0][-1])<30.1:
+        raise ValueError('word transmitter pending-state timing differs')
+    return dict(first_word='1eff',state_after_transmit=2,pending=9,continuation='91b0',
+                completion_route='request0100 via 8ec5/9162',rx_words=0,
+                transmit_completion_modelled=False,physical_baud_proved=False,
+                receive_supervision_fix_proved=False)
+
+
 def inspect_peripheral_routes(program):
     if len(program)!=0x20000:
         raise ValueError('peripheral routes require full live page-zero program')

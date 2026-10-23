@@ -1,8 +1,28 @@
 import unittest
-from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripheral_routes,inspect_peripheral_consumers
+from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripheral_routes,inspect_peripheral_consumers,inspect_word_port_activity
 
 
 class SamplingCheckTest(unittest.TestCase):
+    def test_pending_word_transmitter_requires_complete_activity(self):
+        import struct
+        data=bytearray(0x20000)
+        struct.pack_into('>6H',data,0xb3d1*2,0x9185,0x9199,0x91b0,0x91be,0x91fb,0x9200)
+        rows=[]
+        for p,v,pc,n,t in (('36','0080','8d98',1,.249),('36','0080','90bc',2,.2491),('34','1eff','920d',1,.3425)):
+            rows.append(f'nse2_word_port_write: port={p} value={v} mask=ffff pc={pc} n={n} t={t} observer_writes=0')
+        for p,r,w,v in (('34',0,1,'1eff'),('35',0,0,'0000'),('36',4,2,'0080')):
+            rows.append(f'nse2_word_port_summary: port={p} reads={r} writes={w} last={v} t=30.0 observer_writes=0')
+        rows+=['nse2_word_tx_state: state=0001 flags=0001 pending=0009 pointer=0701 t=0.3425 observer_writes=0',
+               'nse2_word_terminal: state=0002 flags=0001 pending=0009 pointer=0701 t=30.0 observer_writes=0']
+        text='\n'.join(rows)
+        self.assertEqual(inspect_word_port_activity(data,text)['pending'],9)
+        for bad in (text.replace('pending=0009','pending=0000'),text.replace('port=34 reads=0 writes=1','port=34 reads=0 writes=2'),text.replace('value=1eff','value=0000')):
+            with self.assertRaises(ValueError):
+                inspect_word_port_activity(data,bad)
+        data[0xb3d3*2]^=1
+        with self.assertRaises(ValueError):
+            inspect_word_port_activity(data,text)
+
     def test_raw_port_reader_is_a_delayed_call_operand(self):
         from tools.c54x_rom4_port_census import census
         program=bytearray(0x20000)

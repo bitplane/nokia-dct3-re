@@ -21,7 +21,7 @@ from tools.nse2_lifecycle_check import (
 from tools.nse2_native_result_check import (inspect_capture, inspect_control_trace,
                                            inspect_request_lifecycle, inspect_scan_pacing,
                                            inspect_completion_counters, inspect_publisher_runtime,inspect_scan_request_selection,inspect_scan_bitmap_source,inspect_scan_bitmap_writers,inspect_receive_activity)
-from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripheral_routes,inspect_peripheral_consumers
+from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripheral_routes,inspect_peripheral_consumers,inspect_word_port_activity
 
 
 MASK_INPUTS = (
@@ -251,6 +251,8 @@ def main():
                 (run/'nse2_native_program.bin').read_bytes())
             result['native_processing_boundary']['peripheral_consumers'] = inspect_peripheral_consumers(
                 (run/'nse2_native_program.bin').read_bytes())
+            result['native_processing_boundary']['word_port_activity'] = inspect_word_port_activity(
+                (run/'roms'/machine/'nse1_rom4_dsp_data.bin').read_bytes(),text)
             result['native_processing_boundary']['conditional_request'] = inspect_control_trace(text)
             result['native_processing_boundary']['request_lifecycle'] = inspect_request_lifecycle(text)
             result['native_processing_boundary']['scan_request_selection'] = inspect_scan_request_selection(text)

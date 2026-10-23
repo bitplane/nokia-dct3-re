@@ -830,6 +830,21 @@ An operand-pattern port census is not an instruction-boundary proof; the
 processing checker preserves this negative fixture alongside the confirmed
 consumer bytes. No new peripheral behavior follows from this classification.
 
+Full-run I/O observation identifies pending work on this separate peripheral.
+Control port `36` receives `0080` twice during boot; port `34` transmits
+`1eff` at 0.342534 seconds (store `920a`, observed PC `920d`). There are
+no further port-`34` writes and no port-`35` reads through thirty seconds;
+port `36` has four reads and two writes. At the transmit write, state
+`06c6=1`, flags `06f3=1`, pending `06c5=9`, pointer `06c2=0701`.
+At thirty seconds only state has advanced to 2. Resident data table `b3d1`
+maps states 0..5 to `9185/9199/91b0/91be/91fb/9200`; state 2 therefore
+awaits continuation through `91b0`. Request `0100` enters that transmitter
+through `8ec5 -> 9162`. The current backend stores port `34` but provides
+no transmit-completion source. This is a concrete pending-operation boundary,
+not proof of physical baud, external peer identity, an incoming response,
+or a cure for receive supervision. Any completion model must retain those
+distinctions and let the real firmware drain its own queue.
+
 For a forty-second processing capture, the native runner correctly fails
 on the repeated startup. `nse2_lifecycle_check TRACE --timer-boundary`
 requires the raw arm/terminal/reset evidence and reports
