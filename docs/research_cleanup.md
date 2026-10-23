@@ -246,6 +246,10 @@ or was expensive to discover. Current examples include:
   failed device restoration;
 - debugger register exports exposing cached values: compare named PC with
   architectural GENPC before attributing a mismatch to CPU save-state loss;
+- banked ARM7 state: MAME's `R8..R14` exports are the user bank, not an
+  automatic view of the active exception bank. Record CPSR mode and select
+  `FR8..FR14` in FIQ, or the corresponding IRQ/SVC/ABT/UND SP/LR exports,
+  before attributing an interrupt-time caller or stack to firmware;
 - constructors that acknowledge an incoming command rather than initiate it;
 - report code 7 belonging to shutdown/power lifecycle rather than ordinary
   boot readiness; and

@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nse2_lifecycle_check import diagnose, diagnose_transport, diagnose_schedule, diagnose_processing, diagnose_scan_progress, diagnose_timer_boundary
+from tools.nse2_lifecycle_check import diagnose, diagnose_transport, diagnose_schedule, diagnose_processing, diagnose_scan_progress, diagnose_timer_boundary, diagnose_timer_queue
 
 
 def transcript():
@@ -12,6 +12,19 @@ def transcript():
 
 
 class LifecycleTest(unittest.TestCase):
+    def test_timer_queue_uses_active_fiq_bank_not_interrupted_user_lr(self):
+        text = transcript() + '\n' + '\n'.join((
+            'nse2_timer_queue: kind=insert ticks=0b9b node_flags=03 global_flags=03 head10=001008dc head28=001008e8 mode=1f active_lr=00254e5f user_lr=00254e5f r4=001d r6=100020 active_r8=0b9b t=4.7018 observer_writes=0',
+            'nse2_timer_queue: kind=expire ticks=0000 node_flags=03 global_flags=03 head10=001003c0 head28=00100198 mode=11 active_lr=00255535 user_lr=00295d79 r4=0b9b r6=0f8e active_r8=0f11 t=31.0001 observer_writes=0'))
+        result = diagnose_timer_queue(text)
+        self.assertEqual(result['elapsed_beyond_target_ticks'], 886)
+        self.assertTrue(result['queue_migration_site_unmapped'])
+        self.assertFalse(result['hardware_timing_fault_proved'])
+        for old, new in (('active_lr=00255535', 'active_lr=00295d79'), ('mode=11', 'mode=1f'),
+                         ('r6=0f8e', 'r6=0f11'), ('r4=0b9b', 'r4=0b9c')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                diagnose_timer_queue(text.replace(old, new))
+
     def test_timer_terminal_order_is_not_a_clock_fault_proof(self):
         text = transcript() + '\n' + '\n'.join((
             'nse2_receive_timer: ticks=09cd lr=0020fead node_ticks=0000 node_state=01 t=4.7018 observer_writes=0',

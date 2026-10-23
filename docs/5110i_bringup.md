@@ -25,9 +25,10 @@ DSP but retains open-pin ADC2; it completes DSP startup while the analog
 readiness counter cannot drain. These are explicit controls, not alternative
 claims of usable boot.
 
-Next: reconcile the progressing native measurement sequence and peripheral
-timing with the MCU receive-supervision deadline before accepting longer
-contact/persistence workflows. Keep integrity-only rejection as a control.
+Next: trace timer-queue promotion and wake-event selection during sleep,
+reconciling the advancing native measurement with its software deadline
+before accepting longer contact/persistence workflows. Keep the existing
+rejection and restart controls.
 Do not substitute donor EEPROM, force firmware state, or claim phone service
 from the graphical prompt or key decode alone.
 
@@ -420,6 +421,25 @@ on the repeated startup. `nse2_lifecycle_check TRACE --timer-boundary`
 requires the raw arm/terminal/reset evidence and reports
 `hardware_timing_fault_proved=false`. It is a failure diagnostic, not a
 replacement long-run acceptance oracle.
+
+The queue insertion at `254c7c` receives adjusted ticks `0b9b`, node/global
+flags `03/03`, and active LR `254e5f` in system mode `1f`. The own selector
+therefore chooses the queue at global offset `28`, not offset `10`.
+At expiry, the active FIQ LR is `255535`, identifying walker `2554e4`,
+which services the offset-`10` queue. Its cumulative target R4=`0b9b`,
+elapsed banked R8=`0f11` and threshold R6=`0f8e` satisfy the decoded
+`elapsed + 125` batching rule. The target has passed by 886 software ticks;
+this is not a native-completion report fabricated by a device.
+
+The expiry trace's user-bank LR `295d79` belongs to interrupted foreground
+code, not the queue walker. ARM7 exception-time observations must select
+register banks by CPSR; see [the cleanup traps](research_cleanup.md).
+`--timer-queue` requires the bank-correct caller and arithmetic, while
+retaining `queue_migration_site_unmapped=true`. The next boundary is the
+promotion from the offset-`28` queue to FIQ5's offset-`10` queue and its
+wake-event selection. Expiry arithmetic alone does not prove whether the
+deadline should have been serviced earlier or whether a physical clock,
+sleep transition, native reply contract or provisioning field is wrong.
 
 ## Remaining work
 

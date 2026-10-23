@@ -146,6 +146,33 @@ def diagnose_timer_boundary(text):
                 scope='observed ordering, not proof FIQ5 or a clock rate is defective')
 
 
+def diagnose_timer_queue(text):
+    reset = diagnose(text)
+    pattern = (r'nse2_timer_queue: kind=(insert|expire) ticks=([0-9a-f]+) node_flags=([0-9a-f]{2}) '
+               r'global_flags=([0-9a-f]{2}) head10=([0-9a-f]{8}) head28=([0-9a-f]{8}) '
+               r'mode=([0-9a-f]{2}) active_lr=([0-9a-f]{8}) user_lr=([0-9a-f]{8}) '
+               r'r4=([0-9a-f]+) r6=([0-9a-f]+) active_r8=([0-9a-f]+) t=([0-9.]+) observer_writes=0')
+    rows = [row for row in re.findall(pattern, text) if float(row[-1]) < reset['reason_time']]
+    if len(rows) != 2 or [row[0] for row in rows] != ['insert', 'expire']:
+        raise ValueError('NSE-2 complete first timer insertion/expiry missing')
+    inserted, expired = rows
+    if (inserted[2:4] != ('03', '03') or inserted[6:8] != ('1f', '00254e5f')
+            or expired[2:4] != ('03', '03') or expired[6:8] != ('11', '00255535')
+            or expired[1] != '0000'):
+        raise ValueError('NSE-2 timer queue flags or banked caller differ')
+    target = int(inserted[1], 16)
+    cumulative, threshold, elapsed = (int(value, 16) for value in expired[9:12])
+    if (target != cumulative or elapsed <= target or threshold != elapsed + 125
+            or not 4.6 < float(inserted[-1]) < 4.8
+            or not 0 <= reset['reason_time'] - float(expired[-1]) < 0.01):
+        raise ValueError('NSE-2 FIQ5 elapsed/deadline arithmetic differs')
+    return dict(insertion_queue='head28 branch', expiration_queue='FIQ5 head10 walker',
+                requested_adjusted_ticks=target, expiration_elapsed_ticks=elapsed,
+                elapsed_beyond_target_ticks=elapsed-target, batch_slack_ticks=125,
+                queue_migration_site_unmapped=True, hardware_timing_fault_proved=False,
+                scope='own FIQ5 walk expires a passed deadline; physical clock/fault ownership unresolved')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('trace', type=Path)
@@ -154,6 +181,7 @@ def main():
     parser.add_argument('--processing', action='store_true', help='also require reused passive ROM4 processing evidence')
     parser.add_argument('--scan-progress', action='store_true', help='also require advancing measurement-loop evidence')
     parser.add_argument('--timer-boundary', action='store_true', help='require the timer start and terminal-FIQ ordering in a reset capture')
+    parser.add_argument('--timer-queue', action='store_true', help='require bank-correct insertion/expiry and queue arithmetic')
     args = parser.parse_args()
     try:
         text = args.trace.read_text()
@@ -166,6 +194,8 @@ def main():
             result['measurement'] = diagnose_scan_progress(text)
         if args.timer_boundary:
             result['timer_boundary'] = diagnose_timer_boundary(text)
+        if args.timer_queue:
+            result['timer_queue'] = diagnose_timer_queue(text)
         print(json.dumps(result, indent=2))
     except (OSError, ValueError) as error:
         parser.exit(1, str(error) + '\n')

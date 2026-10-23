@@ -2,6 +2,7 @@
 local directory = debug.getinfo(1, 'S').source:sub(2):match('^(.*[/\\])')
 dofile(directory .. 'nse2_post_auth_fixture.lua')
 dofile(directory .. 'c54x_rom4_processing_observe.lua')
+dofile(directory .. 'nse2_timer_queue_observe.lua')
 local machine = manager.machine
 local cpu = assert(machine.devices[':dsp_c54x:cpu'])
 local counts = {}
