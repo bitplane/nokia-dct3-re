@@ -6,6 +6,19 @@ local space = cpu.spaces.program
 local shared_writes, tx, rx, commands, pixels, signal_writes = 0, 0, 0, 0, 0, 0
 local selected = 0
 local nv_reads = 0
+local verdict_writes = 0
+_G.nse2_selftest_tap = space:install_write_tap(0x10fca0, 0x10fcbf, 'nse2_selftest_results', function(offset, data, mask)
+    for lane = 0, 3 do
+        local shift = (3 - lane) * 8
+        if (mask & (255 << shift)) ~= 0 then
+            verdict_writes = verdict_writes + 1
+            if verdict_writes <= 128 then
+                machine:logerror(string.format('nse2_selftest_write: address=%08x value=%02x pc=%08x t=%.9f observer_writes=0\n',
+                    offset + lane, (data >> shift) & 255, cpu.state['R15'].value, machine.time:as_double()))
+            end
+        end
+    end
+end)
 _G.nse2_nv_verdict_tap = space:install_write_tap(0x10fcb0, 0x10fcb3, 'nse2_nv_verdict', function(_, data, mask)
     if cpu.state['R15'].value ~= 0x27dc14 or (mask & 0x0000ff00) == 0 then return end
     machine:logerror(string.format('nse2_nv_verdict: address=0010fcb2 value=%02x pc=0027dc14 t=%.9f observer_writes=0\n',

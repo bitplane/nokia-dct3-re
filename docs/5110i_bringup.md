@@ -115,11 +115,47 @@ graphical and hardware-activity predicates. Evidence:
 artifact, not a required repository input. The observer reads only bounded
 SRAM buffers/stack words, never extra MMIO or guest writes.
 
-A checksum-only fixture is now derivable from this ROM, but it must remain
-an explicitly separate experiment: correcting integrity does not make
-erased identity, lock or calibration content authentic. First establish
-the other self-test failures and record semantics; retain the erased-input
-gate rather than rebasing it to a provisioned image.
+### Checksum-only diagnostic result
+
+```sh
+.venv/bin/python tools/run_nse2_boundary.py tmp/nse2-integrity-only --checksum-only
+```
+
+This explicitly separate fixture creates an 8192-byte erased EEPROM and
+changes only the five four-byte checksum words above. No data payload,
+identity, lock, calibration or donor record is supplied. Its input manifest
+records the initial image hash and declares authentic provisioning false.
+The fresh process receives only this generated external EEPROM and own flash.
+
+Two fresh runs produce five matching comparisons and the actual self-test
+store `00` at `10fcb2`; the seven-second frame remains the identical
+CONTACT SERVICE hash. The same execution/shared-memory/silent-DSP/bus gates
+apply to this experiment; it does not bypass the original acceptance checks
+or promote usable boot. The default runner still requires the erased-input
+`fd` result. Evidence: `tmp/nse2-checksum-selftests` and
+`tmp/nse2-checksum-checked`.
+
+A passive trace of writes to `10fca0..10fcbf` distinguishes additional
+firmware results after integrity passes:
+
+| Result byte | Value | Store PC | Own predecessor |
+| --- | --- | --- | --- |
+| `10fcae` | `0e` | `2333ac` | Getter `28d7b0` returned other than one; semantic owner unresolved. |
+| `10fcaf` | `0f` | `2333b0` | Same getter outcome, not an independently identified DSP failure. |
+| `10fcac` | `0c` | `233470` | Validation of `0240..031d` against stored halfword `031e`, followed by a nonzero guard using `0290`. |
+
+The last validator calls `23315c`, which sums the specified EEPROM byte
+range modulo 65536 and subtracts the two bytes obtained through `280678`
+from `0274`. This is a separate checksum family and is deliberately not
+repaired by the five-word diagnostic. Next recover this record's full
+contract and the writer behind `28d7b0`; do not infer record contents from
+the desired verdict. Correct integrity alone is now falsified as sufficient
+to remove the failure frame.
+
+The getter is a byte load from `10b9f4` (own literal at `28dabc`), not a
+transport transaction. Its state writer/lifecycle is the next census target;
+neither a non-one value nor the `0e/0f` result labels identify missing DSP
+silicon by themselves.
 
 1. Recover the own EEPROM record catalogue and NV validators selecting the
    failure presentation. Establish any own-product defaults or independently

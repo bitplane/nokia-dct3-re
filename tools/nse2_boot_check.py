@@ -24,9 +24,10 @@ NV_CHECKSUM = re.compile(r'nse2_nv_checksum: lr=([0-9a-f]{8}) length=(\d+) '
                          r't=([0-9.]+) observer_writes=0')
 
 
-def verify_nv(text):
+def verify_nv(text, *, checksum_only=False):
     checks = NV_CHECKSUM.findall(text)
-    expected = [(pc, length, (~((255 * length) & 0xffff)) & 0xffffffff, 0xffffffff)
+    expected = [(pc, length, (~((255 * length) & 0xffff)) & 0xffffffff,
+                 (~((255 * length) & 0xffff)) & 0xffffffff if checksum_only else 0xffffffff)
                 for _, length, _, pc in NV_BLOCKS]
     if [(int(pc, 16), int(n), int(want, 16), int(stored, 16))
             for pc, n, want, stored, _ in checks] != expected:
@@ -34,15 +35,16 @@ def verify_nv(text):
     times = [float(row[4]) for row in checks]
     if times != sorted(set(times)) or not 0 < times[0] < times[-1] < 1:
         raise ValueError('NSE-2 NV checksum observation order differs')
-    verdicts = re.findall(r'nse2_nv_verdict: address=0010fcb2 value=fd pc=0027dc14 '
-                          r't=([0-9.]+) observer_writes=0', text)
+    verdict = '00' if checksum_only else 'fd'
+    verdicts = re.findall(r'nse2_nv_verdict: address=0010fcb2 value=' + verdict + r' pc=0027dc14 '
+                         r't=([0-9.]+) observer_writes=0', text)
     if len(verdicts) != 1 or not times[-1] < float(verdicts[0]) < 1:
         raise ValueError('NSE-2 NV checksum self-test failure verdict missing or unordered')
     return len(checks)
 
 
-def verify(text, pixels, size):
-    invalid_blocks = verify_nv(text)
+def verify(text, pixels, size, *, checksum_only=False):
+    blocks = verify_nv(text, checksum_only=checksum_only)
     if text.count('Soft reset\n') != 1:
         raise ValueError('NSE-2 missing initial reset or reset repeated')
     if re.search(r'RX enqueue|peer RAM W off=00[0246]\b|bootstrap.*complete', text):
@@ -74,7 +76,7 @@ def verify(text, pixels, size):
     return dict(graphical_failure_frame=True, usable_boot=False, native_dsp=False,
                 physical_key_delivery=False, samples=len(samples),
                 gensio_tx=last[1], gensio_rx=last[2], lcd_bytes=last[4],
-                invalid_nv_checksum_blocks=invalid_blocks)
+                invalid_nv_checksum_blocks=0 if checksum_only else blocks)
 
 
 def main():

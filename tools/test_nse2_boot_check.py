@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from tools import nse2_boot_check as check
-from tools.run_nse2_boundary import prepare
+from tools.run_nse2_boundary import checksum_fixture, prepare
 
 
 def transcript():
@@ -30,6 +30,35 @@ def transcript():
 
 
 class BoundaryTest(unittest.TestCase):
+    def test_checksum_fixture_changes_only_the_five_integrity_words(self):
+        image = checksum_fixture()
+        self.assertEqual(len(image), 8192)
+        allowed = set()
+        for start, length, stored, _ in check.NV_BLOCKS:
+            allowed.update(range(stored, stored + 4))
+            self.assertEqual(image[start:start + length], b'\xff' * length)
+            self.assertEqual(int.from_bytes(image[stored:stored + 4], 'big'),
+                             (~((255 * length) & 0xffff)) & 0xffffffff)
+        self.assertTrue(all(value == 255 for i, value in enumerate(image) if i not in allowed))
+
+    def test_checksum_experiment_requires_success_not_the_erased_failure(self):
+        text = transcript()
+        for _, length, _, pc in check.NV_BLOCKS:
+            expected = (~((255 * length) & 0xffff)) & 0xffffffff
+            prefix = f'nse2_nv_checksum: lr={pc:08x} length={length} expected={expected:08x} '
+            text = text.replace(prefix + 'stored=ffffffff', prefix + f'stored={expected:08x}')
+        text = text.replace('value=fd', 'value=00')
+        self.assertEqual(check.verify_nv(text, checksum_only=True), 5)
+        result = self.verify(text, checksum_only=True)
+        self.assertEqual(result['invalid_nv_checksum_blocks'], 0)
+        self.assertFalse(result['usable_boot'])
+        with self.assertRaisesRegex(ValueError, 'peer completion'):
+            self.verify(text + 'dspif_transport: RX enqueue type=80', checksum_only=True)
+        with self.assertRaises(ValueError):
+            check.verify_nv(transcript(), checksum_only=True)
+        with self.assertRaises(ValueError):
+            check.verify_nv(text)
+
     def test_nv_checks_require_all_five_erased_blocks_in_order(self):
         self.assertEqual(check.verify_nv(transcript()), 5)
         for old, new in (('length=480', 'length=479'), ('stored=ffffffff', 'stored=00000000'),
@@ -41,10 +70,10 @@ class BoundaryTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             check.verify_nv('')
 
-    def verify(self, text):
+    def verify(self, text, *, checksum_only=False):
         pixels = bytes(84 * 48)
         with patch.object(check, 'FRAME', hashlib.sha256(pixels).hexdigest()):
-            return check.verify(text, pixels, (84, 48))
+            return check.verify(text, pixels, (84, 48), checksum_only=checksum_only)
 
     def test_failure_presentation_does_not_promote_boot(self):
         result = self.verify(transcript())
