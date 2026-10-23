@@ -67,5 +67,20 @@ def verify_security_attempt(text, pixels):
             raise ValueError('NSE-2 phone-code contacts did not reach the own decoder')
     if hashlib.sha256(pixels).hexdigest() != CODE_ERROR_FRAME:
         raise ValueError('NSE-2 reviewed Code error result differs')
+    required = (
+        r'nse2_security_encode: input=313233343500 destination=[0-9a-f]{8} lr=0029469b t=([0-9.]+) observer_writes=0',
+        r'nse2_security_compare: first=0010c6f8 second=[0-9a-f]{8} length=4 a=([0-9a-f]{8}) b=([0-9a-f]{8}) lr=002946a5 t=([0-9.]+) observer_writes=0',
+        r'nse2_security_result: comparison=00000000 attempts=ff t=([0-9.]+) observer_writes=0',
+        r'nse2_security_retry: matched=1 attempts=ff lr=002946b3 t=([0-9.]+) observer_writes=0',
+    )
+    matches = [re.findall(pattern, text) for pattern in required]
+    if any(len(rows) != 1 for rows in matches):
+        raise ValueError('NSE-2 matching phone-code/retry rejection evidence missing')
+    first, second, compare_time = matches[1][0]
+    times = [float(matches[0][0]), float(compare_time), float(matches[2][0]), float(matches[3][0])]
+    if first != second or times != sorted(times) or not 15 <= times[0] <= times[-1] < 15.3:
+        raise ValueError('NSE-2 matching phone-code/retry rejection ordering differs')
     return dict(physical_phone_code_attempts=1, phone_code_authenticated=False,
-                phone_code_result='Code error', exact_editor_buffer_unproved=True)
+                phone_code_result='Code error', exact_editor_buffer_unproved=False,
+                submitted_code_matches_cached_record=True, retry_counter=255,
+                rejection_boundary='own retry guard at 29461c')

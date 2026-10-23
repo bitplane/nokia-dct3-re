@@ -24,6 +24,10 @@ def contacts():
         rows.extend((f'nse2_security_contact: index={i} down=1 t={start} physical_only=1',
                      f'nse2_key_decode: raw={raw} key={key:02x} pc=00299044 t={start + 0.1} observer_writes=0',
                      f'nse2_security_contact: index={i} down=0 t={start + 0.2} physical_only=1'))
+    rows.extend(('nse2_security_encode: input=313233343500 destination=0010d6d4 lr=0029469b t=15.066 observer_writes=0',
+                 'nse2_security_compare: first=0010c6f8 second=0010d6d4 length=4 a=d83b30d8 b=d83b30d8 lr=002946a5 t=15.068 observer_writes=0',
+                 'nse2_security_result: comparison=00000000 attempts=ff t=15.069 observer_writes=0',
+                 'nse2_security_retry: matched=1 attempts=ff lr=002946b3 t=15.070 observer_writes=0'))
     return '\n'.join(rows)
 
 
@@ -56,7 +60,17 @@ class SimCheckTest(unittest.TestCase):
             result = verify_security_attempt(contacts(), b'frame')
         self.assertEqual(result['physical_phone_code_attempts'], 1)
         self.assertFalse(result['phone_code_authenticated'])
-        self.assertTrue(result['exact_editor_buffer_unproved'])
+        self.assertFalse(result['exact_editor_buffer_unproved'])
+        self.assertTrue(result['submitted_code_matches_cached_record'])
+        self.assertEqual(result['retry_counter'], 255)
+
+    def test_rejection_cannot_be_attributed_to_retry_without_comparison_evidence(self):
+        for old, new in (('a=d83b30d8', 'a=ffffffff'), ('attempts=ff', 'attempts=00'),
+                         ('input=313233343500', 'input=313233343600'), ('t=15.070', 't=14.0')):
+            with self.subTest(old=old), \
+                    patch('tools.nse2_sim_check.CODE_ERROR_FRAME', hashlib.sha256(b'frame').hexdigest()), \
+                    self.assertRaises(ValueError):
+                verify_security_attempt(contacts().replace(old, new), b'frame')
 
     def test_missing_extra_wrong_and_outside_window_contacts_fail(self):
         for text in (contacts().replace('key=01', 'key=02'),

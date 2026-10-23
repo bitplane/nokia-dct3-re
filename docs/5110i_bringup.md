@@ -7,7 +7,8 @@ ROM4 backend. The nominal-voltage research profile `nse2r4v` reaches the
 firmware's **Insert SIM card** screen. Two physical Menu presses reach the
 own decoder as raw key 11 / key `19`. With the synthetic card physically
 inserted, firmware completes SIM read bootstrap and presents **Security code**.
-One physical `12345` + OK attempt produces **Code error**. Authentication,
+One physical `12345` + OK attempt matches the cached code but the erased
+retry counter rejects it, producing **Code error**. Authentication,
 persistent contacts, application-menu, registration, calls and SMS are not accepted.
 Fitted mask identity, DSP clock and measured board calibration are unproved.
 
@@ -17,7 +18,8 @@ DSP but retains open-pin ADC2; it completes DSP startup while the analog
 readiness counter cannot drain. These are explicit controls, not alternative
 claims of usable boot.
 
-Next: recover the phone-side security contract from own-product consumers.
+Next: test the own retry-counter contract with an explicit zero-attempt NV
+fixture, keeping integrity-only rejection as a negative control.
 Do not substitute donor EEPROM, force firmware state, or claim phone service
 from the graphical prompt or key decode alone.
 
@@ -201,15 +203,25 @@ not proof of phonebook writes, SMS operation or SIM PIN authentication.
 
 The seven-second frame is **Security code**, not a SIM PIN prompt. A
 separate fixture presses five digit contacts and OK once. All six reach
-the own decoder; the seventeen-second frame is **Code error**. Exact editor
-buffer contents remain unobserved, so this does not establish the stored
-phone code. No additional candidate codes are tried. The integrity-only
-EEPROM has no authentic phone identity or lock payload.
+the own decoder; the seventeen-second frame is **Code error**. Read-only
+entry observation at `294454` confirms the submitted buffer is `12345\0`.
+The four-byte comparison at `2946a0` receives equal values `d83b30d8` and
+returns zero. The subsequent retry guard `29461c` receives `matched=1` but
+reads `ff` at `10c6fc`; values >=5 return failure before the match can reset
+the counter. Thus this result is retry rejection, not a mismatched code.
+No additional candidate codes are tried. The initial integrity-only EEPROM
+has no authentic phone identity or lock payload.
 
-At OK, an EEPROM `000c`/eight-byte read reaches formatter `2593b8`, whose
-nibble-to-ASCII conversion is identity-related; the read alone does not
-identify the stored security-code record. Recover the actual comparison
-and record consumers before selecting any semantic fixture.
+At OK, an EEPROM `000c`/eight-byte read reaches identity formatter `2593b8`
+through wrapper `2869f2`. Encoder `294454` packs the submitted digits via
+`28a1d0`, then XORs four bytes with identity characters 11--14 and the four
+ROM bytes at `2b3a74`. This is an own-ROM contract, not a donor record codec.
+Descriptor group 7 at `2aeaf0` maps `0701` to EEPROM `04a0`/eight bytes,
+`0708` to `04a0`/four bytes, and `0709` to `04a4`/one byte. The coherent
+run loads `04a0`/eight bytes into `10c6f8`; the retry byte is therefore
+`04a4`, not identity address `000c`. A zero-attempt fixture may change only
+that external NV byte; it must not overwrite the cached counter or verifier
+result. Successful authentication and its resulting UI still require a run.
 
 ## Remaining work
 
