@@ -3,6 +3,26 @@ import re
 import struct
 
 
+def inspect_peripheral_consumers(program):
+    fragments={
+        0x71ee:'f27474fa771a000a',
+        0x8ec5:'f07423f6f0749162f0200100',
+        0x8ed8:'74f8000800358813f1200200',
+        0xb792:'74f80008003576f806b20000',
+        0xb81f:'4d82f49575f800080034f07335f7',
+        0x917b:'10f806c6f000b3d1881174f8000800361181f5e2',
+    }
+    for address,encoded in fragments.items():
+        expected=bytes.fromhex(encoded)
+        if program[2*address:2*address+len(expected)]!=expected:
+            raise ValueError(f'peripheral consumer code differs at {address:04x}')
+    return dict(rejected_raw_port_read=dict(candidate='71ef',reason='74fa is CALLD destination at 71ee; 000a belongs to delay-slot STM'),
+                request0100=dict(default_handler='8ec5',callee='9162',state_table='b3d1 indexed by 06c6',status_port='36'),
+                request0200=dict(handlers=['8ed3','b787'],input_port='35'),
+                alternate_output=dict(site='b821',port='34'),
+                sampling_control_link_proved=False,physical_peripheral_identity_proved=False)
+
+
 def inspect_peripheral_routes(program):
     if len(program)!=0x20000:
         raise ValueError('peripheral routes require full live page-zero program')

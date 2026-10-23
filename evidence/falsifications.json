@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nse2_raw_71ef_is_sampling_port_reader",
+      "status": "disproven",
+      "hypothesis": "The raw PORTR-pattern candidate at DSP word71ef reads sampling-control port0a",
+      "conclusion": "Live uploaded program disassembly establishes71ee:f27474fa as CALLD74fa, followed by delay-slot STM#000a,BRC. The operand74fa and following words imitate a PORTR pattern when scanned without instruction boundaries. The sampling checker pins the real sequence and a unit negative fixture retains the raw census hit while rejecting its interpretation. This excludes this candidate only, not indirect readers or unknown hardware consumers. Separate inactive0100/0200 request handlers consume ports35/36 and publish through34; no sampling-control connection is proved.",
+      "evidence": ["docs/5110i_bringup.md", "tools/nse2_sampling_check.py", "tools/test_nse2_sampling_check.py", "tools/c54x_rom4_port_census.py"]
+    },
+    {
       "id": "nhm3_periodic_publication_observer_has_unique_pc",
       "status": "disproven",
       "hypothesis": "The live 6250 verifier publication observer always samples one unique instruction PC, so either0f64 or0f65 alone is a complete acceptance boundary",

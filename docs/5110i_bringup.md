@@ -764,6 +764,18 @@ mask `0040` and sets `06e4 & 2000`. Neither fact establishes a connection
 to sampling controls `09–0b`. Decode the inactive consumers and their
 enables before assigning any additional request bit or interrupt source.
 
+The `0100/0200` consumer pair has a distinct word-transfer contract:
+default `8ec5` calls `9162`, which dispatches through data table `b3d1`
+indexed by `06c6` and reads status port `36`; both `8ed3` and alternate
+`b787` read input port `35`. The alternate protocol publishes output through
+port `34` at `b821`. These consumers establish a buffered stateful peripheral
+path, not its physical identity or a relationship to sampling ports `09–0b`.
+The apparent raw PORTR-`0a` candidate at `71ef` is rejected: instruction
+`71ee: f274 74fa` is CALLD `74fa`, followed by delay-slot STM `#000a,BRC`.
+An operand-pattern port census is not an instruction-boundary proof; the
+processing checker preserves this negative fixture alongside the confirmed
+consumer bytes. No new peripheral behavior follows from this classification.
+
 For a forty-second processing capture, the native runner correctly fails
 on the repeated startup. `nse2_lifecycle_check TRACE --timer-boundary`
 requires the raw arm/terminal/reset evidence and reports

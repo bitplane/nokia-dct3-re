@@ -1,8 +1,25 @@
 import unittest
-from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripheral_routes
+from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripheral_routes,inspect_peripheral_consumers
 
 
 class SamplingCheckTest(unittest.TestCase):
+    def test_raw_port_reader_is_a_delayed_call_operand(self):
+        from tools.c54x_rom4_port_census import census
+        program=bytearray(0x20000)
+        for address,encoded in ((0x71ee,'f27474fa771a000a'),
+                (0x8ec5,'f07423f6f0749162f0200100'),(0x8ed8,'74f8000800358813f1200200'),
+                (0xb792,'74f80008003576f806b20000'),(0xb81f,'4d82f49575f800080034f07335f7'),
+                (0x917b,'10f806c6f000b3d1881174f8000800361181f5e2')):
+            data=bytes.fromhex(encoded)
+            program[address*2:address*2+len(data)]=data
+        self.assertIn(0x71ef,census(program)[('R',0x0a)])
+        result=inspect_peripheral_consumers(program)
+        self.assertFalse(result['sampling_control_link_proved'])
+        self.assertEqual(result['rejected_raw_port_read']['candidate'],'71ef')
+        program[0x71ee*2]^=1
+        with self.assertRaises(ValueError):
+            inspect_peripheral_consumers(program)
+
     def test_peripheral_routes_preserve_alternate_selector(self):
         import struct
         words=[0]*65536

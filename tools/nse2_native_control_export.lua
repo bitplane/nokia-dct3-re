@@ -25,6 +25,10 @@ emu.register_frame_done(function()
                             {'shared_notification',0x382f,0x70},
                             {'peripheral_dispatch',0x3598,0x240},
                             {'sampling_stop',0x44b6,0xc0},
+                            {'peripheral_alternate',0x8e89,0x80},
+                            {'peripheral_alternate_b',0xb787,0xa0},
+                            {'sampling_reader',0x71d0,0x70},
+                            {'peripheral_tx',0x9162,0x100},
                             {'vectors',0xff80,0x80}}) do
         debugger:command(string.format('dasm nse2_control_%s.dasm,%x,%x,1,:dsp_c54x:cpu',
             range[1], range[2], range[3]))
