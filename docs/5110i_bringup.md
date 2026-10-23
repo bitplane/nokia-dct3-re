@@ -1543,5 +1543,14 @@ staged-ROM6 handoff is not reusable as-is. Relevant implementation authority:
 | Native receive supervision | Initial RX is delivered and consumed; full scan advances; timer-`dd` tests generic activity and expires with zero. | Identify a legitimate later producer or peripheral completion. No guessed heartbeat, shortened bitmap or policy disable. |
 | Pending word peripheral | Ports `34/35/36`, state/mask/ack grammar and pending first TX are mapped. | Recover clock/framing/completion ownership from software or measured traces; adjacent setup exposes no evidenced divisor. Its relationship to supervision remains unproved. |
 | Provisioning | Own checksum and explicit retry-byte fixtures permit physical phone authentication. | Own semantic/factory evidence, not donor EEPROM or promotion of a diagnostic byte to a factory default. |
-| Bounded software continuation | SIM security, persistent contacts/drafts, FDN policy, native/UI replay and pending SIM UPDATE/cold-readback have independent pre-restart gates. | Other in-flight serial/security phases remain unqualified; these gates cannot establish sustained handset operation. |
+| Bounded software continuation | SIM security, persistent contacts/drafts, FDN policy, native/UI replay, pending SIM UPDATE/cold-readback, and pre-body PIN VERIFY/PUK UNBLOCK restoration have independent pre-restart gates. Retry exhaustion and cold authentication with the recovered PIN are qualified. | Partially buffered SIMI authentication TX and response/status delivery checkpoints remain unqualified. Extend the existing transaction observer at those boundaries; do not infer sustained handset operation from bounded replay. |
 | Sustained handset service | The reason-`68` restart is retained as a negative control. | Prove operation beyond that boundary before promoting native registration, network SMS, calls or speech. Fitted DSP/clock and electrical calibration remain separate prerequisites. |
+
+For authentication replay, distinguish the controller's buffered TX body from
+the card's received body. `nokia_simi_device::txd_w` queues bytes locally;
+`tx_fifo_control_w` delivers the queued batch synchronously through the card
+callback when firmware flushes it. A save during FIFO filling therefore tests
+SIMI buffer restoration, not partially received card data. Do not introduce
+artificial byte delivery or split a firmware flush merely to create a card-side
+checkpoint. Likewise, an observation tap sees a write before its mapped handler;
+the subsequent save snapshot must establish the actual buffered byte count.

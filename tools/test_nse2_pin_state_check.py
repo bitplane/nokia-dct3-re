@@ -57,9 +57,19 @@ class PinStateTest(unittest.TestCase):
             result=check_puk_state(text,wire,before,after,b'security',b'security')
             self.assertEqual(result['replacement_pin'],'2468')
             for bad in (text.replace('record='+old,'record='+new),text.replace('puk=10/10','puk=9/10'),
-                        text.replace('m_tx_expected:10','m_tx_expected:8')):
+                        text.replace('m_tx_expected:10','m_tx_expected:8'),
+                        text.replace(status,status+'\n'+status,1),
+                        text.replace(release,'',1),
+                        text.replace('nse2_puk_contact_replay: restored=1 physical_only=1','')):
                 with self.assertRaises(ValueError):
                     check_puk_state(bad,wire,before,after,b'security',b'security')
+            for bad_wire in (
+                    wire.replace('restored:1:0.000100000:rx:2c',
+                                 'restored:1:0.000101000:rx:2c'),
+                    wire.replace('restored:2:0.000200000:tx:31',
+                                 'restored:2:0.000200000:tx:32')):
+                with self.assertRaises(ValueError):
+                    check_puk_state(text,bad_wire,before,after,b'security',b'security')
             changed=after.copy()
             changed[CHV_OFFSET+8]^=1
             with self.assertRaises(ValueError):
