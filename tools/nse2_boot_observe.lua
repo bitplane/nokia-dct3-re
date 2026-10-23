@@ -296,6 +296,9 @@ emu.register_frame_done(function()
             machine:logerror(string.format('nse2_native_transport: t=%.9f pc=%04x imr=%04x ifr=%04x words=%s mcu_packets=%04x observer_writes=0\n',
                 now, dsp.state['PC'].value, dsp.state['IMR'].value, dsp.state['IFR'].value,
                 table.concat(values, ','), space:read_u16(0x10c766)))
+            machine:logerror(string.format('nse2_native_scan_state: t=%.9f count0285=%04x repeat0e13=%04x ar5=%04x ar6=%04x ar7=%04x observer_writes=0\n',
+                now, dsp.spaces.data:read_u16(0x285), dsp.spaces.data:read_u16(0xe13),
+                dsp.state['AR5'].value, dsp.state['AR6'].value, dsp.state['AR7'].value))
             if next_sample == 30 then
                 local sites = {}
                 for pc in pairs(native_work_writers) do sites[#sites + 1] = pc end

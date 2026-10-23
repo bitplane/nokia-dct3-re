@@ -25,9 +25,9 @@ DSP but retains open-pin ADC2; it completes DSP startup while the analog
 readiness counter cannot drain. These are explicit controls, not alternative
 claims of usable boot.
 
-Next: resolve native DSP receive-activity supervision before accepting
-longer contact/persistence workflows; keep integrity-only rejection as a
-negative control.
+Next: reconcile the progressing native measurement sequence and peripheral
+timing with the MCU receive-supervision deadline before accepting longer
+contact/persistence workflows. Keep integrity-only rejection as a control.
 Do not substitute donor EEPROM, force firmware state, or claim phone service
 from the graphical prompt or key decode alone.
 
@@ -301,9 +301,8 @@ next packet, nor prove the borrowed mask correct for NSE-2.
 `nse2_lifecycle_check TRACE --transport` requires this complete window and
 the actual count-clear observation alongside the restart evidence. It
 rejects added/unconsumed RX publications or a non-drained TX ring instead
-of labelling every reason-`68` reset as the same cause. Next inspect native
-producer scheduling/MDI state and its external prerequisites, retaining
-the functioning initial transport as a positive control.
+of labelling every reason-`68` reset as the same cause. Retain the functioning
+initial transport as a positive control for further timing/completion work.
 
 In the acquired program mask, word `09ab` is `f4e1` (IDLE); sampled PC
 `09ac` is its continuation, not an unexplained busy loop. The following
@@ -312,7 +311,9 @@ back to IDLE when it is clear. Aggregate writes disprove a missing work-bit
 or stopped-scheduler explanation: by thirty seconds writer `32c1` sets
 bit 0 in all 1,625 observed writes, while `446d` clears it in 1,628 writes.
 The one-second sampled word `0820` and later idle PC samples must not be
-promoted to a claim that the intervening work never runs.
+promoted to a claim that the intervening work never runs. More specifically,
+the runtime overlay places this IDLE inside routine `0926..0a26`, an advancing
+nested measurement loop, not a generic scheduler entrance.
 
 Own final MCU type-`1a` packet has header `441a` and 34 payload words:
 `0011 9800` followed by 32 zeros. Native consumer `3909` advances TX from
@@ -350,13 +351,49 @@ be described as sustained mode-1 filtering.
 All 679,232 observed port-`27` reads are zero, as are observed reduction
 outputs. That is the unattached sample source actually modeled; it does
 not establish electrical units or prove nonzero samples alone would
-produce a packet. The next static boundary is the mode-1 exit/control
-continuation and completion eligibility, cross-referenced to the existing
-ROM4 RF/sample-contract work rather than another guessed heartbeat.
+produce a packet. Resident `4dce` initializes mode 1 then mode 2 through
+`4414`, with intermediate waits through `407c`. The later `09a4` call
+selects mode `c`; the frame path clears its bit 3 at `32b3`, explaining
+the observed `c/4` alternation without requiring a synthetic transition.
 `verify-5110i-native-processing` verifies this known pre-reset boundary
 and the physical menu together. Its result explicitly retains
 `stable_long_boot=false` and `acquisition_proved=false`; thirty seconds
 does not cover or waive the known restart deadline.
+
+### Measurement progression and timing
+
+The uploaded low program overlay must be read after boot: cold data RAM at
+these program addresses is zero. `nse2_native_control_export.lua` exports
+the actual six control ranges at seven seconds through MAME's read-only
+debugger command API, then exits. Use a separately prepared native run,
+`-debug -debugger none -autoboot_delay 0 -seconds_to_run 8`, and this file
+as `-autoboot_script`. It writes run-local `nse2_control_*.dasm`; it is a
+static-inspection instrument, not a handset acceptance run. A startup
+`-debugscript` with the none provider did not provide these exports.
+
+On the measured request path, `092d` compares `0284` with 1. Its other
+branch writes `0285=007b` at `0934`; `097f` initializes outer AR6 to 7.
+The inner loop loads AR5 from `0285`, advances through `0990..09c2`, and
+uses repeat flag `0e13` to make two inner passes. `09cb` decrements the
+outer counter and branches back. This establishes the loop structure,
+not the electrical meaning of its samples or the correct physical cadence.
+
+Positive fetch observations after register restoration show AR5=`ffff`
+at each inner-loop exit. AR6 descends `7,6,5,4,3,2`, with the final
+observed inner pass at AR6=1 by 29.793511 seconds. The first paired exits
+are 6.597880/8.453530 seconds; AR6=2 exits at 25.927572/27.783223 seconds.
+The native sequence is advancing but unfinished before the known restart;
+an idle PC sample is not proof of a stalled measurement. Do not change
+sample values, loop counters or the supervision deadline to make it finish.
+Compare event/clock timing and protocol-owned activity against this actual
+sequence before deciding whether the next missing boundary is RF data.
+
+Policy descriptor `0607` maps to the one-byte EEPROM record at `049e`.
+Erased content enables the observed argument-1 reason-`68` policy, but
+there is no accepted factory value or semantic permission to disable it.
+The diagnostic option `--scan-progress` requires the advancing loop in
+addition to `--schedule --transport --processing`; it explicitly leaves
+`scan_completed=false`.
 
 ## Remaining work
 
@@ -364,6 +401,6 @@ does not cover or waive the known restart deadline.
    verify contact creation/readback and cold persistence with physical input.
 2. Recover semantic EEPROM requirements from their own consumers; retain
    integrity-only fixtures as diagnostic inputs, not factory defaults.
-3. Qualify application/menu behavior and longer lifecycle/save-state tests.
+3. Extend the accepted application-menu path to longer lifecycle/save-state tests.
 4. Keep fitted flash/RAM/DSP/clock/analog evidence distinct from compatibility;
    no registration, native RF or speech claims without their own acceptance.

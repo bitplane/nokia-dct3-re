@@ -108,12 +108,31 @@ def diagnose_processing(text):
                 scope='measured processing frontier, not proof that nonzero samples suffice')
 
 
+def diagnose_scan_progress(text):
+    rows = re.findall(r'nse2_native_scan_loop: address=(09c4|09cb) pc=([0-9a-f]{4}) ar5=ffff '
+                      r'ar6=([0-9a-f]{4}) repeat=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0', text)
+    expected = []
+    for outer in range(7, 1, -1):
+        expected.extend((('09c4', outer, 1), ('09c4', outer, 0), ('09cb', outer, 0xffff)))
+    expected.append(('09c4', 1, 1))
+    actual = [(address, int(outer, 16), int(repeat, 16)) for address, _, outer, repeat, _ in rows]
+    if actual != expected or len(rows) != text.count('nse2_native_scan_loop:'):
+        raise ValueError('NSE-2 advancing outer measurement-loop sequence differs')
+    times = [float(row[4]) for row in rows]
+    if times != sorted(times) or not 6 < times[0] < 7 or not 29 < times[-1] < 30:
+        raise ValueError('NSE-2 measured loop progression horizon differs')
+    return dict(native_measurement_progressing=True, observed_outer_branch_values=list(range(7, 1, -1)),
+                last_observed_outer_counter=1, scan_completed=False,
+                scope='advancing nested loop before deadline; no completed RF measurement claim')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('trace', type=Path)
     parser.add_argument('--transport', action='store_true', help='also require passive first-window ring evidence')
     parser.add_argument('--schedule', action='store_true', help='diagnose thirty-second scheduling without requiring a reset capture')
     parser.add_argument('--processing', action='store_true', help='also require reused passive ROM4 processing evidence')
+    parser.add_argument('--scan-progress', action='store_true', help='also require advancing measurement-loop evidence')
     args = parser.parse_args()
     try:
         text = args.trace.read_text()
@@ -122,6 +141,8 @@ def main():
             result.update(diagnose_transport(text))
         if args.processing:
             result['processing'] = diagnose_processing(text)
+        if args.scan_progress:
+            result['measurement'] = diagnose_scan_progress(text)
         print(json.dumps(result, indent=2))
     except (OSError, ValueError) as error:
         parser.exit(1, str(error) + '\n')

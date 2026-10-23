@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nse2_lifecycle_check import diagnose, diagnose_transport, diagnose_schedule, diagnose_processing
+from tools.nse2_lifecycle_check import diagnose, diagnose_transport, diagnose_schedule, diagnose_processing, diagnose_scan_progress
 
 
 def transcript():
@@ -12,6 +12,21 @@ def transcript():
 
 
 class LifecycleTest(unittest.TestCase):
+    def test_progressing_measurement_is_not_a_completed_result(self):
+        rows = []
+        for i, outer in enumerate(range(7, 0, -1)):
+            rows.append(f'nse2_native_scan_loop: address=09c4 pc=09c5 ar5=ffff ar6={outer:04x} repeat=0001 t={6.6+i*3.866} observer_writes=0')
+            if outer > 1:
+                rows.append(f'nse2_native_scan_loop: address=09c4 pc=09c5 ar5=ffff ar6={outer:04x} repeat=0000 t={8.45+i*3.866} observer_writes=0')
+                rows.append(f'nse2_native_scan_loop: address=09cb pc=09cc ar5=ffff ar6={outer:04x} repeat=ffff t={8.451+i*3.866} observer_writes=0')
+        text = '\n'.join(rows)
+        result = diagnose_scan_progress(text)
+        self.assertTrue(result['native_measurement_progressing'])
+        self.assertFalse(result['scan_completed'])
+        for old, new in (('ar6=0006', 'ar6=0007'), ('repeat=ffff', 'repeat=0000'), ('ar5=ffff', 'ar5=0000')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                diagnose_scan_progress(text.replace(old, new))
+
     def test_two_filter_frames_are_not_sustained_acquisition(self):
         text = '\n'.join(f'rom4_dispatch_count: address={address} count={count}'
                          for address, count in (('32f4', 2), ('09a4', 1627), ('4414', 1629), ('33f3', 21226)))
