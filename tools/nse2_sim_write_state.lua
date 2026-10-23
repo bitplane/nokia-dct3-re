@@ -9,12 +9,14 @@ local sms=_G.nse2_sim_state_sms==true
 local puk=_G.nse2_sim_state_puk==true
 local pin=_G.nse2_sim_state_pin==true or puk
 local buffered=_G.nse2_sim_state_buffered==true
+local status_pending=_G.nse2_sim_state_status_pending==true
 assert(not buffered or (pin and not puk),'buffered checkpoint requires PIN VERIFY')
+assert(not status_pending or (pin and not puk and not buffered),'status checkpoint requires PIN VERIFY')
 local pin_retries=_G.nse2_pin_state_retries or (puk and 0 or 3)
 assert((puk and pin_retries==0) or pin_retries==1 or pin_retries==3,'unreviewed PIN checkpoint input')
 assert(not (sms and pin),'one SIM transaction per fixture')
 local length=puk and 16 or pin and 8 or sms and 176 or 32
-local partial=buffered and 5 or sms and 60 or 0
+local partial=status_pending and 8 or buffered and 5 or sms and 60 or 0
 local capture_time=puk and 25 or pin and 9 or sms and 26.5 or 28.3
 local function item(device,name)
     local index=assert(device.items['0/'..name],'missing saved item '..name)
@@ -77,9 +79,9 @@ local function snapshot(label)
     local protocol=fields(card,{'m_ins','m_tx_len','m_tx_expected','m_receiving_body','m_selected_file'})
     local controller=fields(simi,{'m_rx_count','m_rx_ready','m_iir','m_tx_ready_pending','m_uart_tx_count'})
     local stored=record()
-    local free=pin and string.format('%02x03',pin_retries) or sms and ('00'..string.rep('ff',175)) or string.rep('ff',32)
+    local free=pin and string.format('%02x03',pin_retries-(status_pending and 1 or 0)) or sms and ('00'..string.rep('ff',175)) or string.rep('ff',32)
     if puk then free=free..'31323334ffffffff35363738ffffffff' end
-    assert(stored==free,'SIM record was not rolled back before commit')
+    assert(stored==free,'SIM persistent state differs at checkpoint')
     local body=partial>0 and hex(item(buffered and simi or card,buffered and 'm_uart_tx_fifo' or 'm_tx'):read_block(0,partial)) or ''
     local result=string.format('t=%.9f pc=%08x sp=%08x ram=%08x cpu=%s card=%s simi=%s record=%s partial=%s',s.time,s.pc,s.sp,s.ram,s.cpu,protocol,controller,stored,body)
     machine:logerror('nse2_sim_state: phase='..label..' '..result..'\n')

@@ -2438,6 +2438,12 @@
       "evidence": ["docs/5110i_bringup.md", "tools/run_c54x_core.py", "driver/tms320c54x_test.cpp", "tools/c54x_opcode_coverage.py", "tools/run_nse2_word_contract.py"]
     },
     {
+      "id": "nse2_committed_pin_status_restore", "owner": "nse2_sim_security", "status": "satisfied",
+      "predicate": "A committed physical PIN VERIFY restores its queued unread response without repeating the card operation or consuming another retry",
+      "current": "The7.665808846 checkpoint follows the real body flush: card body counters and receiving state are zero, retries2/3 and SIMI RX count2/not-ready with TX-ready pending. Full ARM/RAM/card/controller snapshots match after load. Both legs receive queued9804, match32 timed wire events and render the exact Code error frame. The sole VERIFY result precedes save; any card result execution after that checkpoint is rejected. Whole-card comparison permits only the original retry3->2 and a separate cold process preserves the complete card. This qualifies committed-card/pending-delivery restoration, not every serial interleaving, registration, speech or native long-run stability.",
+      "evidence": ["docs/5110i_bringup.md", "tools/run_nse2_pin_state.py", "tools/nse2_pin_state_check.py", "tools/nse2_pin_status_state.lua", "tools/nse2_sim_write_state.lua", "tools/test_nse2_pin_state_check.py", "gates.json"]
+    },
+    {
       "id": "nse2_buffered_pin_verify_restore", "owner": "nse2_sim_security", "status": "satisfied",
       "predicate": "SIMI restores a partially buffered physical PIN VERIFY body before card delivery, with exact wire continuation and cold retry persistence",
       "current": "At7.665799425 the controller holds five bytes31313131ff while the card has zero/eight body bytes and retries3/3. Full ARM/RAM/card/controller snapshots restore exactly. The remaining threeff bytes and subsequent status traffic match35 timed wire events; both legs receive9804, consume one retry and render the exact Code error frame. Whole-card comparison permits only CHV1 retry3->2, and a fresh cold process preserves that card. The scheduled save reaches the fifth byte after requesting at the fourth write; pre-save asserts the actual FIFO prefix and count. This qualifies buffered SIMI TX, not partially received card data, registration or sustained native operation.",

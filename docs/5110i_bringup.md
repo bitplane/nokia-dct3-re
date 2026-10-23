@@ -1509,6 +1509,17 @@ The save request occurs at the fourth body write, but scheduling reaches the
 fifth before pre-save. The observer asserts the actual five-byte count and
 prefix instead of assuming request-time state was captured.
 
+`verify-5110i-pin-status-state` saves at 7.665808846 seconds, after the
+card has committed the wrong PIN but before firmware reads `98 04`.
+The card body counters and receiving state are zero, retries are already
+`2/3`, and SIMI holds two unread, not-ready bytes with TX-ready pending.
+Architecture, card state and controller state restore exactly. All 32 timed
+wire events match, beginning with the queued status, and both frames show
+Code error. The card's VERIFY result is logged once before the checkpoint
+and never executes again after save or load; whole-card comparison and a
+fresh cold process preserve the single retry decrement. This tests committed
+card state plus pending controller delivery, not command re-execution.
+
 The separate `verify-5110i-pin-block-state` gate reaches one retry through
 two actual physical wrong-PIN/cold-card transitions before the checkpoint.
 It does not seed an exhausted counter. Save/load then restores the last
@@ -1571,7 +1582,7 @@ staged-ROM6 handoff is not reusable as-is. Relevant implementation authority:
 | Native receive supervision | Initial RX is delivered and consumed; full scan advances; timer-`dd` tests generic activity and expires with zero. | Identify a legitimate later producer or peripheral completion. No guessed heartbeat, shortened bitmap or policy disable. |
 | Pending word peripheral | Ports `34/35/36`, state/mask/ack grammar and pending first TX are mapped. | Recover clock/framing/completion ownership from software or measured traces; adjacent setup exposes no evidenced divisor. Its relationship to supervision remains unproved. |
 | Provisioning | Own checksum and explicit retry-byte fixtures permit physical phone authentication. | Own semantic/factory evidence, not donor EEPROM or promotion of a diagnostic byte to a factory default. |
-| Bounded software continuation | SIM security, persistent contacts/drafts, FDN policy, native/UI replay, pending SIM UPDATE/cold-readback, pre-body PIN VERIFY/PUK UNBLOCK and buffered PIN TX restoration have independent pre-restart gates. Retry exhaustion and cold authentication with the recovered PIN are qualified. | Response/status delivery checkpoints remain unqualified. Do not infer sustained handset operation from bounded replay. |
+| Bounded software continuation | SIM security, persistent contacts/drafts, FDN policy, native/UI replay, pending SIM UPDATE/cold-readback, pre-body PIN VERIFY/PUK UNBLOCK, buffered PIN TX and committed-PIN/unread-status restoration have independent pre-restart gates. Retry exhaustion and cold authentication with the recovered PIN are qualified. | These checkpoints cover specific observed phases, not every serial interleaving. Do not infer sustained handset operation from bounded replay. |
 | Sustained handset service | The reason-`68` restart is retained as a negative control. | Prove operation beyond that boundary before promoting native registration, network SMS, calls or speech. Fitted DSP/clock and electrical calibration remain separate prerequisites. |
 
 For authentication replay, distinguish the controller's buffered TX body from

@@ -58,7 +58,9 @@ def check_puk_state(text,wire,before,after,reference,restored):
                 pin_attempts_remaining=3,puk_attempts_remaining=10,stable_long_run=False)
 
 
-def check_pin_state(text,wire,before,after,reference,restored,*,last_retry=False,buffered_body=False):
+def check_pin_state(text,wire,before,after,reference,restored,*,last_retry=False,buffered_body=False,status_pending=False):
+    if sum((last_retry,buffered_body,status_pending))>1:
+        raise ValueError('PIN checkpoint modes are mutually exclusive')
     if len(before)!=AOC_NVRAM_SIZE or len(after)!=AOC_NVRAM_SIZE:
         raise ValueError('PIN replay requires complete card images')
     initial=1 if last_retry else 3
@@ -80,19 +82,26 @@ def check_pin_state(text,wire,before,after,reference,restored,*,last_retry=False
         raise ValueError('PIN checkpoint timing/fields differ')
     if not re.fullmatch(r'[0-9a-f]{8}(?:,[0-9a-f]{8}){36}',fields['cpu']):
         raise ValueError('PIN checkpoint ARM registers incomplete')
-    if fields['card']!='m_ins:20,m_tx_len:0,m_tx_expected:8,m_receiving_body:1,m_selected_file:6fad':
-        raise ValueError('PIN card command is not pending before its body')
+    expected_card='m_ins:20,m_tx_len:0,m_tx_expected:0,m_receiving_body:0,m_selected_file:6fad' if status_pending else 'm_ins:20,m_tx_len:0,m_tx_expected:8,m_receiving_body:1,m_selected_file:6fad'
+    if fields['card']!=expected_card:
+        raise ValueError('PIN card transaction phase differs')
     expected_simi='m_rx_count:0,m_rx_ready:0,m_iir:0,m_tx_ready_pending:0,m_uart_tx_count:5' if buffered_body else 'm_rx_count:1,m_rx_ready:0,m_iir:0,m_tx_ready_pending:1,m_uart_tx_count:0'
+    if status_pending:
+        expected_simi='m_rx_count:2,m_rx_ready:0,m_iir:0,m_tx_ready_pending:1,m_uart_tx_count:0'
     if fields['simi']!=expected_simi:
         raise ValueError('PIN controller checkpoint differs')
-    if fields['record']!=f'{initial:02x}03' or fields['partial']!=('31313131ff' if buffered_body else ''):
-        raise ValueError('PIN retries/body did not roll back')
+    expected_body='31313131ffffffff' if status_pending else '31313131ff' if buffered_body else ''
+    if fields['record']!=f'{remaining if status_pending else initial:02x}03' or fields['partial']!=expected_body:
+        raise ValueError('PIN checkpoint retries/body differ')
     if re.findall(r'nse2_sim_state: committed=(reference|restored) record=([0-9a-f]+)',text)!=[('reference',f'{remaining:02x}03'),('restored',f'{remaining:02x}03')]:
         raise ValueError('PIN per-leg retry outcome differs')
     boundary=text.index('nse2_sim_state: phase=restored')
-    for leg in (text[:boundary],text[boundary:]):
-        if statuses(leg,0x20)!=[(status,remaining,10)]:
-            raise ValueError('PIN leg lacks exactly one wrong-code result')
+    for index,leg in enumerate((text[:boundary],text[boundary:])):
+        expected_status=[] if status_pending and index==1 else [(status,remaining,10)]
+        if statuses(leg,0x20)!=expected_status:
+            raise ValueError('PIN leg command-result execution count differs')
+    if status_pending and statuses(text[text.index('nse2_sim_state: phase=saved'):],0x20):
+        raise ValueError('committed PIN command executed again after its checkpoint')
     if text.count('nse2_pin_contact_replay: restored=1 physical_only=1')!=1:
         raise ValueError('PIN physical contact timeline was not restored')
     releases=re.findall(r'nse2_pin_contact: event=10 down=0 t=([0-9.]+) physical_only=1',text)
@@ -100,13 +109,15 @@ def check_pin_state(text,wire,before,after,reference,restored,*,last_retry=False
         raise ValueError('PIN held-key release replay differs')
     events=parse_wire_replay(wire)['reference']
     prefix=([('tx',0xff)]*3 if buffered_body else [('rx',0x20)]+[('tx',v) for v in b'1111\xff\xff\xff\xff'])+[('rx',0x98),('rx',status&255)]
+    if status_pending:
+        prefix=[('rx',0x98),('rx',status&255)]
     if [event[1:] for event in events[:len(prefix)]]!=prefix:
         raise ValueError('PIN procedure/body/status wire prefix differs')
     count=str(len(events))
-    if re.findall(rf'nse2_sim_state: completed=1 reference=(\d+) restored=(\d+) sent_before_save={5 if buffered_body else 0}',text)!=[(count,count)]:
+    if re.findall(rf'nse2_sim_state: completed=1 reference=(\d+) restored=(\d+) sent_before_save={8 if status_pending else 5 if buffered_body else 0}',text)!=[(count,count)]:
         raise ValueError('PIN replay summary differs')
     expected_frame=PIN_BLOCKED_FRAME if last_retry else CODE_ERROR_FRAME
     if any(hashlib.sha256(pixels).hexdigest()!=expected_frame for pixels in (reference,restored)):
         raise ValueError('PIN reference/restored error frame differs')
-    return dict(pending_pin_restored=True,buffered_body_bytes=5 if buffered_body else 0,wire_events=len(events),pin_attempts_remaining=remaining,pin_blocked=last_retry,
+    return dict(pending_pin_restored=True,status_pending=status_pending,buffered_body_bytes=5 if buffered_body else 0,wire_events=len(events),pin_attempts_remaining=remaining,pin_blocked=last_retry,
                 double_retry_consumption=False,stable_long_run=False)

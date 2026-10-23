@@ -31,6 +31,31 @@ def fixture(last_retry=False):
 
 
 class PinStateTest(unittest.TestCase):
+    def test_committed_pin_restores_pending_status_without_executing_again(self):
+        text,_,before,after=fixture()
+        status='SIM status ins=20 sw=9804 chv=2/3 puk=10/10 enabled=1'
+        text=status+'\n'+text.replace(status+'\n','')
+        text=text.replace('m_tx_expected:8,m_receiving_body:1',
+                          'm_tx_expected:0,m_receiving_body:0')
+        text=text.replace('m_rx_count:1','m_rx_count:2')
+        text=text.replace('record=0303','record=0203')
+        text=text.replace('partial=','partial=31313131ffffffff')
+        text=text.replace('reference=11 restored=11 sent_before_save=0',
+                          'reference=2 restored=2 sent_before_save=8')
+        wire='\n'.join(f'{phase}:{i}:{i*.0001:.9f}:rx:{value:02x}'
+                       for phase in ('reference','restored') for i,value in enumerate((0x98,4),1))
+        with patch('tools.nse2_pin_state_check.CODE_ERROR_FRAME',hashlib.sha256(b'error').hexdigest()):
+            self.assertTrue(check_pin_state(text,wire,before,after,b'error',b'error',status_pending=True)['status_pending'])
+            for bad in (text.replace('m_rx_count:2','m_rx_count:0'),
+                        text.replace('record=0203','record=0303'),
+                        text+'\n'+status,
+                        text.replace(status+'\n','').replace('nse2_sim_state: committed=reference',
+                                                            status+'\nnse2_sim_state: committed=reference')):
+                with self.assertRaises(ValueError):
+                    check_pin_state(bad,wire,before,after,b'error',b'error',status_pending=True)
+            with self.assertRaises(ValueError):
+                check_pin_state(text,wire,before,after,b'error',b'error',buffered_body=True,status_pending=True)
+
     def test_buffered_pin_body_restores_controller_not_card_body(self):
         text,_,before,after=fixture()
         text=text.replace('m_rx_count:1,m_rx_ready:0,m_iir:0,m_tx_ready_pending:1,m_uart_tx_count:0',

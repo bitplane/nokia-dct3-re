@@ -2684,6 +2684,16 @@
       ]
     },
     {
+      "name": "verify-5110i-pin-status-state",
+      "prerequisites": ["verify-5110i-static", "build"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_pin_state.py",
+         "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame", "--status-pending"]}
+      ]
+    },
+    {
       "name": "verify-5110i-pin-block-state",
       "prerequisites": ["verify-5110i-static", "build"],
       "variables": {},

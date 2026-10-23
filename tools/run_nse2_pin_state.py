@@ -23,6 +23,7 @@ def main():
     modes.add_argument('--last-retry',action='store_true',help='physically reach one retry, then restore its blocking VERIFY')
     modes.add_argument('--puk',action='store_true',help='physically block PIN, then restore successful UNBLOCK and cold-authenticate its new PIN')
     modes.add_argument('--buffered-body',action='store_true',help='restore five PIN body bytes buffered in SIMI before card delivery')
+    modes.add_argument('--status-pending',action='store_true',help='restore committed PIN retries and queued unread status bytes')
     args=parser.parse_args()
     root=Path(__file__).resolve().parents[1]
     run=args.run_directory.resolve()
@@ -47,12 +48,12 @@ def main():
         (target/'nvram/nse2r4v/sim_card').write_bytes(before)
         original=json.loads((seed/'inputs.json').read_text())
         command=[str(arg).replace(str(seed),str(target)) for arg in original['command']]
-        command[command.index('-autoboot_script')+1]=str(root/'tools'/('nse2_puk_write_state.lua' if args.puk else 'nse2_pin_block_state.lua' if args.last_retry else 'nse2_pin_buffered_state.lua' if args.buffered_body else 'nse2_pin_write_state.lua'))
+        command[command.index('-autoboot_script')+1]=str(root/'tools'/('nse2_puk_write_state.lua' if args.puk else 'nse2_pin_block_state.lua' if args.last_retry else 'nse2_pin_status_state.lua' if args.status_pending else 'nse2_pin_buffered_state.lua' if args.buffered_body else 'nse2_pin_write_state.lua'))
         if args.puk:
             command[command.index('-seconds_to_run')+1]='28'
         command+=['-state_directory',str(target/'sta')]
         report.update(command=command,card_sha256=hashlib.sha256(before).hexdigest(),
-                      card_source=str(seed/'nvram/nse2r4v/sim_card'),mame_sha256=original['mame_sha256'],last_retry=args.last_retry,puk=args.puk,buffered_body=args.buffered_body)
+                      card_source=str(seed/'nvram/nse2r4v/sim_card'),mame_sha256=original['mame_sha256'],last_retry=args.last_retry,puk=args.puk,buffered_body=args.buffered_body,status_pending=args.status_pending)
         (target/'inputs.json').write_text(json.dumps(report,indent=2)+'\n')
         with (target/'console.log').open('w') as stream:
             run_stage(command,target,stream)
@@ -69,7 +70,7 @@ def main():
                 return image.convert('L').tobytes()
         inputs=(text,(target/'nse2_sim_state_events.log').read_text(),before,after,
                 pixels('nse2_sim_state_reference.png'),pixels('nse2_sim_state_restored.png'))
-        result=check_puk_state(*inputs) if args.puk else check_pin_state(*inputs,last_retry=args.last_retry,buffered_body=args.buffered_body)
+        result=check_puk_state(*inputs) if args.puk else check_pin_state(*inputs,last_retry=args.last_retry,buffered_body=args.buffered_body,status_pending=args.status_pending)
         reference=text.split('nse2_sim_state: phase=restored')[0]
         if args.puk:
             verify_puk_recovery(reference,before,after,pixels('nse2_puk_probe_1.png'),pixels('nse2_sim_state_reference.png'))
