@@ -10,7 +10,7 @@ emu.register_frame_done(function()
     local debugger = assert(machine.debugger, 'enable MAME debugger for control export')
     for _, range in ipairs({{'modes',0x4414,0xc0}, {'request',0x4dce,0x100},
                             {'measurement',0x926,0x15a}, {'filter',0x3380,0x90},
-                            {'frame',0x3268,0x60}, {'wait',0x407c,0x70}}) do
+                            {'frame',0x3204,0x100}, {'wait',0x407c,0x70}}) do
         debugger:command(string.format('dasm nse2_control_%s.dasm,%x,%x,1,:dsp_c54x:cpu',
             range[1], range[2], range[3]))
     end

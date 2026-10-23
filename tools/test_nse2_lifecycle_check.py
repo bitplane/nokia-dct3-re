@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nse2_lifecycle_check import diagnose, diagnose_transport, diagnose_schedule, diagnose_processing, diagnose_scan_progress
+from tools.nse2_lifecycle_check import diagnose, diagnose_transport, diagnose_schedule, diagnose_processing, diagnose_scan_progress, diagnose_timer_boundary
 
 
 def transcript():
@@ -12,6 +12,18 @@ def transcript():
 
 
 class LifecycleTest(unittest.TestCase):
+    def test_timer_terminal_order_is_not_a_clock_fault_proof(self):
+        text = transcript() + '\n' + '\n'.join((
+            'nse2_receive_timer: ticks=09cd lr=0020fead node_ticks=0000 node_state=01 t=4.7018 observer_writes=0',
+            'nse2_fiq5_status: status=22 current=7fff destination=7fff pc=00295644 t=31.0000 observer_writes=0'))
+        result = diagnose_timer_boundary(text)
+        self.assertAlmostEqual(result['elapsed_start_to_policy'], 26.299)
+        self.assertFalse(result['hardware_timing_fault_proved'])
+        for old, new in (('status=22', 'status=02'), ('current=7fff', 'current=0000'),
+                         ('t=4.7018', 't=0.1'), ('t=31.0000 ', 't=31.01 ')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                diagnose_timer_boundary(text.replace(old, new))
+
     def test_progressing_measurement_is_not_a_completed_result(self):
         rows = []
         for i, outer in enumerate(range(7, 0, -1)):

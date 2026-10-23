@@ -395,6 +395,32 @@ The diagnostic option `--scan-progress` requires the advancing loop in
 addition to `--schedule --transport --processing`; it explicitly leaves
 `scan_completed=false`.
 
+### Receive-timer boundary
+
+The observed timer API start is at 4.701797769 seconds: `254d3a` receives
+timer `1d`, ticks `09cd`, LR `20fead`, with node state 1 and zero stored
+ticks beforehand. It is not enough to describe the deadline simply as a
+31-second boot-relative timer. The first observed FIQ5 status read at
+`295644` is at 31.000004231 seconds: status `22`, Timer-1 current and
+destination both `7fff`. The reason-`68` policy follows at 31.000862462,
+26.299064693 seconds after the API start. This is ordered observation,
+not proof that FIQ5 is defective or that changing a rate would be faithful.
+
+MAD2 retains the calibrated Timer-0/Timer-1 rates documented in
+[MAD2 fidelity](mad2_fidelity.md). The native DSP compare model separately
+uses the 13 MHz/12 reference. Reconcile the MCU timer-node/list handling,
+sleep accounting and the native loop's actual completion timing before
+altering either domain. Ports `09/0a/0b` written by resident `4414` remain
+storage in the backend; their event/sampling ownership is not established
+by this timing coincidence. No new rate, compare behavior or policy value
+has been selected from the desired boot result.
+
+For a forty-second processing capture, the native runner correctly fails
+on the repeated startup. `nse2_lifecycle_check TRACE --timer-boundary`
+requires the raw arm/terminal/reset evidence and reports
+`hardware_timing_fault_proved=false`. It is a failure diagnostic, not a
+replacement long-run acceptance oracle.
+
 ## Remaining work
 
 1. Recover native receive activity across the first timer-`dd` window, then

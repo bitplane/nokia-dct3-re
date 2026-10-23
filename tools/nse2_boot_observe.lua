@@ -4,6 +4,24 @@ assert(machine.system.name == 'noki5110i' or machine.system.name == 'nse2r4t' or
 local cpu = machine.devices[':maincpu']
 local space = cpu.spaces.program
 local reset_entries = 0
+local receive_timer_arms = 0
+local fiq5_reads = 0
+_G.nse2_fiq5_status_tap = space:install_read_tap(0x20008, 0x2000b, 'nse2_fiq5_status', function(_, data, mask)
+    if (mask & 0xff000000) == 0 or (data & 0x20000000) == 0 then return end
+    fiq5_reads = fiq5_reads + 1
+    if fiq5_reads > 8 then return end
+    machine:logerror(string.format('nse2_fiq5_status: status=%02x current=%04x destination=%04x pc=%08x t=%.9f observer_writes=0\n',
+        (data >> 24) & 255, space:read_u16(0x20004), space:read_u16(0x20006),
+        cpu.state['R15'].value, machine.time:as_double()))
+end)
+_G.nse2_receive_timer_tap = space:install_read_tap(0x254d38, 0x254d3b, 'nse2_receive_timer', function()
+    if cpu.state['R15'].value ~= 0x254d3a or cpu.state['R0'].value ~= 0x1d then return end
+    receive_timer_arms = receive_timer_arms + 1
+    if receive_timer_arms > 32 then return end
+    machine:logerror(string.format('nse2_receive_timer: ticks=%04x lr=%08x node_ticks=%04x node_state=%02x t=%.9f observer_writes=0\n',
+        cpu.state['R1'].value, cpu.state['R14'].value, space:read_u16(0x100298),
+        space:read_u8(0x10029c), machine.time:as_double()))
+end)
 local packet_changes = 0
 _G.nse2_packet_count_tap = space:install_write_tap(0x10c764, 0x10c767, 'nse2_packet_count', function(_, data, mask)
     if (mask & 0xffff) == 0 then return end

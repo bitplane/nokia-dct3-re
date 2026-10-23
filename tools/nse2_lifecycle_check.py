@@ -126,6 +126,26 @@ def diagnose_scan_progress(text):
                 scope='advancing nested loop before deadline; no completed RF measurement claim')
 
 
+def diagnose_timer_boundary(text):
+    reset = diagnose(text)
+    arms = re.findall(r'nse2_receive_timer: ticks=09cd lr=0020fead node_ticks=0000 node_state=01 '
+                      r't=([0-9.]+) observer_writes=0', text)
+    first_window = [float(time) for time in arms if float(time) < reset['reason_time']]
+    terminal = re.findall(r'nse2_fiq5_status: status=([0-9a-f]{2}) current=7fff destination=7fff '
+                          r'pc=00295644 t=([0-9.]+) observer_writes=0', text)
+    terminal = [(int(status, 16), float(time)) for status, time in terminal
+                if float(time) < reset['reset_time']]
+    if len(first_window) != 1 or not 4.6 < first_window[0] < 4.8:
+        raise ValueError('NSE-2 own measurement-lifecycle timer start differs')
+    if not terminal or not terminal[0][0] & 0x20 or not 0 <= reset['reason_time'] - terminal[0][1] < 0.01:
+        raise ValueError('NSE-2 FIQ5 terminal observation preceding reset policy missing')
+    return dict(receive_timer_start=first_window[0], requested_ticks=0x9cd,
+                first_observed_fiq5_terminal=terminal[0][1],
+                elapsed_start_to_policy=reset['reason_time'] - first_window[0],
+                timer_clock_rates_calibrated=True, hardware_timing_fault_proved=False,
+                scope='observed ordering, not proof FIQ5 or a clock rate is defective')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('trace', type=Path)
@@ -133,6 +153,7 @@ def main():
     parser.add_argument('--schedule', action='store_true', help='diagnose thirty-second scheduling without requiring a reset capture')
     parser.add_argument('--processing', action='store_true', help='also require reused passive ROM4 processing evidence')
     parser.add_argument('--scan-progress', action='store_true', help='also require advancing measurement-loop evidence')
+    parser.add_argument('--timer-boundary', action='store_true', help='require the timer start and terminal-FIQ ordering in a reset capture')
     args = parser.parse_args()
     try:
         text = args.trace.read_text()
@@ -143,6 +164,8 @@ def main():
             result['processing'] = diagnose_processing(text)
         if args.scan_progress:
             result['measurement'] = diagnose_scan_progress(text)
+        if args.timer_boundary:
+            result['timer_boundary'] = diagnose_timer_boundary(text)
         print(json.dumps(result, indent=2))
     except (OSError, ValueError) as error:
         parser.exit(1, str(error) + '\n')
