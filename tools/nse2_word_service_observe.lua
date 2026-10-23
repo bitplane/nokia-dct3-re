@@ -25,6 +25,15 @@ retained[#retained+1]=mcu.spaces.program:install_write_tap(0x101438,0x101447,'wo
     object_writes=object_writes+1
     if object_writes>32 then return end
     machine:logerror(string.format('nse2_word_object_write: address=%08x value=%08x mask=%08x pc=%08x lr=%08x t=%.9f observer_writes=0\n',address,value,mask,mcu.state.R15.value,mcu.state.R14.value,machine.time:as_double()))
+    if mcu.state.R15.value==0x279a72 then
+        local sp=mcu.state.R13.value
+        local source=mcu.state.R7.value
+        assert(sp>=0x100000 and sp+0x3c<=0x110000,'fragment wrapper stack outside MCU RAM')
+        assert(source>=0x100000 and source+8<=0x110000,'fragment source outside MCU RAM')
+        local bytes={}
+        for i=0,7 do bytes[#bytes+1]=string.format('%02x',mcu.spaces.program:read_u8(source+i)) end
+        machine:logerror(string.format('nse2_word_fragment_source: source=%08x bytes=%s caller=%08x t=%.9f observer_writes=0\n',source,table.concat(bytes),mcu.spaces.program:read_u32(sp+0x38),machine.time:as_double()))
+    end
 end)
 retained[#retained+1]=mcu.spaces.program:install_write_tap(0x100a4,0x100a7,'word_host_post',function(_,value,mask)
     -- DSP 0852 / MCU 100a4 is the producer; 0853 is the DSP consumer.

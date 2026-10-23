@@ -9,9 +9,10 @@ class SamplingCheckTest(unittest.TestCase):
               for n,pointer,prefix in [(1,'00101438','00020a051eff00d000030101e000'),
                                        (2,'002b0754','000208051e1400f400010300')]]
         rows.append('nse2_word_object_write: address=00101438 value=00000005 mask=000000ff pc=00279a72 lr=00256759 t=0.33753 observer_writes=0')
+        rows.append('nse2_word_fragment_source: source=00101420 bytes=1eff00d000010100 caller=00279c5f t=0.33753 observer_writes=0')
         text='\n'.join(rows)
         self.assertEqual(inspect_word_worker_objects(text)['static_object'],'2b0754')
-        for bad in (text.replace('002b0754','00101438'),text.replace('1eff00d0','1eff00f4'),text.replace('pc=00279a72','pc=00279a70')):
+        for bad in (text.replace('002b0754','00101438'),text.replace('1eff00d0','1eff00f4'),text.replace('pc=00279a72','pc=00279a70'),text.replace('caller=00279c5f','caller=00279c5d')):
             with self.assertRaises(ValueError):
                 inspect_word_worker_objects(bad)
 

@@ -1272,6 +1272,16 @@ worker objects; `inspect_word_worker_objects` rejects changed sources or
 contents. The static object's own ROM bytes match its worker snapshot.
 This recovers the immediate packet-construction boundary; the higher-level
 caller's purpose, service peer contract and delivery dependency remain open.
+The dynamic wrapper's saved outer return is `279c5f`; its original source
+is `101420`, beginning `1eff00d000010100` before fragmentation. Own-ROM
+decode identifies the enclosing dequeue loop at `279bfc`: `279c02..279c0a`
+tests frame markers `1e` and `1c`, and `279c5a` calls wrapper `2799c4`
+for either marker. Other branches process types `8d/8e`; the loop releases
+processed objects and receives the next through `2559e8`. This establishes
+a firmware-owned frame-routing/fragmentation path, not a radio-result
+constructor. The checked caller/source record prevents attributing the D0
+object to a different wrapper invocation. The upstream submitter of that
+original frame and the physical endpoint still require separate evidence.
 
 Vector `ffd0` branches to ISR `3416`. Its `34da` path reads port `36`,
 tests mask `2000`, and can write port `34` at `34e8` or `34f4` while

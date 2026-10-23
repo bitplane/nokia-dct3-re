@@ -136,7 +136,11 @@ def inspect_word_worker_objects(text):
         raise ValueError('MCU word worker objects differ')
     if not re.search(r'nse2_word_object_write: address=00101438 value=00000005 mask=000000ff pc=00279a72 lr=00256759 t=[0-9.]+ observer_writes=0',text):
         raise ValueError('MCU dynamic type-05 construction absent')
+    sources=re.findall(r'nse2_word_fragment_source: source=([0-9a-f]{8}) bytes=([0-9a-f]{16}) caller=([0-9a-f]{8}) t=[0-9.]+ observer_writes=0',text)
+    if sources!=[('00101420','1eff00d000010100','00279c5f')]:
+        raise ValueError('MCU frame dispatcher/fragment source differs')
     return dict(dynamic_object='101438',dynamic_constructor_store='279a72',
+                fragment_source='101420',fragment_dispatch_return='279c5f',
                 static_object='2b0754',host_type='05',physical_delivery_proved=False)
 
 
