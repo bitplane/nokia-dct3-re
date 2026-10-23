@@ -4,10 +4,41 @@ import unittest
 from tools.nse2_native_result_check import (FRAGMENTS, MCU_REQUEST_FRAGMENTS, NV_POLICY_FRAGMENTS,
                                            inspect_control_trace, inspect_mcu_request, inspect_program,
                                            inspect_request_lifecycle, inspect_scan_pacing,
-                                           inspect_completion_counters, compare_scan_budget, inspect_nv_policy)
+                                           inspect_completion_counters, compare_scan_budget, inspect_nv_policy,
+                                           inspect_publisher_runtime, PUBLISHER_TYPE_LOADS)
 
 
 class ResultTest(unittest.TestCase):
+    def publisher_trace(self):
+        active = {0x4a11,0x4a21,0x4b1a,0x4ba8}
+        rows = [f'rom4_dispatch_count: address={address:04x} count={4 if address==0x37ce else int(address in active)}'
+                for address in (*PUBLISHER_TYPE_LOADS,0x9404,0x37ce)]
+        rows.extend(f'rom4_publisher_entry: n={index} type=0074 length={length:04x} '
+                    f't={0.4+index*0.1} observer_writes=0'
+                    for index,length in enumerate((16,52,2,4),1))
+        for second in (1,7,15,30):
+            cursor, packets = ('0015',4) if second==1 else ('0041',0)
+            rows.append(f'nse2_native_transport: t={second}.0 pc=09ac imr=035f ifr=0020 '
+                        f'words=0852:{cursor}:0,0853:{cursor}:21,08e4:00a9:4,08e5:00a9:0 '
+                        f'mcu_packets={packets:04x} observer_writes=0')
+        rows.append('nse2_packet_count: value=0000 mask=ffff pc=0020feae lr=00254e67 t=4.7 observer_writes=0')
+        return '\n'.join(rows)
+
+    def test_publisher_runtime_attributes_initial_control_responses(self):
+        result = inspect_publisher_runtime(self.publisher_trace())
+        self.assertEqual(result['packet_types'], ['74']*4)
+        self.assertIn('4810',result['inactive_direct_sites'])
+
+    def test_publisher_runtime_missing_changed_or_extra_entries_fail(self):
+        text = self.publisher_trace()
+        for changed in (text.replace('address=314d','address=ffff'),
+                        text.replace('address=4810 count=0','address=4810 count=1'),
+                        text.replace('type=0074','type=008b'),
+                        text.replace('n=4 type=', 'n=5 type='),
+                        text.replace('t=30.0', 't=29.0')):
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                inspect_publisher_runtime(changed)
+
     def nv_image(self):
         image = bytearray(0xc0000)
         for address, encoded in NV_POLICY_FRAGMENTS.items():

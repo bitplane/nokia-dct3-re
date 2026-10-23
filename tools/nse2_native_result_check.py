@@ -11,7 +11,8 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.c54x_rom4_port_census import direct_callers
 from tools.nsk1_radio_contract import (live_publisher_census, native_completion_contract,
-                                     serial_publisher_contract, publisher_type_inventory)
+                                     serial_publisher_contract, publisher_type_inventory,
+                                     PUBLISHER_TYPE_LOADS)
 
 FRAGMENTS = {
     0x092d: '60f802840001f8300939e87b881a80f80285',
@@ -286,6 +287,36 @@ def compare_scan_budget(text):
                 projection_exceeds_observed_policy=True, scan_completion_observed=False,
                 root_cause_proved=False,
                 scope='same-run timing projection; excludes outer gaps, does not validate clock or NV policy')
+
+
+def inspect_publisher_runtime(text):
+    from tools.nse2_lifecycle_check import diagnose_transport
+    diagnose_transport(text)
+    sites = sorted((*PUBLISHER_TYPE_LOADS,0x9404,0x37ce))
+    counts = {}
+    for address in sites:
+        rows = re.findall(fr'rom4_dispatch_count: address={address:04x} count=(\d+)',text)
+        if len(rows) != 1:
+            raise ValueError('NSE-2 complete direct-publisher count summary missing')
+        counts[address] = int(rows[0])
+    rows = re.findall(r'rom4_publisher_entry: n=(\d+) type=([0-9a-f]{4}) '
+                      r'length=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0',text)
+    if (len(rows) != counts[0x37ce] or len(rows) != 4
+            or [int(row[0]) for row in rows] != list(range(1,5))
+            or [(row[1],int(row[2],16)) for row in rows] != [('0074',16),('0074',52),('0074',2),('0074',4)]):
+        raise ValueError('NSE-2 initial control-response publisher entries differ')
+    times = [float(row[3]) for row in rows]
+    if times != sorted(times) or not all(0 < time < 1 for time in times):
+        raise ValueError('NSE-2 initial publisher entry ordering differs')
+    active = {address:count for address,count in counts.items() if count and address != 0x37ce}
+    if active != {0x4a11:1,0x4a21:1,0x4b1a:1,0x4ba8:1}:
+        raise ValueError('NSE-2 direct publisher attribution differs')
+    return dict(common_entries=4, packet_types=['74']*4,
+                active_direct_sites=[f'{address:04x}' for address in sorted(active)],
+                inactive_direct_sites=[f'{address:04x}' for address in sites
+                                       if address != 0x37ce and not counts[address]],
+                observation_seconds=30, initial_response_delivery_proved=True,
+                scope='observed direct sites and common entry match four initial RX publications; not all possible ring writers')
 
 
 def main():

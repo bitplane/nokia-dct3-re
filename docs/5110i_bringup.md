@@ -347,6 +347,14 @@ This is a checked local literal association inventory, not control-flow
 reachability or proof of a periodic producer. In particular the eight
 service-response sites must not be counted as eight new autonomous peers.
 The static exporter supplies disassembly context for all nineteen sites.
+The coherent thirty-second runtime census positively observes four entries
+at `37ce`, all type `74`, with payload lengths `16,52,2,4`. Direct sites
+`4b1a`, `4ba8`, `4a21` and `4a11` execute once each; the remaining fifteen
+reviewed direct sites execute zero times. These counts agree with the four
+native RX producer advances and MCU consumption. This attributes initial
+traffic to control responses, not a periodic heartbeat or later measurement
+results. The gate requires both positive common-entry coverage and all
+nineteen site summaries; it still does not close indirect/direct-ring paths.
 
 The type-`8b` publisher is `47f6`, loading type `008b` at `47ff` and
 calling `37ce` at `4810` with 162 payload bytes. Its three page-zero direct

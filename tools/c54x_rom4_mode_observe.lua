@@ -40,6 +40,17 @@ local sites = {0x23d0, 0x2626, 0x4ef9, 0x5006, 0x3da2,
     0x990d, 0x996b, 0x9988, 0x6318, 0x659b, 0xa27d,
     0x4701, 0x4798, 0x0acf, 0x0c16, 0x0ad1, 0x0add, 0x0ae4}
 local counts = {}
+local publisher_sites = {0x314d,0x3fe2,0x3ff5,0x4810,0x4a11,0x4a21,0x4a37,
+    0x4a68,0x4ab0,0x4b1a,0x4ba8,0x4be9,0x4f20,0x50db,0x6073,0x62fe,
+    0x6ec6,0x8e1c,0x9404,0x37ce}
+local known_sites = {}
+for _, address in ipairs(sites) do known_sites[address] = true end
+for _, address in ipairs(publisher_sites) do
+    if not known_sites[address] then
+        sites[#sites + 1] = address
+        known_sites[address] = true
+    end
+end
 local filter_operand_count = 0
 for _, range in ipairs({{0x0080, 0x008f}, {0x21a0, 0x21b8}}) do
     taps[#taps + 1] = memory:install_read_tap(range[1], range[2],
@@ -107,6 +118,11 @@ for _, address in ipairs(sites) do
             local pc = cpu.state["PC"].value
             if pc == offset or pc == offset + 1 then
                 counts[address] = counts[address] + 1
+                if address == 0x37ce and counts[address] <= 32 then
+                    machine:logerror(string.format('rom4_publisher_entry: n=%d type=%04x length=%04x t=%.9f observer_writes=0\n',
+                        counts[address], cpu.state['AR4'].value, cpu.state['AR5'].value,
+                        machine.time:as_double()))
+                end
                 if address == 0x3322 and counts[address] <= 2 then
                     machine:logerror(string.format(
                         "rom4_scan_pointer_probe: address=3322 word=%04x ar4=%04x ar5=%04x\n",
