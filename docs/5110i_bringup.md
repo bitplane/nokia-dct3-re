@@ -307,8 +307,33 @@ the functioning initial transport as a positive control.
 In the acquired program mask, word `09ab` is `f4e1` (IDLE); sampled PC
 `09ac` is its continuation, not an unexplained busy loop. The following
 `61f8 06bc 0001 / f820 09ab` tests work flag `06bc` bit 0 and branches
-back to IDLE when it is clear. Inspect the writers/scheduling of that flag
-and MCU requests before assigning a missing RF or clock source.
+back to IDLE when it is clear. Aggregate writes disprove a missing work-bit
+or stopped-scheduler explanation: by thirty seconds writer `32c1` sets
+bit 0 in all 1,625 observed writes, while `446d` clears it in 1,628 writes.
+The one-second sampled word `0820` and later idle PC samples must not be
+promoted to a claim that the intervening work never runs.
+
+Own final MCU type-`1a` packet has header `441a` and 34 payload words:
+`0011 9800` followed by 32 zeros. Native consumer `3909` advances TX from
+`001e` to `0041` at 4.704069442 seconds. Handler writes `06e3=1` at `3db6`;
+consumer `30cb` clears it immediately afterward. This is real request
+consumption, not an unserviced TX request. The native thirty-second summary
+also observes 679,232 port-`27` sample reads and 1,639 port-`32` writes,
+but no port-`38/39` reads. Counts describe this capture, not fixed hardware
+cadence or proof of valid RF acquisition. No further RX publication follows.
+The next native question is processing/completion eligibility and its
+external sample contract, not synthesizing a work bit or guessed ack.
+
+Check the independent scheduling and transport observations with:
+
+```sh
+.venv/bin/python -m tools.nse2_lifecycle_check TRACE --schedule --transport
+```
+
+This accepts a thirty-second pre-reset observation as diagnostic evidence
+while still reporting `stable_long_boot=false`. It requires the own packet
+body and positive bit-set/clear observations; it does not claim all host
+packet formats have been decoded or that the borrowed mask is fitted.
 
 ## Remaining work
 

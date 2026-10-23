@@ -53,14 +53,39 @@ def diagnose_transport(text):
                 native_idle_pc='09ac', broken_initial_fiq_delivery=False)
 
 
+def diagnose_schedule(text):
+    rows = re.findall(r'nse2_native_work_writer: pc=([0-9a-f]{4}) writes=(\d+) bit0_set=(\d+) '
+                      r'bits=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0', text)
+    writers = {}
+    for pc, writes, sets, bits, time in rows:
+        if pc in writers or not 29.9 <= float(time) <= 30.1:
+            raise ValueError('NSE-2 bounded work-writer summary differs')
+        writers[pc] = (int(writes), int(sets), int(bits, 16))
+    setter, clearer = writers.get('32c1'), writers.get('446d')
+    if (setter is None or clearer is None or setter[0] < 1000 or setter[1] != setter[0]
+            or not setter[2] & 1 or clearer[0] < setter[0] or clearer[1] != 0):
+        raise ValueError('NSE-2 active native bit-zero scheduling evidence missing')
+    requests = re.findall(r'nse2_native_host_packet: previous=001e next=0041 header=441a words=([^ ]+) '
+                          r't=([0-9.]+) observer_writes=0', text)
+    if len(requests) != 1:
+        raise ValueError('NSE-2 own final type-1a request consumption missing')
+    words, time = requests[0]
+    if words.split(',') != ['0011', '9800'] + ['0000'] * 32 or not 4 < float(time) < 5:
+        raise ValueError('NSE-2 own type-1a body/horizon differs')
+    return dict(native_scheduling_active=True, bit0_set_writes=setter[1], bit0_clear_writes=clearer[0],
+                own_type1a_request_consumed=True, missing_work_bit_falsified=True,
+                stable_long_boot=False, scope='active scheduling does not prove continued native RX')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('trace', type=Path)
     parser.add_argument('--transport', action='store_true', help='also require passive first-window ring evidence')
+    parser.add_argument('--schedule', action='store_true', help='diagnose thirty-second scheduling without requiring a reset capture')
     args = parser.parse_args()
     try:
         text = args.trace.read_text()
-        result = diagnose(text)
+        result = diagnose_schedule(text) if args.schedule else diagnose(text)
         if args.transport:
             result.update(diagnose_transport(text))
         print(json.dumps(result, indent=2))

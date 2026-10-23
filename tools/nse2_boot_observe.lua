@@ -33,13 +33,37 @@ _G.nse2_reset_entry_tap = space:install_read_tap(0x299c14, 0x299c17, 'nse2_reset
 end)
 local dsp = machine.devices[':dsp_c54x:cpu']
 local native_ring_writes = {}
+local native_work_writers = {}
 if dsp then
     _G.nse2_native_ring_taps = {}
-    for _, address in ipairs({0x852, 0x853, 0x854, 0x855, 0x8e4, 0x8e5, 0x866}) do
+    for _, address in ipairs({0x852, 0x853, 0x854, 0x855, 0x8e4, 0x8e5, 0x866, 0x6bc, 0x6be, 0x6e3}) do
         native_ring_writes[address] = 0
         _G.nse2_native_ring_taps[#_G.nse2_native_ring_taps + 1] =
             dsp.spaces.data:install_write_tap(address, address, 'nse2_native_ring', function(_, data, mask)
                 native_ring_writes[address] = native_ring_writes[address] + 1
+                if address == 0x6bc then
+                    local pc = dsp.state['PC'].value
+                    local entry = native_work_writers[pc] or {count=0, set=0, bits=0}
+                    entry.count = entry.count + 1
+                    if (data & 1) ~= 0 then entry.set = entry.set + 1 end
+                    entry.bits = entry.bits | data
+                    native_work_writers[pc] = entry
+                end
+                if address == 0x853 and native_ring_writes[address] <= 32 then
+                    local previous = dsp.spaces.data:read_u16(address)
+                    if previous < 0x52 and data ~= previous then
+                        local header = dsp.spaces.data:read_u16(0x800 + previous)
+                        local length, payload = header >> 8, {}
+                        if length <= 0x80 then
+                            for index = 1, (length + 1) // 2 do
+                                payload[#payload + 1] = string.format('%04x',
+                                    dsp.spaces.data:read_u16(0x800 + ((previous + index) % 0x52)))
+                            end
+                            machine:logerror(string.format('nse2_native_host_packet: previous=%04x next=%04x header=%04x words=%s t=%.9f observer_writes=0\n',
+                                previous, data, header, table.concat(payload, ','), machine.time:as_double()))
+                        end
+                    end
+                end
                 if native_ring_writes[address] > 16 then return end
                 machine:logerror(string.format('nse2_native_ring: address=%04x data=%04x mask=%04x pc=%04x t=%.9f observer_writes=0\n',
                     address, data, mask, dsp.state['PC'].value, machine.time:as_double()))
@@ -265,13 +289,23 @@ emu.register_frame_done(function()
             now, dsp.state['PC'].value, dsp.state['ILLEGAL'].value, dsp.state['IDLE'].value))
         if next_sample == 1 or next_sample == 7 or next_sample == 15 or next_sample == 30 then
             local values = {}
-            for _, address in ipairs({0x852, 0x853, 0x854, 0x855, 0x8e4, 0x8e5, 0x866}) do
+            for _, address in ipairs({0x852, 0x853, 0x854, 0x855, 0x8e4, 0x8e5, 0x866, 0x6bc, 0x6be, 0x6e3}) do
                 values[#values + 1] = string.format('%04x:%04x:%d', address,
                     dsp.spaces.data:read_u16(address), native_ring_writes[address])
             end
             machine:logerror(string.format('nse2_native_transport: t=%.9f pc=%04x imr=%04x ifr=%04x words=%s mcu_packets=%04x observer_writes=0\n',
                 now, dsp.state['PC'].value, dsp.state['IMR'].value, dsp.state['IFR'].value,
                 table.concat(values, ','), space:read_u16(0x10c766)))
+            if next_sample == 30 then
+                local sites = {}
+                for pc in pairs(native_work_writers) do sites[#sites + 1] = pc end
+                table.sort(sites)
+                for _, pc in ipairs(sites) do
+                    local entry = native_work_writers[pc]
+                    machine:logerror(string.format('nse2_native_work_writer: pc=%04x writes=%d bit0_set=%d bits=%04x t=%.9f observer_writes=0\n',
+                        pc, entry.count, entry.set, entry.bits, now))
+                end
+            end
         end
         machine:logerror(string.format('nse2_ui_state: t=%.9f state_10c664=%04x flags_10c5c9=%02x phase_10ffac=%02x observer_writes=0\n',
             now, space:read_u16(0x10c664), space:read_u8(0x10c5c9), space:read_u8(0x10ffac)))

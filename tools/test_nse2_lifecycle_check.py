@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nse2_lifecycle_check import diagnose, diagnose_transport
+from tools.nse2_lifecycle_check import diagnose, diagnose_transport, diagnose_schedule
 
 
 def transcript():
@@ -12,6 +12,19 @@ def transcript():
 
 
 class LifecycleTest(unittest.TestCase):
+    def test_active_scheduler_is_not_evidence_of_stable_native_receive(self):
+        text = ('nse2_native_work_writer: pc=32c1 writes=1625 bit0_set=1625 bits=0821 t=30.0 observer_writes=0\n'
+                'nse2_native_work_writer: pc=446d writes=1628 bit0_set=0 bits=0830 t=30.0 observer_writes=0\n'
+                'nse2_native_host_packet: previous=001e next=0041 header=441a words=' +
+                ','.join(['0011', '9800'] + ['0000'] * 32) + ' t=4.704 observer_writes=0')
+        result = diagnose_schedule(text)
+        self.assertTrue(result['native_scheduling_active'])
+        self.assertFalse(result['stable_long_boot'])
+        for old, new in (('bit0_set=1625', 'bit0_set=0'), ('bit0_set=0', 'bit0_set=1'),
+                         ('0011,9800', '0010,9800'), ('t=4.704', 't=6.0')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                diagnose_schedule(text.replace(old, new))
+
     def test_transport_distinguishes_initial_delivery_from_later_silence(self):
         rows = []
         for second in (1, 7, 15, 30):
