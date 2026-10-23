@@ -695,6 +695,19 @@ captured request; it does not prove fitted mask identity, correct RF timing,
 or the absence of all other request/lifecycle defects. Do not shorten the
 extent or substitute a supplied list to evade receive supervision.
 
+Own MCU constructor branch `20fd9c` explains the full-scan bit. Getter
+`28531a` copies 48 bytes from runtime bitmap `10a75c`; two observed copies
+contain `003f` followed by 23 `ffff` halfwords. The constructor's population
+count is 374 (`0176`), independently reproduced from the copied words,
+and category is 2. Pinned branch `20fd44..20fd4e` selects full scan when
+count is at least 124 and category is not 6; `20fd9c` ORs bit 0 into the
+packet control byte (initial `10`, becoming `11`). Thus the MCU and DSP
+agree on why this request selects the long scan. The runtime bitmap's
+initialization/provisioning provenance and expected receive-supervision
+traffic remain separate unknowns; a consistent decode is not evidence of
+authentic factory contents. The checker requires actual source copies and
+the positive branch observation, not absence at mid-line PC hooks.
+
 Positive fetch observations after register restoration show AR5=`ffff`
 at each inner-loop exit. AR6 descends `7,6,5,4,3,2`, with the final
 observed inner pass at AR6=1 by 29.793511 seconds. The first paired exits

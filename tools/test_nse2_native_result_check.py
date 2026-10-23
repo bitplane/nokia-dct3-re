@@ -5,10 +5,27 @@ from tools.nse2_native_result_check import (FRAGMENTS, MCU_REQUEST_FRAGMENTS, NV
                                            inspect_control_trace, inspect_mcu_request, inspect_program,
                                            inspect_request_lifecycle, inspect_scan_pacing,
                                            inspect_completion_counters, compare_scan_budget, inspect_nv_policy,
-                                           inspect_publisher_runtime, PUBLISHER_TYPE_LOADS,inspect_scan_request_selection)
+                                           inspect_publisher_runtime, PUBLISHER_TYPE_LOADS,inspect_scan_request_selection,inspect_scan_bitmap_source)
 
 
 class ResultTest(unittest.TestCase):
+    def test_mcu_full_scan_branch_counts_its_copied_bitmap(self):
+        image=bytearray(0x90000)
+        for a,v in ((0x20fd44,'980d287cdb02980c2806d125'),(0x20fd9c,'210146587940430146587141'),
+                    (0x28531a,'b5101c04200ff7cfffb61c20490d2230f015fced'),(0x28535c,'0010a75c')):
+            data=bytes.fromhex(v)
+            image[a-0x200000:a-0x200000+len(data)]=data
+        bitmap=','.join(['003f']+['ffff']*23)
+        text='\n'.join([f'nse2_scan_bitmap_copy: source=0010a75c length=48 bitmap={bitmap} t={t} observer_writes=0' for t in (4.69,4.695)]+
+                      [f'nse2_scan_bitmap: address=0020fd9c category=00000002 count=00000176 detail=00109430 bitmap={bitmap} t=4.7 observer_writes=0'])
+        self.assertEqual(inspect_scan_bitmap_source(image,text)['set_bits'],374)
+        for bad in (text.replace('count=00000176','count=00000175'),text.replace('source=0010a75c','source=0010a75d'),text.replace('category=00000002','category=00000006'),text.replace('bitmap=003f','bitmap=003e',1)):
+            with self.assertRaises(ValueError):
+                inspect_scan_bitmap_source(image,bad)
+        image[0xfd46]^=1
+        with self.assertRaises(ValueError):
+            inspect_scan_bitmap_source(image,text)
+
     def test_scan_extent_is_selected_by_the_actual_request(self):
         rows=[]
         for i,(a,p,v,e,m,s) in enumerate((('3d5e','081f','0011','0000','0000','001f'),

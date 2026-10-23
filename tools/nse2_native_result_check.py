@@ -53,6 +53,32 @@ def inspect_scan_request_selection(text):
     return dict(host_control='0011',following_word='9800',selected_extent=124,inner_banz_initial=123,
                 supplied_list_conversion=False,observed_request_decode_consistent=True,
                 fitted_mask_proved=False,physical_scan_duration_proved=False)
+
+
+def inspect_scan_bitmap_source(image,text):
+    fragments={0x20fd44:'980d287cdb02980c2806d125',
+               0x20fd9c:'210146587940430146587141',
+               0x28531a:'b5101c04200ff7cfffb61c20490d2230f015fced',
+               0x28535c:'0010a75c'}
+    for address,encoded in fragments.items():
+        expected=bytes.fromhex(encoded)
+        if image[address-0x200000:address-0x200000+len(expected)]!=expected:
+            raise ValueError(f'MCU scan bitmap contract differs at {address:06x}')
+    copies=re.findall(r'nse2_scan_bitmap_copy: source=0010a75c length=48 bitmap=([0-9a-f,]+) t=([0-9.]+) observer_writes=0',text)
+    choices=re.findall(r'nse2_scan_bitmap: address=0020fd9c category=([0-9a-f]{8}) count=([0-9a-f]{8}) detail=([0-9a-f]{8}) bitmap=([0-9a-f,]+) t=([0-9.]+) observer_writes=0',text)
+    expected=['003f']+['ffff']*23
+    if len(copies)!=2 or len(choices)!=1 or any(bits.split(',')!=expected for bits,_ in copies):
+        raise ValueError('complete MCU bitmap-source observations differ')
+    category,count,_,bitmap,time=choices[0]
+    population=sum(int(word,16).bit_count() for word in bitmap.split(','))
+    if bitmap.split(',')!=expected or int(count,16)!=population or population!=374 or int(category,16)!=2:
+        raise ValueError('MCU full-scan branch does not follow its bitmap population')
+    times=[float(t) for _,t in copies]+[float(time)]
+    if times!=sorted(times) or not 4.6<times[0]<times[-1]<4.9:
+        raise ValueError('MCU bitmap-copy/branch ordering differs')
+    return dict(bitmap_source='10a75c',bytes=48,set_bits=population,category=2,
+                full_scan_threshold=124,full_scan_branch_observed=True,
+                authentic_factory_bitmap_proved=False)
 MCU_REQUEST_FRAGMENTS = {
     0x2160ec: '27017507',  # R7 supplies the one-byte length.
     0x2160f4: '48a4468078002804d145',

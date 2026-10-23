@@ -3,6 +3,30 @@ local machine=manager.machine
 local cpu=assert(machine.devices[':dsp_c54x:cpu'])
 local data=cpu.spaces.data
 _G.nse2_scan_request_taps={}
+local mcu=machine.devices[':maincpu']
+local memory=mcu.spaces.program
+-- Use a positively observed branch target, not mid-line fetch absence.
+for _,address in ipairs({0x20fd9c}) do
+    local count=0
+    _G.nse2_scan_request_taps[#_G.nse2_scan_request_taps+1]=memory:install_read_tap(address & ~3,(address & ~3)+3,'nse2_scan_bitmap',function()
+        if mcu.state['R15'].value~=address then return end
+        count=count+1
+        if count>16 then return end
+        local sp=mcu.state['R13'].value
+        local bitmap={}
+        for index=0,23 do bitmap[#bitmap+1]=string.format('%04x',memory:read_u16(sp+index*2)) end
+        machine:logerror(string.format('nse2_scan_bitmap: address=%08x category=%08x count=%08x detail=%08x bitmap=%s t=%.9f observer_writes=0\n',
+            address,memory:read_u32(sp+0x30),memory:read_u32(sp+0x34),memory:read_u32(sp+0x38),table.concat(bitmap,','),machine.time:as_double()))
+    end)
+end
+_G.nse2_scan_request_taps[#_G.nse2_scan_request_taps+1]=memory:install_read_tap(0x29ad08,0x29ad0b,'nse2_scan_bitmap_copy',function()
+    if mcu.state['R15'].value~=0x29ad08 or mcu.state['R14'].value~=0x28532f then return end
+    local source=mcu.state['R1'].value
+    local words={}
+    for index=0,23 do words[#words+1]=string.format('%04x',memory:read_u16(source+index*2)) end
+    machine:logerror(string.format('nse2_scan_bitmap_copy: source=%08x length=%d bitmap=%s t=%.9f observer_writes=0\n',
+        source,mcu.state['R2'].value,table.concat(words,','),machine.time:as_double()))
+end)
 for _,address in ipairs({0x284,0x285}) do
     local count=0
     _G.nse2_scan_request_taps[#_G.nse2_scan_request_taps+1]=data:install_write_tap(address,address,'nse2_scan_extent',function(_,value,mask)
