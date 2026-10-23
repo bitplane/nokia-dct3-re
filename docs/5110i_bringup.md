@@ -409,6 +409,27 @@ wait. This explains the measured pacing as firmware counter progression
 under the current model; it does not validate physical timing or the
 MCU receive-supervision policy. Compare the full scan workload with that
 policy before proposing a timing change.
+
+A coherent forty-second failure capture combines the stage observations,
+advancing loop and reason-`68` restart. The checked loop constants imply
+`8 * 2 * 124 = 1984` measurements. Extrapolating the first-eight measured
+iteration period gives 29.69063 seconds of measurement work, ending near
+34.43286 seconds from a 4.74223-second start, even before outer-loop gaps.
+The observed policy acts at 31.00086 seconds, 26.29906 seconds after arm.
+This is a same-run projection, not observed completion or a proven lower
+bound for every later iteration. It demonstrates the current timing-budget
+mismatch without choosing between physical peripheral timing, mask/profile
+compatibility and erased-NV policy. The ordinary runner still fails this
+capture for repeated startup; no timeout or acceptance requirement was relaxed.
+
+```sh
+.venv/bin/python tools/nse2_native_result_check.py RUN/nse2_native_program.bin \
+  --failure-trace RUN/error.log --mcu roms/noki5110i/5110i_5.53A.fls
+```
+
+The failure diagnostic requires the initial thirty-second progression and
+the same capture's timer/restart observations. Its output retains
+`scan_completion_observed=false` and `root_cause_proved=false`.
 None of these static paths establishes an unconditional periodic packet.
 The separate serial publisher retains its existing queued-data contract.
 

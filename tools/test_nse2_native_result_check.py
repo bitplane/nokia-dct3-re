@@ -4,10 +4,41 @@ import unittest
 from tools.nse2_native_result_check import (FRAGMENTS, MCU_REQUEST_FRAGMENTS,
                                            inspect_control_trace, inspect_mcu_request, inspect_program,
                                            inspect_request_lifecycle, inspect_scan_pacing,
-                                           inspect_completion_counters)
+                                           inspect_completion_counters, compare_scan_budget)
 
 
 class ResultTest(unittest.TestCase):
+    def budget_trace(self):
+        rows = [self.pacing_trace(), self.completion_trace(),
+                'nse2_native_identity: n=1 data=0004 mask=ffff pc=0f0f t=0.007 observer_writes=0',
+                'nse2_reset_reason: value=68 pc=0028db6e lr=00290361 t=31.0008 observer_writes=0',
+                'nse2_reset_entry: reason=00000068 lr=0023616d stack=000000d5 t=31.9694 observer_writes=0',
+                'nse2_native_identity: n=2 data=0004 mask=ffff pc=0f0f t=31.9748 observer_writes=0',
+                'nse2_receive_timer: ticks=09cd lr=0020fead node_ticks=0000 node_state=01 t=4.7018 observer_writes=0',
+                'nse2_fiq5_status: status=22 current=7fff destination=7fff pc=00295644 t=31.0000 observer_writes=0']
+        for index, outer in enumerate(range(7, 0, -1)):
+            for address, repeat, time in [('09c4', 1, 6.6 + index * 3.866)] + (
+                    [('09c4', 0, 8.45 + index * 3.866), ('09cb', 0xffff, 8.451 + index * 3.866)]
+                    if outer > 1 else []):
+                rows.append(f'nse2_native_scan_loop: address={address} pc={int(address, 16)+1:04x} '
+                            f'ar5=ffff ar6={outer:04x} repeat={repeat:04x} t={time:.9f} observer_writes=0')
+        return '\n'.join(rows)
+
+    def test_budget_is_projection_not_completion_or_cause(self):
+        result = compare_scan_budget(self.budget_trace())
+        self.assertEqual(result['iterations'], 1984)
+        self.assertGreater(result['projected_end_without_outer_gaps'], result['observed_policy_time'])
+        self.assertFalse(result['root_cause_proved'])
+        self.assertFalse(result['scan_completion_observed'])
+
+    def test_budget_requires_same_trace_boundary_and_progress(self):
+        text = self.budget_trace()
+        for changed in (text.replace('nse2_reset_reason:', 'missing:'),
+                        text.replace('ar6=0006', 'ar6=0007'),
+                        text.replace('address=0990 n=1 ', 'address=0990 n=9 ')):
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                compare_scan_budget(changed)
+
     def completion_trace(self):
         period = 1351 * 12 / 13_000_000
         frames = [(12, 1, 1), (12, 0, 1), (12, 2, 0), (12, 1, 0), (12, 0, 1),

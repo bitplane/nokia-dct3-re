@@ -13,7 +13,10 @@ from tools.c54x_rom4_port_census import direct_callers
 from tools.nsk1_radio_contract import live_publisher_census, native_completion_contract, serial_publisher_contract
 
 FRAGMENTS = {
+    0x092d: '60f802840001f8300939e87b881a80f80285',
     0x0952: '7712006076820546f4957582000e',
+    0x0975: '60f802840001f8300a1a76f80e130001f273098a7716000776f80e130001771a007bf0720989f074407c7215028577140e1577170e14',
+    0x09c2: '6c8d099077120e131082fa44098a6b82ffff6c8e0981',
     0x3c04: '61f806bc0100fc3048117714195df03000f06884ff0f1a84808461f800110040e87c69f806e30020',
     0x6790: '771206bc771006e31180f2300020f84567a9f330ffdf818044f806ad770e0005f58c81f806ab69820100',
     0x0a15: 'f0200e13f07447f6f4bcfc20',
@@ -216,12 +219,49 @@ def inspect_completion_counters(text):
                 scope='first native measurement only; does not establish supervision policy correctness')
 
 
+def compare_scan_budget(text):
+    from tools.nse2_lifecycle_check import diagnose_scan_progress, diagnose_timer_boundary
+    # The progression oracle covers the first thirty seconds; a failure
+    # capture also contains later loop entries and a second native boot.
+    progress_text = '\n'.join(line for line in text.splitlines()
+                              if 'nse2_native_scan_loop:' not in line
+                              or (match := re.search(r' t=([0-9.]+) ', line)) is None
+                              or float(match[1]) <= 30.1)
+    diagnose_scan_progress(progress_text)
+    boundary = diagnose_timer_boundary(text)
+    pacing = inspect_scan_pacing(text)
+    inspect_completion_counters(text)
+    arm = boundary['receive_timer_start']
+    # Projection from the decoded eight inclusive outer counts, two passes,
+    # and 124 inclusive inner counts. This is not an observed completion.
+    iterations = 8 * 2 * 124
+    stages = re.findall(r'nse2_native_scan_stage: address=0990 n=1 [^\n]*t=([0-9.]+) observer_writes=0', text)
+    if len(stages) != 1:
+        raise ValueError('NSE-2 first measurement start missing or duplicated')
+    start = float(stages[0])
+    projected_work = iterations * pacing['measurement_period_mean_seconds']
+    # diagnose_timer_boundary pins the reason/reset observations, including
+    # the actual policy time; do not replace it with a nominal timer rate.
+    reason = re.findall(r'nse2_reset_reason: value=68 pc=0028db6e lr=00290361 t=([0-9.]+) observer_writes=0', text)
+    policy = float(reason[0])
+    if not arm < start < policy < start + projected_work:
+        raise ValueError('NSE-2 projected scan/supervision ordering differs')
+    return dict(iterations=iterations, first_measurement_start=start,
+                projected_measurement_work_seconds=projected_work,
+                projected_end_without_outer_gaps=start + projected_work,
+                observed_policy_time=policy, arm_to_policy_seconds=policy - arm,
+                projection_exceeds_observed_policy=True, scan_completion_observed=False,
+                root_cause_proved=False,
+                scope='same-run timing projection; excludes outer gaps, does not validate clock or NV policy')
+
+
 def main():
     root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('live_program', type=Path)
     parser.add_argument('--trace', type=Path, help='check complete conditional-request write coverage')
     parser.add_argument('--mcu', type=Path, help='check own big-endian NSE-2 request constructor')
+    parser.add_argument('--failure-trace', type=Path, help='compare measured scan workload with observed restart')
     parser.add_argument('--resident', type=Path, default=root / 'roms/noki5110/nse1_rom4_dsp_program.bin')
     parser.add_argument('--data', type=Path, default=root / 'roms/noki5110/nse1_rom4_dsp_data.bin')
     args = parser.parse_args()
@@ -232,6 +272,8 @@ def main():
             result['control_observation'] = inspect_control_trace(args.trace.read_text())
         if args.mcu:
             result['mcu_request'] = inspect_mcu_request(args.mcu.read_bytes())
+        if args.failure_trace:
+            result['scan_budget'] = compare_scan_budget(args.failure_trace.read_text())
         print(json.dumps(result, indent=2))
     except (OSError, ValueError) as error:
         parser.exit(1, str(error) + '\n')
