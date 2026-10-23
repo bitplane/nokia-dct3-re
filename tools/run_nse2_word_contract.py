@@ -25,6 +25,8 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory',type=Path)
     parser.add_argument('--mame',type=Path)
+    parser.add_argument('--core-controls',action='store_true',
+                        help='also run focused execution-observer and PORTR CPU fixtures; not full ISA acceptance')
     args=parser.parse_args()
     root=Path(__file__).resolve().parents[1]
     run=args.run_directory.resolve()
@@ -86,6 +88,16 @@ def main():
                                                 complete_isa_proved=False)
         results['physical_completion_proved']=False
         results['long_run_stability_proved']=False
+        if args.core_controls:
+            profiles=['instr-observer','portr-bypass']
+            for profile in profiles:
+                command=[sys.executable,str(root/'tools/run_c54x_core.py'),
+                         '--mame',str(mame),'--rompath',str(root/'mame/roms'),
+                         '--output-root',str(run/'core'),'--verbose','--profile',profile]
+                with (run/f'core-{profile}.log').open('w') as stream:
+                    run_stage(command,root,stream)
+            results['focused_cpu_controls']=dict(profiles=profiles,passed=True,
+                                                complete_isa_proved=False,physical_timing_proved=False)
         (run/'acceptance.json').write_text(json.dumps(results,indent=2)+'\n')
         print('NSE-2 word contract PASS; physical completion and sustained operation unproved')
     except (OSError,ValueError,subprocess.SubprocessError) as error:

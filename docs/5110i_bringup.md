@@ -1306,6 +1306,14 @@ execution failures. All observed forms occur in the existing CPU assertion
 inventory, but a fresh completed full-fixture assertion/execution comparison
 is not part of this gate. No CPU correctness, pipeline timing, silicon clock or sustained
 handset claim follows from this bounded frontend inventory.
+For focused CPU controls, use the same runner with `--core-controls`.
+It additionally runs isolated `instr-observer` and `portr-bypass` fixtures.
+The former distinguishes execute-owned callbacks from ordinary memory reads,
+repeats and annulled fetches across atomic/staged frontends and save/load;
+the latter checks 6,656 volatile-PORTR consumer/restore cases, including
+512 dispatcher cases. These controls pass on the current build and are
+recorded separately in `acceptance.json`. They do not prove all 564 observed
+forms, physical peripheral banks, port-`36` semantics or a silicon clock.
 
 Vector `ffd0` branches to ISR `3416`. Its `34da` path reads port `36`,
 tests mask `2000`, and can write port `34` at `34e8` or `34f4` while
