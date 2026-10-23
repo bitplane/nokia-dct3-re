@@ -284,6 +284,32 @@ rewritten packet count must not be used to promote this native profile.
 Resolve the actual native receive producer/transport and keep the acquired
 NSE-1 mask's compatibility status explicit.
 
+The passive first-window census rules out a wholly broken initial RX/FIQ
+route. DSP `3805` publishes four producer changes at DARAM `08e4`, ending
+at `00a9` by 0.942549 seconds. MCU consumer `08e5` catches up and own
+dispatcher `2990a2` increments `10c766` to four. Lifecycle store `20feae`
+clears that count at 4.701843 seconds; this is not the timer-`dd` clear.
+At 7/15/30 seconds the RX producer/consumer are both `00a9`, with exactly
+four observed native producer writes, and TX producer/consumer are both
+`0041`. Native CPU samples are idle at `09ac`, with no illegal instruction
+reported. These observations locate the gap after real initial packet
+exchange, not at an assumed missing receive interrupt. They do not prove
+which external DSP input or resident software state should produce the
+next packet, nor prove the borrowed mask correct for NSE-2.
+
+`nse2_lifecycle_check TRACE --transport` requires this complete window and
+the actual count-clear observation alongside the restart evidence. It
+rejects added/unconsumed RX publications or a non-drained TX ring instead
+of labelling every reason-`68` reset as the same cause. Next inspect native
+producer scheduling/MDI state and its external prerequisites, retaining
+the functioning initial transport as a positive control.
+
+In the acquired program mask, word `09ab` is `f4e1` (IDLE); sampled PC
+`09ac` is its continuation, not an unexplained busy loop. The following
+`61f8 06bc 0001 / f820 09ab` tests work flag `06bc` bit 0 and branches
+back to IDLE when it is clear. Inspect the writers/scheduling of that flag
+and MCU requests before assigning a missing RF or clock source.
+
 ## Remaining work
 
 1. Recover native receive activity across the first timer-`dd` window, then

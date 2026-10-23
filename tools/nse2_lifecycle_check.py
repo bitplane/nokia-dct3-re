@@ -23,12 +23,47 @@ def diagnose(text):
                 scope='observed failure diagnostic; no successful long-run claim')
 
 
+def diagnose_transport(text):
+    rows = re.findall(r'nse2_native_transport: t=([0-9.]+) pc=([0-9a-f]{4}) imr=([0-9a-f]{4}) '
+                      r'ifr=([0-9a-f]{4}) words=([^ ]+) mcu_packets=([0-9a-f]{4}) observer_writes=0', text)
+    snapshots = {}
+    for time, pc, imr, ifr, words, packets in rows:
+        values = {}
+        for item in words.split(','):
+            address, value, count = item.split(':')
+            values[int(address, 16)] = (int(value, 16), int(count))
+        snapshots[round(float(time))] = (pc, values, int(packets, 16))
+    if not all(second in snapshots for second in (1, 7, 15, 30)):
+        raise ValueError('NSE-2 complete first native receive window missing')
+    _, initial, count = snapshots[1]
+    if count != 4 or initial.get(0x8e4) != (0xa9, 4) or initial.get(0x8e5, (None,))[0] != 0xa9:
+        raise ValueError('NSE-2 initial four native publications/MCU consumption differ')
+    for second in (7, 15, 30):
+        pc, values, count = snapshots[second]
+        if (pc != '09ac' or count != 0 or values.get(0x8e4) != (0xa9, 4)
+                or values.get(0x8e5, (None,))[0] != 0xa9
+                or values.get(0x852, (None,))[0] != values.get(0x853, (None,))[0]):
+            raise ValueError('NSE-2 drained/stationary native ring frontier differs')
+    clear = re.findall(r'nse2_packet_count: value=0000 mask=ffff pc=0020feae lr=00254e67 t=([0-9.]+) observer_writes=0', text)
+    if not clear or not 4 < float(clear[0]) < 5:
+        raise ValueError('NSE-2 initial MCU packet-count clear missing')
+    return dict(initial_native_rx_packets=4, initial_rx_consumed=True,
+                packet_count_clear_time=float(clear[0]), tx_ring_drained=True,
+                native_rx_publications_unchanged_through=30,
+                native_idle_pc='09ac', broken_initial_fiq_delivery=False)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('trace', type=Path)
+    parser.add_argument('--transport', action='store_true', help='also require passive first-window ring evidence')
     args = parser.parse_args()
     try:
-        print(json.dumps(diagnose(args.trace.read_text()), indent=2))
+        text = args.trace.read_text()
+        result = diagnose(text)
+        if args.transport:
+            result.update(diagnose_transport(text))
+        print(json.dumps(result, indent=2))
     except (OSError, ValueError) as error:
         parser.exit(1, str(error) + '\n')
 

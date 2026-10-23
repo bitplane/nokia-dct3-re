@@ -4,6 +4,14 @@ assert(machine.system.name == 'noki5110i' or machine.system.name == 'nse2r4t' or
 local cpu = machine.devices[':maincpu']
 local space = cpu.spaces.program
 local reset_entries = 0
+local packet_changes = 0
+_G.nse2_packet_count_tap = space:install_write_tap(0x10c764, 0x10c767, 'nse2_packet_count', function(_, data, mask)
+    if (mask & 0xffff) == 0 then return end
+    packet_changes = packet_changes + 1
+    if packet_changes > 64 then return end
+    machine:logerror(string.format('nse2_packet_count: value=%04x mask=%04x pc=%08x lr=%08x t=%.9f observer_writes=0\n',
+        data & 0xffff, mask & 0xffff, cpu.state['R15'].value, cpu.state['R14'].value, machine.time:as_double()))
+end)
 local reset_reasons = 0
 _G.nse2_reset_reason_tap = space:install_write_tap(0x10ff78, 0x10ff7b, 'nse2_reset_reason', function(_, data, mask)
     if (mask & 0xff000000) == 0 then return end
@@ -24,7 +32,19 @@ _G.nse2_reset_entry_tap = space:install_read_tap(0x299c14, 0x299c17, 'nse2_reset
         cpu.state['R0'].value, cpu.state['R14'].value, table.concat(stack, ','), machine.time:as_double()))
 end)
 local dsp = machine.devices[':dsp_c54x:cpu']
+local native_ring_writes = {}
 if dsp then
+    _G.nse2_native_ring_taps = {}
+    for _, address in ipairs({0x852, 0x853, 0x854, 0x855, 0x8e4, 0x8e5, 0x866}) do
+        native_ring_writes[address] = 0
+        _G.nse2_native_ring_taps[#_G.nse2_native_ring_taps + 1] =
+            dsp.spaces.data:install_write_tap(address, address, 'nse2_native_ring', function(_, data, mask)
+                native_ring_writes[address] = native_ring_writes[address] + 1
+                if native_ring_writes[address] > 16 then return end
+                machine:logerror(string.format('nse2_native_ring: address=%04x data=%04x mask=%04x pc=%04x t=%.9f observer_writes=0\n',
+                    address, data, mask, dsp.state['PC'].value, machine.time:as_double()))
+            end)
+    end
     local writes = 0
     _G.nse2_native_identity_tap = dsp.spaces.data:install_write_tap(0x803, 0x803, 'nse2_native_identity', function(_, data, mask)
         writes = writes + 1
@@ -243,6 +263,16 @@ emu.register_frame_done(function()
     if dsp then
         machine:logerror(string.format('nse2_native_state: t=%.9f pc=%04x illegal=%d idle=%d observer_writes=0\n',
             now, dsp.state['PC'].value, dsp.state['ILLEGAL'].value, dsp.state['IDLE'].value))
+        if next_sample == 1 or next_sample == 7 or next_sample == 15 or next_sample == 30 then
+            local values = {}
+            for _, address in ipairs({0x852, 0x853, 0x854, 0x855, 0x8e4, 0x8e5, 0x866}) do
+                values[#values + 1] = string.format('%04x:%04x:%d', address,
+                    dsp.spaces.data:read_u16(address), native_ring_writes[address])
+            end
+            machine:logerror(string.format('nse2_native_transport: t=%.9f pc=%04x imr=%04x ifr=%04x words=%s mcu_packets=%04x observer_writes=0\n',
+                now, dsp.state['PC'].value, dsp.state['IMR'].value, dsp.state['IFR'].value,
+                table.concat(values, ','), space:read_u16(0x10c766)))
+        end
         machine:logerror(string.format('nse2_ui_state: t=%.9f state_10c664=%04x flags_10c5c9=%02x phase_10ffac=%02x observer_writes=0\n',
             now, space:read_u16(0x10c664), space:read_u8(0x10c5c9), space:read_u8(0x10ffac)))
     end
