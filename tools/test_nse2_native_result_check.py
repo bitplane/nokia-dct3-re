@@ -30,6 +30,7 @@ class ResultTest(unittest.TestCase):
             value = bytes.fromhex(encoded)
             program[address * 2:address * 2 + len(value)] = value
         struct.pack_into('>H', data, (0xb00f + 0x4b) * 2, 0x3c92)
+        struct.pack_into('>H', data, (0xb00f + 0x07) * 2, 0x3c04)
         return program, data
 
     def test_static_paths_do_not_claim_runtime_or_heartbeat(self):
@@ -41,10 +42,11 @@ class ResultTest(unittest.TestCase):
         self.assertFalse(result['indirect_producers_closed'])
         self.assertEqual(result['conditional_processing']['setter'], '67a3')
         self.assertEqual(result['conditional_processing']['control_word'], '06e3 mask 0020')
+        self.assertEqual(result['conditional_processing']['host_request_type'], '07')
         self.assertFalse(result['conditional_processing']['setter_runtime_observed'])
 
     def test_changed_caller_gate_table_and_truncation_fail(self):
-        for address in (0xa17, 0x4812, 0x6d1b, 0x6792, 0x6796, 0x67a3):
+        for address in (0xa17, 0x4812, 0x6d1b, 0x6792, 0x6796, 0x67a3, 0x3c04, 0x3c17):
             program, data = self.images()
             program[address * 2] ^= 1
             with self.subTest(address=address), self.assertRaises(ValueError):
@@ -55,6 +57,12 @@ class ResultTest(unittest.TestCase):
             inspect_program(program, data)
         with self.assertRaises(ValueError):
             inspect_program(program[:-2], data)
+
+    def test_changed_request_dispatch_fails(self):
+        program, data = self.images()
+        struct.pack_into('>H', data, (0xb00f + 7) * 2, 0x3d44)
+        with self.assertRaises(ValueError):
+            inspect_program(program, data)
 
 
 if __name__ == '__main__':

@@ -13,6 +13,7 @@ from tools.c54x_rom4_port_census import direct_callers
 from tools.nsk1_radio_contract import live_publisher_census, native_completion_contract, serial_publisher_contract
 
 FRAGMENTS = {
+    0x3c04: '61f806bc0100fc3048117714195df03000f06884ff0f1a84808461f800110040e87c69f806e30020',
     0x6790: '771206bc771006e31180f2300020f84567a9f330ffdf818044f806ad770e0005f58c81f806ab69820100',
     0x0a15: 'f0200e13f07447f6f4bcfc20',
     0x47ff: '7714008b',
@@ -39,6 +40,10 @@ def inspect_program(program, data):
                if struct.unpack_from('>H', data, (0xb00f + index) * 2)[0] == 0x3c92]
     if entries != [0x4b]:
         raise ValueError('ROM4 host table does not uniquely select 3c92 for type 4b')
+    request_entries = [index for index in range(0x52)
+                       if struct.unpack_from('>H', data, (0xb00f + index) * 2)[0] == 0x3c04]
+    if request_entries != [0x07]:
+        raise ValueError('ROM4 host table does not uniquely select 3c04 for type 07')
     return dict(program_sha256=hashlib.sha256(program).hexdigest(),
                 type8b=dict(publisher='47f6', ring_call='4810', payload_bytes=162,
                             direct_caller_candidates=[hex(address) for address, _ in callers]),
@@ -48,6 +53,8 @@ def inspect_program(program, data):
                                             setter='67a3', control_word='06e3 mask 0020',
                                             control_bit_consumed_at='679b',
                                             countdown_initialized_at='67a1',
+                                            host_request_type='07', host_request_entry='3c04',
+                                            request_arm_at='3c15',
                                             setter_runtime_observed=False),
                 unconditional_heartbeat_proved=False, runtime_result_observed=False,
                 indirect_producers_closed=False, fitted_mask_proved=False)

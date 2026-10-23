@@ -355,7 +355,14 @@ insufficient evidence that this request was armed. Both complete thirty-second
 host-census captures contain exactly four `06e3` writes, matching the terminal
 tap count: `0000/0000/0001/0000` at PCs `0f10/0d94/3db6/30cb`.
 None arms `0020`. This bounds the observed conditional-request absence;
-it does not establish who can set the bit or exclude other result paths.
+it does not close all possible setters or exclude other result paths.
+The companion dispatch table uniquely maps host type `07` to `3c04`.
+That handler returns if `06bc & 0100` is already set; otherwise it
+sets `06e3 & 0020` at `3c15` and configures the measurement parameters.
+The checked handler prefix and table mapping identify a request-driven
+path, not an autonomous keep-alive. Type `07` is absent from the complete
+host captures. The nearby `ORM 0020` at `3d4b` instead addresses `1838`
+through AR4 and must not be attributed to `06e3` from proximity alone.
 None of these static paths establishes an unconditional periodic packet.
 The separate serial publisher retains its existing queued-data contract.
 
