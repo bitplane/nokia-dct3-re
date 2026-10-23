@@ -26,6 +26,18 @@ software; it was not downloaded indiscriminately as DCT3. Installers have not
 been executed. Some legacy self-extracting formats are not fully understood
 by 7-Zip, so matching an archive hash does not establish successful extraction.
 
+The separate ignored `roms/twister-dct3/` collection retains two selected
+members of the [Twister service collection](https://archive.org/details/Twister_Mobile_Phone_Flashing_Box):
+`nam1_511.exe` and `3350 virgin eeprom 005F0000.fls`. Its `manifest.json`
+records exact ZIP member names, sizes, CRCs and independently computed SHA-256s.
+Only bounded HTTP ranges were fetched; member CRCs were verified, not the
+whole 22 GB archive hash. The source metadata and full firmware/support-DVD
+member indexes are retained alongside them. Installers were not executed.
+The NAM-1 installer matches the existing v5.11 MCU/PPM-E but supplies no
+PMM record stream; see `tools/nam1_installer_audit.py`. The 3350 file's label
+does not establish pristine factory data or matching-version provenance.
+Neither acquisition is a new accepted handset input.
+
 Six additional complete MAME firmware/PMM pairs are extracted in their
 `roms/noki*/` directories. All twelve members' sizes and SHA-1s match the
 current MAME ROM declarations, and all six ZIPs pass their internal CRC tests.

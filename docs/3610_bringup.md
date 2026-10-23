@@ -110,6 +110,24 @@ recompute checksums over foreign values; faithful progress requires a NAM-1
 PMM dump, preferably the complete `0x5f0000..0x5fffff` active block (or the
 wider `0x550000..0x5fffff` product-state region).
 
+### Product-state acquisition boundary
+
+The [preserved Twister collection](https://archive.org/details/Twister_Mobile_Phone_Flashing_Box)
+has been indexed without downloading its full firmware archive: 2,652 entries
+in `Firmware.zip` and 586 in `DVD.zip`. Neither index lists a NAM-1 PMM.
+The acquired `roms/twister-dct3/nam1_511.exe` is 4,192,123 bytes, SHA-256
+`cfdd4bd690776a0bfe37ad99e0b4fc1517543777c3c17e6eaeea5d44e1fce7ef`.
+Its 30 bounded gzip members include seven Wintesla record streams: MCU
+`200000..48ffff` and six PPMs `490000..54ffff`, with no record bytes outside
+the existing image. MCU member `2e016` and PPM-E member `342061` match the
+existing image exactly. This closes this installer's record-stream avenue,
+not every possible embedded format or public archive. No PMM or calibration
+values have been synthesized or borrowed. Reproduce the read-only audit with:
+
+```sh
+python3 tools/nam1_installer_audit.py roms/twister-dct3/nam1_511.exe roms/noki3610/3610f511e.fls
+```
+
 ### Item-12 calibration predicate
 
 Function `0x2694e4` registers object `0x6509`, then reads and sums the

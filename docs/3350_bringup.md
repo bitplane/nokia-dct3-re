@@ -171,6 +171,20 @@ Primary documents retained locally (SHA-256):
 - [General Information](https://emoc.org/materiel/telephone_mobile_nokia_3310/3310_sm_level_34/2-NHM-2.PDF): `roms/reference-docs/nhm9/nhm9-general-info.pdf`, `97e05ab8ff7fb44d3e9a924d0887d71258c85efc733c060a0f0f9b1cc56e20e4`.
 - [System Module](https://emoc.org/materiel/telephone_mobile_nokia_3310/3310_sm_level_34/3-NHM-2.PDF): `roms/reference-docs/nhm9/nhm9-system-module.pdf`, `eee7ef3ff0380cd042dca2cdc20416da6b51a623107bc1c9ad735593a35251c0`.
 
+## Product-state reference
+
+The ignored reference collection also holds a 65,536-byte ZIP member labelled
+`3350 virgin eeprom 005F0000.fls` from the
+[Twister firmware archive](https://archive.org/details/Twister_Mobile_Phone_Flashing_Box).
+SHA-256 is `337e7c97f5bf8e0f73965f816a845b10f271581566edaeb7eca5a3fe75b910be`;
+the ZIP member CRC is verified. Its label is not factory provenance: apparent
+user-data remnants are present, the PMMCAT parser finds no catalogue, and no
+match to the v5.30 validators has been established. It remains an opaque
+reference, not a default seed, checksum-repair fixture or substitute for the
+missing resident DSP routine. Source member identity is in
+`roms/twister-dct3/manifest.json`; no raw firmware or personal fields are
+committed to this repository.
+
 ## Own DSP uploads
 
 The source contains a 28-pointer descriptor catalogue at `3c2248..3c22b7`.
