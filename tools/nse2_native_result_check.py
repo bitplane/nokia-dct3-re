@@ -10,7 +10,8 @@ import sys
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.c54x_rom4_port_census import direct_callers
-from tools.nsk1_radio_contract import live_publisher_census, native_completion_contract, serial_publisher_contract
+from tools.nsk1_radio_contract import (live_publisher_census, native_completion_contract,
+                                     serial_publisher_contract, publisher_type_inventory)
 
 FRAGMENTS = {
     0x092d: '60f802840001f8300939e87b881a80f80285',
@@ -81,6 +82,7 @@ def inspect_capture(program, resident, data):
     result = inspect_program(program, data)
     result['publisher_census'] = live_publisher_census(program, resident)
     result['serial_contract'] = serial_publisher_contract(program)
+    result['publisher_types'] = publisher_type_inventory(program)
     return result
 
 

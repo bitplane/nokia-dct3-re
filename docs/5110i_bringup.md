@@ -338,6 +338,16 @@ direct B/BD candidates, and the same direct sites as the acquired mask.
 This excludes neither indirect transfers nor other pages or direct ring
 writes, and is not an autonomous-producer absence proof.
 
+The shared `publisher_type_inventory` checks local AR4 immediate loads at
+18 of the 19 sites: `314d→8a`, `3fe2→8e`, `3ff5→9a`, `4810→8b`,
+eight sites in `4a11..4be9→74`, `4f20/50db→80`, `6073→88`,
+`62fe→84`, `6ec6→83`, and `8e1c→8d`. The remaining `9404` site
+inherits its type through the separately checked serial helper (`9a/9b`).
+This is a checked local literal association inventory, not control-flow
+reachability or proof of a periodic producer. In particular the eight
+service-response sites must not be counted as eight new autonomous peers.
+The static exporter supplies disassembly context for all nineteen sites.
+
 The type-`8b` publisher is `47f6`, loading type `008b` at `47ff` and
 calling `37ce` at `4810` with 162 payload bytes. Its three page-zero direct
 caller candidates are `0a17`, `3cab` and `6d7e`. The first follows the
@@ -501,7 +511,7 @@ does not cover or waive the known restart deadline.
 
 The uploaded low program overlay must be read after boot: cold data RAM at
 these program addresses is zero. `nse2_native_control_export.lua` exports
-the actual six control ranges at seven seconds through MAME's read-only
+the selected control ranges and publisher contexts at seven seconds through MAME's read-only
 debugger command API, then exits. Use a separately prepared native run,
 `-debug -debugger none -autoboot_delay 0 -seconds_to_run 8`, and this file
 as `-autoboot_script`. It writes run-local `nse2_control_*.dasm`; it is a

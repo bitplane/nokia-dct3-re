@@ -21,9 +21,19 @@ emu.register_frame_done(function()
                             {'frame',0x3204,0x100}, {'wait',0x407c,0x70},
                             {'rssi_publisher',0x47f6,0x40}, {'rssi_host',0x3c80,0x60},
                             {'rssi_other',0x6d40,0x70}, {'host_dispatch',0x3970,0x30},
-                            {'eligibility',0x6760,0x90}, {'result_requests',0x3bf0,0x180}}) do
+                            {'eligibility',0x6760,0x90}, {'result_requests',0x3bf0,0x180},
+                            {'shared_notification',0x382f,0x70}}) do
         debugger:command(string.format('dasm nse2_control_%s.dasm,%x,%x,1,:dsp_c54x:cpu',
             range[1], range[2], range[3]))
+    end
+    -- These are the reviewed page-zero raw direct CALLD candidates, not
+    -- asserted reachable producers. Export their argument/gate context.
+    for _, address in ipairs({0x314d, 0x3fe2, 0x3ff5, 0x4810, 0x4a11,
+                              0x4a21, 0x4a37, 0x4a68, 0x4ab0, 0x4b1a, 0x4ba8,
+                              0x4be9, 0x4f20, 0x50db, 0x6073, 0x62fe, 0x6ec6,
+                              0x8e1c, 0x9404}) do
+        debugger:command(string.format('dasm nse2_publisher_%04x.dasm,%x,40,1,:dsp_c54x:cpu',
+            address, address - 0x18))
     end
     machine:exit()
 end, 'NSE-2 native control export after upload')

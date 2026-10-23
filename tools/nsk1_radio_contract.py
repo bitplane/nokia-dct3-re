@@ -11,6 +11,35 @@ from tools.c54x_rom4_port_census import direct_callers
 
 BASE = 0x200000
 
+# Reviewed local AR4 immediate loads at the direct publisher sites. This
+# inventory does not recover control-flow reachability or indirect producers.
+PUBLISHER_TYPE_LOADS = {
+    0x314d:(0x314f,0x8a), 0x3fe2:(0x3fe4,0x8e), 0x3ff5:(0x3ff3,0x9a),
+    0x4810:(0x47ff,0x8b), 0x4a11:(0x4a0d,0x74), 0x4a21:(0x4a1e,0x74),
+    0x4a37:(0x4a35,0x74), 0x4a68:(0x4a6a,0x74), 0x4ab0:(0x4ab2,0x74),
+    0x4b1a:(0x4b18,0x74), 0x4ba8:(0x4ba6,0x74), 0x4be9:(0x4be7,0x74),
+    0x4f20:(0x4f1e,0x80), 0x50db:(0x50dd,0x80), 0x6073:(0x606c,0x88),
+    0x62fe:(0x62fc,0x84), 0x6ec6:(0x6ec8,0x83), 0x8e1c:(0x8e1a,0x8d),
+}
+
+
+def publisher_type_inventory(image):
+    census = live_publisher_census(image)
+    calls = direct_callers(image,0x37ce)
+    if calls != [(address,True) for address in sorted((*PUBLISHER_TYPE_LOADS,0x9404))]:
+        raise ValueError('reviewed native publisher caller inventory differs')
+    rows = []
+    for call,(load,packet_type) in PUBLISHER_TYPE_LOADS.items():
+        expected = bytes((0x77,0x14,0,packet_type))
+        if image[load*2:load*2+4] != expected:
+            raise ValueError(f'native publisher type load differs at {load:04x}')
+        rows.append(dict(call=f'{call:04x}', type_load=f'{load:04x}',
+                         packet_type=f'{packet_type:02x}', delay_slot=load==call+2))
+    return dict(direct_candidates=len(census['direct_call_candidates']),
+                local_type_loads=rows, inherited_type_site='9404',
+                scope='reviewed local immediate associations; not reachability, universal arguments or all ring writers',
+                unconditional_heartbeat_proved=False)
+
 
 def tuning_upload_contract(image):
     address = 0x29821c

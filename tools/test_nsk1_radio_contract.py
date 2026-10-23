@@ -1,9 +1,38 @@
 import unittest
 
-from tools.nsk1_radio_contract import literal_references,analyze,native_completion_contract,live_publisher_census,serial_publisher_contract,tuning_upload_contract
+from tools.nsk1_radio_contract import (literal_references,analyze,native_completion_contract,
+    live_publisher_census,serial_publisher_contract,tuning_upload_contract,
+    PUBLISHER_TYPE_LOADS,publisher_type_inventory)
 
 
 class Nsk1RadioContractTest(unittest.TestCase):
+    def publisher_image(self):
+        image = bytearray(0x20000)
+        for call, (load, packet_type) in PUBLISHER_TYPE_LOADS.items():
+            image[call*2:call*2+4] = bytes.fromhex('f27437ce')
+            image[load*2:load*2+4] = bytes((0x77,0x14,0,packet_type))
+        image[0x9404*2:0x9404*2+4] = bytes.fromhex('f27437ce')
+        return image
+
+    def test_publisher_types_leave_inherited_and_reachability_open(self):
+        result = publisher_type_inventory(self.publisher_image())
+        self.assertEqual(result['direct_candidates'],19)
+        self.assertEqual(len(result['local_type_loads']),18)
+        self.assertEqual(result['inherited_type_site'],'9404')
+        self.assertFalse(result['unconditional_heartbeat_proved'])
+        self.assertEqual(sum(row['packet_type']=='74' for row in result['local_type_loads']),8)
+
+    def test_changed_type_and_extra_or_missing_call_fail_inventory(self):
+        for offset in (0x314f*2+3,0x4f20*2,0x4810*2):
+            image = self.publisher_image()
+            image[offset] ^= 1
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                publisher_type_inventory(image)
+        image = self.publisher_image()
+        image[0x20:0x24] = bytes.fromhex('f27437ce')
+        with self.assertRaises(ValueError):
+            publisher_type_inventory(image)
+
     def test_own_tuning_table_does_not_inherit_nse1_addends(self):
         image = bytearray(0x100000)
         image[0x9821c:0x9822e] = bytes.fromhex('216a1e80011c013000780000000417bf1797')
