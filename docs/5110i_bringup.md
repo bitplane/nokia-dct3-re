@@ -1250,6 +1250,17 @@ Thus these queued records are MCU-command-forwarded service traffic, not
 evidence of an unsolicited DSP RF-result producer. The reproduction checks
 the dispatch entry, builder bytes, both caller stacks and uncapped queue
 coverage. Whether physical service delivery affects supervision is still open.
+The MCU producer at shared byte `100a4` commits cursors `0006` and `000b`
+at 0.338334154 and 0.338557154 seconds, respectively. Both stores report
+PC `277f7a`, LR `277fcb`; their RAM stacks contain worker return `28de47`.
+Own-image Thumb decode at `28de30..28de46` reads the queued object's length
+at offset 2, checks ring capacity through `2780f4`, and passes its bytes
+at offset 3 to sender `277f96`. Thus the worker and native forwarding
+path are connected, but the upstream object constructors are not yet
+attributed. Keep that producer boundary separate from physical wire delivery.
+The observer selects the high halfword at `100a4` (DSP producer `0852`),
+not the adjacent low-halfword DSP consumer `0853`; recording initialization
+of the latter would not establish MCU publication.
 
 Vector `ffd0` branches to ISR `3416`. Its `34da` path reads port `36`,
 tests mask `2000`, and can write port `34` at `34e8` or `34f4` while

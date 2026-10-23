@@ -148,8 +148,21 @@ def inspect_word_frame_source(program,data,text):
     summaries=re.findall(r'nse2_word_queue_summary: writes=(\d+) cap=64 observer_writes=0',text)
     if summaries!=['22']:
         raise ValueError('word frame construction coverage differs')
+    posts=re.findall(r'nse2_word_host_post: n=([34]) value=([0-9a-f]{8}) mask=([0-9a-f]{8}) pc=([0-9a-f]{8}) lr=([0-9a-f]{8}) t=([0-9.]+) observer_writes=0',text)
+    if [row[:5] for row in posts]!=[
+            ('3','00060000','ffff0000','00277f7a','00277fcb'),
+            ('4','000b0000','ffff0000','00277f7a','00277fcb')]:
+        raise ValueError('word frame MCU ring publication differs')
+    stacks=re.findall(r'nse2_word_host_stack: n=([34]) sp=0010cf5c words=([0-9a-f,]+) observer_writes=0',text)
+    if [n for n,_ in stacks]!=['3','4']:
+        raise ValueError('word frame MCU caller stacks absent')
+    for _,encoded in stacks:
+        words=encoded.split(',')
+        if len(words)!=16 or words[4]!='00277fcb' or words[7]!='0028de47':
+            raise ValueError('word frame MCU worker return differs')
     return dict(host_command='05',host_handler='3ee7',forward_call='3f05',
                 builder='92df',caller_return='3f09',frames=2,
+                mcu_ring_post='277f7a',mcu_worker_return='28de47',
                 unsolicited_radio_result_proved=False,supervision_link_proved=False)
 
 

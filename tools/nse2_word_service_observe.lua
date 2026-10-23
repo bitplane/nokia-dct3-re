@@ -4,6 +4,22 @@ local cpu=assert(machine.devices[':dsp_c54x:cpu'])
 -- C54x opcode reads expose PC one word ahead in the validated live run.
 -- Entry reads are fetch observations, not proof of instruction retirement.
 local retained,last={},{}
+local mcu=assert(machine.devices[':maincpu'])
+local host_posts=0
+retained[#retained+1]=mcu.spaces.program:install_write_tap(0x100a4,0x100a7,'word_host_post',function(_,value,mask)
+    -- DSP 0852 / MCU 100a4 is the producer; 0853 is the DSP consumer.
+    if mask&0xffff0000==0 then return end
+    host_posts=host_posts+1
+    if host_posts>16 then return end
+    machine:logerror(string.format('nse2_word_host_post: n=%d value=%08x mask=%08x pc=%08x lr=%08x t=%.9f observer_writes=0\n',host_posts,value,mask,mcu.state.R15.value,mcu.state.R14.value,machine.time:as_double()))
+    if host_posts==3 or host_posts==4 then
+        local sp=mcu.state.R13.value
+        assert(sp>=0x100000 and sp+64<=0x110000,'host poster stack outside MCU RAM')
+        local stack={}
+        for i=0,60,4 do stack[#stack+1]=string.format('%08x',mcu.spaces.program:read_u32(sp+i)) end
+        machine:logerror(string.format('nse2_word_host_stack: n=%d sp=%08x words=%s observer_writes=0\n',host_posts,sp,table.concat(stack,',')))
+    end
+end)
 local queue_writes=0
 local builder_entries=0
 retained[#retained+1]=cpu.spaces.program:install_read_tap(0x8db4,0x8db4,'word_builder_caller',function()

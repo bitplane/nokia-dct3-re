@@ -20,9 +20,14 @@ class SamplingCheckTest(unittest.TestCase):
         rows=[f'nse2_word_builder_entry: n={n} a={a} b={b} ar0={kind} ar2=1200 sp=1ec3 stack=3f09,3923,30bc,0000 t=0.34253 observer_writes=0'
               for n,a,b,kind in [(1,'1eff','3','00d0'),(2,'1e14','1','00f4')]]
         rows.append('nse2_word_queue_summary: writes=22 cap=64 observer_writes=0')
+        rows += [f'nse2_word_host_post: n={n} value={value} mask=ffff0000 pc=00277f7a lr=00277fcb t=0.3385 observer_writes=0'
+                 for n,value in [(3,'00060000'),(4,'000b0000')]]
+        stack=['00000000']*16
+        stack[4],stack[7]='00277fcb','0028de47'
+        rows += [f'nse2_word_host_stack: n={n} sp=0010cf5c words={",".join(stack)} observer_writes=0' for n in (3,4)]
         text='\n'.join(rows)
         self.assertEqual(inspect_word_frame_source(program,data,text)['host_command'],'05')
-        for bad in (text.replace('3f09','3f08'),text.replace('writes=22','writes=65'),text.replace('ar0=00f4','ar0=00d0')):
+        for bad in (text.replace('3f09','3f08'),text.replace('writes=22','writes=65'),text.replace('ar0=00f4','ar0=00d0'),text.replace('mask=ffff0000','mask=0000ffff')):
             with self.assertRaises(ValueError):
                 inspect_word_frame_source(program,data,bad)
 
