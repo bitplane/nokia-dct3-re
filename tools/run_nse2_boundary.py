@@ -11,19 +11,22 @@ from PIL import Image
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.nse2_package_check import inspect
-from tools.nse2_boot_check import NV_BLOCKS, verify
+from tools.nse2_boot_check import NV_BLOCKS, verify, verify_record
 
 
-def checksum_fixture():
+def checksum_fixture(*, record_checksum=False):
     """Diagnostic integrity only: no identity, calibration or lock provisioning."""
     image = bytearray(b'\xff' * 8192)
     for start, length, stored, _ in NV_BLOCKS:
         value = (~(sum(image[start:start + length]) & 0xffff)) & 0xffffffff
         image[stored:stored + 4] = value.to_bytes(4, 'big')
+    if record_checksum:
+        value = (sum(image[0x240:0x31e]) - sum(image[0x274:0x276])) & 0xffff
+        image[0x31e:0x320] = value.to_bytes(2, 'big')
     return bytes(image)
 
 
-def prepare(root, run, *, checksum_only=False):
+def prepare(root, run, *, checksum_only=False, record_checksum=False):
     if run.exists():
         raise ValueError('NSE-2 boundary requires a new run directory')
     flash, report = inspect((root / 'roms/archive-dct3-packages/nse2_553.zip').read_bytes())
@@ -38,14 +41,16 @@ def prepare(root, run, *, checksum_only=False):
                   dsp_backend='silent; no mask or completion supplied',
                   boot_rom='shared minimal flash-entry HLE',
                   flash_part='capacity-compatible TE28F160 trial; fitted identity unknown')
-    if checksum_only:
-        image = checksum_fixture()
+    if checksum_only or record_checksum:
+        image = checksum_fixture(record_checksum=record_checksum)
         path = run / 'nvram/noki5110i/eeprom'
         path.parent.mkdir()
         path.write_bytes(image)
         report.update(initial_eeprom='diagnostic erased payload with five own-ROM checksum words',
                       eeprom_sha256=hashlib.sha256(image).hexdigest(),
                       authentic_provisioning=False)
+        if record_checksum:
+            report['initial_eeprom'] = 'diagnostic erased payload with five block checksums and own 031e record checksum'
     return report
 
 
@@ -53,8 +58,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
-    parser.add_argument('--checksum-only', action='store_true',
+    experiment = parser.add_mutually_exclusive_group()
+    experiment.add_argument('--checksum-only', action='store_true',
                         help='separate NV integrity experiment; not a usable-boot gate')
+    experiment.add_argument('--record-checksum-only', action='store_true',
+                            help='also repair own 031e record checksum; no payload provisioning')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -62,7 +70,9 @@ def main():
     try:
         if not mame.is_file():
             raise ValueError('missing MAME binary')
-        report = prepare(root, run, checksum_only=args.checksum_only)
+        integrity = args.checksum_only or args.record_checksum_only
+        report = prepare(root, run, checksum_only=integrity,
+                         record_checksum=args.record_checksum_only)
         command = [str(mame), 'noki5110i', '-rompath', str(run / 'roms'),
                    '-nvram_directory', str(run / 'nvram'), '-cfg_directory', str(run / 'cfg'),
                    '-video', 'none', '-sound', 'none', '-joystickprovider', 'none',
@@ -84,12 +94,15 @@ def main():
         with Image.open(run / 'snap/nse2_7.png') as frame:
             text = (run / 'error.log').read_text(errors='replace')
             result = verify(text, frame.convert('L').tobytes(), frame.size,
-                            checksum_only=args.checksum_only)
-            if args.checksum_only:
+                            checksum_only=integrity)
+            if args.record_checksum_only:
+                verify_record(text)
+                result['record_checksum_selftest_passed'] = True
+            if integrity:
                 result.update(nv_integrity_selftest_passed=True, authentic_provisioning=False,
                               frame_sha256=hashlib.sha256(frame.convert('L').tobytes()).hexdigest())
         (run / 'acceptance.json').write_text(json.dumps(result, indent=2) + '\n')
-        print('NSE-2 NV integrity experiment PASS; usable boot remains unproved' if args.checksum_only
+        print('NSE-2 NV integrity experiment PASS; usable boot remains unproved' if integrity
               else 'NSE-2 graphical failure boundary PASS; usable boot, keys and DSP remain unproved')
         print('Evidence:', run)
     except (OSError, ValueError) as error:

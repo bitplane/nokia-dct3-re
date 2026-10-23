@@ -43,8 +43,25 @@ def verify_nv(text, *, checksum_only=False):
     return len(checks)
 
 
+def verify_record(text):
+    results = re.findall(r'nse2_selftest_write: address=0010fcac value=([0-9a-f]{2}) '
+                         r'pc=(0023340a|00233470) t=([0-9.]+) observer_writes=0', text)
+    if len(results) != 1 or results[0][:2] != ('00', '0023340a'):
+        raise ValueError('NSE-2 record checksum did not clear its own result')
+
+
 def verify(text, pixels, size, *, checksum_only=False):
     blocks = verify_nv(text, checksum_only=checksum_only)
+    loader = re.findall(r'nse2_state_byte: address=(0010b9f[45]) value=([0-9a-f]{2}) '
+                        r'pc=([0-9a-f]{8}) t=([0-9.]+) observer_writes=0', text)
+    expected_loader = [('0010b9f4', '00', '0020010c'), ('0010b9f5', '00', '0020010c'),
+                       ('0010b9f5', '01', '002781f4'), ('0010b9f5', '00', '00278226'),
+                       ('0010b9f5', '00', '002782d6'), ('0010b9f4', '00', '002782d8')]
+    if [row[:3] for row in loader] != expected_loader:
+        raise ValueError('NSE-2 own loader startup failure lifecycle differs')
+    times = [float(row[3]) for row in loader]
+    if times != sorted(times) or not 0 < times[0] < times[-1] < 1:
+        raise ValueError('NSE-2 loader failure observation order differs')
     if text.count('Soft reset\n') != 1:
         raise ValueError('NSE-2 missing initial reset or reset repeated')
     if re.search(r'RX enqueue|peer RAM W off=00[0246]\b|bootstrap.*complete', text):
@@ -75,6 +92,7 @@ def verify(text, pixels, size, *, checksum_only=False):
         raise ValueError('NSE-2 reviewed CONTACT SERVICE frame differs')
     return dict(graphical_failure_frame=True, usable_boot=False, native_dsp=False,
                 physical_key_delivery=False, samples=len(samples),
+                loader_startup_failed=True,
                 gensio_tx=last[1], gensio_rx=last[2], lcd_bytes=last[4],
                 invalid_nv_checksum_blocks=0 if checksum_only else blocks)
 

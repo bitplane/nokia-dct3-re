@@ -25,6 +25,11 @@ VERSION = b'V 05.53\n11-01-01\nNSE-2\n(c) NMP.\0'
 BASE = 0x200000
 TABLE = 0x29bba0
 PERIPHERAL_FRAGMENTS = {
+    'eeprom_record_sum': (0x23315c, 'b5f0b0811c0c1c0642a6da3a1ba004000c041c20f023f9341c0725002f00d11342a6da231ba41c3046692201f060fe0346687800194004000c051c7004000c063c012c00d1efe0111c301c391c22f060fdf2e0061e6004000c045de0194004000c052c00d1f61c38f022ffe0f04dfa560a011a6904090c0d06000e001a2804000c051c28b001bdf0'),
+    'eeprom_record_consumer': (0x2333ce, '200901804970f7fffec24682486ea9012202f060fcd720290100210644692202f060fcd04668888046514281d137466888c043082800d032464946407308'),
+    'eeprom_record_exclusion': (0x280678, 'b500b081209d008046692202f013fb8546688800b001bd00'),
+    'dsp_loader_startup_poll': (0x2781fa, '88a049a24288d11220004682200af022fd4846502814dc081c4004000c00468288a1489a4281d0f1e0014640704788a14640810188e04281d14f464078402800d04b'),
+    'dsp_loader_failure': (0x2782d4, '464070477007'),
     'eeprom_selftest': (0x27dc02, 'b500f7dbf96a2801d00121fde000210048cc74817c80bd00'),
     'eeprom_checksum_sum': (0x28a0c4, '1c0220002900d00d1e4904090c097813181804000c0032011c0b1e5904090c092b00d1f446f7'),
     'eeprom_checksum_validator': (0x258edc, 'b530b08120090180f7fdfb641c0420001c212214f03aff4f201446692204f03aff4a25001c202114f031f8de43c198004281d100250120181c21220cf03aff3b202446692204f03aff361c20210cf031f8cb43c198004281d000250020281c212218f03aff28204046692204f03aff231c202118f031f8b843c198004281d000250020441c2122ff32e1f03aff142089008046692204f03aff0e1c2021ff31e1f031f8a243c198004281d0002500204500c01c212214f03afefe208f008046692204f03afef81c202114f031f88d43c198004281d00025001c20f7fdf8e71c28b001bd30'),
@@ -55,6 +60,10 @@ def peripheral_contract(mcu):
             raise ValueError('NSE-2 peripheral base literal differs')
     if mcu[0x27df44 - BASE:0x27df48 - BASE] != bytes.fromhex('0010fca0'):
         raise ValueError('NSE-2 EEPROM self-test result base differs')
+    for address, expected in ((0x233594, 0x31e), (0x278488, 0xffff),
+                              (0x2782f4, 0x10b9f4), (0x28dabc, 0x10b9f4)):
+        if struct.unpack_from('>I', mcu, address - BASE)[0] != expected:
+            raise ValueError('NSE-2 NV/loader contract literal differs')
     if mcu[0x29907c - BASE:0x299088 - BASE] != bytes.fromhex('002b3848 0010c6b6 002b382c'):
         raise ValueError('NSE-2 keypad table/selector literals differ')
     if (mcu[0x2b382c - BASE:0x2b382c - BASE + 25] != NORMAL_KEYS

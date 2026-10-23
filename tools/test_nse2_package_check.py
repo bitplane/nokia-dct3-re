@@ -40,6 +40,9 @@ def peripheral_image():
     for address in (0x2967dc, 0x297020, 0x298200, 0x2866b0):
         struct.pack_into('>I', image, address - check.BASE, 0x20000)
     struct.pack_into('>I', image, 0x7df44, 0x10fca0)
+    for address, value in ((0x233594, 0x31e), (0x278488, 0xffff),
+                           (0x2782f4, 0x10b9f4), (0x28dabc, 0x10b9f4)):
+        struct.pack_into('>I', image, address - check.BASE, value)
     image[0x9907c:0x99088] = bytes.fromhex('002b3848 0010c6b6 002b382c')
     image[0xb382c:0xb382c + 25] = check.NORMAL_KEYS
     image[0xb3848:0xb3848 + 5] = bytes.fromhex('3e3e3e3e0d')

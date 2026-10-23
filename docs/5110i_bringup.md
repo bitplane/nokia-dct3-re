@@ -11,6 +11,12 @@ presentation, not usable boot, physical key delivery, SIM or phone-service
 acceptance. The archive labels the pair `5110i`; both firmware headers
 identify `NSE-2`, version `05.53`, dated `11-01-01`.
 
+Separate integrity-only EEPROM experiments clear both decoded checksum
+families but do not change the failure frame. The remaining observed
+`0e/0f` results follow the failed initial DSP-loader exchange. The next
+boundary is its actual upload and shared-memory startup protocol, not
+another guessed EEPROM identity or a synthesized DSP completion.
+
 `make verify-5110i-static` independently qualifies the acquired ZIP and
 Windows SFX, verifies their exact two member names/extents/hashes and
 compares their decoded payloads byte-for-byte. Neither installer executes.
@@ -153,15 +159,54 @@ the desired verdict. Correct integrity alone is now falsified as sufficient
 to remove the failure frame.
 
 The getter is a byte load from `10b9f4` (own literal at `28dabc`), not a
-transport transaction. Its state writer/lifecycle is the next census target;
+transport transaction. Its loader-owned lifecycle is described below;
 neither a non-one value nor the `0e/0f` result labels identify missing DSP
 silicon by themselves.
 
-1. Recover the own EEPROM record catalogue and NV validators selecting the
-   failure presentation. Establish any own-product defaults or independently
-   sourced storage before proposing a provisioning fixture.
-2. Trace actual DSP uploads and ownership when reached organically; the
-   current graphical failure result does not establish those transfers.
+### Separate record integrity and loader boundary
+
+`--record-checksum-only` adds just the two-byte word at `031e` to the
+five-word diagnostic above. Its value `db24` is derived from the unchanged
+erased payload and the decoded `23315c` exclusion rule; no other bytes are
+seeded. The statically pinned consumer at `2333ce` checks that value and
+the nonzero guard involving `0290`. Fresh runs observe the actual success
+store `00` at `23340a` to result byte `10fcac`, replacing the prior `0c`.
+The frame remains the same CONTACT SERVICE image. This clears another
+integrity defect without authenticating any record's semantic contents.
+Evidence: `tmp/nse2-own-record-checksum`, `tmp/nse2-record-final`.
+
+The `10b9f4` lifecycle is loader-owned. Own routine `27816c` initializes
+shared words and starts its upload; its poll at `2781fa` compares shared
+offset `+4` with sentinel `ffff`. Expiry writes zero to status byte
+`10b9f5` at `278226`. The failure tail at `2782d4` clears that status again
+and clears `10b9f4` at `2782d8`. Passive write taps observe precisely:
+
+| Byte | Value | Store PC |
+| --- | --- | --- |
+| `10b9f5` | `01` | `2781f4` |
+| `10b9f5` | `00` | `278226` |
+| `10b9f5` | `00` | `2782d6` |
+| `10b9f4` | `00` | `2782d8` |
+
+This occurs at approximately 0.0086--0.0089 seconds, before either NV
+validator. It survives both integrity repairs. The boundary gate requires
+the observed failure sequence, not absence of a hypothetical success hit.
+The poll/failure instructions and sentinel/state literals are pinned by
+static qualification. The later service routine `2787ac` can set the state
+byte to one when it is zero and shared halfword `100e4` is zero; this is a
+different lifecycle, not authority to synthesize either condition.
+
+Next capture the full actual initial upload and consumer-side shared-memory
+protocol before selecting a backend. A silent transport cannot complete a
+DSP-owned exchange. A separately labeled ROM4-mask compatibility experiment
+may be justified by the own upload ABI, but it must not promote a candidate
+mask to fitted identity or replace the exchange with completion constants.
+
+1. Recover the own EEPROM record catalogue and semantic requirements beyond
+   the integrity-only fixtures. Establish own-product defaults or independently
+   sourced storage before proposing authentic provisioning.
+2. Capture the own initial DSP upload and qualify its startup exchange;
+   the loader-failure trace is not native DSP execution or a verdict.
 3. Recover fitted flash identity, physical memory/clock and analogue inputs
    without changing returned IDs or samples merely to satisfy self-tests.
 4. Decide any explicitly separate native-mask compatibility experiment from

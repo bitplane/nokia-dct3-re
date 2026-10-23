@@ -16,6 +16,12 @@ def transcript():
                  f'stored=ffffffff t=0.{i + 1} observer_writes=0\n')
     text += ('nse2_nv_verdict: address=0010fcb2 value=fd pc=0027dc14 '
              't=0.6 observer_writes=0\n')
+    for i, (address, value, pc) in enumerate((
+            (0x10b9f4, 0, 0x20010c), (0x10b9f5, 0, 0x20010c),
+            (0x10b9f5, 1, 0x2781f4), (0x10b9f5, 0, 0x278226),
+            (0x10b9f5, 0, 0x2782d6), (0x10b9f4, 0, 0x2782d8))):
+        text += (f'nse2_state_byte: address={address:08x} value={value:02x} '
+                 f'pc={pc:08x} t=0.00{i + 1} observer_writes=0\n')
     writes = [(0x10000 + i * 2, value, 0x27dca8)
               for i, value in enumerate((0xea, 0xff, 0xff, 0xea))]
     writes += [(0x10000, 0, 0x27817a), (0x10002, 0xffff, 0x278182),
@@ -30,6 +36,25 @@ def transcript():
 
 
 class BoundaryTest(unittest.TestCase):
+    def test_record_result_requires_the_own_success_store(self):
+        success = ('nse2_selftest_write: address=0010fcac value=00 pc=0023340a '
+                   't=0.270 observer_writes=0\n')
+        check.verify_record(success)
+        for text in ('', success * 2, success.replace('value=00', 'value=0c'),
+                     success.replace('pc=0023340a', 'pc=00233470'),
+                     success + success.replace('value=00 pc=0023340a', 'value=0c pc=00233470')):
+            with self.subTest(text=text), self.assertRaisesRegex(ValueError, 'record checksum'):
+                check.verify_record(text)
+
+    def test_record_fixture_changes_only_independently_decoded_checksums(self):
+        base = checksum_fixture()
+        image = checksum_fixture(record_checksum=True)
+        self.assertEqual(image[:0x31e], base[:0x31e])
+        self.assertEqual(image[0x320:], base[0x320:])
+        self.assertEqual(image[0x31e:0x320], bytes.fromhex('db24'))
+        self.assertEqual(int.from_bytes(image[0x31e:0x320], 'big'),
+                         (sum(image[0x240:0x31e]) - sum(image[0x274:0x276])) & 0xffff)
+
     def test_checksum_fixture_changes_only_the_five_integrity_words(self):
         image = checksum_fixture()
         self.assertEqual(len(image), 8192)
@@ -104,6 +129,14 @@ class BoundaryTest(unittest.TestCase):
                 self.verify(transcript().replace(f'{field}={value}', f'{field}=0'))
         with self.assertRaisesRegex(ValueError, 'reset repeated'):
             self.verify(transcript() + 'Soft reset\n')
+
+    def test_loader_failure_is_observed_not_inferred_from_missing_hits(self):
+        for old, new in (('value=01 pc=002781f4', 'value=02 pc=002781f4'),
+                         ('pc=00278226', 'pc=00278224'),
+                         ('address=0010b9f4 value=00 pc=002782d8',
+                          'address=0010b9f4 value=01 pc=002782d8')):
+            with self.subTest(old=old), self.assertRaisesRegex(ValueError, 'loader startup'):
+                self.verify(transcript().replace(old, new))
 
     def test_blank_or_wrong_geometry_is_not_reviewed_frame(self):
         for size in ((84, 48), (96, 60)):
