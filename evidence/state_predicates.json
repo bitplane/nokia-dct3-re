@@ -3,9 +3,15 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nse2_puk2_recovery_cold_credential", "owner": "nse2_sim_security", "status": "satisfied",
+      "predicate": "Physical PUK2 recovery of the organically exhausted card restores PIN2 and its persisted replacement is accepted on a fresh phone",
+      "current": "verify-5110i-puk2-recovery includes three wrong PIN2 attempts and the cold blocked-prompt control, then two more fresh processes. Physical PUK2 87654321 plus confirmed PIN2 2468 produce successful UNBLOCK CHV2 followed by automatic VERIFY CHV2 and Code accepted. The complete card changes only PIN2 digits and retry zero to three; both PUKs and PUK attempts are preserved. A final cold ordinary CHANGE accepts 2468 and restores 5678. Phone authentication uses a separately checked 9-second physical entry start so recovery finishes before the known restart; default input timing, device clocks and PIN1-disabled bootstrap remain unchanged. No native RF, long-run stability, FDN or permanent PUK2 exhaustion is promoted.",
+      "evidence": ["docs/5110i_bringup.md", "gates.json", "tools/nse2_puk2_fixture.lua", "tools/nse2_security_fixture.lua", "tools/nse2_sim_check.py", "tools/test_nse2_sim_check.py"]
+    },
+    {
       "id": "nse2_pin2_exhaustion_cold_puk2_prompt", "owner": "nse2_sim_security", "status": "satisfied",
       "predicate": "Three physical wrong PIN2 CHANGE transactions exhaust retries, and the complete saved card cold-boots into a physically reached PUK2 prompt without mutation",
-      "current": "verify-5110i-pin2-blocked links four independent processes. The first three submit old PIN2 5675 and both new-PIN confirmations through real menus, receiving 9804/9804/9840 and persisting CHV2 retries 2/1/0 without changing PIN2, PIN1 retries, PUKs or other supplied storage. The fourth imports the complete zero-retry card, accepts the phone code and physically navigates to Change PIN2. It shows PIN2 code blocked then Enter PUK2 code, submits no VERIFY/CHANGE/UNBLOCK, and preserves every card byte. PUK2 authentication/recovery, FDN, native RF and long-run stability remain unproved.",
+      "current": "verify-5110i-pin2-blocked links four independent processes. The first three submit old PIN2 5675 and both new-PIN confirmations through real menus, receiving 9804/9804/9840 and persisting CHV2 retries 2/1/0 without changing PIN2, PIN1 retries, PUKs or other supplied storage. The fourth imports the complete zero-retry card, accepts the phone code and physically navigates to Change PIN2. It shows PIN2 code blocked then Enter PUK2 code, submits no VERIFY/CHANGE/UNBLOCK, and preserves every card byte. PUK2 entry is covered separately by nse2_puk2_recovery_cold_credential; FDN, native RF and long-run stability remain unproved.",
       "evidence": ["docs/5110i_bringup.md", "gates.json", "tools/nse2_pin2_fixture.lua", "tools/nse2_pin2_wrong_fixture.lua", "tools/nse2_pin2_blocked_fixture.lua", "tools/nse2_sim_check.py", "tools/test_nse2_sim_check.py"]
     },
     {

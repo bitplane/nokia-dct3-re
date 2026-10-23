@@ -94,7 +94,7 @@ The archive calls the phone 5110i; both headers identify `NSE-2`, `05.53`,
 | GENSIO/CCONT | Own `296704`: select `22` at `28`, TX `2a`, RX `2d`, status `29` bit 2. | Shared serial grammar, not measured electrical timing. |
 | LCD | Own `296e46/296eac`: command/data `2c/2b`, ready bit 0. | Observed 84x48 presentation; fitted controller identity remains unproved. |
 | Keypad | Scanner `29806c`, decoder `299010`, maps `2b382c/2b3848`, selector `10c6b6`; five rows, signal/direction `31/2f`, columns `30`, IRQ mask `33`. | Existing NSE-1 contact layout matches own table; digits 1--5 and Menu have runtime decode acceptance. |
-| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/retry exhaustion/PUK1 recovery, PIN2 change/cold reverse change/retry exhaustion and cold PUK2 prompt, organic ADN write and cold contact readback pass. | PIN1 change, PUK2 recovery/exhaustion and FDN remain unqualified; the Nokia phone code is phone-side. |
+| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/retry exhaustion/PUK1 recovery, PIN2 change/cold reverse change/retry exhaustion/PUK2 recovery, organic ADN write and cold contact readback pass. | PIN1 change, permanent PUK2 exhaustion and FDN remain unqualified; the Nokia phone code is phone-side. |
 
 EEPROM START/STOP entry points are `295814/295886`, identified by SDA
 transitions while SCL is high. Block reader `293d92` takes address,
@@ -324,7 +324,7 @@ cold authentication checker still rejects UNBLOCK commands and requires
 VERIFY before protected SIM reads. No handset state or credentials are
 rewritten by either input fixture.
 
-### Ordinary PIN2 change and cold credential acceptance
+### PIN2 and PUK2 lifecycle
 
 `verify-5110i-pin2-change` uses two isolated thirty-second processes with
 PIN1 disabled and the explicitly declared phone-code retry fixture. Physical
@@ -363,6 +363,25 @@ blocked notice; later frames show `Enter PUK2 code`. No VERIFY, CHANGE or
 UNBLOCK is sent in that cold control, and every card byte is unchanged.
 This proves organic PIN2 blocking and its cold recovery prompt, not PUK2
 authentication or recovery.
+
+`verify-5110i-puk2-recovery` includes the complete exhaustion/prompt gate,
+then imports its zero-retry card into a fresh phone. Physical PUK2
+`87654321` and confirmed new PIN2 `2468` produce `A0 2C 00 02 10` with
+`9000`, followed by the firmware's automatic `A0 20 00 02 08`, also `9000`.
+The result frame is `Code accepted`. Full-card comparison permits only PIN2
+credential changes and its retry reset from zero to three; PIN1, both PUKs,
+PUK attempts and unrelated storage remain unchanged. Another fresh process
+accepts `2468` for ordinary CHANGE and restores `5678`.
+
+The recovery fixture physically enters the phone code at 9–12 seconds,
+instead of the ordinary fixture's 12–15 seconds, and starts menu navigation
+at 15.5 seconds. It waits until the PUK2 editor is visible before entering
+credentials at 24.5 seconds. The exchange finishes around 29.08 seconds,
+before the known native restart. The verifier checks this explicit earlier
+input schedule without relaxing the default, and permits only the reviewed
+late CHV2 VERIFY after the unchanged PIN1-disabled bootstrap. No firmware
+timer, clock, state or input-dispatch result is altered. This remains a
+short-run SIM recovery test, not native long-run acceptance.
 
 ### Physical contact save
 

@@ -34,6 +34,50 @@ def contacts():
 
 
 class SimCheckTest(unittest.TestCase):
+    def test_puk2_recovery_requires_unblock_then_automatic_verify(self):
+        from tools.nse2_sim_check import verify_puk2_recovery
+        from tools.make_sim_card_profile import make_profile
+        from tools.sim_security_trace_check import AOC_NVRAM_SIZE,ATTEMPTS_OFFSET,CHV_OFFSET
+        initial=bytearray(make_profile(False).ljust(AOC_NVRAM_SIZE,b'\xff'))
+        initial[ATTEMPTS_OFFSET+1]=0
+        final=bytearray(initial)
+        final[ATTEMPTS_OFFSET+1]=3
+        final[CHV_OFFSET+8:CHV_OFFSET+16]=b'2468\xff\xff\xff\xff'
+        frames=[b'idle',b'puk',b'new',b'confirm',b'accepted']
+        text='\n'.join(f'nse2_puk2_contact: event={i} down={i%2} t={(15.5+(i-1)*.175) if i<=32 else (24.5+(i-33)*.125):.3f} physical_only=1' for i in range(1,71))
+        text+='\nsim_device: header cla=a0 ins=2c p1=00 p2=02 p3=10 selected=6f3a t=29.072\nSIM status ins=2c sw=9000 chv=3/3 puk=10/10 enabled=0'
+        text+='\nsim_device: header cla=a0 ins=20 p1=00 p2=02 p3=08 selected=6f3a t=29.08\nSIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=0'
+        h=lambda b:hashlib.sha256(b).hexdigest()
+        with patch.multiple('tools.nse2_sim_check',AUTHENTICATED_FRAME=h(b'idle'),PUK2_PROMPT_FRAME=h(b'puk'),
+                            PIN2_CHANGE_FRAMES=('','',h(b'new'),h(b'confirm'),''),PIN_ACCEPTED_FRAME=h(b'accepted')):
+            self.assertTrue(verify_puk2_recovery(text,initial,final,frames)['automatic_pin2_verify'])
+            for bad in (text.replace('p2=02','p2=00',1),text.replace('ins=20 p1=00','ins=24 p1=00'),text.replace('t=29.08','t=28.9'),text.replace('chv=3/3','chv=3/2')):
+                with self.assertRaises(ValueError):
+                    verify_puk2_recovery(bad,initial,final,frames)
+            final[-1]^=1
+            with self.assertRaises(ValueError):
+                verify_puk2_recovery(text,initial,final,frames)
+
+    def test_later_chv2_does_not_weaken_pin1_bootstrap(self):
+        header='\nsim_device: header cla=a0 ins=20 p1=00 p2=02 p3=08 selected=6f3a t=29.08'
+        with patch('tools.nse2_sim_check.SECURITY_FRAME',hashlib.sha256(b'frame').hexdigest()):
+            self.assertFalse(verify_sim_reads(reads()+header,b'frame',later_chv2=True)['sim_pin_verified'])
+            for wrong in (header.replace('p2=02','p2=01'),header.replace('t=29.08','t=9.0')):
+                with self.assertRaises(ValueError):
+                    verify_sim_reads(reads()+wrong,b'frame',later_chv2=True)
+            with self.assertRaises(ValueError):
+                verify_sim_reads(reads()+header,b'frame')
+
+    def test_early_phone_input_schedule_is_explicit_not_a_relaxed_default(self):
+        import re
+        early=re.sub(r'(?<= )t=([0-9.]+)',lambda m:f't={float(m[1])-3:.3f}',contacts())
+        with patch('tools.nse2_sim_check.CODE_ERROR_FRAME',hashlib.sha256(b'frame').hexdigest()):
+            self.assertEqual(verify_security_attempt(early,b'frame',contact_start=9)['retry_counter'],255)
+            with self.assertRaises(ValueError):
+                verify_security_attempt(early,b'frame')
+            with self.assertRaises(ValueError):
+                verify_security_attempt(early,b'frame',contact_start=8)
+
     def test_pin2_cold_blocked_control_requires_puk2_prompt_and_unchanged_card(self):
         from tools.nse2_sim_check import verify_pin2_blocked
         from tools.make_sim_card_profile import make_profile

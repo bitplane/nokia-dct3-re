@@ -35,7 +35,7 @@ HEADER = re.compile(r'sim_device: header cla=([0-9a-f]{2}) ins=([0-9a-f]{2}) '
 COMPLETION = re.compile(r'SIM completion ins=([0-9a-f]{2}) sw=([0-9a-f]{4})')
 
 
-def verify_sim_reads(text, pixels, *, pin_authenticated=False, bootstrap_horizon=10):
+def verify_sim_reads(text, pixels, *, pin_authenticated=False, bootstrap_horizon=10,later_chv2=False):
     if pin_authenticated:
         from tools.sim_security_trace_check import statuses
         if statuses(text,0x20)!=[(0x9000,3,10)]:
@@ -49,7 +49,10 @@ def verify_sim_reads(text, pixels, *, pin_authenticated=False, bootstrap_horizon
             values = header.groups()
             pending = tuple(int(value, 16) for value in values[:6]) + (float(values[6]),)
             if pending[1] == 0x20 and not pin_authenticated:
-                raise ValueError('NSE-2 PIN-disabled fixture unexpectedly issued VERIFY CHV')
+                # A later CHV2 workflow must not turn the bootstrap into a
+                # PIN1-authenticated claim or admit an early/unrelated VERIFY.
+                if not (later_chv2 and pending[:5]==(0xa0,0x20,0,2,8) and pending[-1]>bootstrap_horizon):
+                    raise ValueError('NSE-2 PIN-disabled fixture unexpectedly issued VERIFY CHV')
         if pin_authenticated and 'SIM status ins=20 sw=9000 ' in line:
             if pending is None or pending[1]!=0x20:
                 raise ValueError('NSE-2 successful PIN status lacks its VERIFY header')
@@ -371,7 +374,37 @@ def verify_pin2_blocked(text,initial,final,frames):
                 network_registration=False,stable_long_boot=False)
 
 
-def verify_security_attempt(text, pixels, *, retry_zero=False):
+def verify_puk2_recovery(text,initial,final,frames):
+    from tools.sim_security_trace_check import CHV_OFFSET,ATTEMPTS_OFFSET,AOC_NVRAM_SIZE,statuses
+    verify_pin2_input(initial,blocked=True)
+    expected=bytearray(initial)
+    expected[CHV_OFFSET+8:CHV_OFFSET+16]=b'2468\xff\xff\xff\xff'
+    expected[ATTEMPTS_OFFSET+1]=3
+    if len(initial)!=AOC_NVRAM_SIZE or final!=expected:
+        raise ValueError('PUK2 recovery changed unexpected card bytes')
+    headers=[m.groups() for m in HEADER.finditer(text) if int(m[2],16) in (0x20,0x24,0x2c)]
+    if [h[:5] for h in headers]!=[('a0','2c','00','02','10'),('a0','20','00','02','08')]:
+        raise ValueError('PUK2 UNBLOCK/automatic VERIFY sequence differs')
+    times=[float(h[-1]) for h in headers]
+    if not 29<times[0]<times[1]<29.5 or any(statuses(text,i,chv=2)!=[(0x9000,3,10)] for i in (0x2c,0x20)):
+        raise ValueError('PUK2 status/retry/order differs')
+    contacts=re.findall(r'nse2_puk2_contact: event=(\d+) down=([01]) t=([0-9.]+) physical_only=1',text)
+    if [(int(i),int(d)) for i,d,_ in contacts]!=[(i,i%2) for i in range(1,71)]:
+        raise ValueError('PUK2 physical navigation/credential sequence differs')
+    event_times=[float(t) for _,_,t in contacts]
+    if event_times!=sorted(event_times) or not 15.4<event_times[0]<15.6 or not 24.4<event_times[32]<24.6 or not 29<event_times[-1]<29.4:
+        raise ValueError('PUK2 physical input timing differs')
+    expected_frames=(AUTHENTICATED_FRAME,PUK2_PROMPT_FRAME,*PIN2_CHANGE_FRAMES[2:4],PIN_ACCEPTED_FRAME)
+    if tuple(hashlib.sha256(frame).hexdigest() for frame in frames)!=expected_frames:
+        raise ValueError('PUK2 prompt/new-PIN/confirmation/result frames differ')
+    return dict(puk2_verified=True,sim_pin2_recovered=True,pin2_attempts_remaining=3,
+                automatic_pin2_verify=True,network_registration=False,stable_long_boot=False)
+
+
+def verify_security_attempt(text, pixels, *, retry_zero=False,contact_start=12):
+    if contact_start not in (9,12):
+        raise ValueError('unreviewed physical phone-code input schedule')
+    submit_time=contact_start+3
     contacts = re.findall(r'nse2_security_contact: index=([1-6]) down=([01]) '
                           r't=([0-9.]+) physical_only=1', text)
     if [(int(i), int(down)) for i, down, _ in contacts] != [(i, down) for i in range(1, 7) for down in (1, 0)]:
@@ -380,7 +413,7 @@ def verify_security_attempt(text, pixels, *, retry_zero=False):
                          r't=([0-9.]+) observer_writes=0', text)
     for i, (raw, key) in enumerate(((7, 1), (8, 2), (9, 3), (12, 4), (13, 5), (11, 0x19))):
         start, end = float(contacts[2 * i][2]), float(contacts[2 * i + 1][2])
-        expected = 12 + i * 0.5 if i < 5 else 15
+        expected = contact_start + i * 0.5 if i < 5 else submit_time
         if not expected <= start < expected + 0.04 or not 0.18 <= end - start <= 0.24:
             raise ValueError('NSE-2 physical phone-code contact timing differs')
         if not any(int(r) == raw and int(k, 16) == key and start <= float(t) <= end for r, k, t in decoded):
@@ -400,11 +433,11 @@ def verify_security_attempt(text, pixels, *, retry_zero=False):
         raise ValueError('NSE-2 matching phone-code/retry rejection evidence missing')
     first, second, compare_time = matches[1][0]
     times = [float(matches[0][0]), float(compare_time), float(matches[2][0]), float(matches[3][0])]
-    if first != second or times != sorted(times) or not 15 <= times[0] <= times[-1] < 15.3:
+    if first != second or times != sorted(times) or not submit_time <= times[0] <= times[-1] < submit_time+.3:
         raise ValueError('NSE-2 matching phone-code/retry rejection ordering differs')
     if retry_zero:
         returns = re.findall(r'nse2_security_return: accepted=1 attempts=00 t=([0-9.]+) observer_writes=0', text)
-        if len(returns) != 1 or not times[-1] <= float(returns[0]) < 15.3:
+        if len(returns) != 1 or not times[-1] <= float(returns[0]) < submit_time+.3:
             raise ValueError('NSE-2 own verifier successful return missing')
     return dict(physical_phone_code_attempts=1, phone_code_authenticated=retry_zero,
                 phone_code_result='accepted; application UI unproved' if retry_zero else 'Code error',
