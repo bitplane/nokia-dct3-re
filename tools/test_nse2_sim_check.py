@@ -72,6 +72,16 @@ class SimCheckTest(unittest.TestCase):
                     self.assertRaises(ValueError):
                 verify_security_attempt(contacts().replace(old, new), b'frame')
 
+    def test_zero_attempt_fixture_requires_own_successful_return(self):
+        text = contacts().replace('attempts=ff', 'attempts=00')
+        returned = '\nnse2_security_return: accepted=1 attempts=00 t=15.071 observer_writes=0'
+        with patch('tools.nse2_sim_check.AUTHENTICATED_FRAME', hashlib.sha256(b'frame').hexdigest()):
+            with self.assertRaisesRegex(ValueError, 'successful return'):
+                verify_security_attempt(text, b'frame', retry_zero=True)
+            result = verify_security_attempt(text + returned, b'frame', retry_zero=True)
+        self.assertTrue(result['phone_code_authenticated'])
+        self.assertFalse(result['usable_boot'])
+
     def test_missing_extra_wrong_and_outside_window_contacts_fail(self):
         for text in (contacts().replace('key=01', 'key=02'),
                      contacts().replace('t=12.1', 't=11.1'),

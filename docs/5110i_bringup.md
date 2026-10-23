@@ -8,8 +8,10 @@ firmware's **Insert SIM card** screen. Two physical Menu presses reach the
 own decoder as raw key 11 / key `19`. With the synthetic card physically
 inserted, firmware completes SIM read bootstrap and presents **Security code**.
 One physical `12345` + OK attempt matches the cached code but the erased
-retry counter rejects it, producing **Code error**. Authentication,
-persistent contacts, application-menu, registration, calls and SMS are not accepted.
+retry counter rejects it, producing **Code error**. A separate one-byte
+zero-attempt NV fixture lets the same physical code return `accepted=1`.
+Its resulting frame has placeholder-like glyphs: persistent contacts,
+application-menu, registration, calls and SMS are not accepted.
 Fitted mask identity, DSP clock and measured board calibration are unproved.
 
 The ordinary `noki5110i` profile remains unchanged: erased EEPROM and a
@@ -18,8 +20,8 @@ DSP but retains open-pin ADC2; it completes DSP startup while the analog
 readiness counter cannot drain. These are explicit controls, not alternative
 claims of usable boot.
 
-Next: test the own retry-counter contract with an explicit zero-attempt NV
-fixture, keeping integrity-only rejection as a negative control.
+Next: identify the post-authentication UI/context and invalid NV consumers;
+keep integrity-only rejection as a negative control.
 Do not substitute donor EEPROM, force firmware state, or claim phone service
 from the graphical prompt or key decode alone.
 
@@ -40,6 +42,7 @@ make verify-5110i-nominal-boot RUN_DIR=tmp/nse2-nominal-boot
 make verify-5110i-nominal-input RUN_DIR=tmp/nse2-nominal-input
 make verify-5110i-sim-bootstrap RUN_DIR=tmp/nse2-sim-bootstrap
 make verify-5110i-phonecode-boundary RUN_DIR=tmp/nse2-phonecode-boundary
+make verify-5110i-phonecode-accept RUN_DIR=tmp/nse2-phonecode-accept
 ```
 
 The nominal boot gate requires the reviewed unattended seven-second frame
@@ -221,12 +224,18 @@ Descriptor group 7 at `2aeaf0` maps `0701` to EEPROM `04a0`/eight bytes,
 run loads `04a0`/eight bytes into `10c6f8`; the retry byte is therefore
 `04a4`, not identity address `000c`. A zero-attempt fixture may change only
 that external NV byte; it must not overwrite the cached counter or verifier
-result. Successful authentication and its resulting UI still require a run.
+result. With only initial EEPROM `04a4=00`, the same physical `12345` reaches
+the same matching comparison, passes the retry guard and returns `accepted=1`
+at `2946b2`. Two independent cold runs reproduce the seventeen-second frame
+hash `df66881e695c25b4a157c80b40cf56ad246bb45a9d54c1054264222a639db931`.
+That frame contains placeholder-like glyphs, not an accepted idle/menu UI.
+This explicitly synthetic retry fixture is not authentic factory provisioning;
+it neither supplies a donor identity nor changes the cached counter/result.
 
 ## Remaining work
 
-1. Recover phone-side authentication and verify persistent contacts with
-   physical input; SIM read bootstrap alone does not establish either.
+1. Recover post-authentication UI/context and verify persistent contacts
+   with physical input; a successful verifier return does not establish either.
 2. Recover semantic EEPROM requirements from their own consumers; retain
    integrity-only fixtures as diagnostic inputs, not factory defaults.
 3. Qualify application/menu behavior and longer lifecycle/save-state tests.

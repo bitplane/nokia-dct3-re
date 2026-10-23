@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 790 gates: 592 generated from typed steps, 198 copied verbatim (shell).
+# 791 gates: 593 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -172,7 +172,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5110i-static verify-5110i-native-verifier \
 	verify-5110i-native-verifier-erased verify-5110i-input-frontier \
 	verify-5110i-nominal-boot verify-5110i-nominal-input \
-	verify-5110i-sim-bootstrap verify-5110i-phonecode-boundary verify-6150-static \
+	verify-5110i-sim-bootstrap verify-5110i-phonecode-boundary \
+	verify-5110i-phonecode-accept verify-6150-static \
 	verify-6110-bootstrap-capture verify-dct3-type-1f-static verify-3210-v501 \
 	verify-dsp-memory-upload verify verify-ccont verify-ccont-watchdog \
 	verify-gensio verify-display verify-dsp-transport verify-cobba-control \
@@ -1406,6 +1407,9 @@ verify-5110i-sim-bootstrap: verify-5110i-static build
 
 verify-5110i-phonecode-boundary: verify-5110i-static build
 	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR) --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --seconds 20
+
+verify-5110i-phonecode-accept: verify-5110i-static build
+	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR) --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --phone-retry-zero --seconds 20
 
 verify-6150-static:
 	$(VENV)/bin/python tools/nsm1_v523_static_check.py roms/research/nsm1-v523/6150-v523-ppm-c.fls --package roms/archive-dct3-packages/nsm1_523.exe --eeprom-package roms/research/nsm1-v523/NokiX-scripts-2011.07.24.zip --security-fixture roms/research/nsm1-v523/nsm1-security-checksum-valid.bin --output run_census/nsm1_v523_static_boundary.json

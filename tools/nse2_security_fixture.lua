@@ -41,6 +41,12 @@ _G.nse2_security_retry_tap = space:install_read_tap(0x29461c, 0x29461f, 'nse2_se
     machine:logerror(string.format('nse2_security_retry: matched=%d attempts=%02x lr=%08x t=%.9f observer_writes=0\n',
         cpu.state['R0'].value, space:read_u8(0x10c6fc), cpu.state['R14'].value, now))
 end)
+_G.nse2_security_return_tap = space:install_read_tap(0x2946b0, 0x2946b3, 'nse2_security_return', function()
+    local now = machine.time:as_double()
+    if cpu.state['R15'].value ~= 0x2946b2 or now < 15 or now > 15.3 then return end
+    machine:logerror(string.format('nse2_security_return: accepted=%d attempts=%02x t=%.9f observer_writes=0\n',
+        cpu.state['R0'].value, space:read_u8(0x10c6fc), now))
+end)
 _G.nse2_security_identity_tap = space:install_read_tap(0x2593b8, 0x2593bb, 'nse2_security_identity', function()
     local now = machine.time:as_double()
     if cpu.state['R15'].value ~= 0x2593b8 or now < 15 or now > 15.3 then return end

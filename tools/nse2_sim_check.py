@@ -4,6 +4,7 @@ import re
 
 SECURITY_FRAME = 'ec2809a9dff350a769c7315f5fc3b2a8fb29e534595c2b3c2a7dc0f6cc4f9466'
 CODE_ERROR_FRAME = '042030d4e6f3a8e75d15f45e5ef6ea8cff68f50038e98d2d7a76cb64c489f6a9'
+AUTHENTICATED_FRAME = 'df66881e695c25b4a157c80b40cf56ad246bb45a9d54c1054264222a639db931'
 BINARY_FILES = {0x6fb7: 15, 0x6fae: 1, 0x6f05: 4, 0x6fad: 3,
                 0x6f38: 12, 0x6f07: 9, 0x6f78: 2, 0x2fe6: 4,
                 0x6f46: 17, 0x6f74: 16, 0x6f7e: 11, 0x6f30: 24,
@@ -51,7 +52,7 @@ def verify_sim_reads(text, pixels):
                 binary_files_read=16, phone_code_authenticated=False, sim_pin_verified=False)
 
 
-def verify_security_attempt(text, pixels):
+def verify_security_attempt(text, pixels, *, retry_zero=False):
     contacts = re.findall(r'nse2_security_contact: index=([1-6]) down=([01]) '
                           r't=([0-9.]+) physical_only=1', text)
     if [(int(i), int(down)) for i, down, _ in contacts] != [(i, down) for i in range(1, 7) for down in (1, 0)]:
@@ -65,13 +66,15 @@ def verify_security_attempt(text, pixels):
             raise ValueError('NSE-2 physical phone-code contact timing differs')
         if not any(int(r) == raw and int(k, 16) == key and start <= float(t) <= end for r, k, t in decoded):
             raise ValueError('NSE-2 phone-code contacts did not reach the own decoder')
-    if hashlib.sha256(pixels).hexdigest() != CODE_ERROR_FRAME:
-        raise ValueError('NSE-2 reviewed Code error result differs')
+    expected_frame = AUTHENTICATED_FRAME if retry_zero else CODE_ERROR_FRAME
+    if hashlib.sha256(pixels).hexdigest() != expected_frame:
+        raise ValueError('NSE-2 reviewed phone-code result frame differs')
+    counter = '00' if retry_zero else 'ff'
     required = (
         r'nse2_security_encode: input=313233343500 destination=[0-9a-f]{8} lr=0029469b t=([0-9.]+) observer_writes=0',
         r'nse2_security_compare: first=0010c6f8 second=[0-9a-f]{8} length=4 a=([0-9a-f]{8}) b=([0-9a-f]{8}) lr=002946a5 t=([0-9.]+) observer_writes=0',
-        r'nse2_security_result: comparison=00000000 attempts=ff t=([0-9.]+) observer_writes=0',
-        r'nse2_security_retry: matched=1 attempts=ff lr=002946b3 t=([0-9.]+) observer_writes=0',
+        rf'nse2_security_result: comparison=00000000 attempts={counter} t=([0-9.]+) observer_writes=0',
+        rf'nse2_security_retry: matched=1 attempts={counter} lr=002946b3 t=([0-9.]+) observer_writes=0',
     )
     matches = [re.findall(pattern, text) for pattern in required]
     if any(len(rows) != 1 for rows in matches):
@@ -80,7 +83,12 @@ def verify_security_attempt(text, pixels):
     times = [float(matches[0][0]), float(compare_time), float(matches[2][0]), float(matches[3][0])]
     if first != second or times != sorted(times) or not 15 <= times[0] <= times[-1] < 15.3:
         raise ValueError('NSE-2 matching phone-code/retry rejection ordering differs')
-    return dict(physical_phone_code_attempts=1, phone_code_authenticated=False,
-                phone_code_result='Code error', exact_editor_buffer_unproved=False,
-                submitted_code_matches_cached_record=True, retry_counter=255,
-                rejection_boundary='own retry guard at 29461c')
+    if retry_zero:
+        returns = re.findall(r'nse2_security_return: accepted=1 attempts=00 t=([0-9.]+) observer_writes=0', text)
+        if len(returns) != 1 or not times[-1] <= float(returns[0]) < 15.3:
+            raise ValueError('NSE-2 own verifier successful return missing')
+    return dict(physical_phone_code_attempts=1, phone_code_authenticated=retry_zero,
+                phone_code_result='accepted; application UI unproved' if retry_zero else 'Code error',
+                exact_editor_buffer_unproved=False, usable_boot=False,
+                submitted_code_matches_cached_record=True, retry_counter=0 if retry_zero else 255,
+                rejection_boundary=None if retry_zero else 'own retry guard at 29461c')

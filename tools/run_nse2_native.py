@@ -22,11 +22,13 @@ MASK_INPUTS = (
 )
 
 
-def prepare_native(root, run, *, record_checksum=False, nominal_vbat=False, insert_sim=False):
+def prepare_native(root, run, *, record_checksum=False, nominal_vbat=False, insert_sim=False, phone_retry_zero=False):
     if run.exists():
         raise ValueError('NSE-2 native experiment requires a new run directory')
     if insert_sim and not nominal_vbat:
         raise ValueError('NSE-2 inserted card requires the nominal-voltage research socket')
+    if phone_retry_zero and not (record_checksum and insert_sim):
+        raise ValueError('NSE-2 retry fixture requires integrity EEPROM and inserted SIM')
     masks = {}
     for name, size, expected in MASK_INPUTS:
         data = (root / 'roms/noki5110' / name).read_bytes()
@@ -49,6 +51,14 @@ def prepare_native(root, run, *, record_checksum=False, nominal_vbat=False, inse
                                basis='NSE-1 3.6 V / typical CCONT 6.5 mV per bit' if nominal_vbat else 'research open-pin default',
                                measured_nse2_calibration=False)
     report['inserted_synthetic_sim'] = insert_sim
+    if phone_retry_zero:
+        path = run / 'nvram' / machine / 'eeprom'
+        image = bytearray(path.read_bytes())
+        image[0x4a4] = 0
+        path.write_bytes(image)
+        report.update(phone_retry_fixture={'address': '04a4', 'initial': 0, 'authentic_dump': False},
+                      initial_eeprom='diagnostic own checksums plus explicit zero-attempt byte 04a4',
+                      eeprom_sha256=hashlib.sha256(image).hexdigest())
     if insert_sim:
         config = ET.Element('mameconfig', version='10')
         system = ET.SubElement(config, 'system', name=machine)
@@ -67,6 +77,7 @@ def main():
     parser.add_argument('--insert-sim', action='store_true', help='insert the available synthetic card through its physical input')
     parser.add_argument('--physical-menu', action='store_true', help='press only the physical Menu contacts')
     parser.add_argument('--security-code', action='store_true', help='one physical 12345 + OK experiment')
+    parser.add_argument('--phone-retry-zero', action='store_true', help='explicit own-record zero-attempt NV fixture')
     parser.add_argument('--seconds', type=int, default=8, choices=range(8, 121), metavar='8..120')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -77,8 +88,11 @@ def main():
             raise ValueError('NSE-2 complete SIM read bootstrap requires at least 12 seconds')
         if args.security_code and (not args.insert_sim or args.seconds < 18 or args.physical_menu):
             raise ValueError('security experiment requires inserted SIM, at least 18 seconds, and no Menu probe')
+        if args.phone_retry_zero and not args.security_code:
+            raise ValueError('retry fixture requires the physical security-code experiment')
         report = prepare_native(root, run, record_checksum=args.record_checksum_only,
-                                nominal_vbat=args.nominal_vbat, insert_sim=args.insert_sim)
+                                nominal_vbat=args.nominal_vbat, insert_sim=args.insert_sim,
+                                phone_retry_zero=args.phone_retry_zero)
         machine = report['machine']
         command = [str(mame), machine, '-rompath', str(run / 'roms'),
                    '-nvram_directory', str(run / 'nvram'), '-cfg_directory', str(run / 'cfg'),
@@ -117,10 +131,12 @@ def main():
                 result.update(verify_sim_reads(text, frame.convert('L').tobytes()))
             if args.security_code:
                 with Image.open(run / 'snap/nse2_security_result.png') as frame:
-                    result.update(verify_security_attempt(text, frame.convert('L').tobytes()))
+                    result.update(verify_security_attempt(text, frame.convert('L').tobytes(), retry_zero=args.phone_retry_zero))
         (run / 'acceptance.json').write_text(json.dumps(result, indent=2) + '\n')
         if args.insert_sim:
-            print('NSE-2 SIM read bootstrap PASS; phone-code authentication remains unproved')
+            print('NSE-2 SIM read bootstrap PASS; ' +
+                  ('phone code accepted, application UI unproved' if args.phone_retry_zero else
+                   'phone-code authentication remains unproved'))
         elif args.nominal_vbat:
             scope = 'decoded physical Menu' if args.physical_menu else 'graphical Insert SIM card'
             print(f'NSE-2 nominal-voltage {scope} PASS; fitted board and phone services unproved')

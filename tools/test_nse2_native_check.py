@@ -181,6 +181,19 @@ class NativeTest(unittest.TestCase):
             self.assertEqual((nominal / 'nvram/nse2r4v/eeprom').read_bytes(),
                              (run / 'nvram/nse2r4t/eeprom').read_bytes())
             self.assertEqual((nominal / 'roms/nse2r4v/5110i_5.53A.fls').read_bytes(), b'own flash')
+            zero = root / 'retry-zero'
+            with patch('tools.run_nse2_native.MASK_INPUTS', specs), \
+                    patch('tools.run_nse2_boundary.inspect', side_effect=[
+                        (b'own flash', {'archive_sha256': 'zip'}),
+                        (b'own flash', {'archive_sha256': 'exe'})]):
+                zero_report = prepare_native(root, zero, record_checksum=True, nominal_vbat=True,
+                                             insert_sim=True, phone_retry_zero=True)
+            before = (nominal / 'nvram/nse2r4v/eeprom').read_bytes()
+            after = (zero / 'nvram/nse2r4v/eeprom').read_bytes()
+            self.assertEqual([i for i, (a, b) in enumerate(zip(before, after)) if a != b], [0x4a4])
+            self.assertEqual(after[0x4a4], 0)
+            self.assertFalse(zero_report['authentic_provisioning'])
+            self.assertIn('value="0"', (zero / 'cfg/nse2r4v.cfg').read_text())
 
     def test_wrong_mask_rejected_before_preparing_any_run(self):
         with tempfile.TemporaryDirectory() as directory:
