@@ -5,12 +5,19 @@ local space=machine.devices[':maincpu'].spaces.program
 local capture=dofile(directory..'arm_architecture_snapshot.lua')
 local card=machine.devices[':sim_card']
 local simi=machine.devices[':simi']
+local sms=_G.nse2_sim_state_sms==true
+local length=sms and 176 or 32
+local partial=sms and 60 or 0
+local capture_time=sms and 26.5 or 28.3
 local function item(device,name)
     local index=assert(device.items['0/'..name],'missing saved item '..name)
     return emu.item(index)
 end
-local function adn()
-    return item(card,'m_adn'):read_block(0,32):gsub('.',function(byte) return string.format('%02x',byte:byte()) end)
+local function hex(value)
+    return value:gsub('.',function(byte) return string.format('%02x',byte:byte()) end)
+end
+local function record()
+    return hex(item(card,sms and 'm_sms' or 'm_adn'):read_block(0,length))
 end
 local function fields(device,names)
     local result={}
@@ -34,10 +41,10 @@ retained[#retained+1]=space:install_write_tap(0x20034,0x20037,'sim_state_tx',fun
     tail=(tail..string.char(byte)):sub(-5)
     if pending then sent=sent+1 end
     observe('tx',byte)
-    if not requested and tail==string.char(0xa0,0xdc,1,4,32) then pending=true end
+    if not requested and tail==string.char(0xa0,0xdc,1,4,length) then pending=true end
 end)
 retained[#retained+1]=space:install_write_tap(0x2003c,0x2003f,'sim_state_flush',function(_,value,mask)
-    if pending and not requested and mask&0xff00~=0 and ((value>>8)&0xff)==0 then
+    if pending and sent==partial and not requested and mask&0xff00~=0 and ((value>>8)&0xff)==0 then
         requested=true
         machine:logerror(string.format('nse2_sim_state: requested=1 sent=%d t=%.9f\n',sent,machine.time:as_double()))
         machine:save('nse2_sim_pending')
@@ -50,15 +57,17 @@ local function snapshot(label)
     local s=capture(machine,0x10fffc)
     local protocol=fields(card,{'m_ins','m_tx_len','m_tx_expected','m_receiving_body','m_selected_file'})
     local controller=fields(simi,{'m_rx_count','m_rx_ready','m_iir','m_tx_ready_pending','m_uart_tx_count'})
-    local record=adn()
-    assert(record==string.rep('ff',32),'ADN was not rolled back before commit')
-    local result=string.format('t=%.9f pc=%08x sp=%08x ram=%08x cpu=%s card=%s simi=%s adn=%s',s.time,s.pc,s.sp,s.ram,s.cpu,protocol,controller,record)
+    local stored=record()
+    local free=sms and ('00'..string.rep('ff',175)) or string.rep('ff',32)
+    assert(stored==free,'SIM record was not rolled back before commit')
+    local body=partial>0 and hex(item(card,'m_tx'):read_block(0,partial)) or ''
+    local result=string.format('t=%.9f pc=%08x sp=%08x ram=%08x cpu=%s card=%s simi=%s record=%s partial=%s',s.time,s.pc,s.sp,s.ram,s.cpu,protocol,controller,stored,body)
     machine:logerror('nse2_sim_state: phase='..label..' '..result..'\n')
     return result
 end
 retained[#retained+1]=emu.add_machine_pre_save_notifier(function()
-    assert(requested and sent==0,'SIM body already transmitted before save')
-    assert(machine.time:as_double()>27.57,'Save contact still held')
+    assert(requested and sent==partial,'SIM checkpoint body count differs')
+    assert(machine.time:as_double()>(sms and 25.9 or 27.57),'Save contact still held')
     saved=snapshot('saved')
     anchor,phase=machine.time:as_double(),'reference'
 end)
@@ -69,15 +78,15 @@ retained[#retained+1]=emu.add_machine_post_load_notifier(function()
 end)
 emu.register_frame_done(function()
     local now=machine.time:as_double()
-    if phase=='reference' and not referenced and now>=28.3 then
+    if phase=='reference' and not referenced and now>=capture_time then
         referenced=true
-        machine:logerror('nse2_sim_state: committed=reference adn='..adn()..'\n')
+        machine:logerror('nse2_sim_state: committed=reference record='..record()..'\n')
         machine.screens[':screen']:snapshot('nse2_sim_state_reference.png')
-    elseif phase=='reference' and referenced and now>=28.4 then
+    elseif phase=='reference' and referenced and now>=capture_time+.1 then
         machine:load('nse2_sim_pending')
-    elseif phase=='restored' and not restored and now>=28.3 then
+    elseif phase=='restored' and not restored and now>=capture_time then
         restored=true
-        machine:logerror('nse2_sim_state: committed=restored adn='..adn()..'\n')
+        machine:logerror('nse2_sim_state: committed=restored record='..record()..'\n')
         machine.screens[':screen']:snapshot('nse2_sim_state_restored.png')
         assert(#traffic.reference>0 and #traffic.reference==#traffic.restored,'SIM replay count differs')
         for i,event in ipairs(traffic.reference) do assert(event==traffic.restored[i],'SIM replay mismatch '..i) end
@@ -87,12 +96,12 @@ emu.register_frame_done(function()
         end
         file:close()
         complete=true
-        machine:logerror(string.format('nse2_sim_state: completed=1 reference=%d restored=%d sent_before_save=0\n',#traffic.reference,#traffic.restored))
+        machine:logerror(string.format('nse2_sim_state: completed=1 reference=%d restored=%d sent_before_save=%d\n',#traffic.reference,#traffic.restored,partial))
     end
 end)
 retained[#retained+1]=emu.add_machine_stop_notifier(function() if not complete then machine:logerror('nse2_sim_state: FAIL incomplete\n') end end)
 _G.nse2_sim_state=retained
 
-_G.nse2_phonebook_save_hold=.07
-dofile(directory..'nse2_phonebook_fixture.lua')
+if sms then _G.nse2_sms_save_hold=.07 else _G.nse2_phonebook_save_hold=.07 end
+dofile(directory..(sms and 'nse2_sms_fixture.lua' or 'nse2_phonebook_fixture.lua'))
 

@@ -13,7 +13,9 @@ for _,press in ipairs({{20,1,4},{20.5,0,8},{21,1,4},{21.5,0,8},{22,0,8},
                        {22.5,1,4},{23,3,2},{24.3,1,4},{24.8,0,8},{25.3,0,8},{25.8,1,4}}) do
     local field=contact(press[2],press[3])
     events[#events+1]={press[1],field,1}
-    events[#events+1]={press[1]+0.15,field,0}
+    local hold=press[1]==25.8 and _G.nse2_sms_save_hold or .15
+    assert(hold>0 and hold<=.15)
+    events[#events+1]={press[1]+hold,field,0}
 end
 local next_event,next_frame=1,1
 local frames={20.8,21.3,22.3,22.8,24,24.6,25.6,26.5,29}

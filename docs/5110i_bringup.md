@@ -83,6 +83,7 @@ make verify-5110i-fdn-dial-policy RUN_DIR=tmp/nse2-fdn-policy
 make verify-5110i-native-processing RUN_DIR=tmp/nse2-native-processing
 make verify-5110i-native-ui-state RUN_DIR=tmp/nse2-native-ui-state
 make verify-5110i-sim-write-state RUN_DIR=tmp/nse2-sim-write-state
+make verify-5110i-sms-write-state RUN_DIR=tmp/nse2-sms-write-state
 ```
 
 The nominal boot gate requires the reviewed unattended seven-second frame
@@ -1226,6 +1227,30 @@ This qualifies the declared pending card/SIMI transaction and cold storage
 continuation, not every serial phase, electrical timing, native network
 service or operation beyond the known restart. Saved-item access is
 read-only; only physical inputs and emulator save/load APIs are driven.
+
+`verify-5110i-sms-write-state` exercises a different transaction phase. The
+physical offline draft Save sends `A0 DC 01 04 B0` to EF_SMS. Firmware flushes
+body bytes at cumulative counts `15,30,45,60,...,165,176`; these are observed
+firmware bursts, not a new physical FIFO-capacity or baud claim. A checkpoint
+after the fourth body flush retains 60 of 176 bytes at 25.934035922 seconds.
+Read-only card observations require receiving-body true, expected length
+176, EF `6F3C` selected, the exact first 60 draft bytes retained and the
+stored SMS record still free. The saved/restored MCU observation and partial
+buffer match; the reference commit is rolled back to a free record on load.
+The shared observer also requires an empty RX FIFO, zero IIR, a pending
+TX-ready cause and an empty TX FIFO: this is waiting to transmit more body
+bytes, unlike the ADN gate's queued procedure-byte checkpoint.
+Both legs then transmit the remaining 116 bytes, receive `9000` and render
+the same Saved frame. All 118 recorded TX/RX events match over 0.5 seconds.
+Only the exact unsent `A` record changes in complete card storage. A separate
+cold Outbox/Read displays `A` and preserves the whole saved card.
+`--sms-partial` selects this contract in the same isolated runner, observer
+and checker used by the ADN gate. The shared trace names identify SIM
+transaction state, while explicit file, body-length, partial-buffer, queue,
+frame and complete-card assertions keep the two acceptance cases distinct.
+Each gate uses preparation, restore and cold-read processes; neither extends
+the native stability horizon. The ordinary SMS fixture retains its default
+150-ms Save hold and has a separate regression run.
 
 ## Remaining work
 
