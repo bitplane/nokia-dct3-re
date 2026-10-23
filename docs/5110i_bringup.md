@@ -351,9 +351,27 @@ all four phases, including exact card deltas, command ordering,
 successful CHV2/file-validity statuses and physical contact timing. Its
 negative tests reject protocol, input and storage corruption. The runner
 also verifies phone-code acceptance and the exact cold On/Off frames.
-These runs do not establish
-fixed-number editing, outgoing-call restriction,
-network operation, or native stability beyond the known restart boundary.
+The settings gate does not establish fixed-number editing, outgoing-call
+restriction, network operation, or native stability beyond the known restart
+boundary.
+
+`verify-5110i-fdn-records` adds protected records through the separate Fixed dialling / Numbers menu with
+FDN Off. Physical Add, PIN2 `5678`, name `A` and number `12345` issue CHV2
+VERIFY (`9000`) followed by `A0 DC 01 04 20` to EF_FDN (`6F3B`) at about
+27.69 seconds. The complete card changes only record one's encoded name,
+length, TON/NPI and BCD digits; the other nine records, ADN, credentials and
+validity stay unchanged. A cold Search with held `#` displays `12345`, reads
+record one without PIN2 VERIFY and preserves the complete saved card. A
+fresh empty-card control supplying PIN2 `5675` receives `9804`, changes only
+PIN2 retries from three to two, and sends no UPDATE RECORD. The runner's
+`--records` option links eight fresh processes including preparation and
+the four settings phases. Write imports the final Off card; read imports
+the successful write, while the wrong-PIN2 branch independently imports
+the retained empty Off card. `check_record` in `tools/nse2_fdn_check.py`
+checks protocol, physical input and complete-card transitions, and the
+runner verifies phone authentication and exact result frames. This proves
+record creation/readback and failed-write protection, not modification or
+erasure of an existing record, or active-FDN dialing restrictions.
 
 `verify-5110i-pin2-change` uses two isolated thirty-second processes with
 PIN1 disabled and the explicitly declared phone-code retry fixture. Physical

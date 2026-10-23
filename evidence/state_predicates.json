@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nse2_fdn_protected_record_cold_read", "owner": "nse2_sim_security", "status": "satisfied",
+      "predicate": "Physical FDN record creation persists across a cold process while wrong PIN2 prevents the same protected write",
+      "current": "verify-5110i-fdn-records links preparation, On/cold-On/Off/cold-Off, then physical Numbers/Add A/12345, cold Search with held number view, and independent wrong-PIN2 Add from the retained empty Off card. Successful CHV2 VERIFY precedes UPDATE RECORD of EF_FDN record one; only the expected encoded record bytes change. Cold read displays12345, issues no PIN2 VERIFY or write and preserves the complete saved card. PIN2 5675 returns9804 and decrements only its retry count3 to2 without UPDATE. Phone authentication, exact frames, physical contacts and full-card transitions are checked. This is FDN-Off protected creation/readback, not modification/erasure, active-FDN call restrictions, native RF or long-run native stability.",
+      "evidence": ["docs/5110i_bringup.md", "gates.json", "tools/run_nse2_fdn.py", "tools/nse2_fdn_record_fixture.lua", "tools/nse2_fdn_check.py", "tools/test_nse2_fdn_check.py"]
+    },
+    {
       "id": "nse2_fdn_validity_cold_settings", "owner": "nse2_sim_security", "status": "satisfied",
       "predicate": "Physical FDN activation and deactivation persist across independent native-compatibility processes through SIM file-validity commands",
       "current": "verify-5110i-fdn prepares its own fresh PIN1-disabled laboratory card and explicitly advertises FDN with invalid-ADN access. Physical On and PIN2 5678 issue successful CHV2 VERIFY, ADN INVALIDATE and LOCI/IMSI REHABILITATE. Only the ADN-valid byte changes. Cold On retains the complete card and shows the exact On frame; physical Off verifies PIN2 and rehabilitates ADN, reversing only that byte. Cold Off retains every byte, issues no security/file-validity command and shows the exact Off frame. Separate phone-code authentication and physical contact ordering are checked in each phase. Fixed-number editing, outgoing-call restrictions, authentic fitted DSP data, native RF and operation past the known restart remain unproved.",

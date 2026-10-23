@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nse2_fdn_check import check_phase
+from tools.nse2_fdn_check import check_phase, check_record, FDN_RECORD
 from tools.sim_fdn_profile import extend, expected_validity_card
 
 
@@ -29,6 +29,39 @@ def fixture(phase):
 
 
 class FdnCheckTest(unittest.TestCase):
+    def test_record_storage_protocol_and_physical_input(self):
+        before=bytearray(extend(bytes(3570),True))
+        before[3517]=3
+        for mode,count in (('write',54),('read',30),('wrong',38)):
+            initial=bytearray(before)
+            if mode=='read':
+                initial[3578:3610]=FDN_RECORD
+            final=bytearray(initial)
+            rows=[]
+            if mode!='read':
+                rows.extend(('sim_device: header cla=a0 ins=20 p1=00 p2=02 p3=08 selected=6f3b t=24.9',
+                             'SIM status ins=20 sw='+('9804 chv=3/2' if mode=='wrong' else '9000 chv=3/3')+' puk=10/10 enabled=0'))
+            if mode=='write':
+                final[3578:3610]=FDN_RECORD
+                rows.extend(('sim_device: header cla=a0 ins=dc p1=01 p2=04 p3=20 selected=6f3b t=27.7',
+                             'SIM status ins=dc sw=9000 chv=3/3 puk=10/10 enabled=0'))
+            elif mode=='read':
+                rows.append('sim_device: header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3b t=23.1')
+            else:
+                final[3517]=2
+            for i in range(count):
+                duration=4 if mode=='read' and i==count-1 else .15
+                when=18.5+(i//2)*.35+(duration if i%2 else 0)
+                rows.append(f'nse2_fdn_record_contact: event={i+1} down={1-i%2} t={when:.3f} physical_only=1')
+            text='\n'.join(rows)
+            self.assertEqual(check_record(text,initial,final,mode)['mode'],mode)
+            corrupt=bytearray(final)
+            corrupt[10]^=1
+            for bad_text,bad_card in ((text,corrupt),(text.replace('event=1 ','event=2 ',1),final),
+                                      (text.replace('selected=6f3b','selected=6f3a'),final)):
+                with self.assertRaises(ValueError):
+                    check_record(bad_text,initial,bad_card,mode)
+
     def test_all_four_phases(self):
         for phase in range(4):
             with self.subTest(phase=phase):

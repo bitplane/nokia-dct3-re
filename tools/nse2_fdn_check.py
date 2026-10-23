@@ -3,7 +3,61 @@ import re
 
 from tools.nse2_sim_check import HEADER
 from tools.sim_fdn_profile import expected_validity_card
-from tools.sim_security_trace_check import statuses
+from tools.sim_security_trace_check import ATTEMPTS_OFFSET, statuses
+
+FDN_RECORD = bytes.fromhex('41ffffffffffffffffffffffffffffffffff04812143f5ffffffffffffffffff')
+
+
+def check_record(text, before, after, mode):
+    if mode not in ('write', 'read', 'wrong'):
+        raise ValueError('known FDN record mode required')
+    if len(before)!=3898 or before[3570:3578]!=b'FDN\x01\x01\x01\x01\x00':
+        raise ValueError('complete explicit FDN-Off card required')
+    expected=bytearray(before)
+    if mode=='read':
+        if before[3578:3610]!=FDN_RECORD:
+            raise ValueError('cold read lacks physically saved FDN record')
+    else:
+        if before[3578:]!=b'\xff'*320 or before[ATTEMPTS_OFFSET+1]!=3:
+            raise ValueError('empty FDN and three PIN2 attempts required')
+        if mode=='wrong':
+            expected[ATTEMPTS_OFFSET+1]=2
+        else:
+            expected[3578:3610]=FDN_RECORD
+    if after!=expected:
+        raise ValueError('FDN record operation changed unexpected storage')
+    headers=[tuple(int(v,16) for v in m.groups()[:6])+(float(m[7]),)
+             for m in HEADER.finditer(text)]
+    security=[h for h in headers if h[1] in (0x20,0x24,0x26,0x28,0x2c,0x04,0x44,0xd6)]
+    if [h[:6] for h in security] != ([] if mode=='read' else [(0xa0,0x20,0,2,8,0x6f3b)]):
+        raise ValueError('FDN record security command differs')
+    if security and not 24.5<security[0][-1]<25.5:
+        raise ValueError('FDN PIN2 verification is outside physical submission')
+    wanted=[] if mode=='read' else [(0x9804 if mode=='wrong' else 0x9000,3 if mode=='write' else 2,10)]
+    if statuses(text,0x20,chv=2)!=wanted:
+        raise ValueError('FDN record PIN2 status differs')
+    updates=[h for h in headers if h[1]==0xdc]
+    if mode=='write':
+        if len(updates)!=1 or updates[0][:6]!=(0xa0,0xdc,1,4,32,0x6f3b) or not 27<updates[0][-1]<28:
+            raise ValueError('FDN UPDATE RECORD target or timing differs')
+        if statuses(text,0xdc,chv=2)!=[(0x9000,3,10)]:
+            raise ValueError('FDN UPDATE RECORD did not succeed')
+    elif updates or statuses(text,0xdc,chv=2):
+        raise ValueError('non-writing FDN path updated a record')
+    if mode=='read' and not any(h[:6]==(0xa0,0xb2,1,4,32,0x6f3b) and h[-1]>22 for h in headers):
+        raise ValueError('cold menu did not read FDN record one')
+    edges=re.findall(r'nse2_fdn_record_contact: event=(\d+) down=([01]) '
+                     r't=([0-9.]+) physical_only=1',text)
+    count={'write':54,'read':30,'wrong':38}[mode]
+    if len(edges)!=count:
+        raise ValueError('FDN record physical contact count differs')
+    for index,(event,down,when) in enumerate(edges):
+        duration=4 if mode=='read' and index==count-1 else .15
+        wanted=18.5+(index//2)*.35+(duration if index%2 else 0)
+        if int(event)!=index+1 or int(down)!=1-index%2 or abs(float(when)-wanted)>.04:
+            raise ValueError('FDN record physical timing or order differs')
+    return dict(mode=mode,fdn_record_persisted=mode=='read',
+                wrong_pin2_rejected=mode=='wrong',call_restrictions_verified=False)
 
 
 def check_phase(text, before, after, phase):
