@@ -817,7 +817,11 @@ public:
 			bool const load = (extension & 0xfee0) == 0x0c40;
 			bool const high = (extension & 0xfee0) == 0x0c60;
 			bool const low = (extension & 0xfee0) == 0x0c80;
-			if (arithmetic || load || high || low)
+			// Short MOD=3 is write-only (SPRU131G table 5-4); f9..ff
+			// are reserved. Long MOD=13 remains a valid source form.
+			bool const operand_valid = mode <= 0xf8 &&
+				(!((mode & 0xf8) == 0x98) || high || low);
+			if (operand_valid && (arithmetic || load || high || low))
 			{
 				int const shift = int(extension & 31) - (BIT(extension, 4) ? 32 : 0);
 				char const *name = arithmetic ? (BIT(extension, 5) ? "SUB" : "ADD") : load ? "LD" : high ? "STH" : "STL";

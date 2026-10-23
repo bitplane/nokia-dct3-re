@@ -2000,6 +2000,7 @@ private:
 				"MVPD syntax distinguishes long-offset and absolute extension order");
 		}
 		osd_printf_info("TMS320C54x MVPD disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		unsigned shifted_valid = 0, shifted_invalid = 0;
 		for (u32 pc : {0x010100, 0x01ffff})
 			for (unsigned mode = 0; mode < 256; ++mode)
 				for (unsigned kind = 0; kind < 5; ++kind)
@@ -2010,8 +2011,12 @@ private:
 							bool const extended = mode >= 0xe0;
 							words const buffer(pc, 0x6f00 | mode, extended ? 0x2345 : extension, extension);
 							std::ostringstream text;
-							expect(decoder.disassemble(text, pc, buffer, buffer) == ((2 + extended) | dasm::SUPPORTED) &&
-								buffer.seen() == (extended ? 7 : 3), "Shifted memory decoder bounds legal extension tuples across page wrap");
+							bool const valid = mode <= 0xf8 &&
+								((mode & 0xf8) != 0x98 || kind >= 3);
+							if (valid) ++shifted_valid; else ++shifted_invalid;
+							u32 const expected = valid ? ((2 + extended) | dasm::SUPPORTED) : 1;
+							expect(decoder.disassemble(text, pc, buffer, buffer) == expected &&
+								buffer.seen() == (extended ? 7 : 3), "Shifted memory decoder distinguishes source/store operand domains across page wrap");
 						}
 		for (unsigned extension = 0; extension < 65536; ++extension)
 		{
@@ -2059,7 +2064,10 @@ private:
 				expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) && text.str() == test.text,
 					"Captured shifted memory syntax retains operation, signed shift, address and independent accumulators");
 			}
-		osd_printf_info("TMS320C54x shifted memory disassembler: PASS forms=114688 rejected=130176 captured=18 syntax=20 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		expect(shifted_valid == 217984 && shifted_invalid == 11392,
+			"Shifted memory source/store census covers all address/extension tuples on both pages");
+		osd_printf_info("TMS320C54x shifted memory disassembler: PASS forms=%u invalid_operands=%u rejected=130176 captured=18 syntax=20 pages=2 bounded_extensions=1 pipeline_claim=0\n",
+			shifted_valid / 2, shifted_invalid / 2);
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

@@ -88,6 +88,22 @@ passing mechanically decoded cases is not hardware-legality evidence.
 Long-offset MOD=13 preincrement is a distinct read-capable form and must not
 be removed by that audit.
 
+The debugger's shifted-memory (`6fxx`) decoder applies the same source/store
+distinction: short `98..9f` is valid for STL/STH destinations, not LD/ADD/SUB
+sources; address bytes `f9..ff` are reserved. Long-offset MOD=13 remains
+admitted. This corrects an older disassembler fixture that treated all 256
+address bytes as legal whenever the operation extension was recognized.
+The exhaustive matrix distinguishes 108,992 valid and 5,696 invalid operand
+tuples, each tested at two program-page positions, separately from reserved
+operation extensions. It checks instruction claims and bounded word fetches,
+not execution timing or completion of the remaining source/RMW audit.
+`tools/run_c54x_core.py --mame mame/mame --rompath mame/roms --profile xorm
+--output-root tmp` runs this matrix before its separate 1,024 XORM execution
+and restoration cases. Accepted evidence: `tmp/run_c54x_core_45tucxku`.
+The full native core regression also passes all 293 required markers and
+terminal completion in `tmp/run_c54x_core_zeklnz_z`. No execution handler or
+handset profile changes as part of this debugger correction.
+
 ### Operand-domain acceptance
 
 [SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf) table 5-4 and
