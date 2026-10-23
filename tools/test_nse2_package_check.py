@@ -32,6 +32,19 @@ def package(members):
     return stream.getvalue()
 
 
+def peripheral_image():
+    image = bytearray(0x190000)
+    for address, encoded in check.PERIPHERAL_FRAGMENTS.values():
+        value = bytes.fromhex(encoded)
+        image[address - check.BASE:address - check.BASE + len(value)] = value
+    for address in (0x2967dc, 0x297020, 0x298200, 0x2866b0):
+        struct.pack_into('>I', image, address - check.BASE, 0x20000)
+    image[0x9907c:0x99088] = bytes.fromhex('002b3848 0010c6b6 002b382c')
+    image[0xb382c:0xb382c + 25] = check.NORMAL_KEYS
+    image[0xb3848:0xb3848 + 5] = bytes.fromhex('3e3e3e3e0d')
+    return image
+
+
 class Nse2PackageTest(unittest.TestCase):
     def test_unknown_wrapper_is_rejected_before_extraction(self):
         with self.assertRaisesRegex(ValueError, 'hash-qualified'):
@@ -93,6 +106,29 @@ class Nse2PackageTest(unittest.TestCase):
     def test_truncated_catalogue_is_rejected(self):
         with self.assertRaisesRegex(ValueError, 'truncated'):
             check.loader_contract(b'')
+
+    def test_peripheral_report_keeps_static_scope(self):
+        result = check.peripheral_contract(peripheral_image())
+        self.assertEqual(result['eeprom']['scl_bit'], 2)
+        self.assertEqual(result['gensio']['ccont_tx'], '0x2a')
+        self.assertEqual(result['keypad']['power_column'], 4)
+        self.assertEqual(result['keypad']['column_irq_mask'], '0x33')
+        self.assertEqual(result['keypad']['normal_keys'], list(check.NORMAL_KEYS))
+        self.assertFalse(result['electrical_timing_or_runtime_delivery_proved'])
+
+    def test_each_peripheral_instruction_is_qualified(self):
+        for name, (address, _) in check.PERIPHERAL_FRAGMENTS.items():
+            image = peripheral_image()
+            image[address - check.BASE] ^= 1
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, name):
+                check.peripheral_contract(image)
+
+    def test_bus_literals_and_table_byte_lanes_are_not_interchangeable(self):
+        for offset in (0x967dc, 0x97020, 0x98200, 0x866b0, 0x9907c, 0xb382c, 0xb3848):
+            image = peripheral_image()
+            image[offset] ^= 1
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                check.peripheral_contract(image)
 
 
 if __name__ == '__main__':

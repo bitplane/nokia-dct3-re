@@ -2352,6 +2352,14 @@
       ]
     },
     {
+      "name": "verify-5110i-boundary",
+      "prerequisites": ["verify-5110i-static", "build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_nse2_boundary.py",
+                 "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-5110i-static",
       "prerequisites": [],
       "variables": {},

@@ -1,0 +1,11 @@
+diff --git a/src/mame/mame.lst b/src/mame/mame.lst
+--- a/src/mame/mame.lst
++++ b/src/mame/mame.lst
+@@ -36158,4 +36158,7 @@
+ quizpani
+ quizpanir
+ 
++@source:nokia/nokia_dct3.cpp
++noki5110i
++
+ @source:nokia/dbox.cpp

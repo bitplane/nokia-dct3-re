@@ -24,6 +24,48 @@ FLASH_SHA256 = '00ab7e062de9c89718eb81031528a646a79317ba0bad5a272a6d4d3b09c77781
 VERSION = b'V 05.53\n11-01-01\nNSE-2\n(c) NMP.\0'
 BASE = 0x200000
 TABLE = 0x29bba0
+PERIPHERAL_FRAGMENTS = {
+    'eeprom_input': (0x29574e, '25802601270446a6200002ab3320791a781c43b2711a'),
+    'eeprom_stop': (0x29581a, '22012380029b33207819431170197919431171192004781943017019'),
+    'eeprom_start': (0x29588c, '22012380029b33207819439170197919431171192004781943017019'),
+    'ccont_read': (0x296704, '4835222821225411222a21044321541121295c0908c9d3fb212d5c08'),
+    'lcd_command': (0x296e46, '4a7621295c890849d3fb212c548846f7'),
+    'lcd_data': (0x296eac, '4a5c21295c890849d3fb212b548846f7'),
+    'keypad_base': (0x298078, '4c6120335d0006800e80'),
+    'keypad_scan': (0x2980a0, '2031231f5503202f26e0550620305d0006c00ec006000e0125ff291f'),
+    'keypad_index': (0x2980f4, '008818084665182806000e05'),
+    'keypad_decode': (0x299010, 'b500f7fff82b28ffd101203ebd0009c12900d00949167809008a188918404913180838807800bd0021194a1178124351184049105c08bd00'),
+    'simi_init': (0x28652e, '4c60213820ff550820c07220'),
+}
+NORMAL_KEYS = bytes.fromhex('3e3e3e3e3e3e1a0102033e19040506183e0708093e170c0a0b')
+
+
+def peripheral_contract(mcu):
+    for name, (address, encoded) in PERIPHERAL_FRAGMENTS.items():
+        expected = bytes.fromhex(encoded)
+        offset = address - BASE
+        if mcu[offset:offset + len(expected)] != expected:
+            raise ValueError('NSE-2 peripheral instruction differs: ' + name)
+    for address in (0x2967dc, 0x297020, 0x298200, 0x2866b0):
+        if mcu[address - BASE:address - BASE + 4] != bytes.fromhex('00020000'):
+            raise ValueError('NSE-2 peripheral base literal differs')
+    if mcu[0x29907c - BASE:0x299088 - BASE] != bytes.fromhex('002b3848 0010c6b6 002b382c'):
+        raise ValueError('NSE-2 keypad table/selector literals differ')
+    if (mcu[0x2b382c - BASE:0x2b382c - BASE + 25] != NORMAL_KEYS
+            or mcu[0x2b3848 - BASE:0x2b3848 - BASE + 5] != bytes.fromhex('3e3e3e3e0d')):
+        raise ValueError('NSE-2 own key tables differ')
+    return dict(instruction_sites={name: hex(address) for name, (address, _) in PERIPHERAL_FRAGMENTS.items()},
+                eeprom=dict(signal='0x20020', direction='0x20024', sda_bit=0, scl_bit=2),
+                gensio=dict(select='0x28', ccont_select='0x22', ccont_tx='0x2a',
+                            ccont_rx='0x2d', status='0x29', ccont_ready_bit=2,
+                            lcd_command='0x2c', lcd_data='0x2b', lcd_ready_bit=0),
+                keypad=dict(rows=5, row_signal='0x31', column_input='0x30',
+                            column_irq_mask='0x33', row_direction='0x2f',
+                            normal_table='0x2b382c', special_table='0x2b3848',
+                            selector='0x10c6b6', raw_formula='row * 5 + column',
+                            normal_keys=list(NORMAL_KEYS), power_column=4),
+                simi=dict(iir='0x38', initialization_contract_only=True),
+                electrical_timing_or_runtime_delivery_proved=False)
 
 
 def sha256(data):
@@ -113,7 +155,7 @@ def inspect(source):
                   mcu_base='0x200000', ppm_base='0x390000',
                   reset_entry='0x200040', thumb_entry='0x2000ec',
                   stack_literal='0x10fb98', eeprom=eeprom_geometry(mcu[5]),
-                  loader=loader_contract(mcu), eeprom_supplied=False,
+                  loader=loader_contract(mcu), peripherals=peripheral_contract(mcu), eeprom_supplied=False,
                   boot_or_peripheral_wiring_proved=False)
     return flash, report
 
