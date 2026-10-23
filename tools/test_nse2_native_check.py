@@ -61,6 +61,16 @@ def nominal_transcript():
 
 
 class NativeTest(unittest.TestCase):
+    def test_nominal_readiness_is_scoped_before_later_application_trace_cap(self):
+        result = verify_nominal_voltage(nominal_transcript() +
+            'nse2_startup_message_cap: reached=256 t=28.0\n', b'', empty_socket_frame=False)
+        self.assertTrue(result['later_mailbox_trace_capped'])
+        self.assertEqual(result['startup_message_coverage_seconds'],3)
+        for suffix in ('', ' t=2.0', ' t=3.0'):
+            with self.subTest(suffix=suffix), self.assertRaises(ValueError):
+                verify_nominal_voltage(nominal_transcript() +
+                    'nse2_startup_message_cap: reached=256' + suffix, b'', empty_socket_frame=False)
+
     def test_nominal_voltage_requires_the_complete_organic_chain(self):
         with patch('tools.nse2_native_check.NOMINAL_FRAME', hashlib.sha256(b'frame').hexdigest()):
             result = verify_nominal_voltage(nominal_transcript(), b'frame')

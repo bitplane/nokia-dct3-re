@@ -186,7 +186,7 @@ _G.nse2_key_init_tap = space:install_read_tap(0x299048, 0x29904b, 'nse2_key_init
                         machine:logerror(string.format('nse2_startup_message: address=%08x value=%04x pc=%08x t=%.9f observer_writes=0\n',
                             address, (data >> shift) & 0xffff, cpu.state['R15'].value, machine.time:as_double()))
                     elseif messages == 257 then
-                        machine:logerror('nse2_startup_message_cap: reached=256\n')
+                        machine:logerror(string.format('nse2_startup_message_cap: reached=256 t=%.9f\n', machine.time:as_double()))
                     end
                 end
             end

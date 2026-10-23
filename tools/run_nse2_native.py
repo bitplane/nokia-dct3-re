@@ -87,6 +87,7 @@ def main():
     parser.add_argument('--phone-retry-zero', action='store_true', help='explicit own-record zero-attempt NV fixture')
     parser.add_argument('--post-auth-menu', action='store_true', help='physical Menu probe after accepted phone code')
     parser.add_argument('--native-processing', action='store_true', help='attach existing passive ROM4 processing observers')
+    parser.add_argument('--phonebook', action='store_true', help='physical Add name and real SIM write experiment')
     parser.add_argument('--seconds', type=int, default=8, choices=range(8, 121), metavar='8..120')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -103,6 +104,8 @@ def main():
             raise ValueError('post-auth Menu probe requires zero-attempt fixture and at least 24 seconds')
         if args.native_processing and not (args.post_auth_menu and args.seconds >= 30):
             raise ValueError('native processing census requires post-authentication Menu and at least 30 seconds')
+        if args.phonebook and (not args.post_auth_menu or args.seconds != 30 or args.native_processing):
+            raise ValueError('phonebook experiment requires post-auth Menu, thirty seconds and no processing census')
         report = prepare_native(root, run, record_checksum=args.record_checksum_only,
                                 nominal_vbat=args.nominal_vbat, insert_sim=args.insert_sim,
                                 phone_retry_zero=args.phone_retry_zero)
@@ -112,7 +115,8 @@ def main():
                    '-video', 'none', '-sound', 'none', '-joystickprovider', 'none',
                    '-midiprovider', 'none', '-nothrottle', '-noreadconfig', '-log', '-verbose',
                    '-seconds_to_run', str(args.seconds), '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools' / ('nse2_processing_fixture.lua' if args.native_processing else
+                   '-autoboot_script', str(root / 'tools' / ('nse2_phonebook_fixture.lua' if args.phonebook else
+                       'nse2_processing_fixture.lua' if args.native_processing else
                        'nse2_post_auth_fixture.lua' if args.post_auth_menu else
                        'nse2_security_fixture.lua' if args.security_code else
                        'nse2_menu_fixture.lua' if args.physical_menu else 'nse2_boot_observe.lua'))]
@@ -165,8 +169,15 @@ def main():
                 (run / 'nse2_native_program.bin').read_bytes(),
                 (run / 'roms' / machine / 'nse1_rom4_dsp_program.bin').read_bytes(),
                 (run / 'roms' / machine / 'nse1_rom4_dsp_data.bin').read_bytes())
+        if args.phonebook:
+            from tools.nse2_sim_check import verify_phonebook_save
+            with Image.open(run / 'snap/nse2_phonebook_5.png') as saved:
+                result['phonebook'] = verify_phonebook_save(text,
+                    (run / 'nvram' / machine / 'sim_card').read_bytes(), saved.convert('L').tobytes())
         (run / 'acceptance.json').write_text(json.dumps(result, indent=2) + '\n')
-        if args.post_auth_menu:
+        if args.phonebook:
+            print('NSE-2 physical contact save PASS; cold reload and stable long boot unproved')
+        elif args.post_auth_menu:
             print('NSE-2 physical Phone book menu/submenu PASS; contact persistence and network unproved')
         elif args.insert_sim:
             print('NSE-2 SIM read bootstrap PASS; ' +

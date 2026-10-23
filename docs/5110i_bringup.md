@@ -12,7 +12,9 @@ retry counter rejects it, producing **Code error**. A separate one-byte
 zero-attempt NV fixture lets the same physical code return `accepted=1`.
 The seventeen-second frame has transient placeholder-like glyphs; by
 nineteen seconds a Menu softkey is visible. Physical Menu presses then open
-**Phone book** and **Search / Add name / Erase**. Persistent contacts,
+**Phone book** and **Search / Add name / Erase**. A physical Add name
+workflow now saves `A / 123` through a successful SIM UPDATE RECORD and
+checks its serialized card storage. Cold contact readback,
 registration, calls and SMS are not accepted.
 Longer execution is not stable: both menu-only and contact-entry runs
 request reason-`68` reset at about 31.97 seconds. The short menu gates do
@@ -79,7 +81,7 @@ The archive calls the phone 5110i; both headers identify `NSE-2`, `05.53`,
 | GENSIO/CCONT | Own `296704`: select `22` at `28`, TX `2a`, RX `2d`, status `29` bit 2. | Shared serial grammar, not measured electrical timing. |
 | LCD | Own `296e46/296eac`: command/data `2c/2b`, ready bit 0. | Observed 84x48 presentation; fitted controller identity remains unproved. |
 | Keypad | Scanner `29806c`, decoder `299010`, maps `2b382c/2b3848`, selector `10c6b6`; five rows, signal/direction `31/2f`, columns `30`, IRQ mask `33`. | Existing NSE-1 contact layout matches own table; digits 1--5 and Menu have runtime decode acceptance. |
-| SIMI | Own `286520` initializes standard IIR/FIFO controls; inserted synthetic card completes read bootstrap. | Persistent contacts and SIM PIN authentication remain unaccepted; the tested phone code is phone-side. |
+| SIMI | Own `286520` initializes standard IIR/FIFO controls; inserted synthetic card completes read bootstrap and an organic ADN write. | Cold contact readback and SIM PIN authentication remain unaccepted; the tested phone code is phone-side. |
 
 EEPROM START/STOP entry points are `295814/295886`, identified by SDA
 transitions while SCL is high. Block reader `293d92` takes address,
@@ -249,13 +251,38 @@ scrollbar; the static submenu is checked byte-exactly. This establishes
 application navigation, not contact writes, registration or speech. The
 ordinary silent and open-pin controls remain unchanged.
 
+### Physical contact save
+
+The separate `--phonebook` fixture selects Add name, enters `A / 123` and
+presses OK before the known restart deadline. The own firmware sends
+`A0 DC 01 04 20` for EF_ADN record 1 at 27.585 seconds; the card commits
+32 bytes and returns `9000`. The `Saved` frame is byte-exact across repeats
+(SHA-256 `8f9188505262676c92fd1ec55e94d6e9dbf2854bc5d14fc4d2ac3dc0903d6909`).
+The shared SIM checker verifies record 1 encodes `A / 123` and leaves the
+other 49 ADN slots erased. This proves an organic write and serialized
+storage, not cold firmware readback or stable long operation.
+
+```sh
+.venv/bin/python tools/run_nse2_native.py tmp/nse2-contact-save \
+  --record-checksum-only --nominal-vbat --insert-sim --security-code \
+  --phone-retry-zero --post-auth-menu --phonebook --seconds 30
+```
+
+Startup acceptance remains scoped to its actual contract: readiness/report
+14 before three seconds, and the complete SIM bootstrap before ten seconds.
+A timestamped mailbox trace cap after startup is explicitly reported, not
+treated as lost initial evidence. Early/unknown caps still fail. Later
+application SIM reads do not count as duplicate bootstrap records; missing
+initial records still fail. The contact gate separately checks physical
+contacts, the write, successful status, storage bytes and Saved frame.
+
 ## Long-run native receive boundary
 
-A forty-second menu-only control and a contact-entry workflow both request
-the same reset; contact entry is not its cause. The attempted save has no
-ADN UPDATE RECORD and is not accepted. After reset, later digit contacts
-land in a new security editor, not the intended contact editor. The
-contact probe was removed rather than retained as a misleading workflow.
+A forty-second menu-only control and a slower contact-entry workflow both
+request the same reset; contact entry is not its cause. Contacts entered
+after that restart belong to a new security editor and are not a valid
+phonebook test. The accepted save above completes before this boundary;
+it does not waive the long-run failure.
 
 Own receive dispatcher `29908c` uses context `10c764`; received packets
 increment its halfword at `+2` (`29909e..2990a2`). Timer input `dd` checks

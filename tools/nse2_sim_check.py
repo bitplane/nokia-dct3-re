@@ -7,6 +7,7 @@ CODE_ERROR_FRAME = '042030d4e6f3a8e75d15f45e5ef6ea8cff68f50038e98d2d7a76cb64c489
 AUTHENTICATED_FRAME = 'df66881e695c25b4a157c80b40cf56ad246bb45a9d54c1054264222a639db931'
 PHONEBOOK_MENU_FRAME = 'eba0749f25b43e63dea723e7ca8e8f1051385648fa90278af2de39659c04989e'
 PHONEBOOK_SUBMENU_FRAME = '8e39080ec840c45849dbc34110a5b800de17726429b62d58f0fc2e0b4a227369'
+PHONEBOOK_SAVED_FRAME = '8f9188505262676c92fd1ec55e94d6e9dbf2854bc5d14fc4d2ac3dc0903d6909'
 BINARY_FILES = {0x6fb7: 15, 0x6fae: 1, 0x6f05: 4, 0x6fad: 3,
                 0x6f38: 12, 0x6f07: 9, 0x6f78: 2, 0x2fe6: 4,
                 0x6f46: 17, 0x6f74: 16, 0x6f7e: 11, 0x6f30: 24,
@@ -19,6 +20,7 @@ COMPLETION = re.compile(r'SIM completion ins=([0-9a-f]{2}) sw=([0-9a-f]{4})')
 
 def verify_sim_reads(text, pixels):
     pending, records, binary = None, [], []
+    later_reads = 0
     for line in text.splitlines():
         header = HEADER.search(line)
         if header:
@@ -31,6 +33,12 @@ def verify_sim_reads(text, pixels):
             continue
         ins, status = (int(value, 16) for value in completion.groups())
         if ins not in (0xb0, 0xb2):
+            continue
+        if pending is not None and pending[-1] >= 10:
+            # Later application reads are not extra bootstrap records. The
+            # complete initial file/record sets below must still be present.
+            later_reads += 1
+            pending = None
             continue
         if pending is None or pending[0] != 0xa0 or pending[1] != ins or status != 0x9000:
             raise ValueError('NSE-2 SIM read completion missing its header or successful status')
@@ -51,7 +59,26 @@ def verify_sim_reads(text, pixels):
     if hashlib.sha256(pixels).hexdigest() != SECURITY_FRAME:
         raise ValueError('NSE-2 reviewed phone Security code frame differs')
     return dict(sim_read_bootstrap=True, adn_records_read=50, sms_records_read=10,
+                bootstrap_read_horizon_seconds=10, later_application_reads=later_reads,
                 binary_files_read=16, phone_code_authenticated=False, sim_pin_verified=False)
+
+
+def verify_phonebook_save(text, data, pixels):
+    from tools.sim_phonebook_check import validate_phonebook
+    contacts = re.findall(r'nse2_phonebook_contact: event=(\d+) down=([01]) t=([0-9.]+) physical_only=1', text)
+    if [(int(index),int(down)) for index,down,_ in contacts] != [
+            (index, index % 2) for index in range(1,17)]:
+        raise ValueError('NSE-2 physical Add name contact sequence incomplete')
+    times = [float(time) for _,_,time in contacts]
+    if times != sorted(times) or not 23 < times[0] < times[-1] < 28:
+        raise ValueError('NSE-2 contact save crossed its pre-restart observation window')
+    validate_phonebook(text,data,b'A')
+    if 'SIM status ins=dc sw=9000' not in text:
+        raise ValueError('NSE-2 contact save successful card status missing')
+    if hashlib.sha256(pixels).hexdigest() != PHONEBOOK_SAVED_FRAME:
+        raise ValueError('NSE-2 reviewed Saved frame differs')
+    return dict(name='A', number='123', sim_update_and_storage=True,
+                saved_frame=True, cold_reload_verified=False, stable_long_boot=False)
 
 
 def verify_security_attempt(text, pixels, *, retry_zero=False):

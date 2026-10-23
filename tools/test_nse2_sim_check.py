@@ -2,7 +2,8 @@ import hashlib
 import unittest
 from unittest.mock import patch
 
-from tools.nse2_sim_check import BINARY_FILES, verify_sim_reads, verify_security_attempt, verify_post_auth_menu
+from tools.nse2_sim_check import (BINARY_FILES, verify_sim_reads, verify_security_attempt,
+                                  verify_post_auth_menu, verify_phonebook_save)
 
 
 def reads():
@@ -32,6 +33,26 @@ def contacts():
 
 
 class SimCheckTest(unittest.TestCase):
+    def test_physical_save_needs_contacts_apdu_storage_status_and_frame(self):
+        from tools.sim_phonebook_check import CURRENT_NVRAM_LENGTH
+        data = bytearray([255]*CURRENT_NVRAM_LENGTH)
+        data[0] = ord('A')
+        data[18:22] = bytes((3,0x81,0x21,0xf3))
+        text = '\n'.join(f'nse2_phonebook_contact: event={index} down={index%2} '
+                         f't={23.1+index/4:.2f} physical_only=1' for index in range(1,17))
+        text += ('\nsim_device: header cla=a0 ins=dc p1=01 p2=04 p3=20 selected=6f3a\n'
+                 'sim_device: update fid=6f3a record=1 length=32\nSIM status ins=dc sw=9000')
+        with patch('tools.nse2_sim_check.PHONEBOOK_SAVED_FRAME', hashlib.sha256(b'saved').hexdigest()):
+            result = verify_phonebook_save(text,data,b'saved')
+            self.assertFalse(result['cold_reload_verified'])
+            self.assertFalse(result['stable_long_boot'])
+            for bad in (text.replace('event=16','event=17'),text.replace('sw=9000','sw=9404'),
+                        text.replace('update fid=6f3a','update fid=6f3c')):
+                with self.assertRaises(ValueError):
+                    verify_phonebook_save(bad,data,b'saved')
+            with self.assertRaises(ValueError):
+                verify_phonebook_save(text,data,b'wrong')
+
     def test_post_auth_menu_checks_physical_decode_and_both_frames(self):
         text = '\n'.join(f'nse2_post_auth_contact: index={i} down={down} t={time} physical_only=1'
                          for i, down, time in ((1, 1, 20), (1, 0, 20.2), (2, 1, 22), (2, 0, 22.2)))
@@ -61,6 +82,14 @@ class SimCheckTest(unittest.TestCase):
         self.assertEqual(result['sms_records_read'], 10)
         self.assertFalse(result['phone_code_authenticated'])
         self.assertFalse(result['sim_pin_verified'])
+
+    def test_later_application_reads_do_not_duplicate_bootstrap_records(self):
+        extra = ('\nsim_device: header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3a t=27.0\n'
+                 'SIM completion ins=b2 sw=9000')
+        result = self.check_reads(reads() + extra)
+        self.assertEqual(result['later_application_reads'],1)
+        with self.assertRaises(ValueError):
+            self.check_reads(reads().replace('t=8.8','t=11.0') + extra)
 
     def test_bad_status_header_record_length_and_horizon_fail(self):
         for old, new in (('sw=9000', 'sw=9404'), ('cla=a0', 'cla=00'),

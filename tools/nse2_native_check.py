@@ -8,7 +8,12 @@ NOMINAL_FRAME = '7da9bef12e0bf163dfdf8770e215957b58b4911baa9ba987c05ddf8fadfeae8
 
 
 def verify_nominal_voltage(text, pixels, *, physical_menu=False, empty_socket_frame=True):
-    if 'nse2_average_count_cap:' in text or 'nse2_startup_message_cap:' in text:
+    caps = [line for line in text.splitlines() if 'nse2_startup_message_cap:' in line]
+    # This gate proves the initial <3 s readiness chain, not completeness
+    # of the same mailbox's later keypad/application traffic.
+    early_or_unknown_cap = any((match := re.search(r' t=([0-9.]+)', line)) is None
+                              or float(match[1]) <= 3 for line in caps)
+    if 'nse2_average_count_cap:' in text or early_or_unknown_cap:
         raise ValueError('NSE-2 nominal evidence capped')
     rows = re.findall(r'nse2_average_count: remaining=([0-9a-f]{2}) first=([0-9a-f]{4}) '
                       r'second=([0-9a-f]{4}) pc=002645d0 t=([0-9.]+) observer_writes=0', text)
@@ -31,6 +36,7 @@ def verify_nominal_voltage(text, pixels, *, physical_menu=False, empty_socket_fr
     if len(states) < 7 or float(states[-1]) < 8:
         raise ValueError('NSE-2 completed startup state missing')
     result = dict(nominal_adc2=554, averaging_completed=True, startup_report14_received=True,
+                  startup_message_coverage_seconds=3, later_mailbox_trace_capped=bool(caps),
                   keyboard_unmasked=True, measured_board_calibration=False)
     if physical_menu:
         contacts = re.findall(r'nse2_menu_contact: index=([12]) down=([01]) t=([0-9.]+) physical_only=1', text)
