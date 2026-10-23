@@ -22,7 +22,10 @@ emu.register_frame_done(function()
                             {'rssi_publisher',0x47f6,0x40}, {'rssi_host',0x3c80,0x60},
                             {'rssi_other',0x6d40,0x70}, {'host_dispatch',0x3970,0x30},
                             {'eligibility',0x6760,0x90}, {'result_requests',0x3bf0,0x180},
-                            {'shared_notification',0x382f,0x70}}) do
+                            {'shared_notification',0x382f,0x70},
+                            {'peripheral_dispatch',0x3598,0x240},
+                            {'sampling_stop',0x44b6,0xc0},
+                            {'vectors',0xff80,0x80}}) do
         debugger:command(string.format('dasm nse2_control_%s.dasm,%x,%x,1,:dsp_c54x:cpu',
             range[1], range[2], range[3]))
     end

@@ -747,6 +747,23 @@ control/timing values, not established RF units, compare ownership or
 interrupt wiring. In particular, no sampling interrupt is synthesized from
 these observations; all three ports remain storage-only pending evidence.
 
+The live vector page routes INT0 to `3204`, INT1/INT2 and vector slot
+`ffe0` to common peripheral dispatcher `3598`, and HPINT to `3772`.
+This is firmware routing, not an electrical assignment of sampling events.
+The dispatcher reads `port1 & ~port2` and has twelve reviewed mask/branch
+tests: `1000 -> 369a`, `001c -> 362f`, `0100/0200 -> 8ec5/8ed3` or
+`b7dc/b787` (selected by `06f3 & 0400`), `0400 -> 8e89`,
+`0080 -> 371d`, `0002 -> 3621`, `0001 -> 362d`, and
+`0020/0040 -> 3764`. These tests and their selector are byte-pinned by
+the processing runner; this is not a complete peripheral-source mapping.
+
+In the thirty-second native observation, `369a` enters ten times. Tapped
+subpaths `363c/364e` and handlers `371d/3764/8e89/8ec5/8ed3/b7dc/b787`
+have zero entries. `371d` consumes ports `13/14/15`; `3764` acknowledges
+mask `0040` and sets `06e4 & 2000`. Neither fact establishes a connection
+to sampling controls `09–0b`. Decode the inactive consumers and their
+enables before assigning any additional request bit or interrupt source.
+
 For a forty-second processing capture, the native runner correctly fails
 on the repeated startup. `nse2_lifecycle_check TRACE --timer-boundary`
 requires the raw arm/terminal/reset evidence and reports
