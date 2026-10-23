@@ -119,6 +119,30 @@ def inspect_mcu_request(image):
                 scope='checked constructor and raw aligned direct calls; other producers unclosed')
 
 
+def inspect_request_lifecycle(text):
+    rows = re.findall(r'nse2_request_mode: value=([0-9a-f]{2}) pc=([0-9a-f]{8}) '
+                      r't=([0-9.]+) observer_writes=0', text)
+    summaries = re.findall(r'nse2_request_summary: mode=([0-9a-f]{2}) mode_writes=(\d+) '
+                           r'constructor_entries=(\d+) t=([0-9.]+) observer_writes=0', text)
+    if len(summaries) != 1:
+        raise ValueError('NSE-2 request lifecycle terminal summary missing or duplicated')
+    mode, count, entries, time = summaries[0]
+    if mode != '02' or int(count) != len(rows) or int(entries) != 0 or not 29.9 <= float(time) <= 30.1:
+        raise ValueError('NSE-2 request lifecycle coverage/frontier differs')
+    if [(value, pc) for value, pc, _ in rows] != [
+            ('00', '0020010c'), ('01', '0020cafc'), ('02', '0020feb6')]:
+        raise ValueError('NSE-2 request lifecycle mode transitions differ')
+    times = [float(time) for _, _, time in rows]
+    if not 0 < times[0] < times[1] < times[2] < 5:
+        raise ValueError('NSE-2 request lifecycle transition ordering differs')
+    if 'nse2_request_constructor:' in text:
+        raise ValueError('NSE-2 constructor entry contradicts terminal summary')
+    return dict(mode_transitions=['00', '01', '02'], terminal_mode='02',
+                constructor_entry_observations=0, required_mode_observed=False,
+                mode_writes=len(rows), observation_seconds=30,
+                scope='observed boot lifecycle; type-07 normal-boot necessity not proved')
+
+
 def main():
     root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)

@@ -6,6 +6,32 @@ dofile(directory .. 'nse2_timer_queue_observe.lua')
 local machine = manager.machine
 local cpu = assert(machine.devices[':dsp_c54x:cpu'])
 local counts = {}
+local mcu = assert(machine.devices[':maincpu'])
+local mcu_space = mcu.spaces.program
+local mode_writes, constructor_entries = 0, 0
+_G.nse2_request_mode_tap = mcu_space:install_write_tap(0x1094b4, 0x1094b7,
+    'nse2_request_mode', function(_, value, mask)
+        if (mask & 0xff) == 0 then return end
+        mode_writes = mode_writes + 1
+        if mode_writes > 32 then return end
+        machine:logerror(string.format('nse2_request_mode: value=%02x pc=%08x t=%.9f observer_writes=0\n',
+            value & 255, mcu.state['R15'].value, machine.time:as_double()))
+    end)
+_G.nse2_request_constructor_tap = mcu_space:install_read_tap(0x2160a8, 0x2160ab,
+    'nse2_request_constructor', function()
+        if mcu.state['R15'].value ~= 0x2160a8 then return end
+        constructor_entries = constructor_entries + 1
+        if constructor_entries > 32 then return end
+        machine:logerror(string.format('nse2_request_constructor: mode=%02x lr=%08x t=%.9f observer_writes=0\n',
+            mcu_space:read_u8(0x1094b7), mcu.state['R14'].value, machine.time:as_double()))
+    end)
+local request_summary = false
+emu.register_frame_done(function()
+    if request_summary or machine.time:as_double() < 30 then return end
+    request_summary = true
+    machine:logerror(string.format('nse2_request_summary: mode=%02x mode_writes=%d constructor_entries=%d t=%.9f observer_writes=0\n',
+        mcu_space:read_u8(0x1094b7), mode_writes, constructor_entries, machine.time:as_double()))
+end, 'NSE-2 passive measurement request lifecycle')
 local program_dumped = false
 emu.register_frame_done(function()
     if program_dumped or machine.time:as_double() < 7 then return end

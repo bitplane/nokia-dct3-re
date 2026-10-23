@@ -18,7 +18,7 @@ from tools.nse2_lifecycle_check import (
     diagnose_processing, diagnose_schedule, diagnose_transport,
     diagnose_scan_progress, diagnose_host_packets,
 )
-from tools.nse2_native_result_check import inspect_capture
+from tools.nse2_native_result_check import inspect_capture, inspect_control_trace, inspect_request_lifecycle
 
 
 MASK_INPUTS = (
@@ -151,6 +151,8 @@ def main():
                     result.update(verify_post_auth_menu(text, menu.convert('L').tobytes(), submenu.convert('L').tobytes()))
         if args.native_processing:
             result['native_processing_boundary'] = dict(diagnose_schedule(text), **diagnose_transport(text))
+            result['native_processing_boundary']['conditional_request'] = inspect_control_trace(text)
+            result['native_processing_boundary']['request_lifecycle'] = inspect_request_lifecycle(text)
             result['native_processing_boundary']['processing'] = diagnose_processing(text)
             result['native_processing_boundary']['measurement'] = diagnose_scan_progress(text)
             result['native_processing_boundary']['host_packets'] = diagnose_host_packets(text)

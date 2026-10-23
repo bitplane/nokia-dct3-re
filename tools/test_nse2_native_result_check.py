@@ -2,10 +2,32 @@ import struct
 import unittest
 
 from tools.nse2_native_result_check import (FRAGMENTS, MCU_REQUEST_FRAGMENTS,
-                                           inspect_control_trace, inspect_mcu_request, inspect_program)
+                                           inspect_control_trace, inspect_mcu_request, inspect_program,
+                                           inspect_request_lifecycle)
 
 
 class ResultTest(unittest.TestCase):
+    def request_lifecycle(self):
+        return '\n'.join([
+            'nse2_request_mode: value=00 pc=0020010c t=0.002 observer_writes=0',
+            'nse2_request_mode: value=01 pc=0020cafc t=1.12 observer_writes=0',
+            'nse2_request_mode: value=02 pc=0020feb6 t=4.70 observer_writes=0',
+            'nse2_request_summary: mode=02 mode_writes=3 constructor_entries=0 t=30.0 observer_writes=0'])
+
+    def test_request_lifecycle_mode_two_is_not_request_four(self):
+        result = inspect_request_lifecycle(self.request_lifecycle())
+        self.assertFalse(result['required_mode_observed'])
+
+    def test_request_lifecycle_incomplete_or_changed_fails(self):
+        text = self.request_lifecycle()
+        for changed in ('', text.replace('mode_writes=3', 'mode_writes=4'),
+                        text.replace('value=01', 'value=04'),
+                        text.replace('constructor_entries=0', 'constructor_entries=1'),
+                        text.replace('t=30.0', 't=29.0'),
+                        text + '\nnse2_request_constructor: mode=02'):
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                inspect_request_lifecycle(changed)
+
     def mcu_image(self):
         image = bytearray(0x80000)
         for address, encoded in MCU_REQUEST_FRAGMENTS.items():

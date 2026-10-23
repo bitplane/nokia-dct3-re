@@ -373,6 +373,15 @@ and payload length from R0; `28de42` passes message byte 3 onward there.
 This maps a concrete MCU candidate, not normal-boot reachability or a
 complete census of type-`07` producers. The next question is the lifecycle
 of `1094b7` and those callers, not forcing this request into the stream.
+The coherent native-processing run observes exactly three writes to that
+byte: `00` at `20010c` (0.00265 s), `01` at `20cafc` (1.12047 s),
+and `02` at `20feb6` (4.70184 s). The thirty-second terminal count
+accounts for all three and the value remains `02`; the constructor entry
+tap records zero entries. Thus this boot does not enter the candidate's
+mode-4 lifecycle. Absent type `07` is not evidence that it must be added.
+The active type-`1a` measurement loop remains the next native result path
+to resolve. These are passive observations on the unchanged physical-menu
+fixture, not firmware-state edits or proof of all possible call routes.
 None of these static paths establishes an unconditional periodic packet.
 The separate serial publisher retains its existing queued-data contract.
 
