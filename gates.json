@@ -2352,6 +2352,15 @@
       ]
     },
     {
+      "name": "verify-5110i-static",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/nse2_package_check.py",
+                 "arguments": ["roms/archive-dct3-packages/nse2_553.zip", "--compare-package",
+                               "roms/archive-dct3-packages/nse2_553.exe", "--output", "roms/noki5110i"]}]
+    },
+    {
       "name": "verify-6150-static",
       "prerequisites": [],
       "variables": {},

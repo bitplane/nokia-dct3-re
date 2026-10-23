@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 781 gates: 583 generated from typed steps, 198 copied verbatim (shell).
+# 782 gates: 584 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -168,11 +168,11 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-periodic-location-update \
 	verify-radio-periodic-location-update-state \
 	verify-3410-radio-periodic-location-update verify-dsp-speech-control-static \
-	verify-6110-static verify-6110-v548-static verify-6150-static \
-	verify-6110-bootstrap-capture verify-dct3-type-1f-static verify-3210-v501 \
-	verify-dsp-memory-upload verify verify-ccont verify-ccont-watchdog \
-	verify-gensio verify-display verify-dsp-transport verify-cobba-control \
-	verify-dsp-bootstrap-3310 verify-3310-radio-boundary \
+	verify-6110-static verify-6110-v548-static verify-5110i-static \
+	verify-6150-static verify-6110-bootstrap-capture verify-dct3-type-1f-static \
+	verify-3210-v501 verify-dsp-memory-upload verify verify-ccont \
+	verify-ccont-watchdog verify-gensio verify-display verify-dsp-transport \
+	verify-cobba-control verify-dsp-bootstrap-3310 verify-3310-radio-boundary \
 	verify-3330-radio-boundary verify-3310-radio-registration \
 	verify-3330-radio-registration verify-3330-radio-registration-preserved \
 	verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells \
@@ -1375,6 +1375,9 @@ verify-6110-static: normalize-6110
 
 verify-6110-v548-static: normalize-6110-v548
 	$(VENV)/bin/python tools/nse3_v548_static_check.py --rom3 roms/noki6110/6110_nse3_v548_rom3_ppmb.fls --rom4 roms/noki6110/6110_nse3_v548_rom4_ppmb.fls --json run_census/nse3_v548_static_boundary.json
+
+verify-5110i-static:
+	$(VENV)/bin/python tools/nse2_package_check.py roms/archive-dct3-packages/nse2_553.zip --compare-package roms/archive-dct3-packages/nse2_553.exe --output roms/noki5110i
 
 verify-6150-static:
 	$(VENV)/bin/python tools/nsm1_v523_static_check.py roms/research/nsm1-v523/6150-v523-ppm-c.fls --package roms/archive-dct3-packages/nsm1_523.exe --eeprom-package roms/research/nsm1-v523/NokiX-scripts-2011.07.24.zip --security-fixture roms/research/nsm1-v523/nsm1-security-checksum-valid.bin --output run_census/nsm1_v523_static_boundary.json

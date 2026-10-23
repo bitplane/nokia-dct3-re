@@ -50,7 +50,7 @@ INFRASTRUCTURE_SCRIPTS = {"tools/run_mame_isolated.py"}
 
 def family_of(name: str) -> tuple[str, str] | None:
     """Split a gate name into (product, capability family)."""
-    match = re.match(r"^verify-(\d+)-(.+)$", name)
+    match = re.match(r"^verify-(\d+[a-z]*)-(.+)$", name)
     if match and match.group(1) in product_ids():
         return match.group(1), match.group(2)
     body = name[len("verify-"):] if name.startswith("verify-") else name

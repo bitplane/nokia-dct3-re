@@ -53,6 +53,23 @@ MCU/PPM-A pairs under ignored `roms/noki6130/`. Reproduce and qualify with
 normalized hashes and the bootstrap's distinct3/4 identity writes. No external
 EEPROM or runtime support is implied by these extracted inputs.
 
+## Nokia 5110i NSE-2 v5.53
+
+`make verify-5110i-static` qualifies both acquired
+`archive-dct3-packages/nse2_553.zip` and `nse2_553.exe` without executing
+either installer. Both contain the exact same CPU-order raw members:
+
+| Member | Bytes | SHA-256 |
+| --- | --- | --- |
+| `5110i MCU-05.53.fls` | 1,638,400 | `21084d1546648364ff9d5ee38176ddca31c7b0862e46d4e14dd15c1aca13d628` |
+| `5110i PPM-05.53A.fls` | 458,752 | `a6502decf1a1e6dc3278530b745ce7088c865adcbf25c5a5a08df83d4e1020de` |
+
+The unchanged combined `noki5110i/5110i_5.53A.fls` is 2,097,152 bytes,
+SHA-256 `00ab7e062de9c89718eb81031528a646a79317ba0bad5a272a6d4d3b09c77781`.
+`noki5110i/manifest.json` retains both archive hashes and static contracts.
+No external EEPROM or DSP mask is supplied and no runtime support is implied.
+See [the NSE-2 boundary](../docs/5110i_bringup.md).
+
 ## Reference 3210 image
 
 The **NSE-8/9 v06.00 3210** flash file. It is distributed (by third parties) inside

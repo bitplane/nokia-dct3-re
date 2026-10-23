@@ -56,6 +56,12 @@ class FamilyTest(unittest.TestCase):
         self.assertEqual(gate_parity_audit.family_of("verify-6150-static"),
                          ("6150", "static"))
 
+    def test_suffixed_model_is_not_folded_into_its_parent(self):
+        self.assertEqual(gate_parity_audit.family_of('verify-5110i-static'),
+                         ('5110i', 'static'))
+        from tools.dct3_products import SYSTEM_RE
+        self.assertEqual(SYSTEM_RE.findall('SYST(2000, noki5110i, 0, 0)'), ['5110i'])
+
 
 class AuditTest(unittest.TestCase):
     def setUp(self):
