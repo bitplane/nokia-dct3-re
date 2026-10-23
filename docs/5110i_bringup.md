@@ -845,6 +845,18 @@ not proof of physical baud, external peer identity, an incoming response,
 or a cure for receive supervision. Any completion model must retain those
 distinctions and let the real firmware drain its own queue.
 
+The word-port control contract has independent firmware checks. Initialization
+acknowledges and masks request bits `0700`. The active transmit branch sets
+mask `0400` and clears `0300`; handler `8ec5` calls transmitter `9162`
+**before** acknowledging `0100` at port 1. A completion arriving while the
+handler queues another word must therefore not be discarded by that older
+acknowledgment. Idle/stop path `90e7` tests pending state and status-port-`36`
+bit `1000` before proceeding. Reset helper `9129` transforms control with
+`(old & ffe1) | 801c`, waits for status `4000`, then clears `8000`. These are pinned
+firmware requirements, not measured hardware timings. The meaning of the
+framing/clock bits, transmit word duration and external peer remain unknown;
+do not choose a baud rate merely to clear the boot supervision deadline.
+
 For a forty-second processing capture, the native runner correctly fails
 on the repeated startup. `nse2_lifecycle_check TRACE --timer-boundary`
 requires the raw arm/terminal/reset evidence and reports

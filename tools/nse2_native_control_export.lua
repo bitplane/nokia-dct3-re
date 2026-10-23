@@ -30,6 +30,8 @@ emu.register_frame_done(function()
                             {'sampling_reader',0x71d0,0x70},
                             {'scan_request',0x3d40,0xb0},
                             {'peripheral_tx',0x9162,0x100},
+                            {'word_init',0x8d00,0x180},
+                            {'word_control',0x90a0,0xc2},
                             {'vectors',0xff80,0x80}}) do
         debugger:command(string.format('dasm nse2_control_%s.dasm,%x,%x,1,:dsp_c54x:cpu',
             range[1], range[2], range[3]))

@@ -1,8 +1,27 @@
 import unittest
-from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripheral_routes,inspect_peripheral_consumers,inspect_word_port_activity
+from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripheral_routes,inspect_peripheral_consumers,inspect_word_port_activity,inspect_word_control_contract
 
 
 class SamplingCheckTest(unittest.TestCase):
+    def test_word_control_acknowledges_after_transmitter_call(self):
+        program=bytearray(0x20000)
+        for a,v in ((0x8da5,'76820700f49575820001ec0ef4957482000269820700f49575820002'),
+                (0x90ad,'698204006882fcfff49575820002'),
+                (0x8ec5,'f07423f6f0749162f0200100f49575f800080001'),
+                (0x90e9,'10f806c5fe447712006074f800080036f1301000fc4d'),
+                (0x9129,'748200366882ffe16982801cf49575820036'),
+                (0x913c,'771200607482003661824000f820913e68827ffff49575820036')):
+            data=bytes.fromhex(v)
+            program[a*2:a*2+len(data)]=data
+        result=inspect_word_control_contract(program)
+        self.assertTrue(result['acknowledgement_after_transmitter_call'])
+        self.assertFalse(result['baud_and_framing_proved'])
+        for a in (0x8da6,0x90ae,0x8ec8,0x90f2,0x9130,0x9141):
+            changed=program.copy()
+            changed[a*2]^=1
+            with self.assertRaises(ValueError):
+                inspect_word_control_contract(changed)
+
     def test_pending_word_transmitter_requires_complete_activity(self):
         import struct
         data=bytearray(0x20000)

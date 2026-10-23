@@ -46,6 +46,26 @@ def inspect_word_port_activity(data,text):
                 receive_supervision_fix_proved=False)
 
 
+def inspect_word_control_contract(program):
+    fragments={
+        0x8da5:'76820700f49575820001ec0ef4957482000269820700f49575820002',
+        0x90ad:'698204006882fcfff49575820002',
+        0x8ec5:'f07423f6f0749162f0200100f49575f800080001',
+        0x90e9:'10f806c5fe447712006074f800080036f1301000fc4d',
+        0x9129:'748200366882ffe16982801cf49575820036',
+        0x913c:'771200607482003661824000f820913e68827ffff49575820036',
+    }
+    for address,encoded in fragments.items():
+        expected=bytes.fromhex(encoded)
+        if program[address*2:address*2+len(expected)]!=expected:
+            raise ValueError(f'word-port control contract differs at {address:04x}')
+    return dict(initial_request_mask='0700',active_transmit_mask_clear='0300',
+                active_transmit_mask_set='0400',tx_request='0100',
+                acknowledgement_after_transmitter_call=True,completion_status_test='1000',
+                reset_config_clear='001e',reset_config_set='801c',reset_wait_mask='4000',reset_release_clear='8000',
+                baud_and_framing_proved=False,physical_ready_latency_proved=False)
+
+
 def inspect_peripheral_routes(program):
     if len(program)!=0x20000:
         raise ValueError('peripheral routes require full live page-zero program')
