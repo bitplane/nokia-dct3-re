@@ -4119,8 +4119,11 @@ Check `operand_probe.lst` using `tools/c54x_vendor_operand_check.py`, supplying
 `--source`, `--assembler` and `--driver` paths. It verifies version, exact
 word/address sequence, warning identities/count and assembly completion,
 and explicitly leaves DSP execution and silicon-trap validation false.
-Accepted artifacts are under `tmp/c54x-vendor-operand-probe/`. Execution-side
-RMW admission remains a separate correction; this probe does not change it.
+Accepted artifacts are under `tmp/c54x-vendor-operand-probe/`. The separate
+[execution rejection matrix](5510_bringup.md#operand-domain-acceptance)
+now verifies the corresponding early core guard and both frontend/save-state
+paths. The assembler probe itself remains a toolchain observation, not
+execution, timing or silicon-trap evidence.
 
 ### Isolated simulator setup boundary
 

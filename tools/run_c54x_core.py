@@ -246,7 +246,7 @@ REQUIRED = [
     "TMS320C54x normalization disassembler: PASS forms=12 rejected=4 pages=2 bounded_extensions=1 pipeline_claim=0",
     "TMS320C54x conditional return disassembler: PASS forms=44 pages=2 named_predicates=22 bounded_extensions=1 pipeline_claim=0",
     "TMS320C54x unary disassembler: PASS forms=12 pages=2 bounded_extensions=1 pipeline_claim=0",
-    "TMS320C54x ADDM disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0",
+    "TMS320C54x ADDM disassembler: PASS forms=248 rejected=8 pages=2 bounded_extensions=1 pipeline_claim=0",
     "TMS320C54x operand fetch order: PASS cases=53 families=12 forms=direct,indirect,long,absolute,preincrement",
     "TMS320C54x accumulator call fast return: PASS cases=2 sources=A,B",
     "TMS320C54x native gap arithmetic/load: PASS words=3 cases=6 sxm=0,1",
@@ -276,7 +276,7 @@ REQUIRED = [
     "TMS320C54x repeat endpoints: PASS cases=12 endpoints=ordinary,ffff,0000 counts=short,long sources=irq,nmi",
     "TMS320C54x BRAF control: PASS cases=4 clear=RSBX,STM,POPM restored_loop=1",
     "TMS320C54x XC interrupt protection: PASS cases=4 spans=1,2 accepted,rejected=1 physical_pipeline_claim=0",
-    "TMS320C54x literal disassembler: PASS decoded_modes=992 pages=2 invalid_mmr=32 bounded_extensions=1 operand_order=1 pipeline_claim=0",
+    "TMS320C54x literal disassembler: PASS decoded_modes=1472 pages=2 invalid_mmr=32 invalid_rmw=32 bounded_extensions=1 operand_order=1 pipeline_claim=0",
     "TMS320C54x MMR bus: PASS unified_state=1 partial_write=1 ifr_clear=1 passive_tap=1 reserved_gap=1",
     "TMS320C54x zero BK addressing: PASS variants=320",
     "TMS320C54x SACCD conformance: PASS variants=576",
@@ -666,7 +666,10 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated XC/status complete",
     ),
     "xorm": (
+        (
         "TMS320C54x atomic XORM: PASS cases=1024 restore=1024 forms=8 values=4 literals=4 sxm_ovm=4 snapshots=2 reads=1 writes=1 flags_preserved=1 staged_acceptance=0 silicon_phase_claim=0",
+        "TMS320C54x RMW MOD3 exclusions: PASS cases=1024 restore=1024 opcode_classes=4 arf=8 cmpt=2 initial_tc=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0",
+        ),
         "Fatal error: TMS320C54x isolated XORM complete",
     ),
     "xorm-absolute": (

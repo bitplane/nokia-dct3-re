@@ -1120,7 +1120,8 @@ public:
 			}
 			return (2 + extended) | SUPPORTED;
 		}
-		if (family == 0x6800 || family == 0x6900 || family == 0x6a00 || family == 0x6b00 || family == 0x7600 || (family == 0x7700 && mode < 0xe0))
+		if ((family == 0x6800 || family == 0x6900 || family == 0x6a00 || family == 0x6b00 || family == 0x7600 || (family == 0x7700 && mode < 0xe0)) &&
+			((family & 0xfc00) != 0x6800 || (mode & 0xf8) != 0x98))
 		{
 			bool const extended = family != 0x7700 && mode >= 0xe0;
 			bool const immediate_first = (family == 0x6800 || family == 0x6900 || family == 0x6a00) && mode >= 0xe0 && mode < 0xf8;
@@ -5885,6 +5886,13 @@ void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
 	const auto transfer_pc = [this](u16 destination) { m_pc = destination; m_atomic_condition_redirect = true; };
+	// SPRU131G table 5-4 and the pinned TI assembler probe exclude
+	// short MOD=3 from RMW operands too, before any operand side effect.
+	if ((op & 0xfc00) == 0x6800 && (low & 0xf8) == 0x98)
+	{
+		m_illegal = true;
+		return;
+	}
 	if (invalid_mmr_long_form(op) || ((m_rpt_armed || m_rpt_end != REPEAT_END_UNSET) && extended_repeat_transfer(op)))
 	{
 		m_illegal = true;

@@ -590,11 +590,17 @@ class CoreResultTests(unittest.TestCase):
                         check_result(text.replace(old, new), 3, profile=name)
 
     def test_atomic_xorm_scope(self):
-        marker, ending = EXTRA_PROFILES['xorm']
-        text = marker + '\n' + ending + '\n'
+        markers, ending = EXTRA_PROFILES['xorm']
+        text = '\n'.join((*markers, ending)) + '\n'
         check_result(text, 3, profile='xorm')
+        for marker in markers:
+            with self.subTest(missing=marker), self.assertRaises(ValueError):
+                check_result(text.replace(marker + '\n', ''), 3, profile='xorm')
+            with self.subTest(duplicate=marker), self.assertRaises(ValueError):
+                check_result(text.replace(marker, marker + '\n' + marker), 3, profile='xorm')
         for before, after in (('restore=1024', 'restore=0'), ('reads=1', 'reads=2'),
-                              ('flags_preserved=1', 'flags_preserved=0'), ('staged_acceptance=0', 'staged_acceptance=1')):
+                              ('flags_preserved=1', 'flags_preserved=0'), ('staged_acceptance=0', 'staged_acceptance=1'),
+                              ('data_reads=0', 'data_reads=1'), ('pointer_changes=0', 'pointer_changes=1')):
             with self.subTest(before=before), self.assertRaises(ValueError):
                 check_result(text.replace(before, after), 3, profile='xorm')
 

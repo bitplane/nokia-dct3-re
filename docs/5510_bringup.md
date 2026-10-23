@@ -100,9 +100,9 @@ not execution timing or completion of the remaining source/RMW audit.
 `tools/run_c54x_core.py --mame mame/mame --rompath mame/roms --profile xorm
 --output-root tmp` runs this matrix before its separate 1,024 XORM execution
 and restoration cases. Accepted evidence: `tmp/run_c54x_core_45tucxku`.
-The full native core regression also passes all 293 required markers and
-terminal completion in `tmp/run_c54x_core_zeklnz_z`. No execution handler or
-handset profile changes as part of this debugger correction.
+The decoder-only full-core capture `tmp/run_c54x_core_zeklnz_z` passed all
+293 required markers and terminal completion. It predates the separate RMW
+execution guard below and is not post-guard full-core evidence.
 
 ### Operand-domain acceptance
 
@@ -130,6 +130,7 @@ legality rule or establish CMPT coverage for unrelated fixture helpers.
 | `subc-mod3-edge` | 512 | Both destinations; standalone and short-repeat SUBC. |
 | `long-pair` / `drsub` | 3,584 each | 14 paired-arithmetic classes including C16; rejection adds no positive staged T-variant support. |
 | `logic-short` | 2,816 | AND/OR/XOR plus source-side MVDK, MVMD, PORTW, WRITA and MVDP; 576 positive logic cases run separately. |
+| `xorm` | 1,024 | ANDM/ORM/XORM/ADDM short-preincrement exclusions; 1,024 legal XORM cases run separately in the same profile. |
 | `stack-mod3-edge` | 512 | LDM A/B, PSHM and PSHD; atomic prefix includes `489a` rejection; AR upper bits and SP retained. |
 | `pmac-mod3-edge` (`tms54xtra`) | 512 | MACP/MACD A/B; all ARs, CMPT modes, pages, frontends and two checkpoints; no data access or program/I/O write. |
 | `delay-mod3-edge` (`tms54xtra`) | 512 | LTD/DELAY source operands; all ARs, CMPT/TC settings, pages, frontends and two checkpoints; no source read, implicit successor write or pointer/T change. |
@@ -208,8 +209,31 @@ Other implicit-copy and unenumerated read families remain open. The
 [pinned TI assembler control](rom4_dsp_loader.md#standalone-vendor-assembler-operand-control)
 now warns on all four short-preincrement RMW forms just as on the forbidden
 LD source, while preserving ordinary stores and long-offset reads. This
-resolves the admission ambiguity, not execution-side correction or silicon
-trap behavior; those RMW handlers still need a focused rejection regression.
+supports the atomic admission guard for ANDM/ORM/XORM/ADDM before operand
+effects. The unchanged-core control fails on a data transaction; the guarded
+`xorm` profile passes its 1,024 legal cases/restores and a separate 1,024-case
+rejection matrix over all ARs, CMPT, initial TC, pages, frontends and two
+save points. Rejection preserves pointers/status and performs no data,
+program or I/O write. Accepted evidence: `tmp/run_c54x_core_g0gyh6d9`;
+the unchanged-core failure is `tmp/run_c54x_core_wpl42iu_`.
+The debugger likewise declines these short-preincrement forms without
+fetching their immediate; ordinary stores and long-offset forms remain
+separate positive controls. This is fail-closed admission, not a silicon
+trap specification or an all-ISA closure.
+
+Post-guard legal controls independently pass `long-mvkd` (427,784 shared
+cases/restores, including 153,600 RMW), `preinc-store` (6,144), `preinc-st`
+(1,536) and `xorm-absolute` (4,096). Their accepted runs are respectively
+`tmp/run_c54x_core_am84mku0`, `tmp/run_c54x_core_51wgjuyl`,
+`tmp/run_c54x_core_e65578ms` and `tmp/run_c54x_core_9yfpz7bw`.
+Native ROM4 external-clock boot and wire/pin restoration also pass in
+`tmp/native-pcm-clock-_gqp6iqq`. Original MU4 `bootrecmeta` passes its own
+resident/overlay checks and recording/metadata transaction in
+`tmp/native-gates/c54x-rmw-mod3-mu4`; its complete endpoint NAND is byte-equal
+to the accepted recorder-persistence endpoint (SHA256
+`75a523a9c1b6a0f6d98d47812b3082717e0764a79e0956b47b2de4fa7160d6c3`).
+This is a native regression result, not repaired recording-tail policy,
+whole-file playback, handset boot or native speech acceptance.
 
 MACP/MACD source admission is separately corrected. SPRU172C pages 4-87
 and 4-89 define Smem as the value read into the multiply and T; MACD's

@@ -877,13 +877,14 @@ private:
 		osd_printf_info("TMS320C54x control disassembler: PASS vectors=%u pages=2\n",
 			unsigned(std::size(vectors)));
 		for (u32 pc : {0x010100, 0x01ffff})
-			for (u16 family : {0x6800, 0x6900, 0x7600, 0x7700})
+			for (u16 family : {0x6800, 0x6900, 0x6a00, 0x6b00, 0x7600, 0x7700})
 				for (unsigned mode = 0; mode < 256; ++mode)
 				{
 					words const buffer(pc, family | mode, 0x2345);
 					std::ostringstream text;
 					u32 const result = decoder.disassemble(text, pc, buffer, buffer);
-					bool const valid = family != 0x7700 || mode < 0xe0;
+					bool const valid = (family != 0x7700 || mode < 0xe0) &&
+						((family & 0xfc00) != 0x6800 || (mode & 0xf8) != 0x98);
 					unsigned const length = valid ? 2 + (family != 0x7700 && mode >= 0xe0) : 1;
 					expect(result == (length | (valid ? dasm::SUPPORTED : 0)) && buffer.seen() == (1U << length) - 1,
 						"Literal disassembly bounds extension reads, wraps within XPC and rejects invalid MMR modes");
@@ -903,6 +904,10 @@ private:
 			{0x6af8, 3 | dasm::SUPPORTED, "XORM    #$6789, *($2345)"},
 			{0x6aeb, 3 | dasm::SUPPORTED, "XORM    #$2345, *+AR3($6789)"},
 			{0x6a93, 2 | dasm::SUPPORTED, "XORM    #$2345, *AR3+"},
+			{0x689a, 1, ".word   $689A"},
+			{0x699a, 1, ".word   $699A"},
+			{0x6a9a, 1, ".word   $6A9A"},
+			{0x6b9a, 1, ".word   $6B9A"},
 			{0x77e1, 1, ".word   $77E1"},
 		};
 		for (auto const &test : literals)
@@ -912,7 +917,7 @@ private:
 			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
 				"Literal disassembly preserves asymmetric immediate/offset ordering and indirect modifiers");
 		}
-		osd_printf_info("TMS320C54x literal disassembler: PASS decoded_modes=992 pages=2 invalid_mmr=32 bounded_extensions=1 operand_order=1 pipeline_claim=0\n");
+		osd_printf_info("TMS320C54x literal disassembler: PASS decoded_modes=1472 pages=2 invalid_mmr=32 invalid_rmw=32 bounded_extensions=1 operand_order=1 pipeline_claim=0\n");
 		for (u32 pc : {0x010100, 0x01ffff})
 			for (u16 family : {0x6000, 0x6100, 0x7000, 0x7100, 0x7400, 0x7500, 0x7d00, 0x7e00})
 				for (unsigned mode = 0; mode < 256; ++mode)
@@ -1445,9 +1450,10 @@ private:
 			{
 				words const buffer(pc, 0x6b00 | mode, 0x2345, 0x6789);
 				std::ostringstream text;
-				unsigned const length = mode >= 0xe0 ? 3 : 2;
-				expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) &&
-					buffer.seen() == (length == 3 ? 7 : 3), "ADDM decoder bounds address and literal extensions");
+				bool const valid = (mode & 0xf8) != 0x98;
+				unsigned const length = !valid ? 1 : mode >= 0xe0 ? 3 : 2;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == (length | (valid ? dasm::SUPPORTED : 0)) &&
+					buffer.seen() == (1U << length) - 1, "ADDM decoder bounds address/literal extensions and rejects short preincrement");
 			}
 		vector const addm_forms[] = {
 			{0x6b12, 2 | dasm::SUPPORTED, "ADDM    #$2345, $12"},
@@ -1462,7 +1468,7 @@ private:
 			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
 				"ADDM syntax retains displacement-before-immediate layout");
 		}
-		osd_printf_info("TMS320C54x ADDM disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		osd_printf_info("TMS320C54x ADDM disassembler: PASS forms=248 rejected=8 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 		for (u32 pc : {0x010100, 0x01ffff})
 			for (u16 family : {0xf484, 0xf485, 0xf48f})
 				for (unsigned accumulators = 0; accumulators < 4; ++accumulators)
@@ -11592,10 +11598,11 @@ private:
 		m_pipeline_peripheral_case = variant; m_idle_fixture_tick = 0; m_pipeline_replay = false;
 		u32 const base = (variant & 32) ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
-		bool const delay = variant >= 58624, pmac = variant >= 58112 && !delay, transfer = variant >= 55296 && variant < 58112, paired = variant >= 51712 && variant < 55296, stack = variant >= 51200 && variant < 51712, multiply = variant >= 46848 && variant < 51200, arithmetic = variant >= 11008 && variant < 46848, shifted_arithmetic = arithmetic && variant >= 14080;
+		bool const rmw = variant >= 59136;
+		bool const delay = variant >= 58624 && !rmw, pmac = variant >= 58112 && variant < 58624, transfer = variant >= 55296 && variant < 58112, paired = variant >= 51712 && variant < 55296, stack = variant >= 51200 && variant < 51712, multiply = variant >= 46848 && variant < 51200, arithmetic = variant >= 11008 && variant < 46848, shifted_arithmetic = arithmetic && variant >= 14080;
 		bool const bitfield = variant >= 10496 && variant < 11008, load = variant >= 768 && variant < 2048, dld = variant >= 10240 && variant < 10496, shifted = variant >= 2048 && variant < 10240, subc = variant >= 256 && variant < 768, repeat = subc && variant >= 512;
 		u16 const family = transfer ? std::array<u16, 11>{0x1800,0x1900,0x1a00,0x1b00,0x1c00,0x1d00,0x7100,0x7300,0x7500,0x7f00,0x7d00}[(variant - 55296) / 256] : paired ? std::array<u16, 7>{0x5000,0x5200,0x5400,0x5800,0x5a00,0x5c00,0x5e00}[(variant - 51712) / 512] : stack ? ((variant - 51200) / 256 ? 0x4a00 : 0x4800) : multiply ? std::array<u16, 17>{0x2000,0x2200,0x2400,0x2600,0x2800,0x2a00,0x2c00,0x2e00,0x3000,0x3200,0x3400,0x3600,0x3800,0x3a00,0x6400,0x6600,0x4600}[(variant - 46848) / 256] : shifted_arithmetic ? 0x6f00 : arithmetic ? std::array<u16, 12>{0x0000,0x0200,0x0400,0x0600,0x0800,0x0a00,0x0c00,0x0e00,0x3c00,0x3e00,0x4000,0x4200}[(variant - 11008) / 256] : bitfield ? 0x6000 : dld ? 0x5600 : shifted ? 0x6f00 : load ? std::array<u16, 5>{0x1000, 0x1200, 0x1400, 0x1600, 0x4400}[(variant - 768) / 256] : subc ? 0x1e00 : 0x6200;
-		u16 const opcode = (delay ? ((variant - 58624) / 256 ? 0x4d00 : 0x4c00) : pmac ? ((variant - 58112) / 256 ? 0x7a00 : 0x7800) : family) | 0x98 | (variant & 7) | (!transfer && !delay && (variant & 8) ? 0x100 : 0);
+		u16 const opcode = (rmw ? 0x6800 + ((variant - 59136) / 256) * 0x100 : delay ? ((variant - 58624) / 256 ? 0x4d00 : 0x4c00) : pmac ? ((variant - 58112) / 256 ? 0x7a00 : 0x7800) : family) | 0x98 | (variant & 7) | (!transfer && !delay && !rmw && (variant & 8) ? 0x100 : 0);
 		program.write_word(base + 0x600, repeat ? 0xec03 : opcode);
 		unsigned const operation = shifted_arithmetic ? (variant - 14080) / 8192 : 0;
 		u16 const extension = 0x0c00 | ((operation & 1) << 9) | ((operation & 2) << 4) | ((variant & 8) ? 0x100 : 0) | (shifted_arithmetic ? ((variant - 14080) / 256) % 32 : 0);
@@ -11603,7 +11610,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		// CMPT is ST1 bit 5, not PMST bit 14.
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, (bitfield && variant >= 10752) || ((transfer || pmac || delay) && (variant & 8)) ? 0x0804 : 0x1804); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (multiply ? 0x0815 : 0x800 | (paired && (variant & 256) ? 0x80 : 0)) | (variant & 16 ? 0x20 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, (bitfield && variant >= 10752) || ((transfer || pmac || delay || rmw) && (variant & 8)) ? 0x0804 : 0x1804); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (multiply ? 0x0815 : 0x800 | (paired && (variant & 256) ? 0x80 : 0)) | (variant & 16 ? 0x20 : 0));
 		if (multiply) m_cpu->set_state_int(tms320c54x_device::STATE_RC, 7);
 		if (stack) m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
@@ -11612,7 +11619,7 @@ private:
 		m_rptbd_counts = {};
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "short_read_mod3_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
 		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "short_read_mod3_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
-		if (transfer || pmac || delay)
+		if (transfer || pmac || delay || rmw)
 		{
 			m_pipeline_extensions_reads = m_pipeline_register_writes = 0;
 			m_pipeline_fetch_tap = program.install_write_tap(0, 0x7fffff, "short_read_mod3_program_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_extensions_reads; });
@@ -52068,7 +52075,12 @@ private:
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore rejected source without operand effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310610; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (variant >= 55296) { m_pipeline_fetch_tap.remove(); m_operand_data_tap.remove(); }
-				if (variant < (variant >= 58624 ? 59135U : variant >= 58112 ? 58623U : variant >= 55296 ? 58111U : variant >= 51712 ? 55295U : variant >= 51200 ? 51711U : variant >= 46848 ? 51199U : variant >= 11008 ? 46847U : variant >= 10496 ? 11007U : variant >= 768 ? 10495U : variant >= 256 ? 767U : 255U)) { start_short_read_mod3_edge(variant + 1); return; }
+				if (variant < (variant >= 59136 ? 60159U : variant >= 58624 ? 59135U : variant >= 58112 ? 58623U : variant >= 55296 ? 58111U : variant >= 51712 ? 55295U : variant >= 51200 ? 51711U : variant >= 46848 ? 51199U : variant >= 11008 ? 46847U : variant >= 10496 ? 11007U : variant >= 768 ? 10495U : variant >= 256 ? 767U : 255U)) { start_short_read_mod3_edge(variant + 1); return; }
+				if (variant >= 59136)
+				{
+					osd_printf_info("TMS320C54x RMW MOD3 exclusions: PASS cases=1024 restore=1024 opcode_classes=4 arf=8 cmpt=2 initial_tc=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0\n");
+					throw emu_fatalerror(3, "TMS320C54x isolated XORM complete");
+				}
 				if (variant >= 58624)
 				{
 					osd_printf_info("TMS320C54x delay MOD3 exclusions: PASS cases=512 restore=512 opcode_classes=2 arf=8 cmpt=2 initial_tc=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0\n");
@@ -54530,7 +54542,8 @@ private:
 			}
 			if (index < 1023) { start_atomic_xorm(index + 1); return; }
 			osd_printf_info("TMS320C54x atomic XORM: PASS cases=1024 restore=1024 forms=8 values=4 literals=4 sxm_ovm=4 snapshots=2 reads=1 writes=1 flags_preserved=1 staged_acceptance=0 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated XORM complete");
+			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
+			start_short_read_mod3_edge(59136); return;
 		}
 		if (m_phase >= 519000 && m_phase < 519144)
 		{
