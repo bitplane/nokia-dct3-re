@@ -4087,6 +4087,41 @@ target, package hash and execution mode in the result. Do not change Nokia
 timing, cancel accepted requests or add a foreground-instruction delay from
 archive availability alone. Native recorder completion remains unresolved.
 
+### Standalone vendor assembler operand control
+
+The acquired `CodeGeneration_C5400.CAB` supplies an independently runnable
+C54x assembler/compiler driver, version 4.2.0. This does not resolve the CCS
+simulator automation boundary. Extract `ASM500.EXE*` and `CL500.EXE*` from
+that cabinet and retain copies named `bin/asm500.exe` and `bin/cl500.exe` in
+a disposable work directory. `c54x_vendor_operand_check.py` pins both exact
+executable hashes and the separately authored assembly source.
+
+Copy `fixtures/c54x_vendor_operands/operand_probe.asm` and `probe.cmd` into
+the work directory. Using the isolated runner below, initialize a fresh
+WoW64 prefix with `wineboot -i`, setting `WINEPREFIX=/mnt/work/wow64` and
+`WINEDLLOVERRIDES=mscoree,mshtml,winemenubuilder.exe=` in the command's
+environment. Then invoke `wine cmd /c probe.cmd` with those same settings.
+The command file sets Windows TMP/TEMP explicitly to writable scratch;
+on the current Wine host, Unix TMP/TEMP appear only as `WINE_HOST_*` and
+are not usable vendor scratch settings. All persistent files remain inside
+the disk-backed work directory; no vendor installer is needed.
+
+The reviewed listing emits 13 words for eight instructions. It gives
+write-only warnings for `LD *+AR2,A` and all four short-preincrement
+ANDM/ORM/XORM/ADDM controls. Ordinary postincrement LD, long-offset
+preincrement LD and short-preincrement STL are unflagged. The assembler
+still emits the warned encodings and exits zero; warnings must therefore
+be checked, not mistaken for successful admission. This agrees with
+SPRU131G table 5-4's restriction and disambiguates the RMW source role for
+our fail-closed core. It is not a measured silicon trap or timing result.
+
+Check `operand_probe.lst` using `tools/c54x_vendor_operand_check.py`, supplying
+`--source`, `--assembler` and `--driver` paths. It verifies version, exact
+word/address sequence, warning identities/count and assembly completion,
+and explicitly leaves DSP execution and silicon-trap validation false.
+Accepted artifacts are under `tmp/c54x-vendor-operand-probe/`. Execution-side
+RMW admission remains a separate correction; this probe does not change it.
+
 ### Isolated simulator setup boundary
 
 `tools/run_ccs33_isolated.sh WORK COMMAND ...` supplies a disposable network-

@@ -204,8 +204,12 @@ removed. Full core conformance retains all 292 required markers, including
 legal postincrement, absolute and long-offset MVDP controls. Native clocked
 boot, all four keypad-tone settings, 5110 save/load, RF/processing and the
 3210 baseline/frontier regressions pass without rebanking their oracles.
-Other implicit-copy, read/modify/write and unenumerated read families
-remain open; the RMW operand role must not be guessed from this source rule.
+Other implicit-copy and unenumerated read families remain open. The
+[pinned TI assembler control](rom4_dsp_loader.md#standalone-vendor-assembler-operand-control)
+now warns on all four short-preincrement RMW forms just as on the forbidden
+LD source, while preserving ordinary stores and long-offset reads. This
+resolves the admission ambiguity, not execution-side correction or silicon
+trap behavior; those RMW handlers still need a focused rejection regression.
 
 MACP/MACD source admission is separately corrected. SPRU172C pages 4-87
 and 4-89 define Smem as the value read into the multiply and T; MACD's
