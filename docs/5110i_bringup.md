@@ -1229,6 +1229,29 @@ read-only; only physical inputs and emulator save/load APIs are driven.
 
 ## Remaining work
 
+### Backend ownership constraint
+
+NSE-2's native profiles explicitly remove `dsp_hle` and instantiate the full
+`nokia_dsp_c54x` backend. They do not use the staged backend's runtime-HLE
+handoff. That separate mechanism requires verified loader state, execution
+outside uploaded code and the specific absent ROM6 routine `2C75`; it then
+suspends staged execution and releases its transport ownership. The full
+ROM4 backend running NSE-2 reaches none of that guard's prerequisites.
+`nokia_dsp_hle::native_owns_transport()` currently queries staged ownership,
+not a general arbiter for simultaneously active full-native and HLE peers.
+
+Consequently, NSE-2 network parity is not available by merely enabling a
+radio peer or copying another handset's hybrid configuration. Keep the
+existing full-native composition and restart control unchanged. An explicit
+future research-HLE branch would need its own request/reply contract and
+single-owner transport boundary, not co-driving native rings, a timed switch,
+a firmware-PC escape or a fabricated native completion. This audit does not
+prove that such a branch is impossible; it establishes why the existing
+staged-ROM6 handoff is not reusable as-is. Relevant implementation authority:
+`make_5110i_config` / `nse2r4v` in `driver/nokia_dct3.cpp`,
+`nokia_dsp_staged.cpp`'s `runtime_hle_handoff` guard and
+`nokia_dsp_hle.cpp`'s ownership check.
+
 | Boundary | Established | Required evidence / next action |
 | --- | --- | --- |
 | Native receive supervision | Initial RX is delivered and consumed; full scan advances; timer-`dd` tests generic activity and expires with zero. | Identify a legitimate later producer or peripheral completion. No guessed heartbeat, shortened bitmap or policy disable. |
