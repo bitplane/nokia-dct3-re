@@ -250,6 +250,9 @@ or was expensive to discover. Current examples include:
   automatic view of the active exception bank. Record CPSR mode and select
   `FR8..FR14` in FIQ, or the corresponding IRQ/SVC/ABT/UND SP/LR exports,
   before attributing an interrupt-time caller or stack to firmware;
+- shift/carry selectors: `LSRS #n` puts original bit `n-1` into carry.
+  Decode the conditional branch and intervening flag writers explicitly;
+  a later CPSR snapshot need not retain the carry used for that branch;
 - constructors that acknowledge an incoming command rather than initiate it;
 - report code 7 belonging to shutdown/power lifecycle rather than ordinary
   boot readiness; and

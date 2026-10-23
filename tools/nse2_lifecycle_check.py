@@ -146,6 +146,11 @@ def diagnose_timer_boundary(text):
                 scope='observed ordering, not proof FIQ5 or a clock rate is defective')
 
 
+def timer_queue_offset(global_flags, node_flags):
+    # LSRS #2 exports original bit 1 to carry; BLO selects the other queue.
+    return 0x10 if global_flags & node_flags & 0x02 else 0x28
+
+
 def diagnose_timer_queue(text):
     reset = diagnose(text)
     pattern = (r'nse2_timer_queue: kind=(insert|expire) ticks=([0-9a-f]+) node_flags=([0-9a-f]{2}) '
@@ -160,16 +165,23 @@ def diagnose_timer_queue(text):
             or expired[2:4] != ('03', '03') or expired[6:8] != ('11', '00255535')
             or expired[1] != '0000'):
         raise ValueError('NSE-2 timer queue flags or banked caller differ')
+    if timer_queue_offset(int(inserted[3], 16), int(inserted[2], 16)) != 0x10:
+        raise ValueError('NSE-2 decoded insertion does not select the FIQ5 queue')
     target = int(inserted[1], 16)
     cumulative, threshold, elapsed = (int(value, 16) for value in expired[9:12])
     if (target != cumulative or elapsed <= target or threshold != elapsed + 125
             or not 4.6 < float(inserted[-1]) < 4.8
             or not 0 <= reset['reason_time'] - float(expired[-1]) < 0.01):
         raise ValueError('NSE-2 FIQ5 elapsed/deadline arithmetic differs')
-    return dict(insertion_queue='head28 branch', expiration_queue='FIQ5 head10 walker',
+    selections = re.findall(r'nse2_timer_queue_select: node_flags=03 global_flags=03 selected_base=00100020 '
+                            r't=([0-9.]+) observer_writes=0', text)
+    first_window = [float(time) for time in selections if float(time) < reset['reason_time']]
+    if len(first_window) != 1 or not float(inserted[-1]) <= first_window[0] < 4.8:
+        raise ValueError('NSE-2 direct head10 insertion selection missing')
+    return dict(insertion_queue='FIQ5 head10 queue', expiration_queue='FIQ5 head10 walker',
                 requested_adjusted_ticks=target, expiration_elapsed_ticks=elapsed,
                 elapsed_beyond_target_ticks=elapsed-target, batch_slack_ticks=125,
-                queue_migration_site_unmapped=True, hardware_timing_fault_proved=False,
+                queue_migration_required=False, hardware_timing_fault_proved=False,
                 scope='own FIQ5 walk expires a passed deadline; physical clock/fault ownership unresolved')
 
 

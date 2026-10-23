@@ -25,6 +25,7 @@ VERSION = b'V 05.53\n11-01-01\nNSE-2\n(c) NMP.\0'
 BASE = 0x200000
 TABLE = 0x29bba0
 PERIPHERAL_FRAGMENTS = {
+    'timer_queue_selector': (0x254c7c, 'b5304ca4792279c3401a0892d3011c23e00122181913691d'),
     'analog_source7': (0x2644e6, '2007f033f82d'),
     'analog_sample_scale': (0x264508, '489a434821e8f035ff4d04080c008028'),
     'analog_sample_range': (0x26458e, '2000882922e100d24291db0b4adb4291dc08882122e100d24291db034ad74291dc002001bd70'),

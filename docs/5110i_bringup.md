@@ -25,10 +25,10 @@ DSP but retains open-pin ADC2; it completes DSP startup while the analog
 readiness counter cannot drain. These are explicit controls, not alternative
 claims of usable boot.
 
-Next: trace timer-queue promotion and wake-event selection during sleep,
-reconciling the advancing native measurement with its software deadline
-before accepting longer contact/persistence workflows. Keep the existing
-rejection and restart controls.
+Next: identify the legitimate DSP activity expected during the advancing
+measurement, preserving the proved initial transport and ordinary software
+timer expiry. No queue migration or clock defect is established. Keep the
+existing rejection and restart controls.
 Do not substitute donor EEPROM, force firmware state, or claim phone service
 from the graphical prompt or key decode alone.
 
@@ -409,9 +409,9 @@ not proof that FIQ5 is defective or that changing a rate would be faithful.
 
 MAD2 retains the calibrated Timer-0/Timer-1 rates documented in
 [MAD2 fidelity](mad2_fidelity.md). The native DSP compare model separately
-uses the 13 MHz/12 reference. Reconcile the MCU timer-node/list handling,
-sleep accounting and the native loop's actual completion timing before
-altering either domain. Ports `09/0a/0b` written by resident `4414` remain
+uses the 13 MHz/12 reference. Ordinary queue selection and expiry are
+identified below; physical divider provenance and the native completion/
+activity contract remain distinct questions. Ports `09/0a/0b` written by resident `4414` remain
 storage in the backend; their event/sampling ownership is not established
 by this timing coincidence. No new rate, compare behavior or policy value
 has been selected from the desired boot result.
@@ -423,10 +423,14 @@ requires the raw arm/terminal/reset evidence and reports
 replacement long-run acceptance oracle.
 
 The queue insertion at `254c7c` receives adjusted ticks `0b9b`, node/global
-flags `03/03`, and active LR `254e5f` in system mode `1f`. The own selector
-therefore chooses the queue at global offset `28`, not offset `10`.
-At expiry, the active FIQ LR is `255535`, identifying walker `2554e4`,
-which services the offset-`10` queue. Its cumulative target R4=`0b9b`,
+flags `03/03`, and active LR `254e5f` in system mode `1f`. The byte-pinned
+selector ANDs these bytes and executes `LSRS #2; BLO`: carry is original
+bit 1, not bit 2. Thus `(global_flags & node_flags & 02) != 0` chooses
+global offset `10`; the other branch chooses offset `28`. Positive
+observation at join `254c92` reads selected base `100020`, confirming
+head address `100030` (offset `10`) for timer `1d`.
+At expiry, active FIQ LR `255535` identifies walker `2554e4`, servicing
+that same offset-`10` queue. Its cumulative target R4=`0b9b`,
 elapsed banked R8=`0f11` and threshold R6=`0f8e` satisfy the decoded
 `elapsed + 125` batching rule. The target has passed by 886 software ticks;
 this is not a native-completion report fabricated by a device.
@@ -434,12 +438,13 @@ this is not a native-completion report fabricated by a device.
 The expiry trace's user-bank LR `295d79` belongs to interrupted foreground
 code, not the queue walker. ARM7 exception-time observations must select
 register banks by CPSR; see [the cleanup traps](research_cleanup.md).
-`--timer-queue` requires the bank-correct caller and arithmetic, while
-retaining `queue_migration_site_unmapped=true`. The next boundary is the
-promotion from the offset-`28` queue to FIQ5's offset-`10` queue and its
-wake-event selection. Expiry arithmetic alone does not prove whether the
-deadline should have been serviced earlier or whether a physical clock,
-sleep transition, native reply contract or provisioning field is wrong.
+`--timer-queue` requires the bank-correct caller, positive selection and
+expiry arithmetic, and reports `queue_migration_required=false`. There is
+no evidence of an inter-queue promotion to recover. The former opposite
+selection was a shift/carry decoding error; its link-watching probe is
+removed. A passed deadline in this FIQ5-serviced queue is not alone proof
+of late service or a hardware-clock defect. Resume at the native activity/
+completion contract rather than changing queue state or timer rates.
 
 ## Remaining work
 
