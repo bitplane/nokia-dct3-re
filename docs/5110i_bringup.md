@@ -94,7 +94,7 @@ The archive calls the phone 5110i; both headers identify `NSE-2`, `05.53`,
 | GENSIO/CCONT | Own `296704`: select `22` at `28`, TX `2a`, RX `2d`, status `29` bit 2. | Shared serial grammar, not measured electrical timing. |
 | LCD | Own `296e46/296eac`: command/data `2c/2b`, ready bit 0. | Observed 84x48 presentation; fitted controller identity remains unproved. |
 | Keypad | Scanner `29806c`, decoder `299010`, maps `2b382c/2b3848`, selector `10c6b6`; five rows, signal/direction `31/2f`, columns `30`, IRQ mask `33`. | Existing NSE-1 contact layout matches own table; digits 1--5 and Menu have runtime decode acceptance. |
-| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/retry exhaustion/PUK1 recovery, PIN2 change/retry exhaustion/PUK2 recovery/permanent refusal, organic ADN write and cold contact readback pass. | PIN1 change and FDN remain unqualified; the Nokia phone code is phone-side. |
+| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/retry exhaustion/PUK1 recovery, PIN2 change/retry exhaustion/PUK2 recovery/permanent refusal, organic ADN write and cold contact readback pass. FDN activation/cold-state/deactivation pass. | Fixed-number editing/call restrictions and PIN1 change remain unqualified. The Nokia phone code is phone-side. |
 
 EEPROM START/STOP entry points are `295814/295886`, identified by SDA
 transitions while SCL is high. Block reader `293d92` takes address,
@@ -325,6 +325,35 @@ VERIFY before protected SIM reads. No handset state or credentials are
 rewritten by either input fixture.
 
 ### PIN2 and PUK2 lifecycle
+
+#### Fixed-dialling settings lifecycle
+
+`verify-5110i-fdn` prepares a fresh card through the existing accepted SIM
+bootstrap, then four isolated thirty-second native-compatibility runs establish the FDN
+settings lifecycle on the explicitly FDN-capable laboratory SIM, not on the
+default card. `sim_fdn_profile.extend(card, True)` supplies ten empty FDN
+records and permits ADN access while invalid. PIN1 is disabled, PIN2 is
+`5678`, and the separate phone-code retry fixture remains explicit.
+Physical Settings / Security settings / Fixed dialling / On followed by
+PIN2 produces successful CHV2 VERIFY (`A0 20 00 02 08`), INVALIDATE of
+ADN (`6F3A`), and REHABILITATE of LOCI/IMSI (`6F7E`, `6F07`). Only byte
+3575 changes from one to zero in the complete 3898-byte saved card.
+A new process importing that exact card displays `Fixed dialling: On`,
+performs the LOCI/IMSI rehabilitation during startup, and preserves every
+card byte. Physical Off and PIN2 in another process rehabilitate ADN and
+change only byte 3575 back to one. The final cold process displays Off,
+issues neither VERIFY nor file-validity commands, and preserves the card.
+
+`tools/run_nse2_fdn.py` links the exact saved card between phases and records
+source/input/executable hashes, complete before/after cards, physical input
+scripts, SIM traces and snapshots. `tools/nse2_fdn_check.py` verifies
+all four phases, including exact card deltas, command ordering,
+successful CHV2/file-validity statuses and physical contact timing. Its
+negative tests reject protocol, input and storage corruption. The runner
+also verifies phone-code acceptance and the exact cold On/Off frames.
+These runs do not establish
+fixed-number editing, outgoing-call restriction,
+network operation, or native stability beyond the known restart boundary.
 
 `verify-5110i-pin2-change` uses two isolated thirty-second processes with
 PIN1 disabled and the explicitly declared phone-code retry fixture. Physical
