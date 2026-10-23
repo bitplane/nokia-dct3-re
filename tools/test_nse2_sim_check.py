@@ -49,8 +49,18 @@ class SimCheckTest(unittest.TestCase):
         text+='\nsim_device: header cla=a0 ins=20 p1=00 p2=02 p3=08 selected=6f3a t=29.08\nSIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=0'
         h=lambda b:hashlib.sha256(b).hexdigest()
         with patch.multiple('tools.nse2_sim_check',AUTHENTICATED_FRAME=h(b'idle'),PUK2_PROMPT_FRAME=h(b'puk'),
-                            PIN2_CHANGE_FRAMES=('','',h(b'new'),h(b'confirm'),''),PIN_ACCEPTED_FRAME=h(b'accepted')):
+                            PIN2_CHANGE_FRAMES=('','',h(b'new'),h(b'confirm'),''),PIN_ACCEPTED_FRAME=h(b'accepted'),CODE_ERROR_FRAME=h(b'error')):
             self.assertTrue(verify_puk2_recovery(text,initial,final,frames)['automatic_pin2_verify'])
+            wrong=bytearray(initial)
+            wrong[ATTEMPTS_OFFSET+3]=9
+            rejected=text.split('\nsim_device: header cla=a0 ins=20')[0].replace('sw=9000 chv=3/3 puk=10/10','sw=9804 chv=3/0 puk=10/9')
+            result=verify_puk2_recovery(rejected,initial,wrong,frames[:-1]+[b'error'],wrong=True)
+            self.assertEqual(result['puk2_attempts_remaining'],9)
+            self.assertFalse(result['automatic_pin2_verify'])
+            self.assertEqual(verify_puk2_recovery(text,wrong,final,frames)['puk2_attempts_before'],9)
+            for bad in (rejected.replace('puk=10/9','puk=9/10'),rejected+'\nsim_device: header cla=a0 ins=20 p1=00 p2=02 p3=08 selected=6f3a t=29.08'):
+                with self.assertRaises(ValueError):
+                    verify_puk2_recovery(bad,initial,wrong,frames[:-1]+[b'error'],wrong=True)
             for bad in (text.replace('p2=02','p2=00',1),text.replace('ins=20 p1=00','ins=24 p1=00'),text.replace('t=29.08','t=28.9'),text.replace('chv=3/3','chv=3/2')):
                 with self.assertRaises(ValueError):
                     verify_puk2_recovery(bad,initial,final,frames)

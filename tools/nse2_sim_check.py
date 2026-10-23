@@ -314,6 +314,10 @@ def verify_pin2_input(card,*,restore=False,blocked=False):
     if len(card)<=ATTEMPTS_OFFSET+1 or card[ATTEMPTS_OFFSET+1] not in ((0,) if blocked else (1,2,3)):
         raise ValueError('unqualified initial PIN2 retry lifecycle')
     expected[ATTEMPTS_OFFSET+1]=card[ATTEMPTS_OFFSET+1]
+    if blocked:
+        if card[ATTEMPTS_OFFSET+3] not in range(1,11):
+            raise ValueError('unqualified initial PUK2 retry lifecycle')
+        expected[ATTEMPTS_OFFSET+3]=card[ATTEMPTS_OFFSET+3]
     if len(card) not in (len(expected),AOC_NVRAM_SIZE) or card[:len(expected)]!=expected:
         raise ValueError('PIN2 change requires the declared PIN-disabled laboratory card and qualified credential')
     if (restore or blocked) and len(card)!=AOC_NVRAM_SIZE:
@@ -374,19 +378,29 @@ def verify_pin2_blocked(text,initial,final,frames):
                 network_registration=False,stable_long_boot=False)
 
 
-def verify_puk2_recovery(text,initial,final,frames):
+def verify_puk2_recovery(text,initial,final,frames,*,wrong=False):
     from tools.sim_security_trace_check import CHV_OFFSET,ATTEMPTS_OFFSET,AOC_NVRAM_SIZE,statuses
     verify_pin2_input(initial,blocked=True)
+    before=initial[ATTEMPTS_OFFSET+3]
+    if wrong and before<2:
+        raise ValueError('permanent PUK2 exhaustion is not yet qualified by this checker')
+    remaining=before-1 if wrong else 10
     expected=bytearray(initial)
-    expected[CHV_OFFSET+8:CHV_OFFSET+16]=b'2468\xff\xff\xff\xff'
-    expected[ATTEMPTS_OFFSET+1]=3
+    if not wrong:
+        expected[CHV_OFFSET+8:CHV_OFFSET+16]=b'2468\xff\xff\xff\xff'
+        expected[ATTEMPTS_OFFSET+1]=3
+    expected[ATTEMPTS_OFFSET+3]=remaining
     if len(initial)!=AOC_NVRAM_SIZE or final!=expected:
         raise ValueError('PUK2 recovery changed unexpected card bytes')
     headers=[m.groups() for m in HEADER.finditer(text) if int(m[2],16) in (0x20,0x24,0x2c)]
-    if [h[:5] for h in headers]!=[('a0','2c','00','02','10'),('a0','20','00','02','08')]:
+    expected_headers=[('a0','2c','00','02','10')]+([] if wrong else [('a0','20','00','02','08')])
+    if [h[:5] for h in headers]!=expected_headers:
         raise ValueError('PUK2 UNBLOCK/automatic VERIFY sequence differs')
     times=[float(h[-1]) for h in headers]
-    if not 29<times[0]<times[1]<29.5 or any(statuses(text,i,chv=2)!=[(0x9000,3,10)] for i in (0x2c,0x20)):
+    if times!=sorted(times) or not 29<times[0]<=times[-1]<29.5 or (not wrong and times[0]>=times[1]):
+        raise ValueError('PUK2 APDU timing/order differs')
+    if (statuses(text,0x2c,chv=2)!=[(0x9804 if wrong else 0x9000,0 if wrong else 3,remaining)]
+            or statuses(text,0x20,chv=2)!=([] if wrong else [(0x9000,3,10)])):
         raise ValueError('PUK2 status/retry/order differs')
     contacts=re.findall(r'nse2_puk2_contact: event=(\d+) down=([01]) t=([0-9.]+) physical_only=1',text)
     if [(int(i),int(d)) for i,d,_ in contacts]!=[(i,i%2) for i in range(1,71)]:
@@ -394,11 +408,12 @@ def verify_puk2_recovery(text,initial,final,frames):
     event_times=[float(t) for _,_,t in contacts]
     if event_times!=sorted(event_times) or not 15.4<event_times[0]<15.6 or not 24.4<event_times[32]<24.6 or not 29<event_times[-1]<29.4:
         raise ValueError('PUK2 physical input timing differs')
-    expected_frames=(AUTHENTICATED_FRAME,PUK2_PROMPT_FRAME,*PIN2_CHANGE_FRAMES[2:4],PIN_ACCEPTED_FRAME)
+    expected_frames=(AUTHENTICATED_FRAME,PUK2_PROMPT_FRAME,*PIN2_CHANGE_FRAMES[2:4],CODE_ERROR_FRAME if wrong else PIN_ACCEPTED_FRAME)
     if tuple(hashlib.sha256(frame).hexdigest() for frame in frames)!=expected_frames:
         raise ValueError('PUK2 prompt/new-PIN/confirmation/result frames differ')
-    return dict(puk2_verified=True,sim_pin2_recovered=True,pin2_attempts_remaining=3,
-                automatic_pin2_verify=True,network_registration=False,stable_long_boot=False)
+    return dict(puk2_verified=not wrong,wrong_puk2_rejected=wrong,sim_pin2_recovered=not wrong,
+                puk2_attempts_before=before,puk2_attempts_remaining=remaining,pin2_attempts_remaining=0 if wrong else 3,
+                automatic_pin2_verify=not wrong,network_registration=False,stable_long_boot=False)
 
 
 def verify_security_attempt(text, pixels, *, retry_zero=False,contact_start=12):

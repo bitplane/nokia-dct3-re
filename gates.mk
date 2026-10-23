@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 805 gates: 607 generated from typed steps, 198 copied verbatim (shell).
+# 806 gates: 608 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -178,7 +178,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5110i-sim-pin verify-5110i-sim-pin-persistence \
 	verify-5110i-sim-pin-blocked verify-5110i-sim-puk-recovery \
 	verify-5110i-pin2-change verify-5110i-pin2-retry verify-5110i-pin2-blocked \
-	verify-5110i-puk2-recovery verify-5110i-native-processing verify-6150-static \
+	verify-5110i-puk2-recovery verify-5110i-puk2-retry \
+	verify-5110i-native-processing verify-6150-static \
 	verify-6110-bootstrap-capture verify-dct3-type-1f-static verify-3210-v501 \
 	verify-dsp-memory-upload verify verify-ccont verify-ccont-watchdog \
 	verify-gensio verify-display verify-dsp-transport verify-cobba-control \
@@ -1475,6 +1476,12 @@ verify-5110i-pin2-blocked: verify-5110i-static build
 verify-5110i-puk2-recovery: verify-5110i-pin2-blocked
 	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR)/recover --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --phone-retry-zero --pin2-action puk2 --pin2-card $(RUN_DIR)/wrong3/nvram/nse2r4v/sim_card --seconds 30
 	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR)/restore --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --phone-retry-zero --pin2-action restore --pin2-card $(RUN_DIR)/recover/nvram/nse2r4v/sim_card --seconds 30
+
+verify-5110i-puk2-retry: verify-5110i-pin2-blocked
+	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR)/wrong-puk --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --phone-retry-zero --pin2-action puk2-wrong --pin2-card $(RUN_DIR)/wrong3/nvram/nse2r4v/sim_card --seconds 30
+	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR)/wait-puk --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --phone-retry-zero --pin2-action blocked --pin2-card $(RUN_DIR)/wrong-puk/nvram/nse2r4v/sim_card --seconds 30
+	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR)/recover-puk --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --phone-retry-zero --pin2-action puk2 --pin2-card $(RUN_DIR)/wait-puk/nvram/nse2r4v/sim_card --seconds 30
+	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR)/restore-puk --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --phone-retry-zero --pin2-action restore --pin2-card $(RUN_DIR)/recover-puk/nvram/nse2r4v/sim_card --seconds 30
 
 verify-5110i-native-processing: verify-5110i-static build
 	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR) --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --phone-retry-zero --post-auth-menu --native-processing --seconds 30

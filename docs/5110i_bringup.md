@@ -383,6 +383,17 @@ late CHV2 VERIFY after the unchanged PIN1-disabled bootstrap. No firmware
 timer, clock, state or input-dispatch result is altered. This remains a
 short-run SIM recovery test, not native long-run acceptance.
 
+`verify-5110i-puk2-retry` includes organic PIN2 exhaustion, then four more
+cold stages. Wrong PUK2 `87654325` submits one UNBLOCK returning `9804`:
+only PUK2 attempts change from ten to nine, PIN2 stays blocked and unchanged,
+and no automatic VERIFY is issued. A fresh no-credential menu observation
+retains nine attempts, the PUK2 prompt and byte-identical card storage.
+Correct PUK2 on that saved card restores PIN2 attempts to three and PUK2
+attempts to ten, changes PIN2 to `2468`, and is followed by automatic VERIFY.
+The final cold reverse CHANGE accepts `2468`. Every saved-card transition
+checks the whole input card; PIN1 and PUK1 are independent of this retry path.
+Permanent loss after exhausting all ten PUK2 attempts remains separate.
+
 ### Physical contact save
 
 The separate `--phonebook` fixture selects Add name, enters `A / 123` and

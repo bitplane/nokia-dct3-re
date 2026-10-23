@@ -17,7 +17,7 @@ local function press(t,key)
 end
 local path='MDDDMDDMDDDDMDDM'
 for i=1,#path do press(15.5+(i-1)*.35,path:sub(i,i)) end
-local credentials='87654321M2468M2468M'
+local credentials=(_G.nse2_puk2_wrong and '87654325' or '87654321')..'M2468M2468M'
 for i=1,#credentials do press(24.5+(i-1)*.25,credentials:sub(i,i)) end
 local event,frame=1,1
 local frames={14,24.3,26.65,27.9,29.7}
