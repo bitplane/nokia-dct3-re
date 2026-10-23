@@ -20,7 +20,7 @@ local function digits(t,value,step)
         press(t+(i-1)*step,key[1],key[2])
     end
 end
-digits(11.2,'12345678',0.30)
+digits(11.2,_G.nse2_wrong_puk1 and '12345675' or '12345678',0.30)
 press(13.8,1,4)
 digits(14.4,'2468',0.35)
 press(15.9,1,4)

@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 813 gates: 615 generated from typed steps, 198 copied verbatim (shell).
+# 814 gates: 616 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -178,7 +178,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5110i-sim-pin verify-5110i-sim-pin-persistence \
 	verify-5110i-sim-pin-blocked verify-5110i-sim-puk-recovery verify-5110i-fdn \
 	verify-5110i-fdn-records verify-5110i-fdn-edit-lifecycle \
-	verify-5110i-fdn-dial-policy verify-5110i-pin2-change \
+	verify-5110i-fdn-dial-policy verify-5110i-pin2-change verify-5110i-puk1-retry \
 	verify-5110i-pin1-change verify-5110i-pin-request-lifecycle \
 	verify-5110i-pin2-retry verify-5110i-pin2-blocked verify-5110i-puk2-recovery \
 	verify-5110i-puk2-retry verify-5110i-puk2-exhaustion \
@@ -1476,6 +1476,9 @@ verify-5110i-fdn-dial-policy: verify-5110i-static build
 verify-5110i-pin2-change: verify-5110i-static build
 	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR)/change --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --phone-retry-zero --pin2-action change --seconds 30
 	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR)/restore --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --phone-retry-zero --pin2-action restore --pin2-card $(RUN_DIR)/change/nvram/nse2r4v/sim_card --seconds 30
+
+verify-5110i-puk1-retry: verify-5110i-static build
+	$(VENV)/bin/python tools/run_nse2_puk1_retry.py $(RUN_DIR) --mame $(MAME_DIR)/mame
 
 verify-5110i-pin1-change: verify-5110i-static build
 	$(VENV)/bin/python tools/run_nse2_pin1_change.py $(RUN_DIR) --mame $(MAME_DIR)/mame

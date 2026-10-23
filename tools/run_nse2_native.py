@@ -97,6 +97,7 @@ def main():
     parser.add_argument('--pin-enabled', action='store_true', help='separate PIN-enabled synthetic-card boot observation')
     parser.add_argument('--pin-action', choices=('verify','wrong','blocked','puk','reauth'), help='physical PIN/PUK attempt or cold prompt control')
     parser.add_argument('--pin-card', type=Path, help='persistent PIN-enabled laboratory card from an earlier process')
+    parser.add_argument('--puk-attempts',type=int,choices=range(1,11),default=10,help='explicit expected PUK1 retries for blocked/puk input')
     parser.add_argument('--pin2-action',choices=('change','restore','wrong','blocked','puk2','puk2-wrong','permanent'),help='physical security-menu PIN2/PUK2 lifecycle')
     parser.add_argument('--pin2-card',type=Path,help='complete saved card for a cold PIN2 lifecycle step')
     parser.add_argument('--seconds', type=int, default=8, choices=range(8, 121), metavar='8..120')
@@ -134,6 +135,8 @@ def main():
             raise ValueError('PIN-enabled observation requires inserted card, fourteen seconds and no phone-code/application fixture')
         if args.pin_action and not args.pin_enabled:
             raise ValueError('SIM PIN input requires the explicit PIN-enabled card')
+        if args.puk_attempts!=10 and (args.pin_action not in ('blocked','puk') or not args.pin_card):
+            raise ValueError('reduced PUK1 retries require an imported blocked/recovery card')
         if args.pin_card and not args.pin_enabled:
             raise ValueError('persistent PIN card requires the PIN-enabled boot fixture')
         if args.pin_action in ('blocked','puk','reauth') and not args.pin_card:
@@ -161,7 +164,7 @@ def main():
             from tools.make_sim_card_profile import make_profile
             from tools.nse2_sim_check import verify_pin_input
             pin_card=args.pin_card.read_bytes() if args.pin_card else make_profile(True)
-            verify_pin_input(pin_card,blocked=args.pin_action in ('blocked','puk'),pin=b'2468' if args.pin_action=='reauth' else b'1234')
+            verify_pin_input(pin_card,blocked=args.pin_action in ('blocked','puk'),pin=b'2468' if args.pin_action=='reauth' else b'1234',puk_attempts=args.puk_attempts)
             card_path=run/'nvram'/machine/'sim_card'
             card_path.parent.mkdir(parents=True,exist_ok=True)
             card_path.write_bytes(pin_card)
@@ -238,7 +241,7 @@ def main():
                 from tools.nse2_sim_check import verify_puk_recovery
                 with Image.open(run/'snap/nse2_puk_probe_1.png') as prompt, Image.open(run/'snap/nse2_puk_probe_5.png') as final:
                     result.update(verify_puk_recovery(text,pin_card,(run/'nvram'/machine/'sim_card').read_bytes(),
-                                                     prompt.convert('L').tobytes(),final.convert('L').tobytes()))
+                                                     prompt.convert('L').tobytes(),final.convert('L').tobytes(),puk_attempts=args.puk_attempts))
             elif args.pin_enabled:
                 from tools.nse2_sim_check import verify_pin_boot
                 prompt_name=('nse2_pin_1.png' if args.pin_action in ('verify','wrong','reauth') else
@@ -256,7 +259,7 @@ def main():
                                                              pin_authenticated=True,bootstrap_horizon=14))
                     else:
                         result.update(verify_pin_boot(text,(run/'nvram'/machine/'sim_card').read_bytes(),
-                                                     prompt.convert('L').tobytes(),initial_card=pin_card,action=args.pin_action))
+                                                     prompt.convert('L').tobytes(),initial_card=pin_card,action=args.pin_action,puk_attempts=args.puk_attempts))
             else:
                 with Image.open(run / 'snap/nse2_7.png') as frame:
                     result.update(verify_sim_reads(text, frame.convert('L').tobytes(),later_chv2=args.pin2_action=='puk2'))

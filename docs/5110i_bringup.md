@@ -328,6 +328,25 @@ file reads, fifty ADN reads and ten SMS reads before fourteen seconds, and
 leaves the entire card unchanged. No phone-side authentication or sustained
 native RF operation is established by these probes.
 
+`verify-5110i-puk1-retry` starts from the card saved by three actual PIN1
+exhaustion. Physical `12345675` and twice-confirmed replacement `2468`
+issue `A0 2C 00 00 10` at about 18.266 seconds. Status `9804` changes only
+PUK1 retries from ten to nine; PIN1 remains blocked, its old credential
+remains unchanged, and the phone returns to the PUK prompt. A fresh
+no-input process imports that exact saved card, shows the blocked notice
+then PUK prompt and preserves all bytes, including nine remaining attempts.
+`tools/nse2_puk1_check.py` checks physical contacts, exact protocol/status,
+complete-card deltas and frames. Correct PUK recovery from this nine-attempt
+card then resets PIN1 retries to three and PUK1 retries to ten, changes only
+PIN1 to `2468`, and reaches the phone-code prompt. Cold physical `2468`
+authentication completes protected SIM reads and preserves the full card.
+`tools/run_nse2_puk1_retry.py` links all seven processes, records the
+wrong-PUK input source/hash and retains each stage's checked artifacts.
+`--puk-attempts 9` explicitly declares the reduced-retry input to the
+existing blocked/recovery runner; its default ten-attempt validation remains
+unchanged, and reduced counts are forbidden for unrelated PIN actions.
+Terminal PUK1 exhaustion remains unqualified.
+
 The recovery checker requires the complete saved blocked card, exactly one
 UNBLOCK command following the 38 physical contact edges, successful status,
 the PUK and phone-code frames, and the exact permitted storage delta. The

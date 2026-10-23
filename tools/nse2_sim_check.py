@@ -215,12 +215,15 @@ def verify_sms_action(text, initial, final, prompt_pixels, result_pixels, action
                 network_sms_proved=False,stable_long_boot=False)
 
 
-def verify_pin_input(card, *, blocked=False, pin=b'1234'):
+def verify_pin_input(card, *, blocked=False, pin=b'1234', puk_attempts=10):
     from tools.make_sim_card_profile import make_profile
     from tools.sim_security_trace_check import ATTEMPTS_OFFSET,AOC_NVRAM_SIZE,CHV_OFFSET
     if len(card) not in (len(make_profile(True)),AOC_NVRAM_SIZE):
         raise ValueError('NSE-2 PIN input card has an unsupported storage size')
     initial=bytearray(make_profile(True))
+    if puk_attempts not in range(1,11) or (not blocked and puk_attempts!=10):
+        raise ValueError('reduced PUK1 retries require a blocked card')
+    initial[ATTEMPTS_OFFSET+2]=puk_attempts
     if pin not in (b'1234',b'2468'):
         raise ValueError('unreviewed NSE-2 PIN credential')
     initial[CHV_OFFSET:CHV_OFFSET+8]=pin.ljust(8,b'\xff')
@@ -233,7 +236,7 @@ def verify_pin_input(card, *, blocked=False, pin=b'1234'):
     return retries
 
 
-def verify_pin_boot(text, card, prompt_pixels, result_pixels=None, final_pixels=None, *, action=None,initial_card=None,pin=b'1234'):
+def verify_pin_boot(text, card, prompt_pixels, result_pixels=None, final_pixels=None, *, action=None,initial_card=None,pin=b'1234',puk_attempts=10):
     from tools.make_sim_card_profile import make_profile
     from tools.sim_security_trace_check import statuses,ATTEMPTS_OFFSET,AOC_NVRAM_SIZE,CHV_OFFSET
     if action not in (None,'verify','wrong','blocked'):
@@ -241,7 +244,7 @@ def verify_pin_boot(text, card, prompt_pixels, result_pixels=None, final_pixels=
     if action in ('verify','wrong') and (result_pixels is None or final_pixels is None):
         raise ValueError('NSE-2 PIN result and continuation frames are required')
     initial_card=make_profile(True) if initial_card is None else initial_card
-    before=verify_pin_input(initial_card,blocked=action=='blocked',pin=pin)
+    before=verify_pin_input(initial_card,blocked=action=='blocked',pin=pin,puk_attempts=puk_attempts)
     remaining=3 if action=='verify' else before-1 if action=='wrong' else before
     expected=bytearray(initial_card)
     expected[ATTEMPTS_OFFSET]=remaining
@@ -280,14 +283,15 @@ def verify_pin_boot(text, card, prompt_pixels, result_pixels=None, final_pixels=
                 phone_code_authenticated=False,network_registration=False)
 
 
-def verify_puk_recovery(text, initial, final, prompt_pixels, final_pixels):
+def verify_puk_recovery(text, initial, final, prompt_pixels, final_pixels, *, puk_attempts=10):
     from tools.sim_security_trace_check import statuses,ATTEMPTS_OFFSET,AOC_NVRAM_SIZE,CHV_OFFSET
-    verify_pin_input(initial,blocked=True)
+    verify_pin_input(initial,blocked=True,puk_attempts=puk_attempts)
     if len(initial)!=AOC_NVRAM_SIZE:
         raise ValueError('PUK recovery requires a complete saved exhausted card')
     expected=bytearray(initial)
     expected[CHV_OFFSET:CHV_OFFSET+8]=b'2468\xff\xff\xff\xff'
     expected[ATTEMPTS_OFFSET]=3
+    expected[ATTEMPTS_OFFSET+2]=10
     if final!=expected:
         raise ValueError('PUK recovery changed unexpected card bytes')
     headers=[m.groups() for m in HEADER.finditer(text) if int(m[2],16) in (0x20,0x2c)]
