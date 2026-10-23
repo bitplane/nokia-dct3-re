@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 795 gates: 597 generated from typed steps, 198 copied verbatim (shell).
+# 796 gates: 598 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -174,7 +174,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5110i-nominal-boot verify-5110i-nominal-input \
 	verify-5110i-sim-bootstrap verify-5110i-phonecode-boundary \
 	verify-5110i-phonecode-accept verify-5110i-menu verify-5110i-phonebook \
-	verify-5110i-sms-store verify-5110i-native-processing verify-6150-static \
+	verify-5110i-sms-store verify-5110i-sms-persistence \
+	verify-5110i-native-processing verify-6150-static \
 	verify-6110-bootstrap-capture verify-dct3-type-1f-static verify-3210-v501 \
 	verify-dsp-memory-upload verify verify-ccont verify-ccont-watchdog \
 	verify-gensio verify-display verify-dsp-transport verify-cobba-control \
@@ -1422,6 +1423,10 @@ verify-5110i-phonebook: verify-5110i-static build
 
 verify-5110i-sms-store: verify-5110i-static build
 	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR) --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --phone-retry-zero --sms-store --seconds 30
+
+verify-5110i-sms-persistence: verify-5110i-static build
+	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR)/save --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --phone-retry-zero --sms-store --seconds 30
+	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR)/cold --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --phone-retry-zero --sms-reload $(RUN_DIR)/save/nvram/nse2r4v/sim_card --seconds 30
 
 verify-5110i-native-processing: verify-5110i-static build
 	$(VENV)/bin/python tools/run_nse2_native.py $(RUN_DIR) --mame $(MAME_DIR)/mame --record-checksum-only --nominal-vbat --insert-sim --security-code --phone-retry-zero --post-auth-menu --native-processing --seconds 30

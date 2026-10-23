@@ -3,6 +3,24 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nse2_physical_contact_cold_persistence", "owner": "nse2_sim_application", "status": "satisfied",
+      "predicate": "The declared native-compatibility NSE-2 fixture creates a SIM contact through physical input and retrieves it after a fresh process boot",
+      "current": "verify-5110i-phonebook saves A/123 through A0 DC 01 04 20 with status9000 and an exact Saved frame. A fresh phone imports only the saved synthetic SIM, physically searches for A and renders the contact with byte-identical complete card storage and no UPDATE RECORD. The erased-card control instead renders No phone numbers. Own checksum/retry fixtures, nominal ADC2 hypothesis and borrowed NSE-1 ROM4 remain explicit. No factory-image, fitted DSP, registration, speech or stable-long-boot acceptance follows.",
+      "evidence": ["docs/5110i_bringup.md", "gates.json", "tools/nse2_sim_check.py", "tools/test_nse2_sim_check.py"]
+    },
+    {
+      "id": "nse2_offline_sms_draft_cold_persistence", "owner": "nse2_sim_application", "status": "satisfied",
+      "predicate": "Physical NSE-2 draft composition commits an unsent A to EF_SMS and a separate cold process displays its text without rewriting the card",
+      "current": "verify-5110i-sms-persistence runs physical Messages/Write/Options/Save, one176-byte A0 DC 01 04 B0 transaction with9000 and an exact Message saved frame. The shared SIM assertion checks the unsent A record, erased ADN and nine empty SMS slots. A fresh phone process receives that saved card, physically opens Outbox/Read and renders A, with no UPDATE RECORD and byte-identical card storage. This is offline SIM/application storage, not network SMS, native RF, speech or operation past the known restart.",
+      "evidence": ["docs/5110i_bringup.md", "gates.json", "tools/nse2_sim_check.py", "tools/sim_sms_draft.py", "tools/test_nse2_sim_check.py"]
+    },
+    {
+      "id": "nse2_sustained_native_receive", "owner": "nse2_native_dsp", "status": "unresolved",
+      "predicate": "The native-compatibility NSE-2 composition sustains MCU receive activity without the observed reason68 restart",
+      "current": "Four initial native type74 control responses reach the MCU. The subsequent type1a scan advances, but policy selects reason68 at31.00086s and restarts at31.96943s. Same-run first-eight pacing projects1984 measurements to finish after34.43s before outer gaps; this is not observed completion or root-cause proof. Eleven evenly spaced first-measurement frame entries account for its counter progression. Own ROM table initialization pairs NV record0607 withff through a real writer, so a reader-only/factory-zero assumption cannot justify disabling it. Peripheral timing, fitted-mask compatibility and supervision behavior remain distinct open contracts; no heartbeat, timeout or NV forcing has been accepted.",
+      "evidence": ["docs/5110i_bringup.md", "tools/nse2_native_result_check.py", "tools/nse2_lifecycle_check.py", "tools/test_nse2_native_result_check.py"]
+    },
+    {
       "id": "nhm3_manual_font_numeric_recovery", "owner": "nhm3_documentation", "status": "satisfied",
       "predicate": "The acquired own System Module manual's reviewed Nokia ASCII glyph mapping recovers numeric audio conditions without corrupting ordinary fonts or hiding unresolved glyphs",
       "current": "Source SHA256 be8080882c1014d885d5dd504167e59bd919d14fe3c1898081d458d3e9059414 is pinned. Structured pikepdf font Differences/content/Form/graphics-state parsing maps only Nokia G3..G97 names to ASCII+29, preserves standard-font ASCII and reports every unresolved glyph. All50 pages yield2297 text-show spans/64123 glyphs with120 explicitly unmapped symbols, extended or Type3 glyphs. Rendered printed pages15/21 corroborate recovered values: EAR N/P14mV typical/220mV maximum and maximum-level codec gain-11dB; system connector MIC2P/N2mV typical/12.5mV maximum at1kHz/0dBm0/input gain32dB. The separate13MHz RFIclk and8-bit Tx/12-bit Rx I/Q table is explicitly RF, not speech PCM. Output is content-order text, not reconstructed layout or OCR/image-label completeness. Capture tmp/nhm3-manual-text.json. The acquired-manual retrieval gap is retired; speech serial framing/clock, selected codec controls, native masks and speech remain unresolved. No emulator profile is changed.",

@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from tools.nse2_sim_check import (BINARY_FILES, verify_sim_reads, verify_security_attempt,
                                   verify_post_auth_menu, verify_phonebook_save, verify_phonebook_reload,
-                                  verify_sms_save)
+                                  verify_sms_save, verify_sms_reload)
 
 
 def reads():
@@ -34,6 +34,30 @@ def contacts():
 
 
 class SimCheckTest(unittest.TestCase):
+    def test_cold_outbox_requires_saved_bytes_and_no_update(self):
+        from tools.sim_sms_draft import SMS_OFFSET,DRAFT
+        from tools.make_sim_card_profile import SMS_RECORD_SIZE,SMS_RECORDS
+        from tools.sim_phonebook_check import CURRENT_NVRAM_LENGTH
+        card=bytearray([255]*CURRENT_NVRAM_LENGTH)
+        for index in range(SMS_RECORDS):
+            card[SMS_OFFSET+index*SMS_RECORD_SIZE]=0
+        card[SMS_OFFSET:SMS_OFFSET+SMS_RECORD_SIZE]=DRAFT
+        text='\n'.join(f'nse2_sms_reload_contact: event={i} down={i%2} t={20+i/4:.2f} physical_only=1'
+                       for i in range(1,13))
+        with patch('tools.nse2_sim_check.SMS_READ_FRAME',hashlib.sha256(b'read').hexdigest()):
+            result=verify_sms_reload(text,card,card,b'read')
+            self.assertTrue(result['cold_readback_verified'])
+            self.assertFalse(result['network_sms_proved'])
+            for bad in (text.replace('event=12','event=13'),
+                        text+'\nsim_device: header cla=a0 ins=dc p1=01 p2=04 p3=b0 selected=6f3c t=24.0',
+                        text+'\nSIM status ins=dc sw=9000 chv=3/3 puk=10/10 enabled=0'):
+                with self.subTest(bad=bad[:40]), self.assertRaises(ValueError):
+                    verify_sms_reload(bad,card,card,b'read')
+            with self.assertRaises(ValueError):
+                verify_sms_reload(text,card,bytes(len(card)),b'read')
+            with self.assertRaises(ValueError):
+                verify_sms_reload(text,card,card,b'wrong')
+
     def test_offline_sms_save_requires_physical_commit_and_exact_card(self):
         from tools.sim_sms_draft import SMS_OFFSET,DRAFT
         from tools.make_sim_card_profile import SMS_RECORD_SIZE,SMS_RECORDS

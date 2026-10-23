@@ -11,6 +11,7 @@ PHONEBOOK_SAVED_FRAME = '8f9188505262676c92fd1ec55e94d6e9dbf2854bc5d14fc4d2ac3dc
 PHONEBOOK_RELOAD_FRAME = '4755eca080af19866a8da926e4185de6b1508f6271a3f4d116dc590d12d0e76a'
 PHONEBOOK_EMPTY_SEARCH_FRAME = '34478708c13e25cc3cb0778a9fa40f9cb812c6eb56636909c1ce133a1d616900'
 SMS_SAVED_FRAME = '491f056f1e92fdedbe7e334f423818c8b1770db0838a78bf25743e0ec2f0459c'
+SMS_READ_FRAME = '4877eac15193be5a99aad660db563aa3d4780c90ec47d349eb19448789fa31a9'
 BINARY_FILES = {0x6fb7: 15, 0x6fae: 1, 0x6f05: 4, 0x6fad: 3,
                 0x6f38: 12, 0x6f07: 9, 0x6f78: 2, 0x2fe6: 4,
                 0x6f46: 17, 0x6f74: 16, 0x6f7e: 11, 0x6f30: 24,
@@ -129,6 +130,26 @@ def verify_sms_save(text, card, pixels):
         raise ValueError('NSE-2 reviewed Message saved frame differs')
     return dict(offline_draft_saved=True, text='A', cold_readback_verified=False,
                 network_sms_proved=False, stable_long_boot=False)
+
+
+def verify_sms_reload(text, initial, final, pixels):
+    from tools.sim_sms_draft import check_card
+    from tools.sim_security_trace_check import statuses
+    contacts = re.findall(r'nse2_sms_reload_contact: event=(\d+) down=([01]) t=([0-9.]+) physical_only=1',text)
+    if [(int(index),int(down)) for index,down,_ in contacts] != [(i,i%2) for i in range(1,13)]:
+        raise ValueError('NSE-2 physical Outbox read contact sequence differs')
+    times = [float(time) for _,_,time in contacts]
+    if times!=sorted(times) or not 19<times[0]<times[-1]<24:
+        raise ValueError('NSE-2 physical Outbox timing differs')
+    check_card(initial)
+    if initial!=final:
+        raise ValueError('NSE-2 cold Outbox read changed saved card storage')
+    if any(int(match[2],16)==0xdc for match in HEADER.finditer(text)) or statuses(text,0xdc):
+        raise ValueError('NSE-2 cold Outbox read unexpectedly rewrote a SIM record')
+    if hashlib.sha256(pixels).hexdigest()!=SMS_READ_FRAME:
+        raise ValueError('NSE-2 reviewed cold SMS reader frame differs')
+    return dict(offline_draft_read=True,text='A',cold_readback_verified=True,
+                card_modified=False,network_sms_proved=False,stable_long_boot=False)
 
 
 def verify_security_attempt(text, pixels, *, retry_zero=False):

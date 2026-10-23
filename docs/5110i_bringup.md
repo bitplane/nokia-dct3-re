@@ -17,7 +17,9 @@ workflow now saves `A / 123` through a successful SIM UPDATE RECORD and
 checks its serialized card storage. A separate cold boot reads the saved
 card and physically searches for `A`; an erased-card control instead shows
 **No phone numbers**. Physical Messages / Write / Save also stores an
-unsent `A` draft on the SIM. Registration, calls and network SMS are not accepted.
+unsent `A` draft on the SIM; a fresh cold process opens it in Outbox and
+reads `A` without rewriting the card. Registration, calls and network SMS
+are not accepted.
 Longer execution is not stable: both menu-only and contact-entry runs
 request reason-`68` reset at about 31.97 seconds. The short menu gates do
 not cover this boundary.
@@ -57,6 +59,7 @@ make verify-5110i-phonecode-accept RUN_DIR=tmp/nse2-phonecode-accept
 make verify-5110i-menu RUN_DIR=tmp/nse2-menu
 make verify-5110i-phonebook RUN_DIR=tmp/nse2-phonebook
 make verify-5110i-sms-store RUN_DIR=tmp/nse2-sms-store
+make verify-5110i-sms-persistence RUN_DIR=tmp/nse2-sms-persistence
 make verify-5110i-native-processing RUN_DIR=tmp/nse2-native-processing
 ```
 
@@ -309,8 +312,15 @@ Repeated native runs reproduce the `Message saved` frame (SHA-256
 
 `verify-5110i-sms-store` checks physical contacts, exact EF/record/length,
 single successful commit, serialized draft/empty remainder and frame.
-This is offline storage only. Cold Outbox readback, deletion/cancellation,
-SMS-SUBMIT delivery and network registration remain separate acceptance.
+`verify-5110i-sms-persistence` saves in one process, then supplies only that
+SIM file to a fresh phone process. Physical Messages / Outbox / Read opens
+the stored `A` (reader-frame SHA-256
+`4877eac15193be5a99aad660db563aa3d4780c90ec47d349eb19448789fa31a9`).
+No UPDATE RECORD is issued and the entire serialized card remains identical
+to its pre-launch snapshot. The runner records the saved card's source/hash.
+This proves cold offline draft readback, not SMS-SUBMIT delivery, network
+registration or operation beyond the known restart. Deletion/cancellation
+remains a separate application/storage test.
 
 ## Long-run native receive boundary
 
