@@ -79,6 +79,37 @@ def inspect_scan_bitmap_source(image,text):
     return dict(bitmap_source='10a75c',bytes=48,set_bits=population,category=2,
                 full_scan_threshold=124,full_scan_branch_observed=True,
                 authentic_factory_bitmap_proved=False)
+
+
+def inspect_scan_bitmap_writers(image,text):
+    fragments={0x224a4c:'b5304ce87d202800d1104de51c2821ff2230f076fdf3203f8028207c84a01c28f060fb808ca0f060fb72bd30',
+               0x224dec:'0010ac2c0010abbc',
+               0x285170:'b5101c04200ff7d0f88b48771c21f7e9ff2d48761c212230f015fdbe200ff7d0f8e3bd10'}
+    for address,encoded in fragments.items():
+        expected=bytes.fromhex(encoded)
+        if image[address-0x200000:address-0x200000+len(expected)]!=expected:
+            raise ValueError(f'bitmap default/setter contract differs at {address:06x}')
+    rows=re.findall(r'nse2_bitmap_write: address=([0-9a-f]{8}) value=([0-9a-f]{8}) mask=ffffffff pc=([0-9a-f]{8}) lr=([0-9a-f]{8}) n=(\d+) t=([0-9.]+) observer_writes=0',text)
+    summaries=re.findall(r'nse2_bitmap_write_summary: writes=(\d+) setters=(\d+) t=([0-9.]+) observer_writes=0',text)
+    if len(summaries)!=1 or summaries[0][:2]!=('48','3') or len(rows)!=48 or not 29.9<=float(summaries[0][2])<=30.1:
+        raise ValueError('complete bitmap writer coverage through thirty seconds missing')
+    for i,(address,value,pc,lr,n,_) in enumerate(rows):
+        expected=0 if i<12 else 0x003fffff if i%12==0 else 0xffffffff
+        if int(address,16)!=0x10a75c+(i%12)*4 or int(value,16)!=expected or int(n)!=i+1:
+            raise ValueError('bitmap writer address/value ordering differs')
+        if i<12:
+            valid=pc in ('0020010c','0020010e') and lr=='0022032b'
+        else:
+            valid=pc=='0029ad2a' and lr=='0028518d'
+        if not valid:
+            raise ValueError('bitmap writer provenance differs')
+    setters=re.findall(r'nse2_bitmap_setter: lr=([0-9a-f]{8}) source=([0-9a-f]{8}) bitmap=([0-9a-f,]+) t=([0-9.]+) observer_writes=0',text)
+    if len(setters)!=3 or any(lr!='00224a71' or source!='0010ac2c' or bitmap.split(',')!=['003f']+['ffff']*23 for lr,source,bitmap,_ in setters):
+        raise ValueError('observed bitmap setters do not originate in the explicit default branch')
+    return dict(default_constructor='224a4c',alternative_list_flag='10abd0',source='10ac2c',
+                live_bitmap='10a75c',writes=48,default_setter_calls=3,
+                firmware_constructed_default=True,erased_ram_explanation=False,
+                authentic_factory_nv_required_for_this_bitmap=False)
 MCU_REQUEST_FRAGMENTS = {
     0x2160ec: '27017507',  # R7 supplies the one-byte length.
     0x2160f4: '48a4468078002804d145',

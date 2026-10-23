@@ -5,6 +5,30 @@ local data=cpu.spaces.data
 _G.nse2_scan_request_taps={}
 local mcu=machine.devices[':maincpu']
 local memory=mcu.spaces.program
+local setter_count=0
+_G.nse2_bitmap_setter_tap=memory:install_read_tap(0x285170,0x285173,'nse2_bitmap_setter',function()
+    if mcu.state['R15'].value~=0x285170 then return end
+    setter_count=setter_count+1
+    if setter_count>64 then return end
+    local pointer=mcu.state['R0'].value
+    local words={}
+    for index=0,23 do words[#words+1]=string.format('%04x',memory:read_u16(pointer+index*2)) end
+    machine:logerror(string.format('nse2_bitmap_setter: lr=%08x source=%08x bitmap=%s t=%.9f observer_writes=0\n',
+        mcu.state['R14'].value,pointer,table.concat(words,','),machine.time:as_double()))
+end)
+local bitmap_writes=0
+_G.nse2_bitmap_writer_tap=memory:install_write_tap(0x10a75c,0x10a78b,'nse2_bitmap_writer',function(offset,value,mask)
+    bitmap_writes=bitmap_writes+1
+    if bitmap_writes>128 then return end
+    machine:logerror(string.format('nse2_bitmap_write: address=%08x value=%08x mask=%08x pc=%08x lr=%08x n=%d t=%.9f observer_writes=0\n',
+        offset,value,mask,mcu.state['R15'].value,mcu.state['R14'].value,bitmap_writes,machine.time:as_double()))
+end)
+local bitmap_done=false
+emu.register_frame_done(function()
+    if bitmap_done or machine.time:as_double()<30 then return end
+    bitmap_done=true
+    machine:logerror(string.format('nse2_bitmap_write_summary: writes=%d setters=%d t=%.9f observer_writes=0\n',bitmap_writes,setter_count,machine.time:as_double()))
+end,'NSE-2 channel bitmap writer coverage')
 -- Use a positively observed branch target, not mid-line fetch absence.
 for _,address in ipairs({0x20fd9c}) do
     local count=0

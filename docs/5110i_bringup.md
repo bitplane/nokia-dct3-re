@@ -702,11 +702,26 @@ count is 374 (`0176`), independently reproduced from the copied words,
 and category is 2. Pinned branch `20fd44..20fd4e` selects full scan when
 count is at least 124 and category is not 6; `20fd9c` ORs bit 0 into the
 packet control byte (initial `10`, becoming `11`). Thus the MCU and DSP
-agree on why this request selects the long scan. The runtime bitmap's
-initialization/provisioning provenance and expected receive-supervision
-traffic remain separate unknowns; a consistent decode is not evidence of
-authentic factory contents. The checker requires actual source copies and
+agree on why this request selects the long scan. Expected receive-supervision
+traffic remains unresolved; consistent decoding alone does not establish
+the bitmap's provenance, which the writer census below identifies separately.
+The checker requires actual source copies and
 the positive branch observation, not absence at mid-line PC hooks.
+
+The bitmap itself has a positively identified firmware-default producer.
+Constructor `224a4c` tests byte `10abd0`; its zero branch fills 48 bytes at
+`10ac2c` with `ff`, writes first halfword `003f`, and publishes through
+setter `285170` (return `224a71`). That setter invokes record publication
+`26efdc` using descriptor `493f`, then copies the bytes into `10a75c`.
+The thirty-second writer census observes twelve cold zero stores followed
+by three complete twelve-word copies; all three setter callers are
+`224a71`. The first copy occurs around 1.776 seconds, with two more just
+before the scan request. The checker accounts for all 48 writes and their
+callers against its terminal count. Thus this boot's 374-bit bitmap is an
+explicit software default, not unexplained erased RAM or a factory-image
+guess. Its alternative-list flag's lifecycle and the scan's physical
+completion/receive-activity contract remain distinct questions; do not
+replace the default bitmap with a shorter list to avoid the restart.
 
 Positive fetch observations after register restoration show AR5=`ffff`
 at each inner-loop exit. AR6 descends `7,6,5,4,3,2`, with the final

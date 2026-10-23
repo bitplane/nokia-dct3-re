@@ -5,10 +5,34 @@ from tools.nse2_native_result_check import (FRAGMENTS, MCU_REQUEST_FRAGMENTS, NV
                                            inspect_control_trace, inspect_mcu_request, inspect_program,
                                            inspect_request_lifecycle, inspect_scan_pacing,
                                            inspect_completion_counters, compare_scan_budget, inspect_nv_policy,
-                                           inspect_publisher_runtime, PUBLISHER_TYPE_LOADS,inspect_scan_request_selection,inspect_scan_bitmap_source)
+                                           inspect_publisher_runtime, PUBLISHER_TYPE_LOADS,inspect_scan_request_selection,inspect_scan_bitmap_source,inspect_scan_bitmap_writers)
 
 
 class ResultTest(unittest.TestCase):
+    def test_bitmap_default_requires_complete_writer_provenance(self):
+        image=bytearray(0x90000)
+        for a,v in ((0x224a4c,'b5304ce87d202800d1104de51c2821ff2230f076fdf3203f8028207c84a01c28f060fb808ca0f060fb72bd30'),
+                    (0x224dec,'0010ac2c0010abbc'),(0x285170,'b5101c04200ff7d0f88b48771c21f7e9ff2d48761c212230f015fdbe200ff7d0f8e3bd10')):
+            data=bytes.fromhex(v)
+            image[a-0x200000:a-0x200000+len(data)]=data
+        rows=[]
+        for i in range(48):
+            value=0 if i<12 else 0x003fffff if i%12==0 else 0xffffffff
+            pc,lr=('0020010c','0022032b') if i<12 else ('0029ad2a','0028518d')
+            rows.append(f'nse2_bitmap_write: address={0x10a75c+(i%12)*4:08x} value={value:08x} mask=ffffffff pc={pc} lr={lr} n={i+1} t=1.0 observer_writes=0')
+        bitmap=','.join(['003f']+['ffff']*23)
+        rows.extend([f'nse2_bitmap_setter: lr=00224a71 source=0010ac2c bitmap={bitmap} t=1.0 observer_writes=0']*3)
+        rows.append('nse2_bitmap_write_summary: writes=48 setters=3 t=30.0 observer_writes=0')
+        text='\n'.join(rows)
+        self.assertTrue(inspect_scan_bitmap_writers(image,text)['firmware_constructed_default'])
+        for bad in (text.replace('writes=48','writes=49'),text.replace('lr=00224a71','lr=00224aa3',1),
+                    text.replace('value=003fffff','value=ffffffff',1),text.replace('n=48','n=47')):
+            with self.assertRaises(ValueError):
+                inspect_scan_bitmap_writers(image,bad)
+        image[0x24a64]^=1
+        with self.assertRaises(ValueError):
+            inspect_scan_bitmap_writers(image,text)
+
     def test_mcu_full_scan_branch_counts_its_copied_bitmap(self):
         image=bytearray(0x90000)
         for a,v in ((0x20fd44,'980d287cdb02980c2806d125'),(0x20fd9c,'210146587940430146587141'),
