@@ -8,6 +8,30 @@ from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run, pr
 
 
 class CoherentConfigTest(unittest.TestCase):
+    def test_cipher_scope_is_checked_before_preparation(self):
+        for options in (['--scenario', 'host-incoming-sms'],
+                        ['--scenario', 'registration', '--coherent-cell']):
+            with self.subTest(options=options), \
+                    patch('sys.argv', ['runner', 'unused', '--a5-1'] + options), \
+                    patch('sys.stderr', new_callable=io.StringIO), \
+                    patch('tools.run_noki6250_acceptance.prepare_run') as prepare:
+                with self.assertRaises(SystemExit) as result:
+                    main()
+                self.assertEqual(result.exception.code, 2)
+                prepare.assert_not_called()
+
+    def test_cipher_overlay_is_explicit_and_idempotent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'nhm3hle.cfg'
+            apply_coherent_config(path, self.fixture())
+            self.assertIsNone(ET.parse(path).find("./system/input/port[@tag=':CIPHERCFG']"))
+            for _ in range(2):
+                apply_coherent_config(path, self.fixture(), a5_1=True)
+            ports = ET.parse(path).findall("./system/input/port[@tag=':CIPHERCFG']")
+            self.assertEqual(len(ports), 1)
+            self.assertEqual(ports[0].get('value'), '1')
+            self.assertEqual(ET.parse(path).find("./system/input/port[@tag=':NEIGHBORCFG']").get('value'), '512')
+
     def test_forwarding_requires_own_physical_transaction_before_protocol(self):
         protocol = ('gsm_ss: request=register transaction=1b invoke=1 service=21 '
                     'number_length=5 active=1\n')

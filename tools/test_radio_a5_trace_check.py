@@ -16,6 +16,26 @@ radio_l1: kind=xcch direction=downlink algorithm=1 first_fn=4386 last_fn=4389
 
 
 class A5TraceCheckTest(unittest.TestCase):
+    def signaling(self):
+        return '\n'.join(line for line in GOOD.splitlines() if 'kind=cipher' not in line)
+
+    def test_signaling_scope_does_not_promote_traffic(self):
+        self.assertEqual(check(self.signaling(), require_traffic=False), [])
+        self.assertTrue(check(self.signaling()))
+
+    def test_signaling_requires_each_direction(self):
+        for direction in ('uplink', 'downlink'):
+            with self.subTest(direction=direction):
+                self.assertTrue(check(self.signaling().replace(
+                    f'kind=xcch direction={direction}', 'other'), require_traffic=False))
+
+    def test_signaling_orders_key_control_and_ciphered_downlink(self):
+        lines = self.signaling().strip().splitlines()
+        for index in (1, 3):
+            with self.subTest(index=index):
+                moved = '\n'.join([lines[index]] + lines[:index] + lines[index+1:])
+                self.assertTrue(check(moved, require_traffic=False))
+
     def test_accepts_semantic_trace(self):
         self.assertEqual(check(GOOD), [])
 
@@ -31,9 +51,11 @@ class A5TraceCheckTest(unittest.TestCase):
             "radio_l1: kind=cipher direction=downlink", "other")))
 
     def test_rejects_secret(self):
-        self.assertTrue(check(GOOD + """
-dsp_hle: TX packet type=14 payload=12 data=020001020304050607080000
-"""))
+        for stage in ('TX pending', 'TX packet', 'TX consume', 'DSP consume'):
+            with self.subTest(stage=stage):
+                text = GOOD + f'\ndspif_transport: {stage} type=14 payload=12 data=020001020304050607080000\n'
+                self.assertTrue(check(text))
+                self.assertTrue(check(text, require_traffic=False))
 
     def test_rejects_premature_bursts(self):
         lines = GOOD.splitlines()

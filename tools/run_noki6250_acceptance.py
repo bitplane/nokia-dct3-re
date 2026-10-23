@@ -163,12 +163,15 @@ def prerequisite_trace(text, scenario):
     return before
 
 
-def apply_coherent_config(path, fixture):
+def apply_coherent_config(path, fixture, *, a5_1=False):
     """Overlay lab carrier/host inputs without losing a physical Reply target."""
     source = ET.parse(fixture).getroot().find('system')
     incoming = source.find('input') if source is not None else None
     if source is None or source.get('name') != 'nhm3hle' or incoming is None:
         raise ValueError('coherent NHM-3 fixture lacks inputs')
+    if a5_1:
+        incoming.append(ET.Element('port', tag=':CIPHERCFG', type='CONFIG',
+                                   mask='1', defvalue='0', value='1'))
     if path.exists():
         config = ET.parse(path).getroot()
         system = config.find('system')
@@ -227,7 +230,12 @@ def main():
                         help='use explicit ARFCN19/20 network and require carrier coherence')
     parser.add_argument('--pin-enabled', action='store_true',
                         help='require slow physical PIN entry before coherent services or phonebook')
+    parser.add_argument('--a5-1', action='store_true',
+                        help='require ciphered signaling on a coherent host call/SMS service; not media')
     args = parser.parse_args()
+    if args.a5_1 and (not args.coherent_cell or args.scenario not in
+                      ('host-incoming-call', 'host-outgoing-call', 'host-incoming-sms', 'host-outgoing-sms')):
+        parser.error('a5-1 requires an explicit coherent host call/SMS service')
     if args.coherent_cell and not (args.scenario.startswith('host-') or args.scenario in ('idle-state', 'call-state', 'sms-state', 'phonebook')):
         parser.error('coherent-cell downstream coverage requires a host, state or phonebook scenario')
     if args.pin_enabled and (not args.coherent_cell or args.scenario not in
@@ -276,7 +284,7 @@ def main():
                           mask="1", defvalue="0", value="1")
             ET.ElementTree(config).write(config_path, encoding="utf-8", xml_declaration=True)
         if args.scenario in ('coherent-registration', 'slow-pin-registration', 'pin-retry', 'pin2-change', 'power-cycle') or args.coherent_cell:
-            apply_coherent_config(run / 'cfg/nhm3hle.cfg', root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg')
+            apply_coherent_config(run / 'cfg/nhm3hle.cfg', root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg', a5_1=args.a5_1)
         if args.coherent_cell and args.scenario in ('idle-state', 'call-state', 'sms-state'):
             config_path = run / 'cfg/nhm3hle.cfg'
             configuration = ET.parse(config_path)
@@ -396,6 +404,7 @@ def main():
             "machine": "nhm3hle", "scenario": args.scenario, "command": command,
             "provisioning": "derived acquired initial-record PMM comparison",
             "audio": "not tested", "normal_machine_boot": "not tested",
+            "requested_cipher": "a5_1" if args.a5_1 else "a5_0",
             "laboratory_carrier": 19 if args.scenario in ('coherent-registration', 'slow-pin-registration', 'pin-retry', 'pin2-change', 'power-cycle') or args.coherent_cell else None,
             "slow_physical_pin": args.pin_enabled or args.scenario in ('slow-pin-registration','pin-retry','pin2-change'),
             "shared_rom_audit_members": audit_members,
@@ -492,6 +501,11 @@ def main():
             checker = [sys.executable, str(root / "tools/noki6250_app_check.py"),
                        str(run / "error.log"), str(frames[0])]
         subprocess.run(checker, check=True)
+        if args.a5_1:
+            from tools.radio_a5_trace_check import check as check_cipher
+            errors = check_cipher((run / 'error.log').read_text(errors='replace'), require_traffic=False)
+            if errors:
+                raise ValueError('NHM-3 A5/1 signaling: ' + '; '.join(errors))
         prerequisites = prerequisite_trace(
             (run / 'error.log').read_text(errors='replace'), args.scenario)
         if args.scenario == 'divert-state':

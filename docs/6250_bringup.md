@@ -1484,6 +1484,36 @@ This uses the same evidenced channel contracts, not a new speech backend.
 
 ## Incoming SMS
 
+### Coherent A5/1 host signaling
+
+`verify-6250-a51-host-incoming-sms-signaling` starts with fresh storage on
+the coherent ARFCN19 laboratory cell and enables the existing cipher option
+through machine configuration. It requires organic authentication, Cipher
+Mode Command, redacted MCU type-14 key publication, Cipher Mode Complete,
+and bidirectional A5/1 xCCH, alongside the ordinary host-SMS protocol,
+SIM-storage and physical Read/pixel checks. This is signaling acceptance,
+not TCH, native DSP, PCM or audible speech validation. The initial-record
+PMM comparison and runtime HLE remain explicit prerequisites.
+
+The same runner's `--scenario host-outgoing-sms --coherent-cell --a5-1`
+is not accepted: after the received message and physical Reply, the second
+ciphered service activates but repeated CM Service Accept deliveries do not
+produce a host SMS submission before process exit. This is an unresolved
+service-continuation boundary, not evidence of bidirectional ciphered SMS.
+
+Authentication consumes an additional LAPDm I-frame: this path acknowledges
+Location Updating Accept with N(R)=2 and Channel Release with N(R)=3, and
+commits the LAI before the release acknowledgement. The checker requires
+the preceding Authentication Request/Response before accepting that sequence;
+the unauthenticated 1/2 sequence remains independently checked.
+
+Complete transport TX traces redact key-bearing type-14 packets at pending,
+HLE-consumed and native-DSP-consumed boundaries. Raw MCU low-word logging
+that overlaps the TX ring is omitted; this is not a promise that arbitrary
+RAM dumps or save states contain no key material.
+
+### Ordinary delivery and storage
+
 The network SMS fixture produces an organic `1 message received` screen.
 Firmware acknowledges segmented SAPI-3 CP-DATA, writes the ordinary `hello`
 SMS-DELIVER into EF_SMS record 1, sends RP-ACK and releases SDCCH. The SIM

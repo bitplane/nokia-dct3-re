@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 777 gates: 579 generated from typed steps, 198 copied verbatim (shell).
+# 778 gates: 580 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -446,6 +446,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6250-coherent-host-incoming-call \
 	verify-6250-coherent-host-outgoing-call \
 	verify-6250-coherent-host-incoming-sms verify-6250-coherent-host-outgoing-sms \
+	verify-6250-a51-host-incoming-sms-signaling \
 	verify-6250-coherent-host-rejected-sms verify-6250-coherent-host-silent-sms \
 	verify-8890-code-change verify-8890-alarm-wake-security \
 	verify-8890-alarm-wake-restore verify-8890-alarm verify-8890-alarm-snooze \
@@ -5248,6 +5249,9 @@ verify-6250-coherent-host-incoming-sms: build
 
 verify-6250-coherent-host-outgoing-sms: build
 	$(VENV)/bin/python tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario host-outgoing-sms --coherent-cell --mame $(MAME_DIR)/mame
+
+verify-6250-a51-host-incoming-sms-signaling: build
+	$(VENV)/bin/python tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario host-incoming-sms --coherent-cell --a5-1 --mame $(MAME_DIR)/mame
 
 verify-6250-coherent-host-rejected-sms: build
 	$(VENV)/bin/python tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario host-rejected-sms --coherent-cell --mame $(MAME_DIR)/mame

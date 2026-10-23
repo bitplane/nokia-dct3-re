@@ -49,6 +49,47 @@ class CoherentRegistrationTest(unittest.TestCase):
     def test_exact_sch_candidate_release_and_host_carrier(self):
         self.verify(radio_fixture())
 
+    def test_location_accept_allows_i_frame_sequences_not_supervisory_frames(self):
+        for control in range(256):
+            text = radio_fixture().replace('0300450502', f'03{control:02x}450502')
+            with self.subTest(control=control):
+                if control & 1:
+                    with self.assertRaisesRegex(ValueError, 'Location Updating Accept'):
+                        self.verify(text)
+                else:
+                    self.verify(text)
+
+    def test_authenticated_registration_requires_exchange_and_shifted_acknowledgements(self):
+        text = radio_fixture().replace(
+            '0300450502', '0322450502')
+        start = text.index('RX enqueue type=80 payload=34',
+                           text.index('0173490508') + 10)
+        exchange = (
+            'RX enqueue type=80 payload=34 data=8012000000000013000003004d051200'
+            + '11' * 16 + '\n'
+            'GSM service uplink sapi=0 pd=05 message=14 length=6 data=055411223344\n')
+        text = text[:start] + exchange + text[start:]
+        text = text.replace('LAPDm Location Updating Accept acknowledged nr=1',
+                            'TX packet type=1b data=0080034101')
+        text = text.replace('data=0080032101', 'data=0080034101')
+        # Distinguish packet publication from the transport consuming it.
+        first = text.index('TX packet type=1b data=0080034101')
+        second = text.index('TX packet type=1b', first + 1)
+        text = text[:second] + text[second:].replace('TX packet', 'TX consume', 1)
+        text = text.replace('LAPDm Channel Release acknowledged nr=2',
+                            'LAPDm service Channel Release acknowledged nr=3')
+        release = text.index('LAPDm service Channel Release')
+        text = text[:release] + text[release:].replace('data=0080034101', 'data=0080036101', 1)
+        location = 'sim_device: update-binary fid=6f7e offset=4 length=5'
+        text = text.replace(location, '')
+        consume_end = text.index('\n', text.index('TX consume type=1b'))
+        text = text[:consume_end] + '\n' + location + text[consume_end:]
+        self.verify(text)
+        for required in (exchange.splitlines()[0], exchange.splitlines()[1],
+                         'data=0080036101', location):
+            with self.subTest(required=required), self.assertRaises(ValueError):
+                self.verify(text.replace(required, 'missing'))
+
     def test_legacy_or_other_carrier_not_promoted(self):
         for old, new in (('arfcn=19', 'arfcn=1'), ('arfcn=19', 'arfcn=190'),
                          ('0013000048', '0013000000'),
