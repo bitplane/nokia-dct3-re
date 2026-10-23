@@ -342,6 +342,17 @@ all five prompt/result frames and exactly one CHV2 CHANGE per process.
 This is ordinary PIN2 management, not PIN2 exhaustion/PUK2 recovery, FDN,
 network service or operation past the known native restart.
 
+`verify-5110i-pin2-retry` separately chains wrong entry, cold correct change
+and cold reverse change. Entering old PIN2 `5675` still opens both new-PIN
+editors: the firmware does not authenticate it at the first OK. Only the
+final CHV2 CHANGE returns `9804`, shows `Code error`, and decrements PIN2
+retries from three to two without changing credentials or PIN1 retries.
+The next process imports that exact saved card; correct `5678` changes
+PIN2 to `2468` and restores its three retries with `9000`. The final cold
+reverse change accepts `2468` and restores `5678`. Both cold stages compare
+the complete card, not only the legacy credential prefix. The checker reads
+the CHV2 retry field explicitly; the unchanged CHV1 count is not a proxy.
+
 ### Physical contact save
 
 The separate `--phonebook` fixture selects Add name, enters `A / 123` and

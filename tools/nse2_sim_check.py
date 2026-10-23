@@ -302,27 +302,36 @@ def verify_puk_recovery(text, initial, final, prompt_pixels, final_pixels):
 
 def verify_pin2_input(card,*,restore=False):
     from tools.make_sim_card_profile import make_profile
-    from tools.sim_security_trace_check import CHV_OFFSET,AOC_NVRAM_SIZE
+    from tools.sim_security_trace_check import CHV_OFFSET,AOC_NVRAM_SIZE,ATTEMPTS_OFFSET
     expected=bytearray(make_profile(False))
     if restore:
         expected[CHV_OFFSET+8:CHV_OFFSET+16]=b'2468\xff\xff\xff\xff'
+    if len(card)<=ATTEMPTS_OFFSET+1 or card[ATTEMPTS_OFFSET+1] not in (1,2,3):
+        raise ValueError('unqualified initial PIN2 retry lifecycle')
+    expected[ATTEMPTS_OFFSET+1]=card[ATTEMPTS_OFFSET+1]
     if len(card) not in (len(expected),AOC_NVRAM_SIZE) or card[:len(expected)]!=expected:
         raise ValueError('PIN2 change requires the declared PIN-disabled laboratory card and qualified credential')
     if restore and len(card)!=AOC_NVRAM_SIZE:
         raise ValueError('cold PIN2 restoration requires the complete saved changed card')
+    return card[ATTEMPTS_OFFSET+1]
 
 
-def verify_pin2_change(text,initial,final,frames,*,restore=False):
-    from tools.sim_security_trace_check import CHV_OFFSET,AOC_NVRAM_SIZE,statuses
-    verify_pin2_input(initial,restore=restore)
+def verify_pin2_change(text,initial,final,frames,*,restore=False,wrong=False):
+    from tools.sim_security_trace_check import CHV_OFFSET,AOC_NVRAM_SIZE,statuses,ATTEMPTS_OFFSET
+    before=verify_pin2_input(initial,restore=restore)
+    if wrong and (restore or before<2):
+        raise ValueError('unqualified PIN2 wrong-code lifecycle')
     expected=bytearray(initial)
-    expected[CHV_OFFSET+8:CHV_OFFSET+16]=(b'5678' if restore else b'2468').ljust(8,b'\xff')
+    if not wrong:
+        expected[CHV_OFFSET+8:CHV_OFFSET+16]=(b'5678' if restore else b'2468').ljust(8,b'\xff')
+    remaining=before-1 if wrong else 3
+    expected[ATTEMPTS_OFFSET+1]=remaining
     if len(final)!=AOC_NVRAM_SIZE or final[:len(expected)]!=expected:
         raise ValueError('PIN2 change modified unexpected card bytes or did not persist')
     headers=[m.groups() for m in HEADER.finditer(text) if int(m[2],16) in (0x20,0x24,0x2c)]
     if len(headers)!=1 or headers[0][:5]!=('a0','24','00','02','10') or not 29<float(headers[0][-1])<29.5:
         raise ValueError('physical PIN2 CHANGE header/timing differs')
-    if statuses(text,0x24)!=[(0x9000,3,10)]:
+    if statuses(text,0x24,chv=2)!=[(0x9804 if wrong else 0x9000,remaining,10)]:
         raise ValueError('PIN2 CHANGE did not succeed with intact retries')
     contacts=re.findall(r'nse2_pin2_contact: event=(\d+) down=([01]) t=([0-9.]+) physical_only=1',text)
     if [(int(i),int(d)) for i,d,_ in contacts]!=[(i,i%2) for i in range(1,63)]:
@@ -330,9 +339,11 @@ def verify_pin2_change(text,initial,final,frames,*,restore=False):
     times=[float(t) for _,_,t in contacts]
     if times!=sorted(times) or not 18.4<times[0]<18.6 or not 29<times[-1]<29.4:
         raise ValueError('PIN2 physical navigation/entry timing differs')
-    if tuple(hashlib.sha256(frame).hexdigest() for frame in frames)!=PIN2_CHANGE_FRAMES:
+    expected_frames=PIN2_CHANGE_FRAMES[:-1]+(CODE_ERROR_FRAME,) if wrong else PIN2_CHANGE_FRAMES
+    if tuple(hashlib.sha256(frame).hexdigest() for frame in frames)!=expected_frames:
         raise ValueError('PIN2 change prompt/result frames differ')
-    return dict(sim_pin2_changed=True,cold_replacement_pin2_accepted=restore,sim_pin1_enabled=False,
+    return dict(sim_pin2_changed=not wrong,pin2_wrong_rejected=wrong,pin2_attempts_before=before,pin2_attempts_remaining=remaining,
+                cold_replacement_pin2_accepted=restore,sim_pin1_enabled=False,
                 legacy_profile_expanded=len(initial)!=len(final),whole_input_card_checked=len(initial)==len(final),
                 network_registration=False,stable_long_boot=False)
 

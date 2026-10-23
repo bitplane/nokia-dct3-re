@@ -37,7 +37,7 @@ class SimCheckTest(unittest.TestCase):
     def test_pin2_change_and_cold_reverse_require_exact_card_transition(self):
         from tools.nse2_sim_check import verify_pin2_change
         from tools.make_sim_card_profile import make_profile
-        from tools.sim_security_trace_check import AOC_NVRAM_SIZE,CHV_OFFSET
+        from tools.sim_security_trace_check import AOC_NVRAM_SIZE,CHV_OFFSET,ATTEMPTS_OFFSET
         initial=make_profile(False)
         changed=bytearray(initial.ljust(AOC_NVRAM_SIZE,b'\xff'))
         changed[CHV_OFFSET+8:CHV_OFFSET+16]=b'2468\xff\xff\xff\xff'
@@ -49,6 +49,21 @@ class SimCheckTest(unittest.TestCase):
             restored=bytearray(changed)
             restored[CHV_OFFSET+8:CHV_OFFSET+16]=b'5678\xff\xff\xff\xff'
             self.assertTrue(verify_pin2_change(text,changed,restored,frames,restore=True)['cold_replacement_pin2_accepted'])
+            rejected=bytearray(initial.ljust(AOC_NVRAM_SIZE,b'\xff'))
+            rejected[ATTEMPTS_OFFSET+1]=2
+            error_text=text.replace('sw=9000 chv=3/3','sw=9804 chv=3/2')
+            with patch('tools.nse2_sim_check.CODE_ERROR_FRAME',hashlib.sha256(b'error').hexdigest()):
+                result=verify_pin2_change(error_text,initial,rejected,frames[:-1]+[b'error'],wrong=True)
+                self.assertEqual(result['pin2_attempts_remaining'],2)
+                self.assertFalse(result['sim_pin2_changed'])
+                for bad in (error_text.replace('chv=3/2','chv=2/3'),error_text.replace('sw=9804','sw=9000')):
+                    with self.assertRaises(ValueError):
+                        verify_pin2_change(bad,initial,rejected,frames[:-1]+[b'error'],wrong=True)
+            result=verify_pin2_change(text,rejected,changed,frames)
+            self.assertEqual((result['pin2_attempts_before'],result['pin2_attempts_remaining']),(2,3))
+            rejected[-1]^=1
+            with self.assertRaises(ValueError):
+                verify_pin2_change(text,rejected,changed,frames)
             for bad in (text.replace('sw=9000','sw=9804'),text.replace('p2=02','p2=01'),text.replace('event=62','event=63')):
                 with self.assertRaises(ValueError):
                     verify_pin2_change(bad,initial,changed,frames)

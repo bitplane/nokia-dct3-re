@@ -97,8 +97,8 @@ def main():
     parser.add_argument('--pin-enabled', action='store_true', help='separate PIN-enabled synthetic-card boot observation')
     parser.add_argument('--pin-action', choices=('verify','wrong','blocked','puk','reauth'), help='physical PIN/PUK attempt or cold prompt control')
     parser.add_argument('--pin-card', type=Path, help='persistent PIN-enabled laboratory card from an earlier process')
-    parser.add_argument('--pin2-action',choices=('change','restore'),help='physical security-menu PIN2 change or cold reverse change')
-    parser.add_argument('--pin2-card',type=Path,help='complete saved card for cold PIN2 reverse change')
+    parser.add_argument('--pin2-action',choices=('change','restore','wrong'),help='physical security-menu PIN2 change/rejection or cold reverse change')
+    parser.add_argument('--pin2-card',type=Path,help='complete saved card for a cold PIN2 lifecycle step')
     parser.add_argument('--seconds', type=int, default=8, choices=range(8, 121), metavar='8..120')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -141,7 +141,7 @@ def main():
         if args.pin2_action and (not args.phone_retry_zero or args.seconds!=30 or args.pin_enabled or args.post_auth_menu
                                or args.sms_store or args.sms_reload or args.phonebook or args.phonebook_reload or args.phonebook_search):
             raise ValueError('PIN2 menu requires a separate phone-authenticated thirty-second run')
-        if (args.pin2_card and args.pin2_action!='restore') or (args.pin2_action=='restore' and not args.pin2_card):
+        if (args.pin2_card and not args.pin2_action) or (args.pin2_action=='restore' and not args.pin2_card):
             raise ValueError('cold PIN2 restoration requires the saved changed card')
         report = prepare_native(root, run, record_checksum=args.record_checksum_only,
                                 nominal_vbat=args.nominal_vbat, insert_sim=args.insert_sim,
@@ -189,7 +189,8 @@ def main():
                    '-video', 'none', '-sound', 'none', '-joystickprovider', 'none',
                    '-midiprovider', 'none', '-nothrottle', '-noreadconfig', '-log', '-verbose',
                    '-seconds_to_run', str(args.seconds), '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools' / ('nse2_pin2_restore_fixture.lua' if args.pin2_action=='restore' else
+                   '-autoboot_script', str(root / 'tools' / ('nse2_pin2_wrong_fixture.lua' if args.pin2_action=='wrong' else
+                       'nse2_pin2_restore_fixture.lua' if args.pin2_action=='restore' else
                        'nse2_pin2_fixture.lua' if args.pin2_action else
                        'nse2_puk_fixture.lua' if args.pin_action=='puk' else
                        f'nse2_pin_{args.pin_action}_fixture.lua' if args.pin_action in ('verify','wrong','blocked','reauth') else
@@ -296,7 +297,7 @@ def main():
                 with Image.open(run/f'snap/nse2_pin2_menu_{index}.png') as frame:
                     frames.append(frame.convert('L').tobytes())
             result['pin2_change']=verify_pin2_change(text,pin2_card,(run/'nvram'/machine/'sim_card').read_bytes(),frames,
-                                                   restore=args.pin2_action=='restore')
+                                                   restore=args.pin2_action=='restore',wrong=args.pin2_action=='wrong')
         if args.phonebook:
             from tools.nse2_sim_check import verify_phonebook_save
             with Image.open(run / 'snap/nse2_phonebook_5.png') as saved:

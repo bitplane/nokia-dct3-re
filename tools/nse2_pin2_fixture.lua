@@ -5,6 +5,7 @@ local machine=manager.machine
 local mapping={['1']={2,2},['2']={3,2},['3']={4,2},['4']={2,4},['5']={3,4},['6']={4,4},['7']={2,8},['8']={3,8},['9']={4,8},['0']={3,16},['M']={1,4},['D']={0,8}}
 local old,new='5678','2468'
 if _G.nse2_pin2_restore then old,new=new,old end
+if _G.nse2_pin2_wrong then old='5675' end
 local sequence='MDDDMDDMDDDDMDDM'..old..'M'..new..'M'..new..'M'
 local events={}
 for i=1,#sequence do
