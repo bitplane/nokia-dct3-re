@@ -85,6 +85,7 @@ make verify-5110i-native-ui-state RUN_DIR=tmp/nse2-native-ui-state
 make verify-5110i-sim-write-state RUN_DIR=tmp/nse2-sim-write-state
 make verify-5110i-sms-write-state RUN_DIR=tmp/nse2-sms-write-state
 make verify-5110i-pin-state RUN_DIR=tmp/nse2-pin-state
+make verify-5110i-pin-block-state RUN_DIR=tmp/nse2-pin-block-state
 ```
 
 The nominal boot gate requires the reviewed unattended seven-second frame
@@ -1478,6 +1479,17 @@ values are harness state, not firmware/card pokes. The shared transaction
 observer also serves ADN and partial SMS writes; their acceptance contracts
 remain distinct. This proves bounded SIM authentication restoration, not
 native registration or stability beyond the reason-`68` boundary.
+
+The separate `verify-5110i-pin-block-state` gate reaches one retry through
+two actual physical wrong-PIN/cold-card transitions before the checkpoint.
+It does not seed an exhausted counter. Save/load then restores the last
+VERIFY header with retries `1/3`; both legs send the wrong credential once,
+receive `98 40`, end at `0/3`, and render the exact PIN code blocked frame.
+All 11 wire events match; complete-card comparison permits only the final
+retry decrement, preserving PUK attempts and credentials. An independent
+cold process renders the PUK prompt without a VERIFY or PUK attempt and
+retains the card unchanged. This five-process boundary is distinct from
+the ordinary `3 -> 2` retry outcome and its subsequent STATUS traffic.
 
 ## Remaining work
 

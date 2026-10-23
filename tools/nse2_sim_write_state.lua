@@ -7,6 +7,8 @@ local card=machine.devices[':sim_card']
 local simi=machine.devices[':simi']
 local sms=_G.nse2_sim_state_sms==true
 local pin=_G.nse2_sim_state_pin==true
+local pin_retries=_G.nse2_pin_state_retries or 3
+assert(pin_retries==1 or pin_retries==3,'unreviewed PIN checkpoint input')
 assert(not (sms and pin),'one SIM transaction per fixture')
 local length=pin and 8 or sms and 176 or 32
 local partial=sms and 60 or 0
@@ -62,7 +64,7 @@ local function snapshot(label)
     local protocol=fields(card,{'m_ins','m_tx_len','m_tx_expected','m_receiving_body','m_selected_file'})
     local controller=fields(simi,{'m_rx_count','m_rx_ready','m_iir','m_tx_ready_pending','m_uart_tx_count'})
     local stored=record()
-    local free=pin and '0303' or sms and ('00'..string.rep('ff',175)) or string.rep('ff',32)
+    local free=pin and string.format('%02x03',pin_retries) or sms and ('00'..string.rep('ff',175)) or string.rep('ff',32)
     assert(stored==free,'SIM record was not rolled back before commit')
     local body=partial>0 and hex(item(card,'m_tx'):read_block(0,partial)) or ''
     local result=string.format('t=%.9f pc=%08x sp=%08x ram=%08x cpu=%s card=%s simi=%s record=%s partial=%s',s.time,s.pc,s.sp,s.ram,s.cpu,protocol,controller,stored,body)

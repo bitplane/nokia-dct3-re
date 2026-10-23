@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 819 gates: 621 generated from typed steps, 198 copied verbatim (shell).
+# 820 gates: 622 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -181,7 +181,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5110i-fdn-dial-policy verify-5110i-pin2-change verify-5110i-puk1-retry \
 	verify-5110i-puk1-exhaustion verify-5110i-native-ui-state \
 	verify-5110i-sim-write-state verify-5110i-sms-write-state \
-	verify-5110i-pin-state verify-5110i-pin1-change \
+	verify-5110i-pin-state verify-5110i-pin-block-state verify-5110i-pin1-change \
 	verify-5110i-pin-request-lifecycle verify-5110i-pin2-retry \
 	verify-5110i-pin2-blocked verify-5110i-puk2-recovery verify-5110i-puk2-retry \
 	verify-5110i-puk2-exhaustion verify-5110i-native-processing \
@@ -1496,6 +1496,9 @@ verify-5110i-sms-write-state: verify-5110i-static build
 
 verify-5110i-pin-state: verify-5110i-static build
 	$(VENV)/bin/python tools/run_nse2_pin_state.py $(RUN_DIR) --mame $(MAME_DIR)/mame
+
+verify-5110i-pin-block-state: verify-5110i-static build
+	$(VENV)/bin/python tools/run_nse2_pin_state.py $(RUN_DIR) --mame $(MAME_DIR)/mame --last-retry
 
 verify-5110i-pin1-change: verify-5110i-static build
 	$(VENV)/bin/python tools/run_nse2_pin1_change.py $(RUN_DIR) --mame $(MAME_DIR)/mame

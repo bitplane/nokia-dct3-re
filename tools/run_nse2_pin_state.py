@@ -19,6 +19,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory',type=Path)
     parser.add_argument('--mame',type=Path)
+    parser.add_argument('--last-retry',action='store_true',help='physically reach one retry, then restore its blocking VERIFY')
     args=parser.parse_args()
     root=Path(__file__).resolve().parents[1]
     run=args.run_directory.resolve()
@@ -30,6 +31,12 @@ def main():
         seed=run/'seed'
         with (run/'seed.log').open('w') as stream:
             run_stage(common+[str(seed)]+options,root,stream)
+        if args.last_retry:
+            for index in (1,2):
+                predecessor=seed/'nvram/nse2r4v/sim_card'
+                seed=run/f'wrong{index}'
+                with (run/f'wrong{index}.log').open('w') as stream:
+                    run_stage(common+[str(seed)]+options+['--pin-card',str(predecessor),'--pin-action','wrong'],root,stream)
         target=run/'restore'
         report=prepare_native(root,target,record_checksum=True,nominal_vbat=True,insert_sim=True)
         before=(seed/'nvram/nse2r4v/sim_card').read_bytes()
@@ -37,10 +44,10 @@ def main():
         (target/'nvram/nse2r4v/sim_card').write_bytes(before)
         original=json.loads((seed/'inputs.json').read_text())
         command=[str(arg).replace(str(seed),str(target)) for arg in original['command']]
-        command[command.index('-autoboot_script')+1]=str(root/'tools/nse2_pin_write_state.lua')
+        command[command.index('-autoboot_script')+1]=str(root/'tools'/('nse2_pin_block_state.lua' if args.last_retry else 'nse2_pin_write_state.lua'))
         command+=['-state_directory',str(target/'sta')]
         report.update(command=command,card_sha256=hashlib.sha256(before).hexdigest(),
-                      card_source=str(seed/'nvram/nse2r4v/sim_card'),mame_sha256=original['mame_sha256'])
+                      card_source=str(seed/'nvram/nse2r4v/sim_card'),mame_sha256=original['mame_sha256'],last_retry=args.last_retry)
         (target/'inputs.json').write_text(json.dumps(report,indent=2)+'\n')
         with (target/'console.log').open('w') as stream:
             run_stage(command,target,stream)
@@ -56,7 +63,7 @@ def main():
                     raise ValueError('PIN frame geometry differs')
                 return image.convert('L').tobytes()
         result=check_pin_state(text,(target/'nse2_sim_state_events.log').read_text(),before,after,
-                               pixels('nse2_sim_state_reference.png'),pixels('nse2_sim_state_restored.png'))
+                               pixels('nse2_sim_state_reference.png'),pixels('nse2_sim_state_restored.png'),last_retry=args.last_retry)
         reference=text.split('nse2_sim_state: phase=restored')[0]
         verify_pin_boot(reference,after,pixels('nse2_pin_1.png'),pixels('nse2_sim_state_reference.png'),
                         pixels('nse2_pin_3.png'),action='wrong',initial_card=before)
@@ -65,7 +72,8 @@ def main():
             raise ValueError('PIN checkpoint artifact absent')
         result['state_sha256']=hashlib.sha256(state.read_bytes()).hexdigest()
         with (run/'cold.log').open('w') as stream:
-            run_stage(common+[str(run/'cold')]+options+['--pin-card',str(card)],root,stream)
+            cold_options=['--pin-action','blocked'] if args.last_retry else []
+            run_stage(common+[str(run/'cold')]+options+['--pin-card',str(card)]+cold_options,root,stream)
         if (run/'cold/nvram/nse2r4v/sim_card').read_bytes()!=after:
             raise ValueError('cold PIN wait changed restored card')
         result['cold_retry_persistence']=True

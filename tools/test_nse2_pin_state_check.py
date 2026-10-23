@@ -6,28 +6,43 @@ from tools.nse2_pin_state_check import check_pin_state
 from tools.sim_security_trace_check import ATTEMPTS_OFFSET
 
 
-def fixture():
-    before=make_profile(True).ljust(3570,b'\xff')
+def fixture(last_retry=False):
+    initial=1 if last_retry else 3
+    remaining=initial-1
+    before=bytearray(make_profile(True).ljust(3570,b'\xff'))
+    before[ATTEMPTS_OFFSET]=initial
     after=bytearray(before)
-    after[ATTEMPTS_OFFSET]=2
+    after[ATTEMPTS_OFFSET]=remaining
     snapshot='t=7.663201154 pc=00291a1c sp=0010f7a0 ram=3d516c96 cpu='+','.join(['00000000']*37)
     snapshot+=' card=m_ins:20,m_tx_len:0,m_tx_expected:8,m_receiving_body:1,m_selected_file:6fad'
-    snapshot+=' simi=m_rx_count:1,m_rx_ready:0,m_iir:0,m_tx_ready_pending:1,m_uart_tx_count:0 record=0303 partial='
-    status='SIM status ins=20 sw=9804 chv=2/3 puk=10/10 enabled=1'
+    snapshot+=f' simi=m_rx_count:1,m_rx_ready:0,m_iir:0,m_tx_ready_pending:1,m_uart_tx_count:0 record={initial:02x}03 partial='
+    status=f'SIM status ins=20 sw={"9840" if last_retry else "9804"} chv={remaining}/3 puk=10/10 enabled=1'
     release='nse2_pin_contact: event=10 down=0 t=7.750000000 physical_only=1'
     text='\n'.join(['nse2_sim_state: phase=saved '+snapshot,status,release,
-                    'nse2_sim_state: committed=reference record=0203',
+                    f'nse2_sim_state: committed=reference record={remaining:02x}03',
                     'nse2_sim_state: phase=restored '+snapshot,
                     'nse2_pin_contact_replay: restored=1 physical_only=1',status,release,
-                    'nse2_sim_state: committed=restored record=0203',
+                    f'nse2_sim_state: committed=restored record={remaining:02x}03',
                     'nse2_sim_state: completed=1 reference=11 restored=11 sent_before_save=0'])
-    events=[('rx',0x20)]+[('tx',v) for v in b'1111\xff\xff\xff\xff']+[('rx',0x98),('rx',4)]
+    events=[('rx',0x20)]+[('tx',v) for v in b'1111\xff\xff\xff\xff']+[('rx',0x98),('rx',0x40 if last_retry else 4)]
     wire='\n'.join(f'{phase}:{i}:{i*.0001:.9f}:{kind}:{value:02x}'
                    for phase in ('reference','restored') for i,(kind,value) in enumerate(events,1))
     return text,wire,before,after
 
 
 class PinStateTest(unittest.TestCase):
+    def test_last_retry_blocks_once_and_rejects_wrong_branch(self):
+        text,wire,before,after=fixture(last_retry=True)
+        with patch('tools.nse2_pin_state_check.PIN_BLOCKED_FRAME',hashlib.sha256(b'blocked').hexdigest()):
+            result=check_pin_state(text,wire,before,after,b'blocked',b'blocked',last_retry=True)
+            self.assertTrue(result['pin_blocked'])
+            self.assertEqual(result['pin_attempts_remaining'],0)
+            with self.assertRaises(ValueError):
+                check_pin_state(text,wire,before,after,b'blocked',b'blocked')
+            for bad in (text.replace('sw=9840','sw=9804'),text.replace('record=0103','record=0003')):
+                with self.assertRaises(ValueError):
+                    check_pin_state(bad,wire,before,after,b'blocked',b'blocked',last_retry=True)
+
     def test_pending_pin_replay(self):
         with patch('tools.nse2_pin_state_check.CODE_ERROR_FRAME',hashlib.sha256(b'error').hexdigest()):
             result=check_pin_state(*fixture(),b'error',b'error')
