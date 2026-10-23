@@ -21,8 +21,9 @@ unsent `A` draft on the SIM; a fresh cold process opens it in Outbox and
 reads `A` without rewriting the card. Registration, calls and network SMS
 are not accepted.
 Separate card gates cover CHV1 authentication/change/cold acceptance,
-retry exhaustion and PUK1 recovery; CHV2 change/retry exhaustion and PUK2
-recovery/permanent refusal; and protected FDN record management with a local
+retry exhaustion, PUK1 recovery and permanent card rejection; CHV2 change,
+retry exhaustion and PUK2 recovery/permanent refusal; and protected FDN
+record management with a local
 On/Off dialing-permission contrast. These are handset/SIM software contracts,
 not native network or speech acceptance. SIM authentication and the unrelated
 phone-side lock are checked separately.
@@ -792,8 +793,8 @@ The byte-checked path at `6790` loads `06bc` into AR2 and `06e3`
 into AR0. A nonzero mask-`0020` test consumes that control bit at
 `679b`, initializes `06ab` at `67a1`, then sets the eligibility bit
 at `67a3`. This identifies a conditional setter, not its runtime
-execution or a complete writer census. The next boundary is the origin
-and consumption of `06e3` bit `0020`; a generic write to `06e3` is
+execution or a complete writer census. The request-specific mapping below
+identifies the origin of `06e3` bit `0020`; a generic write to `06e3` is
 insufficient evidence that this request was armed. Both complete thirty-second
 host-census captures contain exactly four `06e3` writes, matching the terminal
 tap count: `0000/0000/0001/0000` at PCs `0f10/0d94/3db6/30cb`.
@@ -814,17 +815,18 @@ The two aligned direct-call candidates are `216250` and `21764a`.
 The generic envelope boundary `277f96` takes its type from buffer byte 0
 and payload length from R0; `28de42` passes message byte 3 onward there.
 This maps a concrete MCU candidate, not normal-boot reachability or a
-complete census of type-`07` producers. The next question is the lifecycle
-of `1094b7` and those callers, not forcing this request into the stream.
+complete census of type-`07` producers. The runtime lifecycle below bounds
+this constructor's relevance without forcing its request into the stream.
 The coherent native-processing run observes exactly three writes to that
 byte: `00` at `20010c` (0.00265 s), `01` at `20cafc` (1.12047 s),
 and `02` at `20feb6` (4.70184 s). The thirty-second terminal count
 accounts for all three and the value remains `02`; the constructor entry
 tap records zero entries. Thus this boot does not enter the candidate's
 mode-4 lifecycle. Absent type `07` is not evidence that it must be added.
-The active type-`1a` measurement loop remains the next native result path
-to resolve. These are passive observations on the unchanged physical-menu
-fixture, not firmware-state edits or proof of all possible call routes.
+The active type-`1a` measurement, rather than this dormant type-`07` path,
+is the observed unfinished result source. These are passive observations on
+the unchanged physical-menu fixture, not firmware-state edits or proof of
+all possible call routes.
 
 Passive first-eight measurement stage observations separate setup from
 processing: `0990→099d` averages 1.24639 ms, `09a6→09b1` averages
@@ -836,11 +838,10 @@ at `09b1`. The byte-checked setup writes `0546` to port `0e` at
 periods, predominantly in the completion wait rather than setup.
 This is a timing decomposition, not evidence that the reload, clock,
 interrupt cadence or execution-cycle model matches physical NSE-2 hardware.
-The next distinction is which processing/frame transitions account for
-those eleven wait periods; changing the clock to beat supervision would
-not answer it.
-The first completion wait now has a counter-level explanation: eleven
-`3204` entries arrive at consecutive modeled frame periods. Their
+The counter-level trace accounts for the eleven modeled wait periods;
+it does not establish physical timing or justify changing the clock to
+beat supervision. Eleven `3204` entries arrive at consecutive modeled frame
+periods. Their
 `(mode, skip, accumulation)` sequence is
 `(c,1,1),(c,0,1),(c,2,0),(c,1,0),(c,0,1),`
 `(4,2,0),(4,1,0),(4,0,4),(4,0,3),(4,0,2),(4,0,1)`.
@@ -1162,11 +1163,10 @@ completion contract rather than changing queue state or timer rates.
 
 ## Remaining work
 
-1. Recover native receive activity across the first timer-`dd` window. Short
-   contact creation and cold readback are accepted independently; operation
-   past the restart remains unproved.
-2. Recover semantic EEPROM requirements from their own consumers; retain
-   integrity-only fixtures as diagnostic inputs, not factory defaults.
-3. Extend the accepted application-menu path to longer lifecycle/save-state tests.
-4. Keep fitted flash/RAM/DSP/clock/analog evidence distinct from compatibility;
-   no registration, native RF or speech claims without their own acceptance.
+| Boundary | Established | Required evidence / next action |
+| --- | --- | --- |
+| Native receive supervision | Initial RX is delivered and consumed; full scan advances; timer-`dd` tests generic activity and expires with zero. | Identify a legitimate later producer or peripheral completion. No guessed heartbeat, shortened bitmap or policy disable. |
+| Pending word peripheral | Ports `34/35/36`, state/mask/ack grammar and pending first TX are mapped. | Recover clock/framing/completion ownership from software or measured traces; adjacent setup exposes no evidenced divisor. Its relationship to supervision remains unproved. |
+| Provisioning | Own checksum and explicit retry-byte fixtures permit physical phone authentication. | Own semantic/factory evidence, not donor EEPROM or promotion of a diagnostic byte to a factory default. |
+| Bounded software continuation | SIM security, persistent contacts/drafts and FDN policy have independent short cold-process gates. | Add native/UI save-state continuation within the accepted pre-restart interval; this cannot promote sustained boot. |
+| Sustained handset service | The reason-`68` restart is retained as a negative control. | Prove operation beyond that boundary before promoting native registration, network SMS, calls or speech. Fitted DSP/clock and electrical calibration remain separate prerequisites. |
