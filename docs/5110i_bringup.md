@@ -1150,6 +1150,21 @@ An input low byte `ff` selects `ffff` for `06f5`. This establishes a
 host-controlled configuration path, not the physical units of those values.
 Initialization writes `06f4=0`; alternate paths `b8cd/b8d3` write
 `0800/081c`. Neither alternate constant is evidence of the boot setting.
+The host dispatcher `398d..3995` indexes **data-space** table `b00f`;
+within its 82 entries, command `4c` alone selects `3b92`. The identically
+addressed program-space words are executable code, not this table.
+`inspect_word_host_command` checks the decoded dispatcher and the separate
+data image, including rejection of a substituted program-space image.
+
+The derived values are software-counter thresholds: `8e4b` compares
+`06f5` against `06b3` (`ffff` bypasses that check); state-zero transmitter
+path `9185` compares `06c4` against `06f6`. Both counters increment at
+`8e6e` when active flag bit 0 permits it. This does not establish the
+physical period of that service routine. At the seven-second native
+snapshot, `06f4=0`, `06f5=0363`, `06f6=0`, `06b3=0448`, `06c4=0462`:
+the configuration retains its initialization defaults at this observation,
+not a demonstrated host-command override. Do not reinterpret these software
+thresholds as physical serial divisors to invent a transmit-completion rate.
 
 Vector `ffd0` branches to ISR `3416`. Its `34da` path reads port `36`,
 tests mask `2000`, and can write port `34` at `34e8` or `34f4` while

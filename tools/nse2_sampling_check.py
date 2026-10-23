@@ -92,6 +92,29 @@ def inspect_word_configuration_contract(program):
                 baud_and_framing_proved=False,completion_source_proved=False)
 
 
+def inspect_word_host_command(program,data):
+    """Resolve the host command using data-space, never program-space tables."""
+    if len(data)!=0x20000:
+        raise ValueError('word host command requires full DSP data space')
+    fragments={
+        0x398d:'f000b00f4a1188117710000110818a11f4e2',
+        0x8e4b:'12f806f5f150fffffa4d8e690af806b3',
+        0x8e6e:'6bf806c400016bf806b30001',
+        0x9185:'13f806c40bf806f6f84b9191',
+    }
+    for address,encoded in fragments.items():
+        expected=bytes.fromhex(encoded)
+        if program[address*2:address*2+len(expected)]!=expected:
+            raise ValueError(f'word host command code differs at {address:04x}')
+    entries=struct.unpack_from('>82H',data,0xb00f*2)
+    if [index for index,target in enumerate(entries) if target==0x3b92]!=[0x4c]:
+        raise ValueError('word configuration command table differs')
+    return dict(command='4c',handler='3b92',table='data:b00f',
+                duration_comparison='06f5 against 06b3; ffff bypasses',
+                start_comparison='06c4 against 06f6',
+                counter_increment_site='8e6e',physical_counter_period_proved=False)
+
+
 def inspect_peripheral_routes(program):
     if len(program)!=0x20000:
         raise ValueError('peripheral routes require full live page-zero program')

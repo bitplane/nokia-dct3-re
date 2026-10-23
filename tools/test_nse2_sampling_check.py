@@ -3,6 +3,29 @@ from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripher
 
 
 class SamplingCheckTest(unittest.TestCase):
+    def test_word_host_command_uses_data_space_and_counter_consumers(self):
+        import struct
+        from tools.nse2_sampling_check import inspect_word_host_command
+        program=bytearray(0x20000)
+        data=bytearray(0x20000)
+        for address,encoded in {
+            0x398d:'f000b00f4a1188117710000110818a11f4e2',
+            0x8e4b:'12f806f5f150fffffa4d8e690af806b3',
+            0x8e6e:'6bf806c400016bf806b30001',
+            0x9185:'13f806c40bf806f6f84b9191',
+        }.items():
+            fragment=bytes.fromhex(encoded)
+            program[address*2:address*2+len(fragment)]=fragment
+        struct.pack_into('>H',data,(0xb00f+0x4c)*2,0x3b92)
+        self.assertEqual(inspect_word_host_command(program,data)['command'],'4c')
+        with self.assertRaises(ValueError):
+            inspect_word_host_command(program,program)
+        struct.pack_into('>H',data,(0xb00f+0x4b)*2,0x3b92)
+        with self.assertRaises(ValueError):
+            inspect_word_host_command(program,data)
+        with self.assertRaises(ValueError):
+            inspect_word_host_command(program,data[:-2])
+
     def test_word_configuration_and_vector_output_contract(self):
         from tools.nse2_sampling_check import inspect_word_configuration_contract
         program=bytearray(0x20000)

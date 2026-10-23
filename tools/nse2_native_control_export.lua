@@ -16,6 +16,15 @@ emu.register_frame_done(function()
     local output = assert(io.open('nse2_native_program.bin', 'wb'))
     output:write(table.concat(bytes))
     output:close()
+    local data_bytes = {}
+    local data = machine.devices[':dsp_c54x:cpu'].spaces.data
+    for address = 0, 0xffff do
+        local word = data:read_u16(address)
+        data_bytes[#data_bytes + 1] = string.char((word >> 8) & 255, word & 255)
+    end
+    local data_output = assert(io.open('nse2_native_data.bin', 'wb'))
+    data_output:write(table.concat(data_bytes))
+    data_output:close()
     for _, range in ipairs({{'modes',0x4414,0xc0}, {'request',0x4dce,0x100},
                             {'measurement',0x926,0x15a}, {'filter',0x3380,0x90},
                             {'frame',0x3204,0x100}, {'wait',0x407c,0x70},
