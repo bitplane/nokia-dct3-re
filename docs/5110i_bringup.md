@@ -29,7 +29,7 @@ is indexed in [the ROM collection](../roms/README.md#nokia-5110i-nse-2-v553).
 | DSP catalogue | Table `29bba0`, 112-byte initializer to `10ba14`, 28 slots, only slot 27 null. | Slots 11 and 26 are populated; an older product's null-slot assumptions do not apply. |
 | Verifier | Slot 25 at `2a0f6c`, header `0f00 0000 00ba 0700 00b4 0000`, 186 program words. | Descriptor decode, not execution or a completed ownership exchange. |
 | Resident ABI | Verifier stores `4` to DSP data `0803`; three pinned CALLs target `8023`, `8023`, `802b`. | ROM4-style ABI evidence, not identification of the fitted mask or authority to supply a verdict. |
-| EEPROM GPIO | Own byte reader `295746`, START/STOP `29588c/29581a`: signal `20020`, direction `20024`, SDA bit 0, SCL bit 2. | No factory contents or measured write latency. |
+| EEPROM GPIO | Own byte reader `295746`, START/STOP entry points `295814/295886`: signal `20020`, direction `20024`, SDA bit 0, SCL bit 2. | No factory contents or measured write latency. |
 | GENSIO | Own CCONT reader `296704`: select `22` at `28`, TX `2a`, RX `2d`, status `29` bit 2. LCD accessors `296e46/296eac`: command/data `2c/2b`, ready bit 0. | Shared device grammar is supported by these own consumers; fitted IC/serial timing is unproved. |
 | Keypad | Scanner `29806c`, decoder `299010`, maps `2b382c/2b3848`, selector `10c6b6`. Five rows, row signal/direction `31/2f`, columns `30`, IRQ mask `33`; special column 4 maps Power. | Own layout matches the existing NSE-1 input layout, not proof of delivered physical input. |
 | SIMI | Own initialization `286520` uses IIR `38` and the standard FIFO controls. | Empty socket; no SIM conversation accepted. |
@@ -66,6 +66,18 @@ The failure frame alone does not identify whether NV, DSP or other self-test
 conditions selected it.
 
 ## Next technical steps
+
+The own block reader is `293d92`: arguments are EEPROM address in `r0`,
+destination in `r1`, and length in `r2`. It calls address setup `293c04`
+with `r1=0`, returns zero if setup fails, otherwise reads intermediate
+bytes through `295746(1)` and the final byte through `295746(0)`, then
+issues STOP through `295886` and returns one. The final byte is read even
+when length is less than two; zero-length safety is not established.
+START drives SDA low while SCL is high; STOP drives SDA high while SCL is
+high. These waveform semantics, rather than product-name analogies,
+identify the two entry points. The static qualifier pins the complete
+block-reader body. None of this establishes a valid NV record or identifies
+the failing self-test; the next census starts at callers of `293d92`.
 
 1. Recover the own EEPROM record catalogue and NV validators selecting the
    failure presentation. Establish any own-product defaults or independently

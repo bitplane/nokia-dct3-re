@@ -26,8 +26,9 @@ BASE = 0x200000
 TABLE = 0x29bba0
 PERIPHERAL_FRAGMENTS = {
     'eeprom_input': (0x29574e, '25802601270446a6200002ab3320791a781c43b2711a'),
-    'eeprom_stop': (0x29581a, '22012380029b33207819431170197919431171192004781943017019'),
-    'eeprom_start': (0x29588c, '22012380029b33207819439170197919431171192004781943017019'),
+    'eeprom_start': (0x29581a, '22012380029b33207819431170197919431171192004781943017019'),
+    'eeprom_stop': (0x29588c, '22012380029b33207819439170197919431171192004781943017019'),
+    'eeprom_block_read': (0x293d92, 'b5701c161c0c1c052005f7c1fa781c282100f7ffff2e2800d1012400e00f2e02db081e752001f001fcc5702034013d012d00d1f72000f001fcbd70202401f001fd592005f7c1fabf1c20bd70'),
     'ccont_read': (0x296704, '4835222821225411222a21044321541121295c0908c9d3fb212d5c08'),
     'lcd_command': (0x296e46, '4a7621295c890849d3fb212c548846f7'),
     'lcd_data': (0x296eac, '4a5c21295c890849d3fb212b548846f7'),
@@ -55,7 +56,11 @@ def peripheral_contract(mcu):
             or mcu[0x2b3848 - BASE:0x2b3848 - BASE + 5] != bytes.fromhex('3e3e3e3e0d')):
         raise ValueError('NSE-2 own key tables differ')
     return dict(instruction_sites={name: hex(address) for name, (address, _) in PERIPHERAL_FRAGMENTS.items()},
-                eeprom=dict(signal='0x20020', direction='0x20024', sda_bit=0, scl_bit=2),
+                eeprom=dict(signal='0x20020', direction='0x20024', sda_bit=0, scl_bit=2,
+                            start='0x295814', stop='0x295886', block_reader='0x293d92',
+                            block_arguments=['address', 'destination', 'length'],
+                            byte_reader='0x295746', intermediate_ack_argument=1,
+                            final_nack_argument=0),
                 gensio=dict(select='0x28', ccont_select='0x22', ccont_tx='0x2a',
                             ccont_rx='0x2d', status='0x29', ccont_ready_bit=2,
                             lcd_command='0x2c', lcd_data='0x2b', lcd_ready_bit=0),

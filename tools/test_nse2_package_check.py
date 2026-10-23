@@ -110,6 +110,10 @@ class Nse2PackageTest(unittest.TestCase):
     def test_peripheral_report_keeps_static_scope(self):
         result = check.peripheral_contract(peripheral_image())
         self.assertEqual(result['eeprom']['scl_bit'], 2)
+        self.assertEqual(result['eeprom']['start'], '0x295814')
+        self.assertEqual(result['eeprom']['stop'], '0x295886')
+        self.assertEqual(result['eeprom']['block_arguments'], ['address', 'destination', 'length'])
+        self.assertEqual(result['eeprom']['final_nack_argument'], 0)
         self.assertEqual(result['gensio']['ccont_tx'], '0x2a')
         self.assertEqual(result['keypad']['power_column'], 4)
         self.assertEqual(result['keypad']['column_irq_mask'], '0x33')
