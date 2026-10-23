@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nse2_physical_pin_request_cold_persistence", "owner": "nse2_sim_security", "status": "satisfied",
+      "predicate": "Physical ENABLE/DISABLE CHV1 changes only PIN-request state and cold boots honor both outcomes without altering credentials",
+      "current": "verify-5110i-pin-request-lifecycle prepares a fresh PIN-disabled card, then physically collects1234 before selecting On. ENABLE A0/28/00/01/08 succeeds and changes only enabled byte3520 zero to one. A fresh existing PIN-verification runner imports the actual card, accepts1234 and preserves it. Another cold phone authenticates the SIM and separate phone code, then selects Off through DISABLE A0/26/00/01/08; only byte3520 returns to zero. The final cold process imports that exact card, sends no SIM security command, preserves all bytes and authenticates the independent phone code. Five isolated processes, exact frames, physical boot/menu contacts, successful statuses and source/card/executable hashes are required. No native registration, connected call, authentic provisioning or stability beyond the known restart is claimed.",
+      "evidence": ["docs/5110i_bringup.md", "gates.json", "tools/run_nse2_pin1_change.py", "tools/nse2_pin_request_fixture.lua", "tools/nse2_pin1_change_check.py", "tools/test_nse2_pin1_change_check.py", "tools/nse2_sim_check.py"]
+    },
+    {
       "id": "nse2_pin1_change_cold_acceptance", "owner": "nse2_sim_security", "status": "satisfied",
       "predicate": "Physical PIN1 change requires enabled PIN checking and the replacement credential authenticates a separate cold boot",
       "current": "verify-5110i-pin1-change prepares a full fresh laboratory card and runs independent disabled/enabled branches. Disabled checking renders Set PIN code request on with no security/write command or card mutation. Enabled checking physically verifies1234, independently authenticates the phone, then changes PIN1 to2468 through A0/24/00/01/10 with9000 and PIN code changed. Only four credential bytes change; enabled state, retries, PIN2/PUKs and application data remain intact. A fresh existing PIN reauth runner imports that actual saved card, accepts2468, completes protected SIM reads and preserves every byte. Physical boot/menu contacts, exact frames, statuses, source hashes and full-card transitions are required. This does not prove authentic provisioning, native registration, connected calls or stability beyond the known restart.",

@@ -2624,6 +2624,16 @@
       ]
     },
     {
+      "name": "verify-5110i-pin-request-lifecycle",
+      "prerequisites": ["verify-5110i-static", "build"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_pin1_change.py",
+         "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame", "--request-lifecycle"]}
+      ]
+    },
+    {
       "name": "verify-5110i-pin2-retry",
       "prerequisites": ["verify-5110i-static", "build"],
       "variables": {},

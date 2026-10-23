@@ -20,8 +20,12 @@ card and physically searches for `A`; an erased-card control instead shows
 unsent `A` draft on the SIM; a fresh cold process opens it in Outbox and
 reads `A` without rewriting the card. Registration, calls and network SMS
 are not accepted.
-A separate PIN-enabled-card gate proves physical CHV1 authentication and
-wrong-PIN rejection; both leave the unrelated phone-side lock untouched.
+Separate card gates cover CHV1 authentication/change/cold acceptance,
+retry exhaustion and PUK1 recovery; CHV2 change/retry exhaustion and PUK2
+recovery/permanent refusal; and protected FDN record management with a local
+On/Off dialing-permission contrast. These are handset/SIM software contracts,
+not native network or speech acceptance. SIM authentication and the unrelated
+phone-side lock are checked separately.
 Longer execution is not stable: both menu-only and contact-entry runs
 request reason-`68` reset at about 31.97 seconds. The short menu gates do
 not cover this boundary.
@@ -33,10 +37,14 @@ DSP but retains open-pin ADC2; it completes DSP startup while the analog
 readiness counter cannot drain. These are explicit controls, not alternative
 claims of usable boot.
 
-Next: identify the legitimate DSP activity expected during the advancing
-measurement, preserving the proved initial transport and ordinary software
-timer expiry. No queue migration or clock defect is established. Keep the
-existing rejection and restart controls.
+The native boundary is receive-activity supervision during an advancing
+full-scan request. The full bitmap is an explicit MCU default, not missing
+provisioning. A separate pending native word transmission has decoded
+state/status handling but no evidenced peripheral clock/completion source;
+its connection to receive supervision is unproved. Preserve the initial
+transport and ordinary timer expiry; do not invent heartbeats, shorten the
+scan or retime clocks to evade the restart. Independent short SIM/software
+work remains possible without claiming that this native boundary is closed.
 Do not substitute donor EEPROM, force firmware state, or claim phone service
 from the graphical prompt or key decode alone.
 
@@ -66,6 +74,9 @@ make verify-5110i-sms-delete RUN_DIR=tmp/nse2-sms-delete
 make verify-5110i-sim-pin RUN_DIR=tmp/nse2-sim-pin
 make verify-5110i-sim-pin-persistence RUN_DIR=tmp/nse2-sim-pin-persistence
 make verify-5110i-sim-pin-blocked RUN_DIR=tmp/nse2-sim-pin-blocked
+make verify-5110i-pin1-change RUN_DIR=tmp/nse2-pin1-change
+make verify-5110i-pin-request-lifecycle RUN_DIR=tmp/nse2-pin-request
+make verify-5110i-fdn-dial-policy RUN_DIR=tmp/nse2-fdn-policy
 make verify-5110i-native-processing RUN_DIR=tmp/nse2-native-processing
 ```
 
@@ -357,6 +368,27 @@ statuses, complete-card transitions and the refusal/change frames. The
 cold stage retains the existing PIN bootstrap checker. The phone-code
 retry fixture, nominal ADC input and acquired NSE-1 DSP-mask compatibility
 assumption remain explicit; this is not authentic NSE-2 provisioning.
+
+`verify-5110i-pin-request-lifecycle` establishes the toggle order independently
+of the prepared enabled-card fixture. Select PIN code request, enter `1234`
+and OK, then choose On or Off. The PIN is collected before the choice;
+there is no preliminary VERIFY in the disabled-card On path. On sends
+`A0 28 00 01 08` around 23.821 seconds and receives `9000`; only enabled
+byte 3520 changes from zero to one. A fresh existing PIN-verification
+runner imports that exact card, authenticates `1234`, completes protected
+bootstrap and preserves every byte. A separate cold phone authenticates
+its enabled SIM and phone code before selecting Off, sending
+`A0 26 00 01 08` with `9000`; only byte 3520 changes back to zero.
+A final cold boot imports that disabled card, sends no SIM security command,
+preserves every byte and physically authenticates the separate phone code.
+The existing PIN1 runner's `--request-lifecycle` mode links five isolated
+processes including preparation and the accepted cold PIN-verification
+runner. Unlike the independent CHANGE prerequisite fixture, it never edits
+the input card's enabled flag: each stage imports the actual predecessor.
+Exact toggle frames, boot/menu contacts, SIM commands/statuses and
+complete-card transitions are required. Final cold-Off phone authentication
+is checked separately from the absent SIM authentication. Source, card and
+executable hashes remain part of each run's input record.
 
 #### Fixed-dialling settings lifecycle
 
