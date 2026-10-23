@@ -76,6 +76,8 @@ make verify-5110i-sim-pin-persistence RUN_DIR=tmp/nse2-sim-pin-persistence
 make verify-5110i-sim-pin-blocked RUN_DIR=tmp/nse2-sim-pin-blocked
 make verify-5110i-pin1-change RUN_DIR=tmp/nse2-pin1-change
 make verify-5110i-pin-request-lifecycle RUN_DIR=tmp/nse2-pin-request
+make verify-5110i-puk1-retry RUN_DIR=tmp/nse2-puk1-retry
+make verify-5110i-puk1-exhaustion RUN_DIR=tmp/nse2-puk1-exhaustion
 make verify-5110i-fdn-dial-policy RUN_DIR=tmp/nse2-fdn-policy
 make verify-5110i-native-processing RUN_DIR=tmp/nse2-native-processing
 ```
@@ -345,7 +347,20 @@ wrong-PUK input source/hash and retains each stage's checked artifacts.
 `--puk-attempts 9` explicitly declares the reduced-retry input to the
 existing blocked/recovery runner; its default ten-attempt validation remains
 unchanged, and reduced counts are forbidden for unrelated PIN actions.
-Terminal PUK1 exhaustion remains unqualified.
+`verify-5110i-puk1-exhaustion` separately chains three wrong PIN entries,
+ten physical wrong PUK entries and cold permanent refusal: fourteen fresh
+processes. Each PUK failure changes only its retry byte; failures ten through
+two return `9804`, while the one-to-zero transition returns `9840` and
+displays `SIM card rejected`. The original PIN1/PIN2/PUK credentials and
+independent PIN2/PUK2 retry counts stay unchanged. A cold boot importing the
+actual exhausted card repeats the physical PUK/new-PIN entry sequence but
+issues no security or write command, preserves the complete card and retains
+the rejected-card frame before and after input. This is whole-SIM PIN1
+security rejection, distinct from permanent PUK2 loss with usable unrelated
+menus. `--exhaust` on the retry runner selects this branch instead of correct
+recovery; the shared checker explicitly distinguishes zero-retry input from
+recoverable cards. No credential recovery or network-service claim follows
+from permanent refusal.
 
 The recovery checker requires the complete saved blocked card, exactly one
 UNBLOCK command following the 38 physical contact edges, successful status,

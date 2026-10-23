@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from tools.make_sim_card_profile import make_profile
-from tools.nse2_puk1_check import check_wrong, check_cold
+from tools.nse2_puk1_check import check_wrong, check_cold, check_permanent
 
 
 class Puk1CheckTest(unittest.TestCase):
@@ -43,7 +43,7 @@ class Puk1CheckTest(unittest.TestCase):
             rows.append(f'nse2_puk_contact: event={i+1} down={1-i%2} t={when:.3f} physical_only=1')
         text='\n'.join(rows)
         digest=lambda value:hashlib.sha256(value).hexdigest()
-        with patch.multiple('tools.nse2_puk1_check',PUK_PROMPT_FRAME=digest(b'puk'),PIN_BLOCKED_FRAME=digest(b'blocked')):
+        with patch.multiple('tools.nse2_puk1_check',PUK_PROMPT_FRAME=digest(b'puk'),PIN_BLOCKED_FRAME=digest(b'blocked'),REJECTED_FRAME=digest(b'rejected')):
             self.assertEqual(check_wrong(text,before,after,b'puk',b'puk')['puk1_attempts_remaining'],9)
             self.assertEqual(check_cold('',after,after,b'blocked',b'puk')['puk1_attempts_remaining'],9)
             bad_card=bytearray(after)
@@ -57,6 +57,16 @@ class Puk1CheckTest(unittest.TestCase):
                     check_cold(trace,after,card,b'blocked',b'puk')
             terminal=bytearray(before)
             terminal[3518]=1
+            exhausted=bytearray(terminal)
+            exhausted[3518]=0
+            terminal_text=text.replace('sw=9804','sw=9840').replace('puk=9/10','puk=0/10')
+            self.assertEqual(check_wrong(terminal_text,terminal,exhausted,b'puk',b'rejected')['puk1_attempts_remaining'],0)
+            cold_text='\n'.join(rows[2:])
+            self.assertTrue(check_permanent(cold_text,exhausted,exhausted,b'rejected',b'rejected')['credential_input_refused'])
+            for bad_trace,card,pixels in ((terminal_text,exhausted,b'rejected'),(cold_text,bad_card,b'rejected'),
+                                           (cold_text,exhausted,b'puk')):
+                with self.assertRaises(ValueError):
+                    check_permanent(bad_trace,exhausted,card,b'rejected',pixels)
             with self.assertRaises(ValueError):
                 check_wrong(text,terminal,after,b'puk',b'puk')
 

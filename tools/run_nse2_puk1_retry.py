@@ -18,6 +18,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory',type=Path)
     parser.add_argument('--mame',type=Path)
+    parser.add_argument('--exhaust',action='store_true',help='exhaust all PUK1 retries and test cold permanent refusal')
     args=parser.parse_args()
     root=Path(__file__).resolve().parents[1]
     run=args.run_directory.resolve()
@@ -38,6 +39,11 @@ def main():
         before=source.read_bytes()
         if input_remaining(before)!=10:
             raise ValueError('organic PIN blocking did not retain ten PUK1 attempts')
+        if args.exhaust:
+            from tools.nse2_puk1_exhaustion import exhaust
+            checked=exhaust(root,run/'exhaust',source,mame)
+            (run/'acceptance.json').write_text(json.dumps(checked,indent=2)+'\n')
+            return
         target=run/'wrong-puk'
         report=prepare_native(root,target,record_checksum=True,nominal_vbat=True,insert_sim=True)
         (target/'initial_sim_card.bin').write_bytes(before)

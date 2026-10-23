@@ -2624,6 +2624,16 @@
       ]
     },
     {
+      "name": "verify-5110i-puk1-exhaustion",
+      "prerequisites": ["verify-5110i-static", "build"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_puk1_retry.py",
+         "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame", "--exhaust"]}
+      ]
+    },
+    {
       "name": "verify-5110i-pin1-change",
       "prerequisites": ["verify-5110i-static", "build"],
       "variables": {},
