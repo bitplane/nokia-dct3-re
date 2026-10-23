@@ -58,6 +58,46 @@ private:
 		m_flash->write(0, 0xc0);
 		m_flash->write(address, data);
 	}
+	void check_query()
+	{
+		// Intel 290645-011 Appendix C, Tables 17--21; x16 word offsets.
+		constexpr u8 expected[] = {
+			0x51, 0x52, 0x59, 0x03, 0x00, 0x35, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x27, 0x36, 0xb4, 0xc6, 0x05,
+			0x00, 0x0a, 0x00, 0x04, 0x00, 0x03, 0x00, 0x15,
+			0x01, 0x00, 0x00, 0x00, 0x02, 0x1e, 0x00, 0x00,
+			0x01, 0x07, 0x00, 0x20, 0x00, 0x50, 0x52, 0x49,
+			0x31, 0x30, 0x66, 0x00, 0x00, 0x00, 0x01, 0x03,
+			0x00, 0x33, 0xc0, 0x01, 0x80, 0x00, 0x03, 0x03
+		};
+		m_flash->write(0x55, 0x98);
+		for (unsigned index = 0; index < std::size(expected); ++index)
+			require(m_flash->read(0x10 + index) == expected[index], "CFI exact table and zero upper byte");
+		require(m_flash->read(0) == 0x89 && m_flash->read(1) == 0x88c2, "CFI identity plane");
+		u32 capacity = 0;
+		for (unsigned region = 0; region < m_flash->read(0x2c); ++region)
+		{
+			u32 const offset = 0x2d + region * 4;
+			u32 const blocks = 1 + m_flash->read(offset) + (m_flash->read(offset + 1) << 8);
+			u32 const bytes = 256 * (m_flash->read(offset + 2) + (m_flash->read(offset + 3) << 8));
+			require(blocks == (region ? 8 : 31) && bytes == (region ? 8192 : 65536), "CFI top-boot region ordering");
+			capacity += blocks * bytes;
+		}
+		require(capacity == 0x200000 && capacity == (1U << m_flash->read(0x27)), "CFI density equals erase geometry");
+		require(m_flash->read(0x1f0000 / 2 + 2) == 1, "CFI top parameter block lock");
+		std::ostringstream saved(std::ios::binary);
+		require(machine().save().write_stream(saved) == STATERR_NONE, "save query mode");
+		m_flash->write(0, 0x70);
+		require(m_flash->read(0x10) == 0x80, "CFI exits to status");
+		std::istringstream restore(saved.str(), std::ios::binary);
+		require(machine().save().read_stream(restore) == STATERR_NONE && m_flash->read(0x10) == 'Q', "restore query mode");
+		m_flash->write(0, 0x90);
+		require(m_flash->read(1) == 0x88c2, "CFI exits to identity");
+		m_flash->write(0, 0x98);
+		m_flash->reset();
+		require(m_flash->read(0x10) == 0xffff, "reset exits query to unchanged array");
+		osd_printf_info("C3 flash CFI: PASS bytes=56 x16=1 top_regions=31x65536,8x8192 restore=1 array_unchanged=1 handset_claim=0\n");
+	}
 	virtual void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(c3_test_state::step), this);
@@ -71,6 +111,7 @@ private:
 		constexpr u32 A = 0x1f0000 / 2, B = 0x1f2000 / 2, MAIN = 0x1e0000 / 2;
 		if (m_phase == 0)
 		{
+			check_query();
 			if (protection(0x85) != 0xffff)
 			{
 				require(protection(0x85) == 0x1200 && protection(0x86) == 0xffff
@@ -95,6 +136,9 @@ private:
 			lock(A, 0xd0); lock(B, 0xd0); lock(MAIN, 0xd0);
 			require(locks(A) == 0 && locks(B) == 0, "independent unlock");
 			require(locks(MAIN + 0x1000) == 0, "main-block lock spans its full geometry");
+			m_flash->write(0, 0x98);
+			require(m_flash->read(A + 2) == 0 && m_flash->read(B + 2) == 0, "CFI reports changed block locks");
+			m_flash->write(0, 0xff);
 			program(A, 0x1234); program(B, 0x5678); program(MAIN, 0x9abc);
 			program(A, 0xff00);
 			require(array(A) == 0x1200, "NOR only clears bits");

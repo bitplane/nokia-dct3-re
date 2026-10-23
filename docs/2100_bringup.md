@@ -504,8 +504,19 @@ save/load restoration of locks, pin, array and protection-register state.
 Protection command `c0` separately programs user words `85..88` one-way;
 factory words reject writes, and clearing protection-lock bit 1 cannot be
 undone by programming or reset. These semantics come from section 3.4 of
-the retained Intel datasheet, not a guessed handset response. CFI queries
-and measured operation timing remain unsupported/unmeasured.
+the retained Intel datasheet, not a guessed handset response.
+
+Read-query command `98` implements Appendix C's 56 low-byte values at word
+offsets `10..47`, including `QRY`, Intel command set `0003`, x16 width,
+2 MiB density, 31 lower 64-KiB blocks, eight top 8-KiB blocks and the
+`PRI1.0`/protection descriptors. The fixture checks all bytes and zero upper
+bytes, derives capacity from the region descriptors, checks identity/lock
+reads, changes read modes, and restores query mode through save/load.
+Fresh and cold fixture processes both produce the CFI pass marker, and the
+NAM-2 security replay retains accepted pixels and own PMM. The table reports
+the part's published capabilities, not implementation completeness:
+program/erase suspension and measured operation timing remain unqualified.
+This does not resolve the handset's idle wake or establish the fitted part.
 
 Changed OTP state is serialized as an optional 18-byte big-endian tail after
 the raw array in this C3 part's NVRAM file. Raw-array-only seeds retain their
