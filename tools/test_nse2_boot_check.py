@@ -10,6 +10,12 @@ from tools.run_nse2_boundary import prepare
 
 def transcript():
     text = 'Soft reset\n'
+    for i, (_, length, _, pc) in enumerate(check.NV_BLOCKS):
+        expected = (~((255 * length) & 0xffff)) & 0xffffffff
+        text += (f'nse2_nv_checksum: lr={pc:08x} length={length} expected={expected:08x} '
+                 f'stored=ffffffff t=0.{i + 1} observer_writes=0\n')
+    text += ('nse2_nv_verdict: address=0010fcb2 value=fd pc=0027dc14 '
+             't=0.6 observer_writes=0\n')
     writes = [(0x10000 + i * 2, value, 0x27dca8)
               for i, value in enumerate((0xea, 0xff, 0xff, 0xea))]
     writes += [(0x10000, 0, 0x27817a), (0x10002, 0xffff, 0x278182),
@@ -24,6 +30,17 @@ def transcript():
 
 
 class BoundaryTest(unittest.TestCase):
+    def test_nv_checks_require_all_five_erased_blocks_in_order(self):
+        self.assertEqual(check.verify_nv(transcript()), 5)
+        for old, new in (('length=480', 'length=479'), ('stored=ffffffff', 'stored=00000000'),
+                         ('expected=ffff21df', 'expected=ffff21de'),
+                         ('lr=00258f81', 'lr=00258f83'), ('t=0.5', 't=0.1'),
+                         ('value=fd', 'value=00'), ('t=0.6', 't=0.4')):
+            with self.subTest(old=old), self.assertRaisesRegex(ValueError, 'NV checksum'):
+                check.verify_nv(transcript().replace(old, new))
+        with self.assertRaises(ValueError):
+            check.verify_nv('')
+
     def verify(self, text):
         pixels = bytes(84 * 48)
         with patch.object(check, 'FRAME', hashlib.sha256(pixels).hexdigest()):

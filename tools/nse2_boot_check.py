@@ -14,9 +14,35 @@ STATE = re.compile(
     r'lcd_commands=(\d+) lcd_bytes=(\d+) eeprom_signal_writes=(\d+) observer_writes=0')
 SHARED = re.compile(r'nse2_shared: address=([0-9a-f]{8}) data=([0-9a-f]{4}) mask=ffff '
                     r'pc=([0-9a-f]{8}) t=([0-9.]+) observer_writes=0')
+NV_BLOCKS = ((0x0000, 20, 0x0014, 0x258f09),
+             (0x0018, 12, 0x0024, 0x258f2f),
+             (0x0028, 24, 0x0040, 0x258f55),
+             (0x0044, 480, 0x0224, 0x258f81),
+             (0x0228, 20, 0x023c, 0x258fab))
+NV_CHECKSUM = re.compile(r'nse2_nv_checksum: lr=([0-9a-f]{8}) length=(\d+) '
+                         r'expected=([0-9a-f]{8}) stored=([0-9a-f]{8}) '
+                         r't=([0-9.]+) observer_writes=0')
+
+
+def verify_nv(text):
+    checks = NV_CHECKSUM.findall(text)
+    expected = [(pc, length, (~((255 * length) & 0xffff)) & 0xffffffff, 0xffffffff)
+                for _, length, _, pc in NV_BLOCKS]
+    if [(int(pc, 16), int(n), int(want, 16), int(stored, 16))
+            for pc, n, want, stored, _ in checks] != expected:
+        raise ValueError('NSE-2 erased NV checksum observations differ')
+    times = [float(row[4]) for row in checks]
+    if times != sorted(set(times)) or not 0 < times[0] < times[-1] < 1:
+        raise ValueError('NSE-2 NV checksum observation order differs')
+    verdicts = re.findall(r'nse2_nv_verdict: address=0010fcb2 value=fd pc=0027dc14 '
+                          r't=([0-9.]+) observer_writes=0', text)
+    if len(verdicts) != 1 or not times[-1] < float(verdicts[0]) < 1:
+        raise ValueError('NSE-2 NV checksum self-test failure verdict missing or unordered')
+    return len(checks)
 
 
 def verify(text, pixels, size):
+    invalid_blocks = verify_nv(text)
     if text.count('Soft reset\n') != 1:
         raise ValueError('NSE-2 missing initial reset or reset repeated')
     if re.search(r'RX enqueue|peer RAM W off=00[0246]\b|bootstrap.*complete', text):
@@ -47,7 +73,8 @@ def verify(text, pixels, size):
         raise ValueError('NSE-2 reviewed CONTACT SERVICE frame differs')
     return dict(graphical_failure_frame=True, usable_boot=False, native_dsp=False,
                 physical_key_delivery=False, samples=len(samples),
-                gensio_tx=last[1], gensio_rx=last[2], lcd_bytes=last[4])
+                gensio_tx=last[1], gensio_rx=last[2], lcd_bytes=last[4],
+                invalid_nv_checksum_blocks=invalid_blocks)
 
 
 def main():

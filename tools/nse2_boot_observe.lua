@@ -5,6 +5,34 @@ local cpu = machine.devices[':maincpu']
 local space = cpu.spaces.program
 local shared_writes, tx, rx, commands, pixels, signal_writes = 0, 0, 0, 0, 0, 0
 local selected = 0
+local nv_reads = 0
+_G.nse2_nv_verdict_tap = space:install_write_tap(0x10fcb0, 0x10fcb3, 'nse2_nv_verdict', function(_, data, mask)
+    if cpu.state['R15'].value ~= 0x27dc14 or (mask & 0x0000ff00) == 0 then return end
+    machine:logerror(string.format('nse2_nv_verdict: address=0010fcb2 value=%02x pc=0027dc14 t=%.9f observer_writes=0\n',
+        (data >> 8) & 255, machine.time:as_double()))
+end)
+_G.nse2_nv_checksum_tap = space:install_read_tap(0x28a0c4, 0x28a0c7, 'nse2_nv_checksum', function()
+    if cpu.state['R15'].value ~= 0x28a0c4 then return end
+    local caller = cpu.state['R14'].value
+    if caller < 0x258edc or caller > 0x258fbe then return end
+    local source, length = cpu.state['R0'].value, cpu.state['R1'].value
+    local sp = cpu.state['R13'].value
+    assert(source >= 0x100000 and source + length <= 0x110000 and length <= 480)
+    assert(sp >= 0x100000 and sp + 4 <= 0x110000)
+    local sum = 0
+    for i = 0, length - 1 do sum = (sum + space:read_u8(source + i)) & 0xffff end
+    machine:logerror(string.format('nse2_nv_checksum: lr=%08x length=%d expected=%08x stored=%08x t=%.9f observer_writes=0\n',
+        caller, length, (~sum) & 0xffffffff, space:read_u32(sp), machine.time:as_double()))
+end)
+_G.nse2_nv_entry_tap = space:install_read_tap(0x293d90, 0x293d93, 'nse2_nv_entry', function()
+    if cpu.state['R15'].value ~= 0x293d92 then return end
+    nv_reads = nv_reads + 1
+    if nv_reads <= 256 then
+        machine:logerror(string.format('nse2_nv_read: n=%d address=%04x destination=%08x length=%d lr=%08x t=%.9f observer_writes=0\n',
+            nv_reads, cpu.state['R0'].value, cpu.state['R1'].value,
+            cpu.state['R2'].value, cpu.state['R14'].value, machine.time:as_double()))
+    end
+end)
 _G.nse2_shared_tap = space:install_write_tap(0x10000, 0x10007, 'nse2_shared', function(offset, data, mask)
     for lane = 0, 1 do
         local shift = (1 - lane) * 16

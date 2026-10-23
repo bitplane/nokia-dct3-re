@@ -77,7 +77,49 @@ START drives SDA low while SCL is high; STOP drives SDA high while SCL is
 high. These waveform semantics, rather than product-name analogies,
 identify the two entry points. The static qualifier pins the complete
 block-reader body. None of this establishes a valid NV record or identifies
-the failing self-test; the next census starts at callers of `293d92`.
+the failing self-test by itself; its callers provide the validation evidence below.
+
+### Observed NV validity failure
+
+The erased-input boot executes validator `258edc`, which calls byte-sum
+helper `28a0c4` for these five blocks. The helper accumulates modulo 65536;
+the validator complements the zero-extended result and compares the full
+32 bits against a stored word. The complete helper and validator bodies
+are pinned by the static qualifier.
+
+| Data start | Bytes | Stored word address | Expected for erased data | Observed stored word |
+| --- | --- | --- | --- | --- |
+| `0000` | 20 | `0014` | `ffffec13` | `ffffffff` |
+| `0018` | 12 | `0024` | `fffff40b` | `ffffffff` |
+| `0028` | 24 | `0040` | `ffffe817` | `ffffffff` |
+| `0044` | 480 | `0224` | `ffff21df` | `ffffffff` |
+| `0228` | 20 | `023c` | `ffffec13` | `ffffffff` |
+
+Passive entry taps capture 43 block-reader calls in the fresh eight-second
+run, including all ten data/checksum reads above. Checksum observations
+occur at 0.186--0.245 seconds and prove all five comparisons cannot match.
+They do not establish transport success returns, identify field semantics,
+or prove these failures are the sole cause of the screen. No missing trace
+hit is treated as absence of a firmware path.
+
+Own self-test wrapper `27dc02` calls the validator and writes `fd` on a
+non-one return, zero on success, to `10fca0+12`. A passive write tap
+observes the actual `fd` store at `27dc14` at 0.245410308 seconds. This
+establishes a failing NV self-test, not merely a hypothetical comparison.
+The wrapper body and its result-base literal are independently pinned.
+
+The boundary gate now requires all five ordered erased-data checksum
+observations and the subsequent own `fd` verdict in addition to the unchanged
+graphical and hardware-activity predicates. Evidence:
+`tmp/nse2-nv-selftest-verdict`; this is an ignored run
+artifact, not a required repository input. The observer reads only bounded
+SRAM buffers/stack words, never extra MMIO or guest writes.
+
+A checksum-only fixture is now derivable from this ROM, but it must remain
+an explicitly separate experiment: correcting integrity does not make
+erased identity, lock or calibration content authentic. First establish
+the other self-test failures and record semantics; retain the erased-input
+gate rather than rebasing it to a provisioned image.
 
 1. Recover the own EEPROM record catalogue and NV validators selecting the
    failure presentation. Establish any own-product defaults or independently

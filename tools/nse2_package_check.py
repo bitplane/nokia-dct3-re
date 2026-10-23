@@ -25,6 +25,9 @@ VERSION = b'V 05.53\n11-01-01\nNSE-2\n(c) NMP.\0'
 BASE = 0x200000
 TABLE = 0x29bba0
 PERIPHERAL_FRAGMENTS = {
+    'eeprom_selftest': (0x27dc02, 'b500f7dbf96a2801d00121fde000210048cc74817c80bd00'),
+    'eeprom_checksum_sum': (0x28a0c4, '1c0220002900d00d1e4904090c097813181804000c0032011c0b1e5904090c092b00d1f446f7'),
+    'eeprom_checksum_validator': (0x258edc, 'b530b08120090180f7fdfb641c0420001c212214f03aff4f201446692204f03aff4a25001c202114f031f8de43c198004281d100250120181c21220cf03aff3b202446692204f03aff361c20210cf031f8cb43c198004281d000250020281c212218f03aff28204046692204f03aff231c202118f031f8b843c198004281d000250020441c2122ff32e1f03aff142089008046692204f03aff0e1c2021ff31e1f031f8a243c198004281d0002500204500c01c212214f03afefe208f008046692204f03afef81c202114f031f88d43c198004281d00025001c20f7fdf8e71c28b001bd30'),
     'eeprom_input': (0x29574e, '25802601270446a6200002ab3320791a781c43b2711a'),
     'eeprom_start': (0x29581a, '22012380029b33207819431170197919431171192004781943017019'),
     'eeprom_stop': (0x29588c, '22012380029b33207819439170197919431171192004781943017019'),
@@ -50,6 +53,8 @@ def peripheral_contract(mcu):
     for address in (0x2967dc, 0x297020, 0x298200, 0x2866b0):
         if mcu[address - BASE:address - BASE + 4] != bytes.fromhex('00020000'):
             raise ValueError('NSE-2 peripheral base literal differs')
+    if mcu[0x27df44 - BASE:0x27df48 - BASE] != bytes.fromhex('0010fca0'):
+        raise ValueError('NSE-2 EEPROM self-test result base differs')
     if mcu[0x29907c - BASE:0x299088 - BASE] != bytes.fromhex('002b3848 0010c6b6 002b382c'):
         raise ValueError('NSE-2 keypad table/selector literals differ')
     if (mcu[0x2b382c - BASE:0x2b382c - BASE + 25] != NORMAL_KEYS
