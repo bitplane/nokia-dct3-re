@@ -1215,6 +1215,28 @@ control-flow or runtime-reachability proof and not a physical-clock absence
 proof. `c54x_rom4_port_census.py --disassembly FILE` exposes the same
 classification for other acquired program images without changing emulation.
 
+The seven-second data snapshot also resolves the pending transmit-buffer
+contents: producer `06c1=070b`, consumer `06c2=0701`, with words `0700..070a`
+holding two complete byte-framed records:
+
+| Record | Bytes | Destination / source / type | Declared payload |
+| --- | --- | --- | --- |
+| First | `1e ff 00 d0 00 03 01 01 e0 00 ff 2d` | `ff / 00 / d0` | `01 01 e0` |
+| Second | `1e 14 00 f4 00 01 03 00 1d e1` | `14 / 00 / f4` | `03` |
+
+Both have the serial-FBUS marker `1e`, a big-endian length, zero padding
+for odd payload length, and independent alternating-byte XOR checksums.
+This framing comparison is supported by
+[Gammu's FBUS v2 description](https://docs.gammu.org/protocol/nokia.html#frame-format-for-fbus-version-2-direct-irda).
+Do not assign standard sequence-field semantics or an external peer identity
+to these particular payloads from that comparison alone.
+`inspect_word_pending_frames` validates exact pointers, bounded record extents,
+padding, both checksums and the native bytes; mutation tests cover each.
+This identifies FBUS-shaped service traffic in the pending queue, not an RF
+sample stream or successful wire delivery. The first word `1eff` is the only
+observed output so far. The framing does not independently establish the
+controller's clock, completion source, external wiring or supervision link.
+
 Vector `ffd0` branches to ISR `3416`. Its `34da` path reads port `36`,
 tests mask `2000`, and can write port `34` at `34e8` or `34f4` while
 maintaining software buffering state `01f9`. Thus the output port also has

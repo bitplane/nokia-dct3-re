@@ -3,6 +3,21 @@ from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripher
 
 
 class SamplingCheckTest(unittest.TestCase):
+    def test_pending_frames_require_pointer_extent_padding_and_both_checksums(self):
+        import struct
+        from tools.nse2_sampling_check import inspect_word_pending_frames
+        data=bytearray(0x20000)
+        struct.pack_into('>2H',data,0x06c1*2,0x070b,0x0701)
+        data[0xe00:0xe16]=bytes.fromhex('1eff00d000030101e000ff2d1e1400f4000103001de1')
+        result=inspect_word_pending_frames(data)
+        self.assertEqual([frame['message_type'] for frame in result['frames']],['d0','f4'])
+        self.assertFalse(result['wire_delivery_proved'])
+        for offset in (0x06c1*2,0xe09,0xe0a,0xe0b,0xe15):
+            changed=data.copy()
+            changed[offset]^=1
+            with self.assertRaises(ValueError):
+                inspect_word_pending_frames(changed)
+
     def test_service_fetch_pc_offset_and_counter_correlation(self):
         from tools.nse2_sampling_check import inspect_word_service_observation
         rows=[f'nse2_word_service_fetch_summary: address={a} reads={n} exact=0 plusone={n} other=0 observer_writes=0'

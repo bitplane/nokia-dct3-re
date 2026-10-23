@@ -92,6 +92,41 @@ def inspect_word_configuration_contract(program):
                 baud_and_framing_proved=False,completion_source_proved=False)
 
 
+def inspect_word_pending_frames(data):
+    """Qualify queued FBUS-shaped bytes, not electrical identity or delivery."""
+    if len(data)!=0x20000:
+        raise ValueError('word queue requires full DSP data image')
+    pointers=struct.unpack_from('>2H',data,0x06c1*2)
+    if pointers!=(0x070b,0x0701):
+        raise ValueError('word queue producer/consumer pointers differ')
+    queued=data[0x700*2:0x70b*2]
+    frames=[]
+    offset=0
+    while offset<len(queued):
+        if len(queued)-offset<8 or queued[offset]!=0x1e:
+            raise ValueError('word queue frame header differs')
+        length=int.from_bytes(queued[offset+4:offset+6],'big')
+        extent=6+length+(length&1)+2
+        frame=queued[offset:offset+extent]
+        if len(frame)!=extent:
+            raise ValueError('word queue frame is truncated')
+        if length&1 and frame[6+length]!=0:
+            raise ValueError('word queue padding differs')
+        checks=[0,0]
+        for index,value in enumerate(frame):
+            checks[index&1]^=value
+        if checks!=[0,0]:
+            raise ValueError('word queue alternating XOR checksums differ')
+        frames.append(dict(destination=f'{frame[1]:02x}',source=f'{frame[2]:02x}',
+                           message_type=f'{frame[3]:02x}',payload=frame[6:6+length].hex(),
+                           frame=frame.hex()))
+        offset+=extent
+    if [frame['frame'] for frame in frames]!=['1eff00d000030101e000ff2d','1e1400f4000103001de1']:
+        raise ValueError('word queue native frame content differs')
+    return dict(frames=frames,alternating_xor_valid=True,wire_delivery_proved=False,
+                physical_baud_proved=False,receive_supervision_link_proved=False)
+
+
 def inspect_word_service_observation(text):
     """Qualify the bounded nine-second fetch/store correlation, not silicon timing."""
     fetches=re.findall(r'nse2_word_service_fetch_summary: address=([0-9a-f]{4}) reads=(\d+) exact=(\d+) plusone=(\d+) other=(\d+) observer_writes=0',text)
