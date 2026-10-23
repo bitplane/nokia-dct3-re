@@ -50,6 +50,7 @@ make verify-5110i-sim-bootstrap RUN_DIR=tmp/nse2-sim-bootstrap
 make verify-5110i-phonecode-boundary RUN_DIR=tmp/nse2-phonecode-boundary
 make verify-5110i-phonecode-accept RUN_DIR=tmp/nse2-phonecode-accept
 make verify-5110i-menu RUN_DIR=tmp/nse2-menu
+make verify-5110i-native-processing RUN_DIR=tmp/nse2-native-processing
 ```
 
 The nominal boot gate requires the reviewed unattended seven-second frame
@@ -334,6 +335,28 @@ This accepts a thirty-second pre-reset observation as diagnostic evidence
 while still reporting `stable_long_boot=false`. It requires the own packet
 body and positive bit-set/clear observations; it does not claim all host
 packet formats have been decoded or that the borrowed mask is fitted.
+
+The processing gate reuses the existing passive ROM4 codec/mode/comparison/
+transfer/RF-consumer observers; it does not substitute NSE-1's expected
+processing counts for NSE-2 evidence. In two cold thirty-second runs, only
+two mode-1 frames execute (`32f4`), with sixteen filter-loop entries
+(`330a`), two early reductions (`332b`), no ordinary reduction (`3347`),
+and one `33ac` control continuation. Modes written to `00ac` progress
+`0 -> 1 -> 2 -> c -> 4` at 4.717--4.750 seconds, then alternate `c/4`.
+Meanwhile `09a4/4414` run more than 1,600 times and common frame exit
+`33f3` runs more than 21,000 times. Thus the later control loop must not
+be described as sustained mode-1 filtering.
+
+All 679,232 observed port-`27` reads are zero, as are observed reduction
+outputs. That is the unattached sample source actually modeled; it does
+not establish electrical units or prove nonzero samples alone would
+produce a packet. The next static boundary is the mode-1 exit/control
+continuation and completion eligibility, cross-referenced to the existing
+ROM4 RF/sample-contract work rather than another guessed heartbeat.
+`verify-5110i-native-processing` verifies this known pre-reset boundary
+and the physical menu together. Its result explicitly retains
+`stable_long_boot=false` and `acquisition_proved=false`; thirty seconds
+does not cover or waive the known restart deadline.
 
 ## Remaining work
 

@@ -77,17 +77,51 @@ def diagnose_schedule(text):
                 stable_long_boot=False, scope='active scheduling does not prove continued native RX')
 
 
+def diagnose_processing(text):
+    def counts(prefix):
+        result = {}
+        for address, count in re.findall(prefix + r': address=([0-9a-f]{4}) count=(\d+)\b', text):
+            if address in result:
+                raise ValueError('NSE-2 duplicate processing count')
+            result[address] = int(count)
+        return result
+    dispatch = counts('rom4_dispatch_count')
+    comparison = counts('rom4_comparison_count')
+    if dispatch.get('32f4') != 2 or any(dispatch.get(site, 0) < 1000 for site in ('09a4', '4414', '33f3')):
+        raise ValueError('NSE-2 two-frame then sustained control-service frontier differs')
+    if any(comparison.get(site) != count for site, count in
+           (('330a', 16), ('332b', 2), ('3347', 0), ('33ac', 1))):
+        raise ValueError('NSE-2 measured filter/reduction path differs')
+    samples = re.findall(r'rom4_comparison_input: reads=(\d+) nonzero=(\d+) reduction_nonzero=(\d+)\b', text)
+    if len(samples) != 1 or int(samples[0][0]) < 100000 or samples[0][1:] != ('0', '0'):
+        raise ValueError('NSE-2 unattached zero-input/output census differs')
+    modes = re.findall(r'rom4_mode_write: t=([0-9.]+) pc=([0-9a-f]{6}) address=00ac data=([0-9a-f]{4}) mask=ffff', text)
+    if [row[2] for row in modes[:5]] != ['0000', '0001', '0002', '000c', '0004']:
+        raise ValueError('NSE-2 native mode lifecycle differs')
+    if not all(4 < float(row[0]) < 5 for row in modes[1:5]):
+        raise ValueError('NSE-2 native mode transition horizon differs')
+    if any(row[2] != ('000c' if index % 2 == 0 else '0004') for index, row in enumerate(modes[5:])):
+        raise ValueError('NSE-2 repeated control mode lifecycle differs')
+    return dict(mode1_filter_frames=2, observed_sample_reads=int(samples[0][0]),
+                all_observed_samples_zero=True, native_control_service_active=True,
+                stable_long_boot=False, acquisition_proved=False,
+                scope='measured processing frontier, not proof that nonzero samples suffice')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('trace', type=Path)
     parser.add_argument('--transport', action='store_true', help='also require passive first-window ring evidence')
     parser.add_argument('--schedule', action='store_true', help='diagnose thirty-second scheduling without requiring a reset capture')
+    parser.add_argument('--processing', action='store_true', help='also require reused passive ROM4 processing evidence')
     args = parser.parse_args()
     try:
         text = args.trace.read_text()
         result = diagnose_schedule(text) if args.schedule else diagnose(text)
         if args.transport:
             result.update(diagnose_transport(text))
+        if args.processing:
+            result['processing'] = diagnose_processing(text)
         print(json.dumps(result, indent=2))
     except (OSError, ValueError) as error:
         parser.exit(1, str(error) + '\n')

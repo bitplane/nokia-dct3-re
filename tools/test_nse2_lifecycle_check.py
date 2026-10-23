@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nse2_lifecycle_check import diagnose, diagnose_transport, diagnose_schedule
+from tools.nse2_lifecycle_check import diagnose, diagnose_transport, diagnose_schedule, diagnose_processing
 
 
 def transcript():
@@ -12,6 +12,23 @@ def transcript():
 
 
 class LifecycleTest(unittest.TestCase):
+    def test_two_filter_frames_are_not_sustained_acquisition(self):
+        text = '\n'.join(f'rom4_dispatch_count: address={address} count={count}'
+                         for address, count in (('32f4', 2), ('09a4', 1627), ('4414', 1629), ('33f3', 21226)))
+        text += '\n' + '\n'.join(f'rom4_comparison_count: address={address} count={count}'
+                                  for address, count in (('330a', 16), ('332b', 2), ('3347', 0), ('33ac', 1)))
+        text += '\nrom4_comparison_input: reads=679232 nonzero=0 reduction_nonzero=0'
+        for i, mode in enumerate(('0000', '0001', '0002', '000c', '0004', '000c', '0004')):
+            text += f'\nrom4_mode_write: t={4.7 + i * 0.01} pc=00442b address=00ac data={mode} mask=ffff'
+        result = diagnose_processing(text)
+        self.assertFalse(result['acquisition_proved'])
+        self.assertFalse(result['stable_long_boot'])
+        for old, new in (('address=32f4 count=2', 'address=32f4 count=2000'),
+                         ('nonzero=0', 'nonzero=1'), ('data=0002', 'data=0003'),
+                         ('address=33ac count=1', 'address=33ac count=0')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                diagnose_processing(text.replace(old, new))
+
     def test_active_scheduler_is_not_evidence_of_stable_native_receive(self):
         text = ('nse2_native_work_writer: pc=32c1 writes=1625 bit0_set=1625 bits=0821 t=30.0 observer_writes=0\n'
                 'nse2_native_work_writer: pc=446d writes=1628 bit0_set=0 bits=0830 t=30.0 observer_writes=0\n'

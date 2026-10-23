@@ -14,6 +14,7 @@ if __package__ in (None, ''):
 from tools.run_nse2_boundary import prepare
 from tools.nse2_native_check import verify_native, verify_menu_probe, verify_nominal_voltage
 from tools.nse2_sim_check import verify_sim_reads, verify_security_attempt, verify_post_auth_menu
+from tools.nse2_lifecycle_check import diagnose_processing, diagnose_schedule, diagnose_transport
 
 
 MASK_INPUTS = (
@@ -79,6 +80,7 @@ def main():
     parser.add_argument('--security-code', action='store_true', help='one physical 12345 + OK experiment')
     parser.add_argument('--phone-retry-zero', action='store_true', help='explicit own-record zero-attempt NV fixture')
     parser.add_argument('--post-auth-menu', action='store_true', help='physical Menu probe after accepted phone code')
+    parser.add_argument('--native-processing', action='store_true', help='attach existing passive ROM4 processing observers')
     parser.add_argument('--seconds', type=int, default=8, choices=range(8, 121), metavar='8..120')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -93,6 +95,8 @@ def main():
             raise ValueError('retry fixture requires the physical security-code experiment')
         if args.post_auth_menu and not (args.phone_retry_zero and args.seconds >= 24):
             raise ValueError('post-auth Menu probe requires zero-attempt fixture and at least 24 seconds')
+        if args.native_processing and not (args.post_auth_menu and args.seconds >= 30):
+            raise ValueError('native processing census requires post-authentication Menu and at least 30 seconds')
         report = prepare_native(root, run, record_checksum=args.record_checksum_only,
                                 nominal_vbat=args.nominal_vbat, insert_sim=args.insert_sim,
                                 phone_retry_zero=args.phone_retry_zero)
@@ -102,7 +106,8 @@ def main():
                    '-video', 'none', '-sound', 'none', '-joystickprovider', 'none',
                    '-midiprovider', 'none', '-nothrottle', '-noreadconfig', '-log', '-verbose',
                    '-seconds_to_run', str(args.seconds), '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools' / ('nse2_post_auth_fixture.lua' if args.post_auth_menu else
+                   '-autoboot_script', str(root / 'tools' / ('nse2_processing_fixture.lua' if args.native_processing else
+                       'nse2_post_auth_fixture.lua' if args.post_auth_menu else
                        'nse2_security_fixture.lua' if args.security_code else
                        'nse2_menu_fixture.lua' if args.physical_menu else 'nse2_boot_observe.lua'))]
         with mame.open('rb') as stream:
@@ -140,6 +145,9 @@ def main():
                 with Image.open(run / 'snap/nse2_post_auth_21.png') as menu, \
                         Image.open(run / 'snap/nse2_post_auth_23.png') as submenu:
                     result.update(verify_post_auth_menu(text, menu.convert('L').tobytes(), submenu.convert('L').tobytes()))
+        if args.native_processing:
+            result['native_processing_boundary'] = dict(diagnose_schedule(text), **diagnose_transport(text))
+            result['native_processing_boundary']['processing'] = diagnose_processing(text)
         (run / 'acceptance.json').write_text(json.dumps(result, indent=2) + '\n')
         if args.post_auth_menu:
             print('NSE-2 physical Phone book menu/submenu PASS; contact persistence and network unproved')
