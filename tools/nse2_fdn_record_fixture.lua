@@ -3,9 +3,11 @@ local directory=debug.getinfo(1,'S').source:sub(2):match('^(.*[/\\])')
 dofile(directory..'nse2_security_fixture.lua')
 local machine=manager.machine
 local mode=assert(_G.nse2_fdn_record_mode)
-local sequences={write='MDDDMDDMDMDMDM5678M2M12345M',read='MDDDMDDMDMDMMMH',wrong='MDDDMDDMDMDMDM5675M'}
+local sequences={write='MDDDMDDMDMDMDM5678M2M12345M',read='MDDDMDDMDMDMMMH',wrong='MDDDMDDMDMDMDM5675M',
+    edit='MDDDMDDMDMDMMMMM5678MMC6M',['read-edited']='MDDDMDDMDMDMMMH',
+    erase='MDDDMDDMDMDMMMMDM5678MM',cancel='MDDDMDDMDMDMMMMDM5678MC',empty='MDDDMDDMDMDMMM'}
 local sequence=assert(sequences[mode])
-local keys={M={1,4},D={0,8},H={4,16},['1']={2,2},['2']={3,2},['3']={4,2},['4']={2,4},['5']={3,4},['6']={4,4},['7']={2,8},['8']={3,8}}
+local keys={M={1,4},D={0,8},H={4,16},C={1,2},['1']={2,2},['2']={3,2},['3']={4,2},['4']={2,4},['5']={3,4},['6']={4,4},['7']={2,8},['8']={3,8}}
 local events={}
 for i=1,#sequence do
     local key=sequence:sub(i,i)
@@ -29,7 +31,8 @@ emu.register_frame_done(function()
         machine:logerror(string.format('nse2_fdn_record_contact: event=%d down=%d t=%.9f physical_only=1\n',event,step[3],now))
         event=event+1
     end
-    if not captured and now>=(mode=='read' and 26.2 or 29.7) then
+    local capture_time=mode=='empty' and 24 or ((mode=='read' or mode=='read-edited') and 26.2 or 29.7)
+    if not captured and now>=capture_time then
         captured=true
         machine.screens[':screen']:snapshot('nse2_fdn_final.png')
     end

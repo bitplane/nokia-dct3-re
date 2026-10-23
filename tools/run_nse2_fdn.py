@@ -22,6 +22,7 @@ def main():
     parser.add_argument('run_directory',type=Path)
     parser.add_argument('--mame',type=Path)
     parser.add_argument('--records',action='store_true',help='also save/read FDN and reject wrong PIN2')
+    parser.add_argument('--edit-lifecycle',action='store_true',help='also edit/cold-read/cancel-erase/erase/cold-empty')
     args=parser.parse_args()
     root=Path(__file__).resolve().parents[1]
     run=args.run_directory.resolve()
@@ -40,11 +41,16 @@ def main():
         card=extend(base,True)
         stages=[]
         names=['on','cold-on','off','cold-off']
-        if args.records:
+        if args.records or args.edit_lifecycle:
             names+=['write','read','wrong']
+        if args.edit_lifecycle:
+            names+=['edit','read-edited','cancel','erase','empty']
         for phase,name in enumerate(names):
             if name=='wrong':
                 source=run/'cold-off/nvram/nse2r4v/sim_card'
+                card=source.read_bytes()
+            elif name=='edit':
+                source=run/'write/nvram/nse2r4v/sim_card'
                 card=source.read_bytes()
             target=run/name
             report=prepare_native(root,target,record_checksum=True,nominal_vbat=True,
@@ -90,7 +96,12 @@ def main():
                              3:'e8e8c3e26c5a79333b2b7870fb8f8e12d7f7e8bc167913097508a004f2891f20',
                              4:'38d49c2e16c4d71080cb49d07f4756964393347b3393d6644f7f10cb7b07c580',
                              5:'1ddc4a9f01b9d098073e2f3cfb4cd3aa190abb0584fb0b3b21bd88c4a3e213b7',
-                             6:'1ec8ac307ef10d0426a2f4769cdec97b6bbbdb26c057b41a3838a9a8ef8ded6c'}
+                             6:'1ec8ac307ef10d0426a2f4769cdec97b6bbbdb26c057b41a3838a9a8ef8ded6c',
+                             7:'38d49c2e16c4d71080cb49d07f4756964393347b3393d6644f7f10cb7b07c580',
+                             8:'20f9bb82e048cf8d6385e0c56c8e37d0245ed3cafb0c55b1714f3ee352dca1f9',
+                             9:'38d49c2e16c4d71080cb49d07f4756964393347b3393d6644f7f10cb7b07c580',
+                             10:'8d58f1afb3d10c470efd80667818c969ecead7cda16935b0d6ce3815d0457052',
+                             11:'34478708c13e25cc3cb0778a9fa40f9cb812c6eb56636909c1ce133a1d616900'}
                 if phase in cold_frames and result['frame_sha256']!=cold_frames[phase]:
                     raise ValueError('FDN settings/record result frame differs')
             (target/'acceptance.json').write_text(json.dumps(result,indent=2)+'\n')

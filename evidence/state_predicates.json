@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nse2_fdn_edit_erase_cold_persistence", "owner": "nse2_sim_security", "status": "satisfied",
+      "predicate": "Physical protected FDN editing and confirmed erasure persist across cold processes while cancellation preserves the complete card",
+      "current": "verify-5110i-fdn-edit-lifecycle composes thirteen fresh processes including preparation and prior settings/save/read/wrong-PIN2 controls. Edit imports the successful A/12345 write rather than the rejected branch, verifies PIN2 and changes only BCD byte3600 F5 to F6 through EF_FDN UPDATE RECORD. Cold held-number read shows12346 without VERIFY/write and preserves the card. Erase cancellation verifies PIN2 but sends no UPDATE. Confirmed erase rewrites only record one to FF, and cold Search displays No phone numbers with unchanged erased storage. Physical input, PIN2-before-update ordering, successful statuses, exact frames and whole-card transitions are checked. FDN remains Off during record management. Active-FDN dialing restrictions, native RF and stable operation beyond the known restart remain unproved.",
+      "evidence": ["docs/5110i_bringup.md", "gates.json", "tools/run_nse2_fdn.py", "tools/nse2_fdn_record_fixture.lua", "tools/nse2_fdn_check.py", "tools/test_nse2_fdn_check.py"]
+    },
+    {
       "id": "nse2_fdn_protected_record_cold_read", "owner": "nse2_sim_security", "status": "satisfied",
       "predicate": "Physical FDN record creation persists across a cold process while wrong PIN2 prevents the same protected write",
       "current": "verify-5110i-fdn-records links preparation, On/cold-On/Off/cold-Off, then physical Numbers/Add A/12345, cold Search with held number view, and independent wrong-PIN2 Add from the retained empty Off card. Successful CHV2 VERIFY precedes UPDATE RECORD of EF_FDN record one; only the expected encoded record bytes change. Cold read displays12345, issues no PIN2 VERIFY or write and preserves the complete saved card. PIN2 5675 returns9804 and decrements only its retry count3 to2 without UPDATE. Phone authentication, exact frames, physical contacts and full-card transitions are checked. This is FDN-Off protected creation/readback, not modification/erasure, active-FDN call restrictions, native RF or long-run native stability.",

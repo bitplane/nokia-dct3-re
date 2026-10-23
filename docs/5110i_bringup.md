@@ -370,8 +370,22 @@ the successful write, while the wrong-PIN2 branch independently imports
 the retained empty Off card. `check_record` in `tools/nse2_fdn_check.py`
 checks protocol, physical input and complete-card transitions, and the
 runner verifies phone authentication and exact result frames. This proves
-record creation/readback and failed-write protection, not modification or
-erasure of an existing record, or active-FDN dialing restrictions.
+record creation/readback and failed-write protection, not active-FDN dialing
+restrictions.
+
+`verify-5110i-fdn-edit-lifecycle` adds five processes to that chain. Physical
+Search / Options / Edit authenticates PIN2, retains the name and replaces
+the final digit with `6`. Successful EF_FDN UPDATE changes only byte 3600
+from `F5` to `F6`, representing `12345` to `12346`. A cold held-number view
+displays `12346` without VERIFY or storage changes. Erase cancellation
+authenticates PIN2 but submits no UPDATE and preserves the whole card.
+Confirmed erase issues one successful UPDATE of record one to all `FF`;
+the final cold Search displays `No phone numbers`, performs no security or
+write command and preserves the erased card. Exact result frames and
+complete-card transitions accompany physical contact/protocol checks.
+The full lifecycle uses thirteen isolated processes including preparation;
+it does not establish active-FDN dialing restrictions or native stability
+beyond the known restart boundary.
 
 `verify-5110i-pin2-change` uses two isolated thirty-second processes with
 PIN1 disabled and the explicitly declared phone-code retry fixture. Physical
