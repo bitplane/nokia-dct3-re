@@ -3,10 +3,40 @@ import unittest
 
 from tools.nse2_native_result_check import (FRAGMENTS, MCU_REQUEST_FRAGMENTS,
                                            inspect_control_trace, inspect_mcu_request, inspect_program,
-                                           inspect_request_lifecycle)
+                                           inspect_request_lifecycle, inspect_scan_pacing)
 
 
 class ResultTest(unittest.TestCase):
+    def pacing_trace(self):
+        period = 1351 * 12 / 13_000_000
+        rows = []
+        for index in range(1, 9):
+            start = 4.74 + (index - 1) * 12 * period
+            for address, delta, mode, work in ((0x990, 0, 4, 0x821),
+                                              (0x99d, period - 0.000001, 4, 0x821),
+                                              (0x9a6, period, 12, 0x830),
+                                              (0x9b1, 12 * period - 0.000002, 4, 0x821),
+                                              (0x9c2, 12 * period - 0.000001, 4, 0x821)):
+                rows.append(f'nse2_native_scan_stage: address={address:04x} n={index} '
+                            f'pc={address + 1:04x} mode={mode:04x} work={work:04x} '
+                            f't={start + delta:.9f} observer_writes=0')
+        return '\n'.join(rows)
+
+    def test_scan_pacing_is_not_hardware_validation(self):
+        result = inspect_scan_pacing(self.pacing_trace())
+        self.assertEqual(result['modeled_periods_per_measurement'], 12)
+        self.assertFalse(result['hardware_clock_fault_proved'])
+
+    def test_scan_pacing_incomplete_changed_and_duplicate_fail(self):
+        text = self.pacing_trace()
+        for changed in ('', '\n'.join(text.splitlines()[1:]),
+                        text + '\n' + text.splitlines()[0],
+                        text.replace('mode=000c', 'mode=0004'),
+                        text.replace('work=0821', 'work=0820'),
+                        text.replace('pc=0991', 'pc=0999')):
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                inspect_scan_pacing(changed)
+
     def request_lifecycle(self):
         return '\n'.join([
             'nse2_request_mode: value=00 pc=0020010c t=0.002 observer_writes=0',

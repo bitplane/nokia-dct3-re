@@ -382,6 +382,20 @@ mode-4 lifecycle. Absent type `07` is not evidence that it must be added.
 The active type-`1a` measurement loop remains the next native result path
 to resolve. These are passive observations on the unchanged physical-menu
 fixture, not firmware-state edits or proof of all possible call routes.
+
+Passive first-eight measurement stage observations separate setup from
+processing: `0990→099d` averages 1.24639 ms, `09a6→09b1` averages
+13.70942 ms, and successive `0990` entries average 14.96504 ms.
+Mode is `000c` at `09a6` and `0004` with the completion work bit set
+at `09b1`. The byte-checked setup writes `0546` to port `0e` at
+`0957`; the current CTSI model converts its 1351-count period to
+1.24708 ms. Each measured iteration therefore takes about twelve modeled
+periods, predominantly in the completion wait rather than setup.
+This is a timing decomposition, not evidence that the reload, clock,
+interrupt cadence or execution-cycle model matches physical NSE-2 hardware.
+The next distinction is which processing/frame transitions account for
+those eleven wait periods; changing the clock to beat supervision would
+not answer it.
 None of these static paths establishes an unconditional periodic packet.
 The separate serial publisher retains its existing queued-data contract.
 

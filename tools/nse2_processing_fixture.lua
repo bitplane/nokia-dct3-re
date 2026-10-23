@@ -49,6 +49,21 @@ emu.register_frame_done(function()
     machine:logerror('nse2_native_program_snapshot: words=65536 byte_order=big observer_writes=0\n')
 end, 'NSE-2 passive live program snapshot')
 _G.nse2_scan_loop_taps = {}
+-- Bound the first few channel measurements; distinguish setup waits from
+-- the processing completion wait without changing clocks or request data.
+for _, address in ipairs({0x990, 0x99d, 0x9a6, 0x9b1, 0x9c2}) do
+    counts[address] = 0
+    _G.nse2_scan_loop_taps[#_G.nse2_scan_loop_taps + 1] =
+        cpu.spaces.program:install_read_tap(address, address, 'nse2_scan_stage', function()
+            local pc = cpu.state['PC'].value
+            if pc ~= address and pc ~= address + 1 then return end
+            counts[address] = counts[address] + 1
+            if counts[address] > 8 then return end
+            machine:logerror(string.format('nse2_native_scan_stage: address=%04x n=%d pc=%04x mode=%04x work=%04x t=%.9f observer_writes=0\n',
+                address, counts[address], pc, cpu.spaces.data:read_u16(0xac),
+                cpu.spaces.data:read_u16(0x6bc), machine.time:as_double()))
+        end)
+end
 for _, address in ipairs({0x9c4, 0x9cb}) do
     counts[address] = 0
     _G.nse2_scan_loop_taps[#_G.nse2_scan_loop_taps + 1] =

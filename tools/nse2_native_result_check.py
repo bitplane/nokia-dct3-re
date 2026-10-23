@@ -13,6 +13,7 @@ from tools.c54x_rom4_port_census import direct_callers
 from tools.nsk1_radio_contract import live_publisher_census, native_completion_contract, serial_publisher_contract
 
 FRAGMENTS = {
+    0x0952: '7712006076820546f4957582000e',
     0x3c04: '61f806bc0100fc3048117714195df03000f06884ff0f1a84808461f800110040e87c69f806e30020',
     0x6790: '771206bc771006e31180f2300020f84567a9f330ffdf818044f806ad770e0005f58c81f806ab69820100',
     0x0a15: 'f0200e13f07447f6f4bcfc20',
@@ -141,6 +142,46 @@ def inspect_request_lifecycle(text):
                 constructor_entry_observations=0, required_mode_observed=False,
                 mode_writes=len(rows), observation_seconds=30,
                 scope='observed boot lifecycle; type-07 normal-boot necessity not proved')
+
+
+def inspect_scan_pacing(text):
+    rows = re.findall(r'nse2_native_scan_stage: address=([0-9a-f]{4}) n=(\d+) '
+                      r'pc=([0-9a-f]{4}) mode=([0-9a-f]{4}) work=([0-9a-f]{4}) '
+                      r't=([0-9.]+) observer_writes=0', text)
+    stages = {}
+    for address, index, pc, mode, work, time in rows:
+        key = (int(index), int(address, 16))
+        if key in stages or int(pc, 16) not in (key[1], key[1] + 1):
+            raise ValueError('NSE-2 scan-stage duplicate or execution-PC mismatch')
+        stages[key] = (float(time), int(mode, 16), int(work, 16))
+    addresses = (0x990, 0x99d, 0x9a6, 0x9b1, 0x9c2)
+    if set(stages) != {(index, address) for index in range(1, 9) for address in addresses}:
+        raise ValueError('NSE-2 complete first-eight measurement stage observations missing')
+    setup, processing, cycles = [], [], []
+    # A model-derived period, not an independent measurement of silicon.
+    period = (0x546 + 1) * 12 / 13_000_000
+    for index in range(1, 9):
+        sequence = [stages[index, address][0] for address in addresses]
+        if sequence != sorted(sequence) or len(set(sequence)) != len(sequence):
+            raise ValueError('NSE-2 scan-stage ordering differs')
+        if stages[index, 0x9a6][1] != 12 or stages[index, 0x9b1][1] != 4:
+            raise ValueError('NSE-2 scan processing mode transition differs')
+        if not stages[index, 0x9b1][2] & 1:
+            raise ValueError('NSE-2 scan completion work bit missing')
+        setup.append(sequence[1] - sequence[0])
+        processing.append(sequence[3] - sequence[2])
+        if index < 8:
+            cycles.append(stages[index + 1, 0x990][0] - sequence[0])
+    if (not all(0.95 < value / period < 1.05 for value in setup)
+            or not all(10.95 < value / period < 11.05 for value in processing)
+            or not all(11.95 < value / period < 12.05 for value in cycles)):
+        raise ValueError('NSE-2 observed one/eleven/twelve-period scan pacing differs')
+    return dict(measurements=8, modeled_frame_period_seconds=period,
+                setup_mean_seconds=sum(setup) / len(setup),
+                processing_wait_mean_seconds=sum(processing) / len(processing),
+                measurement_period_mean_seconds=sum(cycles) / len(cycles),
+                modeled_periods_per_measurement=12, hardware_clock_fault_proved=False,
+                scope='first-eight observed scan timings relative to current model; not physical timing validation')
 
 
 def main():
