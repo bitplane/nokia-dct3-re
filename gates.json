@@ -2631,6 +2631,15 @@
       ]
     },
     {
+      "name": "verify-5110i-puk2-exhaustion",
+      "prerequisites": ["verify-5110i-pin2-blocked"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python", "before_script": [], "script": "tools/run_nse2_puk2_exhaustion.py",
+         "arguments": ["$(RUN_DIR)/puk2-exhaustion", "--mame", "$(MAME_DIR)/mame", "--blocked-card", "$(RUN_DIR)/wrong3/nvram/nse2r4v/sim_card"]}
+      ]
+    },
+    {
       "name": "verify-5110i-native-processing",
       "prerequisites": ["verify-5110i-static", "build"],
       "variables": {},

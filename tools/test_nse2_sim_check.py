@@ -58,6 +58,15 @@ class SimCheckTest(unittest.TestCase):
             self.assertEqual(result['puk2_attempts_remaining'],9)
             self.assertFalse(result['automatic_pin2_verify'])
             self.assertEqual(verify_puk2_recovery(text,wrong,final,frames)['puk2_attempts_before'],9)
+            last=bytearray(initial)
+            last[ATTEMPTS_OFFSET+3]=1
+            permanent=bytearray(last)
+            permanent[ATTEMPTS_OFFSET+3]=0
+            last_text=rejected.replace('sw=9804','sw=9840').replace('puk=10/9','puk=10/0')
+            with patch('tools.nse2_sim_check.PIN2_REJECTED_FRAME',h(b'rejected')):
+                self.assertEqual(verify_puk2_recovery(last_text,last,permanent,frames[:-1]+[b'rejected'],wrong=True)['puk2_attempts_remaining'],0)
+                with self.assertRaises(ValueError):
+                    verify_puk2_recovery(last_text.replace('sw=9840','sw=9804'),last,permanent,frames[:-1]+[b'rejected'],wrong=True)
             for bad in (rejected.replace('puk=10/9','puk=9/10'),rejected+'\nsim_device: header cla=a0 ins=20 p1=00 p2=02 p3=08 selected=6f3a t=29.08'):
                 with self.assertRaises(ValueError):
                     verify_puk2_recovery(bad,initial,wrong,frames[:-1]+[b'error'],wrong=True)
@@ -106,6 +115,17 @@ class SimCheckTest(unittest.TestCase):
                 verify_pin2_blocked(text,card,changed,frames)
             with self.assertRaises(ValueError):
                 verify_pin2_blocked(text+'\nSIM status ins=2c sw=9000 chv=3/3 puk=10/10 enabled=0',card,card,frames)
+            permanent=bytearray(card)
+            permanent[ATTEMPTS_OFFSET+3]=0
+            continued=text+'\nnse2_permanent_contact: down=1 t=28.5 physical_only=1\nnse2_permanent_contact: down=0 t=28.65 physical_only=1\nnse2_permanent_decode: raw=15 key=18 t=28.55 observer_writes=0'
+            permanent_frames=[b'idle',b'rejected',b'rejected',b'pin2item',b'phoneitem']
+            with patch.multiple('tools.nse2_sim_check',PIN2_REJECTED_FRAME=hashlib.sha256(b'rejected').hexdigest(),
+                    PIN2_ITEM_FRAME=hashlib.sha256(b'pin2item').hexdigest(),PHONE_CODE_ITEM_FRAME=hashlib.sha256(b'phoneitem').hexdigest()):
+                self.assertTrue(verify_pin2_blocked(continued,permanent,permanent,permanent_frames,permanent=True)['physical_menu_continuation'])
+                with self.assertRaises(ValueError):
+                    verify_pin2_blocked(continued.replace('raw=15 key=18','raw=14 key=18'),permanent,permanent,permanent_frames,permanent=True)
+                with self.assertRaises(ValueError):
+                    verify_pin2_blocked(continued,card,card,permanent_frames,permanent=True)
 
     def test_pin2_change_and_cold_reverse_require_exact_card_transition(self):
         from tools.nse2_sim_check import verify_pin2_change

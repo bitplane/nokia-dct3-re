@@ -25,6 +25,9 @@ PIN2_CHANGE_FRAMES=(AUTHENTICATED_FRAME,'dcb11fd985f9fadefab2e1aece85f5c36be7243
                    '2ee325765504951d8758a418ae0fa0e90c8252d9fd6234fba603eef0360e811e')
 PIN2_BLOCKED_FRAME='8743820344d395aaf8c7701cf0085c7cad646e06c0b4dcef3bb8979c953b594f'
 PUK2_PROMPT_FRAME='e293d1f5987c36caea43654daa9615a5990cce239403d6f1c3a15e842c184089'
+PIN2_REJECTED_FRAME='e5cc1d2bab0e40f55bfd249883a731df355df5f551f03520c29957e9cabcb239'
+PIN2_ITEM_FRAME='96d2f3fb3ee239cede15f5d48b0c62910809d5acd4d79c1db0910522d86e488f'
+PHONE_CODE_ITEM_FRAME='6c973f265be558dbe2730a733535604e5baac36b9682124ef6e8cd267f022dfd'
 BINARY_FILES = {0x6fb7: 15, 0x6fae: 1, 0x6f05: 4, 0x6fad: 3,
                 0x6f38: 12, 0x6f07: 9, 0x6f78: 2, 0x2fe6: 4,
                 0x6f46: 17, 0x6f74: 16, 0x6f7e: 11, 0x6f30: 24,
@@ -305,7 +308,7 @@ def verify_puk_recovery(text, initial, final, prompt_pixels, final_pixels):
     return dict(puk_verified=True,pin_attempts_remaining=3,phone_code_authenticated=False,network_registration=False)
 
 
-def verify_pin2_input(card,*,restore=False,blocked=False):
+def verify_pin2_input(card,*,restore=False,blocked=False,permanent=False):
     from tools.make_sim_card_profile import make_profile
     from tools.sim_security_trace_check import CHV_OFFSET,AOC_NVRAM_SIZE,ATTEMPTS_OFFSET
     expected=bytearray(make_profile(False))
@@ -315,7 +318,7 @@ def verify_pin2_input(card,*,restore=False,blocked=False):
         raise ValueError('unqualified initial PIN2 retry lifecycle')
     expected[ATTEMPTS_OFFSET+1]=card[ATTEMPTS_OFFSET+1]
     if blocked:
-        if card[ATTEMPTS_OFFSET+3] not in range(1,11):
+        if card[ATTEMPTS_OFFSET+3] not in ((0,) if permanent else range(1,11)):
             raise ValueError('unqualified initial PUK2 retry lifecycle')
         expected[ATTEMPTS_OFFSET+3]=card[ATTEMPTS_OFFSET+3]
     if len(card) not in (len(expected),AOC_NVRAM_SIZE) or card[:len(expected)]!=expected:
@@ -358,9 +361,9 @@ def verify_pin2_change(text,initial,final,frames,*,restore=False,wrong=False):
                 network_registration=False,stable_long_boot=False)
 
 
-def verify_pin2_blocked(text,initial,final,frames):
+def verify_pin2_blocked(text,initial,final,frames,*,permanent=False):
     from tools.sim_security_trace_check import AOC_NVRAM_SIZE,statuses
-    verify_pin2_input(initial,blocked=True)
+    verify_pin2_input(initial,blocked=True,permanent=permanent)
     if len(initial)!=AOC_NVRAM_SIZE or final!=initial:
         raise ValueError('cold blocked PIN2 card changed or was not a complete predecessor')
     if any(int(m[2],16) in (0x20,0x24,0x2c) for m in HEADER.finditer(text)) or any(statuses(text,i,chv=2) for i in (0x20,0x24,0x2c)):
@@ -371,10 +374,21 @@ def verify_pin2_blocked(text,initial,final,frames):
     times=[float(t) for _,_,t in contacts]
     if times!=sorted(times) or not 18.4<times[0]<18.6 or not 23.8<times[-1]<24:
         raise ValueError('cold blocked PIN2 navigation timing differs')
-    expected=(AUTHENTICATED_FRAME,PIN2_BLOCKED_FRAME,PIN2_BLOCKED_FRAME,PUK2_PROMPT_FRAME,PUK2_PROMPT_FRAME)
+    expected=(AUTHENTICATED_FRAME,PIN2_REJECTED_FRAME,PIN2_REJECTED_FRAME,PIN2_ITEM_FRAME,PHONE_CODE_ITEM_FRAME) if permanent else (
+        AUTHENTICATED_FRAME,PIN2_BLOCKED_FRAME,PIN2_BLOCKED_FRAME,PUK2_PROMPT_FRAME,PUK2_PROMPT_FRAME)
     if tuple(hashlib.sha256(frame).hexdigest() for frame in frames)!=expected:
         raise ValueError('cold PIN2 blocked-notice/PUK2 prompt frames differ')
-    return dict(sim_pin2_blocked=True,puk2_prompt=True,puk2_verified=False,card_unchanged=True,
+    navigation=re.findall(r'nse2_permanent_contact: down=([01]) t=([0-9.]+) physical_only=1',text)
+    if permanent:
+        if len(navigation)!=2 or [v for v,_ in navigation]!=['1','0'] or not 28.49<=float(navigation[0][1])<28.54 or not 28.64<=float(navigation[1][1])<28.69:
+            raise ValueError('permanent PIN2 refusal physical continuation differs')
+        decodes=re.findall(r'nse2_permanent_decode: raw=15 key=18 t=([0-9.]+) observer_writes=0',text)
+        if not any(float(navigation[0][1])<=float(t)<=float(navigation[1][1]) for t in decodes):
+            raise ValueError('permanent PIN2 refusal Down contact did not reach decoder')
+    elif navigation:
+        raise ValueError('unexpected permanent-loss fixture in recoverable blocked control')
+    return dict(sim_pin2_blocked=True,puk2_prompt=not permanent,permanent_pin2_loss=permanent,
+                physical_menu_continuation=permanent,puk2_verified=False,card_unchanged=True,
                 network_registration=False,stable_long_boot=False)
 
 
@@ -382,8 +396,6 @@ def verify_puk2_recovery(text,initial,final,frames,*,wrong=False):
     from tools.sim_security_trace_check import CHV_OFFSET,ATTEMPTS_OFFSET,AOC_NVRAM_SIZE,statuses
     verify_pin2_input(initial,blocked=True)
     before=initial[ATTEMPTS_OFFSET+3]
-    if wrong and before<2:
-        raise ValueError('permanent PUK2 exhaustion is not yet qualified by this checker')
     remaining=before-1 if wrong else 10
     expected=bytearray(initial)
     if not wrong:
@@ -399,7 +411,7 @@ def verify_puk2_recovery(text,initial,final,frames,*,wrong=False):
     times=[float(h[-1]) for h in headers]
     if times!=sorted(times) or not 29<times[0]<=times[-1]<29.5 or (not wrong and times[0]>=times[1]):
         raise ValueError('PUK2 APDU timing/order differs')
-    if (statuses(text,0x2c,chv=2)!=[(0x9804 if wrong else 0x9000,0 if wrong else 3,remaining)]
+    if (statuses(text,0x2c,chv=2)!=[(0x9840 if wrong and remaining==0 else 0x9804 if wrong else 0x9000,0 if wrong else 3,remaining)]
             or statuses(text,0x20,chv=2)!=([] if wrong else [(0x9000,3,10)])):
         raise ValueError('PUK2 status/retry/order differs')
     contacts=re.findall(r'nse2_puk2_contact: event=(\d+) down=([01]) t=([0-9.]+) physical_only=1',text)
@@ -408,7 +420,8 @@ def verify_puk2_recovery(text,initial,final,frames,*,wrong=False):
     event_times=[float(t) for _,_,t in contacts]
     if event_times!=sorted(event_times) or not 15.4<event_times[0]<15.6 or not 24.4<event_times[32]<24.6 or not 29<event_times[-1]<29.4:
         raise ValueError('PUK2 physical input timing differs')
-    expected_frames=(AUTHENTICATED_FRAME,PUK2_PROMPT_FRAME,*PIN2_CHANGE_FRAMES[2:4],CODE_ERROR_FRAME if wrong else PIN_ACCEPTED_FRAME)
+    expected_frames=(AUTHENTICATED_FRAME,PUK2_PROMPT_FRAME,*PIN2_CHANGE_FRAMES[2:4],
+                     PIN2_REJECTED_FRAME if wrong and remaining==0 else CODE_ERROR_FRAME if wrong else PIN_ACCEPTED_FRAME)
     if tuple(hashlib.sha256(frame).hexdigest() for frame in frames)!=expected_frames:
         raise ValueError('PUK2 prompt/new-PIN/confirmation/result frames differ')
     return dict(puk2_verified=not wrong,wrong_puk2_rejected=wrong,sim_pin2_recovered=not wrong,

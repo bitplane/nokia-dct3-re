@@ -94,7 +94,7 @@ The archive calls the phone 5110i; both headers identify `NSE-2`, `05.53`,
 | GENSIO/CCONT | Own `296704`: select `22` at `28`, TX `2a`, RX `2d`, status `29` bit 2. | Shared serial grammar, not measured electrical timing. |
 | LCD | Own `296e46/296eac`: command/data `2c/2b`, ready bit 0. | Observed 84x48 presentation; fitted controller identity remains unproved. |
 | Keypad | Scanner `29806c`, decoder `299010`, maps `2b382c/2b3848`, selector `10c6b6`; five rows, signal/direction `31/2f`, columns `30`, IRQ mask `33`. | Existing NSE-1 contact layout matches own table; digits 1--5 and Menu have runtime decode acceptance. |
-| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/retry exhaustion/PUK1 recovery, PIN2 change/cold reverse change/retry exhaustion/PUK2 recovery, organic ADN write and cold contact readback pass. | PIN1 change, permanent PUK2 exhaustion and FDN remain unqualified; the Nokia phone code is phone-side. |
+| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/retry exhaustion/PUK1 recovery, PIN2 change/retry exhaustion/PUK2 recovery/permanent refusal, organic ADN write and cold contact readback pass. | PIN1 change and FDN remain unqualified; the Nokia phone code is phone-side. |
 
 EEPROM START/STOP entry points are `295814/295886`, identified by SDA
 transitions while SCL is high. Block reader `293d92` takes address,
@@ -392,7 +392,25 @@ Correct PUK2 on that saved card restores PIN2 attempts to three and PUK2
 attempts to ten, changes PIN2 to `2468`, and is followed by automatic VERIFY.
 The final cold reverse CHANGE accepts `2468`. Every saved-card transition
 checks the whole input card; PIN1 and PUK1 are independent of this retry path.
-Permanent loss after exhausting all ten PUK2 attempts remains separate.
+Permanent loss is covered by the separate exhaustion gate below.
+
+`verify-5110i-puk2-exhaustion` supplies that separate permanent-loss proof.
+It first rebuilds organic PIN2 blocking, then links ten fresh wrong-PUK2
+processes from ten attempts down to zero. Each source path/hash and complete
+card transition are checked; only the PUK2 retry byte may change. The final
+UNBLOCK returns `9840` and renders `PIN2 code rejected`, distinct from
+recoverable `Code error`. No automatic VERIFY follows a rejection.
+
+A final cold process imports the complete permanent card, completes the
+ordinary SIM read bootstrap and phone-code authentication, and physically
+selects Change PIN2. It shows the permanent refusal, returns to the Change
+PIN2 menu item, and a later physical Down press decodes as key `18` and
+moves to Change security code. No security APDU is submitted and every card
+byte is unchanged. This establishes persistent refusal and responsive
+unrelated menus, not whole-SIM rejection or PIN1 authentication (PIN1 is
+disabled in this fixture). Root `stages.json` retains the predecessor chain;
+root acceptance is written only after all ten rejections and the cold control
+pass. Native RF and the later restart remain outside this software claim.
 
 ### Physical contact save
 
