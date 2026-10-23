@@ -2433,6 +2433,14 @@
                  "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--security-code", "--phone-retry-zero", "--seconds", "20"]}]
     },
     {
+      "name": "verify-5110i-menu",
+      "prerequisites": ["verify-5110i-static", "build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_nse2_native.py",
+                 "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--security-code", "--phone-retry-zero", "--post-auth-menu", "--seconds", "24"]}]
+    },
+    {
       "name": "verify-6150-static",
       "prerequisites": [],
       "variables": {},

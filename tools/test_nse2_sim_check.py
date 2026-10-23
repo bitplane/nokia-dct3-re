@@ -2,7 +2,7 @@ import hashlib
 import unittest
 from unittest.mock import patch
 
-from tools.nse2_sim_check import BINARY_FILES, verify_sim_reads, verify_security_attempt
+from tools.nse2_sim_check import BINARY_FILES, verify_sim_reads, verify_security_attempt, verify_post_auth_menu
 
 
 def reads():
@@ -32,6 +32,25 @@ def contacts():
 
 
 class SimCheckTest(unittest.TestCase):
+    def test_post_auth_menu_checks_physical_decode_and_both_frames(self):
+        text = '\n'.join(f'nse2_post_auth_contact: index={i} down={down} t={time} physical_only=1'
+                         for i, down, time in ((1, 1, 20), (1, 0, 20.2), (2, 1, 22), (2, 0, 22.2)))
+        for time in (20.1, 22.1):
+            text += f'\nnse2_key_decode: raw=11 key=19 pc=00299044 t={time} observer_writes=0'
+        pixels = bytes([255]) * (84 * 48)
+        digest = hashlib.sha256(pixels).hexdigest()
+        with patch('tools.nse2_sim_check.PHONEBOOK_MENU_FRAME', digest), \
+                patch('tools.nse2_sim_check.PHONEBOOK_SUBMENU_FRAME', digest):
+            result = verify_post_auth_menu(text, pixels, pixels)
+            self.assertTrue(result['application_menu'])
+            self.assertFalse(result['contact_persistence'])
+            self.assertFalse(result['network_registration'])
+            for bad in (text.replace('key=19', 'key=18'), text.replace('t=22.2', 't=23.2')):
+                with self.assertRaises(ValueError):
+                    verify_post_auth_menu(bad, pixels, pixels)
+            with self.assertRaisesRegex(ValueError, 'submenu differs'):
+                verify_post_auth_menu(text, pixels, bytes(84 * 48))
+
     def check_reads(self, text):
         with patch('tools.nse2_sim_check.SECURITY_FRAME', hashlib.sha256(b'frame').hexdigest()):
             return verify_sim_reads(text, b'frame')

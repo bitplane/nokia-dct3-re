@@ -13,7 +13,7 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.run_nse2_boundary import prepare
 from tools.nse2_native_check import verify_native, verify_menu_probe, verify_nominal_voltage
-from tools.nse2_sim_check import verify_sim_reads, verify_security_attempt
+from tools.nse2_sim_check import verify_sim_reads, verify_security_attempt, verify_post_auth_menu
 
 
 MASK_INPUTS = (
@@ -78,6 +78,7 @@ def main():
     parser.add_argument('--physical-menu', action='store_true', help='press only the physical Menu contacts')
     parser.add_argument('--security-code', action='store_true', help='one physical 12345 + OK experiment')
     parser.add_argument('--phone-retry-zero', action='store_true', help='explicit own-record zero-attempt NV fixture')
+    parser.add_argument('--post-auth-menu', action='store_true', help='physical Menu probe after accepted phone code')
     parser.add_argument('--seconds', type=int, default=8, choices=range(8, 121), metavar='8..120')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -90,6 +91,8 @@ def main():
             raise ValueError('security experiment requires inserted SIM, at least 18 seconds, and no Menu probe')
         if args.phone_retry_zero and not args.security_code:
             raise ValueError('retry fixture requires the physical security-code experiment')
+        if args.post_auth_menu and not (args.phone_retry_zero and args.seconds >= 24):
+            raise ValueError('post-auth Menu probe requires zero-attempt fixture and at least 24 seconds')
         report = prepare_native(root, run, record_checksum=args.record_checksum_only,
                                 nominal_vbat=args.nominal_vbat, insert_sim=args.insert_sim,
                                 phone_retry_zero=args.phone_retry_zero)
@@ -99,7 +102,8 @@ def main():
                    '-video', 'none', '-sound', 'none', '-joystickprovider', 'none',
                    '-midiprovider', 'none', '-nothrottle', '-noreadconfig', '-log', '-verbose',
                    '-seconds_to_run', str(args.seconds), '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools' / ('nse2_security_fixture.lua' if args.security_code else
+                   '-autoboot_script', str(root / 'tools' / ('nse2_post_auth_fixture.lua' if args.post_auth_menu else
+                       'nse2_security_fixture.lua' if args.security_code else
                        'nse2_menu_fixture.lua' if args.physical_menu else 'nse2_boot_observe.lua'))]
         with mame.open('rb') as stream:
             report['mame_sha256'] = hashlib.file_digest(stream, 'sha256').hexdigest()
@@ -132,8 +136,14 @@ def main():
             if args.security_code:
                 with Image.open(run / 'snap/nse2_security_result.png') as frame:
                     result.update(verify_security_attempt(text, frame.convert('L').tobytes(), retry_zero=args.phone_retry_zero))
+            if args.post_auth_menu:
+                with Image.open(run / 'snap/nse2_post_auth_21.png') as menu, \
+                        Image.open(run / 'snap/nse2_post_auth_23.png') as submenu:
+                    result.update(verify_post_auth_menu(text, menu.convert('L').tobytes(), submenu.convert('L').tobytes()))
         (run / 'acceptance.json').write_text(json.dumps(result, indent=2) + '\n')
-        if args.insert_sim:
+        if args.post_auth_menu:
+            print('NSE-2 physical Phone book menu/submenu PASS; contact persistence and network unproved')
+        elif args.insert_sim:
             print('NSE-2 SIM read bootstrap PASS; ' +
                   ('phone code accepted, application UI unproved' if args.phone_retry_zero else
                    'phone-code authentication remains unproved'))

@@ -5,6 +5,8 @@ import re
 SECURITY_FRAME = 'ec2809a9dff350a769c7315f5fc3b2a8fb29e534595c2b3c2a7dc0f6cc4f9466'
 CODE_ERROR_FRAME = '042030d4e6f3a8e75d15f45e5ef6ea8cff68f50038e98d2d7a76cb64c489f6a9'
 AUTHENTICATED_FRAME = 'df66881e695c25b4a157c80b40cf56ad246bb45a9d54c1054264222a639db931'
+PHONEBOOK_MENU_FRAME = 'eba0749f25b43e63dea723e7ca8e8f1051385648fa90278af2de39659c04989e'
+PHONEBOOK_SUBMENU_FRAME = '8e39080ec840c45849dbc34110a5b800de17726429b62d58f0fc2e0b4a227369'
 BINARY_FILES = {0x6fb7: 15, 0x6fae: 1, 0x6f05: 4, 0x6fad: 3,
                 0x6f38: 12, 0x6f07: 9, 0x6f78: 2, 0x2fe6: 4,
                 0x6f46: 17, 0x6f74: 16, 0x6f7e: 11, 0x6f30: 24,
@@ -92,3 +94,28 @@ def verify_security_attempt(text, pixels, *, retry_zero=False):
                 exact_editor_buffer_unproved=False, usable_boot=False,
                 submitted_code_matches_cached_record=True, retry_counter=0 if retry_zero else 255,
                 rejection_boundary=None if retry_zero else 'own retry guard at 29461c')
+
+
+def verify_post_auth_menu(text, menu_pixels, submenu_pixels):
+    contacts = re.findall(r'nse2_post_auth_contact: index=([12]) down=([01]) t=([0-9.]+) physical_only=1', text)
+    if [(int(i), int(down)) for i, down, _ in contacts] != [(1, 1), (1, 0), (2, 1), (2, 0)]:
+        raise ValueError('NSE-2 post-authentication physical Menu sequence missing')
+    decoded = re.findall(r'nse2_key_decode: raw=11 key=19 pc=00299044 t=([0-9.]+) observer_writes=0', text)
+    for i, expected in enumerate((20, 22)):
+        start, end = float(contacts[2 * i][2]), float(contacts[2 * i + 1][2])
+        if not expected <= start < expected + 0.04 or not 0.18 <= end - start <= 0.24:
+            raise ValueError('NSE-2 post-authentication Menu timing differs')
+        if not any(start <= float(time) <= end for time in decoded):
+            raise ValueError('NSE-2 post-authentication Menu did not reach own decoder')
+    if len(menu_pixels) != 84 * 48 or len(submenu_pixels) != 84 * 48:
+        raise ValueError('NSE-2 post-authentication frame dimensions differ')
+    masked = bytearray(menu_pixels)
+    # Exclude the animated Phone book icon, retaining title, softkey and scrollbar.
+    for y in range(20, 38):
+        masked[y * 84:y * 84 + 76] = bytes([255]) * 76
+    if hashlib.sha256(masked).hexdigest() != PHONEBOOK_MENU_FRAME:
+        raise ValueError('NSE-2 reviewed Phone book menu differs')
+    if hashlib.sha256(submenu_pixels).hexdigest() != PHONEBOOK_SUBMENU_FRAME:
+        raise ValueError('NSE-2 reviewed Search/Add name/Erase submenu differs')
+    return dict(application_menu=True, phonebook_submenu=True, contact_persistence=False,
+                usable_boot=True, network_registration=False)

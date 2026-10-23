@@ -10,8 +10,10 @@ inserted, firmware completes SIM read bootstrap and presents **Security code**.
 One physical `12345` + OK attempt matches the cached code but the erased
 retry counter rejects it, producing **Code error**. A separate one-byte
 zero-attempt NV fixture lets the same physical code return `accepted=1`.
-Its resulting frame has placeholder-like glyphs: persistent contacts,
-application-menu, registration, calls and SMS are not accepted.
+The seventeen-second frame has transient placeholder-like glyphs; by
+nineteen seconds a Menu softkey is visible. Physical Menu presses then open
+**Phone book** and **Search / Add name / Erase**. Persistent contacts,
+registration, calls and SMS are not accepted.
 Fitted mask identity, DSP clock and measured board calibration are unproved.
 
 The ordinary `noki5110i` profile remains unchanged: erased EEPROM and a
@@ -20,8 +22,8 @@ DSP but retains open-pin ADC2; it completes DSP startup while the analog
 readiness counter cannot drain. These are explicit controls, not alternative
 claims of usable boot.
 
-Next: identify the post-authentication UI/context and invalid NV consumers;
-keep integrity-only rejection as a negative control.
+Next: exercise contact creation/readback and cold persistence with physical
+input; keep integrity-only rejection as a negative control.
 Do not substitute donor EEPROM, force firmware state, or claim phone service
 from the graphical prompt or key decode alone.
 
@@ -43,6 +45,7 @@ make verify-5110i-nominal-input RUN_DIR=tmp/nse2-nominal-input
 make verify-5110i-sim-bootstrap RUN_DIR=tmp/nse2-sim-bootstrap
 make verify-5110i-phonecode-boundary RUN_DIR=tmp/nse2-phonecode-boundary
 make verify-5110i-phonecode-accept RUN_DIR=tmp/nse2-phonecode-accept
+make verify-5110i-menu RUN_DIR=tmp/nse2-menu
 ```
 
 The nominal boot gate requires the reviewed unattended seven-second frame
@@ -69,8 +72,8 @@ The archive calls the phone 5110i; both headers identify `NSE-2`, `05.53`,
 | EEPROM | Header `f4`: two address bytes, 32-byte pages, 8 KiB; SDA/SCL are bits 0/2 at signal/direction `20020/20024`. | Native 24C64 is descriptor-compatible; no own factory dump or measured write latency. |
 | GENSIO/CCONT | Own `296704`: select `22` at `28`, TX `2a`, RX `2d`, status `29` bit 2. | Shared serial grammar, not measured electrical timing. |
 | LCD | Own `296e46/296eac`: command/data `2c/2b`, ready bit 0. | Observed 84x48 presentation; fitted controller identity remains unproved. |
-| Keypad | Scanner `29806c`, decoder `299010`, maps `2b382c/2b3848`, selector `10c6b6`; five rows, signal/direction `31/2f`, columns `30`, IRQ mask `33`. | Existing NSE-1 contact layout matches own table; only Menu has runtime decode acceptance here. |
-| SIMI | Own `286520` initializes standard IIR/FIFO controls; inserted synthetic card completes read bootstrap. | Phone-code authentication and persistent contacts remain unaccepted. |
+| Keypad | Scanner `29806c`, decoder `299010`, maps `2b382c/2b3848`, selector `10c6b6`; five rows, signal/direction `31/2f`, columns `30`, IRQ mask `33`. | Existing NSE-1 contact layout matches own table; digits 1--5 and Menu have runtime decode acceptance. |
+| SIMI | Own `286520` initializes standard IIR/FIFO controls; inserted synthetic card completes read bootstrap. | Persistent contacts and SIM PIN authentication remain unaccepted; the tested phone code is phone-side. |
 
 EEPROM START/STOP entry points are `295814/295886`, identified by SDA
 transitions while SCL is high. Block reader `293d92` takes address,
@@ -228,14 +231,22 @@ result. With only initial EEPROM `04a4=00`, the same physical `12345` reaches
 the same matching comparison, passes the retry guard and returns `accepted=1`
 at `2946b2`. Two independent cold runs reproduce the seventeen-second frame
 hash `df66881e695c25b4a157c80b40cf56ad246bb45a9d54c1054264222a639db931`.
-That frame contains placeholder-like glyphs, not an accepted idle/menu UI.
+That frame contains placeholder-like glyphs and is not itself an idle/menu
+oracle. It is transient: at nineteen seconds a Menu softkey is present.
 This explicitly synthetic retry fixture is not authentic factory provisioning;
 it neither supplies a donor identity nor changes the cached counter/result.
 
+Two physical Menu contacts at 20/22 seconds reach raw 11 / key `19` and open
+Phone book followed by Search / Add name / Erase. The menu acceptance masks
+only the animated icon rectangle `(0,20,76,18)`, retaining title, softkey and
+scrollbar; the static submenu is checked byte-exactly. This establishes
+application navigation, not contact writes, registration or speech. The
+ordinary silent and open-pin controls remain unchanged.
+
 ## Remaining work
 
-1. Recover post-authentication UI/context and verify persistent contacts
-   with physical input; a successful verifier return does not establish either.
+1. Verify contact creation/readback and cold persistence with physical input;
+   menu navigation alone does not establish these.
 2. Recover semantic EEPROM requirements from their own consumers; retain
    integrity-only fixtures as diagnostic inputs, not factory defaults.
 3. Qualify application/menu behavior and longer lifecycle/save-state tests.
