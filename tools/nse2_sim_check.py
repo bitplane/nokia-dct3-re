@@ -23,6 +23,8 @@ PIN2_CHANGE_FRAMES=(AUTHENTICATED_FRAME,'dcb11fd985f9fadefab2e1aece85f5c36be7243
                    '78852f434f196bba8c74f94f888c21f47962425559a7f6b18c7932af85116b1e',
                    '859255eea46cf0fcf25c17b9fcf86a9a41e2476ffc3ba6b5eb999adc162a7426',
                    '2ee325765504951d8758a418ae0fa0e90c8252d9fd6234fba603eef0360e811e')
+PIN2_BLOCKED_FRAME='8743820344d395aaf8c7701cf0085c7cad646e06c0b4dcef3bb8979c953b594f'
+PUK2_PROMPT_FRAME='e293d1f5987c36caea43654daa9615a5990cce239403d6f1c3a15e842c184089'
 BINARY_FILES = {0x6fb7: 15, 0x6fae: 1, 0x6f05: 4, 0x6fad: 3,
                 0x6f38: 12, 0x6f07: 9, 0x6f78: 2, 0x2fe6: 4,
                 0x6f46: 17, 0x6f74: 16, 0x6f7e: 11, 0x6f30: 24,
@@ -300,26 +302,26 @@ def verify_puk_recovery(text, initial, final, prompt_pixels, final_pixels):
     return dict(puk_verified=True,pin_attempts_remaining=3,phone_code_authenticated=False,network_registration=False)
 
 
-def verify_pin2_input(card,*,restore=False):
+def verify_pin2_input(card,*,restore=False,blocked=False):
     from tools.make_sim_card_profile import make_profile
     from tools.sim_security_trace_check import CHV_OFFSET,AOC_NVRAM_SIZE,ATTEMPTS_OFFSET
     expected=bytearray(make_profile(False))
     if restore:
         expected[CHV_OFFSET+8:CHV_OFFSET+16]=b'2468\xff\xff\xff\xff'
-    if len(card)<=ATTEMPTS_OFFSET+1 or card[ATTEMPTS_OFFSET+1] not in (1,2,3):
+    if len(card)<=ATTEMPTS_OFFSET+1 or card[ATTEMPTS_OFFSET+1] not in ((0,) if blocked else (1,2,3)):
         raise ValueError('unqualified initial PIN2 retry lifecycle')
     expected[ATTEMPTS_OFFSET+1]=card[ATTEMPTS_OFFSET+1]
     if len(card) not in (len(expected),AOC_NVRAM_SIZE) or card[:len(expected)]!=expected:
         raise ValueError('PIN2 change requires the declared PIN-disabled laboratory card and qualified credential')
-    if restore and len(card)!=AOC_NVRAM_SIZE:
-        raise ValueError('cold PIN2 restoration requires the complete saved changed card')
+    if (restore or blocked) and len(card)!=AOC_NVRAM_SIZE:
+        raise ValueError('cold PIN2 lifecycle requires the complete saved predecessor card')
     return card[ATTEMPTS_OFFSET+1]
 
 
 def verify_pin2_change(text,initial,final,frames,*,restore=False,wrong=False):
     from tools.sim_security_trace_check import CHV_OFFSET,AOC_NVRAM_SIZE,statuses,ATTEMPTS_OFFSET
     before=verify_pin2_input(initial,restore=restore)
-    if wrong and (restore or before<2):
+    if wrong and restore:
         raise ValueError('unqualified PIN2 wrong-code lifecycle')
     expected=bytearray(initial)
     if not wrong:
@@ -331,7 +333,7 @@ def verify_pin2_change(text,initial,final,frames,*,restore=False,wrong=False):
     headers=[m.groups() for m in HEADER.finditer(text) if int(m[2],16) in (0x20,0x24,0x2c)]
     if len(headers)!=1 or headers[0][:5]!=('a0','24','00','02','10') or not 29<float(headers[0][-1])<29.5:
         raise ValueError('physical PIN2 CHANGE header/timing differs')
-    if statuses(text,0x24,chv=2)!=[(0x9804 if wrong else 0x9000,remaining,10)]:
+    if statuses(text,0x24,chv=2)!=[(0x9840 if wrong and remaining==0 else 0x9804 if wrong else 0x9000,remaining,10)]:
         raise ValueError('PIN2 CHANGE did not succeed with intact retries')
     contacts=re.findall(r'nse2_pin2_contact: event=(\d+) down=([01]) t=([0-9.]+) physical_only=1',text)
     if [(int(i),int(d)) for i,d,_ in contacts]!=[(i,i%2) for i in range(1,63)]:
@@ -339,12 +341,33 @@ def verify_pin2_change(text,initial,final,frames,*,restore=False,wrong=False):
     times=[float(t) for _,_,t in contacts]
     if times!=sorted(times) or not 18.4<times[0]<18.6 or not 29<times[-1]<29.4:
         raise ValueError('PIN2 physical navigation/entry timing differs')
-    expected_frames=PIN2_CHANGE_FRAMES[:-1]+(CODE_ERROR_FRAME,) if wrong else PIN2_CHANGE_FRAMES
+    expected_frames=PIN2_CHANGE_FRAMES[:-1]+(PIN2_BLOCKED_FRAME if remaining==0 else CODE_ERROR_FRAME,) if wrong else PIN2_CHANGE_FRAMES
     if tuple(hashlib.sha256(frame).hexdigest() for frame in frames)!=expected_frames:
         raise ValueError('PIN2 change prompt/result frames differ')
-    return dict(sim_pin2_changed=not wrong,pin2_wrong_rejected=wrong,pin2_attempts_before=before,pin2_attempts_remaining=remaining,
+    return dict(sim_pin2_changed=not wrong,pin2_wrong_rejected=wrong,sim_pin2_blocked=remaining==0,
+                pin2_attempts_before=before,pin2_attempts_remaining=remaining,
                 cold_replacement_pin2_accepted=restore,sim_pin1_enabled=False,
                 legacy_profile_expanded=len(initial)!=len(final),whole_input_card_checked=len(initial)==len(final),
+                network_registration=False,stable_long_boot=False)
+
+
+def verify_pin2_blocked(text,initial,final,frames):
+    from tools.sim_security_trace_check import AOC_NVRAM_SIZE,statuses
+    verify_pin2_input(initial,blocked=True)
+    if len(initial)!=AOC_NVRAM_SIZE or final!=initial:
+        raise ValueError('cold blocked PIN2 card changed or was not a complete predecessor')
+    if any(int(m[2],16) in (0x20,0x24,0x2c) for m in HEADER.finditer(text)) or any(statuses(text,i,chv=2) for i in (0x20,0x24,0x2c)):
+        raise ValueError('cold PIN2 prompt control unexpectedly submitted credentials')
+    contacts=re.findall(r'nse2_pin2_contact: event=(\d+) down=([01]) t=([0-9.]+) physical_only=1',text)
+    if [(int(i),int(d)) for i,d,_ in contacts]!=[(i,i%2) for i in range(1,33)]:
+        raise ValueError('cold blocked PIN2 navigation differs')
+    times=[float(t) for _,_,t in contacts]
+    if times!=sorted(times) or not 18.4<times[0]<18.6 or not 23.8<times[-1]<24:
+        raise ValueError('cold blocked PIN2 navigation timing differs')
+    expected=(AUTHENTICATED_FRAME,PIN2_BLOCKED_FRAME,PIN2_BLOCKED_FRAME,PUK2_PROMPT_FRAME,PUK2_PROMPT_FRAME)
+    if tuple(hashlib.sha256(frame).hexdigest() for frame in frames)!=expected:
+        raise ValueError('cold PIN2 blocked-notice/PUK2 prompt frames differ')
+    return dict(sim_pin2_blocked=True,puk2_prompt=True,puk2_verified=False,card_unchanged=True,
                 network_registration=False,stable_long_boot=False)
 
 

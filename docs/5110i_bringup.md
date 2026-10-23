@@ -94,7 +94,7 @@ The archive calls the phone 5110i; both headers identify `NSE-2`, `05.53`,
 | GENSIO/CCONT | Own `296704`: select `22` at `28`, TX `2a`, RX `2d`, status `29` bit 2. | Shared serial grammar, not measured electrical timing. |
 | LCD | Own `296e46/296eac`: command/data `2c/2b`, ready bit 0. | Observed 84x48 presentation; fitted controller identity remains unproved. |
 | Keypad | Scanner `29806c`, decoder `299010`, maps `2b382c/2b3848`, selector `10c6b6`; five rows, signal/direction `31/2f`, columns `30`, IRQ mask `33`. | Existing NSE-1 contact layout matches own table; digits 1--5 and Menu have runtime decode acceptance. |
-| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/retry exhaustion/PUK1 recovery, ordinary PIN2 change/cold reverse change, organic ADN write and cold contact readback pass. | PIN1 change, PIN2 exhaustion/PUK2 and FDN remain unqualified; the Nokia phone code is phone-side. |
+| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/retry exhaustion/PUK1 recovery, PIN2 change/cold reverse change/retry exhaustion and cold PUK2 prompt, organic ADN write and cold contact readback pass. | PIN1 change, PUK2 recovery/exhaustion and FDN remain unqualified; the Nokia phone code is phone-side. |
 
 EEPROM START/STOP entry points are `295814/295886`, identified by SDA
 transitions while SCL is high. Block reader `293d92` takes address,
@@ -352,6 +352,17 @@ PIN2 to `2468` and restores its three retries with `9000`. The final cold
 reverse change accepts `2468` and restores `5678`. Both cold stages compare
 the complete card, not only the legacy credential prefix. The checker reads
 the CHV2 retry field explicitly; the unchanged CHV1 count is not a proxy.
+
+`verify-5110i-pin2-blocked` chains three actual wrong CHANGE transactions,
+persisting retry counts two, one and zero. The final status is `9840`
+instead of `9804`, and the final frame is `PIN2 code blocked`. PIN2 itself,
+PIN1 retries and both PUKs remain unchanged. A fresh fourth process imports
+the complete zero-retry card, authenticates the phone and navigates to
+Change PIN2 without submitting credentials. Its earlier frames show the
+blocked notice; later frames show `Enter PUK2 code`. No VERIFY, CHANGE or
+UNBLOCK is sent in that cold control, and every card byte is unchanged.
+This proves organic PIN2 blocking and its cold recovery prompt, not PUK2
+authentication or recovery.
 
 ### Physical contact save
 

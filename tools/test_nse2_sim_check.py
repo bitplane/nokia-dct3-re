@@ -34,6 +34,25 @@ def contacts():
 
 
 class SimCheckTest(unittest.TestCase):
+    def test_pin2_cold_blocked_control_requires_puk2_prompt_and_unchanged_card(self):
+        from tools.nse2_sim_check import verify_pin2_blocked
+        from tools.make_sim_card_profile import make_profile
+        from tools.sim_security_trace_check import AOC_NVRAM_SIZE,ATTEMPTS_OFFSET
+        card=bytearray(make_profile(False).ljust(AOC_NVRAM_SIZE,b'\xff'))
+        card[ATTEMPTS_OFFSET+1]=0
+        frames=[b'idle',b'blocked',b'blocked',b'puk2',b'puk2']
+        text='\n'.join(f'nse2_pin2_contact: event={i} down={i%2} t={18.5+(i-1)*.175:.3f} physical_only=1' for i in range(1,33))
+        hashes={name:hashlib.sha256(value).hexdigest() for name,value in (
+            ('AUTHENTICATED_FRAME',b'idle'),('PIN2_BLOCKED_FRAME',b'blocked'),('PUK2_PROMPT_FRAME',b'puk2'))}
+        with patch.multiple('tools.nse2_sim_check',**hashes):
+            self.assertTrue(verify_pin2_blocked(text,card,card,frames)['puk2_prompt'])
+            changed=bytearray(card)
+            changed[-1]^=1
+            with self.assertRaises(ValueError):
+                verify_pin2_blocked(text,card,changed,frames)
+            with self.assertRaises(ValueError):
+                verify_pin2_blocked(text+'\nSIM status ins=2c sw=9000 chv=3/3 puk=10/10 enabled=0',card,card,frames)
+
     def test_pin2_change_and_cold_reverse_require_exact_card_transition(self):
         from tools.nse2_sim_check import verify_pin2_change
         from tools.make_sim_card_profile import make_profile
@@ -59,6 +78,15 @@ class SimCheckTest(unittest.TestCase):
                 for bad in (error_text.replace('chv=3/2','chv=2/3'),error_text.replace('sw=9804','sw=9000')):
                     with self.assertRaises(ValueError):
                         verify_pin2_change(bad,initial,rejected,frames[:-1]+[b'error'],wrong=True)
+            last=bytearray(rejected)
+            last[ATTEMPTS_OFFSET+1]=1
+            blocked=bytearray(last)
+            blocked[ATTEMPTS_OFFSET+1]=0
+            blocked_text=error_text.replace('sw=9804 chv=3/2','sw=9840 chv=3/0')
+            with patch('tools.nse2_sim_check.PIN2_BLOCKED_FRAME',hashlib.sha256(b'blocked').hexdigest()):
+                self.assertEqual(verify_pin2_change(blocked_text,last,blocked,frames[:-1]+[b'blocked'],wrong=True)['pin2_attempts_remaining'],0)
+                with self.assertRaises(ValueError):
+                    verify_pin2_change(blocked_text.replace('sw=9840','sw=9804'),last,blocked,frames[:-1]+[b'blocked'],wrong=True)
             result=verify_pin2_change(text,rejected,changed,frames)
             self.assertEqual((result['pin2_attempts_before'],result['pin2_attempts_remaining']),(2,3))
             rejected[-1]^=1

@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nse2_pin2_exhaustion_cold_puk2_prompt", "owner": "nse2_sim_security", "status": "satisfied",
+      "predicate": "Three physical wrong PIN2 CHANGE transactions exhaust retries, and the complete saved card cold-boots into a physically reached PUK2 prompt without mutation",
+      "current": "verify-5110i-pin2-blocked links four independent processes. The first three submit old PIN2 5675 and both new-PIN confirmations through real menus, receiving 9804/9804/9840 and persisting CHV2 retries 2/1/0 without changing PIN2, PIN1 retries, PUKs or other supplied storage. The fourth imports the complete zero-retry card, accepts the phone code and physically navigates to Change PIN2. It shows PIN2 code blocked then Enter PUK2 code, submits no VERIFY/CHANGE/UNBLOCK, and preserves every card byte. PUK2 authentication/recovery, FDN, native RF and long-run stability remain unproved.",
+      "evidence": ["docs/5110i_bringup.md", "gates.json", "tools/nse2_pin2_fixture.lua", "tools/nse2_pin2_wrong_fixture.lua", "tools/nse2_pin2_blocked_fixture.lua", "tools/nse2_sim_check.py", "tools/test_nse2_sim_check.py"]
+    },
+    {
       "id": "nse2_physical_pin2_change_cold_acceptance", "owner": "nse2_sim_security", "status": "satisfied",
       "predicate": "Physical NSE-2 security-menu input changes PIN2, accounts for rejection and cold retry restoration, and accepts the persisted replacement credential for a reverse change",
       "current": "verify-5110i-pin2-change changes 5678 to 2468 through one successful A0 24 00 02 10 and cold-restores 5678. verify-5110i-pin2-retry separately submits wrong old PIN2 5675 with both new-PIN confirmations: 9804 and Code error preserve the credential and change only CHV2 retries from three to two. A fresh process imports that exact card, correctly changes PIN2 and restores three retries; a final cold process accepts the replacement for reverse change. Both cold stages check the complete input card. Initial legacy profiles are checked across their supplied regions and expanded by the device. Each process checks five exact frames, one CHANGE and 62 physical contact edges. This uses own diagnostic NV and an explicit phone retry fixture, and proves ordinary CHV2 persistence/retry handling, not PUK2/exhaustion, FDN, native registration, speech or long-run stability.",

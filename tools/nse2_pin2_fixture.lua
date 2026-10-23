@@ -6,7 +6,7 @@ local mapping={['1']={2,2},['2']={3,2},['3']={4,2},['4']={2,4},['5']={3,4},['6']
 local old,new='5678','2468'
 if _G.nse2_pin2_restore then old,new=new,old end
 if _G.nse2_pin2_wrong then old='5675' end
-local sequence='MDDDMDDMDDDDMDDM'..old..'M'..new..'M'..new..'M'
+local sequence='MDDDMDDMDDDDMDDM'..(_G.nse2_pin2_prompt_only and '' or old..'M'..new..'M'..new..'M')
 local events={}
 for i=1,#sequence do
     local key=mapping[sequence:sub(i,i)]
