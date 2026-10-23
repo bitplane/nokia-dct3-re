@@ -1295,6 +1295,19 @@ discovery, not a required response, physical baud or radio-completion
 dependency. RAM addresses in this trace are reused allocations; do not
 treat every earlier write to `101420/101438` as the same object's lifetime.
 
+Primary family-level hardware evidence supports an accessory-serial
+interpretation, not an RF-mode label: Nokia's NSE-3 System Module manual,
+Original 11/97, page 3-45, connects FBUS/infrared to MAD's AccIF and lists
+9.6, 19.2, 38.4, 57.6 and 115.2 kbit/s IR rates
+([source](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/6110/03SYS%20%5B73%5D.pdf)).
+This is a related-product architecture reference, not the NSE-2 register
+specification: it neither maps DSP I/O `34/35/36` to AccIF nor defines
+control `0080`, status `1000/2000/4000`, interrupt routing or byte packing.
+AccIF is therefore a candidate physical owner, not a promoted device name.
+Multiple supported rates also rule out deriving the configured clock merely
+from an `1e` packet marker. Recover the register/clock selection or a matched
+trace before attaching a serial completion timer or selecting 115,200 baud.
+
 The nine-second service run's native opcode fingerprint is 564 exact forms
 in 101 high-byte groups, SHA-256
 `2214638d14968de30e21a3c62fd9305a00716965ce8568658263cae6f186fede`.
