@@ -14,7 +14,11 @@ if __package__ in (None, ''):
 from tools.run_nse2_boundary import prepare
 from tools.nse2_native_check import verify_native, verify_menu_probe, verify_nominal_voltage
 from tools.nse2_sim_check import verify_sim_reads, verify_security_attempt, verify_post_auth_menu
-from tools.nse2_lifecycle_check import diagnose_processing, diagnose_schedule, diagnose_transport, diagnose_scan_progress
+from tools.nse2_lifecycle_check import (
+    diagnose_processing, diagnose_schedule, diagnose_transport,
+    diagnose_scan_progress, diagnose_host_packets,
+)
+from tools.nse2_native_result_check import inspect_capture
 
 
 MASK_INPUTS = (
@@ -149,6 +153,11 @@ def main():
             result['native_processing_boundary'] = dict(diagnose_schedule(text), **diagnose_transport(text))
             result['native_processing_boundary']['processing'] = diagnose_processing(text)
             result['native_processing_boundary']['measurement'] = diagnose_scan_progress(text)
+            result['native_processing_boundary']['host_packets'] = diagnose_host_packets(text)
+            result['native_processing_boundary']['result_paths'] = inspect_capture(
+                (run / 'nse2_native_program.bin').read_bytes(),
+                (run / 'roms' / machine / 'nse1_rom4_dsp_program.bin').read_bytes(),
+                (run / 'roms' / machine / 'nse1_rom4_dsp_data.bin').read_bytes())
         (run / 'acceptance.json').write_text(json.dumps(result, indent=2) + '\n')
         if args.post_auth_menu:
             print('NSE-2 physical Phone book menu/submenu PASS; contact persistence and network unproved')

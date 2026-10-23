@@ -327,6 +327,50 @@ cadence or proof of valid RF acquisition. No further RX publication follows.
 The next native question is processing/completion eligibility and its
 external sample contract, not synthesizing a work bit or guessed ack.
 
+### Result paths and complete host coverage
+
+The processing fixture captures all 65,536 live page-zero program words at
+seven seconds in `nse2_native_program.bin`. Its result audit reuses the
+existing ROM4 publisher census and companion-mask qualification rather
+than importing the sibling handset's uploaded addresses. The checked
+snapshot retains nineteen raw direct CALLD candidates for `37ce`, no
+direct B/BD candidates, and the same direct sites as the acquired mask.
+This excludes neither indirect transfers nor other pages or direct ring
+writes, and is not an autonomous-producer absence proof.
+
+The type-`8b` publisher is `47f6`, loading type `008b` at `47ff` and
+calling `37ce` at `4810` with 162 payload bytes. Its three page-zero direct
+caller candidates are `0a17`, `3cab` and `6d7e`. The first follows the
+nested measurement loop; this own overlay uses `0a17`, not the sibling
+NSK-1 upload's `0a2c`. Companion table `b00f + 4b` selects `3c92`, which
+reaches `3cab`: it is an explicit host-query path. The other caller is
+behind the `06bc` mask-`0100` test at `6d19` and `06ab==0` at `6d6f`.
+None of these static paths establishes an unconditional periodic packet.
+The separate serial publisher retains its existing queued-data contract.
+
+Host capture checks every pointer advance and payload length against the
+final consumer-write count. All 21 consumed packets through thirty seconds
+are covered; observed types are `05/0d/1a/3c/51/70`, with no `4b` in this
+window. The 154-byte type-`3c` packet is valid in the 82-word ring; a former
+128-byte probe cap omitted it. The bound now covers all 160 payload bytes
+the ring can hold, and invalid/skipped/discontinuous records fail coverage.
+This runtime absence is not a ROM-wide producer exclusion.
+
+Live CPU exports also sample internal TIM=`b0ba`, PRD=`ffff`, TCR=`0010`
+at 1/7/15/30 seconds: the core timer is stopped in these samples. Reading
+backing data space would not establish these internal MMR values. This
+does not explain why it is stopped or establish a missing timer interrupt.
+
+`verify-5110i-native-processing` combines these checks with the unchanged
+physical menu and failure-boundary predicates. For separate static work:
+
+```sh
+.venv/bin/python tools/nse2_native_result_check.py RUN/nse2_native_program.bin
+```
+
+The result explicitly leaves native completion, fitted mask identity,
+unconditional heartbeat and indirect-producer closure unproved.
+
 Check the independent scheduling and transport observations with:
 
 ```sh

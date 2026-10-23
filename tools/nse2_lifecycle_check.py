@@ -77,6 +77,40 @@ def diagnose_schedule(text):
                 stable_long_boot=False, scope='active scheduling does not prove continued native RX')
 
 
+def diagnose_host_packets(text):
+    if 'nse2_native_host_packet_invalid:' in text:
+        raise ValueError('NSE-2 host packet exceeds the bounded ring grammar')
+    rows = re.findall(r'nse2_native_host_packet: previous=([0-9a-f]{4}) next=([0-9a-f]{4}) '
+                      r'header=([0-9a-f]{4}) words=([0-9a-f,]*) t=([0-9.]+) observer_writes=0', text)
+    if not rows or len(rows) != text.count('nse2_native_host_packet:'):
+        raise ValueError('NSE-2 complete host packet records missing')
+    cursor, previous_time, types, largest = 0, 0.0, [], 0
+    for old, new, header, words, time in rows:
+        old, new, header = int(old, 16), int(new, 16), int(header, 16)
+        length = header >> 8
+        payload = words.split(',') if words else []
+        if (old != cursor or not 0 <= old < 0x52 or length > 160
+                or new != (old + (length + 3) // 2) % 0x52
+                or len(payload) != (length + 1) // 2
+                or any(len(word) != 4 for word in payload) or not previous_time <= float(time) <= 30):
+            raise ValueError('NSE-2 host ring pointer/payload chain differs')
+        cursor, previous_time = new, float(time)
+        types.append(header & 255)
+        largest = max(largest, length)
+    snapshots = re.findall(r'nse2_native_transport: t=30\.[0-9]+ .*? words=([^ ]+) ', text)
+    if len(snapshots) != 1:
+        raise ValueError('NSE-2 final host ring coverage snapshot missing')
+    values = {int(address, 16): (int(value, 16), int(count))
+              for address, value, count in (item.split(':') for item in snapshots[0].split(','))}
+    if (values.get(0x853) != (cursor, len(rows)) or len(rows) > 32
+            or values.get(0x852, (None,))[0] != cursor):
+        raise ValueError('NSE-2 host capture does not cover all consumed/pending packets')
+    return dict(captured_host_packets=len(rows), consumer_writes_covered=True,
+                largest_payload_bytes=largest, observed_types=[f'{value:02x}' for value in sorted(set(types))],
+                host_type4b_observed=0x4b in types, observation_horizon=30,
+                scope='complete consumed TX chain in this window, not a ROM-wide absence proof')
+
+
 def diagnose_processing(text):
     def counts(prefix):
         result = {}
@@ -191,6 +225,7 @@ def main():
     parser.add_argument('--transport', action='store_true', help='also require passive first-window ring evidence')
     parser.add_argument('--schedule', action='store_true', help='diagnose thirty-second scheduling without requiring a reset capture')
     parser.add_argument('--processing', action='store_true', help='also require reused passive ROM4 processing evidence')
+    parser.add_argument('--host-packets', action='store_true', help='require complete ring pointer/payload coverage')
     parser.add_argument('--scan-progress', action='store_true', help='also require advancing measurement-loop evidence')
     parser.add_argument('--timer-boundary', action='store_true', help='require the timer start and terminal-FIQ ordering in a reset capture')
     parser.add_argument('--timer-queue', action='store_true', help='require bank-correct insertion/expiry and queue arithmetic')
@@ -202,6 +237,8 @@ def main():
             result.update(diagnose_transport(text))
         if args.processing:
             result['processing'] = diagnose_processing(text)
+        if args.host_packets:
+            result['host_packets'] = diagnose_host_packets(text)
         if args.scan_progress:
             result['measurement'] = diagnose_scan_progress(text)
         if args.timer_boundary:

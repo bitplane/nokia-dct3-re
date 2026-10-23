@@ -1,6 +1,10 @@
 import unittest
 
-from tools.nse2_lifecycle_check import diagnose, diagnose_transport, diagnose_schedule, diagnose_processing, diagnose_scan_progress, diagnose_timer_boundary, diagnose_timer_queue, timer_queue_offset
+from tools.nse2_lifecycle_check import (
+    diagnose, diagnose_transport, diagnose_schedule, diagnose_processing,
+    diagnose_scan_progress, diagnose_timer_boundary, diagnose_timer_queue,
+    timer_queue_offset, diagnose_host_packets,
+)
 
 
 def transcript():
@@ -12,6 +16,22 @@ def transcript():
 
 
 class LifecycleTest(unittest.TestCase):
+    def test_host_capture_requires_the_full_pointer_chain_and_large_payload(self):
+        # A valid 154-byte payload wraps the 82-word ring; the old 128-byte
+        # probe bound silently omitted this case.
+        text = ('nse2_native_host_packet: previous=0000 next=0006 header=0a05 words=0000,0000,0000,0000,0000 t=0.4 observer_writes=0\n'
+                'nse2_native_host_packet: previous=0006 next=0002 header=9a3c words=' +
+                ','.join(['ffff'] * 77) + ' t=0.5 observer_writes=0\n'
+                'nse2_native_transport: t=30.0 pc=09ac imr=035f ifr=0020 '
+                'words=0852:0002:0,0853:0002:2 mcu_packets=0000 observer_writes=0')
+        result = diagnose_host_packets(text)
+        self.assertEqual(result['largest_payload_bytes'], 154)
+        self.assertFalse(result['host_type4b_observed'])
+        for old, new in (('next=0002', 'next=0003'), ('0853:0002:2', '0853:0002:3'),
+                         ('header=9a3c', 'header=983c'), ('0852:0002', '0852:0003')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                diagnose_host_packets(text.replace(old, new))
+
     def test_queue_selector_uses_shift_carry_bit_one_not_bit_two(self):
         for global_flags, node_flags, offset in ((3, 3, 0x10), (2, 2, 0x10), (4, 4, 0x28),
                                                 (1, 1, 0x28), (2, 4, 0x28), (0xff, 2, 0x10)):

@@ -72,13 +72,18 @@ if dsp then
                     if previous < 0x52 and data ~= previous then
                         local header = dsp.spaces.data:read_u16(0x800 + previous)
                         local length, payload = header >> 8, {}
-                        if length <= 0x80 then
+                        -- The 0x52-word ring reserves one word to distinguish
+                        -- full/empty: up to 160 payload bytes plus the header.
+                        if length <= 0xa0 then
                             for index = 1, (length + 1) // 2 do
                                 payload[#payload + 1] = string.format('%04x',
                                     dsp.spaces.data:read_u16(0x800 + ((previous + index) % 0x52)))
                             end
                             machine:logerror(string.format('nse2_native_host_packet: previous=%04x next=%04x header=%04x words=%s t=%.9f observer_writes=0\n',
                                 previous, data, header, table.concat(payload, ','), machine.time:as_double()))
+                        else
+                            machine:logerror(string.format('nse2_native_host_packet_invalid: previous=%04x next=%04x header=%04x t=%.9f observer_writes=0\n',
+                                previous, data, header, machine.time:as_double()))
                         end
                     end
                 end
@@ -317,6 +322,8 @@ emu.register_frame_done(function()
             machine:logerror(string.format('nse2_native_scan_state: t=%.9f count0285=%04x repeat0e13=%04x ar5=%04x ar6=%04x ar7=%04x observer_writes=0\n',
                 now, dsp.spaces.data:read_u16(0x285), dsp.spaces.data:read_u16(0xe13),
                 dsp.state['AR5'].value, dsp.state['AR6'].value, dsp.state['AR7'].value))
+            machine:logerror(string.format('nse2_native_internal_timer: t=%.9f tim=%04x prd=%04x tcr=%04x observer_writes=0\n',
+                now, dsp.state['TIM'].value, dsp.state['PRD'].value, dsp.state['TCR'].value))
             if next_sample == 30 then
                 local sites = {}
                 for pc in pairs(native_work_writers) do sites[#sites + 1] = pc end

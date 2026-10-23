@@ -6,6 +6,22 @@ dofile(directory .. 'nse2_timer_queue_observe.lua')
 local machine = manager.machine
 local cpu = assert(machine.devices[':dsp_c54x:cpu'])
 local counts = {}
+local program_dumped = false
+emu.register_frame_done(function()
+    if program_dumped or machine.time:as_double() < 7 then return end
+    program_dumped = true
+    local bytes = {}
+    _G.rom4_observation_read = true
+    for address = 0, 0xffff do
+        local word = cpu.spaces.program:read_u16(address)
+        bytes[#bytes + 1] = string.char((word >> 8) & 255, word & 255)
+    end
+    _G.rom4_observation_read = false
+    local output = assert(io.open('nse2_native_program.bin', 'wb'))
+    output:write(table.concat(bytes))
+    output:close()
+    machine:logerror('nse2_native_program_snapshot: words=65536 byte_order=big observer_writes=0\n')
+end, 'NSE-2 passive live program snapshot')
 _G.nse2_scan_loop_taps = {}
 for _, address in ipairs({0x9c4, 0x9cb}) do
     counts[address] = 0
