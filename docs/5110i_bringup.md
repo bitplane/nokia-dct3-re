@@ -14,6 +14,9 @@ The seventeen-second frame has transient placeholder-like glyphs; by
 nineteen seconds a Menu softkey is visible. Physical Menu presses then open
 **Phone book** and **Search / Add name / Erase**. Persistent contacts,
 registration, calls and SMS are not accepted.
+Longer execution is not stable: both menu-only and contact-entry runs
+request reason-`68` reset at about 31.97 seconds. The short menu gates do
+not cover this boundary.
 Fitted mask identity, DSP clock and measured board calibration are unproved.
 
 The ordinary `noki5110i` profile remains unchanged: erased EEPROM and a
@@ -22,8 +25,9 @@ DSP but retains open-pin ADC2; it completes DSP startup while the analog
 readiness counter cannot drain. These are explicit controls, not alternative
 claims of usable boot.
 
-Next: exercise contact creation/readback and cold persistence with physical
-input; keep integrity-only rejection as a negative control.
+Next: resolve native DSP receive-activity supervision before accepting
+longer contact/persistence workflows; keep integrity-only rejection as a
+negative control.
 Do not substitute donor EEPROM, force firmware state, or claim phone service
 from the graphical prompt or key decode alone.
 
@@ -243,10 +247,47 @@ scrollbar; the static submenu is checked byte-exactly. This establishes
 application navigation, not contact writes, registration or speech. The
 ordinary silent and open-pin controls remain unchanged.
 
+## Long-run native receive boundary
+
+A forty-second menu-only control and a contact-entry workflow both request
+the same reset; contact entry is not its cause. The attempted save has no
+ADN UPDATE RECORD and is not accepted. After reset, later digit contacts
+land in a new security editor, not the intended contact editor. The
+contact probe was removed rather than retained as a misleading workflow.
+
+Own receive dispatcher `29908c` uses context `10c764`; received packets
+increment its halfword at `+2` (`29909e..2990a2`). Timer input `dd` checks
+that count at `2991b8`; zero selects the unique argument-1 call to policy
+`2902c2` at `299098`. A nonzero window clears the count and rearms timer
+`1d` with `09cd` ticks. Policy reads NV descriptor `0607` and other guards;
+its selected reason is therefore not proof of one physical missing signal
+or a universally unconditional watchdog.
+
+In the read-only capture, `28db6e` writes reason `68` to `10ff78`, with
+LR `290361`, at 31.000862462 seconds. Delayed event `d5` reaches reset
+entry `299c16` via `236168`, LR `23616d`, at 31.969434538 seconds. Native
+execution then repeats its own verifier/identity startup. This is a
+firmware-requested restart, not a CCONT watchdog expiry. The normal native
+runner correctly rejects the repeated upload/control/poll sequence; its
+acceptance has not been relaxed for this reset.
+
+The bounded observer records reason writes and reset-entry stack without
+changing firmware. Diagnose a retained capture with:
+
+```sh
+.venv/bin/python -m tools.nse2_lifecycle_check TRACE
+```
+
+The diagnostic reports `stable_long_boot=false`; it is not a successful
+long-run gate. A guessed receive heartbeat, disabled supervision or
+rewritten packet count must not be used to promote this native profile.
+Resolve the actual native receive producer/transport and keep the acquired
+NSE-1 mask's compatibility status explicit.
+
 ## Remaining work
 
-1. Verify contact creation/readback and cold persistence with physical input;
-   menu navigation alone does not establish these.
+1. Recover native receive activity across the first timer-`dd` window, then
+   verify contact creation/readback and cold persistence with physical input.
 2. Recover semantic EEPROM requirements from their own consumers; retain
    integrity-only fixtures as diagnostic inputs, not factory defaults.
 3. Qualify application/menu behavior and longer lifecycle/save-state tests.

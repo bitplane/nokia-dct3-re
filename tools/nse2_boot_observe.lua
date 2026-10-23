@@ -3,6 +3,26 @@ local machine = manager.machine
 assert(machine.system.name == 'noki5110i' or machine.system.name == 'nse2r4t' or machine.system.name == 'nse2r4v')
 local cpu = machine.devices[':maincpu']
 local space = cpu.spaces.program
+local reset_entries = 0
+local reset_reasons = 0
+_G.nse2_reset_reason_tap = space:install_write_tap(0x10ff78, 0x10ff7b, 'nse2_reset_reason', function(_, data, mask)
+    if (mask & 0xff000000) == 0 then return end
+    reset_reasons = reset_reasons + 1
+    if reset_reasons > 16 then return end
+    machine:logerror(string.format('nse2_reset_reason: value=%02x pc=%08x lr=%08x t=%.9f observer_writes=0\n',
+        (data >> 24) & 255, cpu.state['R15'].value, cpu.state['R14'].value, machine.time:as_double()))
+end)
+_G.nse2_reset_entry_tap = space:install_read_tap(0x299c14, 0x299c17, 'nse2_reset_entry', function()
+    if cpu.state['R15'].value ~= 0x299c16 then return end
+    reset_entries = reset_entries + 1
+    if reset_entries > 8 then return end
+    local sp, stack = cpu.state['R13'].value, {}
+    if sp >= 0x100000 and sp + 64 <= 0x110000 then
+        for offset = 0, 60, 4 do stack[#stack + 1] = string.format('%08x', space:read_u32(sp + offset)) end
+    end
+    machine:logerror(string.format('nse2_reset_entry: reason=%08x lr=%08x stack=%s t=%.9f observer_writes=0\n',
+        cpu.state['R0'].value, cpu.state['R14'].value, table.concat(stack, ','), machine.time:as_double()))
+end)
 local dsp = machine.devices[':dsp_c54x:cpu']
 if dsp then
     local writes = 0
