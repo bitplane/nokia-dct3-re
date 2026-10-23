@@ -21,6 +21,7 @@ from tools.nse2_lifecycle_check import (
 from tools.nse2_native_result_check import (inspect_capture, inspect_control_trace,
                                            inspect_request_lifecycle, inspect_scan_pacing,
                                            inspect_completion_counters, inspect_publisher_runtime)
+from tools.nse2_sampling_check import inspect_sampling_controls
 
 
 MASK_INPUTS = (
@@ -244,6 +245,8 @@ def main():
                     result.update(verify_post_auth_menu(text, menu.convert('L').tobytes(), submenu.convert('L').tobytes()))
         if args.native_processing:
             result['native_processing_boundary'] = dict(diagnose_schedule(text), **diagnose_transport(text))
+            result['native_processing_boundary']['sampling_controls'] = inspect_sampling_controls(
+                (run/'nse2_native_program.bin').read_bytes(),text)
             result['native_processing_boundary']['conditional_request'] = inspect_control_trace(text)
             result['native_processing_boundary']['request_lifecycle'] = inspect_request_lifecycle(text)
             result['native_processing_boundary']['scan_pacing'] = inspect_scan_pacing(text)

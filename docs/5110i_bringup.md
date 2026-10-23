@@ -734,6 +734,19 @@ storage in the backend; their event/sampling ownership is not established
 by this timing coincidence. No new rate, compare behavior or policy value
 has been selected from the desired boot result.
 
+The passive sampling-control census closes a logging gap: the device's
+initial port trace ends before measurement setup. Resident `4414` writes
+port `0a` from `AR1 - [2193]`, adding `[00ee]` when negative; it writes
+the `3a98` sentinel to `0b`, then AR1 to `09`. The observed mode-`c`
+sequence is `0a=028f`, `0b=3a98`, `09=0332`. Its completion mode-`4`
+sequence writes `0b=0029`, then `0a=3a98`. At thirty seconds there are
+1,629 writes to `09` and 3,255 each to `0a/0b`, terminal values
+`0332/028f/3a98`. The processing gate pins the activation instructions,
+first twelve writes per port and full-count relation. These are programmed
+control/timing values, not established RF units, compare ownership or
+interrupt wiring. In particular, no sampling interrupt is synthesized from
+these observations; all three ports remain storage-only pending evidence.
+
 For a forty-second processing capture, the native runner correctly fails
 on the repeated startup. `nse2_lifecycle_check TRACE --timer-boundary`
 requires the raw arm/terminal/reset evidence and reports
