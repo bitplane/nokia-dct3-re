@@ -4,6 +4,26 @@ local cpu=assert(machine.devices[':dsp_c54x:cpu'])
 -- C54x opcode reads expose PC one word ahead in the validated live run.
 -- Entry reads are fetch observations, not proof of instruction retirement.
 local retained,last={},{}
+local queue_writes=0
+local builder_entries=0
+retained[#retained+1]=cpu.spaces.program:install_read_tap(0x8db4,0x8db4,'word_builder_caller',function()
+    local pc=cpu.state.PC.value
+    if pc~=0x8db4 and pc~=0x8db5 then return end
+    builder_entries=builder_entries+1
+    if builder_entries>16 then return end
+    local sp=cpu.state.SP.value
+    local stack={}
+    for i=0,3 do stack[#stack+1]=string.format('%04x',cpu.spaces.data:read_u16((sp+i)&0xffff)) end
+    machine:logerror(string.format('nse2_word_builder_entry: n=%d a=%x b=%x ar0=%04x ar2=%04x sp=%04x stack=%s t=%.9f observer_writes=0\n',builder_entries,cpu.state.A.value,cpu.state.B.value,cpu.state.AR0.value,cpu.state.AR2.value,sp,table.concat(stack,','),machine.time:as_double()))
+end)
+retained[#retained+1]=cpu.spaces.data:install_write_tap(0x700,0x70a,'word_queue_build',function(address,value,mask)
+    queue_writes=queue_writes+1
+    if queue_writes>64 then return end
+    machine:logerror(string.format('nse2_word_queue_write: address=%04x value=%04x mask=%04x pc=%04x t=%.9f observer_writes=0\n',address,value,mask,cpu.state.PC.value,machine.time:as_double()))
+end)
+retained[#retained+1]=emu.add_machine_stop_notifier(function()
+    machine:logerror(string.format('nse2_word_queue_summary: writes=%d cap=64 observer_writes=0\n',queue_writes))
+end)
 for _,address in ipairs({0x3924,0x3f4e,0x8dd0,0x9232}) do
     local reads,exact,plusone,other=0,0,0,0
     retained[#retained+1]=cpu.spaces.program:install_read_tap(address,address,'word_service_fetch',function()

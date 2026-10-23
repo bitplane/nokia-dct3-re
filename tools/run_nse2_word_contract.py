@@ -14,6 +14,7 @@ from tools.c54x_rom4_port_census import classify_candidates
 from tools.nse2_sampling_check import (inspect_word_configuration_contract,
                                       inspect_word_host_command,
                                       inspect_word_pending_frames,
+                                      inspect_word_frame_source,
                                       inspect_word_service_observation)
 
 
@@ -65,7 +66,9 @@ def main():
                 results['linear_decode_census']=dict(sites=sites,negative_control=negative[0],
                                                      runtime_reachability_proved=False)
             else:
-                results['service']=inspect_word_service_observation((target/'error.log').read_text(errors='replace'))
+                text=(target/'error.log').read_text(errors='replace')
+                results['service']=inspect_word_service_observation(text)
+                results['frame_source']=inspect_word_frame_source(program,data,text)
         results['physical_completion_proved']=False
         results['long_run_stability_proved']=False
         (run/'acceptance.json').write_text(json.dumps(results,indent=2)+'\n')

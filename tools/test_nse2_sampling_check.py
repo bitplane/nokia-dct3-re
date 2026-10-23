@@ -3,6 +3,29 @@ from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripher
 
 
 class SamplingCheckTest(unittest.TestCase):
+    def test_frame_source_requires_native_forwarder_and_both_caller_records(self):
+        import struct
+        from tools.nse2_sampling_check import inspect_word_frame_source
+        program=bytearray(0x20000)
+        data=bytearray(0x20000)
+        struct.pack_into('>H',data,(0xb00f+5)*2,0x3ee7)
+        for address,encoded in {
+            0x3eee:'71d2001571d2001013d28914',
+            0x3f01:'f074390049144815f2748db477121200',
+            0x9300:'80d3f540491081d3f2c0491581d3f2c0',
+            0x9318:'1192f330ff00f2c081d380d3fe00731306c1',
+        }.items():
+            fragment=bytes.fromhex(encoded)
+            program[address*2:address*2+len(fragment)]=fragment
+        rows=[f'nse2_word_builder_entry: n={n} a={a} b={b} ar0={kind} ar2=1200 sp=1ec3 stack=3f09,3923,30bc,0000 t=0.34253 observer_writes=0'
+              for n,a,b,kind in [(1,'1eff','3','00d0'),(2,'1e14','1','00f4')]]
+        rows.append('nse2_word_queue_summary: writes=22 cap=64 observer_writes=0')
+        text='\n'.join(rows)
+        self.assertEqual(inspect_word_frame_source(program,data,text)['host_command'],'05')
+        for bad in (text.replace('3f09','3f08'),text.replace('writes=22','writes=65'),text.replace('ar0=00f4','ar0=00d0')):
+            with self.assertRaises(ValueError):
+                inspect_word_frame_source(program,data,bad)
+
     def test_pending_frames_require_pointer_extent_padding_and_both_checksums(self):
         import struct
         from tools.nse2_sampling_check import inspect_word_pending_frames

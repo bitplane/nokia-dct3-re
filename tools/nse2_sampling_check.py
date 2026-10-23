@@ -127,6 +127,32 @@ def inspect_word_pending_frames(data):
                 physical_baud_proved=False,receive_supervision_link_proved=False)
 
 
+def inspect_word_frame_source(program,data,text):
+    if len(data)!=0x20000 or struct.unpack_from('>H',data,(0xb00f+5)*2)[0]!=0x3ee7:
+        raise ValueError('word host-forward command table differs')
+    fragments={
+        0x3eee:'71d2001571d2001013d28914',
+        0x3f01:'f074390049144815f2748db477121200',
+        0x9300:'80d3f540491081d3f2c0491581d3f2c0',
+        0x9318:'1192f330ff00f2c081d380d3fe00731306c1',
+    }
+    for address,encoded in fragments.items():
+        expected=bytes.fromhex(encoded)
+        if program[address*2:address*2+len(expected)]!=expected:
+            raise ValueError(f'word frame source code differs at {address:04x}')
+    entries=re.findall(r'nse2_word_builder_entry: n=(\d+) a=([0-9a-f]+) b=([0-9a-f]+) ar0=([0-9a-f]{4}) ar2=([0-9a-f]{4}) sp=([0-9a-f]{4}) stack=([0-9a-f,]+) t=([0-9.]+) observer_writes=0',text)
+    if [row[:7] for row in entries]!=[
+            ('1','1eff','3','00d0','1200','1ec3','3f09,3923,30bc,0000'),
+            ('2','1e14','1','00f4','1200','1ec3','3f09,3923,30bc,0000')]:
+        raise ValueError('word frame caller/arguments differ')
+    summaries=re.findall(r'nse2_word_queue_summary: writes=(\d+) cap=64 observer_writes=0',text)
+    if summaries!=['22']:
+        raise ValueError('word frame construction coverage differs')
+    return dict(host_command='05',host_handler='3ee7',forward_call='3f05',
+                builder='92df',caller_return='3f09',frames=2,
+                unsolicited_radio_result_proved=False,supervision_link_proved=False)
+
+
 def inspect_word_service_observation(text):
     """Qualify the bounded nine-second fetch/store correlation, not silicon timing."""
     fetches=re.findall(r'nse2_word_service_fetch_summary: address=([0-9a-f]{4}) reads=(\d+) exact=(\d+) plusone=(\d+) other=(\d+) observer_writes=0',text)

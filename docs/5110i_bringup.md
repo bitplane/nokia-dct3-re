@@ -1236,6 +1236,20 @@ This identifies FBUS-shaped service traffic in the pending queue, not an RF
 sample stream or successful wire delivery. The first word `1eff` is the only
 observed output so far. The framing does not independently establish the
 controller's clock, completion source, external wiring or supervision link.
+Read-only queue-write and builder-entry taps resolve their origin: both
+entries at `8db4` return to `3f09`, from CALLD `3f05`, with arguments
+`A=1eff/B=3/AR0=00d0` and `A=1e14/B=1/AR0=00f4`, respectively;
+both source buffers are `1200`. Data dispatch table `b00f` maps host
+command `05` to handler `3ee7`, which extracts the header/type/length,
+copies payload to `1200`, consumes the host object through `3900`, and
+calls the word builder. Native `92df..931f` constructs header, payload,
+odd-byte padding and XOR checksum, then commits producer pointer `06c1`.
+The nine-second trace contains exactly 22 writes to `0700..070a`: eleven
+initial clears and eleven frame words, at post-store PCs `9301/9304/9307/9313/931d/931e`.
+Thus these queued records are MCU-command-forwarded service traffic, not
+evidence of an unsolicited DSP RF-result producer. The reproduction checks
+the dispatch entry, builder bytes, both caller stacks and uncapped queue
+coverage. Whether physical service delivery affects supervision is still open.
 
 Vector `ffd0` branches to ISR `3416`. Its `34da` path reads port `36`,
 tests mask `2000`, and can write port `34` at `34e8` or `34f4` while
