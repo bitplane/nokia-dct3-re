@@ -363,6 +363,16 @@ The checked handler prefix and table mapping identify a request-driven
 path, not an autonomous keep-alive. Type `07` is absent from the complete
 host captures. The nearby `ORM 0020` at `3d4b` instead addresses `1838`
 through AR4 and must not be attributed to `06e3` from proximity alone.
+An own MCU constructor candidate at `2160a8` supplies a one-byte
+type-`07` message (`10`) to task 3 at `216172`. Its mode check
+(`2160f4..2160fc`, literal `216388`) requires byte `1094b7 == 4`;
+additional context checks remain between that gate and construction.
+The two aligned direct-call candidates are `216250` and `21764a`.
+The generic envelope boundary `277f96` takes its type from buffer byte 0
+and payload length from R0; `28de42` passes message byte 3 onward there.
+This maps a concrete MCU candidate, not normal-boot reachability or a
+complete census of type-`07` producers. The next question is the lifecycle
+of `1094b7` and those callers, not forcing this request into the stream.
 None of these static paths establishes an unconditional periodic packet.
 The separate serial publisher retains its existing queued-data contract.
 
@@ -390,6 +400,8 @@ Add `--trace RUN/error.log` to verify that every tapped `06e3` write is
 accounted for through thirty seconds before asserting this request bit
 was absent. Missing/capped writes, a changed terminal value, or an armed
 request fail that diagnostic rather than silently preserving the conclusion.
+Use `--mcu roms/noki5110i/5110i_5.53A.fls` to additionally check the own
+constructor bytes, mode literal and aligned direct-call candidates.
 
 The result explicitly leaves native completion, fitted mask identity,
 unconditional heartbeat and indirect-producer closure unproved.

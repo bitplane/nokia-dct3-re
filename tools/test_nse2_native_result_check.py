@@ -1,10 +1,36 @@
 import struct
 import unittest
 
-from tools.nse2_native_result_check import FRAGMENTS, inspect_control_trace, inspect_program
+from tools.nse2_native_result_check import (FRAGMENTS, MCU_REQUEST_FRAGMENTS,
+                                           inspect_control_trace, inspect_mcu_request, inspect_program)
 
 
 class ResultTest(unittest.TestCase):
+    def mcu_image(self):
+        image = bytearray(0x80000)
+        for address, encoded in MCU_REQUEST_FRAGMENTS.items():
+            value = bytes.fromhex(encoded)
+            image[address - 0x200000:address - 0x200000 + len(value)] = value
+        struct.pack_into('>I', image, 0x16388, 0x1094b7)
+        for address in (0x216250, 0x21764a):
+            displacement = 0x2160a8 - address - 4
+            struct.pack_into('>HH', image, address - 0x200000,
+                             0xf000 | ((displacement >> 12) & 0x7ff),
+                             0xf800 | ((displacement >> 1) & 0x7ff))
+        return image
+
+    def test_mcu_constructor_is_not_boot_reachability(self):
+        result = inspect_mcu_request(self.mcu_image())
+        self.assertEqual(result['payload'], '10')
+        self.assertFalse(result['normal_boot_reachability_proved'])
+
+    def test_mcu_changed_gate_literal_and_callers_fail(self):
+        for offset in (0x160f4, 0x16168, 0x16388, 0x16250, 0x77fb8):
+            image = self.mcu_image()
+            image[offset] ^= 1
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                inspect_mcu_request(image)
+
     def control_trace(self, values=('0000', '0000', '0001', '0000'), count=4):
         rows = [f'nse2_native_ring: address=06e3 data={value} mask=ffff pc=30cb '
                 f't={index + 0.25} observer_writes=0' for index, value in enumerate(values)]

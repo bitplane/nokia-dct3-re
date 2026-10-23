@@ -24,6 +24,12 @@ FRAGMENTS = {
     0x397a: 'f1100051f84f398d',
     0x398d: 'f000b00f4a1188117710000110818a11f4e2771306bd',
 }
+MCU_REQUEST_FRAGMENTS = {
+    0x2160ec: '27017507',  # R7 supplies the one-byte length.
+    0x2160f4: '48a4468078002804d145',
+    0x21615a: '2008f040fa281c0120038008708f200770c8201071082003f03ffb0f',
+    0x277fb8: '781c430c04200c011c5861d01c28f7ffffa8',
+}
 
 
 def inspect_program(program, data):
@@ -92,11 +98,33 @@ def inspect_control_trace(text):
                 scope='complete tapped writes in this capture; not a ROM-wide producer exclusion')
 
 
+def inspect_mcu_request(image):
+    """Own MCU constructor candidate; do not infer normal-boot reachability."""
+    from tools.nse5_roller_contract import thumb_bl_candidates
+    # Pin the producer and its mode literal separately from the generic
+    # envelope boundary; a coincidental immediate 7 is not a producer proof.
+    for address, encoded in MCU_REQUEST_FRAGMENTS.items():
+        expected = bytes.fromhex(encoded)
+        if image[address - 0x200000:address - 0x200000 + len(expected)] != expected:
+            raise ValueError(f'NSE-2 MCU request contract differs at {address:06x}')
+    if struct.unpack_from('>I', image, 0x16388)[0] != 0x1094b7:
+        raise ValueError('NSE-2 request constructor mode literal differs')
+    callers = thumb_bl_candidates(image, (0x2160a8,))[0x2160a8]
+    if callers != [0x216250, 0x21764a]:
+        raise ValueError('NSE-2 request constructor direct-call candidates differ')
+    return dict(constructor='2160a8', mode_byte='1094b7', required_mode=4,
+                packet_type='07', payload='10', task=3,
+                direct_call_candidates=[f'{address:06x}' for address in callers],
+                normal_boot_reachability_proved=False,
+                scope='checked constructor and raw aligned direct calls; other producers unclosed')
+
+
 def main():
     root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('live_program', type=Path)
     parser.add_argument('--trace', type=Path, help='check complete conditional-request write coverage')
+    parser.add_argument('--mcu', type=Path, help='check own big-endian NSE-2 request constructor')
     parser.add_argument('--resident', type=Path, default=root / 'roms/noki5110/nse1_rom4_dsp_program.bin')
     parser.add_argument('--data', type=Path, default=root / 'roms/noki5110/nse1_rom4_dsp_data.bin')
     args = parser.parse_args()
@@ -105,6 +133,8 @@ def main():
         result = inspect_capture(program, resident, data)
         if args.trace:
             result['control_observation'] = inspect_control_trace(args.trace.read_text())
+        if args.mcu:
+            result['mcu_request'] = inspect_mcu_request(args.mcu.read_bytes())
         print(json.dumps(result, indent=2))
     except (OSError, ValueError) as error:
         parser.exit(1, str(error) + '\n')
