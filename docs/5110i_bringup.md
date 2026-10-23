@@ -345,6 +345,17 @@ nested measurement loop; this own overlay uses `0a17`, not the sibling
 NSK-1 upload's `0a2c`. Companion table `b00f + 4b` selects `3c92`, which
 reaches `3cab`: it is an explicit host-query path. The other caller is
 behind the `06bc` mask-`0100` test at `6d19` and `06ab==0` at `6d6f`.
+The byte-checked path at `6790` loads `06bc` into AR2 and `06e3`
+into AR0. A nonzero mask-`0020` test consumes that control bit at
+`679b`, initializes `06ab` at `67a1`, then sets the eligibility bit
+at `67a3`. This identifies a conditional setter, not its runtime
+execution or a complete writer census. The next boundary is the origin
+and consumption of `06e3` bit `0020`; a generic write to `06e3` is
+insufficient evidence that this request was armed. Both complete thirty-second
+host-census captures contain exactly four `06e3` writes, matching the terminal
+tap count: `0000/0000/0001/0000` at PCs `0f10/0d94/3db6/30cb`.
+None arms `0020`. This bounds the observed conditional-request absence;
+it does not establish who can set the bit or exclude other result paths.
 None of these static paths establishes an unconditional periodic packet.
 The separate serial publisher retains its existing queued-data contract.
 
@@ -367,6 +378,11 @@ physical menu and failure-boundary predicates. For separate static work:
 ```sh
 .venv/bin/python tools/nse2_native_result_check.py RUN/nse2_native_program.bin
 ```
+
+Add `--trace RUN/error.log` to verify that every tapped `06e3` write is
+accounted for through thirty seconds before asserting this request bit
+was absent. Missing/capped writes, a changed terminal value, or an armed
+request fail that diagnostic rather than silently preserving the conclusion.
 
 The result explicitly leaves native completion, fitted mask identity,
 unconditional heartbeat and indirect-producer closure unproved.

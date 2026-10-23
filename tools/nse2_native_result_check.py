@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 import struct
 import sys
@@ -12,6 +13,7 @@ from tools.c54x_rom4_port_census import direct_callers
 from tools.nsk1_radio_contract import live_publisher_census, native_completion_contract, serial_publisher_contract
 
 FRAGMENTS = {
+    0x6790: '771206bc771006e31180f2300020f84567a9f330ffdf818044f806ad770e0005f58c81f806ab69820100',
     0x0a15: 'f0200e13f07447f6f4bcfc20',
     0x47ff: '7714008b',
     0x4810: 'f27437ce771500a2',
@@ -42,7 +44,11 @@ def inspect_program(program, data):
                             direct_caller_candidates=[hex(address) for address, _ in callers]),
                 measurement_caller='0a17', host_query=dict(type='4b', entry='3c92', call='3cab'),
                 conditional_processing=dict(call='6d7e', eligibility_flag='06bc mask 0100',
-                                            additional_gate='06ab equals zero'),
+                                            additional_gate='06ab equals zero',
+                                            setter='67a3', control_word='06e3 mask 0020',
+                                            control_bit_consumed_at='679b',
+                                            countdown_initialized_at='67a1',
+                                            setter_runtime_observed=False),
                 unconditional_heartbeat_proved=False, runtime_result_observed=False,
                 indirect_producers_closed=False, fitted_mask_proved=False)
 
@@ -55,16 +61,43 @@ def inspect_capture(program, resident, data):
     return result
 
 
+def inspect_control_trace(text):
+    """Require complete writes, not a capped log, before excluding this bit."""
+    rows = re.findall(r'nse2_native_ring: address=06e3 data=([0-9a-f]{4}) mask=ffff '
+                      r'pc=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0', text)
+    samples = re.findall(r'nse2_native_transport: t=([0-9.]+) [^\n]*?'
+                         r'06e3:([0-9a-f]{4}):(\d+) [^\n]*observer_writes=0', text)
+    terminal = [(value, int(count)) for time, value, count in samples
+                if 29.9 <= float(time) <= 30.1]
+    if len(terminal) != 1 or not rows or len(rows) != terminal[0][1]:
+        raise ValueError('complete NSE-2 control-write coverage through thirty seconds missing')
+    times = [float(time) for _, _, time in rows]
+    if times != sorted(times) or not all(0 <= time <= 30.1 for time in times):
+        raise ValueError('NSE-2 control-write observation order/window differs')
+    if rows[-1][0] != terminal[0][0]:
+        raise ValueError('NSE-2 control-write final value differs from terminal snapshot')
+    if any(int(value, 16) & 0x20 for value, _, _ in rows):
+        raise ValueError('NSE-2 conditional result request was armed; absence diagnostic no longer applies')
+    return dict(control_word='06e3', request_mask='0020', writes=len(rows),
+                observed_values=[value for value, _, _ in rows],
+                writer_pcs=[pc for _, pc, _ in rows],
+                request_bit_observed=False, observation_seconds=30,
+                scope='complete tapped writes in this capture; not a ROM-wide producer exclusion')
+
+
 def main():
     root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('live_program', type=Path)
+    parser.add_argument('--trace', type=Path, help='check complete conditional-request write coverage')
     parser.add_argument('--resident', type=Path, default=root / 'roms/noki5110/nse1_rom4_dsp_program.bin')
     parser.add_argument('--data', type=Path, default=root / 'roms/noki5110/nse1_rom4_dsp_data.bin')
     args = parser.parse_args()
     try:
         program, resident, data = args.live_program.read_bytes(), args.resident.read_bytes(), args.data.read_bytes()
         result = inspect_capture(program, resident, data)
+        if args.trace:
+            result['control_observation'] = inspect_control_trace(args.trace.read_text())
         print(json.dumps(result, indent=2))
     except (OSError, ValueError) as error:
         parser.exit(1, str(error) + '\n')
