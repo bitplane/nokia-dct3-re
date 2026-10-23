@@ -528,6 +528,21 @@ sequence before deciding whether the next missing boundary is RF data.
 Policy descriptor `0607` maps to the one-byte EEPROM record at `049e`.
 Erased content enables the observed argument-1 reason-`68` policy, but
 there is no accepted factory value or semantic permission to disable it.
+Own ROM initialization supplies stronger evidence than an inferred factory
+value: function `290490` loops over indices 1 and 0, takes source bytes
+from `2b3764` (`01 ff`) and record IDs from `2b3768` (`0401 0607`), and
+calls record writer `290de2` at `2904a0`. The write wrapper reaches physical
+EEPROM writer `293c8e` at `290e12`. Thus this initializer explicitly pairs
+record `0607` with `ff`, not zero. Its direct caller `23565a` is conditional
+on argument bit 1 (`LSRS #2` carry); ordinary boot execution of this
+initializer has not been established. This is not a reader-only record.
+Policy `2902c2` interprets bit 0 for argument-1 reason `68` and bit 1 for
+argument-2 reason `69`, with additional runtime guards before restart.
+Neither a complete writer census nor a universal factory default follows
+from this initializer, but clearing the erased byte to zero cannot be
+justified as restoring its ROM initialization value. The `--mcu` audit
+pins the paired tables, writer wrapper and caller branch as well as the
+measurement request constructor.
 The diagnostic option `--scan-progress` requires the advancing loop in
 addition to `--schedule --transport --processing`; it explicitly leaves
 `scan_completed=false`.

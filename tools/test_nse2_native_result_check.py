@@ -1,13 +1,39 @@
 import struct
 import unittest
 
-from tools.nse2_native_result_check import (FRAGMENTS, MCU_REQUEST_FRAGMENTS,
+from tools.nse2_native_result_check import (FRAGMENTS, MCU_REQUEST_FRAGMENTS, NV_POLICY_FRAGMENTS,
                                            inspect_control_trace, inspect_mcu_request, inspect_program,
                                            inspect_request_lifecycle, inspect_scan_pacing,
-                                           inspect_completion_counters, compare_scan_budget)
+                                           inspect_completion_counters, compare_scan_budget, inspect_nv_policy)
 
 
 class ResultTest(unittest.TestCase):
+    def nv_image(self):
+        image = bytearray(0xc0000)
+        for address, encoded in NV_POLICY_FRAGMENTS.items():
+            value = bytes.fromhex(encoded)
+            image[address - 0x200000:address - 0x200000 + len(value)] = value
+        struct.pack_into('>II', image, 0x90670, 0x2b3764, 0x2b3768)
+        image[0xb3764:0xb3766] = bytes((1, 255))
+        struct.pack_into('>HH', image, 0xb3768, 0x401, 0x607)
+        return image
+
+    def test_nv_policy_has_table_driven_ff_initializer(self):
+        result = inspect_nv_policy(self.nv_image())
+        self.assertEqual(result['records'][1], {'record': '0607', 'value': 'ff'})
+        self.assertFalse(result['record_0607_reader_only'])
+        self.assertFalse(result['zero_factory_value_proved'])
+        self.assertFalse(result['initialization_runtime_observed'])
+
+    def test_nv_policy_pairing_pointer_branch_and_truncation_fail(self):
+        for offset in (0xb3765, 0xb376b, 0x90670, 0x35656, 0x9049c, 0x902f4):
+            image = self.nv_image()
+            image[offset] ^= 1
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                inspect_nv_policy(image)
+        with self.assertRaises(ValueError):
+            inspect_nv_policy(self.nv_image()[:0xb376b])
+
     def budget_trace(self):
         rows = [self.pacing_trace(), self.completion_trace(),
                 'nse2_native_identity: n=1 data=0004 mask=ffff pc=0f0f t=0.007 observer_writes=0',

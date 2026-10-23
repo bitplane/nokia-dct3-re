@@ -34,6 +34,12 @@ MCU_REQUEST_FRAGMENTS = {
     0x21615a: '2008f040fa281c0120038008708f200770c8201071082003f03ffb0f',
     0x277fb8: '781c430c04200c011c5861d01c28f7ffffa8',
 }
+NV_POLICY_FRAGMENTS = {
+    0x290e08: '466889001c21466a8952f002ff3c',
+    0x290490: 'b5102401487619004a7600615a512200f000fc9f1c201e4106090e0c2800d1f1',
+    0x235656: '08a8d30df05aff19',
+    0x2902e4: '20002d01d1002001466978094201d0012468e000240020002d02d10020014669780908494208d1022c00d101e0292469',
+}
 
 
 def inspect_program(program, data):
@@ -121,6 +127,31 @@ def inspect_mcu_request(image):
                 direct_call_candidates=[f'{address:06x}' for address in callers],
                 normal_boot_reachability_proved=False,
                 scope='checked constructor and raw aligned direct calls; other producers unclosed')
+
+
+def inspect_nv_policy(image):
+    """Recover own ROM initialization, not a donor/factory EEPROM guess."""
+    for address, encoded in NV_POLICY_FRAGMENTS.items():
+        expected = bytes.fromhex(encoded)
+        if image[address - 0x200000:address - 0x200000 + len(expected)] != expected:
+            raise ValueError(f'NSE-2 NV policy contract differs at {address:06x}')
+    if len(image) < 0xb376c:
+        raise ValueError('NSE-2 NV initialization table truncated')
+    source, records = struct.unpack_from('>II', image, 0x90670)
+    if (source, records) != (0x2b3764, 0x2b3768):
+        raise ValueError('NSE-2 NV initialization pointers differ')
+    defaults = list(image[source - 0x200000:source - 0x200000 + 2])
+    ids = list(struct.unpack_from('>HH', image, records - 0x200000))
+    if ids != [0x401, 0x607] or defaults != [1, 0xff]:
+        raise ValueError('NSE-2 NV initialization record/default pairing differs')
+    return dict(writer='290490', record_write_api='290de2', callsite='2904a0',
+                records=[dict(record=f'{record:04x}', value=f'{value:02x}')
+                         for record, value in zip(ids, defaults)],
+                caller='23565a', caller_condition='argument bit 1 set (LSRS #2 carry)',
+                policy_bits={'0': 'argument-1 reason 68 selection', '1': 'argument-2 reason 69 selection'},
+                record_0607_reader_only=False, zero_factory_value_proved=False,
+                initialization_runtime_observed=False,
+                scope='own table-driven initializer; not complete writer census or factory provisioning proof')
 
 
 def inspect_request_lifecycle(text):
@@ -271,7 +302,9 @@ def main():
         if args.trace:
             result['control_observation'] = inspect_control_trace(args.trace.read_text())
         if args.mcu:
-            result['mcu_request'] = inspect_mcu_request(args.mcu.read_bytes())
+            mcu = args.mcu.read_bytes()
+            result['mcu_request'] = inspect_mcu_request(mcu)
+            result['nv_policy'] = inspect_nv_policy(mcu)
         if args.failure_trace:
             result['scan_budget'] = compare_scan_budget(args.failure_trace.read_text())
         print(json.dumps(result, indent=2))
