@@ -64,6 +64,7 @@ make verify-5110i-sms-store RUN_DIR=tmp/nse2-sms-store
 make verify-5110i-sms-persistence RUN_DIR=tmp/nse2-sms-persistence
 make verify-5110i-sms-delete RUN_DIR=tmp/nse2-sms-delete
 make verify-5110i-sim-pin RUN_DIR=tmp/nse2-sim-pin
+make verify-5110i-sim-pin-persistence RUN_DIR=tmp/nse2-sim-pin-persistence
 make verify-5110i-native-processing RUN_DIR=tmp/nse2-native-processing
 ```
 
@@ -92,7 +93,7 @@ The archive calls the phone 5110i; both headers identify `NSE-2`, `05.53`,
 | GENSIO/CCONT | Own `296704`: select `22` at `28`, TX `2a`, RX `2d`, status `29` bit 2. | Shared serial grammar, not measured electrical timing. |
 | LCD | Own `296e46/296eac`: command/data `2c/2b`, ready bit 0. | Observed 84x48 presentation; fitted controller identity remains unproved. |
 | Keypad | Scanner `29806c`, decoder `299010`, maps `2b382c/2b3848`, selector `10c6b6`; five rows, signal/direction `31/2f`, columns `30`, IRQ mask `33`. | Existing NSE-1 contact layout matches own table; digits 1--5 and Menu have runtime decode acceptance. |
-| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/rejection, organic ADN write and cold contact readback pass. | PIN1/2 changes, PUK recovery/exhaustion and cold retry replay remain separate tests; the Nokia phone code is phone-side. |
+| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/rejection/cold retry restoration, organic ADN write and cold contact readback pass. | PIN1/2 changes and PUK recovery/exhaustion remain separate tests; the Nokia phone code is phone-side. |
 
 EEPROM START/STOP entry points are `295814/295886`, identified by SDA
 transitions while SCL is high. Block reader `293d92` takes address,
@@ -284,6 +285,17 @@ The accepted frame/status/credential contrast is not phone-code unlocking,
 PIN management, PUK recovery or network registration. Legacy card profile
 serialization is expanded by the card device; the checker pins its complete
 credential/retry prefix rather than claiming a byte-identical file length.
+
+`verify-5110i-sim-pin-persistence` then links three isolated processes:
+wrong entry creates a saved two-attempt card; a fresh no-input boot retains
+two attempts at the PIN prompt; another fresh boot receives the same saved
+card and physical `1234` restores three attempts with `9000`. These saved
+cards use the complete current serialization, so the latter two runs
+compare every byte against the input, allowing only the retry reset on
+successful VERIFY. Input path/hash and before/after retry counts are recorded.
+The fixture accepts only the declared laboratory credentials and qualified
+nonblocked retry states; a final wrong attempt is rejected by this acceptance
+path until a distinct blocked/PUK lifecycle is qualified.
 
 ### Physical contact save
 

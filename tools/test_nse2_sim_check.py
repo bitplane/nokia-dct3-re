@@ -34,6 +34,30 @@ def contacts():
 
 
 class SimCheckTest(unittest.TestCase):
+    def test_cold_pin_retry_state_and_restore_preserve_the_full_card(self):
+        from tools.make_sim_card_profile import make_profile
+        from tools.sim_security_trace_check import AOC_NVRAM_SIZE,ATTEMPTS_OFFSET
+        initial=bytearray(make_profile(True).ljust(AOC_NVRAM_SIZE,b'\xff'))
+        initial[ATTEMPTS_OFFSET]=2
+        final=bytearray(initial)
+        final[ATTEMPTS_OFFSET]=3
+        text='\n'.join(f'nse2_pin_contact: event={i} down={i%2} t={6+i*.15:.2f} physical_only=1' for i in range(1,11))
+        text+=('\nsim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08 selected=6fad t=7.7\n'
+               'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1')
+        hashes={name:hashlib.sha256(value).hexdigest() for name,value in (
+            ('PIN_PROMPT_FRAME',b'pin'),('PIN_ACCEPTED_FRAME',b'accepted'),('SECURITY_FRAME',b'phone'))}
+        with patch.multiple('tools.nse2_sim_check',**hashes):
+            waiting=verify_pin_boot('',initial,b'pin',initial_card=initial)
+            self.assertEqual(waiting['pin_attempts_remaining'],2)
+            result=verify_pin_boot(text,final,b'pin',b'accepted',b'phone',action='verify',initial_card=initial)
+            self.assertEqual((result['pin_attempts_before'],result['pin_attempts_remaining']),(2,3))
+            final[-1]^=1
+            with self.assertRaises(ValueError):
+                verify_pin_boot(text,final,b'pin',b'accepted',b'phone',action='verify',initial_card=initial)
+            initial[ATTEMPTS_OFFSET]=0
+            with self.assertRaises(ValueError):
+                verify_pin_boot('',initial,b'pin',initial_card=initial)
+
     def test_pin_wait_verify_and_wrong_pin_are_separate_from_phone_lock(self):
         from tools.make_sim_card_profile import make_profile
         from tools.sim_security_trace_check import AOC_NVRAM_SIZE,ATTEMPTS_OFFSET

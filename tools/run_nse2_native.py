@@ -95,6 +95,7 @@ def main():
     parser.add_argument('--sms-action', choices=('erase','cancel','empty'), help='physical confirmation or erased-card Outbox check')
     parser.add_argument('--pin-enabled', action='store_true', help='separate PIN-enabled synthetic-card boot observation')
     parser.add_argument('--pin-action', choices=('verify','wrong'), help='one physical correct/wrong SIM PIN attempt')
+    parser.add_argument('--pin-card', type=Path, help='persistent PIN-enabled laboratory card from an earlier process')
     parser.add_argument('--seconds', type=int, default=8, choices=range(8, 121), metavar='8..120')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -130,18 +131,22 @@ def main():
             raise ValueError('PIN-enabled observation requires inserted card, fourteen seconds and no phone-code/application fixture')
         if args.pin_action and not args.pin_enabled:
             raise ValueError('SIM PIN input requires the explicit PIN-enabled card')
+        if args.pin_card and not args.pin_enabled:
+            raise ValueError('persistent PIN card requires the PIN-enabled boot fixture')
         report = prepare_native(root, run, record_checksum=args.record_checksum_only,
                                 nominal_vbat=args.nominal_vbat, insert_sim=args.insert_sim,
                                 phone_retry_zero=args.phone_retry_zero)
         machine = report['machine']
         if args.pin_enabled:
             from tools.make_sim_card_profile import make_profile
-            pin_card=make_profile(True)
+            from tools.nse2_sim_check import verify_pin_input
+            pin_card=args.pin_card.read_bytes() if args.pin_card else make_profile(True)
+            verify_pin_input(pin_card)
             card_path=run/'nvram'/machine/'sim_card'
             card_path.parent.mkdir(parents=True,exist_ok=True)
             card_path.write_bytes(pin_card)
             report['pin_card']=dict(pin_enabled=True,sha256=hashlib.sha256(pin_card).hexdigest(),
-                                    source='laboratory profile; not handset EEPROM provisioning')
+                                    source=str(args.pin_card.resolve()) if args.pin_card else 'laboratory profile; not handset EEPROM provisioning')
         if args.phonebook_reload:
             from tools.sim_phonebook_check import validate_phonebook_storage
             saved_card = args.phonebook_reload.read_bytes()
@@ -210,13 +215,13 @@ def main():
                              Image.open(run/'snap/nse2_pin_3.png') as continuation:
                             result.update(verify_pin_boot(text,(run/'nvram'/machine/'sim_card').read_bytes(),
                                 prompt.convert('L').tobytes(),outcome.convert('L').tobytes(),
-                                continuation.convert('L').tobytes(),action=args.pin_action))
+                                continuation.convert('L').tobytes(),action=args.pin_action,initial_card=pin_card))
                             if args.pin_action=='verify':
                                 result.update(verify_sim_reads(text,continuation.convert('L').tobytes(),
                                                              pin_authenticated=True,bootstrap_horizon=14))
                     else:
                         result.update(verify_pin_boot(text,(run/'nvram'/machine/'sim_card').read_bytes(),
-                                                     prompt.convert('L').tobytes()))
+                                                     prompt.convert('L').tobytes(),initial_card=pin_card))
             else:
                 with Image.open(run / 'snap/nse2_7.png') as frame:
                     result.update(verify_sim_reads(text, frame.convert('L').tobytes()))
