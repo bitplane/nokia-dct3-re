@@ -1192,6 +1192,21 @@ word-clock interrupt. The service can run while the separate transmit
 completion remains missing; its counter activity must not be mistaken for
 successful port-`34` transmission or incoming peer traffic.
 
+Reproduce this bounded static/cadence contract without a pre-existing run:
+
+```sh
+python3 tools/run_nse2_word_contract.py tmp/nse2-word-contract
+```
+
+The runner uses two isolated fresh native processes: a seven-second live
+program/data export and a nine-second read-only service observation. It
+zero-pads data words `0000..007f` rather than reading mapped CPU/serial
+registers; the command table at `b00f` is sampled from ordinary data space. It
+records the compatibility-mask/calibration/retry-fixture assumptions and
+executable hash in each `inputs.json`, then writes checked results to
+`acceptance.json`. A pass proves this bounded software contract only;
+physical completion and long-run stability remain explicitly false.
+
 Vector `ffd0` branches to ISR `3416`. Its `34da` path reads port `36`,
 tests mask `2000`, and can write port `34` at `34e8` or `34f4` while
 maintaining software buffering state `01f9`. Thus the output port also has

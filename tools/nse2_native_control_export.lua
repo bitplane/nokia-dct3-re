@@ -19,7 +19,9 @@ emu.register_frame_done(function()
     local data_bytes = {}
     local data = machine.devices[':dsp_c54x:cpu'].spaces.data
     for address = 0, 0xffff do
-        local word = data:read_u16(address)
+        -- Do not sample mapped CPU/serial registers: reads may acknowledge
+        -- peripheral state. Preserve file offsets with an explicit zero pad.
+        local word = address < 0x80 and 0 or data:read_u16(address)
         data_bytes[#data_bytes + 1] = string.char((word >> 8) & 255, word & 255)
     end
     local data_output = assert(io.open('nse2_native_data.bin', 'wb'))
