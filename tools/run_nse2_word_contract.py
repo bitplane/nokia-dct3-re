@@ -10,6 +10,7 @@ if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from tools.run_nse2_native import prepare_native
 from tools.run_nse2_puk2_exhaustion import run_stage
+from tools.c54x_rom4_port_census import classify_candidates
 from tools.nse2_sampling_check import (inspect_word_configuration_contract,
                                       inspect_word_host_command,
                                       inspect_word_service_observation)
@@ -51,6 +52,16 @@ def main():
                 data=(target/'nse2_native_data.bin').read_bytes()
                 results['configuration']=inspect_word_configuration_contract(program)
                 results['host_command']=inspect_word_host_command(program,data)
+                disassemblies=[path.read_text() for path in sorted(target.glob('*.dasm'))]
+                sites=classify_candidates(program,disassemblies,{0x34,0x35,0x36})
+                if len(sites)!=38 or any(site['classification']!='linear_io' for site in sites):
+                    raise ValueError('word-port linear decode coverage differs')
+                negative=[site for site in classify_candidates(program,disassemblies,{0x0a})
+                          if site['address']=='71ef']
+                if len(negative)!=1 or negative[0]['classification']!='operand_word':
+                    raise ValueError('CALLD operand negative control differs')
+                results['linear_decode_census']=dict(sites=sites,negative_control=negative[0],
+                                                     runtime_reachability_proved=False)
             else:
                 results['service']=inspect_word_service_observation((target/'error.log').read_text(errors='replace'))
         results['physical_completion_proved']=False

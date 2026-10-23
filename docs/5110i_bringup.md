@@ -1206,6 +1206,14 @@ records the compatibility-mask/calibration/retry-fixture assumptions and
 executable hash in each `inputs.json`, then writes checked results to
 `acceptance.json`. A pass proves this bounded software contract only;
 physical completion and long-run stability remain explicitly false.
+Its disassembly census covers all 38 raw candidates for ports `34/35/36`
+(31 control/status, five output, two input) with byte-matched linear I/O
+decodes, and rejects `71ef` as an operand of CALLD `74fa`. Uncovered,
+stale or conflicting decodes are explicit tool outcomes; overlapping exports
+are not resolved by majority vote. This is linear-decode coverage, not a
+control-flow or runtime-reachability proof and not a physical-clock absence
+proof. `c54x_rom4_port_census.py --disassembly FILE` exposes the same
+classification for other acquired program images without changing emulation.
 
 Vector `ffd0` branches to ISR `3416`. Its `34da` path reads port `36`,
 tests mask `2000`, and can write port `34` at `34e8` or `34f4` while
