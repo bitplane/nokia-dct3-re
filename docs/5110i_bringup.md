@@ -82,6 +82,7 @@ make verify-5110i-puk1-exhaustion RUN_DIR=tmp/nse2-puk1-exhaustion
 make verify-5110i-fdn-dial-policy RUN_DIR=tmp/nse2-fdn-policy
 make verify-5110i-native-processing RUN_DIR=tmp/nse2-native-processing
 make verify-5110i-native-ui-state RUN_DIR=tmp/nse2-native-ui-state
+make verify-5110i-sim-write-state RUN_DIR=tmp/nse2-sim-write-state
 ```
 
 The nominal boot gate requires the reviewed unattended seven-second frame
@@ -1192,6 +1193,40 @@ It does not establish sustained operation, registration, connected calls or
 speech; the forty-second repeated-startup diagnostic remains a negative
 control. No native clock, firmware state or peer response is changed.
 
+### Pending SIM write restoration
+
+`verify-5110i-sim-write-state` prepares a fresh full card, physically enters
+the existing Add name `A/123` workflow and saves after the real
+`A0 DC 01 04 20` header reaches the card, before any body byte is sent.
+The Save contact uses a separate 70-ms hold so it is already released at
+the checkpoint; the ordinary phonebook fixture retains its 150-ms default.
+The qualified header time is 27.585246462 seconds and the checkpoint is
+27.585249230 seconds. Mixed trace precision is compared with a bounded
+100-ns header-timestamp tolerance, not exact textual timestamp equality.
+
+Read-only saved-item observations require both saved and restored card
+state to be `ins=DC`, body length zero, expected length 32, receiving-body
+true and EF `6F3A` selected. SIMI has one queued, not-ready RX byte, a
+pending TX-ready cause, zero IIR and an empty TX FIFO. Crucially, ADN record
+one is all `FF` both before save and immediately after load: the reference
+leg's committed record is actually rolled back, not merely overwritten
+with identical data. Observed MCU registers and RAM checksum also match.
+
+A run-local wire artifact records and independently checks reference and
+restored TX/RX events over 0.5 seconds, including their order and relative
+timestamps at nine decimal places. Both qualified legs have 195 events,
+starting with pending procedure byte `DC`, the exact 32-byte record body,
+and status `9000`; later record-read traffic also replays identically.
+The diagnostic cap is 2,048 events and fails closed. Each leg has exactly
+one post-checkpoint ADN commit and the exact Saved frame. Only record one
+changes in the complete card. A third, independent cold process physically
+searches for `A`, reads the saved contact and preserves the whole card.
+
+This qualifies the declared pending card/SIMI transaction and cold storage
+continuation, not every serial phase, electrical timing, native network
+service or operation beyond the known restart. Saved-item access is
+read-only; only physical inputs and emulator save/load APIs are driven.
+
 ## Remaining work
 
 | Boundary | Established | Required evidence / next action |
@@ -1199,5 +1234,5 @@ control. No native clock, firmware state or peer response is changed.
 | Native receive supervision | Initial RX is delivered and consumed; full scan advances; timer-`dd` tests generic activity and expires with zero. | Identify a legitimate later producer or peripheral completion. No guessed heartbeat, shortened bitmap or policy disable. |
 | Pending word peripheral | Ports `34/35/36`, state/mask/ack grammar and pending first TX are mapped. | Recover clock/framing/completion ownership from software or measured traces; adjacent setup exposes no evidenced divisor. Its relationship to supervision remains unproved. |
 | Provisioning | Own checksum and explicit retry-byte fixtures permit physical phone authentication. | Own semantic/factory evidence, not donor EEPROM or promotion of a diagnostic byte to a factory default. |
-| Bounded software continuation | SIM security, persistent contacts/drafts, FDN policy and native/UI replay have independent pre-restart gates. | Extend restoration into an actual in-flight SIM write or security transaction; idle/UI replay cannot prove transaction ownership. |
+| Bounded software continuation | SIM security, persistent contacts/drafts, FDN policy, native/UI replay and pending SIM UPDATE/cold-readback have independent pre-restart gates. | Other in-flight serial/security phases remain unqualified; these gates cannot establish sustained handset operation. |
 | Sustained handset service | The reason-`68` restart is retained as a negative control. | Prove operation beyond that boundary before promoting native registration, network SMS, calls or speech. Fitted DSP/clock and electrical calibration remain separate prerequisites. |

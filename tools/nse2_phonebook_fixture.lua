@@ -12,7 +12,9 @@ local events = {}
 local function press(when, column, mask)
     local field = contact(column, mask)
     events[#events + 1] = {when, field, 1}
-    events[#events + 1] = {when + 0.15, field, 0}
+    local hold=when==27.5 and _G.nse2_phonebook_save_hold or 0.15
+    assert(hold>0 and hold<=0.15)
+    events[#events + 1] = {when + hold, field, 0}
 end
 press(23.1, 0, 8) -- Add name
 press(23.5, 1, 4)
