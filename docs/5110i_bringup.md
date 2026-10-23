@@ -94,7 +94,7 @@ The archive calls the phone 5110i; both headers identify `NSE-2`, `05.53`,
 | GENSIO/CCONT | Own `296704`: select `22` at `28`, TX `2a`, RX `2d`, status `29` bit 2. | Shared serial grammar, not measured electrical timing. |
 | LCD | Own `296e46/296eac`: command/data `2c/2b`, ready bit 0. | Observed 84x48 presentation; fitted controller identity remains unproved. |
 | Keypad | Scanner `29806c`, decoder `299010`, maps `2b382c/2b3848`, selector `10c6b6`; five rows, signal/direction `31/2f`, columns `30`, IRQ mask `33`. | Existing NSE-1 contact layout matches own table; digits 1--5 and Menu have runtime decode acceptance. |
-| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/retry exhaustion/PUK1 recovery, PIN2 change/retry exhaustion/PUK2 recovery/permanent refusal, organic ADN write and cold contact readback pass. FDN settings, protected record lifecycle and local On/Off dialing-policy contrast pass. | PIN1 change and network-connected call behavior remain unqualified. The Nokia phone code is phone-side. |
+| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/change/cold acceptance/retry exhaustion/PUK1 recovery, PIN2 change/retry exhaustion/PUK2 recovery/permanent refusal, organic ADN write and cold contact readback pass. FDN settings, protected record lifecycle and local On/Off dialing-policy contrast pass. | Network-connected call behavior remains unqualified. The Nokia phone code is phone-side. |
 
 EEPROM START/STOP entry points are `295814/295886`, identified by SDA
 transitions while SCL is high. Block reader `293d92` takes address,
@@ -325,6 +325,38 @@ VERIFY before protected SIM reads. No handset state or credentials are
 rewritten by either input fixture.
 
 ### PIN2 and PUK2 lifecycle
+
+#### PIN1 change prerequisite and cold acceptance
+
+`verify-5110i-pin1-change` establishes that Change PIN is gated by PIN-code
+request being enabled. On the PIN1-disabled laboratory card, selecting the
+item displays `Set PIN code request on`, sends no CHANGE and preserves the
+complete card. Continuing to type credentials after that notice instead
+becomes ordinary dialing input, so a key script without protocol checks
+would misattribute the result.
+
+With the same laboratory credentials and PIN1 explicitly enabled before
+boot, physical `1234` authenticates CHV1 at about 7.663 seconds. The separate
+phone-code fixture then authenticates the handset, and Settings / Security
+settings / Change access codes / Change PIN accepts old `1234`, new `2468`
+and its confirmation. `A0 24 00 01 10` at about 28.724 seconds returns
+`9000` and displays `PIN code changed`. Only the four PIN1 credential bytes
+change in the complete saved card; the enabled flag, retry counts, PIN2,
+PUKs and application data remain unchanged. A fresh process imports that
+exact card and the existing `--pin-action reauth` fixture successfully
+verifies physical `2468`, completes protected SIM bootstrap and preserves
+the whole card. This cold process reaches the separate phone-code prompt;
+it does not claim phone authentication or native registration.
+
+`tools/run_nse2_pin1_change.py` prepares a fresh full card, then runs the
+disabled and enabled menu branches independently and links the actual
+changed card into the existing cold PIN-authentication runner. All four
+processes are isolated; source/card/executable hashes are recorded. The
+checker requires physical boot/menu contacts, exact commands, successful
+statuses, complete-card transitions and the refusal/change frames. The
+cold stage retains the existing PIN bootstrap checker. The phone-code
+retry fixture, nominal ADC input and acquired NSE-1 DSP-mask compatibility
+assumption remain explicit; this is not authentic NSE-2 provisioning.
 
 #### Fixed-dialling settings lifecycle
 

@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nse2_pin1_change_cold_acceptance", "owner": "nse2_sim_security", "status": "satisfied",
+      "predicate": "Physical PIN1 change requires enabled PIN checking and the replacement credential authenticates a separate cold boot",
+      "current": "verify-5110i-pin1-change prepares a full fresh laboratory card and runs independent disabled/enabled branches. Disabled checking renders Set PIN code request on with no security/write command or card mutation. Enabled checking physically verifies1234, independently authenticates the phone, then changes PIN1 to2468 through A0/24/00/01/10 with9000 and PIN code changed. Only four credential bytes change; enabled state, retries, PIN2/PUKs and application data remain intact. A fresh existing PIN reauth runner imports that actual saved card, accepts2468, completes protected SIM reads and preserves every byte. Physical boot/menu contacts, exact frames, statuses, source hashes and full-card transitions are required. This does not prove authentic provisioning, native registration, connected calls or stability beyond the known restart.",
+      "evidence": ["docs/5110i_bringup.md", "gates.json", "tools/run_nse2_pin1_change.py", "tools/nse2_pin1_change_fixture.lua", "tools/nse2_pin1_change_check.py", "tools/test_nse2_pin1_change_check.py", "tools/nse2_pin_fixture.lua", "tools/nse2_sim_check.py"]
+    },
+    {
       "id": "nse2_local_fdn_dial_permission_contrast", "owner": "nse2_sim_security", "status": "satisfied",
       "predicate": "Physical unlisted dialing is locally refused only with FDN active while listed and matched FDN-Off attempts reach call-progress presentation",
       "current": "verify-5110i-fdn-dial-policy composes seventeen fresh processes. Physical activation imports the organically saved/cold-read A/12346 record and changes only ADN validity. Listed12346 and unlisted54321 import the exact same active card; only54321 renders Call not allowed. A matched54321 attempt imports the retained Off card and reaches the same call-progress frame as listed12346. All dial attempts preserve every card byte and issue no application security/write command; active-card startup performs only LOCI/IMSI rehabilitation. Phone authentication, input/executable/source hashes, physical digit timing and exact before/after frames are checked. This is a local permission decision, not native registration, network connection, speech or stable operation beyond the known restart. The call UI elapsed counter is not connection evidence.",
