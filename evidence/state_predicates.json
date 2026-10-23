@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nse2_physical_pin2_change_cold_acceptance", "owner": "nse2_sim_security", "status": "satisfied",
+      "predicate": "Physical NSE-2 security-menu input changes PIN2 and a fresh process accepts the persisted replacement credential for a reverse change",
+      "current": "verify-5110i-pin2-change runs two phone-authenticated processes with PIN1-disabled laboratory cards, own diagnostic NV and an explicit phone retry fixture. Physical security-menu input supplies PIN2 5678 and confirms 2468. One A0 24 00 02 10 returns 9000 and renders PIN2 code changed. Only PIN2 changes within the supplied legacy profile; current-format fields are appended by the device. A fresh process imports the complete card, accepts 2468 and restores 5678 through another CHANGE, with whole-input-card mutation checks. Five exact frames and all 62 navigation/credential contact edges are checked per process. This proves ordinary CHV2 persistence, not PUK2/exhaustion, FDN, native registration, speech or long-run stability.",
+      "evidence": ["docs/5110i_bringup.md", "gates.json", "tools/nse2_pin2_fixture.lua", "tools/nse2_pin2_restore_fixture.lua", "tools/nse2_sim_check.py", "tools/test_nse2_sim_check.py"]
+    },
+    {
       "id": "nse2_physical_chv1_boot_contrast", "owner": "nse2_sim_security", "status": "satisfied",
       "predicate": "A PIN-enabled laboratory card requires physical CHV1 verification, accepts its real PIN and persistently accounts for a wrong attempt without unlocking the Nokia phone code",
       "current": "verify-5110i-sim-pin contrasts no-input, correct1234 and wrong1111 physical controls. Correct VERIFY opens all16 binary/50 ADN/10 SMS bootstrap reads within14seconds; wrong entry changes only the retry byte. The persistence gate cold-waits at2 retries and restores3 through physical VERIFY. The blocked gate chains three actual wrong attempts through2,1,0 retries with9804/9804/9840, then cold-observes the PUK prompt without input or card mutation. verify-5110i-sim-puk-recovery continues that chain: physical PUK12345678 and confirmed new PIN2468 issue exactly one A0 2C 00 00 10 with9000, changing only PIN1 digits and retry0to3. A fresh process physically verifies2468, completes protected bootstrap reads and leaves the complete card unchanged. Phone-side lock stays active. Other PIN management, PUK exhaustion, network registration, fitted DSP/clock and long-run stability remain unqualified.",

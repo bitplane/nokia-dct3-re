@@ -97,6 +97,8 @@ def main():
     parser.add_argument('--pin-enabled', action='store_true', help='separate PIN-enabled synthetic-card boot observation')
     parser.add_argument('--pin-action', choices=('verify','wrong','blocked','puk','reauth'), help='physical PIN/PUK attempt or cold prompt control')
     parser.add_argument('--pin-card', type=Path, help='persistent PIN-enabled laboratory card from an earlier process')
+    parser.add_argument('--pin2-action',choices=('change','restore'),help='physical security-menu PIN2 change or cold reverse change')
+    parser.add_argument('--pin2-card',type=Path,help='complete saved card for cold PIN2 reverse change')
     parser.add_argument('--seconds', type=int, default=8, choices=range(8, 121), metavar='8..120')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -136,10 +138,24 @@ def main():
             raise ValueError('persistent PIN card requires the PIN-enabled boot fixture')
         if args.pin_action in ('blocked','puk','reauth') and not args.pin_card:
             raise ValueError('blocked PIN control requires the card saved by actual PIN exhaustion')
+        if args.pin2_action and (not args.phone_retry_zero or args.seconds!=30 or args.pin_enabled or args.post_auth_menu
+                               or args.sms_store or args.sms_reload or args.phonebook or args.phonebook_reload or args.phonebook_search):
+            raise ValueError('PIN2 menu requires a separate phone-authenticated thirty-second run')
+        if (args.pin2_card and args.pin2_action!='restore') or (args.pin2_action=='restore' and not args.pin2_card):
+            raise ValueError('cold PIN2 restoration requires the saved changed card')
         report = prepare_native(root, run, record_checksum=args.record_checksum_only,
                                 nominal_vbat=args.nominal_vbat, insert_sim=args.insert_sim,
                                 phone_retry_zero=args.phone_retry_zero)
         machine = report['machine']
+        if args.pin2_action:
+            from tools.make_sim_card_profile import make_profile
+            from tools.nse2_sim_check import verify_pin2_input
+            pin2_card=args.pin2_card.read_bytes() if args.pin2_card else make_profile(False)
+            verify_pin2_input(pin2_card,restore=args.pin2_action=='restore')
+            card_path=run/'nvram'/machine/'sim_card'
+            card_path.parent.mkdir(parents=True,exist_ok=True)
+            card_path.write_bytes(pin2_card)
+            report['pin2_card']=dict(sha256=hashlib.sha256(pin2_card).hexdigest(),source=str(args.pin2_card.resolve()) if args.pin2_card else 'laboratory default')
         if args.pin_enabled:
             from tools.make_sim_card_profile import make_profile
             from tools.nse2_sim_check import verify_pin_input
@@ -173,7 +189,9 @@ def main():
                    '-video', 'none', '-sound', 'none', '-joystickprovider', 'none',
                    '-midiprovider', 'none', '-nothrottle', '-noreadconfig', '-log', '-verbose',
                    '-seconds_to_run', str(args.seconds), '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools' / ('nse2_puk_fixture.lua' if args.pin_action=='puk' else
+                   '-autoboot_script', str(root / 'tools' / ('nse2_pin2_restore_fixture.lua' if args.pin2_action=='restore' else
+                       'nse2_pin2_fixture.lua' if args.pin2_action else
+                       'nse2_puk_fixture.lua' if args.pin_action=='puk' else
                        f'nse2_pin_{args.pin_action}_fixture.lua' if args.pin_action in ('verify','wrong','blocked','reauth') else
                        f'nse2_sms_{args.sms_action}_fixture.lua' if args.sms_action else
                        'nse2_sms_reload_fixture.lua' if args.sms_reload else
@@ -271,6 +289,14 @@ def main():
                 (run / 'nse2_native_program.bin').read_bytes(),
                 (run / 'roms' / machine / 'nse1_rom4_dsp_program.bin').read_bytes(),
                 (run / 'roms' / machine / 'nse1_rom4_dsp_data.bin').read_bytes())
+        if args.pin2_action:
+            from tools.nse2_sim_check import verify_pin2_change
+            frames=[]
+            for index in range(1,6):
+                with Image.open(run/f'snap/nse2_pin2_menu_{index}.png') as frame:
+                    frames.append(frame.convert('L').tobytes())
+            result['pin2_change']=verify_pin2_change(text,pin2_card,(run/'nvram'/machine/'sim_card').read_bytes(),frames,
+                                                   restore=args.pin2_action=='restore')
         if args.phonebook:
             from tools.nse2_sim_check import verify_phonebook_save
             with Image.open(run / 'snap/nse2_phonebook_5.png') as saved:
@@ -307,6 +333,8 @@ def main():
         if args.pin_enabled:
             print('NSE-2 physical SIM PIN ' + (args.pin_action or 'wait') +
                   ' PASS; phone-side code remains locked')
+        elif args.pin2_action:
+            print('NSE-2 physical PIN2 '+args.pin2_action+' PASS; network/stable long boot unproved')
         elif args.sms_store:
             print('NSE-2 physical offline SMS draft save PASS; cold readback/network SMS unproved')
         elif args.sms_reload:

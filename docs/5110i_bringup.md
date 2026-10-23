@@ -94,7 +94,7 @@ The archive calls the phone 5110i; both headers identify `NSE-2`, `05.53`,
 | GENSIO/CCONT | Own `296704`: select `22` at `28`, TX `2a`, RX `2d`, status `29` bit 2. | Shared serial grammar, not measured electrical timing. |
 | LCD | Own `296e46/296eac`: command/data `2c/2b`, ready bit 0. | Observed 84x48 presentation; fitted controller identity remains unproved. |
 | Keypad | Scanner `29806c`, decoder `299010`, maps `2b382c/2b3848`, selector `10c6b6`; five rows, signal/direction `31/2f`, columns `30`, IRQ mask `33`. | Existing NSE-1 contact layout matches own table; digits 1--5 and Menu have runtime decode acceptance. |
-| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/rejection/cold retry restoration, organic ADN write and cold contact readback pass. | PIN1/2 changes and PUK recovery/exhaustion remain separate tests; the Nokia phone code is phone-side. |
+| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/retry exhaustion/PUK1 recovery, ordinary PIN2 change/cold reverse change, organic ADN write and cold contact readback pass. | PIN1 change, PIN2 exhaustion/PUK2 and FDN remain unqualified; the Nokia phone code is phone-side. |
 
 EEPROM START/STOP entry points are `295814/295886`, identified by SDA
 transitions while SCL is high. Block reader `293d92` takes address,
@@ -323,6 +323,24 @@ the PUK and phone-code frames, and the exact permitted storage delta. The
 cold authentication checker still rejects UNBLOCK commands and requires
 VERIFY before protected SIM reads. No handset state or credentials are
 rewritten by either input fixture.
+
+### Ordinary PIN2 change and cold credential acceptance
+
+`verify-5110i-pin2-change` uses two isolated thirty-second processes with
+PIN1 disabled and the explicitly declared phone-code retry fixture. Physical
+phone-code acceptance precedes Settings / Security settings / Change access
+codes / Change PIN2. The first process supplies current PIN2 `5678` and
+confirms replacement `2468`; firmware sends `A0 24 00 02 10` at about
+29.072 seconds, receives `9000`, and renders `PIN2 code changed`. The card
+changes only PIN2 credential bytes within the supplied legacy profile;
+the device appends its current-format fields. PIN1, PUKs, retry counts and
+the supplied application storage remain unchanged. The second process imports that complete card,
+physically supplies `2468`, and restores `5678` through another successful
+CHANGE. Its complete-card comparison proves persisted credential acceptance
+and rejects unrelated mutations. The gate checks physical contact ordering,
+all five prompt/result frames and exactly one CHV2 CHANGE per process.
+This is ordinary PIN2 management, not PIN2 exhaustion/PUK2 recovery, FDN,
+network service or operation past the known native restart.
 
 ### Physical contact save
 

@@ -34,6 +34,30 @@ def contacts():
 
 
 class SimCheckTest(unittest.TestCase):
+    def test_pin2_change_and_cold_reverse_require_exact_card_transition(self):
+        from tools.nse2_sim_check import verify_pin2_change
+        from tools.make_sim_card_profile import make_profile
+        from tools.sim_security_trace_check import AOC_NVRAM_SIZE,CHV_OFFSET
+        initial=make_profile(False)
+        changed=bytearray(initial.ljust(AOC_NVRAM_SIZE,b'\xff'))
+        changed[CHV_OFFSET+8:CHV_OFFSET+16]=b'2468\xff\xff\xff\xff'
+        frames=[bytes([i]) for i in range(5)]
+        text='\n'.join(f'nse2_pin2_contact: event={i} down={i%2} t={18.5+(i-1)*.175:.3f} physical_only=1' for i in range(1,63))
+        text+='\nsim_device: header cla=a0 ins=24 p1=00 p2=02 p3=10 selected=6f3a t=29.072\nSIM status ins=24 sw=9000 chv=3/3 puk=10/10 enabled=0'
+        with patch('tools.nse2_sim_check.PIN2_CHANGE_FRAMES',tuple(hashlib.sha256(f).hexdigest() for f in frames)):
+            self.assertTrue(verify_pin2_change(text,initial,changed,frames)['sim_pin2_changed'])
+            restored=bytearray(changed)
+            restored[CHV_OFFSET+8:CHV_OFFSET+16]=b'5678\xff\xff\xff\xff'
+            self.assertTrue(verify_pin2_change(text,changed,restored,frames,restore=True)['cold_replacement_pin2_accepted'])
+            for bad in (text.replace('sw=9000','sw=9804'),text.replace('p2=02','p2=01'),text.replace('event=62','event=63')):
+                with self.assertRaises(ValueError):
+                    verify_pin2_change(bad,initial,changed,frames)
+            restored[-1]^=1
+            with self.assertRaises(ValueError):
+                verify_pin2_change(text,changed,restored,frames,restore=True)
+            with self.assertRaises(ValueError):
+                verify_pin2_change(text,initial,changed,frames[::-1])
+
     def test_puk_recovery_requires_exact_storage_and_physical_unblock(self):
         from tools.nse2_sim_check import verify_puk_recovery,verify_pin_input
         from tools.make_sim_card_profile import make_profile
