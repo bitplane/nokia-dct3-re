@@ -94,7 +94,7 @@ The archive calls the phone 5110i; both headers identify `NSE-2`, `05.53`,
 | GENSIO/CCONT | Own `296704`: select `22` at `28`, TX `2a`, RX `2d`, status `29` bit 2. | Shared serial grammar, not measured electrical timing. |
 | LCD | Own `296e46/296eac`: command/data `2c/2b`, ready bit 0. | Observed 84x48 presentation; fitted controller identity remains unproved. |
 | Keypad | Scanner `29806c`, decoder `299010`, maps `2b382c/2b3848`, selector `10c6b6`; five rows, signal/direction `31/2f`, columns `30`, IRQ mask `33`. | Existing NSE-1 contact layout matches own table; digits 1--5 and Menu have runtime decode acceptance. |
-| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/retry exhaustion/PUK1 recovery, PIN2 change/retry exhaustion/PUK2 recovery/permanent refusal, organic ADN write and cold contact readback pass. FDN activation/cold-state/deactivation pass. | Fixed-number editing/call restrictions and PIN1 change remain unqualified. The Nokia phone code is phone-side. |
+| SIMI | Own `286520` initializes standard IIR/FIFO controls; SIM bootstrap, physical CHV1 verification/retry exhaustion/PUK1 recovery, PIN2 change/retry exhaustion/PUK2 recovery/permanent refusal, organic ADN write and cold contact readback pass. FDN settings, protected record lifecycle and local On/Off dialing-policy contrast pass. | PIN1 change and network-connected call behavior remain unqualified. The Nokia phone code is phone-side. |
 
 EEPROM START/STOP entry points are `295814/295886`, identified by SDA
 transitions while SCL is high. Block reader `293d92` takes address,
@@ -386,6 +386,22 @@ complete-card transitions accompany physical contact/protocol checks.
 The full lifecycle uses thirteen isolated processes including preparation;
 it does not establish active-FDN dialing restrictions or native stability
 beyond the known restart boundary.
+
+`verify-5110i-fdn-dial-policy` extends the complete record lifecycle with
+four independent processes. Activation imports the previously written and
+cold-read `A/12346` card, not a seeded number list, and changes only ADN
+validity through the established physical On/PIN2 path. Listed `12346` and
+unlisted `54321` each start from that same active saved card. The listed
+number reaches the firmware call-progress presentation; the unlisted number
+displays `Call not allowed`. A matched `54321` attempt from the retained
+FDN-Off card reaches the same call-progress frame as the listed attempt.
+All three preserve complete card storage and issue no application-phase
+security or write command. Active-card boots perform only their expected
+LOCI/IMSI rehabilitation. Physical digit/contact timing, pre-Call number
+frames, result frames, phone authentication and source hashes are checked.
+This seventeen-process gate proves a local FDN permission contrast, not
+native registration, a connected call, speech, or long-run stability. A
+call-progress image or elapsed counter is not network acceptance evidence.
 
 `verify-5110i-pin2-change` uses two isolated thirty-second processes with
 PIN1 disabled and the explicitly declared phone-code retry fixture. Physical

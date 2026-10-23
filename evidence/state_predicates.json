@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nse2_local_fdn_dial_permission_contrast", "owner": "nse2_sim_security", "status": "satisfied",
+      "predicate": "Physical unlisted dialing is locally refused only with FDN active while listed and matched FDN-Off attempts reach call-progress presentation",
+      "current": "verify-5110i-fdn-dial-policy composes seventeen fresh processes. Physical activation imports the organically saved/cold-read A/12346 record and changes only ADN validity. Listed12346 and unlisted54321 import the exact same active card; only54321 renders Call not allowed. A matched54321 attempt imports the retained Off card and reaches the same call-progress frame as listed12346. All dial attempts preserve every card byte and issue no application security/write command; active-card startup performs only LOCI/IMSI rehabilitation. Phone authentication, input/executable/source hashes, physical digit timing and exact before/after frames are checked. This is a local permission decision, not native registration, network connection, speech or stable operation beyond the known restart. The call UI elapsed counter is not connection evidence.",
+      "evidence": ["docs/5110i_bringup.md", "gates.json", "tools/run_nse2_fdn.py", "tools/nse2_fdn_dial_fixture.lua", "tools/nse2_fdn_check.py", "tools/test_nse2_fdn_check.py"]
+    },
+    {
       "id": "nse2_fdn_edit_erase_cold_persistence", "owner": "nse2_sim_security", "status": "satisfied",
       "predicate": "Physical protected FDN editing and confirmed erasure persist across cold processes while cancellation preserves the complete card",
       "current": "verify-5110i-fdn-edit-lifecycle composes thirteen fresh processes including preparation and prior settings/save/read/wrong-PIN2 controls. Edit imports the successful A/12345 write rather than the rejected branch, verifies PIN2 and changes only BCD byte3600 F5 to F6 through EF_FDN UPDATE RECORD. Cold held-number read shows12346 without VERIFY/write and preserves the card. Erase cancellation verifies PIN2 but sends no UPDATE. Confirmed erase rewrites only record one to FF, and cold Search displays No phone numbers with unchanged erased storage. Physical input, PIN2-before-update ordering, successful statuses, exact frames and whole-card transitions are checked. FDN remains Off during record management. Active-FDN dialing restrictions, native RF and stable operation beyond the known restart remain unproved.",

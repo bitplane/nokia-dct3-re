@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nse2_fdn_check import check_phase, check_record, FDN_RECORD, FDN_EDITED_RECORD
+from tools.nse2_fdn_check import check_phase, check_record, check_dial, FDN_RECORD, FDN_EDITED_RECORD
 from tools.sim_fdn_profile import extend, expected_validity_card
 
 
@@ -29,6 +29,30 @@ def fixture(phase):
 
 
 class FdnCheckTest(unittest.TestCase):
+    def test_local_dial_card_and_security_contrast(self):
+        for enabled in (False,True):
+            before=bytearray(extend(bytes(3570),True))
+            before[3575]=int(not enabled)
+            before[3578:3610]=FDN_EDITED_RECORD
+            rows=[]
+            if enabled:
+                for i,fid in enumerate((0x6f7e,0x6f07)):
+                    rows.extend((f'sim_device: header cla=a0 ins=44 p1=00 p2=00 p3=00 selected={fid:04x} t={4.4+i*.1}',
+                                 'SIM status ins=44 sw=9000 chv=3/3 puk=10/10 enabled=0'))
+            for i in range(12):
+                when=18.5+(i//2)*.35+(i%2)*.15
+                rows.append(f'nse2_fdn_dial_contact: event={i+1} down={1-i%2} t={when:.3f} physical_only=1')
+            text='\n'.join(rows)
+            self.assertTrue(check_dial(text,before,before,enabled=enabled)['card_unchanged'])
+            bad=bytearray(before)
+            bad[3500]^=1
+            for trace,after in ((text,bad),(text.replace('event=1 ','event=2 ',1),before),
+                                 (text+'\nsim_device: header cla=a0 ins=20 p1=00 p2=02 p3=08 selected=6f3b t=20',before)):
+                with self.assertRaises(ValueError):
+                    check_dial(trace,before,after,enabled=enabled)
+            with self.assertRaises(ValueError):
+                check_dial(text,before,before,enabled=not enabled)
+
     def test_record_storage_protocol_and_physical_input(self):
         before=bytearray(extend(bytes(3570),True))
         before[3517]=3

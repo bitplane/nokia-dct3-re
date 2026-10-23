@@ -2591,6 +2591,16 @@
       ]
     },
     {
+      "name": "verify-5110i-fdn-dial-policy",
+      "prerequisites": ["verify-5110i-static", "build"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_fdn.py",
+         "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame", "--dial-policy"]}
+      ]
+    },
+    {
       "name": "verify-5110i-pin2-change",
       "prerequisites": ["verify-5110i-static", "build"],
       "variables": {},

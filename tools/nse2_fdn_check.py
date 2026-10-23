@@ -9,6 +9,31 @@ FDN_RECORD = bytes.fromhex('41ffffffffffffffffffffffffffffffffff04812143f5ffffff
 FDN_EDITED_RECORD = FDN_RECORD[:22] + b'\xf6' + FDN_RECORD[23:]
 
 
+def check_dial(text,before,after,*,enabled):
+    if len(before)!=3898 or before[3570:3578]!=b'FDN\x01\x01'+bytes((0 if enabled else 1,1,0)):
+        raise ValueError('explicit FDN card validity differs')
+    if before[3578:3610]!=FDN_EDITED_RECORD or after!=before:
+        raise ValueError('dial lacks saved12346 record or changed card')
+    headers=[tuple(int(v,16) for v in m.groups()[:6])+(float(m[7]),)
+             for m in HEADER.finditer(text)]
+    relevant=[h for h in headers if h[1] in (0x04,0x20,0x24,0x26,0x28,0x2c,0x44,0xd6,0xdc)]
+    expected=[(0xa0,0x44,0,0,0,fid) for fid in (0x6f7e,0x6f07)] if enabled else []
+    if [h[:6] for h in relevant]!=expected or any(not 4<h[-1]<10 for h in relevant):
+        raise ValueError('dial security/file commands differ from cold startup')
+    if statuses(text,0x44,chv=2)!=[(0x9000,3,10)]*len(expected):
+        raise ValueError('cold active-FDN rehabilitation failed')
+    edges=re.findall(r'nse2_fdn_dial_contact: event=(\d+) down=([01]) '
+                     r't=([0-9.]+) physical_only=1',text)
+    if len(edges)!=12:
+        raise ValueError('dial physical contacts differ')
+    for i,(event,down,when) in enumerate(edges):
+        target=18.5+(i//2)*.35+(i%2)*.15
+        if int(event)!=i+1 or int(down)!=1-i%2 or abs(float(when)-target)>.04:
+            raise ValueError('dial physical order or timing differs')
+    return dict(fdn_enabled=enabled,card_unchanged=True,connected_call_verified=False,
+                native_registration_verified=False)
+
+
 def check_record(text, before, after, mode):
     if mode not in ('write', 'read', 'wrong', 'edit', 'read-edited', 'erase', 'cancel', 'empty'):
         raise ValueError('known FDN record mode required')
