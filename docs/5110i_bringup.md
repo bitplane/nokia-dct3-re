@@ -19,8 +19,10 @@ families but do not change the ordinary profile's failure frame. The
 NSE-1 ROM4 backend, obtains identity `4` and reaches organic readiness state
 one. This clears `0e/0f`, but its integrity-repaired run has a blank LCD at
 eight seconds, not accepted usable boot. Its fitted mask, clock, physical
-inputs and phone services remain unproved. The next boundary is the
-firmware-owned UI/provisioning path after native readiness.
+decoded input and phone services remain unproved. The next boundary is
+startup report `14`: state `10`, phase `6` and report bits `0e` leave the
+normal readiness conjunction incomplete. Physical Menu contacts change GPIO
+columns, but firmware still masks all columns and does not decode them.
 
 `make verify-5110i-static` independently qualifies the acquired ZIP and
 Windows SFX, verifies their exact two member names/extents/hashes and
@@ -76,7 +78,7 @@ claimed to be completed ownership exchanges or execution of the verifier.
 The failure frame alone does not identify whether NV, DSP or other self-test
 conditions selected it.
 
-## Next technical steps
+## NV and startup contracts
 
 The own block reader is `293d92`: arguments are EEPROM address in `r0`,
 destination in `r1`, and length in `r2`. It calls address setup `293c04`
@@ -279,15 +281,63 @@ fixture verdict. All usable-boot, physical-key, graphical-boot and fitted-mask
 claims remain false. Evidence: `tmp/nse2-native-final` and
 `tmp/nse2-native-erased-final`.
 
-Next map the own unattended UI and record selectors after readiness. The
-blank frame must be diagnosed, not replaced by a forced display type, donor
-identity or another product's initialization sequence.
+### Physical input and startup frontier
 
-1. Recover the own EEPROM record catalogue and semantic requirements beyond
-   the integrity-only fixtures. Establish own-product defaults or independently
-   sourced storage before proposing authentic provisioning.
-2. Follow the native-ready MCU lifecycle to the blank-frame/UI boundary;
-   keep runtime/native execution separate from usable graphical boot.
+```sh
+make verify-5110i-input-frontier RUN_DIR=tmp/nse2-input-frontier
+```
+
+The fixture presses only the own-ROM-derived physical Menu contact
+(`COL.1`, mask `04`) at 3 and 5 seconds, releasing it after 200 ms. Both
+contacts produce the expected GPIO column transitions `1f -> 1d -> 1f`.
+Firmware's last keyboard-mask write is `3f` at `299066`, so all five
+columns remain masked and the controller reports `changed=00`; the contact
+does not reach decoder `299044`. This is positive evidence of physical
+column response with firmware masking, not decoded input acceptance inferred
+from a missing trace hit.
+
+The mask belongs to keyboard initialization `299048`, called from `25c70a`
+on startup mode 2. Its ABI-preserved `r4` identifies task context `10c660`;
+the observer follows actual writes to its consumed-message word `10c662`.
+It observes reports `17`, `16`, `15` and the phase-changing input `10`,
+but no `14` through eight seconds. Samples from seconds 2--8 show:
+
+| Firmware state | Actual value | Consumer contract |
+| --- | --- | --- |
+| Context state `10c664` | `0010` | Own 17-entry table at `25c59c` sends state 16 to `25c732`. |
+| Phase `10ffac` | `06` | `25c7d2` requires low nibble 6. |
+| Report flags `10c5c9` | `0e` | `25c7dc` requires low nibble `0f`; `14/15/16/17` set bits `1/2/4/8`. |
+
+The phase test passes; the report conjunction does not. The loop remains
+live, consuming periodic `c8` inputs. It is not the previously studied
+3210 shutdown-code path. The own report-14 stub is `2969a6`, posting code
+`14` to task 1 via `2558e4`. An immediate-Thumb-BL census finds one direct
+caller at `22d9da`; this does not exclude table/argument-driven producers.
+The caller's subsystem/entry predicate remains unclassified: do not name it
+battery, radio or an external peer merely from neighboring product findings.
+The startup table, readiness gate, report stub and state literals are pinned
+by static qualification.
+
+The LCD command trace shows normal display mode (`20`, then `0c`) before
+the contacts; the captured frames remain blank. No display-type override,
+unmask, startup report or UI message is injected. The gate requires actual
+contacts, corresponding masked column changes, the incomplete RAM predicates
+and uncapped message evidence. It fails deliberately if the frontier advances,
+so that progress is reviewed rather than hidden by a stale negative claim.
+Evidence: `tmp/nse2-input-final`.
+
+The acquired NokiX scripts archive's external-EEPROM repair directory has
+NSE-1/3/6/8 and NSM-1 blobs, but no NSE-2 image. A historical
+[NSE-2 EEPROM thread](https://forum.gsmhosting.com/vbb/f131/nse-2-5110i-eeprom-51879/)
+is a retrieval lead only; no own dump was acquired or added as an input.
+
+## Next boundary
+
+1. Classify the own `22d9da -> 2969a6` report-14 producer and recover its
+   entry predicate. Compare that contract with actual startup inputs before
+   proposing any device behavior or provisioning fixture.
+2. Recover own EEPROM record semantics and defaults where the producer or UI
+   actually consumes them; never substitute a donor identity or calibration.
 3. Recover fitted flash identity, physical memory/clock and analogue inputs
    without changing returned IDs or samples merely to satisfy self-tests.
 4. Keep native-mask compatibility distinct from fitted-mask identification.

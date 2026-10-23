@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools.nse2_native_check import verify_native
+from tools.nse2_native_check import verify_native, verify_menu_probe
 from tools.run_nse2_native import prepare_native
 from tools.test_nse2_boot_check import transcript as boot_transcript
 from tools.test_nse2_upload_check import transcript as upload_transcript
@@ -29,7 +29,43 @@ def native_transcript():
     return text, payload
 
 
+def menu_transcript():
+    text = 'nse2_key_mask: value=3f pc=00299066 t=0.411 observer_writes=0\n'
+    for index, down, time in ((1, 1, 3.0), (1, 0, 3.2), (2, 1, 5.0), (2, 0, 5.2)):
+        old, new = ('1f', '1d') if down else ('1d', '1f')
+        text += (f'nse2_menu_contact: index={index} down={down} t={time} physical_only=1\n'
+                 f'kbgpio: columns={old}->{new} changed=00 row=e0 dir=1f mask=3f t={time}\n')
+    for time in range(2, 9):
+        text += (f'nse2_ui_state: t={time}.0 state_10c664=0010 flags_10c5c9=0e '
+                 'phase_10ffac=06 observer_writes=0\n')
+    for code in ('0015', '0016', '0017'):
+        text += (f'nse2_startup_message: address=0010c662 value={code} pc=0025c584 '
+                 't=1.1 observer_writes=0\n')
+    return text
+
+
 class NativeTest(unittest.TestCase):
+    def test_physical_probe_distinguishes_columns_from_decoded_delivery(self):
+        result = verify_menu_probe(menu_transcript())
+        self.assertTrue(result['gpio_columns_respond'])
+        self.assertFalse(result['physical_key_delivery'])
+        self.assertEqual(result['unobserved_startup_report'], '0x14')
+
+    def test_contacts_alone_are_not_input_acceptance(self):
+        for old, new in (('mask=3f', 'mask=20'), ('changed=00', 'changed=02'),
+                         ('t=5.2', 't=6.2'), ('pc=00299066', 'pc=00000000')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_menu_probe(menu_transcript().replace(old, new))
+
+    def test_probe_fails_when_frontier_advances_or_evidence_disappears(self):
+        for text in (menu_transcript().replace('flags_10c5c9=0e', 'flags_10c5c9=0f'),
+                     menu_transcript().replace('value=0015', 'value=0014'),
+                     menu_transcript().replace('t=8.0', 't=7.0'),
+                     menu_transcript() + 'nse2_startup_message_cap: reached=256',
+                     menu_transcript() + 'nse2_key_decode: raw=11 key=19'):
+            with self.assertRaises(ValueError):
+                verify_menu_probe(text)
+
     def check(self, text, payload, **kwargs):
         return verify_native(text, payload, bytes([255]) * 4032, (84, 48), **kwargs)
 

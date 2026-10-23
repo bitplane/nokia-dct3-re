@@ -4,6 +4,40 @@ import re
 from tools.nse2_boot_check import STATE, verify_nv, verify_record, verify_upload
 
 
+def verify_menu_probe(text):
+    if 'nse2_startup_message_cap:' in text:
+        raise ValueError('NSE-2 startup message evidence capped')
+    contacts = re.findall(r'nse2_menu_contact: index=([12]) down=([01]) t=([0-9.]+) physical_only=1', text)
+    if [(row[0], row[1]) for row in contacts] != [('1', '1'), ('1', '0'), ('2', '1'), ('2', '0')]:
+        raise ValueError('NSE-2 physical Menu contact sequence missing')
+    for row, expected in zip(contacts, (3, 3.2, 5, 5.2)):
+        if not expected <= float(row[2]) < expected + 0.04:
+            raise ValueError('NSE-2 physical Menu contact timing differs')
+    columns = re.findall(r'kbgpio: columns=(1f|1d)->(1f|1d) changed=00 row=e0 dir=1f mask=3f t=([0-9.]+)', text)
+    columns = [row for row in columns if float(row[2]) >= 3]
+    if [(row[0], row[1]) for row in columns] != [('1f', '1d'), ('1d', '1f')] * 2:
+        raise ValueError('NSE-2 masked physical column transitions missing')
+    if any(abs(float(column[2]) - float(contact[2])) > 0.04
+           for column, contact in zip(columns, contacts)):
+        raise ValueError('NSE-2 column transitions do not track the contacts')
+    masks = re.findall(r'nse2_key_mask: value=([0-9a-f]{2}) pc=([0-9a-f]{8}) t=([0-9.]+) observer_writes=0', text)
+    if not masks or masks[-1][:2] != ('3f', '00299066') or float(masks[-1][2]) >= 3:
+        raise ValueError('NSE-2 firmware-owned keyboard mask changed')
+    states = re.findall(r'nse2_ui_state: t=([0-9.]+) state_10c664=0010 flags_10c5c9=0e phase_10ffac=06 observer_writes=0', text)
+    times = [float(value) for value in states]
+    if len(times) < 7 or times[-1] < 8 or times != sorted(set(times)):
+        raise ValueError('NSE-2 incomplete startup predicate missing')
+    reports = re.findall(r'nse2_startup_message: address=0010c662 value=([0-9a-f]{4}) pc=[0-9a-f]{8} t=[0-9.]+ observer_writes=0', text)
+    if not {'0015', '0016', '0017'} <= set(reports) or '0014' in reports:
+        raise ValueError('NSE-2 observed startup report set changed')
+    if 'nse2_key_decode:' in text:
+        raise ValueError('NSE-2 probe now reaches decoding; re-evaluate the frontier')
+    return dict(physical_contacts_observed=True, gpio_columns_respond=True,
+                columns_masked_by_firmware=True, physical_key_delivery=False,
+                startup_state='0x10', report_bits='0x0e', phase=6,
+                unobserved_startup_report='0x14')
+
+
 def verify_native(text, payload, pixels, size, *, record_checksum=False):
     if text.count('Soft reset\n') != 1 or 'dsp_hle:' in text:
         raise ValueError('NSE-2 native reset/HLE boundary differs')

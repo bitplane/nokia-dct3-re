@@ -53,6 +53,51 @@ _G.nse2_upload_tap = space:install_write_tap(0x10008, 0x10fff, 'nse2_upload_word
     end
 end)
 local nv_reads = 0
+local key_reads = 0
+_G.nse2_task_message_taps = {}
+_G.nse2_key_init_tap = space:install_read_tap(0x299048, 0x29904b, 'nse2_key_init', function()
+    if cpu.state['R15'].value ~= 0x299048 then return end
+    local context = cpu.state['R4'].value
+    machine:logerror(string.format('nse2_key_init: lr=%08x context=%08x t=%.9f observer_writes=0\n',
+        cpu.state['R14'].value, context, machine.time:as_double()))
+    if context < 0x100000 or context + 4 > 0x110000 then return end
+    local address = context + 2
+    if _G.nse2_task_message_taps[address] then return end
+    local messages = 0
+    _G.nse2_task_message_taps[address] = space:install_write_tap(address & ~3, (address & ~3) + 3,
+        'nse2_startup_messages', function(offset, data, mask)
+            for lane = 0, 1 do
+                local shift = (1 - lane) * 16
+                if offset + lane * 2 == address and (mask & (0xffff << shift)) ~= 0 then
+                    messages = messages + 1
+                    if messages <= 256 then
+                        machine:logerror(string.format('nse2_startup_message: address=%08x value=%04x pc=%08x t=%.9f observer_writes=0\n',
+                            address, (data >> shift) & 0xffff, cpu.state['R15'].value, machine.time:as_double()))
+                    elseif messages == 257 then
+                        machine:logerror('nse2_startup_message_cap: reached=256\n')
+                    end
+                end
+            end
+        end)
+end)
+_G.nse2_start_mode_tap = space:install_write_tap(0x10c5cc, 0x10c5cf, 'nse2_start_mode', function(_, data, mask)
+    if (mask & 0xff000000) == 0 then return end
+    machine:logerror(string.format('nse2_start_mode: value=%02x pc=%08x t=%.9f observer_writes=0\n',
+        (data >> 24) & 255, cpu.state['R15'].value, machine.time:as_double()))
+end)
+_G.nse2_key_decode_tap = space:install_read_tap(0x2b382c, 0x2b3847, 'nse2_key_decode', function(offset, data, mask)
+    if cpu.state['R15'].value ~= 0x299044 then return end
+    for lane = 0, 3 do
+        local shift = (3 - lane) * 8
+        if (mask & (255 << shift)) ~= 0 then
+            key_reads = key_reads + 1
+            if key_reads <= 64 then
+                machine:logerror(string.format('nse2_key_decode: raw=%d key=%02x pc=00299044 t=%.9f observer_writes=0\n',
+                    offset + lane - 0x2b382c, (data >> shift) & 255, machine.time:as_double()))
+            end
+        end
+    end
+end)
 local dsp_state_writes = 0
 _G.nse2_dsp_state_tap = space:install_write_tap(0x10b9f4, 0x10b9f7, 'nse2_dsp_state', function(_, data, mask)
     for lane = 0, 1 do
@@ -126,9 +171,19 @@ _G.nse2_io_write_tap = space:install_write_tap(0x20020, 0x2003f, 'nse2_io_write'
         if (mask & (255 << shift)) ~= 0 then
             local value = (data >> shift) & 255
             if address == 0x20020 then signal_writes = signal_writes + 1 end
+            if dsp and address == 0x20033 then
+                machine:logerror(string.format('nse2_key_mask: value=%02x pc=%08x t=%.9f observer_writes=0\n',
+                    value, cpu.state['R15'].value, machine.time:as_double()))
+            end
             if address == 0x20028 then selected = value end
             if address == 0x2002a then tx = tx + 1 end
-            if selected == 0x21 and address == 0x2002c then commands = commands + 1 end
+            if selected == 0x21 and address == 0x2002c then
+                commands = commands + 1
+                if dsp and commands <= 128 then
+                    machine:logerror(string.format('nse2_lcd_command: n=%d value=%02x pc=%08x t=%.9f observer_writes=0\n',
+                        commands, value, cpu.state['R15'].value, machine.time:as_double()))
+                end
+            end
             if selected == 0x21 and address == 0x2002b then pixels = pixels + 1 end
         end
     end
@@ -143,6 +198,8 @@ emu.register_frame_done(function()
     if dsp then
         machine:logerror(string.format('nse2_native_state: t=%.9f pc=%04x illegal=%d idle=%d observer_writes=0\n',
             now, dsp.state['PC'].value, dsp.state['ILLEGAL'].value, dsp.state['IDLE'].value))
+        machine:logerror(string.format('nse2_ui_state: t=%.9f state_10c664=%04x flags_10c5c9=%02x phase_10ffac=%02x observer_writes=0\n',
+            now, space:read_u16(0x10c664), space:read_u8(0x10c5c9), space:read_u8(0x10ffac)))
     end
     machine:logerror(string.format('nse2_state: t=%.9f pc=%08x cpsr=%08x sp=%08x shared_writes=%d gensio_tx=%d gensio_rx=%d lcd_commands=%d lcd_bytes=%d eeprom_signal_writes=%d observer_writes=0\n',
         now, cpu.state['R15'].value, cpu.state['CPSR'].value, cpu.state['R13'].value,

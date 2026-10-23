@@ -11,7 +11,7 @@ from PIL import Image
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.run_nse2_boundary import prepare
-from tools.nse2_native_check import verify_native
+from tools.nse2_native_check import verify_native, verify_menu_probe
 
 
 MASK_INPUTS = (
@@ -48,6 +48,7 @@ def main():
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--record-checksum-only', action='store_true')
+    parser.add_argument('--physical-menu', action='store_true', help='press only the physical Menu contacts')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -59,7 +60,8 @@ def main():
                    '-video', 'none', '-sound', 'none', '-joystickprovider', 'none',
                    '-midiprovider', 'none', '-nothrottle', '-noreadconfig', '-log', '-verbose',
                    '-seconds_to_run', '8', '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools/nse2_boot_observe.lua')]
+                   '-autoboot_script', str(root / 'tools' / (
+                       'nse2_menu_fixture.lua' if args.physical_menu else 'nse2_boot_observe.lua'))]
         with mame.open('rb') as stream:
             report['mame_sha256'] = hashlib.file_digest(stream, 'sha256').hexdigest()
         report['command'] = command
@@ -78,6 +80,8 @@ def main():
             result = verify_native((run / 'error.log').read_text(errors='replace'),
                                    flash[source:source + 400], frame.convert('L').tobytes(), frame.size,
                                    record_checksum=args.record_checksum_only)
+        if args.physical_menu:
+            result['menu_probe'] = verify_menu_probe((run / 'error.log').read_text(errors='replace'))
         (run / 'acceptance.json').write_text(json.dumps(result, indent=2) + '\n')
         print('NSE-2 native verifier and readiness PASS; usable boot remains unproved')
         print(run)
