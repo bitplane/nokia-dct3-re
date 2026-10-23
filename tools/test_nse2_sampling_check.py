@@ -3,6 +3,25 @@ from tools.nse2_sampling_check import inspect_sampling_controls,inspect_peripher
 
 
 class SamplingCheckTest(unittest.TestCase):
+    def test_startup_service_template_and_marker_are_not_radio_completion(self):
+        from tools.nse2_sampling_check import inspect_word_startup_contract
+        image=bytearray(0x200000)
+        for address,encoded in {
+            0x28b7c8:'2007f7cafe071c042c00d00c493d2207f00ffdcc20071c21f7cafc36',
+            0x28b7ee:'2007f7cafdf41c042c00d00e49342207f00ffdb9201e702020071c21f7cafc21',
+            0x279d36:'88a232061c281c21f020ffe3240020081c29f7dbfdcc',
+            0x2b074c:'1ffff0d000010100',
+        }.items():
+            fragment=bytes.fromhex(encoded)
+            image[address-0x200000:address-0x200000+len(fragment)]=fragment
+        text='nse2_word_object_write: address=00101438 value=1e000000 mask=ff000000 pc=0028b804 lr=0028b803 t=0.32669 observer_writes=0'
+        self.assertFalse(inspect_word_startup_contract(image,text)['radio_completion_dependency_proved'])
+        with self.assertRaises(ValueError):
+            inspect_word_startup_contract(image,text.replace('1e000000','1f000000'))
+        image[0xb074c]^=1
+        with self.assertRaises(ValueError):
+            inspect_word_startup_contract(image,text)
+
     def test_worker_object_sources_and_dynamic_constructor(self):
         from tools.nse2_sampling_check import inspect_word_worker_objects
         rows=[f'nse2_word_worker_object: n={n} pc=0028de34 pointer={pointer} bytes={prefix.ljust(48,"0")} t=0.3385 observer_writes=0'

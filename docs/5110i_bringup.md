@@ -1280,8 +1280,20 @@ for either marker. Other branches process types `8d/8e`; the loop releases
 processed objects and receives the next through `2559e8`. This establishes
 a firmware-owned frame-routing/fragmentation path, not a radio-result
 constructor. The checked caller/source record prevents attributing the D0
-object to a different wrapper invocation. The upstream submitter of that
-original frame and the physical endpoint still require separate evidence.
+object to a different wrapper invocation. Physical endpoint ownership still
+requires separate evidence.
+Startup helper `28b7bc` supplies the discovery source. It allocates two
+seven-byte objects, copies template `2b074c` (`1f ff f0 d0 00 01 01`),
+and posts each to task 7 through `256050`; the second copy changes its
+marker to `1e` at `28b804`, positively witnessed in the runtime writes.
+Separate frame-copy helper `279d36..279d4c` allocates/copies the frame and
+posts it to task 8 through `2558e4`. The packet/sequence wrapper and native
+builder remain downstream, not independent radio producers.
+`inspect_word_startup_contract` pins the own-ROM task-post code, template
+and runtime FBUS marker store. This establishes paired startup service
+discovery, not a required response, physical baud or radio-completion
+dependency. RAM addresses in this trace are reused allocations; do not
+treat every earlier write to `101420/101438` as the same object's lifetime.
 
 Vector `ffd0` branches to ISR `3416`. Its `34da` path reads port `36`,
 tests mask `2000`, and can write port `34` at `34e8` or `34f4` while

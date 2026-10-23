@@ -16,6 +16,7 @@ from tools.nse2_sampling_check import (inspect_word_configuration_contract,
                                       inspect_word_pending_frames,
                                       inspect_word_frame_source,
                                       inspect_word_worker_objects,
+                                      inspect_word_startup_contract,
                                       inspect_word_service_observation)
 
 
@@ -71,6 +72,8 @@ def main():
                 results['service']=inspect_word_service_observation(text)
                 results['frame_source']=inspect_word_frame_source(program,data,text)
                 results['worker_objects']=inspect_word_worker_objects(text)
+                image=(target/'roms/nse2r4v/5110i_5.53A.fls').read_bytes()
+                results['startup_service']=inspect_word_startup_contract(image,text)
         results['physical_completion_proved']=False
         results['long_run_stability_proved']=False
         (run/'acceptance.json').write_text(json.dumps(results,indent=2)+'\n')

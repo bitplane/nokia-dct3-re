@@ -127,6 +127,25 @@ def inspect_word_pending_frames(data):
                 physical_baud_proved=False,receive_supervision_link_proved=False)
 
 
+def inspect_word_startup_contract(image,text):
+    fragments={
+        0x28b7c8:'2007f7cafe071c042c00d00c493d2207f00ffdcc20071c21f7cafc36',
+        0x28b7ee:'2007f7cafdf41c042c00d00e49342207f00ffdb9201e702020071c21f7cafc21',
+        0x279d36:'88a232061c281c21f020ffe3240020081c29f7dbfdcc',
+        0x2b074c:'1ffff0d000010100',
+    }
+    for address,encoded in fragments.items():
+        expected=bytes.fromhex(encoded)
+        offset=address-0x200000
+        if image[offset:offset+len(expected)]!=expected:
+            raise ValueError(f'word startup service code/template differs at {address:06x}')
+    if not re.search(r'nse2_word_object_write: address=00101438 value=1e000000 mask=ff000000 pc=0028b804 lr=0028b803 t=[0-9.]+ observer_writes=0',text):
+        raise ValueError('startup FBUS marker store absent')
+    return dict(startup_helper='28b7bc',template='2b074c',paired_frame_markers=['1f','1e'],
+                startup_destination_task=7,copy_destination_task=8,
+                radio_completion_dependency_proved=False)
+
+
 def inspect_word_worker_objects(text):
     rows=re.findall(r'nse2_word_worker_object: n=([12]) pc=0028de34 pointer=([0-9a-f]{8}) bytes=([0-9a-f]{48}) t=([0-9.]+) observer_writes=0',text)
     expected=[('1','00101438','00020a051eff00d000030101e000'),
