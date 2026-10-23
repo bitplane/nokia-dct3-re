@@ -14,8 +14,9 @@ The seventeen-second frame has transient placeholder-like glyphs; by
 nineteen seconds a Menu softkey is visible. Physical Menu presses then open
 **Phone book** and **Search / Add name / Erase**. A physical Add name
 workflow now saves `A / 123` through a successful SIM UPDATE RECORD and
-checks its serialized card storage. Cold contact readback,
-registration, calls and SMS are not accepted.
+checks its serialized card storage. A separate cold boot reads the saved
+card and physically searches for `A`; an erased-card control instead shows
+**No phone numbers**. Registration, calls and SMS are not accepted.
 Longer execution is not stable: both menu-only and contact-entry runs
 request reason-`68` reset at about 31.97 seconds. The short menu gates do
 not cover this boundary.
@@ -53,6 +54,7 @@ make verify-5110i-sim-bootstrap RUN_DIR=tmp/nse2-sim-bootstrap
 make verify-5110i-phonecode-boundary RUN_DIR=tmp/nse2-phonecode-boundary
 make verify-5110i-phonecode-accept RUN_DIR=tmp/nse2-phonecode-accept
 make verify-5110i-menu RUN_DIR=tmp/nse2-menu
+make verify-5110i-phonebook RUN_DIR=tmp/nse2-phonebook
 make verify-5110i-native-processing RUN_DIR=tmp/nse2-native-processing
 ```
 
@@ -81,7 +83,7 @@ The archive calls the phone 5110i; both headers identify `NSE-2`, `05.53`,
 | GENSIO/CCONT | Own `296704`: select `22` at `28`, TX `2a`, RX `2d`, status `29` bit 2. | Shared serial grammar, not measured electrical timing. |
 | LCD | Own `296e46/296eac`: command/data `2c/2b`, ready bit 0. | Observed 84x48 presentation; fitted controller identity remains unproved. |
 | Keypad | Scanner `29806c`, decoder `299010`, maps `2b382c/2b3848`, selector `10c6b6`; five rows, signal/direction `31/2f`, columns `30`, IRQ mask `33`. | Existing NSE-1 contact layout matches own table; digits 1--5 and Menu have runtime decode acceptance. |
-| SIMI | Own `286520` initializes standard IIR/FIFO controls; inserted synthetic card completes read bootstrap and an organic ADN write. | Cold contact readback and SIM PIN authentication remain unaccepted; the tested phone code is phone-side. |
+| SIMI | Own `286520` initializes standard IIR/FIFO controls; inserted synthetic card completes read bootstrap, organic ADN write and cold contact readback. | SIM PIN authentication remains unaccepted; the tested phone code is phone-side. |
 
 EEPROM START/STOP entry points are `295814/295886`, identified by SDA
 transitions while SCL is high. Block reader `293d92` takes address,
@@ -260,7 +262,8 @@ presses OK before the known restart deadline. The own firmware sends
 (SHA-256 `8f9188505262676c92fd1ec55e94d6e9dbf2854bc5d14fc4d2ac3dc0903d6909`).
 The shared SIM checker verifies record 1 encodes `A / 123` and leaves the
 other 49 ADN slots erased. This proves an organic write and serialized
-storage, not cold firmware readback or stable long operation.
+storage. Cold readback is checked separately below; stable long operation
+remains unproved.
 
 ```sh
 .venv/bin/python tools/run_nse2_native.py tmp/nse2-contact-save \
@@ -275,6 +278,19 @@ treated as lost initial evidence. Early/unknown caps still fail. Later
 application SIM reads do not count as duplicate bootstrap records; missing
 initial records still fail. The contact gate separately checks physical
 contacts, the write, successful status, storage bytes and Saved frame.
+
+`verify-5110i-phonebook` runs three isolated processes. First it saves the
+contact. Next it initializes a fresh phone instance with only the SIM NVRAM
+from that save (recording its source SHA-256), repeats authentication and
+physically searches for `A`. The resulting `A`/Call frame has SHA-256
+`4755eca080af19866a8da926e4185de6b1508f6271a3f4d116dc590d12d0e76a`.
+The entire saved card remains byte-identical, with no UPDATE RECORD during
+search. Finally the same physical search on an erased card produces
+`No phone numbers` (SHA-256
+`34478708c13e25cc3cb0778a9fa40f9cb812c6eb56636909c1ce133a1d616900`).
+Thus readback differs from editor text or a fabricated contact. This proves
+cold SIM contact persistence and firmware retrieval, not displayed number
+formatting, call signaling, registration or operation past the restart.
 
 ## Long-run native receive boundary
 
@@ -644,8 +660,9 @@ completion contract rather than changing queue state or timer rates.
 
 ## Remaining work
 
-1. Recover native receive activity across the first timer-`dd` window, then
-   verify contact creation/readback and cold persistence with physical input.
+1. Recover native receive activity across the first timer-`dd` window. Short
+   contact creation and cold readback are accepted independently; operation
+   past the restart remains unproved.
 2. Recover semantic EEPROM requirements from their own consumers; retain
    integrity-only fixtures as diagnostic inputs, not factory defaults.
 3. Extend the accepted application-menu path to longer lifecycle/save-state tests.

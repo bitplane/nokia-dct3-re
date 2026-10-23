@@ -8,6 +8,8 @@ AUTHENTICATED_FRAME = 'df66881e695c25b4a157c80b40cf56ad246bb45a9d54c1054264222a6
 PHONEBOOK_MENU_FRAME = 'eba0749f25b43e63dea723e7ca8e8f1051385648fa90278af2de39659c04989e'
 PHONEBOOK_SUBMENU_FRAME = '8e39080ec840c45849dbc34110a5b800de17726429b62d58f0fc2e0b4a227369'
 PHONEBOOK_SAVED_FRAME = '8f9188505262676c92fd1ec55e94d6e9dbf2854bc5d14fc4d2ac3dc0903d6909'
+PHONEBOOK_RELOAD_FRAME = '4755eca080af19866a8da926e4185de6b1508f6271a3f4d116dc590d12d0e76a'
+PHONEBOOK_EMPTY_SEARCH_FRAME = '34478708c13e25cc3cb0778a9fa40f9cb812c6eb56636909c1ce133a1d616900'
 BINARY_FILES = {0x6fb7: 15, 0x6fae: 1, 0x6f05: 4, 0x6fad: 3,
                 0x6f38: 12, 0x6f07: 9, 0x6f78: 2, 0x2fe6: 4,
                 0x6f46: 17, 0x6f74: 16, 0x6f7e: 11, 0x6f30: 24,
@@ -79,6 +81,31 @@ def verify_phonebook_save(text, data, pixels):
         raise ValueError('NSE-2 reviewed Saved frame differs')
     return dict(name='A', number='123', sim_update_and_storage=True,
                 saved_frame=True, cold_reload_verified=False, stable_long_boot=False)
+
+
+def verify_phonebook_reload(text, initial, final, pixels):
+    from tools.sim_phonebook_check import validate_phonebook_storage, ADN_LENGTH, SUPPORTED_NVRAM_LENGTHS
+    contacts = re.findall(r'nse2_phonebook_reload_contact: event=(\d+) down=([01]) t=([0-9.]+) physical_only=1',text)
+    if [(int(index),int(down)) for index,down,_ in contacts] != [(i,i%2) for i in range(1,7)]:
+        raise ValueError('NSE-2 physical cold search contact sequence differs')
+    times = [float(time) for _,_,time in contacts]
+    if times != sorted(times) or not 23 < times[0] < times[-1] < 26:
+        raise ValueError('NSE-2 cold search timing differs')
+    if any(int(match[2],16)==0xdc for match in HEADER.finditer(text)):
+        raise ValueError('NSE-2 cold search unexpectedly issued UPDATE RECORD')
+    present = initial is not None
+    if present:
+        validate_phonebook_storage(initial,b'A')
+        if final != initial:
+            raise ValueError('NSE-2 cold contact search changed saved card storage')
+    elif len(final) not in SUPPORTED_NVRAM_LENGTHS or final[:ADN_LENGTH] != bytes([255])*ADN_LENGTH:
+        raise ValueError('NSE-2 empty-card negative control contains a contact')
+    expected = PHONEBOOK_RELOAD_FRAME if present else PHONEBOOK_EMPTY_SEARCH_FRAME
+    if hashlib.sha256(pixels).hexdigest() != expected:
+        raise ValueError('NSE-2 cold contact search frame differs')
+    return dict(contact_present=present, cold_reload_verified=present,
+                empty_card_control=not present, card_modified=False,
+                number_displayed=False, call_signaling_proved=False, stable_long_boot=False)
 
 
 def verify_security_attempt(text, pixels, *, retry_zero=False):

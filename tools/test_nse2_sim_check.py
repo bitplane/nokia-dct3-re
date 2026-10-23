@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from tools.nse2_sim_check import (BINARY_FILES, verify_sim_reads, verify_security_attempt,
-                                  verify_post_auth_menu, verify_phonebook_save)
+                                  verify_post_auth_menu, verify_phonebook_save, verify_phonebook_reload)
 
 
 def reads():
@@ -33,6 +33,25 @@ def contacts():
 
 
 class SimCheckTest(unittest.TestCase):
+    def test_cold_contact_readback_differs_from_empty_card_without_writes(self):
+        from tools.sim_phonebook_check import CURRENT_NVRAM_LENGTH
+        empty = bytes([255])*CURRENT_NVRAM_LENGTH
+        card = bytearray(empty)
+        card[0] = ord('A')
+        card[18:22] = bytes((3,0x81,0x21,0xf3))
+        text = '\n'.join(f'nse2_phonebook_reload_contact: event={i} down={i%2} '
+                         f't={23.5+i/4:.2f} physical_only=1' for i in range(1,7))
+        with patch('tools.nse2_sim_check.PHONEBOOK_RELOAD_FRAME',hashlib.sha256(b'present').hexdigest()), \
+             patch('tools.nse2_sim_check.PHONEBOOK_EMPTY_SEARCH_FRAME',hashlib.sha256(b'empty').hexdigest()):
+            self.assertTrue(verify_phonebook_reload(text,card,card,b'present')['cold_reload_verified'])
+            self.assertTrue(verify_phonebook_reload(text,None,empty,b'empty')['empty_card_control'])
+            cases = [(text,None,empty,b'present'),(text,card,empty,b'present'),
+                     (text,None,card,b'empty'),(text.replace('event=6','event=7'),card,card,b'present'),
+                     (text+'\nsim_device: header cla=a0 ins=dc p1=01 p2=04 p3=20 selected=6f3a t=27.0',card,card,b'present')]
+            for args in cases:
+                with self.subTest(args=args[:1]), self.assertRaises(ValueError):
+                    verify_phonebook_reload(*args)
+
     def test_physical_save_needs_contacts_apdu_storage_status_and_frame(self):
         from tools.sim_phonebook_check import CURRENT_NVRAM_LENGTH
         data = bytearray([255]*CURRENT_NVRAM_LENGTH)

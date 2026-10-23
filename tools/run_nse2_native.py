@@ -88,6 +88,8 @@ def main():
     parser.add_argument('--post-auth-menu', action='store_true', help='physical Menu probe after accepted phone code')
     parser.add_argument('--native-processing', action='store_true', help='attach existing passive ROM4 processing observers')
     parser.add_argument('--phonebook', action='store_true', help='physical Add name and real SIM write experiment')
+    parser.add_argument('--phonebook-reload', type=Path, help='card NVRAM produced by a separate accepted contact save')
+    parser.add_argument('--phonebook-search', action='store_true', help='physical Search A on the fresh erased card (negative control)')
     parser.add_argument('--seconds', type=int, default=8, choices=range(8, 121), metavar='8..120')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -106,16 +108,30 @@ def main():
             raise ValueError('native processing census requires post-authentication Menu and at least 30 seconds')
         if args.phonebook and (not args.post_auth_menu or args.seconds != 30 or args.native_processing):
             raise ValueError('phonebook experiment requires post-auth Menu, thirty seconds and no processing census')
+        if args.phonebook_reload and (not args.post_auth_menu or args.seconds != 30 or args.native_processing or args.phonebook):
+            raise ValueError('phonebook reload requires separate post-auth Menu run, thirty seconds and no save/census')
+        if args.phonebook_search and (not args.post_auth_menu or args.seconds != 30 or args.native_processing or args.phonebook or args.phonebook_reload):
+            raise ValueError('erased-card search requires a separate thirty-second post-auth run')
         report = prepare_native(root, run, record_checksum=args.record_checksum_only,
                                 nominal_vbat=args.nominal_vbat, insert_sim=args.insert_sim,
                                 phone_retry_zero=args.phone_retry_zero)
         machine = report['machine']
+        if args.phonebook_reload:
+            from tools.sim_phonebook_check import validate_phonebook_storage
+            saved_card = args.phonebook_reload.read_bytes()
+            validate_phonebook_storage(saved_card,b'A')
+            card_path = run / 'nvram' / machine / 'sim_card'
+            card_path.parent.mkdir(parents=True,exist_ok=True)
+            card_path.write_bytes(saved_card)
+            report['saved_card'] = dict(source=str(args.phonebook_reload.resolve()),
+                                       sha256=hashlib.sha256(saved_card).hexdigest())
         command = [str(mame), machine, '-rompath', str(run / 'roms'),
                    '-nvram_directory', str(run / 'nvram'), '-cfg_directory', str(run / 'cfg'),
                    '-video', 'none', '-sound', 'none', '-joystickprovider', 'none',
                    '-midiprovider', 'none', '-nothrottle', '-noreadconfig', '-log', '-verbose',
                    '-seconds_to_run', str(args.seconds), '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools' / ('nse2_phonebook_fixture.lua' if args.phonebook else
+                   '-autoboot_script', str(root / 'tools' / ('nse2_phonebook_reload_fixture.lua' if args.phonebook_reload or args.phonebook_search else
+                       'nse2_phonebook_fixture.lua' if args.phonebook else
                        'nse2_processing_fixture.lua' if args.native_processing else
                        'nse2_post_auth_fixture.lua' if args.post_auth_menu else
                        'nse2_security_fixture.lua' if args.security_code else
@@ -174,8 +190,18 @@ def main():
             with Image.open(run / 'snap/nse2_phonebook_5.png') as saved:
                 result['phonebook'] = verify_phonebook_save(text,
                     (run / 'nvram' / machine / 'sim_card').read_bytes(), saved.convert('L').tobytes())
+        if args.phonebook_reload or args.phonebook_search:
+            from tools.nse2_sim_check import verify_phonebook_reload
+            with Image.open(run / 'snap/nse2_phonebook_reload_2.png') as frame:
+                result['phonebook_search'] = verify_phonebook_reload(text,
+                    saved_card if args.phonebook_reload else None,
+                    (run / 'nvram' / machine / 'sim_card').read_bytes(),frame.convert('L').tobytes())
+            result['contact_persistence'] = bool(args.phonebook_reload)
         (run / 'acceptance.json').write_text(json.dumps(result, indent=2) + '\n')
-        if args.phonebook:
+        if args.phonebook_reload or args.phonebook_search:
+            print('NSE-2 physical contact search PASS; ' +
+                  ('cold saved-card readback' if args.phonebook_reload else 'erased-card negative control'))
+        elif args.phonebook:
             print('NSE-2 physical contact save PASS; cold reload and stable long boot unproved')
         elif args.post_auth_menu:
             print('NSE-2 physical Phone book menu/submenu PASS; contact persistence and network unproved')

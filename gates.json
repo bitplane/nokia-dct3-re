@@ -2441,6 +2441,22 @@
                  "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--security-code", "--phone-retry-zero", "--post-auth-menu", "--seconds", "24"]}]
     },
     {
+      "name": "verify-5110i-phonebook",
+      "prerequisites": ["verify-5110i-static", "build"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/save", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--security-code", "--phone-retry-zero", "--post-auth-menu", "--phonebook", "--seconds", "30"]},
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/reload", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--security-code", "--phone-retry-zero", "--post-auth-menu", "--phonebook-reload", "$(RUN_DIR)/save/nvram/nse2r4v/sim_card", "--seconds", "30"]},
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+         "before_script": [], "script": "tools/run_nse2_native.py",
+         "arguments": ["$(RUN_DIR)/empty", "--mame", "$(MAME_DIR)/mame", "--record-checksum-only", "--nominal-vbat", "--insert-sim", "--security-code", "--phone-retry-zero", "--post-auth-menu", "--phonebook-search", "--seconds", "30"]}
+      ]
+    },
+    {
       "name": "verify-5110i-native-processing",
       "prerequisites": ["verify-5110i-static", "build"],
       "variables": {},
