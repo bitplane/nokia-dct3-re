@@ -2,14 +2,14 @@
 
 ## Current boundary
 
-`noki6190` is a conservative MCU research instrument. Two independent
-erased-storage runs initialize the same 8 KiB EEPROM, preserve the own flash
-and settle in a firmware idle loop. Passive startup capture additionally
-qualifies a graphical `CONTACT SERVICE` failure and the exact own 186-word
-identity-4 bootstrap installation. Native execution, fitted-mask compatibility,
-interactive input, SIM and radio remain unqualified. Next identify the failed
-self-test and validate the upload/reset boundary before choosing a resident
-mask or HLE completion. No donor EEPROM is supplied.
+`noki6190` is a conservative MCU instrument ending at `CONTACT SERVICE`.
+Separate `nsb3r4t` executes with explicit unproved NSE-1 ROM4 compatibility
+inputs. With one nominal ADC2 hypothesis and six integrity-only corrections
+to its own firmware-created EEPROM, it reproducibly reaches `Insert SIM card`.
+No donor identity/calibration is imported. Fitted-mask compatibility,
+interactive input, inserted SIM and radio remain unqualified. Next compose
+an external laboratory SIM and test firmware-owned reset/security/input;
+native execution does not by itself establish RF or calls.
 
 Collection provenance and the unprovided MCU-to-PPM gap are in
 `roms/README.md`. Reproduce the static report:
@@ -232,3 +232,50 @@ flash images remain unchanged. The five-second panel stays white. Thus this
 acquisition rejection is removed without resolving presentation; no report,
 counter, timer, identity or calibration content was injected. The remaining
 self-test/provisioning and application lifecycle must be investigated separately.
+
+## EEPROM integrity contract and empty-socket presentation
+
+The complete decoded checksum helpers are pinned independently of the
+fixture generator. Helper `270aa4` reads `0000..011f`, sums bytes
+`0000..011b` with the 16-bit byte accumulator at `2a5b14`, and compares
+that zero-extended result with the big-endian 32-bit word at `011c..011f`.
+Helper `23ce68` sums `0120..01fd` while excluding `0154..0155`, then
+compares against the big-endian halfword at `01fe..01ff` through `23d0c0`.
+These are integrity formulas, not authentication or valid calibration claims.
+
+Own native cold storage has stored calibration checksum `ffff` but computed
+value `db24`. The failed comparison clears self-test flag `10fde9` bit `40`
+at `23d0dc`. A two-byte control repairing only `1fe/1ff` passes that exact
+comparison but still fails result-array slot `12`, code `12` at `10fcb2`.
+The slot writer calls `29967a`, whose `270aa4` security-block integrity
+predicate fails. Aggregate scanner `23d12c..23d150` then independently clears
+bit `40` at `23d144`. This negative control prevents a passing calibration
+sum from being mistaken for complete self-test success.
+
+The combined control repairs only `11c..11f` and `1fe..1ff` in the qualified
+own cold EEPROM. It preserves every identity, security, calibration and
+settings content byte. The tool refuses other source hashes or reuse of an
+output directory, and records the complete seeded EEPROM and changed offsets.
+It is an explicit external integrity fixture, not a factory EEPROM image.
+
+```sh
+.venv/bin/python tools/nsb3_nominal_input.py roms/noki6190/6190f613a.fls tmp/nsb3-all-checksums-new --checksum-control-from tmp/nsb3-selftest-nominal --all-decoded-checksums
+```
+
+Run the prepared directory for 15 seconds with `nsb3r4t`,
+`-debug -debugger none` and `tools/nsb3_selftest_observe.lua`. A separate
+12-second preparation without `--all-decoded-checksums` is the calibration-only
+negative control. The full acceptance command is:
+
+```sh
+.venv/bin/python tools/nsb3_selftest_check.py roms/noki6190/6190f613a.fls tmp/nsb3-selftest-nominal tmp/nsb3-calibration-control-final tmp/nsb3-all-checksums-repeat
+```
+
+Both controls pass the calibration comparison; only the combined one has no
+aggregate error and retains final self-test bit `40`. Two independently seeded
+combined runs reach the reviewed `Insert SIM card` frame (84x48 RGB SHA256
+`a879c658a532b6526d3343287b42848f8a16bf10b7215086c1e215db45ee67cc`).
+Initial and final complete EEPROM are identical, SHA256
+`18022fd2313fc9d5a904f2a9c5ef26f498d059d9d8e7326273986c8fe360e92d`;
+the own flash also stays unchanged. The tray remains empty; no SIM protocol,
+menu interactivity, registration or native speech is promoted by this frame.

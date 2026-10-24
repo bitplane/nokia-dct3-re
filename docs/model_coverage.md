@@ -10,6 +10,11 @@ compatibility input. It retains all 811 own uploaded words above `27ff` and
 executes legally through the bounded native mailbox/frame test, ending on a
 white panel with default full-scale ADC2. This is not interactive or native
 RF/voice support; see `tools/nsb3_native_check.py` and `6190_bringup.md`.
+With the explicit nominal ADC2 hypothesis and six decoded integrity bytes
+recomputed in its own cold EEPROM, `nsb3r4t` separately reproduces an exact
+`Insert SIM card` frame with unchanged final storage. The passing fixture and
+calibration-only negative control are checked by `tools/nsb3_selftest_check.py`;
+inserted-card, input and radio acceptance remain open.
 
 Nokia 8855 / NSM-4 v5.18 has a fail-closed `noki8855` MCU research profile.
 Two own erased-storage boots produce identical catalogue/storage state and

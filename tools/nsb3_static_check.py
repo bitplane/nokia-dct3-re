@@ -76,6 +76,7 @@ def inspect(image):
     return {'mcu_sha256': MCU_SHA256, 'peripherals': peripheral_contract(image),
             'catalogues': catalogues,
             'acquisition_contract': acquisition,
+            'checksum_contract': checksum_contract(image),
             'catalogue_selector': {'context': '0x10ad08', 'field': '0x10ad0a',
                                    'equals_3': '0x10ad9c', 'otherwise': '0x10ad2c',
                                    'initial_consumer': '0x2946a0', 'indexed_consumer': '0x294acc'},
@@ -104,6 +105,21 @@ def acquisition_contract(image):
             'inclusive_sample_window': [1800, 5500],
             'gain_ram': '0x10fe54', 'offset_ram': '0x10fe58',
             'remaining_ram': '0x10a0e2', 'physical_units_proved': False}
+
+
+def checksum_contract(image):
+    for start, end, digest in (
+            (0x23ce68, 0x23cede, 'ac9c83cc3e3d1a6a6bee0586987783fedfa301f8a8a23958bf580ec0fafa6102'),
+            (0x270aa4, 0x270ade, '12a41b15bad88563dc155336e3a65ef9eb1f59ac7a26689438d926f0af5f4017'),
+            (0x2a5b14, 0x2a5b3a, '9f0e8d5aaa2f85e9c4b80238ab30f41023dff68b0c4d961e80b8e3da394c3a12')):
+        if hashlib.sha256(image[start - 0x200000:end - 0x200000]).hexdigest() != digest:
+            raise ValueError('NSB-3 decoded EEPROM checksum helper differs')
+    return {'security': {'reader': '0x270aa4', 'sum_bytes': ['0x0', '0x11c'],
+                         'stored': ['0x11c', '0x120'], 'arithmetic': 'sum16 zero extended to BE32'},
+            'calibration': {'reader': '0x23ce68', 'sum_bytes': ['0x120', '0x1fe'],
+                            'excluded_bytes': ['0x154', '0x156'], 'stored': ['0x1fe', '0x200']},
+            'selftest_flag': '0x10fde9', 'aggregate_errors': '0x10fca0',
+            'scope': 'Integrity only, not calibrated or authentic handset identity'}
 
 
 def main():
