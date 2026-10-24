@@ -49,14 +49,36 @@ Independent eight-second-PIN targets are:
   closure, physical reading, exact persisted hello record and body pixels.
 - `verify-8210-dcs-late-pin-host-outgoing-sms`: physical A/5551234 SMS,
   host acceptance, exact SMS-SUBMIT and sent-screen/CP/RP/RR checks.
+- `verify-8210-dcs-late-pin-host-outgoing-call`: physical1234567 dialing,
+  correlated host Connect, reviewed number/connected/idle frames and End.
+- `verify-8210-dcs-late-pin-state-call` and `...-state-sms`: exact active
+  call/delivered-SMS restoration, ordered protocol replay, matching pixels
+  and post-load physical End/Read continuation.
+- `verify-8210-dcs-late-pin-phonebook`: physical A/123 Save, independent
+  cold PIN authentication/registration and preserved-card Search/Detail.
+- `verify-8210-dcs-late-pin-sms-status-persistence`: two cold PIN-authenticated
+  processes; firmware reads/updates EF_SMSS and advances submitted reference
+  0->1 with own relative TP-VP A7 and host CP/RP/RR acceptance.
+
+`verify-8210-dcs-pin-delay-matrix` independently runs fresh own-PMM/card
+fixtures with physical PIN entry starting at7/8/10/12/20 seconds. The checker
+requires the exact five physical key times and registration after physical
+OK, in addition to each child gate's authentication/protocol/EF_LOCI checks.
+The early case publishes no timing failure; each delayed case publishes one.
+Observed registration times are12.891095/13.182360/15.307192/17.135156/
+25.064863 seconds respectively. These are results, not reply-delay settings.
+Binary and fixture sources must remain unchanged throughout the matrix.
+This qualifies five discrete input schedules, not every possible input time;
+only the eight-second profile supplies the service/storage/restoration
+coverage above.
 
 The incoming call/SMS checkers require MM Information and Cipher Mode
 Complete before SETUP/SAPI3 respectively, without fixing their incidental
 relative log order. Both orders and missing/late-event rejection are tested.
 The automatic one-shot call fixture pages at14.767s while phone-security
 input is still pending and does not complete a call; it is not promoted by
-the settled host-call result. Late-PIN outgoing calls, active-call/SMS
-restoration, cold phonebook/SMSS and media remain separate qualifications.
+the settled host-call result. Late-PIN media, extra host SMS rejection/timeout
+outcomes and other input schedules remain separate qualifications.
 
 `verify-8210-sms-status-persistence` checks two separate PIN-enabled
 research-HLE processes with retained own-product storage and physical SMS

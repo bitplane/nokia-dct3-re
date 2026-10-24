@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 828 gates: 630 generated from typed steps, 198 copied verbatim (shell).
+# 834 gates: 636 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -131,7 +131,11 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8210-dcs-late-pin-host-incoming-call \
 	verify-8210-dcs-late-pin-host-incoming-sms \
 	verify-8210-dcs-late-pin-host-outgoing-sms \
-	verify-8210-dcs-early-pin-host-incoming-call \
+	verify-8210-dcs-late-pin-host-outgoing-call \
+	verify-8210-dcs-late-pin-state-call verify-8210-dcs-late-pin-state-sms \
+	verify-8210-dcs-late-pin-phonebook \
+	verify-8210-dcs-late-pin-sms-status-persistence \
+	verify-8210-dcs-pin-delay-matrix verify-8210-dcs-early-pin-host-incoming-call \
 	verify-8210-dcs-host-incoming-sms verify-8210-dcs-early-pin-host-incoming-sms \
 	verify-8210-dcs-host-outgoing-sms verify-8210-dcs-early-pin-host-outgoing-sms \
 	verify-8210-dcs-host-rejected-sms verify-8210-dcs-host-outgoing-call \
@@ -1126,6 +1130,24 @@ verify-8210-dcs-late-pin-host-incoming-sms: build
 
 verify-8210-dcs-late-pin-host-outgoing-sms: build
 	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario host-outgoing-sms --dcs1800 --pin-enabled --pin-start 8 --mame $(MAME_DIR)/mame
+
+verify-8210-dcs-late-pin-host-outgoing-call: build
+	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario host-outgoing-call --dcs1800 --pin-enabled --pin-start 8 --mame $(MAME_DIR)/mame
+
+verify-8210-dcs-late-pin-state-call: build
+	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario call-state --dcs1800 --pin-enabled --pin-start 8 --mame $(MAME_DIR)/mame
+
+verify-8210-dcs-late-pin-state-sms: build
+	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario sms-state --dcs1800 --pin-enabled --pin-start 8 --mame $(MAME_DIR)/mame
+
+verify-8210-dcs-late-pin-phonebook: build
+	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario phonebook --dcs1800 --pin-enabled --pin-start 8 --mame $(MAME_DIR)/mame
+
+verify-8210-dcs-late-pin-sms-status-persistence: build
+	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario host-sms-status --dcs1800 --pin-enabled --pin-start 8 --mame $(MAME_DIR)/mame
+
+verify-8210-dcs-pin-delay-matrix: build
+	$(VENV)/bin/python tools/run_noki8210_pin_delay_matrix.py $(RUN_DIR) --mame $(MAME_DIR)/mame
 
 verify-8210-dcs-early-pin-host-incoming-call: build
 	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario host-incoming-call --dcs1800 --pin-enabled --pin-start 7 --mame $(MAME_DIR)/mame
