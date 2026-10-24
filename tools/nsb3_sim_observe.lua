@@ -5,6 +5,15 @@ local machine = manager.machine
 local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces.program
 local tx, rx, controls = 0, 0, 0
+_G.nsb3_reset_request = memory:install_write_tap(0x20000, 0x20003, 'nsb3_reset_request', function(_, data, mask)
+    if mask & 0x00ff0000 == 0 then return end
+    local value = (data >> 16) & 255
+    if value & 4 ~= 0 then
+        machine:logerror(string.format('nsb3_board_reset_request: data=%02x pc=%08x lr=%08x reason=%08x count=%02x inhibit=%02x t=%.9f observer_writes=0\n',
+            value, cpu.state['R15'].value, cpu.state['R14'].value, cpu.state['R4'].value,
+            memory:read_u8(0x10fdee), memory:read_u8(0x10fdf3), machine.time:as_double()))
+    end
+end)
 local function wire(address, data, mask, write)
     for lane = 0, 3 do
         local offset, shift = address + lane, (3 - lane) * 8

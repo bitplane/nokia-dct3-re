@@ -695,5 +695,30 @@ The gate requires exact physical settings input, credential APDUs/statuses,
 enabled/disabled cold challenge behavior, whole-card contents, own executable,
 linked source hashes/initial card snapshots and Done/prompt/menu pixel oracles.
 Unrelated credential, file or Toolkit mutations fail. No firmware-state write,
-donor data or guest-state transfer is supplied. Menu-based PIN change, PIN2,
+donor data or guest-state transfer is supplied. PIN2,
 failed-PUK and restoration remain separate contracts.
+
+### Menu PIN change and cold authentication
+
+Physical Settings → Security settings → Access codes → Change PIN code
+navigation submits current `1234`, new `4321` and confirmation. The firmware
+issues `A0 24 00 01 10` with the padded current/new credentials; the card
+returns `9000` and the LCD displays **PIN code changed**. Only PIN1 changes.
+An independently launched process rejects old `1234` (attempts 3→2), and a
+further cold process accepts `4321` (attempts 2→3), then accepts the separate
+phone code and opens Messages. No guest RAM or save state is transferred.
+
+Run `tools/nsb3_pin_change_input.lua` for 90 seconds from a prepared copy of
+the original correct-PIN seed. Use `tools/nsb3_pin_change_check.py prepare-old`
+and `prepare-new` to link the following cold processes, running
+`nsb3_pin_old.lua` for 22 seconds and `nsb3_pin_changed.lua` for 42 seconds.
+`check SEED CHANGE OLD NEW` verifies source identities, exact card transitions,
+physical contacts, APDUs/statuses and changed/PIN/error/phone/menu frames.
+
+**Long-run limit:** an extended run requests a board software reset near
+93.969 seconds (`20001=05`, PC `2b4b9e`, caller `23ff2a`). The supervisor
+at `23feac` counts iterations at `10fdee` while flag `10fdf3` is clear;
+the threshold is 15. Its missing lifecycle condition is unresolved. This is
+not established as hardware watchdog expiry or DSP liveness. The 90-second
+credential gate rejects observed reset requests and does not qualify
+long-run stability. No reset suppression, timer change or heartbeat is used.

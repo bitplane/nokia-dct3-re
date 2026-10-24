@@ -21,7 +21,7 @@ local actions = coroutine.create(function()
         assert(emu.wait(0.15))
         field:set_value(0)
         machine:logerror(string.format('nsb3_security_key: key=%s down=0 t=%.9f physical_only=1\n', step[2], machine.time:as_double()))
-        assert(emu.wait(1))
+        assert(emu.wait(_G.nsb3_security_settle or 1))
         machine.screens[':screen']:snapshot(string.format('nsb3_security_%02d.png', index))
     end
 end)
