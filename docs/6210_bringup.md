@@ -313,6 +313,27 @@ erasure. This qualifies two General numbers on one contact and selective
 field deletion, not arbitrary field types, capacity or record encoding.
 Capture: `tmp/npe3-phone-numbers-qualified`.
 
+The independent `tools/run_noki6210_phone_memory_copy.py DIRECTORY` gate
+qualifies one **Phone to SIM card / One by one / Keep original** transfer.
+Three fresh baseline processes establish an empty Phone-bank control,
+firmware-saved A / 123 and cold Phone readback. A fourth process physically
+copies that contact, renders **Copied** and completes the absolute EF_ADN
+record-1 UPDATE with status9000. Exact whole-card comparison permits only
+the expected 32-byte A / 123 record to change; every other record, security
+field and settings byte must remain unchanged.
+
+Two independent cold branches inherit the complete copied NVRAM. Each
+explicitly selects its bank before searching; distinct **Phone memory
+selected** and **SIM card memory selected** pixel oracles prevent reading
+the destination twice from masquerading as source retention. Both branches
+must render the exact A / 123 detail frame, preserve the complete copied
+card and issue no UPDATE RECORD. The SIM branch must also read EF_ADN
+record1. Menu positions are harness policy: the Phone bank inserts **Add
+number** before Options, and Memory in use initially highlights the current
+Phone choice. These observations do not decode flash records or qualify
+reverse copying, Erase original, bulk copying, capacity or native DSP.
+Capture: `tmp/npe3-phone-to-sim-final`.
+
 ### Laboratory registration
 
 The runtime emits an organic type-`0x56` acquisition request with a 160-byte
