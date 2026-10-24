@@ -3606,6 +3606,11 @@ static INPUT_PORTS_START( nsm1r4t )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Right Softkey") PORT_CODE(KEYCODE_BACKSPACE) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( nsb3r4t )
+	PORT_INCLUDE(noki5210)
+	PORT_INCLUDE(dct3_research_adc2)
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( nse2r4v )
 	PORT_INCLUDE(noki5110)
 	PORT_MODIFY("SIM_REMOVED")
@@ -5580,7 +5585,7 @@ SYST( 2001, nse2r4t, noki5110i, 0, nse2r4t, noki5110, nokia_dct3_state, empty_in
 SYST( 2001, nse2r4v, noki5110i, 0, nse2r4v, nse2r4v, nokia_dct3_state, empty_init, "Research", "NSE-2 ROM4 nominal VBATT experiment (unmeasured board)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki5190, 0, 0, noki5190, noki5110, nokia_dct3_state, empty_init, "Nokia", "5190 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki6190, 0, 0, noki6190, noki5210, nokia_dct3_state, empty_init, "Nokia", "6190 MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2026, nsb3r4t, noki6190, 0, nsb3r4t, noki5210, nokia_dct3_state, empty_init, "Research", "NSB-3 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nsb3r4t, noki6190, 0, nsb3r4t, nsb3r4t, nokia_dct3_state, empty_init, "Research", "NSB-3 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsb1r4t, noki5190, 0, nsb1r4t, nsb1r4t, nokia_dct3_state, empty_init, "Research", "NSB-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsk1r4t, 0, 0, nsk1r4t, nsk1r4t, nokia_dct3_state, empty_init, "Research", "NSK-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki6130, 0, 0, noki6130, noki5110, nokia_dct3_state, empty_init, "Nokia", "6130 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

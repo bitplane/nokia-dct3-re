@@ -184,3 +184,51 @@ not standby. Own flash remains unchanged; the independently initialized
 identity is imported. Next decode own acquisition/self-test gates under the
 full-scale ADC input; do not infer an analogue fix from another product's
 successful nominal-value experiment.
+
+## Own acquisition rejection and nominal comparison
+
+`acquisition_contract` pins the complete helper `27a3e0..27a4b4`, including
+both conditional sample paths and signed range comparisons. Reader `2b1eee`
+uses own channel table `2d6a1c` (`00 04 05 06 07 03 01 02 02 01`);
+source 7 selects ADC2 through the own serial ADC routine `2b5244`.
+Gain/offset are RAM `10fe54/10fe58`; both transformed samples must be in
+inclusive `1800..5500`. At identity gain and zero offset, the transform is
+integer `raw * 1500 / 229`. Accumulator `27a4b4` decrements remaining byte
+`10a0e2` only after a successful helper return.
+
+The full-scale native control records 16 failed attempts at return site
+`27a4c2`, each with both samples `1a2c` (6700), gain `3f800000`, offset
+zero and remaining `0a`. This independently explains the uncompleted
+acquisition under raw ADC2 `3ff`; it does not assign physical units by itself.
+
+The [original 6190 owner manual](https://www.instructionsmanuals.com/sites/default/files/2019-05/Nokia-6190-en.pdf),
+Technical Information, specifies nominal operating voltage 3.6 V. The retained
+PDF is `roms/reference-docs/nsb3/nokia-6190-owner-manual.pdf`, SHA256
+`a0a5a8e039bc3cb6548553b4bcf546aee2ef685ee51a8f571b65a1e46c3ce144`.
+Combined with the previously documented typical CCONT VBAT transfer of
+6.5 mV/bit, this supplies one external raw-input hypothesis, `round(3600/6.5)=554`.
+It is not measured NSB-3 board calibration or a value chosen by sweeping.
+
+Only the research machine exposes the existing two-choice ADC2 input. Its
+default remains full-scale. Prepare a fresh config-only comparison:
+
+```sh
+.venv/bin/python tools/nsb3_nominal_input.py roms/noki6190/6190f613a.fls tmp/nsb3-acquisition-nominal-new
+```
+
+Run the prepared directory using the isolated `nsb3r4t` command with
+`-debug -debugger none`, six seconds and `tools/nsb3_acquisition_observe.lua`.
+An independently fresh full-scale run with the same observer supplies the
+control. Compare them with:
+
+```sh
+.venv/bin/python tools/nsb3_acquisition_check.py roms/noki6190/6190f613a.fls tmp/nsb3-acquisition-fullscale tmp/nsb3-acquisition-nominal
+```
+
+The nominal run logs external raw `22a`, ten successful attempts with both
+samples `0e2c` (3628), and remaining values `0a..01` before each decrement.
+The entire EEPROM remains equal to the full-scale native control, and both
+flash images remain unchanged. The five-second panel stays white. Thus this
+acquisition rejection is removed without resolving presentation; no report,
+counter, timer, identity or calibration content was injected. The remaining
+self-test/provisioning and application lifecycle must be investigated separately.

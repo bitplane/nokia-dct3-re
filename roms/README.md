@@ -754,6 +754,15 @@ names these exact files and explicitly lists ROM4 file selections. Neither
 that configuration nor a product label proves mask compatibility or runtime
 support. The source URL/hash remains in the collection acquisition manifest.
 
+## Nokia 6190 owner manual
+
+The original Nokia 6190 owner's manual (NSB-3NX, issue 5) is independently
+retained as `reference-docs/nsb3/nokia-6190-owner-manual.pdf`, SHA256
+`a0a5a8e039bc3cb6548553b4bcf546aee2ef685ee51a8f571b65a1e46c3ce144`.
+Source: [manual PDF](https://www.instructionsmanuals.com/sites/default/files/2019-05/Nokia-6190-en.pdf).
+Its Technical Information gives 3.6 V operating voltage; this is a nominal
+input reference, not a DSP mask or fitted CCONT calibration measurement.
+
 ## External implementation reference archive
 
 The already-catalogued reference revision

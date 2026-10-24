@@ -63,6 +63,7 @@ def peripheral_contract(image):
 def inspect(image):
     if hashlib.sha256(image).hexdigest() != MCU_SHA256:
         raise ValueError('requires own normalized NSB-3 v6.13 MCU')
+    acquisition = acquisition_contract(image)
     catalogues = []
     for table, identity in ((0x2b67d0, 3), (0x2b6848, 4)):
         result = read_catalogue(image, table)
@@ -74,6 +75,7 @@ def inspect(image):
         catalogues.append({'table': hex(table), 'bootstrap_identity': identity, **result})
     return {'mcu_sha256': MCU_SHA256, 'peripherals': peripheral_contract(image),
             'catalogues': catalogues,
+            'acquisition_contract': acquisition,
             'catalogue_selector': {'context': '0x10ad08', 'field': '0x10ad0a',
                                    'equals_3': '0x10ad9c', 'otherwise': '0x10ad2c',
                                    'initial_consumer': '0x2946a0', 'indexed_consumer': '0x294acc'},
@@ -82,6 +84,26 @@ def inspect(image):
                                 'intermediate_predicate': '0x27562c',
                                 'zero_is_not_dsp_wait_proof': True},
             'scope': 'Own static declarations only; runtime mask selection and fitted compatibility unproved'}
+
+
+def acquisition_contract(image):
+    if hashlib.sha256(image[0x7a3e0:0x7a4b4]).hexdigest() != '12729b59c44f38da04c97bc49e8d65e3bb37b1907f05448e25da2c01a5218de9':
+        raise ValueError('NSB-3 complete acquisition helper differs')
+    for address, encoded in {
+            0x27a69c: '0010fe20000005dc', 0x27a834: '0000157c',
+            0x2b1f20: '481d5d40f003f98e', 0x2b1f98: '002d6a1c',
+            0x2d6a1c: '00040506070301020201',
+            0x2b5244: 'b5301c04f7f6ffa3482021295c090889d3fb21285c0a2322540b21874b1c781b4019012343192308430b06190e09252a23fb4c187824',
+            0x2b52d0: '00020000'}.items():
+        expected = bytes.fromhex(encoded)
+        offset = address - 0x200000
+        if image[offset:offset + len(expected)] != expected:
+            raise ValueError('NSB-3 acquisition channel/constant roots differ')
+    return {'helper': '0x27a3e0', 'accumulator_return': '0x27a4c2',
+            'source': 7, 'adc_channel': 2, 'numerator': 1500, 'divisor': 229,
+            'inclusive_sample_window': [1800, 5500],
+            'gain_ram': '0x10fe54', 'offset_ram': '0x10fe58',
+            'remaining_ram': '0x10a0e2', 'physical_units_proved': False}
 
 
 def main():
