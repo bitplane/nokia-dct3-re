@@ -28,13 +28,12 @@ def validity_targets(tx,instruction):
     return targets
 
 
-def check_phase(trace,phase,tx_label):
+def check_protocol_phase(trace,phase,tx):
     if phase not in range(4):raise ValueError('unknown FDN phase')
     if statuses(trace,0x20)!=[(0x9000,3,10)]*(1 if phase%2 else 2):raise ValueError('VERIFY results differ')
     if any(statuses(trace,ins) for ins in (0x24,0x26,0x28,0x2c)):
         raise ValueError('unexpected credential mutation')
     expected=([0x6f7e,0x6f07],[0x6f7e,0x6f07],[0x6f7e,0x6f07,0x6f3a],[])[phase]
-    tx=transmitted(trace,4096,tx_label)
     if len(tx)>=4096:raise ValueError('SIM transmit observation cap reached')
     if validity_targets(tx,0x44)!=expected:raise ValueError('identity/ADN rehabilitation route differs')
     if validity_targets(tx,4)!=([0x6f3a] if phase==0 else []):raise ValueError('ADN invalidation route differs')
@@ -44,3 +43,7 @@ def check_phase(trace,phase,tx_label):
     pin2=bytes.fromhex('a020000208')+padded_pin('5678')
     if tx.count(pin2)!=(0 if phase%2 else 1):raise ValueError('PIN2 APDU differs')
     if not phase%2:tx.index(bytes((0xa0,4 if phase==0 else 0x44,0,0,0)),tx.index(pin2)+len(pin2))
+
+
+def check_phase(trace,phase,tx_label):
+    check_protocol_phase(trace,phase,transmitted(trace,4096,tx_label))

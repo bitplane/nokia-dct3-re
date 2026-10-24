@@ -1024,3 +1024,41 @@ or firmware-context write is supplied. `nsb3_puk2_permanent_input.lua` uses
 physical navigation and a read-only later snapshot; both runs end at92seconds
 before the separately qualified late-reset boundary. Native RF, long-run
 stability and complete idle/display correctness remain open.
+
+## Fixed dialing settings and cold validity
+
+`tools/nsb3_fdn_prepare.py BASE ON` copies only the qualified own handset
+storage and extends the original PIN-enabled laboratory SIM with the shared
+FDN image format. It declares invalid-ADN read access and initially empty
+FDN records. The private image extension is a card fixture, not firmware
+state or an on-wire protocol. Base/input hashes and the unchanged-handset
+declaration are retained separately from ordinary cold-copy provenance.
+
+Physical Settings/Security/Fixed dialing On verifies PIN2 `5678`, invalidates
+EF_ADN and rehabilitates EF_LOCI/EF_IMSI through real T=0 commands. Only the
+card's validity byte 3575 changes 1→0; credentials, retries and all records
+remain unchanged. A cold process authenticates PIN1 and the separate phone
+code, performs the expected identity rehabilitation and displays Fixed
+dialing On without another PIN2 entry or validity change.
+
+Physical Off in a further cold process verifies PIN2 and rehabilitates ADN,
+changing only byte 3575 back 0→1. Another cold process displays Off without
+PIN2 or validity commands. All phases require complete-card transitions,
+exact physical input and ordered/shared validity protocol checks, not just
+the On/Off label.
+
+Run `nsb3_fdn_input.lua` for 84 seconds; use
+`nsb3_fdn_check.py prepare-on-cold ON ON_COLD`, then run
+`nsb3_fdn_cold.lua` for 68 seconds. Prepare Off from ON_COLD with the same
+On-card operation, then run `nsb3_fdn_disable.lua` for 84 seconds. Prepare
+the final cold input using `prepare-off-cold OFF OFF_COLD` and run the cold
+script for 68 seconds. `check BASE ON ON_COLD OFF OFF_COLD` validates the
+explicit initial extension, subsequent exact storage links, own executable,
+credentials/APDUs/statuses and Messages/On/Off pixels. Handset-specific
+contacts remain local; `sim_fdn_protocol_check.check_protocol_phase` is the
+same parsed-TX contract used by the existing sibling adapters.
+
+This qualifies settings and cold file-validity persistence, not rejected
+activation, protected FDN record editing, local dial permission, radio
+registration, connected calls or native speech. No firmware messages,
+selection flags, counters or guest state are injected.

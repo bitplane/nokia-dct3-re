@@ -27,6 +27,10 @@ exposes Scrolling view/Memory status and reports the laboratory SIM's 1 used/49 
 not a separate Phone-memory choice; Nokia's product manual corroborates
 SIM-dependent contact capacity. A 6150-style local Phone store is not an
 independently supported requirement for this profile.
+An explicit FDN-capable lab card additionally proves physical PIN2-authenticated
+On/cold-On/Off/cold-Off and exact file-validity/identity rehabilitation, with
+unchanged credentials and records. Protected FDN records and local dial
+permission remain separate from these settings and from native registration.
 Physical offline SMS composition/save, cold Outbox read, confirmed deletion
 and a second cold empty-Outbox check also pass through the laboratory SIM.
 Physical SIM-security gates cover PIN-request Off/On, PIN1/PIN2 changes and
