@@ -3113,6 +3113,33 @@ observer uses digit-prefixed numeric offsets so debugger accumulator symbols
 `a`/`b` cannot silently replace hexadecimal offsets. The checker validates native
 call ownership, vector widths/order, reference coverage and exact native replay.
 
+`run_efr_filter_replay.py` separately checks filter arithmetic on copies of
+these captured arguments. Its small I/O harness links the acquired reference's
+unmodified `Syn_filt`, not a copied implementation. All 2,072 calls reproduce
+all 82,880 native raw-synthesis samples exactly in both frontends. Each
+calculated history update equals that call's final ten output samples; all
+2,071 observed native inter-call history handoffs independently equal the
+preceding output tail, including frame boundaries.
+
+This closes the measured filter arithmetic/history handoff for these vectors,
+not every CPU flag/saturation case, whole-decoder conformance or the earlier
+excitation-generation differences. Arguments and history copies are supplied
+only to a standalone calculator: neither decoder nor emulator state is edited,
+and the acquired recovery patch and strict PCM failure remain untouched.
+
+```sh
+python3 tools/run_efr_filter_replay.py --source ACQUIRED_REFERENCE_SOURCE \
+  --native RUN/error.log --output NEW_DIRECTORY
+```
+
+The calculator rebuilds its three original reference objects, verifies the
+original decoder's installation PCM, compares two fresh-process calculations
+and checks that the original executable, source and harness hashes do not
+change. The report pins arguments, calculator output and native input log.
+Incomplete binary cases, truncated vectors and an inconsistent history update
+are errors; arithmetic differences are explicitly reported, never silently
+accepted as native speech or full-decoder conformance.
+
 ### Native EFR active-speech erasures
 
 Atomic and staged execution complete all 163 frames and replay 65,440 ordinary
