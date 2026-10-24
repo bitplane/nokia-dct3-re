@@ -23,6 +23,11 @@ READ_KEYS = ['Right Softkey / C'] + ['Left Softkey / Menu'] * 3 + ['End', 'Left 
 EDIT_KEYS = READ_KEYS[:-3] + ['Left Softkey / Menu'] * 3 + [
     'Right Softkey / C', 'Keypad 4', 'Left Softkey / Menu'] + READ_KEYS[-3:]
 KEYS = {'save': SAVE_KEYS, 'read': READ_KEYS, 'edit': EDIT_KEYS, 'edit_read': READ_KEYS}
+ERASE_PREFIX = READ_KEYS[:-3] + ['Left Softkey / Menu', 'Scroll Down', 'Scroll Down', 'Left Softkey / Menu']
+KEYS.update(erase_cancel=ERASE_PREFIX + ['Right Softkey / C'] + READ_KEYS[-3:],
+            erase=ERASE_PREFIX + ['Left Softkey / Menu'] + READ_KEYS[-3:],
+            empty_read=['Right Softkey / C'] + ['Scroll Down'] * 4 +
+                       ['Left Softkey / Menu', 'End'] + READ_KEYS[:3] + READ_KEYS[-3:])
 SAVE_FRAMES = {
     'phone_empty': '5b617392ff03236596d815bc50b1dfd891228d13ca6557728b18496f8db59bb3',
     'memory_selected': 'e8a0189272eb64a815ba67304938418a36abdd57223bba000b0c1a8f258ed98a',
@@ -43,6 +48,12 @@ EDIT_FRAMES = dict(READ_FRAMES,
 EDIT_READ_FRAMES = dict(READ_FRAMES, phonebook='5066beda30d2fbd845ba3036385adc8db278b7844707b18b4d921ee14387775d')
 MODE_FRAMES = {'save': SAVE_FRAMES, 'read': READ_FRAMES,
                'edit': EDIT_FRAMES, 'edit_read': EDIT_READ_FRAMES}
+ERASE_PROMPT = 'f4798fa7bdb4077bae837b58cec453ce6153f7f463a6c2d3d51827a6841a7eaf'
+MODE_FRAMES.update(
+    erase_cancel=dict(READ_FRAMES, erase_prompt=ERASE_PROMPT, erase_result=READ_FRAMES['phonebook_list']),
+    erase=dict(READ_FRAMES, erase_prompt=ERASE_PROMPT,
+               erase_result='9b824b193e9310a0e0644d539bb352dabeea75f2f628a27c94b67a11ce8dfcf8'),
+    empty_read={key: SAVE_FRAMES[key] for key in ('memory_selected', 'phone_empty')})
 
 
 def expected_card():
@@ -92,7 +103,9 @@ def main():
     parser.add_argument('run', type=Path)
     modes = parser.add_mutually_exclusive_group(required=True)
     for flag, mode in (('--save', 'save'), ('--read', 'read'),
-                       ('--edit', 'edit'), ('--edit-read', 'edit_read')):
+                       ('--edit', 'edit'), ('--edit-read', 'edit_read'),
+                       ('--erase-cancel', 'erase_cancel'), ('--erase', 'erase'),
+                       ('--empty-read', 'empty_read')):
         modes.add_argument(flag, action='store_const', dest='mode', const=mode)
     args = parser.parse_args()
     try:

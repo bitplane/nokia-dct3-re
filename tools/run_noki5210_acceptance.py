@@ -27,6 +27,7 @@ class Scenario:
     host_call: str | None = None
     sms_mask: str | None = None
     preserved: bool = False
+    cold_scenario: str | None = None
 
 
 # The early and negative controls deliberately retain the default cell topology.
@@ -79,10 +80,18 @@ SCENARIOS = {
     'pin-sms-wait-state': Scenario('noki5210_pin_sms_wait_state.lua', '--silent-sms-state',
                                   seconds=155, sms_mask='24'),
     'pin-phonebook': Scenario('noki5210_pin_phonebook.lua', '--phonebook-save', seconds=55),
-    'pin-phone-memory': Scenario('noki5210_pin_phone_memory.lua', '--save', seconds=70),
+    'pin-phone-memory': Scenario('noki5210_pin_phone_memory.lua', '--save', seconds=70,
+                                 cold_scenario='pin-phone-memory-read'),
     'pin-phone-memory-read': Scenario('noki5210_pin_phone_memory_read.lua', '--read', seconds=55, preserved=True),
-    'pin-phone-memory-edit': Scenario('noki5210_pin_phone_memory_edit.lua', '--edit', seconds=65, preserved=True),
+    'pin-phone-memory-edit': Scenario('noki5210_pin_phone_memory_edit.lua', '--edit', seconds=65, preserved=True,
+                                      cold_scenario='pin-phone-memory-edit-read'),
     'pin-phone-memory-edit-read': Scenario('noki5210_pin_phone_memory_edit_read.lua', '--edit-read', seconds=55, preserved=True),
+    'pin-phone-memory-erase-cancel': Scenario('noki5210_pin_phone_memory_erase_cancel.lua', '--erase-cancel',
+        seconds=65, preserved=True, cold_scenario='pin-phone-memory-read'),
+    'pin-phone-memory-erase': Scenario('noki5210_pin_phone_memory_erase.lua', '--erase',
+        seconds=65, preserved=True, cold_scenario='pin-phone-memory-empty-read'),
+    'pin-phone-memory-empty-read': Scenario('noki5210_pin_phone_memory_empty_read.lua', '--empty-read',
+        seconds=55, preserved=True),
     'pin-ussd': Scenario('noki5210_pin_ussd.lua', seconds=60),
     'pin-phonebook-read': Scenario('noki5210_pin_phonebook_read.lua', '--phonebook-read', preserved=True),
 }
@@ -290,11 +299,11 @@ def main():
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(run / 'cold'),
                             '--scenario', 'pin-phonebook-read', '--preserved-nvram',
                             str(run / 'nvram'), '--mame', command[0]], check=True)
-        elif args.scenario in ('pin-phone-memory', 'pin-phone-memory-edit'):
+        elif scenario.cold_scenario:
             source = run / 'nvram'
             before = storage_inventory(source)
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(run / 'cold'),
-                            '--scenario', args.scenario + '-read', '--preserved-nvram',
+                            '--scenario', scenario.cold_scenario, '--preserved-nvram',
                             str(source), '--mame', command[0]], check=True)
             if storage_inventory(source) != before:
                 raise ValueError('cold phone-memory read changed its source NVRAM')

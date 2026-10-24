@@ -14,12 +14,24 @@ _G.noki5210_pin_after_accept = function(press, snapshot)
         if delay then assert(emu.wait(delay)) end
     end
     key('Right Softkey / C', read and 0.7 or 0.6)
+    if mode == 'empty_read' then
+        -- Empty SIM and empty Phone look alike; inspect, but do not change, the selector.
+        for index = 1, 4 do key('Scroll Down', 0.3) end
+        key('Left Softkey / Menu', 0.7)
+        snapshot('memory_selected')
+        key('End', 1)
+        key('Right Softkey / C', 0.7)
+    end
     if read then
         key('Left Softkey / Menu', 0.7)
         key('Left Softkey / Menu', 0.7)
-        snapshot('phonebook_list')
-        key('Left Softkey / Menu', 2.5)
-        snapshot('phonebook')
+        if mode == 'empty_read' then
+            snapshot('phone_empty')
+        else
+            snapshot('phonebook_list')
+            key('Left Softkey / Menu', 2.5)
+            snapshot('phonebook')
+        end
         if mode == 'edit' then
             key('Left Softkey / Menu', 0.7)
             key('Left Softkey / Menu', 0.7)
@@ -32,6 +44,14 @@ _G.noki5210_pin_after_accept = function(press, snapshot)
             snapshot('edit_changed')
             key('Left Softkey / Menu', 2.5)
             snapshot('edit_saved')
+        elseif mode == 'erase_cancel' or mode == 'erase' then
+            key('Left Softkey / Menu', 0.7)
+            key('Scroll Down', 0.7)
+            key('Scroll Down', 0.7)
+            key('Left Softkey / Menu', 0.7)
+            snapshot('erase_prompt')
+            key(mode == 'erase' and 'Left Softkey / Menu' or 'Right Softkey / C', 0.7)
+            snapshot('erase_result')
         end
     else
         for index = 1, 4 do key('Scroll Down', 0.3) end

@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm5_phone_memory_erase_cancel_cold_persistence",
+      "owner": "nsm5_nonvolatile_storage",
+      "status": "satisfied",
+      "predicate": "A single phone-local contact survives cancelled erasure but disappears after confirmed erasure across independent cold boots",
+      "current": "The six-process gate first proves empty Phone storage, Save Ada/123 and cold read. Physical Back from Erase? Ada returns the reviewed name list and a cold child retains Ada/123. Physical OK renders Phone book erased; its cold child inspects the retained Phone selector without changing it, then requires Selected memory empty. The selector check is essential because an empty SIM has the same generic notice. All stages authenticate/register, require reviewed UI and exact key releases, preserve complete expected SIM bytes and reject UPDATE RECORD/EF_ADN writes. Predecessor hashes remain unchanged. Cold follow-ups are explicit terminal storage-dependent scenario metadata. This qualifies one-contact erase/cancellation, not selective multi-contact preservation, capacity, interrupted-write atomicity or native DSP speech.",
+      "evidence": ["docs/5210_bringup.md", "tools/noki5210_pin_phone_memory.lua", "tools/noki5210_pin_phone_memory_erase_cancel.lua", "tools/noki5210_pin_phone_memory_erase.lua", "tools/noki5210_pin_phone_memory_empty_read.lua", "tools/noki5210_phone_memory_check.py", "tools/test_noki5210_phone_memory_check.py", "tools/run_noki5210_acceptance.py", "tools/test_run_noki5210_acceptance.py", "gates.json"]
+    },
+    {
       "id": "nsm5_phone_memory_number_edit_cold_persistence",
       "owner": "nsm5_nonvolatile_storage",
       "status": "satisfied",

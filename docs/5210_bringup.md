@@ -105,6 +105,16 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   NVRAM hashes are guarded for every preserved-storage run. The original
   save/read gate still expects123. This proves the selected number edit,
   not name editing, erase/cancel, capacity or power-failure atomicity.
+- `make verify-5210-pin-phone-memory-erase` uses six independent processes:
+  fresh Save/Read, Back from `Erase? Ada` followed by retained `Ada/123`,
+  then OK and a cold empty search. Both confirmation choices have reviewed
+  result frames. The empty reader first inspects the retained Phone selector
+  without changing it: the generic empty notice alone cannot distinguish an
+  empty SIM from empty Phone storage. All stages retain exact full SIM
+  contents and reject UPDATE RECORD/`EF_ADN` writes; predecessor storage is
+  hash-guarded. Cold follow-ups are explicit scenario metadata with terminal,
+  storage-dependent readers. This is a single-contact seed, not proof of
+  selective multi-contact preservation, capacity or failure atomicity.
 - `make verify-5210-radio-supplementary` enters `*123#` and `*#21#` through
   the physical keypad and submits them with the product's dedicated Send key.
   The resulting processUnstructuredSS-Request and InterrogateSS transactions
