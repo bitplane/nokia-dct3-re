@@ -1,7 +1,7 @@
 import unittest
 
 from tools.make_sim_card_profile import make_profile
-from tools.noki8850_host_ussd_check import verify
+from tools.noki8850_host_ussd_check import verify, verify_outgoing
 
 
 class HostUssdTest(unittest.TestCase):
@@ -52,3 +52,51 @@ class HostUssdTest(unittest.TestCase):
             verify(text + '\nsim_device: update-binary fid=6f7e', card)
         with self.assertRaises(ValueError):
             verify(text + '\nsim_device: header cla=a0 ins=24 p1=00', card)
+
+
+class OutgoingHostUssdTest(unittest.TestCase):
+    def capture(self):
+        from tools.noki8850_ussd_check import KEYS
+        _, card = HostUssdTest().capture()
+        lines = [
+            'SIM status ins=20 sw=9000',
+            'LAPDm Location Updating Accept acknowledged',
+            *['8850_ussd_physical: key=' + key for key in KEYS],
+            'gsm_ss: request=ussd_host id=1 transaction=00 dcs=0f packed_length=5',
+            'gsm_call_adapter: ussd request id=1 epoch=1 dcs=0f packed_length=5',
+            'gsm_call_adapter: ussd response id=2 outcome=0 result=rejected',
+            'gsm_call_adapter: ussd response id=1 outcome=0 result=accepted',
+            'gsm_call_adapter: ussd state id=1 epoch=1 phase=accepted',
+            'LAPDm service Channel Release acknowledged',
+            'gsm_call_adapter: ussd state id=1 epoch=1 phase=ended',
+            '8850_ussd_physical: key=Back',
+            '8850_host_ussd_recovery: Menu press',
+            '8850_host_ussd_recovery: Menu release',
+        ]
+        return '\n'.join(lines), card
+
+    def test_correlated_host_response_and_recovery(self):
+        verify_outgoing(*self.capture())
+
+    def test_missing_rejection_stale_epoch_duplicate_and_recovery_fail(self):
+        text, card = self.capture()
+        for before, after in (
+            ('id=2 outcome=0 result=rejected', 'id=2 outcome=0 result=accepted'),
+            ('epoch=1 phase=ended', 'epoch=2 phase=ended'),
+            ('key=Keypad #', 'key=Keypad 9'),
+            ('8850_ussd_physical: key=Back', ''),
+            ('8850_host_ussd_recovery: Menu release', ''),
+        ):
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                verify_outgoing(text.replace(before, after), card)
+        with self.assertRaises(ValueError):
+            verify_outgoing(text + '\ngsm_call_adapter: ussd request id=1 epoch=1', card)
+        with self.assertRaises(ValueError):
+            verify_outgoing(text + '\n[LUA ERROR]', card)
+
+    def test_storage_changes_or_post_request_security_commands_fail(self):
+        text, card = self.capture()
+        with self.assertRaises(ValueError):
+            verify_outgoing(text, card[:-1])
+        with self.assertRaises(ValueError):
+            verify_outgoing(text + '\nsim_device: header cla=a0 ins=2c', card)

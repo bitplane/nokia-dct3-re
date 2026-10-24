@@ -1,3 +1,4 @@
+import io
 import unittest
 from unittest.mock import patch
 from tools import run_noki8850_pin_registration as runner
@@ -5,14 +6,25 @@ from tools.run_noki8850_pin_registration import check_pin_inputs
 
 
 class PinRegistrationTest(unittest.TestCase):
-    def test_host_sms_failure_scenarios_admitted_before_preparation(self):
-        for scenario in ('host-rejected-sms', 'host-silent-sms'):
+    def test_host_services_admitted_before_preparation(self):
+        for scenario in ('host-rejected-sms', 'host-silent-sms', 'host-incoming-ussd', 'host-outgoing-ussd'):
             with self.subTest(scenario=scenario), \
                     patch('sys.argv', ['runner', 'unused', '--scenario', scenario]), \
                     patch.object(runner.Path, 'read_bytes', return_value=b''), \
                     patch.object(runner, 'verify_inputs', side_effect=RuntimeError('admitted')), \
                     self.assertRaisesRegex(RuntimeError, 'admitted'):
                 runner.main()
+
+    def test_host_ussd_requires_authentication_before_preparation(self):
+        for scenario in ('host-incoming-ussd', 'host-outgoing-ussd'):
+            with self.subTest(scenario=scenario), \
+                    patch('sys.argv', ['runner', 'unused', '--scenario', scenario, '--without-pin']), \
+                    patch('sys.stderr', io.StringIO()), \
+                    patch.object(runner, 'verify_inputs') as verify_inputs:
+                with self.assertRaises(SystemExit) as error:
+                    runner.main()
+                self.assertEqual(error.exception.code, 2)
+                verify_inputs.assert_not_called()
 
     def fixture(self):
         records = []

@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm2_host_decided_ussd_request",
+      "owner": "nsm2_host_supplementary_services",
+      "status": "satisfied",
+      "predicate": "PIN-authenticated own-PMM 8850 physically requests *123# and accepts one correlated host response with reviewed result and idle/menu recovery",
+      "current": "The fresh named outgoing gate physically authenticates PIN and phone code, dials *123# and Send, rejects host request ID2, accepts ID1 and renders exact Host network pixels. RR release precedes physical Back, the existing idle hash and a physical Menu recovery using the own stable Messages title crop. Exactly one epoch1 request and accepted/ended states are required. Complete card equality to the expected registered PIN-enabled profile and absence of post-request SIM write/security commands protect unrelated data. Missing rejection, stale epoch, duplicate request, wrong physical dial, absent Back/Menu release, altered card and Lua errors reject. Incoming notification remains separately qualified. This does not establish multi-turn host USSD, pending-request restoration or native radio/speech.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/run_noki8850_pin_registration.py", "tools/noki8850_host_ussd_request.lua", "tools/noki8850_host_ussd_check.py", "tools/test_noki8850_host_ussd_check.py", "gates.json"]
+    },
+    {
       "id": "nsm2_host_ussd_notification_readback",
       "owner": "nsm2_host_supplementary_services",
       "status": "satisfied",

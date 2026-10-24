@@ -2440,6 +2440,17 @@ notification admission. Wrong epoch, duplicate notification, absent release,
 changed card bytes and missing read/recovery frames reject. This establishes
 one-way host notification, not a host request/reply dialogue or native radio.
 
+`verify-8850-pin-host-outgoing-ussd` independently covers physical `*123#`
+and Send on the same authenticated own-PMM composition. The host rejects a
+wrong request identity before accepting the matching response; the handset
+renders the reviewed `Host network` result and releases RR. Physical Back
+returns to the existing registered-idle image, then Menu recovers the existing
+Messages title crop. The request appears exactly once in epoch1, with accepted
+then ended states; the complete card and post-request no-write/security-command
+checks are shared with notification acceptance. The host runner independently
+checks the exact packed `*123#` request. This is one host-decided response,
+not multi-turn dialogue, pending-request restoration or native DSP evidence.
+
 MAME also audits the declared shared `dsp_prom`, `dsp_drom` and `dsp_pdrom`
 files in the product ROM directory. Their presence is a run prerequisite,
 not evidence of a product-matched resident ROM6 mask; do not substitute

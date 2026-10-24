@@ -10,6 +10,18 @@ from tools.radio_host_incoming_ussd_trace_check import verify as verify_protocol
 TEXT = '7938f0209e4ddd0f34e778a4da4be56adf8435c32618be9144afc5874e91e1f0'
 IDLE = 'd6d4b05af24a06c42a97e31c3134f7e497e149f4420f87f3d243613f06926300'
 MENU_TITLE = '1e5c11fcea9aac5331e18c0070697e8795003d6de9a0250284b3d9605209e654'
+HOST_RESULT = '664c8b0e4e2a25ba77ce867b05d60171dccf60b93d136adcba638be9a24bb353'
+
+
+def check_card(after, card):
+    if (re.search(r'sim_device: (?:update|unblock)', after) or
+            re.search(r'sim_device: header cla=a0 ins=(?:24|26|28|2c|d6|dc)\b', after)):
+        raise ValueError('USSD changed SIM files or credentials')
+    expected = bytearray(make_profile(True) + bytes.fromhex('00f110') + b'\xff' * 43)
+    expected[1604:1609] = bytes.fromhex('00f1100001')
+    expected[1610] = 0
+    if card != expected:
+        raise ValueError('complete card differs from authenticated registered laboratory profile')
 
 
 def verify(text, card):
@@ -42,24 +54,55 @@ def verify(text, card):
         if contacts != [(key, str(second)) for key, second in expected_contacts]:
             raise ValueError('physical contacts differ or remain pressed')
     after = text.split('incoming ussd id=1 result=accepted', 1)[1]
-    if (re.search(r'sim_device: (?:update|unblock)', after) or
-            re.search(r'sim_device: header cla=a0 ins=(?:24|26|28|2c|d6|dc)\b', after)):
-        raise ValueError('notification changed SIM files or credentials')
-    expected = bytearray(make_profile(True) + bytes.fromhex('00f110') + b'\xff' * 43)
-    expected[1604:1609] = bytes.fromhex('00f1100001')
-    expected[1610] = 0
-    if card != expected:
-        raise ValueError('complete card differs from authenticated registered laboratory profile')
+    check_card(after, card)
+
+
+def verify_outgoing(text, card):
+    from tools.radio_host_ussd_trace_check import verify as verify_host
+    from tools.noki8850_ussd_check import KEYS
+    if '[LUA ERROR]' in text:
+        raise ValueError('physical USSD fixture failed')
+    verify_host(text)
+    checkpoints = [('PIN accepted', r'SIM status ins=20 sw=9000'),
+                   ('registered', r'LAPDm Location Updating Accept acknowledged')]
+    checkpoints += [(key, re.escape('8850_ussd_physical: key=' + key)) for key in KEYS]
+    checkpoints += [
+        ('request', r'gsm_ss: request=ussd_host id=1 .*dcs=0f packed_length=5'),
+        ('wrong ID rejected', r'ussd response id=2 outcome=0 result=rejected'),
+        ('response accepted', r'ussd response id=1 outcome=0 result=accepted'),
+        ('RR released', r'LAPDm service Channel Release acknowledged'),
+        ('Back', r'8850_ussd_physical: key=Back'),
+        ('Menu', r'8850_host_ussd_recovery: Menu press'),
+        ('Menu release', r'8850_host_ussd_recovery: Menu release'),
+    ]
+    require_ordered(text, checkpoints, '8850 host-decided USSD')
+    if re.findall(r'ussd request id=1 epoch=(\d+)', text) != ['1']:
+        raise ValueError('expected one correlated firmware USSD request')
+    if re.findall(r'ussd state id=1 epoch=(\d+) phase=(\w+)', text) != [('1', 'accepted'), ('1', 'ended')]:
+        raise ValueError('outgoing USSD lifecycle differs')
+    check_card(text.split('gsm_ss: request=ussd_host id=1', 1)[1], card)
+
+
+def check_outgoing_frames(directory):
+    _frames(directory, (
+        ('8850_ussd_result.png', HOST_RESULT, None),
+        ('8850_ussd_after_back.png', IDLE, None),
+        ('8850_host_ussd_menu.png', MENU_TITLE, (0, 0, 72, 16)),
+    ))
 
 
 def check_frames(directory: Path):
-    from PIL import Image
-    for name, expected, crop in (
+    _frames(directory, (
         ('8850_ussd_action_1.png', TEXT, None),
         ('8850_ussd_action_2.png', IDLE, None),
         # Existing own-product title crop excludes animated envelope/scrollbar.
         ('8850_ussd_action_3.png', MENU_TITLE, (0, 0, 72, 16)),
-    ):
+    ))
+
+
+def _frames(directory, specifications):
+    from PIL import Image
+    for name, expected, crop in specifications:
         with Image.open(directory / name) as image:
             if image.size != (84, 48):
                 raise ValueError('unexpected 8850 display geometry')
