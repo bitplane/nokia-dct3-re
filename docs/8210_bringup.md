@@ -84,8 +84,8 @@ Complete before SETUP/SAPI3 respectively, without fixing their incidental
 relative log order. Both orders and missing/late-event rejection are tested.
 The automatic one-shot call fixture pages at14.767s while phone-security
 input is still pending and does not complete a call; it is not promoted by
-the settled host-call result. Late-PIN waveform tests and other input
-schedules remain separate qualifications.
+the settled host-call result. Other input schedules remain separate
+qualifications.
 
 `verify-8210-dcs-late-pin-sip-outgoing-media` and
 `verify-8210-dcs-late-pin-sip-incoming-media` independently qualify real
@@ -99,7 +99,21 @@ The remote peer has a30-second safety hangup instead of the older8-second
 limit, so its BYE cannot race the scheduled physical End. This is a host
 fixture lifetime, not a radio or firmware latency change. It proves neither
 non-silent microphone/earpiece waveforms nor native DSP speech. The separately
-qualified waveform gates below do not imply late-PIN waveform acceptance.
+qualified waveform gates below retain their own acceptance scopes.
+
+`verify-8210-dcs-late-pin-sip-outgoing-waveform` and
+`verify-8210-dcs-late-pin-sip-incoming-waveform` independently add isolated
+host microphone/earpiece endpoints to this same eight-second PIN/DCS profile.
+The physical input, registration, own CC/RR, SIP release and UI checks remain
+mandatory. The shared waveform checker requires at least two consecutive
+seconds of 440 Hz in the remote microphone recording and 660 Hz in the MAME
+earpiece recording; blank, wrong-tone and short recordings remain failures.
+Both directions pass. The shell fixture selects this profile explicitly with
+`SIP_LATE_PIN_DCS=1` and rejects other products/invalid values before audio
+setup; ordinary waveform gates remain unchanged. Temporary audio endpoints
+and defaults use the existing cleanup trap. This proves non-silent synthetic
+audio through the HLE codec/PCM path and local SIP, not native DSP speech,
+electrical gain calibration or waveform continuity across save/load.
 
 The same late-PIN/DCS profile has four independent SIP restoration gates:
 

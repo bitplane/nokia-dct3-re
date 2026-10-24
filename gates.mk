@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 842 gates: 638 generated from typed steps, 204 copied verbatim (shell).
+# 844 gates: 638 generated from typed steps, 206 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -60,6 +60,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8210-dcs-late-pin-sip-pending-outgoing-restore \
 	verify-8210-dcs-late-pin-sip-incoming-restore \
 	verify-8210-dcs-late-pin-sip-alerting-incoming-restore \
+	verify-8210-dcs-late-pin-sip-outgoing-waveform \
+	verify-8210-dcs-late-pin-sip-incoming-waveform \
 	verify-8850-sip-incoming-waveform verify-8850-sip-outgoing-waveform \
 	verify-8210-sip-outgoing-waveform verify-8210-sip-incoming-media \
 	verify-8210-sip-incoming-waveform verify-8210-sip-outgoing-restore \
@@ -623,6 +625,14 @@ verify-8210-dcs-late-pin-sip-incoming-restore: build
 verify-8210-dcs-late-pin-sip-alerting-incoming-restore: build
 	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --late-pin-dcs --incoming-media --restore-incoming --restore-incoming-phase alerting --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
+
+# shell: optional PJSIP/PulseAudio/FFmpeg; own NSM-3 late-PIN DCS outgoing microphone/earpiece tones, HLE not native speech
+verify-8210-dcs-late-pin-sip-outgoing-waveform: build
+	env SIP_PRODUCT=8210 SIP_DIRECTION=outgoing SIP_LATE_PIN_DCS=1 RUN_DIR='$(RUN_DIR)' SIP_PJSUA_BIN='$(SIP_PJSUA_BIN)' SIP_PYTHON_PATH='$(SIP_PYTHON_PATH)' bash tools/run_sip_physical_audio_gate.sh
+
+# shell: optional PJSIP/PulseAudio/FFmpeg; own NSM-3 late-PIN DCS incoming microphone/earpiece tones, HLE not native speech
+verify-8210-dcs-late-pin-sip-incoming-waveform: build
+	env SIP_PRODUCT=8210 SIP_DIRECTION=incoming SIP_LATE_PIN_DCS=1 RUN_DIR='$(RUN_DIR)' SIP_PJSUA_BIN='$(SIP_PJSUA_BIN)' SIP_PYTHON_PATH='$(SIP_PYTHON_PATH)' bash tools/run_sip_physical_audio_gate.sh
 
 # shell: optional PJSIP/PulseAudio/FFmpeg; own NSM-2 incoming physical Answer/End and bidirectional HLE audio tones, not native speech
 verify-8850-sip-incoming-waveform: build

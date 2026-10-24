@@ -4,6 +4,16 @@ cd "$(dirname "$0")/.."
 sip_project_dir=${SIP_PROJECT_DIR:-$PWD/tmp/sip-build/pjproject-2.16}
 product=${SIP_PRODUCT:-3210}
 direction=${SIP_DIRECTION:-outgoing}
+late_pin_dcs=${SIP_LATE_PIN_DCS:-0}
+profile_args=()
+case "$late_pin_dcs" in
+    0) ;;
+    1)
+        [[ "$product" == 8210 ]] || { echo 'late-PIN DCS waveform profile requires 8210' >&2; exit 1; }
+        profile_args=(--late-pin-dcs)
+        ;;
+    *) echo 'SIP_LATE_PIN_DCS must be 0 or 1' >&2; exit 1 ;;
+esac
 incoming_arg=
 seconds=45
 storage_args=()
@@ -111,7 +121,7 @@ if [[ "$product" == 8210 || "$product" == 8850 ]]; then
     if [[ "$direction" == incoming ]]; then media_arg=--incoming-media; fi
     env PYTHONPATH="${SIP_PYTHON_PATH:-$(realpath "$sip_project_dir/pjsip-apps/src/swig/python"):$(realpath "$sip_project_dir"/pjsip-apps/src/swig/python/build/lib.*)}" \
         .venv/bin/python "tools/run_noki${product}_sip_cancel.py" "$run_dir/handset" \
-        "$media_arg" --record-media --sound pulse \
+        "$media_arg" "${profile_args[@]}" --record-media --sound pulse \
         --pjsua "${SIP_PJSUA_BIN:-$(realpath "$sip_project_dir"/pjsip-apps/bin/pjsua-*)}"
 else
 make --no-print-directory verify-radio-outgoing-call-sip RUN_DIR="$run_dir" JOBS="${JOBS:-8}" \

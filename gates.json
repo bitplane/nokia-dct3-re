@@ -223,6 +223,20 @@
       ]
     },
     {
+      "name": "verify-8210-dcs-late-pin-sip-outgoing-waveform", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP/PulseAudio/FFmpeg; own NSM-3 late-PIN DCS outgoing microphone/earpiece tones, HLE not native speech",
+      "recipe": [
+        "\tenv SIP_PRODUCT=8210 SIP_DIRECTION=outgoing SIP_LATE_PIN_DCS=1 RUN_DIR='$(RUN_DIR)' SIP_PJSUA_BIN='$(SIP_PJSUA_BIN)' SIP_PYTHON_PATH='$(SIP_PYTHON_PATH)' bash tools/run_sip_physical_audio_gate.sh"
+      ]
+    },
+    {
+      "name": "verify-8210-dcs-late-pin-sip-incoming-waveform", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP/PulseAudio/FFmpeg; own NSM-3 late-PIN DCS incoming microphone/earpiece tones, HLE not native speech",
+      "recipe": [
+        "\tenv SIP_PRODUCT=8210 SIP_DIRECTION=incoming SIP_LATE_PIN_DCS=1 RUN_DIR='$(RUN_DIR)' SIP_PJSUA_BIN='$(SIP_PJSUA_BIN)' SIP_PYTHON_PATH='$(SIP_PYTHON_PATH)' bash tools/run_sip_physical_audio_gate.sh"
+      ]
+    },
+    {
       "name": "verify-8850-sip-incoming-waveform", "prerequisites": ["build"], "variables": {},
       "unstructured": "optional PJSIP/PulseAudio/FFmpeg; own NSM-2 incoming physical Answer/End and bidirectional HLE audio tones, not native speech",
       "recipe": [

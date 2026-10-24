@@ -13,6 +13,16 @@ from tools.sip_handset_waveform_check import inspect_tone, verify
 
 
 class SipHandsetWaveformTest(unittest.TestCase):
+    def test_late_pin_profile_is_product_explicit_before_audio_setup(self):
+        repository = Path(__file__).resolve().parents[1]
+        for product, value, error in (('8850', '1', 'requires 8210'),
+                                       ('8210', 'yes', 'must be 0 or 1')):
+            environment = dict(os.environ, SIP_PRODUCT=product, SIP_LATE_PIN_DCS=value)
+            result = subprocess.run(['bash', 'tools/run_sip_physical_audio_gate.sh'],
+                                    cwd=repository, env=environment, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(error, result.stderr)
+
     def test_8850_invalid_direction_is_rejected_before_audio_setup(self):
         repository = Path(__file__).resolve().parents[1]
         environment = dict(os.environ, SIP_PRODUCT='8850', SIP_DIRECTION='invalid')
