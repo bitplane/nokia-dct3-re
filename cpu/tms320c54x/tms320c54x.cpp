@@ -6733,7 +6733,8 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		// Smem is a source; the implicit Smem+1 write does not make it
 		// a write operand. Short MOD=3 is write-only (SPRU131G 5.5.3.1).
-		if ((low & 0xf8) == 0x98) { m_illegal = true; return; }
+		// Match staged admission: f8 is absolute; f9..ff are not admitted aliases.
+		if ((low & 0xf8) == 0x98 || low > 0xf8) { m_illegal = true; return; }
 		const u16 address = low >= 0xf8 ? fetch() :
 				low >= 0xe0 ? long_offset_address(low) : short_smem_address(low);
 		const u16 value = data_read(address);

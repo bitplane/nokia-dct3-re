@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_atomic_delay_absolute_alias_admission",
+      "owner": "tms320c54x",
+      "status": "satisfied",
+      "predicate": "Atomic and staged LTD/DELAY reject unadmitted f9..ff absolute aliases without operand effects across restoration",
+      "current": "The unchanged-core negative control fails at case56, the first atomic case, because a data transaction occurs. The corrected delay-abs-edge profile passes224 cases/restores across both instruction classes, seven aliases, CMPT settings, two program pages, frontends and two checkpoints. A/B/T/status and all ARs remain unchanged with zero data transactions. The512-case short-MOD3 control and legal DELAY copy/delayed-control matrices pass separately. This is emulator admission consistency, not silicon-trap behavior, complete alias classification, a fitted-mask claim or a handset boot fix. The earlier293-marker full-default suite remains revision-bound and is not implicitly renewed by this isolated correction.",
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+    },
+    {
       "id": "nsb1_own_toolkit_display_text",
       "owner": "nsb1_sim_toolkit",
       "status": "satisfied",
