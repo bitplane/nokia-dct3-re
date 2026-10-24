@@ -5,8 +5,8 @@ _G.noki5210_pin_after_accept = function(press, snapshot)
     snapshot('idle')
     _G.noki5210_pin_duration = 0.18
     _G.noki5210_pin_gap = 0.26
-    local read = _G.nsm5_phone_memory_read
-    local mode = read and 'read' or 'save'
+    local mode = _G.nsm5_phone_memory_mode or 'save'
+    local read = mode ~= 'save'
     machine:logerror('5210_phone_memory: mode=' .. mode .. ' begin=1\n')
     local function key(name, delay)
         press(name)
@@ -20,6 +20,19 @@ _G.noki5210_pin_after_accept = function(press, snapshot)
         snapshot('phonebook_list')
         key('Left Softkey / Menu', 2.5)
         snapshot('phonebook')
+        if mode == 'edit' then
+            key('Left Softkey / Menu', 0.7)
+            key('Left Softkey / Menu', 0.7)
+            snapshot('edit_name')
+            -- Edit starts with the name even when entered from number Details.
+            key('Left Softkey / Menu', 0.7)
+            snapshot('edit_number')
+            key('Right Softkey / C', 0.7)
+            key('Keypad 4', 0.7)
+            snapshot('edit_changed')
+            key('Left Softkey / Menu', 2.5)
+            snapshot('edit_saved')
+        end
     else
         for index = 1, 4 do key('Scroll Down', 0.3) end
         key('Left Softkey / Menu', 0.7)

@@ -96,6 +96,15 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   Add/Save/Search/Details, not edit/erase/capacity or arbitrary flash records.
   The route agrees with [Nokia's 5210 user guide](https://www.manualslib.com/manual/505197/Nokia-5210.html?page=22#manual);
   capacities stated by that guide are not inferred as tested capacity here.
+- `make verify-5210-pin-phone-memory-edit` retains that fresh empty/save/read
+  chain, then cold-opens `Ada/123`, selects Options/Edit, confirms the unchanged
+  name and physically replaces the last number digit with4. Edit starts with
+  the name even when selected from number Details. Reviewed editor/Saved
+  pixels precede another cold process rendering `Ada/124`. All four processes
+  authenticate/register and preserve complete expected SIM contents; source
+  NVRAM hashes are guarded for every preserved-storage run. The original
+  save/read gate still expects123. This proves the selected number edit,
+  not name editing, erase/cancel, capacity or power-failure atomicity.
 - `make verify-5210-radio-supplementary` enters `*123#` and `*#21#` through
   the physical keypad and submits them with the product's dedicated Send key.
   The resulting processUnstructuredSS-Request and InterrogateSS transactions

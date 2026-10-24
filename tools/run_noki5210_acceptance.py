@@ -26,6 +26,7 @@ class Scenario:
     host_outcome: str = 'rp_ack'
     host_call: str | None = None
     sms_mask: str | None = None
+    preserved: bool = False
 
 
 # The early and negative controls deliberately retain the default cell topology.
@@ -79,9 +80,11 @@ SCENARIOS = {
                                   seconds=155, sms_mask='24'),
     'pin-phonebook': Scenario('noki5210_pin_phonebook.lua', '--phonebook-save', seconds=55),
     'pin-phone-memory': Scenario('noki5210_pin_phone_memory.lua', '--save', seconds=70),
-    'pin-phone-memory-read': Scenario('noki5210_pin_phone_memory_read.lua', '--read', seconds=55),
+    'pin-phone-memory-read': Scenario('noki5210_pin_phone_memory_read.lua', '--read', seconds=55, preserved=True),
+    'pin-phone-memory-edit': Scenario('noki5210_pin_phone_memory_edit.lua', '--edit', seconds=65, preserved=True),
+    'pin-phone-memory-edit-read': Scenario('noki5210_pin_phone_memory_edit_read.lua', '--edit-read', seconds=55, preserved=True),
     'pin-ussd': Scenario('noki5210_pin_ussd.lua', seconds=60),
-    'pin-phonebook-read': Scenario('noki5210_pin_phonebook_read.lua', '--phonebook-read'),
+    'pin-phonebook-read': Scenario('noki5210_pin_phonebook_read.lua', '--phonebook-read', preserved=True),
 }
 
 
@@ -93,6 +96,14 @@ def file_identity(path):
             result['sha256'] = hashlib.file_digest(source, 'sha256').hexdigest()
         result['bytes'] = path.stat().st_size
     return result
+
+
+def storage_inventory(directory):
+    directory = Path(directory)
+    if not directory.is_dir():
+        raise ValueError('preserved storage directory is absent')
+    return {str(path.relative_to(directory)): file_identity(path)['sha256']
+            for path in sorted(directory.rglob('*')) if path.is_file()}
 
 
 def main():
@@ -109,12 +120,12 @@ def main():
     parser.add_argument('--observe-readiness', action='store_true',
                         help='passively observe own context roots during the early-PIN control')
     args = parser.parse_args()
+    scenario = SCENARIOS[args.scenario]
     if args.observe_readiness and args.scenario != 'pin-registration':
         parser.error('--observe-readiness requires pin-registration')
-    if (args.preserved_nvram is not None) != (args.scenario in ('pin-phonebook-read', 'pin-phone-memory-read')):
-        parser.error('--preserved-nvram is required only for cold phonebook/phone-memory reads')
+    if (args.preserved_nvram is not None) != scenario.preserved:
+        parser.error('--preserved-nvram must match the selected storage-dependent scenario')
     root = Path(__file__).resolve().parents[1]
-    scenario = SCENARIOS[args.scenario]
     if args.pjsua and not scenario.host_call:
         parser.error('--pjsua requires a PIN host-call scenario')
     sip_restore = args.scenario in ('pin-sip-outgoing-call-state', 'pin-sip-incoming-call-state')
@@ -126,6 +137,7 @@ def main():
         parser.error('PIN host-call restoration has no promoted SIP contract')
     run = args.run_directory.resolve()
     try:
+        source_before = storage_inventory(args.preserved_nvram) if scenario.preserved else None
         run.mkdir(parents=True, exist_ok=False)
         for name in ('cfg', 'nvram', 'snap'):
             (run / name).mkdir()
@@ -167,7 +179,7 @@ def main():
             checker = 'noki5210_pin_sip_restore_check.py'
         elif args.scenario == 'pin-ussd':
             checker = 'noki5210_pin_ussd_check.py'
-        elif args.scenario in ('pin-phone-memory', 'pin-phone-memory-read'):
+        elif args.scenario.startswith('pin-phone-memory'):
             checker = 'noki5210_phone_memory_check.py'
         command = [str((args.mame or root / 'mame/mame').resolve()), 'noki5210',
                    '-bios', '540e', '-rompath', str(root / 'roms'), '-cfg_directory', 'cfg',
@@ -278,18 +290,19 @@ def main():
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(run / 'cold'),
                             '--scenario', 'pin-phonebook-read', '--preserved-nvram',
                             str(run / 'nvram'), '--mame', command[0]], check=True)
-        elif args.scenario == 'pin-phone-memory':
+        elif args.scenario in ('pin-phone-memory', 'pin-phone-memory-edit'):
             source = run / 'nvram'
-            def inventory():
-                return {str(path.relative_to(source)): file_identity(path)['sha256']
-                        for path in sorted(source.rglob('*')) if path.is_file()}
-            before = inventory()
+            before = storage_inventory(source)
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(run / 'cold'),
-                            '--scenario', 'pin-phone-memory-read', '--preserved-nvram',
+                            '--scenario', args.scenario + '-read', '--preserved-nvram',
                             str(source), '--mame', command[0]], check=True)
-            if inventory() != before:
+            if storage_inventory(source) != before:
                 raise ValueError('cold phone-memory read changed its source NVRAM')
             (run / 'phone_memory_storage.json').write_text(json.dumps(before, indent=2) + '\n')
+        if source_before is not None:
+            if storage_inventory(args.preserved_nvram) != source_before:
+                raise ValueError('storage-dependent run changed its source NVRAM')
+            (run / 'source_storage.json').write_text(json.dumps(source_before, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'5210 isolated {args.scenario} FAIL: {error}\n')
 

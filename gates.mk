@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 871 gates: 649 generated from typed steps, 222 copied verbatim (shell).
+# 872 gates: 650 generated from typed steps, 222 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -44,7 +44,8 @@ DCT3_PRESS_220_300 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_
 DCT3_PRESS_220_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 
-.PHONY: verify-5210-pin-phone-memory verify-8850-pin-host-ussd-empty-reply \
+.PHONY: verify-5210-pin-phone-memory-edit verify-5210-pin-phone-memory \
+	verify-8850-pin-host-ussd-empty-reply \
 	verify-8850-pin-host-ussd-network-restore \
 	verify-8850-pin-host-ussd-network-request verify-8850-pin-host-ussd-restore \
 	verify-8850-pin-host-outgoing-ussd verify-8850-pin-host-incoming-ussd \
@@ -522,6 +523,10 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8890-sip-incoming-media verify-8890-sip-connected-outgoing-restore \
 	verify-8890-sip-connected-incoming-restore \
 	verify-6210-sip-connected-incoming-restore verify-mad2-wake-gates
+
+verify-5210-pin-phone-memory-edit: normalize-5210 build
+	$(VENV)/bin/python tools/run_noki5210_acceptance.py $(RUN_DIR)/save --scenario pin-phone-memory --mame $(MAME_DIR)/mame
+	$(VENV)/bin/python tools/run_noki5210_acceptance.py $(RUN_DIR)/edit --scenario pin-phone-memory-edit --preserved-nvram $(RUN_DIR)/save/nvram --mame $(MAME_DIR)/mame
 
 verify-5210-pin-phone-memory: normalize-5210 build
 	$(VENV)/bin/python tools/run_noki5210_acceptance.py $(RUN_DIR) --scenario pin-phone-memory --mame $(MAME_DIR)/mame

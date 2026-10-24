@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm5_phone_memory_number_edit_cold_persistence",
+      "owner": "nsm5_nonvolatile_storage",
+      "status": "satisfied",
+      "predicate": "A phone-local Ada/123 contact is edited through the firmware's two-field editor and cold-read as Ada/124 without SIM writes",
+      "current": "The separate named edit gate retains the fresh Phone-memory empty/Save and original123 cold-read stages. A preserved-storage process opens Details/Options/Edit, confirms the unchanged name first, physically clears3 and types4, then renders the reviewed124 editor and Saved result. Its cold child requires unchanged Ada list pixels and exact124 Details; the ordinary read gate still requires123. All stages authenticate/register with whole-card equality, no UPDATE RECORD/EF_ADN writes and reviewed idle/Menu recovery. Explicit scenario metadata declares required source storage; every preserved run and the caller's cold chain verify predecessor hashes. This qualifies the selected number edit, not name editing, deletion/cancellation, capacity, arbitrary flash records, failure atomicity or native DSP speech.",
+      "evidence": ["docs/5210_bringup.md", "tools/noki5210_pin_phone_memory.lua", "tools/noki5210_pin_phone_memory_edit.lua", "tools/noki5210_pin_phone_memory_edit_read.lua", "tools/noki5210_phone_memory_check.py", "tools/test_noki5210_phone_memory_check.py", "tools/run_noki5210_acceptance.py", "tools/test_run_noki5210_acceptance.py", "gates.json"]
+    },
+    {
       "id": "nsm5_phone_memory_contact_cold_persistence",
       "owner": "nsm5_nonvolatile_storage",
       "status": "satisfied",

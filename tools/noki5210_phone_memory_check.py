@@ -20,6 +20,9 @@ SAVE_KEYS = (['Right Softkey / C'] + ['Scroll Down'] * 4 +
              'Keypad 1', 'Keypad 2', 'Keypad 3', 'Left Softkey / Menu',
              'End', 'Left Softkey / Menu', 'End'])
 READ_KEYS = ['Right Softkey / C'] + ['Left Softkey / Menu'] * 3 + ['End', 'Left Softkey / Menu', 'End']
+EDIT_KEYS = READ_KEYS[:-3] + ['Left Softkey / Menu'] * 3 + [
+    'Right Softkey / C', 'Keypad 4', 'Left Softkey / Menu'] + READ_KEYS[-3:]
+KEYS = {'save': SAVE_KEYS, 'read': READ_KEYS, 'edit': EDIT_KEYS, 'edit_read': READ_KEYS}
 SAVE_FRAMES = {
     'phone_empty': '5b617392ff03236596d815bc50b1dfd891228d13ca6557728b18496f8db59bb3',
     'memory_selected': 'e8a0189272eb64a815ba67304938418a36abdd57223bba000b0c1a8f258ed98a',
@@ -31,6 +34,15 @@ READ_FRAMES = {
     'phonebook_list': '8399986258ce449c38d8235e7a130c3c7c25d7b961398feaffb86769c63898cf',
     'phonebook': 'fd76ae62168f74fec8f6931d53888a2ea9c8c52f754cc19d3c0a8bc914ae18e9',
 }
+EDIT_FRAMES = dict(READ_FRAMES,
+    edit_name=SAVE_FRAMES['phone_name'],
+    edit_number='f774f5d64d22a49e8bfd0f31af25e687e4d89c944096dddaaaf7b1c3f61a07d8',
+    edit_changed='10e0a6aa6666298d8f28f8214307ad24d0c3df71022b54142790963ddd175be3',
+    edit_saved=SAVE_FRAMES['phone_saved'])
+# The edited reader expects 124; the original read gate retains its 123 oracle.
+EDIT_READ_FRAMES = dict(READ_FRAMES, phonebook='5066beda30d2fbd845ba3036385adc8db278b7844707b18b4d921ee14387775d')
+MODE_FRAMES = {'save': SAVE_FRAMES, 'read': READ_FRAMES,
+               'edit': EDIT_FRAMES, 'edit_read': EDIT_READ_FRAMES}
 
 
 def expected_card():
@@ -40,16 +52,17 @@ def expected_card():
     return bytes(card)
 
 
-def verify(text, card, *, read=False):
-    verify_coherent_late(text, card, preserved=read)
+def verify(text, card, *, mode='save'):
+    if mode not in KEYS:
+        raise ValueError('unreviewed phone-memory mode')
+    verify_coherent_late(text, card, preserved=mode != 'save')
     if card != expected_card() or re.search(r'header cla=a0 ins=dc\b|update fid=6f3a\b', text):
         raise ValueError('phone-memory fixture changed SIM storage')
-    mode = 'read' if read else 'save'
     for edge in ('begin', 'complete'):
         if text.count(f'5210_phone_memory: mode={mode} {edge}=1') != 1:
             raise ValueError('phone-memory fixture did not execute exactly once')
     keys = re.findall(r'5210_phone_memory_key: name=(.*?) released=1', text)
-    if keys != (READ_KEYS if read else SAVE_KEYS) or text.count('5210_phone_memory_key:') != len(keys):
+    if keys != KEYS[mode] or text.count('5210_phone_memory_key:') != len(keys):
         raise ValueError('phone-memory physical input/release sequence differs')
     require_ordered(text, (
         ('PIN', r'SIM status ins=20 sw=9000'),
@@ -59,9 +72,9 @@ def verify(text, card, *, read=False):
     ), '5210 own phone-memory storage')
 
 
-def check_frames(directory, *, read=False):
+def check_frames(directory, *, mode='save'):
     from PIL import Image
-    frames = dict(READ_FRAMES if read else SAVE_FRAMES)
+    frames = dict(MODE_FRAMES[mode])
     frames.update({key: FRAMES[key] for key in ('entered', 'idle', 'recovered')})
     for phase, expected in frames.items():
         with Image.open(directory / f'5210_pin_{phase}.png') as image:
@@ -78,13 +91,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run', type=Path)
     modes = parser.add_mutually_exclusive_group(required=True)
-    modes.add_argument('--save', action='store_true')
-    modes.add_argument('--read', action='store_true')
+    for flag, mode in (('--save', 'save'), ('--read', 'read'),
+                       ('--edit', 'edit'), ('--edit-read', 'edit_read')):
+        modes.add_argument(flag, action='store_const', dest='mode', const=mode)
     args = parser.parse_args()
     try:
         verify((args.run / 'error.log').read_text(),
-               (args.run / 'nvram/noki5210_3/sim_card').read_bytes(), read=args.read)
-        check_frames(args.run / 'snap', read=args.read)
+               (args.run / 'nvram/noki5210_3/sim_card').read_bytes(), mode=args.mode)
+        check_frames(args.run / 'snap', mode=args.mode)
         if (args.run / 'nvram/noki5210_3/flash').stat().st_size != 0x400000:
             raise ValueError('missing complete own-product flash NVRAM')
     except (OSError, ValueError) as error:
