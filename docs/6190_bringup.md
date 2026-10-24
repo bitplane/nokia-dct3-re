@@ -562,3 +562,44 @@ physical contacts, matching phone code, complete APDUs, exact whole-card
 transitions and reviewed editor/save/read/erase/empty pixel oracles.
 This qualifies offline draft persistence/deletion, not SMS transmission,
 reception, delivery reports or laboratory registration on NSB-3.
+
+## SIM PIN and phone-code separation
+
+The explicit `--pin-enabled` external-card fixture uses the shared generated
+current SIM profile, preserving the existing own EEPROM integrity/retry
+fixture. It does not change the handset's encoded security code. The card
+first presents `Enter PIN code`; physical `4321` plus OK sends exactly
+`A0 20 00 01 08` followed by the padded digits. The card returns `9804`,
+the phone displays `Code error`, and only persistent PIN1 attempts at
+serialized-card offset `dbc` change, from 3 to 2. All credentials, enabled
+state and other card bytes remain identical to the generated profile.
+
+A fresh process receives that exact two-attempt card and the handset's own
+saved flash/EEPROM. Physical `1234` plus OK sends the corresponding VERIFY
+APDU, returns `9000`, and restores only that retry byte to 3. It then displays
+the separate Nokia `Security code` prompt. Physical `12345` reaches the own
+matched-code branch, and Menu renders the reviewed Messages frame. SIM PIN
+acceptance is therefore not being mistaken for phone-lock acceptance.
+
+Prepare the usual fresh own integrity/retry fixture with `--pin-enabled` in
+addition to `--insert-sim`, and run `tools/nsb3_pin_input.lua` for 22 seconds.
+Then:
+
+```sh
+.venv/bin/python tools/nsb3_pin_check.py prepare-correct WRONG_RUN CORRECT_RUN
+```
+
+Run `tools/nsb3_pin_correct.lua` in the new directory for 42 seconds; its
+phone-code input starts at 20 seconds, after SIM authentication. The default
+phone-code fixture timing is unchanged. Accept the pair with:
+
+```sh
+.venv/bin/python tools/nsb3_pin_check.py check WRONG_RUN CORRECT_RUN
+```
+
+Acceptance requires exact physical contacts, complete VERIFY APDUs, distinct
+card status/retry transitions, whole-card comparisons, cold source hashes and
+initial-card snapshot, unchanged own executable, and reviewed PIN/error/phone
+prompt/menu frames. No guest RAM/save state, forced authentication result or
+donor provisioning is supplied. PIN change/disable, PIN2, exhaustion/PUK and
+security-state restoration remain separate unqualified NSB-3 contracts.

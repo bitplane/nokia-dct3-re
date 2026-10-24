@@ -21,6 +21,8 @@ number without rewriting or changing the complete card. The boundary is checked
 by `tools/nsb3_menu_check.py` and `tools/nsb3_phonebook_check.py`.
 Physical offline SMS composition/save, cold Outbox read, confirmed deletion
 and a second cold empty-Outbox check also pass through the laboratory SIM.
+Wrong SIM PIN consumes exactly one persistent retry; a cold correct PIN restores
+it and then physical phone-code entry separately reaches the Messages menu.
 Ordinary idle-content provenance, fitted-mask identity and radio/call/SMS-delivery
 acceptance remain open; the unproved native compatibility input is unchanged.
 

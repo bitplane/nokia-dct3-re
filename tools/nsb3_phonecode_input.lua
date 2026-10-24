@@ -23,7 +23,7 @@ machine.devices[':maincpu'].debug:bpset(0x2af450, '1',
 machine.devices[':maincpu'].debug:bpset(0x2af48c, '1',
     'logerror "nsb3_phonecode_matched_branch: retry=%02x observer_writes=0\\n",r1;g')
 local actions = coroutine.create(function()
-    assert(emu.wait(14))
+    assert(emu.wait(_G.nsb3_phonecode_start or 14))
     for _, item in ipairs({{2, 'Keypad 1'}, {3, 'Keypad 2'}, {4, 'Keypad 3'},
                            {2, 'Keypad 4'}, {3, 'Keypad 5'}, {1, 'Left Softkey / Menu'}}) do
         local field = assert(machine.ioport.ports[':COL.' .. item[1]].fields[item[2]])

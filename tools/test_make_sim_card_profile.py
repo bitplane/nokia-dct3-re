@@ -8,6 +8,13 @@ import make_sim_card_profile as profile
 
 
 class SimCardProfileTest(unittest.TestCase):
+    def test_current_profile_keeps_legacy_prefix_and_shared_defaults(self):
+        for enabled in (False, True):
+            data = profile.make_current_profile(enabled)
+            self.assertEqual(len(data), 3570)
+            self.assertEqual(data[:3524], profile.make_profile(enabled))
+            self.assertEqual(data[3524:], bytes.fromhex('00f110') + b'\xff' * 43)
+
     def test_default_layout_matches_device_nvram_contract(self):
         data = profile.make_profile(False)
         self.assertEqual(3524, len(data))

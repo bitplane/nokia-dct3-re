@@ -9,12 +9,12 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.nsb7_radio_check import contract
 from tools.nsb7_sms_check import tx_bytes
-from tools.make_sim_card_profile import make_profile
+from tools.make_sim_card_profile import make_current_profile, make_profile
 from tools.sim_security_trace_check import statuses, ATTEMPTS_OFFSET
 
 
 def serialized_profile():
-    return make_profile(True) + bytes.fromhex('00f110') + b'\xff'*43
+    return make_current_profile(True)
 
 
 def check_frame(path, expected):

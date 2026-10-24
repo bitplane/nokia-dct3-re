@@ -47,6 +47,11 @@ def make_profile(pin_enabled: bool) -> bytes:
     return bytes(image)
 
 
+def make_current_profile(pin_enabled: bool) -> bytes:
+    """Include current shared-card defaults without changing the legacy format."""
+    return make_profile(pin_enabled) + bytes.fromhex('00f110') + b'\xff' * 43
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True, type=Path)

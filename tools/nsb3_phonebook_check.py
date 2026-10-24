@@ -72,6 +72,8 @@ def prepare_reload(source, target, validate_card=check_card):
     for name in ('flash', 'eeprom', 'sim_card'):
         data = (storage / name).read_bytes()
         (target / 'nvram/nsb3r4t' / name).write_bytes(data)
+        if name == 'sim_card':
+            (target / 'initial_sim_card.bin').write_bytes(data)
         hashes[name] = hashlib.sha256(data).hexdigest()
     shutil.copyfile(source / 'cfg/nsb3r4t.cfg', target / 'cfg/nsb3r4t.cfg')
     (target / 'cold_source.json').write_text(json.dumps({

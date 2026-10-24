@@ -3,7 +3,11 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import sys
 import xml.etree.ElementTree as ET
+
+if __package__ in (None, ''):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 IMAGE_SHA256 = '927f94aed4ece8e84ad2eda28614bcede1272e89a2d046b16192f88499da19c2'
 
@@ -33,13 +37,15 @@ def fresh_phone_retry(image, eeprom):
 
 
 def prepare(image, output, eeprom=None, include_security=False, insert_sim=False,
-            initialize_phone_retry=False):
+            initialize_phone_retry=False, pin_enabled=False):
     if hashlib.sha256(image).hexdigest() != IMAGE_SHA256:
         raise ValueError('requires own NSB-3 MCU/PPM-A image')
     if include_security and eeprom is None:
         raise ValueError('security checksum control requires own source EEPROM')
     if initialize_phone_retry and (eeprom is None or not include_security):
         raise ValueError('fresh phone retry requires qualified checksum-control EEPROM')
+    if pin_enabled and not insert_sim:
+        raise ValueError('PIN-enabled fixture requires inserted laboratory card')
     if eeprom is not None and hashlib.sha256(eeprom).hexdigest() != '53584321c1f9e317e59cf67401fb5a28aa84fc4db32c67d264731825aa194d19':
         raise ValueError('requires qualified own native cold EEPROM')
     output.mkdir(parents=True, exist_ok=False)
@@ -71,6 +77,14 @@ def prepare(image, output, eeprom=None, include_security=False, insert_sim=False
                          'source_eeprom_sha256': hashlib.sha256(eeprom).hexdigest(),
                          'initial_eeprom_sha256': hashlib.sha256(repaired).hexdigest(),
                          'changed_offsets': [hex(i) for i, (a, b) in enumerate(zip(eeprom, repaired)) if a != b]})
+    if pin_enabled:
+        from tools.make_sim_card_profile import make_current_profile
+        card = make_current_profile(True)
+        target = output / 'nvram/nsb3r4t'
+        target.mkdir(parents=True, exist_ok=True)
+        (target / 'sim_card').write_bytes(card)
+        (output / 'initial_sim_card.bin').write_bytes(card)
+        metadata.update(laboratory_pin_enabled=True, initial_sim_card_sha256=hashlib.sha256(card).hexdigest())
     (output / 'input.json').write_text(json.dumps(metadata, indent=2) + '\n')
 
 
@@ -83,6 +97,7 @@ def main():
     parser.add_argument('--insert-sim', action='store_true', help='insert a fresh standards-shaped laboratory card')
     parser.add_argument('--initialize-phone-retry', action='store_true',
                         help='separate provisioning fixture: initialize own record 0709 failure count to zero')
+    parser.add_argument('--pin-enabled', action='store_true', help='seed the shared laboratory PIN-enabled SIM, without handset state')
     args = parser.parse_args()
     try:
         image = args.image.read_bytes()
@@ -95,7 +110,7 @@ def main():
                 raise ValueError('own source-run executable differs')
             eeprom = (storage / 'eeprom').read_bytes()
         prepare(image, args.output, eeprom, args.all_decoded_checksums, args.insert_sim,
-                args.initialize_phone_retry)
+                args.initialize_phone_retry, args.pin_enabled)
     except (OSError, ValueError) as exc:
         parser.exit(1, f'NSB-3 nominal input: {exc}\n')
 
