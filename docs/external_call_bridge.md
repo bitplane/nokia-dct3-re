@@ -1405,7 +1405,13 @@ the final `nsb7_sip_check.py --media` validates authentication, physical
 contacts, exact UI/storage, own control writes and clock accounting.
 Outgoing carries474/451 uplink/downlink blocks; incoming carries396/376.
 Both require actual SIP confirmation and normal release. These are HLE
-transport results, not physical waveform or native speech acceptance.
+transport results, not native speech acceptance. Separate
+`verify-8290-sip-outgoing-waveform` and `verify-8290-sip-incoming-waveform`
+gates test actual MAME microphone/playback streams with isolated host routes,
+sustained440Hz/660Hz endpoint tones and unchanged neutral codec gains.
+They require an explicit `SIP_WAVEFORM_NVRAM_DIR` from the own-source NSB-7
+provisioning chain. The reusable `run_noki8290_sip_media.py` validates that
+source, records its hashes, preserves it and runs the exact product checker.
 Incoming also requires a fresh handset-readiness artifact.
 
 The previously qualified restoration fixtures remain explicitly

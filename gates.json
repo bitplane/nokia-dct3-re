@@ -237,6 +237,20 @@
       ]
     },
     {
+      "name": "verify-8290-sip-incoming-waveform", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP/PulseAudio/FFmpeg and explicit SIP_WAVEFORM_NVRAM_DIR from own qualified NSB-7 provisioning; physical Answer/End and HLE microphone/earpiece tones, not native speech",
+      "recipe": [
+        "\tenv SIP_PRODUCT=8290 SIP_DIRECTION=incoming SIP_WAVEFORM_NVRAM_DIR='$(SIP_WAVEFORM_NVRAM_DIR)' RUN_DIR='$(RUN_DIR)' SIP_PJSUA_BIN='$(SIP_PJSUA_BIN)' SIP_PYTHON_PATH='$(SIP_PYTHON_PATH)' bash tools/run_sip_physical_audio_gate.sh"
+      ]
+    },
+    {
+      "name": "verify-8290-sip-outgoing-waveform", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP/PulseAudio/FFmpeg and explicit SIP_WAVEFORM_NVRAM_DIR from own qualified NSB-7 provisioning; physical dialing/End and HLE microphone/earpiece tones, not native speech",
+      "recipe": [
+        "\tenv SIP_PRODUCT=8290 SIP_DIRECTION=outgoing SIP_WAVEFORM_NVRAM_DIR='$(SIP_WAVEFORM_NVRAM_DIR)' RUN_DIR='$(RUN_DIR)' SIP_PJSUA_BIN='$(SIP_PJSUA_BIN)' SIP_PYTHON_PATH='$(SIP_PYTHON_PATH)' bash tools/run_sip_physical_audio_gate.sh"
+      ]
+    },
+    {
       "name": "verify-8890-sip-incoming-waveform", "prerequisites": ["build"], "variables": {},
       "unstructured": "optional PJSIP/PulseAudio/FFmpeg; own NSB-6 incoming Answer/End and microphone/earpiece tones through its documented PCM bus, HLE not native speech",
       "recipe": [

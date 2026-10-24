@@ -3,6 +3,22 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_sip_physical_audio_waveforms",
+      "owner": "nsb7_host_audio",
+      "status": "satisfied",
+      "predicate": "Physical incoming and outgoing NSB-7 HLE calls carry sustained microphone and earpiece tones through actual host audio streams and local SIP",
+      "current": "The shared isolated PulseAudio gate feeds440Hz to MAME microphone capture and records speaker playback carrying remote660Hz. Own-source source-validated NVRAM, physical PIN/Answer/Send/End, exact own UI/card/journal checks and documented PCM accounting remain required. Each recording must contain at least two consecutive1s windows with RMS>=500 and expected-tone energy>=0.5. Full clean wrappers pass outgoing9s microphone/8s earpiece at tmp/nsb7-sip-outgoing-waveform-clean/handset and incoming8s/4s at tmp/nsb7-sip-incoming-waveform/handset. Neutral gains are unchanged and predecessor storage hashes are preserved. This is HLE endpoint audio, not measured analog gains, media-aware restoration, native DSP speech or normal-machine promotion.",
+      "evidence": ["docs/8290_bringup.md", "docs/external_call_bridge.md", "docs/model_coverage.md", "tools/run_noki8290_sip_media.py", "tools/run_sip_physical_audio_gate.sh", "tools/sip_handset_waveform_check.py", "tools/test_sip_handset_waveform_check.py", "gates.json"]
+    },
+    {
+      "id": "nsb7_own_pcm_and_physical_sip_media",
+      "owner": "nsb7_host_audio",
+      "status": "satisfied",
+      "predicate": "Own NSB-7 framing and physical call-control evidence support bidirectional HLE PCM through local SIP without sibling-profile inference",
+      "current": "The acquired 308-page NSB-7 service manual printed System Module27/PDF41 documents COBBA512kHz/8kHz,64-clock frames,13-in-16 sign extension, MSB-first and falling-edge sampling; UI8 identifies MIC2/EAR. Own v5.22 compiler/table/literals and physical Send/Answer/End pin command8/bit0200 at writer2cb93e. Independent outgoing/incoming real-time SIP gates carry474/451 and396/376 uplink/downlink blocks with exact PCM accounting, authentication, own PCS600 registration, reviewed pixels, whole-card equality and valid own flash journal. Source identity6 is a research firmware branch, not fitted silicon; the manual BOM says ROM5, which remains an unresolved hardware identity distinction. HLE media does not qualify resident DSP execution, native speech or measured analogue gains.",
+      "evidence": ["roms/README.md", "docs/8290_bringup.md", "driver/nokia_dct3.cpp", "tools/nsb7_speech_control_check.py", "tools/nsb7_pcm_check.py", "tools/nsb7_sip_check.py", "tools/run_noki8290_sip_media.py", "tools/test_nsb7_speech_control_check.py", "tools/test_nsb7_pcm_check.py", "tools/test_nsb7_sip_check.py"]
+    },
+    {
       "id": "nsb6_sip_physical_audio_waveforms",
       "owner": "nsb6_host_audio",
       "status": "satisfied",

@@ -18,156 +18,156 @@ Every product gate reaches its own ROM normalisation step.
 Which products have a gate in each shared capability family. An
 absent product is a coverage question, not a drifted gate.
 
-| Family | 2100 | 3210 | 3310 | 3330 | 3410 | 3610 | 5110 | 5110i | 5210 | 5510 | 6110 | 6150 | 6210 | 6250 | 7110 | 8210 | 8850 | 8890 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `alarm` | — | yes | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | yes |
-| `alarm-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `alarm-off-no` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `alarm-off-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `alarm-off-restore-yes` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `alarm-off-snooze-no` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `alarm-off-snooze-yes` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `alarm-off-yes` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `alarm-snooze` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | yes |
-| `alarm-snooze-countdown-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `bootstrap` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | yes | — | — |
-| `calculator` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
-| `calendar-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `calendar-leap-day` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | — | yes |
-| `calendar-midnight` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `calendar-year-end` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | — | yes |
-| `call-divert` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `call-divert-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `call-divert-lifecycle` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `charger-wake` | — | yes | — | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `fdn-cycle` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `fdn-dial-controls` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `fdn-records` | — | — | — | — | — | — | — | yes | — | — | — | — | yes | — | — | — | — | — |
-| `frontier` | yes | yes | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `host-incoming-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | yes |
-| `host-outgoing-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | yes |
-| `host-rejected-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | yes |
-| `host-silent-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | yes |
-| `incoming-call` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
-| `incoming-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
-| `keypad-controller` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — | — |
-| `mbus` | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — | — | — |
-| `menu` | — | — | yes | — | yes | — | yes | yes | yes | — | — | — | yes | — | — | — | — | — |
-| `native-verifier` | — | — | yes | — | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
-| `navigation` | — | — | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `outgoing-call` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
-| `outgoing-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
-| `phonebook` | — | — | — | — | — | — | — | yes | — | — | — | — | yes | — | — | yes | — | — |
-| `pin-host-incoming-call` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | yes | yes | yes |
-| `pin-host-incoming-sms` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | yes | yes | yes |
-| `pin-host-outgoing-call` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | yes | yes | yes |
-| `pin-host-outgoing-sms` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | yes | yes | yes |
-| `pin-host-rejected-sms` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | — | yes | yes |
-| `pin-host-silent-sms` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | — | yes | yes |
-| `pin-phonebook` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | yes | yes | yes |
-| `pin-retry` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `pin-retry-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `pin-state-call` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `pin-state-idle` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `pin-state-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `pin2-change` | — | — | — | — | — | — | — | yes | — | — | — | — | yes | yes | — | — | — | — |
-| `pin2-change-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `pin2-exhaustion` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `pin2-retry-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `power-cycle` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes |
-| `power-lifecycle` | — | yes | — | — | — | — | yes | — | yes | — | — | — | — | — | — | — | — | — |
-| `puk-recovery` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `puk2-permanent` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `puk2-recovery` | — | — | — | — | — | — | — | yes | — | — | — | — | yes | yes | — | — | — | — |
-| `radio-a5-1-degraded` | — | yes | yes | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-a5-1-degraded-state` | — | — | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-a5-1-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-a5-1-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-a5-1-incoming-call` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-a5-1-outgoing-call` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-all-cell-loss` | — | yes | — | — | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-authentication-boundary` | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-boundary` | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-answered` | — | yes | — | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-lifecycle` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-sip` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-sip-alerting-restore` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-sip-cancel` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-sip-connected-restore` | — | — | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-sip-idle-restore` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-sip-waveform` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-incoming-smart-message` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-incoming-sms` | — | yes | — | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-loss-recovery` | — | yes | — | — | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-loss-recovery-state` | — | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-media-resilience` | — | — | yes | yes | — | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-host-media` | — | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-host-termination` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-lifecycle` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-sip` | — | yes | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-sip-busy` | — | yes | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-sip-connected-restore` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-sip-pending-restore` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-sip-unavailable` | — | yes | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-sip-waveform` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-outgoing-physical-duplex` | — | — | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-outgoing-sms` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-paging` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-paging-negatives` | — | — | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-paging-preserved` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-paging-state` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-periodic-location-update` | — | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-physical-duplex` | — | — | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-registration` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-registration-preserved` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-registration-state` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-reselection-different-lac` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-reselection-paging` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-reselection-preserved` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-reselection-same-lac` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `radio-reselection-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-smart-message-application` | — | yes | yes | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-smart-message-persistence` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-sms-inbox` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-unsuitable-cells` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `registration` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
-| `save-state` | — | — | — | — | — | — | yes | — | yes | — | — | — | — | — | — | — | — | — |
-| `sim-phonebook` | — | yes | — | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | — |
-| `sim-pin` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
-| `sim-pin-registration` | — | — | — | — | — | — | — | — | yes | — | — | — | — | — | — | — | yes | yes |
-| `sim-toolkit` | — | yes | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `sim-toolkit-call` | — | yes | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `sim-toolkit-call-decline` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `sim-toolkit-inkey` | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — |
-| `sim-toolkit-input` | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — |
-| `sim-toolkit-interactive` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | yes | yes |
-| `sim-toolkit-menu` | — | yes | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `sim-toolkit-menu-state` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
-| `sim-toolkit-sms` | — | yes | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `sip-alerting-incoming-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes |
-| `sip-cancel` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `sip-connected-incoming-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | yes |
-| `sip-connected-outgoing-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | yes |
-| `sip-connected-signaling` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `sip-idle-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `sip-incoming-connected-signaling` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `sip-incoming-media` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
-| `sip-incoming-restore` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
-| `sip-incoming-waveform` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
-| `sip-outgoing-busy` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `sip-outgoing-media` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
-| `sip-outgoing-restore` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
-| `sip-outgoing-unavailable` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `sip-outgoing-waveform` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
-| `sip-pending-outgoing-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes |
-| `slow-pin-registration` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | — |
-| `sms-status-persistence` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
-| `state-divert` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
-| `static` | — | — | — | — | — | — | — | yes | — | — | yes | yes | — | — | — | — | — | — |
-| `ussd` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `verifier` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | yes | — | — |
+| Family | 2100 | 3210 | 3310 | 3330 | 3410 | 3610 | 5110 | 5110i | 5210 | 5510 | 6110 | 6150 | 6210 | 6250 | 7110 | 8210 | 8290 | 8850 | 8890 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `alarm` | — | yes | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | yes |
+| `alarm-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `alarm-off-no` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `alarm-off-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `alarm-off-restore-yes` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `alarm-off-snooze-no` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `alarm-off-snooze-yes` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `alarm-off-yes` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `alarm-snooze` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | yes |
+| `alarm-snooze-countdown-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `bootstrap` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | yes | — | — | — |
+| `calculator` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — | — |
+| `calendar-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `calendar-leap-day` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | — | — | yes |
+| `calendar-midnight` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `calendar-year-end` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | — | — | yes |
+| `call-divert` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `call-divert-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `call-divert-lifecycle` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `charger-wake` | — | yes | — | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `fdn-cycle` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `fdn-dial-controls` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `fdn-records` | — | — | — | — | — | — | — | yes | — | — | — | — | yes | — | — | — | — | — | — |
+| `frontier` | yes | yes | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `host-incoming-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — | yes |
+| `host-outgoing-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — | yes |
+| `host-rejected-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — | yes |
+| `host-silent-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — | yes |
+| `incoming-call` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — | — |
+| `incoming-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — | — |
+| `keypad-controller` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — | — | — |
+| `mbus` | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `menu` | — | — | yes | — | yes | — | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — |
+| `native-verifier` | — | — | yes | — | — | — | — | yes | — | — | — | — | — | — | — | — | — | — | — |
+| `navigation` | — | — | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `outgoing-call` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — | — |
+| `outgoing-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — | — |
+| `phonebook` | — | — | — | — | — | — | — | yes | — | — | — | — | yes | — | — | yes | — | — | — |
+| `pin-host-incoming-call` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `pin-host-incoming-sms` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `pin-host-outgoing-call` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `pin-host-outgoing-sms` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `pin-host-rejected-sms` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | — | — | yes | yes |
+| `pin-host-silent-sms` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | — | — | yes | yes |
+| `pin-phonebook` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `pin-retry` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `pin-retry-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `pin-state-call` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `pin-state-idle` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `pin-state-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `pin2-change` | — | — | — | — | — | — | — | yes | — | — | — | — | yes | yes | — | — | — | — | — |
+| `pin2-change-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `pin2-exhaustion` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `pin2-retry-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `power-cycle` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | — | yes |
+| `power-lifecycle` | — | yes | — | — | — | — | yes | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `puk-recovery` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `puk2-permanent` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `puk2-recovery` | — | — | — | — | — | — | — | yes | — | — | — | — | yes | yes | — | — | — | — | — |
+| `radio-a5-1-degraded` | — | yes | yes | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-a5-1-degraded-state` | — | — | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-a5-1-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-a5-1-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-a5-1-incoming-call` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-a5-1-outgoing-call` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-all-cell-loss` | — | yes | — | — | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-authentication-boundary` | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-boundary` | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-answered` | — | yes | — | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-lifecycle` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip-alerting-restore` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip-cancel` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip-connected-restore` | — | — | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip-idle-restore` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip-waveform` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-smart-message` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-sms` | — | yes | — | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-loss-recovery` | — | yes | — | — | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-loss-recovery-state` | — | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-media-resilience` | — | — | yes | yes | — | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-host-media` | — | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-host-termination` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-lifecycle` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip` | — | yes | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip-busy` | — | yes | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip-connected-restore` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip-pending-restore` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip-unavailable` | — | yes | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip-waveform` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-physical-duplex` | — | — | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-sms` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-paging` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-paging-negatives` | — | — | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-paging-preserved` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-paging-state` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-periodic-location-update` | — | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-physical-duplex` | — | — | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-registration` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-registration-preserved` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-registration-state` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-reselection-different-lac` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-reselection-paging` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-reselection-preserved` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-reselection-same-lac` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-reselection-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-smart-message-application` | — | yes | yes | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-smart-message-persistence` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-sms-inbox` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-unsuitable-cells` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `registration` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — | — |
+| `save-state` | — | — | — | — | — | — | yes | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `sim-phonebook` | — | yes | — | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `sim-pin` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | — | — | — |
+| `sim-pin-registration` | — | — | — | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | yes | yes |
+| `sim-toolkit` | — | yes | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `sim-toolkit-call` | — | yes | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `sim-toolkit-call-decline` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `sim-toolkit-inkey` | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | — |
+| `sim-toolkit-input` | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | — |
+| `sim-toolkit-interactive` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | yes | yes |
+| `sim-toolkit-menu` | — | yes | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `sim-toolkit-menu-state` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | yes |
+| `sim-toolkit-sms` | — | yes | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `sip-alerting-incoming-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | — | yes |
+| `sip-cancel` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `sip-connected-incoming-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | yes |
+| `sip-connected-outgoing-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | yes |
+| `sip-connected-signaling` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `sip-idle-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `sip-incoming-connected-signaling` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `sip-incoming-media` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | yes |
+| `sip-incoming-restore` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — |
+| `sip-incoming-waveform` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes | yes |
+| `sip-outgoing-busy` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `sip-outgoing-media` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | yes |
+| `sip-outgoing-restore` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — |
+| `sip-outgoing-unavailable` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `sip-outgoing-waveform` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes | yes |
+| `sip-pending-outgoing-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | — | yes |
+| `slow-pin-registration` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | — | — |
+| `sms-status-persistence` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — | — |
+| `state-divert` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
+| `static` | — | — | — | — | — | — | — | yes | — | — | yes | yes | — | — | — | — | — | — | — |
+| `ussd` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `verifier` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | yes | — | — | — |
 
 ## Different checker scripts
 

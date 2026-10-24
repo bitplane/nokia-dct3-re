@@ -56,6 +56,11 @@ case "$product" in
     8890)
         machine=nsb6hle bios=
         ;;
+    8290)
+        machine=nsb7hle bios=
+        : "${SIP_WAVEFORM_NVRAM_DIR:?8290 requires its own qualified NVRAM directory}"
+        [[ -f "$SIP_WAVEFORM_NVRAM_DIR/nsb7hle/flash" && -f "$SIP_WAVEFORM_NVRAM_DIR/nsb7hle/sim_card" ]] || { echo 'missing 8290 own qualified storage' >&2; exit 1; }
+        ;;
     *) echo "unsupported SIP waveform product: $product" >&2; exit 1 ;;
 esac
 case "$direction" in
@@ -119,11 +124,16 @@ capture_pid=$!
 python3 tools/pulse_route_mame.py --source "$input_name.monitor" --sink "$output_name" \
     > "$run_dir/sip-pulse-routes.log" &
 router_pid=$!
-if [[ "$product" == 8210 || "$product" == 8850 || "$product" == 8890 ]]; then
+if [[ "$product" == 8210 || "$product" == 8290 || "$product" == 8850 || "$product" == 8890 ]]; then
     media_arg=--outgoing-media
     if [[ "$direction" == incoming ]]; then media_arg=--incoming-media; fi
+    runner="tools/run_noki${product}_sip_cancel.py"
+    if [[ "$product" == 8290 ]]; then
+        runner=tools/run_noki8290_sip_media.py
+        profile_args=(--nvram-source "$(realpath "$SIP_WAVEFORM_NVRAM_DIR")")
+    fi
     env PYTHONPATH="${SIP_PYTHON_PATH:-$(realpath "$sip_project_dir/pjsip-apps/src/swig/python"):$(realpath "$sip_project_dir"/pjsip-apps/src/swig/python/build/lib.*)}" \
-        .venv/bin/python "tools/run_noki${product}_sip_cancel.py" "$run_dir/handset" \
+        .venv/bin/python "$runner" "$run_dir/handset" \
         "$media_arg" "${profile_args[@]}" --record-media --sound pulse \
         --pjsua "${SIP_PJSUA_BIN:-$(realpath "$sip_project_dir"/pjsip-apps/bin/pjsua-*)}"
 else
@@ -140,7 +150,7 @@ wait "$capture_pid" || true
 capture_pid=
 grep -q '^pulse_route: source-output ' "$run_dir/sip-pulse-routes.log" || { echo 'missing MAME microphone stream' >&2; exit 1; }
 grep -q '^pulse_route: sink-input ' "$run_dir/sip-pulse-routes.log" || { echo 'missing MAME speaker stream' >&2; exit 1; }
-if [[ "$product" == 8210 || "$product" == 8850 || "$product" == 8890 ]]; then
+if [[ "$product" == 8210 || "$product" == 8290 || "$product" == 8850 || "$product" == 8890 ]]; then
     cp "$run_dir/sip-earpiece.wav" "$run_dir/handset/sip-earpiece.wav"
     run_dir="$run_dir/handset"
 fi

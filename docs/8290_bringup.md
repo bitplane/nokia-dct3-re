@@ -3293,8 +3293,27 @@ The independent incoming real-time SIP run
 precedes INVITE; physical Answer52 and End60 own connection/release.
 Exact caller/UI/card/journal and own incoming speech-control/PCM checks pass
 through `nsb7_sip_check.py --incoming --media`.
-Physical microphone/earpiece waveforms and media-aware call-phase save/restore
-remain separate outstanding acceptance work.
+The isolated physical-audio gate additionally verifies sustained440Hz
+microphone-to-SIP and660Hz SIP-to-earpiece waveforms using actual MAME
+capture/playback streams, neutral codec gains, RMS>=500 and expected-tone
+energy>=0.5 for at least two consecutive1s windows. Incoming capture
+`tmp/nsb7-sip-incoming-waveform/handset` passes8s/4s; outgoing capture
+`tmp/nsb7-sip-outgoing-waveform-clean/handset` passes9s/8s. Both complete
+wrappers exit successfully after product/UI/storage and waveform checks.
+
+```sh
+make verify-8290-sip-incoming-waveform \
+  SIP_WAVEFORM_NVRAM_DIR="$PWD/tmp/nsb7-pin-registration-cold/nvram" \
+  RUN_DIR=tmp/nsb7-sip-incoming-waveform-fresh
+# Use verify-8290-sip-outgoing-waveform for the independent outgoing leg.
+```
+
+The explicit source must come from the own-source provisioning/registration
+chain, never donor data. `run_noki8290_sip_media.py` requires a fresh run,
+validates source card/journal, records predecessor hashes, preserves the
+predecessor and applies exact whole-run acceptance. The shared audio wrapper
+restores host audio defaults and unloads temporary routes on success/failure.
+Media-aware call-phase save/restore remains outstanding.
 Running an audio producer faster than wall-clock SIP is not valid media
 acceptance: the unthrottled diagnostic left RTP queued past release and
 failed the closed-session check. No device timing was altered to hide it.
