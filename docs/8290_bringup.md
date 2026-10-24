@@ -3329,8 +3329,18 @@ make verify-8290-sip-outgoing-media-restore \
   RUN_DIR=tmp/nsb7-sip-outgoing-media-restore-fresh
 ```
 
-Incoming connected and unanswered call-phase restoration on the PCM-enabled
-composition remain outstanding; prior signaling-only runs do not cover them.
+Connected incoming restoration independently passes
+`tmp/nsb7-sip-incoming-media-restore`: physical Answer52 precedes own speech
+enable and documented PCM, save55/load retains exact architecture/RAM/time,
+and the bridge inventories170 uplink/165 downlink/167 transmitted/176 received
+blocks before invalidating epoch1. One BYE and one epoch2 cause41 clear occur
+without repeated admission, Answer or media replay. Exact caller, saved/
+restored/cleanup/final pixels, retained clock, complete card and journal pass.
+`verify-8290-sip-incoming-media-restore` runs the independent incoming leg
+with the same explicit own-source NVRAM argument.
+
+Unanswered call-phase restoration on the PCM-enabled composition remains
+outstanding; prior signaling-only runs do not cover it.
 This acceptance intentionally clears the live call after restore, not
 seamless external-call resumption or native DSP speech.
 Running an audio producer faster than wall-clock SIP is not valid media

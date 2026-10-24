@@ -53,9 +53,11 @@ def check_restored_architecture(text,*,incoming=False,alerting=False):
         raise ValueError('missing unique connected save/load boundary')
 
 
-def check_incoming_restore(text,phase='connected'):
+def check_incoming_restore(text,phase='connected',*,media=False):
     if phase not in ('connected','alerting'):raise ValueError('unknown incoming restore phase')
     alerting=phase=='alerting'
+    if media and alerting:
+        raise ValueError('unanswered incoming cannot qualify connected media')
     check_restored_architecture(text,incoming=True,alerting=alerting)
     setup=laboratory_incoming_setup('5551234')
     rows=list(re.finditer(r'nsb7_call_input: key=(Send|End) state=([01]) t=([0-9.]+)',text))
@@ -108,9 +110,13 @@ def check_incoming_restore(text,phase='connected'):
     if alerting and text.index('incoming state id=1 epoch=2 phase=ended')>rows[0].start():
         raise ValueError('network termination waited for physical End')
     if len(re.findall(r'gsm_call_adapter: incoming id=\d+ result=accepted',text))!=1 or \
-            'GSM service establish sapi=0 pd=05 message=24 ' in text or \
-            re.search(r'media direction=uplink [^\n]*good=1\b',text) or 'dsp_hle: speech tick' in text:
-        raise ValueError('restored incoming has duplicate/outgoing admission or qualified media')
+            'GSM service establish sapi=0 pd=05 message=24 ' in text:
+        raise ValueError('restored incoming has duplicate/outgoing admission')
+    if media:
+        from tools.nsb7_pcm_check import verify_before_restore
+        verify_before_restore(text, incoming=True)
+    elif re.search(r'media direction=uplink [^\n]*good=1\b',text) or 'dsp_hle: speech tick' in text:
+        raise ValueError('unclocked incoming restoration produced qualified media')
 
 
 def check_restore(text,connected=True,*,media=False):
@@ -214,13 +220,13 @@ def main():
     args=parser.parse_args()
     incoming=args.incoming or args.restore_incoming or args.restore_incoming_alerting
     restoring=args.restore_outgoing or args.restore_outgoing_pending or args.restore_incoming or args.restore_incoming_alerting
-    if args.media and restoring and not args.restore_outgoing:
-        parser.error('--media restoration currently requires connected outgoing')
+    if args.media and restoring and not (args.restore_outgoing or args.restore_incoming):
+        parser.error('--media restoration requires a connected call')
     phase='alerting' if args.restore_incoming_alerting else 'connected'
     try:
         contract(args.image.read_bytes())
         text=(args.run/'error.log').read_text()
-        if args.restore_incoming or args.restore_incoming_alerting: check_incoming_restore(text,phase=phase)
+        if args.restore_incoming or args.restore_incoming_alerting: check_incoming_restore(text,phase=phase,media=args.media)
         elif args.restore_outgoing or args.restore_outgoing_pending: check_restore(text,connected=not args.restore_outgoing_pending,media=args.media)
         else: check(text,incoming=incoming,media=args.media)
         check_clock(text,finish=68 if incoming else 76)
@@ -261,7 +267,7 @@ def main():
             direction='incoming' if incoming else 'outgoing'
             if not (args.run/f'sta/nsb7hle/nsb7_sip_{direction}.sta').is_file():
                 raise ValueError('actual handset snapshot file absent')
-            if incoming: verify_restore(args.run,remote,phase,'8290',signaling_only=True)
+            if incoming: verify_restore(args.run,remote,phase,'8290',signaling_only=not args.media)
             else: verify_outgoing_restore(args.run,remote,not args.restore_outgoing_pending,'8290',signaling_only=not args.media)
         else:
             verify_success(args.run,remote,SimpleNamespace(product='8290',incoming=incoming,

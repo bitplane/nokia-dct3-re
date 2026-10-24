@@ -86,6 +86,17 @@ def alerting_restore_fixture():
 
 class SipTest(unittest.TestCase):
     @patch('tools.nsb7_sip_check.check_authentication')
+    def test_connected_incoming_restore_requires_pre_save_media(self, authentication):
+        text = incoming_restore_fixture()
+        with self.assertRaises(ValueError):
+            check_incoming_restore(text, media=True)
+        with patch('tools.nsb7_pcm_check.verify_before_restore') as pcm:
+            check_incoming_restore(text, media=True)
+        pcm.assert_called_once_with(text, incoming=True)
+        with self.assertRaises(ValueError):
+            check_incoming_restore(text, phase='alerting', media=True)
+
+    @patch('tools.nsb7_sip_check.check_authentication')
     def test_connected_restore_media_requires_own_pre_save_clocked_path(self, authentication):
         text = restore_fixture()
         with self.assertRaises(ValueError):
@@ -164,6 +175,13 @@ class SipTest(unittest.TestCase):
                 patch('tools.run_sip_handset_gate.run',new_callable=AsyncMock) as run:
             main()
         self.assertFalse(run.call_args.args[0].signaling_only)
+        with tempfile.TemporaryDirectory() as directory:
+            with patch('sys.argv', base + ['--incoming', '--ready-file',
+                    str(Path(directory) / 'ready'), '--restore-call', '--', 'true']), \
+                    patch('tools.run_sip_handset_gate.run', new_callable=AsyncMock) as run:
+                main()
+            self.assertTrue(run.call_args.args[0].restore_call)
+            self.assertFalse(run.call_args.args[0].signaling_only)
         with patch('sys.argv',base+['--signaling-only','--restore-outgoing','--','true']), \
                 patch('tools.run_sip_handset_gate.run',new_callable=AsyncMock) as run:
             main()

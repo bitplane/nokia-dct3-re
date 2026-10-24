@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 849 gates: 638 generated from typed steps, 211 copied verbatim (shell).
+# 850 gates: 638 generated from typed steps, 212 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -62,15 +62,15 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8210-dcs-late-pin-sip-alerting-incoming-restore \
 	verify-8210-dcs-late-pin-sip-outgoing-waveform \
 	verify-8210-dcs-late-pin-sip-incoming-waveform \
-	verify-8290-sip-outgoing-media-restore verify-8290-sip-incoming-waveform \
-	verify-8290-sip-outgoing-waveform verify-8890-sip-incoming-waveform \
-	verify-8890-sip-outgoing-waveform verify-8850-sip-incoming-waveform \
-	verify-8850-sip-outgoing-waveform verify-8210-sip-outgoing-waveform \
-	verify-8210-sip-incoming-media verify-8210-sip-incoming-waveform \
-	verify-8210-sip-outgoing-restore verify-8210-sip-pending-outgoing-restore \
-	verify-8210-sip-incoming-restore verify-8210-sip-alerting-incoming-restore \
-	verify-8210-sip-cancel verify-6250-sip-idle-restore \
-	verify-6250-sip-alerting-incoming-restore \
+	verify-8290-sip-incoming-media-restore verify-8290-sip-outgoing-media-restore \
+	verify-8290-sip-incoming-waveform verify-8290-sip-outgoing-waveform \
+	verify-8890-sip-incoming-waveform verify-8890-sip-outgoing-waveform \
+	verify-8850-sip-incoming-waveform verify-8850-sip-outgoing-waveform \
+	verify-8210-sip-outgoing-waveform verify-8210-sip-incoming-media \
+	verify-8210-sip-incoming-waveform verify-8210-sip-outgoing-restore \
+	verify-8210-sip-pending-outgoing-restore verify-8210-sip-incoming-restore \
+	verify-8210-sip-alerting-incoming-restore verify-8210-sip-cancel \
+	verify-6250-sip-idle-restore verify-6250-sip-alerting-incoming-restore \
 	verify-6250-sip-pending-outgoing-restore verify-6250-sip-cancel \
 	verify-6250-sip-outgoing-busy verify-6250-sip-outgoing-unavailable \
 	verify-6210-power-cycle verify-8890-power-off-restore \
@@ -634,6 +634,10 @@ verify-8210-dcs-late-pin-sip-outgoing-waveform: build
 # shell: optional PJSIP/PulseAudio/FFmpeg; own NSM-3 late-PIN DCS incoming microphone/earpiece tones, HLE not native speech
 verify-8210-dcs-late-pin-sip-incoming-waveform: build
 	env SIP_PRODUCT=8210 SIP_DIRECTION=incoming SIP_LATE_PIN_DCS=1 RUN_DIR='$(RUN_DIR)' SIP_PJSUA_BIN='$(SIP_PJSUA_BIN)' SIP_PYTHON_PATH='$(SIP_PYTHON_PATH)' bash tools/run_sip_physical_audio_gate.sh
+
+# shell: optional local PJSIP and explicit own-source SIP_WAVEFORM_NVRAM_DIR; physical NSB-7 Answer, pre-save HLE PCM, exact connected save/load, old-dialog BYE and no repeated admission
+verify-8290-sip-incoming-media-restore: build
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON) tools/run_noki8290_sip_media.py '$(RUN_DIR)' --nvram-source '$(SIP_WAVEFORM_NVRAM_DIR)' --pjsua '$(SIP_PJSUA_BIN)' --restore-incoming-media
 
 # shell: optional local PJSIP and explicit own-source SIP_WAVEFORM_NVRAM_DIR; connected NSB-7 exact save/load, pre-save clocked HLE media, old-dialog BYE and no redial
 verify-8290-sip-outgoing-media-restore: build

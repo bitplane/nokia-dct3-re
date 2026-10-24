@@ -1420,9 +1420,13 @@ positive four-counter discarded-epoch inventory, exact architecture/time
 restoration, old-dialog BYE, one new-epoch cause41 clear and no redial.
 The product's final checker retains exact saved/restored/cleanup pixels,
 whole-card persistence, own flash validity and retained clock.
-Other previously qualified restoration fixtures remain explicitly
-`--signaling-only` fixtures on the pre-PCM configuration; incoming connected
-and unanswered phases must be requalified on the current build.
+Connected incoming independently passes `verify-8290-sip-incoming-media-restore`:
+physical Answer/own speech enable and PCM precede save55, exact architecture/
+RAM/time restores, the old epoch inventories170/165 media blocks and167/176
+host PCM blocks, and one BYE/cause41 clear occurs without repeated admission.
+Exact caller/saved/restored/cleanup/final UI and persistent storage remain
+required. Unanswered restoration fixtures remain pre-PCM evidence until
+requalified on the current build.
 Connected outgoing restoration was separately
 qualified by `nsb7_sip_outgoing_restore.lua` and `--restore-outgoing`: exact37-register/
 RAM/time restoration invalidates the original SIP dialog with BYE, one cause41

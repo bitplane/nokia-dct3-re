@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_connected_incoming_pcm_sip_restoration",
+      "owner": "nsb7_host_call_lifecycle",
+      "status": "satisfied",
+      "predicate": "Physical Answer and own PCM precede exact NSB-7 incoming-call restoration, followed by one external-dialog disposal without readmission or replay",
+      "current": "tmp/nsb7-sip-incoming-media-restore passes actual save55/load equality for all37 ARM/banked registers, RAM and emulated time. Own physical Answer52 and decoded0e precede speech-enable writer2cb93e and at least100 uplink/50 downlink blocks with documented clock accounting. The old epoch inventories170 uplink/165 downlink/167 host PCM transmitted/176 received. Ordered unique SIP caller/physical Answer/confirmation precede epoch change, old-dialog BYE and one cause41 clear; no second incoming admission, answer or replay is allowed. Exact caller/saved/restored/cleanup/final pixels, complete card, valid own journal, retained RTC and physical End/Menu recovery pass. This clears rather than resumes an external call; unanswered restoration, native DSP speech and seamless media continuation remain unqualified.",
+      "evidence": ["docs/8290_bringup.md", "docs/external_call_bridge.md", "tools/run_noki8290_sip_media.py", "tools/run_sip_handset_gate.py", "tools/nsb7_sip_check.py", "tools/nsb7_pcm_check.py", "tools/test_nsb7_pcm_check.py", "tools/test_nsb7_sip_check.py", "gates.json"]
+    },
+    {
       "id": "nsb7_connected_outgoing_pcm_sip_restoration",
       "owner": "nsb7_host_call_lifecycle",
       "status": "satisfied",

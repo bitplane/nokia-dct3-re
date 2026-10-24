@@ -35,12 +35,17 @@ def verify_ticks(text, enable, disable):
             'pcm_clock': [512000, 8000], 'native_speech': False}
 
 
-def verify_before_restore(text):
+def verify_before_restore(text, *, incoming=False):
     saved = text.find('sip_state: saved')
     if saved < 0:
         raise ValueError('missing actual save boundary')
     prefix = text[:saved]
     enable = prefix.find('dsp_control_write: data=860b pc=002cb93e r4=00000008 ')
+    input_prefix = 'nsb7_call_input' if incoming else 'nsb7_outgoing_call_input'
+    press = prefix.find(input_prefix + ': key=Send state=1 ')
+    decoded = prefix.find('nsb7_key_decode: key=0e observer_writes=0', max(press, 0))
+    if not 0 <= press < decoded < enable:
+        raise ValueError('speech enable lacks ordered own physical Send/Answer')
     if enable < 0 or 'dsp_control_write: data=840a pc=002cb93e' in prefix[enable:]:
         raise ValueError('saved call lacks own enabled speech control')
     return verify_ticks(prefix, enable, len(prefix))

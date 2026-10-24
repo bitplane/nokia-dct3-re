@@ -585,7 +585,7 @@ def verify_restore(root, remote_text, phase='connected', product='3210', *, sign
     log = (root / 'error.log').read_text(errors='replace')
     if product=='8290':
         from tools.nsb7_sip_check import check_incoming_restore
-        check_incoming_restore(log,phase=phase)
+        check_incoming_restore(log,phase=phase,media=phase == 'connected' and not signaling_only)
     if phase == 'connected':
         if not re.search(r'state changed to CONFIRMED.*?Request msg BYE/',
                          remote_text, re.DOTALL):
@@ -649,7 +649,7 @@ def verify_restore(root, remote_text, phase='connected', product='3210', *, sign
             if bridge.count(marker) != 1 or (index := bridge.find(marker, cursor)) < 0:
                 raise RuntimeError(f'missing or reordered incoming restoration identity: {marker}')
             cursor = index + len(marker)
-    elif phase == 'connected' and product == '8890':
+    elif phase == 'connected' and product in ('8290', '8890'):
         verify_incoming_identity(bridge, restored=True)
         verify_pre_restore_media(log, bridge)
     (root / 'sip-result.json').write_text(json.dumps({
@@ -766,9 +766,11 @@ def main():
                   not args.restore_call and not args.restore_outgoing and
                   not args.restore_idle and not args.cancel_incoming)
     nsb7_restore_media = (args.product == '8290' and not args.signaling_only and
-                          not args.incoming and args.restore_outgoing and
+                          ((not args.incoming and args.restore_outgoing and not args.restore_call) or
+                           (args.incoming and args.ready_file is not None and args.restore_call and
+                            args.restore_phase == 'connected' and not args.restore_outgoing)) and
                           args.sip_response == 200 and args.calls == 1 and
-                          not args.record_media and not args.restore_call and
+                          not args.record_media and
                           not args.restore_idle and not args.cancel_incoming)
     if args.product=='8290' and not signaling_connected and not nsb7_media and not nsb7_restore_media:
         parser.error('8290 supports only its single signaling-only SIP-200 fixtures; speech is unproved')
