@@ -72,6 +72,49 @@ and identity observations stay in ignored captures; durable reports use
 hashes rather than publishing handset identity bytes. The following sections
 describe the separate-PMM BIOS501 control unless explicitly stated otherwise.
 
+### Separate own-checksum consistency fixture
+
+The acquired v5.01 image above remains untouched. A separate external initial
+flash-NVRAM fixture tests only the decoded checksum dependency: replaying the
+own journal identifies record0dac/source0db0 as the last writer of logical
+003c..003f. Recomputing the first60-byte sum changes only file offset3fcdb3,
+the final checksum byte18ed ->18e0. The remaining logical cache, all identity
+and calibration content, complete executable/PPM and record structure remain
+unchanged. This is a derived consistency fixture, not authentic provisioning
+or a correction to the canonical backup. No RAM, firmware flag or DSP response
+is supplied; the original ROM remains the BIOS input.
+
+In the independent50s `tmp/nse5-checksum-consistency` run, both live
+3af8f2 comparisons read000018e0/000018e0 and3af904 returns1. Self-test
+item12 no longer fires; the actual subsystem release49fddc runs once with
+flagsc8 at2.143830s instead of the prior skip. Both loader-completion cache
+snapshots equal independent replay of their captured whole sectors. The
+identity-check path also changes:3af64e is entered twice. This must not be
+reported as authentic identity acceptance merely because self-test proceeds.
+
+The run still does not boot graphically. Samples4..48s stay in native
+913e/9140 with no unsupported-instruction stop, and the48s96-by65 raster
+is completely white. This moves v5.01 past the checksum-owned self-test
+boundary to the same sampled native region as v5.00; it does not independently
+identify the serial silicon, completion trigger or fitted mask. Ordinary
+`noki7110` and all acquired-input controls remain unchanged.
+
+Firmware makes49 further flash-byte changes in39002d..3fcf84. They are
+retained, not called noise or excluded from comparison. Complete saved flash
+SHA256 is `8683161a65476e694a9f55ff4734d676fb58741b5786a95637a5ece92b8f6188`;
+the MCU prefix stays identical. The checker validates this whole transition,
+initial one-byte derivation/provenance, unchanged ROM/masks, live cache replay,
+checksum/identity/release observations, native sampling and blank final frame.
+
+```sh
+.venv/bin/python tools/nse5_checksum_fixture.py roms/research/nse5-cosconor \
+  tmp/nse5-checksum-consistency
+```
+
+Add `--mame mame/mame` only with a fresh output directory. No derived image
+is admitted as an acquired ROM, normal machine default or evidence of usable
+UI, registration, calls or native speech.
+
 ### Own v5.00 serial-control boundary
 
 The intact v5.00 image independently contains the low-record validator at

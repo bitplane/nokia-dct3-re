@@ -93,7 +93,10 @@ project-wide bootstrap blocker:
   replies. The separate-PMM input and the intact backups have distinct
   boundaries: the v5.01 whole backup reaches a stored-data checksum mismatch,
   while the v5.00 whole backup passes its observed low-record checksum and
-  reaches a native serial-controller completion poll. The physical serial
+  reaches a native serial-controller completion poll. A separately labelled
+  one-byte own-checksum consistency fixture releases v5.01's second task batch
+  but still ends blank in native913e/9140; it is not authentic provisioning.
+  The physical serial
   completion contract, fitted mask/product identity and COBBA inputs remain
   unresolved; none of these instruments establishes usable 7110 support. See
   [7110 bring-up](7110_bringup.md).
