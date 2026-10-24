@@ -7,11 +7,14 @@ Separate `nsb3r4t` executes with explicit unproved NSE-1 ROM4 compatibility
 inputs. With one nominal ADC2 hypothesis and six integrity-only corrections
 to its own firmware-created EEPROM, it reproducibly reaches `Insert SIM card`.
 An explicit laboratory card and separately initialized phone-code retry record
-then support physical security entry, a clean Messages menu, and SIM contact
-save/cold Details retrieval. No donor identity/calibration is imported.
-Ordinary idle-content provenance remains unresolved. Fitted-mask compatibility,
-RF registration, calls and SMS delivery remain unqualified; native liveness is not
-evidence for those contracts.
+then support physical security entry, clean Messages/Names menus, SIM contact
+save/read/delete with cold persistence, offline SMS draft save/read/delete,
+and the PIN/PUK change/retry/exhaustion lifecycles qualified below. No donor
+identity/calibration is imported. Ordinary idle content and notice clearing
+remain unresolved. An independent long-run control resets near 94 seconds
+after an empty native receive window publishes reason `68`; bounded software
+gates do not establish sustained native operation. Fitted-mask compatibility,
+RF registration, calls and SMS delivery remain unqualified.
 
 Collection provenance and the unprovided MCU-to-PPM gap are in
 `roms/README.md`. Reproduce the static report:
@@ -356,6 +359,29 @@ SIM parser, requires exact physical contact ordering and the matched-code
 branch, checks Saved/name/number pixel oracles, and compares whole-card storage.
 This qualifies laboratory SIM contact persistence, not handset-memory contacts,
 all SIM security services, ordinary idle content or radio completion.
+
+### Physical contact deletion and cold empty search
+
+From that actual persisted `A/12345` card, physical Names/Search/Details/
+Options selects Erase and confirms. Firmware sends exactly one
+`A0 DC 01 04 20` with 32 `ff` bytes to EF_ADN, receives `9000` and displays
+**Phone book erased**. Complete-card comparison permits only the first
+record to change; credentials and every unrelated byte remain intact.
+
+An independently launched process receives the erased card and physically
+opens Names/Search with an empty query. It reads ADN record 1 without UPDATE
+and displays **No phone numbers**, preserving every card byte. This is
+durable contact deletion, not just disappearance from an in-memory list.
+
+Prepare the delete directory with the existing `prepare-reload` from the
+qualified saved-contact run. Run `nsb3_phonebook_erase.lua` for 62 seconds,
+then `nsb3_phonebook_erase_check.py prepare-empty ERASE COLD_EMPTY` and run
+`nsb3_phonebook_empty.lua` for 48 seconds. The checker
+`check SOURCE ERASE COLD_EMPTY` requires own unchanged executable, cold
+source hashes/initial card snapshots, exact physical contacts, read/write
+APDU/status contrasts, complete cards and erase/empty-search pixel oracles.
+No contact bytes, firmware context or cached result are supplied by Lua.
+Editing and handset-memory contacts remain distinct unqualified contracts.
 
 ## Native radio-boundary inventory
 
