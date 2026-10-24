@@ -693,3 +693,16 @@ visually reviewed PCM timing diagram; its implementation contract is in
 references, not evidence for importing NSB-6 clocks or framing into those
 products. Some PDF fonts have broken text mappings; visual review remains
 necessary rather than treating a negative text search as document absence.
+
+The independently acquired [8290 NSB-7 service archive](https://mobilecollectors.net/documents/22198/download)
+contains two PDFs, retained outside source control in `research/nsb7/`:
+
+| File | SHA256 |
+| --- | --- |
+| `nokia_8290_nsb7_service.zip` | `993dbbedbef06d8e4790972123471627fd569adca7182a022df70ea963eaa809` |
+| `nsb7-schematics.pdf` (14 pages) | `c266fea3b7106a55a469eb0eccf0249d71aed2e4c69bc6013eb7de5f0daeba2e` |
+| `nsb7-service-manual.pdf` (308 pages) | `eee14565ada962e5458cb8227622bdd6f64ffe89a5a15ff38fbccd95fe428e6d` |
+
+The visually reviewed System Module page27 (PDF page41) supplies NSB-7's
+own PCM waveform; see `docs/8290_bringup.md`. It is independent evidence,
+not an imported NSB-6 timing assumption.

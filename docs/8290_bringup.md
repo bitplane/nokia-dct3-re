@@ -3234,6 +3234,46 @@ the precise presence-poll owner remain unproved. No device behavior changed.
   roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-polling-long --polling
 ```
 
+### Own PCM documentation and physical speech control
+
+The acquired NSB-7 service manual, System Module printed page27/PDF page41,
+visibly specifies COBBA-generated 512 kHz PCMDClk and 8 kHz PCMSClk:
+64 clocks/frame, one active-high sync clock, a 16-bit MSB-first word with
+bits15..13 extending bit12, data changing on rising edges and sampled on
+falling edges. The MAD pin table identifies the clocks as inputs from
+COBBA. UI printed page8/PDF page88 identifies internal MIC2, headset MIC1
+and differential internal EAR. These establish framing and routing, not
+measured analog gain or working emulated media.
+
+`tools/nsb7_speech_control_check.py` pins the acquired v5.22 image hash,
+instructions, selector table and literal pools. Compiler `0x2cb62c` uses
+table `0x2cb660`: selector17 updates bit`0x0200` in shadow`0x12df02`,
+selector8 compiles the command, and writer`0x2cb93e` stores to`0x100a8`.
+The authenticated physical outgoing host-call probe observes Send54s ->
+decoded`0x0e` -> `860b`, then End66s -> decoded`0x0f` -> `840a`, through
+that own writer. No PCM configuration or firmware-state mutation was added.
+
+```sh
+.venv/bin/python tools/nsb7_speech_control_check.py \
+  roms/noki8290/8290f522a.fls \
+  --log tmp/nsb7-own-speech-control-probe/error.log
+```
+
+The manual's System Module parts list (printed64/PDF78) names
+MAD2WD1 v18 ROM5. The research composition's compiled identity6 branch is
+not a measured fitted-mask identity; the BOM is not grounds to silently
+replace it. Resident DSP identity/execution and native speech remain open.
+The product configuration now applies those own framing/routing facts and
+the command8/bit0200 speech predicate. A headless authenticated physical
+host-connected outgoing call (`tmp/nsb7-own-pcm-qualified`) executes500
+uplink and493 downlink blocks. `tools/nsb7_pcm_check.py` checks own
+Send/End controls, transfers bounded by enable/disable, 512000/8000 clocks,
+64-clock frames and exact47-idle-clock accounting. This is HLE PCM transport
+with a laboratory voice peer, not SIP waveform or native DSP speech proof.
+Microphone input is silent in this headless test. The next acceptance is
+SIP media and physical microphone/earpiece waveforms, followed by call-phase
+save/restore; neither is implied by this result.
+
 ### REFRESH and renewed application session
 
 `fixtures/nsb7_toolkit_refresh/nsb7hle.cfg` and `nsb7_toolkit_refresh.lua`

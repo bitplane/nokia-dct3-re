@@ -3956,7 +3956,19 @@ void nokia_dct3_state::noki8290(machine_config &config)
 void nokia_dct3_state::nsb7stage(machine_config &config)
 {
 	noki8290(config);
-	apply_product_config(PRODUCT_8290_UPLOAD);
+	// NSB-7 System Module p27 and UI p8: own COBBA PCM and MIC2/EAR.
+	m_cobba->add_route(nokia_cobba_device::ear, "mono", 1.0);
+	MICROPHONE(config, "microphone", 1).front_center()
+			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);
+	nokia_product_config research = PRODUCT_8290_UPLOAD;
+	research.cobba_pcm.data_clock = 512'000;
+	research.cobba_pcm.frame_clock = 8'000;
+	research.cobba_pcm.sample_bits = 13;
+	research.cobba_pcm.sync_clocks = 1;
+	research.cobba_pcm.word_clocks = 16;
+	research.cobba_pcm.msb_first = true;
+	research.cobba_pcm.data_edge = nokia_mad2_pcm_device::clock_edge::falling;
+	apply_product_config(research);
 	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
 	staged.set_program_fragment(0x11dcac);
 	staged.set_loader2_source(0x11ddd8, 623);
@@ -3967,7 +3979,7 @@ void nokia_dct3_state::nsb7stage(machine_config &config)
 void nokia_dct3_state::nsb7hle(machine_config &config)
 {
 	nsb7stage(config);
-	nokia_product_config runtime = PRODUCT_8290_UPLOAD;
+	nokia_product_config runtime = m_product;
 	// Nominal VBATT transfer hypothesis: 3.6 V / 6.5 mV per CCONT bit.
 	// Other analog channels remain provisional; no charger is asserted.
 	runtime.ccont_board.channel_defaults[2] = 554;
@@ -3992,6 +4004,13 @@ void nokia_dct3_state::nsb7hle(machine_config &config)
 	runtime.radio.traffic_release_parameter = 0x14;
 	runtime.radio.assigned_channel_confirmation = 1;
 	runtime.radio.band_scan_accepts_candidate_window = true;
+	// Own selector17/shadow12df02 and writer2cb93e; physical Send/End
+	// publish 860b/840a. This enables HLE voice, not resident DSP speech.
+	runtime.dsp_speech_control = {
+		0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0200, 0x0200 }
+	};
+	runtime.cobba_hle_voice.microphone = nokia_cobba_device::mic2;
+	runtime.cobba_hle_voice.output = nokia_cobba_device::ear;
 	apply_product_config(runtime);
 	auto *const staged = subdevice<nokia_dsp_staged_device>("dsp_staged");
 	staged->set_observe_after_missing_code(true);
