@@ -13,6 +13,27 @@ BLOCKS = {
 }
 
 
+def catalogue(image, offset=0x315994):
+    """Decode the bounded pointer candidate; do not infer a runtime selector ABI."""
+    pointers = struct.unpack_from('>28I', image, offset)
+    records = []
+    for index, pointer in enumerate(pointers):
+        source = pointer - 0x200000
+        if source < 0 or source + 12 > len(image):
+            raise ValueError(f'catalogue pointer outside source at {index:02x}')
+        header = struct.unpack_from('>6H', image, source)
+        end = source + 12 + header[2] * 2
+        if end > len(image) or header[5] != 0:
+            raise ValueError(f'catalogue payload/header invalid at {index:02x}')
+        if index + 1 < len(pointers) and end > pointers[index + 1] - 0x200000:
+            raise ValueError(f'catalogue payload overlaps next descriptor at {index:02x}')
+        payload = image[source + 12:end]
+        records.append({'index': index, 'descriptor': pointer,
+                        'header': list(header), 'source_offset': source + 12,
+                        'words': header[2], 'sha1': hashlib.sha1(payload).hexdigest()})
+    return records
+
+
 def assess(image, captures=None):
     if hashlib.sha1(image).hexdigest() != '3d9ea319503e78ec69b60d72cda23e461e118ea9':
         raise ValueError('not the acquired NPE-3 image')
@@ -35,7 +56,9 @@ def assess(image, captures=None):
             branches.append({'address': address, 'target': operand, 'owner': owner})
         else:
             other.append({'address': address, 'words': [head, operand]})
-    return {'blocks': blocks, 'pairs_examined': len(words) // 2,
+    return {'blocks': blocks, 'catalogue_candidate_offset': 0x315994,
+            'catalogue_candidate': catalogue(image),
+            'pairs_examined': len(words) // 2,
             'return_nop_pairs': len(returns), 'branch_pairs': branches,
             'other_pairs': other,
             'unowned_branch_pairs': sum(x['owner'] is None for x in branches),

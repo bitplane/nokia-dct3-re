@@ -222,6 +222,18 @@ a CFG or proof that no uploaded codec configuration exists. The native
 loader's first unresolved call remains `0a40 -> 2c75`; later linear-decode
 port operations cannot be treated as executed initialization or PCM evidence.
 
+The same checker inventories a **candidate** 28-entry upload pointer table
+at file offset `315994`. Every pointer resolves into this own image with a
+six-halfword descriptor, zero final header word and a complete payload that
+does not overlap the next descriptor. Entries `00`, `0f`, `14` and `1b`
+point respectively to descriptors `21eab8`, `224a44`, `224b70` and `225c2c`;
+their declared lengths are 638, 104, 629 and 223 words. The 422 installed
+words are a prefix of entry `00`, not its whole 638-word payload. Empty
+entries remain represented rather than being dropped and renumbered.
+These are static table positions, not established runtime request selectors.
+The table reader, relocation and later upload selection remain to be mapped;
+the presence of other payloads does not supply missing resident `2c75`.
+
 Reproduce the bounded capture without an HLE handoff:
 
 ```sh
