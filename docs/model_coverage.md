@@ -31,7 +31,9 @@ Physical menu PIN1 change survives cold old-PIN rejection/new-PIN acceptance.
 Physical PIN2 change and cold authenticated restoration preserve all unrelated
 card bytes. Physical PIN2 exhaustion, cold PUK2 recovery and automatic
 replacement-PIN2 verification also pass, followed by a cold authenticated
-restoration to the complete original card. These credential fixtures are
+restoration to the complete original card. First wrong-PUK1 retry loss also
+persists across a cold correct recovery and cold replacement-PIN login;
+permanent PUK loss is not yet qualified for this model. These credential fixtures are
 bounded to 90–92 seconds: independent extended controls reset near 94 seconds
 after the DSP receive-activity window becomes empty and firmware publishes
 reason `68`. That trigger is mapped, not suppressed; the missing native

@@ -642,8 +642,8 @@ initial-card snapshot, unchanged own executable, and reviewed PIN/error/phone
 prompt/menu frames. No guest RAM/save state, forced authentication result or
 donor provisioning is supplied. Successful PIN1 exhaustion/PUK recovery is
 qualified below, as are menu-based PIN/PIN2 change and cold restoration.
-Wrong/permanently exhausted PUK remains unqualified; PIN2 exhaustion and
-successful PUK2 recovery are qualified below.
+First wrong-PUK1 persistence/recovery, PIN2 exhaustion and successful PUK2
+recovery are qualified below. Permanent PUK exhaustion remains unqualified.
 
 ### PIN1 exhaustion and PUK recovery
 
@@ -736,7 +736,8 @@ enabled/disabled cold challenge behavior, whole-card contents, own executable,
 linked source hashes/initial card snapshots and Done/prompt/menu pixel oracles.
 Unrelated credential, file or Toolkit mutations fail. No firmware-state write,
 donor data or guest-state transfer is supplied. PIN/PIN2 change contracts
-are qualified below, including PIN2 exhaustion/PUK2; failed-PUK remains separate.
+are qualified below, including PIN2 exhaustion/PUK2 and first wrong-PUK1
+recovery; permanent PUK exhaustion remains separate.
 
 ### Menu PIN change and cold authentication
 
@@ -849,3 +850,29 @@ requires exact linked storage, whole-card transitions, contacts,
 CHANGE/UNBLOCK/replacement-VERIFY order, statuses and reviewed frames.
 Reset requests and unrelated mutations fail. This does not qualify wrong
 PUK2 retries, permanent PUK2 loss, long-run native stability or radio service.
+
+### Wrong PUK1 persistence and cold recovery
+
+Starting from the physically exhausted PIN1 card, physical PUK1 `12345679`
+with new/confirmation `2468` emits one `A0 2C 00 00 10` and returns `9804`.
+Only PUK1 attempts change, 10→9; PIN1 stays blocked with its old credential.
+The LCD still says **SIM card blocked**, not permanent PUK loss. No phone-code
+input is supplied in this rejected phase.
+
+A separate cold process receives the exact retry-9 card and physically uses
+correct `12345678` with replacement `2468`. It returns `9000`, restores PUK1
+attempts to 10 and PIN1 attempts to 3, and accepts the separate phone code.
+A further cold process authenticates `2468` and opens Messages without card
+mutation. These three phases require complete-card comparisons, not just a
+successful status or frame.
+
+Prepare the wrong-PUK source using the existing PUK checker's
+`prepare-unblock BLOCKED WRONG`; run `nsb3_puk_wrong_input.lua` for 32 seconds.
+`nsb3_puk_retry_check.py prepare-recovery WRONG RECOVERY` copies only qualified
+persistent storage. Run `nsb3_puk_input.lua` for 62 seconds, then prepare the
+new-PIN cold phase using `nsb3_puk_check.py prepare-new-pin` and run
+`nsb3_pin_new.lua` for 42 seconds. The retry checker
+`check BLOCKED WRONG RECOVERY NEW_PIN` requires exact physical/APDU/status
+sequences, own executable, linked storage and blocked/phone/menu pixels.
+No guest state, PUK-counter edit or authentication result is supplied.
+Permanent PUK1 loss remains a separate unqualified lifecycle.

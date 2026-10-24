@@ -16,9 +16,12 @@ from tools.sim_security_trace_check import statuses, padded_pin
 from tools.nsk1_phonebook_roundtrip import frame_check
 
 
-def check_recovery(text):
+def check_recovery(text, wrong=False, remaining=9):
+    if 'nsb3_board_reset_request:' in text:
+        raise ValueError('reset interrupts PUK qualification')
     expected = []
-    for stage, digits in (('puk', '12345678'), ('new', '2468'), ('repeat', '2468')):
+    puk = '12345679' if wrong else '12345678'
+    for stage, digits in (('puk', puk), ('new', '2468'), ('repeat', '2468')):
         keys = ['Keypad ' + digit for digit in digits] + ['Left Softkey / Menu']
         expected.extend((stage, key, down) for key in keys for down in ('1', '0'))
     contacts = re.findall(r'nsb3_puk_key: stage=(\w+) key=(.*?) down=([01]) t=[0-9.]+ physical_only=1', text)
@@ -26,11 +29,16 @@ def check_recovery(text):
         raise ValueError('physical PUK/new-PIN/repeat contacts differ')
     commands = wire(text)
     credential = [row[:5] for row in commands if row[0] in (0x20, 0x24, 0x26, 0x28, 0x2c)]
-    if credential != [(0x2c, 0, 0, 16, b'12345678' + padded_pin('2468'))]:
+    if credential != [(0x2c, 0, 0, 16, puk.encode() + padded_pin('2468'))]:
         raise ValueError('requires one physical PUK1/replacement UNBLOCK transaction')
-    if statuses(text, 0x2c) != [(0x9000, 3, 10)] or statuses(text, 0x20):
+    expected_status = (0x9804 if remaining else 0x9840, 0, remaining) if wrong else (0x9000, 3, 10)
+    if statuses(text, 0x2c) != [expected_status] or statuses(text, 0x20):
         raise ValueError('PUK recovery status differs')
-    check_phone(text)
+    if wrong:
+        if 'nsb3_phonecode_key:' in text:
+            raise ValueError('wrong PUK must not enter phone authentication')
+    else:
+        check_phone(text)
 
 
 def check_link(source, target):
