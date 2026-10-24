@@ -252,6 +252,23 @@ and display the reviewed contact frame (SHA-256
 The storage validator independently checks the saved name and number.
 Neither process patches phone memory or seeds a contact directly.
 
+The handset bank is independently exercised by
+`.venv/bin/python tools/run_noki6210_phone_memory.py RUN_DIR`.
+Two fresh own-PMM processes physically select Names / Options / Memory in use /
+Phone. The control searches the empty bank and must render **Selected memory
+empty**. The writer enters A / 123 and must render **Saved to phone**. A third
+process inherits the writer's complete NVRAM and physically searches/selects
+the persisted contact, rendering the same exact A / 123 detail frame as the
+SIM-contact gate. Both bank-selection confirmations, empty control, save and
+cold detail have exact grayscale-pixel hashes. All three complete SIM files
+must match, and no SIM UPDATE RECORD may occur. The writer's complete 4MiB
+flash must differ from the independent empty-bank control; the changed-byte
+range is reported, not interpreted as a decoded phonebook-record format.
+Cold boot may update flash metadata, so byte-identical whole-flash readback
+is not required. This qualifies one handset contact and persisted memory-bank
+selection, not handset-bank edit/erase/capacity, SIM-to-phone copying, native
+DSP, network registration or electrical flash timing.
+
 ### Laboratory registration
 
 The runtime emits an organic type-`0x56` acquisition request with a 160-byte

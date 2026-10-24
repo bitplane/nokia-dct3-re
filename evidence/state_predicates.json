@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_handset_phonebook_cold_persistence", "owner": "npe3_nonvolatile_storage", "status": "satisfied",
+      "predicate": "Physical Phone-bank selection and A/123 save persist across a cold process independently of SIM records and an empty-bank control",
+      "current": "The standalone phone-memory runner launches three isolated own-PMM processes. A fresh physical Phone-bank selection/search renders Selected memory empty. A separate fresh selection/save renders Saved to phone. A cold process inherits complete writer NVRAM and physically searches/selects A/123. Selection, empty, save and cold-detail frames have exact pixel hashes. All complete SIM files match and every trace rejects UPDATE RECORD; persistent handset flash differs from the control. Changed flash offsets are reported without assigning an unproved record grammar. Whole-flash cold equality is not required because firmware updates metadata. This covers one handset contact and bank preference, not edit/erase/capacity, copying, registration, native DSP or flash timing.",
+      "evidence": ["docs/6210_bringup.md", "tools/run_noki6210_phone_memory.py", "tools/noki6210_phone_memory.lua", "tools/noki6210_phone_memory_empty.lua", "tools/noki6210_phonebook_read.lua", "tools/test_noki6210_phone_memory.py"]
+    },
+    {
       "id": "npe3_restored_network_ussd_termination", "owner": "npe3_host_ussd", "status": "satisfied",
       "predicate": "A dismissed unanswered request restores observed ARM state and accepts network termination only under its new host epoch",
       "current": "The isolated termination runner --restore saves at34s after physical Answer26/End30 and reloads after one second. Time, ARM registers and backed-RAM checksum match. Request1 is republished queued under epoch2 without readmission. Old epoch1 and wrong request999 are rejected; epoch2/request1 queues real SS RELEASE COMPLETE and RR release before one cancellation, without a fabricated handset result. A duplicate is rejected and physical Menu56 renders Messages. The nonempty save artifact is required. This is one post-dismissal checkpoint, not in-flight release restoration, arbitrary snapshots or external host-process persistence.",
