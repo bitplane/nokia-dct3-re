@@ -139,7 +139,10 @@ and sends no PIN2 credential APDU or call/SMS transaction. The independent
 four-process `run_noki8850_fdn.py` qualifies physical PIN2-protected On/Off,
 cold selected-state persistence, exact ADN-validity exchanges and unchanged
 empty FDN records, with complete-card and own boot/UI/registration checks.
-FDN record editing and listed/unlisted dial permission are not promoted.
+Its independently executed `--records` branch additionally qualifies physical
+PIN2-protected A/12345 Save to EF_FDN record1 and a complete-card-unchanged
+cold Search/Details, with exact own-product UI and wire/storage checks.
+Edit/erase/cancel and listed/unlisted dial permission are not promoted.
 
 NPE-3 additionally has an independent handset-bank A/123 save/cold-read
 fixture with an empty-bank negative control and unchanged complete SIM files;

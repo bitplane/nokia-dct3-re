@@ -2169,6 +2169,24 @@ result frames and the stable Messages title remain required. Capture:
 `tmp/nsm2-fdn-validity-final`. This qualifies cold On/Off persistence, not
 FDN record editing, listed/unlisted dial permission, native DSP/RF or speech.
 
+The independently executed `--records` extension adds a PIN2-protected
+A / 12345 Save and a separate cold Search/Details process. Its input branch
+inherits the verified On phase, not the later Off phase. The 8850 Add entry
+UI is name-first, then number; menu order is product-specific fixture policy,
+not a shared hardware contract. Physical PIN2 verification precedes Save,
+which must issue exactly one successful UPDATE RECORD to EF_FDN (`6f3b`),
+record1, length32. Whole-card comparison requires the canonical A / 12345
+record at that slot, all nine other FDN records erased, ADN unchanged and
+no unrelated credential/validity/location mutation. The writer reads all ten
+FDN records at startup, probes record1 before UPDATE and reads it again after
+success. The cold process authenticates PIN1 only, reads all ten plus three
+record1 selections, leaves the entire card unchanged and renders the reviewed
+A / 12345 detail frame. Exact PIN2/name/number/save/detail and responsive-menu
+oracles, own upload/HLE, preserved registration and immutable complete
+predecessor NVRAM apply throughout. Capture: `tmp/nsm2-fdn-record-final`.
+This qualifies protected Save/cold retrieval, not edit/erase/cancel or listed/
+unlisted dial permission.
+
 The same isolated runner accepts `--scenario host-incoming-call`. It verifies
 physical answer/end input, the complete host-originated CC/RR exchange,
 traffic-channel assignment and release, and reviewed ringing/returned-idle

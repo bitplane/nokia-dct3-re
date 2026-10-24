@@ -4,7 +4,7 @@ from unittest.mock import patch
 import tempfile
 from PIL import Image
 
-from tools.run_noki8850_fdn import expected_card,check_phase,check_frames
+from tools.run_noki8850_fdn import expected_card,check_phase,check_frames,phase_plan,record_card,check_record
 from tools.run_noki8850_pin_retry_cold import mame_command
 
 
@@ -33,6 +33,43 @@ def trace(phase):
 
 
 class FdnValidityTest(unittest.TestCase):
+    def test_record_branch_inherits_verified_on_not_the_later_off_branch(self):
+        plan=phase_plan(True)
+        self.assertEqual([(p.name,p.source,p.record) for p in plan[4:]],
+                         [('write','on','write'),('read','write','read')])
+        self.assertEqual(phase_plan(),plan[:4])
+
+    def test_record_save_and_cold_read_have_exact_card_and_auth_contracts(self):
+        for mode in ('write','read'):
+            writing=mode=='write'
+            lines=['sim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08',
+                   'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1']
+            for fid in ('6f7e','6f07'):
+                lines += [f'sim_device: header cla=a0 ins=44 p1=00 p2=00 p3=00 selected={fid}',
+                          'SIM status ins=44 sw=9000 chv=3/3 puk=10/10 enabled=1']
+            lines += [f'sim_device: header cla=a0 ins=b2 p1={i:02x} p2=04 p3=20 selected=6f3b' for i in range(1,11)]
+            lines += ['8850_fdn: key=Menu state=1 t=40.000000000']
+            if writing:
+                lines += ['8850_fdn: key=Menu state=1 t=47.000000000',
+                          'sim_device: header cla=a0 ins=20 p1=00 p2=02 p3=08',
+                          'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1',
+                          '8850_fdn: key=Menu state=1 t=55.000000000',
+                          'sim_device: header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3b',
+                          'sim_device: header cla=a0 ins=dc p1=01 p2=04 p3=20 selected=6f3b',
+                          'SIM status ins=dc sw=9000 chv=3/3 puk=10/10 enabled=1']
+            lines += ['sim_device: header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3b']*(1 if writing else 3)
+            lines += [f'8850_fdn: key=Menu state=1 t={61 if writing else 49}.000000000',
+                      '8850_fdn: complete=1 firmware_state_forcing=0']
+            text='\n'.join(lines)
+            initial=record_card(not writing)
+            check_record(text,initial,record_card(True),mode)
+            for offset in (0,3484,3517,3575,3610):
+                final=bytearray(record_card(True))
+                final[offset]^=1
+                with self.subTest(mode=mode,offset=offset),self.assertRaises(ValueError):
+                    check_record(text,initial,bytes(final),mode)
+            with self.assertRaises(ValueError):check_record(text.replace('p3=20 selected=6f3b','p3=20 selected=6f3a'),initial,record_card(True),mode)
+
     def test_missing_or_blank_current_state_frame_fails(self):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)

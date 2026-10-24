@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import uuid
+from typing import NamedTuple
 
 if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
@@ -25,6 +26,25 @@ from tools.run_sip_handset_gate import verify_handset_health
 from tools.noki6210_puk_check import contacts
 from tools.sim_security_trace_check import statuses
 from tools.radio_call_lifecycle_common import require_ordered
+from tools.nsk3_phonebook_check import expected_record
+
+
+class Phase(NamedTuple):
+    name:str
+    script:str
+    source:str|None
+    seconds:int
+    validity:int|None=None
+    record:str|None=None
+
+
+def phase_plan(records=False):
+    phases=[Phase('on','fdn_on',None,55,0),Phase('cold_on','fdn','on',55,1),
+            Phase('off','fdn_off','cold_on',55,2),Phase('cold_off','fdn','off',55,3)]
+    if records:
+        phases += [Phase('write','fdn_write','on',67,record='write'),
+                   Phase('read','fdn_read','write',55,record='read')]
+    return phases
 
 
 def expected_card(valid,registered=True):
@@ -83,9 +103,73 @@ def check_frames(directory,phase):
     check_messages_menu(directory/'8850_fdn_responsive_menu.png')
 
 
+def record_card(saved):
+    card=bytearray(expected_card(False))
+    if saved:card[3578:3610]=expected_record()
+    return bytes(card)
+
+
+def check_record(text,initial,final,mode):
+    if mode not in ('write','read'):raise ValueError('unknown 8850 FDN record phase')
+    writing=mode=='write'
+    if initial!=record_card(not writing) or final!=record_card(True):
+        raise ValueError('8850 FDN save/read changed unrelated card data or lost A/12345')
+    if statuses(text,0x20)!=[(0x9000,3,10)]*(2 if writing else 1):
+        raise ValueError('8850 FDN Save requires PIN2; cold read must not reauthenticate PIN2')
+    if re.findall(r'header cla=a0 ins=20 p1=00 p2=(\w\w) p3=08',text)!=(['01','02'] if writing else ['01']):
+        raise ValueError('8850 FDN record authentication selectors/count differ')
+    if re.search(r'header cla=a0 ins=(?:04|24|26|28|2c) ',text):
+        raise ValueError('8850 FDN record operation changed credentials or ADN validity')
+    if (re.findall(r'header cla=a0 ins=44 p1=00 p2=00 p3=00 selected=(\w{4})',text)!=['6f7e','6f07'] or
+            statuses(text,0x44)!=[(0x9000,3,10)]*2):
+        raise ValueError('8850 FDN record startup identity rehabilitation differs')
+    updates=re.findall(r'header cla=a0 ins=dc p1=(\w\w) p2=(\w\w) p3=(\w\w) selected=(\w{4})',text)
+    if (updates!=([('01','04','20','6f3b')] if writing else []) or
+            statuses(text,0xdc)!=([(0x9000,3,10)] if writing else [])):
+        raise ValueError('8850 FDN UPDATE must target only record1 after physical Save')
+    reads=[f'{i:02x}' for i in range(1,11)]+['01']*(2 if writing else 3)
+    if re.findall(r'header cla=a0 ins=b2 p1=(\w\w) p2=04 p3=20 selected=6f3b',text)!=reads:
+        raise ValueError('8850 FDN startup/selection/readback extent differs')
+    keys=['Menu']+['Scroll Down']*3+['Menu']+['Scroll Down']*5+['Menu']+['Scroll Down']*2+['Menu']
+    keys += ['Scroll Down','Scroll Down','Menu']
+    if writing:keys += ['Scroll Down','Menu']+['Keypad '+d for d in '5678']+['Menu','Keypad 2','Menu']+['Keypad '+d for d in '12345']+['Menu']
+    else:keys += ['Menu']*3
+    finish=60 if writing else 48
+    contacts(text,'8850_fdn',[(24+i,key) for i,key in enumerate(keys)]+[(finish,'End'),(finish+1,'Menu')])
+    check_pin_inputs(text)
+    registration(text,'nsm2',preserved=True)
+    ordered=[('Numbers',r'8850_fdn: key=Menu state=1 t=40\.')]
+    if writing:
+        ordered += [('PIN2 submit',r'8850_fdn: key=Menu state=1 t=47\.'),
+            ('PIN2',r'header cla=a0 ins=20 p1=00 p2=02 p3=08'),
+            ('verified',r'SIM status ins=20 sw=9000'),
+            ('Save',r'8850_fdn: key=Menu state=1 t=55\.'),
+            ('UPDATE',r'header cla=a0 ins=dc p1=01 p2=04 p3=20 selected=6f3b'),
+            ('saved',r'SIM status ins=dc sw=9000'),
+            ('readback',r'header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3b')]
+    ordered += [('Menu',rf'8850_fdn: key=Menu state=1 t={finish+1}\.'),
+                ('complete',r'8850_fdn: complete=1 firmware_state_forcing=0')]
+    require_ordered(text,ordered,'8850 FDN protected record')
+
+
+def check_record_frames(directory,mode):
+    from PIL import Image
+    frames=({'record_pin2':'a7a38ac6f4fe16945c758d9f223e2aeb7e28d46ea55a1371a1a9b9e21565cd9f',
+             'name_editor':'5fe5287ff4f8391953ac6355677ce688f5db043df752ce22537e17115a55b4e9',
+             'number_editor':'a4497c68de0c8428e70ae6690f9589203526140d0abb1d581834108802c001d6',
+             'saved':'c0701126a0b251a6ae542c05fe44f58c921ddea4db30ddf50181d0dceb6c0377'} if mode=='write' else
+            {'contact':'f5f0050462c46e6d602544f7c153adbfb77d4d0cf2232e4262b7f4039dff1445'})
+    for label,digest in frames.items():
+        with Image.open(directory/f'8850_fdn_{label}.png') as image:
+            if image.size!=(84,48) or hashlib.sha256(image.convert('L').tobytes()).hexdigest()!=digest:
+                raise ValueError('8850 FDN record pixels differ: '+label)
+    check_messages_menu(directory/'8850_fdn_responsive_menu.png')
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
+    parser.add_argument('--records',action='store_true',help='add protected A/12345 Save and cold FDN Search/Details')
     args=parser.parse_args()
     root=Path(__file__).resolve().parents[1]
     try:
@@ -96,7 +180,9 @@ def main():
         run.mkdir(parents=True,exist_ok=False)
         previous=None
         launches=[]
-        for index,(name,script) in enumerate((('on','fdn_on'),('cold_on','fdn'),('off','fdn_off'),('cold_off','fdn'))):
+        for item in phase_plan(args.records):
+            name,script=item.name,item.script
+            previous=run/item.source if item.source is not None else None
             phase=run/name
             phase.mkdir()
             predecessor=storage_hashes(previous/'nvram') if previous else None
@@ -109,8 +195,9 @@ def main():
                 raise ValueError('8850 FDN cold process did not inherit complete predecessor NVRAM')
             initial=card.read_bytes()
             (phase/'initial_sim_card.bin').write_bytes(initial)
-            command=mame_command(root,script,55)
+            command=mame_command(root,script,item.seconds)
             launch={'invocation_id':str(uuid.uuid4()),'command':command,
+                'source_phase':item.source,
                 'initial_storage':storage_hashes(phase/'nvram'),'mcu_sha1':profile[2],'pmm_sha1':profile[4],
                 'mame_sha256':hashlib.sha256((root/'mame/mame').read_bytes()).hexdigest(),
                 'input_sha256':{filename:hashlib.sha256((root/'tools'/filename).read_bytes()).hexdigest()
@@ -125,14 +212,19 @@ def main():
             text=(phase/'error.log').read_text(errors='replace')
             errors=check_trace(text,runtime_hle=True)
             if errors:raise ValueError('; '.join(errors))
-            check_phase(text,initial,card.read_bytes(),index)
-            check_frames(phase/'snap',index)
+            if item.record:
+                check_record(text,initial,card.read_bytes(),item.record)
+                check_record_frames(phase/'snap',item.record)
+            else:
+                check_phase(text,initial,card.read_bytes(),item.validity)
+                check_frames(phase/'snap',item.validity)
             if previous and storage_hashes(previous/'nvram')!=predecessor:
                 raise ValueError('8850 FDN cold process mutated predecessor NVRAM')
             launches.append(launch)
             previous=phase
             print('8850 FDN phase '+name+': verified',flush=True)
         (run/'acceptance.json').write_text(json.dumps({'phases':launches,'research_hle':True,
+            'protected_record_save_cold_read':args.records,
             'dial_permission_tested':False,'native_speech':False},indent=2)+'\n')
     except (ValueError,RuntimeError,OSError,subprocess.SubprocessError) as error:
         parser.exit(1,f'8850 FDN lifecycle FAIL: {error}\n')
