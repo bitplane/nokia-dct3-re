@@ -35,7 +35,7 @@ def prepare(root, run, *, checksum_only=False, record_checksum=False):
         raise ValueError('NSE-2 qualified wrappers differ')
     for directory in ('roms/noki5110i', 'nvram', 'cfg'):
         (run / directory).mkdir(parents=True, exist_ok=True)
-    (run / 'roms/noki5110i/5110i_5.53A.fls').write_bytes(flash)
+    (run / 'roms/noki5110i/5110i_5.53a.fls').write_bytes(flash)
     report.update(comparison_archive_sha256=other['archive_sha256'],
                   initial_eeprom='absent dump; erased device region',
                   dsp_backend='silent; no mask or completion supplied',
@@ -97,7 +97,7 @@ def main():
                             checksum_only=integrity)
             verifier = report['loader']['entries'][25]
             source = int(verifier['descriptor'], 16) - 0x200000 + 12
-            flash = (run / 'roms/noki5110i/5110i_5.53A.fls').read_bytes()
+            flash = (run / 'roms/noki5110i/5110i_5.53a.fls').read_bytes()
             result['initial_upload'] = verify_upload(text, flash[source:source + 400])
             if args.record_checksum_only:
                 verify_record(text)

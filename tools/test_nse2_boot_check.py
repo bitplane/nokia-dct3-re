@@ -162,7 +162,7 @@ class BoundaryTest(unittest.TestCase):
                     (b'own flash', {'archive_sha256': 'zip'}),
                     (b'own flash', {'archive_sha256': 'exe'})]):
                 report = prepare(root, run)
-            self.assertEqual((run / 'roms/noki5110i/5110i_5.53A.fls').read_bytes(), b'own flash')
+            self.assertEqual((run / 'roms/noki5110i/5110i_5.53a.fls').read_bytes(), b'own flash')
             self.assertEqual(list((run / 'nvram').iterdir()), [])
             self.assertIn('erased', report['initial_eeprom'])
             self.assertIn('no mask', report['dsp_backend'])

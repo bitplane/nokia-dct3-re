@@ -175,9 +175,9 @@ class NativeTest(unittest.TestCase):
                 report = prepare_native(root, run, record_checksum=True)
             self.assertFalse(report['fitted_mask_proved'])
             self.assertFalse(report['authentic_provisioning'])
-            self.assertEqual((run / 'roms/nse2r4t/5110i_5.53A.fls').read_bytes(), b'own flash')
+            self.assertEqual((run / 'roms/nse2r4t/5110i_5.53a.fls').read_bytes(), b'own flash')
             self.assertEqual({path.name for path in (run / 'roms/nse2r4t').iterdir()},
-                             {'5110i_5.53A.fls', 'program.bin', 'data.bin'})
+                             {'5110i_5.53a.fls', 'program.bin', 'data.bin'})
             self.assertEqual({path.name for path in (run / 'nvram/nse2r4t').iterdir()}, {'eeprom'})
             nominal = root / 'nominal'
             with patch('tools.run_nse2_native.MASK_INPUTS', specs), \
@@ -190,7 +190,7 @@ class NativeTest(unittest.TestCase):
             self.assertFalse(nominal_report['adc2_input']['measured_nse2_calibration'])
             self.assertEqual((nominal / 'nvram/nse2r4v/eeprom').read_bytes(),
                              (run / 'nvram/nse2r4t/eeprom').read_bytes())
-            self.assertEqual((nominal / 'roms/nse2r4v/5110i_5.53A.fls').read_bytes(), b'own flash')
+            self.assertEqual((nominal / 'roms/nse2r4v/5110i_5.53a.fls').read_bytes(), b'own flash')
             zero = root / 'retry-zero'
             with patch('tools.run_nse2_native.MASK_INPUTS', specs), \
                     patch('tools.run_nse2_boundary.inspect', side_effect=[

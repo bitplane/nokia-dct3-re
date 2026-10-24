@@ -224,7 +224,7 @@ def main():
         if 'LUA ERROR' in console or 'Error in' in console:
             raise ValueError('native observer failed')
         source = int(report['loader']['entries'][25]['descriptor'], 16) - 0x200000 + 12
-        flash = (run / 'roms' / machine / '5110i_5.53A.fls').read_bytes()
+        flash = (run / 'roms' / machine / '5110i_5.53a.fls').read_bytes()
         with Image.open(run / 'snap/nse2_7.png') as frame:
             result = verify_native((run / 'error.log').read_text(errors='replace'),
                                    flash[source:source + 400], frame.convert('L').tobytes(), frame.size,

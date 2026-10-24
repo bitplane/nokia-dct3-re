@@ -75,7 +75,7 @@ def main():
                 results['service']=inspect_word_service_observation(text)
                 results['frame_source']=inspect_word_frame_source(program,data,text)
                 results['worker_objects']=inspect_word_worker_objects(text)
-                image=(target/'roms/nse2r4v/5110i_5.53A.fls').read_bytes()
+                image=(target/'roms/nse2r4v/5110i_5.53a.fls').read_bytes()
                 results['startup_service']=inspect_word_startup_contract(image,text)
                 coverage=summarize(text)
                 fingerprint=(coverage['opcodes'],coverage['high_byte_groups'],coverage['set_sha256'])

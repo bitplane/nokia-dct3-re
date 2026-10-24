@@ -2,6 +2,9 @@
 
 ## Current boundary
 
+Generated MAME packages use lowercase `5110i_5.53a.fls` for ROM-label
+validity. This is a packaging name, not a change to the acquired source bytes.
+
 Own v5.53 MCU/PPM-A executes its verifier on the explicitly borrowed NSE-1
 ROM4 backend. The nominal-voltage research profile `nse2r4v` reaches the
 firmware's **Insert SIM card** screen. Two physical Menu presses reach the

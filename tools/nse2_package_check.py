@@ -214,7 +214,7 @@ def main():
                                         container=other_report['container'], byte_identical=True)
         if args.output:
             args.output.mkdir(parents=True, exist_ok=True)
-            (args.output / '5110i_5.53A.fls').write_bytes(flash)
+            (args.output / '5110i_5.53a.fls').write_bytes(flash)
             (args.output / 'manifest.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report, indent=2))
     except (OSError, ValueError, zipfile.BadZipFile) as error:
