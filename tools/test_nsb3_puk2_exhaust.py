@@ -48,6 +48,14 @@ class Nsb3Puk2ExhaustTest(unittest.TestCase):
                 (run / 'error.log').write_text(text.replace('nsb3_security_key:', 'missing_key:'))
                 with self.assertRaises(ValueError):
                     check_permanent(previous, run)
+                dismiss = trace(3) + '\n' + '\n'.join(
+                    f'nsb3_security_key: key={key} down={state} t=80.0 physical_only=1'
+                    for key in keys[:-1] + ('Right Softkey / C', 'End', 'Left Softkey / Menu')
+                    for state in (1, 0))
+                (run / 'error.log').write_text(dismiss)
+                check_permanent(previous, run, dismiss=True)
+                with self.assertRaises(ValueError):
+                    check_permanent(previous, run)
 
 
 if __name__ == '__main__':

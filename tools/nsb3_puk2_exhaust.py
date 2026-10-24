@@ -31,7 +31,7 @@ def check_rejection(previous, run, remaining):
     frame_check(run / 'snap/nsb3_security_33.png', ERROR if remaining else REJECTED)
 
 
-def check_permanent(previous, run):
+def check_permanent(previous, run, dismiss=False):
     check_link(previous, run)
     check_own(run)
     check_rejected_card(stored(run), 0)
@@ -41,7 +41,8 @@ def check_permanent(previous, run):
     check_pin(text, True)
     if any(row[0] in (4, 0x44, 0xd6, 0xdc, 0x32, 0xc2) for row in wire(text)):
         raise ValueError('unrelated storage/Toolkit mutation')
-    keys = CHANGE_KEYS[:12] + ('Scroll Down', 'Left Softkey / Menu', 'Scroll Down')
+    tail = ('Right Softkey / C', 'End', 'Left Softkey / Menu') if dismiss else ('Scroll Down',)
+    keys = CHANGE_KEYS[:12] + ('Scroll Down', 'Left Softkey / Menu') + tail
     contacts = re.findall(r'nsb3_security_key: key=(.*?) down=([01]) t=[0-9.]+ physical_only=1', text)
     if contacts != [(key, state) for key in keys for state in ('1', '0')]:
         raise ValueError('permanent PIN2 refusal/navigation contacts differ')
@@ -49,6 +50,13 @@ def check_permanent(previous, run):
     frame_check(run / 'snap/nsb3_security_13.png',
                 '3c437c450b1abdee8fc0e53dd16211268ed594c6f66a9fa4c620ae6ed6a3898a')
     frame_check(run / 'snap/nsb3_security_14.png', REJECTED)
+    if dismiss:
+        frame_check(run / 'snap/nsb3_security_15.png',
+                    'beafe144521e7ce65794b9e26fae65e5e1ccee699d568363aa1e4acb348a270d')
+        frame_check(run / 'snap/nsb3_security_17.png', MENU_FRAME)
+        frame_check(run / 'snap/nsb3_puk2_dismiss_settled.png',
+                    'b2bde13413750ea3a6442a8a4d6c90362d4e8b16cde72bbf2f981a00089cecd0')
+        return
     # The neighboring item redraws, but rejection pixels persist even at90s.
     # This is an observed rendering limit, not a clean-menu acceptance oracle.
     frame_check(run / 'snap/nsb3_puk2_permanent_settled.png',

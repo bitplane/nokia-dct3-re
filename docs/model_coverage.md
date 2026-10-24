@@ -50,8 +50,9 @@ comparisons protect unrelated files and credentials. Permanent PUK1 loss causes
 cold SIM-card rejection with responsive dialing input but no authentication.
 Permanent PUK2 loss instead retains PIN1/phone login and Messages, while PIN2
 selection is refused without another credential APDU. Rejection pixels persist
-over a neighboring security-item redraw even at90s; that display-settlement
-defect remains explicit, not a clean-menu acceptance claim. These credential fixtures are
+over a neighboring security-item redraw even at90s after Down alone. A separate
+physical Back/End/Menu control clears the notice and restores clean menus with
+the same blocked card; automatic notice clearing remains unqualified. These credential fixtures are
 bounded to 90–92 seconds: independent extended controls reset near 94 seconds
 after the DSP receive-activity window becomes empty and firmware publishes
 reason `68`. That trigger is mapped, not suppressed; the missing native

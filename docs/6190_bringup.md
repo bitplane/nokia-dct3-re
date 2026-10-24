@@ -10,8 +10,9 @@ An explicit laboratory card and separately initialized phone-code retry record
 then support physical security entry, clean Messages/Names menus, SIM contact
 save/read/edit/delete with cold persistence, offline SMS draft save/read/delete,
 and the PIN/PUK change/retry/exhaustion lifecycles qualified below. No donor
-identity/calibration is imported. Ordinary idle content and notice clearing
-remain unresolved. An independent long-run control resets near 94 seconds
+identity/calibration is imported. Ordinary idle content and automatic notice
+clearing remain unresolved; explicit rejection dismissal restores clean menus.
+An independent long-run control resets near 94 seconds
 after an empty native receive window publishes reason `68`; bounded software
 gates do not establish sustained native operation. Fitted-mask compatibility,
 RF registration, calls and SMS delivery remain unqualified.
@@ -1221,3 +1222,21 @@ The checker requires own executable, exact full cards/cold links, startup and
 deactivation authentication, physical key ordering/cadence, validity protocol,
 post-Send listed-number lookup, Menu/Off/rejection and comparison-frame pixels.
 The comparison-frame hash deliberately makes no call-progress claim.
+
+### Permanent PIN2 notice dismissal control
+
+From the exact permanent-PUK2 terminal card, a new cold process authenticates
+PIN1 and the separate phone code and physically selects Change PIN2. After
+the expected refusal, Back at 80 seconds clears the notice and displays clean
+Access codes. End at 82 seconds exits; Menu at 85 seconds restores the exact
+qualified Messages-menu frame. The 90-second capture remains a clean menu
+with its animated icon in a different phase. The complete card is unchanged;
+PIN2/PUK2 remain exhausted and no further credential or file mutation occurs.
+
+Run `nsb3_puk2_dismiss_input.lua` for 92 seconds after the normal cold-storage
+preparation, then validate with
+`nsb3_puk2_dismiss_check.py SOURCE RUN`. This supplements rather than replaces
+the Down-only control: Down redraws a neighboring item with retained notice
+pixels, while explicit dismissal clears them. The cause and expected timeout
+of the Down-only notice remain unqualified; it is not an inability to recover
+clean menus through physical input. Native radio and long-run limits are unchanged.
