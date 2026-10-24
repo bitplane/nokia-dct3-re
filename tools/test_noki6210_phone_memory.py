@@ -3,17 +3,24 @@ from pathlib import Path
 import tempfile
 from tools.run_noki6210_phone_memory import (
     verify_storage, verify_lifecycle_digests, LIFECYCLE_FRAMES, EMPTY_SHA256)
-from tools.run_dct3_phone_memory import run
+from tools.run_dct3_phone_memory import run,lifecycle_frames
 
 
 class PhoneMemoryStorageTest(unittest.TestCase):
     def test_unqualified_product_or_lifecycle_cannot_reuse_6210_acceptance(self):
         with tempfile.TemporaryDirectory() as temporary:
             target=Path(temporary)/'run'
-            for product,lifecycle in (('3310',False),('6250',True)):
+            for product,lifecycle in (('3310',False),('8850',True)):
                 with self.subTest(product=product,lifecycle=lifecycle),self.assertRaises(ValueError):
                     run(target,lifecycle,product)
                 self.assertFalse(target.exists())
+
+    def test_lifecycle_oracles_are_product_specific(self):
+        reference={(phase,name):digest for phase,name,digest in lifecycle_frames('6250')}
+        verify_lifecycle_digests(reference,'6250')
+        with self.assertRaises(ValueError):verify_lifecycle_digests(reference,'6210')
+        with self.assertRaises(ValueError):
+            verify_lifecycle_digests({(p,n):h for p,n,h in LIFECYCLE_FRAMES},'6250')
 
     def test_cold_edit_cancel_and_erase_frames_are_distinct(self):
         digests={(phase,name):digest for phase,name,digest in LIFECYCLE_FRAMES}

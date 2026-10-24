@@ -109,8 +109,10 @@ promoted.
 
 NHM-3 separately qualifies Phone-bank A/123 save/cold retrieval against an
 empty control, with unchanged SIM storage and its own PMM comparison and
-upload/HLE checks. Use `run_dct3_phone_memory.py --product 6250`; 6210's
-edit/erase extension is not inherited.
+upload/HLE checks. Its independent `--product 6250 --lifecycle` chain also
+qualifies numeric edit, erase cancellation and confirmed erase through cold
+readback, with product-owned frame/timing checks rather than inherited6210
+acceptance.
 
 `verify-6210-pin-retry` additionally proves physical9999 rejection with one
 consumed PIN1 retry, physical1234 recovery/reset, delayed coherent laboratory

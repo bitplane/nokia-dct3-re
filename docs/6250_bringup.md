@@ -1427,9 +1427,23 @@ from6210. Both selections, empty, save and cold detail are exact pixel oracles.
 All complete SIM files must match and no UPDATE RECORD is allowed. The
 writer's4MiB flash differs from the empty control. Own native upload/HLE
 ownership and initial-record checks run on every leg. Native mask execution,
-factory PMM provenance, capacity and copying remain unproved; the 6210's
-edit/cancel/erase extension is explicitly rejected for6250 until separately
-qualified. Capture: `tmp/nhm3-shared-phone-memory-final`.
+factory PMM provenance, capacity and copying remain unproved.
+Capture: `tmp/nhm3-shared-phone-memory-final`.
+
+The independently executed `--product 6250 --lifecycle` extension covers nine
+isolated processes. Physical Options / Edit number changes123 to124; cold
+Details must display A / 124. Physical Names / Erase / One by one presents
+**Erase all details?** for A. Back cancels and another cold Details must still
+display A / 124. Confirming the same dialog later displays **Phone book
+erased**, followed by a cold **Selected memory empty** search. Seven additional
+product-qualified pixel oracles cover both dialogs, edit/save, erase and the
+three cold outcomes. The 6250 reader uses its own four-contact timing and
+frame names, not the 6210 reader. Every successor inherits complete predecessor
+NVRAM; all nine complete SIM files match and no UPDATE RECORD occurs.
+The own upload/HLE and PMM checks remain mandatory on every leg. Capture:
+`tmp/nhm3-phone-memory-lifecycle`. This qualifies one numeric edit and
+cancel/confirmed erase, not multiple numbers, name editing, capacity, bulk
+erase, copying or native DSP. Menu positions remain harness policy.
 
 ## Radio acquisition comparison
 
