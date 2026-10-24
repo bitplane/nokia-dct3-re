@@ -1059,7 +1059,7 @@ contacts remain local; `sim_fdn_protocol_check.check_protocol_phase` is the
 same parsed-TX contract used by the existing sibling adapters.
 
 This qualifies settings and cold file-validity persistence. Rejected
-activation is qualified below; protected FDN record editing, local dial
+activation and protected FDN record save/edit are qualified below; local dial
 permission, radio registration, connected calls and native speech remain
 unqualified. No firmware messages,
 selection flags, counters or guest state are injected.
@@ -1113,8 +1113,8 @@ saved card; run `nsb3_fdn_record_read.lua` for 89 seconds. The checker
 physical contacts, PIN2-before-write ordering, selected-file APDUs/statuses,
 complete cards and Saved/name/number/Menu pixel oracles. No FDN entry,
 firmware result or guest state is supplied by the host. Rejected record
-writes are qualified below; edit/erase/cancel and local dial permissions
-remain separate.
+writes and editing are qualified below; erase/cancel and local dial
+permissions remain separate.
 
 ### Rejected protected FDN Add and cold record preservation
 
@@ -1140,3 +1140,29 @@ own executable, full card comparisons, physical contacts, ordered successful
 PIN1/failed PIN2, bootstrap-only identity rehabilitation and error/name/
 number/Menu pixel oracles. No record, retry, validity or firmware-context
 edit is supplied by the harness.
+
+### Protected FDN number edit and cold Details
+
+Physical Numbers/Search/Details/Options requires PIN2 before showing Edit/
+Erase. Edit accepts the existing name `A`; short C removes the last number
+digit and keypad 6 enters its replacement. Confirming the number saves
+`A/12346` with one successful UPDATE RECORD to EF_FDN record 1. This route
+does not need the separate Save/Save new menu used by the ordinary ADN edit.
+Only image byte 3600 changes `f5→f6`; ordinary ADN, validity, credentials,
+retries and all other FDN records remain intact.
+
+A new cold process physically opens Numbers/Search/Details and renders
+`A`, then `Number: 12346`, without UPDATE or a second PIN2 VERIFY. It retains
+every card byte. The common protected-record validator requires exact PIN2
+payload/status, authentication-before-write, selected EF_FDN, bootstrap-only
+identity rehabilitation and complete input/APDU ordering for both Add and Edit.
+
+The edit fixture uses one-second intervals between initial navigation keys
+instead of the older three-second pauses; only physical scheduling changes,
+not emulated clocks, timers or firmware state. Run `nsb3_fdn_record_edit.lua`
+for 78 seconds from the qualified saved card. Use
+`nsb3_fdn_edit_check.py prepare-cold EDIT COLD`, run the usual 89-second record
+read fixture, then `check SAVED EDIT COLD`. Own executable/cold links, exact
+cards and Menu/Saved/name/number RGB oracles remain required. No record
+payload or completion is supplied by the host. Erase/cancel and local dial
+permissions remain separate.

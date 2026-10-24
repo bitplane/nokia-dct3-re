@@ -39,17 +39,22 @@ def check_card(card, pin2_attempts=3):
 
 
 def check_trace(text, readback=False):
+    check_record_trace(text, READ_KEYS if readback else WRITE_KEYS,
+                       None if readback else expected_record())
+
+
+def check_record_trace(text, keys, record=None):
+    readback = record is None
     if 'nsb3_board_reset_request:' in text:
         raise ValueError('reset interrupts FDN record qualification')
     verifies = () if readback else ((0x20, 0, 2, 8, padded_pin('5678')),)
     check_pin(text, True, additional_verifies=verifies)
-    keys = READ_KEYS if readback else WRITE_KEYS
     contacts = re.findall(r'nsb3_security_key: key=(.*?) down=([01]) t=[0-9.]+ physical_only=1', text)
     if contacts != [(key, state) for key in keys for state in ('1', '0')]:
-        raise ValueError('physical FDN Add/cold Details contacts differ')
+        raise ValueError('physical FDN record contacts differ')
     commands = wire(text)
     updates = [row for row in commands if row[0] == 0xdc]
-    if updates != ([] if readback else [(0xdc, 1, 4, 32, expected_record(), 0x6f3b)]):
+    if updates != ([] if readback else [(0xdc, 1, 4, 32, record, 0x6f3b)]):
         raise ValueError('requires one exact EF_FDN update then read-only cold retrieval')
     if statuses(text, 0xdc) != ([] if readback else [(0x9000, 3, 10)]):
         raise ValueError('FDN update status differs')
