@@ -2004,6 +2004,24 @@ the existing `55` scan provides the ARFCN 1 measurements before authentication.
 ordinary phone-code-only composition. Acquired PMM is unchanged in both;
 native DSP runtime and speech remain unproved.
 
+`.venv/bin/python tools/run_noki8850_pin_retry_cold.py RUN_DIR` separately
+qualifies durable PIN1 retry state through two isolated processes. The first
+starts with a declared PIN-enabled laboratory card and physically submits9999
+once. It must receive `9804` with two PIN1 attempts remaining, display the
+reviewed84x48 **Code error** frame and never acknowledge Location Updating.
+The complete serialized card must equal the initialized profile with only
+PIN1's retry allowance reduced. The second process inherits all predecessor
+NVRAM, physically submits1234 and enters the phone code12345 through the
+existing own-product input sequence. It must receive one `9000`, restore all
+PIN1 retries, register, and pass the reviewed Messages/Inbox/Names checks.
+Complete card equality permits only that retry reset and the expected EF_LOCI
+update; credential/configuration/record mutations are rejected. Both phases
+retain own input hashes, staged uploads, exclusive HLE/self-test and physical
+input checks. Distinct launch identities, complete initial-storage hashes and
+predecessor immutability checks retain the cold-process boundary. This does
+not qualify PIN exhaustion, PUK recovery, PIN2 or native DSP/speech.
+Capture: `tmp/nsm2-pin-retry-cold-final`.
+
 The same isolated runner accepts `--scenario host-incoming-call`. It verifies
 physical answer/end input, the complete host-originated CC/RR exchange,
 traffic-channel assignment and release, and reviewed ringing/returned-idle

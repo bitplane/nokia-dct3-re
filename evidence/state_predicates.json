@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm2_pin1_retry_cold_recovery", "owner": "nsm2_sim_security", "status": "satisfied",
+      "predicate": "Physical 8850 wrong-PIN rejection consumes one persistent retry and an independent cold process authenticates and restores it before laboratory registration",
+      "current": "The own-MCU/PMM two-process runner starts with a declared PIN-enabled card. Physical9999 yields exactly one CHV1 VERIFY9804, two retries and the reviewed84x48 Code error frame without Location Updating. Complete serialized card equality permits only the consumed retry after initialization. A distinct cold process inherits every NVRAM file, physically submits1234 and the phone code, obtains VERIFY9000, restores retries and passes own staged upload/exclusive HLE/self-test, registration and physical Messages/Inbox/Names checks. Final whole-card equality permits only retry reset and expected EF_LOCI update. Credentials, unrelated card bytes and predecessor NVRAM remain unchanged. Launch/input/storage hashes and identities are retained. This does not establish exhaustion, PUK/PIN2, native DSP, RF or speech.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/run_noki8850_pin_retry_cold.py", "tools/noki8850_pin_wrong.lua", "tools/noki8850_security_input.lua", "tools/noki8850_staged_trace_check.py", "tools/test_noki8850_pin_retry_cold.py"]
+    },
+    {
       "id": "npe3_nhm3_handset_multiple_number_cold_persistence", "owner": "handset_nonvolatile_storage", "status": "satisfied",
       "predicate": "Independent 6210 and 6250 two-number contacts persist across cold boots and selective field deletion preserves the contact and original number",
       "current": "Each product's seven-process --numbers fixture independently qualifies an empty control, fresh A/123 save/cold read, physical General-number789 addition, cold123/789/A detail navigation, physical Erase?789 confirmation and cold123/A/123 wraparound. Exact frames reject absent addition, unconfirmed deletion, retained789 or whole-contact deletion. Complete predecessor NVRAM is inherited, complete SIM files remain identical, every trace rejects UPDATE RECORD and each mutation changes handset flash. Product-owned boot/upload/HLE checks remain required;6250 retains its non-factory own initial-record PMM comparison. This covers one two-General-number contact and selective deletion, not capacity, arbitrary field types, record encoding, native DSP or speech.",

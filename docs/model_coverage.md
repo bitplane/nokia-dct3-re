@@ -100,6 +100,14 @@ Native radio and speech remain unproved; see
 
 ## Promotion rules
 
+NSM-2 additionally qualifies a two-process PIN1 retry lifecycle through
+`run_noki8850_pin_retry_cold.py`: physical9999 rejection consumes exactly one
+retry without registration, complete predecessor NVRAM is inherited by an
+independent cold process, and physical1234 restores retries and reaches the
+existing registered physical-menu acceptance. Exact whole-card comparisons
+and the reviewed Code error frame are required. This is not PIN exhaustion,
+PUK/PIN2 acceptance or native DSP/speech.
+
 NPE-3 additionally has an independent handset-bank A/123 save/cold-read
 fixture with an empty-bank negative control and unchanged complete SIM files;
 see `run_noki6210_phone_memory.py`. Its `--lifecycle` variant adds a physical
