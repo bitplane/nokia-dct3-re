@@ -13,3 +13,9 @@ sid_observed: $(filter-out decoder.o d_homing.o,$(DOBJ)) efr_sid_observer.o
 
 efr_sid_observer.o: $(SID_OBSERVER_SOURCE)
 	$(CC) $(CFLAGS) -c $(SID_OBSERVER_SOURCE) -o $@
+
+decoder_dtx_observed: $(DOBJ) efr_dtx_observer.o
+	$(CC) $(CFLAGS) -o $@ $(DOBJ) efr_dtx_observer.o -Wl,--wrap=rx_dtx
+
+efr_dtx_observer.o: $(DTX_OBSERVER_SOURCE)
+	$(CC) $(CFLAGS) -c $(DTX_OBSERVER_SOURCE) -o $@

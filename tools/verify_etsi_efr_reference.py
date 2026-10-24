@@ -190,6 +190,20 @@ def invalid_sid_input(decoder):
     return bytes(result)
 
 
+def lost_sid_input(decoder):
+    """Lose two scheduled SID updates using decoder-entry channel flags only."""
+    if digest(decoder) != DTX_EXPECTED['dec']:
+        raise ValueError('lost-SID source must be the verified DTX conversation')
+    result = bytearray(decoder)
+    for index in (71, 95):
+        frame = struct.unpack_from('<247H', decoder, index * 494)
+        if (frame[0], frame[245], frame[246]) != (0, 2, 1):
+            raise ValueError('lost-SID source must have a clean scheduled SID update')
+        struct.pack_into('<H', result, index * 494, 1)
+        struct.pack_into('<H', result, index * 494 + 490, 0)
+    return bytes(result)
+
+
 def check_sid_classes(text, decoder):
     if len(decoder) != DTX_FRAMES * 494:
         raise ValueError('SID classifier requires all 518 complete decoder frames')

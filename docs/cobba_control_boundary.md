@@ -2912,6 +2912,30 @@ not native RF SID detection, all corruption patterns, homing/error combinations,
 published conformance vectors or handset speech transport. No CPU, codec state,
 production clock or reference PCM was altered to obtain agreement.
 
+### Reference-only lost-SID muting fixture
+
+`tools/run_efr_lost_sid_reference.py` prepares the untested previous-muting
+branch using channel inputs, not internal state edits. Starting from the
+hash-pinned 518-frame DTX input, only frames71/95 change from received SID
+to unusable frame (BFI1, SID0); payload and TAF are preserved. Both updates
+are scheduled (TAF1), while the initial SID at51 remains valid.
+The separately acquired reference enters muting at95/96 and resumes speech
+with control0501 at97; its later clean resumption at356 remains0401.
+Read-only link wrapping of `rx_dtx` observes every frame's input and control.
+The runner checks installation PCM, fresh-process replay and equality with
+the unobserved decoder before accepting the generated output.
+
+| Local research fixture | SHA-256 |
+| --- | --- |
+| `lost_sid.dec` | `98af464e95397ad9cfd14f23905060770b170ad706261766941294204ffc57d6` |
+| `lost_sid.out` | `771374b3a45dcd5286b4886b8d15ad55d3c5f6beace0b56a63ab3886fcc020c0` |
+
+This is reference-only evidence, not yet a native-DSP comparison or handset
+speech result. The next native check must load this declared input/output
+pair in a distinct bench profile, observe original `c79b` with0501 and
+retain full PCM comparison and frame/history replay. It must not substitute
+these files under an existing clean-DTX profile or force the internal flags.
+
 ### Native EFR active-speech erasures
 
 Atomic and staged execution complete all 163 frames and replay 65,440 ordinary
