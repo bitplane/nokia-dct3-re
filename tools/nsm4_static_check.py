@@ -8,9 +8,46 @@ import sys
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools.dct3_eeprom_descriptor import eeprom_geometry
 
 MCU_SHA256 = 'bf80e6961d37e071c73b0ec5eba448889b4134fa080dfd7f4a6dd04f3a69aac2'
 TABLE = 0x3e8e60
+
+# Own instructions and their literal pools; matching an opcode alone does not
+# establish which register window the operation addresses.
+PERIPHERAL_FRAGMENTS = {
+    0x3c0e9a: '4ead201e7030',
+    0x3c0eb2: '78b006c00ec006000e0224ff2a1f',
+    0x3c0f2a: '40884210d10800a81828180806000e04',
+    0x3c1150: '00020028000200a8',
+    0x3ca4f4: '4d6b212d20225548',
+    0x3ca51a: '206d5d4008c0d3fb206c5d40',
+    0x3ca6a4: '00020000',
+    0x3cda62: '497a20217008',
+    0x3cda6a: '4a79216d5c890849d3fb216e548846f7',
+    0x3cdad6: '4a5e216d5c890849d3fb212e548846f7',
+    0x3cdc4c: '0002002d00020000',
+    0x385874: '213820ff550820c07220',
+}
+
+
+def peripheral_contract(image):
+    for address, encoded in PERIPHERAL_FRAGMENTS.items():
+        expected = bytes.fromhex(encoded)
+        offset = address - 0x200000
+        if image[offset:offset + len(expected)] != expected:
+            raise ValueError(f'NSM-4 peripheral instruction/literal differs at {address:#x}')
+    return {'gensio': {'select': '0x2d', 'ccont_select': '0x22',
+                       'ccont_write': '0x2c', 'ccont_read': '0x6c',
+                       'status': '0x6d', 'ccont_ready_bit': 2,
+                       'lcd_select': '0x21', 'lcd_command': '0x6e',
+                       'lcd_data': '0x2e', 'lcd_ready_bit': 0},
+            'keypad': {'scanner': '0x3c0e72', 'row_output': '0x28',
+                       'row_direction': '0xa8', 'column_input': '0x2a',
+                       'raw_formula': 'row * 5 + column'},
+            'simi_init_fragment': '0x385874',
+            'eeprom_descriptor': eeprom_geometry(image[5]),
+            'physical_key_labels_or_timing_proved': False}
 
 
 def read_catalogue(image):
@@ -50,6 +87,7 @@ def inspect(image):
             'catalogue_destination': '0x13a9a8', 'entries': entries,
             'reset_arm_entry': '0x200040', 'thumb_entry': '0x200148',
             'startup_calls': ['0x2ea064', '0x23f900', '0x3ab530'],
+            'peripheral_contract': peripheral_contract(image),
             'bootstrap': {'identity_data_0803': 6, 'resident_call': '0x861f',
                           'fitted_mask_compatibility_proved': False},
             'scope': 'Static MCU declarations only; no upload execution, peripheral wiring, PMM or resident mask established'}

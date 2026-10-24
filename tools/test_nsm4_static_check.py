@@ -1,7 +1,8 @@
 import struct
 import unittest
 
-from tools.nsm4_static_check import TABLE, inspect, read_catalogue
+from tools.nsm4_static_check import (TABLE, inspect, read_catalogue,
+                                    peripheral_contract, PERIPHERAL_FRAGMENTS)
 
 
 class Nsm4StaticTest(unittest.TestCase):
@@ -38,6 +39,24 @@ class Nsm4StaticTest(unittest.TestCase):
     def test_whole_image_pin(self):
         with self.assertRaisesRegex(ValueError, 'own normalized'):
             inspect(self.fixture())
+
+    def test_peripheral_instructions_and_literals_are_load_bearing(self):
+        image = bytearray(0x290000)
+        image[5] = 0xfd
+        for address, encoded in PERIPHERAL_FRAGMENTS.items():
+            fragment = bytes.fromhex(encoded)
+            offset = address - 0x200000
+            image[offset:offset + len(fragment)] = fragment
+        result = peripheral_contract(image)
+        self.assertEqual(result['gensio']['ccont_ready_bit'], 2)
+        self.assertEqual(result['keypad']['row_direction'], '0xa8')
+        self.assertEqual(result['eeprom_descriptor']['capacity_bytes'], 16384)
+        self.assertFalse(result['physical_key_labels_or_timing_proved'])
+        for address in PERIPHERAL_FRAGMENTS:
+            changed = bytearray(image)
+            changed[address - 0x200000] ^= 1
+            with self.assertRaises(ValueError):
+                peripheral_contract(changed)
 
 
 if __name__ == '__main__':

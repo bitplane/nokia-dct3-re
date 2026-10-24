@@ -4,8 +4,9 @@
 
 Own v5.18 MCU and PPM regions are normalized and statically qualified. No
 machine profile, graphical boot, input, storage or radio acceptance is claimed.
-The next question is the product's peripheral register contract and the
-consumer of its DSP catalogue, before choosing any existing device composition.
+Own GENSIO and keypad register operations are now pinned. The next questions
+are the DSP catalogue consumer, EEPROM GPIO transaction code, physical key
+table and display geometry, before choosing an existing device composition.
 
 Reproduce the static report:
 
@@ -41,11 +42,36 @@ with a sibling mask. No resident mask is provided by the service archive.
 
 ## Admission constraints
 
+The own register contract is recovered from instruction fragments together
+with their literal pools, checked by `peripheral_contract`:
+
+| Consumer | Own evidence | Firmware-visible contract |
+| --- | --- | --- |
+| CCONT | `3ca4f4`, `3ca51a`, pool `3ca6a4` | Select `2d=22`, write `2c`, receive `6c`, status `6d` bit 2 |
+| LCD | `3cda62`, `3cda6a`, `3cdad6`, pool `3cdc4c` | Select `2d=21`, command `6e`, data `2e`, status `6d` bit 0 |
+| Keypad | `3c0e9a`, `3c0eb2`, `3c0f2a`, pool `3c1150` | Row output `28`, direction `a8`, columns `2a`, raw index `row*5+column` |
+
+Offsets are relative to MAD2 `0x20000`. The keypad routine manipulates row
+bits 1 through 4 and tests five column bits; physical key labels require its
+separate translation table. The header descriptor `fd` decodes to two-byte
+EEPROM addressing, 64-byte pages and 16 KiB capacity; it does not identify a
+fitted part or establish SDA/SCL wiring. Serial baud, ADC latency, electrical
+polarity and LCD geometry do not follow from these instruction checks.
+
+The conservative literal-seeded MMIO census, with constant-index recovery,
+resolves 798 candidate accesses from 276 seeds (247 return, 16 decode-gap,
+13 span-limit terminations; 10 seeds without an access). This is linear static
+candidate coverage, not whole-program control-flow proof. Its byte input is
+the normalized MCU with each 16-bit pair swapped, as required by
+`mad2_static_census.analyze_image`; the checked fragments above use unswapped
+big-endian CPU bytes. Do not interchange those representations.
+
 The MCU contains SIMI initialization at `0x385874` matching the instruction
 fragment `2138 20ff 5508 20c0 7220`. This alone is not a complete controller
 or board contract. Older 8xxx exact CCONT/LCD/keypad fragments did not match;
 that is a failed signature search, not evidence that those peripherals are
-absent or incompatible. Recover their own instructions and literal bases.
+absent or incompatible. The own instructions above supersede that search as
+the register-contract evidence; no older product's GPIO layout was inherited.
 
 The service regions end at `0x580000`; no PMM or full-flash tail was acquired.
 Do not borrow EEPROM/PMM, fabricate DSP completion, or assign a sibling board
