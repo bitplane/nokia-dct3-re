@@ -44,7 +44,7 @@ class PhoneMemoryCheckTest(unittest.TestCase):
             checker.verify(self.capture(), checker.expected_card(), mode='read')
 
     def test_preserved_modes_have_distinct_contracts(self):
-        for mode in ('edit', 'edit_read', 'erase_cancel', 'erase', 'empty_read'):
+        for mode in ('edit', 'edit_read', 'erase_cancel', 'erase', 'empty_read', 'rename', 'rename_read'):
             text = '\n'.join((
                 'SIM status ins=20 sw=9000', 'LAPDm Location Updating Accept acknowledged',
                 f'5210_phone_memory: mode={mode} begin=1',
@@ -78,3 +78,17 @@ class PhoneMemoryCheckTest(unittest.TestCase):
         text = self.capture().replace('SIM status ins=20 sw=9000', '') + '\nSIM status ins=20 sw=9000'
         with patch.object(checker, 'verify_coherent_late'), self.assertRaises(ValueError):
             checker.verify(text, checker.expected_card())
+
+    def test_rename_requires_replace_and_a_distinct_name_frame(self):
+        self.assertEqual(checker.MODE_FRAMES['rename_read']['phonebook'], checker.READ_FRAMES['phonebook'])
+        self.assertNotEqual(checker.MODE_FRAMES['rename_read']['phonebook_list'], checker.READ_FRAMES['phonebook_list'])
+        self.assertEqual(checker.KEYS['rename'][-6:-3], ['Left Softkey / Menu'] * 3)
+        keys = checker.KEYS['rename'].copy()
+        keys.insert(len(keys) - 4, 'Scroll Down')  # Select Add instead of Replace.
+        text = '\n'.join((
+            'SIM status ins=20 sw=9000', 'LAPDm Location Updating Accept acknowledged',
+            '5210_phone_memory: mode=rename begin=1',
+            *[f'5210_phone_memory_key: name={key} released=1' for key in keys],
+            '5210_phone_memory: mode=rename complete=1'))
+        with patch.object(checker, 'verify_coherent_late'), self.assertRaisesRegex(ValueError, 'input/release'):
+            checker.verify(text, checker.expected_card(), mode='rename')

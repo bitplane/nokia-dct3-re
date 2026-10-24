@@ -115,6 +115,16 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   hash-guarded. Cold follow-ups are explicit scenario metadata with terminal,
   storage-dependent readers. This is a single-contact seed, not proof of
   selective multi-contact preservation, capacity or failure atomicity.
+- `tools/run_noki5210_acceptance.py DIRECTORY --scenario pin-phone-memory-rename
+  --preserved-nvram SAVED_RUN/nvram` extends a firmware-created `Ada/123`
+  Phone-bank fixture with physical name replacement and automatic cold read.
+  The editor clears Ada, enters A, confirms the retained number123 and explicitly
+  chooses **Replace**, not Add. Reviewed replacement/Saved frames precede a
+  distinct cold **A** list frame and unchanged123 Details. Details alone cannot
+  prove the rename because that screen contains no name. Both processes retain
+  the complete expected SIM, reject SIM updates and hash-guard their predecessor
+  NVRAM. Capture: `tmp/nsm5-phone-rename-qualified`. This qualifies a single-letter
+  replacement, not arbitrary encoding, multiple-contact selection or capacity.
 - `make verify-5210-radio-supplementary` enters `*123#` and `*#21#` through
   the physical keypad and submits them with the product's dedicated Send key.
   The resulting processUnstructuredSS-Request and InterrogateSS transactions

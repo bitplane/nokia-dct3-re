@@ -23,6 +23,9 @@ READ_KEYS = ['Right Softkey / C'] + ['Left Softkey / Menu'] * 3 + ['End', 'Left 
 EDIT_KEYS = READ_KEYS[:-3] + ['Left Softkey / Menu'] * 3 + [
     'Right Softkey / C', 'Keypad 4', 'Left Softkey / Menu'] + READ_KEYS[-3:]
 KEYS = {'save': SAVE_KEYS, 'read': READ_KEYS, 'edit': EDIT_KEYS, 'edit_read': READ_KEYS}
+KEYS['rename'] = READ_KEYS[:-3] + ['Left Softkey / Menu'] * 2 + ['Right Softkey / C'] * 3 + [
+    'Keypad 2'] + ['Left Softkey / Menu'] * 3 + READ_KEYS[-3:]
+KEYS['rename_read'] = READ_KEYS
 ERASE_PREFIX = READ_KEYS[:-3] + ['Left Softkey / Menu', 'Scroll Down', 'Scroll Down', 'Left Softkey / Menu']
 KEYS.update(erase_cancel=ERASE_PREFIX + ['Right Softkey / C'] + READ_KEYS[-3:],
             erase=ERASE_PREFIX + ['Left Softkey / Menu'] + READ_KEYS[-3:],
@@ -48,6 +51,14 @@ EDIT_FRAMES = dict(READ_FRAMES,
 EDIT_READ_FRAMES = dict(READ_FRAMES, phonebook='5066beda30d2fbd845ba3036385adc8db278b7844707b18b4d921ee14387775d')
 MODE_FRAMES = {'save': SAVE_FRAMES, 'read': READ_FRAMES,
                'edit': EDIT_FRAMES, 'edit_read': EDIT_READ_FRAMES}
+MODE_FRAMES['rename'] = dict(READ_FRAMES, edit_name=SAVE_FRAMES['phone_name'],
+    rename_changed='892de07c3d691a90c01a1c35132df8b1e08ebfb9b2c6bcf7a342116dfa8bc2f7',
+    rename_number=EDIT_FRAMES['edit_number'],
+    rename_replace='22891ade22b4f12944faabdedbb27a7e85bc03015784aa0348b2e5f9db8f52a1',
+    rename_saved=SAVE_FRAMES['phone_saved'])
+# Number Details does not show the name: the cold list is the rename oracle.
+MODE_FRAMES['rename_read'] = dict(READ_FRAMES,
+    phonebook_list='9f88b7547ec05ef3fbdf69ad4f3bc94e0acbc1c2834595ea2ff4d85e7eb463de')
 ERASE_PROMPT = 'f4798fa7bdb4077bae837b58cec453ce6153f7f463a6c2d3d51827a6841a7eaf'
 MODE_FRAMES.update(
     erase_cancel=dict(READ_FRAMES, erase_prompt=ERASE_PROMPT, erase_result=READ_FRAMES['phonebook_list']),
@@ -104,6 +115,7 @@ def main():
     modes = parser.add_mutually_exclusive_group(required=True)
     for flag, mode in (('--save', 'save'), ('--read', 'read'),
                        ('--edit', 'edit'), ('--edit-read', 'edit_read'),
+                       ('--rename', 'rename'), ('--rename-read', 'rename_read'),
                        ('--erase-cancel', 'erase_cancel'), ('--erase', 'erase'),
                        ('--empty-read', 'empty_read')):
         modes.add_argument(flag, action='store_const', dest='mode', const=mode)

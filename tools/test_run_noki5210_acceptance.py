@@ -191,6 +191,8 @@ class RunnerTests(unittest.TestCase):
             'pin-phone-memory-read': (55, '--read', ()),
             'pin-phone-memory-edit': (65, '--edit', ()),
             'pin-phone-memory-edit-read': (55, '--edit-read', ()),
+            'pin-phone-memory-rename': (65, '--rename', ()),
+            'pin-phone-memory-rename-read': (55, '--rename-read', ()),
             'pin-phone-memory-erase-cancel': (65, '--erase-cancel', ()),
             'pin-phone-memory-erase': (65, '--erase', ()),
             'pin-phone-memory-empty-read': (55, '--empty-read', ()),
@@ -202,6 +204,7 @@ class RunnerTests(unittest.TestCase):
         cold_followups = {
             'pin-phone-memory': 'pin-phone-memory-read',
             'pin-phone-memory-edit': 'pin-phone-memory-edit-read',
+            'pin-phone-memory-rename': 'pin-phone-memory-rename-read',
             'pin-phone-memory-erase-cancel': 'pin-phone-memory-read',
             'pin-phone-memory-erase': 'pin-phone-memory-empty-read',
         }
@@ -216,6 +219,7 @@ class RunnerTests(unittest.TestCase):
                     expected_card = make_profile(pin_enabled=True)
                     preserved_scenarios = {'pin-phonebook-read', 'pin-phone-memory-read',
                                            'pin-phone-memory-edit', 'pin-phone-memory-edit-read',
+                                           'pin-phone-memory-rename', 'pin-phone-memory-rename-read',
                                            'pin-phone-memory-erase-cancel', 'pin-phone-memory-erase',
                                            'pin-phone-memory-empty-read'}
                     self.assertEqual(runner.SCENARIOS[name].preserved, name in preserved_scenarios)

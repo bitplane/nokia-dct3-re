@@ -32,7 +32,21 @@ _G.noki5210_pin_after_accept = function(press, snapshot)
             key('Left Softkey / Menu', 2.5)
             snapshot('phonebook')
         end
-        if mode == 'edit' then
+        if mode == 'rename' then
+            key('Left Softkey / Menu', 0.7)
+            key('Left Softkey / Menu', 0.7)
+            snapshot('edit_name')
+            for index = 1, 3 do key('Right Softkey / C', 0.7) end
+            key('Keypad 2', 1.5)
+            snapshot('rename_changed')
+            key('Left Softkey / Menu', 0.7)
+            snapshot('rename_number')
+            key('Left Softkey / Menu', 2.5)
+            snapshot('rename_replace')
+            -- Renaming requires an explicit Replace/Add decision after the number editor.
+            key('Left Softkey / Menu', 2.5)
+            snapshot('rename_saved')
+        elseif mode == 'edit' then
             key('Left Softkey / Menu', 0.7)
             key('Left Softkey / Menu', 0.7)
             snapshot('edit_name')
