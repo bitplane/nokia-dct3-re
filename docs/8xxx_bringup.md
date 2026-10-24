@@ -2070,6 +2070,24 @@ ordinary dial text, and no new PIN is installed. It starts no call or Location
 Updating. Capture: `tmp/nsm2-permanent-puk-final`. This establishes permanent
 PUK1 loss for this laboratory card, not PIN2, native DSP, RF or speech.
 
+`.venv/bin/python tools/run_noki8850_pin2_change.py RUN_DIR` independently
+qualifies PIN2 credential persistence. Both processes authenticate startup
+PIN1 and the phone code through the existing product-local sequence, then
+physically navigate Settings / Security settings / Change access codes /
+Change PIN2 code. The first enters5678 and confirms replacement2468 twice.
+After inheriting all predecessor NVRAM, the second cold process uses2468 as
+the old PIN2 and changes it back to5678. Each requires exactly one accepted
+selector02 CHANGE CHV (`A0 24 00 02 10`), no other credential/configuration
+mutation, and complete card equality allowing only the PIN2 replacement and
+the expected laboratory location state. PIN1 and all retry/PUK allowances
+remain unchanged. Current/new/confirmation/**PIN2 code changed** frames are
+exact pixel oracles; End followed by physical Menu must render the reviewed
+stable Messages title. Own staged uploads, exclusive HLE/self-test, physical
+contacts and ordinary/preserved registration checks remain mandatory.
+Capture: `tmp/nsm2-pin2-change-final`. This proves cold use of the replacement
+credential, not merely a serialized edit; it does not establish rejected
+PIN2 changes, PIN2 exhaustion/PUK2 recovery, FDN or native DSP/speech.
+
 The same isolated runner accepts `--scenario host-incoming-call`. It verifies
 physical answer/end input, the complete host-originated CC/RR exchange,
 traffic-channel assignment and release, and reviewed ringing/returned-idle

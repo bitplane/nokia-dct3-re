@@ -59,7 +59,7 @@ def check_puk_frames(directory,name,remaining=9):
                 '085e8c0db175dded35bd2fc7e9be74cfb7963fa563e525ae0c77cdb5208e0336' if remaining==0 else
                 '0b450ca748a44647be303fb1ea7c9f4d7a43de11c8afb09d7a29cffd10976325')
         else:
-            check_puk_menu(directory)
+            check_messages_menu(directory/'8850_puk_menu.png')
     elif name=='permanent':
         # Stage filenames persist, but these are ordinary dial-entry screens,
         # not active PUK/new-PIN editors. End returns to SIM card rejected.
@@ -75,13 +75,13 @@ def check_puk_frames(directory,name,remaining=9):
                 raise ValueError('8850 PUK stage pixels differ: '+filename)
 
 
-def check_puk_menu(directory):
+def check_messages_menu(path):
     from PIL import Image
-    with Image.open(directory/'8850_puk_menu.png') as frame:
+    with Image.open(path) as frame:
         # The established Messages title oracle excludes the animated icon.
         if (frame.size!=(84,48) or hashlib.sha256(frame.convert('L').crop((0,0,72,16)).tobytes()).hexdigest()!=
                 '1e5c11fcea9aac5331e18c0070697e8795003d6de9a0250284b3d9605209e654'):
-            raise ValueError('8850 post-PUK physical Menu did not render Messages')
+            raise ValueError('8850 physical Menu did not render Messages')
 
 
 def check_card_phase(text,initial,final,recovery=False):
