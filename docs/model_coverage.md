@@ -13,8 +13,14 @@ RF/voice support; see `tools/nsb3_native_check.py` and `6190_bringup.md`.
 With the explicit nominal ADC2 hypothesis and six decoded integrity bytes
 recomputed in its own cold EEPROM, `nsb3r4t` separately reproduces an exact
 `Insert SIM card` frame with unchanged final storage. The passing fixture and
-calibration-only negative control are checked by `tools/nsb3_selftest_check.py`;
-inserted-card, input and radio acceptance remain open.
+calibration-only negative control are checked by `tools/nsb3_selftest_check.py`.
+A separate inserted laboratory card/fresh phone-code retry fixture accepts
+physical security entry and clean Messages/Names menus. Physical A/12345 save
+issues one EF_ADN update; an independent cold process retrieves the name and
+number without rewriting or changing the complete card. The boundary is checked
+by `tools/nsb3_menu_check.py` and `tools/nsb3_phonebook_check.py`.
+Ordinary idle-content provenance, fitted-mask identity and radio/call/SMS
+acceptance remain open; the unproved native compatibility input is unchanged.
 
 Nokia 8855 / NSM-4 v5.18 has a fail-closed `noki8855` MCU research profile.
 Two own erased-storage boots produce identical catalogue/storage state and

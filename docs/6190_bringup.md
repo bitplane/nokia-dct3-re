@@ -6,10 +6,12 @@
 Separate `nsb3r4t` executes with explicit unproved NSE-1 ROM4 compatibility
 inputs. With one nominal ADC2 hypothesis and six integrity-only corrections
 to its own firmware-created EEPROM, it reproducibly reaches `Insert SIM card`.
-No donor identity/calibration is imported. Fitted-mask compatibility,
-interactive input, inserted SIM and radio remain unqualified. Next compose
-an external laboratory SIM and test firmware-owned reset/security/input;
-native execution does not by itself establish RF or calls.
+An explicit laboratory card and separately initialized phone-code retry record
+then support physical security entry, a clean Messages menu, and SIM contact
+save/cold Details retrieval. No donor identity/calibration is imported.
+Ordinary idle-content provenance remains unresolved. Fitted-mask compatibility,
+RF registration, calls and SMS remain unqualified; native liveness is not
+evidence for those contracts.
 
 Collection provenance and the unprovided MCU-to-PPM gap are in
 `roms/README.md`. Reproduce the static report:
@@ -33,7 +35,7 @@ at `2000ec`. The own startup stack literal is `10fbf4`.
 | CCONT serial | `2b129e`, pool `2b1374` | Select `28=22`, byte write `2a`, status `29` bit 2, receive `2d` |
 | LCD serial | `2b19e4`, `2b1a4a` | Status `29` bit 0; command `2c`, data `2b` |
 | Keypad scanner | Entry `2b2a2c`, fragment `2b2a60`, pool `2b2bc0` | Five-row scan, row signal `31`, direction `2f`, columns `30`; raw `row*5+column` |
-| SIMI | `2a19c0` | Own IIR/control initialization fragment; no card traffic qualified |
+| SIMI | `2a19c0`; observed TX `20036` / RX `20037` | ATR/PPS, startup file reads and organic ADN update/readback with laboratory card |
 
 Offsets in the table are relative to MAD2 `20000`. Header descriptor `f4`
 decodes to 8 KiB, two-byte addressing and 32-byte pages; this is not a fitted
@@ -319,3 +321,38 @@ matrix contact state; all breakpoint and LCD wire observations are read-only.
 Check the resulting directory with `tools/nsb3_menu_check.py RUN_DIR`.
 The checker requires the seven-byte external fixture, physical credential and
 menu contacts, the matched-code branch, and the reviewed menu pixel hash.
+
+### Physical SIM phonebook persistence
+
+After matching security entry, Menu is exited physically; the idle right
+softkey opens Names. Add entry accepts `A` and `12345`, reports `Saved`, and
+issues exactly one absolute `A0 DC 01 04 20` UPDATE RECORD to selected EF_ADN
+`6f3a`. The stored 32-byte record has name `41`, number trailer
+`04 81 21 43 f5` at byte 18, and erased padding. The other 49 ADN records stay
+erased. This is a card-side protocol write, not a host-edited contact.
+
+`tools/nsb3_phonebook_input.lua` exercises the physical save in 68 emulated
+seconds using the same seven-byte provisioning fixture. Prepare an independent
+cold process with:
+
+```sh
+.venv/bin/python tools/nsb3_phonebook_check.py prepare-reload SAVE_RUN COLD_RUN
+```
+
+Only that handset's persisted flash, EEPROM and SIM are copied, plus its
+input configuration; executable hash and source storage provenance are checked.
+No guest RAM or save state is transferred. Run the cold directory for 50
+seconds with `tools/nsb3_phonebook_reload.lua`. It physically enters the same
+phone code, opens Names, submits an empty Search and opens Details. Reviewed
+frames show `A`, then `Number: 12345`. The cold process issues READ RECORD for
+ADN record one, no UPDATE RECORD, and leaves the complete SIM file unchanged.
+
+```sh
+.venv/bin/python tools/nsb3_phonebook_check.py check SAVE_RUN COLD_RUN
+```
+
+The checker decodes the complete observed PPS/APDU TX stream with the shared
+SIM parser, requires exact physical contact ordering and the matched-code
+branch, checks Saved/name/number pixel oracles, and compares whole-card storage.
+This qualifies laboratory SIM contact persistence, not handset-memory contacts,
+all SIM security services, ordinary idle content or radio completion.
