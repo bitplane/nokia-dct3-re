@@ -1,0 +1,18 @@
+-- Own startup and physical dismissal of card-originated DISPLAY TEXT.
+local directory = debug.getinfo(1, 'S').source:sub(2):match('^(.*[/\\])')
+dofile(directory .. 'nsb3_pin_correct.lua')
+local machine = manager.machine
+local actions = coroutine.create(function()
+    assert(emu.wait(65))
+    machine.screens[':screen']:snapshot('nsb3_toolkit_display.png')
+    assert(emu.wait(3))
+    local field = assert(machine.ioport.ports[':COL.1'].fields['Left Softkey / Menu'])
+    field:set_value(1)
+    machine:logerror('nsb3_toolkit_physical: action=dismiss down=1 t=68.000000000\n')
+    assert(emu.wait(.15))
+    field:set_value(0)
+    machine:logerror('nsb3_toolkit_physical: action=dismiss down=0 t=68.150000000\n')
+    assert(emu.wait(2))
+    machine.screens[':screen']:snapshot('nsb3_toolkit_dismissed.png')
+end)
+assert(coroutine.resume(actions))

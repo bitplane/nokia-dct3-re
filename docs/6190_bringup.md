@@ -10,7 +10,9 @@ An explicit laboratory card and separately initialized phone-code retry record
 then support physical security entry, clean Messages/Names menus, SIM contact
 save/read/edit/delete with cold persistence, offline SMS draft save/read/delete,
 and the PIN/PUK change/retry/exhaustion lifecycles qualified below. No donor
-identity/calibration is imported. Ordinary idle content and automatic notice
+identity/calibration is imported. A configured Phase-2+ lab card additionally
+completes organic TERMINAL PROFILE/FETCH/DISPLAY TEXT and physical dismissal.
+Ordinary idle content and automatic notice
 clearing remain unresolved; explicit rejection dismissal restores clean menus.
 An independent long-run control resets near 94 seconds
 after an empty native receive window publishes reason `68`; bounded software
@@ -1299,3 +1301,31 @@ checksums, not byte-for-byte memory dumps. This bounded gate does not establish
 RF input, native registration, speech or survival past the receive-supervision
 reset. Timer/peripheral continuity is observed through exact subsequent I/O,
 not an exhaustive inventory of every saved device field.
+
+### Card-originated Toolkit DISPLAY TEXT
+
+The existing external card-profile input `SATCFG=1` supplies a Phase-2+
+laboratory card without changing handset storage or persistent card bytes.
+Own firmware sends TERMINAL PROFILE `A0 10 00 00 05 0b 41 97 77 00`.
+After the card application queues DISPLAY TEXT, ordinary STATUS at about
+62.014 seconds returns `91 16`; firmware sends `A0 12 00 00 16` FETCH.
+The received BER-TLV is `d0148103012180820281028d0904` followed by `DCT3 SAT`.
+The screen presents that text with OK/Back. Physical OK at 68 seconds emits
+`A0 14 00 00 0c 810301218002028281030100`, completes with `9000`, and
+returns to clean Messages. No firmware latch, internal D0 object or completion
+is supplied by the harness; the existing card model is the legitimate payload
+producer. The original PIN-enabled card remains byte-identical.
+
+```sh
+.venv/bin/python tools/nsb3_toolkit_prepare.py SOURCE NEW_RUN
+# Run NEW_RUN for 75 seconds with nsb3_toolkit_input.lua.
+.venv/bin/python tools/nsb3_toolkit_check.py SOURCE NEW_RUN
+```
+
+SOURCE is the qualified original PIN-enabled laboratory storage, not the
+extended FDN card. Preparation records the external profile separately from
+the unchanged cold storage link. The gate requires own image, complete card,
+PIN/phone authentication, exact Toolkit APDUs and received payload, `91xx`,
+physical-before-response ordering and reviewed text/returned-menu pixels.
+Other proactive commands, Toolkit persistence, native registration and speech
+remain independent unqualified contracts for this model.
