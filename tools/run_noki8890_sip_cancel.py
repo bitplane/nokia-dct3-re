@@ -88,6 +88,14 @@ def check_alerting_restoration(text, outgoing=False, connected=False):
     if (len(states) != 2 or [state[0] for state in states] != ['saved', 'restored'] or
             states[0][1:] != states[1][1:] or '8890_state: FAIL' in text):
         raise ValueError('incoming alerting architecture did not restore exactly')
+    registers = re.findall(r'8890_state_cpu: event=(saved|restored) cpu=([^\n]+)', text)
+    if (len(registers) != 2 or [row[0] for row in registers] != ['saved', 'restored'] or
+            registers[0][1] != registers[1][1] or
+            not re.fullmatch(r'[0-9a-f]{8}(?:,[0-9a-f]{8}){36}', registers[0][1])):
+        raise ValueError('incomplete or changed ARM/banked register restoration')
+    values = registers[0][1].split(',')
+    if values[15] != states[0][1] or values[13] != states[0][2]:
+        raise ValueError('ARM/banked snapshot disagrees with observed PC/SP')
     cursor = 0
     for marker in (('gsm_call_adapter: request id=1 epoch=1 digits=1234567' if outgoing else
                     'incoming state id=1 epoch=1 phase=' + ('connected' if connected else 'alerting')),

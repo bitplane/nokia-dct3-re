@@ -696,8 +696,9 @@ qualification of PCS external-dialog restoration by the waveform test itself.
 PCS connected restoration independently passes
 `verify-8890-pcs-sip-outgoing-connected-restore` and
 `verify-8890-pcs-sip-incoming-connected-restore`. The snapshot observes exact
-R15/R13, the modeled MCU RAM checksum and emulated time at32s outgoing or52s
-incoming; it does not enumerate every banked CPU register. Before saving,
+all37 exposed ARM registers (including banked registers and status),
+the modeled MCU RAM checksum and emulated time at32s outgoing or52s incoming.
+The register vector must also agree with separately logged R15/R13. Before saving,
 acceptance requires own ARFCN600 registration, connected state, valid uplink
 and accepted downlink frames, and executed PCM. Old-epoch media inventory
 is positive in all four counters (outgoing35/41 media and32/71 PCM;
@@ -706,19 +707,17 @@ with SIP BYE and exactly one new-epoch cause41 clear, then requires own
 carrier600 release and reviewed idle recovery without redial/readmission.
 The same pre-save registration/media guards pass retained GSM900 connected
 captures; wrong-carrier, missing/late registration, absent pre-save media
-and altered release controls reject. Captures are
-`tmp/nsb6-pcs-connected-{outgoing,incoming}-restore`.
+and altered release controls reject. Current captures use the matrix naming below.
 This is cleared external state, not seamless SIP resumption or native speech.
 PCS pending outgoing and ringing incoming independently pass
 `verify-8890-pcs-sip-outgoing-pending-restore` and
 `verify-8890-pcs-sip-incoming-alerting-restore`. They require own ARFCN600
-registration before save, the same R15/R13/RAM-checksum/time snapshot,
+registration before save, the same37-register/RAM-checksum/time snapshot,
 zero old-epoch uplink/downlink/host-PCM inventory and no CONNECT or Answer.
 Pending outgoing closes the actual SIP dialog with CANCEL/487; ringing
 incoming rejects its INVITE and reaches ended before physical Exit dismisses
 the notification. Both require one cause41 clear and own-carrier radio
-release/paging recovery. Captures are `tmp/nsb6-pcs-pending-outgoing-restore`
-and `tmp/nsb6-pcs-ringing-incoming-restore-final`.
+release/paging recovery. Current captures use the matrix naming below.
 
 The pending case has three local HLE PCM ticks at32.180/32.200/32.220s
 during restored teardown, each with zero downlink. A shared checker bounds
@@ -732,9 +731,15 @@ All phases dispose external dialogs; seamless external SIP resumption and
 native DSP speech remain unqualified.
 
 Accepted media captures are `tmp/nsb6-sip-outgoing-media-qualified` and
-`tmp/nsb6-sip-incoming-media-final`. The four restoration captures use
-`tmp/nsb6-pcm-v2-restore-` with suffixes `outgoing-connected`,
+`tmp/nsb6-sip-incoming-media-final`. All eight current restoration captures use
+`tmp/nsb6-arm37-{gsm,pcs}-` with suffixes `outgoing-connected`,
 `incoming-connected`, `outgoing-pending` and `incoming-alerting`.
+Each fresh run passes the full existing product/SIP/UI/storage acceptance
+plus identical saved/restored37-register vectors, RAM checksum and time.
+Missing, shortened, duplicated or changed vectors and PC/SP disagreement
+are rejected. The snapshot uses shared `arm_architecture_snapshot.lua`,
+not a product-specific subset. RAM equality remains a checksum assertion,
+not a byte-for-byte RAM dump or enumeration of DSP state.
 Connected cases require positive pre-save bridge PCM/media and codec
 execution; all external dialogs are cleared, not replayed. The default and
 coherent3210 semantic regressions pass without rebanking their predicates.
@@ -804,10 +809,10 @@ injection or borrowed product verdict is part of these workflows.
 | Real incoming SIP HLE media | `verify-8890-sip-incoming-media`; fresh clock-settled idle, caller `5551234`, physical Answer/End and own carrier-60 lifecycle, reviewed idle recovery and persistent SIM location; sustained bidirectional frames and own PCM accounting |
 | Real outgoing SIP unavailable | `verify-8890-sip-outgoing-unavailable`; same physical number and own carrier, actual SIP 480 with consumed cause 18, full release and reviewed idle restoration; no CONNECT/media |
 | Idle restoration before real SIP | `verify-8890-sip-idle-restore`; exact PC/SP/RAM/time and protocol replay, new host epoch 2, then the same unanswered cancellation and decoded physical cleanup; no saved external dialog or speech |
-| Ringing restoration with real SIP | `verify-8890-sip-alerting-incoming-restore`; exact R15/R13/RAM/time at 52 s, rejected external INVITE, one cause-41 clear under epoch 2, CC/RR release and decoded Exit to reviewed idle; Answer/CONNECT/media forbidden |
-| Pending outgoing restoration with real SIP | `verify-8890-sip-pending-outgoing-restore`; physical 1234567/Send, real 180, exact R15/R13/RAM/time at 32 s, CANCEL/487, one cause-41 clear and CC/RR release to reviewed idle; no redial/CONNECT/media |
-| Connected outgoing restoration with real SIP | `verify-8890-sip-connected-outgoing-restore`; physical `1234567`/Send, SIP-200 connected before the 32 s save, exact R15/R13/RAM/time, pre-save bidirectional PCM/media, BYE/one cause-41 clear, own carrier-60 release and idle recovery; no redial or external-dialog replay |
-| Connected incoming restoration with real SIP | `verify-8890-sip-connected-incoming-restore`; fresh clock-settled idle, physical Answer, connection before the 52 s save, exact R15/R13/RAM/time, pre-save bidirectional PCM/media, BYE/one cause-41 clear, own carrier-60 release and idle recovery; no replay of external dialogs |
+| Ringing restoration with real SIP | `verify-8890-sip-alerting-incoming-restore`; exact37 ARM registers/RAM-checksum/time at 52 s, rejected external INVITE, one cause-41 clear under epoch 2, CC/RR release and decoded Exit to reviewed idle; Answer/CONNECT/media forbidden |
+| Pending outgoing restoration with real SIP | `verify-8890-sip-pending-outgoing-restore`; physical 1234567/Send, real 180, exact37 ARM registers/RAM-checksum/time at 32 s, CANCEL/487, one cause-41 clear and CC/RR release to reviewed idle; no redial/CONNECT/media |
+| Connected outgoing restoration with real SIP | `verify-8890-sip-connected-outgoing-restore`; physical `1234567`/Send, SIP-200 connected before the 32 s save, exact37 ARM registers/RAM-checksum/time, pre-save bidirectional PCM/media, BYE/one cause-41 clear, own carrier-60 release and idle recovery; no redial or external-dialog replay |
+| Connected incoming restoration with real SIP | `verify-8890-sip-connected-incoming-restore`; fresh clock-settled idle, physical Answer, connection before the 52 s save, exact37 ARM registers/RAM-checksum/time, pre-save bidirectional PCM/media, BYE/one cause-41 clear, own carrier-60 release and idle recovery; no replay of external dialogs |
 
 The host SMS gates use `fixtures/noki8890_host/nsb6hle.cfg` in fresh private
 storage with the unchanged own acquired MCU/PMM. The fixture enables the

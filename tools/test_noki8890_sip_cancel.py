@@ -68,12 +68,23 @@ class CleanupFramesTest(unittest.TestCase):
                 '8890_state: event=restored ' + state + '\nsip_state: restored\n'
                 'state_roundtrip: result=pass scenario=8890_incoming_alerting\n'
                 '8890_sip_cancel: physical Exit\n')
+        values = list(range(37))
+        values[13], values[15] = 0x170000, 0x412345
+        registers = ','.join(f'{value:08x}' for value in values)
+        text += ('8890_state_cpu: event=saved cpu=' + registers + '\n'
+                 '8890_state_cpu: event=restored cpu=' + registers + '\n')
         check.check_alerting_restoration(text)
         for invalid in (text.replace('event=restored pc=00412345', 'event=restored pc=00412346'),
                         text.replace('phase=alerting', 'phase=connected'),
                         text.replace('sip_state: restored', ''),
                         text + '8890_state: FAIL incomplete\n'):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                check.check_alerting_restoration(invalid)
+        for invalid in (text.replace('event=restored cpu=00000000', 'event=restored cpu=00000001'),
+                        text.replace(',00000024', ''), text.split('8890_state_cpu:')[0],
+                        text.replace('00170000,0000000e', '00170001,0000000e'),
+                        text + '8890_state_cpu: event=saved cpu=' + registers + '\n'):
+            with self.assertRaisesRegex(ValueError, 'ARM/banked'):
                 check.check_alerting_restoration(invalid)
 
     def test_pending_restore_requires_own_digits_and_exact_snapshot(self):
@@ -82,6 +93,11 @@ class CleanupFramesTest(unittest.TestCase):
                 '8890_state: event=saved ' + state + '\nsip_state: saved\n'
                 '8890_state: event=restored ' + state + '\nsip_state: restored\n'
                 'state_roundtrip: result=pass scenario=8890_outgoing_pending\n')
+        values = list(range(37))
+        values[13], values[15] = 0x170000, 0x412345
+        registers = ','.join(f'{value:08x}' for value in values)
+        text += ('8890_state_cpu: event=saved cpu=' + registers + '\n'
+                 '8890_state_cpu: event=restored cpu=' + registers + '\n')
         check.check_alerting_restoration(text, outgoing=True)
         for invalid in (text.replace('digits=1234567', 'digits=5551234'),
                         text.replace('event=restored pc=00412345', 'event=restored pc=00412346'),

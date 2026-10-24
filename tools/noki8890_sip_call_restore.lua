@@ -6,9 +6,15 @@ local connected = _G.noki8890_sip_restore_connected == true
 dofile(directory .. (outgoing and 'noki8890_outgoing_call_input.lua' or
     connected and 'noki8890_sip_incoming_connected.lua' or 'noki8890_sip_cancel_observe.lua'))
 local machine = manager.machine
-local cpu = assert(machine.devices[':maincpu'])
 local saved, completed
-local snapshot = dofile(directory .. 'dct3_state_snapshot.lua')(machine, cpu, '8890_state')
+local capture = dofile(directory .. 'arm_architecture_snapshot.lua')
+local function snapshot(event)
+    local state = capture(machine)
+    machine:logerror(string.format('8890_state: event=%s pc=%08x sp=%08x ram=%08x t=%.9f\n',
+        event, state.pc, state.sp, state.ram, state.time))
+    machine:logerror(string.format('8890_state_cpu: event=%s cpu=%s\n', event, state.cpu))
+    return state
+end
 local pre_save = emu.add_machine_pre_save_notifier(function()
     saved = snapshot('saved')
     machine:logerror('sip_state: saved\n')
@@ -16,7 +22,9 @@ end)
 local post_load = emu.add_machine_post_load_notifier(function()
     local restored = snapshot('restored')
     assert(saved, 'missing saved architectural observation')
-    for index = 1, 4 do assert(saved[index] == restored[index], 'architectural state mismatch') end
+    for _, name in ipairs({'time', 'pc', 'sp', 'ram', 'cpu'}) do
+        assert(saved[name] == restored[name], 'architectural state mismatch: ' .. name)
+    end
     machine:logerror('sip_state: restored\n')
     machine:logerror('state_roundtrip: result=pass scenario=8890_' ..
         (outgoing and (connected and 'outgoing_connected' or 'outgoing_pending') or

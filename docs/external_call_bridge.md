@@ -1034,8 +1034,8 @@ instead requires post-replay physical Exit after the new call.
 
 `verify-8890-sip-alerting-incoming-restore` saves the organically ringing
 NSB-6 handset at 52 seconds, after the fresh INVITE admitted at 45 seconds.
-It restores exact architectural R15/R13, complete-RAM digest and emulated
-time. The bridge rejects the outstanding external INVITE and publishes one
+It restores all37 exposed ARM/banked registers, modeled-RAM checksum and
+emulated time. The bridge rejects the outstanding external INVITE and publishes one
 cause-41 clear under epoch 2; it does not replay or serialize the SIP dialog.
 Full CC/RR release, the existing missed-call pixels, decoded physical Exit
 and reviewed registered-idle recovery remain required. The shared checker
@@ -1046,11 +1046,11 @@ external-dialog invalidation.
 
 `verify-8890-sip-pending-outgoing-restore` independently dials `1234567`
 through the product's physical keypad, receives a real SIP 180 and saves
-the unanswered handset at 32 seconds. Exact R15/R13, RAM digest and time
+the unanswered handset at 32 seconds. All37 exposed ARM/banked registers, RAM checksum and time
 must restore. The external request is cancelled with CANCEL/487, followed
 by one cause-41 clear, complete CC/RR release and reviewed idle recovery.
 The bridge must not redial, confirm SIP, deliver CONNECT or accept media.
-Both NSB-6 call-restoration fixtures share architectural observation code;
+These NSB-6 unanswered fixtures share architectural observation code;
 their own input schedules and cleanup frames remain distinct. External
 dialogs are discarded, not serialized or restored. Connected SIP and
 native speech remain outside these gates.
