@@ -24,6 +24,14 @@ class Nokia8850OutgoingCallCheckTest(unittest.TestCase):
     def test_complete_signaling(self):
         verify(GOOD)
 
+    def test_alternate_physical_fixture_keeps_complete_protocol_checks(self):
+        text=GOOD.replace('8850_call_physical: action=send','physical fixture Send').replace(
+            '8850_call_physical: action=end','physical fixture End')
+        verify(text,physical_send=r'physical fixture Send',physical_end=r'physical fixture End')
+        with self.assertRaises(ValueError):verify(text)
+        with self.assertRaises(ValueError):
+            verify(text.replace('key=0e','key=11'),physical_send=r'physical fixture Send',physical_end=r'physical fixture End')
+
     def test_wrong_physical_key(self):
         with self.assertRaisesRegex(ValueError, "Send decode"):
             verify(GOOD.replace("key=0e", "key=11"))

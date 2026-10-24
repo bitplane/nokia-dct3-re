@@ -2187,6 +2187,28 @@ predecessor NVRAM apply throughout. Capture: `tmp/nsm2-fdn-record-final`.
 This qualifies protected Save/cold retrieval, not edit/erase/cancel or listed/
 unlisted dial permission.
 
+The independent `--dial-controls` extension runs ten isolated processes,
+including the validity and protected-record prerequisites. Listed12345 and
+unlisted12346 both start from the same saved FDN-On card. The own firmware
+rereads EF_FDN record1 after physical Send in both cases. Listed12345 must
+complete CM service, CC SETUP/assignment/connect, physical End and the full
+CC/RR release back to paging. Unlisted12346 must render **Call not allowed**
+and emit no CM Service Request, CC SETUP, assignment or connect. A separate
+physical PIN2-protected Off process inherits the same saved On card, keeps
+A / 12345 intact and rehabilitates ADN; its cold successor must connect and
+release unlisted12346 under the same complete signaling checks. That Off
+control distinguishes FDN denial from a network that rejects the number.
+
+All three dial controls explicitly configure `CALLHOST=0` for an isolated
+automatic laboratory peer, retain the whole card unchanged, authenticate
+only startup PIN1, load all ten FDN records and pass own upload/HLE,
+preserved registration and physical input checks. The two On controls also
+require the post-Send record1 lookup; Off requires no such lookup. Exact
+Calling/connected/denial frames and the stable responsive Messages title
+are pinned. Capture: `tmp/nsm2-fdn-dial-final`. This qualifies one listed/
+unlisted pair and physical Off, not every number-normalization/prefix case,
+protected edit/erase/cancel, physical RF, native DSP or speech.
+
 The same isolated runner accepts `--scenario host-incoming-call`. It verifies
 physical answer/end input, the complete host-originated CC/RR exchange,
 traffic-channel assignment and release, and reviewed ringing/returned-idle

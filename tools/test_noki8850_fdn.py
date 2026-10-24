@@ -4,7 +4,8 @@ from unittest.mock import patch
 import tempfile
 from PIL import Image
 
-from tools.run_noki8850_fdn import expected_card,check_phase,check_frames,phase_plan,record_card,check_record
+from tools.run_noki8850_fdn import expected_card,check_phase,check_frames,phase_plan,record_card,check_record,check_dial,dial_card,configure_lab_call_peer
+import xml.etree.ElementTree as ET
 from tools.run_noki8850_pin_retry_cold import mame_command
 
 
@@ -33,6 +34,41 @@ def trace(phase):
 
 
 class FdnValidityTest(unittest.TestCase):
+    def test_dial_controls_share_saved_on_state_and_use_physical_off_predecessor(self):
+        plan=phase_plan(dial=True)
+        self.assertEqual([(p.name,p.source,p.dial) for p in plan[-4:]],
+            [('listed','read','listed'),('denied','read','denied'),
+             ('off_saved','read',None),('off_call','off_saved','off')])
+        self.assertTrue(plan[-2].saved_record)
+        self.assertEqual(plan[-2].validity,2)
+        with tempfile.TemporaryDirectory() as temporary:
+            path=Path(temporary)/'cfg'
+            configure_lab_call_peer(path)
+            tree=ET.parse(path/'nsm2hle.cfg')
+            self.assertEqual(tree.find('./system').get('name'),'nsm2hle')
+            self.assertEqual(tree.find("./system/input/port[@tag=':CALLHOST']").get('value'),'0')
+
+    def test_denied_dial_requires_card_lookup_and_zero_call_establishment(self):
+        lines=['sim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08',
+               'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1']
+        for fid in ('6f7e','6f07'):
+            lines += [f'sim_device: header cla=a0 ins=44 p1=00 p2=00 p3=00 selected={fid}',
+                      'SIM status ins=44 sw=9000 chv=3/3 puk=10/10 enabled=1']
+        lines += [f'sim_device: header cla=a0 ins=b2 p1={i:02x} p2=04 p3=20 selected=6f3b' for i in range(1,11)]
+        lines += ['8850_fdn_dial: key=Call / Send state=1 t=32.000000000',
+                  '8850_keypad_decoded key=0e',
+                  'sim_device: header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3b',
+                  '8850_fdn_dial: key=End state=1 t=44.000000000',
+                  '8850_fdn_dial: key=Menu state=1 t=46.000000000',
+                  '8850_fdn_dial: complete=1 firmware_state_forcing=0']
+        text='\n'.join(lines)
+        check_dial(text,dial_card('denied'),dial_card('denied'),'denied')
+        for bad in (text+'\nGSM service establish sapi=0 pd=03 message=05 ',
+                    text.replace('key=0e','key=11'),
+                    text.replace('p3=20 selected=6f3b','p3=20 selected=6f3a')):
+            with self.assertRaises(ValueError):check_dial(bad,dial_card('denied'),dial_card('denied'),'denied')
+        with self.assertRaises(ValueError):check_dial(text,dial_card('denied'),dial_card('off'),'denied')
+
     def test_record_branch_inherits_verified_on_not_the_later_off_branch(self):
         plan=phase_plan(True)
         self.assertEqual([(p.name,p.source,p.record) for p in plan[4:]],

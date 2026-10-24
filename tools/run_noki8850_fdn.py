@@ -11,6 +11,7 @@ import subprocess
 import sys
 import uuid
 from typing import NamedTuple
+import xml.etree.ElementTree as ET
 
 if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
@@ -36,14 +37,21 @@ class Phase(NamedTuple):
     seconds:int
     validity:int|None=None
     record:str|None=None
+    saved_record:bool=False
+    dial:str|None=None
 
 
-def phase_plan(records=False):
+def phase_plan(records=False,dial=False):
     phases=[Phase('on','fdn_on',None,55,0),Phase('cold_on','fdn','on',55,1),
             Phase('off','fdn_off','cold_on',55,2),Phase('cold_off','fdn','off',55,3)]
-    if records:
+    if records or dial:
         phases += [Phase('write','fdn_write','on',67,record='write'),
                    Phase('read','fdn_read','write',55,record='read')]
+    if dial:
+        phases += [Phase('listed','fdn_dial','read',52,dial='listed'),
+                   Phase('denied','fdn_dial_unlisted','read',52,dial='denied'),
+                   Phase('off_saved','fdn_off','read',55,2,saved_record=True),
+                   Phase('off_call','fdn_dial_unlisted','off_saved',52,dial='off')]
     return phases
 
 
@@ -54,9 +62,13 @@ def expected_card(valid,registered=True):
     return bytes(card)
 
 
-def check_phase(text,initial,final,phase):
+def check_phase(text,initial,final,phase,*,saved_record=False):
     if phase not in range(4):raise ValueError('unknown 8850 FDN lifecycle phase')
-    if initial!=expected_card(phase in (0,3),phase!=0) or final!=expected_card(phase>=2):
+    before=bytearray(expected_card(phase in (0,3),phase!=0))
+    after=bytearray(expected_card(phase>=2))
+    if saved_record:
+        before[3578:3610]=after[3578:3610]=expected_record()
+    if initial!=bytes(before) or final!=bytes(after):
         raise ValueError('8850 FDN validity changed unrelated card bytes or lost its cold state')
     toggle=phase%2==0
     if statuses(text,0x20)!=[(0x9000,3,10)]*(2 if toggle else 1):
@@ -166,10 +178,79 @@ def check_record_frames(directory,mode):
     check_messages_menu(directory/'8850_fdn_responsive_menu.png')
 
 
+def dial_card(mode):
+    if mode not in ('listed','denied','off'):raise ValueError('unknown 8850 FDN dial control')
+    card=bytearray(record_card(True))
+    if mode=='off':card[3575]=1
+    return bytes(card)
+
+
+def configure_lab_call_peer(directory):
+    directory.mkdir()
+    root=ET.Element('mameconfig',version='10')
+    inputs=ET.SubElement(ET.SubElement(root,'system',name='nsm2hle'),'input')
+    ET.SubElement(inputs,'port',tag=':CALLHOST',type='CONFIG',mask='1',defvalue='0',value='0')
+    ET.ElementTree(root).write(directory/'nsm2hle.cfg')
+
+
+def check_dial(text,initial,final,mode):
+    from tools import radio_outgoing_call_trace_check as call
+    from tools.noki8850_outgoing_call_check import verify
+    if initial!=dial_card(mode) or final!=initial:
+        raise ValueError('8850 FDN dial control changed complete saved-card contents')
+    if statuses(text,0x20)!=[(0x9000,3,10)] or re.findall(r'header cla=a0 ins=20 p1=00 p2=(\w\w) p3=08',text)!=['01']:
+        raise ValueError('8850 FDN dialing must authenticate only startup PIN1')
+    if re.search(r'header cla=a0 ins=(?:04|24|26|28|2c|dc) ',text):
+        raise ValueError('8850 FDN dial control changed credentials, validity or records')
+    targets=[] if mode=='off' else ['6f7e','6f07']
+    if (re.findall(r'header cla=a0 ins=44 p1=00 p2=00 p3=00 selected=(\w{4})',text)!=targets or
+            statuses(text,0x44)!=[(0x9000,3,10)]*len(targets)):
+        raise ValueError('8850 FDN dial startup validity differs')
+    reads=[f'{i:02x}' for i in range(1,11)]+(['01'] if mode!='off' else [])
+    if re.findall(r'header cla=a0 ins=b2 p1=(\w\w) p2=04 p3=20 selected=6f3b',text)!=reads:
+        raise ValueError('8850 FDN dial startup/Send lookup extent differs')
+    digits='12345' if mode=='listed' else '12346'
+    items=[(24,'End')]+[(26+i,'Keypad '+digit) for i,digit in enumerate(digits)]
+    items += [(32,'Call / Send'),(44,'End'),(46,'Menu')]
+    contacts(text,'8850_fdn_dial',items)
+    check_pin_inputs(text)
+    registration(text,'nsm2',preserved=True)
+    send=r'8850_fdn_dial: key=Call / Send state=1 t=32\.'
+    end=r'8850_fdn_dial: key=End state=1 t=44\.'
+    ordered=[('Send',send),('Send decode',r'8850_keypad_decoded key=0e\b')]
+    if mode!='off':ordered += [('FDN lookup',r'header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3b')]
+    ordered += [('End',end),('Menu',r'8850_fdn_dial: key=Menu state=1 t=46\.'),
+        ('complete',r'8850_fdn_dial: complete=1 firmware_state_forcing=0')]
+    require_ordered(text,ordered,'8850 FDN physical dial')
+    if mode=='denied':
+        if any(pattern.search(text) for pattern in (call.CM_SERVICE_REQUEST,call.SETUP,call.TRAFFIC_ASSIGNMENT,call.CONNECT)) or \
+                re.search(r'GSM service (?:establish|uplink) sapi=\d+ pd=03 ',text):
+            raise ValueError('8850 FDN-denied number reached call establishment')
+    else:verify(text,digits,physical_send=send,physical_end=end)
+
+
+def check_dial_frames(directory,mode):
+    from PIL import Image
+    frames={
+        'listed':('72d54d1aa058a23c026d530f15025c856c9908a7a2c81ef64e7b6dd7b102f592',
+                  '3f5d31143e9e9127593892ddce43c96b628ed4f5d2182881f0b4ee53409f95d5'),
+        'denied':('0a2afc3a01bea44974930c99c2ed578031cad0bd57f6ca21bcfbb1d2757bcb9c',
+                  'cd33e26eaa54b22c20076043c8e03a6a786792c4f1a4c626aa9a3ca2d3bec029'),
+        'off':('b34822be18c3b0ffd6bdeaff59753d638f802741a85d68eb73e9480c3dae1828',
+               '3f5d31143e9e9127593892ddce43c96b628ed4f5d2182881f0b4ee53409f95d5'),
+    }
+    for label,digest in zip(('early','result'),frames[mode]):
+        with Image.open(directory/f'8850_fdn_dial_{label}.png') as image:
+            if image.size!=(84,48) or hashlib.sha256(image.convert('L').tobytes()).hexdigest()!=digest:
+                raise ValueError('8850 FDN dial pixels differ: '+mode+'/'+label)
+    check_messages_menu(directory/'8850_fdn_dial_menu.png')
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
     parser.add_argument('--records',action='store_true',help='add protected A/12345 Save and cold FDN Search/Details')
+    parser.add_argument('--dial-controls',action='store_true',help='test listed/unlisted FDN-On and physically disabled Off calls with the isolated automatic lab peer')
     args=parser.parse_args()
     root=Path(__file__).resolve().parents[1]
     try:
@@ -180,7 +261,7 @@ def main():
         run.mkdir(parents=True,exist_ok=False)
         previous=None
         launches=[]
-        for item in phase_plan(args.records):
+        for item in phase_plan(args.records,args.dial_controls):
             name,script=item.name,item.script
             previous=run/item.source if item.source is not None else None
             phase=run/name
@@ -196,12 +277,17 @@ def main():
             initial=card.read_bytes()
             (phase/'initial_sim_card.bin').write_bytes(initial)
             command=mame_command(root,script,item.seconds)
+            if item.dial:configure_lab_call_peer(phase/'cfg')
             launch={'invocation_id':str(uuid.uuid4()),'command':command,
                 'source_phase':item.source,
                 'initial_storage':storage_hashes(phase/'nvram'),'mcu_sha1':profile[2],'pmm_sha1':profile[4],
                 'mame_sha256':hashlib.sha256((root/'mame/mame').read_bytes()).hexdigest(),
                 'input_sha256':{filename:hashlib.sha256((root/'tools'/filename).read_bytes()).hexdigest()
                     for filename in (f'noki8850_{script}.lua','noki8850_fdn.lua','noki8850_security_input.lua','noki8850_startup_observe.lua')}}
+            if item.dial:
+                launch['laboratory_callhost']=0
+                launch['config_sha256']=hashlib.sha256((phase/'cfg/nsm2hle.cfg').read_bytes()).hexdigest()
+                launch['dial_fixture_sha256']=hashlib.sha256((root/'tools/noki8850_fdn_dial.lua').read_bytes()).hexdigest()
             (phase/'launch.json').write_text(json.dumps(launch,indent=2)+'\n')
             environment=os.environ.copy()
             environment['NOKIA_DCT3_8850_PIN_ENTRY']='1'
@@ -212,11 +298,14 @@ def main():
             text=(phase/'error.log').read_text(errors='replace')
             errors=check_trace(text,runtime_hle=True)
             if errors:raise ValueError('; '.join(errors))
-            if item.record:
+            if item.dial:
+                check_dial(text,initial,card.read_bytes(),item.dial)
+                check_dial_frames(phase/'snap',item.dial)
+            elif item.record:
                 check_record(text,initial,card.read_bytes(),item.record)
                 check_record_frames(phase/'snap',item.record)
             else:
-                check_phase(text,initial,card.read_bytes(),item.validity)
+                check_phase(text,initial,card.read_bytes(),item.validity,saved_record=item.saved_record)
                 check_frames(phase/'snap',item.validity)
             if previous and storage_hashes(previous/'nvram')!=predecessor:
                 raise ValueError('8850 FDN cold process mutated predecessor NVRAM')
@@ -224,11 +313,12 @@ def main():
             previous=phase
             print('8850 FDN phase '+name+': verified',flush=True)
         (run/'acceptance.json').write_text(json.dumps({'phases':launches,'research_hle':True,
-            'protected_record_save_cold_read':args.records,
-            'dial_permission_tested':False,'native_speech':False},indent=2)+'\n')
+            'protected_record_save_cold_read':args.records or args.dial_controls,
+            'dial_permission_tested':args.dial_controls,'native_speech':False},indent=2)+'\n')
     except (ValueError,RuntimeError,OSError,subprocess.SubprocessError) as error:
         parser.exit(1,f'8850 FDN lifecycle FAIL: {error}\n')
-    print('8850 physical FDN validity and cold On/Off persistence PASS')
+    print('8850 '+('listed/unlisted FDN-On and physical-Off call controls' if args.dial_controls else
+                  'physical FDN validity and cold On/Off persistence')+' PASS')
 
 
 if __name__=='__main__':main()

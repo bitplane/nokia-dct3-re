@@ -142,7 +142,13 @@ empty FDN records, with complete-card and own boot/UI/registration checks.
 Its independently executed `--records` branch additionally qualifies physical
 PIN2-protected A/12345 Save to EF_FDN record1 and a complete-card-unchanged
 cold Search/Details, with exact own-product UI and wire/storage checks.
-Edit/erase/cancel and listed/unlisted dial permission are not promoted.
+Its independent ten-process `--dial-controls` chain qualifies listed12345
+connected/released, unlisted12346 refused before call establishment while
+FDN is On, and the same unlisted number connected/released after physical
+PIN2-protected Off. Identical saved-card branches, post-Send FDN lookup,
+complete-card equality, own CC/RR/UI checks and explicit isolated lab peer
+configuration are required. Edit/erase/cancel, arbitrary prefix matching and
+speech remain unpromoted.
 
 NPE-3 additionally has an independent handset-bank A/123 save/cold-read
 fixture with an empty-bank negative control and unchanged complete SIM files;

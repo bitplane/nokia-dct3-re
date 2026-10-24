@@ -49,8 +49,11 @@ CHECKPOINTS = (
 )
 
 
-def verify(text: str, number: str = "5551234") -> None:
-    require_ordered(text, CHECKPOINTS, "NSM-2 physical outgoing signaling")
+def verify(text: str, number: str = "5551234", *, physical_send=None, physical_end=None) -> None:
+    checkpoints=tuple((label,re.compile(physical_send) if label=='physical Send' and physical_send is not None else
+                      re.compile(physical_end) if label=='physical End' and physical_end is not None else pattern)
+                      for label,pattern in CHECKPOINTS)
+    require_ordered(text, checkpoints, "NSM-2 physical outgoing signaling")
     for label, pattern in (("SETUP", SETUP), ("assignment", TRAFFIC_ASSIGNMENT),
                            ("Connect Acknowledge", CONNECT_ACKNOWLEDGE),
                            ("Disconnect", DISCONNECT)):
