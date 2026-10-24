@@ -16,6 +16,30 @@ TRACE='\n'.join((
 
 
 class Pin2ChangeTest(unittest.TestCase):
+    def test_wrong_puk2_preserves_pin2_and_forbids_post_failure_verify(self):
+        blocked=bytearray(registered_card('5678'))
+        blocked[3517]=0
+        rejected=bytearray(blocked)
+        rejected[3519]=9
+        trace=('sim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08\n'
+               'SIM status ins=20 sw=9000 chv=3/0 puk=10/10 enabled=1\n'
+               '8850_pin2: key=Menu state=1 t=62.000000000\n'
+               'sim_device: header cla=a0 ins=2c p1=00 p2=02 p3=10\n'
+               'SIM status ins=2c sw=9804 chv=3/0 puk=10/9 enabled=1\n'
+               '8850_pin2: key=Menu state=1 t=68.000000000\n'
+               '8850_pin2: complete=1 firmware_state_forcing=0')
+        check_puk2_phase(trace,bytes(blocked),bytes(rejected),rejected=True)
+        for bad in (trace.replace('sw=9804','sw=9000'),
+                    trace+'\nsim_device: header cla=a0 ins=20 p1=00 p2=02 p3=08\n'
+                    'SIM status ins=20 sw=9840 chv=3/0 puk=10/9 enabled=1'):
+            with self.assertRaises(ValueError):
+                check_puk2_phase(bad,bytes(blocked),bytes(rejected),rejected=True)
+        for offset in (0,3484,3492,3500,3516,3517,3518,3519,3520):
+            bad=bytearray(rejected)
+            bad[offset]^=1
+            with self.subTest(offset=offset),self.assertRaises(ValueError):
+                check_puk2_phase(trace,bytes(blocked),bytes(bad),rejected=True)
+
     def test_each_pin2_rejection_decrements_only_its_allowance(self):
         for allowance in (3,2,1):
             initial=bytearray(make_profile(True) if allowance==3 else registered_card('5678'))

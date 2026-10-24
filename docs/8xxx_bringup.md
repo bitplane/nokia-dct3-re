@@ -2118,6 +2118,18 @@ processes inherit complete predecessor NVRAM. Capture:
 `tmp/nsm2-puk2-recovery-final`. This qualifies successful PUK2 recovery after
 organic PIN2 exhaustion, not rejected PUK2, permanent PUK2 loss or FDN.
 
+Adding `--wrong-puk2-first` independently extends this to six processes.
+Between PIN2 blocking and correct recovery, a cold process physically enters
+PUK2=99999999 and confirms proposed2468 twice. One selector02 UNBLOCK must
+return9804, retain the original5678 and zero PIN2 retries, and reduce only
+PUK2 allowance10 to9. It must not issue the follow-up PIN2 VERIFY used by the
+successful path. Complete card equality, the shared **Code error** oracle,
+own boot/HLE, continuing registration and responsive menu checks remain
+mandatory. Correct recovery inherits the nine-allowance card, restores the
+allowances and installs2468; the final cold process uses2468 to change back.
+Capture: `tmp/nsm2-wrong-puk2-final`. This qualifies one rejected PUK2 and cold
+recovery, not permanent PUK2 loss or FDN.
+
 The same isolated runner accepts `--scenario host-incoming-call`. It verifies
 physical answer/end input, the complete host-originated CC/RR exchange,
 traffic-channel assignment and release, and reviewed ringing/returned-idle

@@ -128,8 +128,10 @@ credential and subsequent cold replacement-credential use. Its separate
 five-process `--puk2` chain qualifies three cold rejected changes, durable
 PIN2 blocking, cold physical PUK2/new-PIN2 recovery with the firmware's
 post-UNBLOCK VERIFY, and cold replacement-PIN2 use. Whole-card/UI/registration
-checks remain mandatory; rejected/permanently exhausted PUK2 and FDN are not
-promoted.
+checks remain mandatory. Its independent `--puk2 --wrong-puk2-first` chain
+adds one cold wrong-PUK2 rejection, exactly one consumed PUK2 allowance with
+the old PIN2 retained, no post-failure VERIFY, then correct cold recovery and
+replacement-credential use. Permanent PUK2 exhaustion and FDN are not promoted.
 
 NPE-3 additionally has an independent handset-bank A/123 save/cold-read
 fixture with an empty-bank negative control and unchanged complete SIM files;
