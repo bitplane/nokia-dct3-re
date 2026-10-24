@@ -100,9 +100,8 @@ not execution timing or completion of the remaining source/RMW audit.
 `tools/run_c54x_core.py --mame mame/mame --rompath mame/roms --profile xorm
 --output-root tmp` runs this matrix before its separate 1,024 XORM execution
 and restoration cases. Accepted evidence: `tmp/run_c54x_core_45tucxku`.
-The decoder-only full-core capture `tmp/run_c54x_core_zeklnz_z` passed all
-293 required markers and terminal completion. It predates the separate RMW
-execution guard below and is not post-guard full-core evidence.
+The [current full-core checkpoint](#core-regression-checkpoint) covers the
+source-admission corrections below as well as the decoder matrix.
 
 ### Operand-domain acceptance
 
@@ -167,7 +166,8 @@ The existing256-case short-MOD3 MPY rejection control and the complete
 `mpy-mem-imm` profile pass separately:98,304 legal MPY cases,262,144 MAC
 cases and1,408 MAC exclusions, all with restoration. The legal profile's
 capture is`tmp/run_c54x_core_0izklf6w`. These are bounded instruction
-regressions, not post-change acceptance of the entire default core suite.
+regressions; the [core checkpoint](#core-regression-checkpoint) separately
+qualifies the complete default suite after these corrections.
 Native staged5110 Phone book menu acceptance and both3210 default/frontier
 regressions also pass without rebanking their oracles. This does not expand
 handset, RF or speech support.
@@ -229,9 +229,9 @@ guard. Unenumerated instruction families still require their own audit.
 After the guard, `delay-copy` and `delay-copy-ctrl` pass 15,360 and 73,728
 legal cases/restores. Native 5110 save/load and the 30-second RF boundary
 remain unchanged (20,280 frames, 648,032 reads, 1,537 port-32 writes);
-the default 3210 semantic acceptance also passes. The full pre-guard core
-control passed with the corrected legal long-DELAY fixture; it is not a
-post-guard full-core result.
+the default 3210 semantic acceptance also passes. The
+[core checkpoint](#core-regression-checkpoint) additionally qualifies the
+complete default suite with these source guards and corrected fixtures.
 
 Operand role is essential. MVKD/MVDM, PORTR, MVPD and POPD encode a
 destination and must not inherit a read-only Smem restriction. In particular,
@@ -1496,9 +1496,9 @@ delay-MAR entry and 1,024 first-body entries with zero observer writes. Its
 resident-memory comparison and first 128 ordered low-page reads still pass.
 RPTB (6,168 cases/restores plus 16 edge cases), backward in-block branches,
 in-block far calls, delayed LD (147,456 cases/restores) and the native 5110
-save-state control pass on this implementation. This is not a renewed full
-default-suite checkpoint: the full checkpoint below remains tied to its
-documented source revision.
+save-state control pass on this implementation. These focused profiles retain
+their own scope; current default-suite coverage is recorded in the
+[core checkpoint](#core-regression-checkpoint).
 
 `rptbd-irq` passes 768 cases/restores across four counts, all four delay
 layouts, two pages, IRQ2/NMI, arrivals during the delay span or at the first
@@ -2116,6 +2116,26 @@ not permission to borrow another handset's keypad or UI completion events.
 
 ## Core regression checkpoint
 
+The default C54x suite passes on source revision `7f992738`, including the
+source/RMW admission guards and atomic MAC correction at `882a7bcb`.
+All 293 required markers appear exactly once, followed by core conformance
+PASS and intentional MAME exit 3; the isolated runner returns 0, with
+`interrupted=false`. The capture is
+`tmp/c54x-full-admission-audit/run_c54x_core_u6i6bbqp`:
+
+```sh
+.venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath roms \
+  --output-root tmp/c54x-full-admission-audit
+```
+
+This closes the post-admission full-default-suite verification gap. Optional
+profiles retain their separate acceptance scopes; this run does not prove
+the complete ISA, physical pipeline timing, fitted DSP-mask compatibility,
+native RF, speech or end-to-end handset calls. The separate tool suite passes
+5,106 tests. Revision-bound checkpoints below preserve their narrower
+instruction and original-firmware comparisons, not competing current
+default-suite baselines.
+
 The cold-catalogue checkpoint adds no CPU instruction admissions. Its staged
 `bootopenstage` gate passes with the saved recorder endpoint and rejects the
 original no-track seed after successful transport. The existing atomic
@@ -2139,15 +2159,14 @@ rejection), with exactly one startup Execute entry each and unchanged source
 NAND. Their endpoint hashes reproduce the pre-observer captures exactly.
 The older atomic `bootrecordram` gate and native 5110 save-state round trip
 also pass with this observation wiring.
-Full default CPU population coverage remains revision-bound below.
+Current default CPU population coverage is stated above.
 
 The mapped-SP ADD checkpoint passes `add-sp` (4,096 arithmetic cases/restores,
 576 stack-update contexts/restores and twenty control/peripheral exclusions),
 plus the unchanged `add-absolute` and `add-bk` controls. The native 5110
 save-state round trip and exact original MU4 resident-memory comparison pass.
-Tooling acceptance is 2,878 tests (one skip). These isolated scopes do not renew the full default
-population, whose latest complete result remains the direct-ISR-return
-checkpoint below.
+Tooling acceptance at that checkpoint was 2,878 tests (one skip). These
+isolated scopes are distinct from the current full default population above.
 
 The direct-ISR-return checkpoint at `59f4285f` renews the full default population: all
 288 required markers exactly once, expected completion exit and terminal
