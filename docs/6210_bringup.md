@@ -208,6 +208,32 @@ selector `14` once and selector `01` 156 times, verifies the whole second
 loader and installs 422 words at `0590..0735`. The next call is missing
 resident `2c75`. This executes own acquired uploads, not a ROM6 mask dump.
 
+The installed `0590..0735` bytes occur exactly at own MCU file offset
+`1eac4`. A native program-space capture matches that source, and the
+`0a00` loader and `ff80` fragment captures match their own payloads above.
+`tools/noki6210_installed_program.py` pins the image and optionally verifies
+all three captures (`--captures DIR`, files `npe3_{bootstrap,loader2,fragment}.bin`).
+Its aligned census covers all 211 word pairs: 143 `RET/NOP` pairs, 64
+two-word unconditional branches and four other pairs. Six branch entries
+target the available second-loader interval; 58 target outside these three
+owned intervals. This is not an all-code vector-table claim: the exceptional
+pairs include words that must not be silently decoded as vectors. Nor is it
+a CFG or proof that no uploaded codec configuration exists. The native
+loader's first unresolved call remains `0a40 -> 2c75`; later linear-decode
+port operations cannot be treated as executed initialization or PCM evidence.
+
+Reproduce the bounded capture without an HLE handoff:
+
+```sh
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame \
+  --run-dir tmp/npe3-upload-capture -- npe3stage -rompath ../roms \
+  -video none -sound none -nothrottle -seconds_to_run 4 -log \
+  -debug -debugger none -autoboot_delay 0 \
+  -autoboot_script ../tools/noki6210_upload_capture.lua
+.venv/bin/python tools/noki6210_installed_program.py \
+  roms/noki6210/6210_556c.fls --captures tmp/npe3-upload-capture
+```
+
 The runtime comparison's type-05 discovery request is
 `1eff00d000030101e000`; response `1e0002d000030401c100` is acknowledged by
 the MCU with `1e0200d0000305014100`. Own class-74 dispatcher `305a0c..305a5e`
