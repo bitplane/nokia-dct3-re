@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 from tools import nsb1_toolkit_check as checker
 from tools.nsb1_toolkit_prepare import profile_metadata
-from tools.sim_toolkit_interactive_check import INKEY,INPUT,INKEY_RESPONSE,INPUT_RESPONSE,MENU,MENU_RESPONSE
+from tools.sim_toolkit_interactive_check import INKEY,INPUT,INKEY_RESPONSE,INPUT_RESPONSE,MENU,MENU_RESPONSE,SELECT_ITEM,ITEM_RESPONSE
 
 
 def wire(direction, data):
@@ -61,7 +61,39 @@ def menu_trace(item=1):
     return text
 
 
+def select_item_trace():
+    text=menu_trace().replace('ins=c2 sw=9000','ins=c2 sw=9122')
+    text+='\n'+wire('TX',bytes.fromhex('a012000022'))+'\n'+wire('RX',SELECT_ITEM+b'\x90\x00')
+    for action in ('next','confirm'):
+        for down in (1,0):
+            text+=f'\nnsb1_toolkit_select_item: action={action} down={down}'
+    text+='\n'+wire('TX',bytes.fromhex('a01400000f')+ITEM_RESPONSE)
+    text+='\nSIM status ins=14 sw=9000 chv=3/3 puk=10/10 enabled=1'
+    return text
+
+
 class Nsb1ToolkitTest(unittest.TestCase):
+    def test_followup_item_is_card_issued_and_physically_selected(self):
+        text=select_item_trace()
+        checker.check_trace(text,select_item=True)
+        response=wire('TX',bytes.fromhex('a01400000f')+ITEM_RESPONSE)
+        early=text.replace(response,'').replace('nsb1_toolkit_select_item: action=confirm down=1',
+                    response+'\nnsb1_toolkit_select_item: action=confirm down=1')
+        for bad in (early,text.replace('ins=c2 sw=9122','ins=c2 sw=9000'),
+                    text.replace(response,'data=01 '.join(response.rsplit('data=02 ',1))),
+                    text.replace('action=next','action=wrong'),
+                    text+'\nnsb1_toolkit_select_item: malformed'):
+            with self.subTest(tail=bad[-100:]), self.assertRaises(ValueError):
+                checker.check_trace(bad,select_item=True)
+        with self.assertRaises(ValueError):
+            checker.check_trace(text,menu_item=1)
+        with self.assertRaises(ValueError):
+            checker.check_trace(menu_trace(),select_item=True)
+        with self.assertRaises(ValueError):
+            checker.profile_for(menu_item=2,select_item=True)
+        with self.assertRaises(ValueError):
+            checker.profile_for(control=True,select_item=True)
+
     def test_installed_menu_requires_own_physical_route_and_item_envelope(self):
         for item in (1,2):
             text=menu_trace(item)
@@ -142,7 +174,7 @@ class Nsb1ToolkitTest(unittest.TestCase):
                 checker.wire(wire(direction, b'\x00' * 8192), direction)
 
     def test_only_external_card_configuration_may_differ(self):
-        for profile in (0, 1, 3, 4):
+        for profile in (0, 1, 3, 4, 7):
             with tempfile.TemporaryDirectory() as temporary:
                 source, run = Path(temporary) / 'source', Path(temporary) / 'run'
                 for path in (source, run):

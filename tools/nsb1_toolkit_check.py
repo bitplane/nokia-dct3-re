@@ -1,4 +1,4 @@
-"""Qualify own NSB-1 DISPLAY TEXT or its matched Phase-2 card control."""
+"""Own NSB-1 physical Toolkit display/input/menu and matched Phase-2 control."""
 import argparse
 import hashlib
 import json
@@ -34,25 +34,34 @@ MENU_FRAMES = {
     'open':'0fe4d32169242d885c7f23d55885bfbf7364b51dec89cce272d1ad00acdfb175',
 }
 MENU_NEXT='fe5c61cde59b429b92c687c307415e22f9c4c4ae5e94c97f56835d4099096eeb'
+ITEM_FRAMES = {
+    'prompt':'5098d80a497e9798fde3c918df959f7c7c7edd6e6ed8f6f4c13776358fa2291c',
+    'selected':'40644b3eb21317140cf86cd7b90949ad5f69b9128e800c763e047cc40a86adb2',
+    'result':MENU_FRAMES['open'],
+}
 
 
 def wire(text, direction):
     return display_wire(text, direction, 'nsb1')
 
 
-def profile_for(control=False,interactive=False,menu_item=None):
+def profile_for(control=False,interactive=False,menu_item=None,select_item=False):
     if menu_item not in (None,1,2):
         raise ValueError('unknown installed-menu item')
-    if control and (interactive or menu_item is not None):
+    if select_item and menu_item not in (None,1):
+        raise ValueError('follow-up item requires Continue')
+    if control and (interactive or menu_item is not None or select_item):
         raise ValueError('interactive input and Phase-2 control are distinct')
-    return 0 if control else 4 if menu_item is not None else 3 if interactive else 1
+    return 0 if control else 7 if select_item else 4 if menu_item is not None else 3 if interactive else 1
 
 
-def check_trace(text, control=False, interactive=False,menu_item=None):
-    profile_for(control,interactive,menu_item)
+def check_trace(text, control=False, interactive=False,menu_item=None,select_item=False):
+    profile_for(control,interactive,menu_item,select_item)
+    if select_item:
+        menu_item=1
     if interactive or menu_item is not None:
         check_interactive(text,prefix='nsb1',terminal_profile=TERMINAL_PROFILE,
-                          reset_markers=('nsb1_reset_reason:',),menu_item=menu_item)
+                          reset_markers=('nsb1_reset_reason:',),menu_item=menu_item,select_item=select_item)
         if menu_item is not None:
             actions=('main','fieldtest','last','open')+(('next',) if menu_item==2 else ())+('select',)
             if (re.findall(r'nsb1_toolkit_menu: action=(\w+) down=([01])',text) !=
@@ -98,11 +107,13 @@ def check_inputs(source,run,profile,seconds):
     return text,card
 
 
-def check(source, run, control=False, interactive=False,menu_item=None):
-    profile=profile_for(control,interactive,menu_item)
+def check(source, run, control=False, interactive=False,menu_item=None,select_item=False):
+    profile=profile_for(control,interactive,menu_item,select_item)
+    if select_item:
+        menu_item=1
     interactive=interactive or menu_item is not None
-    text,card=check_inputs(source,run,profile,90 if menu_item is not None else 84 if interactive else 74)
-    check_trace(text, control, interactive,menu_item)
+    text,card=check_inputs(source,run,profile,92 if select_item else 90 if menu_item is not None else 84 if interactive else 74)
+    check_trace(text, control, interactive,menu_item,select_item)
     if interactive:
         check_storage(source)
         check_storage(run)
@@ -113,11 +124,14 @@ def check(source, run, control=False, interactive=False,menu_item=None):
         if menu_item is not None:
             for name,expected in MENU_FRAMES.items():
                 check_frame(run/f'snap/nsb1_toolkit_menu_{name}.png',expected)
-            if menu_item==1:
+            if menu_item==1 and not select_item:
                 check_frame(run/'snap/nsb1_toolkit_menu_select.png',MENU_FRAMES['open'])
-            else:
+            elif menu_item==2:
                 check_frame(run/'snap/nsb1_toolkit_menu_next.png',MENU_NEXT)
                 check_frame(run/'snap/nsb1_toolkit_menu_select.png',MENU_NEXT)
+        if select_item:
+            for name,expected in ITEM_FRAMES.items():
+                check_frame(run/f'snap/nsb1_toolkit_item_{name}.png',expected)
         return
     if not control:
         check_frame(run / 'snap/nsb1_toolkit_display.png', DISPLAY_FRAME)
@@ -133,17 +147,19 @@ def main():
     mode.add_argument('--control', action='store_true')
     mode.add_argument('--interactive', action='store_true')
     mode.add_argument('--menu-item',type=int,choices=(1,2))
+    mode.add_argument('--select-item',action='store_true')
     parser.add_argument('--mame', type=Path, help='prepare and execute a fresh isolated run')
     args = parser.parse_args()
     source, run = args.source.resolve(), args.run.resolve()
     try:
         if args.mame:
-            if args.interactive or args.menu_item is not None:
+            if args.interactive or args.menu_item is not None or args.select_item:
                 check_storage(source)
-            profile=profile_for(args.control,args.interactive,args.menu_item)
-            seconds=90 if args.menu_item is not None else 84 if args.interactive else 74
+            profile=profile_for(args.control,args.interactive,args.menu_item,args.select_item)
+            seconds=92 if args.select_item else 90 if args.menu_item is not None else 84 if args.interactive else 74
             prepare(source, run, profile)
-            script = Path(__file__).with_name('nsb1_toolkit_menu_exit.lua' if args.menu_item==2 else
+            script = Path(__file__).with_name('nsb1_toolkit_select_item.lua' if args.select_item else
+                'nsb1_toolkit_menu_exit.lua' if args.menu_item==2 else
                 'nsb1_toolkit_menu.lua' if args.menu_item==1 else
                 'nsb1_toolkit_interactive.lua' if args.interactive else 'nsb1_toolkit_input.lua').resolve()
             binary = args.mame.resolve()
@@ -153,10 +169,11 @@ def main():
                 'seconds': seconds, 'profile': profile,
             }, indent=2) + '\n')
             run_mame(binary, run / 'inputs', run, script, seconds, True)
-        check(source, run, args.control, args.interactive,args.menu_item)
+        check(source, run, args.control, args.interactive,args.menu_item,args.select_item)
     except (OSError, ValueError, KeyError, ET.ParseError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f'NSB-1 Toolkit FAIL: {error}\n')
     print('NSB-1 Toolkit PASS: ' + ('Phase-2 negative control' if args.control else
+          'physical follow-up SELECT ITEM and clean list return' if args.select_item else
           f'physical installed-menu item{args.menu_item} envelope and clean list return' if args.menu_item is not None else
           'physical GET INKEY5/GET INPUT42 and unchanged whole storage' if args.interactive else
           'organic DISPLAY TEXT and physical response; native RF/speech unproved'))

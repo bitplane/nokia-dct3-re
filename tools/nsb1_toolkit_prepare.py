@@ -12,12 +12,13 @@ from tools.nsb1_rom4_compare import INPUTS, prepare_cold_run
 
 
 def profile_metadata(profile):
-    if profile not in (0, 1, 3, 4):
+    if profile not in (0, 1, 3, 4, 7):
         raise ValueError('unqualified external Toolkit profile')
     return {'profile': profile,
             'description': ({0:'Phase 2 control',1:'Phase 2+ with one DISPLAY TEXT command',
                              3:'Phase 2+ with DISPLAY TEXT, GET INKEY and GET INPUT',
-                             4:'Phase 2+ with interactive commands and installed menu'}[profile]),
+                             4:'Phase 2+ with interactive commands and installed menu',
+                             7:'Phase 2+ with interactive menu and SELECT ITEM follow-up'}[profile]),
             'handset_storage_changed': False, 'persistent_card_changed': False}
 
 

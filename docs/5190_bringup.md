@@ -251,6 +251,30 @@ provenance, exact command/envelope/status ordering, product-owned pixels and
 MAME console observer errors, not just successful process exit. Existing
 provisioning, fitted-mask/clock, RF, registration and speech limits remain.
 
+#### Toolkit follow-up SELECT ITEM
+
+An independent92s external profile7 run follows the same installed-menu
+Continue selection with9122 and FETCH34, delivering the card's Choose command
+with Alpha/Beta. Physical column0/mask08 Down89 selects Beta; Navi90.5 returns
+`810307240002028281030100100102`, accepted with9000. The88s/89.5s/91.15s
+frames independently show Alpha, Beta and the restored Continue/Exit list.
+The result list exactly matches its earlier open-list frame. This qualifies
+the card-issued follow-up separately from the ACK-only return above.
+
+```sh
+.venv/bin/python tools/nsb1_toolkit_check.py \
+  tmp/nsb1-diagnostic-display-final-cold tmp/nsb1-toolkit-select-item-accepted \
+  --select-item
+```
+
+Add `--mame mame/mame` with fresh outputs to execute. The complete selected
+EEPROM, original card and executable/resident inputs stay unchanged. The gate
+checks own physical authentication, native execution through91s, cold/profile
+provenance, console errors, exact protocol/action order and product-owned
+pixels. No response precedes the physical confirmation; no firmware state,
+message or completion is injected. This is not arbitrary Toolkit support,
+repeated-selection coverage, fitted-mask fidelity, registration or speech.
+
 #### Pending Toolkit command restoration
 
 An independent74s profile1 process starts from the same own clean-idle bank

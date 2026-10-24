@@ -222,6 +222,8 @@ the original Field test01 DISPLAY TEXT/control gates remain distinct.
 This does not promote native registration or fitted-mask compatibility.
 A profile4 menu also returns distinct accepted physical Continue/Exit envelopes
 and clean item-list pixels after ACK-only selection, unlike the6150's Wait.
+Profile7 separately follows Continue with SELECT ITEM; physical Beta selection
+returns the exact accepted response and restores the original installed list.
 A separate pending DISPLAY TEXT save/load repeats two physical completions
 after one FETCH, restores observed architecture/64KiB research-RAM checksums
 and1170 DSP I/O writes, and returns identical idle pixels with unchanged storage.

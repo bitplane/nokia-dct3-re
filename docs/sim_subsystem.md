@@ -550,6 +550,9 @@ The5190 also installs DCT3 menu and returns distinct physical Continue/Exit
 envelopes. Both ACK-only selections return to the clean list with the selected
 item highlighted, unlike the separate6150/6190 Wait observations. Product
 wrappers retain these different pixel contracts (`--menu-item 1` / `2`).
+The5190 also independently accepts a card-issued SELECT ITEM after Continue;
+physical Beta returns the exact item-2 result and restores the clean installed
+list with unchanged complete storage (`--select-item`).
 The5190 pending-display restoration gate also proves one FETCH followed by
 two physical successful responses, observed native architecture/checksum/I/O
 restoration and identical returned-idle pixels with unchanged complete storage
