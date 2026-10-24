@@ -1,6 +1,8 @@
 -- Explicitly select a bank before cold physical readback.
-return function(bank,empty)
+return function(bank,empty,current_bank)
 assert(bank=='phone' or bank=='sim')
+current_bank=current_bank or 'phone'
+assert(current_bank=='phone' or current_bank=='sim')
 local directory=assert(debug.getinfo(1,'S').source:match('^@(.*/)'))
 dofile(directory..'noki6210_staged_observe.lua')
 local machine=manager.machine
@@ -20,12 +22,12 @@ end
 local input=coroutine.create(function()
     assert(emu.wait(20))
     press('Right Softkey / C','names')
-    -- The source bank is Phone, which inserts Add number before Options.
-    for i=1,6 do press('Scroll Down','option_'..i) end
+    -- Phone inserts Add number before Options; SIM does not.
+    for i=1,current_bank=='phone' and 6 or 5 do press('Scroll Down','option_'..i) end
     press('Left Softkey / Menu','options')
     press('Left Softkey / Menu','memory')
-    -- Memory in use opens with the current Phone selection highlighted.
-    if bank=='sim' then press('Scroll Down','sim') end
+    -- Memory in use opens with the current selection highlighted.
+    if bank~=current_bank then press('Scroll Down',bank) end
     press('Left Softkey / Menu',bank..'_selected')
     press('End','idle')
     press('Right Softkey / C','names_again')

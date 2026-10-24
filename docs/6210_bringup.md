@@ -344,6 +344,19 @@ variant because the destructive choice, completion frame and cold source
 oracle differ. This qualifies one firmware-owned cross-storage move, not
 reverse/bulk copying or capacity. Capture: `tmp/npe3-phone-to-sim-move`.
 
+`tools/run_noki6210_phone_memory_roundtrip.py DIRECTORY` extends the fresh
+move gate with **SIM card to phone / One by one / Keep original**. The Phone
+bank has already been proved empty in an independent cold process; the SIM
+contact was created by the firmware's preceding move, not by a fixture write.
+The reverse process must read EF_ADN, render **Copied**, change persistent
+handset flash and issue no UPDATE RECORD. Two further cold branches inherit
+its complete NVRAM, explicitly select distinct Phone/SIM banks and render
+A / 123 from each. The entire source card must remain identical throughout
+the reverse copy and both readbacks. This nine-process gate qualifies one
+contact's physical move-and-copy roundtrip, not bulk transfer, merging,
+capacity, field-type conversion or decoded flash-record semantics.
+Capture: `tmp/npe3-phone-sim-roundtrip`.
+
 ### Laboratory registration
 
 The runtime emits an organic type-`0x56` acquisition request with a 160-byte

@@ -60,8 +60,35 @@ def verify_copy_trace(trace, move=False):
         cursor = position + len(event)
 
 
-def run(directory, move=False):
+def launch_phase(directory, phase, script, seconds, previous):
     root = Path(__file__).resolve().parents[1]
+    target = directory / phase
+    target.mkdir()
+    shutil.copytree(previous / 'nvram', target / 'nvram')
+    initial = {str(p.relative_to(target / 'nvram')):
+               hashlib.sha256(p.read_bytes()).hexdigest()
+               for p in sorted((target / 'nvram').rglob('*')) if p.is_file()}
+    command = build_command(root, None, 'npe3hle', script, seconds)
+    script_path = Path(command[command.index('-autoboot_script') + 1])
+    launch = dict(command=command, initial_storage=initial,
+                  predecessor=str(previous), research_hle=True,
+                  script_sha256=hashlib.sha256(script_path.read_bytes()).hexdigest(),
+                  mame_sha256=hashlib.sha256(Path(command[0]).read_bytes()).hexdigest())
+    for name, helper in (('bank', 'bank_read'), ('copy', 'copy_input')):
+        launch[name + '_helper_sha256'] = hashlib.sha256(
+            (root / f'tools/noki6210_phone_memory_{helper}.lua').read_bytes()).hexdigest()
+    (target / 'launch.json').write_text(json.dumps(launch, indent=2) + '\n')
+    environment = os.environ.copy()
+    environment.pop('NOKIA_DCT3_6210_PIN_ENTRY', None)
+    with (target / 'console.log').open('w') as output:
+        subprocess.run(command, cwd=target, env=environment, stdout=output,
+                       stderr=subprocess.STDOUT, check=True, timeout=180)
+    verify_handset_health((target / 'console.log').read_text(errors='replace'))
+    verify((target / 'error.log').read_text(errors='replace'), runtime=True, selftest=True)
+    return target
+
+
+def run(directory, move=False):
     directory.mkdir(parents=True, exist_ok=False)
     baseline = directory / 'baseline'
     prepare_contact(baseline)
@@ -70,36 +97,10 @@ def run(directory, move=False):
         ('copy', 'phone_memory_move' if move else 'phone_memory_copy', 34),
         ('phone_cold', 'phone_memory_phone_empty' if move else 'phone_memory_phone_read', 40),
         ('sim_cold', 'phone_memory_sim_read', 40))
-    environment = os.environ.copy()
-    environment.pop('NOKIA_DCT3_6210_PIN_ENTRY', None)
     for phase, script, seconds in phases:
         if phase != 'copy':
             previous = directory / 'copy'
-        target = directory / phase
-        target.mkdir()
-        shutil.copytree(previous / 'nvram', target / 'nvram')
-        initial = {str(p.relative_to(target / 'nvram')):
-                   hashlib.sha256(p.read_bytes()).hexdigest()
-                   for p in sorted((target / 'nvram').rglob('*')) if p.is_file()}
-        command = build_command(root, None, 'npe3hle', script, seconds)
-        script_path = Path(command[command.index('-autoboot_script') + 1])
-        launch = dict(command=command, initial_storage=initial,
-                      predecessor=str(previous), research_hle=True,
-                      script_sha256=hashlib.sha256(script_path.read_bytes()).hexdigest(),
-                      mame_sha256=hashlib.sha256(Path(command[0]).read_bytes()).hexdigest())
-        if phase != 'copy':
-            launch['bank_helper_sha256'] = hashlib.sha256(
-                (root / 'tools/noki6210_phone_memory_bank_read.lua').read_bytes()).hexdigest()
-        else:
-            launch['copy_helper_sha256'] = hashlib.sha256(
-                (root / 'tools/noki6210_phone_memory_copy_input.lua').read_bytes()).hexdigest()
-        (target / 'launch.json').write_text(json.dumps(launch, indent=2) + '\n')
-        with (target / 'console.log').open('w') as output:
-            subprocess.run(command, cwd=target, env=environment, stdout=output,
-                           stderr=subprocess.STDOUT, check=True, timeout=180)
-        verify_handset_health((target / 'console.log').read_text(errors='replace'))
-        verify((target / 'error.log').read_text(errors='replace'), runtime=True, selftest=True)
-        previous = target
+        previous = launch_phase(directory, phase, script, seconds, previous)
     assess(directory, move)
     print('OK - physical Phone-to-SIM ' + ('move, erased' if move else 'copy, retained') +
           ' Phone source and cold SIM readback')
