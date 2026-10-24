@@ -170,6 +170,20 @@ Own idle control flow reaches that store only through`0x4b03e2`; repeated
 sleep-finalization instead loops through`0x4b036a`. Do not replace either
 firmware branch or infer automatic hardware enabling from this distinction.
 
+The late35.9s observation window distinguishes that early repeated-sleep
+path from the subsequent deadline stall: all16 bounded permission returns at
+`0x4b040e` are0, and all16 calls to`0x500a18` carry argument0, control`0a`
+and interval3. This takes`0x4b0410 -> 0x4b0368`, bypassing both sleep
+finalization and the interrupt-enable store. Helper`0x500a18(0)` calls
+DSP-stop`0x4dc102` and clears clock-control bit0; argument1 instead sets
+request bit1 while also clearing bit0. Neither path writes interrupt control.
+The final idle predicate`0x395e8e` is the literal stub `movs r0,#1; mov pc,lr`,
+not another dynamically missing readiness flag. Thus the late stall is an
+awake no-sleep loop, not indefinite suspension or repeated request1.
+Capture:`tmp/npe3-mbus-late-sleep-decision`; the bounded observations do not
+identify whether the missing contract is clock-control semantics, wake
+delivery or another earlier lifecycle input.
+
 Timer allocation/arming uses twelve-byte records based at`0x1001bc`
 (`0x3c19c4..0x3c19ca`), so index`c7` resolves exactly to`0x100b10`.
 The expiry dispatcher`0x3c1bb4` reads owner byte`+6` to select a task queue,

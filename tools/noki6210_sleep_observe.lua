@@ -38,6 +38,14 @@ local runner = coroutine.create(function()
             string.format('%s=%s+1;logerror "6210_sleep_continuation: pc=%%08x r0=%%08x lr=%%08x ctrl=%%02x dsp=%%02x observer_writes=0\\n",pc,r0,r14,b@2000c,b@20002;g',
                           counter, counter))
     end
+    assert(emu.wait(35.9 - machine.time:as_double()))
+    -- Earlier caps can saturate before the deadline/key edge; sample this window separately.
+    machine.debugger:command('temp8=0')
+    cpu.debug:bpset(0x4b040e, 'temp8<16',
+        'temp8=temp8+1;logerror "6210_sleep_late_permission: result=%08x ctrl=%02x interval=%04x observer_writes=0\\n",r0,b@2000c,w@100b14;g')
+    machine.debugger:command('temp9=0')
+    cpu.debug:bpset(0x500a18, 'temp9<16',
+        'temp9=temp9+1;logerror "6210_sleep_late_request: argument=%08x ctrl=%02x interval=%04x observer_writes=0\\n",r0,b@2000c,w@100b14;g')
     for _, target in ipairs({35.99, 36.05, 36.2, 36.4}) do
         assert(emu.wait(target - machine.time:as_double()))
         if target == 35.99 then
