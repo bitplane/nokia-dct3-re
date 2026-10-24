@@ -734,8 +734,8 @@ The gate requires exact physical settings input, credential APDUs/statuses,
 enabled/disabled cold challenge behavior, whole-card contents, own executable,
 linked source hashes/initial card snapshots and Done/prompt/menu pixel oracles.
 Unrelated credential, file or Toolkit mutations fail. No firmware-state write,
-donor data or guest-state transfer is supplied. PIN2,
-failed-PUK and restoration remain separate contracts.
+donor data or guest-state transfer is supplied. PIN/PIN2 change contracts
+are qualified below; failed-PUK and PIN2 failure recovery remain separate.
 
 ### Menu PIN change and cold authentication
 
@@ -788,3 +788,23 @@ the missing response or prove the unqualified resident mask is compatible.
 The 90-second
 credential gate rejects observed reset requests and does not qualify
 long-run stability. No reset suppression, timer change or heartbeat is used.
+
+### Menu PIN2 change and cold authenticated restoration
+
+The physical Access codes menu's next item is Change PIN2 code. Current
+`5678`, new `8765` and confirmation produce `A0 24 00 02 10`, status
+`9000` and **PIN2 code changed**. Complete-card comparison requires only
+PIN2 to change; PIN1, all retry counters, files and enable state are retained.
+The restore fixture starts in a new process from that exact stored card,
+authenticates PIN1 and the separate phone code, then physically submits
+current `8765` and new/confirmation `5678`. Successful credential-2 change
+restores the whole card to its original bytes.
+
+Prepare with `tools/nsb3_pin2_change_check.py prepare-change SEED CHANGE`,
+run `tools/nsb3_pin2_change_input.lua` for 90 seconds, then prepare the
+linked restore with `prepare-restore CHANGE RESTORE` and run
+`tools/nsb3_pin2_restore_input.lua` for 90 seconds. `check SEED CHANGE RESTORE`
+requires exact credentials/contacts/statuses, own executable, linked storage,
+whole-card transitions and Messages/changed-PIN2 frames. It rejects reset
+requests and unrelated mutations. This is bounded cold credential persistence,
+not long-run stability, PIN2 failure/PUK2 recovery or native radio acceptance.
