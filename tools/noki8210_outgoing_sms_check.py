@@ -45,7 +45,7 @@ if __name__ == '__main__':
                            '8210_sms_recovery_physical' in line or
                            '8210_keypad_decoded' in line or '[LUA ERROR]' in line)
         if args.rp_silence:
-            verify_silence(text, product='8210')
+            verify_silence(text, product='8210', allow_message_reference=True)
         else:
             verify(text, rejected=args.rejected)
         if args.recovery_frames:

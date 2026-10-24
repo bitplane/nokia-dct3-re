@@ -53,6 +53,17 @@ class OutgoingSmsTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify(trace.replace('a70141', 'a70142'))
 
+    def test_silence_reference_is_variable_but_tpdu_is_exact(self):
+        trace = SILENCE.replace('8850_', '8210_')
+        for reference in ('00', '01', 'ff'):
+            changed = trace.replace('090d110107', '090d11' + reference + '07')
+            verify_silence(changed, product='8210', allow_message_reference=True)
+            with self.assertRaisesRegex(ValueError, 'exact submission'):
+                verify_silence(changed.replace('a70141', 'a70142'), product='8210',
+                               allow_message_reference=True)
+        with self.assertRaisesRegex(ValueError, 'exact submission'):
+            verify_silence(trace.replace('090d110107', '090d110007'), product='8210')
+
     def test_requires_physical_input(self):
         with self.assertRaisesRegex(ValueError, 'physical A'):
             verify('')

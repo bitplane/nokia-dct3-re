@@ -49,6 +49,13 @@ Independent eight-second-PIN targets are:
   closure, physical reading, exact persisted hello record and body pixels.
 - `verify-8210-dcs-late-pin-host-outgoing-sms`: physical A/5551234 SMS,
   host acceptance, exact SMS-SUBMIT and sent-screen/CP/RP/RR checks.
+- `verify-8210-dcs-late-pin-host-rejected-sms` and `...-host-silent-sms`:
+  host RP rejection or deliberate absence of an RP result, respectively.
+  Both prove physical submission, transport closure, reviewed failure text
+  and physical End/Menu recovery. The silent case releases at approximately
+  104.51 seconds through the firmware's timeout, not a synthetic RP reply.
+  TP-MR is handset-maintained and may vary; destination, payload and all
+  remaining SMS-SUBMIT bytes stay exact, including relative TP-VP A7.
 - `verify-8210-dcs-late-pin-host-outgoing-call`: physical1234567 dialing,
   correlated host Connect, reviewed number/connected/idle frames and End.
 - `verify-8210-dcs-late-pin-state-call` and `...-state-sms`: exact active
@@ -77,8 +84,8 @@ Complete before SETUP/SAPI3 respectively, without fixing their incidental
 relative log order. Both orders and missing/late-event rejection are tested.
 The automatic one-shot call fixture pages at14.767s while phone-security
 input is still pending and does not complete a call; it is not promoted by
-the settled host-call result. Late-PIN media, extra host SMS rejection/timeout
-outcomes and other input schedules remain separate qualifications.
+the settled host-call result. Late-PIN media and other input schedules
+remain separate qualifications.
 
 `verify-8210-sms-status-persistence` checks two separate PIN-enabled
 research-HLE processes with retained own-product storage and physical SMS
