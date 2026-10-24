@@ -1523,6 +1523,22 @@ firmware/network timeout. The selected transaction's legitimate termination
 after UI dismissal remains open. No empty reply or host answered state is
 synthesized. The unsuccessful fixture/scenario is not retained as acceptance.
 
+A fresh own-PMM/PIN-enabled capture extends Answer26/End30 observation to
+180s (`tmp/npe3-ussd-late-dismiss-180`). The host records only queued for
+request1; the session trace has the request at20.949387s and no handset SS
+response or subsequent release. Physical Menu at170s renders Messages, and
+the Lua observation completes at175s. This is bounded trace evidence, not an
+acceptance gate: the exploratory host observer reports a WebSocket-close race
+at normal MAME shutdown. It does not establish permanent deadlock.
+
+The current model supplies no active network-USSD response timer: the adapter's
+deadline applies only while the radio request is queued, and
+`awaiting_network_ussd_response` handles a correlated FACILITY result or handset
+RELEASE COMPLETE without a timer. Thus silence cannot exercise a modeled
+network-originated termination. The next contract to recover is legitimate
+network termination of an unanswered request (and its host cancellation
+interface), not a fabricated empty handset reply or a guessed firmware timeout.
+
 ### Continued laboratory USSD
 
 `make verify-6210-ussd-continued` separately qualifies one continued exchange,

@@ -28,7 +28,7 @@
       "status": "disproven",
       "hypothesis": "Like the qualified NSB-7 fixture, dismissing the 6210's blank network-USSD reply editor immediately returns an empty USSD result to the host",
       "conclusion": "Own-PMM/coherent-cell Choose2 request captures through42s show Answer26/End30 returning to idle without a supplementary-service component. A separate Answer26/Back30 returns to the prompt and Back34 returns to idle, also without ReturnResult, RELEASE COMPLETE or RR release. Host request1 remains queued while physical Menu remains usable; no empty reply is received. This falsifies immediate cross-product equivalence, not all empty-response paths, a later timeout or permanent liveness. The failed scenario is removed; do not promote UI dismissal to answered or fabricate a result. Exact later firmware/network termination remains open. Local captures tmp/npe3-host-ussd-empty-probe and tmp/npe3-host-ussd-empty-back-probe preserve bounded evidence.",
-      "evidence": ["docs/6210_bringup.md", "tools/noki6210_host_ussd_request.lua", "tools/noki6210_host_ussd_notify.lua", "tools/run_host_incoming_ussd_gate.py"]
+      "evidence": ["docs/6210_bringup.md", "tools/noki6210_host_ussd_request.lua", "tools/noki6210_host_ussd_notify.lua", "tools/run_host_incoming_ussd_gate.py", "driver/nokia_gsm_call_adapter.cpp", "driver/nokia_gsm_session.cpp"]
     },
     {
       "id": "network_ussd_version_rejection_proves_no_reply_editor",
