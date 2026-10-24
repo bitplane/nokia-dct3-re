@@ -127,8 +127,17 @@ FIQ=`19` at35.99s. This does not justify tuning timer rates. IRQ3 handler
 existence does not prove the silicon wake edge or automatic global enabling.
 The idle helper`0x4ffb16` reads software flag`0x17556c`; a halfword-aligned
 Thumb literal scan finds references there and`0x4ea0c2`, the latter holding
-the flag through a service loop. This is not a complete indirect-writer census
-or evidence that the flag is a hardware wake latch. Do not synthesize it.
+the flag through a service loop. Within`0x4ea084..0x4ea2be`, R8 holds that
+address. Store`0x4ea0fa` sets it to1 after a class`1a` message with byte5
+bit0 set and the loop's stack`+78` flag nonzero. Event`e6` initially sets
+that stack flag; on its subsequent nonzero branch,`0x4ea10e` clears the
+byte to0. Reader`0x4ea1f2` skips queued DSP-work draining while it equals1.
+These are software-loop effects, not a hardware wake-latch contract; indirect
+writers outside this loop remain unclosed. The read-only
+`tmp/npe3-mbus-idle-veto-owned` run reproduces the End-decode failure with
+this byte0 at35.99,36.05,36.2 and36.4s, while global control stays`0a`.
+A stuck service-loop veto therefore does not explain those observations.
+Do not synthesize the flag or global delivery permission.
 
 Detailed observations are in ignored `tmp/npe3-mbus-call-{key-irq,
 control-transitions,timer-queue,compare-terminal,baseline-continuation}` runs.

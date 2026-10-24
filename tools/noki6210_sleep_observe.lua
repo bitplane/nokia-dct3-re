@@ -26,12 +26,12 @@ local runner = coroutine.create(function()
             interval = memory:read_u16(head + 4)
         end
         machine:logerror(string.format(
-            '6210_sleep_state: port=%02x fiq=%02x irq=%02x fmask=%02x imask=%02x ctrl=%02x timer0=%04x baseline=%04x timer1=%04x destination=%04x head=%08x interval=%d cpsr=%08x t=%.9f\n',
+            '6210_sleep_state: port=%02x fiq=%02x irq=%02x fmask=%02x imask=%02x ctrl=%02x timer0=%04x baseline=%04x timer1=%04x destination=%04x head=%08x interval=%d cpsr=%08x idle_veto=%02x t=%.9f\n',
             machine.ioport.ports[':COL.0']:read(), memory:read_u8(0x20008),
             memory:read_u8(0x20009), memory:read_u8(0x2000a), memory:read_u8(0x2000b),
             memory:read_u8(0x2000c), memory:read_u16(0x20010), memory:read_u16(0x173fe8),
             memory:read_u16(0x20004), memory:read_u16(0x20006), head, interval,
-            cpu.state.CPSR.value, machine.time:as_double()))
+            cpu.state.CPSR.value, memory:read_u8(0x17556c), machine.time:as_double()))
     end
 end)
 _G.npe3_sleep_observer = runner
