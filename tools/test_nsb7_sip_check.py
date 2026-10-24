@@ -86,6 +86,18 @@ def alerting_restore_fixture():
 
 class SipTest(unittest.TestCase):
     @patch('tools.nsb7_sip_check.check_authentication')
+    def test_media_requires_own_pcm_and_remains_distinct_from_signaling(self, authentication):
+        text = '\n'.join(row for row in fixture().splitlines() if
+                         'decision id=2' not in row and 'outcome=0 result=rejected' not in row)
+        with self.assertRaises(ValueError):
+            check(text, media=True)
+        with patch('tools.nsb7_pcm_check.verify') as pcm:
+            check(text, media=True)
+        pcm.assert_called_once_with(text)
+        with self.assertRaises(ValueError):
+            check(text, incoming=True, media=True)
+
+    @patch('tools.nsb7_sip_check.check_authentication')
     def test_alerting_restore_never_answers_and_clears_before_end(self,authentication):
         text=alerting_restore_fixture()
         check_incoming_restore(text,phase='alerting')
@@ -125,7 +137,7 @@ class SipTest(unittest.TestCase):
 
     def test_cli_excludes_unproved_scenarios(self):
         base=['gate','--pjsua','unused','--run-dir','unused','--product','8290']
-        for options in ([],['--incoming'],['--record-media'],['--restore-call'],
+        for options in (['--incoming'],['--record-media'],['--restore-call'],
                         ['--incoming','--restore-outgoing'],['--restore-idle'],['--calls','2'],
                         ['--sip-response','486']):
             flags=[] if not options else ['--signaling-only']
@@ -137,6 +149,10 @@ class SipTest(unittest.TestCase):
                 patch('tools.run_sip_handset_gate.run',new_callable=AsyncMock) as run:
             main()
         self.assertEqual(run.call_args.args[0].product,'8290')
+        with patch('sys.argv',base+['--','true']), \
+                patch('tools.run_sip_handset_gate.run',new_callable=AsyncMock) as run:
+            main()
+        self.assertFalse(run.call_args.args[0].signaling_only)
         with patch('sys.argv',base+['--signaling-only','--restore-outgoing','--','true']), \
                 patch('tools.run_sip_handset_gate.run',new_callable=AsyncMock) as run:
             main()

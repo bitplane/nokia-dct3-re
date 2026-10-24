@@ -49,7 +49,7 @@ async def run(args):
                 # against the older remote eight-second safety hangup.
                 '--duration=30' if (getattr(args, 'signaling_only', False) or
                                     getattr(args, 'dcs1800', False) or
-                                    args.product == '8890') else '--duration=8',
+                                    args.product in ('8290', '8890')) else '--duration=8',
                 f'--play-file={root / "sip-source.wav"}',
                 '--auto-play']
             if args.record_media:
@@ -325,6 +325,9 @@ def verify_success(root, remote_text, args):
                 raise RuntimeError(f'idle restoration lacks fresh-epoch SIP evidence: {marker}')
     cursor = 0
     product = getattr(args, 'product', '3210')
+    if product == '8290':
+        from tools.nsb7_sip_check import check as verify_8290_call
+        verify_8290_call(log, media=True)
     if product == '8890':
         if args.incoming:
             from tools.noki8890_incoming_call_check import verify as verify_8890_call
@@ -408,7 +411,7 @@ def verify_success(root, remote_text, args):
             r'LAPDm service Channel Release acknowledged')
     if args.restore_idle:
         patterns = (r'sip_state: saved', r'sip_state: restored') + patterns
-    for pattern in (() if product in ('8210', '8850', '8890') else patterns):
+    for pattern in (() if product in ('8210', '8290', '8850', '8890') else patterns):
         match = re.search(pattern, log[cursor:])
         if not match:
             raise RuntimeError(f'missing ordered firmware call checkpoint: {pattern}')
@@ -757,7 +760,11 @@ def main():
                              (not args.restore_outgoing or not args.incoming) and not args.cancel_incoming)
     if args.signaling_only and not signaling_connected:
         parser.error('--signaling-only requires a single supported product SIP fixture and qualified restoration phase')
-    if args.product=='8290' and not signaling_connected:
+    nsb7_media = (args.product == '8290' and not args.signaling_only and
+                  not args.incoming and args.sip_response == 200 and args.calls == 1 and
+                  not args.restore_call and not args.restore_outgoing and
+                  not args.restore_idle and not args.cancel_incoming)
+    if args.product=='8290' and not signaling_connected and not nsb7_media:
         parser.error('8290 supports only its single signaling-only SIP-200 fixtures; speech is unproved')
     if args.ready_file and not args.incoming:
         parser.error('--ready-file requires --incoming')

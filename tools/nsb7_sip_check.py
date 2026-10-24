@@ -1,4 +1,4 @@
-"""NSB-7 physical SIP signaling only; fitted DSP and speech remain unproved."""
+"""NSB-7 physical SIP acceptance; HLE media is distinct from native speech."""
 import argparse
 import json
 from pathlib import Path
@@ -156,7 +156,9 @@ def check_restore(text,connected=True):
         raise ValueError('unclocked restoration produced qualified handset media')
 
 
-def check(text,*,incoming=False):
+def check(text,*,incoming=False,media=False):
+    if media and incoming:
+        raise ValueError('incoming NSB-7 media is not yet qualified')
     if incoming:
         check_incoming(text,caller='5551234')
         if any(int(value) for value in re.findall(r'media_uplink_sequence=(\d+)',text)) or 'dsp_hle: speech tick' in text:
@@ -184,7 +186,10 @@ def check(text,*,incoming=False):
     if re.findall(r'gsm_call_adapter: state id=1 epoch=(\d+) phase=(\w+)',text)!=[
             ('1','connected'),('1','media_closed'),('1','ended')]:
         raise ValueError('SIP host state/epoch sequence differs')
-    if any(int(value) for value in re.findall(r'media_uplink_sequence=(\d+)',text)) or 'dsp_hle: speech tick' in text:
+    if media:
+        from tools.nsb7_pcm_check import verify
+        verify(text)
+    elif any(int(value) for value in re.findall(r'media_uplink_sequence=(\d+)',text)) or 'dsp_hle: speech tick' in text:
         raise ValueError('unclocked SIP fixture unexpectedly produced handset media')
 
 
@@ -192,6 +197,8 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image',type=Path)
     parser.add_argument('run',type=Path)
+    parser.add_argument('--media', action='store_true',
+                        help='qualify the single outgoing clocked HLE media fixture')
     modes=parser.add_mutually_exclusive_group()
     modes.add_argument('--incoming',action='store_true')
     modes.add_argument('--restore-outgoing',action='store_true')
@@ -201,13 +208,15 @@ def main():
     args=parser.parse_args()
     incoming=args.incoming or args.restore_incoming or args.restore_incoming_alerting
     restoring=args.restore_outgoing or args.restore_outgoing_pending or args.restore_incoming or args.restore_incoming_alerting
+    if args.media and (incoming or restoring):
+        parser.error('--media currently requires the single outgoing call without restoration')
     phase='alerting' if args.restore_incoming_alerting else 'connected'
     try:
         contract(args.image.read_bytes())
         text=(args.run/'error.log').read_text()
         if args.restore_incoming or args.restore_incoming_alerting: check_incoming_restore(text,phase=phase)
         elif args.restore_outgoing or args.restore_outgoing_pending: check_restore(text,connected=not args.restore_outgoing_pending)
-        else: check(text,incoming=incoming)
+        else: check(text,incoming=incoming,media=args.media)
         check_clock(text,finish=68 if incoming else 76)
         storage=args.run/'nvram/nsb7hle'
         initial=(args.run/'initial_sim_card.bin').read_bytes()
@@ -234,8 +243,8 @@ def main():
                             alerting_snapshot=args.restore_incoming_alerting,
                             pending_snapshot=args.restore_outgoing_pending)
         result=json.loads((args.run/'sip-result.json').read_text())
-        if result.get('passed') is not True or result.get('speech_tested') is not False or \
-                result.get('native_dsp_complete') is not False or (not restoring and
+        if result.get('passed') is not True or (not args.media and (
+                result.get('speech_tested') is not False or result.get('native_dsp_complete') is not False)) or (not restoring and
                 result.get('caller' if incoming else 'dialed_digits')!='5551234'):
             raise ValueError('missing explicit SIP signaling-only result')
         from tools.run_sip_handset_gate import verify_success,verify_outgoing_restore,verify_restore,verify_handset_health
@@ -249,7 +258,8 @@ def main():
             if incoming: verify_restore(args.run,remote,phase,'8290',signaling_only=True)
             else: verify_outgoing_restore(args.run,remote,not args.restore_outgoing_pending,'8290',signaling_only=True)
         else:
-            verify_success(args.run,remote,SimpleNamespace(product='8290',incoming=incoming,signaling_only=True))
+            verify_success(args.run,remote,SimpleNamespace(product='8290',incoming=incoming,
+                           signaling_only=not args.media,restore_idle=False))
     except (OSError,ValueError,RuntimeError) as error:
         parser.exit(1,f'NSB-7 SIP signaling: FAIL: {error}\n')
     print('PASS: physical PIN/'+('unanswered ringing' if args.restore_incoming_alerting else 'Answer' if incoming else 'dial')+
@@ -257,7 +267,7 @@ def main():
           ('; exact pending restore, CANCEL/487 and no replay' if args.restore_outgoing_pending else
            '; exact alerting restore, SIP rejection and no replay' if args.restore_incoming_alerting else
            '; exact connected restore, BYE and no replay' if restoring else '')+
-          '; speech_tested=0')
+          ('; clocked HLE media, native speech unproved' if args.media else '; speech_tested=0'))
 
 
 if __name__=='__main__': main()

@@ -3270,9 +3270,28 @@ uplink and493 downlink blocks. `tools/nsb7_pcm_check.py` checks own
 Send/End controls, transfers bounded by enable/disable, 512000/8000 clocks,
 64-clock frames and exact47-idle-clock accounting. This is HLE PCM transport
 with a laboratory voice peer, not SIP waveform or native DSP speech proof.
-Microphone input is silent in this headless test. The next acceptance is
-SIP media and physical microphone/earpiece waveforms, followed by call-phase
-save/restore; neither is implied by this result.
+Microphone input is silent in this headless test.
+
+An independent real-time outgoing SIP call also passes the own authentication,
+physical dialing/release, exact UI/card/journal and clocked PCM checks:
+`tmp/nsb7-sip-outgoing-media-realtime` reports474 uplink,451 downlink,
+474 PCM transmitted and508 received at the bridge. Normal SIP confirmation
+and release and contiguous handset downlink acceptance are checked. Use
+the existing SIP command without `--signaling-only`, with `-throttle` in
+place of `-nothrottle`, and run the final checker with `--media`:
+
+```sh
+.venv/bin/python tools/nsb7_sip_check.py roms/noki8290/8290f522a.fls \
+  tmp/nsb7-sip-outgoing-media-realtime --media
+```
+
+This supersedes the zero-media requirement only for that outgoing fixture;
+the earlier signaling-only commands describe the pre-PCM configuration.
+Incoming media, physical microphone/earpiece waveforms and media-aware
+call-phase save/restore remain separate outstanding acceptance work.
+Running an audio producer faster than wall-clock SIP is not valid media
+acceptance: the unthrottled diagnostic left RTP queued past release and
+failed the closed-session check. No device timing was altered to hide it.
 
 ### REFRESH and renewed application session
 
