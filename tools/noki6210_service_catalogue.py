@@ -22,7 +22,13 @@ def extract(image):
             'classified_slots': {
                 '0': 'Own version-string pointer getter; runtime observed.',
                 '1': 'Peripheral masked byte WRITE at4dbfea; never a read-only probe.',
-                '2': 'Peripheral masked byte READ at4dc060; MMIO read side effects not excluded.'},
+                '2': 'Peripheral masked byte READ at4dc060; MMIO read side effects not excluded.',
+                '4': 'DSP reset/initialization at426d14; clears2048 shared halfwords and writes control state.',
+                '13': '24-bit address filter at503206: permits <=1fffff or >=a00000; rejects MCU flash window.',
+                '14': '24-bit destination plus byte-count memory WRITE at5031c4; not a read-only probe.',
+                '15': 'Wrapper4ca9ba calls503258/3fec30 to copy bounded MCU cache; wrapper effects not fully closed.',
+                '16': 'Wrapper4ca906 calls503228/3fe944; paired update path, not qualified read-only.',
+                '24': 'DSP mailbox/control publisher at426952; writes shared state, not a read-only probe.'},
             'slots': [{'slot': slot, 'pointer': f'{value:08x}'} for slot, value in enumerate(values)]}
 
 

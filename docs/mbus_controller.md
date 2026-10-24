@@ -114,6 +114,41 @@ indices below `0xf4` address base `0x20000`, others base `0x40000` (literals
 reads may have side effects. Neither slot has been exercised as a probe.
 Classify remaining handlers before choosing a read-only acquisition candidate.
 
+Further bounded classifications (not exercised): slot`0x0e` at `0x5031c4`
+decodes a24-bit destination, byte count and source bytes, then calls the
+copy helper `0x506930`; this is a memory **write**, not a read candidate.
+Slot`0x0d` at `0x503206` instead returns a decoded24-bit address or zero:
+it permits addresses at most `0x1fffff` or at least `0xa00000`, rejecting
+the MCU flash interval `0x200000..0x9fffff`. Its literal limit is `0x1fffff`
+at `0x50328c`. Returning a pointer is not by itself a safe memory-read API:
+dispatcher string/buffer response branches copy through the returned pointer
+and subsequently call `0x3c2a68` on it (`0x49fef4..0x49fef6`). Allocator
+ownership and reply-selector contracts need decoding before any probe.
+Slot`0x18` (`0x426952`) writes a selected DSP/shared control cell and publishes
+further control state; it is not a read-only DSP-ROM path. These classifications
+do not establish an acquisition route to missing resident DSP routine`0x2c75`.
+
+The allocator helper `0x3c2a68` checks a returned pointer against heap bounds
+at `[0x100020+0x24]` and `[0x100020+8]` before examining block metadata
+(`0x3c2a70..0x3c2a7c`). Static pointers outside the heap therefore need not
+be allocations, but this does not make arbitrary in-heap pointers safe.
+
+Slot`0x04` (`0x426d14`) clears2048 shared halfwords and resets DSP-related
+control state: it is an initializer, not acquisition. Slot`0x0f`'s wrapper
+`0x4ca9ba` calls `0x503258`, which locks around `0x3fec30`; that helper
+copies from MCU cache base`0x15e8d8` and accepts only a nonzero extent whose
+offset-plus-size is at most`0x9c4`. This does not address resident DSP code.
+The full wrapper argument grammar/effects remain unqualified. Its paired
+slot`0x10` calls `0x503228/0x3fe944` and must not be treated as a read.
+
+Acquisition limit: software service access to this emulator can expose only
+bytes already present in its MCU, uploads, cache or modeled shared RAM. It
+cannot independently recover absent resident DSP ROM. A service transaction
+that makes the missing DSP routine execute is still blocked by that same
+missing routine; HLE-generated replies would not be independent evidence.
+The catalogue remains useful for mapping hardware and eventual real-phone
+capture, but is not by itself a pure-software source of new mask-ROM data.
+
 ## Timer and remaining uncertainty
 
 The controller uses the physical 9,600-baud rate with a ten-bit character time
