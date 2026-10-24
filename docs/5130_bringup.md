@@ -62,6 +62,35 @@ using an unproved NSE-1 mask/clock, not factory provisioning or normal-machine
 promotion. The short idle result does not resolve the93.974s supervision
 reset, RF acquisition, registration or native speech below.
 
+### Native idle restoration and physical continuation
+
+A fresh54s process from that qualified clean-idle cold input authenticates
+phone12345 without an application key before save40s. ARM PC289408/SP10c100
+and all37 observed ARM registers,36 DSP fields and rolling checksums of64KiB
+backed research ARM RAM, ordinary DSP data and program restore exactly.
+The DSP is actively executing at47a1 at the checkpoint, not merely stopped
+in IDLE. Reference/restored2.7s windows each contain1170 identical DSP I/O
+writes, including relative time, address, data and mask. Both physically
+pressed Menu contacts decode19 and render exact Phone book pixels, RGB SHA256
+`99915d05551950033d0cfbfde4d35b743a5f75729eb3e9212d665df521fda193`.
+
+The full selected EEPROM bank, original PIN-disabled card, own flash and
+external CFG remain unchanged. The cold link excludes copied RAM/save state;
+the new save artifact is nonempty and hashed. The checker additionally
+requalifies source idle/authentication, own loader/record/native observations,
+all architecture fields, replay completion and both physical continuations.
+
+```sh
+.venv/bin/python tools/nsk1_native_state_check.py \
+  tmp/nsk1-diagnostic-display-cold tmp/nsk1-native-idle-state
+```
+
+Add `--mame mame/mame` with a fresh output to execute. This observes the
+current64KiB research decode, not fitted SRAM geometry; rolling checksums
+and bounded I/O equality are not exhaustive memory/device-state proof.
+All existing provisioning, mask/clock, RF/speech and93.974s supervision
+limitations remain. No firmware result or network response is supplied.
+
 Physical manual network-search initiation also passes from independently
 qualified initialized storage: Settings -> Phone settings -> Network
 selection -> Manual renders **Searching / Quit**. The gate verifies all

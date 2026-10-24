@@ -191,6 +191,11 @@ complete bank hash, unchanged on cold boot. Card/flash/input configuration
 are unchanged. This does not resolve its native93.974s supervision reset,
 accessory polarity, registration or speech.
 
+Its separate40s native save/load also restores37 ARM registers,36 DSP fields
+and64KiB research RAM checksums while the DSP is active. The2.7s branches
+repeat1170 DSP I/O writes and physical Phone book pixels with unchanged
+complete storage. This is bounded restoration, not long-run acceptance.
+
 The7110 v5.01 checksum-consistency fixture is separate from its intact-input
 row: changing only the latest journal checksum byte releases the second task
 batch but still leaves a white raster and native913e/9140. Identity-check
