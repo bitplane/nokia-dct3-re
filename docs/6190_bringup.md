@@ -1289,7 +1289,11 @@ unchanged and no board reset is observed.
 
 The checker shares the established NSE-2 architectural/replay contract while
 supplying own checkpoint time, card size and reviewed pixel oracle. Existing
-NSE-2 defaults and tests are preserved. Save/load uses emulator APIs, not guest
+NSE-2 defaults and tests are preserved. Both Lua entry points use
+`native_ui_state_fixture.lua` for observation, save/load and I/O replay;
+startup, checkpoint, backed ARM RAM extent and physical contact remain explicit
+product inputs. Both runtime acceptance gates pass after this consolidation.
+Save/load uses emulator APIs, not guest
 state mutation or a replacement DSP result. RAM comparisons are rolling
 checksums, not byte-for-byte memory dumps. This bounded gate does not establish
 RF input, native registration, speech or survival past the receive-supervision
