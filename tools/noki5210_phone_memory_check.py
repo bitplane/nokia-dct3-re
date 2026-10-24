@@ -26,6 +26,10 @@ KEYS = {'save': SAVE_KEYS, 'read': READ_KEYS, 'edit': EDIT_KEYS, 'edit_read': RE
 KEYS['rename'] = READ_KEYS[:-3] + ['Left Softkey / Menu'] * 2 + ['Right Softkey / C'] * 3 + [
     'Keypad 2'] + ['Left Softkey / Menu'] * 3 + READ_KEYS[-3:]
 KEYS['rename_read'] = READ_KEYS
+KEYS['add'] = KEYS['rename'][:-4] + ['Scroll Down'] + KEYS['rename'][-4:]
+KEYS['multi_read'] = READ_KEYS[:-3] + ['End', 'Right Softkey / C',
+    'Left Softkey / Menu', 'Left Softkey / Menu', 'Scroll Down',
+    'Left Softkey / Menu'] + READ_KEYS[-3:]
 ERASE_PREFIX = READ_KEYS[:-3] + ['Left Softkey / Menu', 'Scroll Down', 'Scroll Down', 'Left Softkey / Menu']
 KEYS.update(erase_cancel=ERASE_PREFIX + ['Right Softkey / C'] + READ_KEYS[-3:],
             erase=ERASE_PREFIX + ['Left Softkey / Menu'] + READ_KEYS[-3:],
@@ -59,6 +63,11 @@ MODE_FRAMES['rename'] = dict(READ_FRAMES, edit_name=SAVE_FRAMES['phone_name'],
 # Number Details does not show the name: the cold list is the rename oracle.
 MODE_FRAMES['rename_read'] = dict(READ_FRAMES,
     phonebook_list='9f88b7547ec05ef3fbdf69ad4f3bc94e0acbc1c2834595ea2ff4d85e7eb463de')
+MODE_FRAMES['add'] = MODE_FRAMES['rename']
+# The two independently selected names reuse the already reviewed A and Ada
+# list frames. Number Details alone cannot distinguish these equal numbers.
+MODE_FRAMES['multi_read'] = dict(MODE_FRAMES['rename_read'],
+    second_list=READ_FRAMES['phonebook_list'], second_number=READ_FRAMES['phonebook'])
 ERASE_PROMPT = 'f4798fa7bdb4077bae837b58cec453ce6153f7f463a6c2d3d51827a6841a7eaf'
 MODE_FRAMES.update(
     erase_cancel=dict(READ_FRAMES, erase_prompt=ERASE_PROMPT, erase_result=READ_FRAMES['phonebook_list']),
@@ -116,6 +125,7 @@ def main():
     for flag, mode in (('--save', 'save'), ('--read', 'read'),
                        ('--edit', 'edit'), ('--edit-read', 'edit_read'),
                        ('--rename', 'rename'), ('--rename-read', 'rename_read'),
+                       ('--add', 'add'), ('--multi-read', 'multi_read'),
                        ('--erase-cancel', 'erase_cancel'), ('--erase', 'erase'),
                        ('--empty-read', 'empty_read')):
         modes.add_argument(flag, action='store_const', dest='mode', const=mode)

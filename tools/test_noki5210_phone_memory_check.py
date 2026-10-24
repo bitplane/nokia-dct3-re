@@ -44,7 +44,8 @@ class PhoneMemoryCheckTest(unittest.TestCase):
             checker.verify(self.capture(), checker.expected_card(), mode='read')
 
     def test_preserved_modes_have_distinct_contracts(self):
-        for mode in ('edit', 'edit_read', 'erase_cancel', 'erase', 'empty_read', 'rename', 'rename_read'):
+        for mode in ('edit', 'edit_read', 'erase_cancel', 'erase', 'empty_read', 'rename', 'rename_read',
+                     'add', 'multi_read'):
             text = '\n'.join((
                 'SIM status ins=20 sw=9000', 'LAPDm Location Updating Accept acknowledged',
                 f'5210_phone_memory: mode={mode} begin=1',
@@ -92,3 +93,19 @@ class PhoneMemoryCheckTest(unittest.TestCase):
             '5210_phone_memory: mode=rename complete=1'))
         with patch.object(checker, 'verify_coherent_late'), self.assertRaisesRegex(ValueError, 'input/release'):
             checker.verify(text, checker.expected_card(), mode='rename')
+
+    def test_second_contact_requires_add_and_both_selections(self):
+        self.assertNotEqual(checker.KEYS['add'], checker.KEYS['rename'])
+        frames = checker.MODE_FRAMES['multi_read']
+        self.assertNotEqual(frames['phonebook_list'], frames['second_list'])
+        self.assertEqual(frames['phonebook'], frames['second_number'])
+        for mode, wrong in (('add', checker.KEYS['rename']),
+                            ('multi_read', checker.READ_KEYS)):
+            text = '\n'.join((
+                'SIM status ins=20 sw=9000', 'LAPDm Location Updating Accept acknowledged',
+                f'5210_phone_memory: mode={mode} begin=1',
+                *[f'5210_phone_memory_key: name={key} released=1' for key in wrong],
+                f'5210_phone_memory: mode={mode} complete=1'))
+            with self.subTest(mode=mode), patch.object(checker, 'verify_coherent_late'), \
+                    self.assertRaisesRegex(ValueError, 'input/release'):
+                checker.verify(text, checker.expected_card(), mode=mode)

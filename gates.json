@@ -27,6 +27,15 @@
   },
   "gates": [
     {
+      "name": "verify-5210-pin-phone-memory-multiple", "prerequisites": ["normalize-5210", "build"], "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python", "before_script": [],
+         "script": "tools/run_noki5210_acceptance.py", "arguments": ["$(RUN_DIR)/save", "--scenario", "pin-phone-memory", "--mame", "$(MAME_DIR)/mame"]},
+        {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python", "before_script": [],
+         "script": "tools/run_noki5210_acceptance.py", "arguments": ["$(RUN_DIR)/add", "--scenario", "pin-phone-memory-add", "--preserved-nvram", "$(RUN_DIR)/save/nvram", "--mame", "$(MAME_DIR)/mame"]}
+      ]
+    },
+    {
       "name": "verify-5210-pin-phone-memory-erase", "prerequisites": ["normalize-5210", "build"], "variables": {},
       "steps": [
         {"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python", "before_script": [],

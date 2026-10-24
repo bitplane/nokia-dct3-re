@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm5_phone_memory_two_contacts_cold_persistence",
+      "owner": "nsm5_nonvolatile_storage",
+      "status": "satisfied",
+      "predicate": "Physical Add preserves two distinct phone-local names across an independent cold boot with unchanged SIM storage",
+      "current": "The named four-process gate first proves fresh empty Phone storage, Ada/123 Save and cold retrieval. A preserved-storage process edits the name to A but physically selects Add rather than Replace. A separate cold process independently selects A and Ada and requires their distinct reviewed list frames plus123 Details for each. Equal numbers cannot prove name coexistence, so both name frames and the complete two-selection physical input sequence are mandatory. All processes authenticate/register, preserve the exact expected full SIM, reject UPDATE RECORD/EF_ADN writes and recover reviewed idle/Messages pixels. Predecessor NVRAM inventories remain unchanged. This is research-HLE handset-local storage evidence, not selective deletion, capacity, failure atomicity or native DSP/speech acceptance.",
+      "evidence": ["docs/5210_bringup.md", "tools/noki5210_pin_phone_memory.lua", "tools/noki5210_pin_phone_memory_add.lua", "tools/noki5210_pin_phone_memory_multi_read.lua", "tools/noki5210_phone_memory_check.py", "tools/test_noki5210_phone_memory_check.py", "tools/run_noki5210_acceptance.py", "tools/test_run_noki5210_acceptance.py", "gates.json"]
+    },
+    {
       "id": "nsm5_phone_memory_erase_cancel_cold_persistence",
       "owner": "nsm5_nonvolatile_storage",
       "status": "satisfied",

@@ -125,6 +125,17 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   the complete expected SIM, reject SIM updates and hash-guard their predecessor
   NVRAM. Capture: `tmp/nsm5-phone-rename-qualified`. This qualifies a single-letter
   replacement, not arbitrary encoding, multiple-contact selection or capacity.
+- `make verify-5210-pin-phone-memory-multiple` starts with a fresh physical
+  empty/Save/cold-read chain, then edits Ada to A but explicitly selects
+  **Add**, not Replace. An independent cold process separately selects A and
+  Ada and reads123 from each Details screen. Both distinct name-list frames
+  are required because number Details alone cannot distinguish equal numbers.
+  All four processes authenticate/register, preserve the complete expected
+  SIM and reject SIM record writes. Every predecessor NVRAM inventory remains
+  unchanged. This proves two-contact coexistence and cold retrieval, not
+  selective multi-contact deletion, capacity or interrupted-write atomicity.
+  Accepted capture: `tmp/nsm5-phone-multiple-gate`; the gate also preserves
+  the original single-contact Save/Read oracles without rebanking them.
 - `make verify-5210-radio-supplementary` enters `*123#` and `*#21#` through
   the physical keypad and submits them with the product's dedicated Send key.
   The resulting processUnstructuredSS-Request and InterrogateSS transactions
