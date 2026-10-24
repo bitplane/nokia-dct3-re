@@ -9,6 +9,11 @@ registration before the save boundary, independently of post-load events.
 Whole-run hardware/provisioning checks remain separate from that ordering
 requirement.
 
+The 6210's `npe3mbus` is a clocked-MBUS/sleep research instrument, not an
+additional handset-support promotion. Read-only version service passes there;
+post-wake call input remains unqualified. Established `npe3hle` call/software
+acceptance retains the timer-disabled composition until both contracts compose.
+
 NSB-7 media qualification: the `nsb7hle` ordinary incoming/outgoing SIP
 fixtures now pass own documented clocked HLE PCM and product-owned exact
 UI/storage checks (`nsb7_sip_check.py --media`, add `--incoming` for Answer).

@@ -59,6 +59,16 @@ The ingress checker retains its transport-only scope. Current fixtures use
 
 ### NPE-3 service timer and version response
 
+Current composition: `npe3mbus` inherits the own-upload/runtime-HLE setup
+and enables MBUSTIM. The ordinary `npe3hle` retains its established disabled
+clock because the combined service/call/sleep acceptance below is unresolved.
+This is an explicit research split, not a workaround claimed as fidelity.
+Retire the split when those contracts compose in one passing machine.
+Fresh containment checks: `tmp/npe3-mbus-separated-service` passes service
+and storage control; `tmp/npe3-mbus-contained-state-call` passes complete
+ordinary call restoration; `tmp/npe3-mbus-contained-wake-negative` preserves
+the clock-enabled End-decode failure and its raw-contact/IRQ observations.
+
 Own 6210 v5.56 MCU (SHA1 `3d9ea319503e78ec69b60d72cda23e461e118ea9`)
 unmasks FIQ3 at `0x504708` after reception. Enabling the existing MBUSTIM
 clock in its product configuration allows an organic ACK and D2 version reply:
@@ -97,8 +107,8 @@ Timer-disabled `state-call` passes; enabled ordinary outgoing and state-call
 runs fail End decode. Architectural restoration itself passes. Controls are
 `tmp/npe3-mbus-disabled-state-call`, `tmp/npe3-mbus-enabled-outgoing` and
 `tmp/npe3-mbus-clock-state-call-default`. This is causal profile evidence,
-not a completed regression qualification. Source/binary remain enabled for
-debugging; default/frontier/MBUS passes do not cover this surface.
+not a completed regression qualification. Clock-enabled debugging now uses
+`npe3mbus`; default/frontier/MBUS passes do not cover this surface.
 
 | Boundary | Own evidence |
 | --- | --- |

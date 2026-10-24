@@ -36,7 +36,7 @@ def main():
         for name in ('control', 'client'):
             command = [sys.executable, str(ROOT / 'tools/run_mame_isolated.py'),
                        '--mame-dir', str(args.mame_dir.resolve()), '--run-dir', str(capture / name),
-                       '--', 'npe3hle', '-rompath', str(ROOT / 'roms'), '-video', 'none',
+                       '--', 'npe3mbus', '-rompath', str(ROOT / 'roms'), '-video', 'none',
                        '-sound', 'none', '-nothrottle', '-seconds_to_run', '24', '-log', '-verbose']
             if name == 'client':
                 command += ['-autoboot_delay', '0', '-autoboot_script',

@@ -1177,9 +1177,9 @@ constexpr nokia_product_config make_6210_config()
 	// Verifier start 426c36..426c3e separately sets CTSI+2 bit 0.
 	result.dsp_reset_wiring = { 0x10, 0x04, 0x01 };
 	result.gensio_wiring = GENSIO_NPE3;
-	// Own 5046fc..50470e acknowledges and unmasks FIQ3 after MBUS RX.
-	// Use the existing one-shot MBUSTIM source, not a fabricated reply.
-	result.mbus_timer_enabled = true;
+	// Own 5046fc..50470e requires MBUSTIM, but enabling it exposes an
+	// unresolved post-wake input regression. npe3mbus retains that research
+	// path separately until the complete call/sleep contract is qualified.
 	// 0x426c58 alternates the two shared-buffer ownership words. Keep
 	// transfer acknowledgements separate from the unresolved final verdict.
 	result.dsp_bootstrap = {
@@ -1387,6 +1387,7 @@ public:
 	void noki6210(machine_config &config);
 	void npe3stage(machine_config &config);
 	void npe3hle(machine_config &config);
+	void npe3mbus(machine_config &config);
 	void nmp5stage(machine_config &config);
 	void nmp5hle(machine_config &config);
 	void noki6250(machine_config &config);
@@ -4716,6 +4717,14 @@ void nokia_dct3_state::npe3hle(machine_config &config)
 	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
 }
 
+void nokia_dct3_state::npe3mbus(machine_config &config)
+{
+	npe3hle(config);
+	nokia_product_config research = m_product;
+	research.mbus_timer_enabled = true;
+	apply_product_config(research);
+}
+
 void nokia_dct3_state::noki6250(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
@@ -5064,6 +5073,9 @@ ROM_START( npe3hle )
 	ROM_LOAD("6210 virgin eeprom 005fa000.fls", 0x3fa000, 0x6000,
 		CRC(3c6d3437) SHA1(b3a527ede1be87bd715fb3741a81eef5bd422efa))
 ROM_END
+
+// Same own flash/PMM inputs; only the unresolved MBUSTIM/sleep composition differs.
+#define rom_npe3mbus rom_npe3hle
 
 ROM_START( noki6250 )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
@@ -5487,6 +5499,7 @@ SYST( 2002, noki3610, 0,      0,      noki3610, noki3310, nokia_dct3_state, empt
 SYST( 2000, noki6210, 0,      0,      noki6210, noki6210, nokia_dct3_state, empty_init, "Nokia", "Nokia 6210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, npe3stage, noki6210, 0, npe3stage, noki6210, nokia_dct3_state, empty_init, "Nokia", "6210 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, npe3hle, noki6210, 0, npe3hle, noki6210, nokia_dct3_state, empty_init, "Nokia", "6210 native uploads with runtime HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, npe3mbus, noki6210, 0, npe3mbus, noki6210, nokia_dct3_state, empty_init, "Nokia", "6210 clocked MBUS and sleep (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki6250, 0,      0,      noki6250, noki6250, nokia_dct3_state, empty_init, "Nokia", "Nokia 6250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nhm3stage, noki6250, 0, nhm3stage, noki6250, nokia_dct3_state, empty_init, "Nokia", "6250 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nhm3hle, noki6250, 0, nhm3hle, noki6250, nokia_dct3_state, empty_init, "Nokia", "6250 native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

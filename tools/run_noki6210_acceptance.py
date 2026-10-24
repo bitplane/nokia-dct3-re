@@ -380,6 +380,7 @@ def main():
             script = 'dsp_mode_observe'
         if args.trace_sleep:
             script = 'sleep_observe'
+            machine = 'npe3mbus'
         if args.scenario in PIN_SCENARIOS or args.pin_enabled:
             from tools.make_sim_card_profile import make_profile
             card = run / f'nvram/{machine}/sim_card'

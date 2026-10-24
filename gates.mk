@@ -523,11 +523,11 @@ verify-6210-mbus-service: build
 	$(PYTHON) tools/run_noki6210_mbus_service.py $(RUN_DIR) --mame-dir $(MAME_DIR)
 
 verify-6210-mbus-byte-events: build
-	$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- npe3hle -rompath $(abspath roms) -video none -sound none -nothrottle -seconds_to_run 10 -log -verbose -autoboot_delay 0 -autoboot_script $(abspath tools/mbus_input_probe.lua)
+	$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- npe3mbus -rompath $(abspath roms) -video none -sound none -nothrottle -seconds_to_run 10 -log -verbose -autoboot_delay 0 -autoboot_script $(abspath tools/mbus_input_probe.lua)
 	$(PYTHON) tools/mbus_input_check.py $(RUN_DIR)/error.log
 
 verify-6210-mbus-version-ingress: build
-	$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- npe3hle -rompath $(abspath roms) -video none -sound none -nothrottle -seconds_to_run 24 -log -verbose -autoboot_delay 0 -autoboot_script $(abspath tools/noki6210_mbus_version_probe.lua)
+	$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- npe3mbus -rompath $(abspath roms) -video none -sound none -nothrottle -seconds_to_run 24 -log -verbose -autoboot_delay 0 -autoboot_script $(abspath tools/noki6210_mbus_version_probe.lua)
 	$(PYTHON) tools/mbus_input_check.py $(RUN_DIR)/error.log --version-query
 
 verify-8210-host-incoming-call: build

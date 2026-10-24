@@ -21,6 +21,14 @@ execution, measured final silicon verdict, speech and full hardware fidelity
 are not claimed. The research phone-service milestone is complete; the normal
 machine remains fail-closed pending authentic native DSP completion.
 
+`npe3mbus` separately enables the firmware-requested MBUSTIM clock on the
+same own-upload/HLE composition. It qualifies read-only version service,
+but exposes an unresolved clock-stop/wake input failure during calls.
+`npe3hle` retains its established timer-disabled scope; this split contains
+the regression, not a completed hardware fix. Merge the compositions only
+after service and complete call/sleep gates pass together. See
+`mbus_controller.md`; `--trace-sleep` selects the clock-enabled instrument.
+
 Physical `*123#` followed by Send also completes a laboratory USSD transaction
 on `npe3hle`: the exact processUnstructuredSS request receives a correlated
 successful response, the firmware renders `Service reply / Nokia test network`,

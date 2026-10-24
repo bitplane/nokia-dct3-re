@@ -37,7 +37,7 @@
       "steps": [
         {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
          "script": "tools/run_mame_isolated.py",
-         "arguments": ["--mame-dir", "$(MAME_DIR)", "--run-dir", "$(RUN_DIR)", "--", "npe3hle",
+         "arguments": ["--mame-dir", "$(MAME_DIR)", "--run-dir", "$(RUN_DIR)", "--", "npe3mbus",
                        "-rompath", "$(abspath roms)", "-video", "none", "-sound", "none", "-nothrottle",
                        "-seconds_to_run", "10", "-log", "-verbose", "-autoboot_delay", "0",
                        "-autoboot_script", "$(abspath tools/mbus_input_probe.lua)"]},
@@ -50,7 +50,7 @@
       "steps": [
         {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
          "script": "tools/run_mame_isolated.py",
-         "arguments": ["--mame-dir", "$(MAME_DIR)", "--run-dir", "$(RUN_DIR)", "--", "npe3hle",
+         "arguments": ["--mame-dir", "$(MAME_DIR)", "--run-dir", "$(RUN_DIR)", "--", "npe3mbus",
                        "-rompath", "$(abspath roms)", "-video", "none", "-sound", "none", "-nothrottle",
                        "-seconds_to_run", "24", "-log", "-verbose", "-autoboot_delay", "0",
                        "-autoboot_script", "$(abspath tools/noki6210_mbus_version_probe.lua)"]},
