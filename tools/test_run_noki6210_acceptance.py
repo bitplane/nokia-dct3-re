@@ -8,6 +8,19 @@ from PIL import Image
 from tools import run_noki6210_acceptance as runner
 
 
+class SleepObserverArgumentsTest(unittest.TestCase):
+    def test_rejects_unrelated_or_competing_observers_before_rom_access(self):
+        for arguments in (['--scenario', 'menu', '--trace-sleep'],
+                          ['--scenario', 'outgoing-call', '--trace-sleep', '--trace-dsp-control']):
+            with patch.object(runner.sys, 'argv', ['acceptance', 'unused-run', *arguments]), \
+                    patch.object(runner.sys, 'stderr', io.StringIO()), \
+                    patch.object(runner, 'assess') as assess:
+                with self.assertRaises(SystemExit) as error:
+                    runner.main()
+                self.assertEqual(error.exception.code, 2)
+                assess.assert_not_called()
+
+
 class RetainedSecurityTest(unittest.TestCase):
     def exercise(self, corrupt=False):
         with tempfile.TemporaryDirectory() as directory:

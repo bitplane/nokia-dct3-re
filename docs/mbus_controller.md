@@ -84,8 +84,52 @@ coherent-frontier gates pass with the clock-enabled build.
 
 Driver TX logging is capped and can exhaust before20s. Absence from that log
 is not absence of traffic; the service fixture uses its independent bounded
-MMIO observation. Refreshed cross-ROM repeated-byte fixtures remain pending;
-the current NPE-3 repeated-byte gate passes at1.1ms.
+MMIO observation. Fresh cross-ROM repeated-byte fixtures pass at1.1ms on
+NSE-8 v6.00/v5.01 (`tmp/nse8-mbus-1100us-v600` and
+`tmp/nse8-mbus-1100us-v501`); the NPE-3 repeated-byte gate also passes.
+
+### Open NPE-3 post-wake regression
+
+**Unresolved:** what restores global interrupt delivery after organic
+clock-stop/wake in the clock-enabled NPE-3 composition?
+
+Timer-disabled `state-call` passes; enabled ordinary outgoing and state-call
+runs fail End decode. Architectural restoration itself passes. Controls are
+`tmp/npe3-mbus-disabled-state-call`, `tmp/npe3-mbus-enabled-outgoing` and
+`tmp/npe3-mbus-clock-state-call-default`. This is causal profile evidence,
+not a completed regression qualification. Source/binary remain enabled for
+debugging; default/frontier/MBUS passes do not cover this surface.
+
+| Boundary | Own evidence |
+| --- | --- |
+| Physical End reaches IRQ0 | At36.050s contact changes`1f->17`, IRQ`04->05`; mask`82` permits IRQ0, but global control stays`0a`. CPSR is ordinary Thumb/system state. |
+| Disable belongs to idle | Last`05->0a` write is`0x4b03a8`,31.039826s. Critical-section helpers preserve it correctly. |
+| Actual sleep and wake | Clock-stop31.039953s; FIQ0 wake31.492899s with control`0a`; subsequent sleep requests blocked by pending FIQ0. |
+| Initial compare works | Timer0 matches`0fa8`; ISR`0x4cc590` programs`1002` through`0x4cc24e`, then acknowledges at`0x4cc5ac`. |
+| Baseline is not corrupt | Writer`0x4cc27a` continues after wake through sleep-finalization`0x4cc4a4`; no lost initial compare or unexplained RAM overwrite is established. |
+| Queue stall is downstream | Head`0x100b10`, words`001003b4,00031501,02c70000`; interval3 is clamped to zero by elapsed-time adjustment. Queue root`0x100048`, baseline`0x173fe8`; object owner unclassified. |
+| FIQ3 honors masking | Live vector`ea1344a1` at`1c` reaches`0x4d12a8`, then`0x4dc1e2`; pending AND NOT mask at`0x4dc276..0x4dc27e`, bit3 wrapper`0x504712`. |
+
+Sleep predicate`0x4cc3e2` passes timer1-distance/FIQ5 checks and later rejects
+an imminent software timer. Timer1=`1499`, destination=`7fff`, pending low
+FIQ=`19` at35.99s. This does not justify tuning timer rates. IRQ3 handler
+`0x50471a` acknowledges/masks its source and publishes an event, but its
+existence does not prove the silicon wake edge or automatic global enabling.
+The idle helper`0x4ffb16` reads software flag`0x17556c`; a halfword-aligned
+Thumb literal scan finds references there and`0x4ea0c2`, the latter holding
+the flag through a service loop. This is not a complete indirect-writer census
+or evidence that the flag is a hardware wake latch. Do not synthesize it.
+
+Detailed observations are in ignored `tmp/npe3-mbus-call-{key-irq,
+control-transitions,timer-queue,compare-terminal,baseline-continuation}` runs.
+The retained bounded observer is reproducible with
+`python tools/run_noki6210_acceptance.py tmp/NAME --scenario outgoing-call --trace-sleep`.
+It preserves the normal physical fixture and ordinary failing acceptance
+criteria; it is not a replacement passing gate. Peripheral writes are only
+observed through taps. `0x4d2cac`'s sleep permission also explicitly requires
+FIQ-mask bit3 set and checks software timer`0x38` (`0x4d2cc8..0x4d2cd8`),
+explaining why restoring MBUS lifecycle progression can expose deeper idle
+behavior. This is not proof that the post-wake hardware contract is complete.
 
 ### NPE-3 service catalogue boundary
 

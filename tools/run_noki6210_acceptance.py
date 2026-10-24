@@ -343,7 +343,11 @@ def main():
                         help='reject a physical PUK in a separate process before cold recovery')
     parser.add_argument('--trace-dsp-control', action='store_true',
                         help='read-only compiler/mode observations during coherent outgoing call')
+    parser.add_argument('--trace-sleep', action='store_true',
+                        help='bounded read-only clock-stop/End-input observations')
     args = parser.parse_args()
+    if args.trace_sleep and (args.scenario != 'outgoing-call' or args.trace_dsp_control):
+        parser.error('--trace-sleep requires outgoing-call without --trace-dsp-control')
     if args.wrong_puk_first and args.scenario!='security-block-cold':
         parser.error('--wrong-puk-first requires security-block-cold')
     if args.scenario in PIN_SCENARIOS-{'security'} and not args.coherent_cell:
@@ -374,6 +378,8 @@ def main():
         machine, script, seconds = SCENARIOS[args.scenario]
         if args.trace_dsp_control:
             script = 'dsp_mode_observe'
+        if args.trace_sleep:
+            script = 'sleep_observe'
         if args.scenario in PIN_SCENARIOS or args.pin_enabled:
             from tools.make_sim_card_profile import make_profile
             card = run / f'nvram/{machine}/sim_card'
