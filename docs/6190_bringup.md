@@ -279,3 +279,43 @@ Initial and final complete EEPROM are identical, SHA256
 `18022fd2313fc9d5a904f2a9c5ef26f498d059d9d8e7326273986c8fe360e92d`;
 the own flash also stays unchanged. The tray remains empty; no SIM protocol,
 menu interactivity, registration or native speech is promoted by this frame.
+
+### Inserted card and phone-code retry contract
+
+The research configuration can attach a fresh laboratory SIM through the
+existing SIMI controller; its default socket remains empty. The explicit
+`--insert-sim` fixture reaches `Security code`. This is a phone-code prompt,
+not evidence of a SIM PIN request. Wire observation must read TX at `20036`
+and RX at `20037`; `2003b` is not TX.
+
+Physical `12345` and the left softkey reach validator `2af450` with `r0=1`
+(credential matches), but retry byte `10c444=ff` triggers its `>=5` rejection.
+Own descriptor `2d03a8` declares record `0709`, EEPROM offset `04ac`, length
+one. The accepted-code tail `2af48c..2af4a2` resets this count to zero and
+returns one. Record `0708` holds the separate four bytes at `04a8`; they
+must not be replaced to bypass the retry guard.
+
+`--initialize-phone-retry` is a separate external provisioning experiment,
+requiring the qualified own checksum-control source. It changes only `04ac`
+in addition to the six documented integrity bytes, preserves the stored
+credential, and pins both the own descriptor and reset-tail instructions.
+It is not an integrity-only repair or an authentic factory dump.
+With the same physical entry, observation reports `match=1 retry=00`;
+a separate cold run reaches the matched branch at `2af48c` with retry zero.
+The subsequent idle-content display remains visually odd through 30.4 seconds,
+not a qualified ordinary idle frame. However, a physical left-softkey press
+then opens a clean `Messages` menu with Select/Exit softkeys. Its 84x48 RGB
+SHA256 is `52f6ae5577f82efd58e386e4606c4ce713a16b2c67b243ba8d0a708a0dd117be`.
+This establishes interactive menu presentation after matching security entry;
+it falsifies treating the odd idle frame alone as a frozen UI or broken LCD.
+Determine the source of that idle content separately. Neither menu presentation
+nor native DSP liveness proves registration, calls, SMS, persistent contacts
+or a fitted DSP-mask identity.
+
+Reproduce with the three fixture switches `--all-decoded-checksums
+--insert-sim --initialize-phone-retry`, the same qualified source run, and
+`tools/nsb3_phonecode_input.lua` for 36 emulated seconds. All input is physical
+matrix contact state; all breakpoint and LCD wire observations are read-only.
+Check the resulting directory with `tools/nsb3_menu_check.py RUN_DIR`.
+The checker requires the seven-byte external fixture, physical credential and
+menu contacts, the matched-code branch, and the reviewed menu pixel hash.

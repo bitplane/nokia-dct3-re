@@ -3609,6 +3609,9 @@ INPUT_PORTS_END
 static INPUT_PORTS_START( nsb3r4t )
 	PORT_INCLUDE(noki5210)
 	PORT_INCLUDE(dct3_research_adc2)
+	PORT_MODIFY("SIM_REMOVED")
+	PORT_BIT(0x01, IP_ACTIVE_LOW, IPT_OTHER) PORT_NAME("Insert synthetic SIM card") PORT_TOGGLE
+	PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sim_removed_changed), 0)
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( nse2r4v )
@@ -4424,6 +4427,9 @@ void nokia_dct3_state::noki6190(machine_config &config)
 void nokia_dct3_state::nsb3r4t(machine_config &config)
 {
 	noki6190(config);
+	nokia_product_config research = PRODUCT_6190;
+	research.synthetic_sim_card = true; // Available lab card; tray defaults empty.
+	apply_product_config(research);
 	// Explicit acquired NSE-1 mask input, not a fitted NSB-3 identity claim.
 	// Keep own firmware, erased storage, ADC configuration and empty SIM tray.
 	config.device_remove("dsp_hle");
