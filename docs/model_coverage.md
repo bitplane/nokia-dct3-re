@@ -218,8 +218,10 @@ EEPROM/card/flash. This does not promote fitted-mask, RF or sustained operation.
 The6150 also independently passes one card-originated Toolkit DISPLAY TEXT
 with own terminal profile0b41ff7700, exact prompt/idle pixels and successful
 response after physical dismissal. Its matched Phase-2 control has no proactive
-traffic and opens Messages on that same contact. Whole storage is unchanged;
-this does not qualify other Toolkit commands or radio support.
+traffic and opens Messages on that same contact. A separate profile3 run
+also returns physical GET INKEY5 and GET INPUT42, with reviewed empty/filled
+editor pixels and clean idle return. Whole storage is unchanged in all three
+fixtures; other Toolkit commands and radio support are not qualified.
 
 The6150 native165s repeated-scan result is explicitly template-policy-dependent:
 record0607 reads EEPROM03ca=00 from the unchanged repair template, suppressing

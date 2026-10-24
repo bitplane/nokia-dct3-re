@@ -14,13 +14,22 @@ from tools.nsm1_security_check import check_trace as check_phone, MENU
 from tools.nsk3_pin_check import check_trace as check_pin
 from tools.nsk1_phonebook_roundtrip import frame_check
 from tools.sim_toolkit_display_check import check_display
+from tools.sim_toolkit_interactive_check import check_interactive
 
 PROFILE = bytes.fromhex('0b41ff7700')
 PROMPT = '0b61ca941a012e9feffe2d13b834c720031b71295220fc32139decd034172b2c'
 IDLE = '1d8403273fd916cd003bb18471343ed23d6a405a3b31ef2a165c5c0e276f3aa1'
+INTERACTIVE_FRAMES = {
+    'inkey': 'e94ea9d879033d48822bb76a8f080f95e12456c3b897a1717be10fb4ddbbb77f',
+    'input': '2b1546243a290d99ea42d5e70e173315b3d620903595782d2dc5f6fec483836c',
+    'input_filled': '169b9f1bb144e9cd4e061a74980b1479956c9431c17482149b7701300b6e83b0',
+    'interactive_final': IDLE,
+}
 
 
-def prepare(seed, run, control=False):
+def prepare(seed, run, control=False, interactive=False):
+    if control and interactive:
+        raise ValueError('interactive card and Phase-2 control are distinct')
     prepare_cold(seed, run)
     path = run / 'cfg/nsm1r4t.cfg'
     tree = ET.parse(path)
@@ -28,28 +37,36 @@ def prepare(seed, run, control=False):
     if inputs.find("port[@tag=':SATCFG']") is not None:
         raise ValueError('seed already overrides external card input')
     ET.SubElement(inputs, 'port', tag=':SATCFG', type='CONFIG',
-                  mask='15', defvalue='0', value='0' if control else '1')
+                  mask='15', defvalue='0', value='0' if control else '3' if interactive else '1')
     tree.write(path, encoding='utf-8', xml_declaration=True)
 
 
-def check_trace(text, control=False):
+def check_trace(text, control=False, interactive=False):
+    if control and interactive:
+        raise ValueError('interactive card and Phase-2 control are distinct')
     check_pin(text, True, prefix='nsm1', tx_limit=4096)
     check_phone(text, True, ())
-    check_display(text, prefix='nsm1', terminal_profile=PROFILE, control=control,
-                  reset_markers=('nsm1_reset_request:', 'nsm1_restart_request:'))
+    if interactive:
+        check_interactive(text, prefix='nsm1', terminal_profile=PROFILE,
+                          reset_markers=('nsm1_reset_request:', 'nsm1_restart_request:'))
+    else:
+        check_display(text, prefix='nsm1', terminal_profile=PROFILE, control=control,
+                      reset_markers=('nsm1_reset_request:', 'nsm1_restart_request:'))
 
 
-def check_configuration(seed, run, control=False):
+def check_configuration(seed, run, control=False, interactive=False):
+    if control and interactive:
+        raise ValueError('interactive card and Phase-2 control are distinct')
     expected = signature(seed / 'cfg/nsm1r4t.cfg')
     actual = signature(run / 'cfg/nsm1r4t.cfg')
     card = ('port', sorted(dict(tag=':SATCFG', type='CONFIG', mask='15',
-                               defvalue='0', value='0' if control else '1').items()), '')
+                               defvalue='0', value='0' if control else '3' if interactive else '1').items()), '')
     # MAME omits the explicitly selected zero/default after saving CFG.
     if actual != expected + [card] and not (control and actual == expected):
         raise ValueError('unrelated external inputs changed')
 
 
-def check(seed, run, control=False):
+def check(seed, run, control=False, interactive=False):
     files = check_storage(seed)
     check_storage(run)
     metadata = json.loads((run / 'cold_input.json').read_text())
@@ -60,21 +77,25 @@ def check(seed, run, control=False):
     for name in ('eeprom', 'sim_card'):
         if (run / f'initial_{name}.bin').read_bytes() != files[name]:
             raise ValueError('initial complete storage differs')
-    check_configuration(seed, run, control)
+    check_configuration(seed, run, control, interactive)
     if json.loads((run / 'exit_status.json').read_text()) != dict(returncode=0):
         raise ValueError('MAME did not complete')
-    check_trace((run / 'error.log').read_text(), control)
+    check_trace((run / 'error.log').read_text(), control, interactive)
     frame_check(run / 'snap/nsm1_toolkit_before.png', IDLE if control else PROMPT)
-    frame_check(run / 'snap/nsm1_toolkit_after.png', MENU if control else IDLE)
+    frame_check(run / 'snap/nsm1_toolkit_after.png',
+                INTERACTIVE_FRAMES['inkey'] if interactive else MENU if control else IDLE)
+    if interactive:
+        for label,expected in INTERACTIVE_FRAMES.items():
+            frame_check(run / f'snap/nsm1_toolkit_{label}.png',expected)
 
 
-def execute(binary, seed, run, control=False):
-    prepare(seed, run, control)
-    script = Path(__file__).with_name('nsm1_toolkit_input.lua').resolve()
+def execute(binary, seed, run, control=False, interactive=False):
+    prepare(seed, run, control, interactive)
+    script = Path(__file__).with_name('nsm1_toolkit_interactive.lua' if interactive else 'nsm1_toolkit_input.lua').resolve()
     command = [str(binary), 'nsm1r4t', '-rompath', str(Path(__file__).resolve().parents[1] / 'roms'),
                '-noreadconfig', '-video', 'none', '-sound', 'none', '-nothrottle',
                '-joystickprovider', 'none', '-midiprovider', 'none',
-               '-debug', '-debugger', 'none', '-log', '-verbose', '-seconds_to_run', '74',
+               '-debug', '-debugger', 'none', '-log', '-verbose', '-seconds_to_run', '84' if interactive else '74',
                '-autoboot_delay', '0', '-autoboot_script', str(script)]
     (run / 'invocation.json').write_text(json.dumps(dict(command=command,
         mame_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
@@ -89,17 +110,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('seed', type=Path)
     parser.add_argument('run', type=Path)
-    parser.add_argument('--control', action='store_true')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--control', action='store_true')
+    mode.add_argument('--interactive', action='store_true')
     parser.add_argument('--mame', type=Path)
     args = parser.parse_args()
     try:
         seed, run = args.seed.resolve(), args.run.resolve()
         if args.mame:
-            execute(args.mame.resolve(), seed, run, args.control)
-        check(seed, run, args.control)
+            execute(args.mame.resolve(), seed, run, args.control, args.interactive)
+        check(seed, run, args.control, args.interactive)
     except (OSError, ValueError, KeyError, ET.ParseError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f'NSM-1 Toolkit FAIL: {error}\n')
     print('NSM-1 Toolkit PASS: ' + ('matched Phase-2 control' if args.control else
+          'physical DISPLAY TEXT, GET INKEY 5 and GET INPUT 42' if args.interactive else
           'card-originated DISPLAY TEXT, physical dismissal and successful response'))
 
 

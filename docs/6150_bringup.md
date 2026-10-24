@@ -50,6 +50,38 @@ execution. The existing diagnostic-template policy03ca=00, nominal ADC2
 and unproved NSE-1 mask remain explicit. This qualifies one Toolkit command,
 not every advertised capability, factory provisioning, RF or native speech.
 
+### Interactive Toolkit input
+
+The same cold PIN-enabled input separately accepts external card profile3
+in an84s run (`tmp/nsm1-toolkit-interactive-accepted`). After the existing
+physical DISPLAY TEXT dismissal, firmware FETCHes GET INKEY `Press 5` and
+GET INPUT `Enter 42`. Own physical Keypad5 and left-softkey confirmation
+return `8103022200020282810301000d020435`. Keypad4, Keypad2 and a separate
+left-softkey confirmation return `8103032300020282810301000d03043432`.
+The card accepts the first two command responses with9115/911a and the final
+response with9000. Each command's payload precedes its physical input; no
+response precedes the associated physical confirmation.
+
+Reviewed70.5s/73.5s/76s frames show Press5, the empty Enter42 editor and its
+filled42 state. At79s the phone returns to its own clean Headset idle frame,
+not an operator-registration screen. The complete16KiB EEPROM, original
+3570-byte persistent card and executable flash remain unchanged. Only the
+external SATCFG profile differs from the DISPLAY TEXT fixture. The own
+five-byte terminal profile, authentication, exact APDU/payload/status sequence,
+physical actions and whole input configuration are checked independently.
+No firmware or controller result is supplied.
+
+```sh
+.venv/bin/python tools/nsm1_toolkit_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-toolkit-interactive-accepted --interactive
+```
+
+Add `--mame mame/mame` with a fresh output directory to execute. Shared
+`sim_toolkit_interactive_check.py` owns the lab command grammar; NSM-1 retains
+its own profile, contacts, provisioning and pixel/storage requirements.
+This qualifies these two input commands on the declared native compatibility
+composition, not installed-menu, timer, RF, speech or fitted-mask fidelity.
+
 ### Native idle restoration and physical continuation
 
 An independent54s cold process from the qualified original PIN-enabled

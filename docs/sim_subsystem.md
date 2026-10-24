@@ -540,6 +540,13 @@ product-specific outcomes must not be unified into a fabricated success.
 Own fixture scope and gates are in [6150 bring-up](6150_bringup.md) and
 [6130 bring-up](6130_bringup.md).
 
+The6150 also independently handles a three-command external card: physical
+DISPLAY TEXT dismissal, GET INKEY5 and GET INPUT42 produce exact successful
+responses and return to its own clean idle frame. Full persistent card,
+EEPROM and flash are unchanged. This is not inferred from the6190's support;
+the common lab command bytes/validator are shared while product inputs and
+acceptance remain separate (`nsm1_toolkit_check.py --interactive`).
+
 NSK-1 v5.61 (5130) independently produces that same four-byte profile and
 automatic result30 refusal. Its matched Phase-2 control has no proactive
 exchange. Unlike the6130 fixture, this Phase-2+ trial also rewrites108 EEPROM

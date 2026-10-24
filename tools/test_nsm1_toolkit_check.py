@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 
 from tools import nsm1_toolkit_check as checker
 from tools.sim_toolkit_display_check import DISPLAY, RESPONSE
+from tools.sim_toolkit_interactive_check import INKEY,INPUT,INKEY_RESPONSE,INPUT_RESPONSE
 from tools.test_nsm1_native_state_check import trace as startup
 
 
@@ -31,7 +32,59 @@ def trace(control=False):
     return '\n'.join(lines)
 
 
+def interactive_trace():
+    text = trace().replace('SIM status ins=14 sw=9000','SIM status ins=14 sw=9115')
+    for payload,response,actions,status in (
+            (INKEY,INKEY_RESPONSE,('inkey_5','inkey_confirm'),0x911a),
+            (INPUT,INPUT_RESPONSE,('input_4','input_2','input_confirm'),0x9000)):
+        text += '\n'+wire('TX',bytes((0xa0,0x12,0,0,len(payload))))
+        text += '\n'+wire('RX',payload+b'\x90\x00')
+        for action in actions:
+            for down in (1,0):
+                text += f'\nnsm1_toolkit_input: action={action} down={down}'
+        text += '\n'+wire('TX',bytes((0xa0,0x14,0,0,len(response)))+response)
+        text += f'\nSIM status ins=14 sw={status:04x} chv=3/3 puk=10/10 enabled=1'
+    return text
+
+
 class Nsm1ToolkitTest(unittest.TestCase):
+    def test_interactive_values_and_order_not_inferred_from_display(self):
+        text=interactive_trace()
+        checker.check_trace(text,interactive=True)
+        response=wire('TX',bytes.fromhex('a014000011')+INPUT_RESPONSE)
+        early=text.replace(response,'').replace('nsm1_toolkit_input: action=input_confirm down=1',
+                    response+'\nnsm1_toolkit_input: action=input_confirm down=1')
+        for bad in (early,text.replace('ins=14 sw=911a','ins=14 sw=9000'),
+                    text.replace('direction=RX data=45 ','direction=RX data=46 ',1),
+                    text.replace('action=inkey_5','action=inkey_6'),
+                    text+'\nnsm1_toolkit_input: malformed',
+                    text+'\nnsm1_toolkit_physical: malformed',
+                    text+'\nnsm1_restart_request:',
+                    text+'\nLUA ERROR'):
+            with self.subTest(tail=bad[-100:]), self.assertRaises(ValueError):
+                checker.check_trace(bad,interactive=True)
+        with self.assertRaises(ValueError):
+            checker.check_trace(trace(),interactive=True)
+        with self.assertRaises(ValueError):
+            checker.check_trace(text)
+
+    def test_interactive_configuration_and_conflicting_modes(self):
+        with TemporaryDirectory() as temporary:
+            seed,run=(Path(temporary)/name for name in ('seed','run'))
+            for directory in (seed,run):
+                (directory/'cfg').mkdir(parents=True)
+            template='<mameconfig><system name="nsm1r4t"><input>{}</input></system></mameconfig>'
+            (seed/'cfg/nsm1r4t.cfg').write_text(template.format(''))
+            (run/'cfg/nsm1r4t.cfg').write_text(template.format(
+                '<port tag=":SATCFG" type="CONFIG" mask="15" defvalue="0" value="3"/>'))
+            checker.check_configuration(seed,run,interactive=True)
+            with self.assertRaises(ValueError):
+                checker.check_configuration(seed,run)
+            with self.assertRaises(ValueError):
+                checker.check_configuration(seed,run,True,True)
+            with self.assertRaises(ValueError):
+                checker.prepare(seed,run,True,True)
+
     def test_configuration_allows_only_declared_card_and_default_elision(self):
         with TemporaryDirectory() as temporary:
             seed, run = (Path(temporary) / name for name in ('seed', 'run'))
