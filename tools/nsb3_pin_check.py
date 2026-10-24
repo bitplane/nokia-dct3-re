@@ -20,17 +20,17 @@ WRONG_FRAME = 'fd5b8fb1ab0c3397bf958d567a46aee84a72f75123802a00d5bc802a1814543e'
 PHONE_PROMPT = 'f14029ce68892bd3d5481aa41aea73af2cf6a3f783cd02dd3633c87dbf23e6b4'
 
 
-def check_card(card, retries, pin='1234'):
+def check_card(card, retries, pin='1234', enabled=True):
     if retries not in range(4) or not re.fullmatch(r'[0-9]{4,8}', pin):
         raise ValueError('invalid expected PIN1/retry state')
-    expected = bytearray(make_current_profile(True))
+    expected = bytearray(make_current_profile(enabled))
     expected[ATTEMPTS_OFFSET] = retries
     expected[CHV_OFFSET:CHV_OFFSET + 8] = padded_pin(pin)
     if card != bytes(expected):
         raise ValueError('PIN-enabled whole card differs beyond qualified PIN1 retry count')
 
 
-def check_trace(text, correct, attempts_before=3, pin=None):
+def check_trace(text, correct, attempts_before=3, pin=None, allowed_mutations=()):
     if attempts_before not in (1, 2, 3):
         raise ValueError('requires live PIN1 attempts')
     digits = pin or ('1234' if correct else '4321')
@@ -46,7 +46,7 @@ def check_trace(text, correct, attempts_before=3, pin=None):
     verify = [row[:5] for row in commands if row[0] == 0x20]
     if verify != [(0x20, 0, 1, 8, padded_pin(digits))]:
         raise ValueError('physical VERIFY APDU differs')
-    if any(row[0] in (0x24, 0x26, 0x28, 0x2c) for row in commands):
+    if any(row[0] in (0x24, 0x26, 0x28, 0x2c) and row[0] not in allowed_mutations for row in commands):
         raise ValueError('unexpected SIM credential mutation')
     if correct:
         check_phone_code(text)

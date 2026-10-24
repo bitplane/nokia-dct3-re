@@ -25,6 +25,8 @@ Wrong SIM PIN consumes exactly one persistent retry; a cold correct PIN restores
 it and then physical phone-code entry separately reaches the Messages menu.
 Three cold wrong-PIN phases also prove blocking, physical PUK1 recovery and
 fresh authentication with the persisted replacement PIN.
+Physical PIN-request Off/On also persists across cold boots: Off skips SIM
+VERIFY but retains the phone-code prompt, while On restores the SIM challenge.
 Ordinary idle-content provenance, fitted-mask identity and radio/call/SMS-delivery
 acceptance remain open; the unproved native compatibility input is unchanged.
 

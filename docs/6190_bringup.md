@@ -602,7 +602,7 @@ card status/retry transitions, whole-card comparisons, cold source hashes and
 initial-card snapshot, unchanged own executable, and reviewed PIN/error/phone
 prompt/menu frames. No guest RAM/save state, forced authentication result or
 donor provisioning is supplied. Successful PIN1 exhaustion/PUK recovery is
-qualified below. Menu-based PIN change/disable, PIN2, wrong/permanently exhausted
+qualified below. Menu-based PIN change, PIN2, wrong/permanently exhausted
 PUK and security-state restoration remain separate unqualified contracts.
 
 ### PIN1 exhaustion and PUK recovery
@@ -654,3 +654,46 @@ and UNBLOCK commands/statuses, whole-card transitions, generated initial-card
 provenance, linked cold snapshots, unchanged own executable and reviewed
 blocked/PUK/new-PIN/phone/menu frames. No network operation, PIN2 recovery,
 failed PUK lifecycle or state-restoration acceptance is implied.
+
+### Persistent SIM PIN request Off/On
+
+From the original accepted `1234` branch (not the `2468` PUK-replacement
+branch), physical scroll/select navigation opens Settings/Security/SIM card
+security. PIN entry and Off selection emit exactly one
+`A0 26 00 01 08` DISABLE CHV with padded `1234`; the result is `9000` and
+the firmware displays `Done`. Only serialized card byte `dc0` changes from
+1 to 0. The PIN credential and retry counts remain unchanged.
+
+A new process with that card performs no SIM VERIFY and receives no physical
+SIM PIN input. It presents the separate Nokia Security code prompt, accepts
+physical `12345` and opens Messages. Physical menu navigation in a subsequent
+cold process selects On and emits `A0 28 00 01 08` ENABLE CHV, returning
+`9000` and changing only `dc0` back to 1. The following cold process again
+presents `Enter PIN code`, physically verifies `1234`, then separately accepts
+the phone code and opens Messages. The disabled-card scripts do not disable
+anything themselves; the persisted card and protocol decide the challenge.
+
+Prepare an enabled input from the original correct-PIN run using
+`tools/nsb3_pin_request_check.py prepare-enabled SEED OFF_RUN`, and run
+`tools/nsb3_security_input.lua` for 80 seconds. Then:
+
+```sh
+.venv/bin/python tools/nsb3_pin_request_check.py prepare-disabled OFF_RUN OFF_COLD
+```
+
+Run `tools/nsb3_pin_disabled.lua` for 42 seconds. Prepare On from that cold
+output using `prepare-disabled OFF_COLD ON_RUN`, and run
+`tools/nsb3_pin_request_on.lua` for 80 seconds. Prepare the final challenge
+with `prepare-enabled ON_RUN ON_COLD`, then run `tools/nsb3_pin_correct.lua`
+for 42 seconds. Check the linked sequence:
+
+```sh
+.venv/bin/python tools/nsb3_pin_request_check.py check SEED OFF_RUN OFF_COLD ON_RUN ON_COLD
+```
+
+The gate requires exact physical settings input, credential APDUs/statuses,
+enabled/disabled cold challenge behavior, whole-card contents, own executable,
+linked source hashes/initial card snapshots and Done/prompt/menu pixel oracles.
+Unrelated credential, file or Toolkit mutations fail. No firmware-state write,
+donor data or guest-state transfer is supplied. Menu-based PIN change, PIN2,
+failed-PUK and restoration remain separate contracts.
