@@ -12,7 +12,8 @@ save/read/edit/delete with cold persistence, offline SMS draft save/read/delete,
 and the PIN/PUK change/retry/exhaustion lifecycles qualified below. No donor
 identity/calibration is imported. A configured Phase-2+ lab card additionally
 completes organic TERMINAL PROFILE/FETCH/DISPLAY TEXT, GET INKEY and GET INPUT
-through physical dismissal/key/text entry.
+through physical dismissal/key/text entry, plus SET UP MENU and physical item
+selection. Final Toolkit menu settlement remains unqualified.
 Ordinary idle content and automatic notice
 clearing remain unresolved; explicit rejection dismissal restores clean menus.
 An independent long-run control resets near 94 seconds
@@ -1350,3 +1351,25 @@ complete unchanged card, authentication, physical-before-response ordering and
 reviewed DISPLAY TEXT/INKEY/input/filled-42/returned-menu pixels. The original
 single-command gate remains a separate regression. No network service follows
 from either result.
+
+#### SIM menu installation and selection
+
+External profile 4 adds SET UP MENU after the same three interactive commands.
+Its `91 28` advertises the 40-byte menu; firmware FETCHes it and returns
+`810304250002028281030100` with `9000`. Physical Up from Messages reaches
+Field test, then another Up reaches `DCT3 menu`. Select opens Continue/Exit.
+Two independently cold controls select Continue or physically Down/Exit.
+Their exact ENVELOPE payloads are `d30702020181100101` and
+`d30702020181100102`; both return `9000` and preserve every card byte.
+
+Use preparation `--menu`, then `nsb3_toolkit_menu.lua` or
+`nsb3_toolkit_menu_exit.lua` for 92 seconds. Validate with
+`nsb3_toolkit_check.py SOURCE RUN --menu-item 1` or `--menu-item 2`.
+The gate retains full preceding input/Toolkit qualification and adds the exact
+received menu, ordered menu response/envelope, physical-before-envelope check,
+menu-title/list/selected-item pixels and immediate post-selection frame.
+That last frame says `Wait` one second after selection in both controls.
+It is an observation, not accepted final application settlement; neither a
+long-lived wait nor its cause is established. The lab card's profile-4 menu
+handler acknowledges selection without scheduling another proactive command.
+Do not supply a firmware completion to dismiss the wait.

@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsb3_toolkit_check import check_trace, DISPLAY, RESPONSE, INKEY, INPUT, INKEY_RESPONSE, INPUT_RESPONSE
+from tools.nsb3_toolkit_check import check_trace, DISPLAY, RESPONSE, INKEY, INPUT, INKEY_RESPONSE, INPUT_RESPONSE, MENU, MENU_RESPONSE
 from tools.test_nsb3_pin_request_check import trace
 
 
@@ -20,6 +20,23 @@ def toolkit_trace():
     text += wire_bytes('TX', bytes.fromhex('a01400000c') + RESPONSE)
     text += '\nSIM status ins=14 sw=9000 chv=3/3 puk=10/10 enabled=1'
     text += '\nnsb3_toolkit_physical: action=dismiss down=0 t=68.150000000'
+    return text
+
+
+def action(name, marker='nsb3_toolkit_input'):
+    return '\n' + '\n'.join(f'{marker}: action={name} down={state}' for state in (1, 0))
+
+
+def interactive_trace():
+    text = toolkit_trace().replace('SIM status ins=14 sw=9000', 'SIM status ins=14 sw=9115')
+    text += wire_bytes('TX', bytes.fromhex('a012000015')) + wire_bytes('RX', INKEY + b'\x90\x00')
+    text += action('inkey_5') + action('inkey_confirm')
+    text += wire_bytes('TX', bytes.fromhex('a014000010') + INKEY_RESPONSE)
+    text += '\nSIM status ins=14 sw=911a chv=3/3 puk=10/10 enabled=1'
+    text += wire_bytes('TX', bytes.fromhex('a01200001a')) + wire_bytes('RX', INPUT + b'\x90\x00')
+    text += action('input_4') + action('input_2') + action('input_confirm')
+    text += wire_bytes('TX', bytes.fromhex('a014000011') + INPUT_RESPONSE)
+    text += '\nSIM status ins=14 sw=9000 chv=3/3 puk=10/10 enabled=1'
     return text
 
 
@@ -46,17 +63,7 @@ class Nsb3ToolkitTest(unittest.TestCase):
             check_trace(text)
 
     def test_interactive_commands_require_exact_values_and_physical_order(self):
-        text = toolkit_trace().replace('SIM status ins=14 sw=9000', 'SIM status ins=14 sw=9115')
-        text += wire_bytes('TX', bytes.fromhex('a012000015')) + wire_bytes('RX', INKEY + b'\x90\x00')
-        def action(name):
-            return '\n' + '\n'.join(f'nsb3_toolkit_input: action={name} down={state}' for state in (1, 0))
-        text += action('inkey_5') + action('inkey_confirm')
-        text += wire_bytes('TX', bytes.fromhex('a014000010') + INKEY_RESPONSE)
-        text += '\nSIM status ins=14 sw=911a chv=3/3 puk=10/10 enabled=1'
-        text += wire_bytes('TX', bytes.fromhex('a01200001a')) + wire_bytes('RX', INPUT + b'\x90\x00')
-        text += action('input_4') + action('input_2') + action('input_confirm')
-        text += wire_bytes('TX', bytes.fromhex('a014000011') + INPUT_RESPONSE)
-        text += '\nSIM status ins=14 sw=9000 chv=3/3 puk=10/10 enabled=1'
+        text = interactive_trace()
         check_trace(text, interactive=True)
         for bad in (text.replace('data=35 ', 'data=36 ', 1),
                     text.replace('action=input_2', 'action=input_3'),
@@ -66,6 +73,25 @@ class Nsb3ToolkitTest(unittest.TestCase):
                 check_trace(bad, interactive=True)
         with self.assertRaises(ValueError):
             check_trace(text)
+
+    def test_menu_choices_have_distinct_physical_envelopes(self):
+        for item in (1, 2):
+            text = interactive_trace().rsplit('SIM status ins=14 sw=9000', 1)
+            text = text[0] + 'SIM status ins=14 sw=9128' + text[1]
+            text += wire_bytes('TX', bytes.fromhex('a012000028')) + wire_bytes('RX', MENU + b'\x90\x00')
+            text += wire_bytes('TX', bytes.fromhex('a01400000c') + MENU_RESPONSE)
+            text += '\nSIM status ins=14 sw=9000 chv=3/3 puk=10/10 enabled=1'
+            for name in ('fieldtest', 'last', 'open') + (('next',) if item == 2 else ()) + ('select',):
+                text += action(name, 'nsb3_toolkit_menu')
+            text += wire_bytes('TX', bytes.fromhex('a0c2000009d307020201811001') + bytes((item,)))
+            text += '\nSIM status ins=c2 sw=9000 chv=3/3 puk=10/10 enabled=1'
+            check_trace(text, menu_item=item)
+            for bad in (text.replace('ins=c2 sw=9000', 'ins=c2 sw=6a80'),
+                        text.replace('action=select', 'action=missing')):
+                with self.assertRaises(ValueError):
+                    check_trace(bad, menu_item=item)
+            with self.assertRaises(ValueError):
+                check_trace(text, menu_item=3-item)
 
 
 if __name__ == '__main__':

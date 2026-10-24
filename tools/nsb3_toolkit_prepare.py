@@ -13,7 +13,8 @@ from tools.make_sim_card_profile import make_current_profile
 
 def profile_metadata(profile):
     descriptions = {1: 'Phase 2+ with one DISPLAY TEXT command',
-                    3: 'Phase 2+ with DISPLAY TEXT, GET INKEY and GET INPUT'}
+                    3: 'Phase 2+ with DISPLAY TEXT, GET INKEY and GET INPUT',
+                    4: 'Phase 2+ with interactive commands and SET UP MENU'}
     if profile not in descriptions:
         raise ValueError('unsupported external card fixture')
     return dict(profile=profile, description=descriptions[profile],
@@ -44,10 +45,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source', type=Path)
     parser.add_argument('target', type=Path)
-    parser.add_argument('--interactive', action='store_true')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--interactive', action='store_true')
+    mode.add_argument('--menu', action='store_true')
     args = parser.parse_args()
     try:
-        prepare(args.source, args.target, 3 if args.interactive else 1)
+        prepare(args.source, args.target, 4 if args.menu else 3 if args.interactive else 1)
     except (OSError, ValueError, KeyError, ET.ParseError) as exc:
         parser.exit(1, f'NSB-3 Toolkit preparation: FAIL: {exc}\n')
     print('Prepared explicit external Phase-2+ card; no handset/card storage edits')
