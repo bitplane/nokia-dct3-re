@@ -191,6 +191,38 @@
       ]
     },
     {
+      "name": "verify-8210-dcs-late-pin-sip-outgoing-restore", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP stack; late physical PIN/DCS823 connected outgoing handset restore, external dialog discarded",
+      "recipe": [
+        "\t@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }",
+        "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --late-pin-dcs --outgoing-media --restore-outgoing --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'"
+      ]
+    },
+    {
+      "name": "verify-8210-dcs-late-pin-sip-pending-outgoing-restore", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP stack; late physical PIN/DCS823 alerting outgoing handset restore, CANCEL/487 without redial",
+      "recipe": [
+        "\t@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }",
+        "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --late-pin-dcs --outgoing-media --restore-outgoing --restore-outgoing-phase alerting --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'"
+      ]
+    },
+    {
+      "name": "verify-8210-dcs-late-pin-sip-incoming-restore", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP stack; late physical PIN/DCS823 connected incoming handset restore, external dialog discarded",
+      "recipe": [
+        "\t@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }",
+        "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --late-pin-dcs --incoming-media --restore-incoming --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'"
+      ]
+    },
+    {
+      "name": "verify-8210-dcs-late-pin-sip-alerting-incoming-restore", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP stack; late physical PIN/DCS823 alerting incoming handset restore, no Answer or dialog replay",
+      "recipe": [
+        "\t@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }",
+        "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --late-pin-dcs --incoming-media --restore-incoming --restore-incoming-phase alerting --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'"
+      ]
+    },
+    {
       "name": "verify-8850-sip-incoming-waveform", "prerequisites": ["build"], "variables": {},
       "unstructured": "optional PJSIP/PulseAudio/FFmpeg; own NSM-2 incoming physical Answer/End and bidirectional HLE audio tones, not native speech",
       "recipe": [

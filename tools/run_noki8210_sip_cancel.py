@@ -102,7 +102,7 @@ def main():
     parser.add_argument('--record-media', action='store_true',
                         help='capture outgoing HLE PCM and remote audio; does not assert non-silent waveform acceptance')
     parser.add_argument('--late-pin-dcs', action='store_true',
-                        help='fresh own card, physical PIN at eight seconds and DCS823; media fixtures only')
+                        help='fresh own card, physical PIN at eight seconds and DCS823; media/active-dialog fixtures only')
     parser.add_argument('--sound', choices=('none', 'pulse'), default='none')
     parser.add_argument('--restore-idle', action='store_true',
                         help='restore registered handset idle before admitting the fresh SIP call')
@@ -123,9 +123,8 @@ def main():
     parser.add_argument('--http-port', type=int, default=18821)
     parser.add_argument('--sip-port', type=int, default=25821)
     args = parser.parse_args()
-    if args.late_pin_dcs and (not (args.outgoing_media or args.incoming_media) or
-                              args.restore_idle or args.restore_outgoing or args.restore_incoming):
-        parser.error('--late-pin-dcs requires a media fixture without restoration')
+    if args.late_pin_dcs and (not (args.outgoing_media or args.incoming_media) or args.restore_idle):
+        parser.error('--late-pin-dcs requires a media or active-dialog fixture without idle restoration')
     if args.record_media and not (args.outgoing_media or args.incoming_media):
         parser.error('--record-media requires a media fixture')
     if args.incoming_media and args.restore_idle:
@@ -199,7 +198,8 @@ def main():
             check_output(text)
             check_output((run / 'console.log').read_text(errors='replace'))
             verify_stage(text, runtime=True, selftest=True, base_record=True)
-            verify_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes(), configured_carrier=True)
+            verify_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes(),
+                                **({'dcs1800': True} if args.late_pin_dcs else {'configured_carrier': True}))
             scenario = ('incoming_alerting_call' if args.restore_incoming_phase == 'alerting' else
                         'incoming_call') if args.restore_incoming else 'call'
             if f'state_roundtrip: result=pass scenario=8210_{scenario}' not in text:

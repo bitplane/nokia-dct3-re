@@ -12,9 +12,8 @@ from tools import run_noki8210_sip_cancel as check
 
 
 class OutgoingBusyTest(unittest.TestCase):
-    def test_late_pin_dcs_requires_unrestored_media(self):
-        for options in ([], ['--outgoing-busy'], ['--outgoing-media', '--restore-outgoing'],
-                        ['--incoming-media', '--restore-incoming']):
+    def test_late_pin_dcs_requires_media_or_active_dialog(self):
+        for options in ([], ['--outgoing-busy'], ['--incoming-media', '--restore-idle']):
             with self.subTest(options=options), patch('sys.argv', [
                     'run_noki8210_sip_cancel.py', '/tmp/unused-8210-run',
                     '--pjsua', '/tmp/unused-pjsua', '--late-pin-dcs', *options]), \
@@ -23,7 +22,7 @@ class OutgoingBusyTest(unittest.TestCase):
                 with self.assertRaises(SystemExit) as failure:
                     check.main()
                 self.assertEqual(failure.exception.code, 2)
-                self.assertIn('media fixture without restoration', errors.getvalue())
+                self.assertIn('without idle restoration', errors.getvalue())
                 prepare.assert_not_called()
 
     def test_incoming_phase_requires_explicit_restoration(self):

@@ -84,8 +84,8 @@ Complete before SETUP/SAPI3 respectively, without fixing their incidental
 relative log order. Both orders and missing/late-event rejection are tested.
 The automatic one-shot call fixture pages at14.767s while phone-security
 input is still pending and does not complete a call; it is not promoted by
-the settled host-call result. Late-PIN waveform and external-dialog
-restoration tests, and other input schedules, remain separate qualifications.
+the settled host-call result. Late-PIN waveform tests and other input
+schedules remain separate qualifications.
 
 `verify-8210-dcs-late-pin-sip-outgoing-media` and
 `verify-8210-dcs-late-pin-sip-incoming-media` independently qualify real
@@ -94,12 +94,29 @@ authentication and DCS823 registration. Both require the exact own-DCS
 traffic/release words, physical dialing or Answer, physical End, reviewed
 UI, normal SIP release and sustained ordered bidirectional HLE PCM transport.
 The runner's `--late-pin-dcs` option selects only this explicit profile;
-ordinary GSM900 and restoration fixtures retain their separate contracts.
+ordinary GSM900 fixtures retain their separate contracts.
 The remote peer has a30-second safety hangup instead of the older8-second
 limit, so its BYE cannot race the scheduled physical End. This is a host
 fixture lifetime, not a radio or firmware latency change. It proves neither
 non-silent microphone/earpiece waveforms nor native DSP speech. The separately
-qualified waveform/restoration gates below do not imply those late-PIN cases.
+qualified waveform gates below do not imply late-PIN waveform acceptance.
+
+The same late-PIN/DCS profile has four independent SIP restoration gates:
+
+- `verify-8210-dcs-late-pin-sip-outgoing-restore`: connected outgoing call,
+  exact handset architecture restored at34s; external dialog closed by BYE.
+- `verify-8210-dcs-late-pin-sip-pending-outgoing-restore`: outgoing SIP180,
+  exact handset restore at34s; CANCEL/487 without connection or media.
+- `verify-8210-dcs-late-pin-sip-incoming-restore`: physical Answer before
+  exact handset restore at42s; connected external dialog closed by BYE.
+- `verify-8210-dcs-late-pin-sip-alerting-incoming-restore`: exact ringing
+  handset restore at36s; INVITE rejected without Answer, connection or media.
+
+Each verifies physical PIN/authentication and DCS registration, exact
+PC/SP/RAM/time restoration, one epoch1->2 transition, one correlated
+restored-call clear and complete firmware release without external replay
+or redial. The external SIP dialog is discarded, not serialized. These are
+restoration tests, not waveform continuity or native-speech acceptance.
 
 `verify-8210-sms-status-persistence` checks two separate PIN-enabled
 research-HLE processes with retained own-product storage and physical SMS

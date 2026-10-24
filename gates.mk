@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 838 gates: 638 generated from typed steps, 200 copied verbatim (shell).
+# 842 gates: 638 generated from typed steps, 204 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -55,13 +55,17 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8850-sip-outgoing-pending-restore verify-8850-sip-outgoing-restore \
 	verify-8850-sip-outgoing-media verify-8210-sip-outgoing-media \
 	verify-8210-dcs-late-pin-sip-outgoing-media \
-	verify-8210-dcs-late-pin-sip-incoming-media verify-8850-sip-incoming-waveform \
-	verify-8850-sip-outgoing-waveform verify-8210-sip-outgoing-waveform \
-	verify-8210-sip-incoming-media verify-8210-sip-incoming-waveform \
-	verify-8210-sip-outgoing-restore verify-8210-sip-pending-outgoing-restore \
-	verify-8210-sip-incoming-restore verify-8210-sip-alerting-incoming-restore \
-	verify-8210-sip-cancel verify-6250-sip-idle-restore \
-	verify-6250-sip-alerting-incoming-restore \
+	verify-8210-dcs-late-pin-sip-incoming-media \
+	verify-8210-dcs-late-pin-sip-outgoing-restore \
+	verify-8210-dcs-late-pin-sip-pending-outgoing-restore \
+	verify-8210-dcs-late-pin-sip-incoming-restore \
+	verify-8210-dcs-late-pin-sip-alerting-incoming-restore \
+	verify-8850-sip-incoming-waveform verify-8850-sip-outgoing-waveform \
+	verify-8210-sip-outgoing-waveform verify-8210-sip-incoming-media \
+	verify-8210-sip-incoming-waveform verify-8210-sip-outgoing-restore \
+	verify-8210-sip-pending-outgoing-restore verify-8210-sip-incoming-restore \
+	verify-8210-sip-alerting-incoming-restore verify-8210-sip-cancel \
+	verify-6250-sip-idle-restore verify-6250-sip-alerting-incoming-restore \
 	verify-6250-sip-pending-outgoing-restore verify-6250-sip-cancel \
 	verify-6250-sip-outgoing-busy verify-6250-sip-outgoing-unavailable \
 	verify-6210-power-cycle verify-8890-power-off-restore \
@@ -599,6 +603,26 @@ verify-8210-dcs-late-pin-sip-outgoing-media: build
 verify-8210-dcs-late-pin-sip-incoming-media: build
 	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --late-pin-dcs --incoming-media --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
+
+# shell: optional PJSIP stack; late physical PIN/DCS823 connected outgoing handset restore, external dialog discarded
+verify-8210-dcs-late-pin-sip-outgoing-restore: build
+	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --late-pin-dcs --outgoing-media --restore-outgoing --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
+
+# shell: optional PJSIP stack; late physical PIN/DCS823 alerting outgoing handset restore, CANCEL/487 without redial
+verify-8210-dcs-late-pin-sip-pending-outgoing-restore: build
+	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --late-pin-dcs --outgoing-media --restore-outgoing --restore-outgoing-phase alerting --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
+
+# shell: optional PJSIP stack; late physical PIN/DCS823 connected incoming handset restore, external dialog discarded
+verify-8210-dcs-late-pin-sip-incoming-restore: build
+	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --late-pin-dcs --incoming-media --restore-incoming --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
+
+# shell: optional PJSIP stack; late physical PIN/DCS823 alerting incoming handset restore, no Answer or dialog replay
+verify-8210-dcs-late-pin-sip-alerting-incoming-restore: build
+	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --late-pin-dcs --incoming-media --restore-incoming --restore-incoming-phase alerting --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
 
 # shell: optional PJSIP/PulseAudio/FFmpeg; own NSM-2 incoming physical Answer/End and bidirectional HLE audio tones, not native speech
 verify-8850-sip-incoming-waveform: build
