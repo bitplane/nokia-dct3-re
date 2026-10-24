@@ -62,8 +62,9 @@ predicates.
   tmp/nsm1-native-upload-radio-long --long-run --retained-upload
 ```
 
-Physical/cold software coverage includes SIM contacts, separate Phone-memory
-erase, PIN1/PIN2 and PUK recovery, request settings, offline SMS storage and
+Physical/cold software coverage includes SIM contacts, a distinct Phone-memory
+contact save/read and separate erase, PIN1/PIN2 and PUK recovery, request
+settings, offline SMS storage and
 PIN2-protected FDN activation/storage/local dial enforcement. Registered
 radio, connected calls and network SMS remain unaccepted.
 
@@ -564,10 +565,54 @@ by this case; the two formatter namespaces must be kept distinct.
 
 Physical memory-selection acknowledgements are also observed, including
 Phone selection changing settings03d6/03e8. Those settings' complete semantics
-are not inferred from the mixed-list formatter. Native Phone record layout
-and all local-contact operations remain incompletely mapped; physical SIM
-name/number persistence and removal of the template's extra Phone rows are
-the accepted scope. The next independent targets are SIM security and SMS.
+are not inferred from the mixed-list formatter. The dedicated Phone save/read
+contract below qualifies one ordinary contact; general native record layout,
+other local-contact operations and capacity remain incompletely mapped.
+
+### Physical Phone-memory persistence
+
+`nsm1_phone_local_check.py SOURCE WRITE READ CONTROL` starts from the qualified
+Phone-erased cold fixture above, retaining SIM A/12345. Physical Names/Options/
+Memory in use selects Phone; the writer enters D/6789. Exact choice, name,
+number and selected-D list frames are required. The write changes only the
+two observed settings bytes `0x03d6`/`0x03e8` and the 37-byte record at `0x19d4`.
+The reviewed record contains the fixture's number prefix `04 67 89` and D at
+offset `0x10`; this is not a
+general Phone-record encoding specification. The complete SIM remains
+byte-identical, with no UPDATE RECORD attempted.
+
+Independent cold processes inherit the complete saved EEPROM and card through
+`nsm1_nominal_input.py --preserve-sim`. The reader must move Down from the
+initially selected SIM A to Phone D before Details: the mixed list does not
+select the newly saved Phone contact automatically after restart. Exact D-list
+and 6789 Number frames distinguish it from the existing SIM read fixture.
+The code-only control runs for the same 24 seconds without contact navigation.
+Cold boot writes `0x03e8` and other EEPROM regions, but reader/control outputs
+must be byte-identical and retain the saved contact, identity and security
+bytes. No unexplained-write allowlist is used. The semantics of those shared
+boot writes remain unmapped; this contrast proves no additional read-specific
+mutation in the fixture, not general nonvolatile-storage fidelity.
+
+| Stage | Script | Emulated seconds |
+| --- | --- | --- |
+| Phone save from qualified erased cold input | `nsm1_phone_local_input.lua` | 45 |
+| Independent writer-derived cold read | `nsm1_phone_local_read.lua` | 24 |
+| Independent writer-derived code-only control | `nsm1_phone_local_control.lua` | 24 |
+
+Use the existing `nsm1r4t` debugger/input-run recipe and prepare each fresh
+directory with `nsm1_nominal_input.py PREDECESSOR DIRECTORY --preserve-sim`.
+Accepted captures are `tmp/nsm1-phone-local-qualified-{save,read,control}`.
+This qualifies one Phone contact with a distinct unchanged SIM control, not
+name/number editing, selective erasure, capacity, normal-machine promotion or
+native RF/speech.
+
+```sh
+.venv/bin/python tools/nsm1_phone_local_check.py \
+  tmp/nsm1-erase-phone-cold tmp/nsm1-phone-local-qualified-save \
+  tmp/nsm1-phone-local-qualified-read tmp/nsm1-phone-local-qualified-control
+```
+
+### SIM and erase reproduction
 
 ```sh
 .venv/bin/python tools/nsm1_phonebook_erase_check.py \
