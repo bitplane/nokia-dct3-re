@@ -12,13 +12,16 @@ from tools.nsb3_pin_change_check import CHANGE_KEYS
 from tools.nsb3_phonebook_check import prepare_reload, wire
 from tools.nsb3_puk_check import check_link
 from tools.nsb3_nominal_input import IMAGE_SHA256
-from tools.sim_security_trace_check import padded_pin, statuses, CHV_OFFSET
+from tools.sim_security_trace_check import padded_pin, statuses, CHV_OFFSET, ATTEMPTS_OFFSET
 from tools.nsk1_phonebook_roundtrip import frame_check
 from tools.nsb3_menu_check import FRAME as MENU_FRAME
 
 
-def check_pin2_card(card, changed=False):
+def check_pin2_card(card, changed=False, attempts=3):
     canonical = bytearray(card)
+    if len(canonical) <= ATTEMPTS_OFFSET + 1 or canonical[ATTEMPTS_OFFSET + 1] != attempts:
+        raise ValueError('PIN2 retry count differs')
+    canonical[ATTEMPTS_OFFSET + 1] = 3
     if changed:
         if canonical[CHV_OFFSET + 8:CHV_OFFSET + 16] != padded_pin('8765'):
             raise ValueError('changed PIN2 required')
@@ -26,11 +29,13 @@ def check_pin2_card(card, changed=False):
     check_card(bytes(canonical), 3)
 
 
-def check_trace(text, restore=False):
+def check_trace(text, restore=False, wrong=False):
     if 'nsb3_board_reset_request:' in text:
         raise ValueError('reset interrupts credential qualification')
     check_pin(text, True, allowed_mutations=(0x24,))
     old, new = ('8765', '5678') if restore else ('5678', '8765')
+    if wrong:
+        old = '5679'
     keys = CHANGE_KEYS[:12] + ('Scroll Down', 'Left Softkey / Menu')
     for digits in (old, new, new):
         keys += tuple('Keypad ' + digit for digit in digits) + ('Left Softkey / Menu',)
@@ -42,7 +47,7 @@ def check_trace(text, restore=False):
     if credentials != [(0x20, 0, 1, 8, padded_pin('1234')),
                        (0x24, 0, 2, 16, padded_pin(old) + padded_pin(new))]:
         raise ValueError('requires PIN1 startup then exact PIN2 CHANGE CHV')
-    if statuses(text, 0x24) != [(0x9000, 3, 10)]:
+    if statuses(text, 0x24) != [(0x9804 if wrong else 0x9000, 3, 10)]:
         raise ValueError('PIN2 change failed')
     if any(row[0] in (4, 0x44, 0xdc, 0xd6, 0x32, 0xc2) for row in commands):
         raise ValueError('unrelated SIM mutation')

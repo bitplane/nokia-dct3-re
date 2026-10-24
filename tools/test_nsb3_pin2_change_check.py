@@ -7,8 +7,10 @@ from tools.sim_security_trace_check import CHV_OFFSET, padded_pin
 from tools.make_sim_card_profile import make_current_profile
 
 
-def pin2_trace(restore=False):
+def pin2_trace(restore=False, wrong=False):
     old, new = ('8765', '5678') if restore else ('5678', '8765')
+    if wrong:
+        old = '5679'
     lines = trace(3).splitlines()
     keys = CHANGE_KEYS[:12] + ('Scroll Down', 'Left Softkey / Menu')
     for digits in (old, new, new):
@@ -17,11 +19,22 @@ def pin2_trace(restore=False):
               for key in keys for state in (1, 0)]
     command = bytes.fromhex('a024000210') + padded_pin(old) + padded_pin(new)
     lines += [f'nsb3_sim_wire: direction=TX data={byte:02x} t=88.0 observer_writes=0' for byte in command]
-    lines.append('SIM status ins=24 sw=9000 chv=3/3 puk=10/10 enabled=1')
+    lines.append(f'SIM status ins=24 sw={"9804" if wrong else "9000"} chv=3/3 puk=10/10 enabled=1')
     return '\n'.join(lines)
 
 
 class Nsb3Pin2ChangeTest(unittest.TestCase):
+    def test_wrong_pin2_and_retry_state_are_not_success(self):
+        check_trace(pin2_trace(wrong=True), wrong=True)
+        with self.assertRaises(ValueError):
+            check_trace(pin2_trace(wrong=True))
+        card = bytearray(make_current_profile(True))
+        from tools.sim_security_trace_check import ATTEMPTS_OFFSET
+        card[ATTEMPTS_OFFSET + 1] = 2
+        check_pin2_card(card, attempts=2)
+        with self.assertRaises(ValueError):
+            check_pin2_card(card)
+
     def test_change_and_restore_are_distinct_authenticated_commands(self):
         for restore in (False, True):
             check_trace(pin2_trace(restore), restore)

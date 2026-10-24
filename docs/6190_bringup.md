@@ -641,8 +641,8 @@ card status/retry transitions, whole-card comparisons, cold source hashes and
 initial-card snapshot, unchanged own executable, and reviewed PIN/error/phone
 prompt/menu frames. No guest RAM/save state, forced authentication result or
 donor provisioning is supplied. Successful PIN1 exhaustion/PUK recovery is
-qualified below. Menu-based PIN change, PIN2, wrong/permanently exhausted
-PUK and security-state restoration remain separate unqualified contracts.
+qualified below, as are menu-based PIN/PIN2 change and cold restoration.
+Wrong/permanently exhausted PUK and PIN2 exhaustion remain unqualified.
 
 ### PIN1 exhaustion and PUK recovery
 
@@ -735,7 +735,7 @@ enabled/disabled cold challenge behavior, whole-card contents, own executable,
 linked source hashes/initial card snapshots and Done/prompt/menu pixel oracles.
 Unrelated credential, file or Toolkit mutations fail. No firmware-state write,
 donor data or guest-state transfer is supplied. PIN/PIN2 change contracts
-are qualified below; failed-PUK and PIN2 failure recovery remain separate.
+are qualified below; failed-PUK and PIN2 exhaustion/PUK2 remain separate.
 
 ### Menu PIN change and cold authentication
 
@@ -807,4 +807,18 @@ linked restore with `prepare-restore CHANGE RESTORE` and run
 requires exact credentials/contacts/statuses, own executable, linked storage,
 whole-card transitions and Messages/changed-PIN2 frames. It rejects reset
 requests and unrelated mutations. This is bounded cold credential persistence,
-not long-run stability, PIN2 failure/PUK2 recovery or native radio acceptance.
+not long-run stability, PIN2 exhaustion/PUK2 recovery or native radio acceptance.
+
+The first PIN2 rejection is independently qualified: physical current `5679`
+with new/confirmation `8765` emits the exact credential-2 CHANGE command,
+returns `9804`, displays **Code error** and changes only PIN2 retries 3→2.
+A linked cold process must use the retained correct `5678` to change PIN2
+to `8765`, restoring retries to 3. A further cold authenticated restoration
+returns PIN2 to `5678` and requires complete original card bytes.
+Use `nsb3_pin2_wrong_input.lua` for the first 90-second run;
+`nsb3_pin2_rejection_check.py prepare-recovery WRONG RECOVERY` prepares the
+retry-2 card for the ordinary change script. Prepare restoration using the
+PIN2-change checker's existing `prepare-restore` operation. The rejection
+checker `check SEED WRONG RECOVERY RESTORE` requires exact cold links,
+whole-card transitions, APDUs/statuses, physical contacts and error/success
+pixels. No attempt counter is seeded or reset by the harness.

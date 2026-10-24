@@ -8,7 +8,7 @@ no donor identity or fitted-mask compatibility is assumed.
 Separate `nsb3r4t` explicitly uses acquired NSE-1 ROM4 as an unproved
 compatibility input. It retains all 811 own uploaded words above `27ff` and
 executes legally through the bounded native mailbox/frame test, ending on a
-white panel with default full-scale ADC2. This is not interactive or native
+white panel with default full-scale ADC2. That control is not interactive or native
 RF/voice support; see `tools/nsb3_native_check.py` and `6190_bringup.md`.
 With the explicit nominal ADC2 hypothesis and six decoded integrity bytes
 recomputed in its own cold EEPROM, `nsb3r4t` separately reproduces an exact
@@ -27,6 +27,14 @@ Three cold wrong-PIN phases also prove blocking, physical PUK1 recovery and
 fresh authentication with the persisted replacement PIN.
 Physical PIN-request Off/On also persists across cold boots: Off skips SIM
 VERIFY but retains the phone-code prompt, while On restores the SIM challenge.
+Physical menu PIN1 change survives cold old-PIN rejection/new-PIN acceptance.
+Physical PIN2 change and cold authenticated restoration preserve all unrelated
+card bytes. A first wrong PIN2 consumes one retry; cold correct change restores
+it, followed by a cold credential restoration. These credential fixtures are
+bounded to 90 seconds: independent extended controls reset near 94 seconds
+after the DSP receive-activity window becomes empty and firmware publishes
+reason `68`. That trigger is mapped, not suppressed; the missing native
+response and fitted-mask/RF compatibility remain unresolved.
 Ordinary idle-content provenance, fitted-mask identity and radio/call/SMS-delivery
 acceptance remain open; the unproved native compatibility input is unchanged.
 
