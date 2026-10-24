@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 
 from tools import nsb1_toolkit_check as checker
 from tools.nsb1_toolkit_prepare import profile_metadata
+from tools.sim_toolkit_interactive_check import INKEY,INPUT,INKEY_RESPONSE,INPUT_RESPONSE
 
 
 def wire(direction, data):
@@ -32,7 +33,41 @@ def trace(control=False):
     return '\n'.join(text)
 
 
+def interactive_trace():
+    text=trace().replace('SIM status ins=14 sw=9000','SIM status ins=14 sw=9115')
+    for payload,response,actions,status in (
+            (INKEY,INKEY_RESPONSE,('inkey_5','inkey_confirm'),0x911a),
+            (INPUT,INPUT_RESPONSE,('input_4','input_2','input_confirm'),0x9000)):
+        text+='\n'+wire('TX',bytes((0xa0,0x12,0,0,len(payload))))
+        text+='\n'+wire('RX',payload+b'\x90\x00')
+        for action in actions:
+            for down in (1,0):
+                text+=f'\nnsb1_toolkit_input: action={action} down={down}'
+        text+='\n'+wire('TX',bytes((0xa0,0x14,0,0,len(response)))+response)
+        text+=f'\nSIM status ins=14 sw={status:04x} chv=3/3 puk=10/10 enabled=1'
+    return text
+
+
 class Nsb1ToolkitTest(unittest.TestCase):
+    def test_interactive_input_is_own_profile_and_physical_result(self):
+        text=interactive_trace()
+        checker.check_trace(text,interactive=True)
+        response=wire('TX',bytes.fromhex('a014000011')+INPUT_RESPONSE)
+        early=text.replace(response,'').replace('nsb1_toolkit_input: action=input_confirm down=1',
+                    response+'\nnsb1_toolkit_input: action=input_confirm down=1')
+        for bad in (early,text.replace('data=0f ','data=0b ',1),
+                    text.replace('action=input_2','action=input_3'),
+                    text.replace('ins=14 sw=911a','ins=14 sw=9000'),
+                    text+'\nnsb1_toolkit_input: malformed',text+'\nnsb1_reset_reason:68'):
+            with self.subTest(tail=bad[-100:]), self.assertRaises(ValueError):
+                checker.check_trace(bad,interactive=True)
+        with self.assertRaises(ValueError):
+            checker.check_trace(text,True,True)
+        with self.assertRaises(ValueError):
+            checker.check_trace(trace(),interactive=True)
+        with self.assertRaises(ValueError):
+            checker.check_trace(text)
+
     def test_own_terminal_profile_and_paired_control(self):
         checker.check_trace(trace())
         checker.check_trace(trace(True), True)
@@ -71,7 +106,7 @@ class Nsb1ToolkitTest(unittest.TestCase):
                 checker.wire(wire(direction, b'\x00' * 8192), direction)
 
     def test_only_external_card_configuration_may_differ(self):
-        for profile in (0, 1):
+        for profile in (0, 1, 3):
             with tempfile.TemporaryDirectory() as temporary:
                 source, run = Path(temporary) / 'source', Path(temporary) / 'run'
                 for path in (source, run):
@@ -106,7 +141,7 @@ class Nsb1ToolkitTest(unittest.TestCase):
                         checker.check_configuration(source, run, profile)
 
     def test_unqualified_profile_rejects(self):
-        for profile in (-1, 2, 3, 15):
+        for profile in (-1, 2, 4, 15):
             with self.assertRaises(ValueError):
                 profile_metadata(profile)
 

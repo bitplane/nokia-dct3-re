@@ -12,10 +12,11 @@ from tools.nsb1_rom4_compare import INPUTS, prepare_cold_run
 
 
 def profile_metadata(profile):
-    if profile not in (0, 1):
-        raise ValueError('only Phase-2 control and DISPLAY TEXT profiles are qualified')
+    if profile not in (0, 1, 3):
+        raise ValueError('unqualified external Toolkit profile')
     return {'profile': profile,
-            'description': ('Phase 2+ with one DISPLAY TEXT command' if profile else 'Phase 2 control'),
+            'description': ({0:'Phase 2 control',1:'Phase 2+ with one DISPLAY TEXT command',
+                             3:'Phase 2+ with DISPLAY TEXT, GET INKEY and GET INPUT'}[profile]),
             'handset_storage_changed': False, 'persistent_card_changed': False}
 
 

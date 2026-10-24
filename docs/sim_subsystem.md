@@ -540,6 +540,13 @@ product-specific outcomes must not be unified into a fabricated success.
 Own fixture scope and gates are in [6150 bring-up](6150_bringup.md) and
 [6130 bring-up](6130_bringup.md).
 
+The5190's own clean-idle composition independently passes physical GET INKEY5
+and GET INPUT42 after DISPLAY TEXT, returning its own `0f41ff7700` terminal
+profile and exact input responses with unchanged whole EEPROM/card/flash.
+Its physical Navi contact differs from the6150 despite sharing the lab schedule.
+`nsb1_toolkit_check.py --interactive` guards this independently of its older
+Field test01 DISPLAY TEXT fixture; native RF and speech remain unqualified.
+
 The6150 also independently handles a three-command external card: physical
 DISPLAY TEXT dismissal, GET INKEY5 and GET INPUT42 produce exact successful
 responses and return to its own clean idle frame. Full persistent card,

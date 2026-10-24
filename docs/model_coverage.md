@@ -215,6 +215,12 @@ fields,64KiB research RAM checksums and7764 identical DSP I/O writes over2.7s.
 Physical Menu repeats the exact Phone book pixels with unchanged complete
 EEPROM/card/flash. This does not promote fitted-mask, RF or sustained operation.
 
+The5190's own clean-idle bank separately passes an external profile3 sequence:
+DISPLAY TEXT, physical GET INKEY5 and physical GET INPUT42, followed by its
+reviewed clean idle pixels. Complete EEPROM/card/flash remain unchanged;
+the original Field test01 DISPLAY TEXT/control gates remain distinct.
+This does not promote native registration or fitted-mask compatibility.
+
 The6150 also independently passes one card-originated Toolkit DISPLAY TEXT
 with own terminal profile0b41ff7700, exact prompt/idle pixels and successful
 response after physical dismissal. Its matched Phase-2 control has no proactive

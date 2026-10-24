@@ -175,7 +175,43 @@ That fixture retains Field test01, so dismissal returns its existing marked
 idle content. The separate physical diagnostic-display gate above qualifies
 the clean layout without changing this Toolkit oracle. This is bounded card/application acceptance on an explicitly
 unproved ROM4 compatibility instrument, not fitted-mask, native radio,
-registration, speech or the rest of Toolkit.
+registration, speech or the rest of Toolkit. Separate interactive qualification
+below uses the physically selected clean-idle storage, not this older display
+fixture's Field test01 bank.
+
+#### Physical GET INKEY and GET INPUT
+
+An independent84s profile3 run starts from the own clean-idle bank in
+`tmp/nsb1-diagnostic-display-final-cold`, with the original complete PIN-enabled
+laboratory card. It retains own terminal profile `0f41ff7700`, displays and
+physically dismisses `DCT3 SAT`, then FETCHes `Press 5` and `Enter 42`.
+Physical Keypad5 plus Navi confirmation returns
+`8103022200020282810301000d020435`; Keypad4/Keypad2 plus a separate confirmation
+returns `8103032300020282810301000d03043432`. Card response statuses are
+9115,911a,9000 in order. Exact wire payloads precede their contacts, and no
+terminal result precedes the corresponding physical confirmation.
+
+Reviewed70.5/73.5/76s frames show Press5, empty Enter42 and filled42; the79s
+frame returns to the own clean Headset idle layout, not network registration.
+The entire8192-byte EEPROM (selected bank SHA256
+`4bd101b1c9089fed802aa5630135c4371f3bb070b136c7bfc15031917a598cad`),
+original3570-byte card and own executable flash remain unchanged. The wrapper
+requalifies cold source hashes, configuration, physical PIN/phone authentication
+and native execution through83s. The declared NSE-1 resident-mask comparison,
+nominal ADC2 and provisioning limitations remain; this is not fitted-silicon,
+RF, speech or long-run native acceptance.
+
+```sh
+.venv/bin/python tools/nsb1_toolkit_check.py \
+  tmp/nsb1-diagnostic-display-final-cold tmp/nsb1-toolkit-interactive-accepted \
+  --interactive
+```
+
+Add `--mame mame/mame` with fresh outputs to execute. The common laboratory
+schedule is `sim_toolkit_interactive_input.lua`; the NSB-1 wrapper selects
+its own Navi column1/mask04, distinct from the6150's column1/mask02.
+Wire validation and lab command bytes are shared, not terminal profiles,
+storage contents or product pixel oracles. Other Toolkit commands remain open.
 
 ```sh
 .venv/bin/python tools/nsb1_toolkit_check.py \
