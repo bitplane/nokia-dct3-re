@@ -73,6 +73,12 @@ class CleanupFramesTest(unittest.TestCase):
                     check.FRAMES, {'8890_sip_registered_idle.png': digest}):
                 (run / 'error.log').write_text(valid)
                 check.check_outgoing_result(run)
+                with self.assertRaisesRegex(ValueError, 'carrier'):
+                    check.check_outgoing_result(run, pcs1900=True)
+                (run / 'error.log').write_text(valid.replace('arfcn=60', 'arfcn=600'))
+                check.check_outgoing_result(run, pcs1900=True)
+                with self.assertRaisesRegex(ValueError, 'carrier'):
+                    check.check_outgoing_result(run)
                 for invalid in (valid.replace('arfcn=60', 'arfcn=1'),
                                 valid.replace('key=0e', 'key=0f')):
                     (run / 'error.log').write_text(invalid)

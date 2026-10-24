@@ -1443,6 +1443,14 @@ ended before its physical Exit (not just eventual release after a key); its
 missed-call/registered-idle frames remain checked. These are cross-product
 HLE signaling regressions, not evidence of native DSP or physical RF behavior.
 
+NSB-6 additionally has independent PCS1900 ordinary media gates:
+`verify-8890-pcs-sip-outgoing-media` and
+`verify-8890-pcs-sip-incoming-media`. Both require own ARFCN600 acquisition,
+physical call controls, exact documented PCM accounting, bidirectional local
+SIP media and product-owned UI/storage recovery. They do not inherit GSM900
+waveform or external-dialog restoration qualification; see the authoritative
+NSB-6 audio contract in `8xxx_bringup.md`.
+
 ### Failed calls and automatic redial
 
 The tested NHM-5 v6.39 profile automatically retries a rejected outgoing call

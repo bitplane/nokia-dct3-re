@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -60,12 +61,13 @@ def check_product_result(run, restore_idle=False):
     check_frames(run / 'snap')
 
 
-def check_outgoing_result(run):
+def check_outgoing_result(run, *, pcs1900=False):
     text = (run / 'error.log').read_text(errors='replace')
     check_output(text)
     check_output((run / 'console.log').read_text(errors='replace'))
     verify_stage(text, runtime=True, selftest=True)
-    if not re.search(r'gsm_call_adapter: network registered=1 arfcn=60\b', text):
+    carrier = 600 if pcs1900 else 60
+    if not re.search(rf'gsm_call_adapter: network registered=1 arfcn={carrier}\b', text):
         raise ValueError('host registration lacks own configured carrier')
     storage = (run / 'nvram/nsb6hle/sim_card').read_bytes()
     if len(storage) < 1611 or storage[1604:1609] != bytes.fromhex('00f1100001') or storage[1610] != 0:
@@ -142,10 +144,14 @@ def main():
                           dest='restore_incoming_connected_signaling', action='store_true',
                           help='physically answer, restore and clear an incoming HLE SIP dialog')
     parser.add_argument('--record-media', action='store_true')
+    parser.add_argument('--pcs1900', action='store_true',
+                        help='independent PCS incoming/outgoing media acceptance, not restoration')
     parser.add_argument('--sound', choices=('none', 'pulse'), default='none')
     parser.add_argument('--http-port', type=int, default=18889)
     parser.add_argument('--sip-port', type=int, default=25889)
     args = parser.parse_args()
+    if args.pcs1900 and not (args.outgoing_connected_signaling or args.incoming_connected_signaling):
+        parser.error('--pcs1900 requires an ordinary incoming/outgoing media fixture')
     outgoing_failure = args.outgoing_busy or args.outgoing_unavailable
     outgoing_run = outgoing_failure or args.restore_outgoing_pending or args.outgoing_connected_signaling or args.restore_outgoing_connected_signaling
     if args.restore_idle and (outgoing_run or args.incoming_connected_signaling or args.restore_incoming_connected_signaling or args.restore_incoming_alerting):
@@ -161,6 +167,11 @@ def main():
         run.mkdir(parents=True, exist_ok=False)
         (run / 'cfg').mkdir()
         shutil.copyfile(root / 'fixtures/noki8890_host/nsb6hle.cfg', run / 'cfg/nsb6hle.cfg')
+        if args.pcs1900:
+            configuration = ET.parse(root / 'fixtures/noki8890_pcs1900/nsb6hle.cfg')
+            ET.SubElement(configuration.find('./system/input'), 'port', tag=':CALLHOST',
+                          type='CONFIG', mask='1', defvalue='0', value='1')
+            configuration.write(run / 'cfg/nsb6hle.cfg', encoding='utf-8', xml_declaration=True)
         handset = [str((args.mame or root / 'mame/mame').resolve()), 'nsb6hle',
                    '-rompath', str(root / 'roms'), '-nvram_directory', str(run / 'nvram'),
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
@@ -181,6 +192,7 @@ def main():
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '8890',
+                   *(['--pcs1900'] if args.pcs1900 else []),
                    *(['--incoming', '--restore-call', '--ready-file',
                       str(run / 'snap/8890_sip_registered_idle.png')] if args.restore_incoming_connected_signaling else
                      ['--restore-outgoing', '--sip-response', '200'] if args.restore_outgoing_connected_signaling else
@@ -200,10 +212,11 @@ def main():
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
         if outgoing_run:
-            check_outgoing_result(run)
+            check_outgoing_result(run, pcs1900=args.pcs1900)
             if args.outgoing_connected_signaling:
                 from tools.noki8890_outgoing_call_check import verify as verify_outgoing
-                verify_outgoing((run / 'error.log').read_text(errors='replace'), configured_gsm900=True)
+                verify_outgoing((run / 'error.log').read_text(errors='replace'),
+                                configured_gsm900=not args.pcs1900, pcs1900=args.pcs1900)
             if args.restore_outgoing_pending or args.restore_outgoing_connected_signaling:
                 check_alerting_restoration((run / 'error.log').read_text(errors='replace'), outgoing=True,
                                           connected=args.restore_outgoing_connected_signaling)
@@ -221,7 +234,8 @@ def main():
                     raise ValueError('connected restoration lacks one own caller SETUP')
             else:
                 from tools.noki8890_incoming_call_check import verify as verify_incoming
-                verify_incoming(text, caller='5551234', configured_gsm900=True)
+                verify_incoming(text, caller='5551234', configured_gsm900=not args.pcs1900,
+                                pcs1900=args.pcs1900)
             storage = (run / 'nvram/nsb6hle/sim_card').read_bytes()
             if len(storage) < 1611 or storage[1604:1609] != bytes.fromhex('00f1100001') or storage[1610] != 0:
                 raise ValueError('incoming cleanup lacks persisted laboratory SIM location')
@@ -237,7 +251,8 @@ def main():
             if args.restore_incoming_alerting:
                 check_alerting_restoration((run / 'error.log').read_text(errors='replace'))
         subprocess.run([sys.executable, str(root / 'tools/noki8890_registration_check.py'),
-                        '--configured-gsm900', str(run / 'error.log')], check=True)
+                        '--pcs1900' if args.pcs1900 else '--configured-gsm900',
+                        str(run / 'error.log')], check=True)
         if args.outgoing_connected_signaling or args.incoming_connected_signaling:
             from tools.noki8890_pcm_check import verify as verify_pcm
             verify_pcm((run / 'error.log').read_text(errors='replace'),
@@ -252,7 +267,8 @@ def main():
                                              'outgoing-sip-unavailable' if args.outgoing_unavailable else
                                              'outgoing-sip-busy' if args.outgoing_busy else 'incoming-sip-cancel'),
             'mcu_sha1': profile[2], 'pmm_sha1': profile[4],
-            'provisioning': 'own acquired PMM unchanged', 'laboratory_carrier': 60,
+            'provisioning': 'own acquired PMM unchanged',
+            'laboratory_carrier': 600 if args.pcs1900 else 60,
             'native_dsp_complete': False,
             'hle_media_tested': args.outgoing_connected_signaling or args.incoming_connected_signaling,
             'idle_restored': args.restore_idle,

@@ -664,7 +664,20 @@ transport counters alone. No codec gain is changed. The outgoing capture
 has6/7 sustained microphone/earpiece seconds; incoming has8/4. Captures are
 `tmp/nsb6-sip-outgoing-waveform/handset` and
 `tmp/nsb6-sip-incoming-waveform/handset`. This is HLE endpoint audio, not
-native speech, measured analogue gain or independently tested PCS1900 audio.
+native speech, measured analogue gain or PCS1900 physical-waveform qualification.
+
+PCS1900 independently passes `verify-8890-pcs-sip-outgoing-media` and
+`verify-8890-pcs-sip-incoming-media`. Each uses unchanged own MCU/PMM and
+fresh isolated storage, the established PCS topology plus the external host
+endpoint, and physical Send/Answer/End. Acceptance requires the own PCS scan,
+ARFCN600 registration, CC/RR closure, persistent EF_LOCI, reviewed idle
+recovery, at least100 media/host-PCM frames in both directions and unchanged
+512000/8000Hz,64-clock/47-idle-clock accounting. Outgoing reports361 uplink
+and346 downlink frames; incoming396/376. The runner's `--pcs1900` is restricted
+to ordinary media calls; it cannot silently select GSM900 checks, restoration
+or signaling-only acceptance. No device configuration or codec gain changed.
+These are clocked HLE transport tests, not native DSP speech, measured RF,
+PCS physical-waveform qualification or PCS external-dialog restoration.
 
 Accepted media captures are `tmp/nsb6-sip-outgoing-media-qualified` and
 `tmp/nsb6-sip-incoming-media-final`. The four restoration captures use

@@ -329,12 +329,13 @@ def verify_success(root, remote_text, args):
         from tools.nsb7_sip_check import check as verify_8290_call
         verify_8290_call(log, incoming=args.incoming, media=True)
     if product == '8890':
+        pcs1900 = getattr(args, 'pcs1900', False)
         if args.incoming:
             from tools.noki8890_incoming_call_check import verify as verify_8890_call
-            verify_8890_call(log, caller='5551234', configured_gsm900=True)
+            verify_8890_call(log, caller='5551234', configured_gsm900=not pcs1900, pcs1900=pcs1900)
         else:
             from tools.noki8890_outgoing_call_check import verify as verify_8890_call
-            verify_8890_call(log, number=number, configured_gsm900=True)
+            verify_8890_call(log, number=number, configured_gsm900=not pcs1900, pcs1900=pcs1900)
     if product == '8850':
         if args.incoming:
             try:
@@ -734,6 +735,8 @@ def main():
     parser.add_argument('--dcs1800', action='store_true',
                         help='use the own NSM-3 DCS channel contract, not GSM900 words')
     parser.add_argument('--product', choices=('3210', '3310', '3330', '3410', '5210', '6210', '6250', '8210', '8290', '8850', '8890'), default='3210')
+    parser.add_argument('--pcs1900', action='store_true',
+                        help='8890 ordinary clocked media with independently checked PCS acquisition')
     parser.add_argument('--ready-file', type=Path,
                         help='wait for a fresh handset readiness artifact before an incoming INVITE')
     parser.add_argument('--calls', type=int, choices=(1, 2), default=1)
@@ -747,6 +750,10 @@ def main():
     parser.add_argument('--sip-response', type=int, choices=(180, 200, 403, 404, 408, 480, 486, 503, 600), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    if args.pcs1900 and (args.product != '8890' or args.signaling_only or
+                        args.sip_response != 200 or args.restore_idle or
+                        args.restore_call or args.restore_outgoing or args.cancel_incoming):
+        parser.error('--pcs1900 requires ordinary 8890 connected media without restoration/cancel')
     if args.dcs1800 and args.product != '8210':
         parser.error('--dcs1800 is qualified only for product 8210')
     signaling_connected = (args.signaling_only and args.product == '6210' and

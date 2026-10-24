@@ -279,6 +279,20 @@
       ]
     },
     {
+      "name": "verify-8890-pcs-sip-outgoing-media", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP; own NSB-6 PCS1900 acquisition, physical Send/End, real SIP and clocked HLE PCM; not native speech",
+      "recipe": [
+        "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON) tools/run_noki8890_sip_cancel.py '$(RUN_DIR)' --pcs1900 --outgoing-media --pjsua '$(SIP_PJSUA_BIN)'"
+      ]
+    },
+    {
+      "name": "verify-8890-pcs-sip-incoming-media", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP; own NSB-6 PCS1900 acquisition, physical Answer/End, real SIP and clocked HLE PCM; not native speech",
+      "recipe": [
+        "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON) tools/run_noki8890_sip_cancel.py '$(RUN_DIR)' --pcs1900 --incoming-media --pjsua '$(SIP_PJSUA_BIN)'"
+      ]
+    },
+    {
       "name": "verify-8890-sip-incoming-waveform", "prerequisites": ["build"], "variables": {},
       "unstructured": "optional PJSIP/PulseAudio/FFmpeg; own NSB-6 incoming Answer/End and microphone/earpiece tones through its documented PCM bus, HLE not native speech",
       "recipe": [

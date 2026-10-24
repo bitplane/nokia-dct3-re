@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 853 gates: 639 generated from typed steps, 214 copied verbatim (shell).
+# 855 gates: 639 generated from typed steps, 216 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -66,6 +66,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8290-sip-incoming-alerting-restore \
 	verify-8290-sip-incoming-media-restore verify-8290-sip-outgoing-media-restore \
 	verify-8290-sip-incoming-waveform verify-8290-sip-outgoing-waveform \
+	verify-8890-pcs-sip-outgoing-media verify-8890-pcs-sip-incoming-media \
 	verify-8890-sip-incoming-waveform verify-8890-sip-outgoing-waveform \
 	verify-8850-sip-incoming-waveform verify-8850-sip-outgoing-waveform \
 	verify-8210-sip-outgoing-waveform verify-8210-sip-incoming-media \
@@ -661,6 +662,14 @@ verify-8290-sip-incoming-waveform: build
 # shell: optional PJSIP/PulseAudio/FFmpeg and explicit SIP_WAVEFORM_NVRAM_DIR from own qualified NSB-7 provisioning; physical dialing/End and HLE microphone/earpiece tones, not native speech
 verify-8290-sip-outgoing-waveform: build
 	env SIP_PRODUCT=8290 SIP_DIRECTION=outgoing SIP_WAVEFORM_NVRAM_DIR='$(SIP_WAVEFORM_NVRAM_DIR)' RUN_DIR='$(RUN_DIR)' SIP_PJSUA_BIN='$(SIP_PJSUA_BIN)' SIP_PYTHON_PATH='$(SIP_PYTHON_PATH)' bash tools/run_sip_physical_audio_gate.sh
+
+# shell: optional PJSIP; own NSB-6 PCS1900 acquisition, physical Send/End, real SIP and clocked HLE PCM; not native speech
+verify-8890-pcs-sip-outgoing-media: build
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON) tools/run_noki8890_sip_cancel.py '$(RUN_DIR)' --pcs1900 --outgoing-media --pjsua '$(SIP_PJSUA_BIN)'
+
+# shell: optional PJSIP; own NSB-6 PCS1900 acquisition, physical Answer/End, real SIP and clocked HLE PCM; not native speech
+verify-8890-pcs-sip-incoming-media: build
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON) tools/run_noki8890_sip_cancel.py '$(RUN_DIR)' --pcs1900 --incoming-media --pjsua '$(SIP_PJSUA_BIN)'
 
 # shell: optional PJSIP/PulseAudio/FFmpeg; own NSB-6 incoming Answer/End and microphone/earpiece tones through its documented PCM bus, HLE not native speech
 verify-8890-sip-incoming-waveform: build
