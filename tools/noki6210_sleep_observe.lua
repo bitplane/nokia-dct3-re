@@ -15,6 +15,16 @@ _G.npe3_sleep_control_tap = memory:install_write_tap(0x2000c, 0x2000f,
         if #transitions > 16 then table.remove(transitions, 1) end
     end)
 local runner = coroutine.create(function()
+    assert(emu.wait(31.5))
+    -- Install after the first wake; debugger counters are not handset state.
+    local checkpoints = {0x500a18, 0x4dc12c, 0x4b03ec, 0x4b0412}
+    for index, address in ipairs(checkpoints) do
+        local counter = 'temp' .. (index - 1)
+        machine.debugger:command(counter .. '=0')
+        cpu.debug:bpset(address, counter .. '<8',
+            string.format('%s=%s+1;logerror "6210_sleep_continuation: pc=%%08x r0=%%08x lr=%%08x ctrl=%%02x dsp=%%02x observer_writes=0\\n",pc,r0,r14,b@2000c,b@20002;g',
+                          counter, counter))
+    end
     for _, target in ipairs({35.99, 36.05, 36.2, 36.4}) do
         assert(emu.wait(target - machine.time:as_double()))
         if target == 35.99 then

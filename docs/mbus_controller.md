@@ -160,6 +160,16 @@ next call entry without intervening argument assignment, not inferred from
 silent hooks. There is no evidence here for a missing keypad edge, masked
 FIQ3 dispatch, corrupt timer baseline, or a safe firmware-flag injection.
 
+The bounded continuation probes install after31.5s, with eight observations
+per address. They positively observe`0x4b0412` entering sleep-finalization,
+`0x500a18` called with argument1 and`0x4dc12c` returning from DSP-stop with
+CTSI+2 ready bit4 clear. Thus the DSP-stop polling loop`0x4dc126` is not
+the observed stall. The global-enable store`0x4b03ec` has no probe hit in
+that run; this is bounded runtime evidence, not a static unreachable claim.
+Own idle control flow reaches that store only through`0x4b03e2`; repeated
+sleep-finalization instead loops through`0x4b036a`. Do not replace either
+firmware branch or infer automatic hardware enabling from this distinction.
+
 A no-call/no-key control (`tmp/npe3-mbus-late-idle-query`) establishes the
 same boundary independently of call signaling or speech: clock-stop at
 31.039953s, FIQ0 wake31.061014s, global control`0a` through49s. A read-only
