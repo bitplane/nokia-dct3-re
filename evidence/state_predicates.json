@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_nhm3_handset_name_edit_cold_persistence", "owner": "handset_nonvolatile_storage", "status": "satisfied",
+      "predicate": "Independent 6210 and 6250 physical handset-contact renames persist across cold processes without changing the number or SIM contents",
+      "current": "Each product's five-process --rename fixture independently qualifies an empty control, fresh A/123 save, cold retrieval, physical Options/Edit name changing A to D and cold retrieval of D/123. Exact editor, product-specific edit-save and cold-detail pixel hashes are required. Complete predecessor NVRAM is inherited, complete SIM files remain identical, every trace rejects UPDATE RECORD and handset flash changes during rename. Own boot/upload/HLE checks remain mandatory;6250 retains its explicitly non-factory own initial-record PMM comparison. This is one single-letter rename, not arbitrary encoding, multiple contacts/numbers, capacity, decoded flash record grammar, native DSP or speech.",
+      "evidence": ["docs/6210_bringup.md", "docs/6250_bringup.md", "tools/run_dct3_phone_memory.py", "tools/dct3_phone_memory_lifecycle.lua", "tools/noki6210_phone_memory_rename.lua", "tools/noki6250_phone_memory_rename.lua", "tools/test_noki6210_phone_memory.py"]
+    },
+    {
       "id": "nse1_native_filter_frontend_owner_parity", "owner": "native_rom4_rf_filter", "status": "satisfied",
       "predicate": "Isolated native receive-filter outputs match an independent convolution on legacy atomic, standard atomic and standard staged compositions with admitted bus owners",
       "current": "The 32-word full-scale mixed fixture yields all48 exact reference outputs on noki5110, nse1astd and nse1pipe; the bounded mixed fixture also passes on nse1pipe. Actual binary/input/ROM hashes and explicit profiles are retained, with healthy CPU and unique system markers required. Staged reads use derived readonly Read-slot ownership rather than advanced PC; Execute-slot ownership attributes output stores. Input owners330a/3310/3316/331c and output owners3321/3322 must match alongside ordered samples and destinations. The existing1728-case PORTR block matrix checks these getter values on real callbacks across two pages and1728 restore replays, including absent-slot sentinels. No CPU instruction arithmetic, threshold, sample words or clock changes are made. This is bounded filter/observer parity, not arbitrary state, physical RF representation/cadence, detector acceptance or native reception.",

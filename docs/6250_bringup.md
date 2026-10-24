@@ -1442,8 +1442,19 @@ frame names, not the 6210 reader. Every successor inherits complete predecessor
 NVRAM; all nine complete SIM files match and no UPDATE RECORD occurs.
 The own upload/HLE and PMM checks remain mandatory on every leg. Capture:
 `tmp/nhm3-phone-memory-lifecycle`. This qualifies one numeric edit and
-cancel/confirmed erase, not multiple numbers, name editing, capacity, bulk
+cancel/confirmed erase, not multiple numbers, capacity, bulk
 erase, copying or native DSP. Menu positions remain harness policy.
+
+The separately executed `--product 6250 --rename` variant starts with its own
+empty control, fresh A / 123 save and cold retrieval, then physically selects
+Options / Edit name, changes A to D and cold-reads D / 123. All five processes
+retain the own upload/HLE and initial-record PMM checks. Name-editor,
+product-specific save confirmation and cold-detail pixel hashes are required;
+complete SIM files remain identical and no UPDATE RECORD is allowed.
+Persistent handset flash changes without external contact mutation. This
+qualifies one single-letter rename with an unchanged number, not arbitrary
+name encodings or a decoded flash-record grammar. Capture:
+`tmp/nhm3-phone-rename-qualified`.
 
 ## Radio acquisition comparison
 

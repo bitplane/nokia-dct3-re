@@ -3,10 +3,27 @@ from pathlib import Path
 import tempfile
 from tools.run_noki6210_phone_memory import (
     verify_storage, verify_lifecycle_digests, LIFECYCLE_FRAMES, EMPTY_SHA256)
-from tools.run_dct3_phone_memory import run,lifecycle_frames
+from tools.run_dct3_phone_memory import (run,lifecycle_frames,verify_rename_digests,
+    NAME_D_SHA256,RENAMED_CONTACT_SHA256,EDIT_SAVED_SHA256,CONTACT_SHA256)
 
 
 class PhoneMemoryStorageTest(unittest.TestCase):
+    def test_rename_requires_changed_name_and_preserved_number_after_cold_boot(self):
+        reference=dict(editor=NAME_D_SHA256,saved=EDIT_SAVED_SHA256,cold=RENAMED_CONTACT_SHA256)
+        verify_rename_digests(reference)
+        for key in reference:
+            bad=dict(reference)
+            bad[key]=CONTACT_SHA256
+            with self.subTest(key=key),self.assertRaises(ValueError):
+                verify_rename_digests(bad)
+        with self.assertRaises(ValueError):verify_rename_digests(reference,'6250')
+
+    def test_combined_mutation_fixtures_are_rejected_before_run_creation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            target=Path(temporary)/'run'
+            with self.assertRaises(ValueError):run(target,True,'6210',True)
+            self.assertFalse(target.exists())
+
     def test_unqualified_product_or_lifecycle_cannot_reuse_6210_acceptance(self):
         with tempfile.TemporaryDirectory() as temporary:
             target=Path(temporary)/'run'

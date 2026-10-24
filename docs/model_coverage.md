@@ -105,7 +105,8 @@ fixture with an empty-bank negative control and unchanged complete SIM files;
 see `run_noki6210_phone_memory.py`. Its `--lifecycle` variant adds a physical
 numeric edit, cancellation and confirmed erase, each with independent cold
 readback and unchanged SIM storage. Capacity, copying and native DSP are not
-promoted.
+promoted. Its separate five-process `--rename` fixture cold-reads D / 123
+after physically renaming A, retaining the number and unchanged SIM storage.
 
 NHM-3 separately qualifies Phone-bank A/123 save/cold retrieval against an
 empty control, with unchanged SIM storage and its own PMM comparison and
@@ -113,6 +114,10 @@ upload/HLE checks. Its independent `--product 6250 --lifecycle` chain also
 qualifies numeric edit, erase cancellation and confirmed erase through cold
 readback, with product-owned frame/timing checks rather than inherited6210
 acceptance.
+The independently run `--product 6250 --rename` fixture also cold-reads
+D / 123 after physical name editing, with its own boot/provisioning checks
+and product-qualified save frame. Neither rename gate establishes arbitrary
+name encodings, capacity or multi-number contacts.
 
 `verify-6210-pin-retry` additionally proves physical9999 rejection with one
 consumed PIN1 retry, physical1234 recovery/reset, delayed coherent laboratory

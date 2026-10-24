@@ -287,7 +287,18 @@ means One by one opens the existing contact directly, not an extra search
 editor; the dialog oracle prevents an extra OK from silently confirming
 instead of cancelling. Capture: `tmp/npe3-phone-memory-lifecycle-banked`.
 This qualifies one numeric edit, erase cancellation and complete-contact erase,
-not multiple numbers, names, bulk erasure, capacity or SIM/phone copying.
+not multiple numbers, bulk erasure, capacity or SIM/phone copying.
+
+The independent `--rename` variant uses five fresh processes: empty control,
+A / 123 save, cold retrieval, physical Options / Edit name changing A to D,
+and cold retrieval of D / 123. The name editor, edit-save confirmation and
+cold detail are exact pixel oracles; the latter checks both the changed name
+and retained number. Complete SIM files remain identical, no UPDATE RECORD
+is allowed, and the rename changes persistent handset flash. Successors
+inherit complete predecessor NVRAM. This is one single-letter rename, not
+arbitrary character encoding, multiple contacts or a decoded flash-record
+grammar. The rename and numeric/erase variants are deliberately separate
+fresh fixtures. Capture: `tmp/npe3-phone-rename-final`.
 
 ### Laboratory registration
 
