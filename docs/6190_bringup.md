@@ -415,3 +415,38 @@ state. It also requires the physical matching-code/menu sequence. Decode the
 NSB-3 constructors/native dispatch for `1a`/`4a` alongside task-12 consumption
 of the late `8b`; this inventory alone is not registration,
 a missing-response diagnosis, or permission to add an HLE radio reply.
+
+### Task-12 result retention
+
+The same native receive object is consumed at `219c7e`, whose task loop is
+`219c70 -> 26cb20`. Its `13b8` subtract-cascade selects table index `0e`
+at `219d3c`, target `219d82`. Runtime observes state `106fcc=3`, phase
+`106fd1=1` and no previous cache. The branch allocates an `a8`-byte object
+and copies 160 bytes from message `+6` to cache `+6` at `219dbe..219dc2`.
+The captured bytes equal the native `8b` body after its first two bytes,
+byte for byte. At `219dee`, state 3 takes `219df4 -> 21a158`, bypassing
+further candidate processing. This is a retained result, not proof of an
+empty vector, absent delivery or successful acquisition.
+
+The read-only state watch sees only zeroing at `20010e` and own task
+initialization to 3 at `219c3e` (1.184 seconds), retained through the 65-second
+run. Owner `106fb8` contains state at `+14` and phase at `+19`; task-local
+owner `106b58` holds the cache pointer at `+28`. Captured heap addresses
+`102c40`/`102e80` identify this fixture's objects, not fixed ABI locations.
+The diagnostic object read tap must be revalidated against the forwarder
+address if allocation changes.
+
+Own initializer `218bb0` sets state 1 at `218bf6` and retains its argument
+at phase-owner `+15`. A two-byte-aligned Thumb BL scan across the `d6d00`-byte
+MCU extent finds direct callers `218d50` and `21a13e`; this does not close
+indirect calls, tail branches or computed aliases. The latter is the own
+task-12 `043f` branch `21a10c`, passing message byte `+2`. These are routes
+to investigate, not statuses to inject. Next qualify the legitimate
+`043f` producer and the other initializer caller, with the state watch
+retained; do not change state 3 or invent a DSP acknowledgment to use the cache.
+
+Run `tools/nsb3_radio_consumer_observe.lua` for 65 seconds on the same fresh
+fixture, then extend the native checker with `--consumer`. It requires the
+same forwarded/consumed object, observed state initialization and retention,
+cache allocation, and exact captured-vector equality in addition to the
+complete native ring and physical security/menu controls.

@@ -17,6 +17,9 @@ ROUTINES = {
     0x294268: (118, 'd7cece5ab68a2ca720f62526e0414dbb53ad3b72af6c4543f7630205fdbfdda5'),
     0x2942fe: (94, '0ef90d2704f1c0b75d05071a9aaf285907cbef9fc9a8133c6e847425f9ad2edb'),
     0x294374: (36, 'bfc81a96569c4fa0e811fcdef4755fd2fcd046dfd62b5e894fbac7a391d57c80'),
+    0x219c7e: (202, '2511fcb04e00cefa92b82b2420fbc7a8f0462de07b41fa6f0c0fbf39376db7d5'),
+    0x219d82: (116, 'fc4ab7df6028e3f8df7f194a2fc40d79eb0cdbf4a3148cd5f82cad0b1cb6d9cc'),
+    0x218bb0: (76, '24d2f695f12c54349e6cce0e18452cdc2b3e12af1e1b55a4809f62545294f903'),
 }
 DIGESTS = {'tx': '4d27ec28fd959770247d0e858d7052dd61fa20975584ca10d7dd761123632e6c',
            'rx': '521c35ae4087fcd95e1eef6abeecf73a749cdbf5ea418e0b97c5f53c083b03ed'}
@@ -91,14 +94,42 @@ def check(text):
             'rf_registration_proved': False, 'fitted_mask_identity_proved': False}
 
 
+def check_consumer(text, cached):
+    received = re.findall(r'nsb3_radio_rx: index=15 type=8b length=162 data=([0-9a-f]+) ', text)
+    if len(received) != 1 or len(cached) != 160 or bytes.fromhex(received[0])[2:] != cached:
+        raise ValueError('cached vector differs from native 8b payload')
+    objects = re.findall(r'nsb3_radio_8b_forward: message=([0-9a-f]{8}) header=1802a28b observer_writes=0', text)
+    if len(objects) != 1:
+        raise ValueError('own native object forwarding evidence missing')
+    token = ('nsb3_radio_object_read: object=' + objects[0] +
+             ' data=13b80000 mask=ffff0000 pc=00219c7e')
+    if token not in text:
+        raise ValueError('same 13b8 object was not read by task12 consumer')
+    if ('nsb3_radio_result_branch: object=' + objects[0] +
+            ' state=03 phase=01 cache=00000000 observer_writes=0') not in text:
+        raise ValueError('deferred result branch state differs')
+    tails = re.findall(r'nsb3_radio_result_tail: state=03 phase=01 cache=([0-9a-f]{8}) observer_writes=0', text)
+    captures = re.findall(r'nsb3_radio_cached_vector: pointer=([0-9a-f]{8}) bytes=160 state=03 phase=01 t=45 observer_writes=0', text)
+    if len(tails) != 1 or tails != captures or not 0x100000 <= int(tails[0], 16) <= 0x110000 - 166:
+        raise ValueError('cached object/retained lifecycle evidence differs')
+    writes = re.findall(r'nsb3_radio_controller_state: value=([0-9a-f]+) pc=([0-9a-f]+) ', text)
+    if writes != [('00', '0020010e'), ('03', '00219c3e')]:
+        raise ValueError('controller initialization/retained state differs')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image', type=Path)
     parser.add_argument('run', type=Path)
+    parser.add_argument('--consumer', action='store_true', help='also verify same-object task12 cache/defer contract')
     args = parser.parse_args()
     try:
         contract(args.image.read_bytes())
-        result = check((args.run / 'error.log').read_text())
+        text = (args.run / 'error.log').read_text()
+        result = check(text)
+        if args.consumer:
+            check_consumer(text, (args.run / 'nsb3_radio_cached_vector.bin').read_bytes())
+            result['task12_result_cached_while_state3'] = True
     except (OSError, ValueError) as exc:
         parser.exit(1, f'NSB-3 native radio inventory: FAIL: {exc}\n')
     print(json.dumps(result, indent=2))
