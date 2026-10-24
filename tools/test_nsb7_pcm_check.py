@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsb7_pcm_check import verify, verify_before_restore
+from tools.nsb7_pcm_check import verify, verify_before_restore, verify_unanswered_restore
 
 
 class PCMTests(unittest.TestCase):
@@ -49,6 +49,19 @@ class PCMTests(unittest.TestCase):
                     'sip_state: saved\n' + self.text):
             with self.subTest(bad=bad[-60:]), self.assertRaises(ValueError):
                 verify_before_restore(bad)
+
+    def test_unanswered_local_pcm_is_only_bounded_zero_downlink_teardown(self):
+        tick = next(row for row in self.text.splitlines() if 'speech tick' in row).replace('downlink=93', 'downlink=0')
+        text = 'sip_state: restored\n' + tick + '\nLAPDm service Channel Release acknowledged'
+        verify_unanswered_restore(text)
+        verify_unanswered_restore('sip_state: restored\nLAPDm service Channel Release acknowledged')
+        for bad in (text.replace('downlink=0', 'downlink=1'),
+                    tick + '\n' + text,
+                    text + '\n' + tick,
+                    text.replace('752000', '752001'),
+                    text + '\ngsm_call_adapter: media direction=uplink id=1 result=accepted'):
+            with self.subTest(bad=bad[-80:]), self.assertRaises(ValueError):
+                verify_unanswered_restore(bad)
 
 
 if __name__ == '__main__':

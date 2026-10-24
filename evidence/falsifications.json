@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsb7_unanswered_restore_implies_no_local_pcm_ticks",
+      "status": "disproven",
+      "hypothesis": "An unanswered NSB-7 restored SIP transaction on the PCM-enabled composition cannot execute any local codec/PCM ticks",
+      "conclusion": "The own-source outgoing SIP180 capture tmp/nsb7-pcm-outgoing-pending-restore never CONNECTs and discards an epoch with all four external-media counters zero, but three local HLE PCM ticks execute at60.520/60.540/60.560 during the post-load radio teardown. All have downlink0 and exact512000/8000Hz,64-clock/47-idle-clock accounting; no accepted host media exists. Codec activity is therefore not evidence of external speech or CONNECT. Current unanswered acceptance separately requires zero external media inventory/admission and confines any local PCM to the restore-to-radio-release interval with zero downlink. It retains exact architecture, no-CONNECT, one termination, release-before-physical-End and exact UI/storage checks. The transient's physical-silicon fidelity is not established, and no device behavior or gain was changed to suppress it.",
+      "evidence": ["docs/8290_bringup.md", "tools/nsb7_pcm_check.py", "tools/nsb7_sip_check.py", "tools/run_sip_handset_gate.py", "tools/test_nsb7_pcm_check.py", "tools/test_nsb7_sip_check.py"]
+    },
+    {
       "id": "mbus_status_bit7_is_universally_counter_reset_only",
       "status": "disproven",
       "hypothesis": "Status bit7 can be described universally as only a serial-counter reset, with no payload-dependent service-loader use",

@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_pcm_composition_unanswered_sip_restoration",
+      "owner": "nsb7_host_call_lifecycle",
+      "status": "satisfied",
+      "predicate": "Unanswered outgoing and ringing incoming NSB-7 SIP transactions restore exact handset state and dispose external transactions without CONNECT, Answer, external media or replay on the PCM-enabled build",
+      "current": "Clean full wrappers tmp/nsb7-pcm-outgoing-pending-restore-clean and tmp/nsb7-pcm-incoming-alerting-restore pass own authentication/PCS600 registration, physical contacts, actual snapshots, all37 ARM/banked registers/RAM/time, exact saved/restored/cleanup/final pixels, complete card, own flash journal and retained RTC. Outgoing SIP180 ends with CANCEL/487 and incoming ringing receives rejection603; each external epoch inventories zero uplink/downlink/host PCM transmitted/received and has no admitted media. One cause41 clear finishes CC/RR before the later physical End, with no redial/readmission or synthesized CONNECT. Any local outgoing HLE PCM ticks are separately constrained to restore-to-radio-release with downlink0 and exact documented clocks; this is not external speech and physical-silicon fidelity remains unknown. Connected phases and endpoint waveforms have separate predicates; native DSP speech remains unproved.",
+      "evidence": ["docs/8290_bringup.md", "docs/external_call_bridge.md", "docs/model_coverage.md", "tools/run_noki8290_sip_media.py", "tools/nsb7_pcm_check.py", "tools/nsb7_sip_check.py", "tools/run_sip_handset_gate.py", "tools/test_run_noki8290_sip_media.py", "tools/test_nsb7_pcm_check.py", "tools/test_nsb7_sip_check.py", "gates.json"]
+    },
+    {
       "id": "nsb7_connected_incoming_pcm_sip_restoration",
       "owner": "nsb7_host_call_lifecycle",
       "status": "satisfied",

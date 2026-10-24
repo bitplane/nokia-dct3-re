@@ -506,12 +506,25 @@ def verify_pre_restore_media(log, bridge):
         raise RuntimeError('connected restoration lacks executed pre-save handset PCM')
 
 
+def verify_unanswered_media_inventory(log, bridge):
+    summaries = re.findall(r'SIP epoch media discarded (\{[^\n]+\})', bridge)
+    if len(summaries) != 1:
+        raise RuntimeError('unanswered restoration lacks one discarded-epoch inventory')
+    counts = json.loads(summaries[0])
+    if any(counts.get(name) != 0 for name in
+           ('uplink', 'downlink', 'pcm_transmitted', 'pcm_received')):
+        raise RuntimeError('unanswered external dialog carried media')
+    if re.search(r'gsm_call_adapter: media direction=\w+ [^\n]*result=accepted', log):
+        raise RuntimeError('unanswered handset admitted external media')
+
+
 def verify_outgoing_restore(root, remote_text, connected=False, product='3210', *, signaling_only=False):
     bridge = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
     if product=='8290':
         from tools.nsb7_sip_check import check_restore
-        check_restore(log,connected=connected,media=connected and not signaling_only)
+        check_restore(log,connected=connected,media=connected and not signaling_only,
+                      clocked_unanswered=not connected and not signaling_only)
     number = {'6210': '1234567', '6250': '123', '8210': '1234567', '8890': '1234567'}.get(product, '5551234')
     if not re.search(outgoing_setup_pattern(product), log):
         raise RuntimeError('restored outgoing call lacks the product SETUP frame')
@@ -572,6 +585,8 @@ def verify_outgoing_restore(root, remote_text, connected=False, product='3210', 
             raise RuntimeError('signaling-only restoration lacks zero-uplink/no-codec evidence')
     elif connected and product in ('8290', '8890'):
         verify_pre_restore_media(log, bridge)
+    elif not connected and product == '8290':
+        verify_unanswered_media_inventory(log, bridge)
     (root / 'sip-result.json').write_text(json.dumps({
         'scope': (f'{product} connected outgoing HLE SIP save/load; BYE, no redial' if connected else
                   f'{product} pending outgoing HLE SIP save/load; CANCEL/487, no redial/CONNECT'),
@@ -585,7 +600,8 @@ def verify_restore(root, remote_text, phase='connected', product='3210', *, sign
     log = (root / 'error.log').read_text(errors='replace')
     if product=='8290':
         from tools.nsb7_sip_check import check_incoming_restore
-        check_incoming_restore(log,phase=phase,media=phase == 'connected' and not signaling_only)
+        check_incoming_restore(log,phase=phase,media=phase == 'connected' and not signaling_only,
+                               clocked_unanswered=phase == 'alerting' and not signaling_only)
     if phase == 'connected':
         if not re.search(r'state changed to CONFIRMED.*?Request msg BYE/',
                          remote_text, re.DOTALL):
@@ -652,6 +668,8 @@ def verify_restore(root, remote_text, phase='connected', product='3210', *, sign
     elif phase == 'connected' and product in ('8290', '8890'):
         verify_incoming_identity(bridge, restored=True)
         verify_pre_restore_media(log, bridge)
+    elif phase == 'alerting' and product == '8290':
+        verify_unanswered_media_inventory(log, bridge)
     (root / 'sip-result.json').write_text(json.dumps({
         'scope': f'{product} {phase} HLE SIP call save/load; external dialog cleared, not restored',
         'passed': True, **({'speech_tested': False, 'native_dsp_complete': False}
@@ -772,7 +790,13 @@ def main():
                           args.sip_response == 200 and args.calls == 1 and
                           not args.record_media and
                           not args.restore_idle and not args.cancel_incoming)
-    if args.product=='8290' and not signaling_connected and not nsb7_media and not nsb7_restore_media:
+    nsb7_unanswered = (args.product == '8290' and not args.signaling_only and
+                       args.calls == 1 and not args.record_media and not args.restore_idle and
+                       not args.cancel_incoming and (
+                       (not args.incoming and args.restore_outgoing and not args.restore_call and args.sip_response == 180) or
+                       (args.incoming and args.ready_file is not None and args.restore_call and
+                        args.restore_phase == 'alerting' and not args.restore_outgoing and args.sip_response == 200)))
+    if args.product=='8290' and not signaling_connected and not nsb7_media and not nsb7_restore_media and not nsb7_unanswered:
         parser.error('8290 supports only its single signaling-only SIP-200 fixtures; speech is unproved')
     if args.ready_file and not args.incoming:
         parser.error('--ready-file requires --incoming')

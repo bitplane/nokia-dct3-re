@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock,patch
 from tools.nsb7_sip_check import check,check_restore,check_incoming_restore,check_sip_frame
 from tools.test_nsb7_host_outgoing_call_check import fixture
 from tools.run_sip_handset_gate import main,verify_success,verify_restore,verify_handset_health
+from tools.run_sip_handset_gate import verify_unanswered_media_inventory
 
 
 def restore_fixture():
@@ -85,6 +86,18 @@ def alerting_restore_fixture():
 
 
 class SipTest(unittest.TestCase):
+    def test_unanswered_bridge_inventory_requires_all_four_zero_counters(self):
+        counts = dict(uplink=0, downlink=0, pcm_transmitted=0, pcm_received=0)
+        bridge = 'SIP epoch media discarded ' + json.dumps(counts)
+        verify_unanswered_media_inventory('', bridge)
+        for key in counts:
+            for value in (1, None):
+                bad = dict(counts, **{key: value})
+                with self.subTest(key=key, value=value), self.assertRaises(RuntimeError):
+                    verify_unanswered_media_inventory('', 'SIP epoch media discarded ' + json.dumps(bad))
+        with self.assertRaises(RuntimeError):
+            verify_unanswered_media_inventory('gsm_call_adapter: media direction=downlink id=1 result=accepted', bridge)
+
     @patch('tools.nsb7_sip_check.check_authentication')
     def test_connected_incoming_restore_requires_pre_save_media(self, authentication):
         text = incoming_restore_fixture()

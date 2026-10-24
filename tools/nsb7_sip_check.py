@@ -53,11 +53,13 @@ def check_restored_architecture(text,*,incoming=False,alerting=False):
         raise ValueError('missing unique connected save/load boundary')
 
 
-def check_incoming_restore(text,phase='connected',*,media=False):
+def check_incoming_restore(text,phase='connected',*,media=False,clocked_unanswered=False):
     if phase not in ('connected','alerting'):raise ValueError('unknown incoming restore phase')
     alerting=phase=='alerting'
     if media and alerting:
         raise ValueError('unanswered incoming cannot qualify connected media')
+    if clocked_unanswered and not alerting:
+        raise ValueError('unanswered acceptance requires alerting phase')
     check_restored_architecture(text,incoming=True,alerting=alerting)
     setup=laboratory_incoming_setup('5551234')
     rows=list(re.finditer(r'nsb7_call_input: key=(Send|End) state=([01]) t=([0-9.]+)',text))
@@ -115,13 +117,18 @@ def check_incoming_restore(text,phase='connected',*,media=False):
     if media:
         from tools.nsb7_pcm_check import verify_before_restore
         verify_before_restore(text, incoming=True)
+    elif clocked_unanswered:
+        from tools.nsb7_pcm_check import verify_unanswered_restore
+        verify_unanswered_restore(text)
     elif re.search(r'media direction=uplink [^\n]*good=1\b',text) or 'dsp_hle: speech tick' in text:
         raise ValueError('unclocked incoming restoration produced qualified media')
 
 
-def check_restore(text,connected=True,*,media=False):
+def check_restore(text,connected=True,*,media=False,clocked_unanswered=False):
     if media and not connected:
         raise ValueError('pending call cannot qualify connected media')
+    if clocked_unanswered and connected:
+        raise ValueError('unanswered acceptance requires pending phase')
     check_restored_architecture(text)
     primary=check_inputs(text,delay=26)
     cleanup=list(re.finditer(r'nsb7_sip_cleanup_input: key=(.*?) state=([01]) t=([0-9.]+)',text))
@@ -163,6 +170,9 @@ def check_restore(text,connected=True,*,media=False):
     if media:
         from tools.nsb7_pcm_check import verify_before_restore
         verify_before_restore(text)
+    elif clocked_unanswered:
+        from tools.nsb7_pcm_check import verify_unanswered_restore
+        verify_unanswered_restore(text)
     elif re.search(r'media direction=uplink [^\n]*good=1\b',text) or 'dsp_hle: speech tick' in text:
         raise ValueError('unclocked restoration produced qualified handset media')
 
@@ -211,6 +221,8 @@ def main():
     parser.add_argument('run',type=Path)
     parser.add_argument('--media', action='store_true',
                         help='qualify clocked HLE media or connected outgoing media restoration')
+    parser.add_argument('--clocked-unanswered', action='store_true',
+                        help='unanswered restoration on PCM-enabled build, no external media')
     modes=parser.add_mutually_exclusive_group()
     modes.add_argument('--incoming',action='store_true')
     modes.add_argument('--restore-outgoing',action='store_true')
@@ -222,12 +234,15 @@ def main():
     restoring=args.restore_outgoing or args.restore_outgoing_pending or args.restore_incoming or args.restore_incoming_alerting
     if args.media and restoring and not (args.restore_outgoing or args.restore_incoming):
         parser.error('--media restoration requires a connected call')
+    if args.clocked_unanswered and (args.media or not (
+            args.restore_outgoing_pending or args.restore_incoming_alerting)):
+        parser.error('--clocked-unanswered requires an unanswered restoration fixture')
     phase='alerting' if args.restore_incoming_alerting else 'connected'
     try:
         contract(args.image.read_bytes())
         text=(args.run/'error.log').read_text()
-        if args.restore_incoming or args.restore_incoming_alerting: check_incoming_restore(text,phase=phase,media=args.media)
-        elif args.restore_outgoing or args.restore_outgoing_pending: check_restore(text,connected=not args.restore_outgoing_pending,media=args.media)
+        if args.restore_incoming or args.restore_incoming_alerting: check_incoming_restore(text,phase=phase,media=args.media,clocked_unanswered=args.clocked_unanswered)
+        elif args.restore_outgoing or args.restore_outgoing_pending: check_restore(text,connected=not args.restore_outgoing_pending,media=args.media,clocked_unanswered=args.clocked_unanswered)
         else: check(text,incoming=incoming,media=args.media)
         check_clock(text,finish=68 if incoming else 76)
         storage=args.run/'nvram/nsb7hle'
@@ -255,7 +270,7 @@ def main():
                             alerting_snapshot=args.restore_incoming_alerting,
                             pending_snapshot=args.restore_outgoing_pending)
         result=json.loads((args.run/'sip-result.json').read_text())
-        if result.get('passed') is not True or (not args.media and (
+        if result.get('passed') is not True or (not args.media and not args.clocked_unanswered and (
                 result.get('speech_tested') is not False or result.get('native_dsp_complete') is not False)) or (not restoring and
                 result.get('caller' if incoming else 'dialed_digits')!='5551234'):
             raise ValueError('missing explicit SIP signaling-only result')
@@ -267,15 +282,16 @@ def main():
             direction='incoming' if incoming else 'outgoing'
             if not (args.run/f'sta/nsb7hle/nsb7_sip_{direction}.sta').is_file():
                 raise ValueError('actual handset snapshot file absent')
-            if incoming: verify_restore(args.run,remote,phase,'8290',signaling_only=not args.media)
-            else: verify_outgoing_restore(args.run,remote,not args.restore_outgoing_pending,'8290',signaling_only=not args.media)
+            if incoming: verify_restore(args.run,remote,phase,'8290',signaling_only=not (args.media or args.clocked_unanswered))
+            else: verify_outgoing_restore(args.run,remote,not args.restore_outgoing_pending,'8290',signaling_only=not (args.media or args.clocked_unanswered))
         else:
             verify_success(args.run,remote,SimpleNamespace(product='8290',incoming=incoming,
                            signaling_only=not args.media,restore_idle=False))
     except (OSError,ValueError,RuntimeError) as error:
         parser.exit(1,f'NSB-7 SIP signaling: FAIL: {error}\n')
     print('PASS: physical PIN/'+('unanswered ringing' if args.restore_incoming_alerting else 'Answer' if incoming else 'dial')+
-          '/End, real local SIP '+('cancellation' if args.restore_outgoing_pending else 'confirmation')+' and CC/RR release'+
+          '/End, real local SIP '+('cancellation' if args.restore_outgoing_pending else
+                                  'rejection' if args.restore_incoming_alerting else 'confirmation')+' and CC/RR release'+
           ('; exact pending restore, CANCEL/487 and no replay' if args.restore_outgoing_pending else
            '; exact alerting restore, SIP rejection and no replay' if args.restore_incoming_alerting else
            '; exact connected restore, BYE and no replay' if restoring else '')+

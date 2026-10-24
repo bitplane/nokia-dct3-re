@@ -20,15 +20,15 @@ machine implicitly.
 | SIM Toolkit | Phase-2+ nine-byte TERMINAL PROFILE; DISPLAY TEXT, GET INKEY, GET INPUT, SET UP MENU, SELECT ITEM, menu-driven SEND SHORT MESSAGE and SET UP CALL accept/Cancel. Exact physical/protocol/UI acceptance; non-SMS cases preserve the full card, SMS permits only its exact EF_SMSS reference update. |
 | PCS laboratory network | Acquisition, BCCH, Location Updating/EF_LOCI, background measurements, addressed paging, physical incoming/outgoing CC/RR signaling and SMS delivery/read/delete/cancel/Reply. |
 | Authenticated composition | Physical PIN before fresh/cold registration, calls, SMS and phonebook; a long wrong-PIN control remains unregistered. |
-| Restoration | Exact ARM/banked registers, RAM/time, protocol replay and pixels at idle, connected call, active SMS and open Toolkit-menu boundaries, with physical continuation. |
-| External host | Independent incoming SMS/read and outgoing Reply accept/reject/silence decisions with physical failure recovery; incoming/outgoing call signaling from clean idle; connected-call restoration republishes a new epoch and rejects stale commands. |
+| Restoration | Exact ARM/banked registers, RAM/time, device/protocol state and pixels at idle, call, active SMS and open Toolkit-menu boundaries, with physical continuation. SIP connected and unanswered phases invalidate the old external dialog rather than replay it. |
+| External host | Incoming SMS/read and outgoing Reply accept/reject/silence decisions with physical failure recovery; incoming/outgoing local SIP with documented HLE PCM and actual microphone/earpiece waveforms. Four call-phase restoration gates preserve handset state, dispose external transactions and reject replay. |
 
 All provisioning is own-derived or explicitly synthetic external card data;
 no donor PMM, identity or firmware-state forcing is admitted. Native resident
-DSP execution, speech/COBBA, measured complete analog calibration, external
-RF and NSB-7 SIP media remain unproved. Physical incoming/outgoing localhost SIP
-dialogs are qualified separately without speech acceptance. Host busy and unanswered-alerting
-physical recovery are qualified; other failure/pending-call cases,
+DSP execution, native speech, measured complete analog calibration and external
+RF remain unproved. HLE SIP/COBBA media and sustained endpoint waveforms are
+qualified separately from native execution. Host busy and unanswered-alerting
+physical recovery are qualified; arbitrary failure/pending-call cases,
 AoC and further SIM Toolkit commands are not established by these gates. The supplied
 SET UP EVENT LIST and TIMER MANAGEMENT fixtures are explicitly rejected, not supported.
 Detailed contracts
@@ -2679,211 +2679,201 @@ this Lua script and an82s guard; require the handset checker too:
 This qualifies host-decided outgoing signaling with physical/UI continuity,
 not host speech, SIP media, native RF or restoration of an external dialog.
 
-## Outgoing real SIP signaling
+## Own PCM documentation and physical speech control
 
-The qualified physical host-dial script also completes a real localhost
-PJSIP2.16 dialog through `dct3_sip_bridge.py`. Fresh own-source PIN-enabled
-storage and `fixtures/nsb7_host/nsb7hle.cfg` remain unchanged. Physical
-PIN/phone-code entry and registration precede45s settled idle; physical
-5551234/Send54 publishes request1/epoch1. The SIP bridge owns its single
-connect decision, the remote confirms200, and physical End66 closes both
-CC/RR and SIP normally. Exact ready/digit/Calling/Call1/final pixels,
-complete unchanged card, valid own journal and continuous RTC all pass.
+The acquired NSB-7 service manual, System Module printed page27/PDF page41,
+visibly specifies COBBA-generated 512 kHz PCMDClk and 8 kHz PCMSClk:
+64 clocks/frame, one active-high sync clock, a 16-bit MSB-first word with
+bits15..13 extending bit12, data changing on rising edges and sampled on
+falling edges. The MAD pin table identifies the clocks as inputs from
+COBBA. UI printed page8/PDF page88 identifies internal MIC2, headset MIC1
+and differential internal EAR. These establish framing and routing, not
+measured analog gain or working emulated media.
 
-The observed bridge counters are uplink0, downlink120, PCM transmitted0,
-PCM received127, dropped0. Received remote media is not proof of handset
-audio. `sip-result.json` explicitly records `speech_tested=false` and
-`native_dsp_complete=false`. No unproved NSB-7 PCM clock is enabled.
-The shared runner admits one signaling-only SIP200 call in either direction;
-incoming additionally requires a fresh handset-readiness artifact. Connected
-outgoing and incoming restoration have separate acceptance below. Unanswered
-incoming alerting and pending outgoing restoration also have their own gates;
-recording/media and multiple-call modes remain rejected.
-
-After preparing the isolated run from the qualified source, reproduce with
-the build paths from [the host bridge contract](external_call_bridge.md).
-The current local binding is CPython3.14:
+`tools/nsb7_speech_control_check.py` pins the acquired v5.22 image hash,
+instructions, selector table and literal pools. Compiler `0x2cb62c` uses
+table `0x2cb660`: selector17 updates bit`0x0200` in shadow`0x12df02`,
+selector8 compiles the command, and writer`0x2cb93e` stores to`0x100a8`.
+The authenticated physical outgoing host-call probe observes Send54s ->
+decoded`0x0e` -> `860b`, then End66s -> decoded`0x0f` -> `840a`, through
+that own writer. No PCM configuration or firmware-state mutation was added.
 
 ```sh
-SIP="$PWD/tmp/sip-build/pjproject-2.16/pjsip-apps/src/swig/python"
-PYTHONPATH="$SIP:$SIP/build/lib.linux-x86_64-cpython-314" \
-  .venv/bin/python tools/run_sip_handset_gate.py \
-  --pjsua tmp/sip-build/pjproject-2.16/pjsip-apps/bin/pjsua-x86_64-pc-linux-gnu \
-  --run-dir tmp/nsb7-sip-outgoing --sip-port 25270 --http-port 18941 \
-  --product 8290 --signaling-only -- \
-  .venv/bin/python tools/run_mame_isolated.py --mame-dir mame \
-  --run-dir tmp/nsb7-sip-outgoing -- nsb7hle -rompath ../roms \
-  -video none -sound none -nothrottle -seconds_to_run 82 -log -verbose \
-  -debug -debugger none -http -http_port 18941 -autoboot_delay 0 \
-  -autoboot_script ../tools/nsb7_pin_host_outgoing_call.lua
-.venv/bin/python tools/nsb7_sip_check.py roms/noki8290/8290f522a.fls tmp/nsb7-sip-outgoing
+.venv/bin/python tools/nsb7_speech_control_check.py \
+  roms/noki8290/8290f522a.fls \
+  --log tmp/nsb7-own-speech-control-probe/error.log
 ```
 
-The final checker independently revalidates SIP confirmation/normal release
-and zero-uplink scope alongside the product's physical/protocol/storage/UI
-contract. This does not qualify native speech, bidirectional handset audio,
-an external carrier or a public SIP service.
+The manual's System Module parts list (printed64/PDF78) names
+MAD2WD1 v18 ROM5. The research composition's compiled identity6 branch is
+not a measured fitted-mask identity; the BOM is not grounds to silently
+replace it. Resident DSP identity/execution and native speech remain open.
+The product configuration now applies those own framing/routing facts and
+the command8/bit0200 speech predicate. A headless authenticated physical
+host-connected outgoing call (`tmp/nsb7-own-pcm-qualified`) executes500
+uplink and493 downlink blocks. `tools/nsb7_pcm_check.py` checks own
+Send/End controls, transfers bounded by enable/disable, 512000/8000 clocks,
+64-clock frames and exact47-idle-clock accounting. This is HLE PCM transport
+with a laboratory voice peer, not SIP waveform or native DSP speech proof.
+Microphone input is silent in this headless test.
 
-### Incoming physical Answer
-
-An independent own-source run waits for the firmware's exact45s registered
-idle snapshot before the remote PJSIP endpoint sends an INVITE as5551234.
-The adapter queues one request1/epoch1, pages on the qualified PCS600 cell,
-and delivers the exact calling-party SETUP through both task4 and task14
-consumers. The51s ringing frame displays5551234. Physical Send52 owns
-Answer and SIP200 confirmation; physical End60 closes CC/RR and SIP normally.
-Exact ready/caller/connected/final pixels, unchanged full card, valid own
-flash journal and continuous RTC through68s pass independently.
-
-Bridge counters are uplink0/downlink100/PCM transmitted0/received102/dropped0;
-the explicit no-speech/no-native-DSP result remains mandatory. The long-caller
-host fixture retains its original447700900123 frame. The shared laboratory
-SETUP payload helper derives each caller's length/BCD bytes, while NSB-7
-acceptance requires them at both real MCU consumers; a length-only match is
-insufficient. Existing long-caller and connected host-restoration captures
-also pass the strengthened check.
-
-Use the same isolated preparation and SIP command above with
-`tmp/nsb7-sip-incoming`, SIP25272/HTTP18942, and add
-`--incoming --ready-file tmp/nsb7-sip-incoming/snap/nsb7_call_ready.png`.
-Select `nsb7_pin_host_incoming_call.lua` and a78s guard; the script exits at68s.
-The readiness path must not exist before launch.
-
-```sh
-.venv/bin/python tools/nsb7_sip_check.py roms/noki8290/8290f522a.fls tmp/nsb7-sip-incoming --incoming
-```
-
-## Connected outgoing SIP restoration
-
-`nsb7_sip_outgoing_restore.lua` uses the same own-source authenticated physical
-dial sequence and saves the connected handset at60s. Loading after0.5s restores
-all37 ARM/banked registers, complete-RAM digest, PC/SP and emulated time exactly;
-both snapshots retain the reviewed Call1 pixels. This checks handset architecture,
-not replay of an external SIP dialog or a protocol-replay interval.
-
-The existing request1 republishes under epoch2. The bridge closes the old real
-dialog with BYE, submits one cause41 termination and never redials. Ordered GSM
-Disconnect/Release/Release Complete and RR closure end the restored call.
-Physical End66, Menu70 and End73 leave exact registered idle at76s. The complete
-card remains unchanged, the own flash journal validates and RTC ticks are continuous.
-
-An unclocked voice peer can publish erased uplink placeholders (`good=0`); these
-are not speech and are discarded by the bridge. Acceptance forbids `good=1`
-uplink and DSP speech ticks, requires discarded-epoch bridge uplink0, and keeps
-`speech_tested=false`/`native_dsp_complete=false`. Pending outgoing and incoming
-connected/alerting restoration have separate gates below.
-
-Prepare fresh isolated storage as above, then run the same SIP command with
-`--restore-outgoing`, script `../tools/nsb7_sip_outgoing_restore.lua`, and an82s
-guard. The qualified capture uses `tmp/nsb7-sip-outgoing-restore-clean`, SIP25276
-and HTTP18944. Revalidate with:
-
-```sh
-.venv/bin/python tools/nsb7_sip_check.py \
-  roms/noki8290/8290f522a.fls tmp/nsb7-sip-outgoing-restore-clean --restore-outgoing
-```
-
-The shared SIP runner captures MAME stdout/stderr in `sip-handset.log` and rejects
-Lua, validity and fatal execution errors even when the process exits zero.
-The restore checker additionally requires that healthy console and the actual
-`.sta` file; successful network clearing alone cannot qualify a broken fixture.
-
-### Pending outgoing SIP restoration
-
-The same physical dial/save60/load/End66/Menu70/End73 fixture also qualifies
-an unanswered outgoing SIP180 attempt with`--sip-response 180 --restore-outgoing`.
-All37 ARM/banked registers, PC/SP, complete-RAM digest and time restore exactly.
-The existing request1 republishes under epoch2; the bridge sends CANCEL,
-receives487 and never redials. One cause41 termination is consumed by the
-ordinary session, completing network Disconnect/handset Release/network
-Release Complete/RR clearing before physical End66. The first qualified run
-reaches ended60.580s. No CONNECT, accepted media, codec tick or connected host
-phase is allowed; discarded-epoch uplink is zero.
-
-SIP180 is provisional at the external bridge, not a synthesized GSM ALERTING
-decision. The handset remains awaiting the host result and displays Calling,
-not the connected Call1 presentation. Adapter phase publication therefore
-contains only epoch2 ended, not fabricated alerting/connected events. The two
-reviewed complete Calling animation frames are accepted only for pending
-snapshots; the legacy filename`nsb7_host_outgoing_connected.png` does not
-qualify a connection. Saved/restored display-cache phases may differ while
-architecture is identical. Exact final76s idle/menu, full unchanged card,
-own flash validity, actual snapshot and continuous RTC remain mandatory.
-
-Use fresh own-source storage and the outgoing restoration command above with
-SIP25288/HTTP18950, the unchanged`nsb7_sip_outgoing_restore.lua`, and82s guard.
-Two independent cold captures qualify; reproduction of the fresh repeat:
+An independent real-time outgoing SIP call also passes the own authentication,
+physical dialing/release, exact UI/card/journal and clocked PCM checks:
+`tmp/nsb7-sip-outgoing-media-realtime` reports474 uplink,451 downlink,
+474 PCM transmitted and508 received at the bridge. Normal SIP confirmation
+and release and contiguous handset downlink acceptance are checked. Use
+the existing SIP command without `--signaling-only`, with `-throttle` in
+place of `-nothrottle`, and run the final checker with `--media`:
 
 ```sh
 .venv/bin/python tools/nsb7_sip_check.py roms/noki8290/8290f522a.fls \
-  tmp/nsb7-sip-pending-repeat --restore-outgoing-pending
+  tmp/nsb7-sip-outgoing-media-realtime --media
 ```
 
-This is pending signaling restoration/external-dialog invalidation, not SIP
-dialog replay, native DSP, speech or media continuity.
-
-### Connected incoming SIP restoration
-
-`nsb7_sip_incoming_restore.lua` shares only the architectural snapshot/physical
-cleanup harness with outgoing restoration. Its own direction checker requires
-settled45s readiness before caller5551234 is paged on PCS600, exact calling-number
-SETUP delivery through task4/task14, and physical Send52 before CONNECT/ACK and
-SIP200 confirmation. Save55/load after0.5s restores all37 CPU registers, RAM and
-time exactly; both saved/restored frames equal reviewed Call1 pixels.
-
-One incoming dialog is closed with BYE on epoch change, never re-admitted.
-Exactly one cause41 termination and normal CC/RR release end request1/epoch2.
-Physical End60/Menu62/End65 leave exact68s idle; the full card, own flash journal,
-continuous RTC and zero qualified uplink retain their existing checks. This
-qualifies connected signaling restoration, not native speech or media continuity.
-
-The51s ringing snapshot permits exactly two reviewed complete frames displaying
-5551234: Calling/Decline visible, or their alternate animation phase. Localhost
-INVITE arrival is not phase-locked to firmware animation. Caller bytes in both
-MCU consumers, physical Answer and connected pixels remain independent mandatory
-checks; no arbitrary frame, mask or missing-caller image is accepted.
-
-Use the same fresh own-source storage and SIP command with `--incoming
---restore-call --ready-file RUN/snap/nsb7_call_ready.png`, script
-`../tools/nsb7_sip_incoming_restore.lua` and78s guard. Qualified capture
-`tmp/nsb7-sip-incoming-restore` uses SIP25280/HTTP18946:
+This supersedes the zero-media requirement only for that outgoing fixture;
+the earlier signaling-only commands describe the pre-PCM configuration.
+The independent incoming real-time SIP run
+`tmp/nsb7-sip-incoming-media-realtime` carries396 uplink,376 downlink,
+396 transmitted and400 received PCM blocks. Its own45s ready snapshot
+precedes INVITE; physical Answer52 and End60 own connection/release.
+Exact caller/UI/card/journal and own incoming speech-control/PCM checks pass
+through `nsb7_sip_check.py --incoming --media`.
+The isolated physical-audio gate additionally verifies sustained440Hz
+microphone-to-SIP and660Hz SIP-to-earpiece waveforms using actual MAME
+capture/playback streams, neutral codec gains, RMS>=500 and expected-tone
+energy>=0.5 for at least two consecutive1s windows. Incoming capture
+`tmp/nsb7-sip-incoming-waveform/handset` passes8s/4s; outgoing capture
+`tmp/nsb7-sip-outgoing-waveform-clean/handset` passes9s/8s. Both complete
+wrappers exit successfully after product/UI/storage and waveform checks.
 
 ```sh
-.venv/bin/python tools/nsb7_sip_check.py \
-  roms/noki8290/8290f522a.fls tmp/nsb7-sip-incoming-restore --restore-incoming
+make verify-8290-sip-incoming-waveform \
+  SIP_WAVEFORM_NVRAM_DIR="$PWD/tmp/nsb7-pin-registration-cold/nvram" \
+  RUN_DIR=tmp/nsb7-sip-incoming-waveform-fresh
+# Use verify-8290-sip-outgoing-waveform for the independent outgoing leg.
 ```
 
-### Unanswered incoming SIP restoration
-
-`nsb7_sip_incoming_alerting_restore.lua` physically authenticates and waits
-for the same45s registered-readiness artifact, but never presses Send. Save51
-and load after0.5s reproduce all37 CPU registers, PC/SP, complete-RAM digest
-and time while the caller is alerting. Saved/restored caller snapshots permit
-only the two reviewed full ringing frames above; animation/cache phase may
-differ, so framebuffer identity is not claimed.
-
-The bridge rejects the old real INVITE with603, republishes request1 as
-alerting under epoch2 and submits one cause41 termination. The radio peer
-now schedules a pending network Disconnect from either idle-uplink phase
-without changing setup/assignment admission. The original traffic-dependent
-phase restriction stranded that Disconnect until physical End60; the
-acceptance gate explicitly rejects such delayed cleanup. The corrected run
-queues termination at51.120s, delivers Disconnect at51.127216s and reaches
-ended at51.140s, before any cleanup key. No CONNECT, Answer, qualified media
-or repeated admission is allowed. Physical End60/Menu62/End65 recover exact
-68s idle, with unchanged complete card, valid own flash and continuous RTC.
-
-Use fresh storage and the incoming command above with`--restore-phase alerting`,
-script`../tools/nsb7_sip_incoming_alerting_restore.lua`, SIP25288/HTTP18950
-and78s guard. Qualified capture:`tmp/nsb7-sip-alerting-disconnect`.
+The explicit source must come from the own-source provisioning/registration
+chain, never donor data. `run_noki8290_sip_media.py` requires a fresh run,
+validates source card/journal, records predecessor hashes, preserves the
+predecessor and applies exact whole-run acceptance. The shared audio wrapper
+restores host audio defaults and unloads temporary routes on success/failure.
+Connected outgoing media restoration independently passes
+`tmp/nsb7-sip-outgoing-media-restore-v2`. Before save60s, the own control
+writer enables speech and at least100 uplink/50 downlink PCM blocks satisfy
+exact clock accounting. Save/load retains all37 ARM/banked registers, RAM
+and emulated time; the external dialog is deliberately not restored.
+The bridge inventories198 uplink/194 downlink/195 transmitted/234 received
+PCM blocks, sends BYE for the old epoch and accepts one cause41 clear in
+epoch2, with no redial or dialog/media replay. Physical End/Menu recovery,
+saved/restored/final pixels, retained RTC, exact card and valid journal pass.
 
 ```sh
-.venv/bin/python tools/nsb7_sip_check.py roms/noki8290/8290f522a.fls \
-  tmp/nsb7-sip-alerting-disconnect --restore-incoming-alerting
+make verify-8290-sip-outgoing-media-restore \
+  SIP_WAVEFORM_NVRAM_DIR="$PWD/tmp/nsb7-pin-registration-cold/nvram" \
+  RUN_DIR=tmp/nsb7-sip-outgoing-media-restore-fresh
 ```
 
-This proves unanswered signaling restoration and external-dialog invalidation,
-not restoration of a SIP dialog, native speech or media continuity.
+Connected incoming restoration independently passes
+`tmp/nsb7-sip-incoming-media-restore`: physical Answer52 precedes own speech
+enable and documented PCM, save55/load retains exact architecture/RAM/time,
+and the bridge inventories170 uplink/165 downlink/167 transmitted/176 received
+blocks before invalidating epoch1. One BYE and one epoch2 cause41 clear occur
+without repeated admission, Answer or media replay. Exact caller, saved/
+restored/cleanup/final pixels, retained clock, complete card and journal pass.
+`verify-8290-sip-incoming-media-restore` runs the independent incoming leg
+with the same explicit own-source NVRAM argument.
+
+Both unanswered phases pass on the PCM-enabled composition:
+`tmp/nsb7-pcm-outgoing-pending-restore-clean` and
+`tmp/nsb7-pcm-incoming-alerting-restore`. All four old-epoch media counters
+are zero in each; outgoing CANCEL/487 and incoming rejection clear the
+handset before physical End, without CONNECT, Answer or external media.
+Both retain exact architecture, snapshots, whole-card/journal and RTC checks.
+The outgoing local-codec teardown exception is bounded separately below.
+This acceptance intentionally clears the live call after restore, not
+seamless external-call resumption or native DSP speech.
+Running an audio producer faster than wall-clock SIP is not valid media
+acceptance: the unthrottled diagnostic left RTP queued past release and
+failed the closed-session check. No device timing was altered to hide it.
+
+## SIP calls and restoration
+
+The current `nsb7hle` composition qualifies physical outgoing and incoming
+local SIP200 calls with clocked HLE media, independently documented framing,
+and sustained endpoint waveforms. Native DSP speech, external RF and
+normal-machine promotion remain unproved. Received remote RTP alone does
+not qualify handset audio.
+
+`run_noki8290_sip_media.py` requires a fresh destination and an explicit
+own-source NVRAM directory from the authenticated provisioning/registration
+chain. It validates the complete laboratory card and own flash journal,
+records source hashes, copies storage into the isolated run and verifies
+that the predecessor remains unchanged. Host calls are enabled only by the
+reviewed fixture; no firmware state or contact contents are injected.
+The PJSIP bindings must be available through absolute `PYTHONPATH` entries;
+see [the host bridge contract](external_call_bridge.md).
+
+Ordinary outgoing acceptance requires PIN/phone-code entry, registered PCS600
+idle45s, physical5551234/Send54, one correlated SIP200 decision and physical
+End66. Incoming requires a fresh45s idle snapshot before INVITE5551234,
+physical Answer52 and End60. The own caller SETUP traverses both task4 and
+task14. Exact ready/dial/caller/connected/final frames, full unchanged card,
+valid journal and continuous RTC remain required. Only explicitly reviewed
+Calling/ringing animation alternatives qualify; matching an arbitrary crop
+or accepting a new hash does not.
+
+### Restoration phases
+
+| Phase | Save / physical cleanup | External transaction |
+| --- | --- | --- |
+| Outgoing connected | Save60; End66, Menu70, End73, final76 | Confirmed dialog closes with BYE |
+| Incoming connected | Save55; End60, Menu62, End65, final68 | Physical Answer precedes confirmation; BYE after restore |
+| Outgoing pending | Save60; same outgoing cleanup | SIP180 remains external/provisional; CANCEL/487, no CONNECT/redial |
+| Incoming ringing | Save51; same incoming cleanup without Answer | Old INVITE rejected603; no Answer/CONNECT/readmission |
+
+Every phase requires the actual snapshot file, healthy execution console,
+all37 ARM/banked registers, PC/SP, complete-RAM digest and emulated time
+equal across save/load. Lua waits canceled by load are replaced only with
+physical cleanup input. Own protocol checks require one epoch change, one
+accepted cause41 termination and complete CC/RR release. Unanswered network
+clearing must precede the later physical End, not merely occur afterward.
+Saved/restored/cleanup/final display, whole-card persistence, flash validity
+and retained RTC checks remain independent of architectural equality.
+
+Connected phases additionally require own physical Send/Answer before
+speech-enable writer2cb93e, at least100 uplink/50 downlink blocks with exact
+PCM accounting before save, and positive old-epoch uplink/downlink/host-PCM
+inventory. Restoring the handset deliberately invalidates the old external
+dialog; it does not replay or seamlessly resume a live SIP call.
+
+Unanswered phases require no connected host state, GSM CONNECT, SIP
+confirmation or admitted external media, plus exactly one discarded-epoch
+inventory with all four media counters zero. The pending outgoing fixture
+can execute a brief local HLE PCM burst during post-load radio teardown:
+observed ticks60.520/60.540/60.560 have downlink0. Acceptance checks exact
+documented clocks and confines any such activity strictly between restore
+and radio release. This falsifies the former zero-codec assertion, not the
+no-external-speech contract; its physical-silicon fidelity remains unknown.
+
+### Reproduction
+
+Use the current build and absolute PJSIP binding/library paths. For an
+ordinary call, invoke `run_noki8290_sip_media.py` with `--outgoing-media`
+or `--incoming-media`, explicit `--nvram-source` and `--pjsua`.
+The runner selects the own physical Lua fixture and runs the complete
+product checker. Physical waveform gates additionally isolate host audio.
+
+Restoration Make targets use the same explicit
+`SIP_WAVEFORM_NVRAM_DIR` and fresh `RUN_DIR`:
+`verify-8290-sip-outgoing-media-restore`,
+`verify-8290-sip-incoming-media-restore`,
+`verify-8290-sip-outgoing-pending-restore` and
+`verify-8290-sip-incoming-alerting-restore`.
+The final checker distinguishes `--media` for connected acceptance from
+`--clocked-unanswered` for the current unanswered composition.
+Legacy `--signaling-only` retains its stricter no-codec assertion for the
+pre-PCM configuration; it is not the current-build acceptance mode.
 
 ## Connected host-call restoration
 
@@ -3233,119 +3223,6 @@ the precise presence-poll owner remain unproved. No device behavior changed.
 .venv/bin/python tools/nsb7_toolkit_check.py \
   roms/noki8290/8290f522a.fls tmp/nsb7-toolkit-polling-long --polling
 ```
-
-### Own PCM documentation and physical speech control
-
-The acquired NSB-7 service manual, System Module printed page27/PDF page41,
-visibly specifies COBBA-generated 512 kHz PCMDClk and 8 kHz PCMSClk:
-64 clocks/frame, one active-high sync clock, a 16-bit MSB-first word with
-bits15..13 extending bit12, data changing on rising edges and sampled on
-falling edges. The MAD pin table identifies the clocks as inputs from
-COBBA. UI printed page8/PDF page88 identifies internal MIC2, headset MIC1
-and differential internal EAR. These establish framing and routing, not
-measured analog gain or working emulated media.
-
-`tools/nsb7_speech_control_check.py` pins the acquired v5.22 image hash,
-instructions, selector table and literal pools. Compiler `0x2cb62c` uses
-table `0x2cb660`: selector17 updates bit`0x0200` in shadow`0x12df02`,
-selector8 compiles the command, and writer`0x2cb93e` stores to`0x100a8`.
-The authenticated physical outgoing host-call probe observes Send54s ->
-decoded`0x0e` -> `860b`, then End66s -> decoded`0x0f` -> `840a`, through
-that own writer. No PCM configuration or firmware-state mutation was added.
-
-```sh
-.venv/bin/python tools/nsb7_speech_control_check.py \
-  roms/noki8290/8290f522a.fls \
-  --log tmp/nsb7-own-speech-control-probe/error.log
-```
-
-The manual's System Module parts list (printed64/PDF78) names
-MAD2WD1 v18 ROM5. The research composition's compiled identity6 branch is
-not a measured fitted-mask identity; the BOM is not grounds to silently
-replace it. Resident DSP identity/execution and native speech remain open.
-The product configuration now applies those own framing/routing facts and
-the command8/bit0200 speech predicate. A headless authenticated physical
-host-connected outgoing call (`tmp/nsb7-own-pcm-qualified`) executes500
-uplink and493 downlink blocks. `tools/nsb7_pcm_check.py` checks own
-Send/End controls, transfers bounded by enable/disable, 512000/8000 clocks,
-64-clock frames and exact47-idle-clock accounting. This is HLE PCM transport
-with a laboratory voice peer, not SIP waveform or native DSP speech proof.
-Microphone input is silent in this headless test.
-
-An independent real-time outgoing SIP call also passes the own authentication,
-physical dialing/release, exact UI/card/journal and clocked PCM checks:
-`tmp/nsb7-sip-outgoing-media-realtime` reports474 uplink,451 downlink,
-474 PCM transmitted and508 received at the bridge. Normal SIP confirmation
-and release and contiguous handset downlink acceptance are checked. Use
-the existing SIP command without `--signaling-only`, with `-throttle` in
-place of `-nothrottle`, and run the final checker with `--media`:
-
-```sh
-.venv/bin/python tools/nsb7_sip_check.py roms/noki8290/8290f522a.fls \
-  tmp/nsb7-sip-outgoing-media-realtime --media
-```
-
-This supersedes the zero-media requirement only for that outgoing fixture;
-the earlier signaling-only commands describe the pre-PCM configuration.
-The independent incoming real-time SIP run
-`tmp/nsb7-sip-incoming-media-realtime` carries396 uplink,376 downlink,
-396 transmitted and400 received PCM blocks. Its own45s ready snapshot
-precedes INVITE; physical Answer52 and End60 own connection/release.
-Exact caller/UI/card/journal and own incoming speech-control/PCM checks pass
-through `nsb7_sip_check.py --incoming --media`.
-The isolated physical-audio gate additionally verifies sustained440Hz
-microphone-to-SIP and660Hz SIP-to-earpiece waveforms using actual MAME
-capture/playback streams, neutral codec gains, RMS>=500 and expected-tone
-energy>=0.5 for at least two consecutive1s windows. Incoming capture
-`tmp/nsb7-sip-incoming-waveform/handset` passes8s/4s; outgoing capture
-`tmp/nsb7-sip-outgoing-waveform-clean/handset` passes9s/8s. Both complete
-wrappers exit successfully after product/UI/storage and waveform checks.
-
-```sh
-make verify-8290-sip-incoming-waveform \
-  SIP_WAVEFORM_NVRAM_DIR="$PWD/tmp/nsb7-pin-registration-cold/nvram" \
-  RUN_DIR=tmp/nsb7-sip-incoming-waveform-fresh
-# Use verify-8290-sip-outgoing-waveform for the independent outgoing leg.
-```
-
-The explicit source must come from the own-source provisioning/registration
-chain, never donor data. `run_noki8290_sip_media.py` requires a fresh run,
-validates source card/journal, records predecessor hashes, preserves the
-predecessor and applies exact whole-run acceptance. The shared audio wrapper
-restores host audio defaults and unloads temporary routes on success/failure.
-Connected outgoing media restoration independently passes
-`tmp/nsb7-sip-outgoing-media-restore-v2`. Before save60s, the own control
-writer enables speech and at least100 uplink/50 downlink PCM blocks satisfy
-exact clock accounting. Save/load retains all37 ARM/banked registers, RAM
-and emulated time; the external dialog is deliberately not restored.
-The bridge inventories198 uplink/194 downlink/195 transmitted/234 received
-PCM blocks, sends BYE for the old epoch and accepts one cause41 clear in
-epoch2, with no redial or dialog/media replay. Physical End/Menu recovery,
-saved/restored/final pixels, retained RTC, exact card and valid journal pass.
-
-```sh
-make verify-8290-sip-outgoing-media-restore \
-  SIP_WAVEFORM_NVRAM_DIR="$PWD/tmp/nsb7-pin-registration-cold/nvram" \
-  RUN_DIR=tmp/nsb7-sip-outgoing-media-restore-fresh
-```
-
-Connected incoming restoration independently passes
-`tmp/nsb7-sip-incoming-media-restore`: physical Answer52 precedes own speech
-enable and documented PCM, save55/load retains exact architecture/RAM/time,
-and the bridge inventories170 uplink/165 downlink/167 transmitted/176 received
-blocks before invalidating epoch1. One BYE and one epoch2 cause41 clear occur
-without repeated admission, Answer or media replay. Exact caller, saved/
-restored/cleanup/final pixels, retained clock, complete card and journal pass.
-`verify-8290-sip-incoming-media-restore` runs the independent incoming leg
-with the same explicit own-source NVRAM argument.
-
-Unanswered call-phase restoration on the PCM-enabled composition remains
-outstanding; prior signaling-only runs do not cover it.
-This acceptance intentionally clears the live call after restore, not
-seamless external-call resumption or native DSP speech.
-Running an audio producer faster than wall-clock SIP is not valid media
-acceptance: the unthrottled diagnostic left RTP queued past release and
-failed the closed-session check. No device timing was altered to hide it.
 
 ### REFRESH and renewed application session
 

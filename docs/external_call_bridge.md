@@ -1394,62 +1394,30 @@ rejected frames: sent-frame counts alone cannot establish downlink delivery.
 
 ### NSB-7 HLE media and restoration boundary
 
-The explicit8290 `nsb7hle` profile independently qualifies physical incoming
-and outgoing local SIP200 dialogs through the same backend. PIN/registration,
-physical Answer or dialing and End, CC/RR clearing, exact UI/storage and retained-clock checks are
-product-owned by `nsb7_sip_check.py`; reproduction lives in
-[the NSB-7 contract](8290_bringup.md#outgoing-real-sip-signaling).
-Ordinary incoming/outgoing calls now use `--product 8290` without
-`--signaling-only`, real-time handset throttling and own documented PCM;
-the final `nsb7_sip_check.py --media` validates authentication, physical
-contacts, exact UI/storage, own control writes and clock accounting.
-Outgoing carries474/451 uplink/downlink blocks; incoming carries396/376.
-Both require actual SIP confirmation and normal release. These are HLE
-transport results, not native speech acceptance. Separate
-`verify-8290-sip-outgoing-waveform` and `verify-8290-sip-incoming-waveform`
-gates test actual MAME microphone/playback streams with isolated host routes,
-sustained440Hz/660Hz endpoint tones and unchanged neutral codec gains.
-They require an explicit `SIP_WAVEFORM_NVRAM_DIR` from the own-source NSB-7
-provisioning chain. The reusable `run_noki8290_sip_media.py` validates that
-source, records its hashes, preserves it and runs the exact product checker.
-Incoming also requires a fresh handset-readiness artifact.
+The explicit8290 `nsb7hle` profile qualifies physical incoming/outgoing
+local SIP200, independently documented PCM and sustained microphone/earpiece
+tones through actual MAME host audio streams. Own PIN/registration, physical
+Answer/Send/End, CC/RR release, exact UI/card/journal and retained-clock checks
+remain product-owned by `nsb7_sip_check.py`; see
+[the authoritative NSB-7 contract](8290_bringup.md#sip-calls-and-restoration).
 
-Connected outgoing restoration on the PCM-enabled composition now passes
-`verify-8290-sip-outgoing-media-restore`: own exact PCM before save,
-positive four-counter discarded-epoch inventory, exact architecture/time
-restoration, old-dialog BYE, one new-epoch cause41 clear and no redial.
-The product's final checker retains exact saved/restored/cleanup pixels,
-whole-card persistence, own flash validity and retained clock.
-Connected incoming independently passes `verify-8290-sip-incoming-media-restore`:
-physical Answer/own speech enable and PCM precede save55, exact architecture/
-RAM/time restores, the old epoch inventories170/165 media blocks and167/176
-host PCM blocks, and one BYE/cause41 clear occurs without repeated admission.
-Exact caller/saved/restored/cleanup/final UI and persistent storage remain
-required. Unanswered restoration fixtures remain pre-PCM evidence until
-requalified on the current build.
-Connected outgoing restoration was separately
-qualified by `nsb7_sip_outgoing_restore.lua` and `--restore-outgoing`: exact37-register/
-RAM/time restoration invalidates the original SIP dialog with BYE, one cause41
-clear under the new epoch and no redial. Physical End/Menu recovery, exact pixels,
-whole-card persistence and retained RTC remain required. Connected incoming has
-independent `nsb7_sip_incoming_restore.lua`/`--incoming --restore-call` acceptance:
-fresh readiness, exact caller SETUP, physical Answer and connected architecture
-precede one BYE/new-epoch cause41 clear, with no repeated admission. Independent
-incoming alerting restoration uses`--restore-phase alerting` and
-`nsb7_sip_incoming_alerting_restore.lua`: save51/load restores exact architecture
-without Answer, the old INVITE receives603, and queued Disconnect clears CC/RR
-under epoch2 before physical End60. Only the reviewed caller animation frames
-are permitted. Pending outgoing restoration independently uses SIP180 and
-`--restore-outgoing`: one CANCEL/487, epoch2 request republication and CC/RR
-clearing before End66, without redial, CONNECT or media. The handset remains
-Calling/awaiting the host decision; SIP180 is not injected as GSM ALERTING.
-Only the reviewed complete Calling snapshots qualify. Other restoration-with-media and
-multiple-call combinations remain rejected. The signaling-only result
-explicitly keeps speech/native-DSP claims false and requires zero handset
-qualified uplink media. Erased `good=0` placeholders after load do not qualify as
-speech; the discarded-epoch bridge summary must report uplink0. Remote RTP receipt
-is not handset audio acceptance. The shared runner records `sip-handset.log` and
-rejects Lua/validity/fatal errors independently of the process exit status.
+`run_noki8290_sip_media.py` requires fresh isolated storage and an explicit
+own-source NVRAM predecessor, validates it, records its hashes and preserves
+it. Ordinary media and four restoration phases have separate Make gates.
+Connected phases require positive own PCM before save and a positive
+discarded-epoch media inventory, then exact37-register/RAM/time restore,
+old-dialog BYE and one new-epoch cause41 clear without redial/readmission.
+Unanswered outgoing CANCEL/487 and incoming rejection require zero external
+media inventory, no CONNECT/Answer and clearing before the physical End.
+
+The PCM-enabled unanswered outgoing run can execute local HLE codec ticks
+only during restored radio teardown. They have zero downlink and exact
+clock accounting and are not admitted external speech. The checker bounds
+this behavior explicitly rather than treating codec activity as CONNECT.
+Only reviewed Calling/ringing alternatives qualify. Seamless external-call
+resumption, arbitrary multi-call combinations, native speech and measured
+analog gains remain unqualified. `--signaling-only` retains the pre-PCM
+no-codec contract and is not a substitute for current-build phase acceptance.
 
 The shared Disconnect scheduling correction also passes fresh NPE-3 incoming
 alerting restoration and NHM-5 v6.39 ordinary SIP CANCEL gates. NPE-3 requires

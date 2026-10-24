@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 148
-Differences found: 208
+Families with more than one product: 150
+Differences found: 210
 
 ## ROM normalisation reachability
 
@@ -152,12 +152,14 @@ absent product is a coverage question, not a drifted gate.
 | `sip-connected-outgoing-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | yes |
 | `sip-connected-signaling` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
 | `sip-idle-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
+| `sip-incoming-alerting-restore` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
 | `sip-incoming-connected-signaling` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
 | `sip-incoming-media` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | yes |
 | `sip-incoming-restore` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — |
 | `sip-incoming-waveform` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes | yes |
 | `sip-outgoing-busy` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
 | `sip-outgoing-media` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | yes |
+| `sip-outgoing-pending-restore` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
 | `sip-outgoing-restore` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — |
 | `sip-outgoing-unavailable` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes | yes |
 | `sip-outgoing-waveform` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes | yes |
@@ -880,6 +882,11 @@ absent product is a coverage question, not a drifted gate.
 - **8850**: `tools/run_noki8850_sip_cancel.py`
 - **8890**: `tools/run_noki8890_sip_cancel.py`
 
+### `sip-incoming-alerting-restore`
+
+- **8290**: `tools/run_noki8290_sip_media.py`
+- **8850**: `tools/run_noki8850_sip_cancel.py`
+
 ### `sip-incoming-connected-signaling`
 
 - **6210**: `tools/run_noki6210_sip_cancel.py`
@@ -909,6 +916,11 @@ absent product is a coverage question, not a drifted gate.
 - **8210**: `tools/run_noki8210_sip_cancel.py`
 - **8850**: `tools/run_noki8850_sip_cancel.py`
 - **8890**: `tools/run_noki8890_sip_cancel.py`
+
+### `sip-outgoing-pending-restore`
+
+- **8290**: `tools/run_noki8290_sip_media.py`
+- **8850**: `tools/run_noki8850_sip_cancel.py`
 
 ### `sip-outgoing-restore`
 
