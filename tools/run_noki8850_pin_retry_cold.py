@@ -46,7 +46,7 @@ PUK_FRAMES={
 }
 
 
-def check_puk_frames(directory,name):
+def check_puk_frames(directory,name,remaining=9):
     from PIL import Image
     frames={}
     if name=='blocked':
@@ -55,9 +55,20 @@ def check_puk_frames(directory,name):
     elif name in ('puk','wrong-puk'):
         frames={f'8850_puk_{label}.png':digest for label,digest in PUK_FRAMES.items()}
         if name=='wrong-puk':
-            frames['8850_puk_result.png']='0b450ca748a44647be303fb1ea7c9f4d7a43de11c8afb09d7a29cffd10976325'
+            frames['8850_puk_result.png']=(
+                '085e8c0db175dded35bd2fc7e9be74cfb7963fa563e525ae0c77cdb5208e0336' if remaining==0 else
+                '0b450ca748a44647be303fb1ea7c9f4d7a43de11c8afb09d7a29cffd10976325')
         else:
             check_puk_menu(directory)
+    elif name=='permanent':
+        # Stage filenames persist, but these are ordinary dial-entry screens,
+        # not active PUK/new-PIN editors. End returns to SIM card rejected.
+        frames={f'8850_puk_{label}.png':digest for label,digest in {
+            'prompt':'a8402b7db24e5909bc8aec8be13a357e9e4f1517c09a999f950dc62c9f43bfe9',
+            'new_pin':'0ce85681cac414837bf0ee55c0ffb59b8d27317118b4c1d659c170cc74b81abe',
+            'confirm':'a8f8aaeb95d1d304160155c9dc6c0d93324c612836a0e0569541d796d237341d',
+            'result':'a8f8aaeb95d1d304160155c9dc6c0d93324c612836a0e0569541d796d237341d',
+            'permanent_after':'a8402b7db24e5909bc8aec8be13a357e9e4f1517c09a999f950dc62c9f43bfe9'}.items()}
     for filename,digest in frames.items():
         with Image.open(directory/filename) as image:
             if image.size!=(84,48) or hashlib.sha256(image.convert('L').tobytes()).hexdigest()!=digest:
@@ -107,8 +118,10 @@ def check_card_phase(text,initial,final,recovery=False):
 def check_puk_phase(text,initial,final,name,*,puk_attempts=10):
     blocked=bytearray(make_profile(True)+bytes.fromhex('00f110')+b'\xff'*43)
     blocked[3516]=0
-    if puk_attempts not in (9,10):
+    if not 0<=puk_attempts<=10 or (puk_attempts==0 and name!='permanent'):
         raise ValueError('unqualified 8850 pre-recovery PUK allowance')
+    if (name=='permanent' and puk_attempts!=0) or (name=='blocked' and puk_attempts!=10):
+        raise ValueError('8850 exhaustion phase has inconsistent initial allowance')
     blocked[3518]=puk_attempts
     rotated=bytearray(blocked)
     rotated[3516]=3
@@ -117,18 +130,20 @@ def check_puk_phase(text,initial,final,name,*,puk_attempts=10):
     rotated[1604:1609]=bytes.fromhex('00f1100001')
     rotated[1610]=0
     rejected=bytearray(blocked)
-    rejected[3518]-=1
-    inputs={'blocked':make_profile(True),'puk':bytes(blocked),'reauth':bytes(rotated),'wrong-puk':bytes(blocked)}
-    outputs={'blocked':bytes(blocked),'puk':bytes(rotated),'reauth':bytes(rotated),'wrong-puk':bytes(rejected)}
+    rejected[3518]=max(0,puk_attempts-1)
+    inputs={'blocked':make_profile(True),'puk':bytes(blocked),'reauth':bytes(rotated),
+            'wrong-puk':bytes(blocked),'permanent':bytes(blocked)}
+    outputs={'blocked':bytes(blocked),'puk':bytes(rotated),'reauth':bytes(rotated),
+             'wrong-puk':bytes(rejected),'permanent':bytes(blocked)}
     if name not in inputs or initial!=inputs[name] or final!=outputs[name]:
         raise ValueError('8850 PUK phase did not retain complete expected card contents')
     verify={'blocked':[(0x9804,2,10),(0x9804,1,10),(0x9840,0,10)],
-            'puk':[],'reauth':[(0x9000,3,10)],'wrong-puk':[]}[name]
-    unblock=([(0x9804,0,puk_attempts-1)] if name=='wrong-puk' else
+            'puk':[],'reauth':[(0x9000,3,10)],'wrong-puk':[],'permanent':[]}[name]
+    unblock=([(0x9840 if puk_attempts==1 else 0x9804,0,puk_attempts-1)] if name=='wrong-puk' else
              [(0x9000,3,10)] if name=='puk' else [])
     if statuses(text,0x20)!=verify or statuses(text,0x2c)!=unblock:
         raise ValueError('8850 PUK phase has wrong credential results or retry allowances')
-    selectors={'blocked':['01']*3,'puk':[],'reauth':['01'],'wrong-puk':[]}[name]
+    selectors={'blocked':['01']*3,'puk':[],'reauth':['01'],'wrong-puk':[],'permanent':[]}[name]
     if re.findall(r'header cla=a0 ins=20 p1=00 p2=(\w\w) p3=08',text)!=selectors:
         raise ValueError('8850 PUK phase has unexpected VERIFY selector/count')
     if re.findall(r'header cla=a0 ins=2c p1=00 p2=(\w\w) p3=10',text)!=(['00'] if name in ('puk','wrong-puk') else []):
@@ -148,22 +163,30 @@ def check_puk_phase(text,initial,final,name,*,puk_attempts=10):
         if ('8850_pin_wrong: complete=1 firmware_state_forcing=0' not in text or
                 'LAPDm Location Updating Accept acknowledged' in text):
             raise ValueError('8850 exhausted PIN incorrectly registered or lacked completion')
-    elif name in ('puk','wrong-puk'):
-        wrong=name=='wrong-puk'
+    elif name in ('puk','wrong-puk','permanent'):
+        wrong=name!='puk'
+        permanent=name=='permanent'
         items=[(8+i,'Keypad '+str(9 if wrong else i+1)) for i in range(8)]+[(16,'Menu')]
         for group in (0,1):
             items += [(20+group*8+i,'Keypad '+str(digit)) for i,digit in enumerate((2,4,6,8))]
             items += [(24+group*8,'Menu')]
         if not wrong:items += [(40+i,'Keypad '+str(i+1)) for i in range(5)]+[(45,'Menu'),(50,'Menu')]
+        if permanent:items.append((38,'End'))
         contacts(text,'8850_puk_input',items)
-        marker='wrong_complete' if wrong else 'complete'
+        marker='permanent_complete' if permanent else 'wrong_complete' if wrong else 'complete'
         if f'8850_puk_input: {marker}=1 firmware_state_forcing=0' not in text:
             raise ValueError('8850 PUK physical sequence did not finish')
         if wrong:
             if 'LAPDm Location Updating Accept acknowledged' in text:
                 raise ValueError('wrong PUK incorrectly registered')
+            if permanent:
+                if any(token in text for token in ('GSM outgoing request','gsm_mm: cm_service_request')):
+                    raise ValueError('permanently blocked credential input started a call')
+                require_ordered(text,[('End',r'8850_puk_input: key=End state=1 t=38\.'),
+                    ('complete',r'8850_puk_input: permanent_complete=1 firmware_state_forcing=0')],'8850 permanent card')
+                return
             require_ordered(text,[('confirm',r'8850_puk_input: key=Menu state=1 t=32\.'),
-                ('rejected',r'SIM status ins=2c sw=9804'),
+                ('rejected',rf'SIM status ins=2c sw={"9840" if puk_attempts==1 else "9804"}'),
                 ('complete',r'8850_puk_input: wrong_complete=1 firmware_state_forcing=0')],'8850 wrong PUK')
             return
         require_ordered(text,[('confirm',r'8850_puk_input: key=Menu state=1 t=32\.'),
@@ -187,8 +210,11 @@ def main():
     parser.add_argument('directory',type=Path)
     parser.add_argument('--puk',action='store_true',help='exhaust PIN1, recover via PUK and cold-authenticate the new PIN')
     parser.add_argument('--wrong-puk-first',action='store_true',help='reject one PUK in a cold process before correct recovery')
+    parser.add_argument('--exhaust-puk',action='store_true',help='physically consume all ten PUK allowances and test cold permanent rejection')
     args=parser.parse_args()
     if args.wrong_puk_first and not args.puk:parser.error('--wrong-puk-first requires --puk')
+    if args.exhaust_puk and (not args.puk or args.wrong_puk_first):
+        parser.error('--exhaust-puk requires --puk without --wrong-puk-first')
     root=Path(__file__).resolve().parents[1]
     try:
         profile=PROFILES['8850']
@@ -202,7 +228,11 @@ def main():
             ('wrong','pin_wrong',18),('recovery','security_input',46))
         if args.wrong_puk_first:
             phases=(phases[0],('wrong-puk','puk_wrong',38),*phases[1:])
+        if args.exhaust_puk:
+            phases=(phases[0],*((f'wrong-puk-{attempt:02d}','puk_wrong',38) for attempt in range(1,11)),
+                    ('permanent','puk_permanent',44))
         for name,script,seconds in phases:
+            kind='wrong-puk' if name.startswith('wrong-puk-') else name
             phase=run/name
             phase.mkdir()
             predecessor_storage=storage_hashes(previous/'nvram') if previous else None
@@ -238,13 +268,14 @@ def main():
                     stderr=subprocess.STDOUT,check=True,timeout=180)
             verify_handset_health((phase/'console.log').read_text(errors='replace'))
             text=(phase/'error.log').read_text(errors='replace')
-            errors=check_trace(text,runtime_hle=True,sim_reads=bool(previous) and name!='wrong-puk')
-            if previous and name not in ('puk','wrong-puk'):errors+=check_physical_inputs(text)+check_navigation_frames(phase/'snap')
+            errors=check_trace(text,runtime_hle=True,sim_reads=bool(previous) and kind not in ('wrong-puk','permanent'))
+            if previous and kind not in ('puk','wrong-puk','permanent'):errors+=check_physical_inputs(text)+check_navigation_frames(phase/'snap')
             if errors:raise ValueError('; '.join(errors))
             if args.puk:
-                check_puk_phase(text,initial,card.read_bytes(),name,
-                                puk_attempts=9 if args.wrong_puk_first and name=='puk' else 10)
-                check_puk_frames(phase/'snap',name)
+                allowance=(11-int(name.rsplit('-',1)[1]) if name.startswith('wrong-puk-') else
+                           0 if name=='permanent' else 9 if args.wrong_puk_first and name=='puk' else 10)
+                check_puk_phase(text,initial,card.read_bytes(),kind,puk_attempts=allowance)
+                check_puk_frames(phase/'snap',kind,remaining=allowance-1)
             else:
                 check_card_phase(text,initial,card.read_bytes(),bool(previous))
                 if not previous:check_wrong_frame(phase/'snap/8850_pin_wrong.png')
@@ -252,12 +283,15 @@ def main():
                 raise ValueError('cold recovery mutated predecessor NVRAM')
             launches.append(launch)
             previous=phase
+            print('8850 cold phase '+name+': verified',flush=True)
         (run/'acceptance.json').write_text(json.dumps({'phases':launches,
             'puk_recovery':args.puk,'wrong_puk_first':args.wrong_puk_first,
+            'permanent_puk_loss':args.exhaust_puk,
             'research_hle':True,'native_speech':False},indent=2)+'\n')
     except (ValueError,RuntimeError,OSError,subprocess.SubprocessError) as error:
         parser.exit(1,f'8850 cold PIN retry FAIL: {error}\n')
-    print('8850 '+('PIN exhaustion, PUK recovery and new-PIN cold authentication' if args.puk else
+    print('8850 '+('PUK exhaustion and cold permanent rejection' if args.exhaust_puk else
+                  'PIN exhaustion, PUK recovery and new-PIN cold authentication' if args.puk else
                   'durable wrong-PIN retry and independent cold recovery')+' PASS')
 
 

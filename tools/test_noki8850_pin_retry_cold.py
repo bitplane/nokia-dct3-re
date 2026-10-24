@@ -25,7 +25,55 @@ def wrong_trace():
     return '\n'.join(lines)
 
 
+def puk_rejection_trace(allowance=10,permanent=False):
+    items=[(8+i,'Keypad 9') for i in range(8)]+[(16,'Menu')]
+    for group in (0,1):
+        items += [(20+group*8+i,'Keypad '+str(digit)) for i,digit in enumerate((2,4,6,8))]
+        items += [(24+group*8,'Menu')]
+    if permanent:items.append((38,'End'))
+    lines=[]
+    for second,key in items:
+        lines += [f'8850_puk_input: key={key} state=1 t={second}.000000000',
+                  f'8850_puk_input: key={key} state=0 t={second}.150000000']
+    if not permanent:
+        status='9840' if allowance==1 else '9804'
+        lines += ['sim_device: header cla=a0 ins=2c p1=00 p2=00 p3=10',
+                  f'SIM status ins=2c sw={status} chv=0/3 puk={allowance-1}/10 enabled=1']
+    marker='permanent_complete' if permanent else 'wrong_complete'
+    lines += [f'8850_puk_input: {marker}=1 firmware_state_forcing=0']
+    return '\n'.join(lines)
+
+
 class ColdPinTest(unittest.TestCase):
+    def test_each_puk_allowance_has_exact_rejection_and_final_block_status(self):
+        for allowance in range(10,0,-1):
+            initial=bytearray(failed_card())
+            initial[3516]=0
+            initial[3518]=allowance
+            final=bytearray(initial)
+            final[3518]-=1
+            with self.subTest(allowance=allowance):
+                check_puk_phase(puk_rejection_trace(allowance),bytes(initial),bytes(final),
+                                'wrong-puk',puk_attempts=allowance)
+                with self.assertRaises(ValueError):
+                    check_puk_phase(puk_rejection_trace(allowance),bytes(initial),bytes(initial),
+                                    'wrong-puk',puk_attempts=allowance)
+
+    def test_permanent_cold_input_cannot_change_card_or_issue_credentials(self):
+        card=bytearray(failed_card())
+        card[3516]=card[3518]=0
+        trace=puk_rejection_trace(0,True)
+        check_puk_phase(trace,bytes(card),bytes(card),'permanent',puk_attempts=0)
+        for extra in ('SIM status ins=2c sw=9840 chv=0/3 puk=0/10 enabled=1',
+                      'SIM status ins=20 sw=9840 chv=0/3 puk=0/10 enabled=1',
+                      'LAPDm Location Updating Accept acknowledged','GSM outgoing request'):
+            with self.subTest(extra=extra),self.assertRaises(ValueError):
+                check_puk_phase(trace+'\n'+extra,bytes(card),bytes(card),'permanent',puk_attempts=0)
+        restored=bytearray(card)
+        restored[3518]=10
+        with self.assertRaises(ValueError):
+            check_puk_phase(trace,bytes(card),bytes(restored),'permanent',puk_attempts=0)
+
     def test_wrong_puk_consumes_one_allowance_without_installing_new_pin(self):
         blocked=bytearray(failed_card())
         blocked[3516]=0

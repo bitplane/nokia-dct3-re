@@ -2052,6 +2052,24 @@ authenticates with2468 under the original recovery checks. Capture:
 `tmp/nsm2-wrong-puk-recovery-final`. This qualifies one persistent wrong-PUK
 attempt and subsequent recovery, not permanent exhaustion or PIN2.
 
+The independent `--puk --exhaust-puk` variant uses twelve processes: fresh
+physical PIN1 exhaustion, ten cold wrong-PUK attempts and a final cold
+permanent-rejection check. Every wrong PUK is entered physically with both
+proposed-PIN confirmations. The complete inherited card must lose exactly
+one PUK1 allowance, preserving the original PIN and all unrelated bytes.
+The first nine UNBLOCK responses are `9804`; the tenth is `9840` with zero
+allowances and the reviewed **Code error** result frame. No blocked phase
+may register. Each attempt's own staged uploads, HLE boundary, physical input
+and exact editor/result frames are required, not inferred from the first.
+The final cold process must retain the entire exhausted card unchanged and
+issue no VERIFY or UNBLOCK despite physical digit/softkey input. Its reviewed
+**SIM card rejected** screen, ordinary numeric-entry frames and End return
+are pinned. The shared fixture's `new_pin`/`confirm` stage filenames do not
+identify PUK editors in this permanently rejected lifecycle: those keys enter
+ordinary dial text, and no new PIN is installed. It starts no call or Location
+Updating. Capture: `tmp/nsm2-permanent-puk-final`. This establishes permanent
+PUK1 loss for this laboratory card, not PIN2, native DSP, RF or speech.
+
 The same isolated runner accepts `--scenario host-incoming-call`. It verifies
 physical answer/end input, the complete host-originated CC/RR exchange,
 traffic-channel assignment and release, and reviewed ringing/returned-idle

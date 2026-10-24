@@ -31,7 +31,12 @@ local input=coroutine.create(function()
         capture(group==0 and 'confirm' or 'result')
     end
     if _G.nsm2_wrong_puk then
-        machine:logerror('8850_puk_input: wrong_complete=1 firmware_state_forcing=0\n')
+        if _G.nsm2_permanent_puk then
+            press('End',38)
+            capture('permanent_after')
+        end
+        machine:logerror('8850_puk_input: '..(_G.nsm2_permanent_puk and 'permanent_complete' or 'wrong_complete')..
+            '=1 firmware_state_forcing=0\n')
         return
     end
     for i,digit in ipairs({1,2,3,4,5}) do press('Keypad '..digit,39+i) end

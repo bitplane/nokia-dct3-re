@@ -1,0 +1,4 @@
+_G.nsm2_permanent_puk=true
+_G.nsm2_wrong_puk=true
+local directory=assert(debug.getinfo(1,'S').source:match('^@(.*/)'))
+dofile(directory..'noki8850_puk_recovery.lua')

@@ -114,7 +114,11 @@ boot/HLE/UI/registration checks remain mandatory. The separate
 `--puk --wrong-puk-first` four-process chain additionally qualifies one
 physical wrong-PUK rejection, persistent10-to9 PUK allowance, correct recovery
 from that cold state and new-PIN cold authentication. Permanent PUK exhaustion
-and PIN2 behavior are not promoted.
+is independently qualified by `--puk --exhaust-puk`: ten cold physical
+wrong-PUK transactions consume all allowances, and a final cold process keeps
+the complete card unchanged, emits no credential APDU or registration, and
+returns to the reviewed SIM card rejected frame after physical input/End.
+PIN2 behavior is not promoted.
 
 NPE-3 additionally has an independent handset-bank A/123 save/cold-read
 fixture with an empty-bank negative control and unchanged complete SIM files;
