@@ -2,16 +2,92 @@
 
 ## Current boundary
 
-The native-core compatibility boundary is parked pending independent evidence,
-not further identity guessing. Public searches for paired NSE-5 PMM/MSID
-captures and COBBA serial-control register specifications have not supplied
-the missing contract. This is a bounded search result, not proof that the data
-does not exist. Gammu's [7110 protocol documentation](https://docs.gammu.org/protocol/n7110.html)
-lists identification reads, but no paired PMM or register-5/6 interpretation;
-service packages and basic-initialization records do not establish a handset's
-original paired identity. Software work may resume on new independent evidence;
-no hardware acquisition or collaborator response is a prerequisite for work
-on other products.
+Normal native support remains unaccepted. Two newly acquired whole4MiB
+backups reopen the stored-input branch without mixing code and PMM from
+different files. The v5.01 PPM-D trial advances beyond the earlier observed
+structural identity rejection, but fails startup result-table item12 (hex).
+The v5.00 trial remains blank with the native DSP polling913e/9140.
+Neither establishes fitted-mask compatibility, original chip pairing, usable
+UI, registration or speech. The existing separate-PMM input remains a distinct
+negative control, not the frontier for every acquired7110 image.
+
+### Whole-backup inputs and bounded native observations
+
+The [preserved7110 full-backup collection](https://www.cosconor.fr/GSM/Nokia/Netmonitor/DCT-3/Nokia%207110/Flash%20Files/)
+supplies an intact v5.01 PPM-D image and a separately archived v5.00 image.
+Hashes, archive member and source URLs are authoritative in `roms/README.md`.
+The names are public-source labels, not proof of original silicon pairing.
+Both contain a write-journal EEPROM sector at5fc000. Independent replay
+finds57 records in v5.01 and87 in v5.00, with distinct full-cache hashes.
+The entire310000-byte v5.01 MCU prefix matches our existing v5.01 PPM-C
+input; its known MCU addresses therefore apply without relocation. The
+v5.00 code differs and is observed without importing those addresses.
+
+Research-only `nse5r4t` BIOSes `501d-full` and `500-full` each load the
+whole acquired4MiB image, including its own upper storage. Default BIOS501
+retains the original separate-PMM composition. Normal `noki7110` is unchanged.
+Both fresh50s processes use the same explicitly unproved NSE-1 mask/clock
+compatibility configuration, without a donor tail, save state or provisioning
+repair. All eight native samples have a clear unsupported-instruction stop
+flag; this is not proof of correct peripheral completion or UI.
+
+In v5.01, loader-completion cache snapshots are independently reproduced from
+the complete flash journal sectors captured at each observation. The first
+sector exactly equals the acquired input. Later firmware-owned record changes
+are not replaced by the original first record or classified as noise.
+The mapped identity check3af540 runs twice, with no hit at its structural
+invalid branch3af64e. The second pass publishes through3ae594 from3af871.
+Unlike the separate-PMM control, self-test consumer30e7a6 receives the actual
+type74 body0d00. These are bounded positive-control-backed observations, not
+a claim that every identity/lock predicate passes.
+
+Startup still excludes the second task batch. The actual write at30e63e
+clears flagscc->8c twice, with result-table index12/value12. This is observed
+through the RAM write, not a silent mid-block fetch hook. Caller30e548 uses
+473356 ->3af8d6: logical bytes00..3f are read, helper491914 sums the first
+3c bytes modulo65536, and the result is compared with the big-endian32-bit
+word at3c. Independent first-cache arithmetic gives18e0 versus stored18ed.
+No checksum or identity is repaired. The subsequent0d00 reply clears busy
+bit2 but cannot restore the already-cleared release bit6;49fe36 skips the
+task batch with flags88. The48s panel is an unaccepted reversed CONTACT
+SERVICE failure frame, not graphical boot success.
+
+The v5.00 backup's independently replayed low-record arithmetic is1988
+versus stored00001988. Its distinct firmware checksum call sites have not
+yet been aligned. Its50s trial remains blank and native PC913e/9140 matches
+the independently documented pending serial-control loop family in
+`8810_bringup.md`; no completion or clock is inferred from that similarity.
+The next software question is the own v5.00 serial-control caller and
+whether its valid stored-input path reaches the same pending-port contract.
+Do not transplant v5.01 flags, addresses, checksum fixes or UI expectations.
+
+```sh
+.venv/bin/python tools/nse5_fullbackup_check.py roms/research/nse5-cosconor
+.venv/bin/python tools/nse5_fullbackup_check.py roms/research/nse5-cosconor \
+  --bios 501d-full --run tmp/nse5-fullbackup-v501d-accepted
+.venv/bin/python tools/nse5_fullbackup_check.py roms/research/nse5-cosconor \
+  --bios 500-full --run tmp/nse5-fullbackup-v500-accepted
+```
+
+Add `--mame mame/mame` with a fresh directory to execute a trial. Raw journal
+and identity observations stay in ignored captures; durable reports use
+hashes rather than publishing handset identity bytes. The following sections
+describe the separate-PMM BIOS501 control unless explicitly stated otherwise.
+
+### Matched current separate-PMM control
+
+`tmp/nse5-fullbackup-default-regression` runs the original input on the same
+newly built binary as the whole-backup trials. It retains two structural
+invalid-branch hits and one system-stop code4 publication. Unlike the older
+captures detailed below, its later startup does reach49fddc with flagsc8
+at2.807611s; self-test consumer30e7a6 is observed once. Final MCU PC49fff6
+and a blank8s frame do not establish usable UI. Native summary reports238
+mailbox writes and366 completion strobes, with DSP PC9140. Thus permanent
+second-phase exclusion or a final stop at4e9510 must not be carried forward
+as the current default composition's invariant. Its identity rejection still
+provides the matched negative contrast to the full v5.01 backup's zero
+invalid hits. Earlier queue-loss/timing observations below retain their
+capture scope and are not current-core acceptance targets.
 
 NSE-5 v5.01 PPM C completes 228 alternating sparse-flash buffer handoffs and
 waits at `0x432f96..0x432f9c` for the DSP-owned halfword at MCU `0x10002` to
@@ -57,11 +133,11 @@ After `make build`, reproduce the bounded observation with:
 The runner hashes all four inputs, prepares a private ROM directory, removes
 only this fixture's retained NVRAM, and captures six native panel images
 through eight seconds. Its Lua observer reads MCU state and snapshots the
-screen; it does not write firmware state or synthesize DSP results. The
-banked model reproduces 238 mailbox writes and 1710 DSP completion strobes.
-Version 4 is copied to `0x167038` by 0.5 seconds; the current peripheral model
-produces word 0 equal to zero, not a hardcoded acceptance value. The final MCU
-PC is `0x4e9510`, and the final native image is blank. This protects the
+screen; it does not write firmware state or synthesize DSP results. An earlier
+capture recorded238 mailbox writes and1710 DSP completion strobes, with
+version4 copied to167038 by0.5s and result word0 supplied by execution,
+not a hardcoded acceptance value. Its MCU ended at4e9510 with a blank image;
+the matched current control above supersedes that endpoint. This protects the
 compatibility observation window, not UI startup, SIM or fitted-mask identity.
 The backend retains its independently documented peripheral/timing models;
 executing authentic mask bytes does not validate those models for NSE-5.
@@ -141,12 +217,12 @@ The twelve-byte task records begin at `0x25d3fc`. They identify entries
 completion calls feed `0x311eb0`. Task `0x17` is separate and has entry
 `0x2df5b4`, containing the report-`0x14` producer. The first release phase
 includes task `0x17`, but the eleven checklist tasks belong to the second
-release phase at `0x49fddc..0x49fe1a`; that phase is not entered in the
-compatibility run. Their absence is therefore not eleven independent
-missing hardware responses.
+release phase at `0x49fddc..0x49fe1a`. The earlier queue-loss capture did not
+enter it; the matched current separate-PMM control does. An excluded batch
+is not eleven independent missing hardware responses.
 
 The deciding predicate `0x469cc2` waits for bit 2 of byte `0x17fe15` to
-clear, then returns 1 only if bit 6 is set. The runtime write-watch sees
+clear, then returns 1 only if bit 6 is set. The earlier runtime write-watch sees
 initialization `00 -> 08 -> 48 -> c8` at approximately 0.695 seconds,
 then `cc` at 0.701 seconds. Event `0xd8` reaches `0x311416` at
 approximately 2.253 seconds while bit 2 remains set. Its busy-expiry branch
@@ -165,9 +241,9 @@ the message construction alone does not prove DSP-ring delivery or identify
 the correct response payload. `--verbose` enables existing device-boundary
 traces in the compatibility runner to check that transport next.
 
-### Self-test reply lost at a full firmware queue
+### Earlier self-test queue-loss observation
 
-The verbose run establishes transport delivery: the DSP consumes all four
+The earlier verbose capture establishes transport delivery: the DSP consumes all four
 stock `0x70` startup packets and publishes replies through the RX ring.
 It publishes type `0x74`, payload `0d 00`, at approximately 0.701377 seconds.
 The MCU consumes that ring entry and `0x469dbc` wraps it for task 2.

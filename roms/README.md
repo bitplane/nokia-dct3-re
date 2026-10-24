@@ -69,6 +69,35 @@ and matching MAME hashes do not independently establish factory authenticity.
 No ROM5/ROM6 DSP mask dump was acquired, no missing MAD2 ROM is fabricated,
 and acquisition alone does not promote any handset's runtime coverage.
 
+### Nokia7110 intact public backups
+
+The [Cosconor preserved full-backup directory](https://www.cosconor.fr/GSM/Nokia/Netmonitor/DCT-3/Nokia%207110/Flash%20Files/)
+supplies additional inputs under `roms/research/nse5-cosconor/`:
+
+| File | Bytes | SHA256 |
+| --- | --- | --- |
+| [FuBu7110-v501-PPM-D.fls](https://www.cosconor.fr/GSM/Nokia/Netmonitor/DCT-3/Nokia%207110/Flash%20Files/FuBu7110%20v5.01%20%28PPM%20D%29.fls) | 4194304 | `da259e776feea05d905399a644f3e4f9ed2862f591e8f3cd8dbc8d05884a5deb` |
+| [My-7110-original-FuBu.zip](https://www.cosconor.fr/GSM/Nokia/Netmonitor/DCT-3/Nokia%207110/Flash%20Files/My%207110%20original%20FuBu.zip) | 2118257 | `4391f36226314808a6ffce4d38509e2879a51eff0839b75670b168b25e9bda77` |
+| Archive member `My 7110 v5.00.fls` | 4194304 | `4e0660c14e8e335380f963ae200bf2404d50e826b15f50355a68c9da0a78aecd` |
+
+The direct-download basename is normalized locally; file bytes are unchanged.
+The ZIP has exactly one member, extracted without executing anything.
+Both raw images include their own complete upper storage rather than a
+transplanted PMM tail. Each has a write-journal EEPROM sector at CPU5fc000;
+independent replay yields57/87 writes and distinct cache hashes. The entire
+310000-byte v5.01 MCU prefix matches the existing PPM-C acquisition.
+The source's version/full-backup labels do not prove original chip pairing
+or integrity of every stored record. In particular, the v5.01 low record
+fails its own decoded checksum predicate; no repair is supplied.
+The source files are preserved intact and private identity bytes are not
+copied into documentation or test fixtures.
+
+`tools/nse5_fullbackup_check.py` pins all input/archive hashes, validates the
+member, independently replays journals and supports isolated read-only native
+trials. Research `nse5r4t` BIOSes `501d-full`/`500-full` load the whole
+images; original default501 and normal `noki7110` remain unchanged.
+Observed boundaries and reproduction commands are in `docs/7110_bringup.md`.
+
 The acquired NSK-3 v5.61 package is additionally decoded into two own
 MCU/PPM-A pairs under ignored `roms/noki6130/`. Reproduce and qualify with
 `tools/nsk3_static_check.py`; `docs/6130_bringup.md` records member pairing,

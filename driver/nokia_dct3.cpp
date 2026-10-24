@@ -5319,10 +5319,19 @@ ROM_START( nse5r4t )
 	ROM_LOAD("nse1_rom4_dsp_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))
 	ROM_REGION16_BE(0x400000, "flash", ROMREGION_ERASEFF)
-	ROM_LOAD("7110f501_ppmc.fls", 0, 0x390000,
-			CRC(919ac753) SHA1(53af8324919f455ba8199d2c05f7a921cfb811d5))
-	ROM_LOAD("7110 virgin eeprom 005fa000.fls", 0x3fa000, 0x6000,
-			CRC(78e7d8c1) SHA1(8b4dd782fc9d1306268ba63124ee463ac646912b))
+	ROM_SYSTEM_BIOS(0, "501", "v5.01 PPM C (separate PMM input)")
+	ROMX_LOAD("7110f501_ppmc.fls", 0, 0x390000,
+			CRC(919ac753) SHA1(53af8324919f455ba8199d2c05f7a921cfb811d5), ROM_BIOS(0))
+	ROMX_LOAD("7110 virgin eeprom 005fa000.fls", 0x3fa000, 0x6000,
+			CRC(78e7d8c1) SHA1(8b4dd782fc9d1306268ba63124ee463ac646912b), ROM_BIOS(0))
+	// Whole acquired backups: preserve each image's own code and all storage.
+	// Public labels do not establish original chip pairing or fitted DSP mask.
+	ROM_SYSTEM_BIOS(1, "501d-full", "v5.01 PPM D (whole backup)")
+	ROMX_LOAD("FuBu7110-v501-PPM-D.fls", 0, 0x400000,
+			CRC(db130e68) SHA1(82f8e1f5a924633f0778e5e1cf1176f89dd0c0a2), ROM_BIOS(1))
+	ROM_SYSTEM_BIOS(2, "500-full", "v5.00 (whole backup)")
+	ROMX_LOAD("My 7110 v5.00.fls", 0, 0x400000,
+			CRC(61990109) SHA1(29d60c369105db039a0a0d7311861e52f7ccf11a), ROM_BIOS(2))
 ROM_END
 
 ROM_START( noki8210 )
