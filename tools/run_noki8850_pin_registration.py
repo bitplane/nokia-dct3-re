@@ -39,11 +39,13 @@ def main():
                         help='run the original phone-code-only baseline')
     parser.add_argument('--scenario', choices=('registration', 'host-incoming-call', 'host-incoming-sms',
                                               'host-outgoing-call', 'host-outgoing-sms',
-                                              'host-rejected-sms', 'host-silent-sms', 'phonebook',
+                                              'host-rejected-sms', 'host-silent-sms', 'host-incoming-ussd', 'phonebook',
                                               'idle-state', 'call-state', 'sms-state'),
                         default='registration')
     parser.add_argument('--port', type=int, default=18850)
     args = parser.parse_args()
+    if args.scenario == 'host-incoming-ussd' and args.without_pin:
+        parser.error('host-incoming-ussd requires the PIN-authenticated profile')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     profile = PROFILES['8850']
@@ -66,6 +68,7 @@ def main():
             'host-outgoing-sms': 'outgoing_sms_input',
             'host-rejected-sms': 'sms_reject_input',
             'host-silent-sms': 'sms_silence_input',
+            'host-incoming-ussd': 'host_ussd_notify',
             'phonebook': 'phonebook_input',
             'idle-state': 'state_idle', 'call-state': 'state_call', 'sms-state': 'state_sms',
         }[args.scenario]
@@ -103,6 +106,8 @@ def main():
                     ['--user-data', '41', '--user-data-length', '1', '--decision', 'rp_error']),
                 'host-silent-sms': ('run_host_sms_gate',
                     ['--user-data', '41', '--user-data-length', '1', '--decision', 'rp_silence']),
+                'host-incoming-ussd': ('run_host_incoming_ussd_gate',
+                    ['--text', 'Host notice', '--ready-marker', '8850_host_ussd: ready']),
             }[args.scenario]
             host_command = [sys.executable, str(root / f'tools/{runner}.py'),
                             '--port', str(args.port), '--cwd', str(run)] + options
@@ -167,6 +172,10 @@ def main():
             subprocess.run([sys.executable, str(root / 'tools/noki8850_phonebook_check.py'),
                             'readback', str(run / 'error.log'), str(card),
                             str(run / 'snap/8850_phonebook_contact.png')], check=True)
+        elif args.scenario == 'host-incoming-ussd':
+            from tools.noki8850_host_ussd_check import verify, check_frames
+            verify(text, card.read_bytes())
+            check_frames(run / 'snap')
         elif sms and not incoming:
             from tools.noki8850_outgoing_sms_check import verify, verify_silence, check_recovery
             outcome = {'host-rejected-sms': 'rp_error', 'host-silent-sms': 'rp_silence'}.get(

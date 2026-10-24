@@ -2426,6 +2426,20 @@ Hash column 4. Shared port labels express that contract without changing
 matrix bits. This proves research-HLE supplementary signaling and UI,
 not native DSP execution or speech.
 
+`verify-8850-pin-host-incoming-ussd` additionally qualifies a host-originated
+notification through the WebSocket backend on fresh own-PMM `nsm2hle`.
+Physical PIN1234 and phone-code12345 precede settled admission at30s.
+The host submits `Host notice`; the firmware acknowledges the notification,
+releases RR, and physical Menu at35s displays the reviewed exact text frame.
+End at38s returns to the existing registered-idle oracle; Menu at41s opens
+the existing Messages title/list crop, excluding its animated icon. Every
+physical contact release is checked. The complete SIM must equal the
+PIN-enabled laboratory profile plus its ordinary registered EF_LOCI and
+default identity trailer; no SIM write or credential change may occur after
+notification admission. Wrong epoch, duplicate notification, absent release,
+changed card bytes and missing read/recovery frames reject. This establishes
+one-way host notification, not a host request/reply dialogue or native radio.
+
 MAME also audits the declared shared `dsp_prom`, `dsp_drom` and `dsp_pdrom`
 files in the product ROM directory. Their presence is a run prerequisite,
 not evidence of a product-matched resident ROM6 mask; do not substitute
