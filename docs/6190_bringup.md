@@ -466,8 +466,23 @@ The alternative task-12 input `13a3` selects `219f94 -> 218cac`. Its `218d50`
 path can call initializer `218bb0` using the retained argument byte. Own
 publisher `211174` constructs `13a3`, copies byte `108947` to message `+2`,
 and posts to task 12. Its three direct BL callers are `2112f2`, `213b64`,
-and `213c02`. These bound the alternative `13a3` publication surface;
-the observed asynchronous predecessor is described below.
+and `213c02`. Their own selectors are now pinned:
+
+- Dispatcher `211ab0` selects handler `2112dc` for input `03f1`
+  (`03ed+4`). Publication at `2112f2` requires byte `108764=1f` and
+  predicate `275b64` returning zero. Otherwise it calls `2111bc`, which
+  constructs a separate type-02 operation; the fallback is not `13a3`.
+- Dispatcher `213950` selects `213b54` for `03e9` message byte `+2=3`,
+  reaching publication at `213b64`.
+- The same dispatcher selects `213bcc` for `03e9` byte `+2=4`, reaching
+  `213c02` only when the prior state read at `213bf8` is 6 or 7.
+
+These are firmware-owned selector contracts, not a demonstrated native RF
+completion vocabulary. The observed cold `03e9/1` search initiation must
+not be relabelled as selector 3/4, and neither `03f1` nor `13a3` should be
+injected to consume the cached result. The census checks these instruction
+fragments and literal addresses against the own image; the observed
+asynchronous predecessor is described below.
 
 With native ring/cache controls passing, counters sampled at 64 seconds
 observe zero `043f/0440` constructor entrances, zero initializer entrances,

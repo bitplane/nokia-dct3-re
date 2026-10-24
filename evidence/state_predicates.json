@@ -2914,6 +2914,12 @@
       "evidence": ["docs/6190_bringup.md", "tools/nsb3_sim_observe.lua", "tools/nsb3_pin_correct.lua", "tools/nsb3_reset_observe.lua", "tools/nsb3_reset_contract.py", "tools/test_nsb3_reset_contract.py"]
     },
     {
+      "id": "nsb3_status13a3_selector_contract", "owner": "nsb3_firmware", "status": "satisfied",
+      "predicate": "The own NSB-3 direct13a3 publication callers have explicit input/state selectors without importing a sibling activation lifecycle",
+      "current": "Own dispatcher211ab0 selects2112dc for03f1 (03ed+4); publisher call2112f2 requires108764=1f and275b64 returning0, otherwise fallback2111bc constructs another type02 operation. Dispatcher213950 selects213b54 for03e9 byte+2=3 and publishes at213b64; selector4 reaches213bcc and publishes at213c02 only with prior state6/7. Own fragments/literals and mutation tests protect these paths. Existing qualified native activation/ring/cache capture still observes cold03e9/1 ->212658(2)->type1a and zero13a3/initializer entrances. These selectors are not established native RF completion meanings; no event, selector or controller state is forced. The absent type80 data path and native RF prerequisites remain independent unresolved boundaries.",
+      "evidence": ["docs/6190_bringup.md", "tools/nsb3_activation_census.py", "tools/test_nsb3_activation_census.py", "tools/nsb3_radio_activation_observe.lua"]
+    },
+    {
       "id": "nam1_display_frontier", "owner": "nam1_firmware", "status": "satisfied",
       "predicate": "Nokia 3610 v5.11 organically reaches a deterministic firmware-rendered display boundary through product-owned GENSIO and geometry contracts",
       "current": "NAM-1 independently writes GENSIO control 0x22 at 0x2d, transfers CCONT bytes at 0x2c and polls 0x6d. Byte-write receive-ready releases that loop. Firmware then writes nine 96-byte display banks; a 96x65 visible area with reversed segment order renders the complete CONTACT SERVICE frame. Separate gates prove DSP bootstrap/service control, request-derived discovery, accepted application sequences 0x42/0x43, channel-0x5f use and a complete physical M2BUS terminal exchange. Missing product state remains the next boundary.",

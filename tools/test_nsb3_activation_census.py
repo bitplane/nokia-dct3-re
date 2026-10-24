@@ -1,9 +1,24 @@
 import unittest
 
-from tools.nsb3_activation_census import callers, check_counts, check_upstream, inspect
+from tools.nsb3_activation_census import callers, check_counts, check_upstream, completion_routes, inspect
+from pathlib import Path
 
 
 class Nsb3ActivationTest(unittest.TestCase):
+    def test_own_completion_selectors_and_mutation_guard(self):
+        path = Path('roms/noki6190/6190f613a.fls')
+        if not path.exists():
+            self.skipTest('optional own NSB-3 ROM not installed')
+        image = path.read_bytes()
+        result = completion_routes(image)
+        self.assertEqual(result['input03f1']['required_value'], 0x1f)
+        self.assertEqual(result['input03e9']['selector4_prior_states'], [6, 7])
+        for address in (0x2112e4, 0x213a30, 0x213bfa, 0x211bdc):
+            changed = bytearray(image)
+            changed[address - 0x200000] ^= 1
+            with self.assertRaises(ValueError):
+                completion_routes(changed)
+
     def test_upstream_requires_request_start_publication_and_uncapped_control(self):
         text = '\n'.join([
             'nsb3_radio_upstream: header=03e90100 caller=00214931 count=1 observer_writes=0',
