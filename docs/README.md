@@ -40,7 +40,7 @@ distinction.
 | `model_coverage.md` | Evidence-gated per-product compatibility and fidelity matrix. |
 | `5110i_bringup.md` | Own NSE-2 inputs, NV integrity, native ROM4 compatibility, graphical/input/security, cold SIM contacts, offline SMS storage and receive-supervision boundary. |
 | `6110_bringup.md` | Authoritative NSE-3 hardware/firmware map and blocked resumption boundary. |
-| `6130_bringup.md` | Own NSK-3 inputs, bounded physical UI/SIM storage and security, native radio/liveness boundaries. |
+| `6130_bringup.md` | Own NSK-3 inputs, physical Net monitor exit and cold idle, bounded SIM storage/security, native radio/liveness boundaries. |
 | `5130_bringup.md` | Own NSK-1 startup/storage/input contracts; native compatibility boot, physical security, persistent contacts and offline SMS save/cold read. |
 | `6150_bringup.md` | NSM-1 compatibility boot/provisioning, physical UI/SIM/storage contracts and fitted DSP/radio prerequisites. |
 | `8810_bringup.md` | Own NSE-6 v6.02 graphical native compatibility fixture, upload geometry and unresolved native serial-control completion. |

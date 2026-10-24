@@ -2,6 +2,58 @@
 
 ## Current result
 
+**Readable cold idle:** the own `nsk3r4t` boot4/PPM A compatibility
+composition now passes physical Net monitor exit and a separate cold restart.
+This is a54s UI/storage qualification, not sustained native operation or
+registered idle. `Headset` is the existing accessory/profile presentation,
+not an operator name or validated unattached-board wiring.
+
+### Physical Net monitor exit and storage contract
+
+Own descriptor0604 at `0x2c1778` is `0000060403a90001`: its selector
+is EEPROM `03a9`, length1. Physical Test00 changes `ff` to `3f`.
+The5190/6190 offset04a1 and value41 must not be imported into this ROM.
+Own logical-key table `0x2c7a30` independently supplies Menu, Up, zero
+and the right softkey contacts used by the fixture.
+
+After physical SIM PIN1234 and separate phone-code12345 authentication,
+Menu28s/Up30s encounters a Battery low notice. Menu32s acknowledges it;
+Menu34s opens Test01. Zero37s/zero39s produces Test00, and Menu41s
+returns readable Headset idle. Right-softkey44s opens Names; another at46s
+returns idle. A cold process repeats only authentication, showing title-free
+idle at25/29/31s and Headset idle at36/42s without repeating the selection.
+
+Relative to the primed predecessor, firmware changes211 EEPROM bytes:
+selector03a9 plus210 bytes in30 repeated33-byte spans within1966..1d43.
+Own records072a/072b/072c and aliases072e/072f/0730 anchor these areas.
+Their full indexing and write semantics remain unmapped; they are not
+classified as harmless metadata or excluded from acceptance. The complete
+8192-byte post-selection bank is identical after cold restart, SHA256
+`26b7dd4abc3ea4d9c712c470ebaf03eaf77d3c6b9e1077351ff8daa0f8503ae2`.
+The primed predecessor hash is
+`7554f3abb2f69da09454f36042e7a8d4d91195c72d5da7d63045649f1d5cc25d`.
+Own executable flash, original complete PIN-enabled laboratory card and
+external input configuration remain unchanged. No EEPROM edits, ADC tuning,
+firmware-state writes or synthesized completions are used by this sequence.
+
+`nsk3_diagnostic_display_check.py` checks own descriptor/key bytes, complete
+storage hashes and cold links, authentication/APDU ordering, nine physical
+contact pairs, nine reviewed selection frames and five cold frames. Passive
+native observations require the unsupported-instruction stop flag clear at
+each snapshot; they do not prove fitted-mask compatibility or RF execution.
+Six unit tests reject contract, bank, contact, native-marker and provenance
+mutations. The current executable acceptance is:
+
+```sh
+.venv/bin/python tools/nsk3_diagnostic_display_check.py \
+  roms/noki6130/source tmp/nsk3-diagnostic-idle-baseline \
+  tmp/nsk3-diagnostic-display-accepted \
+  tmp/nsk3-diagnostic-display-accepted-cold
+```
+
+Add `--mame mame/mame` with two fresh output directories to execute both
+isolated54s processes rather than recheck captured evidence.
+
 **Long-run limit:** the corrected native compatibility composition requests a
 reason68 restart at93.975196s. Short physical UI/storage/security gates do
 not establish sustained native operation. The own packet-supervision contract
@@ -86,7 +138,8 @@ rescans the physical matrix under an explicit nominal ADC2 hypothesis (554).
 With the synthetic SIM inserted and an own-initializer retry-byte fixture,
 physical12345 submission is accepted and another physical command opens a
 readable Messages menu. A separate cold process preserves storage unchanged
-and requires the phone code again. The displayed idle content is not accepted.
+and requires the phone code again. The unmodified diagnostic selector retains
+marked idle content; the physical Test00 contract above qualifies its removal.
 Physical Add entry now saves A/12345 to SIM EF_ADN; a separate cold process
 retrieves the entry through Search/Details and displays12345 without rewriting
 the card. An explicit PIN-enabled laboratory card additionally passes physical
