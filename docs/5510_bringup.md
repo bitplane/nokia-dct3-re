@@ -146,6 +146,23 @@ establish that silicon traps on these encodings or settle other families'
 alias behavior. Canonical`f8` absolute and legal long MOD13 remain distinct.
 Capture:`tmp/run_c54x_core_gfni9tle`; the unchanged-core diagnostic is retained
 in`tmp/c54x-mpy-alias-negative.log`.
+
+`mac-abs-edge` checks448 cases/restores for the same`f9..ff` admission
+boundary: both source and destination accumulators, CMPT settings, program
+pages, frontends and two checkpoints. The unchanged atomic MAC path attempted
+an operand read at case56 (the first atomic case), despite staged rejection.
+MAC now rejects before operand access or T publication, matching MPY and the
+staged classifier. All448 cases retain A/B/T/status/ARs with zero data reads
+or writes. This is an emulator admission-consistency correction, not a
+silicon-trap claim or evidence that a handset uses these aliases.
+Negative control:`tmp/mac-abs-edge-before/run_c54x_core_da4c3f2y`;
+corrected capture:`tmp/mac-abs-edge-after/run_c54x_core_28eddmjv`.
+The unchanged224-case MPY alias control and the complete legal MPY/MAC
+profile also pass after this correction; the latter capture is
+`tmp/mac-abs-edge-controls/run_c54x_core__82ilqn1`.
+The staged NSE-1 Phone book menu oracle also remains exact
+(`make verify-5110-menu NSE1_MACHINE=nse1pipe`).
+
 The existing256-case short-MOD3 MPY rejection control and the complete
 `mpy-mem-imm` profile pass separately:98,304 legal MPY cases,262,144 MAC
 cases and1,408 MAC exclusions, all with restoration. The legal profile's

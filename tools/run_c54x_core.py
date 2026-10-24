@@ -619,6 +619,10 @@ EXTRA_PROFILES = {
         "TMS320C54x interrupt POPM exclusions: PASS cases=24 restore=24 destinations=IMR,IFR contexts=RPT,BD_first,BD_last pages=2 snapshots=2 reads=0 writes=0 stack_changes=0 mask_changes=0 acknowledgements=0 hardware_trap_claim=0",
         "Fatal error: TMS320C54x isolated interrupt POPM exclusions complete",
     ),
+    "mac-abs-edge": (
+        "TMS320C54x MAC absolute alias exclusions: PASS cases=448 restore=448 modes=f9..ff sources=2 destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated MAC absolute alias exclusions complete",
+    ),
     "mpy-abs-edge": (
         "TMS320C54x MPY absolute alias exclusions: PASS cases=224 restore=224 modes=f9..ff destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated MPY absolute alias exclusions complete",
@@ -2356,7 +2360,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("mvdd-follow", "st-acc-mvmm", "shift16-load-age", "addsub-ar-age", "bd-read-a", "mac-map-imm", "tc-delay-call", "tmac-repeat", "tmac-rpt-edge", "lms", "lms-edge", "addm-ar-short", "bd-maca-long", "bd-maca-edge", "push-mvmm-sp"):
         machine = "tms54xtra"
-    if args.profile in ("pmac-mod3-edge","delay-mod3-edge","store-observe","push-observe","dual-sub-native","idle-modes","clock-mvdk","clock-mvdk-edge","pop-irq","pop-irq-edge","mpy-abs-edge"):
+    if args.profile in ("pmac-mod3-edge","delay-mod3-edge","store-observe","push-observe","dual-sub-native","idle-modes","clock-mvdk","clock-mvdk-edge","pop-irq","pop-irq-edge","mpy-abs-edge","mac-abs-edge"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-joystickprovider", "none",

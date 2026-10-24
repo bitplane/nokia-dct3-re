@@ -6686,6 +6686,8 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x6400: case 0x6500: case 0x6600: case 0x6700: // MAC Smem, #lk, src, dst
 	{
+		// Match staged/MPY admission before fetching operands or changing T.
+		if ((low & 0xf8) == 0x98 || low > 0xf8) { m_illegal = true; return; }
 		u16 immediate;
 		const u16 memory = immediate_smem_read(low, immediate);
 		m_t = memory;
