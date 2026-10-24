@@ -35,6 +35,9 @@ FRAGMENTS = {
     0x294a3c: '0010ad9c0010ad2c',
     0x294acc: '88612903d1014962e000496200805809',
     0x294c5c: '0010ad9c0010ad2c',
+    0x28dff4: 'b510240048ed78002800d008f7e7fb142800d00448f778002800d000240106200e00bd10',
+    0x28e3b0: '0010be1a',
+    0x28e3e8: '001080ef',
 }
 
 
@@ -74,6 +77,10 @@ def inspect(image):
             'catalogue_selector': {'context': '0x10ad08', 'field': '0x10ad0a',
                                    'equals_3': '0x10ad9c', 'otherwise': '0x10ad2c',
                                    'initial_consumer': '0x2946a0', 'indexed_consumer': '0x294acc'},
+            'idle_permission': {'entry': '0x28dff4', 'return': '0x28e016',
+                                'first_flag': '0x10be1a', 'second_flag': '0x1080ef',
+                                'intermediate_predicate': '0x27562c',
+                                'zero_is_not_dsp_wait_proof': True},
             'scope': 'Own static declarations only; runtime mask selection and fitted compatibility unproved'}
 
 

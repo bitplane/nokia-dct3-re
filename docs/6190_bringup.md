@@ -4,10 +4,12 @@
 
 `noki6190` is a conservative MCU research instrument. Two independent
 erased-storage runs initialize the same 8 KiB EEPROM, preserve the own flash
-and settle in a firmware idle loop. Runtime context selects catalogue 4;
-fitted-mask compatibility, graphical boot, organic input, SIM and radio remain
-unqualified. Next recover upload/reset execution and the idle loop's pending
-work before choosing a resident mask or HLE completion. No donor EEPROM is supplied.
+and settle in a firmware idle loop. Passive startup capture additionally
+qualifies a graphical `CONTACT SERVICE` failure and the exact own 186-word
+identity-4 bootstrap installation. Native execution, fitted-mask compatibility,
+interactive input, SIM and radio remain unqualified. Next identify the failed
+self-test and validate the upload/reset boundary before choosing a resident
+mask or HLE completion. No donor EEPROM is supplied.
 
 Collection provenance and the unprovided MCU-to-PPM gap are in
 `roms/README.md`. Reproduce the static report:
@@ -113,3 +115,29 @@ Complete flash remains byte-identical to the own installer-derived image.
 `tmp/nsb3-erased-first` and `tmp/nsb3-erased-repeat` agree on full EEPROM,
 flash and card files. The next trace must distinguish pending hardware work
 from a normally idle task; do not synthesize messages from a sampled PC alone.
+
+## Passive graphical and upload boundary
+
+`tools/nsb3_startup_observe.lua` adds bounded read-only debugger samples,
+an installed-program dump and a five-second screenshot. Use the same fresh
+isolated command above with `-debug -debugger none` and this autoboot script,
+then check with:
+
+```sh
+.venv/bin/python tools/nsb3_boot_check.py roms/noki6190/6190f613a.fls tmp/nsb3-startup-qualified --startup
+```
+
+The 372-byte shared-window dump exactly matches the own catalogue-4 bootstrap
+at `2c210c`, SHA1 `e1e8f15a305bf32aea98f444074f30828d933fc4`. This proves
+installation, not execution by a DSP. The reviewed 84x48 screenshot says
+`CONTACT SERVICE`; its RGB pixel SHA256 is
+`ed09afeeadae383b77840654453b183a05e10b2cad5ea5757e8c803cbd6b674b`.
+Own flash and complete EEPROM remain equal to the cold-run controls.
+
+The sampled idle permission routine `28dff4` returns zero. Its complete
+short-circuit chain tests byte `10be1a`, predicate `27562c`, then byte
+`1080ef`; it returns one only if all pass. Zero is not a direct DSP wait.
+At five seconds the idle latch is `01`, companion `00`, global control `05`,
+FIQ/IRQ pending both zero, masks `e3/de`. Early catalogue breakpoints did not
+fire in this autoboot observation window, so they do not establish absence
+of earlier activity; the exact installed payload is the stronger evidence.
