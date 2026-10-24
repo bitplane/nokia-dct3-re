@@ -147,8 +147,12 @@ connected/released, unlisted12346 refused before call establishment while
 FDN is On, and the same unlisted number connected/released after physical
 PIN2-protected Off. Identical saved-card branches, post-Send FDN lookup,
 complete-card equality, own CC/RR/UI checks and explicit isolated lab peer
-configuration are required. Edit/erase/cancel, arbitrary prefix matching and
-speech remain unpromoted.
+configuration are required. The independent twelve-process
+`--record-lifecycle` chain adds PIN2-protected12345-to12346 editing/cold
+Details, identical erase-dialog cancellation with cold retention, and
+confirmed record1 erasure with cold No phone numbers. Complete-card and
+own protocol/UI/registration checks remain mandatory. Capacity, arbitrary
+prefix matching and speech remain unpromoted.
 
 NPE-3 additionally has an independent handset-bank A/123 save/cold-read
 fixture with an empty-bank negative control and unchanged complete SIM files;

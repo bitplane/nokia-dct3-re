@@ -34,6 +34,41 @@ def trace(phase):
 
 
 class FdnValidityTest(unittest.TestCase):
+    def test_lifecycle_predecessors_preserve_cancel_and_erase_boundaries(self):
+        plan=phase_plan(lifecycle=True)
+        self.assertEqual([(p.name,p.source,p.record) for p in plan[6:]],
+            [('edit','read','edit'),('edited_read','edit','edited_read'),
+             ('cancel','edited_read','cancel'),('cancelled_read','cancel','cancelled_read'),
+             ('erase','cancelled_read','erase'),('empty','erase','empty')])
+        self.assertEqual(plan[:6],phase_plan(records=True))
+
+    def test_cancel_and_erase_require_distinct_card_and_update_results(self):
+        for mode in ('cancel','erase'):
+            lines=['sim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08',
+                   'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1']
+            for fid in ('6f7e','6f07'):
+                lines += [f'sim_device: header cla=a0 ins=44 p1=00 p2=00 p3=00 selected={fid}',
+                          'SIM status ins=44 sw=9000 chv=3/3 puk=10/10 enabled=1']
+            lines += [f'sim_device: header cla=a0 ins=b2 p1={i:02x} p2=04 p3=20 selected=6f3b' for i in range(1,11)]
+            lines += ['sim_device: header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3b']*(6 if mode=='cancel' else 3)
+            lines += ['8850_fdn: key=Menu state=1 t=40.000000000',
+                      '8850_fdn: key=Menu state=1 t=49.000000000',
+                      'sim_device: header cla=a0 ins=20 p1=00 p2=02 p3=08',
+                      'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1',
+                      '8850_fdn: key=Menu state=1 t=51.000000000',
+                      f'8850_fdn: key={"Names / C" if mode=="cancel" else "Menu"} state=1 t=52.000000000']
+            if mode=='erase':lines += ['sim_device: header cla=a0 ins=dc p1=01 p2=04 p3=20 selected=6f3b',
+                                      'SIM status ins=dc sw=9000 chv=3/3 puk=10/10 enabled=1']
+            lines += ['8850_fdn: key=Menu state=1 t=59.000000000',
+                      '8850_fdn: complete=1 firmware_state_forcing=0']
+            text='\n'.join(lines)
+            after=record_card(True,True) if mode=='cancel' else record_card(False)
+            check_record(text,record_card(True,True),after,mode)
+            with self.assertRaises(ValueError):
+                check_record(text,record_card(True,True),record_card(False) if mode=='cancel' else record_card(True,True),mode)
+            with self.assertRaises(ValueError):
+                check_record(text.replace('t=52.','t=53.'),record_card(True,True),after,mode)
+
     def test_dial_controls_share_saved_on_state_and_use_physical_off_predecessor(self):
         plan=phase_plan(dial=True)
         self.assertEqual([(p.name,p.source,p.dial) for p in plan[-4:]],

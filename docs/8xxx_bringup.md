@@ -2209,6 +2209,26 @@ are pinned. Capture: `tmp/nsm2-fdn-dial-final`. This qualifies one listed/
 unlisted pair and physical Off, not every number-normalization/prefix case,
 protected edit/erase/cancel, physical RF, native DSP or speech.
 
+The independent `--record-lifecycle` extension uses twelve processes for
+validity, Save/cold Details, protected Edit/cold Details, erase cancellation/
+cold Details, and confirmed erase/cold empty Search. On this product, opening
+an FDN contact's Options asks for PIN2 before displaying Edit/Erase. Physical
+Edit retains nameA, changes12345 to12346 and must update only EF_FDN record1;
+the next cold Details must render A / 12346. Both cancellation and erase
+present the identical reviewed **Erase? A** dialog after PIN2 authentication.
+Back must issue no UPDATE and preserve the full edited card through another
+cold Details. Confirming must issue one record1 UPDATE of32 erased bytes,
+display **Memory erased**, and leave a cold empty query displaying **No phone
+numbers**. A blank Search editor is not accepted as empty-result evidence.
+
+Complete card comparisons retain ADN validity, every other record,
+credentials and all allowances. Own upload/HLE, PIN1/preserved registration,
+physical contact timing, exact dialogs/editors/save/cold outcomes, responsive
+Messages title and full immutable predecessor NVRAM remain mandatory.
+Capture: `tmp/nsm2-fdn-record-lifecycle-final`. This covers one record's edit,
+cancel and erase, not capacity, multi-record ordering, arbitrary name encodings,
+physical RF, native DSP or speech.
+
 The same isolated runner accepts `--scenario host-incoming-call`. It verifies
 physical answer/end input, the complete host-originated CC/RR exchange,
 traffic-channel assignment and release, and reviewed ringing/returned-idle
