@@ -1113,4 +1113,30 @@ saved card; run `nsb3_fdn_record_read.lua` for 89 seconds. The checker
 physical contacts, PIN2-before-write ordering, selected-file APDUs/statuses,
 complete cards and Saved/name/number/Menu pixel oracles. No FDN entry,
 firmware result or guest state is supplied by the host. Rejected record
-writes, edit/erase/cancel and local dial permissions remain separate.
+writes are qualified below; edit/erase/cancel and local dial permissions
+remain separate.
+
+### Rejected protected FDN Add and cold record preservation
+
+The input already contains the physically saved FDN `A/12345` record. A new
+cold process selects Numbers/Add and physically submits wrong PIN2 `5679`.
+Startup PIN1 and the phone code succeed; VERIFY2 returns `9804` and displays
+**Code error**. No UPDATE RECORD is sent. Complete-card comparison requires
+the existing FDN record and every other byte unchanged except PIN2 retries
+3→2. FDN remains On; ordinary ADN is untouched.
+
+A further cold process receives that exact retry-2 card, physically opens
+Numbers/Search/Details and retrieves `A/12345`. It sends no UPDATE or second
+PIN2 VERIFY, and the complete card including the retry-2 count stays intact.
+This distinguishes preserved persistent data from merely refusing an add
+to an empty card or showing a stale in-memory record.
+
+Prepare from the qualified saved-contact card using the normal FDN record
+cold operation, then run `nsb3_fdn_record_wrong.lua` for 85 seconds.
+`nsb3_fdn_record_rejection_check.py prepare-cold WRONG COLD` accepts only
+the exact retained-record/retry-2 state; run the usual record-read script
+for 89 seconds. `check SAVED WRONG COLD` requires exact storage links,
+own executable, full card comparisons, physical contacts, ordered successful
+PIN1/failed PIN2, bootstrap-only identity rehabilitation and error/name/
+number/Menu pixel oracles. No record, retry, validity or firmware-context
+edit is supplied by the harness.

@@ -36,6 +36,8 @@ and cold-recovers through correct PIN2 with the normal validity protocol.
 Physical PIN2-protected EF_FDN A/12345 save and independently cold Details
 also pass, with unchanged ordinary ADN, credentials and validity. FDN
 record edit/erase/cancel and local dial-permission contrasts remain open.
+Wrong-PIN2 FDN Add preserves the existing record, consumes exactly one retry
+and cold-retrieves that record without changing the retry count or card.
 Physical offline SMS composition/save, cold Outbox read, confirmed deletion
 and a second cold empty-Outbox check also pass through the laboratory SIM.
 Physical SIM-security gates cover PIN-request Off/On, PIN1/PIN2 changes and

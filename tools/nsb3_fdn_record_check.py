@@ -12,7 +12,7 @@ from tools.nsb3_pin_check import check_trace as check_pin
 from tools.nsb3_phonebook_check import prepare_reload, wire, expected_record
 from tools.nsb3_puk_check import check_link
 from tools.nsb3_nominal_input import IMAGE_SHA256
-from tools.sim_security_trace_check import padded_pin, statuses
+from tools.sim_security_trace_check import padded_pin, statuses, ATTEMPTS_OFFSET
 from tools.nsk1_phonebook_roundtrip import frame_check
 from tools.nsb3_menu_check import FRAME as MENU_FRAME
 
@@ -24,14 +24,17 @@ READ_KEYS = NUMBERS + ('Left Softkey / Menu',) * 3
 FDN_OFFSET = 3578
 
 
-def expected_card():
+def expected_card(pin2_attempts=3):
+    if pin2_attempts not in range(4):
+        raise ValueError('invalid PIN2 retry expectation')
     card = bytearray(empty_card(True))
     card[FDN_OFFSET:FDN_OFFSET + 32] = expected_record()
+    card[ATTEMPTS_OFFSET + 1] = pin2_attempts
     return bytes(card)
 
 
-def check_card(card):
-    if card != expected_card():
+def check_card(card, pin2_attempts=3):
+    if card != expected_card(pin2_attempts):
         raise ValueError('FDN A/12345 card differs beyond the qualified record')
 
 
@@ -55,6 +58,10 @@ def check_trace(text, readback=False):
         update = next(i for i, row in enumerate(commands) if row[0] == 0xdc)
         if update <= verify:
             raise ValueError('FDN update precedes PIN2 authentication')
+    check_record_environment(text, commands)
+
+
+def check_record_environment(text, commands):
     rehab = [row for row in commands if row[0] == 0x44]
     if [row[5] for row in rehab] != [0x6f7e, 0x6f07] or any(row[1:5] != (0, 0, 0, b'') for row in rehab):
         raise ValueError('active-card bootstrap identity rehabilitation differs')
