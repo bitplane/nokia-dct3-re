@@ -20,6 +20,9 @@ ROUTINES = {
     0x219c7e: (202, '2511fcb04e00cefa92b82b2420fbc7a8f0462de07b41fa6f0c0fbf39376db7d5'),
     0x219d82: (116, 'fc4ab7df6028e3f8df7f194a2fc40d79eb0cdbf4a3148cd5f82cad0b1cb6d9cc'),
     0x218bb0: (76, '24d2f695f12c54349e6cce0e18452cdc2b3e12af1e1b55a4809f62545294f903'),
+    0x28a2a6: (54, '2bf04be3da5c7dbc0a736bbd919a527c3dfbb72c159d19972895d00b576cf9b4'),
+    0x2126f2: (28, '8d3dc05de851e18069af856669ce9759e2bb542a9752f56a5c79b5392bb13859'),
+    0x212880: (32, '552a2a65c8bc0c183055a0ab438f8e5bdd7f7100ba81bd6e57eb34947b93e487'),
 }
 DIGESTS = {'tx': '4d27ec28fd959770247d0e858d7052dd61fa20975584ca10d7dd761123632e6c',
            'rx': '521c35ae4087fcd95e1eef6abeecf73a749cdbf5ea418e0b97c5f53c083b03ed'}
@@ -38,6 +41,8 @@ def contract(image):
             image[0xb3ae4:0xb3af2] != bytes.fromhex('1c20f7d6fd5ce0411c20f7d6fcb7') or
             image[0x8a690:0x8a694] != bytes.fromhex('000013b8')):
         raise ValueError('own 8b dispatcher/forwarder status differs')
+    if image[0x8a650:0x8a654] != bytes.fromhex('0000040b'):
+        raise ValueError('own type80 decoder status differs')
 
 
 def packets(text, direction):

@@ -1,9 +1,22 @@
 import unittest
 
-from tools.nsb3_activation_census import callers, check_counts, inspect
+from tools.nsb3_activation_census import callers, check_counts, check_upstream, inspect
 
 
 class Nsb3ActivationTest(unittest.TestCase):
+    def test_upstream_requires_request_start_publication_and_uncapped_control(self):
+        text = '\n'.join([
+            'nsb3_radio_upstream: header=03e90100 caller=00214931 count=1 observer_writes=0',
+            'nsb3_radio_service_start: mode=00000002 caller=00213f41 count=2 observer_writes=0',
+            'nsb3_radio_service_post: object=00101d44 header=0002441a body=00419800 caller=002128a1 count=3 observer_writes=0',
+            'nsb3_radio_upstream_count: count=3 cap=64 observer_writes=0'])
+        check_upstream(text)
+        for bad in (text.replace('03e90100', '03e90200'), text.replace('mode=00000002', 'mode=00000001'),
+                    text.replace('body=00419800', 'body=00000000'), text.replace('object=00101d44', 'object=00201d44'),
+                    text.replace('count=3 cap=64', 'count=64 cap=64')):
+            with self.assertRaises(ValueError):
+                check_upstream(bad)
+
     def test_native_byte_lanes_and_shifted_argument_are_recovered(self):
         # MOV87; LSL3; ADD7; BL200020. The argument is043f, not an immediate.
         image = bytes.fromhex('208700c03007f000f80b4770') + bytes(32)

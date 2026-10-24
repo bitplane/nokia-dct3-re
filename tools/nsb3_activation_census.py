@@ -20,6 +20,19 @@ def check_counts(text):
         raise ValueError('qualified cold-run activation absence differs')
 
 
+def check_upstream(text):
+    if 'nsb3_radio_upstream: header=03e90100 caller=00214931 count=1 observer_writes=0' not in text:
+        raise ValueError('own task11 request was not consumed')
+    if 'nsb3_radio_service_start: mode=00000002 caller=00213f41 count=2 observer_writes=0' not in text:
+        raise ValueError('own asynchronous service start differs')
+    posts = re.findall(r'nsb3_radio_service_post: object=([0-9a-f]{8}) header=0002441a '
+                       r'body=00419800 caller=002128a1 count=3 observer_writes=0', text)
+    if len(posts) != 1 or not 0x100000 <= int(posts[0], 16) < 0x110000:
+        raise ValueError('own type1a service publication missing')
+    if 'nsb3_radio_upstream_count: count=3 cap=64 observer_writes=0' not in text:
+        raise ValueError('upstream observation missing or capture changed')
+
+
 def callers(image, target):
     # The shared census consumes swap16 input; the NSB-3 collection is CPU-order.
     swapped = bytearray(image)
@@ -67,7 +80,9 @@ def main():
             check(text)
             check_consumer(text, (args.run / 'nsb3_radio_cached_vector.bin').read_bytes())
             check_counts(text)
-            result['cold_activation_entrances_observed'] = False
+            check_upstream(text)
+            result['state_one_or_13a3_entrances_observed'] = False
+            result['own_task11_request_to_type1a_observed'] = True
     except (OSError, ValueError) as exc:
         parser.exit(1, f'NSB-3 activation census: FAIL: {exc}\n')
     print(json.dumps(result, indent=2))

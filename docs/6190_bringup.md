@@ -441,9 +441,8 @@ at phase-owner `+15`. A two-byte-aligned Thumb BL scan across the `d6d00`-byte
 MCU extent finds direct callers `218d50` and `21a13e`; this does not close
 indirect calls, tail branches or computed aliases. The latter is the own
 task-12 `043f` branch `21a10c`, passing message byte `+2`. These are routes
-to investigate, not statuses to inject. Next qualify the legitimate
-`043f` producer and the other initializer caller, with the state watch
-retained; do not change state 3 or invent a DSP acknowledgment to use the cache.
+to classify, not statuses to inject. No ordinary `043f` producer is proved;
+do not change state 3 or invent a DSP acknowledgment to use the cache.
 
 Run `tools/nsb3_radio_consumer_observe.lua` for 65 seconds on the same fresh
 fixture, then extend the native checker with `--consumer`. It requires the
@@ -467,7 +466,8 @@ The alternative task-12 input `13a3` selects `219f94 -> 218cac`. Its `218d50`
 path can call initializer `218bb0` using the retained argument byte. Own
 publisher `211174` constructs `13a3`, copies byte `108947` to message `+2`,
 and posts to task 12. Its three direct BL callers are `2112f2`, `213b64`,
-and `213c02`. These are the next upstream lifecycle boundaries to qualify.
+and `213c02`. These bound the alternative `13a3` publication surface;
+the observed asynchronous predecessor is described below.
 
 With native ring/cache controls passing, counters sampled at 64 seconds
 observe zero `043f/0440` constructor entrances, zero initializer entrances,
@@ -485,3 +485,31 @@ Prepare the same fresh external fixture, then run
 `tools/nsb3_radio_activation_observe.lua` for 65 seconds. The optional run
 check requires the existing physical/security/native-ring/cache controls as
 well as the bounded activation counts; an unqualified null trace is rejected.
+
+The live predecessor is not absent: task 11's own handler `213950` receives
+`03e90100` from caller `214930`. Argument 1 takes the shared tail
+`213f24..213f3c`, which calls `212658(2)`. Runtime then observes publication
+at `21289c`: class `0002`, length `44`, type `1a`, body prefix `00419800`.
+The native-ring capture carries the same request. Constructor
+`2126f2..21270c` and publication `212880..21289c` are pinned. This is a working
+asynchronous search initiation, not an unstarted MCU task or proof that its
+completion should be synthesized as `043f`/`13a3`.
+
+A distinct data-bearing ingress exists in this own image: receive type `80`
+branches through `2b3b24 -> 28a09c` (one direct Thumb-BL candidate). A gated
+path at `28a2a6` stores own status `040b` from literal `28a650`, copies a
+discriminator to message `+b`, and posts to task `0e` at `28a2d6`. No type-80
+packet occurs in the qualified native capture. This is separate from the
+delivered `8b -> 13b8 -> task12` result; neither that cached vector nor the
+existence of a type-80 decoder proves received radio data. Its pre-publication
+gates and downstream completion still require qualification. Native RF input
+and operation prerequisites are shared research boundaries documented in
+`djr_dsp_integration.md`; a guessed type-80 payload would bypass them, not
+validate them. The next radio question is the own asynchronous completion/data
+path and its native receive prerequisites, not another startup-state poke.
+The current machine composition does not bind COBBA's `rf_receive_cb`;
+`nokia_cobba_device` defaults it to zero and owns the deterministic-silence
+policy. Thus no software RF environment is currently supplied to this native
+fixture. A received-block completion requires an evidenced RF/sample and
+activation contract, not fabricated MCU state. This boundary does not prevent
+independent SIM, storage and offline application work.
