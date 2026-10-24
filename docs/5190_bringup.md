@@ -52,6 +52,45 @@ retry recovery are accepted in this compatibility configuration. General app
 coverage, radio services and fitted ADC routing remain unproved.
 The ordinary silent `noki5190` configuration is unchanged.
 
+### Physical diagnostic-display exit and cold idle
+
+The marks on the qualified idle frame are controlled by the firmware's
+Field test display, not a broken LCD transport. Physical Menu, Up, Select
+opens the own `Test` editor showing01. Entering00, confirming OK and pressing
+Back twice leaves a readable idle frame. Own descriptor`2cc088` maps
+record`0604` to EEPROM`04a1`, length1; the firmware changes that byte fromff
+to41. That observation is not a full bitfield specification.
+
+The isolated two-process gate starts from primed own saved devices, without
+editing EEPROM or hardware inputs. The physical-selection process changes
+exactly that one EEPROM byte; a separate cold process preserves the complete
+result and reproduces the clean idle pixels after physical PIN/phone login.
+Flash and the complete laboratory card remain unchanged. Predecessor hashes,
+own descriptor/source identity, complete EEPROM equality, all eight physical
+contact/release pairs and reviewed Field test/editor/idle frames are required.
+The25s cold frame is independently pinned before the accessory title appears;
+the36/42s frames match the post-selection idle hash
+`934b3dcd1024275cbee8dc1e87ec35124fb617a917a0684a1e7bc1463ee59068`.
+
+The title says`Headset` under the unchanged board defaults. This is not
+registered-operator presentation, validated unattached-accessory wiring,
+fitted-mask identity or long-run native stability.
+
+An explicit one-byte empty-startup-text control falsified the borrowed
+NSB-3 explanation for these marks: own record`0745` maps to`05ec`, length31,
+but changing only its first byte to zero leaves the same25s pixels. The
+final physical/cold gate retains all31 originalff bytes; the unnecessary
+text fixture and exploratory implementation are removed.
+
+```sh
+.venv/bin/python tools/nsb1_diagnostic_display_check.py \
+  tmp/nsb1-toolkit-control-accepted tmp/PHYSICAL tmp/COLD --mame mame/mame
+```
+
+Both outputs must be fresh. The predecessor is the qualified primed own
+Phase-2 card control, not donor provisioning. Accepted captures:
+`tmp/nsb1-diagnostic-display-final` and`tmp/nsb1-diagnostic-display-final-cold`.
+
 ### SIM PIN-request settings
 
 The own PPM-A UI selects SIM card security through physical Menu4-2-1,
@@ -100,8 +139,9 @@ authentication/dismissal timeline. MAME omits that default-valued field from
 the saved CFG; the checker accepts its absence only for this control.
 
 The reviewed proactive-text frame is distinct from the post-dismissal frame.
-Dismissal returns the existing corrupted idle content, not a clean-idle
-milestone. This is bounded card/application acceptance on an explicitly
+That fixture retains Field test01, so dismissal returns its existing marked
+idle content. The separate physical diagnostic-display gate above qualifies
+the clean layout without changing this Toolkit oracle. This is bounded card/application acceptance on an explicitly
 unproved ROM4 compatibility instrument, not fitted-mask, native radio,
 registration, speech or the rest of Toolkit.
 

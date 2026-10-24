@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_physical_diagnostic_exit_cold_idle",
+      "owner": "nsb1_mmi_storage",
+      "status": "satisfied",
+      "predicate": "Physical Field test00 removes the marked idle display and persists through a separate authenticated cold boot without external EEPROM edits",
+      "current": "The own PPM-A Menu/Up/Select route shows Field test and Test01, then physical00/OK/Back/Back yields the reviewed readable Headset idle frame. Descriptor2cc088 maps0604 to04a1 length1. Relative to primed own storage, the physical run changes onlyff->41 there; the independent cold run retains complete expected EEPROM equality, original31ff startup-text bytes, unchanged complete SIM and own flash. All eight physical contacts/releases, PIN/phone authentication, own native-compatibility execution, predecessor hashes and unchanged input configuration are required. The cold25s pre-title frame is separately pinned;36/42s match the stable post-selection idle. This is bounded research UI/storage acceptance, not a complete selector bitfield, unattached accessory state, fitted mask, registration, speech or sustained native liveness.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_diagnostic_display_check.py", "tools/nsb1_diagnostic_display_input.lua", "tools/nsb1_idle_input.lua", "tools/test_nsb1_diagnostic_display_check.py"]
+    },
+    {
       "id": "c54x_atomic_delay_absolute_alias_admission",
       "owner": "tms320c54x",
       "status": "satisfied",

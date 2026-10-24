@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsb1_idle_marks_are_erased_startup_text",
+      "status": "disproven",
+      "hypothesis": "NSB-1's repeated idle marks have the same erased startup-text cause as the independently decoded NSB-3 fixture",
+      "conclusion": "Own NSB-1 descriptor2cc2d8 maps record0745 to05ec length31; the own first-byte reader branch is2aadfa..2aae08. A declared external first-byte-zero control leaves exactly the same25s RGB pixels as the unchanged Phase-2 card control. After their ordinary firmware writes, the two EEPROMs differ only at05ec. Physical Field test00 instead clears the marks with the original31ff text bytes retained, changing only diagnostic record0604/04a1 fromff to41 against primed own storage; independent cold idle preserves it. This falsifies that proposed cause for the observed frame, not the existence or all uses of the startup-text record. No NULL text edit or guessed selector byte is retained as provisioning.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_diagnostic_display_check.py", "tools/nsb1_diagnostic_display_input.lua", "tools/nsb1_idle_input.lua", "tools/test_nsb1_diagnostic_display_check.py"]
+    },
+    {
       "id": "positional_mbus_input_preserves_subframe_bytes",
       "status": "disproven",
       "hypothesis": "Lua field:set_value on a positional byte input can transport an MBUS frame at5ms intervals, with a strobe bit sufficient to preserve repeated bytes",
