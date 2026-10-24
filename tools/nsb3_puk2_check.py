@@ -17,13 +17,14 @@ from tools.sim_security_trace_check import padded_pin, statuses
 from tools.nsk1_phonebook_roundtrip import frame_check
 
 
-def check_recovery(text):
+def check_recovery(text, wrong=False, blocked=False):
     if 'nsb3_board_reset_request:' in text:
         raise ValueError('reset interrupts PUK2 qualification')
-    check_pin(text, True, allowed_mutations=(0x2c,),
-              additional_verifies=((0x20, 0, 2, 8, padded_pin('8765')),))
+    verifies = () if wrong else ((0x20, 0, 2, 8, padded_pin('8765')),)
+    check_pin(text, True, allowed_mutations=(0x2c,), additional_verifies=verifies)
     keys = CHANGE_KEYS[:12] + ('Scroll Down', 'Left Softkey / Menu')
-    for digits in ('87654321', '8765', '8765'):
+    puk = '87654322' if wrong else '87654321'
+    for digits in (puk, '8765', '8765'):
         keys += tuple('Keypad ' + digit for digit in digits) + ('Left Softkey / Menu',)
     contacts = re.findall(r'nsb3_security_key: key=(.*?) down=([01]) t=[0-9.]+ physical_only=1', text)
     if contacts != [(key, state) for key in keys for state in ('1', '0')]:
@@ -31,10 +32,9 @@ def check_recovery(text):
     commands = wire(text)
     credentials = [row[:5] for row in commands if row[0] in (0x20, 0x24, 0x26, 0x28, 0x2c)]
     if credentials != [(0x20, 0, 1, 8, padded_pin('1234')),
-                       (0x2c, 0, 2, 16, b'87654321' + padded_pin('8765')),
-                       (0x20, 0, 2, 8, padded_pin('8765'))]:
+                       (0x2c, 0, 2, 16, puk.encode() + padded_pin('8765'))] + list(verifies):
         raise ValueError('requires PIN1 startup, exact UNBLOCK CHV2 then replacement VERIFY2')
-    if statuses(text, 0x2c) != [(0x9000, 3, 10)]:
+    if statuses(text, 0x2c) != [(0x9840 if blocked else 0x9804 if wrong else 0x9000, 3, 10)]:
         raise ValueError('PUK2 recovery failed')
     if any(row[0] in (4, 0x44, 0xdc, 0xd6, 0x32, 0xc2) for row in commands):
         raise ValueError('unrelated SIM mutation')

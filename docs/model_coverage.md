@@ -35,7 +35,9 @@ restoration to the complete original card. First wrong-PUK1 retry loss also
 persists across a cold correct recovery and cold replacement-PIN login;
 Permanent PUK1 exhaustion additionally produces cold SIM-card rejection;
 physical digits remain responsive without credential admission or card
-mutation. Permanent PUK2 loss is not yet qualified. These credential fixtures are
+mutation. First wrong-PUK2 retry loss also persists across cold correct
+recovery and ordinary PIN2 restoration, without affecting PIN1 authentication.
+Permanent PUK2 loss is not yet qualified. These credential fixtures are
 bounded to 90–92 seconds: independent extended controls reset near 94 seconds
 after the DSP receive-activity window becomes empty and firmware publishes
 reason `68`. That trigger is mapped, not suppressed; the missing native

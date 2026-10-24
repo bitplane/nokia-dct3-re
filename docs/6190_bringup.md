@@ -849,8 +849,9 @@ Prepare the ordinary cold restoration through the PIN2-change checker and
 run its restore script for 90 seconds. `check SEED TWO ONE ZERO RECOVERY RESTORE`
 requires exact linked storage, whole-card transitions, contacts,
 CHANGE/UNBLOCK/replacement-VERIFY order, statuses and reviewed frames.
-Reset requests and unrelated mutations fail. This does not qualify wrong
-PUK2 retries, permanent PUK2 loss, long-run native stability or radio service.
+Reset requests and unrelated mutations fail. Wrong-PUK2 persistence is
+qualified below; permanent PUK2 loss, long-run native stability and radio
+service remain separate.
 
 ### Wrong PUK1 persistence and cold recovery
 
@@ -899,4 +900,27 @@ acceptance of the dialed digits. Exact rejected/dial pixels are required.
 The runner supports `--check-only` and explicit `--resume`; an existing run
 is always requalified rather than trusted. Completed logs are compressed
 losslessly and remain recheckable. No retry counter, firmware state or guest
-RAM/save state is supplied. Wrong/permanent PUK2 remains separate.
+RAM/save state is supplied. Permanent PUK2 loss remains separate.
+
+### Wrong PUK2 persistence and cold recovery
+
+The physically PIN2-exhausted card accepts ordinary PIN1 and phone-code
+authentication. Physical PUK2 `87654322`, new PIN2 `8765` and confirmation
+then emit `A0 2C 00 02 10`, return `9804` and display **Code error**.
+Only PUK2 attempts change 10→9. PIN2 stays blocked; PIN1, PUK1, credentials
+and files are unchanged. No replacement-PIN2 VERIFY occurs on this failure.
+
+A linked cold process uses correct `87654321` to recover, then firmware
+automatically verifies replacement PIN2 `8765`; both operations return
+`9000`. Complete-card comparison permits only PIN2 replacement and its
+retry restoration, with PUK2 attempts restored to 10. A further cold
+ordinary PIN2 change authenticates `8765` and restores `5678`, requiring
+complete original card bytes.
+
+Run `nsb3_puk2_wrong_input.lua` for 92 seconds from the blocked card.
+`nsb3_puk2_retry_check.py prepare-recovery WRONG RECOVERY` accepts only
+the exact retry-9 input. Run the normal PUK2 recovery script for 92 seconds,
+then prepare/run the ordinary 90-second PIN2 restore. The retry checker
+`check BLOCKED WRONG RECOVERY RESTORE` requires exact physical/APDU/status
+sequences, own executable, linked storage and error/accepted/changed/menu
+frames. No guest state, counter edit or firmware forcing is supplied.
