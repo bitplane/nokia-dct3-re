@@ -119,6 +119,13 @@ D / 123 after physical name editing, with its own boot/provisioning checks
 and product-qualified save frame. Neither rename gate establishes arbitrary
 name encodings, capacity or multi-number contacts.
 
+Both products independently pass the seven-process `--numbers` variant:
+physical addition of789 to A / 123, cold navigation of123/789/A, selective
+confirmed deletion of789, and cold navigation of123/A/123. Exact frames,
+unchanged complete SIM storage and product boot/provisioning checks remain
+mandatory. This qualifies one two-number contact, not phonebook capacity or
+arbitrary field types.
+
 `verify-6210-pin-retry` additionally proves physical9999 rejection with one
 consumed PIN1 retry, physical1234 recovery/reset, delayed coherent laboratory
 registration and exact error/idle/Menu frames. Whole-card comparison admits

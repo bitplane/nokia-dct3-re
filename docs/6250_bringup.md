@@ -1456,6 +1456,19 @@ qualifies one single-letter rename with an unchanged number, not arbitrary
 name encodings or a decoded flash-record grammar. Capture:
 `tmp/nhm3-phone-rename-qualified`.
 
+The independent `--product 6250 --numbers` variant uses seven isolated
+processes with own boot/upload/HLE and initial-record PMM checks throughout.
+After the empty control and fresh A / 123 save/cold retrieval, physical
+Options / Add number / General adds789. Cold detail navigation must show
+123,789,A. Selecting789 and confirming **Erase? 789** must leave the next
+cold process navigating123,A,123. Exact pixel oracles check both retained
+fields, the added field, confirmation and post-erase wraparound. Complete
+SIM files remain identical, no UPDATE RECORD occurs, and each field mutation
+changes persistent handset flash. This qualifies two General numbers and
+selective deletion on one contact, not capacity, arbitrary field types,
+factory provenance, record encoding or native DSP. Capture:
+`tmp/nhm3-phone-numbers-qualified`.
+
 ## Radio acquisition comparison
 
 After SIM enable, passive DSP TX inventory observes a type `56`, 160-byte

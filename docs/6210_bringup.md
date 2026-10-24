@@ -300,6 +300,19 @@ arbitrary character encoding, multiple contacts or a decoded flash-record
 grammar. The rename and numeric/erase variants are deliberately separate
 fresh fixtures. Capture: `tmp/npe3-phone-rename-final`.
 
+The separate `--numbers` variant uses seven isolated processes. After the
+empty control, fresh A / 123 save and cold retrieval, physical Options /
+Add number / General adds789. A cold process must display the ordered detail
+fields123,789,A. The next process selects789, opens its **Erase? 789**
+confirmation and confirms it. Final cold navigation must display123,A,123,
+showing the original contact/number retained and wraparound without789.
+All seven complete SIM files remain identical, no UPDATE RECORD is allowed,
+and both field mutations change handset flash. Exact detail/confirmation
+pixel oracles reject skipped addition, unconfirmed deletion and whole-contact
+erasure. This qualifies two General numbers on one contact and selective
+field deletion, not arbitrary field types, capacity or record encoding.
+Capture: `tmp/npe3-phone-numbers-qualified`.
+
 ### Laboratory registration
 
 The runtime emits an organic type-`0x56` acquisition request with a 160-byte

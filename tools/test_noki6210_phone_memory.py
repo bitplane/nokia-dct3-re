@@ -5,9 +5,23 @@ from tools.run_noki6210_phone_memory import (
     verify_storage, verify_lifecycle_digests, LIFECYCLE_FRAMES, EMPTY_SHA256)
 from tools.run_dct3_phone_memory import (run,lifecycle_frames,verify_rename_digests,
     NAME_D_SHA256,RENAMED_CONTACT_SHA256,EDIT_SAVED_SHA256,CONTACT_SHA256)
+from tools.run_dct3_phone_memory import (verify_number_digests,SECOND_NUMBER_SHA256,
+    NUMBER_ERASE_CONFIRM_SHA256,CONTACT_NAME_SHA256)
 
 
 class PhoneMemoryStorageTest(unittest.TestCase):
+    def test_second_number_must_persist_then_disappear_without_erasing_contact(self):
+        reference=dict(before_first=CONTACT_SHA256,before_second=SECOND_NUMBER_SHA256,
+            before_third=CONTACT_NAME_SHA256,erase_confirm=NUMBER_ERASE_CONFIRM_SHA256,
+            after_first=CONTACT_SHA256,after_second=CONTACT_NAME_SHA256,after_third=CONTACT_SHA256)
+        verify_number_digests(reference)
+        for key,replacement in (('before_second',CONTACT_SHA256),
+                                 ('after_second',SECOND_NUMBER_SHA256),
+                                 ('after_first',EMPTY_SHA256),('after_third',SECOND_NUMBER_SHA256)):
+            bad=dict(reference)
+            bad[key]=replacement
+            with self.subTest(key=key),self.assertRaises(ValueError):verify_number_digests(bad)
+
     def test_rename_requires_changed_name_and_preserved_number_after_cold_boot(self):
         reference=dict(editor=NAME_D_SHA256,saved=EDIT_SAVED_SHA256,cold=RENAMED_CONTACT_SHA256)
         verify_rename_digests(reference)

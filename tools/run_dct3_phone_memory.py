@@ -24,6 +24,9 @@ ERASED_SHA256='b2fab27b6d6da26aff2cf4c8cbf06e66f1187f1a705a4cdfd438161b2a34935a'
 ERASE_CONFIRM_SHA256='bbfa86d829e7eef9f98c735bbe7c5c9bb71ec3a2a72b5b6c045aba5f0187e1f3'
 RENAMED_CONTACT_SHA256='8f1c905e4eef5dec78b1016d3a1b6ae2513757c6b7bb7187063f6f6b6efeb632'
 NAME_D_SHA256='1ba8b029ab4a03f6af634b7ad8a822aee6d639fc880bb9d8e543babf93673156'
+SECOND_NUMBER_SHA256='7efcee0e836a4612968e1bc784f10b17e1bedff7297c92f1be5bbc8be28e3632'
+NUMBER_ERASE_CONFIRM_SHA256='30c481db732cafc9d66eaac83e60a5e52c7ffc2b63385cebc9f3e943e2a59b49'
+CONTACT_NAME_SHA256='0c07ce69970044e3a81a22b900615000dc70bd32188daac594765b4acaa6540f'
 LIFECYCLE_FRAMES=(
     ('edited_cold','6210_phonebook_read_contact',EDITED_CONTACT_SHA256),
     ('cancelled_cold','6210_phonebook_read_contact',EDITED_CONTACT_SHA256),
@@ -68,6 +71,16 @@ def verify_rename_digests(actual,product='6210'):
         raise ValueError('handset rename did not preserve D / 123 across cold boot')
 
 
+def verify_number_digests(actual):
+    expected={'before_first':CONTACT_SHA256,'before_second':SECOND_NUMBER_SHA256,
+              'before_third':CONTACT_NAME_SHA256,
+              'erase_confirm':NUMBER_ERASE_CONFIRM_SHA256,
+              'after_first':CONTACT_SHA256,'after_second':CONTACT_NAME_SHA256,
+              'after_third':CONTACT_SHA256}
+    if actual!=expected:
+        raise ValueError('second-number add/erase did not preserve A / 123 across cold boots')
+
+
 def verify_lifecycle_frames(directory,product='6210'):
     actual={}
     for phase,filename,_ in lifecycle_frames(product):
@@ -76,12 +89,12 @@ def verify_lifecycle_frames(directory,product='6210'):
     verify_lifecycle_digests(actual,product)
 
 
-def run(directory,lifecycle=False,product='6210',rename=False):
+def run(directory,lifecycle=False,product='6210',rename=False,numbers=False):
     root=Path(__file__).resolve().parents[1]
     if product not in ('6210','6250'):
         raise ValueError('unqualified handset-memory product/lifecycle combination')
-    if lifecycle and rename:
-        raise ValueError('rename and number/erase lifecycles require independent fresh fixtures')
+    if sum((lifecycle,rename,numbers))>1:
+        raise ValueError('mutation lifecycles require independent fresh fixtures')
     if product=='6210':
         assess((root/'roms/noki6210/6210_556c.fls').read_bytes(),
                (root/'roms/noki6210/6210 virgin eeprom 005fa000.fls').read_bytes())
@@ -101,6 +114,11 @@ def run(directory,lifecycle=False,product='6210',rename=False):
                    ('erase','phone_memory_erase',33),('erased_cold',read_script,read_seconds)]
     if rename:
         phases += [('rename','phone_memory_rename',45),('renamed_cold',read_script,read_seconds)]
+    if numbers:
+        phases += [('number_add','phone_memory_number_add',40),
+                   ('numbers_cold','phone_memory_number_read',32),
+                   ('number_erase','phone_memory_number_erase',35),
+                   ('number_erased_cold','phone_memory_number_read',32)]
     previous=None
     for phase,script,seconds in phases:
         target=directory/phase
@@ -124,6 +142,7 @@ def run(directory,lifecycle=False,product='6210',rename=False):
                 'script_sha256':hashlib.sha256(Path(command[command.index('-autoboot_script')+1]).read_bytes()).hexdigest(),
                 'physical_helper_sha256':hashlib.sha256((root/'tools/dct3_phone_memory_input.lua').read_bytes()).hexdigest(),
                 'lifecycle_helper_sha256':hashlib.sha256((root/'tools/dct3_phone_memory_lifecycle.lua').read_bytes()).hexdigest(),
+                'numbers_helper_sha256':hashlib.sha256((root/'tools/dct3_phone_memory_numbers.lua').read_bytes()).hexdigest(),
                 'mame_sha256':hashlib.sha256(Path(command[0]).read_bytes()).hexdigest()}
         (target/'launch.json').write_text(json.dumps(launch,indent=2)+'\n')
         with (target/'console.log').open('w') as output:
@@ -188,11 +207,32 @@ def run(directory,lifecycle=False,product='6210',rename=False):
             with Image.open(directory/phase/'snap'/filename) as frame:
                 rename_digests[key]=hashlib.sha256(frame.convert('L').tobytes()).hexdigest()
         verify_rename_digests(rename_digests,product)
+    if numbers:
+        for phase,_,_ in phases[3:]:
+            if (directory/phase/f'nvram/{machine}/sim_card').read_bytes()!=cards[0]:
+                raise ValueError('handset number lifecycle changed SIM contents: '+phase)
+            if product+'_phone_memory_numbers: complete=1 firmware_state_forcing=0' not in results[phase]:
+                raise ValueError('physical number fixture did not finish: '+phase)
+        number_digests={}
+        for key,phase,label in (
+                ('before_first','numbers_cold','first'),('before_second','numbers_cold','second'),
+                ('before_third','numbers_cold','third'),
+                ('erase_confirm','number_erase','erase_confirm'),
+                ('after_first','number_erased_cold','first'),('after_second','number_erased_cold','second'),
+                ('after_third','number_erased_cold','third')):
+            with Image.open(directory/phase/f'snap/{product}_phone_memory_numbers_{label}.png') as frame:
+                number_digests[key]=hashlib.sha256(frame.convert('L').tobytes()).hexdigest()
+        verify_number_digests(number_digests)
+        for before,after in (('cold','number_add'),('numbers_cold','number_erase')):
+            verify_storage(cards,(directory/f'{before}/nvram/{machine}/flash').read_bytes(),
+                           (directory/f'{after}/nvram/{machine}/flash').read_bytes())
     (directory/'result.json').write_text(json.dumps({'flash_delta':delta,
         'product':product,'research_hle':True,'sim_unchanged':True,
-        'cold_contact':True,'edit_cancel_erase':lifecycle,'rename':rename},indent=2)+'\n')
+        'cold_contact':True,'edit_cancel_erase':lifecycle,'rename':rename,
+        'second_number_add_erase':numbers},indent=2)+'\n')
     label=('save/edit/cancel/erase cold lifecycle' if lifecycle else
-           'A to D rename cold lifecycle' if rename else 'A/123 cold read')
+           'A to D rename cold lifecycle' if rename else
+           'second-number add/erase cold lifecycle' if numbers else 'A/123 cold read')
     print('OK - handset-memory '+label+', unchanged SIM, separate empty control')
 
 
@@ -202,9 +242,10 @@ def main():
     mode=parser.add_mutually_exclusive_group()
     mode.add_argument('--lifecycle',action='store_true')
     mode.add_argument('--rename',action='store_true')
+    mode.add_argument('--numbers',action='store_true')
     parser.add_argument('--product',choices=('6210','6250'),default='6210')
     args=parser.parse_args()
-    try:run(args.directory.resolve(),args.lifecycle,args.product,args.rename)
+    try:run(args.directory.resolve(),args.lifecycle,args.product,args.rename,args.numbers)
     except (ValueError,RuntimeError,OSError,subprocess.SubprocessError) as error:
         parser.exit(1,f'FAIL - {error}\n')
 
