@@ -1798,7 +1798,32 @@ mode-3 branch (selector 4). The hash-pinned radio contract verifier checks
 both comparisons and the helper call. This is an MCU lifecycle distinction,
 not a recovered DSP cancellation or acknowledgement contract.
 
-Immediately before this selection, the caller runs received-block helper
+There is an explicit timing-result entrance to this common path:
+`21ee2c` compares class88 and branches to `21ee8c`; `21eec0` calls
+`286e9a` with the received object. The receiver assembles the complete
+carrier from object bytes8/9 and looks up its record through `285c0a`.
+Updater `286e58` tests object byte4 as an error field. A nonzero value
+increments the record's byte-b counter and selects low control nibble1
+unless that counter wraps to zero; the upper nibble is preserved. These
+instructions are pinned by `noki8210_radio_contract.py`. This is a valid
+consumer-side failure entrance, not proof that every type11 mode requests it.
+
+The independent [ROM6 HLE reference at2b4c10f](https://github.com/djr-747/nokia-dct3-emulator/blob/2b4c10ffd6b22a2d021c7f515f27ceb2fb6c78cd/src/mad2/dsp/dsp_rom6.c#L1903)
+answers type11 with type88 without a mode or neighbour-list test. Its
+ten-byte payload begins with1 and carries the requested full carrier at
+payload4/5, structurally consistent with the own consumer's error/carrier
+positions after a four-byte broker header. Source SHA-256:
+`7af094376d14d87a9854a0f06eee1580ccda02d623d57fd0c1ad7f80201c7969`.
+This is an independent HLE policy, not a raw DSP capture, a proved mode-4
+specification or evidence for its calibrated response delay. No source is
+transplanted. It motivates a bounded request-derived failure-response test,
+after verifying the own transport/dispatch representation, rather than
+inventing a successful neighbour measurement or dropping an unsuccessful
+directed request indefinitely. The peer's live eligibility rules remain
+unchanged until that boundary is tested; late-PIN registration is still
+unaccepted.
+
+Immediately before this selection, the caller runs shared result helper
 `286e9a`, which calls updater `286e58`. That updater dereferences pointer
 slot `137224`, whereas mode-selection helper `286d4a` dereferences `137228`.
 The updater tests received-block payload error byte `+4`: zero selects the

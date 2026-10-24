@@ -107,6 +107,32 @@ def verify(image):
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB | CS_MODE_BIG_ENDIAN)
     def instructions(address, size):
         return [(ins.mnemonic, ins.op_str) for ins in decoder.disasm(read(address, size), address)]
+    if instructions(0x21ee2c, 4) != [
+            ('cmp', 'r0, #0x88'), ('beq', '#0x21ee8c')]:
+        raise ValueError('own timing-result class branch differs')
+    if instructions(0x21eebc, 8) != [
+            ('movs', 'r1, #0'), ('ldr', 'r0, [r4, #8]'),
+            ('bl', '#0x286e9a')]:
+        raise ValueError('own timing-result receiver call differs')
+    if instructions(0x286ea2, 20) != [
+            ('ldrb', 'r1, [r4, #9]'), ('ldrb', 'r0, [r4, #8]'),
+            ('lsls', 'r0, r0, #8'), ('adds', 'r0, r1, r0'),
+            ('lsls', 'r0, r0, #0x10'), ('lsrs', 'r0, r0, #0x10'),
+            ('ldr', 'r1, [r6, #8]'), ('bl', '#0x285c0a'),
+            ('str', 'r0, [r6, #8]')]:
+        raise ValueError('own timing-result full-carrier lookup differs')
+    if instructions(0x286e5e, 6) != [
+            ('ldrb', 'r1, [r0, #4]'), ('cmp', 'r1, #0'),
+            ('bne', '#0x286e80')]:
+        raise ValueError('own timing-result error-byte selection differs')
+    if instructions(0x286e80, 24) != [
+            ('ldrb', 'r0, [r4, #0xb]'), ('adds', 'r0, #1'),
+            ('strb', 'r0, [r4, #0xb]'), ('ldrb', 'r0, [r4, #0xb]'),
+            ('cmp', 'r0, #0'), ('beq', '#0x286e98'),
+            ('movs', 'r0, #0xf0'), ('ldrb', 'r1, [r4, #0xd]'),
+            ('ands', 'r0, r1'), ('movs', 'r1, #1'),
+            ('orrs', 'r1, r0'), ('strb', 'r1, [r4, #0xd]')]:
+        raise ValueError('own timing-result failure counter/state update differs')
     if int.from_bytes(read(0x248df8, 4), 'big') != 0x132b18:
         raise ValueError('neighbour descriptor writer literal differs')
     if instructions(0x248a9c, 2) != [('ldr', 'r6, [pc, #0x358]')]:
