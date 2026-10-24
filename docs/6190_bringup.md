@@ -1192,3 +1192,32 @@ The gate checks all predecessor storage links, complete cards, own executable,
 physical inputs, PIN2-before-write, exact APDUs/statuses and reviewed Menu,
 confirmation, retained Details, erase-result and empty-list pixels. It does
 not establish dial permission, network registration or native RF compatibility.
+
+### Local FDN dialing contrast
+
+Independent cold runs from the same edited FDN-On `A/12346` source enter
+listed `12346` or unlisted `54321` and physically press Send. The unlisted
+number displays `Call not allowed`; the listed number performs a fresh
+EF_FDN record-1 read after Send and does not display that rejection.
+Both complete cards remain unchanged. Physical PIN2-authenticated Off on
+another branch changes only ADN validity, retaining the edited FDN record.
+A cold run from that exact output dials `54321` without the rejection and
+again preserves every card byte.
+
+These are bounded local permission observations, not connected-call acceptance.
+The non-rejected result has retained pixels and no clean call-progress oracle;
+native registration remains unqualified. Fixtures `nsb3_fdn_dial.lua` and
+`nsb3_fdn_dial_unlisted.lua` enter digits after leaving the startup menu and
+press Send at 48 seconds; run each for 52 seconds. Use the existing physical
+FDN-disable fixture for 84 seconds before the independent Off control.
+No network response or firmware result is supplied. Validate the combined
+source/listed/unlisted/deactivation/cold-Off chain with:
+
+```sh
+.venv/bin/python tools/nsb3_fdn_dial_check.py SOURCE LISTED UNLISTED DISABLED OFF
+```
+
+The checker requires own executable, exact full cards/cold links, startup and
+deactivation authentication, physical key ordering/cadence, validity protocol,
+post-Send listed-number lookup, Menu/Off/rejection and comparison-frame pixels.
+The comparison-frame hash deliberately makes no call-progress claim.
