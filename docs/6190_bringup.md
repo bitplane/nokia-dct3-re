@@ -629,6 +629,31 @@ fixture. A received-block completion requires an evidenced RF/sample and
 activation contract, not fabricated MCU state. This boundary does not prevent
 independent SIM, storage and offline application work.
 
+Two independent 60-second cold controls from the qualified edited-FDN storage
+authenticates PIN1/phone code and passively attributes all 1,092,288 RF-port
+reads to the 16 resident read sites, in 52 mode/control/holdoff buckets.
+All bucket counts and first/last timestamps match exactly between runs:
+
+| Resident consumer family | Reads |
+| --- | ---: |
+| Initial filter | 644,704 |
+| Unfiltered history | 382,944 |
+| Scan filter | 64,512 |
+| Capture filter | 128 |
+
+Each four-reader group has matching per-mode/control counts. Scan mode 1
+consumes input through 60.013 seconds; capture mode 2 is observed briefly at
+14.395..14.402 seconds. Thus this composition does not remain wholly inactive
+behind an acquisition-start gate: it executes multiple receive paths on zero
+input. These counts are consumer observations under the explicit compatibility
+configuration, not a sample clock, fitted-mask proof or successful acquisition.
+Run `nsb3_rf_consumers_observe.lua` for 60 seconds after ordinary cold storage
+preparation; check with `nsb3_rf_consumers_check.py SOURCE RUN`. The checker
+requires own executable, exact card/cold link, startup authentication, complete
+reader attribution and independent device-counter agreement. No RF source,
+packet, control register or firmware result is supplied. The next input-side
+question remains physical sample packing/timing, not a missing read call.
+
 ## Offline SMS draft lifecycle
 
 The same fresh own-EEPROM/card/retry fixture accepts physical text composition
