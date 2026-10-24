@@ -2,9 +2,11 @@
 
 ## In-repo tools
 
-- `tools/*.py` — small Thumb-disassembly / cross-reference helpers built on
-  [capstone](https://www.capstone-engine.org/). They operate on the **swap16**
-  firmware image (see `roms/README.md`). Set the image path via the `NOKI_BIN`
+- `tools/` contains firmware RE helpers, protocol/state validators and isolated
+  acceptance runners. Thumb-disassembly / cross-reference helpers use
+  [capstone](https://www.capstone-engine.org/). Legacy 3210 helpers operate on
+  the **swap16** image (see `roms/README.md`); other tools declare their own
+  input format. Set the legacy image path via the `NOKI_BIN`
   environment variable (default points at `roms/3210f600a_swap16.bin`).
   - `disrom.py ADDR:LEN ...` — **the** disassembler. Thumb-1 (ARMv4T) correct:
     it rejects capstone's Thumb-2 mis-decodes and resolves pc-relative pool
@@ -39,6 +41,15 @@
   - `display_trace_check.py` — validates the version-specific NV descriptor
     `0x0749` mapping and the selected PCD8544 command/data stream captured by
     `make verify-display`.
+  - `nse2_native_state_check.py` — shared architecture/I/O/physical-input
+    contract for bounded native restoration; product wrappers own executable,
+    storage, configuration and pixel acceptance. Snapshot fields and DSP
+    register names must be unique, with complete 37-register ARM and 36-field
+    DSP records. DSP values obey the core's exported widths/masks, not an
+    inferred silicon-validity rule. Save/load, replay, contact and completion
+    controls reject malformed, extra or suffixed records. Model-owned periodic
+    `_state: t=...` samples are separate observations, not save/load controls.
+    Rolling checksums and bounded replay do not prove exhaustive state coverage.
   - `dct3_pmm_catalog.py` — enumerates linked entry families from every
     `PMMCAT` segment in a flash-backed product-state image without assigning
     unproved semantics to entry types or indices.
