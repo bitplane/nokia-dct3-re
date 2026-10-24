@@ -13,7 +13,9 @@ from PIL import Image
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.nse5_fullbackup_check import IMAGES, MASKS, audit, observation, check_v501_cache
+from tools.nse5_fullbackup_check import (
+    IMAGES, MASKS, ROM_LABELS, audit, observation, check_v501_cache, capture_rom_label,
+)
 from tools.nse5_pmm_journal import replay
 
 SECTOR = 0x3fc000
@@ -58,7 +60,7 @@ def execute(directory, roms, binary, run):
         raise ValueError('fresh isolated output required')
     target = run / 'roms/nse5r4t'
     target.mkdir(parents=True)
-    shutil.copyfile(directory / IMAGES['501d-full'][0], target / IMAGES['501d-full'][0])
+    shutil.copyfile(directory / IMAGES['501d-full'][0], target / ROM_LABELS['501d-full'])
     for name in MASKS:
         shutil.copyfile(roms / 'noki5110' / name, target / name)
     storage = run / 'nvram/nse5r4t_1'
@@ -71,7 +73,8 @@ def execute(directory, roms, binary, run):
                '-joystickprovider', 'none', '-midiprovider', 'none',
                '-debug', '-debugger', 'none', '-log', '-verbose', '-seconds_to_run', '50',
                '-autoboot_delay', '0', '-autoboot_script', str(script)]
-    metadata.update(command=command, mame_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
+    metadata.update(command=command, rom_label=ROM_LABELS['501d-full'],
+                    mame_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
                     script_sha256=hashlib.sha256(script.read_bytes()).hexdigest())
     (run / 'checksum_fixture.json').write_text(json.dumps(metadata, indent=2)+'\n')
     with (run / 'console.log').open('w') as output:
@@ -117,7 +120,7 @@ def check(directory, roms, run):
         raise ValueError('external checksum-fixture provenance differs')
     if (run / 'initial_flash.bin').read_bytes() != fixture:
         raise ValueError('initial flash differs outside the qualified checksum change')
-    if (run / 'roms/nse5r4t' / IMAGES['501d-full'][0]).read_bytes() != image:
+    if (run / 'roms/nse5r4t' / capture_rom_label('501d-full', actual)).read_bytes() != image:
         raise ValueError('acquired executable ROM changed')
     for name, digest in MASKS.items():
         if hashlib.sha1((run / 'roms/nse5r4t' / name).read_bytes()).hexdigest() != digest:

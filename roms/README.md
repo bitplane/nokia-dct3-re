@@ -82,6 +82,12 @@ supplies additional inputs under `roms/research/nse5-cosconor/`:
 
 The direct-download basename is normalized locally; file bytes are unchanged.
 The ZIP has exactly one member, extracted without executing anything.
+Research BIOS labels are separately normalized to `7110f501d_full.fls` and
+`7110f500_full.fls`. The acceptance tools copy the byte-identical acquired
+inputs under those labels into isolated run directories; collection files
+and archive members retain their provenance names. New capture metadata
+records the chosen label explicitly. Older retained captures remain readable
+without rewriting their original files or manifests.
 Both raw images include their own complete upper storage rather than a
 transplanted PMM tail. Each has a write-journal EEPROM sector at CPU5fc000;
 independent replay yields57/87 writes and distinct cache hashes. The entire

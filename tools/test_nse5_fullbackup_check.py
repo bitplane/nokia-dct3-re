@@ -21,6 +21,20 @@ def samples():
 
 
 class Nse5FullBackupTest(unittest.TestCase):
+    def test_machine_labels_are_normalized_without_renaming_acquired_sources(self):
+        self.assertEqual(checker.IMAGES['500-full'][0], 'My 7110 v5.00.fls')
+        self.assertEqual(checker.IMAGES['501d-full'][0], 'FuBu7110-v501-PPM-D.fls')
+        for bios, label in checker.ROM_LABELS.items():
+            with self.subTest(bios=bios):
+                self.assertRegex(label, r'^[a-z0-9_.]+$')
+                self.assertEqual(checker.capture_rom_label(bios, {'rom_label': label}), label)
+                self.assertEqual(checker.capture_rom_label(bios, {}), checker.IMAGES[bios][0])
+                for bad in ('../' + label, checker.IMAGES[bios][0], '', 'unknown.fls'):
+                    with self.assertRaises(ValueError):
+                        checker.capture_rom_label(bios, {'rom_label': bad})
+        with self.assertRaises(ValueError):
+            checker.capture_rom_label('500-full', {'rom_label': checker.ROM_LABELS['501d-full']})
+
     def test_complete_image_and_independent_journal_description(self):
         data = image()
         result = checker.describe(data, data[:0x390000])

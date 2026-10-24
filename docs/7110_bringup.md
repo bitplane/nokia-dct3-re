@@ -26,6 +26,10 @@ v5.00 code differs and is observed without importing those addresses.
 Research-only `nse5r4t` BIOSes `501d-full` and `500-full` each load the
 whole acquired4MiB image, including its own upper storage. Default BIOS501
 retains the original separate-PMM composition. Normal `noki7110` is unchanged.
+MAME ROM labels are `7110f501d_full.fls` / `7110f500_full.fls`; the harness
+copies unchanged acquired files under these valid lowercase labels and records
+the label in each new capture. Collection filenames and old evidence are not
+renamed. This packaging distinction does not alter BIOS indices or bytes.
 Both fresh50s processes use the same explicitly unproved NSE-1 mask/clock
 compatibility configuration, without a donor tail, save state or provisioning
 repair. All eight native samples have a clear unsupported-instruction stop

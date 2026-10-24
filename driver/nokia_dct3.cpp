@@ -5327,10 +5327,10 @@ ROM_START( nse5r4t )
 	// Whole acquired backups: preserve each image's own code and all storage.
 	// Public labels do not establish original chip pairing or fitted DSP mask.
 	ROM_SYSTEM_BIOS(1, "501d-full", "v5.01 PPM D (whole backup)")
-	ROMX_LOAD("FuBu7110-v501-PPM-D.fls", 0, 0x400000,
+	ROMX_LOAD("7110f501d_full.fls", 0, 0x400000,
 			CRC(db130e68) SHA1(82f8e1f5a924633f0778e5e1cf1176f89dd0c0a2), ROM_BIOS(1))
 	ROM_SYSTEM_BIOS(2, "500-full", "v5.00 (whole backup)")
-	ROMX_LOAD("My 7110 v5.00.fls", 0, 0x400000,
+	ROMX_LOAD("7110f500_full.fls", 0, 0x400000,
 			CRC(61990109) SHA1(29d60c369105db039a0a0d7311861e52f7ccf11a), ROM_BIOS(2))
 ROM_END
 

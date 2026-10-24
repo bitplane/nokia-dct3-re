@@ -24,12 +24,23 @@ IMAGES = {
     '501d-full': ('FuBu7110-v501-PPM-D.fls', 'da259e776feea05d905399a644f3e4f9ed2862f591e8f3cd8dbc8d05884a5deb'),
     '500-full': ('My 7110 v5.00.fls', '4e0660c14e8e335380f963ae200bf2404d50e826b15f50355a68c9da0a78aecd'),
 }
+ROM_LABELS = {'501d-full': '7110f501d_full.fls', '500-full': '7110f500_full.fls'}
 ARCHIVE = '4391f36226314808a6ffce4d38509e2879a51eff0839b75670b168b25e9bda77'
 BASELINE = '53af8324919f455ba8199d2c05f7a921cfb811d5'
 MASKS = {
     'nse1_rom4_dsp_program.bin': 'a05a1e96a8c36ec5a47e1ea059d15afa54ca5739',
     'nse1_rom4_dsp_data.bin': '024c7f970f4ef754d3e90471de48a167515f930d',
 }
+
+
+def capture_rom_label(bios, metadata):
+    # Old retained captures predate normalized labels. Do not rewrite evidence
+    # or accept arbitrary paths under the guise of backwards compatibility.
+    if 'rom_label' not in metadata:
+        return IMAGES[bios][0]
+    if metadata['rom_label'] != ROM_LABELS[bios]:
+        raise ValueError('capture ROM label differs from the selected BIOS')
+    return ROM_LABELS[bios]
 
 
 def describe(image, baseline):
@@ -150,7 +161,7 @@ def execute(directory, roms, binary, run, bios, serial_window=False):
     target = run / 'roms/nse5r4t'
     target.mkdir(parents=True)
     name = IMAGES[bios][0]
-    shutil.copyfile(directory / name, target / name)
+    shutil.copyfile(directory / name, target / ROM_LABELS[bios])
     for name, digest in MASKS.items():
         data = (roms / 'noki5110' / name).read_bytes()
         if hashlib.sha1(data).hexdigest() != digest:
@@ -165,7 +176,7 @@ def execute(directory, roms, binary, run, bios, serial_window=False):
                '-log', '-verbose', '-seconds_to_run', '6' if serial_window else '50',
                '-joystickprovider', 'none', '-midiprovider', 'none',
                '-autoboot_delay', '0', '-autoboot_script', str(script)]
-    metadata = dict(command=command, input=admission[bios],
+    metadata = dict(command=command, input=admission[bios], rom_label=ROM_LABELS[bios],
                     mame_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
                     script_sha256=hashlib.sha256(script.read_bytes()).hexdigest(),
                     copied_guest_ram=False, donor_storage=False,
@@ -199,7 +210,7 @@ def check_run(directory, roms, run, bios, serial_window=False):
         raise ValueError('trial selected a different composition or BIOS')
     inputs = run / 'roms/nse5r4t'
     image = (directory / IMAGES[bios][0]).read_bytes()
-    if (inputs / IMAGES[bios][0]).read_bytes() != image:
+    if (inputs / capture_rom_label(bios, metadata)).read_bytes() != image:
         raise ValueError('trial did not load the complete acquired image')
     for name, digest in MASKS.items():
         if hashlib.sha1((inputs / name).read_bytes()).hexdigest() != digest:
