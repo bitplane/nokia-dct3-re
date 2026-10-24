@@ -91,6 +91,48 @@ and bounded I/O equality are not exhaustive memory/device-state proof.
 All existing provisioning, mask/clock, RF/speech and93.974s supervision
 limitations remain. No firmware result or network response is supplied.
 
+### Toolkit refusal and EEPROM rewrite boundary
+
+An explicit Phase-2+ external-card input reads EF_PHASE03 and produces own
+four-byte TERMINAL PROFILE `03018000`, STATUS9116 and FETCH22 of `DCT3 SAT`.
+The ME automatically returns `810301218002028281030130` (result30, beyond ME
+capabilities), accepted with9000 before the68s physical Menu contact. It
+never displays the proactive text;65s remains clean Headset idle and Menu
+opens the ordinary Phone book at70s. Both native samples remain active with
+no unsupported-instruction stop. This tests one request's refusal, not
+successful DISPLAY TEXT or absence of every Toolkit command.
+
+The matched74s Phase-2 control reads02 and has no proactive APDUs. Its
+entire EEPROM is unchanged; the Phase-2+ run changes108 bytes while retaining
+the complete card and executable flash. The differences occupy18 repeated
+33-byte spans beginning0550, changing positions1..3 and5..7 in each span.
+Own descriptors at2a89fc/2a8a04/2a8a0c map0728/0729/072a to0550/0658/06fd,
+each with declared length33. This is record geometry, not an assigned meaning
+or proof of a hardware fault. The new bytes include executable-looking
+values; their provenance and whether the input records were valid remain open.
+The Phase-2+ output bank SHA256 is
+`1bcc40818ee276be75f40554240f5f2e5a94da8a2e85af0e9537ef9a1bc2ee0d`.
+The checker protects that whole observed transition but explicitly returns
+`eeprom_integrity_validated=false`. It does not whitelist those regions or
+classify the changes as harmless housekeeping. Storage-integrity acceptance
+is unresolved, not a successful card-feature gate.
+
+```sh
+.venv/bin/python tools/nsk1_toolkit_check.py \
+  tmp/nsk1-diagnostic-display-cold tmp/nsk1-toolkit-refusal
+.venv/bin/python tools/nsk1_toolkit_check.py \
+  tmp/nsk1-diagnostic-display-cold tmp/nsk1-toolkit-control --control
+```
+
+Add `--mame mame/mame` with fresh outputs to execute. Only SATCFG differs;
+phone authentication, native execution, raw SIMI TX/RX, card statuses, payload,
+response/contact ordering, complete storage, configuration and pixels are
+independently checked. Shared success/refusal parsing retains the6130's
+automatic refusal and the6150's physical-success contracts separately.
+Next, trace the record-write source bytes and read/default handling for0728..072a;
+do not erase records or alter timing merely to remove the observed changes.
+Normal-machine, fitted-mask, RF and speech claims are unchanged.
+
 Physical manual network-search initiation also passes from independently
 qualified initialized storage: Settings -> Phone settings -> Network
 selection -> Manual renders **Searching / Quit**. The gate verifies all

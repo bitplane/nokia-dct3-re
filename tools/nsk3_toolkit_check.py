@@ -19,53 +19,18 @@ from tools.nsk3_security_check import check_trace as check_phone
 from tools.nsk3_boot_check import check_upload_handoffs
 from tools.nsk3_toolkit_prepare import prepare, profile_metadata
 from tools.nsk1_phonebook_roundtrip import frame_check
-from tools.sim_toolkit_display_check import DISPLAY, wire
-from tools.sim_fdn_protocol_check import apdus
-from tools.sim_security_trace_check import statuses
+from tools.sim_toolkit_display_check import DISPLAY, REFUSAL, wire, check_display
 
 TERMINAL_PROFILE = bytes.fromhex('03018000')
-REFUSAL = bytes.fromhex('810301218002028281030130')
 
 
 def check_trace(text, control=False):
     check_pin(text, True, tx_limit=4096)
     check_phone(text, True)
     check_upload_handoffs(text, 1)
-    if 'nsk3_reset_request:' in text:
-        raise ValueError('reset interrupted Toolkit observation')
-    tx, rx = wire(text, 'TX', 'nsk3'), wire(text, 'RX', 'nsk3')
-    commands = list(apdus(tx))
-    if any(row[0] not in (0xa4, 0x20, 0xb0, 0xb2, 0xc0, 0xf2, 0x10, 0x12, 0x14)
-           for row in commands):
-        raise ValueError('unrelated SIM operation')
-    expected = [] if control else [
-        (0x10, 0, 0, 4, TERMINAL_PROFILE),
-        (0x12, 0, 0, 22, b''), (0x14, 0, 0, 12, REFUSAL),
-    ]
-    if [row[:5] for row in commands if row[0] in (0x10, 0x12, 0x14)] != expected:
-        raise ValueError('own terminal profile, FETCH or refusal differs')
-    if f'read-binary fid=6fae offset=0 length=1 first={"02" if control else "03"}' not in text:
-        raise ValueError('card phase differs')
-    for instruction in (0x10, 0x14):
-        if statuses(text, instruction) != ([] if control else [(0x9000, 3, 10)]):
-            raise ValueError('card acceptance of profile/refusal differs')
-    marker = 'nsk3_toolkit_physical: action=dismiss'
-    contacts = re.findall(re.escape(marker) + r' down=([01]) t=([0-9.]+)', text)
-    if (contacts != [('1', '68.000000000'), ('0', '68.200000000')]
-            or text.count('nsk3_toolkit_physical:') != 2):
-        raise ValueError('physical post-refusal Menu differs')
-    if control:
-        if 'SIM completion ins=f2 sw=91' in text or DISPLAY in rx:
-            raise ValueError('Phase-2 control produced proactive traffic')
-    else:
-        if text.count('SIM completion ins=f2 sw=9116') != 1 or rx.count(DISPLAY + b'\x90\x00') != 1:
-            raise ValueError('missing unique pending STATUS or card payload')
-        before = text.split(marker + ' down=1', 1)[0]
-        previous = list(apdus(wire(before, 'TX', 'nsk3')))
-        if [row[:5] for row in previous if row[0] in (0x10, 0x12, 0x14)] != expected:
-            raise ValueError('refusal did not precede physical input')
-        if statuses(before, 0x14) != [(0x9000, 3, 10)] or DISPLAY + b'\x90\x00' not in wire(before, 'RX', 'nsk3'):
-            raise ValueError('card exchange did not complete before physical input')
+    check_display(text, prefix='nsk3', terminal_profile=TERMINAL_PROFILE,
+                  control=control, capability_refusal=True,
+                  reset_markers=('nsk3_reset_request:',))
     native = re.findall(r'nsk3_toolkit_native: sample=(\d+) pc=([0-9a-f]{6}) stopped=([01]) idle=([01]) observer_writes=0', text)
     if ([(row[0], row[2]) for row in native] != [('1', '0'), ('2', '0')]
             or text.count('nsk3_toolkit_native:') != 2):

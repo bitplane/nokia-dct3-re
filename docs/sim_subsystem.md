@@ -540,6 +540,15 @@ product-specific outcomes must not be unified into a fabricated success.
 Own fixture scope and gates are in [6150 bring-up](6150_bringup.md) and
 [6130 bring-up](6130_bringup.md).
 
+NSK-1 v5.61 (5130) independently produces that same four-byte profile and
+automatic result30 refusal. Its matched Phase-2 control has no proactive
+exchange. Unlike the6130 fixture, this Phase-2+ trial also rewrites108 EEPROM
+bytes while the Phase-2 control preserves them; [5130 bring-up](5130_bringup.md)
+keeps this as unresolved storage-integrity evidence, not a successful feature
+or an ignored difference. The shared wire validator distinguishes automatic
+capability refusal from success after a physical contact; product wrappers
+retain their own storage, native-execution and pixel requirements.
+
 NSM-5 v5.40 (5210) independently submits a nine-byte TERMINAL PROFILE, FETCHes
 the same DISPLAY TEXT command, renders `DCT3 SAT`, and returns result `00`
 after a physical left-softkey press. The longer profile is an observed

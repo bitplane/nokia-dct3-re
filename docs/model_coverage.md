@@ -196,6 +196,12 @@ and64KiB research RAM checksums while the DSP is active. The2.7s branches
 repeat1170 DSP I/O writes and physical Phone book pixels with unchanged
 complete storage. This is bounded restoration, not long-run acceptance.
 
+The5130's separate Phase-2+ Toolkit probe reaches FETCH but automatically
+refuses DISPLAY TEXT with result30. Its matched Phase-2 control preserves
+EEPROM; the Phase-2+ probe rewrites108 bytes in record-shaped spans. This is
+a recorded unresolved storage-integrity boundary, not Toolkit display support
+or harmless housekeeping. The complete transition is retained and checked.
+
 The7110 v5.01 checksum-consistency fixture is separate from its intact-input
 row: changing only the latest journal checksum byte releases the second task
 batch but still leaves a white raster and native913e/9140. Identity-check

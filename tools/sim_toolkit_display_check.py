@@ -1,7 +1,9 @@
 """Shared wire contract for an external one-command DISPLAY TEXT card.
 
 Callers supply their independently observed terminal profile, marker namespace
-and physical dismissal interval. Handset storage and pixels stay product-owned.
+and physical contact interval. Success must follow physical dismissal;
+explicit capability refusal must complete before that contact. Handset storage
+and pixels stay product-owned.
 """
 import re
 
@@ -10,6 +12,7 @@ from tools.sim_security_trace_check import statuses
 
 DISPLAY = bytes.fromhex('d0148103012180820281028d0904') + b'DCT3 SAT'
 RESPONSE = bytes.fromhex('810301218002028281030100')
+REFUSAL = bytes.fromhex('810301218002028281030130')
 
 
 def wire(text, direction, prefix):
@@ -22,7 +25,8 @@ def wire(text, direction, prefix):
 
 
 def check_display(text, *, prefix, terminal_profile, control=False,
-                  dismissal=('68.000000000', '68.200000000'), reset_markers=()):
+                  dismissal=('68.000000000', '68.200000000'), reset_markers=(),
+                  capability_refusal=False):
     tx, rx = wire(text, 'TX', prefix), wire(text, 'RX', prefix)
     commands = list(apdus(tx))
     if any(row[0] not in (0xa4, 0x20, 0xb0, 0xb2, 0xc0, 0xf2, 0x10, 0x12, 0x14)
@@ -36,10 +40,11 @@ def check_display(text, *, prefix, terminal_profile, control=False,
     if any(marker in text for marker in (*reset_markers, 'LUA ERROR', 'Error in')):
         raise ValueError('reset or failed observer')
     toolkit = [row[:5] for row in commands if row[0] in (0x10, 0x12, 0x14)]
+    response = REFUSAL if capability_refusal else RESPONSE
     expected = [] if control else [
         (0x10, 0, 0, len(terminal_profile), terminal_profile),
         (0x12, 0, 0, len(DISPLAY), b''),
-        (0x14, 0, 0, len(RESPONSE), RESPONSE),
+        (0x14, 0, 0, len(response), response),
     ]
     if toolkit != expected:
         raise ValueError('own terminal profile, FETCH or terminal response differs')
@@ -58,5 +63,10 @@ def check_display(text, *, prefix, terminal_profile, control=False,
         before = text.split(action + ' down=1', 1)[0]
         if DISPLAY + b'\x90\x00' not in wire(before, 'RX', prefix):
             raise ValueError('dismissal precedes proactive payload')
-        if any(row[0] == 0x14 for row in apdus(wire(before, 'TX', prefix))):
+        early_responses = [row[:5] for row in apdus(wire(before, 'TX', prefix)) if row[0] == 0x14]
+        if capability_refusal:
+            if (early_responses != [expected[-1]] or
+                    statuses(before, 0x14) != [(0x9000, 3, 10)]):
+                raise ValueError('automatic capability refusal did not complete before physical input')
+        elif early_responses:
             raise ValueError('terminal response precedes physical dismissal')
