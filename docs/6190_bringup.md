@@ -17,6 +17,11 @@ after an empty native receive window publishes reason `68`; bounded software
 gates do not establish sustained native operation. Fitted-mask compatibility,
 RF registration, calls and SMS delivery remain unqualified.
 
+An isolated native save/load control additionally restores the 40-second
+ARM/DSP architecture and RAM checksums exactly, replays 7,767 DSP I/O writes
+over 2.7 seconds, and reproduces physical Down to clean Call log pixels.
+This is bounded continuation, not sustained native stability or registration.
+
 Collection provenance and the unprovided MCU-to-PPM gap are in
 `roms/README.md`. Reproduce the static report:
 
@@ -1265,3 +1270,28 @@ the Down-only control: Down redraws a neighboring item with retained notice
 pixels, while explicit dismissal clears them. The cause and expected timeout
 of the Down-only notice remain unqualified; it is not an inability to recover
 clean menus through physical input. Native radio and long-run limits are unchanged.
+
+### Bounded native save/load continuation
+
+Prepare an independent cold run from the qualified edited-FDN source and run
+`nsb3_native_state.lua` for 47 seconds. After ordinary PIN1/phone authentication
+and Messages entry, the fixture saves at emulated time 40 seconds. It compares
+all 37 ARM architectural registers, 36 DSP state fields, backed ARM RAM and
+ordinary DSP data/program checksums immediately across load. Over the following
+2.7 seconds it compares every DSP I/O write, including relative time, port,
+value and mask; 7,767 writes replay identically. The same physical Down input
+in each branch reaches the exact clean Call log frame. The full card remains
+unchanged and no board reset is observed.
+
+```sh
+.venv/bin/python tools/nsb3_native_state_check.py SOURCE RUN
+```
+
+The checker shares the established NSE-2 architectural/replay contract while
+supplying own checkpoint time, card size and reviewed pixel oracle. Existing
+NSE-2 defaults and tests are preserved. Save/load uses emulator APIs, not guest
+state mutation or a replacement DSP result. RAM comparisons are rolling
+checksums, not byte-for-byte memory dumps. This bounded gate does not establish
+RF input, native registration, speech or survival past the receive-supervision
+reset. Timer/peripheral continuity is observed through exact subsequent I/O,
+not an exhaustive inventory of every saved device field.

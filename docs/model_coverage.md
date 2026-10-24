@@ -15,7 +15,10 @@ recomputed in its own cold EEPROM, `nsb3r4t` separately reproduces an exact
 `Insert SIM card` frame with unchanged final storage. The passing fixture and
 calibration-only negative control are checked by `tools/nsb3_selftest_check.py`.
 A separate inserted laboratory card/fresh phone-code retry fixture accepts
-physical security entry and clean Messages/Names menus. Physical A/12345 save
+physical security entry and clean Messages/Names menus. Bounded native save/load
+restores observed architecture/RAM checksums, exactly replays 7,767 DSP I/O
+writes and reproduces physical Down to Call log; long-run stability is not implied.
+Physical A/12345 save
 issues one EF_ADN update; an independent cold process retrieves the name and
 number without rewriting or changing the complete card. The boundary is checked
 by `tools/nsb3_menu_check.py` and `tools/nsb3_phonebook_check.py`.
