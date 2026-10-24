@@ -151,6 +151,14 @@ next call entry without intervening argument assignment, not inferred from
 silent hooks. There is no evidence here for a missing keypad edge, masked
 FIQ3 dispatch, corrupt timer baseline, or a safe firmware-flag injection.
 
+A no-call/no-key control (`tmp/npe3-mbus-late-idle-query`) establishes the
+same boundary independently of call signaling or speech: clock-stop at
+31.039953s, FIQ0 wake31.061014s, global control`0a` through49s. A read-only
+version query offered at40s produces pending FIQ2 (`19->1d`) but no reply.
+It does not restore delivery. The service gate's24s success is therefore a
+bounded pre-sleep capability, not sustained service availability. The earlier
+call fixture merely made the general post-wake failure visible through End.
+
 ### NPE-3 service catalogue boundary
 
 Read-only observation of the version query resolves the source getter
