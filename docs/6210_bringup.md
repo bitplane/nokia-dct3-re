@@ -230,9 +230,35 @@ point respectively to descriptors `21eab8`, `224a44`, `224b70` and `225c2c`;
 their declared lengths are 638, 104, 629 and 223 words. The 422 installed
 words are a prefix of entry `00`, not its whole 638-word payload. Empty
 entries remain represented rather than being dropped and renumbered.
-These are static table positions, not established runtime request selectors.
-The table reader, relocation and later upload selection remain to be mapped;
-the presence of other payloads does not supply missing resident `2c75`.
+These are table positions, not a universal runtime request-selector ABI.
+The presence of other payloads does not supply missing resident `2c75`.
+
+Passive native `npe3stage` observation establishes startup copying all 28
+pointers from MCU `515994..515a03` into RAM `170004..170073` at PC `200194`
+(0.050300..0.050362 s). The next observed RAM reads in the four-second run are:
+
+| Table entry | MCU reader | Time (s) | Own descriptor |
+| --- | --- | --- | --- |
+| `1b` | `426be8` | 0.131315 | `225c2c` |
+| `00` | `426e1a` | 1.924214 | `21eab8` |
+| `14` | `427396` | 1.925512 | `224b70` |
+| `01` | `427396` | 1.925662 | `21efc4` |
+| `15` | `420356` | 3.878971 | `22507c` |
+
+The indexed reader `427392..4273b4` scales the index by four, reads the
+descriptor pointer and copies five header halfwords; `42034e..420366`
+obtains a byte-selected index and reads the selected descriptor's size.
+The verifier and entry-zero readers independently consume size at `+4`
+and payload at `+12`. Four additional flash-table reads at `426c5c` are
+strided verifier input, not additional upload selections. Native DSP halt
+does not halt the MCU: later MCU selection is not proof of DSP execution.
+No later physical-call selection coverage is claimed by this short run.
+
+Use the capture command below with script
+`../tools/noki6210_upload_catalogue_observe.lua` and a fresh run directory,
+then add `--catalogue-log DIR/error.log` to the source checker. Its acceptance
+requires all 28 own pointer copies, the five ordered RAM reads and uncapped
+flash/RAM totals (32/5); missing, misrouted or truncated evidence fails.
 
 Reproduce the bounded capture without an HLE handoff:
 

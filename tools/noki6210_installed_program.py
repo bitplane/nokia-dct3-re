@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import struct
+import re
 
 
 BLOCKS = {
@@ -66,16 +67,58 @@ def assess(image, captures=None):
                      'execution coverage or proof of absent codec setup.'}
 
 
+def verify_catalogue_reads(image, text):
+    records = catalogue(image)
+    pattern = (r'npe3_catalogue_(flash|ram): address=([0-9a-f]{8}) '
+               r'data=([0-9a-f]{8}) mask=([0-9a-f]{8}) pc=([0-9a-f]{8}) '
+               r'r0=([0-9a-f]{8}) r1=([0-9a-f]{8}) r2=([0-9a-f]{8}) t=([0-9.]+)')
+    rows = [match.groups() for match in re.finditer(pattern, text)]
+    copies = [row for row in rows if row[0] == 'flash' and row[4] == '00200194']
+    expected = [(0x515994 + 4 * i, record['descriptor'], 0xffffffff,
+                 0x515994 + 4 * i, 0x170004 + 4 * i)
+                for i, record in enumerate(records)]
+    actual = [tuple(int(row[i], 16) for i in (1, 2, 3, 5, 6)) for row in copies]
+    if actual != expected:
+        raise ValueError('catalogue startup copy is incomplete or differs from own source')
+    feeder = [row for row in rows if row[0] == 'flash' and row[4] != '00200194']
+    if [tuple(int(row[i], 16) for i in (1, 2, 3, 4)) for row in feeder] != [
+            (address, 0x220000, 0xffff0000, 0x426c5c)
+            for address in (0x5159a0, 0x5159c0, 0x5159e0, 0x515a00)]:
+        raise ValueError('catalogue strided verifier observations missing or changed')
+    selections = [row for row in rows if row[0] == 'ram']
+    sequence = [(0x1b, 0x426be8), (0, 0x426e1a), (0x14, 0x427396),
+                (1, 0x427396), (0x15, 0x420356)]
+    expected = [(0x170004 + 4 * index, records[index]['descriptor'], 0xffffffff, pc)
+                for index, pc in sequence]
+    actual = [tuple(int(row[i], 16) for i in (1, 2, 3, 4)) for row in selections]
+    if actual != expected:
+        raise ValueError('native four-second catalogue selection sequence differs')
+    for name, count in (('flash', 32), ('ram', 5)):
+        if re.findall(rf'npe3_catalogue_{name}: total=(\d+)', text) != [str(count)]:
+            raise ValueError('catalogue observation totals missing or changed')
+    if '[LUA ERROR]' in text:
+        raise ValueError('catalogue observer failed')
+    return {'copied_pointers': len(copies), 'ram_selections': [x[0] for x in sequence],
+            'scope': 'Four-second MCU reads; not successful DSP execution or later-call coverage.'}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image', type=Path)
     parser.add_argument('--captures', type=Path,
                         help='Directory of native npe3_{bootstrap,loader2,fragment}.bin captures')
+    parser.add_argument('--catalogue-log', type=Path,
+                        help='Four-second npe3stage passive catalogue observation')
     args = parser.parse_args()
     try:
         captures = None if args.captures is None else {
             name: (args.captures / f'npe3_{name}.bin').read_bytes() for name in BLOCKS}
-        print(json.dumps(assess(args.image.read_bytes(), captures), indent=2))
+        image = args.image.read_bytes()
+        result = assess(image, captures)
+        if args.catalogue_log:
+            result['catalogue_observation'] = verify_catalogue_reads(
+                image, args.catalogue_log.read_text())
+        print(json.dumps(result, indent=2))
     except (OSError, ValueError) as error:
         parser.exit(1, f'NPE-3 installed program FAIL: {error}\n')
 
