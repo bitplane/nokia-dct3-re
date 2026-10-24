@@ -13,6 +13,39 @@ from tools.sip_handset_waveform_check import inspect_tone, verify
 
 
 class SipHandsetWaveformTest(unittest.TestCase):
+    def test_pcs_profile_rejects_other_product_before_audio_setup(self):
+        repository = Path(__file__).resolve().parents[1]
+        for product, value in (('8210', '1'), ('8890', 'yes')):
+            environment = dict(os.environ, SIP_PRODUCT=product, SIP_PCS1900=value,
+                               SIP_LATE_PIN_DCS='0')
+            result = subprocess.run(['bash', 'tools/run_sip_physical_audio_gate.sh'],
+                                    cwd=repository, env=environment, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('requires 8890' if value == '1' else 'must be 0 or 1', result.stderr)
+
+    def test_pcs_result_requires_matching_band_direction_and_media(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.recording(root, [(440, 8000)] * 2).rename(root / 'sip-microphone.wav')
+            self.recording(root, [(660, 8000)] * 2).rename(root / 'sip-earpiece.wav')
+            valid = dict(machine='nsb6hle', scenario='incoming-sip-media',
+                         laboratory_carrier=600, native_dsp_complete=False,
+                         hle_media_tested=True, result='pass')
+            (root / 'sip-result.json').write_text('{"passed": true}')
+            (root / 'acceptance.json').write_text(json.dumps(valid))
+            verify(root, '8890', 'incoming', pcs1900=True)
+            self.assertEqual(json.loads((root / 'sip-waveform-result.json').read_text())[
+                'laboratory_carrier'], 600)
+            for key, value in (('laboratory_carrier', 60), ('scenario', 'outgoing-sip-media'),
+                               ('hle_media_tested', False), ('native_dsp_complete', True)):
+                (root / 'acceptance.json').write_text(json.dumps({**valid, key: value}))
+                with self.subTest(key=key), self.assertRaisesRegex(ValueError, 'matching own-band'):
+                    verify(root, '8890', 'incoming', pcs1900=True)
+            (root / 'acceptance.json').write_text(json.dumps(valid))
+            (root / 'sip-result.json').write_text('{"passed": false}')
+            with self.assertRaisesRegex(ValueError, 'SIP media acceptance'):
+                verify(root, '8890', 'incoming', pcs1900=True)
+
     def test_late_pin_profile_is_product_explicit_before_audio_setup(self):
         repository = Path(__file__).resolve().parents[1]
         for product, value, error in (('8850', '1', 'requires 8210'),

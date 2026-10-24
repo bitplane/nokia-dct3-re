@@ -1447,9 +1447,11 @@ NSB-6 additionally has independent PCS1900 ordinary media gates:
 `verify-8890-pcs-sip-outgoing-media` and
 `verify-8890-pcs-sip-incoming-media`. Both require own ARFCN600 acquisition,
 physical call controls, exact documented PCM accounting, bidirectional local
-SIP media and product-owned UI/storage recovery. They do not inherit GSM900
-waveform or external-dialog restoration qualification; see the authoritative
-NSB-6 audio contract in `8xxx_bringup.md`.
+SIP media and product-owned UI/storage recovery. Separate
+`verify-8890-pcs-sip-{outgoing,incoming}-waveform` gates prove sustained
+physical microphone/earpiece tones and require matching PCS media acceptance.
+Neither inherits GSM900 external-dialog restoration qualification; see the
+authoritative NSB-6 audio contract in `8xxx_bringup.md`.
 
 ### Failed calls and automatic redial
 

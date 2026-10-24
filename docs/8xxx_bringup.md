@@ -664,7 +664,7 @@ transport counters alone. No codec gain is changed. The outgoing capture
 has6/7 sustained microphone/earpiece seconds; incoming has8/4. Captures are
 `tmp/nsb6-sip-outgoing-waveform/handset` and
 `tmp/nsb6-sip-incoming-waveform/handset`. This is HLE endpoint audio, not
-native speech, measured analogue gain or PCS1900 physical-waveform qualification.
+native speech or measured analogue gain. PCS waveform qualification is separate below.
 
 PCS1900 independently passes `verify-8890-pcs-sip-outgoing-media` and
 `verify-8890-pcs-sip-incoming-media`. Each uses unchanged own MCU/PMM and
@@ -678,6 +678,20 @@ to ordinary media calls; it cannot silently select GSM900 checks, restoration
 or signaling-only acceptance. No device configuration or codec gain changed.
 These are clocked HLE transport tests, not native DSP speech, measured RF,
 PCS physical-waveform qualification or PCS external-dialog restoration.
+
+`verify-8890-pcs-sip-outgoing-waveform` and
+`verify-8890-pcs-sip-incoming-waveform` independently qualify sustained
+physical host-audio paths on PCS1900. They retain the preceding PCS media,
+call, UI and storage checks and use the same440Hz microphone source,
+660Hz remote return and unchanged RMS/energy/duration thresholds as GSM900.
+The outgoing recording has6/6 consecutive microphone/earpiece seconds;
+incoming has8/5. `SIP_PCS1900=1` is product-restricted before audio setup.
+Waveform checking additionally requires a passing own ARFCN600 acceptance,
+matching incoming/outgoing scenario and passing SIP result before marking
+the recording as PCS. Wrong-band/direction and failed-media controls reject.
+Captures live at `tmp/nsb6-pcs-{outgoing,incoming}-waveform/handset`.
+This is HLE endpoint audio, not native speech, measured analog gain or
+qualification of PCS external-dialog restoration.
 
 Accepted media captures are `tmp/nsb6-sip-outgoing-media-qualified` and
 `tmp/nsb6-sip-incoming-media-final`. The four restoration captures use

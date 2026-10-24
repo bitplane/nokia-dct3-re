@@ -293,6 +293,20 @@
       ]
     },
     {
+      "name": "verify-8890-pcs-sip-outgoing-waveform", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP/PulseAudio/FFmpeg; independent own NSB-6 PCS1900 physical call and sustained microphone/earpiece tones, not native DSP speech",
+      "recipe": [
+        "\tenv SIP_PRODUCT=8890 SIP_PCS1900=1 SIP_DIRECTION=outgoing RUN_DIR='$(RUN_DIR)' SIP_PJSUA_BIN='$(SIP_PJSUA_BIN)' SIP_PYTHON_PATH='$(SIP_PYTHON_PATH)' bash tools/run_sip_physical_audio_gate.sh"
+      ]
+    },
+    {
+      "name": "verify-8890-pcs-sip-incoming-waveform", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP/PulseAudio/FFmpeg; independent own NSB-6 PCS1900 physical Answer/End and sustained microphone/earpiece tones, not native DSP speech",
+      "recipe": [
+        "\tenv SIP_PRODUCT=8890 SIP_PCS1900=1 SIP_DIRECTION=incoming RUN_DIR='$(RUN_DIR)' SIP_PJSUA_BIN='$(SIP_PJSUA_BIN)' SIP_PYTHON_PATH='$(SIP_PYTHON_PATH)' bash tools/run_sip_physical_audio_gate.sh"
+      ]
+    },
+    {
       "name": "verify-8890-sip-incoming-waveform", "prerequisites": ["build"], "variables": {},
       "unstructured": "optional PJSIP/PulseAudio/FFmpeg; own NSB-6 incoming Answer/End and microphone/earpiece tones through its documented PCM bus, HLE not native speech",
       "recipe": [

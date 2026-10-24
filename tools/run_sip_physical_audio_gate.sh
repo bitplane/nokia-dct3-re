@@ -6,6 +6,7 @@ product=${SIP_PRODUCT:-3210}
 direction=${SIP_DIRECTION:-outgoing}
 late_pin_dcs=${SIP_LATE_PIN_DCS:-0}
 profile_args=()
+waveform_args=()
 case "$late_pin_dcs" in
     0) ;;
     1)
@@ -13,6 +14,15 @@ case "$late_pin_dcs" in
         profile_args=(--late-pin-dcs)
         ;;
     *) echo 'SIP_LATE_PIN_DCS must be 0 or 1' >&2; exit 1 ;;
+esac
+case "${SIP_PCS1900:-0}" in
+    0) ;;
+    1)
+        [[ "$product" == 8890 ]] || { echo 'PCS1900 waveform profile requires 8890' >&2; exit 1; }
+        profile_args=(--pcs1900)
+        waveform_args=(--pcs1900)
+        ;;
+    *) echo 'SIP_PCS1900 must be 0 or 1' >&2; exit 1 ;;
 esac
 incoming_arg=
 seconds=45
@@ -154,4 +164,4 @@ if [[ "$product" == 8210 || "$product" == 8290 || "$product" == 8850 || "$produc
     cp "$run_dir/sip-earpiece.wav" "$run_dir/handset/sip-earpiece.wav"
     run_dir="$run_dir/handset"
 fi
-.venv/bin/python tools/sip_handset_waveform_check.py "$run_dir" --product "$product" --direction "$direction"
+.venv/bin/python tools/sip_handset_waveform_check.py "$run_dir" --product "$product" --direction "$direction" "${waveform_args[@]}"
