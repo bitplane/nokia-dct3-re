@@ -7,8 +7,11 @@ DSP_REGISTERS=set('PC XPC A B T TRN RTN RC SP ST0 ST1 PMST AR0 AR1 AR2 AR3 AR4 A
 
 
 def check_state(text,before,after,reference_pixels,restored_pixels,*,
-                prefix='nse2',checkpoint='18.500000000',card_size=3570,menu_frame=None):
+                prefix='nse2',checkpoint='18.500000000',card_size=3570,menu_frame=None,
+                ram_limit=0x110000):
     menu_frame = MENU_FRAME if menu_frame is None else menu_frame
+    if not 0x100004 <= ram_limit <= 0x180000 or ram_limit % 4:
+        raise ValueError('invalid backed ARM RAM limit')
     if len(before)!=card_size or after!=before:
         raise ValueError('native UI restoration changed the full SIM card')
     if prefix+'_state: FAIL' in text or 'LUA ERROR' in text or 'Error in' in text:
@@ -24,7 +27,7 @@ def check_state(text,before,after,reference_pixels,restored_pixels,*,
     if any(not re.fullmatch('[0-9a-f]{8}',fields[name]) for name in ('pc','sp','ram','data','program')):
         raise ValueError('native snapshot field encoding differs')
     cpu=fields['cpu'].split(',')
-    if cpu[15]!=fields['pc'] or cpu[13]!=fields['sp'] or not 0x200000<=int(fields['pc'],16)<0x400000 or not 0x100000<=int(fields['sp'],16)<0x110000:
+    if cpu[15]!=fields['pc'] or cpu[13]!=fields['sp'] or not 0x200000<=int(fields['pc'],16)<0x400000 or not 0x100000<=int(fields['sp'],16)<ram_limit:
         raise ValueError('native checkpoint lacks consistent own-ROM/RAM architecture')
     dsp=dict(item.split(':') for item in fields['dsp'].split(','))
     if set(dsp)!=DSP_REGISTERS or any(not re.fullmatch('[0-9a-f]+',v) for v in dsp.values()) or int(dsp['ILLEGAL'],16)!=0:

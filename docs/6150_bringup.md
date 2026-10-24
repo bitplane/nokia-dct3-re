@@ -17,6 +17,49 @@ not factory provisioning or fitted-chip proof. Negative saturated/original-
 retry controls remain distinct. No readiness event or firmware flag is
 synthesized.
 
+### Native idle restoration and physical continuation
+
+An independent54s cold process from the qualified original PIN-enabled
+`tmp/nsm1-pin-menu` storage authenticates PIN1234 and separate phone12345,
+without an application key before save. Save at40s records own ARM
+PC2b61fc/SP112a18; load exactly restores37 ARM registers,36 DSP fields
+and rolling checksums of the backed128KiB ARM research RAM, ordinary DSP
+data and program. The2.7s reference/restored windows contain7771 identical
+DSP I/O writes, including relative timestamps, ports, values and masks.
+Physical left-softkey/Menu in both branches renders the reviewed Messages
+frame `51a20a16acead610184225c78632724f9f20025565bd29a93beffec0c271d3a3`.
+The own logical-key table2e0b18 supplies this contact; no sibling key mapping
+is assumed.
+
+The shared validator now accepts an explicit backed-RAM limit,120000 here;
+its default remains110000 for existing64KiB products. The own stack112a18
+cannot be validated under that default. Three focused tests preserve this
+distinction and reject out-of-range stacks, architecture/replay/input/protocol
+mutations, missing records and changed complete storage. The observer includes
+all128KiB of the current research map, not a claim that fitted SRAM aliases
+have been established. Register names in complete validated architecture
+records are parsed as data; actual execution/observer errors remain failures.
+
+The full16KiB EEPROM remains SHA256
+`44493d3a303c99a1bc87d3320bc01bf292b7e18b581a2f17078159a12096987c`;
+own flash, original complete3570-byte laboratory card and external input
+configuration remain unchanged. Only persistent device files and CFG are
+copied into the fresh process; the generated save artifact is nonempty and
+hashed. Existing diagnostic-template policy03ca=00, nominal ADC2=554,
+own retry-byte fixture and unproved NSE-1 mask compatibility are retained,
+not promoted to factory provisioning or healthy RF operation. Checksums are
+not bytewise memory comparison, and bounded I/O equality is not exhaustive
+device-state or sustained-operation coverage. No firmware result, memory
+poke, timer completion or radio response is supplied.
+
+```sh
+.venv/bin/python tools/nsm1_native_state_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-native-idle-state --mame mame/mame
+```
+
+Omit `--mame` to recheck that capture; execution requires a fresh output
+directory. Normal handset support and native RF/speech claims are unchanged.
+
 ### Native executable upload extent
 
 The own v5.23 loader writes 605 distinct program words in `2800..2a5c`.
