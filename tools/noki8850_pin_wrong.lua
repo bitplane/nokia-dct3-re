@@ -7,7 +7,8 @@ for _,port in pairs(machine.ioport.ports) do
     for _,field in pairs(port.fields) do fields[field.name]=field end
 end
 local input=coroutine.create(function()
-    assert(emu.wait(8))
+    for attempt=1,(_G.nsm2_pin_exhaust and 3 or 1) do
+    assert(emu.wait(8+(attempt-1)*8-machine.time:as_double()))
     for _,name in ipairs({'Keypad 9','Keypad 9','Keypad 9','Keypad 9','Menu'}) do
         local field=assert(fields[name])
         for _,state in ipairs({1,0}) do
@@ -16,6 +17,8 @@ local input=coroutine.create(function()
             field:set_value(state)
             assert(emu.wait(state==1 and 0.15 or 0.85))
         end
+    end
+    machine.screens[':screen']:snapshot('8850_pin_wrong_attempt_'..attempt..'.png')
     end
     machine.screens[':screen']:snapshot('8850_pin_wrong.png')
     machine:logerror('8850_pin_wrong: complete=1 firmware_state_forcing=0\n')

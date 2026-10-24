@@ -11,7 +11,7 @@ local input = coroutine.create(function()
     if os.getenv('NOKIA_DCT3_8850_PIN_ENTRY') == '1' then
         if not emu.wait(8) then return end
         machine.screens[':screen']:snapshot('8850_pin_prompt.png')
-        for _, item in ipairs({{2, 'Keypad 1'}, {3, 'Keypad 2'},
+        for _, item in ipairs(_G.nsm2_pin_digits or {{2, 'Keypad 1'}, {3, 'Keypad 2'},
                                {4, 'Keypad 3'}, {2, 'Keypad 4'}, {1, 'Menu'}}) do
             local key = assert(machine.ioport.ports[':COL.' .. item[1]].fields[item[2]])
             machine:logerror(string.format('8850_pin_physical: key=%s t=%.6f\n',

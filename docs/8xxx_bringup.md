@@ -2019,8 +2019,25 @@ update; credential/configuration/record mutations are rejected. Both phases
 retain own input hashes, staged uploads, exclusive HLE/self-test and physical
 input checks. Distinct launch identities, complete initial-storage hashes and
 predecessor immutability checks retain the cold-process boundary. This does
-not qualify PIN exhaustion, PUK recovery, PIN2 or native DSP/speech.
+not qualify PIN exhaustion, PUK recovery, PIN2 or native DSP/speech by itself.
 Capture: `tmp/nsm2-pin-retry-cold-final`.
+
+The separate `--puk` variant runs three isolated processes. Physical9999
+submissions at8/16/24s must yield `9804`, `9804`, `9840` with PIN1 retry
+counts2/1/0; both **Code error** frames and the **SIM card blocked** frame
+are exact pixel oracles. No registration is allowed. A cold process inherits
+the entire blocked card and all phone NVRAM, enters PUK12345678, new PIN2468
+twice, and the ordinary phone code12345. Its sole UNBLOCK CHV1 APDU must use
+selector00 and return `9000`; no VERIFY is allowed in that phase. The exact
+new-PIN, confirmation and **Code accepted** frames and the stable physical
+Messages menu title are checked. Complete card equality permits only the
+replacement PIN, restored allowances and expected EF_LOCI update. A third
+cold process physically authenticates with2468, must not unblock again,
+retains the complete card unchanged and uses preserved-location registration
+before the established physical navigation checks. This establishes one
+successful PUK1 recovery, not wrong-PUK handling, permanent PUK loss or PIN2.
+Capture: `tmp/nsm2-puk-recovery-final`. These remain research-HLE observations,
+not native DSP, physical RF or speech acceptance.
 
 The same isolated runner accepts `--scenario host-incoming-call`. It verifies
 physical answer/end input, the complete host-originated CC/RR exchange,

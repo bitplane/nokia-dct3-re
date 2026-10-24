@@ -107,6 +107,11 @@ independent cold process, and physical1234 restores retries and reaches the
 existing registered physical-menu acceptance. Exact whole-card comparisons
 and the reviewed Code error frame are required. This is not PIN exhaustion,
 PUK/PIN2 acceptance or native DSP/speech.
+Its independently executed `--puk` variant additionally qualifies three
+physical wrong-PIN attempts, durable blocking, cold PUK1/new-PIN recovery
+and another cold authentication with2468. Whole-card equality and own
+boot/HLE/UI/registration checks remain mandatory; wrong/permanently exhausted
+PUK and PIN2 behavior are not promoted.
 
 NPE-3 additionally has an independent handset-bank A/123 save/cold-read
 fixture with an empty-bank negative control and unchanged complete SIM files;

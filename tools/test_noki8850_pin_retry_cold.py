@@ -5,7 +5,7 @@ import tempfile
 from PIL import Image
 
 from tools.make_sim_card_profile import make_profile
-from tools.run_noki8850_pin_retry_cold import check_card_phase,check_wrong_frame,storage_hashes
+from tools.run_noki8850_pin_retry_cold import check_card_phase,check_wrong_frame,storage_hashes,check_puk_phase
 
 
 def failed_card():
@@ -26,6 +26,43 @@ def wrong_trace():
 
 
 class ColdPinTest(unittest.TestCase):
+    def test_exhaustion_requires_three_rejections_and_zero_persistent_pin_retries(self):
+        lines=[]
+        for start,status,allowance in ((8,'9804',2),(16,'9804',1),(24,'9840',0)):
+            for second,key in [(start+i,'Keypad 9') for i in range(4)]+[(start+4,'Menu')]:
+                lines += [f'8850_pin_wrong: key={key} state=1 t={second}.000000000',
+                          f'8850_pin_wrong: key={key} state=0 t={second}.150000000']
+            lines += ['sim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08',
+                      f'SIM status ins=20 sw={status} chv={allowance}/3 puk=10/10 enabled=1']
+        lines += ['8850_pin_wrong: complete=1 firmware_state_forcing=0']
+        trace='\n'.join(lines)
+        blocked=bytearray(failed_card())
+        blocked[3516]=0
+        check_puk_phase(trace,make_profile(True),bytes(blocked),'blocked')
+        for bad in (trace.replace('sw=9840','sw=9804'),
+                    trace+'\nLAPDm Location Updating Accept acknowledged',
+                    trace.replace('p2=01','p2=02')):
+            with self.assertRaises(ValueError):check_puk_phase(bad,make_profile(True),bytes(blocked),'blocked')
+        with self.assertRaises(ValueError):check_puk_phase(trace,make_profile(True),failed_card(),'blocked')
+
+    def test_new_pin_cold_authentication_rejects_donor_or_old_credential_state(self):
+        rotated=bytearray(failed_card())
+        rotated[3516]=3
+        rotated[3484:3492]=b'2468\xff\xff\xff\xff'
+        rotated[1604:1609]=bytes.fromhex('00f1100001')
+        rotated[1610]=0
+        trace=('8850_pin_physical: key=Menu\n'
+               'sim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08\n'
+               'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1\n'
+               'LAPDm Location Updating Accept acknowledged')
+        with patch('tools.run_noki8850_pin_retry_cold.check_correlated_inputs',return_value=[]),\
+             patch('tools.run_noki8850_pin_retry_cold.registration') as registered:
+            check_puk_phase(trace,bytes(rotated),bytes(rotated),'reauth')
+            registered.assert_called_once_with(trace,'nsm2',preserved=True)
+            with self.assertRaises(ValueError):check_puk_phase(trace,failed_card(),bytes(rotated),'reauth')
+            rotated[3484]=ord('1')
+            with self.assertRaises(ValueError):check_puk_phase(trace,bytes(rotated),bytes(rotated),'reauth')
+
     def test_missing_wrong_frame_and_wrong_pixels_fail(self):
         with tempfile.TemporaryDirectory() as temporary:
             path=Path(temporary)/'error.png'
