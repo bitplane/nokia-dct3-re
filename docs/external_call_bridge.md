@@ -96,6 +96,7 @@ it must not resend an `incoming_call` that MAME has already accepted.
 | Host to MAME | `outgoing_ussd_response` | identity, outcome and either DCS plus packed response data or an error/problem code |
 | MAME to host | `outgoing_ussd_state` | identity and `phase`: `accepted` or `ended` |
 | Host to MAME | `incoming_ussd` | identity, DCS, packed data and optional `operation`: `notify` (default) or `request` |
+| Host to MAME | `incoming_ussd_terminate` | epoch and request identity of an active unanswered request; network RELEASE COMPLETE, not a handset reply |
 | MAME to host | `incoming_ussd_response` | identity, DCS, packed handset reply and `empty` parameter flag, after ordinary RR release |
 | MAME to host | `incoming_ussd_state` | identity and `phase`: `queued`, `delivered`, `answered`, `cancelled` or `expired` |
 
@@ -252,6 +253,17 @@ The firmware owns the editor and physical input. A correlated typed ReturnResult
 is retained until RR release, then published once as `incoming_ussd_response`
 before state `answered`. A handset RELEASE COMPLETE without a result ends as
 `cancelled`; no reply is fabricated. Unknown operation strings are rejected.
+
+For an active unanswered host request, `incoming_ussd_terminate` with the current
+`epoch` and `request_id` asks the network application to end the dialogue.
+TS 24.090 section5.1.1 assigns this termination to network RELEASE COMPLETE.
+The command queues that Layer3 message; it does not clear radio/host state.
+Only the ordinary acknowledged SS/RR release publishes `cancelled`. A stale
+epoch, different request, duplicate, notification, queued-but-not-active request
+or already completed response is rejected without replacing pending downlink
+traffic. There is no automatic timeout or synthesized handset ReturnResult.
+The 6210 physical-dismissal/host-termination fixture is reproducible with
+`.venv/bin/python tools/run_noki6210_ussd_termination.py tmp/ussd-termination`.
 The backward-compatible standalone bridge CLI still sends notifications;
 the request acceptance runner uses `--request --expected-reply 2`.
 Authenticated NSB-7 acceptance is documented in `8290_bringup.md`. Arbitrary

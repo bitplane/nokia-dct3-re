@@ -169,6 +169,7 @@ public:
 	}
 	bool host_incoming_ussd_queued() const { return m_host_incoming_ussd_pending; }
 	void cancel_host_incoming_ussd();
+	bool terminate_host_incoming_ussd();
 	void cancel_host_incoming_call();
 	bool registered() const { return m_registered; }
 	u16 serving_arfcn() const { return m_serving_arfcn; }

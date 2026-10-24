@@ -99,6 +99,7 @@ struct nokia_gsm_call_adapter_device::host_state
 	{
 		u32 epoch = 0;
 		u32 request_id = 0;
+		bool terminate = false;
 		bool request = false;
 		u8 data_coding_scheme = 0x0f;
 		std::array<u8, gsm::ss::maximum_ussd_length> data{};
@@ -336,6 +337,20 @@ void nokia_gsm_call_adapter_device::device_start()
 					std::lock_guard<std::mutex> lock(m_host->mutex);
 					if (m_host->queued_events() < MAXIMUM_QUEUED_EVENTS)
 						m_host->ussd_responses.push_back(item);
+					else
+						++m_host->dropped_events;
+					return;
+				}
+				if (type == "incoming_ussd_terminate")
+				{
+					host_state::queued_incoming_ussd item;
+					item.epoch = message["epoch"].GetUint();
+					item.request_id = message["request_id"].GetUint();
+					item.terminate = true;
+					if (!item.request_id) return;
+					std::lock_guard<std::mutex> lock(m_host->mutex);
+					if (m_host->queued_events() < MAXIMUM_QUEUED_EVENTS)
+						m_host->incoming_ussd.push_back(item);
 					else
 						++m_host->dropped_events;
 					return;
@@ -628,6 +643,17 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 		publish_incoming_ussd_state("queued");
 	for (const auto &item : incoming_ussd)
 	{
+		if (item.terminate)
+		{
+			const bool accepted = item.epoch == m_transport_epoch.load() &&
+					item.request_id == m_incoming_ussd_request_id &&
+					m_radio_peer->terminate_host_incoming_ussd();
+			LOGMASKED(LOG_CALL_ADAPTER,
+					"gsm_call_adapter: incoming ussd termination id=%u result=%s t=%.6f\n",
+					item.request_id, accepted ? "accepted" : "rejected",
+					machine().time().as_double());
+			continue;
+		}
 		const bool accepted = item.epoch == m_transport_epoch.load() &&
 				m_incoming_ussd_request_id == 0 &&
 				m_radio_peer->queue_host_incoming_ussd(

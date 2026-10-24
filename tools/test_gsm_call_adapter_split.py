@@ -40,7 +40,9 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
         self.assertIn("outgoing_call_media_downlink", callback)
         self.assertNotIn("submit_outgoing_decision", callback)
         self.assertNotIn("submit_outgoing_termination", callback)
-        self.assertEqual(callback.count("m_host->queued_events() <"), 8)
+        self.assertIn('incoming_ussd_terminate', callback)
+        self.assertNotIn('terminate_host_incoming_ussd()', callback)
+        self.assertEqual(callback.count("m_host->queued_events() <"), 9)
         self.assertIn("unsigned queued_events() const", self.source)
 
     def test_reset_reannounces_epoch_to_already_connected_clients(self):

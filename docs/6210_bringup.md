@@ -1535,9 +1535,23 @@ The current model supplies no active network-USSD response timer: the adapter's
 deadline applies only while the radio request is queued, and
 `awaiting_network_ussd_response` handles a correlated FACILITY result or handset
 RELEASE COMPLETE without a timer. Thus silence cannot exercise a modeled
-network-originated termination. The next contract to recover is legitimate
-network termination of an unanswered request (and its host cancellation
-interface), not a fabricated empty handset reply or a guessed firmware timeout.
+network-originated termination. Explicit network termination is now exposed
+separately through the correlated host command `incoming_ussd_terminate`; no
+automatic timeout is inferred.
+
+`.venv/bin/python tools/run_noki6210_ussd_termination.py RUN_DIR` qualifies
+that separate application action on fresh own-PMM/PIN-enabled storage.
+Answer26/End30 dismisses the editor; after40s the host sends a stale-epoch
+termination, a wrong-request termination, the valid identity and a duplicate.
+Only the valid command is accepted. SS RELEASE COMPLETE (`0b2a`) goes through
+the existing downlink path, followed by RR CHANNEL RELEASE; only after ordinary
+release does host request1 become cancelled, without an incoming-USSD response.
+Menu at56s renders Messages. Capture: `tmp/npe3-ussd-termination-validity-clean`.
+The fixture checks ordered protocol/host evidence and requires the captured
+frame; it does not yet enforce an exact frame hash or qualify arbitrary
+termination/save-state timing. Console checks reject MAME driver-validity and
+script/execution failures as well as the protocol checker rejecting missing
+release or fabricated replies.
 
 ### Continued laboratory USSD
 

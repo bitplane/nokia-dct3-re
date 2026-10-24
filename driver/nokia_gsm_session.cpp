@@ -1904,6 +1904,25 @@ bool nokia_gsm_session_device::submit_outgoing_sms_decision(
 	return true;
 }
 
+bool nokia_gsm_session_device::terminate_network_ussd()
+{
+	if (m_state != u8(state::awaiting_network_ussd_response) ||
+			!m_network->host_incoming_ussd_pending() ||
+			!m_network->host_incoming_ussd_is_request() ||
+			pending_downlink_kind() != downlink_kind::none)
+		return false;
+	// TS 24.090 5.1.1: application termination clears the SS transaction;
+	// it is not a handset ReturnResult and does not complete RR locally.
+	const auto release = gsm::ss::network_release_complete(0x0b);
+	m_state = u8(state::awaiting_network_ussd_release_acknowledgement);
+	queue_downlink(downlink_kind::supplementary_release_complete,
+			release.data.data(), release.length);
+	LOGMASKED(LOG_GSM_SESSION,
+			"gsm_ss: network_terminated transaction=0b t=%.6f\n",
+			machine().time().as_double());
+	return true;
+}
+
 bool nokia_gsm_session_device::submit_ussd_response(
 		u32 request_id, host_ussd_outcome outcome, u8 data_coding_scheme,
 		const u8 *data, unsigned length, u8 error_code)

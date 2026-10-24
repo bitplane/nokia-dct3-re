@@ -114,6 +114,11 @@ void nokia_radio_peer_device::cancel_host_incoming_ussd()
 	m_gsm_session->cancel_queued_incoming_service();
 }
 
+bool nokia_radio_peer_device::terminate_host_incoming_ussd()
+{
+	return m_host_incoming_ussd_active && m_gsm_session->terminate_network_ussd();
+}
+
 nokia_radio_peer_device::nokia_radio_peer_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_RADIO_PEER, tag, owner, clock),
