@@ -14,7 +14,8 @@ local runner = coroutine.create(function()
             index, byte, machine.time:as_double()))
         port:write(byte | strobe, 0x1ff)
         strobe = strobe ~ 0x100
-        assert(emu.wait(0.005))
+        -- Above a 9600-baud character, below the existing MBUSTIM idle period.
+        assert(emu.wait(0.0011))
     end
     machine:logerror('mbus_input_probe: complete\n')
 end)

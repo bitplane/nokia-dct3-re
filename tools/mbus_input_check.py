@@ -21,7 +21,7 @@ def verify(text, *, version_query=False):
     for index, (byte, row) in enumerate(zip(expected, rows)):
         number, data, time = row.groups()
         if (int(number) != index + 1 or int(data, 16) != byte or
-                Decimal(time) != start + Decimal('0.005') * index):
+                Decimal(time) != start + Decimal('0.0011') * index):
             raise ValueError('byte input or sub-frame cadence differs')
         end = rows[index + 1].start() if index + 1 < len(rows) else text.index('mbus_input_probe: complete')
         interval = text[row.end():end]
@@ -29,9 +29,9 @@ def verify(text, *, version_query=False):
         reads = re.findall(r'mbus_device: event=rx_read data=([0-9a-f]{2})\b', interval)
         if accepted != [(f'{byte:02x}', '1')] or reads != [f'{byte:02x}']:
             raise ValueError('byte was dropped, coalesced, rejected or not read before the next input')
-    transmitted = re.findall(r'mbus: event=TX data=([0-9a-f]{2})\b', text[rows[0].start():])
-    return {'bytes_delivered_and_read': len(expected), 'gap_ms': 5,
-            'wire_transmit_bytes': ''.join(transmitted),
+    transmitted = re.findall(r'mbus_device: event=tx_complete data=([0-9a-f]{2})\b', text[rows[0].start():])
+    return {'bytes_delivered_and_read': len(expected), 'gap_ms': 1.1,
+            'logged_tx_completions': ''.join(transmitted),
             'scope': 'Controller ingress and firmware byte reads only; no service reply or provisioning acceptance.'}
 
 

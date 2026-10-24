@@ -27,6 +27,12 @@
   },
   "gates": [
     {
+      "name": "verify-6210-mbus-service", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_mbus_service.py",
+                 "arguments": ["$(RUN_DIR)", "--mame-dir", "$(MAME_DIR)"]}]
+    },
+    {
       "name": "verify-6210-mbus-byte-events", "prerequisites": ["build"], "variables": {},
       "steps": [
         {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
