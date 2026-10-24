@@ -2986,6 +2986,12 @@
       "evidence": ["docs/6190_bringup.md", "docs/model_coverage.md", "tools/nsb3_phonebook_edit.lua", "tools/nsb3_phonebook_options.lua", "tools/nsb3_phonebook_edit_check.py", "tools/test_nsb3_phonebook_edit_check.py", "tools/nsb3_phonebook_reload.lua"]
     },
     {
+      "id": "nsb3_names_options_sim_capacity", "owner": "nsb3_firmware", "status": "satisfied",
+      "predicate": "Own NSB-3 physical Names/Options capability and memory status are qualified without importing a sibling Phone-storage requirement",
+      "current": "Two independent cold processes from the actual A/12345 SIM source physically reach Names/Options after three Down presses, then alternate Scrolling view/Memory status across three further Down presses. Exact frames6/8 and7/9 match, proving observed two-item wrap rather than a clamped menu. Selecting status renders1used/49free matching the laboratory SIM's50ADN records/one contact. Whole card remains byte-identical, own executable and source hashes/initial snapshot pass, and SIM traffic reads ADN without credential/file/Toolkit mutation. Nokia-authored6190 manual Issue5 describes SIM-dependent contact capacity and identifies NSB-3NX; this is product corroboration, not exact-v6.13/fitted-board proof. The own profile exposes no Phone-memory choice in this traversal, so a6150-style EEPROM contact store is not an evidenced missing feature. This bounded observation is not whole-ROM absence of local-storage functions. No menu feature flag, EEPROM contact data or firmware state is forced; superseded route probes are removed.",
+      "evidence": ["docs/6190_bringup.md", "docs/model_coverage.md", "tools/nsb3_names_options_input.lua", "tools/nsb3_names_options_check.py", "tools/test_nsb3_names_options_check.py"]
+    },
+    {
       "id": "nam1_display_frontier", "owner": "nam1_firmware", "status": "satisfied",
       "predicate": "Nokia 3610 v5.11 organically reaches a deterministic firmware-rendered display boundary through product-owned GENSIO and geometry contracts",
       "current": "NAM-1 independently writes GENSIO control 0x22 at 0x2d, transfers CCONT bytes at 0x2c and polls 0x6d. Byte-write receive-ready releases that loop. Firmware then writes nine 96-byte display banks; a 96x65 visible area with reversed segment order renders the complete CONTACT SERVICE frame. Separate gates prove DSP bootstrap/service control, request-derived discovery, accepted application sequences 0x42/0x43, channel-0x5f use and a complete physical M2BUS terminal exchange. Missing product state remains the next boundary.",

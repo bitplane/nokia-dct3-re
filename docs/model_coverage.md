@@ -22,8 +22,11 @@ by `tools/nsb3_menu_check.py` and `tools/nsb3_phonebook_check.py`.
 Physical Options/Erase additionally emits one erased ADN record; independent
 cold Search displays No phone numbers without card mutation. Physical Edit
 and explicit Save also change both name and number to D/12346; independent
-cold Details retrieves both fields without card writes. Handset-memory
-contacts remain unqualified.
+cold Details retrieves both fields without card writes. Own Names/Options
+exposes Scrolling view/Memory status and reports the laboratory SIM's 1 used/49 free,
+not a separate Phone-memory choice; Nokia's product manual corroborates
+SIM-dependent contact capacity. A 6150-style local Phone store is not an
+independently supported requirement for this profile.
 Physical offline SMS composition/save, cold Outbox read, confirmed deletion
 and a second cold empty-Outbox check also pass through the laboratory SIM.
 Physical SIM-security gates cover PIN-request Off/On, PIN1/PIN2 changes and

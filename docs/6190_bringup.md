@@ -357,7 +357,7 @@ ADN record one, no UPDATE RECORD, and leaves the complete SIM file unchanged.
 The checker decodes the complete observed PPS/APDU TX stream with the shared
 SIM parser, requires exact physical contact ordering and the matched-code
 branch, checks Saved/name/number pixel oracles, and compares whole-card storage.
-This qualifies laboratory SIM contact persistence, not handset-memory contacts,
+This qualifies laboratory SIM contact persistence, not a separate Phone store,
 all SIM security services, ordinary idle content or radio completion.
 
 ### Physical contact deletion and cold empty search
@@ -381,7 +381,7 @@ then `nsb3_phonebook_erase_check.py prepare-empty ERASE COLD_EMPTY` and run
 source hashes/initial card snapshots, exact physical contacts, read/write
 APDU/status contrasts, complete cards and erase/empty-search pixel oracles.
 No contact bytes, firmware context or cached result are supplied by Lua.
-Editing is qualified below; handset-memory contacts remain distinct and unqualified.
+Editing is qualified below; the own Names/Options capability boundary follows.
 
 ### Physical contact edit and cold Details
 
@@ -404,6 +404,33 @@ only the exact edited card. Run `nsb3_phonebook_reload.lua` for 50 seconds,
 then `check SOURCE EDIT COLD` requires own executable, linked source storage,
 exact physical contacts/APDUs/statuses, complete cards and Saved/name/number
 pixel oracles. No contact data, firmware state or cached result is injected.
+
+### Names/Options capability and SIM capacity
+
+The own menu does not match the 6150 Phone-memory workflow. In this
+qualified profile, Names reaches Options after three Down presses; a fourth
+selects Speed dialing instead. Options contains Scrolling view and Memory
+status. Three physical Down presses reproduce the alternating two items,
+with exact matching frames on each revisit. Memory status reports 1 used
+and 49 free, matching the laboratory card's 50 ADN records and single contact.
+Two independent cold processes reproduce these frames, read ADN and retain
+every SIM byte, without credential or file mutation.
+
+This is a bounded own-menu observation, not whole-ROM absence of every local
+storage routine. It removes the unsupported assumption that a separate
+handset Phone-book store must be implemented here. Nokia's
+[6190 owner's manual, Issue 5](https://www.instructionsmanuals.com/sites/default/files/2019-05/Nokia-6190-en.pdf)
+describes phonebook capacity and name/number limits as SIM-dependent
+(printed pages 61 and 103). It identifies NSB-3NX, so it corroborates the
+product boundary rather than proving the exact v6.13 binary or fitted board.
+The manual's maximum capacity is not used to override this card's real size.
+Do not import the 6150 EEPROM contact layout or force a memory-choice menu.
+
+Prepare with `nsb3_names_options_check.py prepare SOURCE RUN` from the
+qualified SIM contact, run `nsb3_names_options_input.lua` for 65 seconds,
+then `check SOURCE RUN`. The checker requires exact physical traversal,
+own executable/cold storage, read-only SIM traffic, complete unchanged card
+and alternating Options/capacity pixel oracles.
 
 ## Native radio-boundary inventory
 
