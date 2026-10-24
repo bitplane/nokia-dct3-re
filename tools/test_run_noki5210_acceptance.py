@@ -3,6 +3,7 @@ from pathlib import Path
 import tempfile
 import json
 import hashlib
+import io
 import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
@@ -12,6 +13,29 @@ from tools.make_sim_card_profile import make_profile
 
 
 class RunnerTests(unittest.TestCase):
+    def test_phone_memory_cold_read_cannot_modify_source(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            run = Path(temporary) / 'phone-memory'
+            def execute(command, **kwargs):
+                if '--scenario' in command and command[command.index('--scenario') + 1] == 'pin-phone-memory-read':
+                    card = run / 'nvram/noki5210_3/sim_card'
+                    card.write_bytes(b'changed source')
+            with patch('sys.argv', ['runner', str(run), '--scenario', 'pin-phone-memory']), \
+                    patch.object(runner.subprocess, 'run', side_effect=execute), \
+                    patch('sys.stderr', io.StringIO()) as errors, self.assertRaises(SystemExit) as caught:
+                runner.main()
+            self.assertEqual(caught.exception.code, 1)
+            self.assertIn('changed its source NVRAM', errors.getvalue())
+
+    def test_phone_memory_read_requires_preserved_storage(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            run = Path(temporary) / 'missing-source'
+            with patch('sys.argv', ['runner', str(run), '--scenario', 'pin-phone-memory-read']), \
+                    patch('sys.stderr', io.StringIO()), self.assertRaises(SystemExit) as caught:
+                runner.main()
+            self.assertEqual(caught.exception.code, 2)
+            self.assertFalse(run.exists())
+
     def test_pin_ussd_selects_authenticated_physical_checker(self):
         with tempfile.TemporaryDirectory() as temporary:
             run = Path(temporary) / 'ussd'
@@ -133,6 +157,8 @@ class RunnerTests(unittest.TestCase):
             'pin-host-incoming-media-state': (65, '--call-state', ('32',)),
             'pin-sms-wait-state': (155, '--silent-sms-state', ()),
             'pin-phonebook': (55, '--phonebook-save', ()),
+            'pin-phone-memory': (70, '--save', ()),
+            'pin-phone-memory-read': (55, '--read', ()),
             'pin-ussd': (60, None, ()),
             'pin-phonebook-read': (45, '--phonebook-read', ()),
         }
@@ -144,8 +170,8 @@ class RunnerTests(unittest.TestCase):
                     run = Path(temporary) / name
                     argv = ['runner', str(run), '--scenario', name]
                     expected_card = make_profile(pin_enabled=True)
-                    if name == 'pin-phonebook-read':
-                        preserved = Path(temporary) / 'preserved'
+                    if name in ('pin-phonebook-read', 'pin-phone-memory-read'):
+                        preserved = Path(temporary) / ('preserved-' + name)
                         card = preserved / 'noki5210_3/sim_card'
                         card.parent.mkdir(parents=True)
                         expected_card = b'Ada' + expected_card[3:]
@@ -169,7 +195,7 @@ class RunnerTests(unittest.TestCase):
                     call = call or name in ('pin-host-incoming-call-state', 'pin-host-incoming-media-state')
                     incoming_call = name in ('pin-host-incoming-call', 'pin-host-incoming-call-state',
                                              'pin-host-incoming-media-state')
-                    self.assertEqual(execute.call_count, 3 if (host and not call) or name == 'pin-phonebook' else 2)
+                    self.assertEqual(execute.call_count, 3 if (host and not call) or name in ('pin-phonebook', 'pin-phone-memory') else 2)
                     if name == 'pin-host-outgoing-media-state':
                         media_verify.assert_called_once_with('host trace', physical_end=True)
                         host_verify.assert_not_called()
@@ -225,10 +251,12 @@ class RunnerTests(unittest.TestCase):
                     self.assertTrue(Path(script).is_file())
                     checker = execute.call_args_list[1].args[0]
                     self.assertEqual(checker[2:], [str(run)] + ([flag] if flag else []))
-                    if name == 'pin-phonebook':
+                    if name in ('pin-phonebook', 'pin-phone-memory'):
                         cold = execute.call_args_list[2].args[0]
                         self.assertEqual(cold[2:7], [str(run / 'cold'), '--scenario',
-                                         'pin-phonebook-read', '--preserved-nvram', str(run / 'nvram')])
+                                         name + '-read', '--preserved-nvram', str(run / 'nvram')])
+                    if name.startswith('pin-phone-memory'):
+                        self.assertEqual(Path(checker[1]).name, 'noki5210_phone_memory_check.py')
                     if host and not call:
                         host_check = execute.call_args_list[2].args[0]
                         self.assertEqual(Path(host_check[1]).name,

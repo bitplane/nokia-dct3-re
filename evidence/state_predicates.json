@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm5_phone_memory_contact_cold_persistence",
+      "owner": "nsm5_nonvolatile_storage",
+      "status": "satisfied",
+      "predicate": "Authenticated own-product 5210 saves Ada/123 to Phone storage and reads it in an independent cold process without SIM phonebook writes",
+      "current": "The physical Names/Settings/Memory in use route selects Phone, then Search proves Selected memory empty before Add name. Exact reviewed name/number/Saved frames precede End/Menu recovery. The child copies only persisted own NVRAM, authenticates PIN1 and registers again, then Search/Details renders exact Ada and123 with the phone-memory icon without reselecting storage. Both complete cards equal the expected PIN-enabled registered laboratory profile; UPDATE RECORD and EF_ADN updates reject. Expected physical-key release sequences, own coherent radio predicates, full flash NVRAM, existing idle pixels and stable Messages title are required. Hashes of every predecessor NVRAM file remain unchanged after cold read. This qualifies phone-local Add/Save/Search/Details, not edit/erase/capacity, arbitrary NV records, fitted flash timing or native DSP speech.",
+      "evidence": ["docs/5210_bringup.md", "tools/noki5210_pin_phone_memory.lua", "tools/noki5210_pin_phone_memory_read.lua", "tools/noki5210_phone_memory_check.py", "tools/test_noki5210_phone_memory_check.py", "tools/run_noki5210_acceptance.py", "tools/test_run_noki5210_acceptance.py", "gates.json"]
+    },
+    {
       "id": "nsm2_host_ussd_empty_editor_dismissal",
       "owner": "nsm2_host_supplementary_services",
       "status": "satisfied",

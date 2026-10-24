@@ -83,6 +83,19 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   `EF_ADN` update, then cold-boots with the same card image and renders the
   stored contact through Search. This proves a non-SMS application write and
   removable-card persistence without importing the 3210 menu route.
+- `make verify-5210-pin-phone-memory` separately selects Phone through
+  Names/Settings/Memory in use, checks the reviewed empty-memory result,
+  then physically saves `Ada`/`123`. An independent cold process inherits
+  the own flash/storage files, authenticates and registers, and renders
+  both the name list and number Details without reselecting Phone.
+  Exact selector/editor/Saved/contact/idle pixels and the stable Messages
+  title are required. Both complete SIMs remain the registered PIN-enabled
+  laboratory profile, with no UPDATE RECORD or `EF_ADN` write. Every source
+  NVRAM file's hash must survive the cold child unchanged; the acceptance
+  inventory is `phone_memory_storage.json`. This exercises phone-local
+  Add/Save/Search/Details, not edit/erase/capacity or arbitrary flash records.
+  The route agrees with [Nokia's 5210 user guide](https://www.manualslib.com/manual/505197/Nokia-5210.html?page=22#manual);
+  capacities stated by that guide are not inferred as tested capacity here.
 - `make verify-5210-radio-supplementary` enters `*123#` and `*#21#` through
   the physical keypad and submits them with the product's dedicated Send key.
   The resulting processUnstructuredSS-Request and InterrogateSS transactions
