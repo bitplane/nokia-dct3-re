@@ -2090,6 +2090,16 @@ lists analogue audio checks, not PCM timing. The independently inspected
 Other products' 1 MHz/8 kHz descriptions are comparisons only, not NPE-3
 configuration authority.
 
+The public [NPE-3 service-bulletin archive index](https://files.elektroda.pl/44690,nokia%2B6210-6220.html)
+lists 29 NPE-3 PDFs and an index document, mixed with unrelated RH-20
+material. Its indexed text has no `PCM` or `COBBA` match, but this is only
+a partial text preview, not inspection of the listed PDFs. The linked
+[attachment post](https://www.elektroda.pl/rtvforum/topic154278.html)
+requires login to download the archive. No archive or member hashes have
+been acquired; this remains an unqualified source lead, not evidence that
+the bulletins lack PCM timing. Do not use it to justify a sibling clock or
+claim the primary-document search is exhaustive.
+
 Reproducible source identities (SHA-256):
 
 - `roms/research/npe3/npe3-schematics-v1.pdf`:
