@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_parameter0_context_pair_selection",
+      "owner": "npe3_dsp_control",
+      "status": "satisfied",
+      "predicate": "Own NPE-3 parameter-builder states0/1 select a mutually exclusive0020/0100 pair from the observed context without assigning physical clock or route semantics",
+      "current": "The SHA1-pinned checker verifies state dispatch at42099a, context block16ed50, comparison branches, keep masksfeff/fedf and stores4209de/420a48. State0 selects0020 for context2; state1 selects0020 for context1; other context bytes select0100 while preserving unrelated bits. The reference decoder rejects undecoded states. Extended verify-6210-dsp-control-observation passes tmp/npe3-parameter-context-gate-final with9 own command8 observations, context0, state0/0102 and state1/050a/070b, source172d80/cache172d68 and positive physical compiler/writer ordering. It validates stable disjoint11-halfword RAM blocks and all three phases; alternative contexts have static evidence only. No PCM rate, microphone selection, gain, device behavior or provisioning is inferred or changed.",
+      "evidence": ["docs/6210_bringup.md", "docs/external_call_bridge.md", "tools/noki6210_dsp_control_contract.py", "tools/noki6210_dsp_mode_observe.lua", "tools/test_noki6210_dsp_control_contract.py", "tools/run_noki6210_acceptance.py", "gates.json"]
+    },
+    {
       "id": "npe3_normal_call_parameter_block_publication",
       "owner": "npe3_dsp_control",
       "status": "satisfied",

@@ -476,6 +476,28 @@ plus the
 The falling-edge family contract is independently documented in the
 [Nokia 12 integrator manual](https://fcc.report/FCC-ID/LJPRX-9/393500.pdf).
 
+### COBBA part identity does not select PCM timing
+
+Two acquired, visually reviewed Nokia manuals identify the same N250
+part4370643, COBBA_GJP V4.1 V257BG64T/8, but document different PCM clocks:
+
+| Source | Part identification | PCM specification |
+| --- | --- | --- |
+| NSM-3 System Module, issue1 12/1999 | Printed/PDF53 | Printed/PDF24:1MHz data,8kHz frame,125 clocks/frame |
+| NSB-7 System Module, issue1 06/2000 | Printed65/PDF79 | Printed27/PDF41:512kHz data,8kHz frame,64 clocks/frame |
+
+The retained PDF hashes are respectively
+`dbd9e70549b6de726be9667a2451bda74b7317f84956b50e5c91fce3124939c0`
+and`eee14565ada962e5458cb8227622bdd6f64ffe89a5a15ff38fbccd95fe428e6d`.
+See `roms/research/nsm3/nsm3-system-module.pdf` and
+`roms/research/nsb7/nsb7-service-manual.pdf`; acquisition references remain
+in the product docs and ROM manifest. This is conflicting documentary
+evidence, not a measured proof of chip programmability or either physical
+rate. Operating configuration, undisclosed revision differences and source
+errata remain possible. Do not collapse product PCM profiles by part name.
+NPE-3's schematic identifies COBBA_GJP_V4.1 but does not settle its own rate;
+its mapped MCU parameter bits also do not independently supply that meaning.
+
 NSE-3 is now tracked as a future product profile rather than only as
 cross-family PCM evidence. Its Nokia system-module parts list names an Intel
 TE28F800 512K x 16 flash and ROM3 MAD2 variant F711604; the memory description

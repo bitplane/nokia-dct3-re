@@ -2,10 +2,22 @@ from pathlib import Path
 import io
 import unittest
 from unittest.mock import patch
-from tools.noki6210_dsp_control_contract import recover, verify_call_field, parse_mode_pairs, verify_mode_observation
+from tools.noki6210_dsp_control_contract import recover, verify_call_field, parse_mode_pairs, verify_mode_observation, parameter0_pair
 
 
 class ControlContractTest(unittest.TestCase):
+    def test_parameter0_pair_preserves_unrelated_bits(self):
+        for state in (0, 1):
+            for context in range(5):
+                for value in (0, 0xffff, 0x0102, 0x050a, 0x070b, 0x120):
+                    result = parameter0_pair(value, context, state)
+                    selected = (state == 0 and context == 2) or (state == 1 and context == 1)
+                    self.assertEqual(result & 0x120, 0x20 if selected else 0x100)
+                    self.assertEqual(result & ~0x120, value & ~0x120)
+        for values in ((0, 0, 2), (-1, 0, 0), (0x10000, 0, 0), (0, 256, 0)):
+            with self.assertRaises(ValueError):
+                parameter0_pair(*values)
+
     def test_observer_cli_is_restricted_before_launch(self):
         from tools.run_noki6210_acceptance import main
         for options in ([], ['--scenario', 'outgoing-call'],
@@ -18,19 +30,24 @@ class ControlContractTest(unittest.TestCase):
             self.assertEqual(error.exception.code, 2)
 
     def test_mode_probe_needs_positive_compiler_and_physical_controls(self):
-        log = ('6210_control_compiler: selector=08 value=0102 publish=1 lr=00420c0f\n'
+        log = ('6210_control_compiler: selector=08 value=0102 publish=1 lr=00420c0f context=00 state=00 source=00172d80 cache=00172d68\n'
                '6210_call_physical: action=send\n'
-               '6210_control_compiler: selector=08 value=070b publish=1 lr=00420c0f\n'
+               '6210_control_compiler: selector=08 value=070b publish=1 lr=00420c0f context=00 state=01 source=00172d80 cache=00172d68\n'
                'dsp_control_write: data=870b pc=0042727c r4=0000870b r7=00000008\n'
                '6210_call_physical: action=end\n'
-               '6210_control_compiler: selector=08 value=050a publish=1 lr=00420c0f\n'
+               '6210_control_compiler: selector=08 value=050a publish=1 lr=00420c0f context=00 state=01 source=00172d80 cache=00172d68\n'
                'dsp_control_write: data=850a pc=0042727c r4=0000850a r7=00000008\n')
         result = verify_mode_observation(log)
         self.assertEqual(result['normal_publish_call'], 0x420c0a)
         self.assertFalse(result['pcm_validated'])
+        self.assertEqual(result['parameter_context']['pair'], 0x100)
+        self.assertFalse(result['parameter_context']['clock_semantics_validated'])
         for bad in (log.replace('value=070b', 'value=060b'),
                     log.replace('00420c0f', '00303c81'),
                     log.replace('6210_control_compiler:', 'missing:'),
+                    log.replace('context=00', 'context=01'),
+                    log.replace('state=01', 'state=00'),
+                    log.replace('cache=00172d68', 'cache=00172d80'),
                     log + '6210_paired_mode: value=01\n',
                     log + '6210_service_command: class=40 command=80 argument=01\n'):
             with self.subTest(bad=bad[-70:]), self.assertRaises(ValueError):
@@ -88,6 +105,9 @@ class ControlContractTest(unittest.TestCase):
         self.assertEqual(result['normal_parameter_publish_call'], 0x420c0a)
         self.assertEqual(result['normal_parameter_selectors'],
                          [8, 9, 0x1b, 0x25, 0x20, 0x21, 0x22, 0x23, 0x24, 0x28, 0x2d])
+        self.assertEqual(result['parameter0_context'], 0x16ed50)
+        self.assertEqual(result['parameter0_pair_bits'], [0x20, 0x100])
+        self.assertFalse(result['parameter0_pair_semantics_validated'])
 
 
 if __name__ == '__main__':

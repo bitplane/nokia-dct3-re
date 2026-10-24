@@ -4,7 +4,7 @@ local directory = assert(source:match('^(.*[/])'))
 dofile(directory .. 'noki6210_outgoing_call_input.lua')
 local cpu = manager.machine.devices[':maincpu']
 cpu.debug:bpset(0x426eb4, nil,
-    'logerror "6210_control_compiler: selector=%02x value=%04x publish=%x lr=%08x\\n",r0,r1,r2,r14;g')
+    'logerror "6210_control_compiler: selector=%02x value=%04x publish=%x lr=%08x context=%02x state=%02x source=%08x cache=%08x\\n",r0,r1,r2,r14,b@16ed5c,b@16ed5a,r5,r7;g')
 cpu.debug:bpset(0x303c30, nil,
     'logerror "6210_paired_mode: value=%02x\\n",r0;g')
 cpu.debug:bpset(0x305258, nil,

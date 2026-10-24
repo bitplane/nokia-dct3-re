@@ -768,8 +768,13 @@ owns that map and the independently observed shared COBBA_GJP_V4.1-part
 hypothesis. A positive-controlled physical call uses normal parameter-block
 publish call420c0a, not that class40/command80 paired-mode route. The latter's
 command80 constructor echoes a reply; it is not an initiating producer.
-Neither table nor part identity establishes the selected PCM operating mode
-or COBBA register semantics. Investigate the normal parameter block rather
+The normal parameter builder's states0/1 select the mutually exclusive
+bits0020/0100 from context byte16ed5c; a coherent physical call observes
+context0,0102/050a/070b and stable source/cache blocks. This intermediate
+selection does not decode either bit as a clock or microphone route.
+The same COBBA part is documented with differing NSM-3/NSB-7 clocks, so
+neither table nor part identity establishes the selected PCM operating mode
+or COBBA register semantics. Investigate context selection and DSP-side interpretation rather
 than treating service-mode selection as an ordinary-call prerequisite.
 
 Primary board evidence is retained in the ignored ROM research collection:

@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "cobba4370643_identifies_unique_documented_pcm_profile",
+      "status": "disproven",
+      "hypothesis": "Identifying COBBA_GJP V4.1 part4370643 is sufficient to select one documented PCM profile for another product",
+      "conclusion": "Visually reviewed acquired Nokia NSM-3 System Module printed/PDF53 and NSB-7 printed65/PDF79 both identify N2504370643/Cobba_gjp v4.1 v257bg64t/8. Their own PCM descriptions disagree: NSM-3 printed/PDF24 specifies1MHz/8kHz and125 clocks/frame; NSB-7 printed27/PDF41 specifies512kHz/8kHz and64 clocks/frame. This falsifies part identity as a unique documentary selector, not a measured claim that the silicon supports either or both physical modes. Configuration, undisclosed revision and source errata remain unresolved. NPE-3's schematicV4.1 match therefore does not justify assigning the sibling clock, and its intermediate bit0100 has no decoded physical timing meaning. No product bus profile changed.",
+      "evidence": ["docs/hardware_atlas.md", "docs/6210_bringup.md", "docs/8210_bringup.md", "docs/8290_bringup.md", "roms/README.md"]
+    },
+    {
       "id": "npe3_normal_call_uses_paired_service_mode_table",
       "status": "disproven",
       "hypothesis": "The coherent NPE-3 physical outgoing-call fixture selects its call controls through paired table262444 and class40 command80",

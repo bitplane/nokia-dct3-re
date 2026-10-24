@@ -1101,18 +1101,48 @@ parameter comparison and11-selector table at`0x263884` are source-pinned:
 qualify this observation. This is one coherent call, not universal absence
 of a service route or a claim that every paired mode is unreachable.
 
+#### Normal-call parameter context
+
+The first parameter's bit0100 is paired with bit0020 in two source-pinned
+branches, using context block`0x16ed50`, context byte`+0c` and state byte`+0a`:
+
+| Builder state | Context selecting0020 | Other contexts |
+| --- | --- | --- |
+| 0 | 2 | Select0100 |
+| 1 | 1 | Select0100 |
+
+The selected branch ORs0020 and keeps`feff`; the alternative keeps`fedf`
+then ORs0100. Other bits are preserved. Stores are`0x420a48` for state0
+and`0x4209de` for state1. These are intermediate firmware parameters, not
+decoded COBBA registers. `parameter0_pair()` desk-checks only these two
+branches; it rejects other states rather than inventing their behavior.
+
+The extended coherent call gate`tmp/npe3-parameter-context-gate-final`
+records9 command8 publications with context00 throughout. State00 accompanies
+0102; state01 accompanies050a/070b. All use source`0x172d80` and
+cache`0x172d68`, non-overlapping11-halfword parameter blocks. The checker
+requires all three phases, stable distinct RAM blocks and agreement with the
+decoded pair rule, independently of the physical call/writer checks.
+Other contexts have not been exercised physically; their table branches are
+static evidence only. In particular, bit0100 is not assigned a clock rate,
+microphone route or gain from this observation.
+
 The board evidence provides a narrower shared-part hypothesis: own NPE-3
 schematic sheet3 names N240`COBBA_GJP_V4.1`, while the independent NSB-7
 manual printed65/PDF79 identifies N250 as part4370643,
 `Cobba_gjp v4.1 v257bg64t/8`. Its printed27/PDF41 supplies512kHz/8kHz
-PCM timing. Same revision and matching clock/data pins support investigating
-a common silicon contract, not silently selecting that operating mode on
-NPE-3. Its observed870b/850a words retain bit0100 absent from NSB-7's
-860b/840a; the meaning of that field and the nine paired modes is unresolved.
+PCM timing. But the own NSM-3 manual lists the same part4370643/v4.1 while
+documenting1MHz/8kHz, not512kHz/8kHz. These conflicting documented profiles
+make part identity alone insufficient; see the
+[shared-part timing boundary](hardware_atlas.md#cobba-part-identity-does-not-select-pcm-timing).
+The difference may involve operating configuration, revision detail or a
+documentation error; no one explanation is established. NPE-3's observed
+870b/850a words retain bit0100 absent from NSB-7's860b/840a; its intermediate
+firmware selection rule is mapped above, but DSP-side meaning remains open.
 No shared PCM profile, codec gain or MCU-to-COBBA register translation is
 enabled from this comparison. The normal-call evidence shifts the immediate
-target to the parameter-block construction feeding`0x420c0a`, including
-bit0100's ownership and operating-mode meaning. Do not pursue command80
+target to context selection and DSP-side interpretation of the parameter
+block feeding`0x420c0a`, plus independent clock evidence. Do not pursue command80
 as a mandatory ordinary-call prerequisite without new evidence connecting it.
 
 ```sh

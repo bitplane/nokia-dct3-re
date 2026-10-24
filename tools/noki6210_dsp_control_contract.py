@@ -16,6 +16,14 @@ def parse_mode_pairs(data):
             for index in range(9)]
 
 
+def parameter0_pair(value, context, state):
+    """Two recovered branches only; field meaning is not a hardware claim."""
+    if not 0 <= value <= 0xffff or not 0 <= context <= 0xff or state not in (0, 1):
+        raise ValueError('requires a halfword, context byte and decoded state0/1')
+    selected = context == (1 if state == 1 else 2)
+    return ((value | 0x20) & 0xfeff) if selected else ((value & 0xfedf) | 0x100)
+
+
 def recover(image):
     if hashlib.sha1(image).hexdigest() != '3d9ea319503e78ec69b60d72cda23e461e118ea9':
         raise ValueError('requires acquired NPE-3 v5.56 PPM C')
@@ -88,6 +96,32 @@ def recover(image):
         0x420c3e: ('bl', '#0x426eb4'),
         0x420c54: ('cmp', 'r6, #0xb'),
         0x420c56: ('blt', '#0x420c28'),
+        0x4209b6: ('ldr', 'r1, [pc, #0x390]'),
+        0x42099a: ('ldrb', 'r3, [r4, #0xa]'),
+        0x42099c: ('adds', 'r1, r3, #0'),
+        0x42099e: ('cmp', 'r1, #0'),
+        0x4209a0: ('beq', '#0x420a10'),
+        0x4209a2: ('subs', 'r1, #1'),
+        0x4209a4: ('cmp', 'r1, #0'),
+        0x4209a6: ('beq', '#0x4209b6'),
+        0x4209ba: ('ldrb', 'r1, [r1, #0xc]'),
+        0x4209bc: ('cmp', 'r1, #1'),
+        0x4209be: ('bne', '#0x4209ce'),
+        0x4209c0: ('movs', 'r1, #0x20'),
+        0x4209c6: ('ldr', 'r2, [pc, #0x2ec]'),
+        0x4209ce: ('ldr', 'r2, [pc, #0x2e8]'),
+        0x4209d4: ('movs', 'r1, #0xff'),
+        0x4209d6: ('adds', 'r1, #1'),
+        0x4209de: ('strh', 'r1, [r5]'),
+        0x420a10: ('ldrb', 'r1, [r4, #0xc]'),
+        0x420a12: ('cmp', 'r1, #2'),
+        0x420a14: ('bne', '#0x420a38'),
+        0x420a16: ('movs', 'r2, #0x20'),
+        0x420a1c: ('ldr', 'r1, [pc, #0x294]'),
+        0x420a38: ('ldr', 'r2, [pc, #0x27c]'),
+        0x420a3e: ('movs', 'r1, #0xff'),
+        0x420a40: ('adds', 'r1, #1'),
+        0x420a48: ('strh', 'r1, [r5]'),
         0x426efa: ('cmp', 'r0, #0x36'),
         0x426efe: ('adr', 'r2, #8'),
         0x4271d4: ('lsls', 'r2, r4, #9'),
@@ -121,6 +155,8 @@ def recover(image):
         raise ValueError('paired mode-table pointer differs')
     if u32(0x420f70) != 0x263884 or read(0x263884, 11) != bytes.fromhex('08091b252021222324282d'):
         raise ValueError('normal parameter-block selector table differs')
+    if (u32(0x420d48), u32(0x420cb4), u32(0x420cb8)) != (0x16ed50, 0xfeff, 0xfedf):
+        raise ValueError('parameter0 context or pair masks differ')
     modes = parse_mode_pairs(read(0x262444, 36))
     dispatch = [u32(0x3053b0 + index * 4) for index in range(55)]
     if [index for index, target in enumerate(dispatch) if target == 0x305668] != [10]:
@@ -173,6 +209,11 @@ def recover(image):
             'paired_mode_reply_echoes_mode': True,
             'normal_parameter_publish_call': 0x420c0a,
             'normal_parameter_selectors': list(read(0x263884, 11)),
+            'parameter0_context': 0x16ed50,
+            'parameter0_context_byte': 12,
+            'parameter0_state_byte': 10,
+            'parameter0_pair_bits': [0x20, 0x100],
+            'parameter0_pair_semantics_validated': False,
             'paired_mode_dispatch_table': 0x3053b0,
             'paired_mode_dispatch_records_checked': 55,
             'paired_mode_direct_bl_candidates': mode_calls,
@@ -212,10 +253,41 @@ def verify_mode_observation(log):
         cursor += match.end()
     if '6210_paired_mode:' in log or '6210_service_command:' in log:
         raise ValueError('paired/service route differs from this normal-call fixture')
+    context = verify_parameter_context(log)
     return {'normal_publish_call': 0x420c0a,
             'paired_mode_observed': False, 'service_consumer_observed': False,
+            'parameter_context': context,
             'scope': 'one coherent physical outgoing call; not universal absence',
             'pcm_validated': False}
+
+
+def verify_parameter_context(log):
+    rows = re.findall(
+        r'6210_control_compiler: selector=08 value=([0-9a-f]{4}) publish=1 '
+        r'lr=00420c0f context=([0-9a-f]{2}) state=([0-9a-f]{2}) '
+        r'source=([0-9a-f]{8}) cache=([0-9a-f]{8})', log)
+    if len(rows) < 3:
+        raise ValueError('missing positive parameter-context observations')
+    blocks = set()
+    values = set()
+    for value, context, state, source, cache in rows:
+        value, context, state, source, cache = (int(item, 16) for item in (value, context, state, source, cache))
+        if context != 0 or value not in (0x0102, 0x050a, 0x070b):
+            raise ValueError('parameter context differs from unattached-call fixture')
+        if state != (0 if value == 0x0102 else 1) or parameter0_pair(value, context, state) != value:
+            raise ValueError('observed parameter0 does not satisfy its decoded branch')
+        if not (0x100000 <= source < 0x180000 - 22 and
+                0x100000 <= cache < 0x180000 - 22 and
+                source % 2 == cache % 2 == 0 and abs(source - cache) >= 22):
+            raise ValueError('source/cache parameter blocks overlap or lie outside RAM')
+        blocks.add((source, cache))
+        values.add(value)
+    if len(blocks) != 1 or values != {0x0102, 0x050a, 0x070b}:
+        raise ValueError('parameter context lacks stable blocks and all three phases')
+    source, cache = next(iter(blocks))
+    return {'source': source, 'cache': cache, 'context': 0,
+            'observations': len(rows), 'pair': 0x100,
+            'clock_semantics_validated': False}
 
 
 def main():
