@@ -9,27 +9,37 @@ import sys
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.make_sim_card_profile import make_current_profile
-from tools.nsb3_menu_check import check_trace as check_phone_code
+from tools.nsb3_menu_check import check_trace as check_phone_code, FRAME as MENU_FRAME
 from tools.nsb3_nominal_input import IMAGE_SHA256
 from tools.nsb3_phonebook_check import prepare_reload, wire
 from tools.nsk1_phonebook_roundtrip import frame_check
-from tools.sim_security_trace_check import statuses, padded_pin, ATTEMPTS_OFFSET
+from tools.sim_security_trace_check import statuses, padded_pin, ATTEMPTS_OFFSET, CHV_OFFSET
+
+PIN_PROMPT = 'ceafc51da2379ff21cd4fc90a07d717d546cc2176be35e2948eec80a5452bb2a'
+WRONG_FRAME = 'fd5b8fb1ab0c3397bf958d567a46aee84a72f75123802a00d5bc802a1814543e'
+PHONE_PROMPT = 'f14029ce68892bd3d5481aa41aea73af2cf6a3f783cd02dd3633c87dbf23e6b4'
 
 
-def check_card(card, retries):
+def check_card(card, retries, pin='1234'):
+    if retries not in range(4) or not re.fullmatch(r'[0-9]{4,8}', pin):
+        raise ValueError('invalid expected PIN1/retry state')
     expected = bytearray(make_current_profile(True))
     expected[ATTEMPTS_OFFSET] = retries
+    expected[CHV_OFFSET:CHV_OFFSET + 8] = padded_pin(pin)
     if card != bytes(expected):
         raise ValueError('PIN-enabled whole card differs beyond qualified PIN1 retry count')
 
 
-def check_trace(text, correct):
-    digits = '1234' if correct else '4321'
+def check_trace(text, correct, attempts_before=3, pin=None):
+    if attempts_before not in (1, 2, 3):
+        raise ValueError('requires live PIN1 attempts')
+    digits = pin or ('1234' if correct else '4321')
     keys = tuple('Keypad ' + digit for digit in digits) + ('Left Softkey / Menu',)
     contacts = re.findall(r'nsb3_pin_key: correct=([01]) key=(.*?) down=([01]) t=[0-9.]+ physical_only=1', text)
     if contacts != [(str(int(correct)), key, down) for key in keys for down in ('1', '0')]:
         raise ValueError('physical SIM PIN contact order differs')
-    expected = (0x9000, 3, 10) if correct else (0x9804, 2, 10)
+    remaining = 3 if correct else attempts_before - 1
+    expected = (0x9000 if correct else 0x9840 if remaining == 0 else 0x9804, remaining, 10)
     if statuses(text, 0x20) != [expected]:
         raise ValueError('SIM VERIFY status/retry transition differs')
     commands = wire(text)
@@ -44,7 +54,7 @@ def check_trace(text, correct):
         raise ValueError('wrong-PIN phase must not enter phone code')
 
 
-def check_pair(wrong, correct):
+def check_source(wrong):
     initial = make_current_profile(True)
     if (wrong / 'initial_sim_card.bin').read_bytes() != initial:
         raise ValueError('wrong-PIN source is not the shared generated card')
@@ -52,6 +62,10 @@ def check_pair(wrong, correct):
     if (metadata.get('laboratory_pin_enabled') is not True or
             metadata.get('initial_sim_card_sha256') != hashlib.sha256(initial).hexdigest()):
         raise ValueError('PIN-enabled fixture provenance differs')
+
+
+def check_pair(wrong, correct):
+    check_source(wrong)
     cards = []
     for run, accepted in ((wrong, False), (correct, True)):
         check_trace((run / 'error.log').read_text(), accepted)
@@ -69,21 +83,23 @@ def check_pair(wrong, correct):
         if provenance['storage_sha256'][name] != hashlib.sha256((wrong / 'nvram/nsb3r4t' / name).read_bytes()).hexdigest():
             raise ValueError('cold source own storage differs')
     for run in (wrong, correct):
-        frame_check(run / 'snap/nsb3_pin_prompt.png', 'ceafc51da2379ff21cd4fc90a07d717d546cc2176be35e2948eec80a5452bb2a')
-    frame_check(wrong / 'snap/nsb3_pin_result.png', 'fd5b8fb1ab0c3397bf958d567a46aee84a72f75123802a00d5bc802a1814543e')
-    frame_check(correct / 'snap/nsb3_pin_result.png', 'f14029ce68892bd3d5481aa41aea73af2cf6a3f783cd02dd3633c87dbf23e6b4')
-    frame_check(correct / 'snap/nsb3_phonecode_menu.png', '52f6ae5577f82efd58e386e4606c4ce713a16b2c67b243ba8d0a708a0dd117be')
+        frame_check(run / 'snap/nsb3_pin_prompt.png', PIN_PROMPT)
+    frame_check(wrong / 'snap/nsb3_pin_result.png', WRONG_FRAME)
+    frame_check(correct / 'snap/nsb3_pin_result.png', PHONE_PROMPT)
+    frame_check(correct / 'snap/nsb3_phonecode_menu.png', MENU_FRAME)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation', choices=('prepare-correct', 'check'))
+    parser.add_argument('operation', choices=('prepare-correct', 'prepare-wrong', 'check'))
     parser.add_argument('wrong', type=Path)
     parser.add_argument('correct', type=Path)
+    parser.add_argument('--attempts', type=int, choices=(1, 2, 3), default=2,
+                        help='source remaining PIN1 attempts for cold preparation')
     args = parser.parse_args()
     try:
-        if args.operation == 'prepare-correct':
-            prepare_reload(args.wrong, args.correct, lambda card: check_card(card, 2))
+        if args.operation in ('prepare-correct', 'prepare-wrong'):
+            prepare_reload(args.wrong, args.correct, lambda card: check_card(card, args.attempts))
         else:
             check_pair(args.wrong, args.correct)
     except (OSError, ValueError, KeyError) as exc:

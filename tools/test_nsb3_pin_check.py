@@ -28,6 +28,16 @@ def trace(correct):
 
 
 class Nsb3PinTest(unittest.TestCase):
+    def test_exhaustion_uses_persistent_attempts_and_terminal_status(self):
+        for before in (2, 1):
+            status = '9840' if before == 1 else '9804'
+            text = trace(False).replace('sw=9804 chv=2/3', f'sw={status} chv={before - 1}/3')
+            check_trace(text, False, before)
+            with self.assertRaises(ValueError):
+                check_trace(text, False)
+        with self.assertRaises(ValueError):
+            check_trace(trace(False), False, 0)
+
     def test_status_apdu_and_physical_contacts_required(self):
         for correct in (False, True):
             text = trace(correct)

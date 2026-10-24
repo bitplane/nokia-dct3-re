@@ -601,5 +601,56 @@ Acceptance requires exact physical contacts, complete VERIFY APDUs, distinct
 card status/retry transitions, whole-card comparisons, cold source hashes and
 initial-card snapshot, unchanged own executable, and reviewed PIN/error/phone
 prompt/menu frames. No guest RAM/save state, forced authentication result or
-donor provisioning is supplied. PIN change/disable, PIN2, exhaustion/PUK and
-security-state restoration remain separate unqualified NSB-3 contracts.
+donor provisioning is supplied. Successful PIN1 exhaustion/PUK recovery is
+qualified below. Menu-based PIN change/disable, PIN2, wrong/permanently exhausted
+PUK and security-state restoration remain separate unqualified contracts.
+
+### PIN1 exhaustion and PUK recovery
+
+Starting with the accepted first wrong-PIN run above, two additional fresh
+processes physically enter `4321`, preserving the previous complete card each
+time. Retries move `2 -> 1 -> 0`; the final VERIFY returns `9840` and the
+firmware displays `SIM card blocked`. This is PIN1 blocking, not permanent
+PUK exhaustion or a synthetic disabled-card state.
+
+The next cold process presents `Enter PUK code`. Physical laboratory PUK1
+`12345678`, replacement `2468`, and repeated replacement produce exactly one
+`A0 2C 00 00 10` UNBLOCK with the PUK and padded replacement PIN. NSB-3's
+observed P2 is zero; do not substitute VERIFY's P2-one convention. The card
+returns `9000`, restores PIN1 attempts to 3, and persists the new PIN while
+preserving every other card byte. Reviewed frames show the New PIN and Verify
+new PIN dialogs, followed by the separate phone-code prompt and Messages menu.
+
+A fifth cold process physically enters `2468`, emits the corresponding VERIFY,
+and reaches the same independent phone-code/menu controls. This establishes
+that the replacement credential persists, rather than only an authorized
+in-memory session. All cold links check complete card snapshots and hashes
+of their own flash/EEPROM/card inputs, with no guest RAM/save-state transfer.
+
+From the first wrong run, prepare each additional wrong phase with
+`tools/nsb3_pin_check.py prepare-wrong SOURCE DEST --attempts N`, using N=2
+then N=1. Run `tools/nsb3_pin_input.lua` for 22 seconds in each directory.
+Then:
+
+```sh
+.venv/bin/python tools/nsb3_puk_check.py prepare-unblock BLOCKED_RUN RECOVERY_RUN
+```
+
+Run `tools/nsb3_puk_input.lua` for 62 seconds. Prepare the replacement-PIN
+cold input with:
+
+```sh
+.venv/bin/python tools/nsb3_puk_check.py prepare-new-pin RECOVERY_RUN NEW_PIN_RUN
+```
+
+Run `tools/nsb3_pin_new.lua` for 42 seconds and accept the complete chain:
+
+```sh
+.venv/bin/python tools/nsb3_puk_check.py check FIRST_WRONG SECOND_WRONG BLOCKED_RUN RECOVERY_RUN NEW_PIN_RUN
+```
+
+The checker requires exact physical digit/confirmation order, complete VERIFY
+and UNBLOCK commands/statuses, whole-card transitions, generated initial-card
+provenance, linked cold snapshots, unchanged own executable and reviewed
+blocked/PUK/new-PIN/phone/menu frames. No network operation, PIN2 recovery,
+failed PUK lifecycle or state-restoration acceptance is implied.

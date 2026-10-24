@@ -16,7 +16,7 @@ local actions = coroutine.create(function()
     assert(emu.wait(10))
     machine.screens[':screen']:snapshot('nsb3_pin_prompt.png')
     assert(emu.wait(2))
-    local digits = correct and '1234' or '4321'
+    local digits = _G.nsb3_pin_digits or (correct and '1234' or '4321')
     local keys = {}
     for digit in digits:gmatch('.') do keys[#keys + 1] = 'Keypad ' .. digit end
     keys[#keys + 1] = 'Left Softkey / Menu'
