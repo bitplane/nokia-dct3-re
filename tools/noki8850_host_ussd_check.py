@@ -57,17 +57,28 @@ def verify(text, card):
     check_card(after, card)
 
 
-def verify_outgoing(text, card):
+def verify_outgoing(text, card, *, restored=False):
     from tools.radio_host_ussd_trace_check import verify as verify_host
     from tools.noki8850_ussd_check import KEYS
     if '[LUA ERROR]' in text:
         raise ValueError('physical USSD fixture failed')
-    verify_host(text)
+    verify_host(text, require_restore=restored)
+    if text.count('gsm_ss: request=ussd_host ') != 1:
+        raise ValueError('expected one firmware-owned USSD transaction')
     checkpoints = [('PIN accepted', r'SIM status ins=20 sw=9000'),
                    ('registered', r'LAPDm Location Updating Accept acknowledged')]
     checkpoints += [(key, re.escape('8850_ussd_physical: key=' + key)) for key in KEYS]
+    checkpoints += [('request', r'gsm_ss: request=ussd_host id=1 .*dcs=0f packed_length=5')]
+    if restored:
+        check_restoration(text)
+        checkpoints += [
+            ('initial request', r'ussd request id=1 epoch=1'),
+            ('save', r'8850_ussd_state: event=saved'),
+            ('restore', r'8850_ussd_state: event=restored'),
+            ('republication', r'ussd request id=1 epoch=2'),
+            ('old epoch rejected', r'ussd response id=1 outcome=0 result=rejected'),
+        ]
     checkpoints += [
-        ('request', r'gsm_ss: request=ussd_host id=1 .*dcs=0f packed_length=5'),
         ('wrong ID rejected', r'ussd response id=2 outcome=0 result=rejected'),
         ('response accepted', r'ussd response id=1 outcome=0 result=accepted'),
         ('RR released', r'LAPDm service Channel Release acknowledged'),
@@ -76,11 +87,34 @@ def verify_outgoing(text, card):
         ('Menu release', r'8850_host_ussd_recovery: Menu release'),
     ]
     require_ordered(text, checkpoints, '8850 host-decided USSD')
-    if re.findall(r'ussd request id=1 epoch=(\d+)', text) != ['1']:
+    if re.findall(r'ussd request id=1 epoch=(\d+)', text) != (['1', '2'] if restored else ['1']):
         raise ValueError('expected one correlated firmware USSD request')
-    if re.findall(r'ussd state id=1 epoch=(\d+) phase=(\w+)', text) != [('1', 'accepted'), ('1', 'ended')]:
+    epoch = '2' if restored else '1'
+    if re.findall(r'ussd state id=1 epoch=(\d+) phase=(\w+)', text) != [(epoch, 'accepted'), (epoch, 'ended')]:
         raise ValueError('outgoing USSD lifecycle differs')
     check_card(text.split('gsm_ss: request=ussd_host id=1', 1)[1], card)
+
+
+def check_restoration(text):
+    if '8850_ussd_state: FAIL' in text or 'state_roundtrip: result=pass scenario=nsm2_ussd ' not in text:
+        raise ValueError('pending USSD restoration did not complete')
+    rows = re.findall(r'8850_ussd_state: event=(saved|restored) pc=([0-9a-f]{8}) '
+                      r'sp=([0-9a-f]{8}) ram=([0-9a-f]{8}) cpu=([0-9a-f,]+) t=([0-9.]+)', text)
+    if (text.count('8850_ussd_state: event=') != 2 or len(rows) != 2 or
+            [row[0] for row in rows] != ['saved', 'restored'] or rows[0][1:] != rows[1][1:]):
+        raise ValueError('CPU/RAM/time restoration differs')
+    for row in rows:
+        if not re.fullmatch(r'[0-9a-f]{8}(?:,[0-9a-f]{8}){36}', row[4]):
+            raise ValueError('incomplete ARM/banked register inventory')
+        registers = row[4].split(',')
+        if row[1] != registers[15] or row[2] != registers[13]:
+            raise ValueError('PC/SP snapshot disagrees with register inventory')
+    roundtrips = re.findall(r'state_roundtrip: result=pass scenario=nsm2_ussd requested_at=([0-9.]+) t=([0-9.]+)', text)
+    if roundtrips != [(rows[0][5], rows[1][5])]:
+        raise ValueError('restoration marker disagrees with architectural timeline')
+    before = text.split('8850_ussd_state: event=restored', 1)[0]
+    if ('ussd response id=' in before or 'GSM service downlink kind=27 sapi=0 pd=0b' in before):
+        raise ValueError('host answered or released before pending restoration')
 
 
 def check_outgoing_frames(directory):

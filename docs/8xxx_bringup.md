@@ -2451,6 +2451,20 @@ checks are shared with notification acceptance. The host runner independently
 checks the exact packed `*123#` request. This is one host-decided response,
 not multi-turn dialogue, pending-request restoration or native DSP evidence.
 
+`verify-8850-pin-host-ussd-restore` separately saves the pending host decision
+at31.8s, after physical authentication, registration and the first request.
+The shared snapshot helper records all37 ARM/banked registers, PC/SP, mapped
+RAM digest and emulated time; saved/restored records must match exactly and
+PC/SP must agree with the register inventory. The adapter republishes the
+same request once under epoch2. The host withholds a response in epoch1,
+then tests stale-epoch and wrong-ID rejection before replying to the restored
+identity. No response or SS release may precede restoration. Reviewed
+`Host network`, registered idle and Messages recovery, complete expected card
+bytes and post-request no-write checks remain mandatory. Reference/restored
+protocol traffic is intentionally unequal because only the restored branch
+receives a host answer; this is not a deterministic packet-replay claim.
+Cancelled host-side fixture waits exit cleanly without changing handset state.
+
 MAME also audits the declared shared `dsp_prom`, `dsp_drom` and `dsp_pdrom`
 files in the product ROM directory. Their presence is a run prerequisite,
 not evidence of a product-matched resident ROM6 mask; do not substitute

@@ -39,12 +39,12 @@ def main():
                         help='run the original phone-code-only baseline')
     parser.add_argument('--scenario', choices=('registration', 'host-incoming-call', 'host-incoming-sms',
                                               'host-outgoing-call', 'host-outgoing-sms',
-                                              'host-rejected-sms', 'host-silent-sms', 'host-incoming-ussd', 'host-outgoing-ussd', 'phonebook',
+                                              'host-rejected-sms', 'host-silent-sms', 'host-incoming-ussd', 'host-outgoing-ussd', 'host-outgoing-ussd-restore', 'phonebook',
                                               'idle-state', 'call-state', 'sms-state'),
                         default='registration')
     parser.add_argument('--port', type=int, default=18850)
     args = parser.parse_args()
-    if args.scenario in ('host-incoming-ussd', 'host-outgoing-ussd') and args.without_pin:
+    if args.scenario in ('host-incoming-ussd', 'host-outgoing-ussd', 'host-outgoing-ussd-restore') and args.without_pin:
         parser.error('host USSD requires the PIN-authenticated profile')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -70,6 +70,7 @@ def main():
             'host-silent-sms': 'sms_silence_input',
             'host-incoming-ussd': 'host_ussd_notify',
             'host-outgoing-ussd': 'host_ussd_request',
+            'host-outgoing-ussd-restore': 'host_ussd_restore',
             'phonebook': 'phonebook_input',
             'idle-state': 'state_idle', 'call-state': 'state_call', 'sms-state': 'state_sms',
         }[args.scenario]
@@ -110,6 +111,7 @@ def main():
                 'host-incoming-ussd': ('run_host_incoming_ussd_gate',
                     ['--text', 'Host notice', '--ready-marker', '8850_host_ussd: ready']),
                 'host-outgoing-ussd': ('run_host_ussd_gate', []),
+                'host-outgoing-ussd-restore': ('run_host_ussd_gate', ['--require-restore']),
             }[args.scenario]
             host_command = [sys.executable, str(root / f'tools/{runner}.py'),
                             '--port', str(args.port), '--cwd', str(run)] + options
@@ -174,9 +176,9 @@ def main():
             subprocess.run([sys.executable, str(root / 'tools/noki8850_phonebook_check.py'),
                             'readback', str(run / 'error.log'), str(card),
                             str(run / 'snap/8850_phonebook_contact.png')], check=True)
-        elif args.scenario == 'host-outgoing-ussd':
+        elif args.scenario in ('host-outgoing-ussd', 'host-outgoing-ussd-restore'):
             from tools.noki8850_host_ussd_check import verify_outgoing, check_outgoing_frames
-            verify_outgoing(text, card.read_bytes())
+            verify_outgoing(text, card.read_bytes(), restored=args.scenario.endswith('-restore'))
             check_outgoing_frames(run / 'snap')
         elif args.scenario == 'host-incoming-ussd':
             from tools.noki8850_host_ussd_check import verify, check_frames

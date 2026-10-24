@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm2_pending_host_ussd_restoration",
+      "owner": "nsm2_host_supplementary_services",
+      "status": "satisfied",
+      "predicate": "Own-PMM authenticated 8850 restores a pending external USSD decision with exact ARM/banked inventory, RAM digest/time and new-epoch host continuation",
+      "current": "Fresh pending fixture saves at31.8s after physical PIN/phone authentication, registration and one *123# request. All37 ARM/banked registers, PC/SP, mapped RAM digest and time match exactly after load; snapshot PC/SP must cross-match the register inventory and the roundtrip marker must match both times. The host withholds the epoch1 response, then accepts one epoch2 republication only after rejecting the stale epoch and wrong request ID. No answer or release may precede restoration. Physical Back/Menu recovery reproduces reviewed Host network, idle and stable Messages pixels; complete expected registered card and post-request no-write/security-command checks pass. Truncated inventories, changed RAM/time, inconsistent markers, early answer and missing stale rejection reject. External decisions differ between branches, so protocol replay equality is not claimed. Native radio and speech remain unproved.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/noki8850_host_ussd_restore.lua", "tools/arm_architecture_snapshot.lua", "tools/noki8850_host_ussd_check.py", "tools/test_noki8850_host_ussd_check.py", "tools/run_noki8850_pin_registration.py", "gates.json"]
+    },
+    {
       "id": "nsm2_host_decided_ussd_request",
       "owner": "nsm2_host_supplementary_services",
       "status": "satisfied",

@@ -1,7 +1,7 @@
 import unittest
 
 from tools.make_sim_card_profile import make_profile
-from tools.noki8850_host_ussd_check import verify, verify_outgoing
+from tools.noki8850_host_ussd_check import verify, verify_outgoing, check_restoration
 
 
 class HostUssdTest(unittest.TestCase):
@@ -100,3 +100,47 @@ class OutgoingHostUssdTest(unittest.TestCase):
             verify_outgoing(text, card[:-1])
         with self.assertRaises(ValueError):
             verify_outgoing(text + '\nsim_device: header cla=a0 ins=2c', card)
+
+
+class PendingHostUssdTest(unittest.TestCase):
+    def capture(self):
+        text, card = OutgoingHostUssdTest().capture()
+        cpu = ','.join(['00000000'] * 37)
+        snapshot = f'pc=00000000 sp=00000000 ram=12345678 cpu={cpu} t=31.800000000'
+        initial = 'gsm_call_adapter: ussd request id=1 epoch=1 dcs=0f packed_length=5'
+        sequence = '\n'.join((initial,
+            '8850_ussd_state: event=saved ' + snapshot,
+            '8850_ussd_state: event=restored ' + snapshot,
+            'state_roundtrip: result=pass scenario=nsm2_ussd requested_at=31.800000000 t=31.800000000',
+            initial.replace('epoch=1', 'epoch=2'),
+            'gsm_call_adapter: ussd response id=1 outcome=0 result=rejected'))
+        text = text.replace(initial, sequence)
+        text = text.replace('epoch=1 phase=', 'epoch=2 phase=')
+        return text, card
+
+    def test_exact_pending_restore_and_new_epoch_response(self):
+        verify_outgoing(*self.capture(), restored=True)
+
+    def test_banked_register_count_and_snapshot_consistency(self):
+        text, _ = self.capture()
+        for bad in (
+            text.replace('cpu=' + ','.join(['00000000'] * 37),
+                         'cpu=' + ','.join(['00000000'] * 36)),
+            text.replace('pc=00000000', 'pc=00000001'),
+            text.replace('event=restored pc=00000000 sp=00000000 ram=12345678',
+                         'event=restored pc=00000000 sp=00000000 ram=12345679'),
+            text.replace('requested_at=31.800000000', 'requested_at=32.800000000'),
+            text + '\n8850_ussd_state: event=saved malformed',
+        ):
+            with self.assertRaises(ValueError):
+                check_restoration(bad)
+
+    def test_early_host_answer_and_missing_old_epoch_rejection(self):
+        text, card = self.capture()
+        early = text.replace('8850_ussd_state: event=saved',
+                             'ussd response id=1 outcome=0 result=accepted\n8850_ussd_state: event=saved')
+        with self.assertRaises(ValueError):
+            check_restoration(early)
+        with self.assertRaises(ValueError):
+            verify_outgoing(text.replace('id=1 outcome=0 result=rejected',
+                                         'id=3 outcome=0 result=rejected'), card, restored=True)
