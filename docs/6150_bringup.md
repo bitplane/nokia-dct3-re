@@ -140,6 +140,37 @@ This qualifies clean return after this follow-up command, not automatic return
 from the separate ACK-only profile, arbitrary Toolkit applications, native RF,
 speech or fitted-mask fidelity.
 
+### Pending Toolkit command restoration
+
+An independent74s cold profile1 process saves at65s while the organically
+fetched DISPLAY TEXT is awaiting physical dismissal. The pre-save frame
+matches the reviewed `DCT3 SAT` prompt. Own ARM PC2b61fa/SP112a18 and active
+DSP PC479e/IDLE0 are observed; all37 ARM registers,36 DSP fields and rolling
+checksums of backed128KiB research ARM RAM, ordinary DSP data and program
+restore exactly. The2.7s reference/restored windows compare1170 DSP I/O writes
+including relative times, addresses, values and masks.
+
+Only one TERMINAL PROFILE and one FETCH occur. Each branch's separate physical
+left-softkey contact produces the same successful terminal response, accepted
+with9000, without refetching the command. Both resulting frames match the own
+clean Headset idle oracle exactly. The complete EEPROM, original persistent
+card and executable flash are unchanged. Cold provenance, unrelated CFG,
+PIN/phone acceptance before save, exact APDUs, payload/contact ordering and a
+nonempty saved-state artifact are checked rather than inferred from pixels.
+
+```sh
+.venv/bin/python tools/nsm1_toolkit_state_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-toolkit-native-state-accepted
+```
+
+Add `--mame mame/mame` with fresh outputs to execute. Save/load uses MAME APIs;
+no guest state or firmware result is forced. The replay protocol validator is
+shared with the separately qualified6190 capture, but terminal profile,
+authentication, backed-RAM extent, storage and pixel contracts remain own.
+This covers a fetched proactive command awaiting input, not an in-flight SIM
+character, every Toolkit command or exhaustive device-state restoration.
+Provisioning, native-mask, sustained-operation, RF and speech limits remain.
+
 ### Native idle restoration and physical continuation
 
 An independent54s cold process from the qualified original PIN-enabled

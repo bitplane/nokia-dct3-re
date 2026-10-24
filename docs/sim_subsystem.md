@@ -561,6 +561,10 @@ A separate6150 profile7 follows Continue with SELECT ITEM. Physical Beta
 selection emits the exact item-2 terminal response, accepted with9000, and
 returns to the clean installed list with unchanged complete storage
 (`--select-item`). This does not change the ACK-only return boundary.
+The6150 pending DISPLAY TEXT also survives native save/load with one FETCH,
+two physical successful completions and exact observed architecture/I/O/pixel
+replay, preserving complete persistent storage (`nsm1_toolkit_state_check.py`).
+This is proactive-command state, not a claim about saving mid-character.
 
 NSK-1 v5.61 (5130) independently produces that same four-byte profile and
 automatic result30 refusal. Its matched Phase-2 control has no proactive

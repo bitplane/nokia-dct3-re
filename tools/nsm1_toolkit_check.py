@@ -95,11 +95,9 @@ def check_configuration(seed, run, control=False, interactive=False, menu_item=N
         raise ValueError('unrelated external inputs changed')
 
 
-def check(seed, run, control=False, interactive=False, menu_item=None, select_item=False):
+def check_inputs(seed, run, control=False, interactive=False, menu_item=None, select_item=False):
+    """Whole cold inputs and outputs shared by ordinary and restoration gates."""
     profile_for(control,interactive,menu_item,select_item)
-    if select_item:
-        menu_item=1
-    interactive=interactive or menu_item is not None
     files = check_storage(seed)
     check_storage(run)
     metadata = json.loads((run / 'cold_input.json').read_text())
@@ -113,6 +111,14 @@ def check(seed, run, control=False, interactive=False, menu_item=None, select_it
     check_configuration(seed, run, control, interactive, menu_item, select_item)
     if json.loads((run / 'exit_status.json').read_text()) != dict(returncode=0):
         raise ValueError('MAME did not complete')
+    return files
+
+
+def check(seed, run, control=False, interactive=False, menu_item=None, select_item=False):
+    check_inputs(seed,run,control,interactive,menu_item,select_item)
+    if select_item:
+        menu_item=1
+    interactive=interactive or menu_item is not None
     check_trace((run / 'error.log').read_text(), control, interactive, menu_item, select_item)
     frame_check(run / 'snap/nsm1_toolkit_before.png', IDLE if control else PROMPT)
     frame_check(run / 'snap/nsm1_toolkit_after.png',
