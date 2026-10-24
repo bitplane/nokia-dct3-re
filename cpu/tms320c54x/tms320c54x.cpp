@@ -1428,6 +1428,8 @@ void tms320c54x_device::device_start()
 	state_add(STATE_ILLEGAL, "ILLEGAL", m_illegal).formatstr("%1u");
 	state_add(STATE_GENPC, "GENPC", m_debug_pc).mask(0x7fffff).callimport().callexport().noshow();
 	state_add(STATE_GENPCBASE, "CURPC", m_debug_pc).mask(0x7fffff).callimport().callexport().noshow();
+	state_add(STATE_READPC, "READPC", m_debug_pipeline_pc).readonly().callexport().formatstr("%08X");
+	state_add(STATE_EXECPC, "EXECPC", m_debug_pipeline_pc).readonly().callexport().formatstr("%08X");
 
 	save_item(NAME(m_pc));
 	save_item(NAME(m_atomic_io_pending));
@@ -2004,7 +2006,14 @@ void tms320c54x_device::publish_bus_controls()
 
 void tms320c54x_device::state_export(const device_state_entry &entry)
 {
-	if (entry.index() == STATE_GENPC || entry.index() == STATE_GENPCBASE)
+	if (entry.index() == STATE_READPC || entry.index() == STATE_EXECPC)
+	{
+		unsigned const stage = entry.index() == STATE_READPC ? 4 : 5;
+		// Derived observation only: PC can already point beyond a bus owner.
+		m_debug_pipeline_pc = m_pipeline_frontend && m_pipeline_valid[stage] && !m_pipeline_annulled[stage]
+				? m_pipeline_address[stage] : 0xffffffff;
+	}
+	else if (entry.index() == STATE_GENPC || entry.index() == STATE_GENPCBASE)
 		m_debug_pc = logical_program_address(m_pc);
 	else if (entry.index() >= STATE_TIM && entry.index() <= STATE_TCR)
 		m_debug_timer = data_read(0x24 + entry.index() - STATE_TIM);

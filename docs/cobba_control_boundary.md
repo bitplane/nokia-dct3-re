@@ -734,6 +734,36 @@ Its required fixture ROM directory is `mame/roms`, not the handset `roms`
 directory. Native RF/CRC evidence runners now default to ignored repo `tmp/`
 on disk and accept `--output-root`; they no longer default to tmpfs.
 
+The full-scale variant `--mixed-full-scale` supplies32 words repeating
+`0000,7fff,8000,ffff,7ffe,8001,1234,edcb`; every one of48 output words
+matches the same independent convolution with rounding after accumulation.
+Explicit `--machine` selection now qualifies these CPU/bus compositions:
+
+| Machine | Frontend / bus | Input | Current capture |
+| --- | --- | --- | --- |
+| `noki5110` | atomic / legacy | full-scale mixed | `tmp/run_rom4_rf_impulse_ir1zbl_f` |
+| `nse1astd` | atomic / standard | full-scale mixed | `tmp/run_rom4_rf_impulse_mwaa4emo` |
+| `nse1pipe` | staged / standard | full-scale mixed | `tmp/run_rom4_rf_impulse_rjlndfg2` |
+| `nse1pipe` | staged / standard | bounded mixed | `tmp/run_rom4_rf_impulse_phbhtxr1` |
+
+Each capture records the actual binary, ROM/input identities and profile,
+and requires a unique matching machine marker and clear illegal-opcode state.
+Staged `PC` is ahead of a bus access's owning instruction; using atomic
+`330c` as its first-read trigger produces no admitted input. Read-only C54x
+`READPC`/`EXECPC` getters instead expose the valid, non-annulled Read/Execute
+slot addresses (or`ffffffff` when absent). The fixture admits input owners
+`330a/3310/3316/331c` and output owners`3321/3322`, independently of the
+advanced PC, while retaining exact destination/value ordering. No pipeline,
+register or sample value is changed by these derived getters.
+
+The existing `run_c54x_core.py --profile portr-block` independently checks
+these owner getters at real I/O-read and data-write callbacks across1728
+cases and1728 save/load replays, two program pages and three snapshot phases;
+empty pipeline slots must report no owner. Capture: `tmp/run_c54x_core_g4hbuvkp`.
+This is numerical/observer qualification, not all accumulator modes, physical
+bus timing, arbitrary filter state or RF acquisition. It does not supersede
+the separate failed rotating-score acceptance.
+
 #### Port-3 receive-window candidate
 
 The port-3 receive-window interpretation from the reviewed external emulator
@@ -1347,18 +1377,6 @@ captures constrain consumption scheduling but do not select a receive
 buffer depth, latch policy, lane order or sample-production clock.
 Do not connect read-indexed tone/GMSK data as an operational RF source
 merely because both windows are frame-paced.
-
-Full-scale arithmetic control: `run_c54x_rom4_rf_impulse.py --mame mame/mame
---rompath mame/roms --mixed-full-scale` supplies 32 diagnostic port words
-repeating `0000,7fff,8000,ffff,7ffe,8001,1234,edcb`. In a fresh eight-second
-native boot, all 48 captured filter outputs match the independent integer
-convolution reference, with rounding after accumulation. The runner records
-the actual input sequence and binary/ROM identities and rejects observer
-errors in both console and trace. Evidence:
-`tmp/run_rom4_rf_impulse_9s7qvlq_/0000_00/error.log`.
-This extends signed numerical coverage beyond the bounded mixed fixture;
-it does not validate all accumulator modes, saturation settings, physical
-I/Q assignment, production cadence, or native acquisition.
 
 ### Product-specific physical buses
 

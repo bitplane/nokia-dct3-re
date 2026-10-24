@@ -13,6 +13,33 @@ def fixture(index=0, amplitude=0x4000):
 
 
 class ImpulseTests(unittest.TestCase):
+    def test_selected_frontend_and_healthy_cpu_are_required(self):
+        text=fixture()+'\nrom4_rf_profile: system=nse1astd\nrom4_rf_cpu_state: illegal=0 pc=0123\n'
+        check(text,0,0x4000,machine='nse1astd')
+        for changed in (text.replace('system=nse1astd','system=noki5110'),
+                        text.replace('illegal=0','illegal=1'),
+                        fixture(),text+'rom4_rf_profile: system=nse1astd\n'):
+            with self.subTest(changed=changed),self.assertRaises(ValueError):
+                check(changed,0,0x4000,machine='nse1astd')
+
+    def test_staged_bus_owner_not_prefetch_pc_controls_attribution(self):
+        lines=[]
+        for line in fixture().splitlines():
+            if line.startswith('rom4_rf_impulse_input:'):
+                index=int(line.split('index=')[1].split()[0])
+                line += f' owner={(0x330a,0x3310,0x3316,0x331c)[index%4]:08x}'
+            elif line.startswith('rom4_rf_impulse_output:'):
+                index=int(line.split('index=')[1].split()[0])
+                line += f' owner={0x3321+index%2:08x}'
+            lines.append(line)
+        text='\n'.join(lines)+'\nrom4_rf_profile: system=nse1pipe\nrom4_rf_cpu_state: illegal=0 pc=0123\n'
+        check(text,0,0x4000,machine='nse1pipe')
+        for changed in (text.replace('owner=0000330a','owner=0000330f'),
+                        text.replace('owner=00003321','owner=00003322'),
+                        text.replace(' owner=0000330a','')):
+            with self.subTest(changed=changed),self.assertRaises(ValueError):
+                check(changed,0,0x4000,machine='nse1pipe')
+
     def test_full_scale_capture_and_profile_identity(self):
         words = mixed_words(full_scale=True)
         self.assertEqual(len(words), 32)

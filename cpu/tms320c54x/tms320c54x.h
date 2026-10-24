@@ -87,7 +87,9 @@ public:
 		STATE_BSCR,
 		STATE_SWCR,
 		STATE_RSA,
-		STATE_REA
+		STATE_REA,
+		STATE_READPC,
+		STATE_EXECPC
 	};
 
 protected:
@@ -221,6 +223,7 @@ private:
 	u16 m_pc = 0;
 	u8 m_xpc = 0;
 	u32 m_debug_pc = 0;
+	u32 m_debug_pipeline_pc = 0xffffffff;
 	u16 m_debug_timer = 0;
 	u16 m_op = 0;
 	u64 m_a = 0;

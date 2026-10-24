@@ -11,14 +11,16 @@ import tempfile
 
 try:
     from tools.c54x_rom4_rf_delivery_check import check_observer_health
+    from tools.run_c54x_rom4_rf_delivery import MACHINES, machine_profile, check_cpu_health
 except ModuleNotFoundError:
     from c54x_rom4_rf_delivery_check import check_observer_health
+    from run_c54x_rom4_rf_delivery import MACHINES, machine_profile, check_cpu_health
 
 
 COEFFICIENTS = (0x0387, 0x11a3, 0x2ad6, 0x4000,
                 0x4000, 0x2ad6, 0x11a3, 0x0387)
-INPUT = re.compile(r"rom4_rf_impulse_input: index=(\d+) pc=([0-9a-f]{4}) value=([0-9a-f]{4})")
-OUTPUT = re.compile(r"rom4_rf_impulse_output: index=(\d+) pc=([0-9a-f]{4}) address=([0-9a-f]{4}) value=([0-9a-f]{4})")
+INPUT = re.compile(r"rom4_rf_impulse_input: index=(\d+) pc=([0-9a-f]{4}) value=([0-9a-f]{4})(?: owner=([0-9a-f]{8}))?\r?$",re.MULTILINE)
+OUTPUT = re.compile(r"rom4_rf_impulse_output: index=(\d+) pc=([0-9a-f]{4}) address=([0-9a-f]{4}) value=([0-9a-f]{4})(?: owner=([0-9a-f]{8}))?\r?$",re.MULTILINE)
 
 
 def mixed_words(full_scale=False):
@@ -49,8 +51,10 @@ def expected(index, amplitude):
     return expected_words(inputs)
 
 
-def check(text, index, amplitude, mixed=False, full_scale=False):
+def check(text, index, amplitude, mixed=False, full_scale=False, machine=None):
     check_observer_health(text)
+    if machine is not None:
+        check_cpu_health(text,machine)
     if full_scale and not mixed:
         raise ValueError('full-scale control requires mixed input')
     inputs = INPUT.findall(text)
@@ -58,14 +62,19 @@ def check(text, index, amplitude, mixed=False, full_scale=False):
     if len(inputs) != 32 or len(outputs) != 48:
         raise ValueError("missing complete input/output capture")
     wanted_inputs = mixed_words(full_scale) if mixed else [amplitude if number == index else 0 for number in range(32)]
-    for number, (position, pc, value) in enumerate(inputs):
-        if int(position) != number or int(pc, 16) != (0x330c, 0x3312, 0x3318, 0x331e)[number % 4]:
+    staged=machine is not None and MACHINES[machine][0]=='staged'
+    for number, (position, pc, value, owner) in enumerate(inputs):
+        if int(position) != number or (not staged and int(pc, 16) != (0x330c, 0x3312, 0x3318, 0x331e)[number % 4]):
             raise ValueError(f"input alignment changed at {number}")
+        if (staged and not owner) or (owner and int(owner,16)!=(0x330a,0x3310,0x3316,0x331c)[number%4]):
+            raise ValueError(f'input owner changed at {number}')
         if int(value, 16) != wanted_inputs[number]:
             raise ValueError(f"input value changed at {number}")
-    for number, ((position, pc, address, value), wanted) in enumerate(zip(outputs, expected_words(wanted_inputs))):
-        if int(position) != number or int(pc, 16) != 0x3322 + number % 2 or int(address, 16) != 0x1a48 + number % 16:
+    for number, ((position, pc, address, value, owner), wanted) in enumerate(zip(outputs, expected_words(wanted_inputs))):
+        if int(position) != number or (not staged and int(pc, 16) != 0x3322 + number % 2) or int(address, 16) != 0x1a48 + number % 16:
             raise ValueError(f"output alignment changed at {number}")
+        if (staged and not owner) or (owner and int(owner,16)!=0x3321+number%2):
+            raise ValueError(f'output owner changed at {number}')
         if int(value, 16) != wanted:
             raise ValueError(f"output {number}: actual={value} expected={wanted:04x}")
     marker = ('rom4_rf_mixed_full_scale_summary: samples=32' if full_scale else
@@ -79,6 +88,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mame", type=Path, required=True)
     parser.add_argument("--rompath", type=Path, required=True)
+    parser.add_argument('--machine',choices=tuple(MACHINES),default='noki5110',
+                        help='explicit CPU frontend/bus composition, not fitted silicon')
     parser.add_argument('--mixed', action='store_true',
                         help='check overlapping bounded nonzero words instead of isolated impulses')
     parser.add_argument('--mixed-full-scale', action='store_true',
@@ -109,14 +120,14 @@ def main():
             identity['bytes'] = path.stat().st_size
         identities[name] = identity
     (run / 'inputs.json').write_text(json.dumps({
-        'schema': 1, 'inputs': identities, 'mixed': args.mixed,
+        'schema': 1, 'inputs': identities, 'profile':machine_profile(args.machine),'mixed': args.mixed,
         'mixed_full_scale': args.mixed_full_scale,
         'physical_iq_claim': False, 'acquisition_claim': False}, indent=2) + '\n')
     cases = 0
     for amplitude in ((0,) if args.mixed else (0x4000, 0xc000)):
         for index in (range(1) if args.mixed else range(32)):
             case = run / f"{amplitude:04x}_{index:02d}"
-            nvram = case / "nvram" / "noki5110"
+            nvram = case / "nvram" / args.machine
             nvram.mkdir(parents=True)
             subprocess.run([str(root / ".venv/bin/python"), str(root / "tools/make_5110_eeprom_profile.py"),
                             "--eeprom", str(root / "roms/noki5110/nse-1.bin"),
@@ -129,13 +140,14 @@ def main():
             else:
                 env.pop('ROM4_RF_MIXED_WORDS', None)
             env['ROM4_RF_MIXED_FULL_SCALE'] = '1' if args.mixed_full_scale else '0'
-            command = [str(args.mame.resolve()), "noki5110", "-rompath", str(args.rompath.resolve()),
+            command = [str(args.mame.resolve()), args.machine, "-rompath", str(args.rompath.resolve()),
                        "-nvram_directory", str(case / "nvram"), "-video", "none", "-sound", "none",
                        "-log", "-skip_gameinfo", "-nothrottle", "-seconds_to_run", "8",
                        "-autoboot_script", str(root / "tools/c54x_rom4_rf_impulse.lua")]
             (case / 'invocation.json').write_text(json.dumps({
                 'command': command, 'cwd': str(case.resolve()),
                 'stimulus': 'mixed' if args.mixed else 'impulse',
+                'profile':machine_profile(args.machine),
                 'mixed_full_scale': args.mixed_full_scale,
                 'input_words': mixed_words(args.mixed_full_scale) if args.mixed else
                     [amplitude if number == index else 0 for number in range(32)],
@@ -145,7 +157,7 @@ def main():
                 subprocess.run(command, cwd=case, env=env, stdout=console, stderr=subprocess.STDOUT, check=True)
             check_observer_health((case / 'console.log').read_text())
             check((case / "error.log").read_text(), index, amplitude,
-                  mixed=args.mixed, full_scale=args.mixed_full_scale)
+                  mixed=args.mixed, full_scale=args.mixed_full_scale,machine=args.machine)
             cases += 1
             print('RF mixed convolution case: PASS words=32 outputs=48' if args.mixed else
                   f"RF impulse case: PASS index={index} amplitude={amplitude:04x}", flush=True)
