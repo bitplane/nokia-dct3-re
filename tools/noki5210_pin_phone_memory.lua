@@ -68,13 +68,13 @@ _G.noki5210_pin_after_accept = function(press, snapshot)
             snapshot('edit_changed')
             key('Left Softkey / Menu', 2.5)
             snapshot('edit_saved')
-        elseif mode == 'erase_cancel' or mode == 'erase' then
+        elseif mode == 'erase_cancel' or mode == 'erase' or mode == 'erase_first' then
             key('Left Softkey / Menu', 0.7)
             key('Scroll Down', 0.7)
             key('Scroll Down', 0.7)
             key('Left Softkey / Menu', 0.7)
             snapshot('erase_prompt')
-            key(mode == 'erase' and 'Left Softkey / Menu' or 'Right Softkey / C', 0.7)
+            key(mode == 'erase_cancel' and 'Right Softkey / C' or 'Left Softkey / Menu', 0.7)
             snapshot('erase_result')
         end
     else

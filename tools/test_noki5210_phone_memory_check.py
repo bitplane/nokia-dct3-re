@@ -45,7 +45,7 @@ class PhoneMemoryCheckTest(unittest.TestCase):
 
     def test_preserved_modes_have_distinct_contracts(self):
         for mode in ('edit', 'edit_read', 'erase_cancel', 'erase', 'empty_read', 'rename', 'rename_read',
-                     'add', 'multi_read'):
+                     'add', 'multi_read', 'erase_first'):
             text = '\n'.join((
                 'SIM status ins=20 sw=9000', 'LAPDm Location Updating Accept acknowledged',
                 f'5210_phone_memory: mode={mode} begin=1',
@@ -63,6 +63,7 @@ class PhoneMemoryCheckTest(unittest.TestCase):
         cases = (
             ('erase_cancel', checker.ERASE_PREFIX + ['Left Softkey / Menu'] + checker.READ_KEYS[-3:]),
             ('erase', checker.ERASE_PREFIX + ['Right Softkey / C'] + checker.READ_KEYS[-3:]),
+            ('erase_first', checker.ERASE_PREFIX + ['Right Softkey / C'] + checker.READ_KEYS[-3:]),
             ('empty_read', checker.READ_KEYS[:3] + checker.READ_KEYS[-3:]),
         )
         for mode, keys in cases:
@@ -109,3 +110,10 @@ class PhoneMemoryCheckTest(unittest.TestCase):
             with self.subTest(mode=mode), patch.object(checker, 'verify_coherent_late'), \
                     self.assertRaisesRegex(ValueError, 'input/release'):
                 checker.verify(text, checker.expected_card(), mode=mode)
+
+    def test_selective_erase_uses_different_selected_name(self):
+        frames = checker.MODE_FRAMES['erase_first']
+        self.assertEqual(frames['phonebook_list'], checker.MODE_FRAMES['multi_read']['phonebook_list'])
+        self.assertNotEqual(frames['phonebook_list'], checker.READ_FRAMES['phonebook_list'])
+        self.assertNotEqual(frames['erase_prompt'], checker.ERASE_PROMPT)
+        self.assertNotEqual(frames['erase_result'], checker.MODE_FRAMES['erase']['erase_result'])

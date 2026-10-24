@@ -195,6 +195,7 @@ class RunnerTests(unittest.TestCase):
             'pin-phone-memory-rename-read': (55, '--rename-read', ()),
             'pin-phone-memory-add': (70, '--add', ()),
             'pin-phone-memory-multi-read': (65, '--multi-read', ()),
+            'pin-phone-memory-erase-first': (65, '--erase-first', ()),
             'pin-phone-memory-erase-cancel': (65, '--erase-cancel', ()),
             'pin-phone-memory-erase': (65, '--erase', ()),
             'pin-phone-memory-empty-read': (55, '--empty-read', ()),
@@ -208,6 +209,7 @@ class RunnerTests(unittest.TestCase):
             'pin-phone-memory-edit': 'pin-phone-memory-edit-read',
             'pin-phone-memory-rename': 'pin-phone-memory-rename-read',
             'pin-phone-memory-add': 'pin-phone-memory-multi-read',
+            'pin-phone-memory-erase-first': 'pin-phone-memory-read',
             'pin-phone-memory-erase-cancel': 'pin-phone-memory-read',
             'pin-phone-memory-erase': 'pin-phone-memory-empty-read',
         }
@@ -224,6 +226,7 @@ class RunnerTests(unittest.TestCase):
                                            'pin-phone-memory-edit', 'pin-phone-memory-edit-read',
                                            'pin-phone-memory-rename', 'pin-phone-memory-rename-read',
                                            'pin-phone-memory-add', 'pin-phone-memory-multi-read',
+                                           'pin-phone-memory-erase-first',
                                            'pin-phone-memory-erase-cancel', 'pin-phone-memory-erase',
                                            'pin-phone-memory-empty-read'}
                     self.assertEqual(runner.SCENARIOS[name].preserved, name in preserved_scenarios)

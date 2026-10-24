@@ -130,11 +130,15 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   **Add**, not Replace. An independent cold process separately selects A and
   Ada and reads123 from each Details screen. Both distinct name-list frames
   are required because number Details alone cannot distinguish equal numbers.
-  All four processes authenticate/register, preserve the complete expected
+  It then physically confirms `Erase? A`; a sixth independent process
+  cold-retrieves the original Ada/123. The selective result has its own
+  reviewed `Erased` frame rather than borrowing the last-contact erase oracle.
+  All six processes authenticate/register, preserve the complete expected
   SIM and reject SIM record writes. Every predecessor NVRAM inventory remains
-  unchanged. This proves two-contact coexistence and cold retrieval, not
-  selective multi-contact deletion, capacity or interrupted-write atomicity.
-  Accepted capture: `tmp/nsm5-phone-multiple-gate`; the gate also preserves
+  unchanged. This proves two-contact coexistence, cold retrieval and
+  non-selected-contact preservation after confirmed erasure, not capacity,
+  arbitrary record enumeration or interrupted-write atomicity.
+  Accepted capture: `tmp/nsm5-phone-selective-qualified`; the gate also preserves
   the original single-contact Save/Read oracles without rebanking them.
 - `make verify-5210-radio-supplementary` enters `*123#` and `*#21#` through
   the physical keypad and submits them with the product's dedicated Send key.

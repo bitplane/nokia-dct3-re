@@ -94,6 +94,8 @@ SCENARIOS = {
         seconds=70, preserved=True, cold_scenario='pin-phone-memory-multi-read'),
     'pin-phone-memory-multi-read': Scenario('noki5210_pin_phone_memory_multi_read.lua', '--multi-read',
         seconds=65, preserved=True),
+    'pin-phone-memory-erase-first': Scenario('noki5210_pin_phone_memory_erase_first.lua', '--erase-first',
+        seconds=65, preserved=True, cold_scenario='pin-phone-memory-read'),
     'pin-phone-memory-erase-cancel': Scenario('noki5210_pin_phone_memory_erase_cancel.lua', '--erase-cancel',
         seconds=65, preserved=True, cold_scenario='pin-phone-memory-read'),
     'pin-phone-memory-erase': Scenario('noki5210_pin_phone_memory_erase.lua', '--erase',

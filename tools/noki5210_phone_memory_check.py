@@ -74,6 +74,11 @@ MODE_FRAMES.update(
     erase=dict(READ_FRAMES, erase_prompt=ERASE_PROMPT,
                erase_result='9b824b193e9310a0e0644d539bb352dabeea75f2f628a27c94b67a11ce8dfcf8'),
     empty_read={key: SAVE_FRAMES[key] for key in ('memory_selected', 'phone_empty')})
+KEYS['erase_first'] = KEYS['erase']
+MODE_FRAMES['erase_first'] = dict(MODE_FRAMES['erase'],
+    phonebook_list=MODE_FRAMES['rename_read']['phonebook_list'],
+    erase_prompt='3d2ffab2e4af9a377c9962ebc75e29c74439700bdef4a0e87cc9a74a366c2210',
+    erase_result='56cf729fac7146f33c16fe06f42d863b2421aa6e2f0eb695287e8afa5e0300bc')
 
 
 def expected_card():
@@ -127,6 +132,7 @@ def main():
                        ('--rename', 'rename'), ('--rename-read', 'rename_read'),
                        ('--add', 'add'), ('--multi-read', 'multi_read'),
                        ('--erase-cancel', 'erase_cancel'), ('--erase', 'erase'),
+                       ('--erase-first', 'erase_first'),
                        ('--empty-read', 'empty_read')):
         modes.add_argument(flag, action='store_const', dest='mode', const=mode)
     args = parser.parse_args()

@@ -528,6 +528,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 verify-5210-pin-phone-memory-multiple: normalize-5210 build
 	$(VENV)/bin/python tools/run_noki5210_acceptance.py $(RUN_DIR)/save --scenario pin-phone-memory --mame $(MAME_DIR)/mame
 	$(VENV)/bin/python tools/run_noki5210_acceptance.py $(RUN_DIR)/add --scenario pin-phone-memory-add --preserved-nvram $(RUN_DIR)/save/nvram --mame $(MAME_DIR)/mame
+	$(VENV)/bin/python tools/run_noki5210_acceptance.py $(RUN_DIR)/erase --scenario pin-phone-memory-erase-first --preserved-nvram $(RUN_DIR)/add/nvram --mame $(MAME_DIR)/mame
 
 verify-5210-pin-phone-memory-erase: normalize-5210 build
 	$(VENV)/bin/python tools/run_noki5210_acceptance.py $(RUN_DIR)/save --scenario pin-phone-memory --mame $(MAME_DIR)/mame

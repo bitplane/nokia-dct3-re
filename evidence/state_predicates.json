@@ -3,11 +3,19 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm5_phone_memory_selective_erase_cold_survivor",
+      "owner": "nsm5_nonvolatile_storage",
+      "status": "satisfied",
+      "predicate": "Confirmed physical erasure of A from a two-contact Phone bank preserves the original Ada/123 through an independent cold boot",
+      "current": "The six-process multiple-contact gate retains fresh empty/Save/cold-read and Add/cold-two-name controls, then selects A/123, renders Erase? A and physically confirms OK. The reviewed Erased result differs from the existing last-contact erase oracle; neither oracle is relaxed. A separate cold process retrieves the original Ada list and123 Details with unchanged complete SIM. Exact physical release sequences, authentication/registration, idle/Messages recovery and all predecessor NVRAM hashes remain mandatory. This qualifies non-selected-contact preservation after confirmed erasure, not exhaustive record enumeration, capacity, interrupted-write atomicity or native DSP speech.",
+      "evidence": ["docs/5210_bringup.md", "tools/noki5210_pin_phone_memory.lua", "tools/noki5210_pin_phone_memory_erase_first.lua", "tools/noki5210_phone_memory_check.py", "tools/test_noki5210_phone_memory_check.py", "tools/run_noki5210_acceptance.py", "tools/test_run_noki5210_acceptance.py", "gates.json"]
+    },
+    {
       "id": "nsm5_phone_memory_two_contacts_cold_persistence",
       "owner": "nsm5_nonvolatile_storage",
       "status": "satisfied",
       "predicate": "Physical Add preserves two distinct phone-local names across an independent cold boot with unchanged SIM storage",
-      "current": "The named four-process gate first proves fresh empty Phone storage, Ada/123 Save and cold retrieval. A preserved-storage process edits the name to A but physically selects Add rather than Replace. A separate cold process independently selects A and Ada and requires their distinct reviewed list frames plus123 Details for each. Equal numbers cannot prove name coexistence, so both name frames and the complete two-selection physical input sequence are mandatory. All processes authenticate/register, preserve the exact expected full SIM, reject UPDATE RECORD/EF_ADN writes and recover reviewed idle/Messages pixels. Predecessor NVRAM inventories remain unchanged. This is research-HLE handset-local storage evidence, not selective deletion, capacity, failure atomicity or native DSP/speech acceptance.",
+      "current": "The first four processes of the named gate prove fresh empty Phone storage, Ada/123 Save and cold retrieval. A preserved-storage process edits the name to A but physically selects Add rather than Replace. A separate cold process independently selects A and Ada and requires their distinct reviewed list frames plus123 Details for each. Equal numbers cannot prove name coexistence, so both name frames and the complete two-selection physical input sequence are mandatory. All processes authenticate/register, preserve the exact expected full SIM, reject UPDATE RECORD/EF_ADN writes and recover reviewed idle/Messages pixels. Predecessor NVRAM inventories remain unchanged. This is research-HLE handset-local storage evidence, not selective deletion, capacity, failure atomicity or native DSP/speech acceptance.",
       "evidence": ["docs/5210_bringup.md", "tools/noki5210_pin_phone_memory.lua", "tools/noki5210_pin_phone_memory_add.lua", "tools/noki5210_pin_phone_memory_multi_read.lua", "tools/noki5210_phone_memory_check.py", "tools/test_noki5210_phone_memory_check.py", "tools/run_noki5210_acceptance.py", "tools/test_run_noki5210_acceptance.py", "gates.json"]
     },
     {
