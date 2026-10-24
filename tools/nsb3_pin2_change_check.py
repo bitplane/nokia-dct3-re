@@ -29,7 +29,7 @@ def check_pin2_card(card, changed=False, attempts=3):
     check_card(bytes(canonical), 3)
 
 
-def check_trace(text, restore=False, wrong=False):
+def check_trace(text, restore=False, wrong=False, blocked=False):
     if 'nsb3_board_reset_request:' in text:
         raise ValueError('reset interrupts credential qualification')
     check_pin(text, True, allowed_mutations=(0x24,))
@@ -47,7 +47,7 @@ def check_trace(text, restore=False, wrong=False):
     if credentials != [(0x20, 0, 1, 8, padded_pin('1234')),
                        (0x24, 0, 2, 16, padded_pin(old) + padded_pin(new))]:
         raise ValueError('requires PIN1 startup then exact PIN2 CHANGE CHV')
-    if statuses(text, 0x24) != [(0x9804 if wrong else 0x9000, 3, 10)]:
+    if statuses(text, 0x24) != [(0x9840 if blocked else 0x9804 if wrong else 0x9000, 3, 10)]:
         raise ValueError('PIN2 change failed')
     if any(row[0] in (4, 0x44, 0xdc, 0xd6, 0x32, 0xc2) for row in commands):
         raise ValueError('unrelated SIM mutation')

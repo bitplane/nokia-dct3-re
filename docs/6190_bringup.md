@@ -642,7 +642,8 @@ initial-card snapshot, unchanged own executable, and reviewed PIN/error/phone
 prompt/menu frames. No guest RAM/save state, forced authentication result or
 donor provisioning is supplied. Successful PIN1 exhaustion/PUK recovery is
 qualified below, as are menu-based PIN/PIN2 change and cold restoration.
-Wrong/permanently exhausted PUK and PIN2 exhaustion remain unqualified.
+Wrong/permanently exhausted PUK remains unqualified; PIN2 exhaustion and
+successful PUK2 recovery are qualified below.
 
 ### PIN1 exhaustion and PUK recovery
 
@@ -735,7 +736,7 @@ enabled/disabled cold challenge behavior, whole-card contents, own executable,
 linked source hashes/initial card snapshots and Done/prompt/menu pixel oracles.
 Unrelated credential, file or Toolkit mutations fail. No firmware-state write,
 donor data or guest-state transfer is supplied. PIN/PIN2 change contracts
-are qualified below; failed-PUK and PIN2 exhaustion/PUK2 remain separate.
+are qualified below, including PIN2 exhaustion/PUK2; failed-PUK remains separate.
 
 ### Menu PIN change and cold authentication
 
@@ -807,7 +808,8 @@ linked restore with `prepare-restore CHANGE RESTORE` and run
 requires exact credentials/contacts/statuses, own executable, linked storage,
 whole-card transitions and Messages/changed-PIN2 frames. It rejects reset
 requests and unrelated mutations. This is bounded cold credential persistence,
-not long-run stability, PIN2 exhaustion/PUK2 recovery or native radio acceptance.
+not long-run stability or native radio acceptance. PIN2 exhaustion/PUK2
+recovery is qualified separately below.
 
 The first PIN2 rejection is independently qualified: physical current `5679`
 with new/confirmation `8765` emits the exact credential-2 CHANGE command,
@@ -822,3 +824,28 @@ PIN2-change checker's existing `prepare-restore` operation. The rejection
 checker `check SEED WRONG RECOVERY RESTORE` requires exact cold links,
 whole-card transitions, APDUs/statuses, physical contacts and error/success
 pixels. No attempt counter is seeded or reset by the harness.
+
+### Physical PIN2 exhaustion and PUK2 recovery
+
+Two further independent cold wrong-current-PIN2 runs consume the actual
+predecessor card, reducing attempts 2→1→0. The last CHANGE returns `9840`
+and displays **PIN2 code blocked**. PIN1, PUK2 and all unrelated bytes remain
+unchanged. The next cold process still authenticates PIN1 and the separate
+phone code, then selects Change PIN2. After the blocked notice it accepts
+physical PUK2 `87654321`, new PIN2 `8765` and confirmation. Firmware sends
+`A0 2C 00 02 10`, receives `9000`, automatically sends
+`A0 20 00 02 08` for the replacement PIN2, receives `9000` and displays
+**Code accepted**. PIN2 changes and its attempts return to 3; PUK2 attempts
+remain 10. A further cold ordinary PIN2 change authenticates `8765` and
+restores `5678`, requiring the complete original card.
+
+Use `nsb3_puk2_check.py prepare-last-wrong ONE ZERO` for the final wrong
+input, and `prepare-recovery ZERO RECOVERY` for the exhausted input. Run
+`nsb3_puk2_recover_input.lua` for 92 seconds; the actual physical sequence
+ends at 90 seconds, before the separately qualified late-reset boundary.
+Prepare the ordinary cold restoration through the PIN2-change checker and
+run its restore script for 90 seconds. `check SEED TWO ONE ZERO RECOVERY RESTORE`
+requires exact linked storage, whole-card transitions, contacts,
+CHANGE/UNBLOCK/replacement-VERIFY order, statuses and reviewed frames.
+Reset requests and unrelated mutations fail. This does not qualify wrong
+PUK2 retries, permanent PUK2 loss, long-run native stability or radio service.

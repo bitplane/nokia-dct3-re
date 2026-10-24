@@ -29,9 +29,10 @@ Physical PIN-request Off/On also persists across cold boots: Off skips SIM
 VERIFY but retains the phone-code prompt, while On restores the SIM challenge.
 Physical menu PIN1 change survives cold old-PIN rejection/new-PIN acceptance.
 Physical PIN2 change and cold authenticated restoration preserve all unrelated
-card bytes. A first wrong PIN2 consumes one retry; cold correct change restores
-it, followed by a cold credential restoration. These credential fixtures are
-bounded to 90 seconds: independent extended controls reset near 94 seconds
+card bytes. Physical PIN2 exhaustion, cold PUK2 recovery and automatic
+replacement-PIN2 verification also pass, followed by a cold authenticated
+restoration to the complete original card. These credential fixtures are
+bounded to 90–92 seconds: independent extended controls reset near 94 seconds
 after the DSP receive-activity window becomes empty and firmware publishes
 reason `68`. That trigger is mapped, not suppressed; the missing native
 response and fitted-mask/RF compatibility remain unresolved.

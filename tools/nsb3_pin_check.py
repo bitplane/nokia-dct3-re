@@ -30,7 +30,7 @@ def check_card(card, retries, pin='1234', enabled=True):
         raise ValueError('PIN-enabled whole card differs beyond qualified PIN1 retry count')
 
 
-def check_trace(text, correct, attempts_before=3, pin=None, allowed_mutations=()):
+def check_trace(text, correct, attempts_before=3, pin=None, allowed_mutations=(), additional_verifies=()):
     if attempts_before not in (1, 2, 3):
         raise ValueError('requires live PIN1 attempts')
     digits = pin or ('1234' if correct else '4321')
@@ -40,11 +40,13 @@ def check_trace(text, correct, attempts_before=3, pin=None, allowed_mutations=()
         raise ValueError('physical SIM PIN contact order differs')
     remaining = 3 if correct else attempts_before - 1
     expected = (0x9000 if correct else 0x9840 if remaining == 0 else 0x9804, remaining, 10)
-    if statuses(text, 0x20) != [expected]:
+    if additional_verifies and not correct:
+        raise ValueError('extra verification requires authenticated startup')
+    if statuses(text, 0x20) != [expected] + [(0x9000, 3, 10)] * len(additional_verifies):
         raise ValueError('SIM VERIFY status/retry transition differs')
     commands = wire(text)
     verify = [row[:5] for row in commands if row[0] == 0x20]
-    if verify != [(0x20, 0, 1, 8, padded_pin(digits))]:
+    if verify != [(0x20, 0, 1, 8, padded_pin(digits))] + list(additional_verifies):
         raise ValueError('physical VERIFY APDU differs')
     if any(row[0] in (0x24, 0x26, 0x28, 0x2c) and row[0] not in allowed_mutations for row in commands):
         raise ValueError('unexpected SIM credential mutation')
