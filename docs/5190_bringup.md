@@ -82,6 +82,40 @@ cold runs use `nsb1_security_fixture.lua`/`nsb1_pin_reload.lua` for28s. The
 5190's Menu/Navi contact is column1/mask04 and Up is column1/mask10; the 6130's
 softkey/navigation cells are not inherited by these fixtures.
 
+### SIM Toolkit external-card boundary
+
+The explicit Phase-2+ laboratory profile independently qualifies DISPLAY TEXT
+on `nsb1r4t`. The own firmware reads EF_PHASE=03, publishes the five-byte
+TERMINAL PROFILE `0f41ff7700`, receives one pending `91 16` STATUS and FETCHes
+the exact `DCT3 SAT` proactive command. Physical Menu/Navi OK at68s precedes
+the sole successful TERMINAL RESPONSE `810301218002028281030100`.
+Both SIMI wire directions are observed below the protocol parser; no event,
+callback, guest RAM or card-response injection bypasses the controller.
+
+The complete persistent PIN-enabled card, own MCU/PPM, declared NSE-1 resident
+inputs and predecessor-storage hashes are preserved. The only configuration difference
+is SATCFG:1. A matched SATCFG:0 Phase-2 control reads EF_PHASE=02 and sends
+no TERMINAL PROFILE, FETCH or TERMINAL RESPONSE under the same physical
+authentication/dismissal timeline. MAME omits that default-valued field from
+the saved CFG; the checker accepts its absence only for this control.
+
+The reviewed proactive-text frame is distinct from the post-dismissal frame.
+Dismissal returns the existing corrupted idle content, not a clean-idle
+milestone. This is bounded card/application acceptance on an explicitly
+unproved ROM4 compatibility instrument, not fitted-mask, native radio,
+registration, speech or the rest of Toolkit.
+
+```sh
+.venv/bin/python tools/nsb1_toolkit_check.py \
+  tmp/nsb1-pin-roundtrip-gated/correct tmp/NAME --mame mame/mame
+.venv/bin/python tools/nsb1_toolkit_check.py \
+  tmp/nsb1-pin-roundtrip-gated/correct tmp/CONTROL --control --mame mame/mame
+```
+
+Both commands require fresh output directories and the qualified own original
+PIN-card predecessor, not a donor provision. Captures:
+`tmp/nsb1-toolkit-display-accepted` and `tmp/nsb1-toolkit-control-accepted`.
+
 ### Fixed dialling card state
 
 An explicit FDN-capable laboratory card now passes physical activation,

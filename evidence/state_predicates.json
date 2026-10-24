@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb1_own_toolkit_display_text",
+      "owner": "nsb1_sim_toolkit",
+      "status": "satisfied",
+      "predicate": "Own NSB-1 firmware fetches a card-originated DISPLAY TEXT command and returns success only after physical dismissal",
+      "current": "The Phase-2+ external lab card causes EF_PHASE03, own TERMINAL PROFILE0f41ff7700, one pending STATUS9116 and a22-byte FETCH of the exact DCT3 SAT BER-TLV. The reviewed text precedes physical Menu/Navi OK at68s; the sole12-byte successful terminal response follows that contact. Both full SIMI wire streams, successful PIN/phone authentication, own native-compatibility execution, reviewed startup frames, exact complete unchanged card and predecessor hashes pass. Only SATCFG differs. A matched Phase-2 control reads02 and emits no proactive APDUs under the same contacts. Post-dismissal pixels retain known corrupted idle content, not clean-idle acceptance. This is bounded Toolkit support on nsb1r4t, not fitted-mask identity, native RF, registration, speech or every Toolkit command.",
+      "evidence": ["docs/5190_bringup.md", "tools/nsb1_toolkit_prepare.py", "tools/nsb1_toolkit_input.lua", "tools/nsb1_toolkit_check.py", "tools/test_nsb1_toolkit_check.py"]
+    },
+    {
       "id": "nsm5_phone_memory_selective_erase_cold_survivor",
       "owner": "nsm5_nonvolatile_storage",
       "status": "satisfied",
