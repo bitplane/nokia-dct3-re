@@ -78,6 +78,43 @@ def catalogue_consumer(image):
             'payload_offset_bytes': 12, 'transport_execution_proved': False}
 
 
+STORAGE_DISPLAY_FRAGMENTS = {
+    0x3383b8: '2000210122c9a3b1f051f8b520002102f051f855682c',
+    0x338684: '454550524f4d00c0',
+    0x389250: '48d068013c011c2046fe4708',
+    0x38927e: '48eb6802466888011c2046fe4710',
+    0x389594: '0013c45c',
+    0x38962c: '0013c458',
+    0x3dbb52: '1e412900d00d39022900d10a490e4a13604a4a13600a4a13610a4a13608a4a13e0094a094908604a4a09600a4a09610a4a09608a4a0960cab002bd00',
+    0x3dbb98: '0013c458003e04990015a6b1003e049d0015a739003e04bd003e04fd0015a6b1003e05010015a739003e0521',
+    0x3e0498: '880046f7',
+    0x3e04fc: '880046f7',
+    0x3cdb50: '206d5d000840d3fb216e202455082300258022002040431006000e01206d5d000840d3fb206e5501206d5d000840d3fb206e55052054216d5d090849d3fb212e550b38012800d1f61c5006000e022a06dbe0206d5d000840d3fb216e20205508',
+    0x3cdc50: '00020000',
+}
+
+
+def storage_display_contract(image):
+    for address, encoded in STORAGE_DISPLAY_FRAGMENTS.items():
+        expected = bytes.fromhex(encoded)
+        offset = address - 0x200000
+        if image[offset:offset + len(expected)] != expected:
+            raise ValueError(f'NSM-4 storage/display instructions differ at {address:#x}')
+    return {'storage': {'named_region': 'EEPROM', 'registration_call': '0x3383c0',
+                        'registration_argument_r2': '0xc9',
+                        'word_read_callback_ram': '0x13c45c',
+                        'word_program_callback_ram': '0x13c458',
+                        'callback_initializer': '0x3dbb52',
+                        'read_entries': ['0x3e0498', '0x3e04fc'],
+                        'read_operation': 'memory-mapped halfword',
+                        'program_entry_ram': '0x15a6b0',
+                        'physical_backend_established': False},
+            'display': {'clear_loop': '0x3cdb50', 'banks': 6, 'bytes_per_bank': 84,
+                        'command_space_width': 84, 'command_space_height': 48,
+                        'clear_entry_command': '0x24', 'clear_exit_command': '0x20',
+                        'physical_panel_identification_proved': False}}
+
+
 def read_catalogue(image):
     offset = TABLE - 0x200000
     if len(image) < offset + 124:
@@ -118,6 +155,7 @@ def inspect(image):
             'peripheral_contract': peripheral_contract(image),
             'keymap_contract': keymap_contract(image),
             'catalogue_consumer': catalogue_consumer(image),
+            'storage_display_contract': storage_display_contract(image),
             'bootstrap': {'identity_data_0803': 6, 'resident_call': '0x861f',
                           'fitted_mask_compatibility_proved': False},
             'scope': 'Static MCU declarations only; no upload execution, peripheral wiring, PMM or resident mask established'}

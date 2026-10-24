@@ -5,9 +5,10 @@
 Own v5.18 MCU and PPM regions are normalized and statically qualified. No
 machine profile, graphical boot, input, storage or radio acceptance is claimed.
 Own GENSIO and keypad register operations are now pinned. The next questions
-are EEPROM GPIO transaction code and display geometry, before choosing an
-existing device composition. The DSP catalogue consumer and logical key
-translation tables are statically recovered, not yet runtime-qualified.
+are the RAM-resident flash program/identification routines and flash part
+contract, before choosing an existing device composition. The storage callback
+initializer, display clear layout, DSP catalogue
+consumer and logical key tables are statically recovered, not runtime-qualified.
 
 Reproduce the static report:
 
@@ -80,6 +81,32 @@ Layout zero uses 25 normal entries at `0x45dfd4`, in raw-index order:
 The special five-entry table at `0x45dff0` is `3e 3e 3e 3e 0d`, mapping
 raw `0x84` to power logical `0x0d`. These are own firmware logical values;
 runtime key delivery and all physical legends remain separate acceptance.
+
+## Storage backend and display layout
+
+Do not infer an external I2C EEPROM from header descriptor `fd`. Its decoded
+geometry above is only a descriptor interpretation; the actual storage path
+must be recovered independently. At `0x3383b8..0x3383c0`, firmware calls
+`0x38952e` with `r0=0`, `r1=1`, `r2=c9` and `r3=0x338684`, an `EEPROM`
+string. The byte-write routine `0x389212` performs word read/modify/program
+through indirect callbacks: `0x389250` obtains its read pointer from RAM
+`0x13c45c`; `0x38927e` obtains its program pointer from `0x13c458`.
+The initializer at `0x3dbb52` selects one of two callback sets according to
+its preceding identification result (values 1/3 versus other values). Both
+sets install program pointer `0x15a6b1` (Thumb RAM entry `0x15a6b0`); read
+pointers are `0x3e0499` and `0x3e04fd`. Both own read routines are exactly
+`8800 46f7`: `ldrh r0,[r0]; mov pc,lr`. Thus this storage read path is
+memory-mapped halfword access, not GPIO I2C. The RAM-resident program code,
+identification result semantics, particular fitted flash and PMM location
+remain unmapped; no particular part follows from a callback address.
+
+The initializer at `0x3cdae6` selects LCD channel `21`, pulses GPIO bit 3,
+then the `0x3cdb50..0x3cdbae` loop writes command `24`, selects banks with
+`40|bank` and column `80`, writes 84 zero data bytes per bank, iterates six
+banks and writes final command `20`. This establishes an 84x48 command-space
+clear layout. It does not identify the physical panel, prove contrast or
+refresh timing, or qualify pixel rendering in MAME. Its own MMIO literal is
+`00020000` at `0x3cdc50`.
 
 The conservative literal-seeded MMIO census, with constant-index recovery,
 resolves 798 candidate accesses from 276 seeds (247 return, 16 decode-gap,

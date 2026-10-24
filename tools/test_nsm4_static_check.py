@@ -3,7 +3,8 @@ import unittest
 
 from tools.nsm4_static_check import (TABLE, inspect, read_catalogue,
                                     peripheral_contract, PERIPHERAL_FRAGMENTS,
-                                    keymap_contract, catalogue_consumer)
+                                    keymap_contract, catalogue_consumer,
+                                    storage_display_contract, STORAGE_DISPLAY_FRAGMENTS)
 
 
 class Nsm4StaticTest(unittest.TestCase):
@@ -84,6 +85,22 @@ class Nsm4StaticTest(unittest.TestCase):
             changed[offset] ^= 1
             with self.assertRaises(ValueError):
                 catalogue_consumer(changed)
+
+    def test_storage_and_display_boundaries(self):
+        image = bytearray(0x290000)
+        for address, encoded in STORAGE_DISPLAY_FRAGMENTS.items():
+            data = bytes.fromhex(encoded)
+            offset = address - 0x200000
+            image[offset:offset + len(data)] = data
+        result = storage_display_contract(image)
+        self.assertEqual(result['display']['banks'], 6)
+        self.assertEqual(result['display']['bytes_per_bank'], 84)
+        self.assertFalse(result['storage']['physical_backend_established'])
+        for address in STORAGE_DISPLAY_FRAGMENTS:
+            changed = bytearray(image)
+            changed[address - 0x200000] ^= 1
+            with self.assertRaises(ValueError):
+                storage_display_contract(changed)
 
 
 if __name__ == '__main__':
