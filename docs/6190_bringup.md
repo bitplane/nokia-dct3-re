@@ -15,6 +15,8 @@ completes organic TERMINAL PROFILE/FETCH/DISPLAY TEXT, GET INKEY and GET INPUT
 through physical dismissal/key/text entry, plus SET UP MENU and physical item
 selection. SELECT ITEM additionally returns a physical choice to the card and
 restores the clean installed list; ACK-only menu settlement remains unqualified.
+A fetched DISPLAY TEXT awaiting input additionally survives native save/load,
+with exact observed architecture/I/O replay and successful physical completion.
 Ordinary idle content and automatic notice
 clearing remain unresolved; explicit rejection dismissal restores clean menus.
 An independent long-run control resets near 94 seconds
@@ -1417,3 +1419,26 @@ pending notification, all fetched/returned payloads and statuses, physical
 selection before the item response, unchanged full card/cold provenance and
 reviewed Alpha/Beta/selected-Beta/returned-list pixels. The ACK-only Wait control
 remains an independent characterization, not a failure this positive gate hides.
+
+#### Pending Toolkit transaction restoration
+
+An independent profile-1 input saves at 65 seconds while the fetched DISPLAY
+TEXT is visibly awaiting input. Physical OK completes it; loading the saved
+machine restores that pending card/UI transaction, and the same physical OK
+completes it again. The wire trace has one TERMINAL PROFILE, one FETCH and two
+identical successful TERMINAL RESPONSEs, each after its own physical contact.
+No refetch or card reinitialization supplies the restored transaction.
+
+The shared native-state fixture restores the observed 37 ARM registers,
+36 DSP fields and backed-RAM/data/program rolling checksums exactly. Both
+2.7-second continuations reproduce all 1,170 DSP I/O writes and the same clean
+Messages pixels. The complete persistent card is unchanged. The gate also
+requires the checkpoint's exact pending-prompt pixels and a nonempty saved-state
+artifact, whose hash is returned for provenance.
+
+Prepare a fresh default Toolkit input, run `nsb3_toolkit_state.lua` for 72 seconds,
+then check with `nsb3_toolkit_state_check.py SOURCE RUN`. Storage/profile checks
+are shared with the ordinary Toolkit gates rather than independently relaxed.
+This accepts one pending DISPLAY TEXT restoration, not all Toolkit commands,
+menu persistence across power loss, long-run native stability, registration or
+speech. It uses emulator save/load APIs, not guest-state forcing.

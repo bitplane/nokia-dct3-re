@@ -117,15 +117,10 @@ def check_trace(text, interactive=False, menu_item=None, return_wait=False, sele
             raise ValueError('item response preceded physical confirmation')
 
 
-def check(source, run, interactive=False, menu_item=None, return_wait=False, select_item=False):
-    if select_item:
-        if menu_item not in (None, 1) or return_wait:
-            raise ValueError('SELECT ITEM requires its own Continue control')
-        menu_item = 1
-    interactive = interactive or menu_item is not None
+def check_storage(source, run, profile):
+    """Common own-storage and explicit external-card provenance contract."""
     check_link(source, run)
     metadata = json.loads((run / 'cold_source.json').read_text())
-    profile = 7 if select_item else 4 if menu_item is not None else 3 if interactive else 1
     if metadata.get('external_toolkit_card') != profile_metadata(profile):
         raise ValueError('external Toolkit profile provenance differs')
     storage = run / 'nvram/nsb3r4t'
@@ -133,6 +128,16 @@ def check(source, run, interactive=False, menu_item=None, return_wait=False, sel
         raise ValueError('own executable changed')
     if (run / 'initial_sim_card.bin').read_bytes() != make_current_profile(True) or (storage / 'sim_card').read_bytes() != make_current_profile(True):
         raise ValueError('complete card changed')
+
+
+def check(source, run, interactive=False, menu_item=None, return_wait=False, select_item=False):
+    if select_item:
+        if menu_item not in (None, 1) or return_wait:
+            raise ValueError('SELECT ITEM requires its own Continue control')
+        menu_item = 1
+    interactive = interactive or menu_item is not None
+    profile = 7 if select_item else 4 if menu_item is not None else 3 if interactive else 1
+    check_storage(source, run, profile)
     check_trace((run / 'error.log').read_text(), interactive, menu_item, return_wait, select_item)
     frame_check(run / 'snap/nsb3_toolkit_display.png', '0b61ca941a012e9feffe2d13b834c720031b71295220fc32139decd034172b2c')
     if not interactive:

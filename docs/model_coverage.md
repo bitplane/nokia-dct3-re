@@ -54,6 +54,9 @@ physical Continue/Exit send distinct accepted item-1/item-2 envelopes. Immediate
 post-selection Wait is observed for ACK-only selection. A follow-up SELECT ITEM
 card displays Alpha/Beta, returns physical Beta and restores the clean installed
 list; ACK-only automatic settlement remains unqualified. Other Toolkit commands remain open.
+A fetched DISPLAY TEXT awaiting physical input also survives native save/load:
+one FETCH yields two successful physical completions with identical I/O and
+returned-menu pixels, preserving the complete persistent card.
 Physical SIM-security gates cover PIN-request Off/On, PIN1/PIN2 changes and
 cold restoration, retry persistence, physical PIN exhaustion, wrong-PUK
 persistence/recovery and replacement-credential authentication. Exact whole-card
