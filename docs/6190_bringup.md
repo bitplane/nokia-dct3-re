@@ -450,3 +450,38 @@ fixture, then extend the native checker with `--consumer`. It requires the
 same forwarded/consumed object, observed state initialization and retention,
 cache allocation, and exact captured-vector equality in addition to the
 complete native ring and physical security/menu controls.
+
+### Activation caller coverage
+
+Constructor `2937c4` has a `043f` case at `29386e`, copying bytes `+5/+4`
+from own control record `10c3d8` into message `+2/+3` before posting to task
+12. This does not establish that the case has an ordinary producer.
+The two-byte-aligned direct-Thumb-BL scan over the complete `d6d00`-byte MCU
+extent finds 38 constructor candidates; the shared constant-recovery census
+decodes all 38 and recovers all 38 inputs, with no undecoded candidates.
+None supplies `043f`. Caller `257b82` supplies `0440`, which selects a different
+task-12 branch; it must not be relabeled as the initializer input. The NSB-1
+`043f` producer cannot therefore be imported as an NSB-3 fact.
+
+The alternative task-12 input `13a3` selects `219f94 -> 218cac`. Its `218d50`
+path can call initializer `218bb0` using the retained argument byte. Own
+publisher `211174` constructs `13a3`, copies byte `108947` to message `+2`,
+and posts to task 12. Its three direct BL callers are `2112f2`, `213b64`,
+and `213c02`. These are the next upstream lifecycle boundaries to qualify.
+
+With native ring/cache controls passing, counters sampled at 64 seconds
+observe zero `043f/0440` constructor entrances, zero initializer entrances,
+zero `13a3` consumer entrances and zero `13a3` publisher entrances. The
+debugger counters use `temp5..8`; parent startup/acquisition observers reserve
+`temp0..4`. This scoped absence is not a whole-ROM proof: indirect callers,
+tail branches, interpreted tables and later or other physical lifecycles
+remain open. Do not inject either status or initialize the controller byte.
+
+```sh
+.venv/bin/python tools/nsb3_activation_census.py roms/noki6190/6190f613a.fls --run ACTIVATION_RUN
+```
+
+Prepare the same fresh external fixture, then run
+`tools/nsb3_radio_activation_observe.lua` for 65 seconds. The optional run
+check requires the existing physical/security/native-ring/cache controls as
+well as the bounded activation counts; an unqualified null trace is rejected.
