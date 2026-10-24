@@ -7142,7 +7142,8 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		// Smem is read; MACD's implicit write is to Smem+1, not this operand.
 		// SPRU131G 5.5.3.1 excludes short preincrement from source reads.
-		if ((low & 0xf8) == 0x98) { m_illegal = true; return; }
+		// Keep unadmitted f9..ff aliases distinct from canonical absolute f8.
+		if ((low & 0xf8) == 0x98 || low > 0xf8) { m_illegal = true; return; }
 		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
 		u16 coefficient_address;

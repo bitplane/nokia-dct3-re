@@ -100,8 +100,8 @@ not execution timing or completion of the remaining source/RMW audit.
 `tools/run_c54x_core.py --mame mame/mame --rompath mame/roms --profile xorm
 --output-root tmp` runs this matrix before its separate 1,024 XORM execution
 and restoration cases. Accepted evidence: `tmp/run_c54x_core_45tucxku`.
-The [full-core checkpoint](#core-regression-checkpoint) is revision-bound;
-newer isolated admission checks retain their separately stated scope below.
+The [full-core checkpoint](#core-regression-checkpoint) covers the current
+source-admission guards; optional profiles retain their separate scopes below.
 
 ### Operand-domain acceptance
 
@@ -175,16 +175,28 @@ copies/restores pass separately. Negative capture:
 `tmp/c54x-delay-alias-fixed/run_c54x_core_qyy685wz`.
 The native staged NSE-1 menu oracle and existing MPY/MAC alias controls also
 pass; the tool suite passes5,116 tests.
-This correction is newer than the full-default-suite checkpoint below;
-its isolated controls do not renew that entire population.
+The current full-default-suite checkpoint also includes this guard; the
+isolated rejection/copy matrices retain their own case counts and scopes.
+
+`pmac-abs-edge` separately checks448 cases/restores for MACP/MACD
+`f9..ff` aliases, both destinations, CMPT settings, program pages,
+frontends and two checkpoints. The unchanged atomic path performs a data
+transaction at case56. The corrected handler rejects before reading the
+source/coefficient, publishing T or performing MACD's successor copy.
+All cases preserve A/B/T/status and every AR with zero data transactions.
+The existing512-case short-MOD3 control remains unchanged. These are
+fail-closed admission contracts, not silicon-trap claims or positive staged
+MACP/MACD support. Negative capture:
+`tmp/c54x-pmac-alias-negative/run_c54x_core_dl6032t6`; corrected capture:
+`tmp/c54x-pmac-alias-fixed/run_c54x_core_9z1v8zec`.
 
 The existing256-case short-MOD3 MPY rejection control and the complete
 `mpy-mem-imm` profile pass separately:98,304 legal MPY cases,262,144 MAC
 cases and1,408 MAC exclusions, all with restoration. The legal profile's
 capture is`tmp/run_c54x_core_0izklf6w`. These are bounded instruction
 regressions; the [core checkpoint](#core-regression-checkpoint) separately
-qualifies the complete default suite at`7f992738`, before the later
-LTD/DELAY absolute-alias guard.
+qualifies the complete default suite including the LTD/DELAY and MACP/MACD
+absolute-alias guards.
 Native staged5110 Phone book menu acceptance and both3210 default/frontier
 regressions also pass without rebanking their oracles. This does not expand
 handset, RF or speech support.
@@ -332,7 +344,7 @@ execution. This is the existing emulator phase contract, not a new physical
 timing claim. Conformance failures now print the case, tick, replay, registers
 and transaction counters, and the runner rejects any such assertion diagnostic
 even if completion markers are also present.
-With these assertions, the full default core gate reproduces all 292 required
+The current full default core gate reproduces all 293 required
 markers exactly once, including the legal MACP/MACD examples. The separate
 program-multiply rejection and repeated-SUBC/ST profiles and the complete tool
 suite also pass. These are executable emulator regressions, not all-ISA or
@@ -2133,26 +2145,39 @@ not permission to borrow another handset's keypad or UI completion events.
 
 ## Core regression checkpoint
 
-The default C54x suite passes on source revision `7f992738`, including the
-source/RMW admission guards and atomic MAC correction at `882a7bcb`.
+The default C54x suite passes with the source/RMW admission guards and
+atomic MPY/MAC, LTD/DELAY and MACP/MACD absolute-alias corrections.
 All 293 required markers appear exactly once, followed by core conformance
 PASS and intentional MAME exit 3; the isolated runner returns 0, with
 `interrupted=false`. The capture is
-`tmp/c54x-full-admission-audit/run_c54x_core_u6i6bbqp`:
+`tmp/c54x-post-alias-default/run_c54x_core_who49g7h`:
 
 ```sh
 .venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath roms \
-  --output-root tmp/c54x-full-admission-audit
+  --output-root tmp/c54x-post-alias-default
 ```
 
-This closes the post-admission full-default-suite verification gap for that
-revision, not later isolated changes such as the LTD/DELAY alias guard. Optional
+The recorded executable SHA256 is
+`e9cefc83fd98bf799c08ad4e8374616f175a68bd347def3fe34235d3d27a5255`.
+CPU source SHA256 is
+`5cd936357159c1d15150f6b83ea88e1557ec10128c906fdc56cda860772df41f`;
+fixture source SHA256 is
+`81892f0461ab906dbdd3f1e2552ef544b9a36c4b6d7d4f75c8fe270ccedffc0a`.
+All three still match after completion. Its5,690 distinct executable-opcode
+assertions exactly match the preceding complete run, with no lost or added
+forms. Optional
 profiles retain their separate acceptance scopes; this run does not prove
 the complete ISA, physical pipeline timing, fitted DSP-mask compatibility,
-native RF, speech or end-to-end handset calls. The separate tool suite passes
-5,106 tests. Revision-bound checkpoints below preserve their narrower
+native RF or end-to-end handset speech and calls. The separate tool suite passes
+5,123 tests. Revision-bound checkpoints below preserve their narrower
 instruction and original-firmware comparisons, not competing current
 default-suite baselines.
+
+The same binary separately passes the isolated native EFR decoder in both
+atomic and staged modes:163 frames,26,080 reference-exact PCM samples and
+65,440 ordinary RAM words replayed per frame. The staged NSE-1 physical
+Phone book menu oracle also remains exact. These are codec/component and
+handset-UI preservation controls, not native RF or call-media acceptance.
 
 The cold-catalogue checkpoint adds no CPU instruction admissions. Its staged
 `bootopenstage` gate passes with the saved recorder endpoint and rejects the

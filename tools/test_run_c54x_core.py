@@ -14,6 +14,16 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_program_multiply_alias_exclusions_require_both_instructions_and_destinations(self):
+        marker, ending = EXTRA_PROFILES['pmac-abs-edge']
+        text = marker + '\n' + ending
+        check_result(text, 3, profile='pmac-abs-edge')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3,
+                                 profile='pmac-abs-edge')
+
     def test_delay_alias_exclusions_require_both_instructions_and_no_data_effects(self):
         marker, ending = EXTRA_PROFILES['delay-abs-edge']
         text = marker + '\n' + ending
