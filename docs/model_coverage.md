@@ -1,5 +1,11 @@
 # DCT3 model coverage
 
+Nokia 6190 / NSB-3 v6.13 has a conservative `noki6190` MCU instrument.
+Two initially erased EEPROM runs reproduce exact own initialization and idle
+samples (`tools/nsb3_boot_check.py`), not graphical/input or DSP completion.
+Its own peripheral and dual-catalogue contracts are in `6190_bringup.md`;
+no donor identity or fitted-mask compatibility is assumed.
+
 Nokia 8855 / NSM-4 v5.18 has a fail-closed `noki8855` MCU research profile.
 Two own erased-storage boots produce identical catalogue/storage state and
 stop at an unacknowledged DSP ownership wait; `tools/nsm4_boot_check.py`

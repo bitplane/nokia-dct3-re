@@ -30,6 +30,11 @@ FRAGMENTS = {
     0x2b3618: '002d6a140010c482002d69f8',
     0x2d69f8: '3e3e3e3e3e11190102030e170405060f18070809101a0c0a0b',
     0x2d6a14: '3e3e3e3e0d',
+    0x2946a0: '48cf468088402803d10148e4e00048e46806',
+    0x2949e0: '0010ad08',
+    0x294a3c: '0010ad9c0010ad2c',
+    0x294acc: '88612903d1014962e000496200805809',
+    0x294c5c: '0010ad9c0010ad2c',
 }
 
 
@@ -66,6 +71,9 @@ def inspect(image):
         catalogues.append({'table': hex(table), 'bootstrap_identity': identity, **result})
     return {'mcu_sha256': MCU_SHA256, 'peripherals': peripheral_contract(image),
             'catalogues': catalogues,
+            'catalogue_selector': {'context': '0x10ad08', 'field': '0x10ad0a',
+                                   'equals_3': '0x10ad9c', 'otherwise': '0x10ad2c',
+                                   'initial_consumer': '0x2946a0', 'indexed_consumer': '0x294acc'},
             'scope': 'Own static declarations only; runtime mask selection and fitted compatibility unproved'}
 
 

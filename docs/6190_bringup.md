@@ -2,11 +2,12 @@
 
 ## Current boundary
 
-Own NSB-3 v6.13 MCU and PPM A/B/C service regions are qualified and extracted;
-there is no machine profile or runtime acceptance yet. Startup, peripheral
-instructions, logical key tables and both DSP catalogues are independently
-mapped. Next recover the runtime catalogue selector and upload/reset contract
-before choosing a resident mask or HLE composition. No donor EEPROM is supplied.
+`noki6190` is a conservative MCU research instrument. Two independent
+erased-storage runs initialize the same 8 KiB EEPROM, preserve the own flash
+and settle in a firmware idle loop. Runtime context selects catalogue 4;
+fitted-mask compatibility, graphical boot, organic input, SIM and radio remain
+unqualified. Next recover upload/reset execution and the idle loop's pending
+work before choosing a resident mask or HLE completion. No donor EEPROM is supplied.
 
 Collection provenance and the unprovided MCU-to-PPM gap are in
 `roms/README.md`. Reproduce the static report:
@@ -66,5 +67,49 @@ tested shared catalogue reader, not a guessed descriptor extent.
 Both bootstrap headers are `0f00 0000 00ba 0700 00b4 0000` (186 words).
 The identities are explicit `76f8 0803 0003/0004` instructions, not inferred
 from a product label. The installer names ROM4 files, but the runtime selector
-and compatibility with acquired resident masks remain unproved. Declared
+is statically recovered: initial consumer `2946a0` reads context word
+`10ad0a` and uses catalogue RAM `10ad9c` only for value 3, otherwise
+`10ad2c`. Indexed consumer `294acc` applies the same test. Both initial cold
+runs observe value 4. This is runtime branch selection, not fitted-mask
+compatibility. Declared
 payload ranges are not proof of execution, relocation or complete mask content.
+
+## Initial erased-storage instrument
+
+The own installer INI says `EraseDefinedArea=Yes`, `LowEraseLimit=200000`,
+`HighEraseLimit=2FFFFF`. Therefore the image builder fills the unsupplied
+`2d6d00..2e0000` gap with erased bytes, not donor content. Reproduce into a
+fresh file:
+
+```sh
+.venv/bin/python tools/nsb3_archive.py roms/archive-dct3-packages/nsb3_613.exe --image roms/noki6190/6190f613a.fls
+```
+
+The 1 MiB image SHA256 is
+`927f94aed4ece8e84ad2eda28614bcede1272e89a2d046b16192f88499da19c2`.
+The machine uses capacity-compatible Intel 28F800B3T and 24C64 devices;
+fitted identities are not proved. It shares only hardware construction with
+the 5190 profile, then applies its own independently checked contracts.
+Its minimum RAM window through `10ffff` covers stack `10fbf4`; upper aliases
+remain unmapped. Host logical key positions match the own table, not a claim
+that all 5210 physical legends apply to the 6190. Boot and DSP masks are
+`NO_DUMP`, boot transfer remains HLE, SIM socket is empty, and no DSP or
+application peer acknowledges firmware work.
+
+After `make build`, use a fresh isolated directory:
+
+```sh
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame --run-dir tmp/nsb3-new -- noki6190 -rompath /data/gaz/src/nokia-dct3-re/roms -noreadconfig -video none -sound none -nothrottle -log -seconds_to_run 6 -autoboot_delay 0 -autoboot_script /data/gaz/src/nokia-dct3-re/tools/nsb3_boot_observe.lua
+.venv/bin/python tools/nsb3_boot_check.py roms/noki6190/6190f613a.fls tmp/nsb3-new
+```
+
+Samples at seconds 1..5 show PC `2a8ac8/2a8acc`, LR `2a8a89`, selector
+`0004`, catalogue first pointers `2b7168/2bd0a8`, DSP control `02`, shared
+words `10000=0000`, `10002=ffff`. This is the idle-loop latch test at
+`2a8ac6..2a8acc`, not by itself a DSP ownership wait or proof of completed
+boot. Firmware changes 68 EEPROM bytes from erased state; the resulting
+8 KiB SHA256 is `4dc2b8ea96b930813282e930ebb9cddfddb916809c8f17d972540d59dd004917`.
+Complete flash remains byte-identical to the own installer-derived image.
+`tmp/nsb3-erased-first` and `tmp/nsb3-erased-repeat` agree on full EEPROM,
+flash and card files. The next trace must distinguish pending hardware work
+from a normally idle task; do not synthesize messages from a sampled PC alone.

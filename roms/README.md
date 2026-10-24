@@ -745,7 +745,9 @@ in `noki6190/v613/manifest.json`. Reproduce into a fresh directory:
 
 MCU `nsb3___6.130` occupies `0x200000..0x2d6d00`; PPM A/B/C each occupy
 `0x2e0000..0x300000` (exclusive ends). The intervening `0x9300` bytes are
-not supplied and are not synthesized by extraction. No external EEPROM or
+not supplied and are not synthesized by region extraction. Optional `--image`
+fills that gap with `ff` under the own INI's explicit whole-image erase policy;
+it does not source those bytes from another product. No external EEPROM or
 resident DSP mask is supplied. The own MCU marker says `V  6.13`,
 `28-04-00`, `NSB-3`; PPM headers say `27-04-00`. The matched installer INI
 names these exact files and explicitly lists ROM4 file selections. Neither

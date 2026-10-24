@@ -1071,6 +1071,18 @@ constexpr nokia_product_config make_5190_config()
 	return result; // No DSP acknowledgement, inserted card or application peer.
 }
 constexpr nokia_product_config PRODUCT_5190 = make_5190_config();
+constexpr nokia_product_config make_6190_config()
+{
+	nokia_product_config result;
+	// NSB-3's own scanner 2b2a2c and special key table 2d6a14.
+	result.keypad_wiring = { 5, 0x10, 0x31, 0x30, 0x33, 0x2f };
+	// Own 2b129e CCONT and 2b19e4/2b1a4a LCD accessor contracts.
+	result.gensio_wiring = { 0x2a, 0x28, 0x2b, 0x2d, 0x29, 0x2c, 0x07, true };
+	result.pup_eeprom_scl_bit = 2; // Own SDA/SCL transfer at 2b057e.
+	result.simi_controller = true; // Own 2a19c0; empty socket.
+	return result; // No DSP acknowledgement, application peer or inserted card.
+}
+constexpr nokia_product_config PRODUCT_6190 = make_6190_config();
 constexpr nokia_product_config make_5110i_config()
 {
 	nokia_product_config result;
@@ -1389,6 +1401,7 @@ public:
 	void nse2r4t(machine_config &config);
 	void nse2r4v(machine_config &config);
 	void noki5190(machine_config &config);
+	void noki6190(machine_config &config);
 	void nsb1r4t(machine_config &config);
 	void nsk1r4t(machine_config &config);
 	void noki6130(machine_config &config);
@@ -4393,6 +4406,15 @@ void nokia_dct3_state::noki5110i(machine_config &config)
 	apply_product_config(PRODUCT_5110I);
 }
 
+void nokia_dct3_state::noki6190(machine_config &config)
+{
+	// Shared hardware construction only: own header f4 declares 8 KiB EEPROM,
+	// own flash extent is 1 MiB, and stack 10fbf4 fits the minimum RAM window.
+	// Flash/EEPROM fitted identities and upper SRAM aliases remain unproved.
+	noki5190(config);
+	apply_product_config(PRODUCT_6190);
+}
+
 void nokia_dct3_state::nse2r4t(machine_config &config)
 {
 	noki5110i(config);
@@ -4871,6 +4893,18 @@ ROM_START( noki5190 )
 			CRC(55876b30) SHA1(49987333223932f13dd4fb8e71a9645497894f73), ROM_BIOS(1))
 	ROM_REGION(0x2000, "eeprom", ROMREGION_ERASEFF)
 	ROM_LOAD("nsb1_eeprom.bin", 0, 0x2000, NO_DUMP)
+ROM_END
+
+ROM_START( noki6190 )
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
+	ROM_LOAD("nsb3_boot.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x20000, "dsp", ROMREGION_ERASE00)
+	ROM_LOAD("nsb3_dsp.bin", 0, 0x20000, NO_DUMP)
+	ROM_REGION16_BE(0x100000, "flash", ROMREGION_ERASEFF)
+	ROM_LOAD("6190f613a.fls", 0, 0x100000,
+			CRC(476d7f42) SHA1(a17d00b8a1d1468c196fe34ba70c14d9e86a3dfd))
+	ROM_REGION(0x2000, "eeprom", ROMREGION_ERASEFF)
+	ROM_LOAD("nsb3_eeprom.bin", 0, 0x2000, NO_DUMP)
 ROM_END
 
 ROM_START( nsb1r4t )
@@ -5515,6 +5549,7 @@ SYST( 2001, noki5110i, 0, 0, noki5110i, noki5110, nokia_dct3_state, empty_init, 
 SYST( 2001, nse2r4t, noki5110i, 0, nse2r4t, noki5110, nokia_dct3_state, empty_init, "Research", "NSE-2 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, nse2r4v, noki5110i, 0, nse2r4v, nse2r4v, nokia_dct3_state, empty_init, "Research", "NSE-2 ROM4 nominal VBATT experiment (unmeasured board)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki5190, 0, 0, noki5190, noki5110, nokia_dct3_state, empty_init, "Nokia", "5190 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1998, noki6190, 0, 0, noki6190, noki5210, nokia_dct3_state, empty_init, "Nokia", "6190 MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsb1r4t, noki5190, 0, nsb1r4t, nsb1r4t, nokia_dct3_state, empty_init, "Research", "NSB-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsk1r4t, 0, 0, nsk1r4t, nsk1r4t, nokia_dct3_state, empty_init, "Research", "NSK-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki6130, 0, 0, noki6130, noki5110, nokia_dct3_state, empty_init, "Nokia", "6130 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
