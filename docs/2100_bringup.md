@@ -318,6 +318,39 @@ both domains are explicitly commanded together, not accidentally lost to
 a partial whole-byte write. The existing idle observer retains the value
 inventory; it does not establish all possible command or readback semantics.
 
+### Primary NAM-2 sleep and clock reference
+
+The original **NAM-2 System Module DF9**, Issue1 12/02, is retained in
+`roms/research/nam2-service-manual/2100/03-nam2-syst.pdf`. The public
+[two-part manual archive](https://www.eserviceinfo.com/download.php?fileid=26128)
+links [part2](https://www.eserviceinfo.com/download.php?fileid=26129).
+Both volumes pass `unrar t` for all twelve PDFs; the ignored collection
+retains the test log, source URLs and a complete `SHA256SUMS` manifest.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `gsm_NAM-2_.part1.rar` | `580d111824a0133808ce559b170c43db78ce8a502f4f46d1a03a673d42fea041` |
+| `gsm_NAM-2_.part2.rar` | `7b47a0a07c492c0cfdbb7168aa5a21d79064a79fe0548ebabb82ecc241a6d9c5` |
+| `03-nam2-syst.pdf` | `7ffbd55b8b9ce167b5cf38cfd82fdb5091278a6dc2ce0993fec8595d7e8cbf13` |
+| `12-nam2-schem.pdf` | `9cec6c53e658b9e4de29ee8aafc8d60c4b049a0e52cfafe62b37e26eda7a9c7a` |
+
+Visually reviewed pages20..22 establish product-specific facts:
+
+- Page20 describes wake from sleep-counter expiry or external interrupts,
+  followed by oscillator settling and clock/regulator restoration. It supplies
+  no CTSI register/readback rule or automatic global-enable guarantee.
+- Pages20/21 assign PCM clocks to COBBA-GJP: 13MHz divided by13 gives
+  1MHz; division by125 gives 8kHz framing. This is not live-media acceptance.
+- Pages21/22 name MAD2WD1 and a 45.5MHz DSP, with 13MHz input and
+  6.5/13MHz MCU/system clocks. Page22 specifies 16Mbit flash and
+  2048Kbit work memory. Capacity alone does not establish upper-window
+  address mirroring in the current512KiB RAM aperture.
+
+The PDF metadata retains a NAM-1 subject; rendered headers identify NAM-2.
+Its extracted font mapping is corrupt, so numerical claims require page-image
+inspection. These references do not resolve disabled delivery after wake,
+provide a resident mask or justify enabling interrupts as a workaround.
+
 ## Own v5.21 checksum fixture
 
 The complete Sharp-labelled v5.21 image (SHA-1
