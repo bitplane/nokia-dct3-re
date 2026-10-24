@@ -221,6 +221,19 @@ supported RF sample timing/encoding.
 
 ### Software RF reference boundary
 
+Nokia's [NSE/K-1/3 Repair Hints v2.0, 2001-06-13](https://files.elektroda.pl/44719,nokia%2B5110_5130_6110_6130_v20.html),
+printed pp. 29..31, identifies the receive second IF at COBBA pins 22/23
+as 13 MHz and separately checks the COBBA reference clock. These are
+analogue/clock measurements, not a digital word-rate or port-`27` packing
+specification. Do not derive the sample cadence from that frequency.
+
+The [RAE-3 system manual, issue 06/01, pp. 3-37..3-38](https://www.eserviceinfo.com/preview_html.php?fileid=26922&previewid=13302)
+describes COBBA_GJP receiving IF, separating/converting I/Q, and exchanging
+digital RF data/control through SerialMFI, separately from audio PCM.
+This later MADLinda board corroborates distinct interfaces only; it does
+not establish NSE-1 COBBA variant compatibility, sample width, sign,
+lane order, scaling or timing. No machine configuration follows from it.
+
 An independent baseband waveform source is available in
 [OsmoTRX's signal-processing implementation](https://github.com/osmocom/osmo-trx/blob/master/Transceiver52M/sigProcLib.cpp).
 Its `modulateBurst` accepts burst bits and produces a shaped complex
