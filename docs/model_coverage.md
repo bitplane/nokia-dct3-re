@@ -107,6 +107,11 @@ numeric edit, cancellation and confirmed erase, each with independent cold
 readback and unchanged SIM storage. Capacity, copying and native DSP are not
 promoted.
 
+NHM-3 separately qualifies Phone-bank A/123 save/cold retrieval against an
+empty control, with unchanged SIM storage and its own PMM comparison and
+upload/HLE checks. Use `run_dct3_phone_memory.py --product 6250`; 6210's
+edit/erase extension is not inherited.
+
 `verify-6210-pin-retry` additionally proves physical9999 rejection with one
 consumed PIN1 retry, physical1234 recovery/reset, delayed coherent laboratory
 registration and exact error/idle/Menu frames. Whole-card comparison admits

@@ -1411,6 +1411,26 @@ by `tools/noki6250_phonebook_check.py STAGE NVRAM FRAME`, where STAGE is
 49 erased records. Keep save/readback as separate processes: an in-process
 UI reread is not this persistence test.
 
+### Handset-memory persistence
+
+`.venv/bin/python tools/run_dct3_phone_memory.py RUN_DIR --product 6250`
+independently qualifies the Phone bank. Three isolated processes use the
+existing own initial-record PMM comparison, not factory provisioning or a donor
+PMM. Fresh physical Names / Options / Memory in use / Phone selection and a
+search render **Selected memory empty** in the control. A separate fresh
+selection enters A / 123 and renders **Saved to phone**. The cold process
+inherits the writer's complete NVRAM and physically opens A / 123.
+
+The shared physical sequence has product-owned runtime observers and an
+independently reviewed 6250 save-frame hash; it does not inherit acceptance
+from6210. Both selections, empty, save and cold detail are exact pixel oracles.
+All complete SIM files must match and no UPDATE RECORD is allowed. The
+writer's4MiB flash differs from the empty control. Own native upload/HLE
+ownership and initial-record checks run on every leg. Native mask execution,
+factory PMM provenance, capacity and copying remain unproved; the 6210's
+edit/cancel/erase extension is explicitly rejected for6250 until separately
+qualified. Capture: `tmp/nhm3-shared-phone-memory-final`.
+
 ## Radio acquisition comparison
 
 After SIM enable, passive DSP TX inventory observes a type `56`, 160-byte

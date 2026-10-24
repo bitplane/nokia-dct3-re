@@ -254,6 +254,9 @@ Neither process patches phone memory or seeds a contact directly.
 
 The handset bank is independently exercised by
 `.venv/bin/python tools/run_noki6210_phone_memory.py RUN_DIR`.
+This compatibility entry point delegates to `run_dct3_phone_memory.py` with
+6210 as the default product. The shared physical sequence is not shared
+provisioning: each product retains its own observer, inputs and frame oracles.
 Two fresh own-PMM processes physically select Names / Options / Memory in use /
 Phone. The control searches the empty bank and must render **Selected memory
 empty**. The writer enters A / 123 and must render **Saved to phone**. A third

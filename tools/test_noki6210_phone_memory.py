@@ -1,9 +1,20 @@
 import unittest
+from pathlib import Path
+import tempfile
 from tools.run_noki6210_phone_memory import (
     verify_storage, verify_lifecycle_digests, LIFECYCLE_FRAMES, EMPTY_SHA256)
+from tools.run_dct3_phone_memory import run
 
 
 class PhoneMemoryStorageTest(unittest.TestCase):
+    def test_unqualified_product_or_lifecycle_cannot_reuse_6210_acceptance(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            target=Path(temporary)/'run'
+            for product,lifecycle in (('3310',False),('6250',True)):
+                with self.subTest(product=product,lifecycle=lifecycle),self.assertRaises(ValueError):
+                    run(target,lifecycle,product)
+                self.assertFalse(target.exists())
+
     def test_cold_edit_cancel_and_erase_frames_are_distinct(self):
         digests={(phase,name):digest for phase,name,digest in LIFECYCLE_FRAMES}
         verify_lifecycle_digests(digests)
