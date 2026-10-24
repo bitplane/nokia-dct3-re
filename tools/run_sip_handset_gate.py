@@ -249,7 +249,7 @@ def verify_success(root, remote_text, args):
     if not match:
         raise RuntimeError('missing bridge media/release summary')
     counts = json.loads(match[1])
-    if args.incoming and getattr(args, 'product', None) == '8890':
+    if args.incoming and getattr(args, 'product', None) in ('8290', '8890'):
         verify_incoming_identity(bridge_text)
     if getattr(args, 'signaling_only', False):
         log = (root / 'error.log').read_text(errors='replace')
@@ -327,7 +327,7 @@ def verify_success(root, remote_text, args):
     product = getattr(args, 'product', '3210')
     if product == '8290':
         from tools.nsb7_sip_check import check as verify_8290_call
-        verify_8290_call(log, media=True)
+        verify_8290_call(log, incoming=args.incoming, media=True)
     if product == '8890':
         if args.incoming:
             from tools.noki8890_incoming_call_check import verify as verify_8890_call
@@ -761,7 +761,8 @@ def main():
     if args.signaling_only and not signaling_connected:
         parser.error('--signaling-only requires a single supported product SIP fixture and qualified restoration phase')
     nsb7_media = (args.product == '8290' and not args.signaling_only and
-                  not args.incoming and args.sip_response == 200 and args.calls == 1 and
+                  (not args.incoming or args.ready_file is not None) and
+                  args.sip_response == 200 and args.calls == 1 and
                   not args.restore_call and not args.restore_outgoing and
                   not args.restore_idle and not args.cancel_incoming)
     if args.product=='8290' and not signaling_connected and not nsb7_media:

@@ -50,12 +50,14 @@ def recover(image):
             'pcm_validated': False, 'native_speech_validated': False}
 
 
-def verify_call(text):
+def verify_call(text, *, incoming=False):
     cursor = 0
     for pattern in (
+        r'nsb7_call_input: key=Send state=1 ' if incoming else
         r'nsb7_outgoing_call_input: key=Send state=1 ',
         r'nsb7_key_decode: key=0e observer_writes=0',
         r'dsp_control_write: data=860b pc=002cb93e r4=00000008 ',
+        r'nsb7_call_input: key=End state=1 ' if incoming else
         r'nsb7_outgoing_call_input: key=End state=1 ',
         r'nsb7_key_decode: key=0f observer_writes=0',
         r'dsp_control_write: data=840a pc=002cb93e r4=00000008 ',

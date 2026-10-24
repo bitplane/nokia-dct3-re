@@ -1392,15 +1392,26 @@ independent radio clock remain unchanged. Normal-call acceptance also requires
 at least 100 consecutive, handset-accepted downlink sequence numbers and no
 rejected frames: sent-frame counts alone cannot establish downlink delivery.
 
-### NSB-7 signaling-only boundary
+### NSB-7 HLE media and restoration boundary
 
 The explicit8290 `nsb7hle` profile independently qualifies physical incoming
 and outgoing local SIP200 dialogs through the same backend. PIN/registration,
 physical Answer or dialing and End, CC/RR clearing, exact UI/storage and retained-clock checks are
 product-owned by `nsb7_sip_check.py`; reproduction lives in
 [the NSB-7 contract](8290_bringup.md#outgoing-real-sip-signaling).
-The runner requires `--product 8290 --signaling-only`; incoming also requires
-a fresh handset-readiness artifact. Connected outgoing restoration is separately
+Ordinary incoming/outgoing calls now use `--product 8290` without
+`--signaling-only`, real-time handset throttling and own documented PCM;
+the final `nsb7_sip_check.py --media` validates authentication, physical
+contacts, exact UI/storage, own control writes and clock accounting.
+Outgoing carries474/451 uplink/downlink blocks; incoming carries396/376.
+Both require actual SIP confirmation and normal release. These are HLE
+transport results, not physical waveform or native speech acceptance.
+Incoming also requires a fresh handset-readiness artifact.
+
+The previously qualified restoration fixtures remain explicitly
+`--signaling-only` fixtures on the pre-PCM configuration; media-aware
+restoration must be requalified before claiming parity on the current build.
+Connected outgoing restoration was separately
 qualified by `nsb7_sip_outgoing_restore.lua` and `--restore-outgoing`: exact37-register/
 RAM/time restoration invalidates the original SIP dialog with BYE, one cause41
 clear under the new epoch and no redial. Physical End/Menu recovery, exact pixels,
@@ -1416,8 +1427,8 @@ are permitted. Pending outgoing restoration independently uses SIP180 and
 `--restore-outgoing`: one CANCEL/487, epoch2 request republication and CC/RR
 clearing before End66, without redial, CONNECT or media. The handset remains
 Calling/awaiting the host decision; SIP180 is not injected as GSM ALERTING.
-Only the reviewed complete Calling snapshots qualify. Recording/media and
-multiple-call combinations remain rejected. Its result
+Only the reviewed complete Calling snapshots qualify. Restoration with media and
+multiple-call combinations remain rejected. The signaling-only result
 explicitly keeps speech/native-DSP claims false and requires zero handset
 qualified uplink media. Erased `good=0` placeholders after load do not qualify as
 speech; the discarded-epoch bridge summary must report uplink0. Remote RTP receipt

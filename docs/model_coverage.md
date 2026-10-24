@@ -9,6 +9,13 @@ registration before the save boundary, independently of post-load events.
 Whole-run hardware/provisioning checks remain separate from that ordering
 requirement.
 
+NSB-7 media qualification: the `nsb7hle` ordinary incoming/outgoing SIP
+fixtures now pass own documented clocked HLE PCM and product-owned exact
+UI/storage checks (`nsb7_sip_check.py --media`, add `--incoming` for Answer).
+The matrix's older signaling/restoration scope does not qualify physical
+waveforms or media-aware save/restore; those remain outstanding. No native
+DSP speech or conservative `noki8290` promotion is implied.
+
 Native NSE-1 opcode coverage is currently 626 asserted forms out of 626
 observed in cold idle; Menu and long-power runs add no unasserted forms.
 The reproducible gate is `make check-c54x-observed-coverage`; it verifies

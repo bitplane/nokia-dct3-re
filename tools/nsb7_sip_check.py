@@ -157,11 +157,12 @@ def check_restore(text,connected=True):
 
 
 def check(text,*,incoming=False,media=False):
-    if media and incoming:
-        raise ValueError('incoming NSB-7 media is not yet qualified')
     if incoming:
         check_incoming(text,caller='5551234')
-        if any(int(value) for value in re.findall(r'media_uplink_sequence=(\d+)',text)) or 'dsp_hle: speech tick' in text:
+        if media:
+            from tools.nsb7_pcm_check import verify
+            verify(text, incoming=True)
+        elif any(int(value) for value in re.findall(r'media_uplink_sequence=(\d+)',text)) or 'dsp_hle: speech tick' in text:
             raise ValueError('unclocked incoming SIP unexpectedly produced handset media')
         return
     check_authentication(text.split('nsb7_host_outgoing_ready:',1)[0])
@@ -208,8 +209,8 @@ def main():
     args=parser.parse_args()
     incoming=args.incoming or args.restore_incoming or args.restore_incoming_alerting
     restoring=args.restore_outgoing or args.restore_outgoing_pending or args.restore_incoming or args.restore_incoming_alerting
-    if args.media and (incoming or restoring):
-        parser.error('--media currently requires the single outgoing call without restoration')
+    if args.media and restoring:
+        parser.error('--media currently requires a single call without restoration')
     phase='alerting' if args.restore_incoming_alerting else 'connected'
     try:
         contract(args.image.read_bytes())

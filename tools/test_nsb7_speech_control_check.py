@@ -25,6 +25,12 @@ class SpeechControlTests(unittest.TestCase):
             with self.subTest(index=index), self.assertRaises(ValueError):
                 verify_call('\n'.join(self.events[:index] + self.events[index + 1:]))
 
+    def test_incoming_uses_own_answer_contacts(self):
+        text = '\n'.join(self.events).replace('nsb7_outgoing_call_input', 'nsb7_call_input')
+        self.assertTrue(verify_call(text, incoming=True)['runtime_validated'])
+        with self.assertRaises(ValueError):
+            verify_call(text)
+
     def test_other_product_writer_rejected(self):
         with self.assertRaises(ValueError):
             verify_call('\n'.join(self.events).replace('002cb93e', '002c338e'))

@@ -3287,8 +3287,14 @@ place of `-nothrottle`, and run the final checker with `--media`:
 
 This supersedes the zero-media requirement only for that outgoing fixture;
 the earlier signaling-only commands describe the pre-PCM configuration.
-Incoming media, physical microphone/earpiece waveforms and media-aware
-call-phase save/restore remain separate outstanding acceptance work.
+The independent incoming real-time SIP run
+`tmp/nsb7-sip-incoming-media-realtime` carries396 uplink,376 downlink,
+396 transmitted and400 received PCM blocks. Its own45s ready snapshot
+precedes INVITE; physical Answer52 and End60 own connection/release.
+Exact caller/UI/card/journal and own incoming speech-control/PCM checks pass
+through `nsb7_sip_check.py --incoming --media`.
+Physical microphone/earpiece waveforms and media-aware call-phase save/restore
+remain separate outstanding acceptance work.
 Running an audio producer faster than wall-clock SIP is not valid media
 acceptance: the unthrottled diagnostic left RTP queued past release and
 failed the closed-session check. No device timing was altered to hide it.

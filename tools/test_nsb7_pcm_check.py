@@ -19,6 +19,12 @@ class PCMTests(unittest.TestCase):
     def test_clocked_transport(self):
         self.assertEqual(verify(self.text)['downlink'], 93)
 
+    def test_incoming_clocked_transport(self):
+        text = self.text.replace('nsb7_outgoing_call_input', 'nsb7_call_input')
+        self.assertEqual(verify(text, incoming=True)['downlink'], 93)
+        with self.assertRaises(ValueError):
+            verify(text)
+
     def test_invalid_transfers(self):
         for old, new in [('512000/8000', '256000/8000'),
                          ('pcm_shape=64', 'pcm_shape=32'),

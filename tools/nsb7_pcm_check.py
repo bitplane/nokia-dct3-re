@@ -10,8 +10,8 @@ from tools.noki8890_pcm_check import TICK
 from tools.nsb7_speech_control_check import verify_call
 
 
-def verify(text):
-    verify_call(text)
+def verify(text, *, incoming=False):
+    verify_call(text, incoming=incoming)
     enable = text.index('dsp_control_write: data=860b pc=002cb93e r4=00000008 ')
     disable = text.index('dsp_control_write: data=840a pc=002cb93e r4=00000008 ', enable)
     previous = (0, 0)
