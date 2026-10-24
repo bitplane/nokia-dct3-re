@@ -1,9 +1,18 @@
 from pathlib import Path
 import unittest
-from tools.noki6210_dsp_control_contract import recover, verify_call_field
+from tools.noki6210_dsp_control_contract import recover, verify_call_field, parse_mode_pairs
 
 
 class ControlContractTest(unittest.TestCase):
+    def test_paired_modes_are_big_endian_and_one_based(self):
+        pairs = parse_mode_pairs(bytes.fromhex('070205050702060407020700060309a506030aa406030ba007020d0507020e0407020f00'))
+        self.assertEqual(len(pairs), 9)
+        self.assertEqual(pairs[0], dict(mode=1, command8=0x0702, command9=0x0505))
+        self.assertEqual(pairs[3], dict(mode=4, command8=0x0603, command9=0x09a5))
+        self.assertEqual(pairs[-1], dict(mode=9, command8=0x0702, command9=0x0f00))
+        for size in (0, 32, 35, 37, 40):
+            with self.assertRaises(ValueError):
+                parse_mode_pairs(bytes(size))
     def test_physical_call_field_order_and_ownership(self):
         log = ('6210_call_physical: action=send\n'
                'dsp_control_write: data=870b pc=0042727c r4=0000870b r7=00000008\n'
@@ -32,6 +41,16 @@ class ControlContractTest(unittest.TestCase):
         self.assertFalse(result['speech_semantics_validated'])
         self.assertEqual(len(result['direct_bl_candidates']), 11)
         self.assertFalse(result['indirect_call_coverage'])
+        self.assertEqual(result['paired_mode_publisher'], 0x303c30)
+        self.assertEqual(result['paired_mode_table'], 0x262444)
+        self.assertEqual(len(result['paired_modes']), 9)
+        self.assertFalse(result['paired_mode_semantics_validated'])
+        self.assertFalse(result['negative_mode_input_rejected'])
+        self.assertEqual(result['paired_mode_message_byte'], 9)
+        self.assertEqual(result['paired_mode_direct_bl_candidates'], [0x30566a])
+        self.assertEqual(result['paired_mode_command_byte'], 8)
+        self.assertEqual(result['paired_mode_command'], 0x80)
+        self.assertEqual(result['paired_mode_dispatch_records_checked'], 55)
 
 
 if __name__ == '__main__':

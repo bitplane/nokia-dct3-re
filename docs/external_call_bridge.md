@@ -761,7 +761,12 @@ clock defaults to zero, `block_period()` returns `never`, and the HLE speech
 timer cannot run. Normal answered SIP restrictions remain; temporary probe
 switches were removed. Recover NPE-3's own PCM clock/framing and COBBA route
 before configuring that link; do not fabricate uplink or inherit a sibling
-bus profile without evidence.
+bus profile without evidence. The own control checker now pins nine paired
+command8/9 parameter records and their command80/message-byte9 consumer;
+[the NPE-3 mode boundary](6210_bringup.md#paired-dsp-control-mode-boundary)
+owns that map and the independently observed shared COBBA_GJP_V4.1-part
+hypothesis. Neither table nor part identity establishes the selected PCM
+operating mode or COBBA register semantics.
 
 Primary board evidence is retained in the ignored ROM research collection:
 `roms/research/npe3/npe3-system-module.pdf`, Nokia NPE-3 System Module,

@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_paired_dsp_control_modes_and_consumer",
+      "owner": "npe3_dsp_control",
+      "status": "satisfied",
+      "predicate": "Own NPE-3 v5.56 contains nine recovered paired command8/9 parameter records with a source-pinned message consumer, without inferring PCM or COBBA register semantics",
+      "current": "The own SHA1-qualified checker pins publisher303c30, all9 positive records at262444, selector8/9 compiler calls, one halfword-aligned direct-BL candidate30566a and preceding unsigned message-byte9 load. The message-byte8 subtract cascade and all55 dispatch records at3053b0 establish index10 at base73+3, command80. Mode0 is separate and positive>=10 fails the publisher guard; negative inputs are not independently rejected by the function, while the mapped consumer supplies an unsigned byte. Indirect calls/producers and semantic meaning remain unclosed. Own NPE-3 sheet3 COBBA_GJP_V4.1 and independent NSB-7 part4370643/v4.1 corroborate a shared-part hypothesis; unresolved bit0100 differences and operating-mode ownership prevent assigning sibling PCM timing. No emulation behavior or provisioning changed.",
+      "evidence": ["docs/6210_bringup.md", "docs/external_call_bridge.md", "roms/README.md", "tools/noki6210_dsp_control_contract.py", "tools/test_noki6210_dsp_control_contract.py"]
+    },
+    {
       "id": "nsb7_pcm_composition_unanswered_sip_restoration",
       "owner": "nsb7_host_call_lifecycle",
       "status": "satisfied",

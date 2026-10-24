@@ -1053,6 +1053,52 @@ call audio. The independently mapped command-8 speech-request field and
 exact missing clock/framing evidence are owned by
 [`external_call_bridge.md`](external_call_bridge.md).
 
+### Paired DSP-control mode boundary
+
+The own hash-pinned control checker additionally recovers the positive
+mode1..9 table at`0x262444`. Publisher`0x303c30` reads two big-endian
+halfwords per record and calls compiler`0x426eb4` with selectors8/9:
+
+| Mode | Command8 parameter | Command9 parameter |
+| --- | --- | --- |
+| 1 | `0702` | `0505` |
+| 2 | `0702` | `0604` |
+| 3 | `0702` | `0700` |
+| 4 | `0603` | `09a5` |
+| 5 | `0603` | `0aa4` |
+| 6 | `0603` | `0ba0` |
+| 7 | `0702` | `0d05` |
+| 8 | `0702` | `0e04` |
+| 9 | `0702` | `0f00` |
+
+These are compiler inputs, not decoded COBBA registers or PCM rates.
+The halfword-aligned direct-BL census finds one candidate caller,
+`0x30566a`; its preceding`0x305668` loads unsigned message byte9.
+Consumer`0x305258` dispatches message byte8. Its subtract cascade uses
+base`0x73+3`; all55 table records at`0x3053b0` are checked, and index10
+alone selects this caller, hence command`0x80`. Mode0 takes a separate
+branch; positive values>=10 are rejected by the signed compare. The
+publisher alone has no negative-input guard, but this mapped consumer
+supplies an unsigned byte. Indirect calls and command producers remain
+outside the direct-call census coverage.
+
+The board evidence provides a narrower shared-part hypothesis: own NPE-3
+schematic sheet3 names N240`COBBA_GJP_V4.1`, while the independent NSB-7
+manual printed65/PDF79 identifies N250 as part4370643,
+`Cobba_gjp v4.1 v257bg64t/8`. Its printed27/PDF41 supplies512kHz/8kHz
+PCM timing. Same revision and matching clock/data pins support investigating
+a common silicon contract, not silently selecting that operating mode on
+NPE-3. Its observed870b/850a words retain bit0100 absent from NSB-7's
+860b/840a; the meaning of that field and the nine paired modes is unresolved.
+No shared PCM profile, codec gain or MCU-to-COBBA register translation is
+enabled from this comparison. Next identify command80's producer and the
+normal-call mode, then relate its fields to independent DSP/control evidence.
+
+```sh
+.venv/bin/python tools/noki6210_dsp_control_contract.py \
+  roms/noki6210/6210_556c.fls > tmp/npe3-paired-mode-contract.json
+```
+
 `verify-6210-incoming-sms` requires segmented GSM delivery, CP/RP acknowledgments,
 EF_SMS delivery/read-status writes and persistent `hello`, plus its graphical
 read frame. `verify-6210-outgoing-sms` physically composes `A` for `5551234`,
