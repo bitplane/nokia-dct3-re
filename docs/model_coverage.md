@@ -102,8 +102,10 @@ Native radio and speech remain unproved; see
 
 NPE-3 additionally has an independent handset-bank A/123 save/cold-read
 fixture with an empty-bank negative control and unchanged complete SIM files;
-see `run_noki6210_phone_memory.py`. This is not handset-bank edit/erase/capacity
-coverage or native DSP promotion.
+see `run_noki6210_phone_memory.py`. Its `--lifecycle` variant adds a physical
+numeric edit, cancellation and confirmed erase, each with independent cold
+readback and unchanged SIM storage. Capacity, copying and native DSP are not
+promoted.
 
 `verify-6210-pin-retry` additionally proves physical9999 rejection with one
 consumed PIN1 retry, physical1234 recovery/reset, delayed coherent laboratory

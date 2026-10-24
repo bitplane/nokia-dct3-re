@@ -266,8 +266,25 @@ flash must differ from the independent empty-bank control; the changed-byte
 range is reported, not interpreted as a decoded phonebook-record format.
 Cold boot may update flash metadata, so byte-identical whole-flash readback
 is not required. This qualifies one handset contact and persisted memory-bank
-selection, not handset-bank edit/erase/capacity, SIM-to-phone copying, native
-DSP, network registration or electrical flash timing.
+selection, not capacity, SIM-to-phone copying, native DSP, network registration
+or electrical flash timing.
+
+Adding `--lifecycle` extends this to nine isolated processes. After the initial
+save/read, physical Options / Edit number changes123 to124. A cold process
+must render A / 124. Physical Names / Erase / One by one then opens the
+**Erase all details?** dialog for A; Back cancels, and another cold process
+must retain A / 124. The same dialog is later confirmed, producing **Phone
+book erased**; the final cold search must render **Selected memory empty**.
+Both confirmation frames, edit-save, erased, edited/cancelled cold details and
+final empty search are exact pixel oracles. Complete SIM storage remains
+identical across all nine runs, and no UPDATE RECORD is allowed in any trace.
+Each successor inherits the complete previous process's NVRAM; no contact
+record is seeded or changed outside firmware. The fixture's prior search
+means One by one opens the existing contact directly, not an extra search
+editor; the dialog oracle prevents an extra OK from silently confirming
+instead of cancelling. Capture: `tmp/npe3-phone-memory-lifecycle-banked`.
+This qualifies one numeric edit, erase cancellation and complete-contact erase,
+not multiple numbers, names, bulk erasure, capacity or SIM/phone copying.
 
 ### Laboratory registration
 

@@ -18,6 +18,18 @@ from tools.run_sip_handset_gate import verify_handset_health
 EMPTY_SHA256='d83d9b52d4f7e98e48ec50060bd97cc17392015bc61b7fe11d54ea401352d3f6'
 SELECTED_SHA256='fbae7ab0adf3755f093e4667f00ef00abe06f9ec3209bdc38716b9ee18581bed'
 SAVED_SHA256='15855ac7ae0e186aa9522e69c56cf5995ff558541faa17815d2b9b07aff34715'
+EDITED_CONTACT_SHA256='850b1d4dfad2663b696d3786cba7b2b6cea45310b1ea96efc6536c13a492c59d'
+EDIT_SAVED_SHA256='38494461645e0c2ca1fdb260b741cb0690eb66a8bad42aae39b85bb3c6bb4893'
+ERASED_SHA256='b2fab27b6d6da26aff2cf4c8cbf06e66f1187f1a705a4cdfd438161b2a34935a'
+ERASE_CONFIRM_SHA256='bbfa86d829e7eef9f98c735bbe7c5c9bb71ec3a2a72b5b6c045aba5f0187e1f3'
+LIFECYCLE_FRAMES=(
+    ('edited_cold','6210_phonebook_read_contact',EDITED_CONTACT_SHA256),
+    ('cancelled_cold','6210_phonebook_read_contact',EDITED_CONTACT_SHA256),
+    ('erased_cold','6210_phonebook_read_search_results',EMPTY_SHA256),
+    ('edit','6210_phone_memory_lifecycle_edited',EDIT_SAVED_SHA256),
+    ('erase','6210_phone_memory_lifecycle_erase',ERASED_SHA256),
+    ('cancel','6210_phone_memory_lifecycle_erase_confirm',ERASE_CONFIRM_SHA256),
+    ('erase','6210_phone_memory_lifecycle_erase_confirm',ERASE_CONFIRM_SHA256))
 
 
 def verify_storage(cards,empty_flash,written_flash):
@@ -30,7 +42,21 @@ def verify_storage(cards,empty_flash,written_flash):
     return {'count':len(changed),'first':changed[0],'last':changed[-1]}
 
 
-def run(directory):
+def verify_lifecycle_digests(actual):
+    expected={(phase,filename):digest for phase,filename,digest in LIFECYCLE_FRAMES}
+    if actual!=expected:
+        raise ValueError('handset contact edit/cancel/erase frame contract differs')
+
+
+def verify_lifecycle_frames(directory):
+    actual={}
+    for phase,filename,_ in LIFECYCLE_FRAMES:
+        with Image.open(directory/phase/f'snap/{filename}.png') as frame:
+            actual[phase,filename]=hashlib.sha256(frame.convert('L').tobytes()).hexdigest()
+    verify_lifecycle_digests(actual)
+
+
+def run(directory,lifecycle=False):
     root=Path(__file__).resolve().parents[1]
     assess((root/'roms/noki6210/6210_556c.fls').read_bytes(),
            (root/'roms/noki6210/6210 virgin eeprom 005fa000.fls').read_bytes())
@@ -38,13 +64,18 @@ def run(directory):
     environment=os.environ.copy()
     environment.pop('NOKIA_DCT3_6210_PIN_ENTRY',None)
     results={}
-    for phase,script,seconds in (('empty','phone_memory_empty',42),
-                                  ('write','phone_memory',46),
-                                  ('cold','phonebook_read',27)):
+    phases=[('empty','phone_memory_empty',42),('write','phone_memory',46),
+            ('cold','phonebook_read',27)]
+    if lifecycle:
+        phases += [('edit','phone_memory_edit',35),('edited_cold','phonebook_read',27),
+                   ('cancel','phone_memory_cancel',33),('cancelled_cold','phonebook_read',27),
+                   ('erase','phone_memory_erase',33),('erased_cold','phonebook_read',27)]
+    previous=None
+    for phase,script,seconds in phases:
         target=directory/phase
         target.mkdir()
-        if phase=='cold':
-            shutil.copytree(directory/'write/nvram',target/'nvram')
+        if phase not in ('empty','write'):
+            shutil.copytree(directory/previous/'nvram',target/'nvram')
         initial={str(p.relative_to(target/'nvram')):hashlib.sha256(p.read_bytes()).hexdigest()
                  for p in sorted((target/'nvram').rglob('*')) if p.is_file()}
         command=build_command(root,None,'npe3hle',script,seconds)
@@ -58,6 +89,7 @@ def run(directory):
         text=(target/'error.log').read_text(errors='replace')
         if 'ins=dc' in text:raise ValueError('handset-memory lifecycle wrote a SIM record')
         results[phase]=text
+        previous=phase
     cards=[(directory/p/'nvram/npe3hle/sim_card').read_bytes()
            for p in ('empty','write','cold')]
     delta=verify_storage(cards,(directory/'empty/nvram/npe3hle/flash').read_bytes(),
@@ -75,15 +107,25 @@ def run(directory):
                                ('write','saved',SAVED_SHA256)):
         with Image.open(directory/phase/f'snap/6210_phone_memory_{name}.png') as frame:
             check_frame(frame,digest,phase+' '+name)
+    if lifecycle:
+        for phase,_,_ in phases[3:]:
+            if (directory/phase/'nvram/npe3hle/sim_card').read_bytes()!=cards[0]:
+                raise ValueError('handset lifecycle changed SIM contents: '+phase)
+        for phase in ('edit','cancel','erase'):
+            if '6210_phone_memory_lifecycle: complete=1 firmware_state_forcing=0' not in results[phase]:
+                raise ValueError('physical lifecycle fixture did not finish: '+phase)
+        verify_lifecycle_frames(directory)
     (directory/'result.json').write_text(json.dumps({'flash_delta':delta,
-        'sim_unchanged':True,'cold_contact':True},indent=2)+'\n')
-    print('OK - handset-memory A/123 cold read, unchanged SIM, separate empty control')
+        'sim_unchanged':True,'cold_contact':True,'edit_cancel_erase':lifecycle},indent=2)+'\n')
+    print('OK - handset-memory '+('save/edit/cancel/erase cold lifecycle' if lifecycle else
+          'A/123 cold read')+', unchanged SIM, separate empty control')
 
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
+    parser.add_argument('--lifecycle',action='store_true')
     args=parser.parse_args()
-    try:run(args.directory.resolve())
-    except (ValueError,RuntimeError,subprocess.SubprocessError) as error:
+    try:run(args.directory.resolve(),args.lifecycle)
+    except (ValueError,RuntimeError,OSError,subprocess.SubprocessError) as error:
         parser.exit(1,f'FAIL - {error}\n')
