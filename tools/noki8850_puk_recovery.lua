@@ -22,13 +22,17 @@ end
 local input=coroutine.create(function()
     assert(emu.wait(7))
     capture('prompt')
-    for i=1,8 do press('Keypad '..i,7+i) end
+    for i=1,8 do press('Keypad '..(_G.nsm2_wrong_puk and 9 or i),7+i) end
     press('Menu',16)
     capture('new_pin')
     for group=0,1 do
         for i,digit in ipairs({2,4,6,8}) do press('Keypad '..digit,19+group*8+i) end
         press('Menu',24+group*8)
         capture(group==0 and 'confirm' or 'result')
+    end
+    if _G.nsm2_wrong_puk then
+        machine:logerror('8850_puk_input: wrong_complete=1 firmware_state_forcing=0\n')
+        return
     end
     for i,digit in ipairs({1,2,3,4,5}) do press('Keypad '..digit,39+i) end
     press('Menu',45)

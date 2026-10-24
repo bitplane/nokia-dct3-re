@@ -52,17 +52,25 @@ def check_puk_frames(directory,name):
     if name=='blocked':
         for attempt in (1,2):check_wrong_frame(directory/f'8850_pin_wrong_attempt_{attempt}.png')
         frames['8850_pin_wrong_attempt_3.png']=PUK_FRAMES['prompt']
-    elif name=='puk':
+    elif name in ('puk','wrong-puk'):
         frames={f'8850_puk_{label}.png':digest for label,digest in PUK_FRAMES.items()}
-        with Image.open(directory/'8850_puk_menu.png') as frame:
-            # The established Messages title oracle excludes the animated icon.
-            if (frame.size!=(84,48) or hashlib.sha256(frame.convert('L').crop((0,0,72,16)).tobytes()).hexdigest()!=
-                    '1e5c11fcea9aac5331e18c0070697e8795003d6de9a0250284b3d9605209e654'):
-                raise ValueError('8850 post-PUK physical Menu did not render Messages')
+        if name=='wrong-puk':
+            frames['8850_puk_result.png']='0b450ca748a44647be303fb1ea7c9f4d7a43de11c8afb09d7a29cffd10976325'
+        else:
+            check_puk_menu(directory)
     for filename,digest in frames.items():
         with Image.open(directory/filename) as image:
             if image.size!=(84,48) or hashlib.sha256(image.convert('L').tobytes()).hexdigest()!=digest:
                 raise ValueError('8850 PUK stage pixels differ: '+filename)
+
+
+def check_puk_menu(directory):
+    from PIL import Image
+    with Image.open(directory/'8850_puk_menu.png') as frame:
+        # The established Messages title oracle excludes the animated icon.
+        if (frame.size!=(84,48) or hashlib.sha256(frame.convert('L').crop((0,0,72,16)).tobytes()).hexdigest()!=
+                '1e5c11fcea9aac5331e18c0070697e8795003d6de9a0250284b3d9605209e654'):
+            raise ValueError('8850 post-PUK physical Menu did not render Messages')
 
 
 def check_card_phase(text,initial,final,recovery=False):
@@ -96,26 +104,34 @@ def check_card_phase(text,initial,final,recovery=False):
             raise ValueError('wrong PIN status did not follow physical submission')
 
 
-def check_puk_phase(text,initial,final,name):
+def check_puk_phase(text,initial,final,name,*,puk_attempts=10):
     blocked=bytearray(make_profile(True)+bytes.fromhex('00f110')+b'\xff'*43)
     blocked[3516]=0
+    if puk_attempts not in (9,10):
+        raise ValueError('unqualified 8850 pre-recovery PUK allowance')
+    blocked[3518]=puk_attempts
     rotated=bytearray(blocked)
     rotated[3516]=3
+    rotated[3518]=10
     rotated[3484:3492]=b'2468\xff\xff\xff\xff'
     rotated[1604:1609]=bytes.fromhex('00f1100001')
     rotated[1610]=0
-    inputs={'blocked':make_profile(True),'puk':bytes(blocked),'reauth':bytes(rotated)}
-    outputs={'blocked':bytes(blocked),'puk':bytes(rotated),'reauth':bytes(rotated)}
+    rejected=bytearray(blocked)
+    rejected[3518]-=1
+    inputs={'blocked':make_profile(True),'puk':bytes(blocked),'reauth':bytes(rotated),'wrong-puk':bytes(blocked)}
+    outputs={'blocked':bytes(blocked),'puk':bytes(rotated),'reauth':bytes(rotated),'wrong-puk':bytes(rejected)}
     if name not in inputs or initial!=inputs[name] or final!=outputs[name]:
         raise ValueError('8850 PUK phase did not retain complete expected card contents')
     verify={'blocked':[(0x9804,2,10),(0x9804,1,10),(0x9840,0,10)],
-            'puk':[],'reauth':[(0x9000,3,10)]}[name]
-    if statuses(text,0x20)!=verify or statuses(text,0x2c)!=([(0x9000,3,10)] if name=='puk' else []):
+            'puk':[],'reauth':[(0x9000,3,10)],'wrong-puk':[]}[name]
+    unblock=([(0x9804,0,puk_attempts-1)] if name=='wrong-puk' else
+             [(0x9000,3,10)] if name=='puk' else [])
+    if statuses(text,0x20)!=verify or statuses(text,0x2c)!=unblock:
         raise ValueError('8850 PUK phase has wrong credential results or retry allowances')
-    selectors={'blocked':['01']*3,'puk':[],'reauth':['01']}[name]
+    selectors={'blocked':['01']*3,'puk':[],'reauth':['01'],'wrong-puk':[]}[name]
     if re.findall(r'header cla=a0 ins=20 p1=00 p2=(\w\w) p3=08',text)!=selectors:
         raise ValueError('8850 PUK phase has unexpected VERIFY selector/count')
-    if re.findall(r'header cla=a0 ins=2c p1=00 p2=(\w\w) p3=10',text)!=(['00'] if name=='puk' else []):
+    if re.findall(r'header cla=a0 ins=2c p1=00 p2=(\w\w) p3=10',text)!=(['00'] if name in ('puk','wrong-puk') else []):
         raise ValueError('8850 PUK phase has unexpected UNBLOCK selector/count')
     if any(statuses(text,ins) for ins in (4,0x24,0x26,0x28,0x44,0xdc)):
         raise ValueError('8850 PUK phase changed unrelated configuration or records')
@@ -132,15 +148,24 @@ def check_puk_phase(text,initial,final,name):
         if ('8850_pin_wrong: complete=1 firmware_state_forcing=0' not in text or
                 'LAPDm Location Updating Accept acknowledged' in text):
             raise ValueError('8850 exhausted PIN incorrectly registered or lacked completion')
-    elif name=='puk':
-        items=[(8+i,'Keypad '+str(i+1)) for i in range(8)]+[(16,'Menu')]
+    elif name in ('puk','wrong-puk'):
+        wrong=name=='wrong-puk'
+        items=[(8+i,'Keypad '+str(9 if wrong else i+1)) for i in range(8)]+[(16,'Menu')]
         for group in (0,1):
             items += [(20+group*8+i,'Keypad '+str(digit)) for i,digit in enumerate((2,4,6,8))]
             items += [(24+group*8,'Menu')]
-        items += [(40+i,'Keypad '+str(i+1)) for i in range(5)]+[(45,'Menu'),(50,'Menu')]
+        if not wrong:items += [(40+i,'Keypad '+str(i+1)) for i in range(5)]+[(45,'Menu'),(50,'Menu')]
         contacts(text,'8850_puk_input',items)
-        if '8850_puk_input: complete=1 firmware_state_forcing=0' not in text:
+        marker='wrong_complete' if wrong else 'complete'
+        if f'8850_puk_input: {marker}=1 firmware_state_forcing=0' not in text:
             raise ValueError('8850 PUK physical sequence did not finish')
+        if wrong:
+            if 'LAPDm Location Updating Accept acknowledged' in text:
+                raise ValueError('wrong PUK incorrectly registered')
+            require_ordered(text,[('confirm',r'8850_puk_input: key=Menu state=1 t=32\.'),
+                ('rejected',r'SIM status ins=2c sw=9804'),
+                ('complete',r'8850_puk_input: wrong_complete=1 firmware_state_forcing=0')],'8850 wrong PUK')
+            return
         require_ordered(text,[('confirm',r'8850_puk_input: key=Menu state=1 t=32\.'),
             ('unblocked',r'SIM status ins=2c sw=9000'),
             ('registered',r'LAPDm Location Updating Accept acknowledged'),
@@ -161,7 +186,9 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
     parser.add_argument('--puk',action='store_true',help='exhaust PIN1, recover via PUK and cold-authenticate the new PIN')
+    parser.add_argument('--wrong-puk-first',action='store_true',help='reject one PUK in a cold process before correct recovery')
     args=parser.parse_args()
+    if args.wrong_puk_first and not args.puk:parser.error('--wrong-puk-first requires --puk')
     root=Path(__file__).resolve().parents[1]
     try:
         profile=PROFILES['8850']
@@ -173,6 +200,8 @@ def main():
         launches=[]
         phases=(('blocked','pin_exhaust',36),('puk','puk_recovery',56),('reauth','pin_rotated',46)) if args.puk else (
             ('wrong','pin_wrong',18),('recovery','security_input',46))
+        if args.wrong_puk_first:
+            phases=(phases[0],('wrong-puk','puk_wrong',38),*phases[1:])
         for name,script,seconds in phases:
             phase=run/name
             phase.mkdir()
@@ -209,11 +238,12 @@ def main():
                     stderr=subprocess.STDOUT,check=True,timeout=180)
             verify_handset_health((phase/'console.log').read_text(errors='replace'))
             text=(phase/'error.log').read_text(errors='replace')
-            errors=check_trace(text,runtime_hle=True,sim_reads=bool(previous))
-            if previous and name!='puk':errors+=check_physical_inputs(text)+check_navigation_frames(phase/'snap')
+            errors=check_trace(text,runtime_hle=True,sim_reads=bool(previous) and name!='wrong-puk')
+            if previous and name not in ('puk','wrong-puk'):errors+=check_physical_inputs(text)+check_navigation_frames(phase/'snap')
             if errors:raise ValueError('; '.join(errors))
             if args.puk:
-                check_puk_phase(text,initial,card.read_bytes(),name)
+                check_puk_phase(text,initial,card.read_bytes(),name,
+                                puk_attempts=9 if args.wrong_puk_first and name=='puk' else 10)
                 check_puk_frames(phase/'snap',name)
             else:
                 check_card_phase(text,initial,card.read_bytes(),bool(previous))
@@ -223,7 +253,8 @@ def main():
             launches.append(launch)
             previous=phase
         (run/'acceptance.json').write_text(json.dumps({'phases':launches,
-            'puk_recovery':args.puk,'research_hle':True,'native_speech':False},indent=2)+'\n')
+            'puk_recovery':args.puk,'wrong_puk_first':args.wrong_puk_first,
+            'research_hle':True,'native_speech':False},indent=2)+'\n')
     except (ValueError,RuntimeError,OSError,subprocess.SubprocessError) as error:
         parser.exit(1,f'8850 cold PIN retry FAIL: {error}\n')
     print('8850 '+('PIN exhaustion, PUK recovery and new-PIN cold authentication' if args.puk else

@@ -26,6 +26,34 @@ def wrong_trace():
 
 
 class ColdPinTest(unittest.TestCase):
+    def test_wrong_puk_consumes_one_allowance_without_installing_new_pin(self):
+        blocked=bytearray(failed_card())
+        blocked[3516]=0
+        rejected=bytearray(blocked)
+        rejected[3518]=9
+        items=[(8+i,'Keypad 9') for i in range(8)]+[(16,'Menu')]
+        for group in (0,1):
+            items += [(20+group*8+i,'Keypad '+str(digit)) for i,digit in enumerate((2,4,6,8))]
+            items += [(24+group*8,'Menu')]
+        lines=[]
+        for second,key in items:
+            lines += [f'8850_puk_input: key={key} state=1 t={second}.000000000',
+                      f'8850_puk_input: key={key} state=0 t={second}.150000000']
+        lines += ['sim_device: header cla=a0 ins=2c p1=00 p2=00 p3=10',
+                  'SIM status ins=2c sw=9804 chv=0/3 puk=9/10 enabled=1',
+                  '8850_puk_input: wrong_complete=1 firmware_state_forcing=0']
+        trace='\n'.join(lines)
+        check_puk_phase(trace,bytes(blocked),bytes(rejected),'wrong-puk')
+        for offset in (0,1604,3484,3516,3517,3518,3520):
+            bad=bytearray(rejected)
+            bad[offset]^=1
+            with self.subTest(offset=offset),self.assertRaises(ValueError):
+                check_puk_phase(trace,bytes(blocked),bytes(bad),'wrong-puk')
+        for bad in (trace.replace('sw=9804','sw=9000'),
+                    trace+'\nLAPDm Location Updating Accept acknowledged',
+                    trace.replace('p2=00 p3=10','p2=01 p3=10')):
+            with self.assertRaises(ValueError):check_puk_phase(bad,bytes(blocked),bytes(rejected),'wrong-puk')
+
     def test_exhaustion_requires_three_rejections_and_zero_persistent_pin_retries(self):
         lines=[]
         for start,status,allowance in ((8,'9804',2),(16,'9804',1),(24,'9840',0)):

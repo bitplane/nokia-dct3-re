@@ -2039,6 +2039,19 @@ successful PUK1 recovery, not wrong-PUK handling, permanent PUK loss or PIN2.
 Capture: `tmp/nsm2-puk-recovery-final`. These remain research-HLE observations,
 not native DSP, physical RF or speech acceptance.
 
+Adding `--wrong-puk-first` inserts a fourth independent process between
+blocking and recovery. It physically enters99999999 and confirms proposed
+PIN2468 twice; its sole selector00 UNBLOCK must return `9804`, retain zero
+PIN1 retries and consume only one PUK1 allowance (10 to9). The complete card
+must otherwise remain unchanged, including the original PIN. The blocked,
+new-PIN, confirmation and rejected-result frames are exact pixel oracles;
+neither registration nor protected post-authentication file reads are
+required of this still-blocked phase. The next cold process inherits the
+nine-allowance card, recovers with the correct PUK, and the final cold process
+authenticates with2468 under the original recovery checks. Capture:
+`tmp/nsm2-wrong-puk-recovery-final`. This qualifies one persistent wrong-PUK
+attempt and subsequent recovery, not permanent exhaustion or PIN2.
+
 The same isolated runner accepts `--scenario host-incoming-call`. It verifies
 physical answer/end input, the complete host-originated CC/RR exchange,
 traffic-channel assignment and release, and reviewed ringing/returned-idle
