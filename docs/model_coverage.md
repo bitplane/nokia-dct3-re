@@ -73,8 +73,12 @@ bounded to 90–92 seconds: independent extended controls reset near 94 seconds
 after the DSP receive-activity window becomes empty and firmware publishes
 reason `68`. That trigger is mapped, not suppressed; the missing native
 response and fitted-mask/RF compatibility remain unresolved.
-Ordinary idle-content provenance, fitted-mask identity and radio/call/SMS-delivery
-acceptance remain open; the unproved native compatibility input is unchanged.
+The repeated idle glyphs now trace to erased startup-text record0745: own
+PPM conversion maps byteff to U+017E before LCD output. A declared one-byte
+empty-text input plus physical Field test `00` yields repeatable idle-layout
+pixels after an independent cold boot, with unchanged complete card/flash.
+The remaining `Headset` accessory/profile state, fitted-mask identity and
+radio/call/SMS-delivery acceptance remain open; native compatibility is unchanged.
 
 Nokia 8855 / NSM-4 v5.18 has a fail-closed `noki8855` MCU research profile.
 Two own erased-storage boots produce identical catalogue/storage state and

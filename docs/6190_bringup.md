@@ -19,8 +19,11 @@ A fetched DISPLAY TEXT awaiting input additionally survives native save/load,
 with exact observed architecture/I/O replay and successful physical completion.
 The tested TIMER MANAGEMENT request is explicitly rejected; timer expiry is
 not qualified by that result.
-Ordinary idle content and automatic notice
-clearing remain unresolved; explicit rejection dismissal restores clean menus.
+The erased startup-text record and physical Field test selection now explain
+the previously odd idle presentation. An explicit empty-text input plus
+physical Test `00` yields repeatable idle-layout pixels across a cold boot;
+the displayed `Headset` accessory state remains unqualified. Automatic notice
+clearing remains unresolved; explicit rejection dismissal restores clean menus.
 An independent long-run control resets near 94 seconds
 after an empty native receive window publishes reason `68`; bounded software
 gates do not establish sustained native operation. Fitted-mask compatibility,
@@ -322,13 +325,14 @@ credential, and pins both the own descriptor and reset-tail instructions.
 It is not an integrity-only repair or an authentic factory dump.
 With the same physical entry, observation reports `match=1 retry=00`;
 a separate cold run reaches the matched branch at `2af48c` with retry zero.
-The subsequent idle-content display remains visually odd through 30.4 seconds,
-not a qualified ordinary idle frame. However, a physical left-softkey press
+The original erased-record fixture displays repeated U+017E characters after
+acceptance; its startup-text and Field test causes are qualified below.
+A physical left-softkey press
 then opens a clean `Messages` menu with Select/Exit softkeys. Its 84x48 RGB
 SHA256 is `52f6ae5577f82efd58e386e4606c4ce713a16b2c67b243ba8d0a708a0dd117be`.
 This establishes interactive menu presentation after matching security entry;
 it falsifies treating the odd idle frame alone as a frozen UI or broken LCD.
-Determine the source of that idle content separately. Neither menu presentation
+Neither menu presentation
 nor native DSP liveness proves registration, calls, SMS, persistent contacts
 or a fitted DSP-mask identity.
 
@@ -339,6 +343,62 @@ matrix contact state; all breakpoint and LCD wire observations are read-only.
 Check the resulting directory with `tools/nsb3_menu_check.py RUN_DIR`.
 The checker requires the seven-byte external fixture, physical credential and
 menu contacts, the matched-code branch, and the reviewed menu pixel hash.
+
+### Startup text and physical diagnostic-display exit
+
+The repeated marks are firmware-owned text, not a broken LCD transport.
+Own descriptor `2d0590` maps record `0745` to EEPROM `05ec`, length31.
+Reader `2ab0ac..2ab0c6` publishes that text only when the first byte is
+nonzero. The erased record supplies31 `ff` bytes through reader `2af18a`;
+character conversion `29d574` indexes own PPM table `2e0050` with byte `ff`,
+whose entry at `2e024e` is U+017E. The observed `1f` argument is the31-byte
+length, not a character code. Copy `24fa56` passes those characters
+to the compositor. Its504-byte framebuffer at `107acc` and companion mask
+at `1078d4` are consumed by `2692c2..2692de` and LCD byte sender `2b1a48`.
+The observed compositor inputs include font `2e0494`,13 repeated characters
+and string buffer `10b9d4`. These observations explain the glyphs; they do
+not establish a fitted LCD or a missing native DSP completion.
+
+An explicitly synthetic empty-startup-text fixture changes only `05ec` from
+`ff` to zero before boot, as selected by the own reader's branch. It retains
+the remaining30 bytes, own credential/calibration, diagnostic selector and
+complete original PIN-enabled card. This is an external content experiment,
+not a recovered factory default. The normal machine is not changed.
+
+After physical PIN/phone authentication and Menu, Up selects Field test.
+Select opens the reviewed Test editor showing `01`. Physical `00`, OK and
+End remove that diagnostic display. Own descriptor `2d0340` maps its stored
+record `0604` to `04a1`, length1; firmware changes `ff` to `41`. Do not
+interpret that observation as a complete bitfield specification. A priming
+cold run first records ordinary firmware-owned diagnostic EEPROM activity;
+relative to that predecessor, the physical-selection run changes only
+`04a1`. Flash and complete card remain identical. A separate process copies
+only the resulting storage, authenticates physically, and reproduces the same
+idle-layout RGB SHA256:
+`192aec2de3cd98478979cc093ad09b2f7ad825bcfc29ac2162f64ba7f37ea462`.
+The frame has Menu/Names softkeys and says `Headset`. It is not operator
+presentation, registration, verified unattached-accessory state, or sustained
+native operation beyond the known receive-supervision deadline.
+
+Reproduce three independent runs, serially, with the established isolated
+`nsb3r4t` command and physical PIN-enabled source `tmp/nsb3-pin-correct`:
+
+1. `tools/nsb3_idle_profile.py prepare SOURCE BASELINE` creates only the
+   explicit empty-text input. Run BASELINE for48seconds with
+   `tools/nsb3_pin_correct.lua`.
+2. `tools/nsb3_idle_profile.py cold BASELINE RUN` copies cold
+   storage without edits. Run RUN for58seconds with
+   `tools/nsb3_fieldtest_input.lua`.
+3. `tools/nsb3_idle_profile.py cold RUN COLD`; run for44seconds with
+   `tools/nsb3_pin_correct.lua`. Check with
+   `tools/nsb3_idle_profile.py check SOURCE BASELINE RUN COLD`.
+
+Accepted captures are `tmp/nsb3-idle-profile-{baseline,physical,restored}`.
+The checker pins the own executable/descriptors/branch, complete predecessor
+hashes, exact one-byte fixture, physical Test input order, editor and idle
+pixels, exact post-baseline EEPROM delta, unchanged card/flash and cold
+continuation. The remaining idle question is the owning accessory/profile
+contract behind `Headset`, not the repeated-glyph or Field test route.
 
 ### Physical SIM phonebook persistence
 
