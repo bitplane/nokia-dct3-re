@@ -54,6 +54,38 @@ mutations. The current executable acceptance is:
 Add `--mame mame/mame` with two fresh output directories to execute both
 isolated54s processes rather than recheck captured evidence.
 
+### Native idle save/load and physical continuation
+
+`nsk3_native_state.lua` starts a fresh process from the physically selected
+cold bank above, authenticates the original PIN-enabled card and phone lock,
+then saves at40s. The shared native-state fixture observes37 ARM registers,
+36 DSP fields and rolling checksums of the backed64KiB ARM research RAM,
+ordinary DSP data and program. Load exactly restores those observations.
+The2.7s reference/restored windows repeat7764 DSP I/O writes with identical
+relative timestamps, ports, values and masks. Physical Menu in both branches
+renders the reviewed Messages frame, RGB SHA256
+`2ab2adf527d11235a1ce8e0dfbc5b640e0f1011d70c7aadff363cd573b61ff9f`.
+Complete EEPROM/card/flash and external inputs remain unchanged; the saved
+artifact is nonempty and hashed by the checker.
+
+The checker validates complete architectural records, including `ILLEGAL:0`,
+before separating them from protocol/error-message scanning. Actual error
+lines, malformed or extra snapshots, nonzero stop flags, incomplete upload,
+bad authentication, mismatched replay and changed pixels remain failures.
+Three focused mutation tests cover this separation and the product-specific
+restoration contract. Checksums are not bytewise memory comparison; bounded
+I/O equality is not exhaustive device-state coverage or long-run stability.
+No guest state is supplied outside emulator save/load APIs and physical keys.
+
+```sh
+.venv/bin/python -c "from pathlib import Path; from tools.nsk3_cold_input import prepare; from tools.nsk3_diagnostic_display_check import execute; r=Path.cwd(); o=r/'tmp/nsk3-native-idle-state'; prepare(r/'roms/noki6130/source',r/'tmp/nsk3-diagnostic-display-accepted-cold',o); execute(r/'mame/mame',r/'roms',o,'nsk3_native_state.lua')"
+.venv/bin/python tools/nsk3_native_state_check.py roms/noki6130/source \
+  tmp/nsk3-diagnostic-display-accepted-cold tmp/nsk3-native-idle-state
+```
+
+The execution command requires a fresh output directory. The cold predecessor
+contains only the physically selected persistent inputs, not RAM/save states.
+
 **Long-run limit:** the corrected native compatibility composition requests a
 reason68 restart at93.975196s. Short physical UI/storage/security gates do
 not establish sustained native operation. The own packet-supervision contract
