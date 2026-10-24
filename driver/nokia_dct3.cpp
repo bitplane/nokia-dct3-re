@@ -1379,6 +1379,7 @@ public:
 	void noki3330(machine_config &config);
 	void noki3350(machine_config &config);
 	void noki8855(machine_config &config);
+	void nsm4stage(machine_config &config);
 	void nhm9stage(machine_config &config);
 	void noki3410(machine_config &config);
 	void noki2100(machine_config &config);
@@ -3912,6 +3913,16 @@ void nokia_dct3_state::noki8855(machine_config &config)
 	apply_product_config(PRODUCT_8855);
 }
 
+void nokia_dct3_state::nsm4stage(machine_config &config)
+{
+	noki8855(config);
+	// NSM-4 selector 15 fragment and selector 27 verifier, not a sibling mask.
+	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	staged.set_program_fragment(0x2007fc);
+	staged.set_verifier_program_words(246);
+	staged.set_verifier_source_end(0x0000);
+}
+
 void nokia_dct3_state::noki3610(machine_config &config)
 {
 	// NAM-1's normalized MCU/PPM image requires the later 32-Mbit flash
@@ -5025,6 +5036,8 @@ ROM_START( noki8855 )
 			CRC(3c345a20) SHA1(8f740f901f51ea60dcca560de011891eb8026f8a))
 ROM_END
 
+#define rom_nsm4stage rom_noki8855
+
 ROM_START( noki3610 )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 
@@ -5549,6 +5562,7 @@ SYST( 2001, noki3350, 0,      0,      noki3350, noki3350, nokia_dct3_state, empt
 SYST( 2001, nhm9stage, noki3350, 0, nhm9stage, noki3350, nokia_dct3_state, empty_init, "Nokia", "3350 own uploaded DSP research fixture", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 // Host positions match own logical table; 5210 physical legends are not NSM-4 evidence.
 SYST( 2002, noki8855, 0, 0, noki8855, noki5210, nokia_dct3_state, empty_init, "Nokia", "8855 MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2002, nsm4stage, noki8855, 0, nsm4stage, noki5210, nokia_dct3_state, empty_init, "Nokia", "8855 own uploaded DSP research fixture", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3410, 0,      0,      noki3410, noki3410, nokia_dct3_state, empty_init, "Nokia", "Nokia 3410", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki5210, 0,      0,      noki5210, noki5210, nokia_dct3_state, empty_init, "Nokia", "Nokia 5210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, nmp5stage, 0, 0, nmp5stage, nmp5stage, nokia_dct3_state, empty_init, "Nokia", "5510 own-upload bootstrap (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

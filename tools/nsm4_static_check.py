@@ -139,6 +139,23 @@ def flash_program_contract(image):
             'fitted_part_or_identification_table_proved': False}
 
 
+def dsp_upload_contract(image, entries):
+    if hashlib.sha256(image[0x13e234:0x13e332]).hexdigest() != 'add83f26bca92d2414ed3d01300968ac4a7a56b34dcaea6cb6b72b2808d531b6':
+        raise ValueError('NSM-4 MCU DSP upload sequence differs')
+    if image[0x13e50c:0x13e530] != bytes.fromhex('0013aa14000100f60000ffff0002000200010200000100fe000106000020004000000dff'):
+        raise ValueError('NSM-4 MCU DSP upload roots differ')
+    if (entries[15]['descriptor'] != '0x4007f0'
+            or entries[15]['header'] != [0xff80, 0xff80, 104, 0x200, 140, 0]
+            or entries[15]['sha256'] != 'e972f50bfce7866c64676357f5baeed679445fafd052029ab900504c5965b52a'):
+        raise ValueError('NSM-4 own program fragment differs')
+    return {'fragment_source': '0x4007fc', 'fragment_words': 104,
+            'verifier_words': 246, 'release_fields': [0x100, 0x300, 0x1c, 0, 1, 1, 0x200],
+            'full_blocks': 0xdff, 'source_start': '0x200040', 'source_stride': '0x400',
+            'alternating_buffers': ['0x10200', '0x10600'],
+            'ownership_cells': ['0x100fe', '0x10100'],
+            'first_unacknowledged_wait': '0x33e2e0'}
+
+
 def read_catalogue(image):
     offset = TABLE - 0x200000
     if len(image) < offset + 124:
@@ -181,6 +198,7 @@ def inspect(image):
             'catalogue_consumer': catalogue_consumer(image),
             'storage_display_contract': storage_display_contract(image),
             'flash_program_contract': flash_program_contract(image),
+            'dsp_upload_contract': dsp_upload_contract(image, entries),
             'bootstrap': {'identity_data_0803': 6, 'resident_call': '0x861f',
                           'fitted_mask_compatibility_proved': False},
             'scope': 'Static MCU declarations only; no upload execution, peripheral wiring, PMM or resident mask established'}

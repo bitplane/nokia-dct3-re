@@ -8,7 +8,9 @@ recovered catalogue and flash callbacks, and reach the same DSP ownership
 wait. Graphical boot, firmware input delivery, SIM, radio and phonebook
 acceptance are not established. No DSP acknowledgement or donor PMM is supplied.
 The next question is the exact upload/release contract at the shared `0fe`
-wait, not a guessed completion value. Fitted flash identity remains unproved.
+wait's missing resident-code dependency, not a guessed completion value.
+The own upload/release sequence is now qualified below. Fitted flash identity
+remains unproved.
 
 Reproduce the static report:
 
@@ -83,6 +85,34 @@ At payload byte offset `0x18`, `76f8 0803 0006` writes identity 6 into
 DSP data word `0x0803`. The stream includes direct CALL `f074 861f`.
 Neither the identity nor this resident-code dependency proves compatibility
 with a sibling mask. No resident mask is provided by the service archive.
+
+## Own uploaded execution
+
+`nsm4stage` separately executes the own uploaded program with the existing
+C54x research executor. It supplies only selector 15's 104-word fragment
+from `0x4007fc` and selector 27's 246-word verifier, never a sibling mask.
+The MCU's `0x33e234..0x33e332` sequence selects catalogue RAM slot 27,
+copies the payload, writes release fields
+`0100/0300/001c/0000/0001/0001/0200` at `100f6..10102`, and requests
+verification of `dff` full blocks from `200040` in `400`-byte strides through buffers
+`10200/10600`. Ownership alternates through `100fe/10100`; the ordinary
+silent-peer machine remains in its first `100fe` wait. These fields and
+literal roots are independently pinned by `dsp_upload_contract`.
+
+Reproduce the native negative boundary in a fresh directory:
+
+```sh
+.venv/bin/python tools/nsm4_native_boundary_check.py mame/mame roms tmp/nsm4-native-new
+```
+
+The own verifier starts at DSP `0f00` at 0.241519 s, writes `0006` to
+immutable fragment word `ff87` at PC `0f12`, then executes its direct
+`CALL 861f` at `0fd6..0fd7` (payload offset `1ac`). The executor stops on
+unavailable program `861f` with PC `8620` at 0.243103 s. The checker requires
+that precise controlled termination and rejects publication, loader handoff
+or a different release. The 13 MHz cadence is an explicit research assumption,
+not measured NSM-4 timing. No code at `861f` or return side effects are supplied;
+the missing resident program remains a native execution boundary.
 
 ## Admission constraints
 
