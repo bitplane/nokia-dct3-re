@@ -2907,8 +2907,9 @@ INPUT_CHANGED_MEMBER( nokia_dct3_state::charger_irq )
 
 INPUT_CHANGED_MEMBER( nokia_dct3_state::mbus_rx_byte )
 {
-	// Configuration loading initializes adjusters before the machine runs. Only
-	// a live field change represents a byte arriving at the external MBUS pin.
+	// A live event-port write represents a byte arriving at the external MBUS pin.
+	// Unlike positional inputs, output events are not coalesced at video cadence.
+	// Bit 8 is a fixture strobe: toggling it delivers repeated identical bytes.
 	if (newval != oldval && machine().phase() == machine_phase::RUNNING)
 	{
 		const bool accepted = m_mbus->receive_byte(u8(newval));
@@ -2929,6 +2930,10 @@ INPUT_CHANGED_MEMBER( nokia_dct3_state::sim_removed_changed )
 }
 
 static INPUT_PORTS_START( dct3_network_config )
+	PORT_START("MBUS_RX")
+	PORT_BIT(0x1ff, 0x00, IPT_OUTPUT) PORT_NAME("MBUS receive byte event")
+		PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::mbus_rx_byte), 0)
+
 	PORT_START("SIM_REMOVED")
 	PORT_BIT(0x01, IP_ACTIVE_HIGH, IPT_OTHER) PORT_NAME("Remove SIM card") PORT_TOGGLE
 	PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sim_removed_changed), 0)
@@ -3229,11 +3234,6 @@ static INPUT_PORTS_START( noki3210 )
 
 	PORT_START("CHARGER")
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Charger connected") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::charger_irq), 0)
-
-	PORT_START("MBUS_RX")
-	PORT_BIT(0xff, 0xff, IPT_POSITIONAL) PORT_NAME("MBUS receive byte")
-		PORT_POSITIONS(0xff) PORT_SENSITIVITY(100) PORT_KEYDELTA(1)
-		PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::mbus_rx_byte), 0)
 
 INPUT_PORTS_END
 

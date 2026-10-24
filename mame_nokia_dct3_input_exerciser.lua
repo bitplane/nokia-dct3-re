@@ -277,7 +277,7 @@ key_fields.right = key_fields.c
 key_fields.soft2 = key_fields.c
 key_fields.hash = key_fields.minus
 local charger_field = field_by_mask("CHARGER", 0x01)
-local mbus_rx_field = field_by_mask("MBUS_RX", 0xff)
+local mbus_rx_port = machine.ioport.ports[":MBUS_RX"]
 local sim_removed_field = field_by_mask("SIM_REMOVED", 0x01)
 if charger_initial and charger_field then charger_field:set_value(1) end
 
@@ -713,10 +713,10 @@ if sim_remove_at >= 0 and sim_removed_field then
 	assert(coroutine.resume(sim_presence_timer))
 end
 
-if mbus_rx_fixture and mbus_rx_field then
+if mbus_rx_fixture and mbus_rx_port then
 	local mbus_rx_timer = coroutine.create(function()
 		emu.wait(mbus_rx_fixture_at)
-		mbus_rx_field:set_value(mbus_rx_fixture & 0xff)
+		mbus_rx_port:write((mbus_rx_fixture & 0xff) | 0x100, 0x1ff)
 	end)
 	assert(coroutine.resume(mbus_rx_timer))
 end

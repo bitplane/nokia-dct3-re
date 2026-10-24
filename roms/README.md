@@ -706,3 +706,14 @@ contains two PDFs, retained outside source control in `research/nsb7/`:
 The visually reviewed System Module page27 (PDF page41) supplies NSB-7's
 own PCM waveform; see `docs/8290_bringup.md`. It is independent evidence,
 not an imported NSB-6 timing assumption.
+
+## External implementation reference archive
+
+The already-catalogued reference revision
+`2b4c10ffd6b22a2d021c7f515f27ceb2fb6c78cd` is retained as
+`research/djr-reference/nokia-dct3-emulator-2b4c10ffd6b22a2d021c7f515f27ceb2fb6c78cd.tar.gz`,
+SHA256 `6e8badb69d91480e7e9920ddf19159227eca1019c888910c98222bf3ff9cf731`.
+Source: [pinned repository archive](https://codeload.github.com/djr-747/nokia-dct3-emulator/tar.gz/2b4c10ffd6b22a2d021c7f515f27ceb2fb6c78cd).
+This is implementation reference material, not a newly acquired Nokia mask
+ROM or matched PMM. Its admission/dependency limits live in
+`docs/djr_dsp_integration.md`; sibling HLE success is not a native-ROM oracle.

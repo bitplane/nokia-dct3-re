@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 861 gates: 639 generated from typed steps, 222 copied verbatim (shell).
+# 863 gates: 641 generated from typed steps, 222 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -44,7 +44,8 @@ DCT3_PRESS_220_300 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_
 DCT3_PRESS_220_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 
-.PHONY: verify-8210-host-incoming-call verify-8210-host-outgoing-call \
+.PHONY: verify-6210-mbus-byte-events verify-6210-mbus-version-ingress \
+	verify-8210-host-incoming-call verify-8210-host-outgoing-call \
 	verify-8210-host-incoming-sms verify-8210-host-outgoing-sms \
 	verify-8210-host-rejected-sms verify-8210-host-silent-sms \
 	verify-8210-sip-idle-restore verify-8210-sip-outgoing-busy \
@@ -517,6 +518,14 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8890-sip-incoming-media verify-8890-sip-connected-outgoing-restore \
 	verify-8890-sip-connected-incoming-restore \
 	verify-6210-sip-connected-incoming-restore verify-mad2-wake-gates
+
+verify-6210-mbus-byte-events: build
+	$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- npe3hle -rompath $(abspath roms) -video none -sound none -nothrottle -seconds_to_run 10 -log -verbose -autoboot_delay 0 -autoboot_script $(abspath tools/mbus_input_probe.lua)
+	$(PYTHON) tools/mbus_input_check.py $(RUN_DIR)/error.log
+
+verify-6210-mbus-version-ingress: build
+	$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- npe3hle -rompath $(abspath roms) -video none -sound none -nothrottle -seconds_to_run 24 -log -verbose -autoboot_delay 0 -autoboot_script $(abspath tools/noki6210_mbus_version_probe.lua)
+	$(PYTHON) tools/mbus_input_check.py $(RUN_DIR)/error.log --version-query
 
 verify-8210-host-incoming-call: build
 	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario host-incoming-call --mame $(MAME_DIR)/mame

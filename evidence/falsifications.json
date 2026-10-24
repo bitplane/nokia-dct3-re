@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "positional_mbus_input_preserves_subframe_bytes",
+      "status": "disproven",
+      "hypothesis": "Lua field:set_value on a positional byte input can transport an MBUS frame at5ms intervals, with a strobe bit sufficient to preserve repeated bytes",
+      "conclusion": "The positional NPE-3 probe requested13 events over60ms but produced only four port callbacks at video-frame boundaries; only the first callback's d1 byte was accepted/read. MAME ioport frame_update samples non-output fields, while ioport_port.write dispatches IPT_OUTPUT handlers immediately. The shared event-port replacement independently delivers all14 framed bytes including repeated a5/ff/00 values on NPE-3 and both NSE-8 ROMs. The strobe is a fixture event discriminator, not a physical ninth data bit. Arbitrary leading a5 is also not a valid framing control: NPE-3 firmware disables reception after it, so the repeat acceptance uses complete framing rather than forcing RX back on. This closes the input API fault, not the D1 service-reply lifecycle.",
+      "evidence": ["docs/mbus_controller.md", "driver/nokia_dct3.cpp", "tools/mbus_input_probe.lua", "tools/mbus_input_check.py", "tools/test_mbus_input_check.py"]
+    },
+    {
       "id": "cobba4370643_identifies_unique_documented_pcm_profile",
       "status": "disproven",
       "hypothesis": "Identifying COBBA_GJP V4.1 part4370643 is sufficient to select one documented PCM profile for another product",
