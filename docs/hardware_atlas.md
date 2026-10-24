@@ -60,6 +60,41 @@ The named DAS documents remain unacquired. A document title in a service
 manual is not authority to implement guessed register semantics; likewise,
 serial frame recognition does not determine the peripheral clock.
 
+## Service-loader references
+
+The [preserved Twister collection](https://archive.org/details/Twister_Mobile_Phone_Flashing_Box)
+supplies independent service-tool binaries, not resident ROM dumps. The
+ignored collection's source chain is
+`roms/research/mad2-flash-loaders/provenance.json`: `New.zip` contains
+`Twister_New/UFS_Suite_Setup.zip`, whose installer is 41,426,398 bytes,
+SHA-256 `3e69edbcc9213a3484a1a79c526ba7e005ffb98ae6f2c0705da907b27d0b1f37`.
+Its ZIP member CRC is verified; the whole outer archive hash is not. The
+installer was never executed. Nine bounded wrapper records account for its
+complete overlay; unshield 1.6.2 lists 624 cabinet files and extracts the
+following five from group `DCTxBB5_TIA`:
+
+| File | Bytes | Admitted observation |
+| --- | ---: | --- |
+| `DCT3BT2.TIA` | 956 | Big-endian Thumb branch skips the `DCT3` header to relative offset `0e`. The decoded prologue constructs checksum span `03ba`; its halfword sum is zero modulo 16 bits. |
+| `WD1BT2.TIA` | 844 | Same bounded bootstrap shape, checksum span `034a` and zero sum. |
+| `I28F008.TIA` | 4,676 | Exact extracted identity only; programmer header/entry contract remains undecoded. |
+| `I28F160.TIA` | 6,092 | Exact extracted identity only; no fitted flash or product claim follows from its name. |
+| `M28W320C.TIA` | 5,996 | Exact extracted identity only; not a specification of every M28W320 variant. |
+
+Both bootstraps have an excluded trailing `0000`, with no assigned protocol
+meaning. File hashes are in `audit.json`; reproduce their identity and
+checksum checks with:
+
+```sh
+python3 tools/mad2_flash_loader_audit.py roms/research/mad2-flash-loaders/DCTxBB5_TIA
+```
+
+These artifacts can supply bounded register-use clues independently of the
+phone application firmware. They have not run in MAME or on captured hardware
+here, do not establish NAM-2 wake semantics, and must not supply guessed
+bootstrap results or calibration. Loading addresses, wire protocol and
+product applicability still require their own evidence.
+
 ## The chip
 
 The 3210 board uses MAD2PR1, containing the emulated **ARM7TDMI MCU** and an

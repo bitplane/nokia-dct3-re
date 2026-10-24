@@ -38,6 +38,16 @@ PMM record stream; see `tools/nam1_installer_audit.py`. The 3350 file's label
 does not establish pristine factory data or matching-version provenance.
 Neither acquisition is a new accepted handset input.
 
+The same collection's `New.zip` contains a nested UFS suite installer. A
+read-only InstallShield cabinet extraction retains five service-loader
+binaries under `roms/research/mad2-flash-loaders/DCTxBB5_TIA/`, with source
+chain in `provenance.json` and member hashes in `audit.json`.
+`tools/mad2_flash_loader_audit.py` verifies those identities and the two
+bootstrap files' self-checksum spans. They are service-tool inputs, not
+resident MAD2 ROM dumps or newly accepted handset configuration. The Windows
+installer was not executed; its complete 624-file cabinet listing is retained
+under `roms/twister-dct3/` separately from firmware admission.
+
 Six additional complete MAME firmware/PMM pairs are extracted in their
 `roms/noki*/` directories. All twelve members' sizes and SHA-1s match the
 current MAME ROM declarations, and all six ZIPs pass their internal CRC tests.

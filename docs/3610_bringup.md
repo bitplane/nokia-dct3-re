@@ -115,6 +115,11 @@ wider `0x550000..0x5fffff` product-state region).
 The [preserved Twister collection](https://archive.org/details/Twister_Mobile_Phone_Flashing_Box)
 has been indexed without downloading its full firmware archive: 2,652 entries
 in `Firmware.zip` and 586 in `DVD.zip`. Neither index lists a NAM-1 PMM.
+The remaining `New.zip` and `JAF.zip` indexes contain only support installers
+and drivers. The nested UFS suite's 624-file InstallShield cabinet also has
+no named NAM-1 PMM; its service-loader references are separately qualified in
+`hardware_atlas.md`. These are filename/record-stream bounds, not a proof
+that every executable's embedded data has been semantically decoded.
 The acquired `roms/twister-dct3/nam1_511.exe` is 4,192,123 bytes, SHA-256
 `cfdd4bd690776a0bfe37ad99e0b4fc1517543777c3c17e6eaeea5d44e1fce7ef`.
 Its 30 bounded gzip members include seven Wintesla record streams: MCU
