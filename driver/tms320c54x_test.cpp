@@ -11594,6 +11594,31 @@ private:
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_mpy_absolute_edge(unsigned variant = 0)
+	{
+		m_cpu->reset(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant; m_idle_fixture_tick = 0; m_pipeline_replay = false;
+		unsigned const flags = variant / 7;
+		u32 const base = flags & 4 ? 0x20000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(base + 0x600, 0x6200 | (flags & 1 ? 0x100 : 0) | (0xf9 + variant % 7));
+		program.write_word(base + 0x601, 0x1500);
+		program.write_word(base + 0x602, 3);
+		program.write_word(base + 0x603, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1804);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (flags & 2 ? 0x20 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xabcd);
+		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x1400 + i);
+		m_rptbd_counts = {};
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mpy_alias_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "mpy_alias_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600);
+		m_cpu->set_pipeline_frontend(!(flags & 8));
+		m_phase = 310700; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_short_read_mod3_edge(unsigned variant = 0)
 	{
 		m_cpu->reset(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
@@ -20261,6 +20286,7 @@ private:
 		if (!strcmp(machine().options().bios(), "rptb-branch")) { start_block_branch(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-mem-imm")) { start_memory_immediate_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mac-map-imm")) { start_mapped_immediate_mac(); return; }
+		if (!strcmp(machine().options().bios(), "mpy-abs-edge")) { start_mpy_absolute_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-mod3-edge")) { start_short_read_mod3_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mmr-long-edge")) { start_mmr_long_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-xfer-edge")) { start_mmr_long_edge(); return; }
@@ -52063,6 +52089,26 @@ private:
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase == 254330) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254320; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
+		if (m_phase == 310700)
+		{
+			unsigned const variant = m_pipeline_peripheral_case, flags = variant / 7;
+			unsigned const tick = ++m_idle_fixture_tick, checkpoint = flags & 16 ? 10 : 1;
+			expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Unadmitted MPY absolute alias performs no data transaction");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xabcd && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1804 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (flags & 2 ? 0x20 : 0)), "Unadmitted MPY absolute alias preserves accumulators, T and status");
+			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x1400 + i, "Unadmitted MPY alias preserves every AR");
+			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save MPY alias before or after rejection"); }
+			if (tick == 20)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Both frontends reject unadmitted MPY absolute aliases");
+				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore MPY rejection without operand effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310710; m_check_timer->enable(true); return; }
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (variant < 223) { start_mpy_absolute_edge(variant + 1); return; }
+				osd_printf_info("TMS320C54x MPY absolute alias exclusions: PASS cases=224 restore=224 modes=f9..ff destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n");
+				throw emu_fatalerror(3, "TMS320C54x isolated MPY absolute alias exclusions complete");
+			}
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 310710) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310700; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 310600)
 		{
 			unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = (variant & 128) ? 10 : 1;
@@ -57524,6 +57570,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(207, "clock-mvdk-edge", "Excluded repeated/delayed CLKMD moves have no operand or clock effects")
 	ROM_SYSTEM_BIOS(208, "pop-irq", "Retained IMR/IFR stack writes and W1C acknowledgement across restore")
 	ROM_SYSTEM_BIOS(209, "pop-irq-edge", "Excluded repeated/delayed interrupt pops have no stack or acknowledgement effects")
+	ROM_SYSTEM_BIOS(210, "mpy-abs-edge", "Unadmitted memory-immediate MPY absolute-alias exclusions")
 ROM_END
 
 ROM_START(tms54rom4)

@@ -14,6 +14,16 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_mpy_alias_exclusions_require_both_frontends_and_no_operand_effects(self):
+        marker, ending = EXTRA_PROFILES['mpy-abs-edge']
+        text = marker + '\n' + ending
+        check_result(text, 3, profile='mpy-abs-edge')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'), 3,
+                                 profile='mpy-abs-edge')
+
     def test_interrupt_pop_exclusions_require_no_ack_or_stack_side_effects(self):
         marker,ending=EXTRA_PROFILES['pop-irq-edge']
         text=marker+'\n'+ending

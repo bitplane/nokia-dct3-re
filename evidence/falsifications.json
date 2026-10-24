@@ -1210,6 +1210,12 @@
       "evidence": ["docs/8210_bringup.md", "tools/noki8210_incoming_call_check.py", "tools/noki8210_incoming_sms_check.py", "tools/test_noki8210_incoming_call_check.py", "tools/test_noki8210_incoming_sms_check.py"]
     },
     {
+      "id": "c54x_mpy_decoder_exclusion_implies_atomic_nonadmission", "status": "disproven",
+      "hypothesis": "Memory/immediate MPY modes f9..ff already have no operand effects because the decoder and staged path leave them unsupported",
+      "conclusion": "The unchanged atomic control reaches case56 for62f9, performs a data transaction and changes A to zero: prepare_smem_address treated every mode>=f8 as an absolute address. An early MPY-family guard now aligns atomic admission with the existing decoder/staged limit. The224-case matrix covers all seven aliases, both destinations, CMPT settings, pages, frontends and two save points, requiring no data transaction and unchanged A/B/T/status/ARs. This is a fail-closed emulator policy for unvalidated aliases, not evidence of a silicon trap, an exclusion of documented f8/long-MOD13, or an all-family legality closure.",
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+    },
+    {
       "id": "mu4_state5_reload_requires_nonzero_worker_result", "status": "disproven",
       "hypothesis": "Repeated resident entry at lifecycle 5 requires a nonzero worker result published to 3742, indicating a failed decoder or missing external completion",
       "conclusion": "AA99 029575 uses 7212 3742, MVDM data-to-AR2, so 3742 is an input control rather than a result publication. The pinned 46-word cleanup and two-word AA55 API contract enumerates all 65536 controls: while lifecycle is 4, control 2 selects state 2 and every other control selects state 5; both join descriptor-0 reload through 002080 -> 003538. A passive three-second run reads control zero at 2.198518905 seconds, writes state 5 at 2.198519039 and re-enters state 4 at 2.588181162 without guest writes by the observer. The twenty-second Execute trails identify the AA99 02959b reload caller and AA22 0291c7 REL request; they do not show a reset-vector restart or corrupt FRET. The raw data tap is not an all-alias writer census, and its context PC is not instruction ownership. Why the worker reaches cleanup, whether this is EOF, and decoded PCM remain unproved.",

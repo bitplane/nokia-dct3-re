@@ -6672,7 +6672,8 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x6200: case 0x6300: // MPY Smem, #lk, A/B
 	{
 		// SPRU131G table 5-4: short MOD=3 is write-only, unlike long MOD=13.
-		if ((low & 0xf8) == 0x98) { m_illegal = true; return; }
+		// The decoder admits f8 absolute addressing, not unvalidated f9..ff aliases.
+		if ((low & 0xf8) == 0x98 || low > 0xf8) { m_illegal = true; return; }
 		u16 immediate;
 		const u16 memory = immediate_smem_read(low, immediate);
 		m_t = memory;

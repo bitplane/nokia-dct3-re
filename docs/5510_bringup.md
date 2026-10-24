@@ -135,6 +135,26 @@ legality rule or establish CMPT coverage for unrelated fixture helpers.
 | `pmac-mod3-edge` (`tms54xtra`) | 512 | MACP/MACD A/B; all ARs, CMPT modes, pages, frontends and two checkpoints; no data access or program/I/O write. |
 | `delay-mod3-edge` (`tms54xtra`) | 512 | LTD/DELAY source operands; all ARs, CMPT/TC settings, pages, frontends and two checkpoints; no source read, implicit successor write or pointer/T change. |
 
+`mpy-abs-edge` independently checks224 cases/restores for memory/immediate
+MPY modes`f9..ff`: both destinations, CMPT settings, program pages, frontends
+and two checkpoints. The decoder and staged path do not admit these modes,
+but the former atomic helper interpreted every mode`>=f8` as absolute and
+read an operand in the first atomic control case. The MPY handler now rejects
+these unvalidated aliases before operand access, retaining A/B/T/status and
+all ARs. This aligns the emulator's fail-closed admission paths; it does not
+establish that silicon traps on these encodings or settle other families'
+alias behavior. Canonical`f8` absolute and legal long MOD13 remain distinct.
+Capture:`tmp/run_c54x_core_gfni9tle`; the unchanged-core diagnostic is retained
+in`tmp/c54x-mpy-alias-negative.log`.
+The existing256-case short-MOD3 MPY rejection control and the complete
+`mpy-mem-imm` profile pass separately:98,304 legal MPY cases,262,144 MAC
+cases and1,408 MAC exclusions, all with restoration. The legal profile's
+capture is`tmp/run_c54x_core_0izklf6w`. These are bounded instruction
+regressions, not post-change acceptance of the entire default core suite.
+Native staged5110 Phone book menu acceptance and both3210 default/frontier
+regressions also pass without rebanking their oracles. This does not expand
+handset, RF or speech support.
+
 Corrected positive load domains are:
 
 | Profile | Admitted cases/restores | Domain |
