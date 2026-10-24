@@ -1453,8 +1453,13 @@ physical microphone/earpiece tones and require matching PCS media acceptance.
 Connected PCS restoration is independently qualified by
 `verify-8890-pcs-sip-{outgoing,incoming}-connected-restore`: own registration
 and bidirectional media precede saving, and restoration clears the external
-dialog rather than replaying it. Pending/ringing PCS restoration is not
-inherited from GSM900. See the NSB-6 contract in `8xxx_bringup.md`.
+dialog rather than replaying it. Independent
+`verify-8890-pcs-sip-outgoing-pending-restore` and
+`verify-8890-pcs-sip-incoming-alerting-restore` require zero external media,
+no CONNECT/Answer, actual SIP cancellation/rejection and own-band release.
+Any local unanswered codec ticks are restricted to restored radio teardown
+with zero downlink and exact clock accounting, not counted as speech.
+See the NSB-6 contract in `8xxx_bringup.md`.
 
 ### Failed calls and automatic redial
 

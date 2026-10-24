@@ -39,6 +39,26 @@ def verify(text, *, incoming=False):
             'native_dsp_speech': False}
 
 
+def verify_unanswered_restore(text):
+    """Bound local 512k/64-clock PCM to post-load teardown, not external speech."""
+    restored = text.find('sip_state: restored')
+    released = text.find('LAPDm service Channel Release acknowledged', restored)
+    if restored < 0 or released < 0:
+        raise ValueError('missing unanswered restore/release boundaries')
+    previous = 0
+    for tick in TICK.finditer(text):
+        up, down, pcm, data_clock, frame_clock, shape, clocks, idle = map(int, tick.groups())
+        if not restored < tick.start() < released:
+            raise ValueError('unanswered local PCM outside restored radio teardown')
+        if (down != 0 or pcm != up or up <= previous or
+                (data_clock, frame_clock, shape) != (512000, 8000, 64) or
+                clocks != pcm * 160 * 64 or idle != pcm * 160 * 47):
+            raise ValueError('unanswered PCM has downlink or invalid clock accounting')
+        previous = up
+    if re.search(r'media direction=\w+ [^\n]*result=accepted', text):
+        raise ValueError('unanswered call admitted external media')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)

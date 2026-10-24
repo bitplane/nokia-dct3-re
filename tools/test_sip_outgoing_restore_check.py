@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -29,6 +30,20 @@ REMOTE = 'Response msg 180/INVITE/\nRequest msg CANCEL/\nResponse msg 487/INVITE
 
 
 class SipOutgoingRestoreCheckTest(unittest.TestCase):
+    def test_8890_pending_requires_zero_external_media_inventory(self):
+        log = LOG.replace('5551234', '1234567').replace(
+            'length=15 data=03450401a05e0581551532f4150101',
+            'length=19 data=03450404600200815e0581214365f7a1150101')
+        counts = dict(uplink=0, downlink=0, pcm_transmitted=0, pcm_received=0)
+        bridge = BRIDGE + 'SIP epoch media discarded ' + json.dumps(counts) + '\n'
+        self.check(log=log, bridge=bridge, product='8890')
+        for field in counts:
+            invalid = BRIDGE + 'SIP epoch media discarded ' + json.dumps({**counts, field: 1})
+            with self.subTest(field=field), self.assertRaisesRegex(RuntimeError, 'carried media'):
+                self.check(log=log, bridge=invalid, product='8890')
+        with self.assertRaisesRegex(RuntimeError, 'inventory'):
+            self.check(log=log, bridge=BRIDGE, product='8890')
+
     def test_8290_connected_restore_composes_product_and_sip_checks(self):
         from tools.test_nsb7_sip_check import restore_fixture
         log=('GSM service uplink sapi=0 pd=03 message=05 length=18 '

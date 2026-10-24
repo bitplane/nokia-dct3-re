@@ -7,7 +7,7 @@ import sys
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tools.noki8890_pcm_check import TICK
+from tools.noki8890_pcm_check import TICK, verify_unanswered_restore
 from tools.nsb7_speech_control_check import verify_call
 
 
@@ -50,25 +50,6 @@ def verify_before_restore(text, *, incoming=False):
     if enable < 0 or 'dsp_control_write: data=840a pc=002cb93e' in prefix[enable:]:
         raise ValueError('saved call lacks own enabled speech control')
     return verify_ticks(prefix, enable, len(prefix))
-
-
-def verify_unanswered_restore(text):
-    restored = text.find('sip_state: restored')
-    released = text.find('LAPDm service Channel Release acknowledged', restored)
-    if restored < 0 or released < 0:
-        raise ValueError('missing unanswered restore/release boundaries')
-    previous = 0
-    for tick in TICK.finditer(text):
-        up, down, pcm, data_clock, frame_clock, shape, clocks, idle = map(int, tick.groups())
-        if not restored < tick.start() < released:
-            raise ValueError('unanswered local PCM outside restored radio teardown')
-        if (down != 0 or pcm != up or up <= previous or
-                (data_clock, frame_clock, shape) != (512000, 8000, 64) or
-                clocks != pcm * 160 * 64 or idle != pcm * 160 * 47):
-            raise ValueError('unanswered PCM has downlink or invalid clock accounting')
-        previous = up
-    if re.search(r'media direction=\w+ [^\n]*result=accepted', text):
-        raise ValueError('unanswered call admitted external media')
 
 
 def main():

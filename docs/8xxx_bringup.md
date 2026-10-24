@@ -674,8 +674,8 @@ ARFCN600 registration, CC/RR closure, persistent EF_LOCI, reviewed idle
 recovery, at least100 media/host-PCM frames in both directions and unchanged
 512000/8000Hz,64-clock/47-idle-clock accounting. Outgoing reports361 uplink
 and346 downlink frames; incoming396/376. The runner's `--pcs1900` selects
-own-band checks for ordinary media or connected restoration; pending/ringing
-restoration and signaling-only combinations reject. No device configuration or codec gain changed.
+own-band checks for ordinary media and all four call-restoration phases;
+unqualified failure/cancel and signaling-only combinations reject. No device configuration or codec gain changed.
 These are clocked HLE transport tests, not native DSP speech, measured RF,
 PCS physical-waveform qualification or PCS external-dialog restoration.
 
@@ -709,7 +709,27 @@ captures; wrong-carrier, missing/late registration, absent pre-save media
 and altered release controls reject. Captures are
 `tmp/nsb6-pcs-connected-{outgoing,incoming}-restore`.
 This is cleared external state, not seamless SIP resumption or native speech.
-PCS pending outgoing and ringing incoming restoration remain unqualified.
+PCS pending outgoing and ringing incoming independently pass
+`verify-8890-pcs-sip-outgoing-pending-restore` and
+`verify-8890-pcs-sip-incoming-alerting-restore`. They require own ARFCN600
+registration before save, the same R15/R13/RAM-checksum/time snapshot,
+zero old-epoch uplink/downlink/host-PCM inventory and no CONNECT or Answer.
+Pending outgoing closes the actual SIP dialog with CANCEL/487; ringing
+incoming rejects its INVITE and reaches ended before physical Exit dismisses
+the notification. Both require one cause41 clear and own-carrier radio
+release/paging recovery. Captures are `tmp/nsb6-pcs-pending-outgoing-restore`
+and `tmp/nsb6-pcs-ringing-incoming-restore-final`.
+
+The pending case has three local HLE PCM ticks at32.180/32.200/32.220s
+during restored teardown, each with zero downlink. A shared checker bounds
+all such ticks between restore and radio release and checks exact512000/8000Hz,
+64-clock/47-idle-clock accounting. The external media inventory stays zero;
+local ticks are not evidence of CONNECT. The ringing case has no local ticks.
+The same stricter zero-inventory and own-band release checks pass retained
+GSM900 unanswered captures. Missing inventory, any positive external counter,
+late/wrong-band release and cleanup dependent on physical Exit reject.
+All phases dispose external dialogs; seamless external SIP resumption and
+native DSP speech remain unqualified.
 
 Accepted media captures are `tmp/nsb6-sip-outgoing-media-qualified` and
 `tmp/nsb6-sip-incoming-media-final`. The four restoration captures use

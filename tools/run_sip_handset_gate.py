@@ -586,7 +586,7 @@ def verify_outgoing_restore(root, remote_text, connected=False, product='3210', 
             raise RuntimeError('signaling-only restoration lacks zero-uplink/no-codec evidence')
     elif connected and product in ('8290', '8890'):
         verify_pre_restore_media(log, bridge)
-    elif not connected and product == '8290':
+    elif not connected and product in ('8290', '8890'):
         verify_unanswered_media_inventory(log, bridge)
     (root / 'sip-result.json').write_text(json.dumps({
         'scope': (f'{product} connected outgoing HLE SIP save/load; BYE, no redial' if connected else
@@ -648,11 +648,11 @@ def verify_restore(root, remote_text, phase='connected', product='3210', *, sign
         if not match:
             raise RuntimeError(f'missing handset restoration checkpoint: {pattern}')
         cursor += match.end()
-    if phase=='alerting' and product=='6210':
-        cleanup=log.find('6210_sip_cancel: physical Exit')
+    if phase=='alerting' and product in ('6210', '8890'):
+        cleanup=log.find(f'{product}_sip_cancel: physical Exit')
         ended=re.search(r'incoming state id=1 epoch=2 phase=ended\b',log)
         if cleanup<0 or ended is None or ended.end()>cleanup:
-            raise RuntimeError('6210 alerting restoration waited for physical Exit to clear')
+            raise RuntimeError(f'{product} alerting restoration waited for physical Exit to clear')
     if signaling_only:
         summaries = re.findall(r'SIP epoch media discarded (\{[^\n]+\})', bridge)
         if len(summaries) != 1 or json.loads(summaries[0]).get('uplink') != 0 or 'dsp_hle: speech tick' in log:
@@ -669,7 +669,7 @@ def verify_restore(root, remote_text, phase='connected', product='3210', *, sign
     elif phase == 'connected' and product in ('8290', '8890'):
         verify_incoming_identity(bridge, restored=True)
         verify_pre_restore_media(log, bridge)
-    elif phase == 'alerting' and product == '8290':
+    elif phase == 'alerting' and product in ('8290', '8890'):
         verify_unanswered_media_inventory(log, bridge)
     (root / 'sip-result.json').write_text(json.dumps({
         'scope': f'{product} {phase} HLE SIP call save/load; external dialog cleared, not restored',
@@ -750,10 +750,10 @@ def main():
     parser.add_argument('--sip-response', type=int, choices=(180, 200, 403, 404, 408, 480, 486, 503, 600), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
-    if args.pcs1900 and (args.product != '8890' or args.signaling_only or
-                        args.sip_response != 200 or args.restore_idle or
-                        (args.restore_call and args.restore_phase != 'connected') or args.cancel_incoming):
-        parser.error('--pcs1900 requires 8890 connected media; no pending/alerting/cancel fixture')
+    if args.pcs1900 and (args.product != '8890' or args.signaling_only or args.restore_idle or
+                        args.cancel_incoming or not (args.sip_response == 200 or
+                        (args.restore_outgoing and not args.incoming and args.sip_response == 180))):
+        parser.error('--pcs1900 requires 8890 media or call-phase restoration; no failure/cancel fixture')
     if args.dcs1800 and args.product != '8210':
         parser.error('--dcs1800 is qualified only for product 8210')
     signaling_connected = (args.signaling_only and args.product == '6210' and

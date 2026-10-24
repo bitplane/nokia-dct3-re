@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 859 gates: 639 generated from typed steps, 220 copied verbatim (shell).
+# 861 gates: 639 generated from typed steps, 222 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -66,6 +66,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8290-sip-incoming-alerting-restore \
 	verify-8290-sip-incoming-media-restore verify-8290-sip-outgoing-media-restore \
 	verify-8290-sip-incoming-waveform verify-8290-sip-outgoing-waveform \
+	verify-8890-pcs-sip-outgoing-pending-restore \
+	verify-8890-pcs-sip-incoming-alerting-restore \
 	verify-8890-pcs-sip-outgoing-connected-restore \
 	verify-8890-pcs-sip-incoming-connected-restore \
 	verify-8890-pcs-sip-outgoing-media verify-8890-pcs-sip-incoming-media \
@@ -665,6 +667,14 @@ verify-8290-sip-incoming-waveform: build
 # shell: optional PJSIP/PulseAudio/FFmpeg and explicit SIP_WAVEFORM_NVRAM_DIR from own qualified NSB-7 provisioning; physical dialing/End and HLE microphone/earpiece tones, not native speech
 verify-8290-sip-outgoing-waveform: build
 	env SIP_PRODUCT=8290 SIP_DIRECTION=outgoing SIP_WAVEFORM_NVRAM_DIR='$(SIP_WAVEFORM_NVRAM_DIR)' RUN_DIR='$(RUN_DIR)' SIP_PJSUA_BIN='$(SIP_PJSUA_BIN)' SIP_PYTHON_PATH='$(SIP_PYTHON_PATH)' bash tools/run_sip_physical_audio_gate.sh
+
+# shell: optional PJSIP; own PCS1900 pre-save registration, pending outgoing snapshot replay, real CANCEL/487, zero external media and one cause41 clear without redial
+verify-8890-pcs-sip-outgoing-pending-restore: build
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON) tools/run_noki8890_sip_cancel.py '$(RUN_DIR)' --pcs1900 --restore-outgoing-pending --pjsua '$(SIP_PJSUA_BIN)'
+
+# shell: optional PJSIP; own PCS1900 ringing snapshot replay, old INVITE rejection, zero Answer/CONNECT/media, clear before physical Exit and own-band idle recovery
+verify-8890-pcs-sip-incoming-alerting-restore: build
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON) tools/run_noki8890_sip_cancel.py '$(RUN_DIR)' --pcs1900 --restore-incoming-alerting --pjsua '$(SIP_PJSUA_BIN)'
 
 # shell: optional PJSIP; own PCS1900 pre-save registration/media, connected outgoing snapshot replay, old SIP dialog BYE and one cause41 clear without redial
 verify-8890-pcs-sip-outgoing-connected-restore: build

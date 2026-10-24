@@ -34,7 +34,7 @@ def check_frames(directory):
                 raise ValueError('missing reviewed SIP cleanup frame: ' + name)
 
 
-def check_product_result(run, restore_idle=False):
+def check_product_result(run, restore_idle=False, *, pcs1900=False):
     text = (run / 'error.log').read_text(errors='replace')
     check_output(text)
     check_output((run / 'console.log').read_text(errors='replace'))
@@ -48,7 +48,8 @@ def check_product_result(run, restore_idle=False):
             raise ValueError('incoming SIP call did not follow exact idle restoration')
         if json.loads((run / 'sip-result.json').read_text()).get('epoch') != 2:
             raise ValueError('idle restore did not establish a fresh host epoch')
-    if not re.search(r'gsm_call_adapter: network registered=1 arfcn=60\b', text):
+    carrier = 600 if pcs1900 else 60
+    if not re.search(rf'gsm_call_adapter: network registered=1 arfcn={carrier}\b', text):
         raise ValueError('host registration lacks own configured carrier')
     if len(host_setup_pattern('5551234').findall(text)) != 1:
         raise ValueError('missing one own SETUP for the real SIP caller')
@@ -125,6 +126,22 @@ def check_connected_restoration_radio(text, *, outgoing, pcs1900=False):
     ), 'NSB-6 connected restoration')
 
 
+def check_unanswered_restoration_radio(text, *, pcs1900=False):
+    from tools.noki8890_registration_check import verify as verify_registration
+    before_save, marker, _ = text.partition('sip_state: saved')
+    if not marker:
+        raise ValueError('unanswered restoration lacks save boundary')
+    verify_registration(before_save, pcs1900=pcs1900, configured_gsm900=not pcs1900)
+    carrier = '0258' if pcs1900 else '003c'
+    require_ordered(text, (
+        ('save', r'sip_state: saved'), ('restore', r'sip_state: restored'),
+        ('own release carrier', rf'TX packet type=02 payload=20 .*data=041202001117001a6000{carrier}0000001400000001'),
+        ('release confirmation', RELEASE_CONFIRMATION), ('resumed paging', IDLE_PCH),
+    ), 'NSB-6 unanswered restoration')
+    from tools.noki8890_pcm_check import verify_unanswered_restore
+    verify_unanswered_restore(text)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
@@ -155,14 +172,15 @@ def main():
                           help='physically answer, restore and clear an incoming HLE SIP dialog')
     parser.add_argument('--record-media', action='store_true')
     parser.add_argument('--pcs1900', action='store_true',
-                        help='independent PCS ordinary or connected-restoration media acceptance')
+                        help='independent PCS ordinary media or call-phase restoration acceptance')
     parser.add_argument('--sound', choices=('none', 'pulse'), default='none')
     parser.add_argument('--http-port', type=int, default=18889)
     parser.add_argument('--sip-port', type=int, default=25889)
     args = parser.parse_args()
     if args.pcs1900 and not (args.outgoing_connected_signaling or args.incoming_connected_signaling or
-                            args.restore_outgoing_connected_signaling or args.restore_incoming_connected_signaling):
-        parser.error('--pcs1900 requires ordinary or connected-restoration media')
+                            args.restore_outgoing_connected_signaling or args.restore_incoming_connected_signaling or
+                            args.restore_outgoing_pending or args.restore_incoming_alerting):
+        parser.error('--pcs1900 requires ordinary media or call-phase restoration')
     outgoing_failure = args.outgoing_busy or args.outgoing_unavailable
     outgoing_run = outgoing_failure or args.restore_outgoing_pending or args.outgoing_connected_signaling or args.restore_outgoing_connected_signaling
     if args.restore_idle and (outgoing_run or args.incoming_connected_signaling or args.restore_incoming_connected_signaling or args.restore_incoming_alerting):
@@ -222,6 +240,9 @@ def main():
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
+        if args.restore_outgoing_pending or args.restore_incoming_alerting:
+            check_unanswered_restoration_radio((run / 'error.log').read_text(errors='replace'),
+                                               pcs1900=args.pcs1900)
         if outgoing_run:
             check_outgoing_result(run, pcs1900=args.pcs1900)
             if args.outgoing_connected_signaling:
@@ -259,7 +280,7 @@ def main():
                     if frame.size != (84, 48) or digest != FRAMES['8890_sip_registered_idle.png']:
                         raise ValueError('incoming cleanup differs from reviewed idle content: ' + name)
         else:
-            check_product_result(run, args.restore_idle)
+            check_product_result(run, args.restore_idle, pcs1900=args.pcs1900)
             if args.restore_incoming_alerting:
                 check_alerting_restoration((run / 'error.log').read_text(errors='replace'))
         subprocess.run([sys.executable, str(root / 'tools/noki8890_registration_check.py'),

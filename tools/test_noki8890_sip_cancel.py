@@ -10,6 +10,25 @@ from tools import run_noki8890_sip_cancel as check
 
 
 class CleanupFramesTest(unittest.TestCase):
+    def test_unanswered_release_requires_own_band_after_restore(self):
+        for pcs in (False, True):
+            carrier = '0258' if pcs else '003c'
+            text = ('registered\nsip_state: saved\nsip_state: restored\n'
+                f'TX packet type=02 payload=20 data=041202001117001a6000{carrier}0000001400000001\n'
+                'RX enqueue type=89 payload=8 data=0000000000000000\n'
+                'LAPDm service Channel Release acknowledged\n'
+                'RX enqueue type=80 payload=34 data=60' + '00' * 9 + '1506210001f0\n')
+            with patch('tools.noki8890_registration_check.verify') as registration:
+                check.check_unanswered_restoration_radio(text, pcs1900=pcs)
+                registration.assert_called_once_with('registered\n', pcs1900=pcs,
+                                                     configured_gsm900=not pcs)
+                for bad in (text.replace(carrier, '0013'),
+                            text.replace('sip_state: restored', ''),
+                            text.replace('type=89', 'type=88'),
+                            text.replace('sip_state: restored\n', '') + 'sip_state: restored\n'):
+                    with self.subTest(pcs=pcs), self.assertRaises(ValueError):
+                        check.check_unanswered_restoration_radio(bad, pcs1900=pcs)
+
     def test_connected_restore_requires_own_carrier_and_postload_release(self):
         for outgoing in (False, True):
             connected = 'gsm_call_adapter: ' + ('' if outgoing else 'incoming ') + 'state id=1 epoch=1 phase=connected\n'
@@ -125,11 +144,13 @@ class CleanupFramesTest(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, message):
                         check.check_product_result(run, restore_idle=True)
 
-    def product_result(self, mutation=lambda text: text, bad_storage=False):
+    def product_result(self, mutation=lambda text: text, bad_storage=False, pcs1900=False):
         setup = '80000000000000000000032445030504046002008134015c0581551532f4'
         text = ('gsm_call_adapter: network registered=1 arfcn=60\n'
                 'RX enqueue type=80 payload=34 producer=abc data=' + setup + '\n'
                 '8890_sip_cancel: physical Exit\n8890_keypad_decoded: key=1a\n')
+        if pcs1900:
+            text = text.replace('arfcn=60', 'arfcn=600')
         storage = bytearray(1611)
         storage[1604:1609] = bytes.fromhex('00f1100001')
         storage[1610] = int(bad_storage)
@@ -140,11 +161,14 @@ class CleanupFramesTest(unittest.TestCase):
             (run / 'console.log').write_text('')
             (run / 'error.log').write_text(mutation(text))
             with patch.object(check, 'verify_stage') as stage, patch.object(check, 'check_frames'):
-                check.check_product_result(run)
+                check.check_product_result(run, pcs1900=pcs1900)
                 stage.assert_called_once_with(mutation(text), runtime=True, selftest=True)
 
     def test_product_boundary_is_not_just_exit_marker(self):
         self.product_result()
+        self.product_result(pcs1900=True)
+        with self.assertRaisesRegex(ValueError, 'carrier'):
+            self.product_result(pcs1900=True, mutation=lambda text: text.replace('arfcn=600', 'arfcn=60'))
         for options in (
             {'mutation': lambda text: text.replace('arfcn=60', 'arfcn=600')},
             {'mutation': lambda text: text.replace('0581551532f4', '0581551532f5')},

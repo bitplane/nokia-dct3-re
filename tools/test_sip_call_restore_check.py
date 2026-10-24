@@ -25,6 +25,24 @@ REMOTE = 'state changed to CONFIRMED\nRequest msg BYE/\n'
 
 
 class SipRestoreCheckTest(unittest.TestCase):
+    def test_8890_alerting_requires_zero_external_media_inventory(self):
+        log = LOG.replace('phase=connected', 'phase=alerting') + '8890_sip_cancel: physical Exit\n'
+        counts = dict(uplink=0, downlink=0, pcm_transmitted=0, pcm_received=0)
+        bridge = BRIDGE + 'SIP epoch media discarded ' + json.dumps(counts) + '\n'
+        remote = 'Response msg 603/INVITE/\n'
+        self.check(log=log, bridge=bridge, remote=remote, phase='alerting', product='8890')
+        for field in counts:
+            invalid = BRIDGE + 'SIP epoch media discarded ' + json.dumps({**counts, field: 1})
+            with self.subTest(field=field), self.assertRaisesRegex(RuntimeError, 'carried media'):
+                self.check(log=log, bridge=invalid, remote=remote, phase='alerting', product='8890')
+        with self.assertRaisesRegex(RuntimeError, 'inventory'):
+            self.check(log=log, bridge=BRIDGE, remote=remote, phase='alerting', product='8890')
+        for invalid in (log.replace('8890_sip_cancel: physical Exit', ''),
+                        log.replace('8890_sip_cancel: physical Exit\n', '').replace(
+                            'termination id=1', '8890_sip_cancel: physical Exit\ntermination id=1')):
+            with self.assertRaisesRegex(RuntimeError, 'physical Exit'):
+                self.check(log=invalid, bridge=bridge, remote=remote, phase='alerting', product='8890')
+
     def test_6210_alerting_restore_rejects_media_or_missing_alert(self):
         log = LOG.replace('phase=connected', 'phase=alerting')+'6210_sip_cancel: physical Exit\n'
         remote = 'Response msg 603/INVITE/\n'
