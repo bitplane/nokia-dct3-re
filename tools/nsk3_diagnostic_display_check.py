@@ -131,12 +131,12 @@ def check(source, seed, run, cold):
         frame_check(cold / f'snap/nsk3_idle_{time}.png', EARLY_IDLE if time < 36 else IDLE)
 
 
-def execute(binary, rompath, run, script):
+def execute(binary, rompath, run, script, seconds=54):
     path = Path(__file__).with_name(script).resolve()
     command = [str(binary), 'nsk3r4t', '-rompath', str(rompath), '-noreadconfig',
                '-video','none','-sound','none','-joystickprovider','none','-midiprovider','none',
                '-nothrottle','-debug','-debugger','none','-log','-verbose',
-               '-seconds_to_run','54','-autoboot_delay','0','-autoboot_script',str(path)]
+               '-seconds_to_run',str(seconds),'-autoboot_delay','0','-autoboot_script',str(path)]
     (run / 'idle_invocation.json').write_text(json.dumps({
         'command': command, 'mame_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
         'script_sha256': hashlib.sha256(path.read_bytes()).hexdigest(),

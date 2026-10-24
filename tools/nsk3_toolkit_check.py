@@ -1,0 +1,134 @@
+"""Own NSK-3 DISPLAY TEXT capability refusal and matched Phase-2 control."""
+import argparse
+import json
+from pathlib import Path
+import re
+import subprocess
+import sys
+import xml.etree.ElementTree as ET
+
+if __package__ in (None, ''):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools.make_sim_card_profile import make_current_profile
+from tools.nsk3_static_check import inspect
+from tools.nsk3_diagnostic_display_check import (
+    FRAMES, IDLE, check_bank, check_link, contract, execute, input_signature,
+)
+from tools.nsk3_pin_check import check_trace as check_pin
+from tools.nsk3_security_check import check_trace as check_phone
+from tools.nsk3_boot_check import check_upload_handoffs
+from tools.nsk3_toolkit_prepare import prepare, profile_metadata
+from tools.nsk1_phonebook_roundtrip import frame_check
+from tools.sim_toolkit_display_check import DISPLAY, wire
+from tools.sim_fdn_protocol_check import apdus
+from tools.sim_security_trace_check import statuses
+
+TERMINAL_PROFILE = bytes.fromhex('03018000')
+REFUSAL = bytes.fromhex('810301218002028281030130')
+
+
+def check_trace(text, control=False):
+    check_pin(text, True, tx_limit=4096)
+    check_phone(text, True)
+    check_upload_handoffs(text, 1)
+    if 'nsk3_reset_request:' in text:
+        raise ValueError('reset interrupted Toolkit observation')
+    tx, rx = wire(text, 'TX', 'nsk3'), wire(text, 'RX', 'nsk3')
+    commands = list(apdus(tx))
+    if any(row[0] not in (0xa4, 0x20, 0xb0, 0xb2, 0xc0, 0xf2, 0x10, 0x12, 0x14)
+           for row in commands):
+        raise ValueError('unrelated SIM operation')
+    expected = [] if control else [
+        (0x10, 0, 0, 4, TERMINAL_PROFILE),
+        (0x12, 0, 0, 22, b''), (0x14, 0, 0, 12, REFUSAL),
+    ]
+    if [row[:5] for row in commands if row[0] in (0x10, 0x12, 0x14)] != expected:
+        raise ValueError('own terminal profile, FETCH or refusal differs')
+    if f'read-binary fid=6fae offset=0 length=1 first={"02" if control else "03"}' not in text:
+        raise ValueError('card phase differs')
+    for instruction in (0x10, 0x14):
+        if statuses(text, instruction) != ([] if control else [(0x9000, 3, 10)]):
+            raise ValueError('card acceptance of profile/refusal differs')
+    marker = 'nsk3_toolkit_physical: action=dismiss'
+    contacts = re.findall(re.escape(marker) + r' down=([01]) t=([0-9.]+)', text)
+    if (contacts != [('1', '68.000000000'), ('0', '68.200000000')]
+            or text.count('nsk3_toolkit_physical:') != 2):
+        raise ValueError('physical post-refusal Menu differs')
+    if control:
+        if 'SIM completion ins=f2 sw=91' in text or DISPLAY in rx:
+            raise ValueError('Phase-2 control produced proactive traffic')
+    else:
+        if text.count('SIM completion ins=f2 sw=9116') != 1 or rx.count(DISPLAY + b'\x90\x00') != 1:
+            raise ValueError('missing unique pending STATUS or card payload')
+        before = text.split(marker + ' down=1', 1)[0]
+        previous = list(apdus(wire(before, 'TX', 'nsk3')))
+        if [row[:5] for row in previous if row[0] in (0x10, 0x12, 0x14)] != expected:
+            raise ValueError('refusal did not precede physical input')
+        if statuses(before, 0x14) != [(0x9000, 3, 10)] or DISPLAY + b'\x90\x00' not in wire(before, 'RX', 'nsk3'):
+            raise ValueError('card exchange did not complete before physical input')
+    native = re.findall(r'nsk3_toolkit_native: sample=(\d+) pc=([0-9a-f]{6}) stopped=([01]) idle=([01]) observer_writes=0', text)
+    if ([(row[0], row[2]) for row in native] != [('1', '0'), ('2', '0')]
+            or text.count('nsk3_toolkit_native:') != 2):
+        raise ValueError('native observations missing or stopped')
+
+
+def check_configuration(seed, run, profile):
+    profile_metadata(profile)
+    tree = ET.parse(run / 'cfg/nsk3r4t.cfg')
+    inputs = tree.find('./system/input')
+    if inputs is None:
+        raise ValueError('own inputs missing')
+    ports = inputs.findall("port[@tag=':SATCFG']")
+    if ports or profile:
+        if len(ports) != 1 or ports[0].attrib != dict(
+                tag=':SATCFG', type='CONFIG', mask='15', defvalue='0', value=str(profile)):
+            raise ValueError('external Toolkit input differs')
+        inputs.remove(ports[0])
+    signature = [(node.tag, sorted(node.attrib.items()), (node.text or '').strip())
+                 for node in inputs.iter()]
+    if (tree.find('system').get('name') != 'nsk3r4t'
+            or signature != input_signature(seed / 'cfg/nsk3r4t.cfg')):
+        raise ValueError('unrelated configuration changed')
+    if json.loads((run / 'toolkit_input.json').read_text()) != profile_metadata(profile):
+        raise ValueError('external card provenance differs')
+
+
+def check(source, seed, run, control=False):
+    _, image = inspect(source, 'boot4')
+    contract(image)
+    check_link(seed, run)
+    check_configuration(seed, run, 0 if control else 1)
+    for directory in (seed, run):
+        storage = directory / 'nvram/nsk3r4t'
+        if (storage / 'flash').read_bytes() != image or (storage / 'sim_card').read_bytes() != make_current_profile(True):
+            raise ValueError('own executable or complete original card changed')
+        check_bank((storage / 'eeprom').read_bytes(), True)
+    if json.loads((run / 'exit_status.json').read_text())['returncode'] != 0:
+        raise ValueError('MAME did not complete')
+    check_trace((run / 'error.log').read_text(), control)
+    frame_check(run / 'snap/nsk3_toolkit_display.png', IDLE)
+    frame_check(run / 'snap/nsk3_toolkit_dismissed.png', FRAMES[0])
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in ('source', 'seed', 'run'):
+        parser.add_argument(name, type=Path)
+    parser.add_argument('--control', action='store_true')
+    parser.add_argument('--mame', type=Path)
+    args = parser.parse_args()
+    source, seed, run = (getattr(args, name).resolve() for name in ('source', 'seed', 'run'))
+    try:
+        if args.mame:
+            prepare(source, seed, run, 0 if args.control else 1)
+            execute(args.mame.resolve(), Path(__file__).resolve().parents[1] / 'roms',
+                    run, 'nsk3_toolkit_input.lua', 74)
+        check(source, seed, run, args.control)
+    except (OSError, ValueError, KeyError, ET.ParseError, subprocess.TimeoutExpired) as error:
+        parser.exit(1, f'NSK-3 Toolkit FAIL: {error}\n')
+    print('NSK-3 Toolkit PASS: ' + ('matched Phase-2 negative control' if args.control else
+          'organic FETCH and result30 capability refusal, not DISPLAY TEXT support'))
+
+
+if __name__ == '__main__':
+    main()

@@ -3,7 +3,6 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
-import re
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -14,60 +13,20 @@ from tools.make_sim_card_profile import make_current_profile
 from tools.nsb1_pin_roundtrip import check_correct
 from tools.nsb1_rom4_compare import check_card_run, check_cold_link, check_frame, run_mame
 from tools.nsb1_toolkit_prepare import prepare, profile_metadata
-from tools.sim_fdn_protocol_check import apdus
-from tools.sim_security_trace_check import statuses
+from tools.sim_toolkit_display_check import DISPLAY, RESPONSE, check_display, wire as display_wire
 
-DISPLAY = bytes.fromhex('d0148103012180820281028d0904') + b'DCT3 SAT'
-RESPONSE = bytes.fromhex('810301218002028281030100')
 TERMINAL_PROFILE = bytes.fromhex('0f41ff7700')
 DISPLAY_FRAME = 'c390ab782b18d054bb4e134ee5bf6b62e99cee154a90b986ec139db956bd0b64'
 DISMISSED_FRAME = '8fe18df5185a637968b1e15fe088b069c1978d70688e6cd4ccf0eae1e587eef2'
 
 
 def wire(text, direction):
-    values = re.findall(r'nsb1_sim_wire: direction=' + direction + r' data=([0-9a-f]{2}) ', text)
-    if not values or len(values) >= 8192:
-        raise ValueError('missing or capped SIM wire observation')
-    return bytes.fromhex(''.join(values))
+    return display_wire(text, direction, 'nsb1')
 
 
 def check_trace(text, control=False):
-    tx, rx = wire(text, 'TX'), wire(text, 'RX')
-    commands = list(apdus(tx))
-    if any(row[0] not in (0xa4, 0x20, 0xb0, 0xb2, 0xc0, 0xf2, 0x10, 0x12, 0x14)
-           for row in commands):
-        raise ValueError('unrelated SIM operation')
-    contacts = re.findall(r'nsb1_toolkit_physical: action=dismiss down=([01]) t=([0-9.]+)', text)
-    if contacts != [('1', '68.000000000'), ('0', '68.200000000')]:
-        raise ValueError('physical dismissal differs')
-    if any(marker in text for marker in ('nsb1_reset_reason:', 'LUA ERROR', 'Error in')):
-        raise ValueError('reset or failed observer')
-    toolkit = [row[:5] for row in commands if row[0] in (0x10, 0x12, 0x14)]
-    expected = [] if control else [
-        (0x10, 0, 0, 5, TERMINAL_PROFILE),
-        (0x12, 0, 0, len(DISPLAY), b''),
-        (0x14, 0, 0, len(RESPONSE), RESPONSE),
-    ]
-    if toolkit != expected:
-        raise ValueError('own terminal profile, FETCH or terminal response differs')
-    phase = '02' if control else '03'
-    if f'read-binary fid=6fae offset=0 length=1 first={phase}' not in text:
-        raise ValueError('card phase was not read')
-    for instruction in (0x10, 0x14):
-        expected_status = [] if control else [(0x9000, 3, 10)]
-        if statuses(text, instruction) != expected_status:
-            raise ValueError('Toolkit completion status differs')
-    if control:
-        if 'SIM completion ins=f2 sw=91' in text or DISPLAY in rx:
-            raise ValueError('Phase-2 control produced proactive traffic')
-    else:
-        if text.count('SIM completion ins=f2 sw=9116') != 1 or rx.count(DISPLAY + b'\x90\x00') != 1:
-            raise ValueError('missing unique pending STATUS or card-originated payload')
-        before = text.split('nsb1_toolkit_physical: action=dismiss down=1', 1)[0]
-        if DISPLAY + b'\x90\x00' not in wire(before, 'RX'):
-            raise ValueError('dismissal precedes proactive payload')
-        if any(row[0] == 0x14 for row in apdus(wire(before, 'TX'))):
-            raise ValueError('terminal response precedes physical dismissal')
+    check_display(text, prefix='nsb1', terminal_profile=TERMINAL_PROFILE,
+                  control=control, reset_markers=('nsb1_reset_reason:',))
 
 
 def check_configuration(source, run, profile):

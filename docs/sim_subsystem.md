@@ -447,7 +447,7 @@ gates rather than being implied by this signalling-focused toolkit fixture.
 `SELECT ITEM` is also supported: the card supplies two item TLVs, physical Down
 and Select choose the second firmware-rendered entry, and the ME returns item
 identifier `02` in TERMINAL RESPONSE. Conversely, NSE-8 v6.00 returns general
-result `31` (command beyond ME capabilities) for `SET UP EVENT LIST` requesting
+result `31` (command type not understood by ME) for `SET UP EVENT LIST` requesting
 User Activity and Idle Screen Available. The card accepts that result and does
 not expect or synthesize an Event Download envelope. These are separate
 positive and negative gates because event download is not an applicable 3210

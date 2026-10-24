@@ -86,6 +86,46 @@ No guest state is supplied outside emulator save/load APIs and physical keys.
 The execution command requires a fresh output directory. The cold predecessor
 contains only the physically selected persistent inputs, not RAM/save states.
 
+### SIM Toolkit transport and tested command refusal
+
+The own Phase-2+ cold card fixture reads EF_PHASE03 and sends TERMINAL
+PROFILE `A0 10 00 00 04 03 01 80 00`. This four-byte profile differs from
+the5190/6190 profiles; neither their capabilities nor successful UI commands
+are assumed here. Ordinary STATUS returns9116, then own firmware FETCHes the
+card's22-byte DISPLAY TEXT `DCT3 SAT` BER-TLV. It automatically returns
+`810301218002028281030130`, result30, accepted by the card with9000,
+before the physical68s left-softkey contact. No proactive text is displayed:
+the65s frame remains Headset idle, and the later physical contact opens the
+ordinary Messages menu. This qualifies transport and a tested-command
+capability refusal, not successful DISPLAY TEXT or whole-ROM Toolkit absence.
+The result meaning is defined by
+[GSM11.14/ETSI TS101267, general-result coding](https://www.etsi.org/deliver/etsi_ts/101200_101299/101267/08.16.00_60/ts_101267v081600p.pdf):
+30 denotes a capability limitation, distinct from31 (unrecognized command).
+
+A matched Phase-2 control uses identical own cold handset/card storage and
+physical input timing, reads EF_PHASE02 and sends no TERMINAL PROFILE,
+FETCH or TERMINAL RESPONSE. Both74s runs preserve the complete EEPROM,
+flash and original PIN-enabled card, with matching own authentication,
+upload, native no-stop observations and reviewed idle/Messages pixels.
+Only the declared external SATCFG input differs. No firmware result,
+application context, credential, radio reply or replacement clear is supplied.
+Six focused tests reject wrong profile/result/payload/status, late refusal,
+malformed/capped wire data, missing contacts/native observations and changed
+external-input provenance. The5190 successful DISPLAY TEXT/control captures
+also pass after sharing the strict wire/parser mechanics; product profiles,
+storage and pixels remain independently checked.
+
+```sh
+.venv/bin/python tools/nsk3_toolkit_check.py roms/noki6130/source \
+  tmp/nsk3-diagnostic-display-accepted-cold tmp/nsk3-toolkit-display-accepted
+.venv/bin/python tools/nsk3_toolkit_check.py roms/noki6130/source \
+  tmp/nsk3-diagnostic-display-accepted-cold tmp/nsk3-toolkit-control-accepted --control
+```
+
+Add `--mame mame/mame` and use a fresh output directory to execute either
+fixture. The diagnostic card deliberately tests an unadvertised command;
+this is not a claim that an ordinary SIM application should request it.
+
 **Long-run limit:** the corrected native compatibility composition requests a
 reason68 restart at93.975196s. Short physical UI/storage/security gates do
 not establish sustained native operation. The own packet-supervision contract
