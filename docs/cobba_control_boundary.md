@@ -3199,6 +3199,28 @@ history1 comes from the preceding bad frame, not an external peer or a
 missing initialization write. No other writer occurs in this complete
 49-frame fixture; this is not a whole-ROM static absence proof. The fixture
 does not reach the separately identified conditional writer at `c79b`.
+That writer is exercised by the independent 518-frame DTX decoder fixture.
+At `c78f`, all1036 original/replay observations have DP=0013, so direct
+operand40 addresses09c0. The original `BITF #0400` admits four writer
+executions, each with flags0401; `BITF #0100` then selects A=0 and the
+store at `c79b` clears0ab9 with decoder state0aba=5. These masks match
+`RX_FIRST_SP_FLAG` and `RX_PREV_DTX_MUTING` in the acquired ETSI EFR
+reference archive's `DTX.H`. This is a first-speech-after-DTX history
+adjustment, not evidence of an absent external history producer. The
+fixture does not exercise the bit0100-set alternative. All82880 PCM
+samples remain reference-exact, with full frame/history replay; this
+does not change the separate recovery/homing-error nonconformance.
+The staged DTX frontend reproduces the same two original decisions and
+their two replay executions, also with bit-exact PCM. The invalid-SID
+fixture supplies the same bit0100-clear coverage, not the missing set
+alternative. Synthetic checker tests cover rejection and both Boolean
+store values; those tests are not acquired-code execution evidence.
+Reproduce with BIOS `efr-dtx-decoder`, debugger enabled and
+`tools/c54x_rom4_efr_dtx_history_observe.lua` as the zero-delay autoboot
+script; use `efr-dtx-dec-pipe` for staged execution or `efr-invalid-sid`
+for the invalid-SID fixture. Run
+`python3 tools/c54x_rom4_efr_dtx_history_check.py PATH/error.log` and retain
+the ordinary fixture PCM/replay checker as well as the trace.
 The checker pins the tail/reset instructions, write values and BFI agreement.
 Atomic/staged write callbacks report different advanced PCs for the same
 tail store; neither sampled PC is relabeled as the opcode's owner address.
