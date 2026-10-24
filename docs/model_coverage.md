@@ -51,7 +51,9 @@ organic STATUS/FETCH, displayed DCT3 SAT text and successful physical dismissal.
 A separate interactive profile returns physical GET INKEY 5 and GET INPUT 42,
 with the complete persistent card unchanged. SET UP MENU installs DCT3 menu;
 physical Continue/Exit send distinct accepted item-1/item-2 envelopes. Immediate
-post-selection Wait is observed, not final UI settlement. Other Toolkit commands remain open.
+post-selection Wait is observed for ACK-only selection. A follow-up SELECT ITEM
+card displays Alpha/Beta, returns physical Beta and restores the clean installed
+list; ACK-only automatic settlement remains unqualified. Other Toolkit commands remain open.
 Physical SIM-security gates cover PIN-request Off/On, PIN1/PIN2 changes and
 cold restoration, retry persistence, physical PIN exhaustion, wrong-PUK
 persistence/recovery and replacement-credential authentication. Exact whole-card

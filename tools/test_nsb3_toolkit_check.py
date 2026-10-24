@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsb3_toolkit_check import check_trace, DISPLAY, RESPONSE, INKEY, INPUT, INKEY_RESPONSE, INPUT_RESPONSE, MENU, MENU_RESPONSE
+from tools.nsb3_toolkit_check import check_trace, DISPLAY, RESPONSE, INKEY, INPUT, INKEY_RESPONSE, INPUT_RESPONSE, MENU, MENU_RESPONSE, SELECT_ITEM, ITEM_RESPONSE
 from tools.test_nsb3_pin_request_check import trace
 
 
@@ -40,6 +40,19 @@ def interactive_trace():
     return text
 
 
+def menu_trace(item=1):
+    text = interactive_trace().rsplit('SIM status ins=14 sw=9000', 1)
+    text = text[0] + 'SIM status ins=14 sw=9128' + text[1]
+    text += wire_bytes('TX', bytes.fromhex('a012000028')) + wire_bytes('RX', MENU + b'\x90\x00')
+    text += wire_bytes('TX', bytes.fromhex('a01400000c') + MENU_RESPONSE)
+    text += '\nSIM status ins=14 sw=9000 chv=3/3 puk=10/10 enabled=1'
+    for name in ('fieldtest', 'last', 'open') + (('next',) if item == 2 else ()) + ('select',):
+        text += action(name, 'nsb3_toolkit_menu')
+    text += wire_bytes('TX', bytes.fromhex('a0c2000009d307020201811001') + bytes((item,)))
+    text += '\nSIM status ins=c2 sw=9000 chv=3/3 puk=10/10 enabled=1'
+    return text
+
+
 class Nsb3ToolkitTest(unittest.TestCase):
     def test_own_profile_fetch_and_physical_response(self):
         check_trace(toolkit_trace())
@@ -76,15 +89,7 @@ class Nsb3ToolkitTest(unittest.TestCase):
 
     def test_menu_choices_have_distinct_physical_envelopes(self):
         for item in (1, 2):
-            text = interactive_trace().rsplit('SIM status ins=14 sw=9000', 1)
-            text = text[0] + 'SIM status ins=14 sw=9128' + text[1]
-            text += wire_bytes('TX', bytes.fromhex('a012000028')) + wire_bytes('RX', MENU + b'\x90\x00')
-            text += wire_bytes('TX', bytes.fromhex('a01400000c') + MENU_RESPONSE)
-            text += '\nSIM status ins=14 sw=9000 chv=3/3 puk=10/10 enabled=1'
-            for name in ('fieldtest', 'last', 'open') + (('next',) if item == 2 else ()) + ('select',):
-                text += action(name, 'nsb3_toolkit_menu')
-            text += wire_bytes('TX', bytes.fromhex('a0c2000009d307020201811001') + bytes((item,)))
-            text += '\nSIM status ins=c2 sw=9000 chv=3/3 puk=10/10 enabled=1'
+            text = menu_trace(item)
             check_trace(text, menu_item=item)
             if item == 1:
                 returned = text + action('end', 'nsb3_toolkit_menu') + action('return', 'nsb3_toolkit_menu')
@@ -97,6 +102,21 @@ class Nsb3ToolkitTest(unittest.TestCase):
                     check_trace(bad, menu_item=item)
             with self.assertRaises(ValueError):
                 check_trace(text, menu_item=3-item)
+
+    def test_follow_up_select_item_requires_pending_payload_and_physical_beta(self):
+        text = menu_trace().replace('ins=c2 sw=9000', 'ins=c2 sw=9122')
+        text += wire_bytes('TX', bytes.fromhex('a012000022')) + wire_bytes('RX', SELECT_ITEM + b'\x90\x00')
+        text += action('next', 'nsb3_toolkit_select_item') + action('confirm', 'nsb3_toolkit_select_item')
+        text += wire_bytes('TX', bytes.fromhex('a01400000f') + ITEM_RESPONSE)
+        text += '\nSIM status ins=14 sw=9000 chv=3/3 puk=10/10 enabled=1'
+        check_trace(text, select_item=True)
+        for bad in (text.replace('ins=c2 sw=9122', 'ins=c2 sw=9000'),
+                    text.replace('nsb3_toolkit_select_item: action=next', 'nsb3_toolkit_select_item: action=missing'),
+                    text.replace('direction=RX data=42 ', 'direction=RX data=43 ')):
+            with self.assertRaises(ValueError):
+                check_trace(bad, select_item=True)
+        with self.assertRaises(ValueError):
+            check_trace(text, menu_item=1)
 
 
 if __name__ == '__main__':

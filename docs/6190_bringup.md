@@ -13,7 +13,8 @@ and the PIN/PUK change/retry/exhaustion lifecycles qualified below. No donor
 identity/calibration is imported. A configured Phase-2+ lab card additionally
 completes organic TERMINAL PROFILE/FETCH/DISPLAY TEXT, GET INKEY and GET INPUT
 through physical dismissal/key/text entry, plus SET UP MENU and physical item
-selection. Final Toolkit menu settlement remains unqualified.
+selection. SELECT ITEM additionally returns a physical choice to the card and
+restores the clean installed list; ACK-only menu settlement remains unqualified.
 Ordinary idle content and automatic notice
 clearing remain unresolved; explicit rejection dismissal restores clean menus.
 An independent long-run control resets near 94 seconds
@@ -1394,6 +1395,25 @@ cold input; validate with `nsb3_toolkit_envelope_check.py SOURCE RUN`. The check
 retains the complete card/Toolkit/menu qualification and explicitly reports a
 characterization, not successful UI settlement. It checks physical End/Menu,
 both Wait captures, one live SIMI caller stack and both transfer returns.
-The next discriminator is a standards-valid follow-up proactive command after
-selection, versus this ACK-only menu handler. Do not assume missing RF or inject
-a firmware event to finish the menu.
+The follow-up SELECT ITEM control below distinguishes this ACK-only menu handler
+from an application that supplies further work. Do not assume missing RF or
+inject a firmware event to finish the menu.
+
+#### Follow-up SELECT ITEM and clean return
+
+External profile 7 uses the same startup and menu, then answers item-1 ENVELOPE
+with `91 22` rather than `9000`. Firmware FETCHes the card's 34-byte SELECT ITEM,
+displays Alpha/Beta, and physical Down/OK selects Beta. Its exact response is
+`810307240002028281030100100102` with `9000`; the clean Continue/Exit list
+returns. Complete card and all preceding authentication/Toolkit contracts
+remain unchanged. This provides positive receive/UI continuation beyond menu
+selection, without a missing generic SIM event or synthetic dismissal. It does
+not prove what an ACK-only application should display or fix native radio.
+
+Prepare with `nsb3_toolkit_prepare.py SOURCE NEW_RUN --select-item`, run
+`nsb3_toolkit_select_item.lua` for 92 seconds, then validate with
+`nsb3_toolkit_check.py SOURCE NEW_RUN --select-item`. The gate requires exact
+pending notification, all fetched/returned payloads and statuses, physical
+selection before the item response, unchanged full card/cold provenance and
+reviewed Alpha/Beta/selected-Beta/returned-list pixels. The ACK-only Wait control
+remains an independent characterization, not a failure this positive gate hides.

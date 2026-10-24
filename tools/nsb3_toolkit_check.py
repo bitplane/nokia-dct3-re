@@ -25,9 +25,15 @@ INKEY_RESPONSE = bytes.fromhex('8103022200020282810301000d020435')
 INPUT_RESPONSE = bytes.fromhex('8103032300020282810301000d03043432')
 MENU = bytes.fromhex('d0268103042500820281828509') + b'DCT3 menu' + bytes.fromhex('8f0901') + b'Continue' + bytes.fromhex('8f0502') + b'Exit'
 MENU_RESPONSE = bytes.fromhex('810304250002028281030100')
+SELECT_ITEM = bytes.fromhex('d0208103072400820281828506') + b'Choose' + bytes.fromhex('8f0601') + b'Alpha' + bytes.fromhex('8f0502') + b'Beta'
+ITEM_RESPONSE = bytes.fromhex('810307240002028281030100100102')
 
 
-def check_trace(text, interactive=False, menu_item=None, return_wait=False):
+def check_trace(text, interactive=False, menu_item=None, return_wait=False, select_item=False):
+    if select_item:
+        if menu_item not in (None, 1) or return_wait:
+            raise ValueError('SELECT ITEM requires its own Continue control')
+        menu_item = 1
     if return_wait and menu_item != 1:
         raise ValueError('Wait control requires Continue selection')
     if menu_item not in (None, 1, 2):
@@ -46,6 +52,8 @@ def check_trace(text, interactive=False, menu_item=None, return_wait=False):
     if menu_item is not None:
         expected += [(0x12, 0, 0, 40, b''), (0x14, 0, 0, 12, MENU_RESPONSE),
                      (0xc2, 0, 0, 9, bytes.fromhex('d307020201811001') + bytes((menu_item,)))]
+    if select_item:
+        expected += [(0x12, 0, 0, 34, b''), (0x14, 0, 0, 15, ITEM_RESPONSE)]
     if toolkit != expected:
         raise ValueError('own Toolkit APDU sequence or result differs')
     if any(row[0] in (4, 0x44, 0xdc, 0xd6, 0x24, 0x26, 0x28, 0x2c, 0x32) for row in commands):
@@ -53,7 +61,10 @@ def check_trace(text, interactive=False, menu_item=None, return_wait=False):
     results = [(0x9115, 3, 10), (0x911a, 3, 10), (0x9000, 3, 10)] if interactive else [(0x9000, 3, 10)]
     if menu_item is not None:
         results[-1:] = [(0x9128, 3, 10), (0x9000, 3, 10)]
-    if statuses(text, 0xc2) != ([(0x9000, 3, 10)] if menu_item is not None else []):
+    if select_item:
+        results.append((0x9000, 3, 10))
+    envelope_status = 0x9122 if select_item else 0x9000
+    if statuses(text, 0xc2) != ([(envelope_status, 3, 10)] if menu_item is not None else []):
         raise ValueError('menu envelope status differs')
     if statuses(text, 0x10) != [(0x9000, 3, 10)] or statuses(text, 0x14) != results:
         raise ValueError('Toolkit command completion status differs')
@@ -66,6 +77,8 @@ def check_trace(text, interactive=False, menu_item=None, return_wait=False):
         raise ValueError('missing exact card input command payload')
     if menu_item is not None and rx.count(MENU + b'\x90\x00') != 1:
         raise ValueError('missing exact card menu payload')
+    if select_item and rx.count(SELECT_ITEM + b'\x90\x00') != 1:
+        raise ValueError('missing exact follow-up SELECT ITEM payload')
     contacts = re.findall(r'nsb3_toolkit_physical: action=dismiss down=([01]) t=([0-9.]+)', text)
     if contacts != [('1', '68.000000000'), ('0', '68.150000000')]:
         raise ValueError('physical dismissal differs')
@@ -95,20 +108,32 @@ def check_trace(text, interactive=False, menu_item=None, return_wait=False):
         prefix = text.split('nsb3_toolkit_menu: action=select down=1', 1)[0]
         if any(row[0] == 0xc2 for row in wire(prefix)):
             raise ValueError('menu envelope preceded physical selection')
+    item_actions = re.findall(r'nsb3_toolkit_select_item: action=(\w+) down=([01])', text)
+    if item_actions != ([(action, down) for action in ('next', 'confirm') for down in ('1', '0')] if select_item else []):
+        raise ValueError('physical SELECT ITEM contacts differ')
+    if select_item:
+        prefix = text.split('nsb3_toolkit_select_item: action=confirm down=1', 1)[0]
+        if sum(row[0] == 0x14 for row in wire(prefix)) != 4:
+            raise ValueError('item response preceded physical confirmation')
 
 
-def check(source, run, interactive=False, menu_item=None, return_wait=False):
+def check(source, run, interactive=False, menu_item=None, return_wait=False, select_item=False):
+    if select_item:
+        if menu_item not in (None, 1) or return_wait:
+            raise ValueError('SELECT ITEM requires its own Continue control')
+        menu_item = 1
     interactive = interactive or menu_item is not None
     check_link(source, run)
     metadata = json.loads((run / 'cold_source.json').read_text())
-    if metadata.get('external_toolkit_card') != profile_metadata(4 if menu_item is not None else 3 if interactive else 1):
+    profile = 7 if select_item else 4 if menu_item is not None else 3 if interactive else 1
+    if metadata.get('external_toolkit_card') != profile_metadata(profile):
         raise ValueError('external Toolkit profile provenance differs')
     storage = run / 'nvram/nsb3r4t'
     if hashlib.sha256((storage / 'flash').read_bytes()).hexdigest() != IMAGE_SHA256:
         raise ValueError('own executable changed')
     if (run / 'initial_sim_card.bin').read_bytes() != make_current_profile(True) or (storage / 'sim_card').read_bytes() != make_current_profile(True):
         raise ValueError('complete card changed')
-    check_trace((run / 'error.log').read_text(), interactive, menu_item, return_wait)
+    check_trace((run / 'error.log').read_text(), interactive, menu_item, return_wait, select_item)
     frame_check(run / 'snap/nsb3_toolkit_display.png', '0b61ca941a012e9feffe2d13b834c720031b71295220fc32139decd034172b2c')
     if not interactive:
         frame_check(run / 'snap/nsb3_toolkit_dismissed.png', 'b2bde13413750ea3a6442a8a4d6c90362d4e8b16cde72bbf2f981a00089cecd0')
@@ -124,8 +149,15 @@ def check(source, run, interactive=False, menu_item=None, return_wait=False):
         frame_check(run / 'snap/nsb3_toolkit_menu_open.png', 'ecf749905f760960630345d99b41bbbcdf11da3bd72c26dbf7ea6da71f6a7111')
         if menu_item == 2:
             frame_check(run / 'snap/nsb3_toolkit_menu_next.png', '7b83617cd69944ee0e73e5e29b42aefe1f291d5b45123e5aa1f36a29c11dd6b6')
-        # Immediate Wait is recorded, not promoted to settled application UI.
-        frame_check(run / 'snap/nsb3_toolkit_menu_select.png', 'a2cc199c75ea302146b2174ad6f1094aa807d391504e45650ddf8aa2bdea5ff7')
+        if not select_item:
+            # Immediate Wait is recorded, not promoted to settled application UI.
+            frame_check(run / 'snap/nsb3_toolkit_menu_select.png', 'a2cc199c75ea302146b2174ad6f1094aa807d391504e45650ddf8aa2bdea5ff7')
+    if select_item:
+        for name, expected in (
+                ('prompt', 'd52d2e45c89c1929d44f4f9c35f1ec025a8d2fbd79a3e57ee2a623eeb1c147f3'),
+                ('selected', '8c8be627546fe82db2276ebddf9f3fe1dd358e1d267b2a2a56e66fef4944c42b'),
+                ('result', 'ecf749905f760960630345d99b41bbbcdf11da3bd72c26dbf7ea6da71f6a7111')):
+            frame_check(run / f'snap/nsb3_toolkit_item_{name}.png', expected)
 
 
 def main():
@@ -135,12 +167,18 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--interactive', action='store_true')
     mode.add_argument('--menu-item', type=int, choices=(1, 2))
+    mode.add_argument('--select-item', action='store_true')
     args = parser.parse_args()
     try:
-        check(args.source, args.run, args.interactive, args.menu_item)
+        check(args.source, args.run, args.interactive, args.menu_item, select_item=args.select_item)
     except (OSError, ValueError, KeyError) as exc:
         parser.exit(1, f'NSB-3 Toolkit: FAIL: {exc}\n')
-    boundary = 'menu installation/selection; final UI settlement unproved' if args.menu_item is not None else 'physical Toolkit display/input lifecycle'
+    if args.select_item:
+        boundary = 'physical SELECT ITEM and clean return'
+    elif args.menu_item is not None:
+        boundary = 'menu installation/selection; final UI settlement unproved'
+    else:
+        boundary = 'physical Toolkit display/input lifecycle'
     print(f'PASS: own {boundary}; native registration unproved')
 
 
