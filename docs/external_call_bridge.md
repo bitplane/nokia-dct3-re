@@ -267,6 +267,11 @@ The 6210 physical-dismissal/host-termination fixture is reproducible with
 Adding `--restore` checkpoints the dismissed unanswered transaction and requires
 new-epoch cancellation while rejecting the pre-load epoch. It does not qualify
 an in-flight release checkpoint or restore the external host process.
+Both variants require physical PIN authentication before admission, complete
+expected SIM contents, released input contacts and the existing exact Messages
+recovery image. Restoration additionally checks raw all37 ARM/banked registers,
+PC/SP, backed-RAM digest and time using `arm_architecture_snapshot_check.py`;
+the Lua pass marker alone is insufficient architectural evidence.
 The backward-compatible standalone bridge CLI still sends notifications;
 the request acceptance runner uses `--request --expected-reply 2`.
 Authenticated NSB-7 acceptance is documented in `8290_bringup.md`. Arbitrary

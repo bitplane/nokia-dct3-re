@@ -167,22 +167,8 @@ def verify_outgoing(text, card, *, restored=False):
 
 
 def check_restoration(text, *, prefix='8850_ussd_state', scenario='nsm2_ussd'):
-    if f'{prefix}: FAIL' in text or f'state_roundtrip: result=pass scenario={scenario} ' not in text:
-        raise ValueError('pending USSD restoration did not complete')
-    rows = re.findall(re.escape(prefix) + r': event=(saved|restored) pc=([0-9a-f]{8}) '
-                      r'sp=([0-9a-f]{8}) ram=([0-9a-f]{8}) cpu=([0-9a-f,]+) t=([0-9.]+)', text)
-    if (text.count(f'{prefix}: event=') != 2 or len(rows) != 2 or
-            [row[0] for row in rows] != ['saved', 'restored'] or rows[0][1:] != rows[1][1:]):
-        raise ValueError('CPU/RAM/time restoration differs')
-    for row in rows:
-        if not re.fullmatch(r'[0-9a-f]{8}(?:,[0-9a-f]{8}){36}', row[4]):
-            raise ValueError('incomplete ARM/banked register inventory')
-        registers = row[4].split(',')
-        if row[1] != registers[15] or row[2] != registers[13]:
-            raise ValueError('PC/SP snapshot disagrees with register inventory')
-    roundtrips = re.findall(r'state_roundtrip: result=pass scenario=' + re.escape(scenario) + r' requested_at=([0-9.]+) t=([0-9.]+)', text)
-    if roundtrips != [(rows[0][5], rows[1][5])]:
-        raise ValueError('restoration marker disagrees with architectural timeline')
+    from tools.arm_architecture_snapshot_check import verify_roundtrip
+    verify_roundtrip(text, prefix=prefix, scenario=scenario)
     before = text.split(f'{prefix}: event=restored', 1)[0]
     if ('ussd response id=' in before or 'incoming ussd reply ' in before or
             'GSM service downlink kind=27 sapi=0 pd=0b' in before):

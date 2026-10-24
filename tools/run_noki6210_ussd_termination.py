@@ -16,6 +16,8 @@ from tools.run_host_ussd_gate import pack_gsm7
 from tools.run_noki6210_acceptance import build_command, assess, verify_radio_contract
 from tools.run_sip_handset_gate import verify_handset_health
 from tools.noki6210_ussd_termination_check import verify
+from tools.noki6210_host_ussd_check import check_card_authentication, check_admission, FRAMES
+from tools.noki6210_puk_check import check_rgb_frame, contacts
 from websockets.exceptions import ConnectionClosed
 
 
@@ -101,11 +103,18 @@ async def run(directory,restore=False):
         (directory/'console.log').write_text(output)
         (directory/'host_events.json').write_text(json.dumps(events,indent=2)+'\n')
     verify_handset_health(output)
-    verify((directory/'error.log').read_text(errors='replace'),events,restore=restore)
+    text=(directory/'error.log').read_text(errors='replace')
+    verify(text,events,restore=restore)
+    check_card_authentication(text,card.read_bytes())
+    check_admission(text,'cancelled',restored=restore)
+    contacts(text,'6210_host_ussd_input',[(8,'Keypad 1'),(9,'Keypad 2'),(10,'Keypad 3'),
+        (11,'Keypad 4'),(12,'Left Softkey / Menu'),(26,'Left Softkey / Menu'),
+        (30,'End'),(56,'Left Softkey / Menu')])
     if restore and not any(p.stat().st_size for p in directory.rglob('npe3_ussd_termination.sta')):
         raise ValueError('missing termination checkpoint artifact')
     frame=directory/'snap/6210_host_ussd_terminated_menu.png'
     if not frame.is_file():raise ValueError('missing physical post-release Menu capture')
+    check_rgb_frame(frame,FRAMES['6210_host_ussd_key_30.png'])
     print('OK - correlated network SS/RR termination; no handset result fabricated')
 
 

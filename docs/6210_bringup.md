@@ -1836,21 +1836,27 @@ termination, a wrong-request termination, the valid identity and a duplicate.
 Only the valid command is accepted. SS RELEASE COMPLETE (`0b2a`) goes through
 the existing downlink path, followed by RR CHANNEL RELEASE; only after ordinary
 release does host request1 become cancelled, without an incoming-USSD response.
-Menu at56s renders Messages. Capture: `tmp/npe3-ussd-termination-validity-clean`.
-The fixture checks ordered protocol/host evidence and requires the captured
-frame; it does not yet enforce an exact frame hash or qualify arbitrary
+Menu at56s renders the existing byte-exact Messages oracle. Capture:
+`tmp/npe3-ussd-termination-exact`. The fixture checks ordered PIN acceptance,
+registration, admission and protocol/host release, every expected contact
+release and complete registered SIM contents. It does not qualify arbitrary
 termination/save-state timing. Console checks reject MAME driver-validity and
 script/execution failures as well as the protocol checker rejecting missing
 release or fabricated replies.
 
 The same runner's `--restore` variant saves the dismissed but unanswered
 transaction at34s and reloads after one emulated second. The pre-save and
-post-load time, ARM registers and backed-RAM checksum must match. Host request1
+post-load time, all37 ARM/banked registers and backed-RAM checksum must match.
+Raw snapshot records are independently checked by the shared
+`arm_architecture_snapshot_check.py`, including PC/SP register consistency,
+exact event order and matching roundtrip-marker times. Authentication and
+request/editor dismissal must precede the save boundary. Host request1
 is republished queued under epoch2 without a second admission. An epoch1
 termination is rejected; epoch2/request1 sends the same SS/RR release and
 publishes cancellation once without a reply. Wrong identity and duplicate
 controls remain active, Menu56 still renders Messages, and the checkpoint
-artifact must exist. Capture: `tmp/npe3-ussd-termination-restore`. This covers
+artifact must exist; exact Messages recovery and complete SIM equality remain
+mandatory. Capture: `tmp/npe3-ussd-termination-exact-restore`. This covers
 one unanswered post-dismissal checkpoint, not termination in flight or external
 network process restoration.
 
