@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -16,6 +17,7 @@ from tools.run_noki8890_host_sms import check_output
 from tools.noki8210_staged_check import verify as verify_stage
 from tools.noki8210_registration_check import verify as verify_registration
 from tools.radio_call_lifecycle_common import INCOMING_SETUP
+from tools.run_noki8210_acceptance import configure_dcs_topology, verify_pin_measurement_registration
 
 FRAMES = {
     '8210_sip_registered_idle.png': '1705ada895a4942757e7e237c74f9b88605456c381e2f41774664eedd8eb2b80',
@@ -71,14 +73,15 @@ def check_product_result(run, restore_idle=False):
     check_frames(run / 'snap')
 
 
-def check_outgoing_result(run):
+def check_outgoing_result(run, *, dcs1800=False):
     from tools.noki8210_outgoing_call_check import FRAMES as outgoing_frames
     text = (run / 'error.log').read_text(errors='replace')
     check_output(text)
     check_output((run / 'console.log').read_text(errors='replace'))
     verify_stage(text, runtime=True, selftest=True, base_record=True)
-    verify_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes(), configured_carrier=True)
-    if not re.search(r'gsm_call_adapter: network registered=1 arfcn=4\b', text):
+    verify_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes(),
+                        **({'dcs1800': True} if dcs1800 else {'configured_carrier': True}))
+    if not re.search(r'gsm_call_adapter: network registered=1 arfcn=' + ('823' if dcs1800 else '4') + r'\b', text):
         raise ValueError('NSM-3 host registration lacks own laboratory carrier')
     send_at = text.find('8210_call_physical: action=send')
     if send_at < 0 or not re.search(r'8210_keypad_decoded: key=0e\b', text[send_at:]):
@@ -98,6 +101,8 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--record-media', action='store_true',
                         help='capture outgoing HLE PCM and remote audio; does not assert non-silent waveform acceptance')
+    parser.add_argument('--late-pin-dcs', action='store_true',
+                        help='fresh own card, physical PIN at eight seconds and DCS823; media fixtures only')
     parser.add_argument('--sound', choices=('none', 'pulse'), default='none')
     parser.add_argument('--restore-idle', action='store_true',
                         help='restore registered handset idle before admitting the fresh SIP call')
@@ -118,6 +123,9 @@ def main():
     parser.add_argument('--http-port', type=int, default=18821)
     parser.add_argument('--sip-port', type=int, default=25821)
     args = parser.parse_args()
+    if args.late_pin_dcs and (not (args.outgoing_media or args.incoming_media) or
+                              args.restore_idle or args.restore_outgoing or args.restore_incoming):
+        parser.error('--late-pin-dcs requires a media fixture without restoration')
     if args.record_media and not (args.outgoing_media or args.incoming_media):
         parser.error('--record-media requires a media fixture')
     if args.incoming_media and args.restore_idle:
@@ -139,6 +147,16 @@ def main():
         prepare_run(run, (root / 'roms/noki8210/8210_5.31ppm_c.fls').read_bytes(),
                     (root / 'roms/noki8210/8210 virgin eeprom 003d0000.fls').read_bytes())
         shutil.copyfile(root / 'fixtures/noki8210_host_gsm900/nsm3hle.cfg', run / 'cfg/nsm3hle.cfg')
+        environment = os.environ.copy()
+        environment.pop('NOKIA_DCT3_8210_PIN_ENTRY', None)
+        environment.pop('NOKIA_DCT3_8210_PIN_START', None)
+        if args.late_pin_dcs:
+            from tools.make_sim_card_profile import make_profile
+            (run / 'nvram/nsm3hle/sim_card').write_bytes(make_profile(pin_enabled=True))
+            configure_dcs_topology(run / 'cfg/nsm3hle.cfg',
+                                   root / 'fixtures/noki8210_dcs1800/nsm3hle.cfg')
+            environment['NOKIA_DCT3_8210_PIN_ENTRY'] = '1'
+            environment['NOKIA_DCT3_8210_PIN_START'] = '8'
         handset = [str((args.mame or root / 'mame/mame').resolve()), 'nsm3hle',
                    '-rompath', str(root / 'roms'), '-nvram_directory', str(run / 'nvram'),
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
@@ -159,6 +177,7 @@ def main():
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '8210',
+                   *(['--dcs1800'] if args.late_pin_dcs else []),
                    *(['--restore-outgoing'] if args.restore_outgoing else []),
                    *(['--restore-call', '--restore-phase', args.restore_incoming_phase] if args.restore_incoming else []),
                    *(['--record-media'] if args.record_media else []),
@@ -171,7 +190,10 @@ def main():
                    '--', *handset]
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
-                           check=True, timeout=180)
+                           check=True, timeout=180, env=environment)
+        if args.late_pin_dcs:
+            verify_pin_measurement_registration((run / 'error.log').read_text(errors='replace'),
+                                                dcs1800=True)
         if args.restore_outgoing or args.restore_incoming:
             text = (run / 'error.log').read_text(errors='replace')
             check_output(text)
@@ -188,11 +210,12 @@ def main():
             check_output(text)
             check_output((run / 'console.log').read_text(errors='replace'))
             verify_stage(text, runtime=True, selftest=True, base_record=True)
-            verify_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes(), configured_carrier=True)
-            verify(text, configured_carrier=True)
+            verify_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes(),
+                                **({'dcs1800': True} if args.late_pin_dcs else {'configured_carrier': True}))
+            verify(text, **({'dcs1800': True} if args.late_pin_dcs else {'configured_carrier': True}))
             incoming_frames(run / 'snap')
         elif outgoing_call:
-            check_outgoing_result(run)
+            check_outgoing_result(run, dcs1800=args.late_pin_dcs)
         else:
             check_product_result(run, args.restore_idle)
         (run / 'acceptance.json').write_text(json.dumps({
@@ -208,7 +231,8 @@ def main():
             'hle_media_transport_tested': (args.outgoing_media or args.incoming_media) and not (args.restore_outgoing or args.restore_incoming),
             'media_recorded': args.record_media,
             'factory_provisioning_validated': False,
-            'laboratory_carrier': 4,
+            'laboratory_carrier': 823 if args.late_pin_dcs else 4,
+            'pin_start_seconds': 8 if args.late_pin_dcs else None,
             'idle_restored': args.restore_idle,
             'outgoing_restored': args.restore_outgoing,
             'incoming_restored': args.restore_incoming,

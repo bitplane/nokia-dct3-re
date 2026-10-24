@@ -12,6 +12,20 @@ from tools import run_noki8210_sip_cancel as check
 
 
 class OutgoingBusyTest(unittest.TestCase):
+    def test_late_pin_dcs_requires_unrestored_media(self):
+        for options in ([], ['--outgoing-busy'], ['--outgoing-media', '--restore-outgoing'],
+                        ['--incoming-media', '--restore-incoming']):
+            with self.subTest(options=options), patch('sys.argv', [
+                    'run_noki8210_sip_cancel.py', '/tmp/unused-8210-run',
+                    '--pjsua', '/tmp/unused-pjsua', '--late-pin-dcs', *options]), \
+                    patch.object(check, 'prepare_run') as prepare, \
+                    contextlib.redirect_stderr(io.StringIO()) as errors:
+                with self.assertRaises(SystemExit) as failure:
+                    check.main()
+                self.assertEqual(failure.exception.code, 2)
+                self.assertIn('media fixture without restoration', errors.getvalue())
+                prepare.assert_not_called()
+
     def test_incoming_phase_requires_explicit_restoration(self):
         with patch('sys.argv', ['run_noki8210_sip_cancel.py', '/tmp/unused-8210-run',
                                '--pjsua', '/tmp/unused-pjsua',
@@ -66,6 +80,13 @@ class OutgoingBusyTest(unittest.TestCase):
                     patch('tools.noki8210_outgoing_call_check.FRAMES', frames):
                 (run / 'error.log').write_text(valid)
                 check.check_outgoing_result(run)
+                (run / 'error.log').write_text(valid.replace('arfcn=4', 'arfcn=823'))
+                with patch.object(check, 'verify_registration') as registration:
+                    check.check_outgoing_result(run, dcs1800=True)
+                    registration.assert_called_once_with(
+                        valid.replace('arfcn=4', 'arfcn=823'), b'', dcs1800=True)
+                with self.assertRaisesRegex(ValueError, 'own laboratory carrier'):
+                    check.check_outgoing_result(run)
                 for invalid in (valid.replace('arfcn=4', 'arfcn=1'),
                                 valid.replace('key=0e', 'key=0f')):
                     (run / 'error.log').write_text(invalid)

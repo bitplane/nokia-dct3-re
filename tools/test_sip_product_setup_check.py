@@ -22,7 +22,7 @@ SETUP = {
 
 class SipProductSetupCheckTest(unittest.TestCase):
     def check(self, product, setup_product, accepted=100, rejected=False, reason='200 (OK)',
-              disconnect=False, missing_release=False):
+              disconnect=False, missing_release=False, dcs1800=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'error.log').write_text(
@@ -45,7 +45,8 @@ class SipProductSetupCheckTest(unittest.TestCase):
                 f'SIP dial digits={number}\nSIP confirmed status=200\n'
                 'SIP bridge ended ' + json.dumps(counts) + '\n')
             verify_success(root, 'state changed to CONFIRMED\nDISCONNECTED [reason=' + reason + ']',
-                           SimpleNamespace(incoming=False, restore_idle=False, product=product))
+                           SimpleNamespace(incoming=False, restore_idle=False, product=product,
+                                           dcs1800=dcs1800))
             result = json.loads((root / 'sip-result.json').read_text())
             self.assertTrue(result['scope'].startswith(product + ' research-HLE'))
 
@@ -78,6 +79,15 @@ class SipProductSetupCheckTest(unittest.TestCase):
             own_verify.assert_called_once()
             self.assertEqual(own_verify.call_args.kwargs, {'number': '5551234'})
 
+    def test_8210_dcs_selects_exact_dcs_contract(self):
+        with patch('tools.noki8210_outgoing_call_check.verify') as own_verify:
+            self.check('8210', '8210', dcs1800=True)
+            self.assertEqual(own_verify.call_args.kwargs,
+                             {'number': '1234567', 'dcs1800': True})
+        with patch('tools.noki8210_incoming_call_check.verify') as own_verify:
+            self.check_incoming('8210', '3210', dcs1800=True)
+            self.assertEqual(own_verify.call_args.kwargs, {'dcs1800': True})
+
     def test_normal_clearing_status_wording(self):
         self.check('3210', '3210', reason='200 (Normal call clearing)')
         for reason in ('2000 (OK)', '486 (Normal call clearing)'):
@@ -96,7 +106,7 @@ class SipProductSetupCheckTest(unittest.TestCase):
             self.check('3210', '3210', rejected=True)
 
     def check_incoming(self, product, wire_product, release_override=None, answer_override=None,
-                       pin_end=False, missing=None):
+                       pin_end=False, missing=None, dcs1800=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             connect, release = {
@@ -136,7 +146,8 @@ class SipProductSetupCheckTest(unittest.TestCase):
                 'SIP incoming caller=5551234\nSIP physical answer identity=(1, 1)\n'
                 'SIP confirmed status=200\nSIP bridge ended ' + json.dumps(counts) + '\n')
             verify_success(root, 'state changed to CONFIRMED\nDISCONNECTED [reason=200 (OK)]',
-                           SimpleNamespace(incoming=True, restore_idle=False, product=product))
+                           SimpleNamespace(incoming=True, restore_idle=False, product=product,
+                                           dcs1800=dcs1800))
 
     def test_5210_pin_physical_end_requires_entire_release(self):
         self.check_incoming('5210', '5210', pin_end=True)

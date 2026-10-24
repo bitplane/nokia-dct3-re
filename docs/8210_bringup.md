@@ -84,8 +84,22 @@ Complete before SETUP/SAPI3 respectively, without fixing their incidental
 relative log order. Both orders and missing/late-event rejection are tested.
 The automatic one-shot call fixture pages at14.767s while phone-security
 input is still pending and does not complete a call; it is not promoted by
-the settled host-call result. Late-PIN media and other input schedules
-remain separate qualifications.
+the settled host-call result. Late-PIN waveform and external-dialog
+restoration tests, and other input schedules, remain separate qualifications.
+
+`verify-8210-dcs-late-pin-sip-outgoing-media` and
+`verify-8210-dcs-late-pin-sip-incoming-media` independently qualify real
+local SIP-200 calls after physical PIN entry at eight seconds, own-card
+authentication and DCS823 registration. Both require the exact own-DCS
+traffic/release words, physical dialing or Answer, physical End, reviewed
+UI, normal SIP release and sustained ordered bidirectional HLE PCM transport.
+The runner's `--late-pin-dcs` option selects only this explicit profile;
+ordinary GSM900 and restoration fixtures retain their separate contracts.
+The remote peer has a30-second safety hangup instead of the older8-second
+limit, so its BYE cannot race the scheduled physical End. This is a host
+fixture lifetime, not a radio or firmware latency change. It proves neither
+non-silent microphone/earpiece waveforms nor native DSP speech. The separately
+qualified waveform/restoration gates below do not imply those late-PIN cases.
 
 `verify-8210-sms-status-persistence` checks two separate PIN-enabled
 research-HLE processes with retained own-product storage and physical SMS
@@ -172,8 +186,9 @@ The explicit `nsm3hle` composition now selects those declared MIC2/EAR
 endpoints and neutral host microphone/receiver routes, without inherited
 gains or synthesized COBBA register writes. Fresh rebuilt
 `run_8210_audio_endpoints_final` preserves the physical outgoing call gate;
-five focused NSM-3/NPE-3 control tests pass. Actual answered SIP/RTP and
-non-silent physical audio remain unvalidated. Endpoint wiring does not
+five focused NSM-3/NPE-3 control tests pass. These controls alone do not
+validate answered SIP/RTP or non-silent physical audio; the independent
+acceptance gates below cover those boundaries. Endpoint wiring does not
 promote native DSP execution or factory provisioning.
 
 `make verify-8210-sip-outgoing-media RUN_DIR=NEW_DIRECTORY` validates one physical

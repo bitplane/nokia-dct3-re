@@ -175,6 +175,22 @@
       ]
     },
     {
+      "name": "verify-8210-dcs-late-pin-sip-outgoing-media", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP stack; own NSM-3 late physical PIN and DCS823 outgoing HLE media transport, not native speech",
+      "recipe": [
+        "\t@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }",
+        "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --late-pin-dcs --outgoing-media --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'"
+      ]
+    },
+    {
+      "name": "verify-8210-dcs-late-pin-sip-incoming-media", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP stack; own NSM-3 late physical PIN and DCS823 incoming HLE media transport, not native speech",
+      "recipe": [
+        "\t@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }",
+        "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --late-pin-dcs --incoming-media --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'"
+      ]
+    },
+    {
       "name": "verify-8850-sip-incoming-waveform", "prerequisites": ["build"], "variables": {},
       "unstructured": "optional PJSIP/PulseAudio/FFmpeg; own NSM-2 incoming physical Answer/End and bidirectional HLE audio tones, not native speech",
       "recipe": [

@@ -45,7 +45,10 @@ async def run(args):
                 '--null-audio', '--no-tcp', '--no-vad', '--clock-rate=8000',
                 '--bound-addr=127.0.0.1', '--ip-addr=127.0.0.1', f'--local-port={args.sip_port}',
                 f'--auto-answer={args.sip_response}',
-                '--duration=30' if getattr(args, 'signaling_only', False) else '--duration=8',
+                # DCS late-PIN fixtures end physically; don't race that key
+                # against the older remote eight-second safety hangup.
+                '--duration=30' if (getattr(args, 'signaling_only', False) or
+                                    getattr(args, 'dcs1800', False)) else '--duration=8',
                 f'--play-file={root / "sip-source.wav"}',
                 '--auto-play']
             if args.record_media:
@@ -323,7 +326,8 @@ def verify_success(root, remote_text, args):
                 from tools.noki8210_incoming_call_check import verify as verify_8210_call
             except ModuleNotFoundError:
                 from noki8210_incoming_call_check import verify as verify_8210_call
-            verify_8210_call(log, configured_carrier=True)
+            verify_8210_call(log, **({'dcs1800': True} if getattr(args, 'dcs1800', False)
+                                    else {'configured_carrier': True}))
         else:
             try:
                 from tools.noki8210_outgoing_call_check import verify as verify_8210_call
@@ -331,7 +335,9 @@ def verify_success(root, remote_text, args):
                 from noki8210_outgoing_call_check import verify as verify_8210_call
             # Physical End uses handset DISCONNECT, network RELEASE, then
             # RELEASE COMPLETE. Reuse the full own-product lifecycle.
-            verify_8210_call(log, number=number, configured_carrier=True)
+            verify_8210_call(log, number=number,
+                            **({'dcs1800': True} if getattr(args, 'dcs1800', False)
+                               else {'configured_carrier': True}))
     # Exact encodings from these acceptance fixtures, including their observed
     # CC sequence bit; not a claim that the bit is a fixed product property.
     connect_data = '8307' if product in ('3310', '3330', '3410', '5210') else '8347'
@@ -661,6 +667,8 @@ def main():
     parser.add_argument('--http-port', type=int, default=18100)
     parser.add_argument('--incoming', action='store_true')
     parser.add_argument('--record-media', action='store_true')
+    parser.add_argument('--dcs1800', action='store_true',
+                        help='use the own NSM-3 DCS channel contract, not GSM900 words')
     parser.add_argument('--product', choices=('3210', '3310', '3330', '3410', '5210', '6210', '6250', '8210', '8290', '8850', '8890'), default='3210')
     parser.add_argument('--ready-file', type=Path,
                         help='wait for a fresh handset readiness artifact before an incoming INVITE')
@@ -675,6 +683,8 @@ def main():
     parser.add_argument('--sip-response', type=int, choices=(180, 200, 403, 404, 408, 480, 486, 503, 600), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    if args.dcs1800 and args.product != '8210':
+        parser.error('--dcs1800 is qualified only for product 8210')
     signaling_connected = (args.signaling_only and args.product == '6210' and
                            args.sip_response == 200 and args.calls == 1 and
                            (not args.incoming or args.ready_file is not None) and
