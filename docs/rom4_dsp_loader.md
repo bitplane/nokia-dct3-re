@@ -106,6 +106,14 @@ separately requires every marker in `run_c54x_core.REQUIRED`; its assertions
 alone must not be promoted to exact execution attribution without an opcode
 inventory.
 
+The runner owns a separate process group and reaps it on SIGTERM,
+KeyboardInterrupt or wait failure; interruption is never a conformance pass.
+`exit_status.json` retains the actual child return code, command and
+`interrupted` flag, including interrupted runs that reach cleanup. No manifest
+or partial PASS prefix establishes completion. An uncatchable launcher kill
+still requires external orphan cleanup. Profile runs qualify only their named
+matrix, not the default full-core set or native handset speech.
+
 ## Paired-memory assertion attribution
 
 `indirect-dld` already validates extended DST (3,072 cases), short-indirect
@@ -9751,10 +9759,10 @@ native speech. The suite deliberately exits via its completion exception
 after printing `TMS320C54x core conformance: PASS`.
 `check-c54x-core` uses `tools/run_c54x_core.py` to retain independent
 `run_c54x_core_*` directories containing `console.log` and the opcode
-assertions in `error.log`. Acceptance requires all 16 existing markers,
-exit status 3 and the terminal test-completion exception; a marker followed
-by an unrelated crash is not success. The isolated native run passed in
-`run_c54x_core_ycwnst8i`; seven runner tests cover negative outcomes.
+assertions in `error.log`. Acceptance requires every current marker in
+`run_c54x_core.REQUIRED`, exit status3 and the terminal test-completion
+exception; a marker followed by an unrelated crash or interruption is not
+success. Earlier smaller marker sets are not current full-core acceptance.
 Four additional ASM=0 `f480` vectors cover positive and negative 32-bit
 overflow with OVM clear/set: guard-preserving 40-bit results versus signed
 32-bit saturation, A-owned sticky overflow, low-word carry, unchanged B and
