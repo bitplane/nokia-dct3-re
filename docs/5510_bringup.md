@@ -153,6 +153,15 @@ cases over nine forms plus 24,576 mapped-source cases, totaling 208,896
 across MPYA/MASA/MACA/MACAR, MPYU, MPY/MPYR and LD T. Unrelated multiply
 generators still require independent domain audit.
 
+Memory SQUR uses this same generator and raw-ID exclusion, retaining
+52,224 cases/restores rather than admitting the 3,072 short-MOD=3 RAM
+cases. `squr-smem` verifies both accumulators, eight patterns, sixteen flag
+states, RAM/mapped sources, Read-stage T publication, retained operands and
+preservation of a newer T value. Accepted captures are
+`tmp/run_c54x_core_pkd3rv1w` (SQUR) and `tmp/run_c54x_core_jyveg6cq`
+(512 LTD/DELAY rejection cases/restores). Neither establishes physical
+pipeline phases or complete instruction-set conformance.
+
 Other positive domains retain 104,448 scalar ADD/SUB cases, 52,224 each for
 ADDS/SUBS, 208,896 shift-16 and 153,984 TS arithmetic cases (6,528 address
 plus 147,456 numeric). Variable-shift arithmetic retains 245,760 cases.
@@ -174,8 +183,11 @@ the no-data-transaction assertion. An older default fixture had incorrectly
 treated `4d9b` as a valid preincrement read; its positive control now uses
 legal long MOD=13, `4deb 0001`, preserving the distinct two-cycle contract.
 This is fail-closed source admission, not a silicon-trap claim or new positive
-staged LTD/long-DELAY support. Other implicit-copy/RMW families still require
-their own role/encoding audit.
+staged LTD/long-DELAY support. MACP/MACD have the same explicit source
+guard; MVDK, MVDP, MVMD, PORTW and WRITA are covered by the central
+`execute_one` admission check. Destination-side transfers are distinct,
+as described below; the implicit write alone is not evidence of a missing
+guard. Unenumerated instruction families still require their own audit.
 
 After the guard, `delay-copy` and `delay-copy-ctrl` pass 15,360 and 73,728
 legal cases/restores. Native 5110 save/load and the 30-second RF boundary
@@ -205,7 +217,8 @@ removed. Full core conformance retains all 292 required markers, including
 legal postincrement, absolute and long-offset MVDP controls. Native clocked
 boot, all four keypad-tone settings, 5110 save/load, RF/processing and the
 3210 baseline/frontier regressions pass without rebanking their oracles.
-Other implicit-copy and unenumerated read families remain open. The
+This closes the short-MOD=3 source-guard question for these named copy
+families, not the whole ISA or their positive timing/composition domains. The
 [pinned TI assembler control](rom4_dsp_loader.md#standalone-vendor-assembler-operand-control)
 now warns on all four short-preincrement RMW forms just as on the forbidden
 LD source, while preserving ordinary stores and long-offset reads. This
