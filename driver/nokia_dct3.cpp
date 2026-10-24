@@ -1042,6 +1042,19 @@ constexpr nokia_product_config make_3350_config()
 	return result;
 }
 constexpr nokia_product_config PRODUCT_3350 = make_3350_config();
+constexpr nokia_product_config make_8855_config()
+{
+	nokia_product_config result;
+	// NSM-4 v5.18 scanner 3c0e68 and special table 45dff0.
+	result.keypad_wiring = { 5, 0x10 };
+	// Own CCONT 3ca4f4 and LCD 3cda6a/3cdad6 instruction contracts.
+	result.gensio_wiring = { 0x2c, 0x2d, 0x2e, 0x6c, 0x6d, 0x6e, 0x03, true };
+	result.simi_controller = true; // Own 385874 initialization; empty socket.
+	// Own clear loop writes 84 bytes across six banks; physical panel unproved.
+	result.display = { 84, 48, 84, 48, false };
+	return result; // No DSP completion, service/radio peers or donor storage.
+}
+constexpr nokia_product_config PRODUCT_8855 = make_8855_config();
 constexpr nokia_product_config make_5190_config()
 {
 	nokia_product_config result;
@@ -1365,6 +1378,7 @@ public:
 
 	void noki3330(machine_config &config);
 	void noki3350(machine_config &config);
+	void noki8855(machine_config &config);
 	void nhm9stage(machine_config &config);
 	void noki3410(machine_config &config);
 	void noki2100(machine_config &config);
@@ -3890,6 +3904,14 @@ void nokia_dct3_state::nhm9stage(machine_config &config)
 	staged.set_loader2_source(0x1f0d80, 629);
 }
 
+void nokia_dct3_state::noki8855(machine_config &config)
+{
+	// Own Intel-style routines require the 580000..600000 writable tail.
+	// Capacity/command-compatible research part, not a fitted-device claim.
+	dct3_32mbit_flash_base(config);
+	apply_product_config(PRODUCT_8855);
+}
+
 void nokia_dct3_state::noki3610(machine_config &config)
 {
 	// NAM-1's normalized MCU/PPM image requires the later 32-Mbit flash
@@ -4990,6 +5012,19 @@ ROM_END
 
 #define rom_nhm9stage rom_noki3350
 
+ROM_START( noki8855 )
+	// NSM-4 service files supply neither resident mask nor PMM.
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
+	ROM_LOAD("nsm4_boot.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x20000, "dsp", ROMREGION_ERASE00)
+	ROM_LOAD("nsm4_dsp_prom.bin", 0, 0xc000, NO_DUMP)
+	ROM_LOAD("nsm4_dsp_drom.bin", 0xc000, 0x4000, NO_DUMP)
+	ROM_LOAD("nsm4_dsp_pdrom.bin", 0x10000, 0x1000, NO_DUMP)
+	ROM_REGION16_BE(0x400000, "flash", ROMREGION_ERASEFF)
+	ROM_LOAD("8855f518p.fls", 0, 0x380000,
+			CRC(3c345a20) SHA1(8f740f901f51ea60dcca560de011891eb8026f8a))
+ROM_END
+
 ROM_START( noki3610 )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 
@@ -5512,6 +5547,8 @@ SYST( 2000, nsb6hle, noki8890, 0, nsb6hle, noki8890, nokia_dct3_state, empty_ini
 SYST( 2001, noki3330, 0,      0,      noki3330, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3330", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, noki3350, 0,      0,      noki3350, noki3350, nokia_dct3_state, empty_init, "Nokia", "3350 MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, nhm9stage, noki3350, 0, nhm9stage, noki3350, nokia_dct3_state, empty_init, "Nokia", "3350 own uploaded DSP research fixture", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+// Host positions match own logical table; 5210 physical legends are not NSM-4 evidence.
+SYST( 2002, noki8855, 0, 0, noki8855, noki5210, nokia_dct3_state, empty_init, "Nokia", "8855 MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3410, 0,      0,      noki3410, noki3410, nokia_dct3_state, empty_init, "Nokia", "Nokia 3410", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki5210, 0,      0,      noki5210, noki5210, nokia_dct3_state, empty_init, "Nokia", "Nokia 5210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, nmp5stage, 0, 0, nmp5stage, nmp5stage, nokia_dct3_state, empty_init, "Nokia", "5510 own-upload bootstrap (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

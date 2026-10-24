@@ -2,20 +2,55 @@
 
 ## Current boundary
 
-Own v5.18 MCU and PPM regions are normalized and statically qualified. No
-machine profile, graphical boot, input, storage or radio acceptance is claimed.
-Own GENSIO and keypad register operations are now pinned. The next questions
-are flash identification semantics and capacity-compatible erased-storage
-execution, before promoting any fitted-part claim. The program command family
-is now recovered. The storage callback
-initializer, display clear layout, DSP catalogue
-consumer and logical key tables are statically recovered, not runtime-qualified.
+`noki8855` is a fail-closed MCU research instrument. Two independent cold
+runs of own v5.18 MCU/PPM-P create identical storage headers, install the
+recovered catalogue and flash callbacks, and reach the same DSP ownership
+wait. Graphical boot, firmware input delivery, SIM, radio and phonebook
+acceptance are not established. No DSP acknowledgement or donor PMM is supplied.
+The next question is the exact upload/release contract at the shared `0fe`
+wait, not a guessed completion value. Fitted flash identity remains unproved.
 
 Reproduce the static report:
 
 ```sh
 .venv/bin/python tools/nsm4_static_check.py roms/noki8855/v518/nsm4_5.180.bin
 ```
+
+## Erased-storage execution
+
+Generate the own contiguous prefix into a fresh file (no fabricated tail):
+
+```sh
+.venv/bin/python tools/nsm4_archive.py roms/archive-dct3-packages/nsm4_518.zip --image roms/noki8855/8855f518p.fls
+```
+
+The `0x380000`-byte result has SHA1
+`8f740f901f51ea60dcca560de011891eb8026f8a`. The machine supplies an erased
+tail in a capacity/command-compatible Intel TE28F320 research device; this is
+not identification of the fitted part. Boot and resident DSP masks are
+`NO_DUMP`; the shared MCU boot-transfer HLE remains explicit. The generic
+512 KiB RAM window is a research allocation covering own stack `146a24` and
+RAM programming code through `15a8xx`, not a fitted SRAM/alias claim. The host
+matrix reuses matching logical positions, not another handset's provisioning
+or physical side-key legends. The socket is empty and all DSP/service/radio
+completion models remain disabled.
+
+After `make build`, reproduce in a fresh isolated directory:
+
+```sh
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame --run-dir tmp/nsm4-new -- noki8855 -rompath /data/gaz/src/nokia-dct3-re/roms -noreadconfig -video none -sound none -nothrottle -log -seconds_to_run 6 -autoboot_delay 0 -autoboot_script /data/gaz/src/nokia-dct3-re/tools/nsm4_boot_observe.lua
+.venv/bin/python tools/nsm4_boot_check.py roms/noki8855/8855f518p.fls tmp/nsm4-new
+```
+
+The read-only observer samples seconds 1 through 5. Each sample has catalogue
+selectors 0/27 equal to `3fae04/4019d8`, callbacks `3e0499/15a6b1`, DSP
+control `01`, shared words `10000=0000`, `10002=ffff`, and PC in
+`33e2e0..33e2e4` with LR `33e2d9`. This is an unmet DSP ownership boundary,
+not a graphical boot or completed upload. The complete resulting 4 MiB flash
+SHA256 is `7bc92e6b3bdedbc26a28e134b74909f478f2c5953020ff4f8681a7dd99c0a2fb`.
+Only 83 tail bytes differ from erased state, including `PMM` at `590006`
+and `EEPROM` at `5e0006`; every acquired MCU/PPM byte is unchanged. Captures
+`tmp/nsm4-erased-boot` and `tmp/nsm4-erased-repeat` independently agree.
 
 Collection provenance and the independent NSM-4 product identity are in
 `roms/README.md`. The complete normalized MCU SHA256 is

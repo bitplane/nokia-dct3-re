@@ -22,6 +22,14 @@ class Nsm4ArchiveTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'requires the acquired'):
             subject.decode_archive(b'not the acquired archive')
 
+    def test_prefix_joins_only_own_contiguous_regions(self):
+        with patch.object(subject, 'decode_archive', return_value=({},
+                {subject.MCU: b'MCU', 'nsm4_5.18p': b'PPM'})):
+            self.assertEqual(subject.image_prefix(b'', 'p'), b'MCUPPM')
+        for pack in ('', 'a', 'pq'):
+            with self.assertRaises(ValueError):
+                subject.image_prefix(b'', pack)
+
     def test_decodes_without_padding_and_refuses_reuse(self):
         source, members = self.fixture()
         with patch.object(subject, 'ARCHIVE_SHA256', subject.sha256(source)), \

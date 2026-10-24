@@ -58,14 +58,30 @@ def extract(source, output):
     return report
 
 
+def image_prefix(source, pack):
+    if pack not in 'pqrstu' or len(pack) != 1:
+        raise ValueError('requires one acquired PPM pack p through u')
+    _, decoded = decode_archive(source)
+    return decoded[MCU] + decoded[f'nsm4_5.18{pack}']
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('archive', type=Path)
     parser.add_argument('--output', type=Path, help='fresh directory for normalized regions')
+    parser.add_argument('--image', type=Path, help='fresh MCU+PPM prefix file, no tail padding')
+    parser.add_argument('--ppm', choices=list('pqrstu'), default='p')
     args = parser.parse_args()
     try:
         source = args.archive.read_bytes()
         report = extract(source, args.output) if args.output else decode_archive(source)[0]
+        if args.image:
+            payload = image_prefix(source, args.ppm)
+            args.image.parent.mkdir(parents=True, exist_ok=True)
+            with args.image.open('xb') as stream:
+                stream.write(payload)
+            report['image_prefix'] = {'ppm': args.ppm, 'bytes': len(payload),
+                                      'sha256': sha256(payload)}
     except (OSError, ValueError, zipfile.BadZipFile) as exc:
         parser.exit(1, f'NSM-4 archive: {exc}\n')
     print(json.dumps(report, indent=2))

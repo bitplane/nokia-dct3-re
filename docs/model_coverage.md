@@ -1,11 +1,11 @@
 # DCT3 model coverage
 
-Acquisition-only gap: Nokia 8855 / NSM-4 v5.18 has independently qualified
-MCU and six PPM regions (`tools/nsm4_archive.py`; collection details in
-`roms/README.md`). It has no machine profile or runtime acceptance yet. The next
-admission step is its own peripheral and DSP-upload consumer contract; the
-own static startup/catalogue map is in `8855_bringup.md`. Sibling
-configuration and provisioning must not be assumed from the product name.
+Nokia 8855 / NSM-4 v5.18 has a fail-closed `noki8855` MCU research profile.
+Two own erased-storage boots produce identical catalogue/storage state and
+stop at an unacknowledged DSP ownership wait; `tools/nsm4_boot_check.py`
+checks that boundary, not graphical boot. The own register/key/static upload
+contracts and exact remaining dependency are in `8855_bringup.md`. No donor
+PMM, resident mask, DSP completion or application acceptance is implied.
 
 This matrix records demonstrated product coverage, not family resemblance. A
 cell is promoted only by a named reproducible gate or reviewed hardware or
