@@ -707,6 +707,28 @@ The visually reviewed System Module page27 (PDF page41) supplies NSB-7's
 own PCM waveform; see `docs/8290_bringup.md`. It is independent evidence,
 not an imported NSB-6 timing assumption.
 
+## NSM-4 service regions (Nokia 8855)
+
+`tools/nsm4_archive.py` qualifies the already acquired
+`archive-dct3-packages/nsm4_518.zip` (SHA256
+`8ef5e4bf68b0b190ca31a51790a80fe13e3fc2aee0dd4fed45975149d9c5807d`).
+The normalized regions and per-member hashes are retained outside source control
+under `noki8855/v518/manifest.json`. Reproduce into a fresh directory with:
+
+```sh
+.venv/bin/python tools/nsm4_archive.py roms/archive-dct3-packages/nsm4_518.zip --output roms/noki8855/v518
+```
+
+The MCU occupies `0x200000..0x490000`; six alternative PPM packs P through U
+each occupy `0x490000..0x580000` (exclusive ends). These are contiguous service
+regions, **not a full-flash dump**: no PMM tail or resident DSP mask is supplied.
+No pack language, ASIC configuration or handset support follows from extraction.
+NSM-4's Nokia 8855 identity is independently listed in the
+[official NTC approval catalogue](https://ntc.gov.ph/wp-content/uploads/2024/TYPE%20APPROVED/CPE-1999-2021-Updated.pdf).
+The extractor pins the archive, checks its exact member set and decoded extents,
+and uses the shared strict Wintesla record decoder; unknown record-header
+checksum fields are not interpreted.
+
 ## External implementation reference archive
 
 The already-catalogued reference revision

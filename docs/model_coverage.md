@@ -1,5 +1,11 @@
 # DCT3 model coverage
 
+Acquisition-only gap: Nokia 8855 / NSM-4 v5.18 has independently qualified
+MCU and six PPM regions (`tools/nsm4_archive.py`; collection details in
+`roms/README.md`). It has no machine profile or runtime acceptance yet. The next
+admission step is its own boot/peripheral and DSP-upload contract; sibling
+configuration and provisioning must not be assumed from the product name.
+
 This matrix records demonstrated product coverage, not family resemblance. A
 cell is promoted only by a named reproducible gate or reviewed hardware or
 firmware evidence. `Partial` means that the preceding acceptance level works
