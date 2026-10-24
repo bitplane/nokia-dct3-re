@@ -10,8 +10,25 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.nsk1_static_check import read_catalogue
 from tools.dct3_eeprom_descriptor import eeprom_geometry
+from tools.nsm1_v523_static_check import direct_call_candidates
 
 MCU_SHA256 = '4ae57f0eed01125efbe0f4e63abf5412b44539069b424f5d6dcf030659a8ebda'
+ACCESSORY_FRAGMENTS = {
+    0x2ad13a: 'b5102000f008f881',
+    0x2743f0: 'f038fea349e4800849e44288db00e4d4',
+    0x273d8c: '7b800880d20349da20107008e387',
+    0x273daa: '213901094288da00e3ff7828',
+    0x273dc4: '48d67b810889d300e37f7b800880d218',
+    0x273dea: '48c478012920d100e3c4212070012002f02cfd46',
+    0x2ad1a4: 'b500483c210f70c121007041',
+    0x2744ce: '4da67828280fd0062000f02cf9d7200f7028f024',
+    0x2740fc: '0010c3cb',
+    0x274120: '00020000',
+    0x274768: '0010c3cb',
+    0x274788: '0010c3d6',
+    0x27478c: '00000312',
+    0x2747c0: '00020000',
+}
 FRAGMENTS = {
     0x2000e4: 'e28f0001e12fff10',
     0x20016c: '0010fbf4',
@@ -77,6 +94,7 @@ def inspect(image):
             'catalogues': catalogues,
             'acquisition_contract': acquisition,
             'checksum_contract': checksum_contract(image),
+            'accessory_contract': accessory_contract(image),
             'catalogue_selector': {'context': '0x10ad08', 'field': '0x10ad0a',
                                    'equals_3': '0x10ad9c', 'otherwise': '0x10ad2c',
                                    'initial_consumer': '0x2946a0', 'indexed_consumer': '0x294acc'},
@@ -85,6 +103,28 @@ def inspect(image):
                                 'intermediate_predicate': '0x27562c',
                                 'zero_is_not_dsp_wait_proof': True},
             'scope': 'Own static declarations only; runtime mask selection and fitted compatibility unproved'}
+
+
+def accessory_contract(image):
+    for address, encoded in ACCESSORY_FRAGMENTS.items():
+        expected = bytes.fromhex(encoded)
+        offset = address - 0x200000
+        if image[offset:offset + len(expected)] != expected:
+            raise ValueError(f'NSB-3 accessory instruction/literal differs at {address:#x}')
+    callers = direct_call_candidates(image, 0x2ad13a)
+    if callers != [0x2743f0]:
+        raise ValueError('NSB-3 selector-zero wrapper direct-call candidates differ')
+    return {'raw_selector': 0, 'reader': '0x2ad13a',
+            'state': '0x10c3cb', 'sample': '0x10c3d6',
+            'decision_threshold': 0x312, 'cleanup_threshold': 0x390,
+            'external_status': '0x2000e', 'tested_bit': 1,
+            'runtime_comparison_targets': [
+                {'adc0': 0, 'external_status': 0, 'state': 0x10, 'title': 'Headset'},
+                {'adc0': 1023, 'external_status': 0, 'state': 0x20, 'title': 'Car'},
+                {'adc0': 1023, 'external_status': 2, 'state': 0x0f, 'title': None}],
+            'reader_direct_call_candidates': [hex(site) for site in callers],
+            'indirect_reader_coverage': False,
+            'physical_pin_identity_or_voltage_proved': False}
 
 
 def acquisition_contract(image):

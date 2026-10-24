@@ -22,7 +22,8 @@ not qualified by that result.
 The erased startup-text record and physical Field test selection now explain
 the previously odd idle presentation. An explicit empty-text input plus
 physical Test `00` yields repeatable idle-layout pixels across a cold boot;
-the displayed `Headset` accessory state remains unqualified. Automatic notice
+own raw-input contrasts attribute Headset/Car/neither to accessory selection,
+but physical unattached pin levels remain unqualified. Automatic notice
 clearing remains unresolved; explicit rejection dismissal restores clean menus.
 An independent long-run control resets near 94 seconds
 after an empty native receive window publishes reason `68`; bounded software
@@ -397,8 +398,66 @@ Accepted captures are `tmp/nsb3-idle-profile-{baseline,physical,restored}`.
 The checker pins the own executable/descriptors/branch, complete predecessor
 hashes, exact one-byte fixture, physical Test input order, editor and idle
 pixels, exact post-baseline EEPROM delta, unchanged card/flash and cold
-continuation. The remaining idle question is the owning accessory/profile
-contract behind `Headset`, not the repeated-glyph or Field test route.
+continuation. The accessory-input contract below separately resolves the
+firmware owner of `Headset`, not physical open-pin calibration.
+
+### Accessory analog and external-status inputs
+
+The own accessory reader at `2ad13a` calls CCONT selector0 directly. Its only
+direct-call candidate is `2743f0`, which stores the sample at `10c3d6` and
+compares it with `0312` (786). The separate high cleanup comparison at
+`273daa` is `0390` (912). Accessory state is byte `10c3cb`, initialized to
+`0f` at `2ad1aa`. This is separate from source7/selector2 battery acquisition;
+neither its calibration nor another product's headset polarity is inherited.
+
+The state machine also reads CTSI external-status register `2000e` bit1.
+For the tested boot, low bit1 permits state10 publication at `273d96` on
+the low-sample path, or state20 at `273df6` on the high path. Setting that
+external input high with the high analog sample leaves state0f. The live
+frame titles corroborate the roles independently:
+
+| Explicit ADC0 | External-status bank | State at5/10/24/36/40s | Idle title |
+| --- | --- | --- | --- |
+| 0 | 0 | `10` | Headset |
+| 1023 | 0 | `20` | Car |
+| 1023 | 2 (bit1 high) | `0f` | No accessory-profile title |
+
+All three44-second cold runs retain complete identical EEPROM, flash and
+PIN-enabled card files. They physically authenticate SIM/phone code and
+open identical reviewed Messages-menu pixels. The title-free36-second
+frame RGB SHA256 is
+`9b62da95e67601d1d4124ebeef9c1f3a956cd96506a7de0d097f2fd79e806dc2`.
+This establishes a two-input firmware decision, not a measured open-input
+voltage, a named PCB connection or a complete accessory lifecycle. The
+[own owner manual](https://www.instructionsmanuals.com/sites/default/files/2019-05/Nokia-6190-en.pdf),
+printed p.65, independently describes automatic Headset/Car profile selection
+while those accessories are attached; it does not supply the electrical map.
+
+The separate research composition exposes `RESEARCH_ADC0` (default0) and
+`RESEARCH_EXT_STATUS` (default0). They drive existing CCONT source and MAD2
+external input APIs at reset; no firmware state, result or message is written.
+The conservative machine and existing defaults remain unchanged. Raising
+ADC0 alone is specifically insufficient: it selects Car, not the title-free
+branch. Do not promote either high setting to a board default from these
+software observations alone.
+
+Reproduce with `tools/nsb3_accessory_profile.py prepare SOURCE RUN PROFILE`,
+where SOURCE is the qualified cold idle-profile storage and PROFILE is
+`low`, `analog-high` or `both-high`. Run each isolated directory serially
+for44seconds with `tools/nsb3_accessory_observe.lua`, then use
+`tools/nsb3_accessory_profile.py check SOURCE LOW ANALOG_HIGH BOTH_HIGH`.
+Accepted runs are `tmp/nsb3-accessory-{low,analog,both}-qualified`, from
+`tmp/nsb3-idle-profile-restored`. The static checker includes the own
+instruction/literal and direct-reader census; the runtime checker additionally
+requires exact state writers, all five sample/input observations, complete
+unchanged cold storage and original input configuration except the two
+declared raw inputs. Native RF, registration and physical electrical ownership
+remain unproved.
+
+A separate100-second `both-high` control still requests the board reset at
+93.976929692seconds with reason68 (`tmp/nsb3-accessory-both-long`). Accessory
+selection therefore does not resolve the existing empty native receive-window
+supervision boundary. No watchdog or reset behavior is suppressed.
 
 ### Physical SIM phonebook persistence
 

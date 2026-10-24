@@ -77,8 +77,11 @@ The repeated idle glyphs now trace to erased startup-text record0745: own
 PPM conversion maps byteff to U+017E before LCD output. A declared one-byte
 empty-text input plus physical Field test `00` yields repeatable idle-layout
 pixels after an independent cold boot, with unchanged complete card/flash.
-The remaining `Headset` accessory/profile state, fitted-mask identity and
-radio/call/SMS-delivery acceptance remain open; native compatibility is unchanged.
+Own CCONT selector0 plus MAD2 external-status bit1 now independently account
+for Headset, Car and title-free idle branches through three raw-input controls,
+with unchanged complete storage and shared physical Messages-menu acceptance.
+Electrical open-input levels, fitted-mask identity and radio/call/SMS-delivery
+acceptance remain open; native compatibility is unchanged.
 
 Nokia 8855 / NSM-4 v5.18 has a fail-closed `noki8855` MCU research profile.
 Two own erased-storage boots produce identical catalogue/storage state and

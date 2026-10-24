@@ -1366,6 +1366,8 @@ public:
 		m_vibration(*this, "vibration"),
 		m_hw_config(*this, "HWCFG"),
 		m_diag_config(*this, "DIAGCFG"),
+		m_research_external_status(*this, "RESEARCH_EXT_STATUS"),
+		m_research_adc0(*this, "RESEARCH_ADC0"),
 		m_research_adc2(*this, "RESEARCH_ADC2"),
 		m_network_config(*this, "NETCFG"),
 		m_sms_config(*this, "SMSCFG"),
@@ -1569,6 +1571,8 @@ private:
 	output_finder<> m_vibration;
 	optional_ioport m_hw_config;
 	optional_ioport m_diag_config;
+	optional_ioport m_research_external_status;
+	optional_ioport m_research_adc0;
 	optional_ioport m_research_adc2;
 	optional_ioport m_network_config;
 	optional_ioport m_sms_config;
@@ -1882,6 +1886,18 @@ void nokia_dct3_state::reset_board_state(bool clear_sram)
 	// names and units remain deliberately unassigned where board evidence is absent.
 	for (unsigned id = 0; id < 8; id++)
 		m_ccont->set_adc_source(id, m_product.ccont_board.channel_defaults[id]);
+	const u8 research_external_status = m_research_external_status.read_safe(0xff);
+	if (research_external_status <= 7)
+	{
+		m_mad2->set_external_status(research_external_status);
+		machine().logerror("mad2_external_config: raw=%x external_input=1\n", research_external_status);
+	}
+	const u16 research_adc0 = m_research_adc0.read_safe(0xffff);
+	if (research_adc0 <= 0x3ff)
+	{
+		m_ccont->set_adc_source(0, research_adc0);
+		machine().logerror("ccont_adc0_config: raw=%03x external_input=1\n", research_adc0);
+	}
 	const u16 research_adc2 = m_research_adc2.read_safe(0xffff);
 	if (research_adc2 <= 0x3ff)
 	{
@@ -3609,6 +3625,18 @@ INPUT_PORTS_END
 static INPUT_PORTS_START( nsb3r4t )
 	PORT_INCLUDE(noki5210)
 	PORT_INCLUDE(dct3_research_adc2)
+	PORT_START("RESEARCH_ADC0")
+	// Own 2ad13a reads selector 0 for accessory classification. These are
+	// external raw-input contrasts, not measured NSB-3 open-pin voltages.
+	PORT_CONFNAME(0x03ff, 0, "Research CCONT ADC0 source")
+	PORT_CONFSETTING(0, "Low control (0)")
+	PORT_CONFSETTING(0x03ff, "High input comparison (1023)")
+	PORT_START("RESEARCH_EXT_STATUS")
+	// Own 273dc4..273dcc reads CTSI+0e bit 1 before accessory selection.
+	// Physical signal ownership/polarity remains a board-research question.
+	PORT_CONFNAME(0x07, 0, "Research MAD2 external status")
+	PORT_CONFSETTING(0, "Low control (0)")
+	PORT_CONFSETTING(2, "Bit 1 high comparison (2)")
 	PORT_MODIFY("SIM_REMOVED")
 	PORT_BIT(0x01, IP_ACTIVE_LOW, IPT_OTHER) PORT_NAME("Insert synthetic SIM card") PORT_TOGGLE
 	PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::sim_removed_changed), 0)
