@@ -2908,6 +2908,12 @@
       "evidence": ["docs/6190_bringup.md", "tools/nsb3_pin_change_input.lua", "tools/nsb3_pin_old.lua", "tools/nsb3_pin_changed.lua", "tools/nsb3_pin_change_check.py", "tools/test_nsb3_pin_change_check.py", "tools/nsb3_sim_observe.lua"]
     },
     {
+      "id": "nsb3_late_reason68_reset", "owner": "nsb3_reset_policy", "status": "unresolved",
+      "predicate": "Own NSB-3 native compatibility remains running beyond the long-run supervisory interval without an unexplained firmware reset",
+      "current": "Independent no-change controls reproduce20001=05 at PC2b4b9e/LR23ff2f at93.976929692seconds, reason68, counter10fdee=00 and condition10fdf3=00. Correct own literal resolution identifies reason byte10ff80; setter2a8b08/caller2a794a publishes68 at93.002796692seconds, followed by event tail23fdfe and reset. Direct policy census recovers2/2 callers:20738c(argument2) and2b3a60(argument1). The repeated window run observes activity0002 then0000 at receive-loop timerdd, then the exact argument1/caller2b3a65 entry and same publication/reset. Own fragments show non-dd receive increments10c4ce, while an empty window calls the policy. Thus receive inactivity is the reset trigger, not the threshold15 idle-counter branch or established hardware expiry. The missing post-result native response, fitted-mask compatibility and RF inputs remain unresolved; no arbitrary heartbeat, reset suppression, EEPROM policy or timing change is justified.",
+      "evidence": ["docs/6190_bringup.md", "tools/nsb3_sim_observe.lua", "tools/nsb3_pin_correct.lua", "tools/nsb3_reset_observe.lua", "tools/nsb3_reset_contract.py", "tools/test_nsb3_reset_contract.py"]
+    },
+    {
       "id": "nam1_display_frontier", "owner": "nam1_firmware", "status": "satisfied",
       "predicate": "Nokia 3610 v5.11 organically reaches a deterministic firmware-rendered display boundary through product-owned GENSIO and geometry contracts",
       "current": "NAM-1 independently writes GENSIO control 0x22 at 0x2d, transfers CCONT bytes at 0x2c and polls 0x6d. Byte-write receive-ready releases that loop. Firmware then writes nine 96-byte display banks; a 96x65 visible area with reversed segment order renders the complete CONTACT SERVICE frame. Separate gates prove DSP bootstrap/service control, request-derived discovery, accepted application sequences 0x42/0x43, channel-0x5f use and a complete physical M2BUS terminal exchange. Missing product state remains the next boundary.",

@@ -718,7 +718,34 @@ physical contacts, APDUs/statuses and changed/PIN/error/phone/menu frames.
 **Long-run limit:** an extended run requests a board software reset near
 93.969 seconds (`20001=05`, PC `2b4b9e`, caller `23ff2a`). The supervisor
 at `23feac` counts iterations at `10fdee` while flag `10fdf3` is clear;
-the threshold is 15. Its missing lifecycle condition is unresolved. This is
-not established as hardware watchdog expiry or DSP liveness. The 90-second
+the threshold is 15, but that branch is not established as the reset cause.
+An independent 114-second control with only normal PIN/phone-code/Menu input
+repeats the reset at 93.976929692 seconds, reason `68`, with counter `00`
+and condition flag `00` at the reset write. Thus PIN change is not required,
+and the observed zero counter does not support attributing this reset to the
+threshold-15 branch.
+
+The own-image reason byte is `10ff80`. A corrected passive watch records
+policy setter `2a8b08`, caller `2a794a`, publishing `68` at 93.002796692
+seconds; event tail `23fdfe` then consumes that reason before the reset.
+The reason setter has 12/12 decoded direct Thumb callers, with arguments
+recovered at 10. The policy routine `2a78a6` has two direct callers:
+`20738c` passes 2 and `2b3a60` passes 1. The latter belongs to the DSP
+receive loop: ordinary non-`dd` messages increment halfword `10c4ce`;
+timer `dd` at `2b3b94` checks it, rearms/clears on activity and calls
+policy argument 1 on zero. These own-ROM instructions and the actual
+reason writer identify a receive-inactivity policy route, not hardware
+watchdog expiry. They do not establish what native radio response ought to
+follow the late cached `8b` result or justify synthesizing a heartbeat.
+
+`tools/nsb3_reset_contract.py IMAGE --trace TRACE` checks the own image,
+quantified direct policy/setter census, instruction fragments and ordered
+policy publication/event/software reset. `tools/nsb3_reset_observe.lua`
+adds only read-only reason/window observations to ordinary physical login.
+The repeated `--windows` run observes activity `0002`, then `0000` and
+the exact policy argument-1 caller `2b3a60` before the same reason/reset.
+This qualifies receive inactivity as the reset trigger. It does not establish
+the missing response or prove the unqualified resident mask is compatible.
+The 90-second
 credential gate rejects observed reset requests and does not qualify
 long-run stability. No reset suppression, timer change or heartbeat is used.
