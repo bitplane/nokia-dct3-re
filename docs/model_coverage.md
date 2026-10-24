@@ -57,6 +57,8 @@ list; ACK-only automatic settlement remains unqualified. Other Toolkit commands 
 A fetched DISPLAY TEXT awaiting physical input also survives native save/load:
 one FETCH yields two successful physical completions with identical I/O and
 returned-menu pixels, preserving the complete persistent card.
+The separate five-second TIMER MANAGEMENT request receives explicit result31;
+this is a qualified refusal, not timer-start/expiry support.
 Physical SIM-security gates cover PIN-request Off/On, PIN1/PIN2 changes and
 cold restoration, retry persistence, physical PIN exhaustion, wrong-PUK
 persistence/recovery and replacement-credential authentication. Exact whole-card

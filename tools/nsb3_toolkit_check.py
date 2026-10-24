@@ -27,6 +27,37 @@ MENU = bytes.fromhex('d0268103042500820281828509') + b'DCT3 menu' + bytes.fromhe
 MENU_RESPONSE = bytes.fromhex('810304250002028281030100')
 SELECT_ITEM = bytes.fromhex('d0208103072400820281828506') + b'Choose' + bytes.fromhex('8f0601') + b'Alpha' + bytes.fromhex('8f0502') + b'Beta'
 ITEM_RESPONSE = bytes.fromhex('810307240002028281030100100102')
+TIMER = bytes.fromhex('d01181030f270082028182a40101a503000005')
+TIMER_REJECTION = bytes.fromhex('81030f270002028281030131')
+
+
+def command_contract(profile, menu_item=1):
+    """Observed lab-card command contracts, independent of device execution."""
+    if profile not in (1, 3, 4, 7, 14):
+        raise ValueError('unknown Toolkit command contract')
+    if profile in (4, 7, 14) and menu_item not in (1, 2):
+        raise ValueError('unknown Toolkit menu item')
+    if profile in (7, 14) and menu_item != 1:
+        raise ValueError('follow-up requires Continue')
+    result = [(0x10, 0, 0, 5, bytes.fromhex('0b41977700')),
+              (0x12, 0, 0, 22, b''), (0x14, 0, 0, 12, RESPONSE)]
+    if profile != 1:
+        result += [(0x12, 0, 0, 21, b''), (0x14, 0, 0, 16, INKEY_RESPONSE),
+                   (0x12, 0, 0, 26, b''), (0x14, 0, 0, 17, INPUT_RESPONSE)]
+    if profile in (4, 7, 14):
+        result += [(0x12, 0, 0, 40, b''), (0x14, 0, 0, 12, MENU_RESPONSE),
+                   (0xc2, 0, 0, 9, bytes.fromhex('d307020201811001') + bytes((menu_item,)))]
+    if profile == 7:
+        result += [(0x12, 0, 0, 34, b''), (0x14, 0, 0, 15, ITEM_RESPONSE)]
+    elif profile == 14:
+        result += [(0x12, 0, 0, 19, b''), (0x14, 0, 0, 12, TIMER_REJECTION)]
+    return result
+
+
+def check_actions(text, marker, actions):
+    rows = re.findall(re.escape(marker) + r': action=(\w+) down=([01])', text)
+    if rows != [(action, down) for action in actions for down in ('1', '0')]:
+        raise ValueError('physical Toolkit actions differ: ' + marker)
 
 
 def check_trace(text, interactive=False, menu_item=None, return_wait=False, select_item=False):
@@ -44,16 +75,8 @@ def check_trace(text, interactive=False, menu_item=None, return_wait=False, sele
         raise ValueError('reset or failed observer')
     commands = wire(text)
     toolkit = [row[:5] for row in commands if row[0] in (0x10, 0x12, 0x14, 0xc2)]
-    expected = [(0x10, 0, 0, 5, bytes.fromhex('0b41977700')),
-                (0x12, 0, 0, 22, b''), (0x14, 0, 0, 12, RESPONSE)]
-    if interactive:
-        expected += [(0x12, 0, 0, 21, b''), (0x14, 0, 0, 16, INKEY_RESPONSE),
-                     (0x12, 0, 0, 26, b''), (0x14, 0, 0, 17, INPUT_RESPONSE)]
-    if menu_item is not None:
-        expected += [(0x12, 0, 0, 40, b''), (0x14, 0, 0, 12, MENU_RESPONSE),
-                     (0xc2, 0, 0, 9, bytes.fromhex('d307020201811001') + bytes((menu_item,)))]
-    if select_item:
-        expected += [(0x12, 0, 0, 34, b''), (0x14, 0, 0, 15, ITEM_RESPONSE)]
+    profile = 7 if select_item else 4 if menu_item is not None else 3 if interactive else 1
+    expected = command_contract(profile, menu_item)
     if toolkit != expected:
         raise ValueError('own Toolkit APDU sequence or result differs')
     if any(row[0] in (4, 0x44, 0xdc, 0xd6, 0x24, 0x26, 0x28, 0x2c, 0x32) for row in commands):
@@ -88,9 +111,7 @@ def check_trace(text, interactive=False, menu_item=None, return_wait=False, sele
     if any(row[0] == 0x14 for row in wire(before)):
         raise ValueError('terminal response preceded physical dismissal')
     actions = ('inkey_5', 'inkey_confirm', 'input_4', 'input_2', 'input_confirm') if interactive else ()
-    observed = re.findall(r'nsb3_toolkit_input: action=(\w+) down=([01])', text)
-    if observed != [(action, down) for action in actions for down in ('1', '0')]:
-        raise ValueError('physical Toolkit input sequence differs')
+    check_actions(text, 'nsb3_toolkit_input', actions)
     if interactive:
         for action, prior_responses in (('inkey_5', 1), ('input_confirm', 2)):
             prefix = text.split(f'nsb3_toolkit_input: action={action} down=1', 1)[0]
@@ -101,16 +122,12 @@ def check_trace(text, interactive=False, menu_item=None, return_wait=False, sele
         menu_actions = ('fieldtest', 'last', 'open') + (('next',) if menu_item == 2 else ()) + ('select',)
         if return_wait:
             menu_actions += ('end', 'return')
-    observed_menu = re.findall(r'nsb3_toolkit_menu: action=(\w+) down=([01])', text)
-    if observed_menu != [(action, down) for action in menu_actions for down in ('1', '0')]:
-        raise ValueError('physical menu selection differs')
+    check_actions(text, 'nsb3_toolkit_menu', menu_actions)
     if menu_item is not None:
         prefix = text.split('nsb3_toolkit_menu: action=select down=1', 1)[0]
         if any(row[0] == 0xc2 for row in wire(prefix)):
             raise ValueError('menu envelope preceded physical selection')
-    item_actions = re.findall(r'nsb3_toolkit_select_item: action=(\w+) down=([01])', text)
-    if item_actions != ([(action, down) for action in ('next', 'confirm') for down in ('1', '0')] if select_item else []):
-        raise ValueError('physical SELECT ITEM contacts differ')
+    check_actions(text, 'nsb3_toolkit_select_item', ('next', 'confirm') if select_item else ())
     if select_item:
         prefix = text.split('nsb3_toolkit_select_item: action=confirm down=1', 1)[0]
         if sum(row[0] == 0x14 for row in wire(prefix)) != 4:

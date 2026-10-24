@@ -17,6 +17,8 @@ selection. SELECT ITEM additionally returns a physical choice to the card and
 restores the clean installed list; ACK-only menu settlement remains unqualified.
 A fetched DISPLAY TEXT awaiting input additionally survives native save/load,
 with exact observed architecture/I/O replay and successful physical completion.
+The tested TIMER MANAGEMENT request is explicitly rejected; timer expiry is
+not qualified by that result.
 Ordinary idle content and automatic notice
 clearing remain unresolved; explicit rejection dismissal restores clean menus.
 An independent long-run control resets near 94 seconds
@@ -1420,3 +1422,22 @@ then check with `nsb3_toolkit_state_check.py SOURCE RUN`. Storage/profile checks
 are shared with the ordinary Toolkit gates rather than independently relaxed.
 This accepts one pending DISPLAY TEXT restoration, not every Toolkit command.
 It uses emulator save/load APIs, not guest-state forcing.
+
+#### TIMER MANAGEMENT refusal
+
+External profile 14 is a negative capability fixture. After the same startup,
+interactive commands and physical menu selection, its `91 13` leads to FETCH
+of `d01181030f270082028182a40101a503000005`: start timer 1 for five seconds.
+The ME returns `81030f270002028281030131`, explicitly rejecting the command
+with result `31`; the card accepts that response with `9000`. It sends no timer
+expiry ENVELOPE in the bounded run and preserves the complete persistent card.
+The immediate result screen remains `Wait`, not a successful timer UI.
+
+Prepare with `nsb3_toolkit_prepare.py SOURCE NEW_RUN --timer`, run the ordinary
+`nsb3_toolkit_menu.lua` for 93 seconds, then check with
+`nsb3_toolkit_timer_check.py SOURCE RUN`. Common cold-storage/authentication,
+exact command/status/received-payload, physical-order and prerequisite screen
+checks remain mandatory. The gate rejects a success result or an expiry
+envelope; it does not reinterpret either as the observed refusal. No timer
+clock or firmware state is changed. This establishes the tested request's
+capability boundary, not timer-start/expiry support or a timer-model defect.
