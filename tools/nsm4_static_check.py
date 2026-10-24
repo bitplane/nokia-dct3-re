@@ -16,6 +16,7 @@ TABLE = 0x3e8e60
 # Own instructions and their literal pools; matching an opcode alone does not
 # establish which register window the operation addresses.
 PERIPHERAL_FRAGMENTS = {
+    0x3c0e68: 'b5f04641464a4653465c',
     0x3c0e9a: '4ead201e7030',
     0x3c0eb2: '78b006c00ec006000e0224ff2a1f',
     0x3c0f2a: '40884210d10800a81828180806000e04',
@@ -42,12 +43,39 @@ def peripheral_contract(image):
                        'status': '0x6d', 'ccont_ready_bit': 2,
                        'lcd_select': '0x21', 'lcd_command': '0x6e',
                        'lcd_data': '0x2e', 'lcd_ready_bit': 0},
-            'keypad': {'scanner': '0x3c0e72', 'row_output': '0x28',
+            'keypad': {'scanner': '0x3c0e68', 'row_output': '0x28',
                        'row_direction': '0xa8', 'column_input': '0x2a',
                        'raw_formula': 'row * 5 + column'},
             'simi_init_fragment': '0x385874',
             'eeprom_descriptor': eeprom_geometry(image[5]),
             'physical_key_labels_or_timing_proved': False}
+
+
+def keymap_contract(image):
+    decoder = bytes.fromhex('b500f7faff5f28ffd101203ebd0009c12900d009493d7809008a18891840493c180838807800bd0021194a3878124351184049355c08bd00')
+    if image[0x1c5fa4:0x1c5fdc] != decoder:
+        raise ValueError('NSM-4 key translation instructions differ')
+    normal, selector, special = struct.unpack_from('>III', image, 0x1c60ac)
+    if (normal, selector, special) != (0x45dfd4, 0x13de7b, 0x45dff0):
+        raise ValueError('NSM-4 key translation roots differ')
+    keys = bytes.fromhex('3e3e3e3e3e11190102030e170405060f18070809101a0c0a0b')
+    if (image[normal - 0x200000:normal - 0x200000 + 25] != keys
+            or image[special - 0x200000:special - 0x200000 + 5] != bytes.fromhex('3e3e3e3e0d')):
+        raise ValueError('NSM-4 key translation tables differ')
+    return {'decoder': '0x3c5fa4', 'normal_table': hex(normal),
+            'special_table': hex(special), 'layout_selector': hex(selector),
+            'layout_zero_keys': list(keys), 'power_raw': '0x84',
+            'power_logical': '0x0d', 'runtime_delivery_proved': False}
+
+
+def catalogue_consumer(image):
+    expected = bytes.fromhex('488e00b15842488d61202000004169235a8e52ce1c4006000e002805dbf6889080e088d000401828616089108120320c6122')
+    if (image[0x13e95e:0x13e990] != expected
+            or image[0x13eb98:0x13eba0] != bytes.fromhex('0013a9a8000100f6')):
+        raise ValueError('NSM-4 indexed catalogue consumer differs')
+    return {'lookup': '0x33e95e', 'table_ram': '0x13a9a8',
+            'selector_stride_bytes': 4, 'copied_header_halfwords': 5,
+            'payload_offset_bytes': 12, 'transport_execution_proved': False}
 
 
 def read_catalogue(image):
@@ -88,6 +116,8 @@ def inspect(image):
             'reset_arm_entry': '0x200040', 'thumb_entry': '0x200148',
             'startup_calls': ['0x2ea064', '0x23f900', '0x3ab530'],
             'peripheral_contract': peripheral_contract(image),
+            'keymap_contract': keymap_contract(image),
+            'catalogue_consumer': catalogue_consumer(image),
             'bootstrap': {'identity_data_0803': 6, 'resident_call': '0x861f',
                           'fitted_mask_compatibility_proved': False},
             'scope': 'Static MCU declarations only; no upload execution, peripheral wiring, PMM or resident mask established'}

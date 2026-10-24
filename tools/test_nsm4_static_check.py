@@ -2,7 +2,8 @@ import struct
 import unittest
 
 from tools.nsm4_static_check import (TABLE, inspect, read_catalogue,
-                                    peripheral_contract, PERIPHERAL_FRAGMENTS)
+                                    peripheral_contract, PERIPHERAL_FRAGMENTS,
+                                    keymap_contract, catalogue_consumer)
 
 
 class Nsm4StaticTest(unittest.TestCase):
@@ -57,6 +58,32 @@ class Nsm4StaticTest(unittest.TestCase):
             changed[address - 0x200000] ^= 1
             with self.assertRaises(ValueError):
                 peripheral_contract(changed)
+
+    def test_keymap_roots_tables_and_instructions(self):
+        image = bytearray(0x290000)
+        image[0x1c5fa4:0x1c5fdc] = bytes.fromhex('b500f7faff5f28ffd101203ebd0009c12900d009493d7809008a18891840493c180838807800bd0021194a3878124351184049355c08bd00')
+        struct.pack_into('>III', image, 0x1c60ac, 0x45dfd4, 0x13de7b, 0x45dff0)
+        image[0x25dfd4:0x25dfed] = bytes.fromhex('3e3e3e3e3e11190102030e170405060f18070809101a0c0a0b')
+        image[0x25dff0:0x25dff5] = bytes.fromhex('3e3e3e3e0d')
+        result = keymap_contract(image)
+        self.assertEqual(result['layout_zero_keys'][8], 2)
+        self.assertFalse(result['runtime_delivery_proved'])
+        for offset in (0x1c5fa4, 0x1c60ac, 0x25dfd4, 0x25dff4):
+            changed = bytearray(image)
+            changed[offset] ^= 1
+            with self.assertRaises(ValueError):
+                keymap_contract(changed)
+
+    def test_catalogue_consumer_rejects_pointer_or_opcode_drift(self):
+        image = bytearray(0x290000)
+        image[0x13e95e:0x13e990] = bytes.fromhex('488e00b15842488d61202000004169235a8e52ce1c4006000e002805dbf6889080e088d000401828616089108120320c6122')
+        image[0x13eb98:0x13eba0] = bytes.fromhex('0013a9a8000100f6')
+        self.assertEqual(catalogue_consumer(image)['payload_offset_bytes'], 12)
+        for offset in (0x13e960, 0x13e97c, 0x13e98c, 0x13eb98):
+            changed = bytearray(image)
+            changed[offset] ^= 1
+            with self.assertRaises(ValueError):
+                catalogue_consumer(changed)
 
 
 if __name__ == '__main__':
