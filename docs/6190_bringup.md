@@ -522,6 +522,30 @@ and operation prerequisites are shared research boundaries documented in
 `djr_dsp_integration.md`; a guessed type-80 payload would bypass them, not
 validate them. The next radio question is the own asynchronous completion/data
 path and its native receive prerequisites, not another startup-state poke.
+
+The type-80 decoder's message byte `+4` is a second selector, not a single
+completion opcode. Selector `60` enters `28a1b0`; the shared early filter
+drops it when byte `108947=1`. Its `040b` forwarding gate rejects word
+`1089c0` bit 22 or message byte `+6=1`. A conditional mismatch check rejects
+when bit 31 is clear, word `108754` differs from saved word `1088c8`,
+`10a6a4` bit 0 is set and byte `108721=2`. Bit 29 additionally requires
+mode byte `108942=1a`. These are decoded firmware predicates, not evidence
+that altering any of them would be faithful.
+
+The `040b` consumer is receive routine `24ce74` (one decoded direct call,
+`24edc2`). Its `24cff4` branch classifies the message at `24cb6c` and calls
+parser `24cbc0`. Selector `60` takes the fixed-block path `24ce22`: byte
+`+0e` must have low bits `01` and upper-six-bit length 1..22. Valid input
+copies 22 bytes from message `+0f` and returns `061a`; invalid headers
+return `061b`. This is a received-data parser contract, not proof that this
+path emits `13a3` or releases the state-3 result cache.
+
+`tools/nsb3_rx80_contract.py IMAGE` guards own instruction fragments and
+literal ownership, reports the forwarding/consumer boundary and quantifies
+the consumer callsite. Tests cover flag interactions and all 256 first-byte
+values. It does not construct packets or claim native delivery: the accepted
+native captures still contain no type-80 packet.
+
 The current machine composition does not bind COBBA's `rf_receive_cb`;
 `nokia_cobba_device` defaults it to zero and owns the deterministic-silence
 policy. Thus no software RF environment is currently supplied to this native
