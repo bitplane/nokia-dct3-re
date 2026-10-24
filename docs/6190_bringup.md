@@ -1164,5 +1164,31 @@ for 78 seconds from the qualified saved card. Use
 `nsb3_fdn_edit_check.py prepare-cold EDIT COLD`, run the usual 89-second record
 read fixture, then `check SAVED EDIT COLD`. Own executable/cold links, exact
 cards and Menu/Saved/name/number RGB oracles remain required. No record
-payload or completion is supplied by the host. Erase/cancel and local dial
-permissions remain separate.
+payload or completion is supplied by the host. Erase/cancel is qualified below;
+local dial permissions remain separate.
+
+### Protected FDN erase cancellation and cold empty Search
+
+From the edited `A/12346` card, physical Options authenticates PIN2 and
+selects Erase. Back at `Erase? A` sends no UPDATE and preserves the complete
+card. An independent cold Search/Details retrieves both retained fields.
+The next authenticated Erase, confirmed with OK, sends exactly one successful
+UPDATE RECORD of 32 erased bytes to EF_FDN record 1 and displays
+`Phone book erased`. Another cold Search displays `No phone numbers` without
+UPDATE or additional PIN2 authentication. FDN remains On; ordinary ADN,
+credentials, retry counts and all unrelated card bytes remain unchanged.
+
+Use `nsb3_fdn_erase_check.py prepare-retained SOURCE TARGET` for each
+pre-erasure cold link and `prepare-empty SOURCE TARGET` after erasure.
+Run `nsb3_fdn_record_cancel.lua` for 74 seconds, the ordinary record-read
+fixture for 89 seconds, `nsb3_fdn_record_erase.lua` for 74 seconds, then
+`nsb3_fdn_record_empty.lua` for 60 seconds. Validate with:
+
+```sh
+.venv/bin/python tools/nsb3_fdn_erase_check.py check SOURCE CANCEL RETAINED ERASED EMPTY
+```
+
+The gate checks all predecessor storage links, complete cards, own executable,
+physical inputs, PIN2-before-write, exact APDUs/statuses and reviewed Menu,
+confirmation, retained Details, erase-result and empty-list pixels. It does
+not establish dial permission, network registration or native RF compatibility.

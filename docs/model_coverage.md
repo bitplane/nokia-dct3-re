@@ -29,14 +29,14 @@ SIM-dependent contact capacity. A 6150-style local Phone store is not an
 independently supported requirement for this profile.
 An explicit FDN-capable lab card additionally proves physical PIN2-authenticated
 On/cold-On/Off/cold-Off and exact file-validity/identity rehabilitation, with
-unchanged credentials and records. Protected FDN records and local dial
-permission remain separate from these settings and from native registration.
+unchanged credentials and records. These settings do not establish native registration.
 Wrong-PIN2 FDN activation also preserves Off state, consumes only one retry
 and cold-recovers through correct PIN2 with the normal validity protocol.
 Physical PIN2-protected EF_FDN A/12345 save and independently cold Details
 also pass, with unchanged ordinary ADN, credentials and validity. Protected
-FDN number edit/cold read to A/12346 also passes; erase/cancel and
-local dial-permission contrasts remain open.
+FDN number edit/cold read to A/12346, authenticated erase cancellation/cold
+retention, and confirmed erase/cold empty Search also pass. Local dial-permission
+contrasts remain open.
 Wrong-PIN2 FDN Add preserves the existing record, consumes exactly one retry
 and cold-retrieves that record without changing the retry count or card.
 Physical offline SMS composition/save, cold Outbox read, confirmed deletion

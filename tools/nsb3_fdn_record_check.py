@@ -43,11 +43,11 @@ def check_trace(text, readback=False):
                        None if readback else expected_record())
 
 
-def check_record_trace(text, keys, record=None):
+def check_record_trace(text, keys, record=None, authenticate_read=False):
     readback = record is None
     if 'nsb3_board_reset_request:' in text:
         raise ValueError('reset interrupts FDN record qualification')
-    verifies = () if readback else ((0x20, 0, 2, 8, padded_pin('5678')),)
+    verifies = ((0x20, 0, 2, 8, padded_pin('5678')),) if not readback or authenticate_read else ()
     check_pin(text, True, additional_verifies=verifies)
     contacts = re.findall(r'nsb3_security_key: key=(.*?) down=([01]) t=[0-9.]+ physical_only=1', text)
     if contacts != [(key, state) for key in keys for state in ('1', '0')]:
