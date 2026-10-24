@@ -16,6 +16,18 @@ TRACE='\n'.join((
 
 
 class Pin2ChangeTest(unittest.TestCase):
+    def test_rejected_change_preserves_pin2_and_cold_recovery_restores_retry(self):
+        rejected=bytearray(registered_card('5678'))
+        rejected[3517]=2
+        trace=TRACE.replace('ins=24 sw=9000 chv=3/3','ins=24 sw=9804 chv=3/2')
+        check_phase(trace,make_profile(True),bytes(rejected),rejected=True)
+        check_phase(TRACE,bytes(rejected),registered_card('2468'),prior_rejection=True)
+        for bad in (registered_card('2468'),registered_card('5678')):
+            with self.assertRaises(ValueError):
+                check_phase(trace,make_profile(True),bad,rejected=True)
+        with self.assertRaises(ValueError):
+            check_phase(TRACE,registered_card('5678'),registered_card('2468'),prior_rejection=True)
+
     def setUp(self):
         self.contexts=[patch('tools.run_noki8850_pin2_change.'+name)
                        for name in ('contacts','check_pin_inputs','registration')]

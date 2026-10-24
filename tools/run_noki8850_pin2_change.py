@@ -15,7 +15,7 @@ if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from tools.make_sim_card_profile import make_profile
 from tools.run_noki8xxx_supplementary import PROFILES,verify_inputs
-from tools.run_noki8850_pin_retry_cold import storage_hashes,check_messages_menu
+from tools.run_noki8850_pin_retry_cold import storage_hashes,check_messages_menu,check_wrong_frame
 from tools.run_noki8850_pin_registration import check_pin_inputs
 from tools.noki8850_staged_trace_check import check_trace
 from tools.radio_registration_trace_check import verify as registration
@@ -33,9 +33,12 @@ PIN2_FRAMES={
 }
 
 
-def check_frames(directory):
+def check_frames(directory,rejected=False):
     from PIL import Image
     for label,digest in PIN2_FRAMES.items():
+        if rejected and label=='result':
+            check_wrong_frame(directory/f'8850_pin2_{label}.png')
+            continue
         with Image.open(directory/f'8850_pin2_{label}.png') as image:
             if image.size!=(84,48) or hashlib.sha256(image.convert('L').tobytes()).hexdigest()!=digest:
                 raise ValueError('8850 PIN2 pixels differ: '+label)
@@ -50,23 +53,29 @@ def registered_card(pin2):
     return bytes(card)
 
 
-def check_phase(text,initial,final,reverse=False):
+def check_phase(text,initial,final,reverse=False,*,rejected=False,prior_rejection=False):
     old,new=('2468','5678') if reverse else ('5678','2468')
-    if initial!=(registered_card(old) if reverse else make_profile(True)) or final!=registered_card(new):
+    if rejected and (reverse or prior_rejection):
+        raise ValueError('rejected PIN2 fixture must start independently')
+    expected_initial=bytearray(registered_card(old) if reverse or prior_rejection else make_profile(True))
+    expected_final=bytearray(registered_card(old if rejected else new))
+    if prior_rejection:expected_initial[3517]=2
+    if rejected:expected_final[3517]=2
+    if initial!=bytes(expected_initial) or final!=bytes(expected_final):
         raise ValueError('8850 PIN2 phase changed unexpected card bytes or lost the replacement PIN')
-    if statuses(text,0x20)!=[(0x9000,3,10)] or statuses(text,0x24,chv=2)!=[(0x9000,3,10)]:
-        raise ValueError('8850 requires one startup PIN1 VERIFY and one accepted PIN2 CHANGE')
+    if statuses(text,0x20)!=[(0x9000,3,10)] or statuses(text,0x24,chv=2)!=[(0x9804,2,10) if rejected else (0x9000,3,10)]:
+        raise ValueError('8850 requires one startup PIN1 VERIFY and its exact PIN2 CHANGE result')
     if re.findall(r'header cla=a0 ins=24 p1=00 p2=(\w\w) p3=10',text)!=['02']:
         raise ValueError('8850 CHANGE must address CHV2 exactly once')
     if any(statuses(text,ins) for ins in (4,0x26,0x28,0x2c,0x44,0xdc)):
         raise ValueError('8850 PIN2 change unexpectedly altered other card configuration or records')
     keys=['Menu']+['Scroll Down']*3+['Menu']+['Scroll Down']*5+['Menu']+['Scroll Down']*5+['Menu']+['Scroll Down']*2+['Menu']
-    for digits in (old,new,new):keys += ['Keypad '+digit for digit in digits]+['Menu']
+    for digits in ('9999' if rejected else old,new,new):keys += ['Keypad '+digit for digit in digits]+['Menu']
     contacts(text,'8850_pin2',[(24+i,key) for i,key in enumerate(keys)]+[(62,'End'),(63,'Menu')])
     check_pin_inputs(text)
-    registration(text,'nsm2',preserved=reverse)
+    registration(text,'nsm2',preserved=reverse or prior_rejection)
     require_ordered(text,[('confirm',r'8850_pin2: key=Menu state=1 t=58\.'),
-        ('changed',r'SIM status ins=24 sw=9000'),
+        ('result',rf'SIM status ins=24 sw={"9804" if rejected else "9000"}'),
         ('Menu',r'8850_pin2: key=Menu state=1 t=63\.'),
         ('complete',r'8850_pin2: complete=1 firmware_state_forcing=0')],'8850 PIN2 change')
 
@@ -74,6 +83,7 @@ def check_phase(text,initial,final,reverse=False):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
+    parser.add_argument('--reject-first',action='store_true',help='consume one PIN2 retry with a wrong old PIN before cold recovery')
     args=parser.parse_args()
     root=Path(__file__).resolve().parents[1]
     try:
@@ -84,7 +94,9 @@ def main():
         run.mkdir(parents=True,exist_ok=False)
         previous=None
         launches=[]
-        for name,script in (('change','pin2_change'),('cold_restore','pin2_restore')):
+        phases=(('change','pin2_change'),('cold_restore','pin2_restore'))
+        if args.reject_first:phases=(('reject','pin2_wrong'),*phases)
+        for name,script in phases:
             phase=run/name
             phase.mkdir()
             predecessor=storage_hashes(previous/'nvram') if previous else None
@@ -117,13 +129,15 @@ def main():
             text=(phase/'error.log').read_text(errors='replace')
             errors=check_trace(text,runtime_hle=True,sim_reads=True)
             if errors:raise ValueError('; '.join(errors))
-            check_phase(text,initial,card.read_bytes(),bool(previous))
-            check_frames(phase/'snap')
+            check_phase(text,initial,card.read_bytes(),name=='cold_restore',
+                        rejected=name=='reject',prior_rejection=args.reject_first and name=='change')
+            check_frames(phase/'snap',rejected=name=='reject')
             if previous and storage_hashes(previous/'nvram')!=predecessor:
                 raise ValueError('8850 cold PIN2 phase mutated predecessor NVRAM')
             launches.append(launch)
             previous=phase
         (run/'acceptance.json').write_text(json.dumps({'phases':launches,
+            'rejected_change_recovery':args.reject_first,
             'research_hle':True,'native_speech':False},indent=2)+'\n')
     except (ValueError,RuntimeError,OSError,subprocess.SubprocessError) as error:
         parser.exit(1,f'8850 PIN2 change FAIL: {error}\n')

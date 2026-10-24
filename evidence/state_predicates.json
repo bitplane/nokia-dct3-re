@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm2_pin2_rejected_change_cold_recovery", "owner": "nsm2_sim_security", "status": "satisfied",
+      "predicate": "A rejected physical 8850 PIN2 CHANGE preserves the old PIN and consumes one retry, which a cold accepted change restores",
+      "current": "The three-process --reject-first chain physically proposes old9999/new2468/confirmation and requires exactly one CHV2 CHANGE9804, PIN2 retries3-to2 and the reviewed Code error frame. Complete card equality retains5678 and all unrelated fields. A cold process inherits all NVRAM, uses5678 to install2468 through CHANGE9000 and restores retries3. Another cold process uses2468 to restore5678. Every leg requires startup PIN1 authentication, own staged uploads/exclusive HLE, physical contacts, editor/result/Message-title pixels and ordinary/preserved registration. Whole-card comparison and predecessor immutability prevent credential reseeding or unrelated changes. This is one rejected CHANGE and recovery, not PIN2 exhaustion, PUK2, FDN, native DSP/RF or speech.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/run_noki8850_pin2_change.py", "tools/noki8850_pin2_wrong.lua", "tools/noki8850_pin2_change.lua", "tools/noki8850_pin2_restore.lua", "tools/test_noki8850_pin2_change.py"]
+    },
+    {
       "id": "nsm2_pin2_change_cold_use", "owner": "nsm2_sim_security", "status": "satisfied",
       "predicate": "Physical 8850 PIN2 replacement persists through a complete-NVRAM cold boot and the new credential authorizes a second change",
       "current": "Two independently launched own-MCU/PMM processes authenticate PIN1 and the phone code, physically navigate Change PIN2 code and confirm5678-to2468 followed by cold2468-to5678. Each requires one accepted selector02 CHANGE CHV and one startup PIN1 VERIFY, forbids other credential/configuration/record mutations and compares the complete card with the expected PIN2/location state. All retry/PUK allowances and unrelated card bytes remain unchanged. Exact current/new/confirmation/PIN2 code changed frames and the shared stable Messages title oracle validate responsive physical UI. Own staged uploads/exclusive HLE, ordinary/preserved registration, complete predecessor NVRAM inheritance and predecessor immutability remain required. This is successful PIN2 change/cold use, not rejection, exhaustion, PUK2, FDN, native DSP/RF or speech.",

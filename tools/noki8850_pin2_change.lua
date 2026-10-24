@@ -29,6 +29,7 @@ local input=coroutine.create(function()
     for i=1,2 do press('Scroll Down','code_'..i) end
     press('Menu','current_pin2')
     local old=_G.nsm2_pin2_reverse and {2,4,6,8} or {5,6,7,8}
+    if _G.nsm2_pin2_wrong then old={9,9,9,9} end
     local new=_G.nsm2_pin2_reverse and {5,6,7,8} or {2,4,6,8}
     for group,digits in ipairs({old,new,new}) do
         for index,digit in ipairs(digits) do press('Keypad '..digit,'digits_'..group..'_'..index) end

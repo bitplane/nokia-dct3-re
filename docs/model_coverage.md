@@ -121,8 +121,11 @@ returns to the reviewed SIM card rejected frame after physical input/End.
 PIN2 credential change and cold replacement-credential use are independently
 qualified by `run_noki8850_pin2_change.py`: physical5678-to2468 change,
 complete-NVRAM cold boot, then2468-to5678 change, exact card/editor/result
-checks and responsive Messages menu. PIN2 retry/exhaustion, PUK2 and FDN
-are not promoted.
+checks and responsive Messages menu. The independent `--reject-first` chain
+also qualifies one physical wrong-old-PIN2 CHANGE, exactly one persistent
+retry consumed without changing the PIN, cold recovery with the unchanged
+credential and subsequent cold replacement-credential use. PIN2 exhaustion,
+PUK2 and FDN are not promoted.
 
 NPE-3 additionally has an independent handset-bank A/123 save/cold-read
 fixture with an empty-bank negative control and unchanged complete SIM files;

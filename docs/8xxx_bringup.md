@@ -2088,6 +2088,18 @@ Capture: `tmp/nsm2-pin2-change-final`. This proves cold use of the replacement
 credential, not merely a serialized edit; it does not establish rejected
 PIN2 changes, PIN2 exhaustion/PUK2 recovery, FDN or native DSP/speech.
 
+Its independent `--reject-first` variant adds a fresh first process that
+physically enters old PIN2=9999 and confirms proposed2468 twice. Exactly one
+CHV2 CHANGE must return `9804`, consume one PIN2 retry (3 to2), preserve5678
+and render the existing **Code error** oracle. Complete card equality rejects
+premature installation of2468 or unrelated changes. The next cold process
+inherits all NVRAM, uses the unchanged5678 to install2468 and restores the
+PIN2 allowance to3. A final cold process uses2468 to change back to5678.
+Every leg retains its physical/editor/result/menu, own upload/HLE and
+ordinary/preserved registration checks. Capture:
+`tmp/nsm2-pin2-rejection-final`. This qualifies one rejected CHANGE and durable
+retry recovery, not PIN2 exhaustion, PUK2 or FDN.
+
 The same isolated runner accepts `--scenario host-incoming-call`. It verifies
 physical answer/end input, the complete host-originated CC/RR exchange,
 traffic-channel assignment and release, and reviewed ringing/returned-idle
