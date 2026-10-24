@@ -55,8 +55,7 @@ class HostUssdTest(unittest.TestCase):
 
 
 class NetworkRequestTest(unittest.TestCase):
-    def test_reply_contract_and_rejected_variants(self):
-        from tools.noki8850_host_ussd_check import verify_network_request
+    def capture(self):
         text, card = HostUssdTest().capture()
         text = text[:text.index('gsm_ss: network_initiated')]
         text += 'network_initiated operation=request transaction=0b invoke=1 dcs=0f\n'
@@ -71,6 +70,11 @@ class NetworkRequestTest(unittest.TestCase):
             for state, fraction in [(1, '000000000'), (0, '200000000')]:
                 text += f'8850_host_ussd_input: key={key} state={state} t={second}.{fraction}\n'
         text += '8850_host_ussd: complete'
+        return text, card
+
+    def test_reply_contract_and_rejected_variants(self):
+        from tools.noki8850_host_ussd_check import verify_network_request
+        text, card = self.capture()
         verify_network_request(text, card)
         for old, new in [('data=32', 'data=33'), ('phase=answered', 'phase=delivered'),
                          ('key=Keypad 2 state=0', 'key=Menu state=0'),
@@ -78,6 +82,28 @@ class NetworkRequestTest(unittest.TestCase):
                          ('SIM status ins=20 sw=9000', 'SIM status ins=20 sw=9804')]:
             with self.subTest(old=old), self.assertRaises(ValueError):
                 verify_network_request(text.replace(old, new), card)
+
+    def test_pending_request_architecture_and_epoch(self):
+        from tools.noki8850_host_ussd_check import verify_network_request
+        text, card = self.capture()
+        cpu = ','.join(['00000000'] * 37)
+        snapshot = f'pc=00000000 sp=00000000 ram=12345678 cpu={cpu} t=33.000000000'
+        boundary = '\n'.join((
+            '8850_network_ussd_state: event=saved ' + snapshot,
+            '8850_network_ussd_state: event=restored ' + snapshot,
+            'state_roundtrip: result=pass scenario=nsm2_network_ussd requested_at=33.000000000 t=33.000000000',
+            'incoming ussd state id=1 epoch=2 phase=queued', ''))
+        text = text.replace('8850_host_ussd_input: key=Menu state=1 t=35.',
+                            boundary + '8850_host_ussd_input: key=Menu state=1 t=35.', 1)
+        text = text.replace('reply id=1 epoch=1', 'reply id=1 epoch=2')
+        text = text.replace('epoch=1 phase=answered', 'epoch=2 phase=answered')
+        verify_network_request(text, card, restored=True)
+        for old, new in [('epoch=2 phase=queued', 'epoch=1 phase=queued'),
+                         ('event=restored pc=00000000', 'event=restored pc=00000001'),
+                         ('requested_at=33.', 'requested_at=34.'),
+                         ('cpu=' + cpu, 'cpu=' + ','.join(['00000000'] * 36))]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_network_request(text.replace(old, new), card, restored=True)
 
 
 class OutgoingHostUssdTest(unittest.TestCase):

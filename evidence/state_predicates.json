@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm2_pending_network_ussd_restoration",
+      "owner": "nsm2_host_supplementary_services",
+      "status": "satisfied",
+      "predicate": "Own authenticated 8850 restores a pending network-originated USSD request with exact architecture and a correlated physical epoch2 reply",
+      "current": "The fresh fixture saves at33s after request delivery but before Read/Answer. All37 ARM/banked registers, PC/SP, RAM digest and emulated time match; the adapter republishes queued ID1 under epoch2. Physical Read/Answer/2/Send returns one exact nonempty DCS0f/data32 result, releases RR and reaches answered. Reviewed prompt/editor/Done/Messages recovery and complete registered SIM bytes pass. Wrong epoch, truncated registers, changed architectural state and inconsistent roundtrip times reject. The shared physical replay handles cancelled host waits without handset-state writes. This is one restored HLE transaction, not equal external traffic, multi-turn dialogue or native DSP speech.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/noki8850_host_ussd_network_restore.lua", "tools/noki8850_host_ussd_notify.lua", "tools/noki8850_host_ussd_check.py", "tools/test_noki8850_host_ussd_check.py", "tools/run_noki8850_pin_registration.py", "gates.json"]
+    },
+    {
       "id": "nsm2_host_originated_ussd_physical_reply",
       "owner": "nsm2_host_supplementary_services",
       "status": "satisfied",

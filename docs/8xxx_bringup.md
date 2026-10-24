@@ -2452,6 +2452,16 @@ an empty result on End rather than the intended reply. No handset state is
 injected. This qualifies one request/reply, not a multi-turn session or native
 DSP/radio execution.
 
+`verify-8850-pin-host-ussd-network-restore` saves that pending handset
+request at33s, before any Read/Answer input, and restores all37 ARM/banked
+registers, PC/SP, mapped RAM digest and emulated time exactly. The adapter
+republishes queued request1 under epoch2; only the restored branch receives
+the physical reply. One admission, queued epochs1/2 and one epoch2 nonempty
+reply/answered state are required. The same reviewed prompt/editor/Done/menu
+images, released contacts and whole-card invariants apply. This preserves
+an in-flight network-originated transaction, not external packet replay or
+multi-turn-session acceptance.
+
 `verify-8850-pin-host-outgoing-ussd` independently covers physical `*123#`
 and Send on the same authenticated own-PMM composition. The host rejects a
 wrong request identity before accepting the matching response; the handset

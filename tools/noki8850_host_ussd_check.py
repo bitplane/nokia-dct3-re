@@ -57,13 +57,15 @@ def verify(text, card):
     check_card(after, card)
 
 
-def verify_network_request(text, card):
+def verify_network_request(text, card, *, restored=False):
     if '[LUA ERROR]' in text or text.count('8850_host_ussd: complete') != 1:
         raise ValueError('network request input fixture failed')
     admissions = re.findall(r'incoming ussd id=1 result=accepted t=([0-9.]+)', text)
     if len(admissions) != 1 or not 30 <= float(admissions[0]) < 31:
         raise ValueError('network request must follow settled authentication once')
-    if re.findall(r'incoming ussd state id=1 epoch=(\d+) phase=(\w+)', text) != [('1', 'queued'), ('1', 'answered')]:
+    epoch = '2' if restored else '1'
+    phases = [('1', 'queued'), ('2', 'queued'), ('2', 'answered')] if restored else [('1', 'queued'), ('1', 'answered')]
+    if re.findall(r'incoming ussd state id=1 epoch=(\d+) phase=(\w+)', text) != phases:
         raise ValueError('network request identity/phase lifecycle differs')
     if text.count('network_initiated operation=request ') != 1:
         raise ValueError('expected exactly one network request')
@@ -82,13 +84,22 @@ def verify_network_request(text, card):
           for key, second in contacts[:4]],
         ('result', r'network_initiated handset_response message=3a length=21 data=8b3a12a210020101300b02013c300604010f040132'),
         ('release', r'LAPDm service Channel Release acknowledged'),
-        ('reply', r'incoming ussd reply id=1 epoch=1 dcs=0f data=32 empty=0'),
-        ('answered', r'incoming ussd state id=1 epoch=1 phase=answered'),
+        ('reply', rf'incoming ussd reply id=1 epoch={epoch} dcs=0f data=32 empty=0'),
+        ('answered', rf'incoming ussd state id=1 epoch={epoch} phase=answered'),
         ('recovery', r'8850_host_ussd_input: key=Menu state=0 t=47\.200000000'),
     ), '8850 network request')
     if text.count('incoming ussd reply ') != 1:
         raise ValueError('duplicate network request reply')
     check_card(text.split('incoming ussd id=1 result=accepted', 1)[1], card)
+    if restored:
+        check_restoration(text, prefix='8850_network_ussd_state', scenario='nsm2_network_ussd')
+        require_ordered(text, (
+            ('request', r'network_initiated operation=request'),
+            ('save', r'8850_network_ussd_state: event=saved'),
+            ('restore', r'8850_network_ussd_state: event=restored'),
+            ('republication', r'incoming ussd state id=1 epoch=2 phase=queued'),
+            ('physical Read', r'8850_host_ussd_input: key=Menu state=1 t=35\.'),
+        ), '8850 pending network request')
 
 
 def check_network_request_frames(directory):
@@ -138,12 +149,12 @@ def verify_outgoing(text, card, *, restored=False):
     check_card(text.split('gsm_ss: request=ussd_host id=1', 1)[1], card)
 
 
-def check_restoration(text):
-    if '8850_ussd_state: FAIL' in text or 'state_roundtrip: result=pass scenario=nsm2_ussd ' not in text:
+def check_restoration(text, *, prefix='8850_ussd_state', scenario='nsm2_ussd'):
+    if f'{prefix}: FAIL' in text or f'state_roundtrip: result=pass scenario={scenario} ' not in text:
         raise ValueError('pending USSD restoration did not complete')
-    rows = re.findall(r'8850_ussd_state: event=(saved|restored) pc=([0-9a-f]{8}) '
+    rows = re.findall(re.escape(prefix) + r': event=(saved|restored) pc=([0-9a-f]{8}) '
                       r'sp=([0-9a-f]{8}) ram=([0-9a-f]{8}) cpu=([0-9a-f,]+) t=([0-9.]+)', text)
-    if (text.count('8850_ussd_state: event=') != 2 or len(rows) != 2 or
+    if (text.count(f'{prefix}: event=') != 2 or len(rows) != 2 or
             [row[0] for row in rows] != ['saved', 'restored'] or rows[0][1:] != rows[1][1:]):
         raise ValueError('CPU/RAM/time restoration differs')
     for row in rows:
@@ -152,11 +163,12 @@ def check_restoration(text):
         registers = row[4].split(',')
         if row[1] != registers[15] or row[2] != registers[13]:
             raise ValueError('PC/SP snapshot disagrees with register inventory')
-    roundtrips = re.findall(r'state_roundtrip: result=pass scenario=nsm2_ussd requested_at=([0-9.]+) t=([0-9.]+)', text)
+    roundtrips = re.findall(r'state_roundtrip: result=pass scenario=' + re.escape(scenario) + r' requested_at=([0-9.]+) t=([0-9.]+)', text)
     if roundtrips != [(rows[0][5], rows[1][5])]:
         raise ValueError('restoration marker disagrees with architectural timeline')
-    before = text.split('8850_ussd_state: event=restored', 1)[0]
-    if ('ussd response id=' in before or 'GSM service downlink kind=27 sapi=0 pd=0b' in before):
+    before = text.split(f'{prefix}: event=restored', 1)[0]
+    if ('ussd response id=' in before or 'incoming ussd reply ' in before or
+            'GSM service downlink kind=27 sapi=0 pd=0b' in before):
         raise ValueError('host answered or released before pending restoration')
 
 
