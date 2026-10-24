@@ -18,3 +18,11 @@ _G.nsk1_nv_source = space:install_read_tap(0x28ee2c,0x28ee2f,'nsk1_nv_source',fu
     machine:logerror(string.format('nsk1_nv_source: address=%04x pointer=%08x length=%d caller=%08x data=%s t=%.9f observer_writes=0\n',
         address,pointer,length,cpu.state.R14.value,table.concat(data),machine.time:as_double()))
 end)
+-- Empty input sets only the encoded length; the fixed-width record copy can
+-- subsequently persist unused stack padding. Observe input, never initialize it.
+_G.nsk1_nv_encode = space:install_read_tap(0x285a98,0x285a9b,'nsk1_nv_encode',function()
+    if cpu.state.R15.value ~= 0x285a98 or cpu.state.R14.value ~= 0x249c51 then return end
+    machine:logerror(string.format('nsk1_nv_encode: source=%08x first=%02x output=%08x lr=%08x t=%.9f observer_writes=0\n',
+        cpu.state.R0.value,space:read_u8(cpu.state.R0.value),cpu.state.R1.value,
+        cpu.state.R14.value,machine.time:as_double()))
+end)

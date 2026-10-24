@@ -198,9 +198,10 @@ complete storage. This is bounded restoration, not long-run acceptance.
 
 The5130's separate Phase-2+ Toolkit probe reaches FETCH but automatically
 refuses DISPLAY TEXT with result30. Its matched Phase-2 control preserves
-EEPROM; the Phase-2+ probe rewrites108 bytes in record-shaped spans. This is
-a recorded unresolved storage-integrity boundary, not Toolkit display support
-or harmless housekeeping. The complete transition is retained and checked.
+EEPROM; the Phase-2+ probe rewrites108 bytes of unused empty-digit-field
+padding. Passive input/write observations and the length-driven decoder
+explain those bytes, not general storage integrity or Toolkit display support.
+The complete transition remains checked; the update's lifecycle trigger is open.
 
 The7110 v5.01 checksum-consistency fixture is separate from its intact-input
 row: changing only the latest journal checksum byte releases the second task

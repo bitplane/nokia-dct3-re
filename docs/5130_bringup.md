@@ -107,9 +107,9 @@ entire EEPROM is unchanged; the Phase-2+ run changes108 bytes while retaining
 the complete card and executable flash. The differences occupy18 repeated
 33-byte spans beginning0550, changing positions1..3 and5..7 in each span.
 Own descriptors at2a89fc/2a8a04/2a8a0c map0728/0729/072a to0550/0658/06fd,
-each with declared length33. This is record geometry, not an assigned meaning
-or proof of a hardware fault. The new bytes include executable-looking
-values; their provenance and whether the input records were valid remain open.
+each with declared length33. This is record geometry, not proof of a hardware
+fault. The changed executable-looking bytes are explained below as unused
+padding in an empty encoded digit field; broader record semantics remain open.
 The Phase-2+ output bank SHA256 is
 `1bcc40818ee276be75f40554240f5f2e5a94da8a2e85af0e9537ef9a1bc2ee0d`.
 The checker protects that whole observed transition but explicitly returns
@@ -150,8 +150,36 @@ the source comparison:
 .venv/bin/python tools/nsk1_nv_source_check.py tmp/nsk1-toolkit-nv-source
 ```
 
-Next, recover who fills10ce38 and the read/default handling for0728..072a;
-do not erase records or alter timing merely to remove the observed changes.
+A second74s capture (`tmp/nsk1-toolkit-nv-encode`) identifies the buffer
+producer. For each of18 writes,285a98 receives an empty string at10ce88
+and output10ce28, called from249c51. Its zero-input path stores only a zero
+length byte then returns; it does not initialize the trailing15 bytes.
+At249c82..249c8c two LDM/STM pairs copy16 bytes from SP+4 to SP+14
+(10ce38). The observed249c88 stores copy00290951/0028bb2a from the stack,
+not SIM payload. Record requests from249cb5 enumerate0728 indices0..7,
+0729 indices0..4 and072a indices0..4.
+
+The corresponding reader249938 copies the field and calls285a44 at249992.
+That decoder tests the leading length and emits an empty string without
+reading payload when it is zero. All108 changed bytes lie in that unused
+payload; both initial and final lengths are zero, and all other bytes retain
+the previously checked whole-bank transition. Thus this specific byte drift
+is firmware-persisted empty-field padding, not demonstrated EEPROM corruption.
+This is not a general validity claim for the original records or every reader.
+The checker still requires the complete observed bank; no region is exempted
+from the product storage guard and `eeprom_integrity_validated` remains false.
+
+```sh
+.venv/bin/python tools/nsk1_toolkit_check.py \
+  tmp/nsk1-diagnostic-display-cold tmp/nsk1-toolkit-nv-encode
+.venv/bin/python tools/nsk1_nv_source_check.py \
+  tmp/nsk1-toolkit-nv-encode --empty-encoding
+```
+
+The remaining lifecycle question is why Phase-2+ invokes these empty-field
+record updates while the matched Phase-2 run does not. Trace callers of249c2c
+before assigning reset/refresh semantics; do not erase records or alter timing
+merely to make the byte difference disappear.
 Normal-machine, fitted-mask, RF and speech claims are unchanged.
 
 Physical manual network-search initiation also passes from independently
