@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 from tools import nsm1_toolkit_check as checker
 from tools.sim_toolkit_display_check import DISPLAY, RESPONSE
-from tools.sim_toolkit_interactive_check import INKEY,INPUT,INKEY_RESPONSE,INPUT_RESPONSE
+from tools.sim_toolkit_interactive_check import INKEY,INPUT,INKEY_RESPONSE,INPUT_RESPONSE,MENU,MENU_RESPONSE
 from tools.test_nsm1_native_state_check import trace as startup
 
 
@@ -47,7 +47,43 @@ def interactive_trace():
     return text
 
 
+def menu_trace(item=1):
+    text=interactive_trace().replace('SIM status ins=14 sw=9000','SIM status ins=14 sw=9128')
+    text+='\n'+wire('TX',bytes.fromhex('a012000028'))+'\n'+wire('RX',MENU+b'\x90\x00')
+    text+='\n'+wire('TX',bytes.fromhex('a01400000c')+MENU_RESPONSE)
+    text+='\nSIM status ins=14 sw=9000 chv=3/3 puk=10/10 enabled=1'
+    for action in ('main','up1','open')+(('next',) if item==2 else ())+('select',):
+        for down in (1,0):
+            text+=f'\nnsm1_toolkit_menu: action={action} down={down}'
+    text+='\n'+wire('TX',bytes.fromhex('a0c2000009d307020201811001')+bytes((item,)))
+    text+='\nSIM status ins=c2 sw=9000 chv=3/3 puk=10/10 enabled=1'
+    return text
+
+
 class Nsm1ToolkitTest(unittest.TestCase):
+    def test_menu_envelope_requires_installation_and_physical_choice(self):
+        for item in (1,2):
+            text=menu_trace(item)
+            checker.check_trace(text,menu_item=item)
+            envelope=wire('TX',bytes.fromhex('a0c2000009d307020201811001')+bytes((item,)))
+            early=text.replace(envelope,'').replace('nsm1_toolkit_menu: action=select down=1',
+                        envelope+'\nnsm1_toolkit_menu: action=select down=1')
+            for bad in (early,text.replace('ins=c2 sw=9000','ins=c2 sw=6a80'),
+                        text.replace('action=select','action=wrong'),
+                        text.replace('ins=14 sw=9128','ins=14 sw=9000'),
+                        text+'\nnsm1_toolkit_menu: malformed'):
+                with self.assertRaises(ValueError):
+                    checker.check_trace(bad,menu_item=item)
+            with self.assertRaises(ValueError):
+                checker.check_trace(text,menu_item=3-item)
+            with self.assertRaises(ValueError):
+                checker.check_trace(text,interactive=True)
+        for bad in (0,3,-1):
+            with self.assertRaises(ValueError):
+                checker.profile_for(menu_item=bad)
+        with self.assertRaises(ValueError):
+            checker.profile_for(control=True,menu_item=1)
+
     def test_interactive_values_and_order_not_inferred_from_display(self):
         text=interactive_trace()
         checker.check_trace(text,interactive=True)
@@ -78,6 +114,12 @@ class Nsm1ToolkitTest(unittest.TestCase):
             (run/'cfg/nsm1r4t.cfg').write_text(template.format(
                 '<port tag=":SATCFG" type="CONFIG" mask="15" defvalue="0" value="3"/>'))
             checker.check_configuration(seed,run,interactive=True)
+            path=run/'cfg/nsm1r4t.cfg'
+            path.write_text(path.read_text().replace('value="3"','value="4"'))
+            for item in (1,2):
+                checker.check_configuration(seed,run,menu_item=item)
+            with self.assertRaises(ValueError):
+                checker.check_configuration(seed,run,interactive=True)
             with self.assertRaises(ValueError):
                 checker.check_configuration(seed,run)
             with self.assertRaises(ValueError):

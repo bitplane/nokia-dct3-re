@@ -80,7 +80,39 @@ Add `--mame mame/mame` with a fresh output directory to execute. Shared
 `sim_toolkit_interactive_check.py` owns the lab command grammar; NSM-1 retains
 its own profile, contacts, provisioning and pixel/storage requirements.
 This qualifies these two input commands on the declared native compatibility
-composition, not installed-menu, timer, RF, speech or fitted-mask fidelity.
+composition, not timer, RF, speech or fitted-mask fidelity. Installed-menu
+selection has the separate contract below.
+
+### Installed Toolkit menu selection
+
+External profile4 appends the40-byte SET UP MENU command, installing
+`DCT3 menu` with Continue/Exit after the three text/input commands. The same
+own terminal profile and physical input sequence apply, but GET INPUT's
+terminal response now receives9128, followed by FETCH40 and a successful
+menu-installation response `810304250002028281030100` accepted with9000.
+
+The own UI remains at idle after installation. Physical Menu80 enters the
+main menu; Up81 selects DCT3 menu and Menu84 opens its two-item list. Continue
+confirmation at86s sends envelope `d30702020181100101`; a separate cold run
+presses Down86 and confirms Exit88, sending `d30702020181100102`. Both are
+accepted with9000 and neither envelope precedes the physical selection.
+Reviewed heading/list/selected-item frames and exact envelopes distinguish
+these two outcomes. All complete persistent handset/card storage is unchanged.
+No production firmware input or menu state is injected.
+
+```sh
+.venv/bin/python tools/nsm1_toolkit_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-toolkit-menu-continue-accepted --menu-item 1
+.venv/bin/python tools/nsm1_toolkit_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-toolkit-menu-exit-accepted --menu-item 2
+```
+
+Both90s runs show **Wait** after the ACK-only selection. This qualifies
+installation, physical navigation and selection envelopes, not automatic
+return to the application menu. A real follow-up proactive command is a
+separate card/application contract; do not synthesize a firmware completion
+to clear this frame. Add `--mame mame/mame` with fresh outputs to execute.
+All existing provisioning, native-mask, RF and speech limitations remain.
 
 ### Native idle restoration and physical continuation
 

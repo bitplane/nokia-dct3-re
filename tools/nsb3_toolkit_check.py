@@ -16,12 +16,10 @@ from tools.nsb3_nominal_input import IMAGE_SHA256
 from tools.nsk1_phonebook_roundtrip import frame_check
 from tools.sim_security_trace_check import statuses
 from tools.nsb3_toolkit_prepare import profile_metadata
-from tools.sim_toolkit_interactive_check import INKEY, INPUT, INKEY_RESPONSE, INPUT_RESPONSE
+from tools.sim_toolkit_interactive_check import INKEY, INPUT, INKEY_RESPONSE, INPUT_RESPONSE, MENU, MENU_RESPONSE
 
 DISPLAY = bytes.fromhex('d0148103012180820281028d0904') + b'DCT3 SAT'
 RESPONSE = bytes.fromhex('810301218002028281030100')
-MENU = bytes.fromhex('d0268103042500820281828509') + b'DCT3 menu' + bytes.fromhex('8f0901') + b'Continue' + bytes.fromhex('8f0502') + b'Exit'
-MENU_RESPONSE = bytes.fromhex('810304250002028281030100')
 SELECT_ITEM = bytes.fromhex('d0208103072400820281828506') + b'Choose' + bytes.fromhex('8f0601') + b'Alpha' + bytes.fromhex('8f0502') + b'Beta'
 ITEM_RESPONSE = bytes.fromhex('810307240002028281030100100102')
 TIMER = bytes.fromhex('d01181030f270082028182a40101a503000005')

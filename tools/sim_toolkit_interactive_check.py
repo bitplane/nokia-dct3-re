@@ -11,27 +11,41 @@ INKEY = bytes.fromhex('d0138103022200820281828d0804') + b'Press 5'
 INPUT = bytes.fromhex('d0188103032300820281828d0904') + b'Enter 42' + bytes.fromhex('91020102')
 INKEY_RESPONSE = bytes.fromhex('8103022200020282810301000d020435')
 INPUT_RESPONSE = bytes.fromhex('8103032300020282810301000d03043432')
+MENU = bytes.fromhex('d0268103042500820281828509') + b'DCT3 menu' + bytes.fromhex('8f0901') + b'Continue' + bytes.fromhex('8f0502') + b'Exit'
+MENU_RESPONSE = bytes.fromhex('810304250002028281030100')
 
 
-def check_interactive(text, *, prefix, terminal_profile, reset_markers=()):
+def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_item=None):
+    if menu_item not in (None,1,2):
+        raise ValueError('unknown installed-menu item')
     if any(marker in text for marker in (*reset_markers,'LUA ERROR','Error in')):
         raise ValueError('reset or failed observer')
     if re.search(r'illegal instruction|unimplemented|unsupported|unhandled|fatal',text,re.I):
         raise ValueError('execution failed')
     tx,rx = wire(text,'TX',prefix),wire(text,'RX',prefix)
     commands = list(apdus(tx))
-    if any(row[0] not in (0xa4,0x20,0xb0,0xb2,0xc0,0xf2,0x10,0x12,0x14) for row in commands):
+    allowed=(0xa4,0x20,0xb0,0xb2,0xc0,0xf2,0x10,0x12,0x14)
+    if any(row[0] not in allowed+((0xc2,) if menu_item is not None else ()) for row in commands):
         raise ValueError('unrelated SIM operation')
     expected = [(0x10,0,0,len(terminal_profile),terminal_profile)]
-    for payload,response in ((DISPLAY,RESPONSE),(INKEY,INKEY_RESPONSE),(INPUT,INPUT_RESPONSE)):
+    exchanges=[(DISPLAY,RESPONSE),(INKEY,INKEY_RESPONSE),(INPUT,INPUT_RESPONSE)]
+    if menu_item is not None:
+        exchanges.append((MENU,MENU_RESPONSE))
+    for payload,response in exchanges:
         expected += [(0x12,0,0,len(payload),b''),(0x14,0,0,len(response),response)]
         if rx.count(payload+b'\x90\x00') != 1:
             raise ValueError('missing unique card command payload')
-    if [row[:5] for row in commands if row[0] in (0x10,0x12,0x14)] != expected:
+    if menu_item is not None:
+        expected.append((0xc2,0,0,9,bytes.fromhex('d307020201811001')+bytes((menu_item,))))
+    if [row[:5] for row in commands if row[0] in (0x10,0x12,0x14,0xc2)] != expected:
         raise ValueError('interactive profile/FETCH/response sequence differs')
     if 'read-binary fid=6fae offset=0 length=1 first=03' not in text or text.count('SIM completion ins=f2 sw=9116') != 1:
         raise ValueError('Phase-2+ pending command differs')
-    if statuses(text,0x10) != [(0x9000,3,10)] or statuses(text,0x14) != [(0x9115,3,10),(0x911a,3,10),(0x9000,3,10)]:
+    results=[(0x9115,3,10),(0x911a,3,10),(0x9000,3,10)]
+    if menu_item is not None:
+        results[-1:]=[(0x9128,3,10),(0x9000,3,10)]
+    if (statuses(text,0x10) != [(0x9000,3,10)] or statuses(text,0x14) != results
+            or statuses(text,0xc2) != ([(0x9000,3,10)] if menu_item is not None else [])):
         raise ValueError('interactive response status differs')
     marker = prefix+'_toolkit_physical: action=dismiss'
     if re.findall(re.escape(marker)+r' down=([01]) t=([0-9.]+)',text) != [('1','68.000000000'),('0','68.200000000')]:
@@ -54,3 +68,12 @@ def check_interactive(text, *, prefix, terminal_profile, reset_markers=()):
             raise ValueError('response precedes physical input/confirmation')
         if payload+b'\x90\x00' not in wire(before,'RX',prefix):
             raise ValueError('physical input precedes card command')
+    if menu_item is not None:
+        selection=prefix+'_toolkit_menu: action=select down=1'
+        if text.count(selection) != 1:
+            raise ValueError('missing unique physical menu selection')
+        before=text.split(selection,1)[0]
+        if any(row[0]==0xc2 for row in apdus(wire(before,'TX',prefix))):
+            raise ValueError('menu envelope precedes physical selection')
+        if MENU+b'\x90\x00' not in wire(before,'RX',prefix) or len(statuses(before,0x14)) != 4:
+            raise ValueError('menu installation incomplete before selection')

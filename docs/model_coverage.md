@@ -226,8 +226,11 @@ with own terminal profile0b41ff7700, exact prompt/idle pixels and successful
 response after physical dismissal. Its matched Phase-2 control has no proactive
 traffic and opens Messages on that same contact. A separate profile3 run
 also returns physical GET INKEY5 and GET INPUT42, with reviewed empty/filled
-editor pixels and clean idle return. Whole storage is unchanged in all three
-fixtures; other Toolkit commands and radio support are not qualified.
+editor pixels and clean idle return. Profile4 independently installs DCT3 menu;
+physical Continue/Exit produce distinct accepted item-1/item-2 envelopes.
+ACK-only selection leaves Wait, so automatic menu return is not qualified.
+Whole storage is unchanged across these fixtures; other Toolkit commands
+and radio support are not qualified.
 
 The6150 native165s repeated-scan result is explicitly template-policy-dependent:
 record0607 reads EEPROM03ca=00 from the unchanged repair template, suppressing

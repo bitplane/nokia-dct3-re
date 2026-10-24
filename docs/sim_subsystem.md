@@ -553,6 +553,10 @@ responses and return to its own clean idle frame. Full persistent card,
 EEPROM and flash are unchanged. This is not inferred from the6190's support;
 the common lab command bytes/validator are shared while product inputs and
 acceptance remain separate (`nsm1_toolkit_check.py --interactive`).
+Separate6150 profile4 runs also install DCT3 menu and physically select
+Continue/Exit, returning distinct item-1/item-2 envelopes with9000 and unchanged
+complete storage. Both ACK-only results show Wait; automatic menu return is
+not promoted (`--menu-item 1` / `--menu-item 2`).
 
 NSK-1 v5.61 (5130) independently produces that same four-byte profile and
 automatic result30 refusal. Its matched Phase-2 control has no proactive
