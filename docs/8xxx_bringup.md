@@ -2462,6 +2462,16 @@ images, released contacts and whole-card invariants apply. This preserves
 an in-flight network-originated transaction, not external packet replay or
 multi-turn-session acceptance.
 
+`verify-8850-pin-host-ussd-empty-reply` independently opens the same
+network request's Read and Answer screens, then dismisses the empty editor
+with physical End at39s. Firmware returns the exact empty result
+`8b3a05a203020101`; the host receives DCS00, no data and `empty=true`
+before one answered state. Exact empty-editor, existing registered-idle and
+Messages recovery pixels and complete expected card bytes are mandatory.
+An empty result is not accepted by the typed-reply gate. This product-local
+dismissal contract does not qualify restored dismissal or other handsets'
+editor behavior; notably the NPE-3 dismissal boundary remains separate.
+
 `verify-8850-pin-host-outgoing-ussd` independently covers physical `*123#`
 and Send on the same authenticated own-PMM composition. The host rejects a
 wrong request identity before accepting the matching response; the handset

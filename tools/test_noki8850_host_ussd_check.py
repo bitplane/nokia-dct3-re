@@ -1,4 +1,5 @@
 import unittest
+import re
 
 from tools.make_sim_card_profile import make_profile
 from tools.noki8850_host_ussd_check import verify, verify_outgoing, check_restoration
@@ -43,6 +44,10 @@ class HostUssdTest(unittest.TestCase):
 
     def test_duplicate_operation_and_unrelated_storage_change(self):
         text, card = self.capture()
+        for extra in ('8850_host_ussd_input: key=Menu state=1 t=36.500000000',
+                      '8850_host_ussd_input: key=Menu state=2 t=36.000000000'):
+            with self.subTest(extra=extra), self.assertRaises(ValueError):
+                verify(text + '\n' + extra, card)
         with self.assertRaises(ValueError):
             verify(text + '\nnetwork_initiated operation=notify transaction=0b', card)
         for altered in (card[:-1], bytes((card[0] ^ 1,)) + card[1:], card + b'\xff'):
@@ -104,6 +109,29 @@ class NetworkRequestTest(unittest.TestCase):
                          ('cpu=' + cpu, 'cpu=' + ','.join(['00000000'] * 36))]:
             with self.subTest(old=old), self.assertRaises(ValueError):
                 verify_network_request(text.replace(old, new), card, restored=True)
+
+    def test_empty_editor_is_a_distinct_result(self):
+        from tools.noki8850_host_ussd_check import verify_network_request
+        text, card = self.capture()
+        text = re.sub(r'8850_host_ussd_input:.*\n', '', text)
+        text = text.replace('length=21 data=8b3a12a210020101300b02013c300604010f040132',
+                            'length=8 data=8b3a05a203020101')
+        text = text.replace('dcs=0f data=32 empty=0', 'dcs=00 data= empty=1')
+        def contacts(actions):
+            return ''.join(f'8850_host_ussd_input: key={key} state={state} t={second}.{fraction}\n'
+                           for key, second in actions
+                           for state, fraction in [(1, '000000000'), (0, '200000000')])
+        marker = 'network_initiated handset_response'
+        text = text.replace(marker, contacts([('Menu', 35), ('Menu', 37), ('End', 39)]) + marker)
+        text = text.replace('8850_host_ussd: complete', contacts([('Menu', 45)]) + '8850_host_ussd: complete')
+        verify_network_request(text, card, empty=True)
+        with self.assertRaises(ValueError):
+            verify_network_request(text, card)
+        for old, new in [('dcs=00 data= empty=1', 'dcs=0f data=32 empty=0'),
+                         ('key=End state=0', 'key=Menu state=0'),
+                         ('epoch=1 phase=answered', 'epoch=2 phase=answered')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_network_request(text.replace(old, new), card, empty=True)
 
 
 class OutgoingHostUssdTest(unittest.TestCase):

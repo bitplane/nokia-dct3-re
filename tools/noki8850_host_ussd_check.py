@@ -13,6 +13,15 @@ MENU_TITLE = '1e5c11fcea9aac5331e18c0070697e8795003d6de9a0250284b3d9605209e654'
 HOST_RESULT = '664c8b0e4e2a25ba77ce867b05d60171dccf60b93d136adcba638be9a24bb353'
 
 
+def check_contacts(text, contacts):
+    actual = re.findall(r'8850_host_ussd_input: key=(.*?) state=([01]) t=([0-9.]+)', text)
+    expected = [(key, str(state), f'{second}.{fraction}')
+                for key, second in contacts
+                for state, fraction in ((1, '000000000'), (0, '200000000'))]
+    if actual != expected or text.count('8850_host_ussd_input:') != len(actual):
+        raise ValueError('physical contacts differ, are malformed or remain pressed')
+
+
 def check_card(after, card):
     if (re.search(r'sim_device: (?:update|unblock)', after) or
             re.search(r'sim_device: header cla=a0 ins=(?:24|26|28|2c|d6|dc)\b', after)):
@@ -49,15 +58,14 @@ def verify(text, card):
         ('Menu', r'8850_host_ussd_input: key=Menu state=1 t=41\.000000000'),
     ), '8850 host USSD')
     expected_contacts = [('Menu', 35), ('End', 38), ('Menu', 41)]
-    for state, fraction in ((1, '000000000'), (0, '200000000')):
-        contacts = re.findall(rf'8850_host_ussd_input: key=(.*?) state={state} t=(\d+)\.{fraction}', text)
-        if contacts != [(key, str(second)) for key, second in expected_contacts]:
-            raise ValueError('physical contacts differ or remain pressed')
+    check_contacts(text, expected_contacts)
     after = text.split('incoming ussd id=1 result=accepted', 1)[1]
     check_card(after, card)
 
 
-def verify_network_request(text, card, *, restored=False):
+def verify_network_request(text, card, *, restored=False, empty=False):
+    if restored and empty:
+        raise ValueError('restored empty-editor dismissal is not qualified')
     if '[LUA ERROR]' in text or text.count('8850_host_ussd: complete') != 1:
         raise ValueError('network request input fixture failed')
     admissions = re.findall(r'incoming ussd id=1 result=accepted t=([0-9.]+)', text)
@@ -69,24 +77,25 @@ def verify_network_request(text, card, *, restored=False):
         raise ValueError('network request identity/phase lifecycle differs')
     if text.count('network_initiated operation=request ') != 1:
         raise ValueError('expected exactly one network request')
-    contacts = [('Menu', 35), ('Menu', 37), ('Keypad 2', 39),
-                ('Menu', 41), ('End', 45), ('Menu', 47)]
-    for state, fraction in ((1, '000000000'), (0, '200000000')):
-        actual = re.findall(rf'8850_host_ussd_input: key=(.*?) state={state} t=(\d+)\.{fraction}', text)
-        if actual != [(key, str(second)) for key, second in contacts]:
-            raise ValueError('network request physical contacts differ')
+    contacts = ([('Menu', 35), ('Menu', 37), ('End', 39), ('Menu', 45)] if empty else
+                [('Menu', 35), ('Menu', 37), ('Keypad 2', 39),
+                 ('Menu', 41), ('End', 45), ('Menu', 47)])
+    result = ('length=8 data=8b3a05a203020101' if empty else
+              'length=21 data=8b3a12a210020101300b02013c300604010f040132')
+    reply = 'dcs=00 data= empty=1' if empty else 'dcs=0f data=32 empty=0'
+    check_contacts(text, contacts)
     require_ordered(text, (
         ('PIN', r'SIM status ins=20 sw=9000'),
         ('registration', r'LAPDm Location Updating Accept acknowledged'),
         ('admission', r'incoming ussd id=1 result=accepted t=30\.'),
         ('request', r'network_initiated operation=request transaction=0b invoke=1 dcs=0f'),
         *[(key, re.escape(f'8850_host_ussd_input: key={key} state=1 t={second}.000000000'))
-          for key, second in contacts[:4]],
-        ('result', r'network_initiated handset_response message=3a length=21 data=8b3a12a210020101300b02013c300604010f040132'),
+          for key, second in contacts[:3 if empty else 4]],
+        ('result', r'network_initiated handset_response message=3a ' + result),
         ('release', r'LAPDm service Channel Release acknowledged'),
-        ('reply', rf'incoming ussd reply id=1 epoch={epoch} dcs=0f data=32 empty=0'),
+        ('reply', rf'incoming ussd reply id=1 epoch={epoch} ' + reply),
         ('answered', rf'incoming ussd state id=1 epoch={epoch} phase=answered'),
-        ('recovery', r'8850_host_ussd_input: key=Menu state=0 t=47\.200000000'),
+        ('recovery', rf'8850_host_ussd_input: key=Menu state=0 t={contacts[-1][1]}\.200000000'),
     ), '8850 network request')
     if text.count('incoming ussd reply ') != 1:
         raise ValueError('duplicate network request reply')
@@ -102,7 +111,15 @@ def verify_network_request(text, card, *, restored=False):
         ), '8850 pending network request')
 
 
-def check_network_request_frames(directory):
+def check_network_request_frames(directory, *, empty=False):
+    if empty:
+        _frames(directory, (
+            ('8850_ussd_action_1.png', 'f5d05b3cb51c3058f10fd0dce547b7ce7b3d416e97410ea2afa7e1b7c635315d', None),
+            ('8850_ussd_action_2.png', '772d9bcf2602786c164c063b4358b9f74df74257289b671a6302a724ab2651a8', None),
+            ('8850_ussd_action_3.png', IDLE, None),
+            ('8850_ussd_action_4.png', MENU_TITLE, (0, 0, 72, 16)),
+        ))
+        return
     _frames(directory, (
         ('8850_ussd_action_1.png', 'f5d05b3cb51c3058f10fd0dce547b7ce7b3d416e97410ea2afa7e1b7c635315d', None),
         ('8850_ussd_action_3.png', 'a9c79a6b61112a58b1d21567712dc371311ea7de7606cb28fdea0e312aca79c4', None),

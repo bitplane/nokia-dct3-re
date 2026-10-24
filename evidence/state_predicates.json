@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm2_host_ussd_empty_editor_dismissal",
+      "owner": "nsm2_host_supplementary_services",
+      "status": "satisfied",
+      "predicate": "Authenticated own-PMM 8850 returns a correlated empty USSD result after physical dismissal of the empty network-request editor",
+      "current": "Read35s and Answer37s open the reviewed empty numeric editor. Physical End39s produces exact eight-byte ReturnResult 8b3a05a203020101, RR release, DCS00/empty data/empty=true and one epoch1 answered state. Existing exact idle and Messages recovery pixels, all contact releases and full registered card equality pass. The typed-reply checker rejects this result; substituted data, wrong epoch and held keys reject. No firmware state is injected. This is product-local HLE cancellation evidence, not restored dismissal, multi-turn USSD, NPE-3 dismissal parity or native radio/speech.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/noki8850_host_ussd_network_empty.lua", "tools/noki8850_host_ussd_check.py", "tools/test_noki8850_host_ussd_check.py", "tools/run_noki8850_pin_registration.py", "gates.json"]
+    },
+    {
       "id": "nsm2_pending_network_ussd_restoration",
       "owner": "nsm2_host_supplementary_services",
       "status": "satisfied",
