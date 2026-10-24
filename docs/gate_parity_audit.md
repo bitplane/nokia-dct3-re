@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 79
-Differences found: 120
+Families with more than one product: 148
+Differences found: 208
 
 ## ROM normalisation reachability
 
@@ -18,89 +18,211 @@ Every product gate reaches its own ROM normalisation step.
 Which products have a gate in each shared capability family. An
 absent product is a coverage question, not a drifted gate.
 
-| Family | 2100 | 3210 | 3310 | 3330 | 3410 | 3610 | 5110 | 5210 | 5510 | 6110 | 6210 | 6250 | 7110 | 8210 | 8850 | 8890 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `bootstrap` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | yes | — | — |
-| `calculator` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
-| `call-divert` | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
-| `charger-wake` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — | — |
-| `frontier` | yes | yes | yes | yes | yes | yes | — | yes | — | — | — | — | — | — | — | — |
-| `host-incoming-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | yes |
-| `host-outgoing-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | yes |
-| `host-rejected-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | yes |
-| `host-silent-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | yes |
-| `incoming-call` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
-| `incoming-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
-| `keypad-controller` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — | — |
-| `mbus` | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
-| `menu` | — | — | yes | — | yes | — | yes | yes | — | — | yes | — | — | — | — | — |
-| `navigation` | — | — | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `outgoing-call` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
-| `outgoing-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
-| `phonebook` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
-| `power-cycle` | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes |
-| `power-lifecycle` | — | yes | — | — | — | — | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-a5-1-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-a5-1-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-a5-1-incoming-call` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-a5-1-outgoing-call` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-all-cell-loss` | — | yes | — | — | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-authentication-boundary` | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-boundary` | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-answered` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-lifecycle` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-sip` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-sip-alerting-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-sip-cancel` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-sip-connected-restore` | — | — | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-sip-idle-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-sip-waveform` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-incoming-smart-message` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-incoming-sms` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-loss-recovery` | — | yes | — | — | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-loss-recovery-state` | — | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-media-resilience` | — | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-host-media` | — | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-host-termination` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-lifecycle` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-sip` | — | yes | — | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-sip-busy` | — | yes | — | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-sip-connected-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-sip-pending-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-sip-unavailable` | — | yes | — | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-sip-waveform` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-outgoing-physical-duplex` | — | — | — | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-outgoing-sms` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-paging` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-paging-negatives` | — | — | — | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-paging-preserved` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-paging-state` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-periodic-location-update` | — | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-physical-duplex` | — | — | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-registration` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-registration-preserved` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-registration-state` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-reselection-different-lac` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-reselection-paging` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-reselection-preserved` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-reselection-same-lac` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-reselection-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-smart-message-application` | — | yes | yes | — | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-smart-message-persistence` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-sms-inbox` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `radio-unsuitable-cells` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
-| `registration` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
-| `save-state` | — | — | — | — | — | — | yes | yes | — | — | — | — | — | — | — | — |
-| `sim-phonebook` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — | — |
-| `sim-toolkit` | — | yes | — | — | — | — | — | — | — | — | yes | — | — | — | — | — |
-| `sip-cancel` | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `sip-idle-restore` | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `ussd` | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
-| `verifier` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | yes | — | — |
+| Family | 2100 | 3210 | 3310 | 3330 | 3410 | 3610 | 5110 | 5110i | 5210 | 5510 | 6110 | 6150 | 6210 | 6250 | 7110 | 8210 | 8850 | 8890 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `alarm` | — | yes | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | yes |
+| `alarm-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `alarm-off-no` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `alarm-off-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `alarm-off-restore-yes` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `alarm-off-snooze-no` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `alarm-off-snooze-yes` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `alarm-off-yes` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `alarm-snooze` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | yes |
+| `alarm-snooze-countdown-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `bootstrap` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | yes | — | — |
+| `calculator` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
+| `calendar-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `calendar-leap-day` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | — | yes |
+| `calendar-midnight` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `calendar-year-end` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | — | yes |
+| `call-divert` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
+| `call-divert-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `call-divert-lifecycle` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `charger-wake` | — | yes | — | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `fdn-cycle` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `fdn-dial-controls` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `fdn-records` | — | — | — | — | — | — | — | yes | — | — | — | — | yes | — | — | — | — | — |
+| `frontier` | yes | yes | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `host-incoming-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | yes |
+| `host-outgoing-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | yes |
+| `host-rejected-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | yes |
+| `host-silent-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | yes |
+| `incoming-call` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
+| `incoming-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
+| `keypad-controller` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — | — |
+| `mbus` | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — | — | — | — |
+| `menu` | — | — | yes | — | yes | — | yes | yes | yes | — | — | — | yes | — | — | — | — | — |
+| `native-verifier` | — | — | yes | — | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `navigation` | — | — | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `outgoing-call` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
+| `outgoing-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
+| `phonebook` | — | — | — | — | — | — | — | yes | — | — | — | — | yes | — | — | yes | — | — |
+| `pin-host-incoming-call` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | yes | yes | yes |
+| `pin-host-incoming-sms` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | yes | yes | yes |
+| `pin-host-outgoing-call` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | yes | yes | yes |
+| `pin-host-outgoing-sms` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | yes | yes | yes |
+| `pin-host-rejected-sms` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | — | yes | yes |
+| `pin-host-silent-sms` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | — | yes | yes |
+| `pin-phonebook` | — | — | — | — | — | — | — | — | yes | — | — | — | yes | yes | — | yes | yes | yes |
+| `pin-retry` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `pin-retry-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `pin-state-call` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
+| `pin-state-idle` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
+| `pin-state-sms` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
+| `pin2-change` | — | — | — | — | — | — | — | yes | — | — | — | — | yes | yes | — | — | — | — |
+| `pin2-change-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `pin2-exhaustion` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `pin2-retry-cold` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `power-cycle` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes |
+| `power-lifecycle` | — | yes | — | — | — | — | yes | — | yes | — | — | — | — | — | — | — | — | — |
+| `puk-recovery` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `puk2-permanent` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `puk2-recovery` | — | — | — | — | — | — | — | yes | — | — | — | — | yes | yes | — | — | — | — |
+| `radio-a5-1-degraded` | — | yes | yes | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-a5-1-degraded-state` | — | — | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-a5-1-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-a5-1-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-a5-1-incoming-call` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-a5-1-outgoing-call` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-all-cell-loss` | — | yes | — | — | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-authentication-boundary` | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-boundary` | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-answered` | — | yes | — | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-lifecycle` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip-alerting-restore` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip-cancel` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip-connected-restore` | — | — | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip-idle-restore` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip-waveform` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-smart-message` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-sms` | — | yes | — | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-loss-recovery` | — | yes | — | — | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-loss-recovery-state` | — | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-media-resilience` | — | — | yes | yes | — | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-host-media` | — | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-host-termination` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-lifecycle` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip` | — | yes | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip-busy` | — | yes | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip-connected-restore` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip-pending-restore` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip-unavailable` | — | yes | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip-waveform` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-physical-duplex` | — | — | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-sms` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-paging` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-paging-negatives` | — | — | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-paging-preserved` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-paging-state` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-periodic-location-update` | — | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-physical-duplex` | — | — | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-registration` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-registration-preserved` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-registration-state` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-reselection-different-lac` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-reselection-paging` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-reselection-preserved` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-reselection-same-lac` | — | yes | yes | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `radio-reselection-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-smart-message-application` | — | yes | yes | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-smart-message-persistence` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-sms-inbox` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-unsuitable-cells` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| `registration` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
+| `save-state` | — | — | — | — | — | — | yes | — | yes | — | — | — | — | — | — | — | — | — |
+| `sim-phonebook` | — | yes | — | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `sim-pin` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `sim-pin-registration` | — | — | — | — | — | — | — | — | yes | — | — | — | — | — | — | — | yes | yes |
+| `sim-toolkit` | — | yes | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
+| `sim-toolkit-call` | — | yes | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
+| `sim-toolkit-call-decline` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
+| `sim-toolkit-inkey` | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — |
+| `sim-toolkit-input` | — | yes | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — |
+| `sim-toolkit-interactive` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | yes | yes |
+| `sim-toolkit-menu` | — | yes | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
+| `sim-toolkit-menu-state` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
+| `sim-toolkit-sms` | — | yes | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
+| `sip-alerting-incoming-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes |
+| `sip-cancel` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
+| `sip-connected-incoming-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | yes |
+| `sip-connected-outgoing-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | yes |
+| `sip-connected-signaling` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | yes |
+| `sip-idle-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
+| `sip-incoming-connected-signaling` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | yes |
+| `sip-incoming-media` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
+| `sip-incoming-restore` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
+| `sip-incoming-waveform` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
+| `sip-outgoing-busy` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
+| `sip-outgoing-media` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
+| `sip-outgoing-restore` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
+| `sip-outgoing-unavailable` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
+| `sip-outgoing-waveform` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
+| `sip-pending-outgoing-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes |
+| `slow-pin-registration` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | — |
+| `sms-status-persistence` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
+| `state-divert` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `static` | — | — | — | — | — | — | — | yes | — | — | yes | yes | — | — | — | — | — | — |
+| `ussd` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
+| `verifier` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | yes | yes | — | — |
 
 ## Different checker scripts
+
+### `alarm`
+
+- **3210**: `tools/alarm_trace_check.py`
+- **6210**: `tools/run_noki6210_alarm.py`
+- **6250**: `tools/run_noki6250_alarm.py`
+- **8890**: `tools/run_noki8890_alarm.py`
+
+### `alarm-cold`
+
+- **6210**: `tools/run_noki6210_alarm.py`
+- **6250**: `tools/run_noki6250_alarm.py`
+
+### `alarm-off-no`
+
+- **6210**: `tools/run_noki6210_alarm.py`
+- **6250**: `tools/run_noki6250_alarm.py`
+
+### `alarm-off-restore`
+
+- **6210**: `tools/run_noki6210_alarm.py`
+- **6250**: `tools/run_noki6250_alarm.py`
+
+### `alarm-off-restore-yes`
+
+- **6210**: `tools/run_noki6210_alarm.py`
+- **6250**: `tools/run_noki6250_alarm.py`
+
+### `alarm-off-snooze-no`
+
+- **6210**: `tools/run_noki6210_alarm.py`
+- **6250**: `tools/run_noki6250_alarm.py`
+
+### `alarm-off-snooze-yes`
+
+- **6210**: `tools/run_noki6210_alarm.py`
+- **6250**: `tools/run_noki6250_alarm.py`
+
+### `alarm-off-yes`
+
+- **6210**: `tools/run_noki6210_alarm.py`
+- **6250**: `tools/run_noki6250_alarm.py`
+
+### `alarm-snooze`
+
+- **6210**: `tools/run_noki6210_alarm.py`
+- **6250**: `tools/run_noki6250_alarm.py`
+- **8890**: `tools/run_noki8890_alarm.py`
+
+### `alarm-snooze-countdown-restore`
+
+- **6210**: `tools/run_noki6210_alarm.py`
+- **6250**: `tools/run_noki6250_alarm.py`
 
 ### `bootstrap`
 
@@ -113,11 +235,53 @@ absent product is a coverage question, not a drifted gate.
 - **6210**: `tools/run_noki6210_acceptance.py`
 - **8210**: `tools/run_noki8210_acceptance.py`
 
+### `calendar-cold`
+
+- **6210**: `tools/run_noki6210_calendar.py`
+- **6250**: `tools/run_noki6250_calendar.py`
+
+### `calendar-leap-day`
+
+- **6210**: `tools/run_noki6210_calendar.py`
+- **8890**: `tools/run_noki8890_calendar.py`
+
+### `calendar-midnight`
+
+- **6210**: `tools/run_noki6210_calendar.py`
+- **6250**: `tools/run_noki6250_calendar.py`
+
+### `calendar-year-end`
+
+- **6210**: `tools/run_noki6210_calendar.py`
+- **8890**: `tools/run_noki8890_calendar.py`
+
 ### `call-divert`
 
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
 - **8210**: `tools/run_noki8210_acceptance.py`
 - **8850**: `tools/run_noki8xxx_supplementary.py`
 - **8890**: `tools/run_noki8xxx_supplementary.py`
+
+### `call-divert-lifecycle`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+
+### `fdn-cycle`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_fdn.py`
+
+### `fdn-dial-controls`
+
+- **6210**: `tools/run_noki6210_fdn_dial.py`
+- **6250**: `tools/run_noki6250_fdn.py`
+
+### `fdn-records`
+
+- **5110i**: `tools/run_nse2_fdn.py`
+- **6210**: `tools/run_noki6210_fdn_records.py`
 
 ### `frontier`
 
@@ -179,8 +343,14 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `tools/check_lcd_frame.py`
 - **3410**: `tools/check_lcd_frame.py`
 - **5110**: `tools/make_5110_eeprom_profile.py`
+- **5110i**: `tools/run_nse2_native.py`
 - **5210**: `tools/check_lcd_frame.py`
 - **6210**: `tools/run_noki6210_acceptance.py`
+
+### `native-verifier`
+
+- **3310**: `tools/nsm3_verifier_check.py`
+- **5110i**: `tools/run_nse2_native.py`
 
 ### `outgoing-call`
 
@@ -194,8 +364,125 @@ absent product is a coverage question, not a drifted gate.
 
 ### `phonebook`
 
+- **5110i**: `tools/run_nse2_native.py`
 - **6210**: `tools/run_noki6210_acceptance.py`
 - **8210**: `tools/run_noki8210_acceptance.py`
+
+### `pin-host-incoming-call`
+
+- **5210**: `tools/run_noki5210_acceptance.py`
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8850_pin_registration.py`
+- **8890**: `tools/run_noki8890_pin_registration.py`
+
+### `pin-host-incoming-sms`
+
+- **5210**: `tools/run_noki5210_acceptance.py`
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8850_pin_registration.py`
+- **8890**: `tools/run_noki8890_pin_registration.py`
+
+### `pin-host-outgoing-call`
+
+- **5210**: `tools/run_noki5210_acceptance.py`
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8850_pin_registration.py`
+- **8890**: `tools/run_noki8890_pin_registration.py`
+
+### `pin-host-outgoing-sms`
+
+- **5210**: `tools/run_noki5210_acceptance.py`
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8850_pin_registration.py`
+- **8890**: `tools/run_noki8890_pin_registration.py`
+
+### `pin-host-rejected-sms`
+
+- **5210**: `tools/run_noki5210_acceptance.py`
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8850**: `tools/run_noki8850_pin_registration.py`
+- **8890**: `tools/run_noki8890_pin_registration.py`
+
+### `pin-host-silent-sms`
+
+- **5210**: `tools/run_noki5210_acceptance.py`
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8850**: `tools/run_noki8850_pin_registration.py`
+- **8890**: `tools/run_noki8890_pin_registration.py`
+
+### `pin-phonebook`
+
+- **5210**: `tools/run_noki5210_acceptance.py`
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8850_pin_registration.py`
+- **8890**: `tools/run_noki8890_pin_registration.py`
+
+### `pin-retry`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+
+### `pin-retry-cold`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_pin_retry_cold.py`
+
+### `pin-state-call`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8850_pin_registration.py`
+- **8890**: `tools/run_noki8890_pin_registration.py`
+
+### `pin-state-idle`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8850_pin_registration.py`
+- **8890**: `tools/run_noki8890_pin_registration.py`
+
+### `pin-state-sms`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8850_pin_registration.py`
+- **8890**: `tools/run_noki8890_pin_registration.py`
+
+### `pin2-change`
+
+- **5110i**: `tools/run_nse2_native.py`
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+
+### `pin2-change-cold`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_pin2_cold.py`
+
+### `pin2-exhaustion`
+
+- **6210**: `tools/run_noki6210_pin2_exhaustion.py`
+- **6250**: `tools/run_noki6250_pin2_cold.py`
+
+### `pin2-retry-cold`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_pin2_cold.py`
 
 ### `power-cycle`
 
@@ -209,6 +496,37 @@ absent product is a coverage question, not a drifted gate.
 - **3210**: `tools/power_lifecycle_check.py`
 - **5110**: `tools/make_5110_eeprom_profile.py`, `tools/power_5110_trace_check.py`
 - **5210**: `tools/check_lcd_frame.py`, `tools/power_5210_trace_check.py`
+
+### `puk-recovery`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_pin_retry_cold.py`
+
+### `puk2-permanent`
+
+- **6210**: `tools/run_noki6210_puk2_exhaustion.py`
+- **6250**: `tools/run_noki6250_pin2_cold.py`
+
+### `puk2-recovery`
+
+- **5110i**: `tools/run_nse2_native.py`
+- **6210**: `tools/run_noki6210_pin2_exhaustion.py`
+- **6250**: `tools/run_noki6250_pin2_cold.py`
+
+### `radio-a5-1-degraded`
+
+- **3210**: `tools/radio_answered_call_lifecycle_trace_check.py`, `tools/radio_call_state_roundtrip_trace_check.py`
+- **3310**: `tools/radio_3310_incoming_call_boundary_check.py`, `tools/radio_3310_speech_control_trace_check.py`
+- **3410**: `tools/radio_3410_incoming_call_lifecycle_check.py`
+- shared: `tools/radio_a5_trace_check.py`, `tools/radio_degraded_speech_trace_check.py`, `tools/radio_facch_interruption_trace_check.py`, `tools/radio_sacch_coexistence_trace_check.py`
+
+### `radio-a5-1-degraded-state`
+
+- **3310**: `tools/radio_3310_incoming_call_boundary_check.py`, `tools/radio_3310_speech_control_trace_check.py`
+- **3330**: `tools/check_model_frontier_summary.py`, `tools/radio_3330_incoming_call_boundary_check.py`
+- **3410**: `tools/radio_3410_incoming_call_lifecycle_check.py`
+- **5210**: `tools/radio_5210_incoming_call_trace_check.py`
+- shared: `tools/radio_a5_trace_check.py`, `tools/radio_call_state_roundtrip_trace_check.py`, `tools/radio_degraded_speech_trace_check.py`, `tools/radio_facch_interruption_trace_check.py`, `tools/radio_sacch_coexistence_trace_check.py`
 
 ### `radio-a5-1-handover`
 
@@ -441,13 +759,93 @@ absent product is a coverage question, not a drifted gate.
 
 ### `save-state`
 
-- **5110**: `tools/make_5110_eeprom_profile.py`
+- **5110**: `tools/c54x_rom4_codec_contract.py`, `tools/make_5110_eeprom_profile.py`
 - **5210**: `tools/check_lcd_frame.py`
+
+### `sim-pin`
+
+- **3210**: `tools/make_eeprom_profile.py`, `tools/make_sim_card_profile.py`, `tools/sim_security_trace_check.py`
+- **5110i**: `tools/run_nse2_native.py`
+
+### `sim-pin-registration`
+
+- **5210**: `tools/run_noki5210_acceptance.py`
+- **8850**: `tools/run_noki8850_pin_registration.py`
+- **8890**: `tools/run_noki8890_pin_registration.py`
 
 ### `sim-toolkit`
 
 - **3210**: `tools/sim_toolkit_trace_check.py`
 - **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8xxx_supplementary.py`
+- **8890**: `tools/run_noki8890_toolkit_retained.py`
+
+### `sim-toolkit-call`
+
+- **3210**: `tools/sim_toolkit_call_trace_check.py`
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8xxx_supplementary.py`
+- **8890**: `tools/run_noki8890_toolkit_retained.py`
+
+### `sim-toolkit-call-decline`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8xxx_supplementary.py`
+- **8890**: `tools/run_noki8890_toolkit_retained.py`
+
+### `sim-toolkit-inkey`
+
+- **3210**: `tools/sim_toolkit_inkey_trace_check.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+
+### `sim-toolkit-input`
+
+- **3210**: `tools/sim_toolkit_input_trace_check.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+
+### `sim-toolkit-interactive`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8850**: `tools/run_noki8xxx_supplementary.py`
+- **8890**: `tools/run_noki8890_toolkit_retained.py`
+
+### `sim-toolkit-menu`
+
+- **3210**: `tools/sim_toolkit_menu_trace_check.py`
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8xxx_supplementary.py`
+- **8890**: `tools/run_noki8890_toolkit_retained.py`
+
+### `sim-toolkit-menu-state`
+
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8xxx_supplementary.py`
+- **8890**: `tools/run_noki8890_toolkit_retained.py`
+
+### `sim-toolkit-sms`
+
+- **3210**: `tools/sim_toolkit_sms_trace_check.py`
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8xxx_supplementary.py`
+- **8890**: `tools/run_noki8890_toolkit_retained.py`
+
+### `sip-alerting-incoming-restore`
+
+- **6210**: `tools/run_noki6210_sip_cancel.py`
+- **6250**: `tools/run_noki6250_sip_cancel.py`
+- **8210**: `tools/run_noki8210_sip_cancel.py`
+- **8890**: `tools/run_noki8890_sip_cancel.py`
 
 ### `sip-cancel`
 
@@ -455,6 +853,24 @@ absent product is a coverage question, not a drifted gate.
 - **6250**: `tools/run_noki6250_sip_cancel.py`
 - **8210**: `tools/run_noki8210_sip_cancel.py`
 - **8850**: `tools/run_noki8850_sip_cancel.py`
+- **8890**: `tools/run_noki8890_sip_cancel.py`
+
+### `sip-connected-incoming-restore`
+
+- **6210**: `tools/run_noki6210_sip_cancel.py`
+- **6250**: `tools/run_noki6250_sip_cancel.py`
+- **8890**: `tools/run_noki8890_sip_cancel.py`
+
+### `sip-connected-outgoing-restore`
+
+- **6210**: `tools/run_noki6210_sip_cancel.py`
+- **6250**: `tools/run_noki6250_sip_cancel.py`
+- **8890**: `tools/run_noki8890_sip_cancel.py`
+
+### `sip-connected-signaling`
+
+- **6210**: `tools/run_noki6210_sip_cancel.py`
+- **6250**: `tools/run_noki6250_sip_cancel.py`
 - **8890**: `tools/run_noki8890_sip_cancel.py`
 
 ### `sip-idle-restore`
@@ -465,8 +881,81 @@ absent product is a coverage question, not a drifted gate.
 - **8850**: `tools/run_noki8850_sip_cancel.py`
 - **8890**: `tools/run_noki8890_sip_cancel.py`
 
+### `sip-incoming-connected-signaling`
+
+- **6210**: `tools/run_noki6210_sip_cancel.py`
+- **6250**: `tools/run_noki6250_sip_cancel.py`
+- **8890**: `tools/run_noki8890_sip_cancel.py`
+
+### `sip-incoming-media`
+
+- **8210**: `tools/run_noki8210_sip_cancel.py`
+- **8850**: `tools/run_noki8850_sip_cancel.py`
+
+### `sip-incoming-restore`
+
+- **8210**: `tools/run_noki8210_sip_cancel.py`
+- **8850**: `tools/run_noki8850_sip_cancel.py`
+
+### `sip-outgoing-busy`
+
+- **6210**: `tools/run_noki6210_sip_cancel.py`
+- **6250**: `tools/run_noki6250_sip_cancel.py`
+- **8210**: `tools/run_noki8210_sip_cancel.py`
+- **8850**: `tools/run_noki8850_sip_cancel.py`
+- **8890**: `tools/run_noki8890_sip_cancel.py`
+
+### `sip-outgoing-media`
+
+- **8210**: `tools/run_noki8210_sip_cancel.py`
+- **8850**: `tools/run_noki8850_sip_cancel.py`
+
+### `sip-outgoing-restore`
+
+- **8210**: `tools/run_noki8210_sip_cancel.py`
+- **8850**: `tools/run_noki8850_sip_cancel.py`
+
+### `sip-outgoing-unavailable`
+
+- **6210**: `tools/run_noki6210_sip_cancel.py`
+- **6250**: `tools/run_noki6250_sip_cancel.py`
+- **8210**: `tools/run_noki8210_sip_cancel.py`
+- **8850**: `tools/run_noki8850_sip_cancel.py`
+- **8890**: `tools/run_noki8890_sip_cancel.py`
+
+### `sip-pending-outgoing-restore`
+
+- **6210**: `tools/run_noki6210_sip_cancel.py`
+- **6250**: `tools/run_noki6250_sip_cancel.py`
+- **8210**: `tools/run_noki8210_sip_cancel.py`
+- **8890**: `tools/run_noki8890_sip_cancel.py`
+
+### `slow-pin-registration`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+
+### `sms-status-persistence`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+
+### `state-divert`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
+
+### `static`
+
+- **5110i**: `tools/nse2_package_check.py`
+- **6110**: `tools/nse3_v406_static_check.py`
+- **6150**: `tools/nsm1_v523_static_check.py`
+
 ### `ussd`
 
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
 - **8210**: `tools/run_noki8210_acceptance.py`
 - **8850**: `tools/run_noki8xxx_supplementary.py`
 - **8890**: `tools/run_noki8xxx_supplementary.py`
@@ -478,6 +967,12 @@ absent product is a coverage question, not a drifted gate.
 - **8210**: `tools/nsm3_verifier_check.py`
 
 ## Same checker, different options
+
+### `call-divert-cold` — `tools/run_dct3_divert_cold.py`
+
+- **6210**: `--check-corrupt-storage`, `--port`, `--product`
+- **6250**: _(none)_
+- shared: `--mame`
 
 ### `charger-wake` — `tools/charger_wake_check.py`
 
@@ -528,6 +1023,18 @@ absent product is a coverage question, not a drifted gate.
 
 ## Different prerequisites
 
+### `alarm`
+
+- **3210**: _(none)_
+- **6210**: `build`
+- **6250**: `build`
+- **8890**: `build`
+
+### `fdn-records`
+
+- **5110i**: `build`, `verify-5110i-static`
+- **6210**: `build`
+
 ### `frontier`
 
 - **2100**: _(none)_
@@ -549,14 +1056,38 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: _(none)_
 - **3410**: _(none)_
 - **5110**: `build`
+- **5110i**: `build`, `verify-5110i-static`
 - **5210**: _(none)_
 - **6210**: `build`
+
+### `native-verifier`
+
+- **3310**: `build`
+- **5110i**: `build`, `verify-5110i-static`
+
+### `phonebook`
+
+- **5110i**: `build`, `verify-5110i-static`
+- **6210**: `build`
+- **8210**: `build`
+
+### `pin2-change`
+
+- **5110i**: `build`, `verify-5110i-static`
+- **6210**: `build`
+- **6250**: `build`
 
 ### `power-lifecycle`
 
 - **3210**: _(none)_
 - **5110**: `build`
 - **5210**: _(none)_
+
+### `puk2-recovery`
+
+- **5110i**: `verify-5110i-pin2-blocked`
+- **6210**: `build`
+- **6250**: `build`
 
 ### `radio-media-resilience`
 
@@ -576,12 +1107,65 @@ absent product is a coverage question, not a drifted gate.
 - **5110**: `build`
 - **5210**: _(none)_
 
+### `sim-pin`
+
+- **3210**: `build`
+- **5110i**: `build`, `verify-5110i-static`
+
 ### `sim-toolkit`
 
 - **3210**: _(none)_
 - **6210**: `build`
+- **6250**: `build`
+- **8210**: `build`
+- **8850**: `build`
+- **8890**: `build`
+
+### `sim-toolkit-call`
+
+- **3210**: _(none)_
+- **6210**: `build`
+- **6250**: `build`
+- **8210**: `build`
+- **8850**: `build`
+- **8890**: `build`
+
+### `sim-toolkit-inkey`
+
+- **3210**: _(none)_
+- **8210**: `build`
+
+### `sim-toolkit-input`
+
+- **3210**: _(none)_
+- **8210**: `build`
+
+### `sim-toolkit-menu`
+
+- **3210**: _(none)_
+- **6210**: `build`
+- **6250**: `build`
+- **8210**: `build`
+- **8850**: `build`
+- **8890**: `build`
+
+### `sim-toolkit-sms`
+
+- **3210**: _(none)_
+- **6210**: `build`
+- **6250**: `build`
+- **8210**: `build`
+- **8850**: `build`
+- **8890**: `build`
 
 ## Different run duration
+
+### `alarm`
+
+- **3210**: `135`
+- **6210**: _(none)_
+- **6250**: _(none)_
+- **8890**: _(none)_
 
 ### `bootstrap`
 
@@ -616,6 +1200,13 @@ absent product is a coverage question, not a drifted gate.
 - **3330**: `49`, `51`
 - **3410**: `22`, `24`
 - **5210**: `25`
+
+### `radio-a5-1-degraded-state`
+
+- **3310**: `45`
+- **3330**: `32`, `44`
+- **3410**: `45`
+- **5210**: `35`
 
 ### `radio-all-cell-loss`
 
@@ -746,6 +1337,11 @@ absent product is a coverage question, not a drifted gate.
 - **3330**: `40`, `44`, `62`, `68`
 - **3410**: `35`, `40`, `45`
 
+### `sim-pin`
+
+- **3210**: `12`
+- **5110i**: _(none)_
+
 ## Not comparable — a member hides its steps in shell
 
 ### `menu`
@@ -753,6 +1349,7 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `structured`
 - **3410**: `structured`
 - **5110**: `shell`
+- **5110i**: `structured`
 - **5210**: `structured`
 - **6210**: `structured`
 
@@ -761,6 +1358,12 @@ absent product is a coverage question, not a drifted gate.
 - **3210**: `structured`
 - **5110**: `shell`
 - **5210**: `structured`
+
+### `radio-a5-1-degraded`
+
+- **3210**: `shell`
+- **3310**: `structured`
+- **3410**: `structured`
 
 ### `radio-a5-1-handover`
 
@@ -921,4 +1524,45 @@ absent product is a coverage question, not a drifted gate.
 
 - **3210**: `shell`
 - **6210**: `structured`
+- **6250**: `structured`
+- **8210**: `structured`
+- **8850**: `structured`
+- **8890**: `structured`
+
+### `sim-toolkit-call`
+
+- **3210**: `shell`
+- **6210**: `structured`
+- **6250**: `structured`
+- **8210**: `structured`
+- **8850**: `structured`
+- **8890**: `structured`
+
+### `sim-toolkit-inkey`
+
+- **3210**: `shell`
+- **8210**: `structured`
+
+### `sim-toolkit-input`
+
+- **3210**: `shell`
+- **8210**: `structured`
+
+### `sim-toolkit-menu`
+
+- **3210**: `shell`
+- **6210**: `structured`
+- **6250**: `structured`
+- **8210**: `structured`
+- **8850**: `structured`
+- **8890**: `structured`
+
+### `sim-toolkit-sms`
+
+- **3210**: `shell`
+- **6210**: `structured`
+- **6250**: `structured`
+- **8210**: `structured`
+- **8850**: `structured`
+- **8890**: `structured`
 

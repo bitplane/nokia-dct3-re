@@ -149,6 +149,8 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_neighbour_arfcn_count));
 	save_item(NAME(m_neighbour_bcch_pending));
 	save_item(NAME(m_neighbour_bcch_arfcn));
+	save_item(NAME(m_neighbour_timing_failure_pending));
+	save_item(NAME(m_neighbour_timing_failure_arfcn));
 	save_item(NAME(m_neighbour_instruction_mode));
 	save_item(NAME(m_neighbour_instruction_bsic));
 	save_item(NAME(m_last_neighbour_instruction_arfcn));
@@ -322,6 +324,8 @@ void nokia_radio_peer_device::device_reset()
 	m_neighbour_arfcn_count = 0;
 	m_neighbour_bcch_pending = false;
 	m_neighbour_bcch_arfcn = 0xffff;
+	m_neighbour_timing_failure_pending = false;
+	m_neighbour_timing_failure_arfcn = 0xffff;
 	m_neighbour_instruction_mode = 0;
 	m_neighbour_instruction_bsic = 0;
 	m_last_neighbour_instruction_arfcn = 0xffff;
@@ -1357,8 +1361,9 @@ bool nokia_radio_peer_device::decode_neighbour_measurement_instruction(
 	// BSIC and byte 7 as the ARFCN.  NHM-2 independently emits zero in byte 1
 	// while requesting synchronization of its SI2-derived carrier, so keep the
 	// independently evidenced validation rule in the typed product contract.
-	// In either grammar the target must be a member of the firmware-published
-	// neighbour list as well as a receivable cell in the generic topology.
+	// A successful measurement requires membership of the firmware-published
+	// neighbour list and a receivable cell in the generic topology. Explicit
+	// lab negative-completion contracts are handled separately below.
 	const u8 expected_bsic = packet.payload[1];
 	u16 arfcn = packet.payload[7];
 	if (m_protocol.neighbour_instruction_arfcn ==
@@ -1394,6 +1399,19 @@ bool nokia_radio_peer_device::decode_neighbour_measurement_instruction(
 	if (!listed && m_protocol.neighbour_instruction_establishes_candidate)
 		listed = m_gsm_network->configured_neighbour(
 				m_serving_arfcn, arfcn);
+	// A directed unlisted request still needs a terminal result. This bounded
+	// lab contract reports failure, never a fabricated timing measurement.
+	if (packet.payload[0] == 4 && packet.length == 12 && !listed &&
+			m_protocol.unlisted_mode4_timing_failure)
+	{
+		m_neighbour_timing_failure_pending = true;
+		m_neighbour_timing_failure_arfcn = arfcn;
+		if (m_trace_enabled)
+			LOGMASKED(LOG_RADIO,
+					"dsp_hle: directed timing failure requested arfcn=%u mode=4 t=%.6f\n",
+					arfcn, machine().time().as_double());
+		return true;
+	}
 	if (candidate && listed && bsic_matches)
 	{
 		if (m_neighbour_arfcn_count == 0)
@@ -3401,6 +3419,24 @@ void nokia_radio_peer_device::tick()
 {
 	if (!m_enabled)
 		return;
+	if (m_neighbour_timing_failure_pending)
+	{
+		const u16 arfcn = m_neighbour_timing_failure_arfcn;
+		const u8 failure[10] = { 1, 0, 0, 0, u8(arfcn >> 8), u8(arfcn), 0, 0, 0, 1 };
+		// Defer to the existing peer cadence and retain the result while the
+		// RX ring is full. Cadence and unused timing bytes are not silicon evidence.
+		if (m_transport->enqueue_rx_packet(0x88, failure, std::size(failure)))
+		{
+			m_neighbour_timing_failure_pending = false;
+			m_neighbour_timing_failure_arfcn = 0xffff;
+			m_transport->notify_rx();
+			if (m_trace_enabled)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: directed timing failure published arfcn=%u mode=4 status=1 t=%.6f\n",
+						arfcn, machine().time().as_double());
+		}
+		return;
+	}
 	if (m_background_measurement_pending)
 	{
 		std::array<u8, 166> payload{};

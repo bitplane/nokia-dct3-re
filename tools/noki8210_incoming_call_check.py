@@ -23,7 +23,7 @@ TRAFFIC_CONFIG, RELEASE_CONFIG = channel_patterns()
 CHECKPOINTS = (
     ('registration release', REGISTRATION_RELEASE), ('IMSI page', IMSI_PAGE),
     ('Paging Response', PAGING_RESPONSE), ('contention UA', PAGING_CONTENTION_UA),
-    ('Cipher Mode Command', CIPHER_MODE_COMMAND), ('MM Information', MM_INFORMATION),
+    ('Cipher Mode Command', CIPHER_MODE_COMMAND),
     ('Cipher Mode Complete', CIPHER_MODE_COMPLETE), ('incoming SETUP', INCOMING_SETUP),
     ('own Call Confirmed', re.compile(r'GSM service uplink sapi=0 pd=03 message=08 length=5 data=8308150101')),
     ('Alerting', ALERTING),
@@ -50,7 +50,15 @@ def verify(text, *, configured_carrier=False, dcs1800=False):
     replacements = {'own traffic configuration': traffic, 'own release configuration': release}
     checkpoints = tuple((name, replacements.get(name, pattern)) for name, pattern in CHECKPOINTS)
     require_ordered(text, checkpoints, '8210 incoming signaling')
-    for label, pattern in (('incoming SETUP', INCOMING_SETUP), ('Connect', CONNECT), ('Disconnect', DISCONNECT)):
+    # Both completions precede SETUP; their relative trace order varies with
+    # the handset's asynchronous cipher-control publication.
+    require_ordered(text, (('Cipher Mode Command', CIPHER_MODE_COMMAND),
+                          ('MM Information', MM_INFORMATION),
+                          ('incoming SETUP', INCOMING_SETUP)), '8210 MM information')
+    for label, pattern in (('Cipher Mode Command', CIPHER_MODE_COMMAND),
+                           ('MM Information', MM_INFORMATION),
+                           ('Cipher Mode Complete', CIPHER_MODE_COMPLETE),
+                           ('incoming SETUP', INCOMING_SETUP), ('Connect', CONNECT), ('Disconnect', DISCONNECT)):
         require_count(text, pattern, 1, f'exactly one {label}')
 
 

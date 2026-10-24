@@ -149,12 +149,16 @@ def main():
     parser.add_argument('--pin-start', type=float,
                         help='supported PIN fixture physical entry start time (default 8 seconds)')
     parser.add_argument('--dcs1800', action='store_true',
-                        help='test supported scenarios on DCS1800 carriers 823/824; late-PIN recovery remains unproved')
+                        help='test supported scenarios on DCS1800 carriers 823/824 with the declared lab peer')
+    parser.add_argument('--timing-result-observe', action='store_true',
+                        help='passively observe the late-PIN directed timing failure consumer')
     parser.add_argument('--phase-observe', action='store_true',
                         help='passively observe the DCS PIN continuation; does not relax registration acceptance')
     args = parser.parse_args()
     if args.phase_observe and (args.scenario != 'registration' or not args.pin_enabled or not args.dcs1800):
         parser.error('--phase-observe requires registration with --pin-enabled --dcs1800')
+    if args.timing_result_observe and (args.scenario != 'registration' or not args.pin_enabled or not args.dcs1800 or args.phase_observe):
+        parser.error('--timing-result-observe requires DCS PIN registration without --phase-observe')
     if args.pin_start is not None and (
             not args.pin_enabled or args.scenario not in PIN_SCENARIOS or
             not math.isfinite(args.pin_start) or not 3.5 <= args.pin_start <= 20):
@@ -205,6 +209,8 @@ def main():
         script, seconds, checker = SCENARIOS[args.scenario]
         if args.phase_observe:
             script = 'phase_input'
+        if args.timing_result_observe:
+            script = 'timing_result_input'
         command = [str((args.mame or root / 'mame/mame').resolve()), 'nsm3hle',
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
                    '-cfg_directory', 'cfg', '-noreadconfig', '-debug', '-debugger', 'none',
@@ -246,6 +252,10 @@ def main():
                            (run / 'nvram/nsm3hle/sim_card').read_bytes(), 'verify', '1234')
             verify_stage(pin_text, runtime=True, selftest=True, base_record=True)
             verify_pin_measurement_registration(pin_text, dcs1800=args.dcs1800)
+        if args.timing_result_observe:
+            from tools.noki8210_timing_result_check import verify as verify_timing_result
+            report = verify_timing_result((run / 'error.log').read_text(errors='replace'))
+            (run / 'timing_result.json').write_text(json.dumps(report, indent=2) + '\n')
         check = [sys.executable, str(root / f'tools/noki8210_{checker}.py'), str(run / 'error.log')]
         if args.scenario == 'toolkit-input':
             check.append('--get-input')
@@ -411,6 +421,7 @@ def main():
                 else 'PIN-enabled laboratory card' if args.pin_enabled else 'default laboratory card',
             'pin_start_seconds': (args.pin_start if args.pin_start is not None else 8)
                 if args.pin_enabled else None,
+            'timing_failure_observed': args.timing_result_observe,
             'command': command,
             'host_command': host_command,
             'smss_status_persistence': sms_status,

@@ -1170,6 +1170,18 @@
       "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
+      "id": "nsm3_unlisted_mode4_silent_peer_is_sufficient", "status": "disproven",
+      "hypothesis": "The laboratory peer can drop the unlisted mode4 directed measurement indefinitely without preventing eight-second-PIN DCS registration",
+      "conclusion": "The bounded no-completion control stalls after accepted PIN. Own class88 branch21ee2c and receiver286e9a identify a failure entrance with full carrier and error fields. A request-derived negative result reaches824's own record, counter0->1 and selector2->1, then organic Location Updating/release and EF_LOCI complete. Settled host-call/SMS and idle-restoration checks also pass. The failure is an explicitly declared HLE capability limitation, not a successful measurement or proof of real ROM6 mode4 policy; no callback, timer result or MCU state is forced.",
+      "evidence": ["docs/8210_bringup.md", "tools/noki8210_radio_contract.py", "tools/noki8210_timing_result_check.py", "tools/noki8210_timing_result_input.lua", "driver/nokia_radio_peer.cpp", "gates.json"]
+    },
+    {
+      "id": "nsm3_mm_information_must_precede_cipher_complete", "status": "disproven",
+      "hypothesis": "Every accepted NSM-3 incoming call or SMS trace must log MM Information before Cipher Mode Complete",
+      "conclusion": "Recovered late-PIN DCS host calls and SMS complete their protocol, physical UI and storage outcomes with Cipher Mode Complete logged before MM Information. Both messages remain mandatory after Cipher Mode Command and before SETUP or SAPI3 establishment. Product-local checkers now enforce those separate order chains and reject missing/late events while accepting both observed relative orders. This corrects an incidental total-order assertion, not cipher acceptance or unrelated products' protocol contracts.",
+      "evidence": ["docs/8210_bringup.md", "tools/noki8210_incoming_call_check.py", "tools/noki8210_incoming_sms_check.py", "tools/test_noki8210_incoming_call_check.py", "tools/test_noki8210_incoming_sms_check.py"]
+    },
+    {
       "id": "mu4_state5_reload_requires_nonzero_worker_result", "status": "disproven",
       "hypothesis": "Repeated resident entry at lifecycle 5 requires a nonzero worker result published to 3742, indicating a failed decoder or missing external completion",
       "conclusion": "AA99 029575 uses 7212 3742, MVDM data-to-AR2, so 3742 is an input control rather than a result publication. The pinned 46-word cleanup and two-word AA55 API contract enumerates all 65536 controls: while lifecycle is 4, control 2 selects state 2 and every other control selects state 5; both join descriptor-0 reload through 002080 -> 003538. A passive three-second run reads control zero at 2.198518905 seconds, writes state 5 at 2.198519039 and re-enters state 4 at 2.588181162 without guest writes by the observer. The twenty-second Execute trails identify the AA99 02959b reload caller and AA22 0291c7 REL request; they do not show a reset-vector restart or corrupt FRET. The raw data tap is not an all-alias writer census, and its context PC is not instruction ownership. Why the worker reaches cleanup, whether this is EOF, and decoded PCM remain unproved.",

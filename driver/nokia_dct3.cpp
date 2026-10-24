@@ -4236,6 +4236,9 @@ void nokia_dct3_state::nsm3hle(machine_config &config)
 	runtime.simi_controller = true;
 	runtime.synthetic_sim_card = true;
 	runtime.radio = RADIO_NSM3;
+	// Own class-88 error consumer plus independent HLE comparison; this is
+	// a lab failure completion, not recovered ROM6 measurement behavior.
+	runtime.radio.unlisted_mode4_timing_failure = true;
 	// Own parameter publisher 2c6cf4 adds field 0200 from table 337db0;
 	// command 8 changes 840a -> 860b -> 840a on physical Send/End.
 	// This selects the HLE request only, not an unevidenced analogue route.

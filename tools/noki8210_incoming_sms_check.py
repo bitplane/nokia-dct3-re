@@ -8,7 +8,7 @@ from PIL import Image
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.radio_call_lifecycle_common import require_ordered
+from tools.radio_call_lifecycle_common import require_ordered, require_count
 from tools.radio_incoming_sms_trace_check import (
     COMMON_CHECKPOINTS, SMS_NVRAM_OFFSET, STORED_RECORD_PREFIX,
 )
@@ -20,7 +20,7 @@ def verify(text, storage):
     checkpoints = COMMON_CHECKPOINTS[:5] + ((
         'own DSP cipher control', re.compile(
             r'TX packet type=14 payload=12 .*data=0080ffffffffffffffff0000'),
-    ),) + COMMON_CHECKPOINTS[5:] + (
+    ),) + COMMON_CHECKPOINTS[6:] + (
         ('CP ACK', re.compile(r'GSM service uplink sapi=3 pd=09 message=04 length=2')),
         ('RP ACK', re.compile(r'GSM service uplink sapi=3 pd=09 message=01 length=5 data=8901020240')),
         ('network CP ACK', re.compile(r'GSM service downlink kind=17 sapi=3 pd=09 message=04 length=2')),
@@ -29,6 +29,12 @@ def verify(text, storage):
         ('read key', re.compile(r'8210_keypad_decoded: key=19\b')),
     )
     require_ordered(text, checkpoints, '8210 incoming SMS')
+    # MM Information and Cipher Mode Complete are both mandatory before
+    # SAPI 3 establishment, without imposing their incidental trace order.
+    require_ordered(text, (COMMON_CHECKPOINTS[4], COMMON_CHECKPOINTS[5],
+                          COMMON_CHECKPOINTS[7]), '8210 SMS MM information')
+    for name, pattern in COMMON_CHECKPOINTS[4:7]:
+        require_count(text, pattern, 1, f'exactly one {name}')
     if text.count('PCH IMSI page transmitted channel=60') != 1:
         raise ValueError('expected exactly one SMS page')
     if text.count('sim_device: update fid=6f3c record=1 length=176') != 2:

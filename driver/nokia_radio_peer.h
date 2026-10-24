@@ -88,6 +88,8 @@ public:
 		// Partial products may establish RSSI transport before channel/SCH
 		// contracts. Do not answer the latter using another product's defaults.
 		acquisition_coverage coverage = acquisition_coverage::full;
+		// Explicit lab-peer negative completion; not a measured DSP policy.
+		bool unlisted_mode4_timing_failure = false;
 
 		constexpr bool enabled() const
 		{
@@ -368,6 +370,8 @@ private:
 	u8 m_neighbour_arfcn_count = 0;
 	bool m_neighbour_bcch_pending = false;
 	u16 m_neighbour_bcch_arfcn = 0xffff;
+	bool m_neighbour_timing_failure_pending = false;
+	u16 m_neighbour_timing_failure_arfcn = 0xffff;
 	u8 m_neighbour_instruction_mode = 0;
 	u8 m_neighbour_instruction_bsic = 0;
 	u16 m_last_neighbour_instruction_arfcn = 0xffff;

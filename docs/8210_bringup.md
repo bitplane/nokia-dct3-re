@@ -17,6 +17,47 @@ Identity and record success replies remain unselected. This is research-HLE
 phone-service acceptance, not a promotion of the normal machine, complete
 hardware fidelity, native DSP speech, or authentic factory-default provisioning.
 
+### Late-PIN DCS laboratory acceptance
+
+Physical PIN entry starting at eight seconds now reaches own DCS823
+registration/EF_LOCI and registered idle in `nsm3hle`. The declared NSM-3
+lab peer completes an unsupported unlisted mode-4 directed measurement with
+a type88 failure, rather than silently dropping the request. This is not a
+claim that a real receiver would fail to measure the receivable candidate.
+The own transport delivers error1 and full target0338 to `21ee8c` and
+`286e9a`; firmware reselects record824 rather than serving record823,
+increments its error counter0->1 and changes only selector2->1. Location
+Updating completes afterwards. No request, state, callback or successful
+measurement is synthesized inside MCU firmware.
+
+The pending response and target are saved/reset with the peer and published
+through its ordinary service tick; a full RX ring retains the pending result.
+This is a calibrated HLE completion and a single-outstanding-request fixture,
+not recovered ROM6 measurement timing or general NMEAS mode semantics.
+Early-PIN DCS, no-PIN DCS and slow-PIN GSM registration controls still pass.
+
+Independent eight-second-PIN targets are:
+
+- `verify-8210-dcs-late-pin-registration`: request/RX/object identity,
+  firmware error-state update and subsequent registration/release/EF_LOCI.
+- `verify-8210-dcs-late-pin-state-idle`: exact idle CPU/RAM/time, protocol
+  and pixels across restoration, followed by physical Menu continuation.
+- `verify-8210-dcs-late-pin-host-incoming-call`: settled host paging,
+  physical Answer/End, own DCS channel words, reviewed caller/idle pixels
+  and complete CC/RR release; no speech claim.
+- `verify-8210-dcs-late-pin-host-incoming-sms`: host delivery, CP/RP/RR
+  closure, physical reading, exact persisted hello record and body pixels.
+- `verify-8210-dcs-late-pin-host-outgoing-sms`: physical A/5551234 SMS,
+  host acceptance, exact SMS-SUBMIT and sent-screen/CP/RP/RR checks.
+
+The incoming call/SMS checkers require MM Information and Cipher Mode
+Complete before SETUP/SAPI3 respectively, without fixing their incidental
+relative log order. Both orders and missing/late-event rejection are tested.
+The automatic one-shot call fixture pages at14.767s while phone-security
+input is still pending and does not complete a call; it is not promoted by
+the settled host-call result. Late-PIN outgoing calls, active-call/SMS
+restoration, cold phonebook/SMSS and media remain separate qualifications.
+
 `verify-8210-sms-status-persistence` checks two separate PIN-enabled
 research-HLE processes with retained own-product storage and physical SMS
 composition. Firmware reads and updates EF_SMSS, and the submitted TP-MR
@@ -29,8 +70,8 @@ the same two-process contract on coherent DCS ARFCN 823 with physical PIN
 entry starting at seven seconds. The cold firmware reads retained SMSS
 byte `00`, submits reference 1 and updates the file after host acknowledgement.
 Both processes independently verify PIN, own DCS registration and sent
-pixels. This preserves the early-PIN boundary; late-PIN DCS recovery remains
-unproved.
+pixels. This independently qualifies the early-PIN cold SMSS boundary;
+it is not a late-PIN two-process status-report result.
 
 ### Documented PCM bus
 
@@ -1012,8 +1053,8 @@ idle save/load round trip. `run_8210_dcs_idle_state_01` passes explicit
 DCS registration and persisted EF_LOCI, exact saved/restored PC/SP/RAM
 and emulated time, transport replay, matching registered-screen pixels,
 and post-load physical Menu decode plus reviewed menu presentation.
-The runner rejects DCS PIN idle-state and unsupported DCS service scenarios
-pending their own evidence; this gate does not weaken the late-PIN boundary.
+PIN-enabled DCS restoration has separate early- and late-PIN gates;
+this no-PIN result does not supply their evidence.
 `verify-8210-dcs-incoming-sms` composes the same topology with the external
 incoming-SMS scenario without discarding either configuration. Run
 `run_8210_dcs_incoming_sms_01` passes DCS registration and EF_LOCI,
@@ -1052,8 +1093,8 @@ is byte-identical to fresh GSM control `run_8210_gsm_incoming_call_pixels_01`;
 the retired wider crop included changing signal/battery/animation pixels
 and failed for both bands. Blank-caller negative tests remain enforced.
 This gate proves no-PIN laboratory signaling only. DCS host services and
-early-PIN acceptance have separate gates above; late-PIN recovery, native
-speech and external end-to-end speech calls remain unproved.
+early- and late-PIN acceptance have separate gates above. Native speech
+and external end-to-end speech calls remain unproved by these signaling gates.
 `verify-8210-dcs-phonebook` creates contact `A/123` through physical
 inputs, checks initial DCS registration/EF_LOCI, cold-boots preserved
 storage with the same own base-record comparison and carrier-823
@@ -1061,8 +1102,10 @@ configuration, then physically reads the contact. Run
 `run_8210_dcs_phonebook_01` passes record persistence and reviewed
 contact pixels. This does not add PIN-timing or host-backend coverage.
 
-**Current frontier:** DCS with physical PIN entry starting at eight seconds
-does not register; entry starting at seven seconds does. The passing
+**Control without a terminal timing result:** the following negative maps
+describe the peer with unlisted mode-4 failure completion disabled, not the
+current accepted late-PIN lab composition. In this control, physical PIN
+entry starting at eight seconds does not register; seven seconds does. The passing
 no-PIN DCS control also lacks `07f0`, `1587` and type 57: none is a universal
 DCS prerequisite. It receives `03ec` before serving-channel completion;
 PIN DCS receives it afterwards. At completion, the passing control has
@@ -1084,7 +1127,7 @@ consumer anchors below are verified; they do not justify periodic `8b`
 or acknowledgement replay. Do not make DCS reproduce GSM's reference
 chain. No firmware state or peer response is forced.
 
-The default-timing `--dcs1800 --pin-enabled` experiment remains unsuccessful:
+In that no-completion control, default-timing DCS/PIN is unsuccessful:
 the early `55:03050000` response reaches the correlated task-12 completion
 at 5.54 seconds, before physical PIN acceptance at 12 seconds. Unlike the
 verified GSM900 PIN lifecycle, no later type-57 request is emitted. The
@@ -1247,7 +1290,8 @@ persisted EF_LOCI, physical Answer/End and CC/RR release. The host waits for
 the registered-idle capture before calling; a fixed automatic call can collide
 with security-code input and is not an equivalent fixture. Host registration
 validation selects the DCS823 contract rather than the GSM900 ARFCN4 contract.
-Speech and late-PIN recovery remain unproved.
+This is an early-PIN signaling result, not speech or the separate late-PIN
+acceptance documented at the start of this contract.
 The corresponding standard target is
 `make verify-8210-dcs-early-pin-host-incoming-call RUN_DIR=NEW_DIRECTORY`.
 Outgoing DCS host signaling separately passes without PIN and with early
@@ -1672,7 +1716,7 @@ The upstream packet family is DSP RX **9c**: dispatcher `306fae` subtracts
 subtracts `17` (selecting 9a), then `306fc2` subtracts 2 (selecting 9c).
 The latter branch reaches `307008 -> 2ba010`, the sole aligned direct caller
 of the registered packet worker. The dispatch arithmetic and worker call are
-machine-checked. The current late-PIN trace has no type-9c publication.
+machine-checked. The no-completion late-PIN control has no type-9c publication.
 This establishes `9c -> registered callback -> 03f7 -> decoder -> 0411`
 as an eligible chain, not that ordinary DCS camping requires it or that it
 has a particular GSM message meaning. Packet lifetime, payload meaning and
@@ -1819,9 +1863,11 @@ specification or evidence for its calibrated response delay. No source is
 transplanted. It motivates a bounded request-derived failure-response test,
 after verifying the own transport/dispatch representation, rather than
 inventing a successful neighbour measurement or dropping an unsuccessful
-directed request indefinitely. The peer's live eligibility rules remain
-unchanged until that boundary is tested; late-PIN registration is still
-unaccepted.
+directed request indefinitely. The live NSM-3 lab composition now supplies
+that negative completion for an unlisted mode-4 request; other product and
+listed-neighbour rules remain unchanged. Accepted transport, own record
+update and subsequent late-PIN registration are summarized at the start of
+this contract.
 
 Immediately before this selection, the caller runs shared result helper
 `286e9a`, which calls updater `286e58`. That updater dereferences pointer
@@ -1975,7 +2021,7 @@ both dispatch and zero gate, common store `21c348` and both ROM literals
 selecting root `138038`. Its phase word is `138044`, not the request queue's
 `137f58+0c` pointer.
 
-Paired fresh DCS/PIN runs with the passive phase observer establish a bounded
+Paired DCS/PIN controls without timing-failure completion establish a bounded
 negative result for this gate. Physical PIN begins at seven/eight seconds;
 both accept VERIFY CHV. The seven-second control passes the full registration,
 release, paging and persisted-EF_LOCI check. Its first phase continuation has
