@@ -14,7 +14,7 @@ local function observe(pc, kind, address, count)
             prefix, string.rep('%04x', width), suffix, table.concat(args, ','))
     end
 end
-local function filter_vector(kind, pointer, count)
+local function dynamic_vector(pc, namespace, kind, pointer, count)
     for first = 0, count - 1, 16 do
         local width = math.min(16, count - first)
         local args = {}
@@ -22,8 +22,8 @@ local function filter_vector(kind, pointer, count)
             -- Leading digits keep offsets a/b from resolving as accumulators.
             args[#args + 1] = string.format('dw@(%s+%04x)', pointer, i)
         end
-        actions[0xd014] = actions[0xd014] .. string.format('logerror "%s%s%s",%s;',
-            first == 0 and ('efr_filter: kind=' .. kind .. ' values=') or '',
+        actions[pc] = actions[pc] .. string.format('logerror "%s%s%s",%s;',
+            first == 0 and (namespace .. ': kind=' .. kind .. ' values=') or '',
             string.rep('%04x', width), first + width == count and '\\n' or '',
             table.concat(args, ','))
     end
@@ -39,7 +39,11 @@ observe(0xc907, 'LPC', 0x1317, 44)
 -- Preserve the full accumulator; debugger shift literals use hexadecimal radix.
 cpu.debug:bpset(0xc4d0, '1', 'logerror "efr_gain_policy: previous=%04x gain=%04x candidate_b=%010x\\n",dw@ab9,dw@abe,b;g')
 actions[0xd014] = 'logerror "efr_filter_call: return=%04x coefficients=%04x input=%04x output=%04x brc=%04x\\n",dw@sp,ar2,ar3,ar4,brc;'
-filter_vector('A', 'ar2', 11)
-filter_vector('EXC', 'ar3', 40)
-filter_vector('MEM', 'ar4-000a', 10)
+dynamic_vector(0xd014, 'efr_filter', 'A', 'ar2', 11)
+dynamic_vector(0xd014, 'efr_filter', 'EXC', 'ar3', 40)
+dynamic_vector(0xd014, 'efr_filter', 'MEM', 'ar4-000a', 10)
+-- ADD $12 after LD #26,DP reads data1312, not the AR2 MMR.
+actions[0xc85a] = actions[0xc85a] .. 'logerror "efr_excitation_call: ctrl=%04x base=%04x offset=%04x\\n",dw@09c0,dw@0ac9,dw@1312;'
+dynamic_vector(0xc85a, 'efr_excitation', 'FIXED', '0aca', 40)
+dynamic_vector(0xc85a, 'efr_excitation', 'ADAPT', '(dw@0ac9)+(dw@1312)', 40)
 for pc, action in pairs(actions) do cpu.debug:bpset(pc, conditions[pc] or '1', action .. 'g') end

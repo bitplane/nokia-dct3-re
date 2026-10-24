@@ -3140,6 +3140,37 @@ Incomplete binary cases, truncated vectors and an inconsistent history update
 are errors; arithmetic differences are explicitly reported, never silently
 accepted as native speech or full-decoder conformance.
 
+The read-only gain-mixing boundary at `c85a` separates the sharpened fixed
+codebook (`0aca`, 40 words) from adaptive excitation (`[0ac9] + [1312]`).
+The latter offset is data `1312` under DP=26, not the AR2 register. Each
+frame must supply four offsets 0/40/80/120 and exact replay. The reference
+observes the fixed vector at original `d_gain_code` entry and adaptive output
+at original `Pred_lt_6` return; installation/generated PCM remains unchanged.
+
+| Component | Compared words | Differences | First / last differing subframe |
+| --- | --- | --- | --- |
+| Sharpened fixed codebook | 82,880 | None | None |
+| Adaptive prediction | 60,000 | 2,648 | Frame 97/subframe 2 through frame 116/subframe 3 |
+
+Adaptive coverage is exactly the 1,500 reference speech-admitted predictor
+calls; the 572 comfort-noise subframes do not execute that predictor and their
+stale adaptive buffers are not compared. The admission bit must agree in both
+implementations; other control bits retain the documented policy difference.
+Adaptive divergence starts after the first differing code gain. Its last
+differing subframe has pitch gain zero and already-equal filter input. These
+observations constrain the feedback/recovery window, not every predictor
+operation or sole-cause equivalence. Atomic/staged logs and native PCM remain
+identical; the strict frame 97 comparison still fails with 86 differences.
+
+```sh
+python3 tools/c54x_rom4_efr_excitation_check.py RUN/error.log REFERENCE/state.log \
+  --output RUN/excitation-characterization.json
+```
+
+The reference generator now requires all 2,072 gain-boundary calls and 3,572
+ordered excitation vectors in both fresh processes. Wrong pointer ownership,
+missing predictor calls, altered replay and short/reordered vectors are errors.
+
 ### Native EFR active-speech erasures
 
 Atomic and staged execution complete all 163 frames and replay 65,440 ordinary

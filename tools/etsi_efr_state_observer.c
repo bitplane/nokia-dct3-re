@@ -12,8 +12,26 @@ extern void __real_d_gain_code(short, short *, short, short *, short, short, sho
 extern short past_r2_q[10], past_lsf_q[10];
 extern short prev_gc;
 extern void __real_Syn_filt(short *, short *, short *, short, short *, short);
+extern void __real_Pred_lt_6(short *, short, short, short);
 typedef char word16_requires_two_bytes[sizeof(short) == 2 ? 1 : -1];
 static unsigned frame, pitch_subframe, code_subframe, filter_subframe, in_decoder;
+
+static void excitation_words(const char *kind, unsigned subframe, const short *values)
+{
+    unsigned i;
+    fprintf(stderr, "\nEFREXC frame=%u subframe=%u kind=%s values=", frame, subframe, kind);
+    for (i = 0; i < 40; ++i) fprintf(stderr, "%04x", (unsigned)(unsigned short)values[i]);
+    fputc('\n', stderr);
+}
+
+void __wrap_Pred_lt_6(short *excitation, short lag, short fraction, short length)
+{
+    __real_Pred_lt_6(excitation, lag, fraction, length);
+    if (in_decoder) {
+        fprintf(stderr, "\nEFREXCPRED frame=%u subframe=%u length=%d\n", frame, pitch_subframe, length);
+        excitation_words("ADAPT", pitch_subframe, excitation);
+    }
+}
 
 static void words(const char *kind, const short *values, unsigned count)
 {
@@ -76,6 +94,9 @@ void __wrap_d_gain_code(short index, short *code, short length, short *gain, sho
                        short state, short prev_bf, short ctrl, short subframe, short dtx_state)
 {
     short previous_gain = prev_gc;
+    fprintf(stderr, "\nEFREXCCALL frame=%u subframe=%u ctrl=%04x length=%d\n", frame,
+            code_subframe, (unsigned)(unsigned short)ctrl, length);
+    excitation_words("FIXED", code_subframe, code);
     __real_d_gain_code(index, code, length, gain, bfi, state, prev_bf, ctrl, subframe, dtx_state);
     if (!bfi)
         fprintf(stderr, "\nEFRPOLICY frame=%u subframe=%u prev_bf=%04x previous_gain=%04x value=%04x\n", frame,
