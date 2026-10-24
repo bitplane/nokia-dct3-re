@@ -26,6 +26,16 @@ static void excitation_words(const char *kind, unsigned subframe, const short *v
 
 void __wrap_Pred_lt_6(short *excitation, short lag, short fraction, short length)
 {
+    if (in_decoder) {
+        unsigned i;
+        fprintf(stderr, "\nEFRPREDINPUT frame=%u subframe=%u lag=%04x fraction=%04x length=%d\n",
+                frame, pitch_subframe, (unsigned)(unsigned short)lag,
+                (unsigned)(unsigned short)fraction, length);
+        fprintf(stderr, "EFRPREDHISTORY frame=%u subframe=%u values=", frame, pitch_subframe);
+        for (i = 0; i < 154; ++i)
+            fprintf(stderr, "%04x", (unsigned)(unsigned short)excitation[(int)i - 154]);
+        fputc('\n', stderr);
+    }
     __real_Pred_lt_6(excitation, lag, fraction, length);
     if (in_decoder) {
         fprintf(stderr, "\nEFREXCPRED frame=%u subframe=%u length=%d\n", frame, pitch_subframe, length);

@@ -53,20 +53,23 @@ class FilterHarnessTests(unittest.TestCase):
         stub = cls.root / 'stub.c'
         stub.write_text('void Syn_filt(short*a,short*x,short*y,short n,short*m,short u)'
                         '{int i;for(i=0;i<n;i++)y[i]=x[i];'
-                        'if(u)for(i=0;i<10;i++)m[i]=y[n-10+i];}\n')
+                        'if(u)for(i=0;i<10;i++)m[i]=y[n-10+i];}\n'
+                        'void Pred_lt_6(short*e,short lag,short frac,short n)'
+                        '{int i;for(i=0;i<n;i++)e[i]=e[-1];}\n')
         cls.program = cls.root / 'calculator'
         subprocess.run(['gcc', '-std=gnu89', '-Wall', '-Wextra', '-o', str(cls.program),
-                        str(Path(__file__).with_name('etsi_efr_filter_replay.c')), str(stub)],
+                        str(Path(__file__).with_name('etsi_efr_argument_replay.c')), str(stub)],
                        check=True, capture_output=True)
 
     @classmethod
     def tearDownClass(cls):
         cls.temporary.cleanup()
 
-    def run_harness(self, data):
+    def run_harness(self, data, *, predictor=False):
         source, output = self.root / 'input.bin', self.root / 'output.bin'
         source.write_bytes(data)
-        result = subprocess.run([str(self.program), str(source), str(output)], capture_output=True)
+        result = subprocess.run([str(self.program), *(['--predictor'] if predictor else []),
+                                 str(source), str(output)], capture_output=True)
         return result, output.read_bytes()
 
     def test_little_endian_signed_words_and_multiple_calls(self):
@@ -81,4 +84,17 @@ class FilterHarnessTests(unittest.TestCase):
         for data in (b'', b'\x01', b'\x00\x00' * 60):
             with self.subTest(size=len(data)):
                 result, _ = self.run_harness(data)
+                self.assertNotEqual(result.returncode, 0)
+
+    def test_predictor_history_window_and_argument_domain(self):
+        history = tuple(range(153)) + (0xfffe,)
+        arguments = struct.pack('<156H', 45, 0xffff, *history)
+        result, output = self.run_harness(arguments, predictor=True)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(output, struct.pack('<40H', *((0xfffe,) * 40)))
+        for bad in (arguments[:-2], arguments[:1], b'',
+                    struct.pack('<156H', 0, 0, *history),
+                    struct.pack('<156H', 45, 4, *history)):
+            with self.subTest(length=len(bad)):
+                result, _ = self.run_harness(bad, predictor=True)
                 self.assertNotEqual(result.returncode, 0)

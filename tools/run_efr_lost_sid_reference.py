@@ -73,15 +73,17 @@ def main():
     from tools.c54x_rom4_efr_state_check import parse
     from tools.c54x_rom4_efr_filter_check import reference_records
     from tools.c54x_rom4_efr_excitation_check import reference_records as excitation_records
+    from tools.c54x_rom4_efr_predictor_check import reference_records as predictor_records
     states = []
     for name in ('state', 'state_replay'):
         text = (output / f'{name}.log').read_text()
         parse(text, frames=518)
         reference_records(text)
         excitation_controls, excitation_vectors = excitation_records(text)
+        predictor_inputs = predictor_records(text)
         states.append([line for line in text.splitlines() if line.startswith(
             ('EFRSTATE ', 'EFRGAIN ', 'EFRPOLICY ', 'EFRFILTER ', 'EFRFILTERCALL ',
-             'EFREXCCALL ', 'EFREXCPRED ', 'EFREXC '))])
+             'EFREXCCALL ', 'EFREXCPRED ', 'EFREXC ', 'EFRPREDINPUT ', 'EFRPREDHISTORY '))])
     if states[0] != states[1]:
         raise ValueError('reference semantic observations differ across fresh processes')
     evidence = dict(commands=commands, frames=518, samples=82880,
@@ -91,6 +93,7 @@ def main():
                     installation_verified=True, fresh_process_replay=True, observer_pcm_unchanged=True,
                     synthesis_filter_calls=2072, synthesis_filter_vectors=6216,
                     excitation_calls=len(excitation_controls), excitation_vectors=len(excitation_vectors),
+                    predictor_calls=len(predictor_inputs), predictor_history_words=len(predictor_inputs) * 154,
                     native_dsp_claim=False, handset_audio_claim=False)
     (output / 'evidence.json').write_text(json.dumps(evidence, indent=2) + '\n')
     print('PASS: reference-only lost-SID muting and first-speech fixture; native DSP not tested')

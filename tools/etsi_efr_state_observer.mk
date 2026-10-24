@@ -19,10 +19,3 @@ decoder_dtx_observed: $(DOBJ) efr_dtx_observer.o
 
 efr_dtx_observer.o: $(DTX_OBSERVER_SOURCE)
 	$(CC) $(CFLAGS) -c $(DTX_OBSERVER_SOURCE) -o $@
-
-# Standalone argument-only synthesis calculator, not a decoder-state replay.
-efr_filter_replay: syn_filt.o basicop2.o count.o efr_filter_replay.o
-	$(CC) $(CFLAGS) -o $@ $^
-
-efr_filter_replay.o: $(FILTER_REPLAY_SOURCE)
-	$(CC) $(CFLAGS) -c $(FILTER_REPLAY_SOURCE) -o $@

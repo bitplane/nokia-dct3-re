@@ -3132,7 +3132,7 @@ python3 tools/run_efr_filter_replay.py --source ACQUIRED_REFERENCE_SOURCE \
   --native RUN/error.log --output NEW_DIRECTORY
 ```
 
-The calculator rebuilds its three original reference objects, verifies the
+The calculator compiles original reference routines into an isolated executable, verifies the
 original decoder's installation PCM, compares two fresh-process calculations
 and checks that the original executable, source and harness hashes do not
 change. The report pins arguments, calculator output and native input log.
@@ -3170,6 +3170,44 @@ python3 tools/c54x_rom4_efr_excitation_check.py RUN/error.log REFERENCE/state.lo
 The reference generator now requires all 2,072 gain-boundary calls and 3,572
 ordered excitation vectors in both fresh processes. Wrong pointer ownership,
 missing predictor calls, altered replay and short/reordered vectors are errors.
+
+The predictor's native call at `c7f6` returns through `c7fa` and enters `d080`
+with the excitation pointer in AR2, interpolation table `eaaa` in AR3,
+integer lag in AR0 and signed fractional lag in A. Data `130e`/`1301`
+independently retain the lag/fraction; the observer requires agreement with
+the live arguments. Its 154 preceding excitation words match the reference's
+allocated prediction-history window. Only speech-admitted calls are observed.
+
+All 1,500 native/reference lag/fraction pairs match; the fixture executes
+integer lags 17..142 and all six fractions -2..3. Of 231,000 history words,
+9,898 differ from frame 97/subframe 2 through frame 117/subframe 2. History
+therefore outlasts the differing predictor outputs; the full buffer is not
+equivalent to the taps selected for a particular lag/fraction.
+
+`run_efr_predictor_replay.py` invokes the acquired reference's unmodified
+`Pred_lt_6` on copies of these native arguments and histories. Both frontends
+match all 60,000 native adaptive samples exactly. The shared argument calculator
+builds its own isolated executable and checks installation PCM, immutable
+sources and two fresh-process outputs. The synthesis-filter control still
+matches all 82,880 native samples through the same builder. No original source
+tree executable is replaced and no decoder/emulator state is edited.
+
+```sh
+python3 tools/c54x_rom4_efr_predictor_check.py RUN/error.log REFERENCE/state.log \
+  --output RUN/predictor-characterization.json
+python3 tools/run_efr_predictor_replay.py --source ACQUIRED_REFERENCE_SOURCE \
+  --native RUN/error.log --output NEW_DIRECTORY
+```
+
+The reference generator requires 1,500 ordered predictor inputs and 231,000
+history words in both fresh processes. The native checker rejects wrong call
+ownership, missing/short history, inconsistent saved/live arguments, altered
+replay or mismatched lag/fraction. The calculator rejects truncated cases and
+out-of-contract lag/fraction before invoking the original routine. This validates
+predictor arithmetic for captured inputs, not every CPU flag/saturation case,
+whole-decoder reference equality, every excitation-mixing operation or native
+handset speech. The acquired patch and strict frame 97/86-sample failure remain
+unchanged; atomic/staged semantic logs and PCM remain identical.
 
 ### Native EFR active-speech erasures
 
