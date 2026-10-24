@@ -262,6 +262,12 @@ def verify_mode_observation(log):
 
 
 def verify_parameter_context(log):
+    writes = re.findall(r'6210_parameter_context_write: pc=([0-9a-f]{8}) data=([0-9a-f]{8})', log)
+    if ('0041ac32', '00000000') not in writes or any(int(value, 16) != 0 for _, value in writes):
+        raise ValueError('context watch lacks initialization or differs from zero-write fixture')
+    setters = re.findall(r'6210_parameter_context_set: value=([0-9a-f]+) lr=([0-9a-f]{8})', log)
+    if any(int(value, 16) != 0 for value, _ in setters):
+        raise ValueError('context setter differs from unattached-call fixture')
     rows = re.findall(
         r'6210_control_compiler: selector=08 value=([0-9a-f]{4}) publish=1 '
         r'lr=00420c0f context=([0-9a-f]{2}) state=([0-9a-f]{2}) '
@@ -287,6 +293,7 @@ def verify_parameter_context(log):
     source, cache = next(iter(blocks))
     return {'source': source, 'cache': cache, 'context': 0,
             'observations': len(rows), 'pair': 0x100,
+            'context_writes': len(writes), 'context_setter_calls': len(setters),
             'clock_semantics_validated': False}
 
 

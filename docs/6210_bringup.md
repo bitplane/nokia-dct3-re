@@ -1126,6 +1126,9 @@ decoded pair rule, independently of the physical call/writer checks.
 Other contexts have not been exercised physically; their table branches are
 static evidence only. In particular, bit0100 is not assigned a clock rate,
 microphone route or gain from this observation.
+The context setter is linked to accessory lifecycle callers, not a newly
+identified clock-control API; the [accessory context contract](#accessory-to-parameter-context)
+owns its caller inventory and observed initialization.
 
 The board evidence provides a narrower shared-part hypothesis: own NPE-3
 schematic sheet3 names N240`COBBA_GJP_V4.1`, while the independent NSB-7
@@ -2120,7 +2123,7 @@ numbers; the numbered contract below comes from the product's firmware.
 Reader `46b3d6` selects ADC input 0 via `504100`. Consumer
 `39d678/39d686/39d692` stores the result and evaluates accessory state byte
 `173a97`. Initialization `46b982` writes `0f`. At a constant zero input,
-`39ccc8` advances that state to `10`; `39d784` calls UI selector `41a944`
+`39ccc8` advances that state to `10`; `39d784` calls parameter-context setter `41a944`
 with argument 1, and the idle frame displays `Headset`. A nominal high input
 `03ff` leaves the state at `0f` and the reviewed idle frame has no accessory
 label. This controlled input/state/frame correspondence supports the
@@ -2181,7 +2184,43 @@ This explains why a nominal 1023 input exercises the high/cleanup path,
 not the 300..500 path. It does not identify every accessory type, recover
 electrical units, establish the complete downstream lifecycle, or justify
 adding guessed headset/hook inputs. The low-input state-`10` write remains
-anchored at `39ccc8`; UI selection remains firmware-owned.
+anchored at `39ccc8`; accessory/context selection remains firmware-owned.
+
+### Accessory-to-parameter context
+
+Setter`41a944` stores its argument in`16ed5c`, calls`41a6b0` and requests
+parameter reconstruction through`4202a0`. Its positive argument guard is
+`<5`. All8 halfword-aligned direct-BL candidates decode to immediate values
+in0..4; indirect calls and other aliases/writers are not closed:
+
+| Context | Adjacent accessory classification / role | Direct call sites |
+| --- | --- | --- |
+| 0 | `0f` unattached transitions or reset | `39cdba`, `39d58a`, `39dc9e`, `4ba860` |
+| 1 | `10` Headset classification | `39d786` |
+| 2 | `20`, physical accessory identity unproved | `39db7a` |
+| 3 | `80`, physical accessory identity unproved | `39d566` |
+| 4 | `84`, physical accessory identity unproved | `39d528` |
+
+These are adjacent lifecycle transitions, not an atomic invariant between
+the two bytes. The four reset/unattached sites are not all ADC decisions.
+Only known positive direct arguments are covered; the signed guard does not
+independently exclude negative inputs from unclosed callers.
+
+Initializer`41ac32` separately stores zero. Extended coherent physical call
+`tmp/npe3-context-owner-gate-final` passes with a positive one-byte write
+watch: CPU startup clear`200168` and initializer`41ac32` both write zero,
+with no setter invocation in that run. Nine command8 observations retain
+context0 and source/cache blocks`172d80/172d68`. The tested parameter
+publications therefore proceed with initialized context0 and no setter
+event; this does not prove native or hardware audio readiness.
+Alternate physical accessory transitions and their PCM/DSP meaning
+remain unqualified. The two decoded parameter-builder branches select
+bits0020/0100 from this context as described above; neither bit is assigned
+electrical units, codec routing or a PCM rate.
+
+The static map is verified by`noki6210_accessory_contract.py`; the read-only
+setter/write observations are part of`verify-6210-dsp-control-observation`.
+No driver, ADC input, PMM, RAM state or service message was changed.
 
 Registration verification permits SIM EF_LOCI writes after Location Updating
 Accept either before or after radio release. The network and SIM consumers

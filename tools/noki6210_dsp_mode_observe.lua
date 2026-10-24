@@ -9,3 +9,7 @@ cpu.debug:bpset(0x303c30, nil,
     'logerror "6210_paired_mode: value=%02x\\n",r0;g')
 cpu.debug:bpset(0x305258, nil,
     'logerror "6210_service_command: class=%02x command=%02x argument=%02x\\n",b@(r0+3),b@(r0+8),b@(r0+9);g')
+cpu.debug:bpset(0x41a944, nil,
+    'logerror "6210_parameter_context_set: value=%02x lr=%08x\\n",r0,r14;g')
+cpu.debug:wpset(cpu.spaces['program'], 'w', 0x16ed5c, 1, nil,
+    'logerror "6210_parameter_context_write: pc=%08x data=%08x\\n",pc,wpdata;g')

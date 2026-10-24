@@ -30,7 +30,8 @@ class ControlContractTest(unittest.TestCase):
             self.assertEqual(error.exception.code, 2)
 
     def test_mode_probe_needs_positive_compiler_and_physical_controls(self):
-        log = ('6210_control_compiler: selector=08 value=0102 publish=1 lr=00420c0f context=00 state=00 source=00172d80 cache=00172d68\n'
+        log = ('6210_parameter_context_write: pc=0041ac32 data=00000000\n'
+               '6210_control_compiler: selector=08 value=0102 publish=1 lr=00420c0f context=00 state=00 source=00172d80 cache=00172d68\n'
                '6210_call_physical: action=send\n'
                '6210_control_compiler: selector=08 value=070b publish=1 lr=00420c0f context=00 state=01 source=00172d80 cache=00172d68\n'
                'dsp_control_write: data=870b pc=0042727c r4=0000870b r7=00000008\n'
@@ -48,6 +49,9 @@ class ControlContractTest(unittest.TestCase):
                     log.replace('context=00', 'context=01'),
                     log.replace('state=01', 'state=00'),
                     log.replace('cache=00172d68', 'cache=00172d80'),
+                    log.replace('pc=0041ac32', 'pc=0041ac30'),
+                    log + '6210_parameter_context_write: pc=0041a956 data=00000001\n',
+                    log + '6210_parameter_context_set: value=01 lr=0039d78b\n',
                     log + '6210_paired_mode: value=01\n',
                     log + '6210_service_command: class=40 command=80 argument=01\n'):
             with self.subTest(bad=bad[-70:]), self.assertRaises(ValueError):

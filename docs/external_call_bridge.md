@@ -772,6 +772,10 @@ The normal parameter builder's states0/1 select the mutually exclusive
 bits0020/0100 from context byte16ed5c; a coherent physical call observes
 context0,0102/050a/070b and stable source/cache blocks. This intermediate
 selection does not decode either bit as a clock or microphone route.
+The setter's8 direct callers link contexts0..4 to accessory lifecycle
+classifications; the unattached-call write watch observes only startup/
+initializer zero writes, not a missing context-setter event. Product-owned
+caller coverage and unknown accessory identities remain in the NPE-3 doc.
 The same COBBA part is documented with differing NSM-3/NSB-7 clocks, so
 neither table nor part identity establishes the selected PCM operating mode
 or COBBA register semantics. Investigate context selection and DSP-side interpretation rather

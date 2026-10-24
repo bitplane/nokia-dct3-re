@@ -12,6 +12,20 @@ def verify(image):
         return [(item.mnemonic, item.op_str) for item in decoder.disasm(
             image[start - 0x200000:start - 0x200000 + size], start)]
     spans = (
+        (0x41a944, 4, [('push', '{r4, lr}'), ('adds', 'r4, r0, #0')]),
+        (0x41a950, 20, [('cmp', 'r4, #5'), ('bge', '#0x41a962'),
+                       ('ldr', 'r0, [pc, #0x20c]'), ('strb', 'r4, [r0]'),
+                       ('adds', 'r0, r4, #0'), ('bl', '#0x41a6b0'),
+                       ('bl', '#0x4202a0'), ('movs', 'r0, #1')]),
+        (0x41abfc, 2, [('movs', 'r4, #0')]),
+        (0x41ac30, 4, [('ldr', 'r0, [pc, #0x370]'), ('strb', 'r4, [r0]')]),
+        (0x39d478, 2, [('ldr', 'r6, [pc, #0x358]')]),
+        (0x39d522, 4, [('movs', 'r0, #0x84'), ('strb', 'r0, [r6]')]),
+        (0x39d560, 4, [('movs', 'r0, #0x80'), ('strb', 'r0, [r6]')]),
+        (0x39d584, 4, [('movs', 'r0, #0xf'), ('strb', 'r0, [r6]')]),
+        (0x39db6c, 12, [('ldr', 'r0, [pc, #0x1e4]'), ('ldrb', 'r1, [r0]'),
+                        ('cmp', 'r1, #0x20'), ('beq', '#0x39db84'),
+                        ('movs', 'r1, #0x20'), ('strb', 'r1, [r0]')]),
         (0x46b3d6, 8, [('push', '{r4, lr}'), ('movs', 'r0, #0'), ('bl', '#0x504100')]),
         (0x39d680, 6, [('ldrb', 'r0, [r5]'), ('cmp', 'r0, #0xf'), ('bne', '#0x39d6a8')]),
         (0x39d686, 12, [('bl', '#0x46b3d6'), ('movs', 'r1, #0xff'),
@@ -32,10 +46,36 @@ def verify(image):
     for start, size, expected in spans:
         if instructions(start, size) != expected:
             raise ValueError(f'own accessory instruction span differs at {start:x}')
-    literals = {0x39d7d4: 0x173a97, 0x39da0c: 0x173aa2, 0x39da30: 0x312}
+    literals = {0x39d7d4: 0x173a97, 0x39da0c: 0x173aa2, 0x39da30: 0x312,
+                0x41ab64: 0x16ed5c, 0x41afa4: 0x16ed5c, 0x39dd54: 0x173a97}
     for address, value in literals.items():
         if int.from_bytes(image[address - 0x200000:address - 0x200000 + 4], 'big') != value:
             raise ValueError(f'own accessory literal differs at {address:x}')
+    setters = {0x39cdba: 0, 0x39d528: 4, 0x39d566: 3, 0x39d58a: 0,
+               0x39d786: 1, 0x39db7a: 2, 0x39dc9e: 0, 0x4ba860: 0}
+    for address, value in setters.items():
+        if instructions(address - 2, 6) != [('movs', f'r0, #{value}'), ('bl', '#0x41a944')]:
+            raise ValueError(f'context setter argument differs at {address:x}')
+    calls = []
+    for offset in range(0, len(image) - 3, 2):
+        first = int.from_bytes(image[offset:offset + 2], 'big')
+        second = int.from_bytes(image[offset + 2:offset + 4], 'big')
+        if first & 0xf800 != 0xf000 or second & 0xf800 != 0xf800:
+            continue
+        displacement = ((first & 0x7ff) << 12) | ((second & 0x7ff) << 1)
+        if displacement & 0x400000:
+            displacement -= 0x800000
+        address = 0x200000 + offset
+        if address + 4 + displacement == 0x41a944:
+            calls.append(address)
+    if calls != sorted(setters):
+        raise ValueError('context setter direct-call inventory differs')
     return {'selector': 0, 'state': 0x173a97, 'sample': 0x173aa2,
             'state_0f_interval': [300, 500], 'decision_threshold': 786,
-            'cleanup_threshold': 912, 'high_state_branch': 0x39d796}
+            'cleanup_threshold': 912, 'high_state_branch': 0x39d796,
+            'parameter_context': 0x16ed5c, 'context_setter': 0x41a944,
+            'context_initializer': 0x41ac32,
+            'context_setter_direct_calls': setters,
+            'context_transition_pairs': {0x0f: 0, 0x10: 1, 0x20: 2, 0x80: 3, 0x84: 4},
+            'indirect_writer_coverage': False,
+            'pcm_semantics_validated': False}
