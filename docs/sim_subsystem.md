@@ -557,6 +557,10 @@ Separate6150 profile4 runs also install DCT3 menu and physically select
 Continue/Exit, returning distinct item-1/item-2 envelopes with9000 and unchanged
 complete storage. Both ACK-only results show Wait; automatic menu return is
 not promoted (`--menu-item 1` / `--menu-item 2`).
+A separate6150 profile7 follows Continue with SELECT ITEM. Physical Beta
+selection emits the exact item-2 terminal response, accepted with9000, and
+returns to the clean installed list with unchanged complete storage
+(`--select-item`). This does not change the ACK-only return boundary.
 
 NSK-1 v5.61 (5130) independently produces that same four-byte profile and
 automatic result30 refusal. Its matched Phase-2 control has no proactive

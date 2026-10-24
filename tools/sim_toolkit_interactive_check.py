@@ -13,9 +13,15 @@ INKEY_RESPONSE = bytes.fromhex('8103022200020282810301000d020435')
 INPUT_RESPONSE = bytes.fromhex('8103032300020282810301000d03043432')
 MENU = bytes.fromhex('d0268103042500820281828509') + b'DCT3 menu' + bytes.fromhex('8f0901') + b'Continue' + bytes.fromhex('8f0502') + b'Exit'
 MENU_RESPONSE = bytes.fromhex('810304250002028281030100')
+SELECT_ITEM = bytes.fromhex('d0208103072400820281828506') + b'Choose' + bytes.fromhex('8f0601') + b'Alpha' + bytes.fromhex('8f0502') + b'Beta'
+ITEM_RESPONSE = bytes.fromhex('810307240002028281030100100102')
 
 
-def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_item=None):
+def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_item=None, select_item=False):
+    if select_item:
+        if menu_item not in (None,1):
+            raise ValueError('follow-up item requires Continue')
+        menu_item=1
     if menu_item not in (None,1,2):
         raise ValueError('unknown installed-menu item')
     if any(marker in text for marker in (*reset_markers,'LUA ERROR','Error in')):
@@ -37,6 +43,10 @@ def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_
             raise ValueError('missing unique card command payload')
     if menu_item is not None:
         expected.append((0xc2,0,0,9,bytes.fromhex('d307020201811001')+bytes((menu_item,))))
+    if select_item:
+        expected += [(0x12,0,0,len(SELECT_ITEM),b''),(0x14,0,0,len(ITEM_RESPONSE),ITEM_RESPONSE)]
+        if rx.count(SELECT_ITEM+b'\x90\x00') != 1:
+            raise ValueError('missing unique follow-up item payload')
     if [row[:5] for row in commands if row[0] in (0x10,0x12,0x14,0xc2)] != expected:
         raise ValueError('interactive profile/FETCH/response sequence differs')
     if 'read-binary fid=6fae offset=0 length=1 first=03' not in text or text.count('SIM completion ins=f2 sw=9116') != 1:
@@ -44,8 +54,10 @@ def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_
     results=[(0x9115,3,10),(0x911a,3,10),(0x9000,3,10)]
     if menu_item is not None:
         results[-1:]=[(0x9128,3,10),(0x9000,3,10)]
+    if select_item:
+        results.append((0x9000,3,10))
     if (statuses(text,0x10) != [(0x9000,3,10)] or statuses(text,0x14) != results
-            or statuses(text,0xc2) != ([(0x9000,3,10)] if menu_item is not None else [])):
+            or statuses(text,0xc2) != ([(0x9122 if select_item else 0x9000,3,10)] if menu_item is not None else [])):
         raise ValueError('interactive response status differs')
     marker = prefix+'_toolkit_physical: action=dismiss'
     if re.findall(re.escape(marker)+r' down=([01]) t=([0-9.]+)',text) != [('1','68.000000000'),('0','68.200000000')]:
@@ -77,3 +89,14 @@ def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_
             raise ValueError('menu envelope precedes physical selection')
         if MENU+b'\x90\x00' not in wire(before,'RX',prefix) or len(statuses(before,0x14)) != 4:
             raise ValueError('menu installation incomplete before selection')
+    if select_item:
+        marker=prefix+'_toolkit_select_item:'
+        if (re.findall(re.escape(marker)+r' action=(\w+) down=([01])',text) !=
+                [(action,down) for action in ('next','confirm') for down in ('1','0')]
+                or text.count(marker) != 4):
+            raise ValueError('physical follow-up selection differs')
+        before=text.split(marker+' action=confirm down=1',1)[0]
+        if (len(statuses(before,0x14)) != 4
+                or sum(row[0]==0x14 for row in apdus(wire(before,'TX',prefix))) != 4
+                or SELECT_ITEM+b'\x90\x00' not in wire(before,'RX',prefix)):
+            raise ValueError('follow-up response precedes physical confirmation')

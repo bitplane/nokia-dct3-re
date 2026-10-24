@@ -114,6 +114,32 @@ separate card/application contract; do not synthesize a firmware completion
 to clear this frame. Add `--mame mame/mame` with fresh outputs to execute.
 All existing provisioning, native-mask, RF and speech limitations remain.
 
+### Toolkit follow-up SELECT ITEM
+
+External profile7 retains the same installation and Continue selection, then
+answers its menu-selection envelope with9122 rather than a final9000. Firmware
+FETCHes the34-byte SELECT ITEM command `Choose` with Alpha/Beta. Physical
+Down89 selects Beta; left-softkey confirmation90.5 returns
+`810307240002028281030100100102`, accepted with9000. Reviewed88s/89.5s/91.15s
+frames show Alpha selected, Beta selected, then the original Continue/Exit
+list with Continue selected. The result list matches its pre-selection frame
+exactly. The item result follows physical confirmation, not card delivery alone.
+
+```sh
+.venv/bin/python tools/nsm1_toolkit_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-toolkit-select-item-accepted --select-item
+```
+
+The independent92s run preserves complete EEPROM/card/flash and all unrelated
+configuration. It requalifies PIN/phone authentication, own terminal profile,
+all preceding text/input/menu exchanges, exact follow-up payload/status/action
+ordering and all product-owned pixel oracles. Add `--mame mame/mame` with a
+fresh output directory to execute. The card supplies the real next proactive
+command through SIMI; no firmware completion or context change is supplied.
+This qualifies clean return after this follow-up command, not automatic return
+from the separate ACK-only profile, arbitrary Toolkit applications, native RF,
+speech or fitted-mask fidelity.
+
 ### Native idle restoration and physical continuation
 
 An independent54s cold process from the qualified original PIN-enabled

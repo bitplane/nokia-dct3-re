@@ -229,6 +229,8 @@ also returns physical GET INKEY5 and GET INPUT42, with reviewed empty/filled
 editor pixels and clean idle return. Profile4 independently installs DCT3 menu;
 physical Continue/Exit produce distinct accepted item-1/item-2 envelopes.
 ACK-only selection leaves Wait, so automatic menu return is not qualified.
+Separate profile7 responds with SELECT ITEM; physical Beta selection returns
+the exact accepted result and restores the clean installed list.
 Whole storage is unchanged across these fixtures; other Toolkit commands
 and radio support are not qualified.
 
