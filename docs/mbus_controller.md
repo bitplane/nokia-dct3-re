@@ -130,6 +130,16 @@ observed through taps. `0x4d2cac`'s sleep permission also explicitly requires
 FIQ-mask bit3 set and checks software timer`0x38` (`0x4d2cc8..0x4d2cd8`),
 explaining why restoring MBUS lifecycle progression can expose deeper idle
 behavior. This is not proof that the post-wake hardware contract is complete.
+The timer query`0x3c1ad0` inspects registered timer state and, when active,
+adjusts a software queue interval against hardware counters; it does not
+directly poll an IRQ3 latch. Bounded entry observations immediately after
+wake (`tmp/npe3-mbus-idle-gate-inputs`,31.4932s) confirm the permission chain:
+`43001a=1`, `4ffb16=0`, `4e8938=1`, `4dc316=1`, `4aaa1c=1`,
+`4ba464=1`, `395e8e=1`; `4cc3e2=1` initially reaches sleep-finalization
+again before the later imminent-timer stall. Results are observed at the
+next call entry without intervening argument assignment, not inferred from
+silent hooks. There is no evidence here for a missing keypad edge, masked
+FIQ3 dispatch, corrupt timer baseline, or a safe firmware-flag injection.
 
 ### NPE-3 service catalogue boundary
 
