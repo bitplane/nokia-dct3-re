@@ -1,5 +1,5 @@
 import unittest
-from tools.nsk1_nv_source_check import CODE, check_sources, check_empty_encoding
+from tools.nsk1_nv_source_check import CODE, check_sources, check_empty_encoding, check_lifecycle
 
 
 def fixture():
@@ -11,6 +11,27 @@ def fixture():
 
 
 class SourceTest(unittest.TestCase):
+    def test_shared_update_lifecycle_is_not_card_specific(self):
+        lines = [
+            'nsk1_nv_selector: input=05e7 stage=01 flags=20 caller=0028db52 t=16.000000000 observer_writes=0',
+            'nsk1_nv_clear: caller=00270ead r0=00000000 r4=002a968c r5=0010fd0a r6=000005e7 sp=0010cec0 t=16.500000000 observer_writes=0']
+        index = 0
+        for kind,count in ((3,8),(4,5),(5,5)):
+            for slot in range(count):
+                lines.append(f'nsk1_nv_lifecycle: class={kind} index={slot} digit=0010ce88 digit_first=00 '
+                    f'other=0010ce88 other_first=00 caller=0024b411 sp=0010ce88 t={17+index}.000000000 observer_writes=0')
+                index += 1
+        text = '\n'.join(lines)
+        self.assertEqual(check_lifecycle(text),18)
+        for bad in (text.replace('stage=01','stage=00'), text.replace('flags=20','flags=00'),
+                    text.replace('digit_first=00','digit_first=01',1),
+                    text.replace('index=7','index=8',1),
+                    text+'\nnsk1_nv_lifecycle: malformed',
+                    text+'\n'+lines[1], text.replace('t=16.500','t=18.500'),
+                    text.replace('t=18.000','t=16.000')):
+            with self.assertRaises(ValueError):
+                check_lifecycle(bad)
+
     def test_empty_encoding_explains_only_inactive_payload_changes(self):
         text, before = fixture()
         after = bytearray(before)

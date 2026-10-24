@@ -545,8 +545,10 @@ automatic result30 refusal. Its matched Phase-2 control has no proactive
 exchange. Unlike the6130 fixture, this Phase-2+ trial also rewrites108 EEPROM
 bytes while the Phase-2 control preserves them; [5130 bring-up](5130_bringup.md)
 localizes the differences to firmware-copied stack padding in empty encoded
-digit fields, not bytes damaged in transport. The update trigger and general
-record validity remain open; the whole bank is checked, not region-whitelisted.
+digit fields, not bytes damaged in transport. Both card profiles execute the
+same accepted-code record updates; the control's unused padding already
+matches storage. General record validity remains unclaimed; the whole bank
+is checked, not region-whitelisted.
 This is not a successful feature. The shared wire validator distinguishes automatic
 capability refusal from success after a physical contact; product wrappers
 retain their own storage, native-execution and pixel requirements.

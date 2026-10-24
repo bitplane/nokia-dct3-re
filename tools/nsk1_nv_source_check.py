@@ -16,6 +16,28 @@ CODE = {0x85a98: 'b5f01c0e2200703278022a00d031',
         0x49c82: 'a905a801c80cc10cc80cc10c'}
 
 
+def check_lifecycle(text):
+    rows = re.findall(r'nsk1_nv_lifecycle: class=([0-9a-f]+) index=([0-9a-f]+) '
+        r'digit=0010ce88 digit_first=00 other=0010ce88 other_first=00 '
+        r'caller=0024b411 sp=0010ce88 t=([0-9]+\.[0-9]+) observer_writes=0', text)
+    expected = [(str(kind), str(index)) for kind,count in ((3,8),(4,5),(5,5)) for index in range(count)]
+    if [(kind,index) for kind,index,_ in rows] != expected or text.count('nsk1_nv_lifecycle:') != 18:
+        raise ValueError('indexed empty-field lifecycle differs')
+    selectors = re.findall(r'nsk1_nv_selector: input=05e7 stage=01 flags=20 caller=0028db52 '
+                           r't=([0-9]+\.[0-9]+) observer_writes=0', text)
+    clears = re.findall(r'nsk1_nv_clear: caller=00270ead r0=00000000 r4=002a968c '
+                        r'r5=0010fd0a r6=000005e7 sp=0010cec0 '
+                        r't=([0-9]+\.[0-9]+) observer_writes=0', text)
+    if len(selectors) != 1 or len(clears) != 1 or text.count('nsk1_nv_clear:') != 1:
+        raise ValueError('accepted-code record-update selection differs')
+    if not (float(selectors[0]) < float(clears[0]) < float(rows[0][2])):
+        raise ValueError('selector/clear/write order differs')
+    times = [float(row[2]) for row in rows]
+    if any(a >= b for a,b in zip(times,times[1:])):
+        raise ValueError('record update order differs')
+    return len(rows)
+
+
 def check_empty_encoding(text, image, before, after):
     for offset, encoded in CODE.items():
         expected = bytes.fromhex(encoded)
@@ -84,6 +106,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run', type=Path)
     parser.add_argument('--empty-encoding', action='store_true')
+    parser.add_argument('--lifecycle', action='store_true')
     args = parser.parse_args()
     try:
         count = check_sources((args.run/'error.log').read_text(),
@@ -93,11 +116,15 @@ def main():
                 (args.run/'nvram/nsk1r4t/flash').read_bytes(),
                 (args.run/'initial_eeprom.bin').read_bytes(),
                 (args.run/'nvram/nsk1r4t/eeprom').read_bytes())
+        if args.lifecycle:
+            check_lifecycle((args.run/'error.log').read_text())
     except (OSError, ValueError) as error:
         parser.exit(1, f'NSK-1 NV source FAIL: {error}\n')
     print(f'NSK-1: {count} complete record writes match pre-serialization RAM; source semantics unresolved')
     if args.empty_encoding:
         print('108 changed bytes are inactive empty-digit padding; not general storage-integrity acceptance')
+    if args.lifecycle:
+        print('Accepted-code selector invokes the indexed empty-field update; not unique to Phase-2+')
 
 
 if __name__ == '__main__':

@@ -201,7 +201,9 @@ refuses DISPLAY TEXT with result30. Its matched Phase-2 control preserves
 EEPROM; the Phase-2+ probe rewrites108 bytes of unused empty-digit-field
 padding. Passive input/write observations and the length-driven decoder
 explain those bytes, not general storage integrity or Toolkit display support.
-The complete transition remains checked; the update's lifecycle trigger is open.
+The complete transition remains checked. Paired lifecycle traces show both
+profiles execute the same accepted-code record updates; only stale padding
+differs, not whether firmware writes the records.
 
 The7110 v5.01 checksum-consistency fixture is separate from its intact-input
 row: changing only the latest journal checksum byte releases the second task

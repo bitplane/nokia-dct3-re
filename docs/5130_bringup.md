@@ -176,10 +176,32 @@ from the product storage guard and `eeprom_integrity_validated` remains false.
   tmp/nsk1-toolkit-nv-encode --empty-encoding
 ```
 
-The remaining lifecycle question is why Phase-2+ invokes these empty-field
-record updates while the matched Phase-2 run does not. Trace callers of249c2c
-before assigning reset/refresh semantics; do not erase records or alter timing
-merely to make the byte difference disappear.
+Paired26s lifecycle captures (`tmp/nsk1-toolkit-nv-context` and
+`tmp/nsk1-toolkit-nv-context-control`) correct the apparent trigger distinction:
+**both profiles execute the same record updates**. After physical code
+acceptance,2713cc stores20 in the context word at10acdc. Selector270e74
+receives05e7 with context stage byte10acd7=01 and flag byte10acdf=20.
+Its explicit270e8a..270e96 branch calls24b420 at270ea8. That routine loops
+classes3,4,5 through24b3e0, supplying the same zeroed31-byte input to both
+field arguments. The selected indices are0..7,0..4,0..4 respectively; all18
+calls to249c2c come from24b40c. The matched control also writes all18 complete
+records, but its unused padding already equals the initial EEPROM, so the
+final bank remains byte-identical. The Phase-2+ run carries different stale
+padding. No unique card-triggered erase or storage fault follows from this
+comparison. Why the broader firmware lifecycle chooses that context state
+is not established by this bounded observation.
+
+```sh
+.venv/bin/python tools/nsk1_nv_source_check.py \
+  tmp/nsk1-toolkit-nv-context --empty-encoding --lifecycle
+.venv/bin/python tools/nsk1_nv_source_check.py \
+  tmp/nsk1-toolkit-nv-context-control --lifecycle
+```
+
+These26s captures qualify the observed lifecycle, not the later65/70s frames;
+the separate74s feature/control runs above remain the UI evidence. The whole
+output banks and original card/executable remain guarded. Do not erase records
+or tune timing merely to make unused padding match.
 Normal-machine, fitted-mask, RF and speech claims are unchanged.
 
 Physical manual network-search initiation also passes from independently
