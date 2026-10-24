@@ -64,16 +64,23 @@ def check_configuration(source, run, profile):
         raise ValueError('external card provenance differs')
 
 
-def check(source, run, control=False, interactive=False):
-    if control and interactive:
-        raise ValueError('interactive input and Phase-2 control are distinct')
+def check_inputs(source,run,profile,seconds):
+    """Own linked cold inputs, full card and physical authentication."""
     check_cold_link(run, source)
-    check_configuration(source, run, 0 if control else 3 if interactive else 1)
+    check_configuration(source, run, profile)
     code = json.loads((run / 'exit_status.json').read_text())['returncode']
-    text, card = check_card_run(run, code, 84 if interactive else 74)
+    text, card = check_card_run(run, code, seconds)
     if card != make_current_profile(True):
         raise ValueError('complete persistent laboratory card changed')
     check_correct(text, card, run / 'snap')
+    return text,card
+
+
+def check(source, run, control=False, interactive=False):
+    if control and interactive:
+        raise ValueError('interactive input and Phase-2 control are distinct')
+    text,card=check_inputs(source,run,0 if control else 3 if interactive else 1,
+                           84 if interactive else 74)
     check_trace(text, control, interactive)
     if interactive:
         check_storage(source)

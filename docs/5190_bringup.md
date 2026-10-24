@@ -213,6 +213,37 @@ its own Navi column1/mask04, distinct from the6150's column1/mask02.
 Wire validation and lab command bytes are shared, not terminal profiles,
 storage contents or product pixel oracles. Other Toolkit commands remain open.
 
+#### Pending Toolkit command restoration
+
+An independent74s profile1 process starts from the same own clean-idle bank
+and saves at65s with the organically fetched `DCT3 SAT` command awaiting
+physical dismissal. Own ARM PC2a4674/SP10c6dc and active DSP PC47a1/IDLE0
+are observed. All37 ARM registers,36 DSP fields and rolling checksums of64KiB
+backed research ARM RAM, ordinary DSP data and program restore exactly.
+The2.7s reference/restored windows repeat1170 DSP I/O writes including relative
+times, addresses, values and masks.
+
+One TERMINAL PROFILE `0f41ff7700` and one FETCH precede save; separate physical
+Navi contacts in the two branches each emit the exact successful response,
+accepted with9000, without refetching the command. Both resulting frames
+equal the own clean Headset idle oracle. The complete selected8192-byte
+EEPROM, original3570-byte persistent card and own executable remain unchanged.
+Source hashes/CFG, physical PIN/phone authentication before save, card protocol,
+prompt/returned pixels and a nonempty hashed saved artifact are checked.
+
+```sh
+.venv/bin/python tools/nsb1_toolkit_state_check.py \
+  tmp/nsb1-diagnostic-display-final-cold tmp/nsb1-toolkit-native-state-accepted
+```
+
+Add `--mame mame/mame` with fresh outputs to execute. The shared replay
+validator also serves the6150 and6190, but profiles, physical contacts,
+storage, RAM extent and pixels stay product-owned. This is MAME save/load
+and physical input, not guest-state forcing. It covers one fetched proactive
+command awaiting a key, not an in-flight SIM character or every card command.
+Bounded checksums/replay are not exhaustive device-state proof, sustained
+native acceptance, fitted-mask/clock fidelity, registration or speech.
+
 ```sh
 .venv/bin/python tools/nsb1_toolkit_check.py \
   tmp/nsb1-pin-roundtrip-gated/correct tmp/NAME --mame mame/mame

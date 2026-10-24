@@ -546,6 +546,10 @@ profile and exact input responses with unchanged whole EEPROM/card/flash.
 Its physical Navi contact differs from the6150 despite sharing the lab schedule.
 `nsb1_toolkit_check.py --interactive` guards this independently of its older
 Field test01 DISPLAY TEXT fixture; native RF and speech remain unqualified.
+The5190 pending-display restoration gate also proves one FETCH followed by
+two physical successful responses, observed native architecture/checksum/I/O
+restoration and identical returned-idle pixels with unchanged complete storage
+(`nsb1_toolkit_state_check.py`). This is not mid-character SIMI coverage.
 
 The6150 also independently handles a three-command external card: physical
 DISPLAY TEXT dismissal, GET INKEY5 and GET INPUT42 produce exact successful

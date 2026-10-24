@@ -21,6 +21,7 @@ _G.nsb1_toolkit_tx = memory:install_write_tap(0x20034,0x20037,'nsb1_toolkit_tx',
     function(offset,data,mask) wire(offset,data,mask,'TX',0x20036) end)
 _G.nsb1_toolkit_rx = memory:install_read_tap(0x20034,0x20037,'nsb1_toolkit_rx',
     function(offset,data,mask) wire(offset,data,mask,'RX',0x20037) end)
+if _G.nsb1_toolkit_observe_only then return end
 local actions = coroutine.create(function()
     assert(emu.wait(65))
     machine.screens[':screen']:snapshot('nsb1_toolkit_display.png')
