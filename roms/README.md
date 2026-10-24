@@ -729,6 +729,29 @@ The extractor pins the archive, checks its exact member set and decoded extents,
 and uses the shared strict Wintesla record decoder; unknown record-header
 checksum fields are not interpreted.
 
+## NSB-3 service regions (Nokia 6190)
+
+The already acquired `archive-dct3-packages/nsb3_613.exe` is a ZIP
+self-extractor (SHA256
+`d2e684dbef4dc74fd0233ed96c3a3c1f1bdbd9b0615f338aff28e18a20c63d85`).
+`tools/nsb3_archive.py` reads its ZIP structure without running the executable.
+It pins the source, exact member set, normalized hashes and record extents.
+Normalized regions and per-member hashes are retained outside source control
+in `noki6190/v613/manifest.json`. Reproduce into a fresh directory:
+
+```sh
+.venv/bin/python tools/nsb3_archive.py roms/archive-dct3-packages/nsb3_613.exe --output roms/noki6190/v613
+```
+
+MCU `nsb3___6.130` occupies `0x200000..0x2d6d00`; PPM A/B/C each occupy
+`0x2e0000..0x300000` (exclusive ends). The intervening `0x9300` bytes are
+not supplied and are not synthesized by extraction. No external EEPROM or
+resident DSP mask is supplied. The own MCU marker says `V  6.13`,
+`28-04-00`, `NSB-3`; PPM headers say `27-04-00`. The matched installer INI
+names these exact files and explicitly lists ROM4 file selections. Neither
+that configuration nor a product label proves mask compatibility or runtime
+support. The source URL/hash remains in the collection acquisition manifest.
+
 ## External implementation reference archive
 
 The already-catalogued reference revision

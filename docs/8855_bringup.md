@@ -114,6 +114,14 @@ or a different release. The 13 MHz cadence is an explicit research assumption,
 not measured NSM-4 timing. No code at `861f` or return side effects are supplied;
 the missing resident program remains a native execution boundary.
 
+Public-reference check: the [parallel emulator's model inventory](https://github.com/djr-747/nokia-dct3-emulator/blob/main/README.md)
+reports an NSM-4 v5.13 HLE standby result. That is a software lead, not a
+resident-mask source or an independent native verifier oracle. No matching
+ROM6 image was located by the bounded public `DCT3 ROM6 DSP ROM dump` and
+`8855 NSM-4 DSP ROM dump` searches; this is a search result, not a proof of
+global absence. Further native progress requires an independently qualified
+source for the called program, rather than importing HLE completion values.
+
 ## Admission constraints
 
 The own register contract is recovered from instruction fragments together
