@@ -213,6 +213,44 @@ its own Navi column1/mask04, distinct from the6150's column1/mask02.
 Wire validation and lab command bytes are shared, not terminal profiles,
 storage contents or product pixel oracles. Other Toolkit commands remain open.
 
+#### Installed Toolkit menu and ACK-only return
+
+Separate90s profile4 cold runs append SET UP MENU `DCT3 menu` with Continue/Exit
+to the same DISPLAY TEXT/GET INKEY/GET INPUT sequence. GET INPUT's response
+receives9128, followed by FETCH40 and exact menu-installation response
+`810304250002028281030100`, accepted with9000. Own terminal profile remains
+`0f41ff7700`.
+
+Physical Navi80 enters Phone book in the main menu. Up81 wraps to Field test,
+Up82 selects the installed DCT3 menu, and Navi84 opens its two-item list.
+Continue86 emits envelope `d30702020181100101`; a separate cold run uses
+Down86 and Navi88 to emit Exit envelope `d30702020181100102`. Down is the
+column0/mask08 contact, not column1's unused bit08. Both envelopes receive9000
+after their physical selection. The complete selected EEPROM, original card
+and own executable remain unchanged.
+
+At87s/89s respectively the LCD exactly matches the pre-selection list with
+the chosen item highlighted. Thus this product returns to its list under the
+ACK-only profile, unlike the separately observed6150/6190 Wait outcomes.
+Do not normalize those UI contracts or require a follow-up command on every
+product. This qualifies the bounded return and the two selections, not arbitrary
+Toolkit applications or continued repeated selection.
+
+```sh
+.venv/bin/python tools/nsb1_toolkit_check.py \
+  tmp/nsb1-diagnostic-display-final-cold tmp/nsb1-toolkit-menu-continue-accepted \
+  --menu-item 1
+.venv/bin/python tools/nsb1_toolkit_check.py \
+  tmp/nsb1-diagnostic-display-final-cold tmp/nsb1-toolkit-menu-exit-accepted \
+  --menu-item 2
+```
+
+Add `--mame mame/mame` with fresh outputs to execute. The gate checks physical
+authentication, own native execution through89s, complete storage and input
+provenance, exact command/envelope/status ordering, product-owned pixels and
+MAME console observer errors, not just successful process exit. Existing
+provisioning, fitted-mask/clock, RF, registration and speech limits remain.
+
 #### Pending Toolkit command restoration
 
 An independent74s profile1 process starts from the same own clean-idle bank

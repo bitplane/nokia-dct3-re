@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 from tools import nsb1_toolkit_check as checker
 from tools.nsb1_toolkit_prepare import profile_metadata
-from tools.sim_toolkit_interactive_check import INKEY,INPUT,INKEY_RESPONSE,INPUT_RESPONSE
+from tools.sim_toolkit_interactive_check import INKEY,INPUT,INKEY_RESPONSE,INPUT_RESPONSE,MENU,MENU_RESPONSE
 
 
 def wire(direction, data):
@@ -48,7 +48,43 @@ def interactive_trace():
     return text
 
 
+def menu_trace(item=1):
+    text=interactive_trace().replace('SIM status ins=14 sw=9000','SIM status ins=14 sw=9128')
+    text+='\n'+wire('TX',bytes.fromhex('a012000028'))+'\n'+wire('RX',MENU+b'\x90\x00')
+    text+='\n'+wire('TX',bytes.fromhex('a01400000c')+MENU_RESPONSE)
+    text+='\nSIM status ins=14 sw=9000 chv=3/3 puk=10/10 enabled=1'
+    for action in ('main','fieldtest','last','open')+(('next',) if item==2 else ())+('select',):
+        for down in (1,0):
+            text+=f'\nnsb1_toolkit_menu: action={action} down={down}'
+    text+='\n'+wire('TX',bytes.fromhex('a0c2000009d307020201811001')+bytes((item,)))
+    text+='\nSIM status ins=c2 sw=9000 chv=3/3 puk=10/10 enabled=1'
+    return text
+
+
 class Nsb1ToolkitTest(unittest.TestCase):
+    def test_installed_menu_requires_own_physical_route_and_item_envelope(self):
+        for item in (1,2):
+            text=menu_trace(item)
+            checker.check_trace(text,menu_item=item)
+            envelope=wire('TX',bytes.fromhex('a0c2000009d307020201811001')+bytes((item,)))
+            early=text.replace(envelope,'').replace('nsb1_toolkit_menu: action=select down=1',
+                        envelope+'\nnsb1_toolkit_menu: action=select down=1')
+            for bad in (early,text.replace('action=fieldtest','action=wrong'),
+                        text.replace('ins=c2 sw=9000','ins=c2 sw=6a80'),
+                        text.replace('ins=14 sw=9128','ins=14 sw=9000'),
+                        text+'\nnsb1_toolkit_menu: malformed'):
+                with self.assertRaises(ValueError):
+                    checker.check_trace(bad,menu_item=item)
+            with self.assertRaises(ValueError):
+                checker.check_trace(text,menu_item=3-item)
+            with self.assertRaises(ValueError):
+                checker.check_trace(text,interactive=True)
+        for item in (0,3,-1):
+            with self.assertRaises(ValueError):
+                checker.profile_for(menu_item=item)
+        with self.assertRaises(ValueError):
+            checker.profile_for(control=True,menu_item=1)
+
     def test_interactive_input_is_own_profile_and_physical_result(self):
         text=interactive_trace()
         checker.check_trace(text,interactive=True)
@@ -106,7 +142,7 @@ class Nsb1ToolkitTest(unittest.TestCase):
                 checker.wire(wire(direction, b'\x00' * 8192), direction)
 
     def test_only_external_card_configuration_may_differ(self):
-        for profile in (0, 1, 3):
+        for profile in (0, 1, 3, 4):
             with tempfile.TemporaryDirectory() as temporary:
                 source, run = Path(temporary) / 'source', Path(temporary) / 'run'
                 for path in (source, run):
@@ -141,7 +177,7 @@ class Nsb1ToolkitTest(unittest.TestCase):
                         checker.check_configuration(source, run, profile)
 
     def test_unqualified_profile_rejects(self):
-        for profile in (-1, 2, 4, 15):
+        for profile in (-1, 2, 5, 15):
             with self.assertRaises(ValueError):
                 profile_metadata(profile)
 

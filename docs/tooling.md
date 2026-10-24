@@ -259,3 +259,10 @@ and is likewise **not redistributed** here.
 The driver `driver/nokia_dct3.cpp` is overlaid onto an upstream
 [MAME](https://github.com/mamedev/mame) checkout (pinned commit in the Makefile);
 MAME is not vendored. See `LICENSE` for the licensing split.
+
+A zero MAME exit status does not prove a Lua acceptance observer completed:
+failed coroutines can emit `[LUA ERROR]` only to the captured console and still
+return zero. Check that console as well as `error.log`, and require the complete
+expected action/protocol/output sequence. The5190 and6150 Toolkit input guards
+share `sim_toolkit_display_check.check_observer_console`; neither suppresses
+observer errors merely because the requested emulation duration elapsed.

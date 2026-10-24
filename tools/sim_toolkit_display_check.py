@@ -15,6 +15,12 @@ RESPONSE = bytes.fromhex('810301218002028281030100')
 REFUSAL = bytes.fromhex('810301218002028281030130')
 
 
+def check_observer_console(text):
+    # MAME can report a failed Lua coroutine here and still exit successfully.
+    if 'LUA ERROR' in text or 'Error in' in text:
+        raise ValueError('failed Lua observer in MAME console')
+
+
 def wire(text, direction, prefix):
     marker = re.escape(prefix) + r'_sim_wire: direction=' + re.escape(direction)
     rows = re.findall(marker + r' data=([0-9a-f]{2}) ', text)

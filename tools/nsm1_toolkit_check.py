@@ -14,7 +14,7 @@ from tools.nsm1_native_state_check import prepare as prepare_cold, check_storage
 from tools.nsm1_security_check import check_trace as check_phone, MENU
 from tools.nsk3_pin_check import check_trace as check_pin
 from tools.nsk1_phonebook_roundtrip import frame_check
-from tools.sim_toolkit_display_check import check_display
+from tools.sim_toolkit_display_check import check_display,check_observer_console
 from tools.sim_toolkit_interactive_check import check_interactive
 
 PROFILE = bytes.fromhex('0b41ff7700')
@@ -111,6 +111,7 @@ def check_inputs(seed, run, control=False, interactive=False, menu_item=None, se
     check_configuration(seed, run, control, interactive, menu_item, select_item)
     if json.loads((run / 'exit_status.json').read_text()) != dict(returncode=0):
         raise ValueError('MAME did not complete')
+    check_observer_console((run/'console.log').read_text())
     return files
 
 

@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -13,7 +14,7 @@ from tools.make_sim_card_profile import make_current_profile
 from tools.nsb1_pin_roundtrip import check_correct
 from tools.nsb1_rom4_compare import check_card_run, check_cold_link, check_frame, run_mame
 from tools.nsb1_toolkit_prepare import prepare, profile_metadata
-from tools.sim_toolkit_display_check import DISPLAY, RESPONSE, check_display, wire as display_wire
+from tools.sim_toolkit_display_check import DISPLAY, RESPONSE, check_display, check_observer_console, wire as display_wire
 from tools.sim_toolkit_interactive_check import check_interactive
 from tools.nsb1_native_state_check import check_storage
 
@@ -26,18 +27,38 @@ INTERACTIVE_FRAMES = {
     'input_filled':'0a05a2522d6a8a1e5d6774961cdb33754c7a7584465feaec4f3978828553aa43',
     'interactive_final':'934b3dcd1024275cbee8dc1e87ec35124fb617a917a0684a1e7bc1463ee59068',
 }
+MENU_FRAMES = {
+    'main':'ed5b9d247f48525c5f67b4ca71914bff1802af857d212e4dd5cb0e7e8c9a8b33',
+    'fieldtest':'15970bd84bf9c79a6628ee62eafb7fc92baeb0a28b05857bfbb44322dab695d7',
+    'last':'28ef1d58dc05c4c81dea1c524172e142721e2475d8691dd57a2683f239c00722',
+    'open':'0fe4d32169242d885c7f23d55885bfbf7364b51dec89cce272d1ad00acdfb175',
+}
+MENU_NEXT='fe5c61cde59b429b92c687c307415e22f9c4c4ae5e94c97f56835d4099096eeb'
 
 
 def wire(text, direction):
     return display_wire(text, direction, 'nsb1')
 
 
-def check_trace(text, control=False, interactive=False):
-    if control and interactive:
+def profile_for(control=False,interactive=False,menu_item=None):
+    if menu_item not in (None,1,2):
+        raise ValueError('unknown installed-menu item')
+    if control and (interactive or menu_item is not None):
         raise ValueError('interactive input and Phase-2 control are distinct')
-    if interactive:
+    return 0 if control else 4 if menu_item is not None else 3 if interactive else 1
+
+
+def check_trace(text, control=False, interactive=False,menu_item=None):
+    profile_for(control,interactive,menu_item)
+    if interactive or menu_item is not None:
         check_interactive(text,prefix='nsb1',terminal_profile=TERMINAL_PROFILE,
-                          reset_markers=('nsb1_reset_reason:',))
+                          reset_markers=('nsb1_reset_reason:',),menu_item=menu_item)
+        if menu_item is not None:
+            actions=('main','fieldtest','last','open')+(('next',) if menu_item==2 else ())+('select',)
+            if (re.findall(r'nsb1_toolkit_menu: action=(\w+) down=([01])',text) !=
+                    [(action,down) for action in actions for down in ('1','0')]
+                    or text.count('nsb1_toolkit_menu:') != len(actions)*2):
+                raise ValueError('own installed-menu physical route differs')
     else:
         check_display(text, prefix='nsb1', terminal_profile=TERMINAL_PROFILE,
                       control=control, reset_markers=('nsb1_reset_reason:',))
@@ -72,16 +93,16 @@ def check_inputs(source,run,profile,seconds):
     text, card = check_card_run(run, code, seconds)
     if card != make_current_profile(True):
         raise ValueError('complete persistent laboratory card changed')
+    check_observer_console((run/'mame_output.log').read_text())
     check_correct(text, card, run / 'snap')
     return text,card
 
 
-def check(source, run, control=False, interactive=False):
-    if control and interactive:
-        raise ValueError('interactive input and Phase-2 control are distinct')
-    text,card=check_inputs(source,run,0 if control else 3 if interactive else 1,
-                           84 if interactive else 74)
-    check_trace(text, control, interactive)
+def check(source, run, control=False, interactive=False,menu_item=None):
+    profile=profile_for(control,interactive,menu_item)
+    interactive=interactive or menu_item is not None
+    text,card=check_inputs(source,run,profile,90 if menu_item is not None else 84 if interactive else 74)
+    check_trace(text, control, interactive,menu_item)
     if interactive:
         check_storage(source)
         check_storage(run)
@@ -89,6 +110,14 @@ def check(source, run, control=False, interactive=False):
         check_frame(run/'snap/nsb1_toolkit_dismissed.png',INTERACTIVE_FRAMES['inkey'])
         for name,expected in INTERACTIVE_FRAMES.items():
             check_frame(run/f'snap/nsb1_toolkit_{name}.png',expected)
+        if menu_item is not None:
+            for name,expected in MENU_FRAMES.items():
+                check_frame(run/f'snap/nsb1_toolkit_menu_{name}.png',expected)
+            if menu_item==1:
+                check_frame(run/'snap/nsb1_toolkit_menu_select.png',MENU_FRAMES['open'])
+            else:
+                check_frame(run/'snap/nsb1_toolkit_menu_next.png',MENU_NEXT)
+                check_frame(run/'snap/nsb1_toolkit_menu_select.png',MENU_NEXT)
         return
     if not control:
         check_frame(run / 'snap/nsb1_toolkit_display.png', DISPLAY_FRAME)
@@ -103,17 +132,20 @@ def main():
     mode=parser.add_mutually_exclusive_group()
     mode.add_argument('--control', action='store_true')
     mode.add_argument('--interactive', action='store_true')
+    mode.add_argument('--menu-item',type=int,choices=(1,2))
     parser.add_argument('--mame', type=Path, help='prepare and execute a fresh isolated run')
     args = parser.parse_args()
     source, run = args.source.resolve(), args.run.resolve()
     try:
         if args.mame:
-            if args.interactive:
+            if args.interactive or args.menu_item is not None:
                 check_storage(source)
-            profile=0 if args.control else 3 if args.interactive else 1
-            seconds=84 if args.interactive else 74
+            profile=profile_for(args.control,args.interactive,args.menu_item)
+            seconds=90 if args.menu_item is not None else 84 if args.interactive else 74
             prepare(source, run, profile)
-            script = Path(__file__).with_name('nsb1_toolkit_interactive.lua' if args.interactive else 'nsb1_toolkit_input.lua').resolve()
+            script = Path(__file__).with_name('nsb1_toolkit_menu_exit.lua' if args.menu_item==2 else
+                'nsb1_toolkit_menu.lua' if args.menu_item==1 else
+                'nsb1_toolkit_interactive.lua' if args.interactive else 'nsb1_toolkit_input.lua').resolve()
             binary = args.mame.resolve()
             (run / 'toolkit_invocation.json').write_text(json.dumps({
                 'mame': str(binary), 'mame_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
@@ -121,10 +153,11 @@ def main():
                 'seconds': seconds, 'profile': profile,
             }, indent=2) + '\n')
             run_mame(binary, run / 'inputs', run, script, seconds, True)
-        check(source, run, args.control, args.interactive)
+        check(source, run, args.control, args.interactive,args.menu_item)
     except (OSError, ValueError, KeyError, ET.ParseError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f'NSB-1 Toolkit FAIL: {error}\n')
     print('NSB-1 Toolkit PASS: ' + ('Phase-2 negative control' if args.control else
+          f'physical installed-menu item{args.menu_item} envelope and clean list return' if args.menu_item is not None else
           'physical GET INKEY5/GET INPUT42 and unchanged whole storage' if args.interactive else
           'organic DISPLAY TEXT and physical response; native RF/speech unproved'))
 
