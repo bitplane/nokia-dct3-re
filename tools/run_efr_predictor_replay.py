@@ -11,7 +11,7 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.c54x_rom4_efr_predictor_check import native_records
 from tools.c54x_rom4_efr_excitation_check import native_records as excitation_records
-from tools.efr_reference_calculator import calculate
+from tools.efr_reference_calculator import calculate, compare_vectors
 
 
 def prepare(text):
@@ -25,20 +25,7 @@ def prepare(text):
 
 
 def compare(output, expected):
-    if not expected or any(len(values) != 40 for _, values in expected):
-        raise ValueError('expected complete native prediction vectors')
-    if len(output) != len(expected) * 80:
-        raise ValueError('incomplete reference prediction output')
-    differences = []
-    for result, (key, actual) in zip(struct.iter_unpack('<40H', output), expected):
-        count = sum(a != b for a, b in zip(result, actual))
-        if count:
-            differences.append(dict(frame=key[0], subframe=key[1], samples=count))
-    return dict(scope='captured-argument predictor arithmetic only', calls=len(expected),
-                samples=len(expected) * 40, differences=differences,
-                differing_samples=sum(row['samples'] for row in differences),
-                reference_equal=not differences, full_decoder_conformance=False,
-                handset_audio_claim=False)
+    return compare_vectors(output, expected, scope='captured-argument predictor arithmetic only')
 
 
 def main():
@@ -51,7 +38,7 @@ def main():
         native = args.native.read_bytes()
         vectors, expected = prepare(native.decode('utf-8-sig'))
         output = args.output.resolve()
-        result, evidence = calculate(args.source.resolve(), output, vectors, predictor=True)
+        result, evidence = calculate(args.source.resolve(), output, vectors, mode='predictor')
         report = compare(result, expected)
         report.update(evidence, native_log_sha256=hashlib.sha256(native).hexdigest())
         (output / 'comparison.json').write_text(json.dumps(report, indent=2) + '\n')

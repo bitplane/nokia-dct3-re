@@ -3209,6 +3209,35 @@ whole-decoder reference equality, every excitation-mixing operation or native
 handset speech. The acquired patch and strict frame 97/86-sample failure remain
 unchanged; atomic/staged semantic logs and PCM remain identical.
 
+The gain-mixing check captures the in-place total excitation at decoder-owned
+`d014` entry, after the `c86b..c86e` mixing loop. Enhancement uses separate
+scratch; the total excitation remains at `[0ac9] + [1312]`. Pre-mixing adaptive
+and sharpened fixed vectors come from the earlier `c85a` boundary, alongside
+the already observed pitch/code gains. Four complete vectors per frame and
+exact original/replay agreement are mandatory.
+
+`run_efr_mixing_replay.py` supplies these 82-word argument records to the shared
+standalone calculator. Its scalar composition invokes original reference
+`L_mult`, `L_mac`, `L_shl` and rounding primitives; it is not a copied codec or
+an altered reference decoder. All 2,072 calls and 82,880 native total-excitation
+samples match in both frontends. Predictor and synthesis-filter controls remain
+exact through the same isolated builder. The source and calculator executable
+hashes, installation PCM and two fresh-process outputs remain checked.
+
+```sh
+python3 tools/run_efr_mixing_replay.py --source ACQUIRED_REFERENCE_SOURCE \
+  --native RUN/error.log --output NEW_DIRECTORY
+```
+
+Thus prediction, mixing and synthesis arithmetic all match their independent
+calculations on captured native arguments. This does not prove every CPU
+saturation/flag case, the enhancement gain-control path, sole-cause equivalence
+of all later samples or whole-decoder conformance. The known gains remain
+different; neither decoder/emulator state nor reference PCM is changed to
+remove that difference. Native PCM and the strict frame 97/86 failure are
+preserved. Truncated argument cases, short or missing total vectors and changed
+replay are errors; computed arithmetic differences are reported explicitly.
+
 ### Native EFR active-speech erasures
 
 Atomic and staged execution complete all 163 frames and replay 65,440 ordinary

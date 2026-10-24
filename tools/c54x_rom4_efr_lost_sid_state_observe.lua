@@ -42,6 +42,8 @@ actions[0xd014] = 'logerror "efr_filter_call: return=%04x coefficients=%04x inpu
 dynamic_vector(0xd014, 'efr_filter', 'A', 'ar2', 11)
 dynamic_vector(0xd014, 'efr_filter', 'EXC', 'ar3', 40)
 dynamic_vector(0xd014, 'efr_filter', 'MEM', 'ar4-000a', 10)
+-- The total excitation remains in-place while enhancement uses separate scratch.
+dynamic_vector(0xd014, 'efr_mixing', 'TOTAL', '(dw@0ac9)+(dw@1312)', 40)
 -- ADD $12 after LD #26,DP reads data1312, not the AR2 MMR.
 actions[0xc85a] = actions[0xc85a] .. 'logerror "efr_excitation_call: ctrl=%04x base=%04x offset=%04x\\n",dw@09c0,dw@0ac9,dw@1312;'
 dynamic_vector(0xc85a, 'efr_excitation', 'FIXED', '0aca', 40)

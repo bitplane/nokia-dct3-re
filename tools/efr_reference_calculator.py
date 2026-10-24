@@ -2,6 +2,7 @@
 import hashlib
 from pathlib import Path
 import shlex
+import struct
 import subprocess
 
 from tools.verify_etsi_efr_reference import CFLAGS, EXPECTED
@@ -11,7 +12,9 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def calculate(source, output, vectors, *, predictor=False):
+def calculate(source, output, vectors, *, mode='filter'):
+    if mode not in ('filter', 'predictor', 'mix'):
+        raise ValueError('unknown reference argument mode')
     tools = Path(__file__).resolve().parent
     output.mkdir(parents=True, exist_ok=False)
     (output / 'arguments.bin').write_bytes(vectors)
@@ -28,7 +31,7 @@ def calculate(source, output, vectors, *, predictor=False):
     if digest(source / 'spch_dos.dec') != EXPECTED['dec'][1]:
         raise ValueError('reference installation input differs')
     for name in ('first', 'replay'):
-        commands.append([str(program), *(['--predictor'] if predictor else []),
+        commands.append([str(program), *(['--' + mode] if mode != 'filter' else []),
                          str(output / 'arguments.bin'), str(output / f'{name}.bin')])
     with (output / 'commands.log').open('w') as log:
         for command in commands:
@@ -44,3 +47,19 @@ def calculate(source, output, vectors, *, predictor=False):
                         source_sha256=identities, arguments_sha256=digest(output / 'arguments.bin'),
                         output_sha256=digest(output / 'first.bin'), calculator_sha256=digest(program),
                         harness_sha256=digest(tools / 'etsi_efr_argument_replay.c'))
+
+
+def compare_vectors(output, expected, *, scope):
+    if not expected or any(len(values) != 40 for _, values in expected):
+        raise ValueError('expected complete native output vectors')
+    if len(output) != len(expected) * 80:
+        raise ValueError('incomplete reference output')
+    differences = []
+    for result, (key, actual) in zip(struct.iter_unpack('<40H', output), expected):
+        count = sum(a != b for a, b in zip(result, actual))
+        if count:
+            differences.append(dict(frame=key[0], subframe=key[1], samples=count))
+    return dict(scope=scope, calls=len(expected), samples=len(expected) * 40,
+                differences=differences, differing_samples=sum(row['samples'] for row in differences),
+                reference_equal=not differences, full_decoder_conformance=False,
+                handset_audio_claim=False)

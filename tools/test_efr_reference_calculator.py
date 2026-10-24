@@ -8,7 +8,7 @@ from tools import efr_reference_calculator as calculator
 
 
 class ReferenceCalculatorTests(unittest.TestCase):
-    def run_calculator(self, *, predictor=False, bad_pcm=False, unstable=False, changed=False):
+    def run_calculator(self, *, mode='filter', bad_pcm=False, unstable=False, changed=False):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             source = root / 'source'
@@ -36,10 +36,11 @@ class ReferenceCalculatorTests(unittest.TestCase):
             with patch.object(calculator, 'EXPECTED', expected), \
                     patch.object(calculator.subprocess, 'run', side_effect=execute):
                 result, evidence = calculator.calculate(source, root / 'output', b'arguments',
-                                                         predictor=predictor)
+                                                         mode=mode)
             self.assertIn('-fwrapv', commands[0])
             self.assertEqual(commands[0][-1], str(root / 'output/reference-calculator'))
-            self.assertEqual('--predictor' in commands[-1], predictor)
+            self.assertEqual('--predictor' in commands[-1], mode == 'predictor')
+            self.assertEqual('--mix' in commands[-1], mode == 'mix')
             self.assertEqual(result, b'calculated')
             self.assertTrue(evidence['installation_verified'])
             self.assertTrue(evidence['fresh_process_replay'])
@@ -47,7 +48,8 @@ class ReferenceCalculatorTests(unittest.TestCase):
 
     def test_both_modes_rebuild_and_preserve_provenance(self):
         self.run_calculator()
-        self.run_calculator(predictor=True)
+        self.run_calculator(mode='predictor')
+        self.run_calculator(mode='mix')
 
     def test_bad_installation_pcm_rejected(self):
         with self.assertRaisesRegex(ValueError, 'installation PCM'):
@@ -60,3 +62,10 @@ class ReferenceCalculatorTests(unittest.TestCase):
     def test_changed_reference_source_rejected(self):
         with self.assertRaisesRegex(ValueError, 'sources changed'):
             self.run_calculator(changed=True)
+
+    def test_invalid_mode_fails_before_creating_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'unused'
+            with self.assertRaisesRegex(ValueError, 'unknown'):
+                calculator.calculate(Path(directory), output, b'', mode='unknown')
+            self.assertFalse(output.exists())

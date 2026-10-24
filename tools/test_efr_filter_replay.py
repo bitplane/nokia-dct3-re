@@ -55,7 +55,12 @@ class FilterHarnessTests(unittest.TestCase):
                         '{int i;for(i=0;i<n;i++)y[i]=x[i];'
                         'if(u)for(i=0;i<10;i++)m[i]=y[n-10+i];}\n'
                         'void Pred_lt_6(short*e,short lag,short frac,short n)'
-                        '{int i;for(i=0;i<n;i++)e[i]=e[-1];}\n')
+                        '{int i;for(i=0;i<n;i++)e[i]=e[-1];}\n'
+                        'int L_mult(short a,short b){return 2*a*b;}\n'
+                        'int L_mac(int v,short a,short b){return v+2*a*b;}\n'
+                        'int L_shl(int v,short s){return v<<s;}\n'
+                        'short fixture_round(int v)__asm__("round");\n'
+                        'short fixture_round(int v){return(short)((v+32768)>>16);}\n')
         cls.program = cls.root / 'calculator'
         subprocess.run(['gcc', '-std=gnu89', '-Wall', '-Wextra', '-o', str(cls.program),
                         str(Path(__file__).with_name('etsi_efr_argument_replay.c')), str(stub)],
@@ -65,10 +70,10 @@ class FilterHarnessTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.temporary.cleanup()
 
-    def run_harness(self, data, *, predictor=False):
+    def run_harness(self, data, *, mode='filter'):
         source, output = self.root / 'input.bin', self.root / 'output.bin'
         source.write_bytes(data)
-        result = subprocess.run([str(self.program), *(['--predictor'] if predictor else []),
+        result = subprocess.run([str(self.program), *(['--' + mode] if mode != 'filter' else []),
                                  str(source), str(output)], capture_output=True)
         return result, output.read_bytes()
 
@@ -89,12 +94,20 @@ class FilterHarnessTests(unittest.TestCase):
     def test_predictor_history_window_and_argument_domain(self):
         history = tuple(range(153)) + (0xfffe,)
         arguments = struct.pack('<156H', 45, 0xffff, *history)
-        result, output = self.run_harness(arguments, predictor=True)
+        result, output = self.run_harness(arguments, mode='predictor')
         self.assertEqual(result.returncode, 0)
         self.assertEqual(output, struct.pack('<40H', *((0xfffe,) * 40)))
         for bad in (arguments[:-2], arguments[:1], b'',
                     struct.pack('<156H', 0, 0, *history),
                     struct.pack('<156H', 45, 4, *history)):
             with self.subTest(length=len(bad)):
-                result, _ = self.run_harness(bad, predictor=True)
+                result, _ = self.run_harness(bad, mode='predictor')
                 self.assertNotEqual(result.returncode, 0)
+
+    def test_mixing_argument_order_and_partial_case(self):
+        arguments = struct.pack('<82H', 1024, 4096, *((100,) * 40), *((200,) * 40))
+        result, output = self.run_harness(arguments, mode='mix')
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(output, struct.pack('<40H', *((225,) * 40)))
+        result, _ = self.run_harness(arguments[:-2], mode='mix')
+        self.assertNotEqual(result.returncode, 0)
