@@ -264,6 +264,9 @@ or already completed response is rejected without replacing pending downlink
 traffic. There is no automatic timeout or synthesized handset ReturnResult.
 The 6210 physical-dismissal/host-termination fixture is reproducible with
 `.venv/bin/python tools/run_noki6210_ussd_termination.py tmp/ussd-termination`.
+Adding `--restore` checkpoints the dismissed unanswered transaction and requires
+new-epoch cancellation while rejecting the pre-load epoch. It does not qualify
+an in-flight release checkpoint or restore the external host process.
 The backward-compatible standalone bridge CLI still sends notifications;
 the request acceptance runner uses `--request --expected-reply 2`.
 Authenticated NSB-7 acceptance is documented in `8290_bringup.md`. Arbitrary

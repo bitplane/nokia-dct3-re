@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_restored_network_ussd_termination", "owner": "npe3_host_ussd", "status": "satisfied",
+      "predicate": "A dismissed unanswered request restores observed ARM state and accepts network termination only under its new host epoch",
+      "current": "The isolated termination runner --restore saves at34s after physical Answer26/End30 and reloads after one second. Time, ARM registers and backed-RAM checksum match. Request1 is republished queued under epoch2 without readmission. Old epoch1 and wrong request999 are rejected; epoch2/request1 queues real SS RELEASE COMPLETE and RR release before one cancellation, without a fabricated handset result. A duplicate is rejected and physical Menu56 renders Messages. The nonempty save artifact is required. This is one post-dismissal checkpoint, not in-flight release restoration, arbitrary snapshots or external host-process persistence.",
+      "evidence": ["docs/6210_bringup.md", "docs/external_call_bridge.md", "tools/run_noki6210_ussd_termination.py", "tools/noki6210_host_ussd_terminate.lua", "tools/noki6210_host_ussd_terminate_restore.lua", "tools/noki6210_ussd_termination_check.py", "tools/test_noki6210_ussd_termination_check.py", "tools/arm_architecture_snapshot.lua"]
+    },
+    {
       "id": "npe3_host_network_ussd_termination", "owner": "npe3_host_ussd", "status": "satisfied",
       "predicate": "An explicit correlated host application termination releases an unanswered network USSD transaction through SS and RR before reporting cancellation",
       "current": "Fresh own-PMM/PIN-enabled 6210 capture physically dismisses Choose2 with Answer26/End30. After40s the stale epoch and wrong request are rejected, the valid identity queues network RELEASE COMPLETE0b2a, and a duplicate is rejected. Ordinary SS acknowledgement and RR CHANNEL RELEASE precede one host queued/cancelled lifecycle; no incoming_ussd_response is emitted. Physical Menu56 renders Messages. The standalone runner checks protocol/host ordering, console health and frame presence, not an exact frame hash. This qualifies explicit application release in one HLE transaction, not automatic expiry, arbitrary continuation, snapshot timing or native radio/speech.",

@@ -19,7 +19,7 @@ from tools.noki6210_ussd_termination_check import verify
 from websockets.exceptions import ConnectionClosed
 
 
-async def run(directory):
+async def run(directory,restore=False):
     root=Path(__file__).resolve().parents[1]
     mcu=(root/'roms/noki6210/6210_556c.fls').read_bytes()
     assess(mcu,(root/'roms/noki6210/6210 virgin eeprom 005fa000.fls').read_bytes())
@@ -34,11 +34,13 @@ async def run(directory):
     for tag,mask in ((':CALLHOST','1'),(':NEIGHBORCFG','1024')):
         ET.SubElement(ports,'port',tag=tag,type='CONFIG',mask=mask,defvalue='0',value=mask)
     ET.ElementTree(cfg).write(directory/'cfg/npe3hle.cfg')
-    command=build_command(root,None,'npe3hle','host_ussd_terminate',62)
+    script='host_ussd_terminate_restore' if restore else 'host_ussd_terminate'
+    command=build_command(root,None,'npe3hle',script,62)
     command+=['-http','-http_port','16210']
     (directory/'launch.json').write_text(json.dumps({'command':command,
         'mame_sha256':hashlib.sha256(Path(command[0]).read_bytes()).hexdigest(),
-        'script_sha256':hashlib.sha256((root/'tools/noki6210_host_ussd_terminate.lua').read_bytes()).hexdigest()},indent=2)+'\n')
+        'restore':restore,
+        'script_sha256':hashlib.sha256((root/f'tools/noki6210_{script}.lua').read_bytes()).hexdigest()},indent=2)+'\n')
     process=await asyncio.create_subprocess_exec(*command,cwd=directory,
         stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.STDOUT)
     ready,terminate_ready=asyncio.Event(),asyncio.Event()
@@ -71,12 +73,18 @@ async def run(directory):
                     request_id=1,operation='request',dcs=15,data=pack_gsm7('Choose 2'))))
                 async def terminate():
                     await terminate_ready.wait()
-                    for e,r in ((epoch+1,1),(epoch,999),(epoch,1),(epoch,1)):
+                    if epoch != (2 if restore else 1):
+                        raise ValueError('termination did not observe required epoch')
+                    stale=epoch-1 if restore else epoch+1
+                    for e,r in ((stale,1),(epoch,999),(epoch,1),(epoch,1)):
                         await socket.send(json.dumps(dict(type='incoming_ussd_terminate',epoch=e,request_id=r)))
                         await asyncio.sleep(0.1)
                 termination=asyncio.create_task(terminate())
                 try:
-                    while True:await receive()
+                    while True:
+                        event=await receive()
+                        if event.get('type')=='call_adapter_ready':
+                            epoch=event['epoch']
                 except ConnectionClosed:
                     # MAME closes its WebSocket before its process handle settles.
                     if await asyncio.wait_for(process.wait(),5):
@@ -93,7 +101,9 @@ async def run(directory):
         (directory/'console.log').write_text(output)
         (directory/'host_events.json').write_text(json.dumps(events,indent=2)+'\n')
     verify_handset_health(output)
-    verify((directory/'error.log').read_text(errors='replace'),events)
+    verify((directory/'error.log').read_text(errors='replace'),events,restore=restore)
+    if restore and not any(p.stat().st_size for p in directory.rglob('npe3_ussd_termination.sta')):
+        raise ValueError('missing termination checkpoint artifact')
     frame=directory/'snap/6210_host_ussd_terminated_menu.png'
     if not frame.is_file():raise ValueError('missing physical post-release Menu capture')
     print('OK - correlated network SS/RR termination; no handset result fabricated')
@@ -102,7 +112,8 @@ async def run(directory):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory',type=Path)
+    parser.add_argument('--restore',action='store_true')
     args=parser.parse_args()
-    try:asyncio.run(run(args.directory.resolve()))
+    try:asyncio.run(run(args.directory.resolve(),args.restore))
     except (ValueError,RuntimeError,TimeoutError,ConnectionClosed) as error:
         parser.exit(1,f'FAIL - {error}\n')

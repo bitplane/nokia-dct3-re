@@ -1553,6 +1553,17 @@ termination/save-state timing. Console checks reject MAME driver-validity and
 script/execution failures as well as the protocol checker rejecting missing
 release or fabricated replies.
 
+The same runner's `--restore` variant saves the dismissed but unanswered
+transaction at34s and reloads after one emulated second. The pre-save and
+post-load time, ARM registers and backed-RAM checksum must match. Host request1
+is republished queued under epoch2 without a second admission. An epoch1
+termination is rejected; epoch2/request1 sends the same SS/RR release and
+publishes cancellation once without a reply. Wrong identity and duplicate
+controls remain active, Menu56 still renders Messages, and the checkpoint
+artifact must exist. Capture: `tmp/npe3-ussd-termination-restore`. This covers
+one unanswered post-dismissal checkpoint, not termination in flight or external
+network process restoration.
+
 ### Continued laboratory USSD
 
 `make verify-6210-ussd-continued` separately qualifies one continued exchange,

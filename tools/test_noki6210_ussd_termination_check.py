@@ -18,6 +18,22 @@ EVENTS=[dict(type='incoming_ussd_state',request_id=1,epoch=1,phase=p)
 
 
 class TerminationCheckTest(unittest.TestCase):
+    def test_restored_epoch_owns_termination(self):
+        text=TEXT.replace('epoch=1 phase=cancelled','epoch=2 phase=cancelled')
+        text=text.replace('gsm_ss: network_terminated',
+                          '6210_ussd_termination_restore: architecture=pass\ngsm_ss: network_terminated')
+        events=[dict(type='call_adapter_ready',epoch=1),EVENTS[0],
+                dict(type='call_adapter_ready',epoch=2),
+                dict(EVENTS[0],epoch=2),dict(EVENTS[1],epoch=2)]
+        verify(text,events,restore=True)
+        for bad in (events[:-1]+[EVENTS[1]],events[:2]+events[3:],events+[events[-1]]):
+            with self.subTest(events=bad),self.assertRaises(ValueError):
+                verify(text,bad,restore=True)
+        with self.assertRaises(ValueError):
+            verify(TEXT,events,restore=True)
+        with self.assertRaises(ValueError):
+            verify(text+'\ngsm_ss: network_initiated operation=request',events,restore=True)
+
     def test_complete_network_release(self):
         verify(TEXT,EVENTS)
 
