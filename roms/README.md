@@ -672,3 +672,24 @@ were not acquired, so no local file identity or hash is asserted:
 - [NSK-3 System Module, issue 3, 01/2001](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/6130/03sys%20%5B106%5D.pdf)
 - [NSK-3 UR9U block diagrams](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/6130/sysa3u%20%5B26%5D.pdf)
 - [NSE/K-1/3 Repair Hints, version 2.0, 13 June 2001](https://files.elektroda.pl/44719,nokia%2B5110_5130_6110_6130_v20.html)
+
+## Acquired complete service manuals
+
+The public Mobile Collectors download forms supplied these single-PDF ZIP
+archives. Both original ZIP and extracted PDF are retained under the listed
+`research/` directory; binaries remain outside source control. The POST uses
+the ordinary page's session token and `legal_confirmation=1`, without an
+account. Archive integrity and PDF page counts were checked locally.
+
+| Product / source | Directory and basename | ZIP SHA256 | PDF SHA256 |
+| --- | --- | --- | --- |
+| [8890 NSB-6](https://mobilecollectors.net/documents/1546/download), 303 pages | `research/nsb6/nokia_8890_nsb-6_` | `447c049b702bbecf2a00291219ad64fc585dc17ef1f2cbbd7da5342923efcf4f` | `d725449db85e04d82f2f9e693428a8ea327b0228bbd6975cba40578841f41996` |
+| [6210 NPE-3](https://mobilecollectors.net/documents/1552/download), 240 pages | `research/npe3/nokia_6210_npe-3_` | `70fb153cbc94eb0e5047933ce89f69c526365489acf685ac488bcc6da71ee0d1` | `34b5bee7b3d66ed8f5ddc56522750bf84c05753174396f0f1ffd8f6d899e905d` |
+| [6250 NHM-3](https://mobilecollectors.net/documents/1551/download), 245 pages | `research/nhm3/nokia_6250_nhm-3_` | `ce33517f4f7d166e512657d38357ba401ff91fb71190be7c0c2682ca09246865` | `e1012c4dd46cf415db3ee7666880be29eb27c5ed8ae7c8de0c49d39c1a0819e7` |
+
+NSB-6 System Module printed page25, PDF page39, contains the acquired and
+visually reviewed PCM timing diagram; its implementation contract is in
+`docs/8xxx_bringup.md`. The NPE-3/NHM-3 bundles are independently retained
+references, not evidence for importing NSB-6 clocks or framing into those
+products. Some PDF fonts have broken text mappings; visual review remains
+necessary rather than treating a negative text search as document absence.

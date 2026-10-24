@@ -4069,7 +4069,8 @@ void nokia_dct3_state::nsb6stage(machine_config &config)
 {
 	noki8xxx(config);
 	// NSB-6 UI Description, issue 1 (06/2000), p7: internal MIC2 and EAR.
-	// Board connectivity only; PCM framing and codec mux/gains remain unknown.
+	// Board connectivity only. Own PCM framing is documented in
+	// docs/8xxx_bringup.md but not configured here; codec gains remain unknown.
 	m_cobba->add_route(nokia_cobba_device::ear, "mono", 1.0);
 	MICROPHONE(config, "microphone", 1).front_center()
 			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);

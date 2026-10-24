@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb6_own_pcm_document_contract",
+      "owner": "nsb6_board",
+      "status": "satisfied",
+      "predicate": "The acquired own-product Nokia NSB-6 System Module identifies PCM clock ownership and serial word framing without importing a sibling profile",
+      "current": "The 303-page Mobile Collectors service PDF d725449db85e04d82f2f9e693428a8ea327b0228bbd6975cba40578841f41996 contains the visually reviewed Issue1 06/2000 printed page25 at PDF page39. COBBA generates512kHz PCMDClk and8kHz PCMSClk; the waveform shows one active-high sync clock, a16-bit MSB-first word, sign extension above bit12 and rising-edge data changes for falling-edge sampling. The MAD pin table independently declares both clocks as COBBA inputs. This closes document acquisition/framing evidence, not PCM implementation, measured electrical behavior, analogue gains, native DSP speech or handset media acceptance. Existing runtime remains unclocked pending configuration and independent incoming/outgoing/restoration gates.",
+      "evidence": ["docs/8xxx_bringup.md", "roms/README.md"]
+    },
+    {
       "id": "nsm2_fdn_protected_edit_cancel_erase_cold_lifecycle", "owner": "nsm2_sim_security", "status": "satisfied",
       "predicate": "Physical 8850 protected FDN Edit, erase cancellation and confirmed erase produce distinct persistent cold outcomes without altering unrelated card state",
       "current": "The twelve-process --record-lifecycle gate establishes validity and A/12345 Save/cold Details, then authenticates PIN2 at the own contact-Options entrance before Edit/Erase choices. Edit changes12345-to12346 through one EF_FDN record1 UPDATE and cold Details renders A/12346. PIN2-authenticated Back at reviewed Erase?A issues no UPDATE, retains the full edited card and another cold Details remains A/12346. Confirm at the identical dialog writes exactly32 erased bytes to record1, displays Memory erased and a cold submitted empty Search renders No phone numbers, not a blank editor. Complete card equality retains other records, ADN validity, credentials and allowances. Own staged uploads/exclusive HLE, physical contacts, exact UI/Menu-title oracles, PIN1/preserved registration and full predecessor NVRAM inheritance/immutability apply throughout. This is one-record lifecycle, not capacity, arbitrary name encoding, native DSP/RF or speech.",

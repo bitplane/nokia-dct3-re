@@ -622,27 +622,29 @@ Neither PCM clocks nor an HLE voice mux are enabled by these routes.
 The independent physical outgoing-call/speech-control gate remains green;
 that proves unchanged signaling/control, not physical duplex or native speech.
 
-The indexed NSB-6 System Module, Issue 1 06/2000, printed page 25,
-[Audio Control](https://www.manualslib.com/manual/1616779/Nokia-Nsb-6-Series.html?page=25),
-lists 512 kHz PCMDClk and 8 kHz PCMSClk. The independent NSB-6 troubleshooting
-[test-point table, printed page 9](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/8890/DISTRBLE%20%5B42%5D.pdf)
-also labels J254 as 512 kHz and J255 as 8 kHz. These are indexed primary-document
-leads, not acquired/visually reviewed timing evidence: direct retrieval failed.
-Before enabling PCM, acquire the system timing diagram and establish word
-shape, sync polarity/width, sample edge and clock ownership. Do not inherit
-the 8850's 1 MHz/125-clock framing; the reported NSB-6 ratio would be 64 clocks.
-Own-ROM speech-control decoding and physical Send/End correlation remain
-separate prerequisites. Native DSP speech is not established.
+#### Own PCM Timing Contract
 
-The manual's publicly readable [page summary](https://www.manualslib.com/manual/1616779/Nokia-Nsb-6-Series.html)
-now independently establishes the narrower clock-ownership statement:
-COBBA-GJP generates PCM sync by dividing the 512 kHz data clock to 8 kHz.
-That fixes the frequency ratio at 64 and identifies sync generation, but the
-summary's sign-extension caption does not recover word placement, sample
-edge or sync polarity/width. The direct page and independent Guidessimo
-mirror return HTTP 403; the waveform has not been visually reviewed.
-Accordingly PCM remains disabled pending the missing framing evidence,
-not pending ownership of sync generation.
+The complete 303-page service manual is acquired from the public
+[Mobile Collectors archive](https://mobilecollectors.net/documents/1546/download)
+and retained as `roms/research/nsb6/nokia_8890_nsb-6_.pdf` (SHA256
+`d725449db85e04d82f2f9e693428a8ea327b0228bbd6975cba40578841f41996`).
+Its System Module, Issue 1 06/2000, printed page25 (PDF page39) has been
+rendered and visually reviewed. COBBA-GJP supplies both clocks: 512kHz
+PCMDClk and 8kHz PCMSClk, hence64 clocks per frame. The chart depicts a
+one-clock active-high sync followed by a 16-bit MSB-first word. Bits15..13
+extend the sign of bit12; data changes on rising clock edges and is stable
+for falling-edge sampling. The MAD pin table independently marks PCMDClk
+and PCMSClk as inputs from COBBA. These are own-product document contracts,
+not measured waveforms or an inherited8850 bus profile.
+
+The PCM profile can therefore be implemented without acquiring another
+timing source. It is not yet enabled: implementation must compose these
+512kHz/64-clock values with the separately validated own speech-control
+field below, then independently qualify incoming/outgoing media and
+restoration. The existing signaling-only/zero-media gates must be treated
+explicitly when that capability changes. Native DSP speech and analogue
+gains remain unproved. Archive identity and acquisition are recorded in
+`roms/README.md`.
 
 The acquired v12.20 MCU (SHA1 `a214a0d69760ecd8eeca0b9d82f95c94bdfe70ed`)
 independently pins the compiler at `2c307c`, selector table `2c30b0`
@@ -671,7 +673,7 @@ selector-8 publications. The host signaling checker accepts either direct
 connected-to-ended notification or an explicit `media_closed` immediately
 before ended; both retain every preceding ordered state. This is bearer
 lifecycle notification, not proof of audio. Missing connection, reversed
-closure and unexpected states remain rejected. PCM framing remains open.
+closure and unexpected states remain rejected. PCM execution remains unqualified.
 
 PCS1900 is independently verified by `verify-8890-pcs-speech-control` and
 `verify-8890-pcs-incoming-speech-control` on fresh own-PMM fixtures
@@ -680,16 +682,6 @@ PCS1900 is independently verified by `verify-8890-pcs-speech-control` and
 registration, full band-specific call acceptance and physical key decoding;
 selector 8 publishes the same `860b`/`840a` at `2c338e`. This establishes
 two-band MCU control consistency, not DSP speech or analogue codec behavior.
-
-An additional full-manual acquisition candidate is
-[Ciklon's NSB-6 service archive](https://www.ciklon.org/bg/downloads/download/346-nokia/43823-nokia-service-manual-8890-nsb-6),
-listed as `Nokia service manual 8890 NSB-6.zip`, 5.66 MB, MD5
-`6ba2da15107783919ee4e2df8bf89d92`. It requires an authenticated account and
-has not been acquired; its advertised checksum is not local validation.
-The public [03sysa3 schematic listing](https://www.eserviceinfo.com/downloadsm/231240/NOKIA_03sysa3.html)
-is another own-product lead (8890, 1,788 kB). Its HTML listing was retrieved,
-but the embedded PDF response was empty and the download link redirected to
-the site index. No schematic bytes or timing diagram are validated from it.
 
 ```sh
 .venv/bin/python -m tools.noki8890_speech_control_check \
@@ -2580,42 +2572,6 @@ These documents close the missing bus-shape and physical-endpoint evidence
 for 8850 only. The own-ROM field writer and physical Send/End correspondence
 are verified below, including bidirectional PCM/media. No native
 DSP speech, audible call or 8890 PCM contract is established by this finding.
-
-### NSB-6 PCM source lead (not promoted)
-
-The indexed Nokia NSB-6 Disassembly & Troubleshooting Instructions, issue 1
-(06/2000), printed page 9, labels J254/PCMDCLK as 512 kHz and J255/PCMSCLK
-as 8 kHz. Source: [original manual mirror](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/8890/DISTRBLE%20%5B42%5D.pdf).
-The original PDF could not be acquired for visual verification; this is an
-indexed primary-document lead, not a validated bus profile. The separate
-[System Module contents](https://www.manualslib.com/manual/1616779/Nokia-Nsb-6-Series.html)
-identify an Audio Control / PCM Serial Interface section on printed page 25.
-Its indexed page summary independently gives 512 kHz / 8 kHz and says
-COBBA-GJP generates PCMSClk by dividing PCMDClk. That clock direction must
-be reconciled with the troubleshooting table's MAD-to-COBBA annotation;
-neither summary resolves the full timing diagram. The public page and
-alternate [manual index](https://guidessimo.com/document/1337506/nokia-nsb-6-series-technical-documentation-manual-56.html)
-did not provide an acquirable original (HTTP 403 / unavailable page).
-Recover page 25 and corroborate clock ownership, word width, alignment and edges before
-enabling PCM. Do not import the 8850's 1 MHz profile or infer a 16-bit word
-from the two clock labels. Existing 8890 signaling and native/HLE limits
-remain unchanged.
-
-An additional [NSB-6 service archive listing](https://www.ciklon.org/bg/downloads/download/346-nokia/43823-nokia-service-manual-8890-nsb-6)
-identifies `Nokia service manual 8890 NSB-6.zip`, 5.66 MB, MD5
-`6ba2da15107783919ee4e2df8bf89d92`. Download requires an authenticated
-registered account; the archive has not been acquired or inspected. This
-is a retrieval lead only, not timing evidence or a reason to enable PCM.
-
-The [ManualMachine 8890 index](https://manualmachine.com/nokia/8890/13692547-user-manual/)
-also lists a separate `Service Manual 03sys`, 56 pages, 239.15 KB; the linked
-page itself is a Spanish user guide, not that system manual. Its direct
-retrieval returns HTTP 403, as do the ManualsLib page-25 and Guidessimo
-routes; the original electronicsandbooks mirror is currently unreachable.
-The separately indexed NSB-7 manual corroborates the clock-rate family,
-but is not NSB-6 word-alignment or edge evidence. The required artifact
-remains the NSB-6 System Module page-25 timing diagram, not another frequency
-summary or a substituted sibling profile.
 
 The acquired `8850v531.fls` (SHA1
 `9f966787403b68a09530680ad911302403eb1521`) now has a ROM-pinned static
