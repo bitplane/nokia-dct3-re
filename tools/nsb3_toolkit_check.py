@@ -27,7 +27,9 @@ MENU = bytes.fromhex('d0268103042500820281828509') + b'DCT3 menu' + bytes.fromhe
 MENU_RESPONSE = bytes.fromhex('810304250002028281030100')
 
 
-def check_trace(text, interactive=False, menu_item=None):
+def check_trace(text, interactive=False, menu_item=None, return_wait=False):
+    if return_wait and menu_item != 1:
+        raise ValueError('Wait control requires Continue selection')
     if menu_item not in (None, 1, 2):
         raise ValueError('unknown menu item')
     interactive = interactive or menu_item is not None
@@ -84,6 +86,8 @@ def check_trace(text, interactive=False, menu_item=None):
     menu_actions = ()
     if menu_item is not None:
         menu_actions = ('fieldtest', 'last', 'open') + (('next',) if menu_item == 2 else ()) + ('select',)
+        if return_wait:
+            menu_actions += ('end', 'return')
     observed_menu = re.findall(r'nsb3_toolkit_menu: action=(\w+) down=([01])', text)
     if observed_menu != [(action, down) for action in menu_actions for down in ('1', '0')]:
         raise ValueError('physical menu selection differs')
@@ -93,7 +97,7 @@ def check_trace(text, interactive=False, menu_item=None):
             raise ValueError('menu envelope preceded physical selection')
 
 
-def check(source, run, interactive=False, menu_item=None):
+def check(source, run, interactive=False, menu_item=None, return_wait=False):
     interactive = interactive or menu_item is not None
     check_link(source, run)
     metadata = json.loads((run / 'cold_source.json').read_text())
@@ -104,7 +108,7 @@ def check(source, run, interactive=False, menu_item=None):
         raise ValueError('own executable changed')
     if (run / 'initial_sim_card.bin').read_bytes() != make_current_profile(True) or (storage / 'sim_card').read_bytes() != make_current_profile(True):
         raise ValueError('complete card changed')
-    check_trace((run / 'error.log').read_text(), interactive, menu_item)
+    check_trace((run / 'error.log').read_text(), interactive, menu_item, return_wait)
     frame_check(run / 'snap/nsb3_toolkit_display.png', '0b61ca941a012e9feffe2d13b834c720031b71295220fc32139decd034172b2c')
     if not interactive:
         frame_check(run / 'snap/nsb3_toolkit_dismissed.png', 'b2bde13413750ea3a6442a8a4d6c90362d4e8b16cde72bbf2f981a00089cecd0')

@@ -11,6 +11,11 @@ local actions = coroutine.create(function()
                    {84, 'Left Softkey / Menu', 'open'}}
     if _G.nsb3_toolkit_menu_exit then steps[#steps + 1] = {86, 'Scroll Down', 'next'} end
     steps[#steps + 1] = {_G.nsb3_toolkit_menu_exit and 88 or 86, 'Left Softkey / Menu', 'select'}
+    if _G.nsb3_toolkit_menu_return then
+        assert(not _G.nsb3_toolkit_menu_exit, 'return control uses Continue timing')
+        steps[#steps + 1] = {88, 'End', 'end'}
+        steps[#steps + 1] = {90, 'Left Softkey / Menu', 'return'}
+    end
     for _, step in ipairs(steps) do
         assert(emu.wait(step[1] - machine.time:as_double()))
         local field = assert(fields[step[2]])

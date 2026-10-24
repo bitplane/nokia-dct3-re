@@ -1373,3 +1373,27 @@ It is an observation, not accepted final application settlement; neither a
 long-lived wait nor its cause is established. The lab card's profile-4 menu
 handler acknowledges selection without scheduling another proactive command.
 Do not supply a firmware completion to dismiss the wait.
+
+The physical recovery control selects Continue at 86 seconds, End at 88 and
+Menu at 90. Both later snapshots (89 and 91 seconds) retain `Wait`, with exact
+hash `675fd00adf99c80636183cf695a5291891abdca36ec93e007d01b82b8cf27ec9`.
+The card remains unchanged and the accepted ENVELOPE is retained. Thus End/Menu
+does not establish clean-menu recovery in this context; this is bounded to the
+pre-reset window, not proof of an indefinite wait.
+
+Passive SIMI observation identifies the live write at `2a16a6`, with caller
+stack values `280869` and `280c3d` identifying the generic T=0 transfer path.
+At its `280878` return observation, both header `a0c20000` and body
+`d3070202` independently report result `07`, the normal branch selected by
+the caller's comparison. This plus card status `9000` excludes a simple
+header/body transport stall, not every post-status firmware continuation.
+Unproductive wrapper probes are removed rather than retained as models.
+
+Run `nsb3_toolkit_menu_observe.lua` for 92 seconds from an independent profile-4
+cold input; validate with `nsb3_toolkit_envelope_check.py SOURCE RUN`. The checker
+retains the complete card/Toolkit/menu qualification and explicitly reports a
+characterization, not successful UI settlement. It checks physical End/Menu,
+both Wait captures, one live SIMI caller stack and both transfer returns.
+The next discriminator is a standards-valid follow-up proactive command after
+selection, versus this ACK-only menu handler. Do not assume missing RF or inject
+a firmware event to finish the menu.

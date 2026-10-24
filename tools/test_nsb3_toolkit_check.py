@@ -86,6 +86,11 @@ class Nsb3ToolkitTest(unittest.TestCase):
             text += wire_bytes('TX', bytes.fromhex('a0c2000009d307020201811001') + bytes((item,)))
             text += '\nSIM status ins=c2 sw=9000 chv=3/3 puk=10/10 enabled=1'
             check_trace(text, menu_item=item)
+            if item == 1:
+                returned = text + action('end', 'nsb3_toolkit_menu') + action('return', 'nsb3_toolkit_menu')
+                check_trace(returned, menu_item=1, return_wait=True)
+                with self.assertRaises(ValueError):
+                    check_trace(returned, menu_item=1)
             for bad in (text.replace('ins=c2 sw=9000', 'ins=c2 sw=6a80'),
                         text.replace('action=select', 'action=missing')):
                 with self.assertRaises(ValueError):
