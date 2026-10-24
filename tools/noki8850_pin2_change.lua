@@ -30,12 +30,13 @@ local input=coroutine.create(function()
     press('Menu','current_pin2')
     local old=_G.nsm2_pin2_reverse and {2,4,6,8} or {5,6,7,8}
     if _G.nsm2_pin2_wrong then old={9,9,9,9} end
+    if _G.nsm2_puk2_recovery then old={8,7,6,5,4,3,2,1} end
     local new=_G.nsm2_pin2_reverse and {5,6,7,8} or {2,4,6,8}
     for group,digits in ipairs({old,new,new}) do
         for index,digit in ipairs(digits) do press('Keypad '..digit,'digits_'..group..'_'..index) end
         press('Menu',({'new_pin2','confirm','result'})[group])
     end
-    assert(emu.wait(62-machine.time:as_double()))
+    assert(emu.wait((_G.nsm2_puk2_recovery and 67 or 62)-machine.time:as_double()))
     press('End','return')
     press('Menu','responsive_menu')
     machine:logerror('8850_pin2: complete=1 firmware_state_forcing=0\n')

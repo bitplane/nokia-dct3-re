@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from tools.make_sim_card_profile import make_profile
-from tools.run_noki8850_pin2_change import registered_card,check_phase
+from tools.run_noki8850_pin2_change import registered_card,check_phase,check_puk2_phase
 
 
 TRACE='\n'.join((
@@ -16,6 +16,41 @@ TRACE='\n'.join((
 
 
 class Pin2ChangeTest(unittest.TestCase):
+    def test_each_pin2_rejection_decrements_only_its_allowance(self):
+        for allowance in (3,2,1):
+            initial=bytearray(make_profile(True) if allowance==3 else registered_card('5678'))
+            initial[3517]=allowance
+            final=bytearray(registered_card('5678'))
+            final[3517]=allowance-1
+            status='9840' if allowance==1 else '9804'
+            trace=TRACE.replace('ins=24 sw=9000 chv=3/3',f'ins=24 sw={status} chv=3/{allowance-1}')
+            with self.subTest(allowance=allowance):
+                check_phase(trace,bytes(initial),bytes(final),rejected=True,pin2_attempts=allowance)
+                with self.assertRaises(ValueError):
+                    check_phase(trace,bytes(initial),registered_card('2468'),rejected=True,pin2_attempts=allowance)
+
+    def test_puk2_recovers_only_the_blocked_second_credential(self):
+        blocked=bytearray(registered_card('5678'))
+        blocked[3517]=0
+        post_verify=('sim_device: header cla=a0 ins=20 p1=00 p2=02 p3=08\n'
+                     'SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1\n')
+        trace=('sim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08\n'
+               'SIM status ins=20 sw=9000 chv=3/0 puk=10/10 enabled=1\n'
+               '8850_pin2: key=Menu state=1 t=62.000000000\n'
+               'sim_device: header cla=a0 ins=2c p1=00 p2=02 p3=10\n'
+               'SIM status ins=2c sw=9000 chv=3/3 puk=10/10 enabled=1\n'+post_verify+
+               '8850_pin2: key=Menu state=1 t=68.000000000\n'
+               '8850_pin2: complete=1 firmware_state_forcing=0')
+        check_puk2_phase(trace,bytes(blocked),registered_card('2468'))
+        for bad in (trace.replace('p2=02','p2=00'),trace.replace(post_verify,''),
+                    trace+'\nSIM status ins=24 sw=9000 chv=3/3 puk=10/10 enabled=1'):
+            with self.assertRaises(ValueError):check_puk2_phase(bad,bytes(blocked),registered_card('2468'))
+        for offset in (0,3484,3500,3516,3518,3519,3520):
+            final=bytearray(registered_card('2468'))
+            final[offset]^=1
+            with self.subTest(offset=offset),self.assertRaises(ValueError):
+                check_puk2_phase(trace,bytes(blocked),bytes(final))
+
     def test_rejected_change_preserves_pin2_and_cold_recovery_restores_retry(self):
         rejected=bytearray(registered_card('5678'))
         rejected[3517]=2

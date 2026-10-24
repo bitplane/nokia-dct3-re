@@ -2100,6 +2100,24 @@ ordinary/preserved registration checks. Capture:
 `tmp/nsm2-pin2-rejection-final`. This qualifies one rejected CHANGE and durable
 retry recovery, not PIN2 exhaustion, PUK2 or FDN.
 
+The separately executed `--puk2` variant uses five isolated processes. Three
+physical wrong-old-PIN2 changes consume allowances3/2/1 to2/1/0, with
+`9804`/`9804`/`9840` and the reviewed **PIN2 code blocked** final frame.
+PIN1 authentication and ordinary/preserved registration remain valid on
+every leg; PIN2 blocking is not whole-card rejection. A cold process inherits
+the complete blocked card, physically enters PUK2=87654321 and confirms
+new PIN2=2468 twice. It must send one selector02 UNBLOCK CHV returning9000,
+then organically send selector02 VERIFY for the installed PIN2 and obtain
+9000 again. That follow-up verification is required, not treated as a
+duplicate startup PIN1 attempt. Exact blocked/new/confirmation/**Code
+accepted** frames and the responsive Messages title are required. The last
+cold process uses2468 to change PIN2 back to5678. Complete card equality
+permits only each PIN2 retry decrement or authorized PIN2 replacement/reset;
+PIN1, both PUKs and all unrelated bytes remain unchanged. All successor
+processes inherit complete predecessor NVRAM. Capture:
+`tmp/nsm2-puk2-recovery-final`. This qualifies successful PUK2 recovery after
+organic PIN2 exhaustion, not rejected PUK2, permanent PUK2 loss or FDN.
+
 The same isolated runner accepts `--scenario host-incoming-call`. It verifies
 physical answer/end input, the complete host-originated CC/RR exchange,
 traffic-channel assignment and release, and reviewed ringing/returned-idle
