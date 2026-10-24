@@ -1082,6 +1082,25 @@ publisher alone has no negative-input guard, but this mapped consumer
 supplies an unsigned byte. Indirect calls and command producers remain
 outside the direct-call census coverage.
 
+The parent consumer at`0x305ab8` is reached through class`0x40` at message
+byte3, not DSP packet type80. The paired publisher subsequently constructs
+class40/command80 at`0x303cbe`, echoes the selected mode into byte9 and
+sends it through`0x3026d8`. This is a reply constructor, not evidence of an
+initiating command producer. The checker pins the parent subtract cascade,
+builder class/command stores and mode echo. It does not close every possible
+class40 producer or indirect call.
+
+`verify-6210-dsp-control-observation` retains the complete physical outgoing
+call acceptance and adds read-only debugger observations. Its own coherent
+run`tmp/npe3-normal-control-gate-final` passes with182 compiler observations,
+including9 selector8 entries, but zero paired-mode or class40-consumer hits.
+Positive initialization0102 and physical Send/End070b/050a entries all have
+R14=`0x420c0f`, identifying the normal publish call`0x420c0a`. Its changed-
+parameter comparison and11-selector table at`0x263884` are source-pinned:
+`08 09 1b 25 20 21 22 23 24 28 2d`. Null compiler instrumentation cannot
+qualify this observation. This is one coherent call, not universal absence
+of a service route or a claim that every paired mode is unreachable.
+
 The board evidence provides a narrower shared-part hypothesis: own NPE-3
 schematic sheet3 names N240`COBBA_GJP_V4.1`, while the independent NSB-7
 manual printed65/PDF79 identifies N250 as part4370643,
@@ -1091,12 +1110,15 @@ a common silicon contract, not silently selecting that operating mode on
 NPE-3. Its observed870b/850a words retain bit0100 absent from NSB-7's
 860b/840a; the meaning of that field and the nine paired modes is unresolved.
 No shared PCM profile, codec gain or MCU-to-COBBA register translation is
-enabled from this comparison. Next identify command80's producer and the
-normal-call mode, then relate its fields to independent DSP/control evidence.
+enabled from this comparison. The normal-call evidence shifts the immediate
+target to the parameter-block construction feeding`0x420c0a`, including
+bit0100's ownership and operating-mode meaning. Do not pursue command80
+as a mandatory ordinary-call prerequisite without new evidence connecting it.
 
 ```sh
 .venv/bin/python tools/noki6210_dsp_control_contract.py \
   roms/noki6210/6210_556c.fls > tmp/npe3-paired-mode-contract.json
+make verify-6210-dsp-control-observation RUN_DIR=tmp/npe3-control-fresh
 ```
 
 `verify-6210-incoming-sms` requires segmented GSM delivery, CP/RP acknowledgments,

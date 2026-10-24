@@ -58,6 +58,36 @@ def recover(image):
         0x3053a8: ('lsls', 'r0, r0, #2'),
         0x3053aa: ('ldr', 'r0, [r1, r0]'),
         0x3053ac: ('mov', 'pc, r0'),
+        0x3059de: ('ldrb', 'r0, [r4, #3]'),
+        0x3059e6: ('subs', 'r0, r0, #2'),
+        0x3059ec: ('subs', 'r0, #0x11'),
+        0x3059f2: ('subs', 'r0, #6'),
+        0x3059f8: ('subs', 'r0, #6'),
+        0x3059fe: ('subs', 'r0, #0x1a'),
+        0x305a04: ('subs', 'r0, #7'),
+        0x305a08: ('beq', '#0x305aaa'),
+        0x305ab8: ('bl', '#0x305258'),
+        0x303cba: ('movs', 'r1, #0x80'),
+        0x303cbe: ('bl', '#0x302688'),
+        0x303cc2: ('strb', 'r5, [r0, #9]'),
+        0x303cc6: ('bl', '#0x3026d8'),
+        0x30268c: ('adds', 'r5, r1, #0'),
+        0x3026b8: ('movs', 'r2, #0x40'),
+        0x3026ba: ('strb', 'r2, [r0, #3]'),
+        0x3026d2: ('strb', 'r5, [r0, #8]'),
+        0x420bfc: ('ldrh', 'r1, [r5]'),
+        0x420bfe: ('ldrh', 'r0, [r7]'),
+        0x420c00: ('cmp', 'r0, r1'),
+        0x420c02: ('beq', '#0x420c20'),
+        0x420c04: ('ldr', 'r0, [pc, #0x368]'),
+        0x420c06: ('ldrb', 'r0, [r0]'),
+        0x420c08: ('movs', 'r2, #1'),
+        0x420c0a: ('bl', '#0x426eb4'),
+        0x420c38: ('ldrb', 'r0, [r0, r6]'),
+        0x420c3a: ('ldrh', 'r1, [r5, #2]'),
+        0x420c3e: ('bl', '#0x426eb4'),
+        0x420c54: ('cmp', 'r6, #0xb'),
+        0x420c56: ('blt', '#0x420c28'),
         0x426efa: ('cmp', 'r0, #0x36'),
         0x426efe: ('adr', 'r2, #8'),
         0x4271d4: ('lsls', 'r2, r4, #9'),
@@ -89,12 +119,15 @@ def recover(image):
         raise ValueError('parameter-shadow ownership differs')
     if u32(0x303fe8) != 0x262444:
         raise ValueError('paired mode-table pointer differs')
+    if u32(0x420f70) != 0x263884 or read(0x263884, 11) != bytes.fromhex('08091b252021222324282d'):
+        raise ValueError('normal parameter-block selector table differs')
     modes = parse_mode_pairs(read(0x262444, 36))
     dispatch = [u32(0x3053b0 + index * 4) for index in range(55)]
     if [index for index, target in enumerate(dispatch) if target == 0x305668] != [10]:
         raise ValueError('paired mode consumer dispatch differs')
     calls = []
     mode_calls = []
+    consumer_calls = []
     for offset in range(0, len(image) - 3, 2):
         first = int.from_bytes(image[offset:offset + 2], 'big')
         second = int.from_bytes(image[offset + 2:offset + 4], 'big')
@@ -109,12 +142,16 @@ def recover(image):
             calls.append(address)
         if target == 0x303c30:
             mode_calls.append(address)
+        if target == 0x305258:
+            consumer_calls.append(address)
     expected_calls = [0x303278, 0x303c7c, 0x303c86, 0x41ab0e, 0x41b07a,
                       0x420c0a, 0x420c3e, 0x420c66, 0x4272ae, 0x45dbfc, 0x46b9ee]
     if calls != expected_calls:
         raise ValueError('direct Thumb BL candidate inventory differs')
     if mode_calls != [0x30566a]:
         raise ValueError('paired mode direct-call inventory differs')
+    if consumer_calls != [0x305ab8]:
+        raise ValueError('paired mode consumer direct-call inventory differs')
     return {'compiler': 0x426eb4, 'selector_count': 55,
             'field_selector': 0x11, 'field_mask': 0x0200,
             'keep_mask': 0xfdff, 'parameter_selector': 8,
@@ -130,6 +167,12 @@ def recover(image):
             'paired_mode_command_byte': 8,
             'paired_mode_command': 0x73 + 3 + 10,
             'paired_mode_consumer': 0x305258,
+            'paired_mode_message_class': 0x2 + 0x11 + 6 + 6 + 0x1a + 7,
+            'paired_mode_consumer_direct_bl_candidates': consumer_calls,
+            'paired_mode_command80_reply_constructor': 0x303cbe,
+            'paired_mode_reply_echoes_mode': True,
+            'normal_parameter_publish_call': 0x420c0a,
+            'normal_parameter_selectors': list(read(0x263884, 11)),
             'paired_mode_dispatch_table': 0x3053b0,
             'paired_mode_dispatch_records_checked': 55,
             'paired_mode_direct_bl_candidates': mode_calls,
@@ -152,15 +195,43 @@ def verify_call_field(log):
             'pcm_validated': False, 'native_speech_validated': False}
 
 
+def verify_mode_observation(log):
+    verify_call_field(log)
+    cursor = 0
+    for pattern in (
+            r'6210_control_compiler: selector=08 value=0102 publish=1 lr=00420c0f',
+            r'6210_call_physical: action=send\b',
+            r'6210_control_compiler: selector=08 value=070b publish=1 lr=00420c0f',
+            r'dsp_control_write: data=870b pc=0042727c',
+            r'6210_call_physical: action=end\b',
+            r'6210_control_compiler: selector=08 value=050a publish=1 lr=00420c0f',
+            r'dsp_control_write: data=850a pc=0042727c'):
+        match = re.search(pattern, log[cursor:])
+        if match is None:
+            raise ValueError('missing positive ordered mode-observer control: ' + pattern)
+        cursor += match.end()
+    if '6210_paired_mode:' in log or '6210_service_command:' in log:
+        raise ValueError('paired/service route differs from this normal-call fixture')
+    return {'normal_publish_call': 0x420c0a,
+            'paired_mode_observed': False, 'service_consumer_observed': False,
+            'scope': 'one coherent physical outgoing call; not universal absence',
+            'pcm_validated': False}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image', type=Path)
     parser.add_argument('--log', type=Path)
+    parser.add_argument('--mode-probe', action='store_true')
     args = parser.parse_args()
+    if args.mode_probe and not args.log:
+        parser.error('--mode-probe requires --log')
     try:
         result = {'static': recover(args.image.read_bytes())}
         if args.log:
             result['physical_call'] = verify_call_field(args.log.read_text(errors='replace'))
+            if args.mode_probe:
+                result['mode_observation'] = verify_mode_observation(args.log.read_text(errors='replace'))
         print(json.dumps(result, indent=2))
     except (OSError, ValueError) as error:
         parser.exit(1, f'NPE-3 DSP control FAIL: {error}\n')

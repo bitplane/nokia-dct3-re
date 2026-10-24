@@ -765,8 +765,12 @@ bus profile without evidence. The own control checker now pins nine paired
 command8/9 parameter records and their command80/message-byte9 consumer;
 [the NPE-3 mode boundary](6210_bringup.md#paired-dsp-control-mode-boundary)
 owns that map and the independently observed shared COBBA_GJP_V4.1-part
-hypothesis. Neither table nor part identity establishes the selected PCM
-operating mode or COBBA register semantics.
+hypothesis. A positive-controlled physical call uses normal parameter-block
+publish call420c0a, not that class40/command80 paired-mode route. The latter's
+command80 constructor echoes a reply; it is not an initiating producer.
+Neither table nor part identity establishes the selected PCM operating mode
+or COBBA register semantics. Investigate the normal parameter block rather
+than treating service-mode selection as an ordinary-call prerequisite.
 
 Primary board evidence is retained in the ignored ROM research collection:
 `roms/research/npe3/npe3-system-module.pdf`, Nokia NPE-3 System Module,

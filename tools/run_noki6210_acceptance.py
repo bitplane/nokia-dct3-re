@@ -341,6 +341,8 @@ def main():
                         help='authenticate a PIN-enabled SIM before the host service')
     parser.add_argument('--wrong-puk-first',action='store_true',
                         help='reject a physical PUK in a separate process before cold recovery')
+    parser.add_argument('--trace-dsp-control', action='store_true',
+                        help='read-only compiler/mode observations during coherent outgoing call')
     args = parser.parse_args()
     if args.wrong_puk_first and args.scenario!='security-block-cold':
         parser.error('--wrong-puk-first requires security-block-cold')
@@ -356,6 +358,9 @@ def main():
                               'state-idle', 'state-sms')):
         parser.error('--pin-enabled requires --coherent-cell and a supported service fixture')
     root = Path(__file__).resolve().parents[1]
+    if args.trace_dsp_control and (args.scenario != 'outgoing-call' or
+                                  not args.coherent_cell or args.foreign_cell):
+        parser.error('--trace-dsp-control requires the home coherent outgoing-call fixture')
     try:
         contract = assess((root / 'roms/noki6210/6210_556c.fls').read_bytes(),
                           (root / 'roms/noki6210/6210 virgin eeprom 005fa000.fls').read_bytes())
@@ -367,6 +372,8 @@ def main():
         run = args.run_directory.resolve()
         run.mkdir(parents=True, exist_ok=False)
         machine, script, seconds = SCENARIOS[args.scenario]
+        if args.trace_dsp_control:
+            script = 'dsp_mode_observe'
         if args.scenario in PIN_SCENARIOS or args.pin_enabled:
             from tools.make_sim_card_profile import make_profile
             card = run / f'nvram/{machine}/sim_card'
@@ -670,6 +677,11 @@ def main():
         elif args.scenario in ('outgoing-call', 'host-outgoing-call'):
             from tools.noki6210_outgoing_call_check import verify as check_call
             check_call(text, coherent_pin=args.pin_enabled or args.coherent_cell)
+            if args.trace_dsp_control:
+                from tools.noki6210_dsp_control_contract import verify_mode_observation
+                # The compact events view omits the mailbox CPU snapshots.
+                contract['dsp_control_observation'] = verify_mode_observation(
+                    (run / 'error.log').read_text(errors='replace'))
             if host:
                 from tools.radio_host_outgoing_connect_check import verify as check_host
                 check_host((run / 'error.log').read_text(errors='replace'), '1234567')

@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "npe3_normal_call_uses_paired_service_mode_table",
+      "status": "disproven",
+      "hypothesis": "The coherent NPE-3 physical outgoing-call fixture selects its call controls through paired table262444 and class40 command80",
+      "conclusion": "tmp/npe3-normal-control-gate-final passes full own outgoing call acceptance with182 positive compiler observations and9 command8 entries, but zero paired-mode or class40-consumer hits. Initialization0102, physical Send070b and End050a all enter compiler426eb4 with R14=420c0f, identifying normal changed-parameter publisher420c0a and its11-selector table263884. The class40 route's command80 constructor303cbe echoes its selected mode as a reply, not an initiating producer. This disproves the prerequisite for this fixture, not all indirect callers, service operation or other call modes. Debugger null results without the required compiler/physical positives cannot qualify. PCM operating-mode meaning and hardware timing remain unproved; no profile, field or message was forced.",
+      "evidence": ["docs/6210_bringup.md", "docs/external_call_bridge.md", "tools/noki6210_dsp_control_contract.py", "tools/noki6210_dsp_mode_observe.lua", "tools/run_noki6210_acceptance.py", "tools/test_noki6210_dsp_control_contract.py", "gates.json"]
+    },
+    {
       "id": "nsb7_unanswered_restore_implies_no_local_pcm_ticks",
       "status": "disproven",
       "hypothesis": "An unanswered NSB-7 restored SIP transaction on the PCM-enabled composition cannot execute any local codec/PCM ticks",

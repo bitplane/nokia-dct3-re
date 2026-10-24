@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 852 gates: 638 generated from typed steps, 214 copied verbatim (shell).
+# 853 gates: 639 generated from typed steps, 214 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -102,7 +102,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6210-sip-alerting-incoming-restore \
 	verify-6210-sip-pending-outgoing-restore verify-6210-sip-idle-restore \
 	verify-6210-stage verify-6210-runtime verify-6210-outgoing-call \
-	verify-6210-incoming-call verify-6210-pcm-missing verify-6210-incoming-sms \
+	verify-6210-dsp-control-observation verify-6210-incoming-call \
+	verify-6210-pcm-missing verify-6210-incoming-sms \
 	verify-6210-host-incoming-sms verify-6210-host-outgoing-sms \
 	verify-6210-host-rejected-sms verify-6210-host-silent-sms \
 	verify-6210-host-silent-sms-realtime verify-6210-outgoing-sms \
@@ -941,6 +942,9 @@ verify-6210-runtime: build
 
 verify-6210-outgoing-call: build
 	$(PYTHON) tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario outgoing-call --mame $(MAME_DIR)/mame
+
+verify-6210-dsp-control-observation: build
+	$(PYTHON) tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario outgoing-call --coherent-cell --trace-dsp-control --mame $(MAME_DIR)/mame
 
 verify-6210-incoming-call: build
 	$(PYTHON) tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario incoming-call --mame $(MAME_DIR)/mame

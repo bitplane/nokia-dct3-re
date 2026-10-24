@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_normal_call_parameter_block_publication",
+      "owner": "npe3_dsp_control",
+      "status": "satisfied",
+      "predicate": "A positive-controlled coherent NPE-3 physical call publishes command8 setup/teardown through the own changed-parameter block publisher rather than assuming service-mode table selection",
+      "current": "verify-6210-dsp-control-observation passes the complete own physical outgoing-call contract and checks raw mailbox CPU snapshots separately from the compact event filter. Read-only Lua compiler observations require initialization0102, physical Send070b and End050a at R14=420c0f; own writer42727c emits870b/850a. The static checker pins call420c0a, changed source/cache comparison and all11 selectors at263884. The current coherent run reports182 positive compiler observations,9 selector8 entries and no paired-mode/class40-consumer invocation. Static class40 routing, one direct consumer call and command80 mode-echo reply are separately pinned. These are one-fixture observations, not universal absence, decoded COBBA registers, selected PCM timing, native DSP speech or evidence to inject a service request.",
+      "evidence": ["docs/6210_bringup.md", "docs/external_call_bridge.md", "tools/noki6210_dsp_control_contract.py", "tools/noki6210_dsp_mode_observe.lua", "tools/run_noki6210_acceptance.py", "tools/test_noki6210_dsp_control_contract.py", "gates.json"]
+    },
+    {
       "id": "npe3_paired_dsp_control_modes_and_consumer",
       "owner": "npe3_dsp_control",
       "status": "satisfied",
