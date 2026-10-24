@@ -12,6 +12,29 @@ from tools.c54x_opcode_coverage import (decoder_declared_words, group_gaps, main
 
 
 class C54xOpcodeCoverageTest(unittest.TestCase):
+    def test_malformed_primary_records_cannot_disappear_from_coverage(self):
+        valid = '[opcov] op=8194 first_pc=05e3 count=1\n'
+        for record in (
+            '[opcov] op=8194 first_pc=05e3 count=-1',
+            '[opcov] op=8194 first_pc=05e3 count=1 trailing',
+            '[opcov] op=10000 first_pc=05e3 count=1',
+            '[opassert] op=8194 trailing',
+            '[:] [opassert] op=819',
+            '[opdecode] op=8194 supported=2 words=1',
+            '[opdecode] op=8194 supported=1 words=1 trailing',
+        ):
+            with self.subTest(record=record), self.assertRaisesRegex(ValueError, 'malformed'):
+                summarize(valid + record + '\n')
+
+    def test_unrelated_log_lines_and_both_assertion_formats_remain_supported(self):
+        result = summarize('ordinary MAME output\n'
+                           '[opcov] op=8194 first_pc=05e3 count=1\n'
+                           '[opassert] op=8194\n'
+                           '[:] [opassert] op=8194\n'
+                           '[opdecode] op=8194 supported=1 words=1\n')
+        self.assertEqual(result['asserted'], {0x8194})
+        self.assertEqual(result['decoded'], {0x8194: (True, 1)})
+
     def test_completed_fixture_union_requires_assertions_not_just_execution(self):
         with TemporaryDirectory() as root:
             root = Path(root)

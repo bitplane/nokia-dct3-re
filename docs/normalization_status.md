@@ -90,9 +90,12 @@ project-wide bootstrap blocker:
   laboratory registration, call signaling and SMS, not native speech. See
   [6210 bring-up](6210_bringup.md).
 - NSE-5's ROM4 compatibility instrument executes uploads and delivers DSP
-  replies, but its original stored-data reply fails the MCU's validation.
-  Matching mask/product identity and COBBA inputs remain unresolved; the
-  compatibility instrument is not normal 7110 support. See
+  replies. The separate-PMM input and the intact backups have distinct
+  boundaries: the v5.01 whole backup reaches a stored-data checksum mismatch,
+  while the v5.00 whole backup passes its observed low-record checksum and
+  reaches a native serial-controller completion poll. The physical serial
+  completion contract, fitted mask/product identity and COBBA inputs remain
+  unresolved; none of these instruments establishes usable 7110 support. See
   [7110 bring-up](7110_bringup.md).
 - NPM-5's isolated native MU4 staged recorder has metadata-save and cold-open
   evidence. Fresh original initialization, complete readback, retained storage

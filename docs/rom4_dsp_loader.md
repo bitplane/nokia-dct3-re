@@ -8430,6 +8430,9 @@ The generated report gives the current fixture-only total; these are *word*
 counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
+The coverage reader rejects malformed execution, assertion, decoder and
+extension records rather than silently dropping them from the measured set;
+unrelated emulator output remains permitted.
 `make check-c54x-observed-coverage` regenerates the fixture and handset logs and fails if
 the ROM4 idle word set changes or any observed word lacks an assertion. It is
 also part of `make check-c54x-cross-rom`; the gate does not validate unobserved

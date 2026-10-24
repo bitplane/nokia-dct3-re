@@ -64,6 +64,8 @@ def summarize(text: str) -> dict[str, object]:
     tuple_decoded = {}
     for line in text.splitlines():
         match = OPCODE.match(line)
+        if line.startswith("[opcov]") and not match:
+            raise ValueError("malformed opcode execution record")
         if match:
             opcode, pc = (int(value, 16) for value in match.groups()[:2])
             if match.group(3) is not None and not int(match.group(3)):
@@ -71,9 +73,13 @@ def summarize(text: str) -> dict[str, object]:
             first_pc.setdefault(opcode, pc)
             counts[opcode] = counts.get(opcode, 0) + int(match.group(3) or 1)
         match = ASSERTION.match(line)
+        if line.startswith(("[opassert]", "[:] [opassert]")) and not match:
+            raise ValueError("malformed opcode assertion record")
         if match:
             asserted.add(int(match.group(1), 16))
         match = DECODE.match(line)
+        if line.startswith("[opdecode]") and not match:
+            raise ValueError("malformed opcode decoder record")
         if match:
             opcode = int(match.group(1), 16)
             value = (bool(int(match.group(2))), int(match.group(3)))
