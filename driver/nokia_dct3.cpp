@@ -4069,8 +4069,7 @@ void nokia_dct3_state::nsb6stage(machine_config &config)
 {
 	noki8xxx(config);
 	// NSB-6 UI Description, issue 1 (06/2000), p7: internal MIC2 and EAR.
-	// Board connectivity only. Own PCM framing is documented in
-	// docs/8xxx_bringup.md but not configured here; codec gains remain unknown.
+	// Board connectivity; codec gains remain neutral pending measured evidence.
 	m_cobba->add_route(nokia_cobba_device::ear, "mono", 1.0);
 	MICROPHONE(config, "microphone", 1).front_center()
 			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);
@@ -4079,6 +4078,17 @@ void nokia_dct3_state::nsb6stage(machine_config &config)
 	// persistent-flash bus census; it never changes read/write results.
 	research.flash_persistent_start = 0x003d0000;
 	research.dsp_reset_wiring = { 0x10, 0x01 };
+	// NSB-6 System Module issue 1 06/2000 p25 (acquired PDF p39):
+	// COBBA generates 512 kHz/8 kHz, one active-high sync clock and a
+	// 16-bit MSB-first word sign-extended from bit 12. Data changes on
+	// rising edges; the receiver samples falling edges, 64 clocks/frame.
+	research.cobba_pcm.data_clock = 512'000;
+	research.cobba_pcm.frame_clock = 8'000;
+	research.cobba_pcm.sample_bits = 13;
+	research.cobba_pcm.sync_clocks = 1;
+	research.cobba_pcm.word_clocks = 16;
+	research.cobba_pcm.msb_first = true;
+	research.cobba_pcm.data_edge = nokia_mad2_pcm_device::clock_edge::falling;
 	// Own consumer 2c2dbc requires matching non-sentinel identity words.
 	// Six is the acquired fragment's ROM input, not measured NSB-6 silicon.
 	research.dsp_bootstrap = {
@@ -4122,6 +4132,13 @@ void nokia_dct3_state::nsb6hle(machine_config &config)
 	// Own class-74 dispatcher 24373a calls 240938; command 0d at
 	// 2409ac cancels the armed wait and interprets fault bits at +9.
 	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
+	// Own selector 17 updates bit 0200; selector 8 publishes at 2c338e.
+	// Physical Answer/Send and End independently produce 860b -> 840a.
+	runtime.dsp_speech_control = {
+		0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0200, 0x0200 }
+	};
+	runtime.cobba_hle_voice.microphone = nokia_cobba_device::mic2;
+	runtime.cobba_hle_voice.output = nokia_cobba_device::ear;
 	apply_product_config(runtime);
 	m_dsp_hle->set_opaque_parameter_acceptance(true);
 	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);

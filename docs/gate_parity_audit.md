@@ -150,14 +150,14 @@ absent product is a coverage question, not a drifted gate.
 | `sip-cancel` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
 | `sip-connected-incoming-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | yes |
 | `sip-connected-outgoing-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | yes |
-| `sip-connected-signaling` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | yes |
+| `sip-connected-signaling` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
 | `sip-idle-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `sip-incoming-connected-signaling` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | yes |
-| `sip-incoming-media` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
+| `sip-incoming-connected-signaling` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
+| `sip-incoming-media` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
 | `sip-incoming-restore` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
 | `sip-incoming-waveform` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
 | `sip-outgoing-busy` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `sip-outgoing-media` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
+| `sip-outgoing-media` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
 | `sip-outgoing-restore` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
 | `sip-outgoing-unavailable` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
 | `sip-outgoing-waveform` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
@@ -871,7 +871,6 @@ absent product is a coverage question, not a drifted gate.
 
 - **6210**: `tools/run_noki6210_sip_cancel.py`
 - **6250**: `tools/run_noki6250_sip_cancel.py`
-- **8890**: `tools/run_noki8890_sip_cancel.py`
 
 ### `sip-idle-restore`
 
@@ -885,12 +884,12 @@ absent product is a coverage question, not a drifted gate.
 
 - **6210**: `tools/run_noki6210_sip_cancel.py`
 - **6250**: `tools/run_noki6250_sip_cancel.py`
-- **8890**: `tools/run_noki8890_sip_cancel.py`
 
 ### `sip-incoming-media`
 
 - **8210**: `tools/run_noki8210_sip_cancel.py`
 - **8850**: `tools/run_noki8850_sip_cancel.py`
+- **8890**: `tools/run_noki8890_sip_cancel.py`
 
 ### `sip-incoming-restore`
 
@@ -909,6 +908,7 @@ absent product is a coverage question, not a drifted gate.
 
 - **8210**: `tools/run_noki8210_sip_cancel.py`
 - **8850**: `tools/run_noki8850_sip_cancel.py`
+- **8890**: `tools/run_noki8890_sip_cancel.py`
 
 ### `sip-outgoing-restore`
 

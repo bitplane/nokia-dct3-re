@@ -56,7 +56,7 @@ class SipCancelCheckTest(unittest.TestCase):
     def test_signaling_only_cli_rejects_answered_or_media_promotion(self):
         script = Path(__file__).with_name('run_sip_handset_gate.py')
         with tempfile.TemporaryDirectory() as directory:
-            for product in ('6210', '6250', '8890'):
+            for product in ('6210', '6250'):
                 for extra in ([], ['--incoming'],
                               ['--incoming', '--cancel-incoming', '--record-media'],
                               ['--incoming', '--cancel-incoming', '--restore-call']):
@@ -70,7 +70,7 @@ class SipCancelCheckTest(unittest.TestCase):
     def test_validated_media_products_do_not_inherit_cancel_only_scope(self):
         script = Path(__file__).with_name('run_sip_handset_gate.py')
         with tempfile.TemporaryDirectory() as directory:
-            for product in ('8210', '8850'):
+            for product in ('8210', '8850', '8890'):
                 for extra in ([], ['--incoming'], ['--record-media'],
                               ['--incoming', '--record-media']):
                     with self.subTest(product=product, extra=extra):

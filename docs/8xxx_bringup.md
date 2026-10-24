@@ -618,9 +618,9 @@ These establish product-owned endpoint topology, not codec gains or an
 enabled media path.
 `nsb6stage` now connects the host microphone to MIC2 and EAR to the mono
 speaker with neutral route gains; `nsb6hle` inherits this board connectivity.
-Neither PCM clocks nor an HLE voice mux are enabled by these routes.
-The independent physical outgoing-call/speech-control gate remains green;
-that proves unchanged signaling/control, not physical duplex or native speech.
+These routes alone do not enable media. The independently documented PCM
+profile and own speech-control predicate below supply the research-HLE path;
+physical host-audio waveforms and native DSP speech remain separate claims.
 
 #### Own PCM Timing Contract
 
@@ -637,14 +637,28 @@ for falling-edge sampling. The MAD pin table independently marks PCMDClk
 and PCMSClk as inputs from COBBA. These are own-product document contracts,
 not measured waveforms or an inherited8850 bus profile.
 
-The PCM profile can therefore be implemented without acquiring another
-timing source. It is not yet enabled: implementation must compose these
-512kHz/64-clock values with the separately validated own speech-control
-field below, then independently qualify incoming/outgoing media and
-restoration. The existing signaling-only/zero-media gates must be treated
-explicitly when that capability changes. Native DSP speech and analogue
-gains remain unproved. Archive identity and acquisition are recorded in
-`roms/README.md`.
+`nsb6stage` configures this own 512kHz/64-clock profile. `nsb6hle` additionally
+uses command8/bit0200 from the independently recovered field below, with
+MIC2/EAR and neutral gains. No new device-core timing exception or sibling
+clock is needed. Native execution still stops at missing resident2c75;
+framing configuration does not supply that code. Archive identity and
+acquisition are recorded in `roms/README.md`.
+
+The outgoing and incoming real-SIP media gates require at least100 executed
+uplink/downlink and host PCM frames, own call/control/release checks and
+registered-idle recovery. `noki8890_pcm_check.py` independently requires
+512000/8000Hz,64 clocks/frame,16 serial bits plus one sync clock and47 idle
+clocks, with exact cumulative counters and transfers bounded by the own
+860b/840a writer. Recorded host PCM is not a nonsilent microphone/earpiece
+waveform test. Native speech and analogue gains remain unproved.
+
+Accepted media captures are `tmp/nsb6-sip-outgoing-media-qualified` and
+`tmp/nsb6-sip-incoming-media-final`. The four restoration captures use
+`tmp/nsb6-pcm-v2-restore-` with suffixes `outgoing-connected`,
+`incoming-connected`, `outgoing-pending` and `incoming-alerting`.
+Connected cases require positive pre-save bridge PCM/media and codec
+execution; all external dialogs are cleared, not replayed. The default and
+coherent3210 semantic regressions pass without rebanking their predicates.
 
 The acquired v12.20 MCU (SHA1 `a214a0d69760ecd8eeca0b9d82f95c94bdfe70ed`)
 independently pins the compiler at `2c307c`, selector table `2c30b0`
@@ -654,8 +668,8 @@ Selector 17 updates bit `0200` using keep mask `fdff`; the field base is
 uses that same `134c4e` halfword for its `8000`-prefixed command.
 The common store at `2c338e` publishes to DSPIF `100a8`.
 `noki8890_speech_control_check.py` pins the ROM hash, instruction forms,
-selector targets and pool literals. This is static field ownership only:
-PCM execution and native speech remain unproved.
+selector targets and pool literals. This establishes static field ownership,
+not by itself PCM execution or native speech.
 
 Physical Send/End correlation separately passes `verify-8890-speech-control`
 (`run_8890_speech_control_probe`). The unchanged own-PMM no-PIN host fixture
@@ -664,7 +678,7 @@ the full existing outgoing-call acceptance. Send publishes `860b` at
 48.202981 seconds; End publishes `840a` at 57.091636 seconds. Both use
 the own writer `2c338e` with selector 8. The control checker requires ordered
 physical inputs and own decoded keys, rejecting sibling writer addresses,
-wrong selectors and missing/incorrect disable. No PCM configuration was enabled.
+wrong selectors and missing/incorrect disable. It does not itself qualify media.
 
 `verify-8890-incoming-speech-control` independently passes on a fresh
 host incoming call (`run_8890_incoming_speech_control_verified`), requiring
@@ -673,7 +687,7 @@ selector-8 publications. The host signaling checker accepts either direct
 connected-to-ended notification or an explicit `media_closed` immediately
 before ended; both retain every preceding ordered state. This is bearer
 lifecycle notification, not proof of audio. Missing connection, reversed
-closure and unexpected states remain rejected. PCM execution remains unqualified.
+closure and unexpected states remain rejected. PCM has the separate gates above.
 
 PCS1900 is independently verified by `verify-8890-pcs-speech-control` and
 `verify-8890-pcs-incoming-speech-control` on fresh own-PMM fixtures
@@ -707,14 +721,14 @@ injection or borrowed product verdict is part of these workflows.
 | Host incoming/outgoing SMS | `verify-8890-host-incoming-sms` and `verify-8890-host-outgoing-sms`; own configured ARFCN60, external request/decision correlation, physical composition/read and persistent received content |
 | Real SIP caller cancellation | `verify-8890-sip-cancel`; own clock-settled idle, exact caller SETUP, CANCEL/487, clean CC/RR release, missed-call notification and decoded physical Exit; no Answer/media |
 | Real outgoing SIP busy | `verify-8890-sip-outgoing-busy`; own unchanged PMM, configured GSM900 carrier 60, physical `1234567`/Send, actual SIP 486, correlated busy and CC/RR release, reviewed idle pixels excluding the top-row clock; no CONNECT/media |
-| Real outgoing connected SIP signaling | `verify-8890-sip-connected-signaling`; own unchanged PMM, physical `1234567`/Send/End, real SIP-200, own carrier-60 traffic/release contract, reviewed idle recovery and persistent SIM location; zero uplink/no HLE codec ticks, no speech claim |
-| Real incoming connected SIP signaling | `verify-8890-sip-incoming-connected-signaling`; fresh clock-settled idle, caller `5551234`, physical Answer/End and own GSM900 carrier-60 lifecycle, reviewed idle recovery and persistent SIM location; zero uplink/no HLE codec ticks, no speech claim |
+| Real outgoing SIP HLE media | `verify-8890-sip-outgoing-media`; own unchanged PMM, physical `1234567`/Send/End, real SIP-200, own carrier-60 traffic/release, reviewed idle recovery and persistent SIM location; sustained bidirectional frames and exact own PCM accounting |
+| Real incoming SIP HLE media | `verify-8890-sip-incoming-media`; fresh clock-settled idle, caller `5551234`, physical Answer/End and own carrier-60 lifecycle, reviewed idle recovery and persistent SIM location; sustained bidirectional frames and own PCM accounting |
 | Real outgoing SIP unavailable | `verify-8890-sip-outgoing-unavailable`; same physical number and own carrier, actual SIP 480 with consumed cause 18, full release and reviewed idle restoration; no CONNECT/media |
 | Idle restoration before real SIP | `verify-8890-sip-idle-restore`; exact PC/SP/RAM/time and protocol replay, new host epoch 2, then the same unanswered cancellation and decoded physical cleanup; no saved external dialog or speech |
 | Ringing restoration with real SIP | `verify-8890-sip-alerting-incoming-restore`; exact R15/R13/RAM/time at 52 s, rejected external INVITE, one cause-41 clear under epoch 2, CC/RR release and decoded Exit to reviewed idle; Answer/CONNECT/media forbidden |
 | Pending outgoing restoration with real SIP | `verify-8890-sip-pending-outgoing-restore`; physical 1234567/Send, real 180, exact R15/R13/RAM/time at 32 s, CANCEL/487, one cause-41 clear and CC/RR release to reviewed idle; no redial/CONNECT/media |
-| Connected outgoing restoration with real SIP | `verify-8890-sip-connected-outgoing-restore`; physical `1234567`/Send, SIP-200 connected before the 32 s save, exact R15/R13/RAM/time, BYE/one cause-41 clear, own carrier-60 release and idle recovery; no redial, zero old-epoch uplink/no HLE codec ticks, no speech claim |
-| Connected incoming restoration with real SIP | `verify-8890-sip-connected-incoming-restore`; fresh clock-settled idle, physical Answer, connection before the 52 s save, exact R15/R13/RAM/time, BYE/one cause-41 clear, own carrier-60 release and idle recovery; no replay, zero old-epoch uplink/no HLE codec ticks, no speech claim |
+| Connected outgoing restoration with real SIP | `verify-8890-sip-connected-outgoing-restore`; physical `1234567`/Send, SIP-200 connected before the 32 s save, exact R15/R13/RAM/time, pre-save bidirectional PCM/media, BYE/one cause-41 clear, own carrier-60 release and idle recovery; no redial or external-dialog replay |
+| Connected incoming restoration with real SIP | `verify-8890-sip-connected-incoming-restore`; fresh clock-settled idle, physical Answer, connection before the 52 s save, exact R15/R13/RAM/time, pre-save bidirectional PCM/media, BYE/one cause-41 clear, own carrier-60 release and idle recovery; no replay of external dialogs |
 
 The host SMS gates use `fixtures/noki8890_host/nsb6hle.cfg` in fresh private
 storage with the unchanged own acquired MCU/PMM. The fixture enables the

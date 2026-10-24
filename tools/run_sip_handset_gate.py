@@ -48,7 +48,8 @@ async def run(args):
                 # DCS late-PIN fixtures end physically; don't race that key
                 # against the older remote eight-second safety hangup.
                 '--duration=30' if (getattr(args, 'signaling_only', False) or
-                                    getattr(args, 'dcs1800', False)) else '--duration=8',
+                                    getattr(args, 'dcs1800', False) or
+                                    args.product == '8890') else '--duration=8',
                 f'--play-file={root / "sip-source.wav"}',
                 '--auto-play']
             if args.record_media:
@@ -217,6 +218,21 @@ def verify_downlink_lifecycle(log):
         raise RuntimeError('handset did not accept a sustained ordered SIP downlink')
 
 
+def verify_incoming_identity(bridge, *, restored=False):
+    cursor = 0
+    markers = ('SIP incoming identity=(1, 1) caller=5551234',
+               'SIP physical answer identity=(1, 1)',
+               'SIP confirmed status=200 identity=(1, 1)')
+    if restored:
+        markers += ('SIP epoch changed old=1 new=2',
+                    'SIP restored call cleared identity=(2, 1)')
+    for marker in markers:
+        position = bridge.find(marker, cursor)
+        if position < 0 or bridge.count(marker) != 1:
+            raise RuntimeError('missing unique ordered incoming SIP identity/Answer/confirmation')
+        cursor = position + len(marker)
+
+
 def verify_success(root, remote_text, args):
     if 'state changed to CONFIRMED' not in remote_text or not re.search(
             r'DISCONNECTED \[reason=200 \((?:OK|Normal call clearing)\)\]', remote_text):
@@ -233,6 +249,8 @@ def verify_success(root, remote_text, args):
     if not match:
         raise RuntimeError('missing bridge media/release summary')
     counts = json.loads(match[1])
+    if args.incoming and getattr(args, 'product', None) == '8890':
+        verify_incoming_identity(bridge_text)
     if getattr(args, 'signaling_only', False):
         log = (root / 'error.log').read_text(errors='replace')
         if args.incoming:
@@ -307,6 +325,13 @@ def verify_success(root, remote_text, args):
                 raise RuntimeError(f'idle restoration lacks fresh-epoch SIP evidence: {marker}')
     cursor = 0
     product = getattr(args, 'product', '3210')
+    if product == '8890':
+        if args.incoming:
+            from tools.noki8890_incoming_call_check import verify as verify_8890_call
+            verify_8890_call(log, caller='5551234', configured_gsm900=True)
+        else:
+            from tools.noki8890_outgoing_call_check import verify as verify_8890_call
+            verify_8890_call(log, number=number, configured_gsm900=True)
     if product == '8850':
         if args.incoming:
             try:
@@ -383,7 +408,7 @@ def verify_success(root, remote_text, args):
             r'LAPDm service Channel Release acknowledged')
     if args.restore_idle:
         patterns = (r'sip_state: saved', r'sip_state: restored') + patterns
-    for pattern in (() if product in ('8210', '8850') else patterns):
+    for pattern in (() if product in ('8210', '8850', '8890') else patterns):
         match = re.search(pattern, log[cursor:])
         if not match:
             raise RuntimeError(f'missing ordered firmware call checkpoint: {pattern}')
@@ -465,6 +490,19 @@ def verify_failure(root, remote_text, status, product='3210', calls=1):
     print(f'OK - SIP {status} became a correlated handset failure and clean release without CONNECT/media')
 
 
+def verify_pre_restore_media(log, bridge):
+    summaries = re.findall(r'SIP epoch media discarded (\{[^\n]+\})', bridge)
+    if len(summaries) != 1:
+        raise RuntimeError('connected restoration lacks one old-epoch media inventory')
+    counts = json.loads(summaries[0])
+    if any(counts.get(name, 0) <= 0 for name in
+           ('uplink', 'downlink', 'pcm_transmitted', 'pcm_received')):
+        raise RuntimeError('connected restoration lacks bidirectional pre-save media')
+    saved = log.find('sip_state: saved')
+    if saved < 0 or 'dsp_hle: speech tick' not in log[:saved]:
+        raise RuntimeError('connected restoration lacks executed pre-save handset PCM')
+
+
 def verify_outgoing_restore(root, remote_text, connected=False, product='3210', *, signaling_only=False):
     bridge = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
@@ -529,6 +567,8 @@ def verify_outgoing_restore(root, remote_text, connected=False, product='3210', 
         summaries = re.findall(r'SIP epoch media discarded (\{[^\n]+\})', bridge)
         if len(summaries) != 1 or json.loads(summaries[0]).get('uplink') != 0 or 'dsp_hle: speech tick' in log:
             raise RuntimeError('signaling-only restoration lacks zero-uplink/no-codec evidence')
+    elif connected and product == '8890':
+        verify_pre_restore_media(log, bridge)
     (root / 'sip-result.json').write_text(json.dumps({
         'scope': (f'{product} connected outgoing HLE SIP save/load; BYE, no redial' if connected else
                   f'{product} pending outgoing HLE SIP save/load; CANCEL/487, no redial/CONNECT'),
@@ -606,6 +646,9 @@ def verify_restore(root, remote_text, phase='connected', product='3210', *, sign
             if bridge.count(marker) != 1 or (index := bridge.find(marker, cursor)) < 0:
                 raise RuntimeError(f'missing or reordered incoming restoration identity: {marker}')
             cursor = index + len(marker)
+    elif phase == 'connected' and product == '8890':
+        verify_incoming_identity(bridge, restored=True)
+        verify_pre_restore_media(log, bridge)
     (root / 'sip-result.json').write_text(json.dumps({
         'scope': f'{product} {phase} HLE SIP call save/load; external dialog cleared, not restored',
         'passed': True, **({'speech_tested': False, 'native_dsp_complete': False}
@@ -723,16 +766,12 @@ def main():
     signaling_failure = (not args.incoming and
                          args.product in ('6210', '6250', '8210', '8850', '8890') and
                          args.sip_response in (480, 486))
-    nsm3_media = (args.product == '8210' and not args.cancel_incoming and
-                 args.sip_response == 200 and args.calls == 1 and
-                 not args.restore_call and
-                 not args.restore_idle and not args.restore_outgoing)
-    nsm2_media = (args.product == '8850' and
+    clocked_media = (args.product in ('8210', '8850', '8890') and
                  args.sip_response == 200 and args.calls == 1 and
                  not args.cancel_incoming and
                  not args.restore_call and not args.restore_idle and
                  not args.restore_outgoing)
-    nsm3_restore = (args.product in ('8210', '8850') and not args.incoming and
+    clocked_outgoing_restore = (args.product in ('8210', '8850', '8890') and not args.incoming and
                     args.restore_outgoing and args.sip_response in (180, 200) and
                     not args.record_media and not args.restore_call and not args.restore_idle)
     npe3_pending_restore = (args.product == '6210' and not args.incoming and
@@ -747,12 +786,12 @@ def main():
                            args.restore_outgoing and args.sip_response == 180 and
                            args.calls == 1 and not args.record_media and
                            not args.restore_call and not args.restore_idle)
-    nsm3_incoming_restore = (args.product in ('8210', '8850') and args.incoming and
+    clocked_incoming_restore = (args.product in ('8210', '8850', '8890') and args.incoming and
                             args.restore_call and not args.cancel_incoming and
                             not args.record_media and not args.restore_outgoing and not args.restore_idle)
-    if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_connected and not signaling_failure and not nsm3_media and not nsm2_media and not nsm3_restore and not npe3_pending_restore and not unanswered_alerting_restore and not unanswered_pending_restore and not nsm3_incoming_restore and
+    if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_connected and not signaling_failure and not clocked_media and not clocked_outgoing_restore and not npe3_pending_restore and not unanswered_alerting_restore and not unanswered_pending_restore and not clocked_incoming_restore and
             (not args.incoming or not args.cancel_incoming)) or
-            (args.record_media and not nsm3_media and not nsm2_media) or (args.restore_call and not signaling_connected and not nsm3_incoming_restore and not unanswered_alerting_restore) or args.restore_idle or (args.restore_outgoing and not signaling_connected and not nsm3_restore and not npe3_pending_restore and not unanswered_pending_restore)):
+            (args.record_media and not clocked_media) or (args.restore_call and not signaling_connected and not clocked_incoming_restore and not unanswered_alerting_restore) or args.restore_idle or (args.restore_outgoing and not signaling_connected and not clocked_outgoing_restore and not npe3_pending_restore and not unanswered_pending_restore)):
         parser.error(f'unsupported SIP scenario for {args.product}; use a verified product-specific signaling/media fixture')
     if args.calls != 1 and (args.product != '3310' or args.incoming or args.sip_response not in (480, 486)):
         parser.error('two-call fixture requires 3310 outgoing SIP failure/redial')

@@ -3,11 +3,27 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb6_pcm_sip_four_phase_restoration",
+      "owner": "nsb6_host_call_lifecycle",
+      "status": "satisfied",
+      "predicate": "Clocked NSB-6 HLE SIP calls retain exact handset restoration and discard external dialogs across connected and unanswered call phases",
+      "current": "Four fresh local-SIP gates pass connected outgoing/incoming and pending outgoing/ringing incoming restoration. Connected cases require positive pre-save uplink/downlink and host PCM counters plus an executed handset codec tick. The bridge inventories these counters before clearing the old epoch. Exact R15/R13/RAM/time restore, own carrier60 signaling/release, one accepted cause41 termination and reviewed idle recovery remain required. Incoming Answer/confirmation identity precedes epoch change; unanswered cases prohibit CONNECT and external-dialog redelivery. No dialog or media replay, native DSP speech or physical-waveform acceptance is claimed. Captures are tmp/nsb6-pcm-v2-restore-outgoing-connected, incoming-connected, outgoing-pending and incoming-alerting with the same prefix.",
+      "evidence": ["docs/8xxx_bringup.md", "docs/external_call_bridge.md", "tools/run_noki8890_sip_cancel.py", "tools/run_sip_handset_gate.py", "tools/dct3_sip_bridge.py", "tools/test_noki8890_sip_media.py", "tools/test_sip_call_restore_check.py", "gates.json"]
+    },
+    {
+      "id": "nsb6_hle_pcm_bidirectional_sip_media",
+      "owner": "nsb6_pcm_hle",
+      "status": "satisfied",
+      "predicate": "Own-PMM NSB-6 physical incoming and outgoing SIP calls execute bidirectional HLE media over independently documented PCM framing",
+      "current": "nsb6stage configures own512000/8000Hz,64-clock,13-in-16 PCM; nsb6hle uses independently recovered command8/bit0200 and MIC2/EAR with neutral gains. Fresh outgoing and incoming real local SIP gates require physical Send/Answer/End, own carrier60 call and registration checks, at least100 uplink/downlink and host PCM frames, exact own enable/disable writer and cumulative64-clock/47-idle-clock accounting, reviewed idle recovery and persistent EF_LOCI. Captures tmp/nsb6-sip-outgoing-media-qualified and tmp/nsb6-sip-incoming-media-final pass. This is HLE transport, not nonsilent physical microphone/earpiece waveform qualification, measured analogue gains, native DSP speech or normal-machine promotion.",
+      "evidence": ["driver/nokia_dct3.cpp", "docs/8xxx_bringup.md", "tools/noki8890_pcm_check.py", "tools/test_noki8890_pcm_check.py", "tools/run_noki8890_sip_cancel.py", "tools/run_sip_handset_gate.py", "tools/test_noki8890_sip_media.py", "gates.json"]
+    },
+    {
       "id": "nsb6_own_pcm_document_contract",
       "owner": "nsb6_board",
       "status": "satisfied",
       "predicate": "The acquired own-product Nokia NSB-6 System Module identifies PCM clock ownership and serial word framing without importing a sibling profile",
-      "current": "The 303-page Mobile Collectors service PDF d725449db85e04d82f2f9e693428a8ea327b0228bbd6975cba40578841f41996 contains the visually reviewed Issue1 06/2000 printed page25 at PDF page39. COBBA generates512kHz PCMDClk and8kHz PCMSClk; the waveform shows one active-high sync clock, a16-bit MSB-first word, sign extension above bit12 and rising-edge data changes for falling-edge sampling. The MAD pin table independently declares both clocks as COBBA inputs. This closes document acquisition/framing evidence, not PCM implementation, measured electrical behavior, analogue gains, native DSP speech or handset media acceptance. Existing runtime remains unclocked pending configuration and independent incoming/outgoing/restoration gates.",
+      "current": "The 303-page Mobile Collectors service PDF d725449db85e04d82f2f9e693428a8ea327b0228bbd6975cba40578841f41996 contains the visually reviewed Issue1 06/2000 printed page25 at PDF page39. COBBA generates512kHz PCMDClk and8kHz PCMSClk; the waveform shows one active-high sync clock, a16-bit MSB-first word, sign extension above bit12 and rising-edge data changes for falling-edge sampling. The MAD pin table independently declares both clocks as COBBA inputs. nsb6stage configures this profile; runtime HLE media has separate own-field/call gates. The document alone does not prove measured electrical behavior, analogue gains, native DSP speech or handset media acceptance.",
       "evidence": ["docs/8xxx_bringup.md", "roms/README.md"]
     },
     {

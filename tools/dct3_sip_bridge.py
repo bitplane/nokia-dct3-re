@@ -284,7 +284,11 @@ async def bridge(args, pj):
                                 blocked_restore = event.get('calls_idle') is False
                             if epoch is not None and epoch != event.get('epoch'):
                                 if identity is not None:
-                                    print(f'SIP epoch media discarded {json.dumps(counts)}', flush=True)
+                                    discarded = dict(counts,
+                                        pcm_transmitted=endpoint.media.transmitted,
+                                        pcm_received=endpoint.media.received,
+                                        dropped=endpoint.media.dropped)
+                                    print(f'SIP epoch media discarded {json.dumps(discarded)}', flush=True)
                                 endpoint.hangup()
                                 blocked_restore = event.get('calls_idle') is not True
                                 restored_identity = None

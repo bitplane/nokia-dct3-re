@@ -18,11 +18,16 @@ from tools.radio_call_lifecycle_common import (
 )
 from tools.noki8890_registration_check import verify as verify_registration
 
+CIPHER_CHECKPOINTS = (
+    ('Cipher Mode Command', CIPHER_MODE_COMMAND),
+    ('Cipher Mode Complete', CIPHER_MODE_COMPLETE),
+    ('MM Information', MM_INFORMATION),
+)
+
 CHECKPOINTS = (
     ('registration release', REGISTRATION_RELEASE), ('IMSI page', IMSI_PAGE),
     ('Paging Response', PAGING_RESPONSE), ('contention UA', PAGING_CONTENTION_UA),
-    ('Cipher Mode Command', CIPHER_MODE_COMMAND), ('MM Information', MM_INFORMATION),
-    ('Cipher Mode Complete', CIPHER_MODE_COMPLETE), ('incoming SETUP', INCOMING_SETUP),
+    *CIPHER_CHECKPOINTS, ('incoming SETUP', INCOMING_SETUP),
     ('Call Confirmed', re.compile(r'GSM service uplink sapi=0 pd=03 message=08 length=11')),
     ('Alerting', ALERTING),
     ('own traffic configuration', re.compile(r'TX packet type=02 payload=20 .*data=040002000271012fc10000010000000400000000')),

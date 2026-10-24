@@ -17143,23 +17143,23 @@
                                "--pjsua", "$(SIP_PJSUA_BIN)", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
-      "name": "verify-8890-sip-connected-signaling",
+      "name": "verify-8890-sip-outgoing-media",
       "prerequisites": ["build"],
       "variables": {},
       "steps": [{"step": "check", "silent": false,
                  "interpreter": "env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON)",
                  "before_script": [], "script": "tools/run_noki8890_sip_cancel.py",
-                 "arguments": ["$(RUN_DIR)", "--outgoing-connected-signaling",
+                 "arguments": ["$(RUN_DIR)", "--outgoing-media",
                                "--pjsua", "$(SIP_PJSUA_BIN)", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
-      "name": "verify-8890-sip-incoming-connected-signaling",
+      "name": "verify-8890-sip-incoming-media",
       "prerequisites": ["build"],
       "variables": {},
       "steps": [{"step": "check", "silent": false,
                  "interpreter": "env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON)",
                  "before_script": [], "script": "tools/run_noki8890_sip_cancel.py",
-                 "arguments": ["$(RUN_DIR)", "--incoming-connected-signaling",
+                 "arguments": ["$(RUN_DIR)", "--incoming-media",
                                "--pjsua", "$(SIP_PJSUA_BIN)", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
@@ -17169,7 +17169,7 @@
       "steps": [{"step": "check", "silent": false,
                  "interpreter": "env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON)",
                  "before_script": [], "script": "tools/run_noki8890_sip_cancel.py",
-                 "arguments": ["$(RUN_DIR)", "--restore-outgoing-connected-signaling",
+                 "arguments": ["$(RUN_DIR)", "--restore-outgoing-connected-media",
                                "--pjsua", "$(SIP_PJSUA_BIN)", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
@@ -17179,7 +17179,7 @@
       "steps": [{"step": "check", "silent": false,
                  "interpreter": "env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON)",
                  "before_script": [], "script": "tools/run_noki8890_sip_cancel.py",
-                 "arguments": ["$(RUN_DIR)", "--restore-incoming-connected-signaling",
+                 "arguments": ["$(RUN_DIR)", "--restore-incoming-connected-media",
                                "--pjsua", "$(SIP_PJSUA_BIN)", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {

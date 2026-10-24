@@ -1,4 +1,4 @@
-"""Own-PMM NSB-6 real SIP cancellation/failures; no native speech claim."""
+"""Own-PMM NSB-6 real SIP lifecycles and explicitly qualified HLE media."""
 import argparse
 import json
 import hashlib
@@ -121,10 +121,12 @@ def main():
     parser.add_argument('--restore-idle', action='store_true',
                         help='restore idle before admitting the fresh unanswered SIP call')
     outgoing = parser.add_mutually_exclusive_group()
-    outgoing.add_argument('--outgoing-connected-signaling', action='store_true',
-                          help='physically connect and end a real SIP dialog without speech acceptance')
-    outgoing.add_argument('--incoming-connected-signaling', action='store_true',
-                          help='physically answer and end a real SIP dialog without speech acceptance')
+    outgoing.add_argument('--outgoing-media', '--outgoing-connected-signaling',
+                          dest='outgoing_connected_signaling', action='store_true',
+                          help='physically connect/end SIP and require bidirectional HLE media')
+    outgoing.add_argument('--incoming-media', '--incoming-connected-signaling',
+                          dest='incoming_connected_signaling', action='store_true',
+                          help='physically answer/end SIP and require bidirectional HLE media')
     outgoing.add_argument('--outgoing-busy', action='store_true',
                         help='physically dial 1234567 against a real SIP 486 response')
     outgoing.add_argument('--outgoing-unavailable', action='store_true',
@@ -133,10 +135,13 @@ def main():
                           help='restore an unanswered incoming call and clear the external dialog')
     outgoing.add_argument('--restore-outgoing-pending', action='store_true',
                           help='restore an outgoing SIP 180 request without redial or media')
-    outgoing.add_argument('--restore-outgoing-connected-signaling', action='store_true',
-                          help='restore and clear a connected outgoing SIP dialog without speech')
-    outgoing.add_argument('--restore-incoming-connected-signaling', action='store_true',
-                          help='physically answer, restore and clear an incoming SIP dialog without speech')
+    outgoing.add_argument('--restore-outgoing-connected-media', '--restore-outgoing-connected-signaling',
+                          dest='restore_outgoing_connected_signaling', action='store_true',
+                          help='restore and clear a connected outgoing HLE SIP dialog')
+    outgoing.add_argument('--restore-incoming-connected-media', '--restore-incoming-connected-signaling',
+                          dest='restore_incoming_connected_signaling', action='store_true',
+                          help='physically answer, restore and clear an incoming HLE SIP dialog')
+    parser.add_argument('--record-media', action='store_true')
     parser.add_argument('--http-port', type=int, default=18889)
     parser.add_argument('--sip-port', type=int, default=25889)
     args = parser.parse_args()
@@ -144,6 +149,8 @@ def main():
     outgoing_run = outgoing_failure or args.restore_outgoing_pending or args.outgoing_connected_signaling or args.restore_outgoing_connected_signaling
     if args.restore_idle and (outgoing_run or args.incoming_connected_signaling or args.restore_incoming_connected_signaling or args.restore_incoming_alerting):
         parser.error('--restore-idle cannot be combined with outgoing failure')
+    if args.record_media and not (args.outgoing_connected_signaling or args.incoming_connected_signaling):
+        parser.error('--record-media requires an incoming/outgoing media call')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     profile = PROFILES['8890']
@@ -173,12 +180,12 @@ def main():
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '8890',
-                   *(['--incoming', '--restore-call', '--signaling-only', '--ready-file',
+                   *(['--incoming', '--restore-call', '--ready-file',
                       str(run / 'snap/8890_sip_registered_idle.png')] if args.restore_incoming_connected_signaling else
-                     ['--restore-outgoing', '--sip-response', '200', '--signaling-only'] if args.restore_outgoing_connected_signaling else
-                     ['--incoming', '--signaling-only', '--ready-file',
+                     ['--restore-outgoing', '--sip-response', '200'] if args.restore_outgoing_connected_signaling else
+                     ['--incoming', '--ready-file',
                       str(run / 'snap/8890_sip_registered_idle.png')] if args.incoming_connected_signaling else
-                     ['--sip-response', '200', '--signaling-only'] if args.outgoing_connected_signaling else
+                     ['--sip-response', '200'] if args.outgoing_connected_signaling else
                      ['--restore-outgoing', '--sip-response', '180'] if args.restore_outgoing_pending else
                      ['--sip-response', '480' if args.outgoing_unavailable else '486'] if outgoing_failure else
                      ['--incoming', '--restore-call', '--restore-phase', 'alerting', '--ready-file',
@@ -186,6 +193,7 @@ def main():
                      ['--incoming', '--cancel-incoming', '--ready-file',
                       str(run / 'snap/8890_sip_registered_idle.png')]),
                    '--http-port', str(args.http_port), '--sip-port', str(args.sip_port),
+                   *(['--record-media'] if args.record_media else []),
                    '--', *handset]
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
@@ -229,18 +237,23 @@ def main():
                 check_alerting_restoration((run / 'error.log').read_text(errors='replace'))
         subprocess.run([sys.executable, str(root / 'tools/noki8890_registration_check.py'),
                         '--configured-gsm900', str(run / 'error.log')], check=True)
+        if args.outgoing_connected_signaling or args.incoming_connected_signaling:
+            from tools.noki8890_pcm_check import verify as verify_pcm
+            verify_pcm((run / 'error.log').read_text(errors='replace'),
+                       incoming=args.incoming_connected_signaling)
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': 'nsb6hle', 'scenario': ('incoming-sip-connected-restore' if args.restore_incoming_connected_signaling else
                                              'outgoing-sip-connected-restore' if args.restore_outgoing_connected_signaling else
-                                             'incoming-sip-connected-signaling' if args.incoming_connected_signaling else
-                                             'outgoing-sip-connected-signaling' if args.outgoing_connected_signaling else
+                                             'incoming-sip-media' if args.incoming_connected_signaling else
+                                             'outgoing-sip-media' if args.outgoing_connected_signaling else
                                              'outgoing-sip-pending-restore' if args.restore_outgoing_pending else
                                              'incoming-sip-alerting-restore' if args.restore_incoming_alerting else
                                              'outgoing-sip-unavailable' if args.outgoing_unavailable else
                                              'outgoing-sip-busy' if args.outgoing_busy else 'incoming-sip-cancel'),
             'mcu_sha1': profile[2], 'pmm_sha1': profile[4],
             'provisioning': 'own acquired PMM unchanged', 'laboratory_carrier': 60,
-            'native_dsp_complete': False, 'speech_tested': False,
+            'native_dsp_complete': False,
+            'hle_media_tested': args.outgoing_connected_signaling or args.incoming_connected_signaling,
             'idle_restored': args.restore_idle,
             'incoming_alerting_restored': args.restore_incoming_alerting,
             'outgoing_pending_restored': args.restore_outgoing_pending,
@@ -250,7 +263,7 @@ def main():
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'8890 SIP signaling FAIL: {error}; inspect {run}\n')
-    print('8890 real SIP signaling PASS; no speech acceptance')
+    print('8890 real SIP lifecycle PASS; native DSP speech unproved')
 
 
 if __name__ == '__main__':

@@ -684,45 +684,27 @@ recovery must pass. The original Answer/confirmation identity is ordered
 before epoch change. Zero pre-reset uplink and no HLE codec tick exclude
 speech claims; external dialogs are cleared, never resurrected.
 
-`verify-8890-sip-connected-signaling` physically dials `1234567` and ends a
-real SIP-200 dialog on NSB-6 with unchanged own PMM. The own GSM900 carrier-60
-checker requires decoded Send/End, traffic assignment, CONNECT/acknowledgement,
-complete CC/RR release with product-owned configuration bodies and resumed
-paging. Reviewed pre/post idle pixels and persistent laboratory SIM location
-must hold. Zero bridge uplink and no HLE codec tick are required; remote PCM
-reception remains a host-side observation, not handset playback. Recording
-and native speech remain unproved; connected restoration has separate gates below.
+`verify-8890-sip-outgoing-media` physically dials `1234567` and ends a real
+SIP-200 dialog on unchanged own PMM. `verify-8890-sip-incoming-media` admits
+caller `5551234` after fresh clock-settled idle, then uses physical Answer/End.
+Both require own GSM900 carrier-60 signaling, decoded keys, complete CC/RR
+release, reviewed idle recovery, persistent SIM location and at least100
+uplink/downlink and host PCM frames. The independently acquired NSB-6 manual
+supplies512kHz/8kHz,64-clock framing; the own control writer and exact PCM
+clock/idle counters are checked separately. `--record-media` retains bridge
+PCM, but does not by itself qualify nonsilent physical microphone/earpiece
+waveforms. Native DSP speech and analogue gains remain unproved.
 
-`verify-8890-sip-incoming-connected-signaling` captures fresh registered
-idle at 45 seconds after physical clock/date settlement, then admits caller
-`5551234`. The existing physical fixture answers at 48 seconds and ends at
-56 seconds. The own caller-specific SETUP, carrier-60 traffic/release bodies,
-decoded keys, full CC/RR release and resumed paging must pass, along with
-reviewed pre/post idle pixels and persistent SIM location. The original
-identity's unique Answer precedes SIP confirmation. Zero bridge uplink and
-no HLE codec ticks keep this signaling-only; remote PCM reception is not
-handset playback, and no unsupported PCM clock is enabled.
-
-`verify-8890-sip-connected-outgoing-restore` separately saves a physically
-dialed `1234567` call at 32 seconds after real SIP-200 and handset connection.
-Exact R15/R13/RAM/time restoration invalidates the external dialog with BYE,
-then requires one cause-41 clear, complete CC/RR release, own carrier-60
-traffic/release configuration and confirmation, resumed paging and reviewed
-idle recovery. Persistent SIM location remains checked. The bridge publishes
-old-epoch media counters before resetting them; zero uplink and no HLE codec
-ticks are mandatory. The dialog is cleared, not saved or redialed, and
-neither native DSP completion nor speech is established.
-
-`verify-8890-sip-connected-incoming-restore` admits caller `5551234` only
-after fresh clock-settled idle, physically answers at 48 seconds and saves
-at 52 seconds after connection. Exact R15/R13/RAM/time restoration changes
-the host epoch and clears the original dialog with BYE. Its unique Answer
-and confirmation must precede epoch change; one cause-41 termination clears
-the restored handset call. Own caller SETUP, carrier-60 traffic/release,
-confirmation, resumed paging, reviewed pre/post idle pixels and persistent
-SIM location remain required. Zero old-epoch uplink and no HLE codec ticks
-keep this signaling-only. External dialogs are cleared, not restored or
-replayed; native DSP completion and speech remain unproved.
+The connected outgoing/incoming restoration gates save at32/52 seconds,
+respectively, after physical input and real SIP connection. Exact
+R15/R13/RAM/time restoration invalidates the old dialog with BYE and clears
+the restored handset once with cause41. Each gate requires positive old-epoch
+uplink/downlink/PCM counters and a pre-save executed codec tick, then full own
+carrier-60 release, paging, reviewed idle and persistent SIM location. The
+original incoming Answer and confirmation precede epoch change. Pending
+outgoing and ringing incoming gates separately prohibit connection and
+external-dialog redelivery. Dialogs and media are discarded, not serialized
+or replayed. These checks do not execute the missing native DSP mask.
 
 A bounded outgoing SIP-200 research probe on unchanged own-PMM `npe3hle`
 confirmed and released the real dialog, but failed full media acceptance:
