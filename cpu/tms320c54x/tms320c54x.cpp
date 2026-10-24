@@ -6662,6 +6662,9 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x2c00: case 0x2d00: // MAS Smem, A/B
 	case 0x2e00: case 0x2f00: // MASR Smem, A/B
 	{
+		// Match staged Smem admission: only f8 owns absolute addressing.
+		// Unvalidated f9..ff aliases must stop before an operand read or SQUR's T write.
+		if (low > 0xf8) { m_illegal = true; return; }
 		const u16 memory = indirect_read(low);
 		if ((op & 0xfe00) == 0x2600) m_t = memory;
 		u64 &destination = accumulator(BIT(op, 8));

@@ -8487,6 +8487,27 @@ That is the result of a manual syntax inventory, not an exhaustive opcode or
 silicon-conformance claim. The next audit layer is the unasserted status and
 addressing combinations in the right-hand column.
 
+The eight memory/T-source families MPY, MPYR, MPYU, SQUR, MAC, MACR, MAS and
+MASR now share the staged frontend's fail-closed admission for unvalidated
+absolute aliases `f9..ff`. Before the correction, the first atomic exclusion
+case consumed an operand and changed A instead of stopping. The atomic
+guard now precedes the data read and SQUR's T publication; admitted `f8`
+absolute addressing is unchanged. This is an emulator-supported-domain
+boundary, not a claim that physical silicon traps on those aliases, and it
+does not close operand admission for every other Smem family.
+
+`run_c54x_core.py --profile mem-t-abs-edge` executes 1792 cases and 1792
+save/load replays: seven aliases, eight families, two accumulators, CMPT
+off/on, two program pages, atomic/staged frontends and snapshots before/after
+rejection. It asserts no operand data reads/writes, unchanged A/B/T/status
+and every AR, and rejected execution in both modes. The original failing
+case 56 and fixed acceptance are retained separately under
+`tmp/c54x-memory-t-alias-before` and `tmp/c54x-memory-t-alias-after`.
+The corrected core also passes the full default fixture (all 293 required
+markers exactly once, unchanged 5690 asserted opcode forms) and the native
+`nse1pipe` physical Phone book menu gate. This is regression evidence, not
+completion of the separate MAD2 serial/RF contracts.
+
 SPRU172C's listed cycle counts assume DARAM. The focused tests assert those
 baseline costs and selected absolute/long-offset surcharges; they do not
 model external-memory wait states. A static decoder mask match is not counted
