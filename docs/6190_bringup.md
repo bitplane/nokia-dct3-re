@@ -1088,3 +1088,29 @@ complete card/error/On/Menu oracles. Startup authentication is checked
 before the physical application boundary; the failed PIN2 transaction is
 still required by the full-stream checker, not filtered out. No retries,
 validity flags or firmware context are edited by the harness.
+
+### PIN2-protected FDN record save and cold Details
+
+On the actual enabled FDN card, physical Settings/Security/Fixed dialing/
+Numbers selects Add, verifies PIN2 `5678`, enters `A/12345` and saves.
+Exactly one successful absolute UPDATE RECORD targets EF_FDN `6f3b`, not
+EF_ADN. The saved 32-byte record equals the already qualified phonebook
+encoding, but occupies the FDN image extension at 3578..3609. Ordinary ADN,
+validity, credentials, retries and every other card byte remain unchanged.
+
+An independently launched process receives that exact card and physically
+selects Numbers/Search, submits an empty query and opens Details. It renders
+`A`, then `Number: 12345`, reads FDN record 1 and sends no UPDATE or second
+PIN2 VERIFY. The complete card remains unchanged. Active-card bootstrap
+identity rehabilitation of LOCI/IMSI remains explicit and separate from a
+record mutation.
+
+Prepare the writer using the normal On-card cold operation, then run
+`nsb3_fdn_record_write.lua` for 90 seconds.
+`nsb3_fdn_record_check.py prepare-cold SAVE COLD` accepts only the exact
+saved card; run `nsb3_fdn_record_read.lua` for 89 seconds. The checker
+`check EMPTY_ON SAVE COLD` requires own executable, exact cold source links,
+physical contacts, PIN2-before-write ordering, selected-file APDUs/statuses,
+complete cards and Saved/name/number/Menu pixel oracles. No FDN entry,
+firmware result or guest state is supplied by the host. Rejected record
+writes, edit/erase/cancel and local dial permissions remain separate.

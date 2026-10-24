@@ -33,6 +33,9 @@ unchanged credentials and records. Protected FDN records and local dial
 permission remain separate from these settings and from native registration.
 Wrong-PIN2 FDN activation also preserves Off state, consumes only one retry
 and cold-recovers through correct PIN2 with the normal validity protocol.
+Physical PIN2-protected EF_FDN A/12345 save and independently cold Details
+also pass, with unchanged ordinary ADN, credentials and validity. FDN
+record edit/erase/cancel and local dial-permission contrasts remain open.
 Physical offline SMS composition/save, cold Outbox read, confirmed deletion
 and a second cold empty-Outbox check also pass through the laboratory SIM.
 Physical SIM-security gates cover PIN-request Off/On, PIN1/PIN2 changes and
