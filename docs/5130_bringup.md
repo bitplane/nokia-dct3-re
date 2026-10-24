@@ -24,6 +24,44 @@ deletes it and verifies erased ADN storage after another cold search.
 Offline SMS draft save/cold read/deletion/cold-empty Outbox also pass. Registration, calls
 and network SMS remain unproved.
 
+### Physical diagnostic-display exit and cold idle
+
+Own descriptor `2a889c` maps record0604 to EEPROM0299/length1. On the
+qualified `nsk1r4t` composition, physical Menu/Up reaches the Net monitor
+entry after acknowledging the Battery low warning. Selecting Test00 through
+its real editor changes0299 fromff to3d and removes the diagnostic-looking
+startup text. The selected screen and subsequent independent cold boot show
+a clean Headset-titled idle with Menu softkey. Headset is not an operator
+or proof of the physical accessory-input polarity.
+
+The selection run changes127 EEPROM bytes in total. The other126 bytes
+remain semantically unmapped and are not treated as noise or whitelisted.
+The entire2048-byte resulting bank is protected by SHA256
+`6d31cb5b3d495145f6d0903147aeebf98571cd59b5adab538e03bc866693206e`.
+A separate48s process copies only executable inputs, NVRAM and CFG, enters
+phone12345 with physical contacts and repeats no selection/application key.
+It preserves the entire bank, complete original3570-byte PIN-disabled lab
+card, own executable flash and hardware-input configuration. Exact36/42s
+idle RGB SHA256 is
+`68fbc5929acbebe923d4df2456ca487e044cdde0e122e05d4eebbf5c9ce02fc2`;
+the25s title-free phase is separately checked. The54s selection gate also
+requires the warning, Net monitor, Test01/Test00 editor and idle frames,
+physical contact timing, own decoded keys, matching phone-code gate and
+native/storage/provenance checks. No EEPROM value is directly supplied by
+the selection fixture.
+
+```sh
+.venv/bin/python tools/nsk1_diagnostic_display_check.py \
+  tmp/nsk1-security-positive-qualified \
+  tmp/nsk1-diagnostic-display-selected tmp/nsk1-diagnostic-display-cold
+```
+
+Add `--mame mame/mame` only with two fresh outputs to execute. This remains
+the declared published-record/checksum/retry and nominal ADC2 comparison
+using an unproved NSE-1 mask/clock, not factory provisioning or normal-machine
+promotion. The short idle result does not resolve the93.974s supervision
+reset, RF acquisition, registration or native speech below.
+
 Physical manual network-search initiation also passes from independently
 qualified initialized storage: Settings -> Phone settings -> Network
 selection -> Manual renders **Searching / Quit**. The gate verifies all
