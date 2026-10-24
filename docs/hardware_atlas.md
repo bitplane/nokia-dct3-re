@@ -89,6 +89,27 @@ checksum checks with:
 python3 tools/mad2_flash_loader_audit.py roms/research/mad2-flash-loaders/DCTxBB5_TIA
 ```
 
+Both read the byte at `20000` and extract bits 5:4 as a four-way selector.
+The table bases are relative offsets `2c` (stack), `3c` (configuration base)
+and `4c` (serial offset). High-register `MOV ...,PC` uses PC+4, not the
+word-aligned base of a literal LDR; the audit checks each indexed-load site
+separately in both programs and reads the table data big-endian.
+
+| Selector | Stack | Configuration base | Serial status | Serial receive |
+| --- | --- | --- | --- | --- |
+| 0 | `00107ffc` | `000200d0` | `00020081` | `00020082` |
+| 1 | `00010400` | `00040000` | `00020003` | `00020004` |
+| 2 | `00010400` | `00040000` | `00020019` | `0002001a` |
+| 3 | `00010400` | `00040000` | `00020003` | `00020004` |
+
+These are conditional software selections, not identified silicon revisions.
+The driver's current synthetic ID byte `40` would select row 0; this does not
+validate that byte as a factory identity. DCT3's receive/transmit helpers are
+at relative `37c/386`; WD1's are `30c/316`. Their byte-matched bodies wait for
+receive bit 5 and exchange eight LSB-first transmit bits through bit 7 with
+bit-6 clear/set waits. Electrical ownership and cadence remain unproved;
+`mbus_controller.md` records the distinction from the existing byte interface.
+
 These artifacts can supply bounded register-use clues independently of the
 phone application firmware. They have not run in MAME or on captured hardware
 here, do not establish NAM-2 wake semantics, and must not supply guessed

@@ -33,8 +33,9 @@ The controller uses the physical 9,600-baud rate with a ten-bit character time
 (approximately 1.042 ms) for byte completion. The public MADos interrupt map
 independently identifies FIQ3 as `FIQ_MBUSTIM` at 423.1 Hz, distinct from the
 FIQ2 receive/transmit event. Products with an independently exercised timer
-contract arm one terminal event when firmware unmasks FIQ3;
-status bit 7 only resets the serial bit counter. The 3210 profiles retain the
+contract arm one terminal event when firmware unmasks FIQ3; status writes do
+not arm that event. The byte-level model does not implement the service-loader
+bit path described below. The 3210 profiles retain the
 established no-FIQ3 ordinary-boot behavior until their clock gate is identified.
 
 M2BUS is a single-wire half-duplex bus, so a transmitted byte is also sampled
@@ -81,3 +82,25 @@ address, RAM state or sibling-handset timing appears in the peer.
 The remaining hardware uncertainty is below that protocol acceptance point:
 oscillator phase within a 423.1 Hz period, bit-level arbitration, electrical
 timing and error reporting.
+
+## Static service-loader bit path
+
+The separately acquired `DCT3BT2.TIA` and `WD1BT2.TIA` bootstraps select their
+serial base through bits 5:4 of the byte read at `20000`. Their four-entry
+tables and source identities are maintained in
+`hardware_atlas.md#service-loader-references`, not inferred from a phone name.
+Selector 2 addresses status `20019` and receive data `2001a`, matching this
+device's mapped window; other selectors use different addresses and are not
+automatically additional MBUS mappings.
+
+The receive helper waits for status bit 5 before reading base+4. The transmit
+helper sends eight payload bits LSB-first: wait for bit 6 clear, write the
+payload bit in status bit 7, then wait for bit 6 set. It finally reads base+4.
+These byte-matched static consumers corroborate the bit-5 receive test but
+invalidate treating bit 7 as universally counter-reset-only. They do not
+identify pin direction, clock ownership, baud, character framing, counter
+side effects or a product's selected controller. In particular, the current
+busy/idle projection of bit 6 does not reproduce those individual transitions.
+No bit timing, selector alias, bootloader execution or normal-handset promotion
+is added on this evidence. The 2100 sleep/wake restoration question is also
+unaffected.

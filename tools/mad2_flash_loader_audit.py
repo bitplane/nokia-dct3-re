@@ -12,6 +12,51 @@ KNOWN = {
     'I28F160.TIA': (6092, 'e925e1778855de3c57b8c289f5d84a5821dcef626381a8d426fa2cb58ff04d3f'),
     'M28W320C.TIA': (5996, '1c7952d6f048d230f75e1de5b7936aba681f01793f88a4f1e0e080d15057cef0'),
 }
+BOOTSTRAP_SITES = {
+    'DCT3BT2.TIA': (0x7a, 0x82, 0x140, 0x37c),
+    'WD1BT2.TIA': (0x7c, 0x84, 0x142, 0x30c),
+}
+
+
+def pc_sub_table(data, site, register):
+    if site < 0 or site + 6 > len(data) or register not in (1, 2):
+        raise ValueError('bounded bootstrap table site required')
+    move, subtract, load = struct.unpack_from('>3H', data, site)
+    if (move != 0x4678 + register or subtract & 0xff00 != 0x3800 + (register << 8)
+            or load != (0x5809 if register == 1 else 0x5a10)):
+        raise ValueError('bootstrap PC/subtract/indexed-load sequence differs')
+    # High-register MOV uses PC+4, not LDR-literal's word-aligned PC.
+    address = site + 4 - (subtract & 255)
+    if address < 0 or address + (16 if register == 1 else 8) > len(data):
+        raise ValueError('bootstrap table exceeds image')
+    return address
+
+
+def bootstrap_setup(data, sites):
+    stack_site, config_site, serial_site, receive_site = sites
+    stack_table = pc_sub_table(data, stack_site, 1)
+    config_table = pc_sub_table(data, config_site, 1)
+    serial_table = pc_sub_table(data, serial_site, 2)
+    stacks = struct.unpack_from('>4I', data, stack_table)
+    configs = struct.unpack_from('>4I', data, config_table)
+    serial = struct.unpack_from('>4H', data, serial_table)
+    if data[0x58:0x66] != bytes.fromhex('220204177838468006800f804681'):
+        raise ValueError('bootstrap ID read/selector construction differs')
+    if data[receive_site:receive_site + 10] != bytes.fromhex('78f90989d3fc793846f7'):
+        raise ValueError('bootstrap receive handshake differs')
+    transmit = receive_site + 10
+    if data[transmit:transmit + 32] != bytes.fromhex(
+            'b501182d220878f909c9d2fc01c170f9084078f909c9d3fc3a01d1f4793abd01'):
+        raise ValueError('bootstrap eight-bit transmit handshake differs')
+    return dict(id_read_address=0x20000, selector_bits='5:4',
+                table_offsets=[stack_table, config_table, serial_table],
+                branches=[dict(selector=i, stack=stacks[i], configuration_base=configs[i],
+                               serial_base=0x20000 + serial[i]) for i in range(4)],
+                receive_site=receive_site, transmit_site=transmit,
+                status_offset=3, receive_offset=4, receive_ready_mask=0x20,
+                clock_sample_mask=0x40, transmit_bit_mask=0x80,
+                transmit_bits=8, transmit_order='lsb_first',
+                controller_identity_proved=False, physical_timing_proved=False)
 
 
 def checksum_words(data, span):
@@ -43,7 +88,7 @@ def audit(directory):
             if data[:6] != b'\xe0\x05DCT3' or span != len(data) - 2 or checksum_words(data, span):
                 raise ValueError(f'{name}: bootstrap header/checksum differs')
             row.update(checksum_span=span, checksum=0, excluded_suffix=data[span:].hex(),
-                       thumb_relative_entry=14)
+                       thumb_relative_entry=14, setup=bootstrap_setup(data, BOOTSTRAP_SITES[name]))
         result.append(row)
     return result
 

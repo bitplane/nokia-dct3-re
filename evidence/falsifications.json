@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "mbus_status_bit7_is_universally_counter_reset_only",
+      "status": "disproven",
+      "hypothesis": "Status bit7 can be described universally as only a serial-counter reset, with no payload-dependent service-loader use",
+      "conclusion": "Hash-qualified DCT3BT2 and WD1BT2 helpers encode eight payload bits LSB-first into status bit7, waiting for bit6 clear before each write and bit6 set afterward, then reading receive data. Their ID-selector2 table addresses20019/2001a, matching the current MBUS window. The receive helper independently tests bit5. This defeats the universal counter-only description, not the possibility of mode-specific counter effects. Other selectors map different windows, and physical pin/clock ownership, baud and framing remain unproved. The byte-level device behavior is unchanged; it does not implement this bit path. No selector alias, synthetic controller edge or handset wake fix is admitted.",
+      "evidence": ["docs/hardware_atlas.md", "docs/mbus_controller.md", "tools/mad2_flash_loader_audit.py", "tools/test_mad2_flash_loader_audit.py", "driver/nokia_mbus.cpp"]
+    },
+    {
       "id": "nse2_raw_71ef_is_sampling_port_reader",
       "status": "disproven",
       "hypothesis": "The raw PORTR-pattern candidate at DSP word71ef reads sampling-control port0a",
