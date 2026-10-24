@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Physical NPE-3 Phone-to-SIM copy, source retention and cold bank readback."""
+"""Physical NPE-3 Phone-to-SIM copy/move and independent cold bank readback."""
 import argparse
 import hashlib
 import json
@@ -13,13 +13,14 @@ from PIL import Image
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.run_dct3_phone_memory import run as prepare_contact, SELECTED_SHA256
+from tools.run_dct3_phone_memory import run as prepare_contact, SELECTED_SHA256, EMPTY_SHA256
 from tools.run_noki6210_acceptance import build_command, check_frame, CONTACT_SHA256
 from tools.noki6210_staged_check import verify
 from tools.run_sip_handset_gate import verify_handset_health
 from tools.sim_phonebook_check import validate_phonebook, validate_phonebook_storage
 
 COPIED_SHA256 = '12fe4de7e19b94296dbac66f7a783d371881f3277f3f24461ed7d7222107ac25'
+MOVED_SHA256 = 'c4c59289b4ef41151b7dda5bb69f99ba6db71ceda29497f50fc327d65a692101'
 SIM_SELECTED_SHA256 = '960aacb8e69d1fd3666ab1ea3a475410fd0b6651531f20553250c0d08cb84c5c'
 
 
@@ -40,30 +41,34 @@ def verify_copy_storage(before, copied, phone_cold, sim_cold):
         raise ValueError('cold bank readback changed copied SIM contents')
 
 
-def verify_copy_trace(trace):
+def verify_copy_trace(trace, move=False):
     cursor = 0
-    for event in (
+    events = (
             '6210_phone_memory_copy: action=keep_original',
+            *(('6210_phone_memory_copy: action=erase_original',) if move else ()),
             '6210_phone_memory_copy: action=copied',
             'header cla=a0 ins=dc p1=01 p2=04 p3=20 selected=6f3a',
             'body ins=dc length=32 selected=6f3a',
             'SIM status ins=dc sw=9000',
-            '6210_phone_memory_copy: complete=1 firmware_state_forcing=0'):
+            '6210_phone_memory_copy: complete=1 firmware_state_forcing=0')
+    if not move and '6210_phone_memory_copy: action=erase_original' in trace:
+        raise ValueError('copy fixture selected destructive move semantics')
+    for event in events:
         position = trace.find(event, cursor)
         if position < 0:
             raise ValueError('missing ordered physical copy event: ' + event)
         cursor = position + len(event)
 
 
-def run(directory):
+def run(directory, move=False):
     root = Path(__file__).resolve().parents[1]
     directory.mkdir(parents=True, exist_ok=False)
     baseline = directory / 'baseline'
     prepare_contact(baseline)
     previous = baseline / 'cold'
     phases = (
-        ('copy', 'phone_memory_copy', 32),
-        ('phone_cold', 'phone_memory_phone_read', 40),
+        ('copy', 'phone_memory_move' if move else 'phone_memory_copy', 34),
+        ('phone_cold', 'phone_memory_phone_empty' if move else 'phone_memory_phone_read', 40),
         ('sim_cold', 'phone_memory_sim_read', 40))
     environment = os.environ.copy()
     environment.pop('NOKIA_DCT3_6210_PIN_ENTRY', None)
@@ -85,6 +90,9 @@ def run(directory):
         if phase != 'copy':
             launch['bank_helper_sha256'] = hashlib.sha256(
                 (root / 'tools/noki6210_phone_memory_bank_read.lua').read_bytes()).hexdigest()
+        else:
+            launch['copy_helper_sha256'] = hashlib.sha256(
+                (root / 'tools/noki6210_phone_memory_copy_input.lua').read_bytes()).hexdigest()
         (target / 'launch.json').write_text(json.dumps(launch, indent=2) + '\n')
         with (target / 'console.log').open('w') as output:
             subprocess.run(command, cwd=target, env=environment, stdout=output,
@@ -92,9 +100,16 @@ def run(directory):
         verify_handset_health((target / 'console.log').read_text(errors='replace'))
         verify((target / 'error.log').read_text(errors='replace'), runtime=True, selftest=True)
         previous = target
+    assess(directory, move)
+    print('OK - physical Phone-to-SIM ' + ('move, erased' if move else 'copy, retained') +
+          ' Phone source and cold SIM readback')
+
+
+def assess(directory, move=False):
+    baseline = directory / 'baseline'
     card = lambda phase: (directory / phase / 'nvram/npe3hle/sim_card').read_bytes()
     copy_trace = (directory / 'copy/error.log').read_text(errors='replace')
-    verify_copy_trace(copy_trace)
+    verify_copy_trace(copy_trace, move)
     validate_phonebook(copy_trace, card('copy'), b'A')
     verify_copy_storage((baseline / 'cold/nvram/npe3hle/sim_card').read_bytes(),
                         card('copy'), card('phone_cold'), card('sim_cold'))
@@ -106,9 +121,9 @@ def run(directory):
     verify_bank_selection_digests(selections)
     for phase, filename, marker, digest in (
             ('copy', '6210_phone_memory_copy_copied',
-             '6210_phone_memory_copy: complete=1', COPIED_SHA256),
-            ('phone_cold', '6210_phone_memory_phone_read_contact',
-             '6210_phone_memory_phone_read: complete=1', CONTACT_SHA256),
+             '6210_phone_memory_copy: complete=1', MOVED_SHA256 if move else COPIED_SHA256),
+            ('phone_cold', '6210_phone_memory_phone_read_' + ('result' if move else 'contact'),
+             '6210_phone_memory_phone_read: complete=1', EMPTY_SHA256 if move else CONTACT_SHA256),
             ('sim_cold', '6210_phone_memory_sim_read_contact',
              '6210_phone_memory_sim_read: complete=1', CONTACT_SHA256)):
         trace = (directory / phase / 'error.log').read_text(errors='replace')
@@ -120,17 +135,17 @@ def run(directory):
             check_frame(frame, digest, phase)
     (directory / 'result.json').write_text(json.dumps(dict(
         product='6210', research_hle=True, phone_to_sim=True,
-        source_retained_cold=True, destination_read_cold=True,
+        source_retained_cold=not move, source_erased_cold=move, destination_read_cold=True,
         unrelated_card_unchanged=True), indent=2) + '\n')
-    print('OK - physical Phone-to-SIM copy, retained Phone source and cold SIM readback')
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', type=Path)
+    parser.add_argument('--move', action='store_true', help='Erase original after copying to SIM')
     args = parser.parse_args()
     try:
-        run(args.directory.resolve())
+        run(args.directory.resolve(), args.move)
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
         parser.exit(1, f'FAIL - {error}\n')
 

@@ -174,9 +174,10 @@ NPE-3 separately qualifies one physical Phone-to-SIM **Keep original** copy
 through `run_noki6210_phone_memory_copy.py`. Independent cold branches
 explicitly select Phone and SIM using distinct selection-screen oracles,
 then read the same A/123 contact. Only the expected EF_ADN record may change
-in the complete card, and neither cold readback may write it. Reverse/bulk
-copying, Erase original and capacity remain unpromoted; NHM-3 does not
-inherit this acceptance.
+in the complete card, and neither cold readback may write it. Its independent
+`--move` variant additionally proves **Erase original**, the distinct Moved
+frame, cold empty Phone bank and retained cold SIM contact. Reverse/bulk
+copying and capacity remain unpromoted; NHM-3 does not inherit this acceptance.
 The independently run `--product 6250 --rename` fixture also cold-reads
 D / 123 after physical name editing, with its own boot/provisioning checks
 and product-qualified save frame. Neither rename gate establishes arbitrary

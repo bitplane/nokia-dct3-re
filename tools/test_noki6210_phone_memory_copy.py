@@ -45,6 +45,16 @@ class PhoneMemoryCopyTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify_copy_trace('\n'.join(bad))
 
+    def test_destructive_choice_must_be_explicit_and_ordered(self):
+        trace = '\n'.join(self.events)
+        with self.assertRaises(ValueError):
+            verify_copy_trace(trace, move=True)
+        events = list(self.events)
+        events.insert(1, '6210_phone_memory_copy: action=erase_original')
+        verify_copy_trace('\n'.join(events), move=True)
+        with self.assertRaises(ValueError):
+            verify_copy_trace('\n'.join(events))
+
     def test_unrelated_record_or_security_mutation_fails(self):
         for offset in (32, 1599, 1600, CURRENT_NVRAM_LENGTH - 1):
             bad = bytearray(self.copied)

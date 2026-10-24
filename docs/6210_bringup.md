@@ -334,6 +334,16 @@ Phone choice. These observations do not decode flash records or qualify
 reverse copying, Erase original, bulk copying, capacity or native DSP.
 Capture: `tmp/npe3-phone-to-sim-final`.
 
+The independent `--move` variant selects **Erase original** after the same
+Phone-to-SIM / One by one route. It requires the distinct **Moved** frame,
+the same exact EF_ADN record and complete-card preservation outside that
+record. Independent cold branches explicitly select their banks: Phone must
+render **Selected memory empty**, while SIM must retain A / 123. Neither
+cold branch may write the card. A Keep-original capture cannot satisfy this
+variant because the destructive choice, completion frame and cold source
+oracle differ. This qualifies one firmware-owned cross-storage move, not
+reverse/bulk copying or capacity. Capture: `tmp/npe3-phone-to-sim-move`.
+
 ### Laboratory registration
 
 The runtime emits an organic type-`0x56` acquisition request with a 160-byte

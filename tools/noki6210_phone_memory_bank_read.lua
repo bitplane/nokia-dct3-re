@@ -1,5 +1,5 @@
 -- Explicitly select a bank before cold physical readback.
-return function(bank)
+return function(bank,empty)
 assert(bank=='phone' or bank=='sim')
 local directory=assert(debug.getinfo(1,'S').source:match('^@(.*/)'))
 dofile(directory..'noki6210_staged_observe.lua')
@@ -31,7 +31,7 @@ local input=coroutine.create(function()
     press('Right Softkey / C','names_again')
     press('Left Softkey / Menu','search')
     press('Left Softkey / Menu','result')
-    press('Left Softkey / Menu','contact')
+    if not empty then press('Left Softkey / Menu','contact') end
     machine:logerror('6210_phone_memory_'..bank..'_read: complete=1 firmware_state_forcing=0\n')
 end)
 _G.noki6210_phone_memory_bank_read=input
