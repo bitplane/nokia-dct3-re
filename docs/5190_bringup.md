@@ -21,6 +21,38 @@ The qualified checksum/nominal-input comparison additionally reaches the
 firmware's Insert SIM card screen. Fitted mask identity and DSP cadence remain unproved.
 No scheduler or ownership flag is injected.
 
+### Native clean-idle restoration
+
+An independent54s cold process from the physically selected Field test00
+storage authenticates the original laboratory PIN1234 and separate phone12345,
+then saves at40s without an application key. All37 observed ARM registers,
+36 DSP fields and rolling checksums of64KiB backed research ARM RAM,
+ordinary DSP data and program restore exactly. The observed ARM checkpoint
+is PC2a4672/SP10c6dc. The2.7s reference/restored windows each contain7764
+identical DSP I/O writes, including relative times, addresses, data and masks.
+Physical Menu in both branches renders the reviewed Phone book frame,
+RGB SHA256 `ed5b9d247f48525c5f67b4ca71914bff1802af857d212e4dd5cb0e7e8c9a8b33`.
+
+Complete8192-byte EEPROM remains SHA256
+`4bd101b1c9089fed802aa5630135c4371f3bb070b136c7bfc15031917a598cad`;
+own executable flash, original3570-byte PIN-enabled card and external CFG
+are unchanged. Preparation copies qualified executable inputs and persistent
+device/CFG files only, not guest RAM or a predecessor save. The resulting
+save artifact is nonempty and hashed. Architecture, native startup/authentication,
+exact pixels and complete storage have independent checker requirements.
+
+```sh
+.venv/bin/python tools/nsb1_native_state_check.py \
+  tmp/nsb1-diagnostic-display-final-cold tmp/nsb1-native-idle-state \
+  --mame mame/mame
+```
+
+Omit `--mame` to recheck retained evidence; execution requires a fresh output.
+This is bounded native-compatibility restoration and physical continuation,
+not exhaustive device-state coverage, SRAM geometry, fitted-mask identity,
+factory calibration, sustained RF operation, registration or native speech.
+The existing checksum/retry and nominal ADC hypotheses remain explicit.
+
 ### Executable upload extent
 
 The own loader writes 825 program words in `2800..2b38`, including
