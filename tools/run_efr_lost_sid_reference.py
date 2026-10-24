@@ -71,11 +71,14 @@ def main():
     for name in ('lost_sid', 'replay'):
         check_flags((output / f'{name}.log').read_text(), decoder)
     from tools.c54x_rom4_efr_state_check import parse
+    from tools.c54x_rom4_efr_filter_check import reference_records
     states = []
     for name in ('state', 'state_replay'):
         text = (output / f'{name}.log').read_text()
         parse(text, frames=518)
-        states.append([line for line in text.splitlines() if line.startswith(('EFRSTATE ', 'EFRGAIN ', 'EFRPOLICY '))])
+        reference_records(text)
+        states.append([line for line in text.splitlines() if line.startswith(
+            ('EFRSTATE ', 'EFRGAIN ', 'EFRPOLICY ', 'EFRFILTER ', 'EFRFILTERCALL '))])
     if states[0] != states[1]:
         raise ValueError('reference semantic observations differ across fresh processes')
     evidence = dict(commands=commands, frames=518, samples=82880,
@@ -83,6 +86,7 @@ def main():
                     observer_sha256=hashlib.sha256((tools / 'etsi_efr_dtx_observer.c').read_bytes()).hexdigest(),
                     state_observer_sha256=hashlib.sha256((tools / 'etsi_efr_state_observer.c').read_bytes()).hexdigest(),
                     installation_verified=True, fresh_process_replay=True, observer_pcm_unchanged=True,
+                    synthesis_filter_calls=2072, synthesis_filter_vectors=6216,
                     native_dsp_claim=False, handset_audio_claim=False)
     (output / 'evidence.json').write_text(json.dumps(evidence, indent=2) + '\n')
     print('PASS: reference-only lost-SID muting and first-speech fixture; native DSP not tested')

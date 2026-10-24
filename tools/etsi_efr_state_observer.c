@@ -11,8 +11,9 @@ extern short __real_d_gain_pitch(short, short, short, short, short);
 extern void __real_d_gain_code(short, short *, short, short *, short, short, short, short, short, short);
 extern short past_r2_q[10], past_lsf_q[10];
 extern short prev_gc;
+extern void __real_Syn_filt(short *, short *, short *, short, short *, short);
 typedef char word16_requires_two_bytes[sizeof(short) == 2 ? 1 : -1];
-static unsigned frame, pitch_subframe, code_subframe;
+static unsigned frame, pitch_subframe, code_subframe, filter_subframe, in_decoder;
 
 static void words(const char *kind, const short *values, unsigned count)
 {
@@ -25,10 +26,35 @@ static void words(const char *kind, const short *values, unsigned count)
 void __wrap_Decoder_12k2(short *parameters, short *synth, short *lpc, short taf, short sid)
 {
     pitch_subframe = code_subframe = 0;
+    filter_subframe = 0;
+    in_decoder = 1;
     __real_Decoder_12k2(parameters, synth, lpc, taf, sid);
+    in_decoder = 0;
     words("RAW", synth, 160);
     words("LPC", lpc, 44);
     ++frame;
+}
+
+void __wrap_Syn_filt(short *coefficients, short *input, short *output, short length,
+                     short *memory, short update)
+{
+    if (in_decoder) {
+        const char *kinds[] = {"A", "EXC", "MEM"};
+        const short *vectors[] = {coefficients, input, memory};
+        unsigned widths[] = {11, 40, 10};
+        unsigned kind, i;
+        fprintf(stderr, "\nEFRFILTERCALL frame=%u subframe=%u length=%d update=%d\n",
+                frame, filter_subframe, length, update);
+        for (kind = 0; kind < 3; ++kind) {
+            fprintf(stderr, "EFRFILTER frame=%u subframe=%u kind=%s values=",
+                    frame, filter_subframe, kinds[kind]);
+            for (i = 0; i < widths[kind]; ++i)
+                fprintf(stderr, "%04x", (unsigned)(unsigned short)vectors[kind][i]);
+            fputc('\n', stderr);
+        }
+        ++filter_subframe;
+    }
+    __real_Syn_filt(coefficients, input, output, length, memory, update);
 }
 
 void __wrap_D_plsf_5(short *indices, short *first, short *second, short bfi, short ctrl, short state)

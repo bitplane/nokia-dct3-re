@@ -3075,6 +3075,44 @@ limit rejects a single 160-word action; absent RAW/LPC records must fail the
 checker, not imply equality. Synthesis mode rejects incomplete widths, missing
 boundaries and altered replay, and is available only with complete mode.
 
+The decoder's two delayed calls at `c88c`/`c898` enter synthesis filter
+`d014` with return addresses `c890`/`c89c`. Four calls per frame select
+11 coefficients at `1317 + 11*subframe`, 40 excitation words through AR3,
+output at `1388 + 40*subframe`, and BRC=19 for 20 paired samples. The ten
+preceding output-buffer words carry synthesis history. The enhanced branch
+uses input `0af2`; the other uses its current excitation pointer. Calls from
+postprocessing (`c5e0`/`c608` returns) are explicitly excluded.
+
+The read-only reference wrapper observes only `Syn_filt` calls inside
+`Decoder_12k2`. Every call requires length 40/update 1 and ordered
+coefficient/excitation/history vectors. Installation PCM, two fresh observed
+runs and unobserved reference PCM all remain unchanged. Both native frontends
+replay all 2,072 decoder filter calls and produce identical logs/PCM:
+
+| Filter input | Compared words | Differences | Last differing subframe |
+| --- | --- | --- | --- |
+| Coefficients | 22,792 | None | None |
+| Excitation | 82,880 | 2,576 | Frame 116, subframe 2 |
+| History | 20,720 | 828 | Frame 118, subframe 2 |
+
+Excitation has reconverged by frame 116/subframe 3 while history still differs
+through frame 118/subframe 2. This identifies a history-bearing synthesis tail rather
+than a later gain/coefficient divergence or postprocessing-only cause. It does
+not yet establish numerical equivalence of every filter operation or sole-cause
+equivalence to the frame 97 gain-policy difference. No reference or native codec
+state is replaced. The strict frame 97 failure remains unchanged.
+
+```sh
+python3 tools/c54x_rom4_efr_filter_check.py RUN/error.log REFERENCE/state.log \
+  --output RUN/filter-characterization.json
+```
+
+Generate the reference with `run_efr_lost_sid_reference.py`; its evidence now
+requires 6,216 ordered filter vectors in each fresh observed process. The native
+observer uses digit-prefixed numeric offsets so debugger accumulator symbols
+`a`/`b` cannot silently replace hexadecimal offsets. The checker validates native
+call ownership, vector widths/order, reference coverage and exact native replay.
+
 ### Native EFR active-speech erasures
 
 Atomic and staged execution complete all 163 frames and replay 65,440 ordinary
