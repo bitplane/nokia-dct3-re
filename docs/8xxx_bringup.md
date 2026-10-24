@@ -2130,6 +2130,28 @@ allowances and installs2468; the final cold process uses2468 to change back.
 Capture: `tmp/nsm2-wrong-puk2-final`. This qualifies one rejected PUK2 and cold
 recovery, not permanent PUK2 loss or FDN.
 
+The independent `--puk2 --exhaust-puk2` variant uses fourteen processes:
+three physical rejected PIN2 changes, ten cold wrong-PUK2 attempts and a
+final cold permanently rejected entry. Every PUK2 attempt loses exactly one
+allowance in the complete inherited card, preserves5678 and zero PIN2
+retries, and emits one selector02 UNBLOCK without a subsequent VERIFY.
+Nine `9804` results precede final `9840` and the reviewed **PIN2 code rejected**
+frame. PIN1 authentication and ordinary/preserved laboratory registration
+remain mandatory on every leg; this is not whole-SIM rejection.
+
+The final cold process physically opens Change PIN2 code and must display
+**PIN2 code rejected**, with no PIN2 credential APDU available. One digit
+enters the ordinary dial screen; End cancels it and physical Menu renders
+the stable Messages title. The complete exhausted card remains unchanged,
+and no call/SMS transaction is allowed. Do not replay the usual PUK2
+digit/softkey sequence after the rejected-entry dialog: it has left the
+credential flow and can invoke ordinary SIM contact saving. The permanent
+fixture therefore observes that boundary and cancels dial entry rather
+than treating later screens as PUK2 editors. Capture:
+`tmp/nsm2-permanent-puk2-final`. Exact frame, card, physical-contact,
+own-upload/HLE and predecessor-storage checks apply throughout. FDN,
+native DSP/RF and speech remain separate contracts.
+
 The same isolated runner accepts `--scenario host-incoming-call`. It verifies
 physical answer/end input, the complete host-originated CC/RR exchange,
 traffic-channel assignment and release, and reviewed ringing/returned-idle

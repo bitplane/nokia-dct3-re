@@ -131,7 +131,11 @@ post-UNBLOCK VERIFY, and cold replacement-PIN2 use. Whole-card/UI/registration
 checks remain mandatory. Its independent `--puk2 --wrong-puk2-first` chain
 adds one cold wrong-PUK2 rejection, exactly one consumed PUK2 allowance with
 the old PIN2 retained, no post-failure VERIFY, then correct cold recovery and
-replacement-credential use. Permanent PUK2 exhaustion and FDN are not promoted.
+replacement-credential use. The independently executed
+`--puk2 --exhaust-puk2` chain qualifies all ten physical PUK2 rejections and
+cold permanent PIN2-code refusal while PIN1 and registration remain valid.
+The final rejected-entry/digit/End/Menu control preserves the entire card
+and sends no PIN2 credential APDU or call/SMS transaction. FDN is not promoted.
 
 NPE-3 additionally has an independent handset-bank A/123 save/cold-read
 fixture with an empty-bank negative control and unchanged complete SIM files;

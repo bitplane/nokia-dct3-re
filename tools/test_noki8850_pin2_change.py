@@ -16,6 +16,45 @@ TRACE='\n'.join((
 
 
 class Pin2ChangeTest(unittest.TestCase):
+    def test_puk2_exhaustion_has_exact_last_allowance_status(self):
+        for allowance in range(10,0,-1):
+            blocked=bytearray(registered_card('5678'))
+            blocked[3517]=0
+            blocked[3519]=allowance
+            rejected=bytearray(blocked)
+            rejected[3519]-=1
+            status='9840' if allowance==1 else '9804'
+            trace=('sim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08\n'
+                   f'SIM status ins=20 sw=9000 chv=3/0 puk=10/{allowance} enabled=1\n'
+                   '8850_pin2: key=Menu state=1 t=62.000000000\n'
+                   'sim_device: header cla=a0 ins=2c p1=00 p2=02 p3=10\n'
+                   f'SIM status ins=2c sw={status} chv=3/0 puk=10/{allowance-1} enabled=1\n'
+                   '8850_pin2: key=Menu state=1 t=68.000000000\n'
+                   '8850_pin2: complete=1 firmware_state_forcing=0')
+            with self.subTest(allowance=allowance):
+                check_puk2_phase(trace,bytes(blocked),bytes(rejected),rejected=True,puk2_attempts=allowance)
+                with self.assertRaises(ValueError):
+                    check_puk2_phase(trace,bytes(blocked),bytes(blocked),rejected=True,puk2_attempts=allowance)
+
+    def test_permanent_puk2_retains_pin1_but_issues_no_second_credential_apdu(self):
+        blocked=bytearray(registered_card('5678'))
+        blocked[3517]=blocked[3519]=0
+        trace=('sim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08\n'
+               'SIM status ins=20 sw=9000 chv=3/0 puk=10/0 enabled=1\n'
+               '8850_pin2: key=Menu state=1 t=43.000000000\n'
+               '8850_pin2: key=Keypad 9 state=1 t=46.000000000\n'
+               '8850_pin2: key=End state=1 t=48.000000000\n'
+               '8850_pin2: key=Menu state=1 t=49.000000000\n'
+               '8850_pin2: complete=1 firmware_state_forcing=0')
+        check_puk2_phase(trace,bytes(blocked),bytes(blocked),permanent=True,puk2_attempts=0)
+        for extra in ('SIM status ins=2c sw=9840 chv=3/0 puk=10/0 enabled=1',
+                      'sim_device: header cla=a0 ins=20 p1=00 p2=02 p3=08',
+                      'GSM service establish sapi=0 pd=03 message=05 '):
+            with self.assertRaises(ValueError):
+                check_puk2_phase(trace+'\n'+extra,bytes(blocked),bytes(blocked),permanent=True,puk2_attempts=0)
+        with self.assertRaises(ValueError):
+            check_puk2_phase(trace,bytes(blocked),registered_card('2468'),permanent=True,puk2_attempts=0)
+
     def test_wrong_puk2_preserves_pin2_and_forbids_post_failure_verify(self):
         blocked=bytearray(registered_card('5678'))
         blocked[3517]=0

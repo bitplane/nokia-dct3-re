@@ -28,6 +28,15 @@ local input=coroutine.create(function()
     press('Menu','access_codes')
     for i=1,2 do press('Scroll Down','code_'..i) end
     press('Menu','current_pin2')
+    if _G.nsm2_permanent_puk2 then
+        assert(emu.wait(46-machine.time:as_double()))
+        press('Keypad 9','permanent_digit')
+        assert(emu.wait(48-machine.time:as_double()))
+        press('End','return')
+        press('Menu','responsive_menu')
+        machine:logerror('8850_pin2: complete=1 firmware_state_forcing=0\n')
+        return
+    end
     local old=_G.nsm2_pin2_reverse and {2,4,6,8} or {5,6,7,8}
     if _G.nsm2_pin2_wrong then old={9,9,9,9} end
     if _G.nsm2_puk2_recovery then old={8,7,6,5,4,3,2,1} end

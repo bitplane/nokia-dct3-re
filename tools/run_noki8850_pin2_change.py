@@ -33,14 +33,18 @@ PIN2_FRAMES={
 }
 
 
-def check_frames(directory,rejected=False,remaining=2,puk2=False):
+def check_frames(directory,rejected=False,remaining=2,puk2=False,permanent=False):
     from PIL import Image
-    for label,digest in PIN2_FRAMES.items():
+    frames=({'current_pin2':'64b9b1653dea6132cded485fb1d4c81332c56dd7eef8301f5c3e3df312be4542',
+             'permanent_digit':'cb8cf263c8bea9bca5312f02d302c4c063793e1f06eb2c492457375279110848'}
+            if permanent else PIN2_FRAMES)
+    for label,digest in frames.items():
         if puk2 and label=='current_pin2':digest='d2b301fa8d10bb8a12f0541444b866ed6ab51a770b13aada88b32da8632ea545'
         if puk2 and label=='result':digest='27b8f689bd860c433e6e7c2f32282b3a745a5e82258b887c80477e89276a1ec5'
         if rejected and label=='result':
             if remaining==0:
-                digest='d2b301fa8d10bb8a12f0541444b866ed6ab51a770b13aada88b32da8632ea545'
+                digest=('64b9b1653dea6132cded485fb1d4c81332c56dd7eef8301f5c3e3df312be4542' if puk2 else
+                        'd2b301fa8d10bb8a12f0541444b866ed6ab51a770b13aada88b32da8632ea545')
             else:
                 check_wrong_frame(directory/f'8850_pin2_{label}.png')
                 continue
@@ -94,37 +98,46 @@ def check_phase(text,initial,final,reverse=False,*,rejected=False,prior_rejectio
         ('complete',r'8850_pin2: complete=1 firmware_state_forcing=0')],'8850 PIN2 change')
 
 
-def check_puk2_phase(text,initial,final,*,rejected=False,puk2_attempts=10):
-    if puk2_attempts not in (9,10):raise ValueError('unqualified 8850 PUK2 allowance')
+def check_puk2_phase(text,initial,final,*,rejected=False,puk2_attempts=10,permanent=False):
+    if not 0<=puk2_attempts<=10 or (puk2_attempts==0)!=permanent:
+        raise ValueError('inconsistent 8850 PUK2 allowance/lifecycle')
+    if permanent and rejected:raise ValueError('permanent PUK2 has no further rejected transaction')
     blocked=bytearray(registered_card('5678'))
     blocked[3517]=0
     blocked[3519]=puk2_attempts
-    expected=bytearray(blocked if rejected else registered_card('2468'))
+    expected=bytearray(blocked if rejected or permanent else registered_card('2468'))
     if rejected:expected[3519]-=1
     if initial!=bytes(blocked) or final!=bytes(expected):
         raise ValueError('8850 PUK2 did not preserve the blocked card or install only the new PIN2')
-    pin1=[(0x9000,3,10)]*(1 if rejected else 2)
-    pin2=[(0x9000,0,puk2_attempts)]+([] if rejected else [(0x9000,3,10)])
-    unblock=[(0x9804,0,puk2_attempts-1)] if rejected else [(0x9000,3,10)]
+    pin1=[(0x9000,3,10)]*(1 if rejected or permanent else 2)
+    pin2=[(0x9000,0,puk2_attempts)]+([] if rejected or permanent else [(0x9000,3,10)])
+    failure='9840' if puk2_attempts==1 else '9804'
+    unblock=[] if permanent else [(int(failure,16),0,puk2_attempts-1)] if rejected else [(0x9000,3,10)]
     if (statuses(text,0x20)!=pin1 or statuses(text,0x20,chv=2)!=pin2 or statuses(text,0x2c,chv=2)!=unblock):
         raise ValueError('8850 PUK2 credential results or retry state differ')
-    if re.findall(r'header cla=a0 ins=20 p1=00 p2=(\w\w) p3=08',text)!=(['01'] if rejected else ['01','02']):
+    if re.findall(r'header cla=a0 ins=20 p1=00 p2=(\w\w) p3=08',text)!=(['01'] if rejected or permanent else ['01','02']):
         raise ValueError('8850 PUK2 must VERIFY PIN1, then PIN2 only after successful UNBLOCK')
-    if re.findall(r'header cla=a0 ins=2c p1=00 p2=(\w\w) p3=10',text)!=['02']:
+    if re.findall(r'header cla=a0 ins=2c p1=00 p2=(\w\w) p3=10',text)!=([] if permanent else ['02']):
         raise ValueError('8850 PUK2 must use selector02 once')
     if any(statuses(text,ins) for ins in (4,0x24,0x26,0x28,0x44,0xdc)):
         raise ValueError('8850 PUK2 changed unrelated configuration or records')
-    keys=editor_keys('99999999' if rejected else '87654321','2468','2468')
-    contacts(text,'8850_pin2',[(24+i,key) for i,key in enumerate(keys)]+[(67,'End'),(68,'Menu')])
+    if permanent and re.search(r'GSM service (?:establish|uplink) sapi=\d+ pd=(?:03|09) ',text):
+        raise ValueError('permanent PUK2 input unexpectedly started a call or SMS')
+    keys=editor_keys() if permanent else editor_keys('99999999' if rejected else '87654321','2468','2468')
+    ending=[(46,'Keypad 9'),(48,'End'),(49,'Menu')] if permanent else [(67,'End'),(68,'Menu')]
+    contacts(text,'8850_pin2',[(24+i,key) for i,key in enumerate(keys)]+ending)
     check_pin_inputs(text)
     registration(text,'nsm2',preserved=True)
-    ordered=[('confirm',r'8850_pin2: key=Menu state=1 t=62\.'),
-        ('result',rf'SIM status ins=2c sw={"9804" if rejected else "9000"}')]
-    if not rejected:
+    ordered=([('rejected entry',r'8850_pin2: key=Menu state=1 t=43\.'),
+              ('digit',r'8850_pin2: key=Keypad 9 state=1 t=46\.'),
+              ('End',r'8850_pin2: key=End state=1 t=48\.')] if permanent else
+             [('confirm',r'8850_pin2: key=Menu state=1 t=62\.')])
+    if not permanent:ordered += [('result',rf'SIM status ins=2c sw={failure if rejected else "9000"}')]
+    if not rejected and not permanent:
         ordered += [('verify new PIN2',r'header cla=a0 ins=20 p1=00 p2=02 p3=08'),
                     ('verified',r'SIM status ins=20 sw=9000')]
     ordered += [
-        ('Menu',r'8850_pin2: key=Menu state=1 t=68\.'),
+        ('Menu',rf'8850_pin2: key=Menu state=1 t={49 if permanent else 68}\.'),
         ('complete',r'8850_pin2: complete=1 firmware_state_forcing=0')]
     require_ordered(text,ordered,'8850 PUK2 transaction')
 
@@ -136,8 +149,11 @@ def main():
     mode.add_argument('--reject-first',action='store_true',help='consume one PIN2 retry with a wrong old PIN before cold recovery')
     mode.add_argument('--puk2',action='store_true',help='physically exhaust PIN2, recover with PUK2 and cold-use the replacement PIN2')
     parser.add_argument('--wrong-puk2-first',action='store_true',help='reject one PUK2 in a cold process before recovery')
+    parser.add_argument('--exhaust-puk2',action='store_true',help='consume all PUK2 allowances physically and test cold permanent refusal')
     args=parser.parse_args()
     if args.wrong_puk2_first and not args.puk2:parser.error('--wrong-puk2-first requires --puk2')
+    if args.exhaust_puk2 and (not args.puk2 or args.wrong_puk2_first):
+        parser.error('--exhaust-puk2 requires --puk2 without --wrong-puk2-first')
     root=Path(__file__).resolve().parents[1]
     try:
         profile=PROFILES['8850']
@@ -153,7 +169,11 @@ def main():
             phases=(*((f'reject-{attempt}','pin2_wrong') for attempt in range(1,4)),
                     ('puk2','puk2_recovery'),('cold_restore','pin2_restore'))
             if args.wrong_puk2_first:phases=(*phases[:3],('wrong-puk2','puk2_wrong'),*phases[3:])
+            if args.exhaust_puk2:
+                phases=(*phases[:3],*((f'wrong-puk2-{attempt:02d}','puk2_wrong') for attempt in range(1,11)),
+                        ('permanent','puk2_permanent'))
         for name,script in phases:
+            kind='wrong-puk2' if name.startswith('wrong-puk2-') else name
             phase=run/name
             phase.mkdir()
             predecessor=storage_hashes(previous/'nvram') if previous else None
@@ -170,7 +190,7 @@ def main():
                 '-nvram_directory','nvram','-cfg_directory','cfg','-snapshot_directory','snap',
                 '-noreadconfig','-debug','-debugger','none','-verbose','-log','-video','none',
                 '-sound','none','-nothrottle','-autoboot_delay','0',
-                '-autoboot_script',str(root/f'tools/noki8850_{script}.lua'),'-seconds_to_run','74' if name in ('puk2','wrong-puk2') else '69']
+                '-autoboot_script',str(root/f'tools/noki8850_{script}.lua'),'-seconds_to_run','74' if kind in ('puk2','wrong-puk2','permanent') else '69']
             launch={'invocation_id':str(uuid.uuid4()),'command':command,
                 'initial_storage':storage_hashes(phase/'nvram'),'mcu_sha1':profile[2],'pmm_sha1':profile[4],
                 'mame_sha256':hashlib.sha256((root/'mame/mame').read_bytes()).hexdigest(),
@@ -186,10 +206,13 @@ def main():
             text=(phase/'error.log').read_text(errors='replace')
             errors=check_trace(text,runtime_hle=True,sim_reads=True)
             if errors:raise ValueError('; '.join(errors))
-            if name in ('puk2','wrong-puk2'):
-                check_puk2_phase(text,initial,card.read_bytes(),rejected=name=='wrong-puk2',
-                    puk2_attempts=9 if args.wrong_puk2_first and name=='puk2' else 10)
-                check_frames(phase/'snap',puk2=True,rejected=name=='wrong-puk2')
+            if kind in ('puk2','wrong-puk2','permanent'):
+                allowance=(11-int(name.rsplit('-',1)[1]) if name.startswith('wrong-puk2-') else
+                           0 if kind=='permanent' else 9 if args.wrong_puk2_first and name=='puk2' else 10)
+                check_puk2_phase(text,initial,card.read_bytes(),rejected=kind=='wrong-puk2',
+                    puk2_attempts=allowance,permanent=kind=='permanent')
+                check_frames(phase/'snap',puk2=kind!='permanent',rejected=kind=='wrong-puk2',
+                             remaining=allowance-1,permanent=kind=='permanent')
             else:
                 rejected=name=='reject' or name.startswith('reject-')
                 allowance=4-int(name.rsplit('-',1)[1]) if name.startswith('reject-') else 3
@@ -200,14 +223,17 @@ def main():
                 raise ValueError('8850 cold PIN2 phase mutated predecessor NVRAM')
             launches.append(launch)
             previous=phase
+            print('8850 PIN2 phase '+name+': verified',flush=True)
         (run/'acceptance.json').write_text(json.dumps({'phases':launches,
             'rejected_change_recovery':args.reject_first,
             'puk2_recovery':args.puk2,
             'wrong_puk2_first':args.wrong_puk2_first,
+            'permanent_puk2_loss':args.exhaust_puk2,
             'research_hle':True,'native_speech':False},indent=2)+'\n')
     except (ValueError,RuntimeError,OSError,subprocess.SubprocessError) as error:
         parser.exit(1,f'8850 PIN2 change FAIL: {error}\n')
-    print('8850 PIN2 change and cold replacement-credential use PASS')
+    print('8850 '+('permanent PUK2 loss with retained PIN1/registration' if args.exhaust_puk2 else
+                  'PIN2 change and cold replacement-credential use')+' PASS')
 
 
 if __name__=='__main__':main()
