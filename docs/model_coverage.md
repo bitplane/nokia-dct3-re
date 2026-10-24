@@ -31,6 +31,8 @@ An explicit FDN-capable lab card additionally proves physical PIN2-authenticated
 On/cold-On/Off/cold-Off and exact file-validity/identity rehabilitation, with
 unchanged credentials and records. Protected FDN records and local dial
 permission remain separate from these settings and from native registration.
+Wrong-PIN2 FDN activation also preserves Off state, consumes only one retry
+and cold-recovers through correct PIN2 with the normal validity protocol.
 Physical offline SMS composition/save, cold Outbox read, confirmed deletion
 and a second cold empty-Outbox check also pass through the laboratory SIM.
 Physical SIM-security gates cover PIN-request Off/On, PIN1/PIN2 changes and

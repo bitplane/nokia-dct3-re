@@ -1058,7 +1058,33 @@ credentials/APDUs/statuses and Messages/On/Off pixels. Handset-specific
 contacts remain local; `sim_fdn_protocol_check.check_protocol_phase` is the
 same parsed-TX contract used by the existing sibling adapters.
 
-This qualifies settings and cold file-validity persistence, not rejected
-activation, protected FDN record editing, local dial permission, radio
-registration, connected calls or native speech. No firmware messages,
+This qualifies settings and cold file-validity persistence. Rejected
+activation is qualified below; protected FDN record editing, local dial
+permission, radio registration, connected calls and native speech remain
+unqualified. No firmware messages,
 selection flags, counters or guest state are injected.
+
+### Rejected FDN activation and cold retry
+
+The same explicit initially-Off FDN card physically receives PIN2 `5679`
+while selecting On. Startup PIN1 and the separate phone code succeed, but
+the application VERIFY2 returns `9804` and displays **Code error**. There
+is no INVALIDATE, REHABILITATE or other credential/file mutation. Complete
+card comparison permits only PIN2 retries 3→2; FDN remains Off.
+
+A separate cold process receives that exact retry-2 card and physically
+uses correct `5678`. It verifies PIN2, restores retries to 3, performs the
+normal ADN invalidation/identity rehabilitation and displays On. Its final
+card exactly equals the qualified enabled FDN card; credentials, records
+and unrelated state remain intact.
+
+Run `nsb3_fdn_wrong.lua` for 84 seconds on a freshly declared FDN input.
+`nsb3_fdn_rejection_check.py prepare-retry WRONG RETRY` requires the exact
+rejected card, then the ordinary FDN input script runs for 84 seconds.
+`check BASE WRONG RETRY` validates the external fixture provenance, own
+executable, cold source hashes/initial card snapshot, exact input and
+VERIFY payload/status order, absence of validity commands on failure and
+complete card/error/On/Menu oracles. Startup authentication is checked
+before the physical application boundary; the failed PIN2 transaction is
+still required by the full-stream checker, not filtered out. No retries,
+validity flags or firmware context are edited by the harness.
