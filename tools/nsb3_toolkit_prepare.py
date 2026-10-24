@@ -11,7 +11,17 @@ from tools.nsb3_phonebook_check import prepare_reload
 from tools.make_sim_card_profile import make_current_profile
 
 
-def prepare(source, target):
+def profile_metadata(profile):
+    descriptions = {1: 'Phase 2+ with one DISPLAY TEXT command',
+                    3: 'Phase 2+ with DISPLAY TEXT, GET INKEY and GET INPUT'}
+    if profile not in descriptions:
+        raise ValueError('unsupported external card fixture')
+    return dict(profile=profile, description=descriptions[profile],
+                handset_storage_changed=False, persistent_card_changed=False)
+
+
+def prepare(source, target, profile=1):
+    metadata_profile = profile_metadata(profile)
     def check_card(card):
         if card != make_current_profile(True):
             raise ValueError('requires qualified original PIN-enabled laboratory card')
@@ -23,11 +33,10 @@ def prepare(source, target):
         raise ValueError('own input configuration missing')
     if inputs.find("port[@tag=':SATCFG']") is not None:
         raise ValueError('source already overrides Toolkit profile')
-    ET.SubElement(inputs, 'port', tag=':SATCFG', type='CONFIG', mask='15', defvalue='0', value='1')
+    ET.SubElement(inputs, 'port', tag=':SATCFG', type='CONFIG', mask='15', defvalue='0', value=str(profile))
     tree.write(path, encoding='utf-8', xml_declaration=True)
     metadata = json.loads((target / 'cold_source.json').read_text())
-    metadata['external_toolkit_card'] = dict(profile=1, description='Phase 2+ with one DISPLAY TEXT command',
-                                            handset_storage_changed=False, persistent_card_changed=False)
+    metadata['external_toolkit_card'] = metadata_profile
     (target / 'cold_source.json').write_text(json.dumps(metadata, indent=2) + '\n')
 
 
@@ -35,9 +44,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source', type=Path)
     parser.add_argument('target', type=Path)
+    parser.add_argument('--interactive', action='store_true')
     args = parser.parse_args()
     try:
-        prepare(args.source, args.target)
+        prepare(args.source, args.target, 3 if args.interactive else 1)
     except (OSError, ValueError, KeyError, ET.ParseError) as exc:
         parser.exit(1, f'NSB-3 Toolkit preparation: FAIL: {exc}\n')
     print('Prepared explicit external Phase-2+ card; no handset/card storage edits')

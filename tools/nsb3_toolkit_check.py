@@ -15,29 +15,41 @@ from tools.nsb3_puk_check import check_link
 from tools.nsb3_nominal_input import IMAGE_SHA256
 from tools.nsk1_phonebook_roundtrip import frame_check
 from tools.sim_security_trace_check import statuses
+from tools.nsb3_toolkit_prepare import profile_metadata
 
 DISPLAY = bytes.fromhex('d0148103012180820281028d0904') + b'DCT3 SAT'
 RESPONSE = bytes.fromhex('810301218002028281030100')
+INKEY = bytes.fromhex('d0138103022200820281828d0804') + b'Press 5'
+INPUT = bytes.fromhex('d0188103032300820281828d0904') + b'Enter 42' + bytes.fromhex('91020102')
+INKEY_RESPONSE = bytes.fromhex('8103022200020282810301000d020435')
+INPUT_RESPONSE = bytes.fromhex('8103032300020282810301000d03043432')
 
 
-def check_trace(text):
+def check_trace(text, interactive=False):
     check_pin(text, True)
     if 'nsb3_board_reset_request:' in text or 'LUA ERROR' in text or 'Error in' in text:
         raise ValueError('reset or failed observer')
     commands = wire(text)
     toolkit = [row[:5] for row in commands if row[0] in (0x10, 0x12, 0x14, 0xc2)]
-    if toolkit != [(0x10, 0, 0, 5, bytes.fromhex('0b41977700')),
-                   (0x12, 0, 0, 22, b''), (0x14, 0, 0, 12, RESPONSE)]:
+    expected = [(0x10, 0, 0, 5, bytes.fromhex('0b41977700')),
+                (0x12, 0, 0, 22, b''), (0x14, 0, 0, 12, RESPONSE)]
+    if interactive:
+        expected += [(0x12, 0, 0, 21, b''), (0x14, 0, 0, 16, INKEY_RESPONSE),
+                     (0x12, 0, 0, 26, b''), (0x14, 0, 0, 17, INPUT_RESPONSE)]
+    if toolkit != expected:
         raise ValueError('own Toolkit APDU sequence or result differs')
     if any(row[0] in (4, 0x44, 0xdc, 0xd6, 0x24, 0x26, 0x28, 0x2c, 0x32) for row in commands):
         raise ValueError('unrelated card mutation')
-    if statuses(text, 0x10) != [(0x9000, 3, 10)] or statuses(text, 0x14) != [(0x9000, 3, 10)]:
+    results = [(0x9115, 3, 10), (0x911a, 3, 10), (0x9000, 3, 10)] if interactive else [(0x9000, 3, 10)]
+    if statuses(text, 0x10) != [(0x9000, 3, 10)] or statuses(text, 0x14) != results:
         raise ValueError('Toolkit command completion status differs')
     if text.count('SIM completion ins=f2 sw=9116') != 1:
         raise ValueError('missing unique proactive-pending STATUS')
     rx = bytes.fromhex(''.join(re.findall(r'nsb3_sim_wire: direction=RX data=([0-9a-f]{2}) ', text)))
     if rx.count(DISPLAY + b'\x90\x00') != 1:
         raise ValueError('missing exact card-originated proactive payload')
+    if interactive and any(rx.count(payload + b'\x90\x00') != 1 for payload in (INKEY, INPUT)):
+        raise ValueError('missing exact card input command payload')
     contacts = re.findall(r'nsb3_toolkit_physical: action=dismiss down=([01]) t=([0-9.]+)', text)
     if contacts != [('1', '68.000000000'), ('0', '68.150000000')]:
         raise ValueError('physical dismissal differs')
@@ -46,32 +58,48 @@ def check_trace(text):
     before = text.split('nsb3_toolkit_physical: action=dismiss down=1', 1)[0]
     if any(row[0] == 0x14 for row in wire(before)):
         raise ValueError('terminal response preceded physical dismissal')
+    actions = ('inkey_5', 'inkey_confirm', 'input_4', 'input_2', 'input_confirm') if interactive else ()
+    observed = re.findall(r'nsb3_toolkit_input: action=(\w+) down=([01])', text)
+    if observed != [(action, down) for action in actions for down in ('1', '0')]:
+        raise ValueError('physical Toolkit input sequence differs')
+    if interactive:
+        for action, prior_responses in (('inkey_5', 1), ('input_confirm', 2)):
+            prefix = text.split(f'nsb3_toolkit_input: action={action} down=1', 1)[0]
+            if sum(row[0] == 0x14 for row in wire(prefix)) != prior_responses:
+                raise ValueError('input result preceded physical entry/confirmation')
 
 
-def check(source, run):
+def check(source, run, interactive=False):
     check_link(source, run)
     metadata = json.loads((run / 'cold_source.json').read_text())
-    if metadata.get('external_toolkit_card') != dict(profile=1,
-            description='Phase 2+ with one DISPLAY TEXT command',
-            handset_storage_changed=False, persistent_card_changed=False):
+    if metadata.get('external_toolkit_card') != profile_metadata(3 if interactive else 1):
         raise ValueError('external Toolkit profile provenance differs')
     storage = run / 'nvram/nsb3r4t'
     if hashlib.sha256((storage / 'flash').read_bytes()).hexdigest() != IMAGE_SHA256:
         raise ValueError('own executable changed')
     if (run / 'initial_sim_card.bin').read_bytes() != make_current_profile(True) or (storage / 'sim_card').read_bytes() != make_current_profile(True):
         raise ValueError('complete card changed')
-    check_trace((run / 'error.log').read_text())
+    check_trace((run / 'error.log').read_text(), interactive)
     frame_check(run / 'snap/nsb3_toolkit_display.png', '0b61ca941a012e9feffe2d13b834c720031b71295220fc32139decd034172b2c')
-    frame_check(run / 'snap/nsb3_toolkit_dismissed.png', 'b2bde13413750ea3a6442a8a4d6c90362d4e8b16cde72bbf2f981a00089cecd0')
+    if not interactive:
+        frame_check(run / 'snap/nsb3_toolkit_dismissed.png', 'b2bde13413750ea3a6442a8a4d6c90362d4e8b16cde72bbf2f981a00089cecd0')
+    else:
+        for name, expected in (
+                ('inkey', 'e94ea9d879033d48822bb76a8f080f95e12456c3b897a1717be10fb4ddbbb77f'),
+                ('input', '2b1546243a290d99ea42d5e70e173315b3d620903595782d2dc5f6fec483836c'),
+                ('input_filled', '169b9f1bb144e9cd4e061a74980b1479956c9431c17482149b7701300b6e83b0'),
+                ('interactive_final', 'b2bde13413750ea3a6442a8a4d6c90362d4e8b16cde72bbf2f981a00089cecd0')):
+            frame_check(run / f'snap/nsb3_toolkit_{name}.png', expected)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source', type=Path)
     parser.add_argument('run', type=Path)
+    parser.add_argument('--interactive', action='store_true')
     args = parser.parse_args()
     try:
-        check(args.source, args.run)
+        check(args.source, args.run, args.interactive)
     except (OSError, ValueError, KeyError) as exc:
         parser.exit(1, f'NSB-3 Toolkit: FAIL: {exc}\n')
     print('PASS: own physical DISPLAY TEXT lifecycle; native registration unproved')

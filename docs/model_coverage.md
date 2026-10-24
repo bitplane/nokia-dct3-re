@@ -47,7 +47,8 @@ and cold-retrieves that record without changing the retry count or card.
 Physical offline SMS composition/save, cold Outbox read, confirmed deletion
 and a second cold empty-Outbox check also pass through the laboratory SIM.
 A Phase-2+ external card separately proves the own five-byte TERMINAL PROFILE,
-organic STATUS/FETCH, displayed DCT3 SAT text and successful physical dismissal
+organic STATUS/FETCH, displayed DCT3 SAT text and successful physical dismissal.
+A separate interactive profile returns physical GET INKEY 5 and GET INPUT 42,
 with the complete persistent card unchanged. Other Toolkit commands remain open.
 Physical SIM-security gates cover PIN-request Off/On, PIN1/PIN2 changes and
 cold restoration, retry persistence, physical PIN exhaustion, wrong-PUK

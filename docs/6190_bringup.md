@@ -11,7 +11,8 @@ then support physical security entry, clean Messages/Names menus, SIM contact
 save/read/edit/delete with cold persistence, offline SMS draft save/read/delete,
 and the PIN/PUK change/retry/exhaustion lifecycles qualified below. No donor
 identity/calibration is imported. A configured Phase-2+ lab card additionally
-completes organic TERMINAL PROFILE/FETCH/DISPLAY TEXT and physical dismissal.
+completes organic TERMINAL PROFILE/FETCH/DISPLAY TEXT, GET INKEY and GET INPUT
+through physical dismissal/key/text entry.
 Ordinary idle content and automatic notice
 clearing remain unresolved; explicit rejection dismissal restores clean menus.
 An independent long-run control resets near 94 seconds
@@ -1327,5 +1328,25 @@ extended FDN card. Preparation records the external profile separately from
 the unchanged cold storage link. The gate requires own image, complete card,
 PIN/phone authentication, exact Toolkit APDUs and received payload, `91xx`,
 physical-before-response ordering and reviewed text/returned-menu pixels.
-Other proactive commands, Toolkit persistence, native registration and speech
-remain independent unqualified contracts for this model.
+GET INKEY and GET INPUT are additionally qualified below. Other proactive
+commands, Toolkit persistence, native registration and speech remain independent
+unqualified contracts for this model.
+
+#### Interactive card input
+
+Preparation with `--interactive` selects external profile 3, leaving the same
+persistent card and handset storage unchanged. After DISPLAY TEXT dismissal,
+the card returns `91 15` and firmware FETCHes GET INKEY. Physical 5/OK returns
+`8103022200020282810301000d020435`. The next `91 1a` leads to GET INPUT;
+physical 4/2 fills the firmware's `Enter 42` editor, and OK returns
+`8103032300020282810301000d03043432`. The final status is `9000` and clean
+Messages returns. Each response identifies its own fetched command; no input
+text or completion is supplied except through physical key fields.
+
+Run `nsb3_toolkit_interactive.lua` for 82 seconds from the separately prepared
+profile-3 cold input. Add `--interactive` to `nsb3_toolkit_check.py SOURCE RUN`.
+The shared gate requires all three exact command/response payloads and statuses,
+complete unchanged card, authentication, physical-before-response ordering and
+reviewed DISPLAY TEXT/INKEY/input/filled-42/returned-menu pixels. The original
+single-command gate remains a separate regression. No network service follows
+from either result.

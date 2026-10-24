@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsb3_toolkit_check import check_trace, DISPLAY, RESPONSE
+from tools.nsb3_toolkit_check import check_trace, DISPLAY, RESPONSE, INKEY, INPUT, INKEY_RESPONSE, INPUT_RESPONSE
 from tools.test_nsb3_pin_request_check import trace
 
 
@@ -42,6 +42,28 @@ class Nsb3ToolkitTest(unittest.TestCase):
     def test_automatic_response_is_not_physical_completion(self):
         text = toolkit_trace().replace('\nnsb3_toolkit_physical: action=dismiss down=1 t=68.000000000', '')
         text += '\nnsb3_toolkit_physical: action=dismiss down=1 t=68.000000000'
+        with self.assertRaises(ValueError):
+            check_trace(text)
+
+    def test_interactive_commands_require_exact_values_and_physical_order(self):
+        text = toolkit_trace().replace('SIM status ins=14 sw=9000', 'SIM status ins=14 sw=9115')
+        text += wire_bytes('TX', bytes.fromhex('a012000015')) + wire_bytes('RX', INKEY + b'\x90\x00')
+        def action(name):
+            return '\n' + '\n'.join(f'nsb3_toolkit_input: action={name} down={state}' for state in (1, 0))
+        text += action('inkey_5') + action('inkey_confirm')
+        text += wire_bytes('TX', bytes.fromhex('a014000010') + INKEY_RESPONSE)
+        text += '\nSIM status ins=14 sw=911a chv=3/3 puk=10/10 enabled=1'
+        text += wire_bytes('TX', bytes.fromhex('a01200001a')) + wire_bytes('RX', INPUT + b'\x90\x00')
+        text += action('input_4') + action('input_2') + action('input_confirm')
+        text += wire_bytes('TX', bytes.fromhex('a014000011') + INPUT_RESPONSE)
+        text += '\nSIM status ins=14 sw=9000 chv=3/3 puk=10/10 enabled=1'
+        check_trace(text, interactive=True)
+        for bad in (text.replace('data=35 ', 'data=36 ', 1),
+                    text.replace('action=input_2', 'action=input_3'),
+                    text.replace('sw=911a', 'sw=9000'),
+                    text.replace('action=input_confirm down=1', 'action=missing down=1')):
+            with self.assertRaises(ValueError):
+                check_trace(bad, interactive=True)
         with self.assertRaises(ValueError):
             check_trace(text)
 
