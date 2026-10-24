@@ -141,3 +141,46 @@ At five seconds the idle latch is `01`, companion `00`, global control `05`,
 FIQ/IRQ pending both zero, masks `e3/de`. Early catalogue breakpoints did not
 fire in this autoboot observation window, so they do not establish absence
 of earlier activity; the exact installed payload is the stronger evidence.
+
+## Explicit native ROM4 compatibility input
+
+`nsb3r4t` replaces only the DSP HLE backend with the acquired NSE-1 ROM4
+program/data inputs at a declared 52 MHz research cadence. It retains own
+NSB-3 executable, erased EEPROM, full-scale default ADC2 and empty SIM socket.
+This is not a relabelled NSB-3 mask, verified clock or native RF/voice claim.
+The ordinary `noki6190` remains unchanged. Mask filenames and hashes retain
+their NSE-1 provenance in the ROM declarations and `roms/README.md`.
+
+The first run exposed a real compatibility-configuration defect: the default
+program overlay ended at `2800`, while own catalogue-4 entry 1 (descriptor
+`2bd53c`, payload `2bd548`, destination `25b4`) installs through `2b2a`.
+A passive program write tap observes exactly 811 writes at `2800..2b2a`.
+Before widening the overlay, 800 of those words read as resident ROM instead
+of their uploaded values. This profile now admits overlay through `2fff`;
+the extent is a research geometry, not physical SRAM identification.
+All 811 words then match own source bytes beginning at `2bd9e0` exactly.
+
+`tools/nsb3_native_upload_observe.lua` captures that upload window during a
+fresh two-second `nsb3r4t` run. A separate fresh six-second run with the
+startup observer captures native state and the panel. Check both with:
+
+```sh
+.venv/bin/python tools/nsb3_native_check.py roms/noki6190/6190f613a.fls tmp/nsb3-native-upload-fixed tmp/nsb3-native-fixed-graphical
+```
+
+Optional `--negative-upload tmp/nsb3-native-upload/nsb3_program_2800.bin`
+checks the retained pre-fix 800-word mismatch, not merely a passing source
+convention. The accepted run observes DSP PC `408d`, `ILLEGAL=0`, `IDLE=1`
+at five seconds and a terminal interface summary with 1313 completion strobes,
+76 mailbox writes, 1272 slot expiries and 1296 frame expiries. These are
+bounded execution/liveness observations, not RF acquisition or speech proof.
+
+The five-second frame is entirely white (RGB SHA256
+`5fdab89cdada4b6ac821d32facb589dfb541e9856fe3b569e8da49646fc3d249`),
+not standby. Own flash remains unchanged; the independently initialized
+8 KiB EEPROM SHA256 is
+`53584321c1f9e317e59cf67401fb5a28aa84fc4db32c67d264731825aa194d19`,
+33 bytes different from the silent-peer cold control. No edited provision or
+identity is imported. Next decode own acquisition/self-test gates under the
+full-scale ADC input; do not infer an analogue fix from another product's
+successful nominal-value experiment.

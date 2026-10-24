@@ -5,6 +5,11 @@ Two initially erased EEPROM runs reproduce exact own initialization and idle
 samples (`tools/nsb3_boot_check.py`), not graphical/input or DSP completion.
 Its own peripheral and dual-catalogue contracts are in `6190_bringup.md`;
 no donor identity or fitted-mask compatibility is assumed.
+Separate `nsb3r4t` explicitly uses acquired NSE-1 ROM4 as an unproved
+compatibility input. It retains all 811 own uploaded words above `27ff` and
+executes legally through the bounded native mailbox/frame test, ending on a
+white panel with default full-scale ADC2. This is not interactive or native
+RF/voice support; see `tools/nsb3_native_check.py` and `6190_bringup.md`.
 
 Nokia 8855 / NSM-4 v5.18 has a fail-closed `noki8855` MCU research profile.
 Two own erased-storage boots produce identical catalogue/storage state and

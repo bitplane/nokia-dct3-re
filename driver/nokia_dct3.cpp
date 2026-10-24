@@ -1402,6 +1402,7 @@ public:
 	void nse2r4v(machine_config &config);
 	void noki5190(machine_config &config);
 	void noki6190(machine_config &config);
+	void nsb3r4t(machine_config &config);
 	void nsb1r4t(machine_config &config);
 	void nsk1r4t(machine_config &config);
 	void noki6130(machine_config &config);
@@ -4415,6 +4416,19 @@ void nokia_dct3_state::noki6190(machine_config &config)
 	apply_product_config(PRODUCT_6190);
 }
 
+void nokia_dct3_state::nsb3r4t(machine_config &config)
+{
+	noki6190(config);
+	// Explicit acquired NSE-1 mask input, not a fitted NSB-3 identity claim.
+	// Keep own firmware, erased storage, ADC configuration and empty SIM tray.
+	config.device_remove("dsp_hle");
+	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	// Own catalogue-4 payload at 2bd548 installs through program word 2b2a.
+	// The observed 811 writes above 27ff must not disappear into mask ROM.
+	m_dsp_c54x->set_overlay_end(0x3000);
+	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
+}
+
 void nokia_dct3_state::nse2r4t(machine_config &config)
 {
 	noki5110i(config);
@@ -4905,6 +4919,22 @@ ROM_START( noki6190 )
 			CRC(476d7f42) SHA1(a17d00b8a1d1468c196fe34ba70c14d9e86a3dfd))
 	ROM_REGION(0x2000, "eeprom", ROMREGION_ERASEFF)
 	ROM_LOAD("nsb3_eeprom.bin", 0, 0x2000, NO_DUMP)
+ROM_END
+
+ROM_START( nsb3r4t )
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
+	ROM_LOAD("nsb3_boot.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x100000, "flash", ROMREGION_ERASEFF)
+	ROM_LOAD("6190f613a.fls", 0, 0x100000,
+			CRC(476d7f42) SHA1(a17d00b8a1d1468c196fe34ba70c14d9e86a3dfd))
+	ROM_REGION(0x2000, "eeprom", ROMREGION_ERASEFF)
+	ROM_LOAD("nsb3_eeprom.bin", 0, 0x2000, NO_DUMP)
+	ROM_REGION16_BE(0x20000, "dsp_program", ROMREGION_ERASE00)
+	ROM_LOAD("nse1_rom4_dsp_program.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739))
+	ROM_REGION16_BE(0x20000, "dsp_data", ROMREGION_ERASE00)
+	ROM_LOAD("nse1_rom4_dsp_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))
 ROM_END
 
 ROM_START( nsb1r4t )
@@ -5550,6 +5580,7 @@ SYST( 2001, nse2r4t, noki5110i, 0, nse2r4t, noki5110, nokia_dct3_state, empty_in
 SYST( 2001, nse2r4v, noki5110i, 0, nse2r4v, nse2r4v, nokia_dct3_state, empty_init, "Research", "NSE-2 ROM4 nominal VBATT experiment (unmeasured board)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki5190, 0, 0, noki5190, noki5110, nokia_dct3_state, empty_init, "Nokia", "5190 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki6190, 0, 0, noki6190, noki5210, nokia_dct3_state, empty_init, "Nokia", "6190 MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nsb3r4t, noki6190, 0, nsb3r4t, noki5210, nokia_dct3_state, empty_init, "Research", "NSB-3 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsb1r4t, noki5190, 0, nsb1r4t, nsb1r4t, nokia_dct3_state, empty_init, "Research", "NSB-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsk1r4t, 0, 0, nsk1r4t, nsk1r4t, nokia_dct3_state, empty_init, "Research", "NSK-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki6130, 0, 0, noki6130, noki5110, nokia_dct3_state, empty_init, "Nokia", "6130 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

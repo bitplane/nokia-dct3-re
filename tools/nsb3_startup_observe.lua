@@ -18,6 +18,11 @@ local samples = coroutine.create(function()
     local stream = assert(io.open('nsb3_uploaded_program.bin', 'wb'))
     for offset = 0, 185 do stream:write(string.pack('>I2', memory:read_u16(0x10e00 + offset * 2))) end
     stream:close()
+    local dsp = machine.devices[':dsp_c54x:cpu']
+    if dsp then
+        machine:logerror(string.format('nsb3_native_state: pc=%04x illegal=%d idle=%d observer_writes=0\n',
+            dsp.state['PC'].value, dsp.state['ILLEGAL'].value, dsp.state['IDLE'].value))
+    end
     machine.screens[':screen']:snapshot('nsb3_startup_5s.png')
 end)
 assert(coroutine.resume(samples))
