@@ -8,7 +8,7 @@ inputs. With one nominal ADC2 hypothesis and six integrity-only corrections
 to its own firmware-created EEPROM, it reproducibly reaches `Insert SIM card`.
 An explicit laboratory card and separately initialized phone-code retry record
 then support physical security entry, clean Messages/Names menus, SIM contact
-save/read/delete with cold persistence, offline SMS draft save/read/delete,
+save/read/edit/delete with cold persistence, offline SMS draft save/read/delete,
 and the PIN/PUK change/retry/exhaustion lifecycles qualified below. No donor
 identity/calibration is imported. Ordinary idle content and notice clearing
 remain unresolved. An independent long-run control resets near 94 seconds
@@ -381,7 +381,29 @@ then `nsb3_phonebook_erase_check.py prepare-empty ERASE COLD_EMPTY` and run
 source hashes/initial card snapshots, exact physical contacts, read/write
 APDU/status contrasts, complete cards and erase/empty-search pixel oracles.
 No contact bytes, firmware context or cached result are supplied by Lua.
-Editing and handset-memory contacts remain distinct unqualified contracts.
+Editing is qualified below; handset-memory contacts remain distinct and unqualified.
+
+### Physical contact edit and cold Details
+
+The retained `A/12345` contact's physical Options/Edit action opens Name.
+Short C removes `A`; keypad 3 enters `D`. After confirming the name, short
+C removes the number's final digit and keypad 6 replaces it. Confirming the
+number opens a separate **Save / Save new** menu; a further physical Select
+is required to write the original record. Merely entering that menu issues
+no UPDATE and is not a successful save.
+
+The explicit Save sends one successful EF_ADN record-1 UPDATE containing
+`D/12346`, with only record offsets 0 and 22 changed relative to `A/12345`.
+Every other card byte is preserved. An independently launched cold process
+physically opens Search/Details and renders `D`, then `Number: 12346`, with
+READ RECORD and no UPDATE. It leaves the entire persisted card unchanged.
+
+Run `nsb3_phonebook_edit.lua` for 77 seconds from the qualified original
+contact input. `nsb3_phonebook_edit_check.py prepare-cold EDIT COLD` accepts
+only the exact edited card. Run `nsb3_phonebook_reload.lua` for 50 seconds,
+then `check SOURCE EDIT COLD` requires own executable, linked source storage,
+exact physical contacts/APDUs/statuses, complete cards and Saved/name/number
+pixel oracles. No contact data, firmware state or cached result is injected.
 
 ## Native radio-boundary inventory
 

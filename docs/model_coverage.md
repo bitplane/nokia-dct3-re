@@ -20,8 +20,10 @@ issues one EF_ADN update; an independent cold process retrieves the name and
 number without rewriting or changing the complete card. The boundary is checked
 by `tools/nsb3_menu_check.py` and `tools/nsb3_phonebook_check.py`.
 Physical Options/Erase additionally emits one erased ADN record; independent
-cold Search displays No phone numbers without card mutation. Editing and
-handset-memory contacts remain unqualified.
+cold Search displays No phone numbers without card mutation. Physical Edit
+and explicit Save also change both name and number to D/12346; independent
+cold Details retrieves both fields without card writes. Handset-memory
+contacts remain unqualified.
 Physical offline SMS composition/save, cold Outbox read, confirmed deletion
 and a second cold empty-Outbox check also pass through the laboratory SIM.
 Physical SIM-security gates cover PIN-request Off/On, PIN1/PIN2 changes and
