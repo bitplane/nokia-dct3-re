@@ -2152,6 +2152,23 @@ than treating later screens as PUK2 editors. Capture:
 own-upload/HLE and predecessor-storage checks apply throughout. FDN,
 native DSP/RF and speech remain separate contracts.
 
+`.venv/bin/python tools/run_noki8850_fdn.py RUN_DIR` independently qualifies
+the physical FDN validity cycle on a declared laboratory card with ten empty
+FDN records and initially valid ADN. Four isolated processes perform On,
+cold On inspection, Off and cold Off inspection. Physical PIN2=5678 is
+required only for toggles; every boot still authenticates PIN1 and registers.
+On sends INVALIDATE EF_ADN (`6f3a`); Off sends REHABILITATE EF_ADN. The own
+firmware additionally rehabilitates identity files `6f7e`/`6f07` on On,
+cold On and Off, but no validity command is expected on cold Off. All ten
+FDN records are read on each boot. Complete card equality permits only the
+expected ADN-validity flag and laboratory location state; credentials,
+allowances and every FDN record remain unchanged. No credential changes or
+UPDATE RECORD are allowed. Own upload/HLE, complete predecessor NVRAM
+inheritance, immutability, physical contacts, exact current/selected/PIN2/
+result frames and the stable Messages title remain required. Capture:
+`tmp/nsm2-fdn-validity-final`. This qualifies cold On/Off persistence, not
+FDN record editing, listed/unlisted dial permission, native DSP/RF or speech.
+
 The same isolated runner accepts `--scenario host-incoming-call`. It verifies
 physical answer/end input, the complete host-originated CC/RR exchange,
 traffic-channel assignment and release, and reviewed ringing/returned-idle

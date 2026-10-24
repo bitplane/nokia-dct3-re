@@ -30,6 +30,14 @@ def storage_hashes(directory):
             for path in sorted(directory.rglob('*')) if path.is_file()}
 
 
+def mame_command(root,script,seconds):
+    return [str(root/'mame/mame'),'nsm2hle','-rompath',str(root/'roms'),
+        '-nvram_directory','nvram','-cfg_directory','cfg','-snapshot_directory','snap',
+        '-noreadconfig','-debug','-debugger','none','-verbose','-log','-video','none',
+        '-sound','none','-nothrottle','-autoboot_delay','0',
+        '-autoboot_script',str(root/f'tools/noki8850_{script}.lua'),'-seconds_to_run',str(seconds)]
+
+
 def check_wrong_frame(path):
     from PIL import Image
     with Image.open(path) as image:
@@ -246,12 +254,7 @@ def main():
                 card.write_bytes(make_profile(True))
             initial=card.read_bytes()
             (phase/'initial_sim_card.bin').write_bytes(initial)
-            command=[str(root/'mame/mame'),'nsm2hle','-rompath',str(root/'roms'),
-                '-nvram_directory','nvram','-cfg_directory','cfg','-snapshot_directory','snap',
-                '-noreadconfig','-debug','-debugger','none','-verbose','-log',
-                '-video','none','-sound','none','-nothrottle','-autoboot_delay','0',
-                '-autoboot_script',str(root/f'tools/noki8850_{script}.lua'),
-                '-seconds_to_run',str(seconds)]
+            command=mame_command(root,script,seconds)
             launch={'invocation_id':str(uuid.uuid4()),'command':command,
                 'initial_storage':storage_hashes(phase/'nvram'),
                 'initial_card_sha256':hashlib.sha256(initial).hexdigest(),

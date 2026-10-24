@@ -135,7 +135,11 @@ replacement-credential use. The independently executed
 `--puk2 --exhaust-puk2` chain qualifies all ten physical PUK2 rejections and
 cold permanent PIN2-code refusal while PIN1 and registration remain valid.
 The final rejected-entry/digit/End/Menu control preserves the entire card
-and sends no PIN2 credential APDU or call/SMS transaction. FDN is not promoted.
+and sends no PIN2 credential APDU or call/SMS transaction. The independent
+four-process `run_noki8850_fdn.py` qualifies physical PIN2-protected On/Off,
+cold selected-state persistence, exact ADN-validity exchanges and unchanged
+empty FDN records, with complete-card and own boot/UI/registration checks.
+FDN record editing and listed/unlisted dial permission are not promoted.
 
 NPE-3 additionally has an independent handset-bank A/123 save/cold-read
 fixture with an empty-bank negative control and unchanged complete SIM files;

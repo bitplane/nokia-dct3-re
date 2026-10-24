@@ -15,7 +15,7 @@ if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from tools.make_sim_card_profile import make_profile
 from tools.run_noki8xxx_supplementary import PROFILES,verify_inputs
-from tools.run_noki8850_pin_retry_cold import storage_hashes,check_messages_menu,check_wrong_frame
+from tools.run_noki8850_pin_retry_cold import storage_hashes,check_messages_menu,check_wrong_frame,mame_command
 from tools.run_noki8850_pin_registration import check_pin_inputs
 from tools.noki8850_staged_trace_check import check_trace
 from tools.radio_registration_trace_check import verify as registration
@@ -186,11 +186,7 @@ def main():
                 raise ValueError('8850 cold PIN2 phase did not inherit complete predecessor NVRAM')
             initial=card.read_bytes()
             (phase/'initial_sim_card.bin').write_bytes(initial)
-            command=[str(root/'mame/mame'),'nsm2hle','-rompath',str(root/'roms'),
-                '-nvram_directory','nvram','-cfg_directory','cfg','-snapshot_directory','snap',
-                '-noreadconfig','-debug','-debugger','none','-verbose','-log','-video','none',
-                '-sound','none','-nothrottle','-autoboot_delay','0',
-                '-autoboot_script',str(root/f'tools/noki8850_{script}.lua'),'-seconds_to_run','74' if kind in ('puk2','wrong-puk2','permanent') else '69']
+            command=mame_command(root,script,74 if kind in ('puk2','wrong-puk2','permanent') else 69)
             launch={'invocation_id':str(uuid.uuid4()),'command':command,
                 'initial_storage':storage_hashes(phase/'nvram'),'mcu_sha1':profile[2],'pmm_sha1':profile[4],
                 'mame_sha256':hashlib.sha256((root/'mame/mame').read_bytes()).hexdigest(),
