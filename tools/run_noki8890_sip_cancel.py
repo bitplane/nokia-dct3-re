@@ -103,13 +103,23 @@ def check_alerting_restoration(text, outgoing=False, connected=False):
         raise ValueError('missing post-load physical Exit')
 
 
-def check_connected_restoration_radio(text, *, outgoing):
+def check_connected_restoration_radio(text, *, outgoing, pcs1900=False):
+    from tools.noki8890_registration_check import verify as verify_registration
+    before_save, marker, _ = text.partition('sip_state: saved')
+    if not marker:
+        raise ValueError('connected restoration lacks save boundary')
+    verify_registration(before_save, pcs1900=pcs1900, configured_gsm900=not pcs1900)
+    for pattern in (r'gsm_call_adapter: media direction=uplink id=1 sequence=\d+ good=1\b',
+                    r'gsm_call_adapter: media direction=downlink id=1 sequence=\d+ result=accepted\b'):
+        if not re.search(pattern, before_save):
+            raise ValueError('connected restoration lacks bidirectional media before save')
+    carrier = '0258' if pcs1900 else '003c'
     require_ordered(text, (
-        ('own carrier-60 traffic', r'TX packet type=02 payload=20 .*data=041202000271012fc100003c0000000400000000'),
+        ('own traffic carrier', rf'TX packet type=02 payload=20 .*data=041202000271012fc100{carrier}0000000400000000'),
         ('connected before save', r'gsm_call_adapter: ' + ('' if outgoing else 'incoming ') +
          r'state id=1 epoch=1 phase=connected'),
         ('handset restored', r'sip_state: restored'),
-        ('own carrier-60 release', r'TX packet type=02 payload=20 .*data=041202001117001a6000003c0000001400000001'),
+        ('own release carrier', rf'TX packet type=02 payload=20 .*data=041202001117001a6000{carrier}0000001400000001'),
         ('release confirmation', RELEASE_CONFIRMATION),
         ('resumed paging', IDLE_PCH),
     ), 'NSB-6 connected restoration')
@@ -145,13 +155,14 @@ def main():
                           help='physically answer, restore and clear an incoming HLE SIP dialog')
     parser.add_argument('--record-media', action='store_true')
     parser.add_argument('--pcs1900', action='store_true',
-                        help='independent PCS incoming/outgoing media acceptance, not restoration')
+                        help='independent PCS ordinary or connected-restoration media acceptance')
     parser.add_argument('--sound', choices=('none', 'pulse'), default='none')
     parser.add_argument('--http-port', type=int, default=18889)
     parser.add_argument('--sip-port', type=int, default=25889)
     args = parser.parse_args()
-    if args.pcs1900 and not (args.outgoing_connected_signaling or args.incoming_connected_signaling):
-        parser.error('--pcs1900 requires an ordinary incoming/outgoing media fixture')
+    if args.pcs1900 and not (args.outgoing_connected_signaling or args.incoming_connected_signaling or
+                            args.restore_outgoing_connected_signaling or args.restore_incoming_connected_signaling):
+        parser.error('--pcs1900 requires ordinary or connected-restoration media')
     outgoing_failure = args.outgoing_busy or args.outgoing_unavailable
     outgoing_run = outgoing_failure or args.restore_outgoing_pending or args.outgoing_connected_signaling or args.restore_outgoing_connected_signaling
     if args.restore_idle and (outgoing_run or args.incoming_connected_signaling or args.restore_incoming_connected_signaling or args.restore_incoming_alerting):
@@ -221,7 +232,8 @@ def main():
                 check_alerting_restoration((run / 'error.log').read_text(errors='replace'), outgoing=True,
                                           connected=args.restore_outgoing_connected_signaling)
             if args.restore_outgoing_connected_signaling:
-                check_connected_restoration_radio((run / 'error.log').read_text(errors='replace'), outgoing=True)
+                check_connected_restoration_radio((run / 'error.log').read_text(errors='replace'),
+                                                  outgoing=True, pcs1900=args.pcs1900)
         elif args.incoming_connected_signaling or args.restore_incoming_connected_signaling:
             text = (run / 'error.log').read_text(errors='replace')
             check_output(text)
@@ -229,7 +241,7 @@ def main():
             verify_stage(text, runtime=True, selftest=True)
             if args.restore_incoming_connected_signaling:
                 check_alerting_restoration(text, connected=True)
-                check_connected_restoration_radio(text, outgoing=False)
+                check_connected_restoration_radio(text, outgoing=False, pcs1900=args.pcs1900)
                 if len(host_setup_pattern('5551234').findall(text)) != 1:
                     raise ValueError('connected restoration lacks one own caller SETUP')
             else:

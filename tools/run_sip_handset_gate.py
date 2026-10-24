@@ -752,8 +752,8 @@ def main():
     args = parser.parse_args()
     if args.pcs1900 and (args.product != '8890' or args.signaling_only or
                         args.sip_response != 200 or args.restore_idle or
-                        args.restore_call or args.restore_outgoing or args.cancel_incoming):
-        parser.error('--pcs1900 requires ordinary 8890 connected media without restoration/cancel')
+                        (args.restore_call and args.restore_phase != 'connected') or args.cancel_incoming):
+        parser.error('--pcs1900 requires 8890 connected media; no pending/alerting/cancel fixture')
     if args.dcs1800 and args.product != '8210':
         parser.error('--dcs1800 is qualified only for product 8210')
     signaling_connected = (args.signaling_only and args.product == '6210' and

@@ -1450,8 +1450,11 @@ physical call controls, exact documented PCM accounting, bidirectional local
 SIP media and product-owned UI/storage recovery. Separate
 `verify-8890-pcs-sip-{outgoing,incoming}-waveform` gates prove sustained
 physical microphone/earpiece tones and require matching PCS media acceptance.
-Neither inherits GSM900 external-dialog restoration qualification; see the
-authoritative NSB-6 audio contract in `8xxx_bringup.md`.
+Connected PCS restoration is independently qualified by
+`verify-8890-pcs-sip-{outgoing,incoming}-connected-restore`: own registration
+and bidirectional media precede saving, and restoration clears the external
+dialog rather than replaying it. Pending/ringing PCS restoration is not
+inherited from GSM900. See the NSB-6 contract in `8xxx_bringup.md`.
 
 ### Failed calls and automatic redial
 

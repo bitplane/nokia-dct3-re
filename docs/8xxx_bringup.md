@@ -673,9 +673,9 @@ endpoint, and physical Send/Answer/End. Acceptance requires the own PCS scan,
 ARFCN600 registration, CC/RR closure, persistent EF_LOCI, reviewed idle
 recovery, at least100 media/host-PCM frames in both directions and unchanged
 512000/8000Hz,64-clock/47-idle-clock accounting. Outgoing reports361 uplink
-and346 downlink frames; incoming396/376. The runner's `--pcs1900` is restricted
-to ordinary media calls; it cannot silently select GSM900 checks, restoration
-or signaling-only acceptance. No device configuration or codec gain changed.
+and346 downlink frames; incoming396/376. The runner's `--pcs1900` selects
+own-band checks for ordinary media or connected restoration; pending/ringing
+restoration and signaling-only combinations reject. No device configuration or codec gain changed.
 These are clocked HLE transport tests, not native DSP speech, measured RF,
 PCS physical-waveform qualification or PCS external-dialog restoration.
 
@@ -691,7 +691,25 @@ matching incoming/outgoing scenario and passing SIP result before marking
 the recording as PCS. Wrong-band/direction and failed-media controls reject.
 Captures live at `tmp/nsb6-pcs-{outgoing,incoming}-waveform/handset`.
 This is HLE endpoint audio, not native speech, measured analog gain or
-qualification of PCS external-dialog restoration.
+qualification of PCS external-dialog restoration by the waveform test itself.
+
+PCS connected restoration independently passes
+`verify-8890-pcs-sip-outgoing-connected-restore` and
+`verify-8890-pcs-sip-incoming-connected-restore`. The snapshot observes exact
+R15/R13, the modeled MCU RAM checksum and emulated time at32s outgoing or52s
+incoming; it does not enumerate every banked CPU register. Before saving,
+acceptance requires own ARFCN600 registration, connected state, valid uplink
+and accepted downlink frames, and executed PCM. Old-epoch media inventory
+is positive in all four counters (outgoing35/41 media and32/71 PCM;
+incoming220/213 media and217/226 PCM). Restoring disposes the old dialog
+with SIP BYE and exactly one new-epoch cause41 clear, then requires own
+carrier600 release and reviewed idle recovery without redial/readmission.
+The same pre-save registration/media guards pass retained GSM900 connected
+captures; wrong-carrier, missing/late registration, absent pre-save media
+and altered release controls reject. Captures are
+`tmp/nsb6-pcs-connected-{outgoing,incoming}-restore`.
+This is cleared external state, not seamless SIP resumption or native speech.
+PCS pending outgoing and ringing incoming restoration remain unqualified.
 
 Accepted media captures are `tmp/nsb6-sip-outgoing-media-qualified` and
 `tmp/nsb6-sip-incoming-media-final`. The four restoration captures use

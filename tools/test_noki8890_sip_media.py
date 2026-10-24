@@ -58,16 +58,16 @@ class Nsb6SipMediaTest(unittest.TestCase):
         for incoming in (False, True):
             self.check(incoming, pcs1900=True)
 
-    def test_pcs_cannot_silently_select_restoration_or_other_product(self):
+    def test_pcs_cannot_silently_select_pending_restore_or_other_product(self):
         root = Path(__file__).resolve().parents[1]
-        for flags in (['--product', '8210'], ['--product', '8890', '--restore-outgoing'],
+        for flags in (['--product', '8210'], ['--product', '8890', '--restore-outgoing', '--sip-response', '180'],
                       ['--product', '8890', '--signaling-only']):
             with self.subTest(flags=flags):
                 result = subprocess.run([sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                     '--pjsua', '/nonexistent', '--run-dir', '/nonexistent',
                     '--pcs1900', *flags, '--', '/nonexistent'], capture_output=True, text=True)
                 self.assertEqual(result.returncode, 2)
-                self.assertIn('--pcs1900 requires ordinary 8890', result.stderr)
+                self.assertIn('--pcs1900 requires 8890 connected media', result.stderr)
 
     def test_every_media_direction_and_pcm_counter_is_required(self):
         for field in ('uplink', 'downlink', 'pcm_transmitted', 'pcm_received'):

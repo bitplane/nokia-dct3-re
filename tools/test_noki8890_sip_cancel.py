@@ -14,17 +14,33 @@ class CleanupFramesTest(unittest.TestCase):
         for outgoing in (False, True):
             connected = 'gsm_call_adapter: ' + ('' if outgoing else 'incoming ') + 'state id=1 epoch=1 phase=connected\n'
             text = ('TX packet type=02 payload=20 data=041202000271012fc100003c0000000400000000\n' +
-                    connected + 'sip_state: restored\n'
+                    connected + 'gsm_call_adapter: media direction=uplink id=1 sequence=0 good=1\n'
+                    'gsm_call_adapter: media direction=downlink id=1 sequence=0 result=accepted\n'
+                    'sip_state: saved\nsip_state: restored\n'
                     'TX packet type=02 payload=20 data=041202001117001a6000003c0000001400000001\n'
                     'RX enqueue type=89 payload=8 data=0000000000000000\n'
                     'RX enqueue type=80 payload=34 data=60' + '00' * 9 + '1506210001f0\n')
-            check.check_connected_restoration_radio(text, outgoing=outgoing)
-            for invalid in (text.replace('003c', '0013'),
-                            text.replace('sip_state: restored', ''),
-                            text.replace('phase=connected', 'phase=alerting'),
-                            text.replace('type=89', 'type=88')):
-                with self.subTest(outgoing=outgoing, invalid=invalid), self.assertRaises(ValueError):
-                    check.check_connected_restoration_radio(invalid, outgoing=outgoing)
+            for pcs in (False, True):
+                own = text.replace('003c', '0258') if pcs else text
+                with patch('tools.noki8890_registration_check.verify') as registration:
+                    check.check_connected_restoration_radio(own, outgoing=outgoing, pcs1900=pcs)
+                    registration.assert_called_once_with(own.split('sip_state: saved')[0],
+                        pcs1900=pcs, configured_gsm900=not pcs)
+                    for invalid in (own.replace('0258' if pcs else '003c', '0013'),
+                                    own.replace('sip_state: restored', ''),
+                                    own.replace('sip_state: saved', ''),
+                                    own.replace('direction=uplink', 'direction=missing'),
+                                    own.replace('good=1', 'good=0'),
+                                    own.replace('gsm_call_adapter: media direction=uplink id=1 sequence=0 good=1\n', '') +
+                                        'gsm_call_adapter: media direction=uplink id=1 sequence=0 good=1\n',
+                                    own.replace('result=accepted', 'result=rejected'),
+                                    own.replace('phase=connected', 'phase=alerting'),
+                                    own.replace('type=89', 'type=88')):
+                        with self.subTest(outgoing=outgoing, pcs=pcs, invalid=invalid), self.assertRaises(ValueError):
+                            check.check_connected_restoration_radio(invalid, outgoing=outgoing, pcs1900=pcs)
+                with patch('tools.noki8890_registration_check.verify', side_effect=ValueError('unregistered')):
+                    with self.assertRaisesRegex(ValueError, 'unregistered'):
+                        check.check_connected_restoration_radio(own, outgoing=outgoing, pcs1900=pcs)
 
     def test_alerting_restore_requires_exact_architecture_and_order(self):
         state = 'pc=00412345 sp=00170000 ram=12345678 t=52.000000000'
