@@ -13,3 +13,5 @@ cpu.debug:bpset(0x41a944, nil,
     'logerror "6210_parameter_context_set: value=%02x lr=%08x\\n",r0,r14;g')
 cpu.debug:wpset(cpu.spaces['program'], 'w', 0x16ed5c, 1, nil,
     'logerror "6210_parameter_context_write: pc=%08x data=%08x\\n",pc,wpdata;g')
+_G.npe3_catalogue_parent_observer = true
+dofile(directory .. 'noki6210_upload_catalogue_observe.lua')

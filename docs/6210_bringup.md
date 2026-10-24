@@ -260,6 +260,18 @@ then add `--catalogue-log DIR/error.log` to the source checker. Its acceptance
 requires all 28 own pointer copies, the five ordered RAM reads and uncapped
 flash/RAM totals (32/5); missing, misrouted or truncated evidence fails.
 
+The coherent 48-second physical outgoing-call fixture independently has the
+same five RAM reads and 32/5 totals, with no additional catalogue reads during
+Send, laboratory connection or End. Run
+`tools/run_noki6210_acceptance.py DIR --scenario outgoing-call --coherent-cell --trace-dsp-control`
+with the project Python environment. Its ordinary call acceptance and positive
+parameter-compiler observations are retained, and its result additionally
+records `upload_catalogue_observation`. This bounds the negative result to
+the research-HLE composition, duration and this table's observed reads;
+it does not show what missing resident DSP code would request, or exclude
+other upload paths. Do not synthesize later DSP requests to make the table
+yield a codec-clock answer.
+
 Reproduce the bounded capture without an HLE handoff:
 
 ```sh

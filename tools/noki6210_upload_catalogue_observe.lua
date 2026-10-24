@@ -1,6 +1,8 @@
 -- Passive own-ROM catalogue reads; no extra memory reads or DSP requests.
 local source = debug.getinfo(1, 'S').source:sub(2)
-dofile(assert(source:match('^(.*[/])')) .. 'noki6210_staged_observe.lua')
+if not _G.npe3_catalogue_parent_observer then
+    dofile(assert(source:match('^(.*[/])')) .. 'noki6210_staged_observe.lua')
+end
 local machine = manager.machine
 local cpu = assert(machine.devices[':maincpu'])
 local totals = {}

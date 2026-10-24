@@ -682,6 +682,10 @@ def main():
                 # The compact events view omits the mailbox CPU snapshots.
                 contract['dsp_control_observation'] = verify_mode_observation(
                     (run / 'error.log').read_text(errors='replace'))
+                from tools.noki6210_installed_program import verify_catalogue_reads
+                contract['upload_catalogue_observation'] = verify_catalogue_reads(
+                    (root / 'roms/noki6210/6210_556c.fls').read_bytes(),
+                    (run / 'error.log').read_text(errors='replace'))
             if host:
                 from tools.radio_host_outgoing_connect_check import verify as check_host
                 check_host((run / 'error.log').read_text(errors='replace'), '1234567')

@@ -92,14 +92,14 @@ def verify_catalogue_reads(image, text):
                 for index, pc in sequence]
     actual = [tuple(int(row[i], 16) for i in (1, 2, 3, 4)) for row in selections]
     if actual != expected:
-        raise ValueError('native four-second catalogue selection sequence differs')
+        raise ValueError('catalogue selection sequence differs')
     for name, count in (('flash', 32), ('ram', 5)):
         if re.findall(rf'npe3_catalogue_{name}: total=(\d+)', text) != [str(count)]:
             raise ValueError('catalogue observation totals missing or changed')
     if '[LUA ERROR]' in text:
         raise ValueError('catalogue observer failed')
     return {'copied_pointers': len(copies), 'ram_selections': [x[0] for x in sequence],
-            'scope': 'Four-second MCU reads; not successful DSP execution or later-call coverage.'}
+            'scope': 'Bounded fixture MCU reads; not successful DSP execution or unobserved selections.'}
 
 
 def main():
@@ -108,7 +108,7 @@ def main():
     parser.add_argument('--captures', type=Path,
                         help='Directory of native npe3_{bootstrap,loader2,fragment}.bin captures')
     parser.add_argument('--catalogue-log', type=Path,
-                        help='Four-second npe3stage passive catalogue observation')
+                        help='Qualified passive catalogue observation (native boot or physical-call fixture)')
     args = parser.parse_args()
     try:
         captures = None if args.captures is None else {
