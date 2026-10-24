@@ -10,7 +10,8 @@ local runner = coroutine.create(function()
     io.stdout:flush()
     assert(emu.wait(4))
     machine.screens[':screen']:snapshot('8850_ussd_pending.png')
-    for index, action in ipairs({{35, 1, 'Menu'}, {38, 0, 'End'}, {41, 1, 'Menu'}}) do
+    for index, action in ipairs(_G.nsm2_host_ussd_actions or
+                               {{35, 1, 'Menu'}, {38, 0, 'End'}, {41, 1, 'Menu'}}) do
         assert(emu.wait(action[1] - machine.time:as_double()))
         local key = assert(machine.ioport.ports[':COL.' .. action[2]].fields[action[3]])
         machine:logerror(string.format('8850_host_ussd_input: key=%s state=1 t=%.9f\n', action[3], machine.time:as_double()))

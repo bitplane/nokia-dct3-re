@@ -57,6 +57,49 @@ def verify(text, card):
     check_card(after, card)
 
 
+def verify_network_request(text, card):
+    if '[LUA ERROR]' in text or text.count('8850_host_ussd: complete') != 1:
+        raise ValueError('network request input fixture failed')
+    admissions = re.findall(r'incoming ussd id=1 result=accepted t=([0-9.]+)', text)
+    if len(admissions) != 1 or not 30 <= float(admissions[0]) < 31:
+        raise ValueError('network request must follow settled authentication once')
+    if re.findall(r'incoming ussd state id=1 epoch=(\d+) phase=(\w+)', text) != [('1', 'queued'), ('1', 'answered')]:
+        raise ValueError('network request identity/phase lifecycle differs')
+    if text.count('network_initiated operation=request ') != 1:
+        raise ValueError('expected exactly one network request')
+    contacts = [('Menu', 35), ('Menu', 37), ('Keypad 2', 39),
+                ('Menu', 41), ('End', 45), ('Menu', 47)]
+    for state, fraction in ((1, '000000000'), (0, '200000000')):
+        actual = re.findall(rf'8850_host_ussd_input: key=(.*?) state={state} t=(\d+)\.{fraction}', text)
+        if actual != [(key, str(second)) for key, second in contacts]:
+            raise ValueError('network request physical contacts differ')
+    require_ordered(text, (
+        ('PIN', r'SIM status ins=20 sw=9000'),
+        ('registration', r'LAPDm Location Updating Accept acknowledged'),
+        ('admission', r'incoming ussd id=1 result=accepted t=30\.'),
+        ('request', r'network_initiated operation=request transaction=0b invoke=1 dcs=0f'),
+        *[(key, re.escape(f'8850_host_ussd_input: key={key} state=1 t={second}.000000000'))
+          for key, second in contacts[:4]],
+        ('result', r'network_initiated handset_response message=3a length=21 data=8b3a12a210020101300b02013c300604010f040132'),
+        ('release', r'LAPDm service Channel Release acknowledged'),
+        ('reply', r'incoming ussd reply id=1 epoch=1 dcs=0f data=32 empty=0'),
+        ('answered', r'incoming ussd state id=1 epoch=1 phase=answered'),
+        ('recovery', r'8850_host_ussd_input: key=Menu state=0 t=47\.200000000'),
+    ), '8850 network request')
+    if text.count('incoming ussd reply ') != 1:
+        raise ValueError('duplicate network request reply')
+    check_card(text.split('incoming ussd id=1 result=accepted', 1)[1], card)
+
+
+def check_network_request_frames(directory):
+    _frames(directory, (
+        ('8850_ussd_action_1.png', 'f5d05b3cb51c3058f10fd0dce547b7ce7b3d416e97410ea2afa7e1b7c635315d', None),
+        ('8850_ussd_action_3.png', 'a9c79a6b61112a58b1d21567712dc371311ea7de7606cb28fdea0e312aca79c4', None),
+        ('8850_ussd_action_4.png', '6213cd3c42a877704ac80826e4f16706f12736d2abfe4fc9713dc9186c649a34', None),
+        ('8850_ussd_action_6.png', MENU_TITLE, (0, 0, 72, 16)),
+    ))
+
+
 def verify_outgoing(text, card, *, restored=False):
     from tools.radio_host_ussd_trace_check import verify as verify_host
     from tools.noki8850_ussd_check import KEYS

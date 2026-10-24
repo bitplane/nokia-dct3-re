@@ -7,7 +7,7 @@ from tools.run_noki8850_pin_registration import check_pin_inputs
 
 class PinRegistrationTest(unittest.TestCase):
     def test_host_services_admitted_before_preparation(self):
-        for scenario in ('host-rejected-sms', 'host-silent-sms', 'host-incoming-ussd', 'host-outgoing-ussd', 'host-outgoing-ussd-restore'):
+        for scenario in ('host-rejected-sms', 'host-silent-sms', 'host-incoming-ussd', 'host-incoming-ussd-request', 'host-outgoing-ussd', 'host-outgoing-ussd-restore'):
             with self.subTest(scenario=scenario), \
                     patch('sys.argv', ['runner', 'unused', '--scenario', scenario]), \
                     patch.object(runner.Path, 'read_bytes', return_value=b''), \
@@ -16,7 +16,7 @@ class PinRegistrationTest(unittest.TestCase):
                 runner.main()
 
     def test_host_ussd_requires_authentication_before_preparation(self):
-        for scenario in ('host-incoming-ussd', 'host-outgoing-ussd', 'host-outgoing-ussd-restore'):
+        for scenario in ('host-incoming-ussd', 'host-incoming-ussd-request', 'host-outgoing-ussd', 'host-outgoing-ussd-restore'):
             with self.subTest(scenario=scenario), \
                     patch('sys.argv', ['runner', 'unused', '--scenario', scenario, '--without-pin']), \
                     patch('sys.stderr', io.StringIO()), \

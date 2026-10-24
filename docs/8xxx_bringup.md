@@ -2440,6 +2440,18 @@ notification admission. Wrong epoch, duplicate notification, absent release,
 changed card bytes and missing read/recovery frames reject. This establishes
 one-way host notification, not a host request/reply dialogue or native radio.
 
+`verify-8850-pin-host-ussd-network-request` covers one host-originated
+`Choose 2` request after the same physical authentication. Menu reads the
+prompt at35s; a second Menu selects Answer at37s. Physical Keypad2 at39s
+and Send/Menu at41s produce the exact nonempty response DCS0f/data32,
+followed by RR release and the correlated epoch1 answered state. Reviewed
+prompt, numeric editor containing2, Done and recovered Messages title pixels
+are mandatory, as are exact contact releases and complete expected SIM
+contents. The first Read does not open the editor: omitting Answer returns
+an empty result on End rather than the intended reply. No handset state is
+injected. This qualifies one request/reply, not a multi-turn session or native
+DSP/radio execution.
+
 `verify-8850-pin-host-outgoing-ussd` independently covers physical `*123#`
 and Send on the same authenticated own-PMM composition. The host rejects a
 wrong request identity before accepting the matching response; the handset

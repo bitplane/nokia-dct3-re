@@ -54,6 +54,32 @@ class HostUssdTest(unittest.TestCase):
             verify(text + '\nsim_device: header cla=a0 ins=24 p1=00', card)
 
 
+class NetworkRequestTest(unittest.TestCase):
+    def test_reply_contract_and_rejected_variants(self):
+        from tools.noki8850_host_ussd_check import verify_network_request
+        text, card = HostUssdTest().capture()
+        text = text[:text.index('gsm_ss: network_initiated')]
+        text += 'network_initiated operation=request transaction=0b invoke=1 dcs=0f\n'
+        for key, second in [('Menu', 35), ('Menu', 37), ('Keypad 2', 39), ('Menu', 41)]:
+            for state, fraction in [(1, '000000000'), (0, '200000000')]:
+                text += f'8850_host_ussd_input: key={key} state={state} t={second}.{fraction}\n'
+        text += ('network_initiated handset_response message=3a length=21 data=8b3a12a210020101300b02013c300604010f040132\n'
+                 'LAPDm service Channel Release acknowledged\n'
+                 'incoming ussd reply id=1 epoch=1 dcs=0f data=32 empty=0\n'
+                 'incoming ussd state id=1 epoch=1 phase=answered\n')
+        for key, second in [('End', 45), ('Menu', 47)]:
+            for state, fraction in [(1, '000000000'), (0, '200000000')]:
+                text += f'8850_host_ussd_input: key={key} state={state} t={second}.{fraction}\n'
+        text += '8850_host_ussd: complete'
+        verify_network_request(text, card)
+        for old, new in [('data=32', 'data=33'), ('phase=answered', 'phase=delivered'),
+                         ('key=Keypad 2 state=0', 'key=Menu state=0'),
+                         ('epoch=1 phase=answered', 'epoch=2 phase=answered'),
+                         ('SIM status ins=20 sw=9000', 'SIM status ins=20 sw=9804')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_network_request(text.replace(old, new), card)
+
+
 class OutgoingHostUssdTest(unittest.TestCase):
     def capture(self):
         from tools.noki8850_ussd_check import KEYS
