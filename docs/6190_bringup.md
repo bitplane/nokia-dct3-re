@@ -1307,7 +1307,30 @@ RF input, native registration, speech or survival past the receive-supervision
 reset. Timer/peripheral continuity is observed through exact subsequent I/O,
 not an exhaustive inventory of every saved device field.
 
-### Card-originated Toolkit DISPLAY TEXT
+### SIM Toolkit contracts
+
+These gates use the qualified original PIN-enabled laboratory storage, not the
+extended FDN card. `nsb3_toolkit_prepare.py SOURCE NEW_RUN` copies cold storage
+and declares an external card profile; it changes neither handset storage nor
+persistent card bytes. Common acceptance requires own executable/cold links,
+PIN/phone authentication, exact Toolkit APDUs/statuses/received payloads,
+physical-before-response ordering, unchanged complete card and reviewed pixels.
+The card legitimately supplies proactive BER-TLVs; no firmware latch, internal
+message, UI state or completion is injected.
+
+| External profile | Preparation option | Physical fixture | Seconds | `nsb3_toolkit_check.py SOURCE RUN` option |
+| --- | --- | --- | ---: | --- |
+| 1: DISPLAY TEXT | default | `nsb3_toolkit_input.lua` | 75 | default |
+| 3: text, key and input | `--interactive` | `nsb3_toolkit_interactive.lua` | 82 | `--interactive` |
+| 4: installed menu, Continue | `--menu` | `nsb3_toolkit_menu.lua` | 92 | `--menu-item 1` |
+| 4: installed menu, Exit | `--menu` | `nsb3_toolkit_menu_exit.lua` | 92 | `--menu-item 2` |
+| 7: follow-up SELECT ITEM | `--select-item` | `nsb3_toolkit_select_item.lua` | 92 | `--select-item` |
+
+Pending-command restoration and ACK-only Wait use the separate checkers below.
+Other proactive commands, menu persistence across cold boots, sustained native
+operation, RF registration and speech are not established by these gates.
+
+#### DISPLAY TEXT
 
 The existing external card-profile input `SATCFG=1` supplies a Phase-2+
 laboratory card without changing handset storage or persistent card bytes.
@@ -1317,43 +1340,17 @@ After the card application queues DISPLAY TEXT, ordinary STATUS at about
 The received BER-TLV is `d0148103012180820281028d0904` followed by `DCT3 SAT`.
 The screen presents that text with OK/Back. Physical OK at 68 seconds emits
 `A0 14 00 00 0c 810301218002028281030100`, completes with `9000`, and
-returns to clean Messages. No firmware latch, internal D0 object or completion
-is supplied by the harness; the existing card model is the legitimate payload
-producer. The original PIN-enabled card remains byte-identical.
-
-```sh
-.venv/bin/python tools/nsb3_toolkit_prepare.py SOURCE NEW_RUN
-# Run NEW_RUN for 75 seconds with nsb3_toolkit_input.lua.
-.venv/bin/python tools/nsb3_toolkit_check.py SOURCE NEW_RUN
-```
-
-SOURCE is the qualified original PIN-enabled laboratory storage, not the
-extended FDN card. Preparation records the external profile separately from
-the unchanged cold storage link. The gate requires own image, complete card,
-PIN/phone authentication, exact Toolkit APDUs and received payload, `91xx`,
-physical-before-response ordering and reviewed text/returned-menu pixels.
-GET INKEY and GET INPUT are additionally qualified below. Other proactive
-commands, Toolkit persistence, native registration and speech remain independent
-unqualified contracts for this model.
+returns to clean Messages.
 
 #### Interactive card input
 
-Preparation with `--interactive` selects external profile 3, leaving the same
-persistent card and handset storage unchanged. After DISPLAY TEXT dismissal,
-the card returns `91 15` and firmware FETCHes GET INKEY. Physical 5/OK returns
+After DISPLAY TEXT dismissal, profile 3 returns `91 15` and firmware FETCHes
+GET INKEY. Physical 5/OK returns
 `8103022200020282810301000d020435`. The next `91 1a` leads to GET INPUT;
 physical 4/2 fills the firmware's `Enter 42` editor, and OK returns
 `8103032300020282810301000d03043432`. The final status is `9000` and clean
 Messages returns. Each response identifies its own fetched command; no input
 text or completion is supplied except through physical key fields.
-
-Run `nsb3_toolkit_interactive.lua` for 82 seconds from the separately prepared
-profile-3 cold input. Add `--interactive` to `nsb3_toolkit_check.py SOURCE RUN`.
-The shared gate requires all three exact command/response payloads and statuses,
-complete unchanged card, authentication, physical-before-response ordering and
-reviewed DISPLAY TEXT/INKEY/input/filled-42/returned-menu pixels. The original
-single-command gate remains a separate regression. No network service follows
-from either result.
 
 #### SIM menu installation and selection
 
@@ -1365,17 +1362,13 @@ Two independently cold controls select Continue or physically Down/Exit.
 Their exact ENVELOPE payloads are `d30702020181100101` and
 `d30702020181100102`; both return `9000` and preserve every card byte.
 
-Use preparation `--menu`, then `nsb3_toolkit_menu.lua` or
-`nsb3_toolkit_menu_exit.lua` for 92 seconds. Validate with
-`nsb3_toolkit_check.py SOURCE RUN --menu-item 1` or `--menu-item 2`.
-The gate retains full preceding input/Toolkit qualification and adds the exact
-received menu, ordered menu response/envelope, physical-before-envelope check,
-menu-title/list/selected-item pixels and immediate post-selection frame.
-That last frame says `Wait` one second after selection in both controls.
-It is an observation, not accepted final application settlement; neither a
-long-lived wait nor its cause is established. The lab card's profile-4 menu
-handler acknowledges selection without scheduling another proactive command.
-Do not supply a firmware completion to dismiss the wait.
+The immediate post-selection frame says `Wait` in both controls. Profile 4
+acknowledges selection without scheduling another proactive command; final
+automatic settlement is unqualified. Do not inject a completion to dismiss it.
+
+**Open question:** what UI settlement does the firmware require for this
+ACK-only application policy? The profile-7 positive control proves that
+follow-up command reception and clean return work independently of this wait.
 
 The physical recovery control selects Continue at 86 seconds, End at 88 and
 Menu at 90. Both later snapshots (89 and 91 seconds) retain `Wait`, with exact
@@ -1390,16 +1383,10 @@ At its `280878` return observation, both header `a0c20000` and body
 `d3070202` independently report result `07`, the normal branch selected by
 the caller's comparison. This plus card status `9000` excludes a simple
 header/body transport stall, not every post-status firmware continuation.
-Unproductive wrapper probes are removed rather than retained as models.
-
 Run `nsb3_toolkit_menu_observe.lua` for 92 seconds from an independent profile-4
 cold input; validate with `nsb3_toolkit_envelope_check.py SOURCE RUN`. The checker
-retains the complete card/Toolkit/menu qualification and explicitly reports a
-characterization, not successful UI settlement. It checks physical End/Menu,
-both Wait captures, one live SIMI caller stack and both transfer returns.
-The follow-up SELECT ITEM control below distinguishes this ACK-only menu handler
-from an application that supplies further work. Do not assume missing RF or
-inject a firmware event to finish the menu.
+reports a characterization, not UI completion, and checks physical End/Menu,
+both Wait captures, the live SIMI caller stack and both transfer returns.
 
 #### Follow-up SELECT ITEM and clean return
 
@@ -1407,18 +1394,10 @@ External profile 7 uses the same startup and menu, then answers item-1 ENVELOPE
 with `91 22` rather than `9000`. Firmware FETCHes the card's 34-byte SELECT ITEM,
 displays Alpha/Beta, and physical Down/OK selects Beta. Its exact response is
 `810307240002028281030100100102` with `9000`; the clean Continue/Exit list
-returns. Complete card and all preceding authentication/Toolkit contracts
-remain unchanged. This provides positive receive/UI continuation beyond menu
-selection, without a missing generic SIM event or synthetic dismissal. It does
-not prove what an ACK-only application should display or fix native radio.
-
-Prepare with `nsb3_toolkit_prepare.py SOURCE NEW_RUN --select-item`, run
-`nsb3_toolkit_select_item.lua` for 92 seconds, then validate with
-`nsb3_toolkit_check.py SOURCE NEW_RUN --select-item`. The gate requires exact
-pending notification, all fetched/returned payloads and statuses, physical
-selection before the item response, unchanged full card/cold provenance and
-reviewed Alpha/Beta/selected-Beta/returned-list pixels. The ACK-only Wait control
-remains an independent characterization, not a failure this positive gate hides.
+returns. This demonstrates positive receive/UI continuation after menu selection,
+without a missing generic SIM event or synthetic dismissal. It does not settle
+the ACK-only application-policy question. Prompt/selected-Beta/returned-list
+pixels and the exact physical response remain mandatory acceptance evidence.
 
 #### Pending Toolkit transaction restoration
 
@@ -1439,6 +1418,5 @@ artifact, whose hash is returned for provenance.
 Prepare a fresh default Toolkit input, run `nsb3_toolkit_state.lua` for 72 seconds,
 then check with `nsb3_toolkit_state_check.py SOURCE RUN`. Storage/profile checks
 are shared with the ordinary Toolkit gates rather than independently relaxed.
-This accepts one pending DISPLAY TEXT restoration, not all Toolkit commands,
-menu persistence across power loss, long-run native stability, registration or
-speech. It uses emulator save/load APIs, not guest-state forcing.
+This accepts one pending DISPLAY TEXT restoration, not every Toolkit command.
+It uses emulator save/load APIs, not guest-state forcing.
