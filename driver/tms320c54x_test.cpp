@@ -20557,9 +20557,9 @@ private:
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
 				(rom4_codec_is("efr-dtx-decoder") || rom4_codec_is("efr-erasure") || rom4_codec_is("efr-loss-observe") ||
-				 rom4_codec_is("efr-homing") || rom4_codec_is("efr-home-errors") || rom4_codec_is("efr-invalid-sid") || rom4_codec_is("efr-lost-sid")))
+				 rom4_codec_is("efr-homing") || rom4_codec_is("efr-home-errors") || rom4_codec_is("efr-invalid-sid") || rom4_codec_is("efr-lost-sid") || rom4_codec_is("efr-lsid-observe")))
 		{
-			enable_rom4_codec_pipeline(rom4_codec_is("efr-lost-sid") ? "EFR lost SID decoder" : rom4_codec_is("efr-dtx-decoder") ? "EFR DTX decoder" : rom4_codec_is("efr-invalid-sid") ? "EFR invalid SID decoder" : rom4_codec_is("efr-erasure") || rom4_codec_is("efr-loss-observe") ? "EFR erasure decoder" : "EFR homing decoder");
+			enable_rom4_codec_pipeline(rom4_codec_is("efr-lost-sid") || rom4_codec_is("efr-lsid-observe") ? "EFR lost SID decoder" : rom4_codec_is("efr-dtx-decoder") ? "EFR DTX decoder" : rom4_codec_is("efr-invalid-sid") ? "EFR invalid SID decoder" : rom4_codec_is("efr-erasure") || rom4_codec_is("efr-loss-observe") ? "EFR erasure decoder" : "EFR homing decoder");
 			start_rom4_efr_decoder(0, true);
 			return;
 		}
@@ -21751,6 +21751,7 @@ private:
 		else if(bios=="efr-ehome") bios="efr-enc-homing";
 		else if(bios=="efr-isid") bios="efr-invalid-sid";
 		else if(bios=="efr-lsid") bios="efr-lost-sid";
+		else if(bios=="efr-lso") bios="efr-lsid-observe";
 		else if(bios=="efr-loss") bios="efr-loss-observe";
 		else if(bios=="efr-herr") bios="efr-home-errors";
 		return bios==name;
@@ -21824,7 +21825,7 @@ private:
 	{
 		if (rom4_codec_is("efr-dtx-decoder")) return { "efr_dtx_input", "efr_dtx_pcm", " DTX", 518 };
 		if (rom4_codec_is("efr-invalid-sid")) return { "efr_invalid_sid_input", "efr_invalid_sid_pcm", " invalid SID", 518 };
-		if (rom4_codec_is("efr-lost-sid")) return { "efr_lost_sid_input", "efr_lost_sid_pcm", " lost SID", 518 };
+		if (rom4_codec_is("efr-lost-sid") || rom4_codec_is("efr-lsid-observe")) return { "efr_lost_sid_input", "efr_lost_sid_pcm", " lost SID", 518 };
 		if (rom4_codec_is("efr-erasure") || rom4_codec_is("efr-loss-observe")) return { "efr_erasure_input", "efr_erasure_pcm", " erasure", 163 };
 		if (rom4_codec_is("efr-homing")) return { "efr_homing_input", "efr_homing_pcm", " homing", 46 };
 		if (rom4_codec_is("efr-home-errors")) return { "efr_homing_error_input", "efr_homing_error_pcm", " homing error", 49 };
@@ -54781,7 +54782,8 @@ private:
 		{
 			bool const dtx = rom4_codec_is("efr-dtx-decoder");
 			bool const invalid_sid = rom4_codec_is("efr-invalid-sid");
-			bool const lost_sid = rom4_codec_is("efr-lost-sid");
+			bool const lost_sid_observing = rom4_codec_is("efr-lsid-observe");
+			bool const lost_sid = rom4_codec_is("efr-lost-sid") || lost_sid_observing;
 			bool const observing = rom4_codec_is("efr-loss-observe");
 			bool const erasure = observing || rom4_codec_is("efr-erasure");
 			bool const homing = rom4_codec_is("efr-homing");
@@ -54809,7 +54811,7 @@ private:
 			{
 				u16 const expected = reference[i * 2] | (reference[i * 2 + 1] << 8);
 				u16 const actual = data.read_word(0x1388 + i);
-				if (observing || homing_errors)
+				if (observing || homing_errors || lost_sid_observing)
 					for (int shift = 12; shift >= 0; shift -= 4) observed_pcm += "0123456789abcdef"[(actual >> shift) & 15];
 				if (homing && (frame == 0 || frame == 1 || frame == 23 || frame == 45))
 					expect(actual == 8 && expected == 8, "steady decoder homing publishes the EHF pattern");
@@ -54831,6 +54833,8 @@ private:
 			m_rom4_pcm_mismatches += mismatches;
 			if (observing)
 				osd_printf_info("ROM4 EFR loss observation: frame=%u mismatches=%u pcm=%s\n", frame, mismatches, observed_pcm.c_str());
+			else if (lost_sid_observing)
+				osd_printf_info("ROM4 EFR lost SID observation: frame=%u mismatches=%u pcm=%s\n", frame, mismatches, observed_pcm.c_str());
 			else if (!homing_errors)
 				expect(!mismatches, "native EFR decoder matches independent ETSI PCM");
 			if (invalid_sid)
@@ -54843,7 +54847,10 @@ private:
 			if (lost_sid && (frame == 95 || frame == 96 || frame == 97 || frame == 356))
 			{
 				u16 const expected = frame == 95 ? 0x0290 : frame == 96 ? 0x02c0 : frame == 97 ? 0x0501 : 0x0401;
-				expect(data.read_word(0x09c0) == expected, "Original EFR lost-SID muting and first-speech flags match reference");
+				if (lost_sid_observing)
+					osd_printf_info("ROM4 EFR lost SID flags: frame=%u native=%04x reference=%04x\n", frame, data.read_word(0x09c0), expected);
+				else
+					expect(data.read_word(0x09c0) == expected, "Original EFR lost-SID muting and first-speech flags match reference");
 			}
 			if (dtx)
 			{
@@ -54861,6 +54868,12 @@ private:
 			}
 			if (lost_sid)
 			{
+				if (lost_sid_observing)
+				{
+					osd_printf_info("TMS320C54x ROM4 EFR lost SID observation replay: COMPLETE frames=518 ram_words=65440 checkpoints=frame_input\n");
+					osd_printf_info("TMS320C54x ROM4 EFR lost SID observation: COMPLETE frames=518 samples=82880 lost_sid=2 mismatches=%u conformance_claim=0 handset_audio_claim=0\n", m_rom4_pcm_mismatches);
+					throw emu_fatalerror(0, "TMS320C54x ROM4 EFR lost SID observation complete");
+				}
 				osd_printf_info("TMS320C54x ROM4 EFR lost SID decoder replay: PASS frames=518 ram_words=65440 checkpoints=frame_input handset_audio_claim=0\n");
 				osd_printf_info("TMS320C54x ROM4 EFR lost SID decoder: PASS frames=518 samples=82880 lost_sid=2 mismatches=0 handset_audio_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x ROM4 EFR lost SID decoder complete");
@@ -57552,7 +57565,11 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(35, "rf-pairs-pipe", "Original adjacent RF pair products on staged CPU")
 	ROM_SYSTEM_BIOS(36, "efr-lost-sid", "Original EFR lost-SID muting and speech resumption")
 	ROM_SYSTEM_BIOS(37, "efr-lsid-pipe", "Original EFR lost-SID muting on staged CPU")
+	ROM_SYSTEM_BIOS(38, "efr-lsid-observe", "Characterize complete EFR lost-SID recovery without conformance promotion")
+	ROM_SYSTEM_BIOS(39, "efr-lso-pipe", "Characterize complete EFR lost-SID recovery on staged CPU")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe, CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739), ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(38))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe, CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739), ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(39))
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe, CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739), ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(36))
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe, CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739), ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(37))
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
@@ -57664,6 +57681,8 @@ ROM_START(tms54rom4)
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(18))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000, CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d), ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(38))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000, CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d), ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(39))
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000, CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d), ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(36))
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000, CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d), ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(37))
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
@@ -57781,9 +57800,13 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("homing_error.out", 0, 15680, CRC(f1f822a8) SHA1(fbdf3d13761497e798baadc21b5dd8ac327ca593), ROM_BIOS(18))
 	ROMX_LOAD("homing_error.out", 0, 15680, CRC(f1f822a8) SHA1(fbdf3d13761497e798baadc21b5dd8ac327ca593), ROM_BIOS(31))
 	ROM_REGION(255892, "efr_lost_sid_input", 0)
+	ROMX_LOAD("lost_sid.dec", 0, 255892, CRC(943bba49) SHA1(f26d632264a5b684024e45130b5bd337e095bacb), ROM_BIOS(38))
+	ROMX_LOAD("lost_sid.dec", 0, 255892, CRC(943bba49) SHA1(f26d632264a5b684024e45130b5bd337e095bacb), ROM_BIOS(39))
 	ROMX_LOAD("lost_sid.dec", 0, 255892, CRC(943bba49) SHA1(f26d632264a5b684024e45130b5bd337e095bacb), ROM_BIOS(36))
 	ROMX_LOAD("lost_sid.dec", 0, 255892, CRC(943bba49) SHA1(f26d632264a5b684024e45130b5bd337e095bacb), ROM_BIOS(37))
 	ROM_REGION(165760, "efr_lost_sid_pcm", 0)
+	ROMX_LOAD("lost_sid.out", 0, 165760, CRC(409e4ecb) SHA1(fdf1df0aec709a45a9a4819bb3fb49f76c93bdbe), ROM_BIOS(38))
+	ROMX_LOAD("lost_sid.out", 0, 165760, CRC(409e4ecb) SHA1(fdf1df0aec709a45a9a4819bb3fb49f76c93bdbe), ROM_BIOS(39))
 	ROMX_LOAD("lost_sid.out", 0, 165760, CRC(409e4ecb) SHA1(fdf1df0aec709a45a9a4819bb3fb49f76c93bdbe), ROM_BIOS(36))
 	ROMX_LOAD("lost_sid.out", 0, 165760, CRC(409e4ecb) SHA1(fdf1df0aec709a45a9a4819bb3fb49f76c93bdbe), ROM_BIOS(37))
 	ROM_REGION(255892, "efr_invalid_sid_input", 0)

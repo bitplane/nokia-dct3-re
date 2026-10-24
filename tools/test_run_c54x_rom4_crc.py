@@ -93,6 +93,7 @@ class Rom4HelperResultTest(unittest.TestCase):
             ('efr-homing', 'efr-homing-pipe', (('efr_homing_input', 'homing.dec'), ('efr_homing_pcm', 'homing.out'))),
             ('efr-invalid-sid', 'efr-isid-pipe', (('efr_invalid_sid_input', 'invalid_sid.dec'), ('efr_invalid_sid_pcm', 'invalid_sid.out'))),
             ('efr-lost-sid', 'efr-lsid-pipe', (('efr_lost_sid_input', 'lost_sid.dec'), ('efr_lost_sid_pcm', 'lost_sid.out'))),
+            ('efr-lsid-observe', 'efr-lso-pipe', (('efr_lost_sid_input', 'lost_sid.dec'), ('efr_lost_sid_pcm', 'lost_sid.out'))),
             ('efr-erasure', 'efr-erasure-pipe', (('efr_erasure_input', 'erasure.dec'), ('efr_erasure_pcm', 'erasure.out'))),
             ('efr-loss-observe', 'efr-loss-pipe', (('efr_erasure_input', 'erasure.dec'), ('efr_erasure_pcm', 'erasure.out'))),
         )
@@ -104,7 +105,7 @@ class Rom4HelperResultTest(unittest.TestCase):
                     loads = re.findall(r'ROMX_LOAD\("' + re.escape(filename) +
                                        r'"(.*), ROM_BIOS\((\d+)\)\)', content)
                     by_bios = {int(number): payload for payload, number in loads}
-                    self.assertEqual(len(loads), 4 if region.startswith('efr_erasure_') else 2)
+                    self.assertEqual(len(loads), 4 if region.startswith(('efr_erasure_', 'efr_lost_sid_')) else 2)
                     self.assertEqual(by_bios[bios[name]], by_bios[bios[staged]])
 
     def test_staged_efr_lifecycle_requires_its_own_frontend_and_full_result(self):

@@ -2933,7 +2933,8 @@ the unobserved decoder before accepting the generated output.
 Distinct native BIOS profiles `efr-lost-sid` and `efr-lsid-pipe` load this
 declared input/output pair without replacing clean-DTX data. Both strict
 runs match all15520 PCM samples in frames0..96, then stop at97 with86
-sample differences. Thus the complete518-frame fixture is not validated.
+sample differences. Thus the complete518-frame fixture is not reference-
+conformant; its full PCM characterization is described below.
 The observed muting flags0290/02c0 at95/96 match the reference, but native
 first-speech flags at97 are0401, not0501. The acquired recovery patch
 explains this flag divergence: before its RX handler, `28ee..28f3` clears
@@ -2995,8 +2996,35 @@ python3 tools/c54x_rom4_efr_lost_sid_state_check.py RUN/error.log REFERENCE/stat
 
 Neither observer writes firmware/codec state. No raw-synthesis equality,
 remaining420-frame result or handset speech claim is inferred from this
-prefix. The surviving native/reference mismatch should not be repaired
+prefix alone. The surviving native/reference mismatch should not be repaired
 by deleting the acquired recovery patch or importing the reference codec.
+
+The separate `efr-lsid-observe` / `efr-lso-pipe` profiles execute all518
+frames without suppressing the recorded differences. Each frame captures
+all160 output samples and replays65440 ordinary RAM words; the independent
+checker recomputes every mismatch count from that PCM and requires complete
+ordered records and terminal replay evidence. Both frontends produce the
+same native PCM SHA-256
+`af8a73ffe823001cf043f947616cdb5ea71f55a4d3d8b2ea6879c19ec425ae6a`.
+Exactly22 frames (97..118) differ, totaling3178 samples; maximum absolute
+difference2888, whole-conversation RMS114.38768665001865 sample units.
+Frames119..517 match all63840 reference samples, including the later DTX
+and speech resumption. Both first-speech history publications remain0;
+this fixture still does not execute the bit0100-set writer alternative.
+
+```sh
+python3 tools/run_c54x_rom4_crc.py --mame mame/mame --rompath mame/roms \
+  --efr-lost-sid-observe --observe-dtx-history
+# Add --staged to compare the full staged result.
+```
+
+The runner retains `native.pcm`, per-frame statistics and input/source hashes.
+Its result is explicitly `status=characterized`, `reference_equal=False`,
+`conformance_claim=False`. The strict `--efr-lost-sid` control still fails
+at97 with86 differences; no production DSP/CPU code, patch instruction,
+reference PCM or internal codec state was changed to complete observation.
+The first differing gain boundary is explained above; equality of every
+later internal arithmetic boundary has not been established.
 
 ### Native EFR active-speech erasures
 

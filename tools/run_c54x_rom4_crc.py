@@ -228,6 +228,7 @@ def main():
     mode.add_argument("--efr-dtx-decoder", action="store_true", help="compare native EFR silence/SID/unusable-frame decoding with the external reference")
     mode.add_argument('--efr-invalid-sid', action='store_true', help='compare payload-classified invalid and bad accepted SID frames against the reference')
     mode.add_argument('--efr-lost-sid', action='store_true', help='compare lost-SID muting and first-speech recovery against the reference')
+    mode.add_argument('--efr-lost-sid-observe', action='store_true', help='characterize the complete lost-SID conversation without claiming reference conformance')
     mode.add_argument("--efr-dtx-encoder", action="store_true", help="compare native EFR VAD/DTX encoding with the external reference")
     mode.add_argument("--efr-erasure-decoder", action="store_true", help="compare native EFR active-speech erasure concealment with the external reference")
     mode.add_argument("--efr-erasure-observe", action="store_true", help="characterize all native EFR loss frames without claiming reference conformance")
@@ -244,7 +245,7 @@ def main():
     args = parser.parse_args()
     if args.staged and not (args.fr_decoder or args.fr_encoder or args.efr_encoder or args.efr_decoder or
                            args.efr_dtx_encoder or args.efr_dtx_decoder or args.efr_homing_encoder or args.efr_homing_decoder or args.efr_invalid_sid or
-                           args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_errors or args.efr_lost_sid or args.rf_bitmap or args.rf_pairs):
+                           args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_errors or args.efr_lost_sid or args.efr_lost_sid_observe or args.rf_bitmap or args.rf_pairs):
         parser.error('--staged requires a supported codec or RF helper mode')
     if args.trace_fr and not (args.fr_decoder or args.fr_encoder):
         parser.error('--trace-fr requires --fr-decoder or --fr-encoder')
@@ -254,7 +255,7 @@ def main():
         parser.error('--trace-efr-loss requires --efr-erasure-observe')
     if args.observe_homing_errors and not args.efr_homing_errors:
         parser.error('--observe-homing-errors requires --efr-homing-errors')
-    if args.observe_dtx_history and not (args.efr_dtx_decoder or args.efr_invalid_sid or args.efr_lost_sid):
+    if args.observe_dtx_history and not (args.efr_dtx_decoder or args.efr_invalid_sid or args.efr_lost_sid or args.efr_lost_sid_observe):
         parser.error('--observe-dtx-history requires a DTX decoder fixture')
     if args.observe_lost_sid_state and (not args.efr_lost_sid or args.observe_dtx_history):
         parser.error('--observe-lost-sid-state requires --efr-lost-sid without --observe-dtx-history')
@@ -277,6 +278,8 @@ def main():
         bios = 'efr-invalid-sid'
     if args.efr_lost_sid:
         bios = 'efr-lost-sid'
+    if args.efr_lost_sid_observe:
+        bios = 'efr-lsid-observe'
     if args.efr_dtx_encoder:
         bios = "efr-dtx-encoder"
     if args.efr_erasure_decoder:
@@ -295,12 +298,13 @@ def main():
                 'efr-enc-homing': 'efr-ehome-pipe',
                 'efr-invalid-sid': 'efr-isid-pipe',
                 'efr-lost-sid': 'efr-lsid-pipe',
+                'efr-lsid-observe': 'efr-lso-pipe',
                 'efr-home-errors': 'efr-herr-pipe',
                 'efr-loss-observe': 'efr-loss-pipe'}.get(bios, bios + '-pipe')
     command = [str(args.mame.resolve()), "tms54rom4", "-bios", bios,
                "-rompath", str(args.rompath.resolve()), "-video", "none",
                "-sound", "none", "-nothrottle", "-noreadconfig", "-log",
-               "-seconds_to_run", "30" if args.efr_dtx_decoder or args.efr_dtx_encoder or args.efr_invalid_sid or args.efr_lost_sid else "10" if args.efr_decoder or args.efr_encoder or args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_decoder or args.efr_homing_encoder or args.efr_homing_errors else "2"]
+               "-seconds_to_run", "30" if args.efr_dtx_decoder or args.efr_dtx_encoder or args.efr_invalid_sid or args.efr_lost_sid or args.efr_lost_sid_observe else "10" if args.efr_decoder or args.efr_encoder or args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_decoder or args.efr_homing_encoder or args.efr_homing_errors else "2"]
     if args.trace_fr or args.trace_efr_reset or args.trace_efr_loss:
         command.append('-verbose')
     root = Path(__file__).resolve().parents[1]
@@ -333,7 +337,7 @@ def main():
     if args.efr_invalid_sid:
         for name in ('invalid_sid.dec', 'invalid_sid.out'):
             inputs.append(args.rompath / 'tms54rom4' / name)
-    if args.efr_lost_sid:
+    if args.efr_lost_sid or args.efr_lost_sid_observe:
         for name in ('lost_sid.dec', 'lost_sid.out'):
             inputs.append(args.rompath / 'tms54rom4' / name)
     if args.efr_dtx_encoder:
@@ -355,7 +359,7 @@ def main():
     evidence = {"command": command, "bios": bios,
                 "inputs": [file_identity(path) for path in inputs],
                 "handset_audio_claim": False}
-    if args.efr_erasure_observe:
+    if args.efr_erasure_observe or args.efr_lost_sid_observe:
         evidence['comparison_scope'] = 'characterization'
         evidence['frontend'] = 'staged' if args.staged else 'atomic'
         if args.trace_efr_loss:
@@ -371,20 +375,22 @@ def main():
     text = (run / "console.log").read_text()
     print(text, end="")
     try:
-        if args.efr_erasure_observe:
-            if args.staged:
+        if args.efr_erasure_observe or args.efr_lost_sid_observe:
+            if args.staged and not args.efr_lost_sid_observe:
                 check_staged_frontend(text, 'EFR erasure decoder')
             try:
                 from tools.c54x_rom4_efr_loss_check import characterize
             except ModuleNotFoundError:
                 from c54x_rom4_efr_loss_check import characterize
+            fixture_name = 'lost_sid' if args.efr_lost_sid_observe else 'erasure'
             report, pcm = characterize(text, result.returncode,
-                (args.rompath / 'tms54rom4/erasure.out').read_bytes(),
-                (args.rompath / 'tms54rom4/erasure.dec').read_bytes(),
-                verbose_teardown=args.trace_efr_loss)
+                (args.rompath / f'tms54rom4/{fixture_name}.out').read_bytes(),
+                (args.rompath / f'tms54rom4/{fixture_name}.dec').read_bytes(),
+                verbose_teardown=args.trace_efr_loss, lost_sid=args.efr_lost_sid_observe, staged=args.staged)
             (run / 'characterization.json').write_text(json.dumps(report, indent=2) + '\n')
             (run / 'native.pcm').write_bytes(pcm)
-            print(f"ROM4 EFR loss characterized: frames={report['frames']} differing_frames={report['differing_frames']} mismatches={report['mismatches']} conformance_claim=0")
+            label = 'lost SID' if args.efr_lost_sid_observe else 'loss'
+            print(f"ROM4 EFR {label} characterized: frames={report['frames']} differing_frames={report['differing_frames']} mismatches={report['mismatches']} conformance_claim=0")
         elif args.efr_homing_errors:
             try:
                 from tools.c54x_rom4_efr_homing_error_check import check as check_homing_errors
