@@ -3,6 +3,10 @@ local machine = manager.machine
 local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces.program
 machine.debugger:command('temp4=0')
+machine.debugger:command('temp5=0')
+-- Expiry receives the record pointer, not timer ID c7; do not compare r0 with c7.
+cpu.debug:bpset(0x3c1bb4, 'r0==100b10 && temp5<128',
+    'temp5=temp5+1;logerror "6210_sleep_timer_expire: record=%08x interval=%04x owner=%02x flags=%02x state=%02x id=%02x ctrl=%02x lr=%08x observer_writes=0\\n",r0,w@100b14,b@100b16,b@100b17,b@100b18,b@100b19,b@2000c,r14;g')
 cpu.debug:bpset(0x3c19ba, 'r0==c7 && temp4<1024',
     'temp4=temp4+1;logerror "6210_sleep_timer_arm: id=%02x delay=%04x lr=%08x owner=%02x flags=%02x state=%02x stored_id=%02x observer_writes=0\\n",r0,r1,r14,b@100b16,b@100b17,b@100b18,b@100b19;g')
 local transitions, previous = {}, nil
@@ -19,6 +23,12 @@ _G.npe3_sleep_control_tap = memory:install_write_tap(0x2000c, 0x2000f,
     end)
 local runner = coroutine.create(function()
     assert(emu.wait(31.5))
+    machine.debugger:command('temp6=0')
+    cpu.debug:bpset(0x3c1c08, 'temp6<16',
+        'temp6=temp6+1;logerror "6210_sleep_timer_service: head=%08x interval=%04x ctrl=%02x lr=%08x observer_writes=0\\n",d@100048,w@100b14,b@2000c,r14;g')
+    machine.debugger:command('temp7=0')
+    cpu.debug:bpset(0x4cc3b2, 'r0==100b14 && temp7<16',
+        'temp7=temp7+1;logerror "6210_sleep_timer_adjust: interval=%04x timer0=%04x baseline=%04x ctrl=%02x lr=%08x observer_writes=0\\n",w@100b14,w@20010,w@173fe8,b@2000c,r14;g')
     -- Install after the first wake; debugger counters are not handset state.
     local checkpoints = {0x500a18, 0x4dc12c, 0x4b03ec, 0x4b0412}
     for index, address in ipairs(checkpoints) do
