@@ -511,7 +511,7 @@ def verify_outgoing_restore(root, remote_text, connected=False, product='3210', 
     log = (root / 'error.log').read_text(errors='replace')
     if product=='8290':
         from tools.nsb7_sip_check import check_restore
-        check_restore(log,connected=connected)
+        check_restore(log,connected=connected,media=connected and not signaling_only)
     number = {'6210': '1234567', '6250': '123', '8210': '1234567', '8890': '1234567'}.get(product, '5551234')
     if not re.search(outgoing_setup_pattern(product), log):
         raise RuntimeError('restored outgoing call lacks the product SETUP frame')
@@ -570,7 +570,7 @@ def verify_outgoing_restore(root, remote_text, connected=False, product='3210', 
         summaries = re.findall(r'SIP epoch media discarded (\{[^\n]+\})', bridge)
         if len(summaries) != 1 or json.loads(summaries[0]).get('uplink') != 0 or 'dsp_hle: speech tick' in log:
             raise RuntimeError('signaling-only restoration lacks zero-uplink/no-codec evidence')
-    elif connected and product == '8890':
+    elif connected and product in ('8290', '8890'):
         verify_pre_restore_media(log, bridge)
     (root / 'sip-result.json').write_text(json.dumps({
         'scope': (f'{product} connected outgoing HLE SIP save/load; BYE, no redial' if connected else
@@ -765,7 +765,12 @@ def main():
                   args.sip_response == 200 and args.calls == 1 and
                   not args.restore_call and not args.restore_outgoing and
                   not args.restore_idle and not args.cancel_incoming)
-    if args.product=='8290' and not signaling_connected and not nsb7_media:
+    nsb7_restore_media = (args.product == '8290' and not args.signaling_only and
+                          not args.incoming and args.restore_outgoing and
+                          args.sip_response == 200 and args.calls == 1 and
+                          not args.record_media and not args.restore_call and
+                          not args.restore_idle and not args.cancel_incoming)
+    if args.product=='8290' and not signaling_connected and not nsb7_media and not nsb7_restore_media:
         parser.error('8290 supports only its single signaling-only SIP-200 fixtures; speech is unproved')
     if args.ready_file and not args.incoming:
         parser.error('--ready-file requires --incoming')

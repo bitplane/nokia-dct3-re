@@ -237,6 +237,13 @@
       ]
     },
     {
+      "name": "verify-8290-sip-outgoing-media-restore", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional local PJSIP and explicit own-source SIP_WAVEFORM_NVRAM_DIR; connected NSB-7 exact save/load, pre-save clocked HLE media, old-dialog BYE and no redial",
+      "recipe": [
+        "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON) tools/run_noki8290_sip_media.py '$(RUN_DIR)' --nvram-source '$(SIP_WAVEFORM_NVRAM_DIR)' --pjsua '$(SIP_PJSUA_BIN)' --restore-outgoing-media"
+      ]
+    },
+    {
       "name": "verify-8290-sip-incoming-waveform", "prerequisites": ["build"], "variables": {},
       "unstructured": "optional PJSIP/PulseAudio/FFmpeg and explicit SIP_WAVEFORM_NVRAM_DIR from own qualified NSB-7 provisioning; physical Answer/End and HLE microphone/earpiece tones, not native speech",
       "recipe": [

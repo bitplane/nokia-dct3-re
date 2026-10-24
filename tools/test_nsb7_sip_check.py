@@ -86,6 +86,17 @@ def alerting_restore_fixture():
 
 class SipTest(unittest.TestCase):
     @patch('tools.nsb7_sip_check.check_authentication')
+    def test_connected_restore_media_requires_own_pre_save_clocked_path(self, authentication):
+        text = restore_fixture()
+        with self.assertRaises(ValueError):
+            check_restore(text, media=True)
+        with patch('tools.nsb7_pcm_check.verify_before_restore') as pcm:
+            check_restore(text, media=True)
+        pcm.assert_called_once_with(text)
+        with self.assertRaises(ValueError):
+            check_restore(text, connected=False, media=True)
+
+    @patch('tools.nsb7_sip_check.check_authentication')
     def test_media_requires_own_pcm_and_remains_distinct_from_signaling(self, authentication):
         text = '\n'.join(row for row in fixture().splitlines() if
                          'decision id=2' not in row and 'outcome=0 result=rejected' not in row)

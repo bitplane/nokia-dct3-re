@@ -14,6 +14,10 @@ def verify(text, *, incoming=False):
     verify_call(text, incoming=incoming)
     enable = text.index('dsp_control_write: data=860b pc=002cb93e r4=00000008 ')
     disable = text.index('dsp_control_write: data=840a pc=002cb93e r4=00000008 ', enable)
+    return verify_ticks(text, enable, disable)
+
+
+def verify_ticks(text, enable, disable):
     previous = (0, 0)
     for tick in TICK.finditer(text):
         up, down, pcm, data_clock, frame_clock, shape, clocks, idle = map(int, tick.groups())
@@ -29,6 +33,17 @@ def verify(text, *, incoming=False):
         raise ValueError('insufficient sustained bidirectional PCM')
     return {'uplink': previous[0], 'downlink': previous[1],
             'pcm_clock': [512000, 8000], 'native_speech': False}
+
+
+def verify_before_restore(text):
+    saved = text.find('sip_state: saved')
+    if saved < 0:
+        raise ValueError('missing actual save boundary')
+    prefix = text[:saved]
+    enable = prefix.find('dsp_control_write: data=860b pc=002cb93e r4=00000008 ')
+    if enable < 0 or 'dsp_control_write: data=840a pc=002cb93e' in prefix[enable:]:
+        raise ValueError('saved call lacks own enabled speech control')
+    return verify_ticks(prefix, enable, len(prefix))
 
 
 def main():

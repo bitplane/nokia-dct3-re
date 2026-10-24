@@ -3313,7 +3313,26 @@ chain, never donor data. `run_noki8290_sip_media.py` requires a fresh run,
 validates source card/journal, records predecessor hashes, preserves the
 predecessor and applies exact whole-run acceptance. The shared audio wrapper
 restores host audio defaults and unloads temporary routes on success/failure.
-Media-aware call-phase save/restore remains outstanding.
+Connected outgoing media restoration independently passes
+`tmp/nsb7-sip-outgoing-media-restore-v2`. Before save60s, the own control
+writer enables speech and at least100 uplink/50 downlink PCM blocks satisfy
+exact clock accounting. Save/load retains all37 ARM/banked registers, RAM
+and emulated time; the external dialog is deliberately not restored.
+The bridge inventories198 uplink/194 downlink/195 transmitted/234 received
+PCM blocks, sends BYE for the old epoch and accepts one cause41 clear in
+epoch2, with no redial or dialog/media replay. Physical End/Menu recovery,
+saved/restored/final pixels, retained RTC, exact card and valid journal pass.
+
+```sh
+make verify-8290-sip-outgoing-media-restore \
+  SIP_WAVEFORM_NVRAM_DIR="$PWD/tmp/nsb7-pin-registration-cold/nvram" \
+  RUN_DIR=tmp/nsb7-sip-outgoing-media-restore-fresh
+```
+
+Incoming connected and unanswered call-phase restoration on the PCM-enabled
+composition remain outstanding; prior signaling-only runs do not cover them.
+This acceptance intentionally clears the live call after restore, not
+seamless external-call resumption or native DSP speech.
 Running an audio producer faster than wall-clock SIP is not valid media
 acceptance: the unthrottled diagnostic left RTP queued past release and
 failed the closed-session check. No device timing was altered to hide it.

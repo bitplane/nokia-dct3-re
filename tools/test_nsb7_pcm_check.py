@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsb7_pcm_check import verify
+from tools.nsb7_pcm_check import verify, verify_before_restore
 
 
 class PCMTests(unittest.TestCase):
@@ -37,6 +37,18 @@ class PCMTests(unittest.TestCase):
     def test_no_transfers(self):
         with self.assertRaises(ValueError):
             verify('\n'.join(row for row in self.text.splitlines() if 'speech tick' not in row))
+
+    def test_saved_call_requires_positive_exact_pre_save_pcm(self):
+        text = self.text.replace('nsb7_outgoing_call_input: key=End',
+                                 'sip_state: saved\nnsb7_outgoing_call_input: key=End')
+        self.assertEqual(verify_before_restore(text)['uplink'], 100)
+        for bad in (text.replace('sip_state: saved', ''),
+                    text.replace('downlink=93', 'downlink=0'),
+                    text.replace('002cb93e', '002c338e'),
+                    text.replace('752000', '752001'),
+                    'sip_state: saved\n' + self.text):
+            with self.subTest(bad=bad[-60:]), self.assertRaises(ValueError):
+                verify_before_restore(bad)
 
 
 if __name__ == '__main__':

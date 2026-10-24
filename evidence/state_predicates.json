@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb7_connected_outgoing_pcm_sip_restoration",
+      "owner": "nsb7_host_call_lifecycle",
+      "status": "satisfied",
+      "predicate": "A connected NSB-7 HLE SIP call executes own documented PCM before exact handset restoration and disposes its external dialog without replay",
+      "current": "tmp/nsb7-sip-outgoing-media-restore-v2 passes actual save60/load with all37 ARM/banked registers, RAM and time equal. Own speech enable and at least100 uplink/50 downlink blocks precede save with exact documented clocks. One discarded epoch inventories198 uplink/194 downlink/195 host PCM transmitted/234 received; the old SIP dialog receives BYE, the request republishes under epoch2 and one accepted cause41 termination clears CC/RR without redial. Physical End/Menu recovery, exact saved/restored/cleanup/final frames, complete card equality, own valid flash and retained RTC remain required. This deliberately clears rather than resumes an external dialog. Incoming/unanswered restoration, native DSP speech and seamless media continuation are not qualified.",
+      "evidence": ["docs/8290_bringup.md", "docs/external_call_bridge.md", "tools/run_noki8290_sip_media.py", "tools/run_sip_handset_gate.py", "tools/nsb7_sip_check.py", "tools/nsb7_pcm_check.py", "tools/test_nsb7_pcm_check.py", "tools/test_nsb7_sip_check.py", "gates.json"]
+    },
+    {
       "id": "nsb7_sip_physical_audio_waveforms",
       "owner": "nsb7_host_audio",
       "status": "satisfied",

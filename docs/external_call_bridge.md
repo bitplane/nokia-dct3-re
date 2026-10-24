@@ -1414,9 +1414,15 @@ provisioning chain. The reusable `run_noki8290_sip_media.py` validates that
 source, records its hashes, preserves it and runs the exact product checker.
 Incoming also requires a fresh handset-readiness artifact.
 
-The previously qualified restoration fixtures remain explicitly
-`--signaling-only` fixtures on the pre-PCM configuration; media-aware
-restoration must be requalified before claiming parity on the current build.
+Connected outgoing restoration on the PCM-enabled composition now passes
+`verify-8290-sip-outgoing-media-restore`: own exact PCM before save,
+positive four-counter discarded-epoch inventory, exact architecture/time
+restoration, old-dialog BYE, one new-epoch cause41 clear and no redial.
+The product's final checker retains exact saved/restored/cleanup pixels,
+whole-card persistence, own flash validity and retained clock.
+Other previously qualified restoration fixtures remain explicitly
+`--signaling-only` fixtures on the pre-PCM configuration; incoming connected
+and unanswered phases must be requalified on the current build.
 Connected outgoing restoration was separately
 qualified by `nsb7_sip_outgoing_restore.lua` and `--restore-outgoing`: exact37-register/
 RAM/time restoration invalidates the original SIP dialog with BYE, one cause41
@@ -1433,7 +1439,7 @@ are permitted. Pending outgoing restoration independently uses SIP180 and
 `--restore-outgoing`: one CANCEL/487, epoch2 request republication and CC/RR
 clearing before End66, without redial, CONNECT or media. The handset remains
 Calling/awaiting the host decision; SIP180 is not injected as GSM ALERTING.
-Only the reviewed complete Calling snapshots qualify. Restoration with media and
+Only the reviewed complete Calling snapshots qualify. Other restoration-with-media and
 multiple-call combinations remain rejected. The signaling-only result
 explicitly keeps speech/native-DSP claims false and requires zero handset
 qualified uplink media. Erased `good=0` placeholders after load do not qualify as

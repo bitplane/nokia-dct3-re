@@ -113,7 +113,9 @@ def check_incoming_restore(text,phase='connected'):
         raise ValueError('restored incoming has duplicate/outgoing admission or qualified media')
 
 
-def check_restore(text,connected=True):
+def check_restore(text,connected=True,*,media=False):
+    if media and not connected:
+        raise ValueError('pending call cannot qualify connected media')
     check_restored_architecture(text)
     primary=check_inputs(text,delay=26)
     cleanup=list(re.finditer(r'nsb7_sip_cleanup_input: key=(.*?) state=([01]) t=([0-9.]+)',text))
@@ -152,7 +154,10 @@ def check_restore(text,connected=True):
             raise ValueError('pending outgoing restore connected')
         if text.index('state id=1 epoch=2 phase=ended')>primary[-2].start():
             raise ValueError('pending outgoing restore waited for physical End')
-    if re.search(r'media direction=uplink [^\n]*good=1\b',text) or 'dsp_hle: speech tick' in text:
+    if media:
+        from tools.nsb7_pcm_check import verify_before_restore
+        verify_before_restore(text)
+    elif re.search(r'media direction=uplink [^\n]*good=1\b',text) or 'dsp_hle: speech tick' in text:
         raise ValueError('unclocked restoration produced qualified handset media')
 
 
@@ -199,7 +204,7 @@ def main():
     parser.add_argument('image',type=Path)
     parser.add_argument('run',type=Path)
     parser.add_argument('--media', action='store_true',
-                        help='qualify the single outgoing clocked HLE media fixture')
+                        help='qualify clocked HLE media or connected outgoing media restoration')
     modes=parser.add_mutually_exclusive_group()
     modes.add_argument('--incoming',action='store_true')
     modes.add_argument('--restore-outgoing',action='store_true')
@@ -209,14 +214,14 @@ def main():
     args=parser.parse_args()
     incoming=args.incoming or args.restore_incoming or args.restore_incoming_alerting
     restoring=args.restore_outgoing or args.restore_outgoing_pending or args.restore_incoming or args.restore_incoming_alerting
-    if args.media and restoring:
-        parser.error('--media currently requires a single call without restoration')
+    if args.media and restoring and not args.restore_outgoing:
+        parser.error('--media restoration currently requires connected outgoing')
     phase='alerting' if args.restore_incoming_alerting else 'connected'
     try:
         contract(args.image.read_bytes())
         text=(args.run/'error.log').read_text()
         if args.restore_incoming or args.restore_incoming_alerting: check_incoming_restore(text,phase=phase)
-        elif args.restore_outgoing or args.restore_outgoing_pending: check_restore(text,connected=not args.restore_outgoing_pending)
+        elif args.restore_outgoing or args.restore_outgoing_pending: check_restore(text,connected=not args.restore_outgoing_pending,media=args.media)
         else: check(text,incoming=incoming,media=args.media)
         check_clock(text,finish=68 if incoming else 76)
         storage=args.run/'nvram/nsb7hle'
@@ -257,7 +262,7 @@ def main():
             if not (args.run/f'sta/nsb7hle/nsb7_sip_{direction}.sta').is_file():
                 raise ValueError('actual handset snapshot file absent')
             if incoming: verify_restore(args.run,remote,phase,'8290',signaling_only=True)
-            else: verify_outgoing_restore(args.run,remote,not args.restore_outgoing_pending,'8290',signaling_only=True)
+            else: verify_outgoing_restore(args.run,remote,not args.restore_outgoing_pending,'8290',signaling_only=not args.media)
         else:
             verify_success(args.run,remote,SimpleNamespace(product='8290',incoming=incoming,
                            signaling_only=not args.media,restore_idle=False))
