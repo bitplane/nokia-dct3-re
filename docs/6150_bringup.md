@@ -17,6 +17,39 @@ not factory provisioning or fitted-chip proof. Negative saturated/original-
 retry controls remain distinct. No readiness event or firmware flag is
 synthesized.
 
+### Card-originated Toolkit DISPLAY TEXT
+
+The qualified `nsm1r4t` composition accepts an explicit Phase-2+ external
+card without changing the complete PIN-enabled card image or handset storage.
+Own firmware reads EF_PHASE03, publishes five-byte TERMINAL PROFILE
+`0b41ff7700`, then polls STATUS9116 and FETCHes the22-byte card-originated
+`DCT3 SAT` command. The65s LCD shows that exact text and Back softkey.
+Physical Menu at68s dismisses it; only afterward does firmware send terminal
+response `810301218002028281030100`, accepted with9000. The70s frame is idle.
+This differs from the6130's automatic result30 refusal; neither result is
+inherited from the sibling profile.
+
+The matched Phase-2 control uses the same cold input and physical contacts,
+changing only SATCFG from1 to0. It reads EF_PHASE02 and emits no proactive
+profile/FETCH/response; the same Menu contact opens Messages instead of
+dismissing a prompt. Both runs preserve the entire qualified16KiB EEPROM,
+original3570-byte card and own executable flash. Initial storage hashes and
+CFG comparison exclude unrelated provisioning changes. Authentication and
+raw SIMI TX/RX, statuses, payload, response ordering and exact pixels are
+checked, not just the displayed text.
+
+```sh
+.venv/bin/python tools/nsm1_toolkit_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-toolkit-positive --mame mame/mame
+.venv/bin/python tools/nsm1_toolkit_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-toolkit-control --control --mame mame/mame
+```
+
+Omit `--mame` to recheck retained captures. Fresh outputs are required for
+execution. The existing diagnostic-template policy03ca=00, nominal ADC2
+and unproved NSE-1 mask remain explicit. This qualifies one Toolkit command,
+not every advertised capability, factory provisioning, RF or native speech.
+
 ### Native idle restoration and physical continuation
 
 An independent54s cold process from the qualified original PIN-enabled

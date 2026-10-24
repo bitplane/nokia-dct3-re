@@ -530,6 +530,16 @@ NHM-6 v4.50 (3330) reaches the same FETCH boundary but returns `20 01`
 lifecycle. That result is preserved as a product limitation, not rewritten as
 card or transport failure.
 
+The separate NSM-1 v5.23 native-compatibility composition (6150) independently
+advertises `0b41ff7700`, displays the same card payload and returns result00
+only after physical Menu. Matched Phase-2 input has no proactive traffic;
+complete handset/card storage is unchanged. The NSK-3 v5.61 composition
+(6130) instead advertises `03018000` and automatically returns result30
+(beyond ME capabilities), without displaying the text. These observed
+product-specific outcomes must not be unified into a fabricated success.
+Own fixture scope and gates are in [6150 bring-up](6150_bringup.md) and
+[6130 bring-up](6130_bringup.md).
+
 NSM-5 v5.40 (5210) independently submits a nine-byte TERMINAL PROFILE, FETCHes
 the same DISPLAY TEXT command, renders `DCT3 SAT`, and returns result `00`
 after a physical left-softkey press. The longer profile is an observed
