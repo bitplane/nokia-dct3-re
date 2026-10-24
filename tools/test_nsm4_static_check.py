@@ -4,7 +4,8 @@ import unittest
 from tools.nsm4_static_check import (TABLE, inspect, read_catalogue,
                                     peripheral_contract, PERIPHERAL_FRAGMENTS,
                                     keymap_contract, catalogue_consumer,
-                                    storage_display_contract, STORAGE_DISPLAY_FRAGMENTS)
+                                    storage_display_contract, STORAGE_DISPLAY_FRAGMENTS,
+                                    flash_program_contract)
 
 
 class Nsm4StaticTest(unittest.TestCase):
@@ -101,6 +102,10 @@ class Nsm4StaticTest(unittest.TestCase):
             changed[address - 0x200000] ^= 1
             with self.assertRaises(ValueError):
                 storage_display_contract(changed)
+
+    def test_flash_program_requires_actual_pinned_payload(self):
+        with self.assertRaisesRegex(ValueError, 'program routine differs'):
+            flash_program_contract(bytearray(0x290000))
 
 
 if __name__ == '__main__':

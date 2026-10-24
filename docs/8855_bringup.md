@@ -5,8 +5,9 @@
 Own v5.18 MCU and PPM regions are normalized and statically qualified. No
 machine profile, graphical boot, input, storage or radio acceptance is claimed.
 Own GENSIO and keypad register operations are now pinned. The next questions
-are the RAM-resident flash program/identification routines and flash part
-contract, before choosing an existing device composition. The storage callback
+are flash identification semantics and capacity-compatible erased-storage
+execution, before promoting any fitted-part claim. The program command family
+is now recovered. The storage callback
 initializer, display clear layout, DSP catalogue
 consumer and logical key tables are statically recovered, not runtime-qualified.
 
@@ -96,9 +97,21 @@ its preceding identification result (values 1/3 versus other values). Both
 sets install program pointer `0x15a6b1` (Thumb RAM entry `0x15a6b0`); read
 pointers are `0x3e0499` and `0x3e04fd`. Both own read routines are exactly
 `8800 46f7`: `ldrh r0,[r0]; mov pc,lr`. Thus this storage read path is
-memory-mapped halfword access, not GPIO I2C. The RAM-resident program code,
-identification result semantics, particular fitted flash and PMM location
-remain unmapped; no particular part follows from a callback address.
+memory-mapped halfword access, not GPIO I2C. Identification result semantics,
+particular fitted flash and PMM location remain unmapped; no particular part
+follows from a callback address.
+
+The copy roots at `0x3e04b0` and `0x3e0514` install respectively 120 bytes
+from `0x45e8fc..0x45e974` or 136 bytes from `0x45e974..0x45e9fc` at RAM
+`0x15a6b0`. The checker pins both complete payloads and copy roots. Both
+limit programming to the half-open window `0x580000..0x600000`, use command
+address `0x5fff00`, issue `50` (clear status), `40` (word program), write the
+data halfword, poll status bit 7 and restore array mode with `ff`. The second
+variant additionally issues `60/d0` before programming and `60/01` afterward.
+This is an Intel-style command-family requirement, not a fitted-device ID.
+The routines also inspect MAD2 `0x20073` bits `0c`; their physical protection
+meaning is not established. The acquired MCU+PPM prefix ends exactly at the
+lower programming bound; the archive does not provide those writable bytes.
 
 The initializer at `0x3cdae6` selects LCD channel `21`, pulses GPIO bit 3,
 then the `0x3cdb50..0x3cdbae` loop writes command `24`, selects banks with

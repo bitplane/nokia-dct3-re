@@ -115,6 +115,30 @@ def storage_display_contract(image):
                         'physical_panel_identification_proved': False}}
 
 
+def flash_program_contract(image):
+    variants = []
+    for start, end, digest, extra in (
+            (0x45e8fc, 0x45e974, 'a0ac023aa4dcc2e3d7cb5d07416faf152b1c9d50332b5553aa39fa8bcc41a29c', False),
+            (0x45e974, 0x45e9fc, 'dfb2c0dd075af5bfe199b841c116afec5912f2d73cb1e38d219de59ab625412c', True)):
+        body = image[start - 0x200000:end - 0x200000]
+        if hashlib.sha256(body).hexdigest() != digest:
+            raise ValueError('NSM-4 RAM flash program routine differs')
+        if struct.unpack('>4I', body[-16:]) != (0x5fff00, 0x580000, 0x600000, 0x20073):
+            raise ValueError('NSM-4 flash program literal bounds differ')
+        variants.append({'source': hex(start), 'end_exclusive': hex(end),
+                         'bytes': len(body), 'sha256': digest,
+                         'additional_unlock_relock_commands': extra})
+    for address, expected in (
+            (0x3e04b0, (0x45e8fc, 0x45e974, 0x15a6b0)),
+            (0x3e0514, (0x45e974, 0x45e9fc, 0x15a6b0))):
+        if struct.unpack_from('>3I', image, address - 0x200000) != expected:
+            raise ValueError('NSM-4 flash program copy roots differ')
+    return {'execution_address': '0x15a6b0', 'variants': variants,
+            'program_window': ['0x580000', '0x600000'],
+            'command_address': '0x5fff00', 'command_family': 'Intel-style word program',
+            'fitted_part_or_identification_table_proved': False}
+
+
 def read_catalogue(image):
     offset = TABLE - 0x200000
     if len(image) < offset + 124:
@@ -156,6 +180,7 @@ def inspect(image):
             'keymap_contract': keymap_contract(image),
             'catalogue_consumer': catalogue_consumer(image),
             'storage_display_contract': storage_display_contract(image),
+            'flash_program_contract': flash_program_contract(image),
             'bootstrap': {'identity_data_0803': 6, 'resident_call': '0x861f',
                           'fitted_mask_compatibility_proved': False},
             'scope': 'Static MCU declarations only; no upload execution, peripheral wiring, PMM or resident mask established'}
