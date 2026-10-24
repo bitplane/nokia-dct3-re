@@ -53,13 +53,11 @@ task batch with flags88. The48s panel is an unaccepted reversed CONTACT
 SERVICE failure frame, not graphical boot success.
 
 The v5.00 backup's independently replayed low-record arithmetic is1988
-versus stored00001988. Its distinct firmware checksum call sites have not
-yet been aligned. Its50s trial remains blank and native PC913e/9140 matches
-the independently documented pending serial-control loop family in
-`8810_bringup.md`; no completion or clock is inferred from that similarity.
-The next software question is the own v5.00 serial-control caller and
-whether its valid stored-input path reaches the same pending-port contract.
-Do not transplant v5.01 flags, addresses, checksum fixes or UI expectations.
+versus stored00001988. Its own checksum/read call sites are now aligned and
+runtime-qualified below. Its50s trial remains blank at native913e/9140;
+the focused serial window identifies the own producer and pending-port
+contract rather than importing the8810's payload or MCU addresses.
+Do not transplant v5.01 flags, checksum fixes or UI expectations.
 
 ```sh
 .venv/bin/python tools/nse5_fullbackup_check.py roms/research/nse5-cosconor
@@ -73,6 +71,67 @@ Add `--mame mame/mame` with a fresh directory to execute a trial. Raw journal
 and identity observations stay in ignored captures; durable reports use
 hashes rather than publishing handset identity bytes. The following sections
 describe the separate-PMM BIOS501 control unless explicitly stated otherwise.
+
+### Own v5.00 serial-control boundary
+
+The intact v5.00 image independently contains the low-record validator at
+3af24e. Logical reader4eb934 returns64bytes to its caller3af263;
+the two observed reads compute1988 against stored00001988, matching the independent
+journal arithmetic. This is a live stored-input check, not only a desk
+calculation or a substituted checksum.
+
+Own initializer calls3d72b4/3d72bc set configuration tuple `(9,4,1,1)`
+through3d6efe, then enter two-argument wrapper3d6e9c with `(0,0)`.
+That wrapper's zero branch delegates `(0,0,0)` to3e3b3a rather than directly
+constructing the8810-style packet. Later controller initializer3e3640 calls
+builder3e35a8 with `(0,1)` at3e365c. The task3 post at3bb680 has caller
+3e35d5 and exact object `0002044c0000010a`. The four-byte body is therefore
+`0000,010a`, not NSE-6's `0080,0104`. The same stored configuration tuple
+does not imply the same lower packet or peripheral timing words.
+
+An aligned direct-BL candidate census over the310000-byte MCU extent finds
+four callers of3e35a8, eight of3e3b3a, four of3d6e9c and four of4d7f12.
+This quantifies direct candidates only: indirect/computed callers and
+literal/code ambiguity are not closed. The observed builder path is one
+of those candidates, with live argument and call-edge controls.
+
+At2.224998711s the native restart enters9129 with control06f3=0000,
+pending06f4=0800, timing06f5/06f6=0876/0015 and saved returns9258/3bcf.
+Portable port observation confirms0 reads001d then writes000d at9251;
+the restart subsequently restores001d at913a. Port36 writes809c at9132,
+then polls that same value at9140 while bit4000 remains clear.
+The six-second window records21,907,415 reads, five writes and no9144
+completion entry. Two initialization cycles account for four earlier0080
+writes; they must not be collapsed to the8810's single-cycle count.
+Two earlier port34 writes carry1eff; port35 has no accesses. These are
+observed counts, not a physical baud rate or delivered serial traffic.
+
+Live readback matches all four words at23e4 and59 words at9009..9043
+against the checked resident helper sequences. No uploaded helper replacement
+or hidden publisher of4000 is established in this execution. The result
+corroborates the shared pending-port family from `8810_bringup.md`, but the
+physical block, ready-bit trigger, clock and latency remain unproved.
+No status constant, receive bytes, firmware result or fabricated completion
+is supplied. Completing this branch requires evidence for that peripheral
+contract, not another MCU startup event or a borrowed control payload.
+
+The focused observer deliberately ends at6s: tapping millions of repeated
+poll reads makes a50s probe exceed its wall-clock cap. The separate unmodified
+50s observation above remains qualified; a short serial capture cannot
+substitute for it. Four focused tests cover own code/caller extraction,
+checksum/producer/pending-port ordering, sibling-value negatives and distinct
+short/default observation horizons.
+
+```sh
+.venv/bin/python tools/nse5_fullbackup_check.py roms/research/nse5-cosconor \
+  --bios 500-full --serial-window --run tmp/nse5-v500-serial-accepted
+.venv/bin/python tools/nse5_v500_serial_check.py roms/research/nse5-cosconor \
+  tmp/nse5-v500-serial-accepted
+```
+
+Add `--mame mame/mame` to the first command with a fresh directory to run
+the focused fixture. Both checks are required: whole-input provenance and
+bounded native/pixel observation first, then own static/serial contract.
 
 ### Matched current separate-PMM control
 

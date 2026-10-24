@@ -3,7 +3,7 @@ local machine = manager.machine
 local cpu = assert(machine.devices[':maincpu'])
 local dsp = assert(machine.devices[':dsp_c54x:cpu'])
 local index = 1
-local times = {1,2,4,8,16,24,36,48}
+local times = _G.nse5_full_sample_times or {1,2,4,8,16,24,36,48}
 emu.register_frame_done(function()
     local now = machine.time:as_double()
     if times[index] and now >= times[index] then

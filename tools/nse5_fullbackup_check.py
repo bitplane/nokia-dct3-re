@@ -74,13 +74,13 @@ def audit(directory, roms):
     return result
 
 
-def observation(text, returncode):
+def observation(text, returncode, times=(1,2,4,8,16,24,36,48)):
     if returncode or 'LUA ERROR' in text or 'Error in' in text:
         raise ValueError('native trial or observer failed')
     rows = re.findall(r'nse5_full_sample: index=(\d+) t=([0-9.]+) arm=([0-9a-f]{8}) sp=([0-9a-f]{8}) dsp=([0-9a-f]{6}) stopped=([01]) idle=([01]) observer_writes=0', text)
-    if (len(rows) != 8 or text.count('nse5_full_sample:') != 8
-            or [int(row[0]) for row in rows] != list(range(1, 9))
-            or any(abs(float(row[1])-time) > .1 for row, time in zip(rows, (1,2,4,8,16,24,36,48)))):
+    if (len(rows) != len(times) or text.count('nse5_full_sample:') != len(times)
+            or [int(row[0]) for row in rows] != list(range(1, len(times)+1))
+            or any(abs(float(row[1])-time) > .1 for row, time in zip(rows, times))):
         raise ValueError('bounded native observations incomplete')
     # A stopped core is a reportable negative boundary, never accepted boot.
     return dict(samples=[dict(time=float(row[1]), arm=row[2], sp=row[3],
@@ -141,7 +141,9 @@ def check_v501_boundary(text):
                 second_task_batch_released=False)
 
 
-def execute(directory, roms, binary, run, bios):
+def execute(directory, roms, binary, run, bios, serial_window=False):
+    if serial_window and bios != '500-full':
+        raise ValueError('serial window requires own v5.00 input')
     admission = audit(directory, roms)
     if run.exists():
         raise ValueError('fresh isolated trial required')
@@ -154,24 +156,26 @@ def execute(directory, roms, binary, run, bios):
         if hashlib.sha1(data).hexdigest() != digest:
             raise ValueError('declared ROM4 compatibility mask changed')
         (target / name).write_bytes(data)
-    script = Path(__file__).with_name('nse5_fullbackup_v501_observe.lua' if bios == '501d-full'
-                                    else 'nse5_fullbackup_observe.lua').resolve()
+    script_name = ('nse5_v500_serial_window.lua' if serial_window else
+                   'nse5_fullbackup_v501_observe.lua' if bios == '501d-full' else
+                   'nse5_fullbackup_observe.lua')
+    script = Path(__file__).with_name(script_name).resolve()
     command = [str(binary), 'nse5r4t', '-bios', bios, '-rompath', str(run / 'roms'),
                '-noreadconfig', '-video', 'none', '-sound', 'none', '-nothrottle',
-               '-log', '-verbose', '-seconds_to_run', '50',
+               '-log', '-verbose', '-seconds_to_run', '6' if serial_window else '50',
                '-joystickprovider', 'none', '-midiprovider', 'none',
                '-autoboot_delay', '0', '-autoboot_script', str(script)]
     metadata = dict(command=command, input=admission[bios],
                     mame_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
                     script_sha256=hashlib.sha256(script.read_bytes()).hexdigest(),
                     copied_guest_ram=False, donor_storage=False,
-                    fitted_mask_proved=False, saved_state_copied=False)
+                    fitted_mask_proved=False, saved_state_copied=False, serial_window=serial_window)
     (run / 'input.json').write_text(json.dumps(metadata, indent=2)+'\n')
     with (run / 'console.log').open('w') as output:
         process = subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT, timeout=180)
     (run / 'exit_status.json').write_text(json.dumps(dict(returncode=process.returncode))+'\n')
     text = (run / 'error.log').read_text()
-    result = observation(text, process.returncode)
+    result = observation(text, process.returncode, (1,2,4,5) if serial_window else (1,2,4,8,16,24,36,48))
     if bios == '501d-full':
         result['journal'] = check_v501_cache((directory / IMAGES[bios][0]).read_bytes(), text)
         result['boundary'] = check_v501_boundary(text)
@@ -179,15 +183,19 @@ def execute(directory, roms, binary, run, bios):
     return result
 
 
-def check_run(directory, roms, run, bios):
+def check_run(directory, roms, run, bios, serial_window=False):
+    if serial_window and bios != '500-full':
+        raise ValueError('serial window requires own v5.00 input')
     admission = audit(directory, roms)
     metadata = json.loads((run / 'input.json').read_text())
     if (metadata.get('input') != admission[bios] or metadata.get('copied_guest_ram') is not False
             or metadata.get('donor_storage') is not False or metadata.get('fitted_mask_proved') is not False
-            or metadata.get('saved_state_copied') is not False):
+            or metadata.get('saved_state_copied') is not False
+            or metadata.get('serial_window', False) != serial_window):
         raise ValueError('whole-backup trial provenance differs')
     command = metadata['command']
-    if command[1] != 'nse5r4t' or command[command.index('-bios')+1] != bios:
+    if (command[1] != 'nse5r4t' or command[command.index('-bios')+1] != bios
+            or command[command.index('-seconds_to_run')+1] != ('6' if serial_window else '50')):
         raise ValueError('trial selected a different composition or BIOS')
     inputs = run / 'roms/nse5r4t'
     image = (directory / IMAGES[bios][0]).read_bytes()
@@ -197,12 +205,13 @@ def check_run(directory, roms, run, bios):
         if hashlib.sha1((inputs / name).read_bytes()).hexdigest() != digest:
             raise ValueError('trial resident compatibility input changed')
     text = (run / 'error.log').read_text()
-    result = observation(text, json.loads((run / 'exit_status.json').read_text())['returncode'])
+    times = (1,2,4,5) if serial_window else (1,2,4,8,16,24,36,48)
+    result = observation(text, json.loads((run / 'exit_status.json').read_text())['returncode'], times)
     if bios == '501d-full':
         result['journal'] = check_v501_cache(image, text)
         result['boundary'] = check_v501_boundary(text)
     result['frames'] = {}
-    for time in (1,2,4,8,16,24,36,48):
+    for time in times:
         with Image.open(run / f'snap/nse5_full_{time:02}.png') as frame:
             if frame.size != (96,65):
                 raise ValueError('whole-backup display geometry differs')
@@ -217,16 +226,18 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--run', type=Path)
     parser.add_argument('--bios', choices=IMAGES)
+    parser.add_argument('--serial-window', action='store_true', help='six-second v5.00 passive serial census')
     args = parser.parse_args()
     try:
         result = audit(args.directory, args.roms)
-        if any((args.mame, args.run, args.bios)):
+        if any((args.mame, args.run, args.bios, args.serial_window)):
             if not all((args.run, args.bios)):
                 raise ValueError('trial requires --run and --bios together')
             if args.mame:
                 execute(args.directory.resolve(), args.roms.resolve(), args.mame.resolve(),
-                        args.run.resolve(), args.bios)
-            result = check_run(args.directory.resolve(), args.roms.resolve(), args.run.resolve(), args.bios)
+                        args.run.resolve(), args.bios, args.serial_window)
+            result = check_run(args.directory.resolve(), args.roms.resolve(), args.run.resolve(), args.bios,
+                               args.serial_window)
     except (OSError, ValueError, KeyError, zipfile.BadZipFile, subprocess.TimeoutExpired) as error:
         parser.exit(1, f'NSE-5 whole-backup audit FAIL: {error}\n')
     print(json.dumps(result, indent=2))
