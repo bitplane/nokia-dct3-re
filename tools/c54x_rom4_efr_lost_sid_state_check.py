@@ -11,11 +11,12 @@ if __package__ in (None, ''):
 
 from tools.c54x_rom4_efr_state_check import parse, POLICY
 
-BOUNDARY = re.compile(r'efr_boundary: kind=(R2|LSF|pitch|code) values=([0-9a-f]+)')
+WIDTHS = dict(R2=10, LSF=10, pitch=1, code=1, RAW=160, LPC=44)
+BOUNDARY = re.compile(r'efr_boundary: kind=(R2|LSF|pitch|code|RAW|LPC) values=([0-9a-f]+)')
 NATIVE_POLICY = re.compile(r'efr_gain_policy: previous=([0-9a-f]{4}) gain=([0-9a-f]{4}) candidate_b=([0-9a-f]{10})')
 
 
-def parse_native(text, *, frames=98):
+def parse_native(text, *, frames=98, synthesis=False):
     groups = []
     for line in text.splitlines():
         if line == 'efr_boundary: kind=entry':
@@ -32,13 +33,13 @@ def parse_native(text, *, frames=98):
         group = groups[index]
         if group != groups[index + 1]:
             raise ValueError('native boundaries differ after restoration')
-        fields = {kind: [] for kind in ('R2', 'LSF', 'pitch', 'code', 'policy')}
+        fields = {kind: [] for kind in (*WIDTHS, 'policy')}
         order = []
         for line in group:
             match = BOUNDARY.fullmatch(line)
             if match:
                 kind, values = match.groups()
-                if len(values) != (40 if kind in ('R2', 'LSF') else 4):
+                if len(values) != WIDTHS[kind] * 4:
                     raise ValueError('wrong native field width')
                 fields[kind].extend(int(values[i:i + 4], 16) for i in range(0, len(values), 4))
             else:
@@ -47,7 +48,10 @@ def parse_native(text, *, frames=98):
             order.append(kind)
         with_policy = ['R2', 'LSF'] + ['pitch', 'policy', 'code'] * 4
         without_policy = ['R2', 'LSF'] + ['pitch', 'code'] * 4
-        if order not in (with_policy, without_policy):
+        accepted = (with_policy + ['RAW', 'LPC'], without_policy + ['RAW', 'LPC'])
+        if not synthesis:
+            accepted += (with_policy, without_policy)
+        if order not in accepted:
             raise ValueError('native semantic boundary order differs')
         frames.append(fields)
     return frames
@@ -95,21 +99,22 @@ def compare_prefix(frames, reference):
                 complete_fixture_claim=False, handset_audio_claim=False)
 
 
-def characterize(native, reference):
-    frames = parse_native(native, frames=518)
+def characterize(native, reference, *, synthesis=False):
+    frames = parse_native(native, frames=518, synthesis=synthesis)
     prefix = compare_prefix(frames[:98], reference)
     states, gains = parse(reference, frames=518)
     boundaries = {}
-    for kind in ('R2', 'LSF', 'pitch', 'code'):
+    kinds = ('R2', 'LSF', 'pitch', 'code') + (('RAW', 'LPC') if synthesis else ())
+    for kind in kinds:
         differences = []
         for index, actual in enumerate(frames):
-            expected = (states[index, kind] if kind in ('R2', 'LSF') else
+            expected = (states[index, kind] if kind in ('R2', 'LSF', 'RAW', 'LPC') else
                         [gains[index, kind, sub] for sub in range(4)])
             count = sum(a != b for a, b in zip(actual[kind], expected))
             if count:
                 differences.append(dict(frame=index, words=count))
         boundaries[kind] = dict(
-            compared_words=518 * (10 if kind in ('R2', 'LSF') else 4),
+            compared_words=518 * (4 if kind in ('pitch', 'code') else WIDTHS[kind]),
             differing_frames=differences,
             differing_words=sum(row['words'] for row in differences),
             first_difference=differences[0]['frame'] if differences else None,
@@ -126,10 +131,15 @@ def main():
     parser.add_argument('--complete', action='store_true',
                         help='characterize all 518 frames; never promotes reference conformance')
     parser.add_argument('--output', type=Path, help='retain the report with input hashes')
+    parser.add_argument('--synthesis', action='store_true',
+                        help='require complete raw synthesis/LPC boundaries as well as gains')
     args = parser.parse_args()
+    if args.synthesis and not args.complete:
+        parser.error('--synthesis requires --complete')
     try:
-        report = (characterize if args.complete else compare)(
-            args.native.read_text(), args.reference.read_text())
+        native, reference = args.native.read_text(), args.reference.read_text()
+        report = (characterize(native, reference, synthesis=args.synthesis) if args.complete
+                  else compare(native, reference))
         report['input_sha256'] = {
             name: hashlib.sha256(path.read_bytes()).hexdigest()
             for name, path in (('native_log', args.native), ('reference_log', args.reference))}

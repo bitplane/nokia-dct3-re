@@ -3,7 +3,7 @@ import unittest
 from tools.c54x_rom4_efr_lost_sid_state_check import compare, parse_native, characterize
 
 
-def fixture(*, complete=False, difference_frame=None):
+def fixture(*, complete=False, difference_frame=None, synthesis=False, raw_difference_frame=None):
     native, reference = [], []
     for frame in range(518):
         group = ['efr_boundary: kind=entry']
@@ -25,6 +25,10 @@ def fixture(*, complete=False, difference_frame=None):
             group.append(f'efr_boundary: kind=code values={code:04x}')
         for kind, width in (('RAW', 160), ('LPC', 44)):
             reference.append(f'EFRSTATE frame={frame} kind={kind} values=' + '0000' * width)
+            if synthesis:
+                values = ('0001' + '0000' * (width - 1)
+                          if frame == raw_difference_frame and kind == 'RAW' else '0000' * width)
+                group.append(f'efr_boundary: kind={kind} values=' + values)
         if frame == 97:
             for sub in range(4):
                 reference.append(f'EFRPOLICY frame=97 subframe={sub} prev_bf=0001 previous_gain={10 if sub == 0 else 8:04x} value=0008')
@@ -34,6 +38,20 @@ def fixture(*, complete=False, difference_frame=None):
 
 
 class LostSidStateTests(unittest.TestCase):
+    def test_synthesis_characterization_checks_whole_frames(self):
+        native, reference = fixture(complete=True, synthesis=True, raw_difference_frame=118)
+        result = characterize(native, reference, synthesis=True)
+        self.assertEqual(result['boundaries']['RAW']['compared_words'], 82880)
+        self.assertEqual(result['boundaries']['RAW']['differing_frames'],
+                         [dict(frame=118, words=1)])
+        self.assertEqual(result['boundaries']['LPC']['compared_words'], 22792)
+        self.assertEqual(result['boundaries']['LPC']['differing_words'], 0)
+        with self.assertRaisesRegex(ValueError, 'boundary order'):
+            characterize(*fixture(complete=True), synthesis=True)
+        with self.assertRaisesRegex(ValueError, 'field width'):
+            characterize(native.replace('kind=RAW values=', 'kind=RAW values=0000'),
+                         reference, synthesis=True)
+
     def test_complete_semantic_characterization_retains_known_prefix(self):
         report = characterize(*fixture(complete=True, difference_frame=100))
         self.assertEqual(report['replayed_frames'], 518)

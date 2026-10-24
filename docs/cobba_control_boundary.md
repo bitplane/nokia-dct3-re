@@ -3059,6 +3059,22 @@ differences rather than accepting them as an oracle. Input-log hashes accompany
 the retained report. Default checker mode still requires the strict 98-frame
 prefix; neither mode claims codec conformance or handset speech.
 
+Add `--synthesis` to the complete checker to require the original `c907`
+pre-postprocessing boundary as well. All 22,792 LPC coefficient words match
+the reference; 3,335 of 82,880 raw synthesis samples differ, only in frames
+97..118. Raw synthesis and final PCM are both exact again from frame 119 onward.
+Atomic/staged semantic logs and native PCM remain byte-identical. This rules
+out a coefficient mismatch and a postprocessing-only origin for this fixture;
+it does not prove every excitation/filter history or that the known three
+gain differences are the sole cause of every subsequent sample difference.
+The strict control still fails at frame 97 with 86 final-PCM differences.
+
+The observer emits long vectors in 16-word debugger-command chunks while
+retaining a single complete record per boundary. MAME's 128-parameter command
+limit rejects a single 160-word action; absent RAW/LPC records must fail the
+checker, not imply equality. Synthesis mode rejects incomplete widths, missing
+boundaries and altered replay, and is available only with complete mode.
+
 ### Native EFR active-speech erasures
 
 Atomic and staged execution complete all 163 frames and replay 65,440 ordinary
