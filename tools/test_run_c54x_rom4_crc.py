@@ -27,6 +27,25 @@ from tools.run_c54x_rom4_crc import check_rf_bitmap, check_rf_pairs
 
 
 class Rom4HelperResultTest(unittest.TestCase):
+    def test_lost_sid_requires_every_frame_replay_and_frontend(self):
+        frames = '\n'.join(f'ROM4 EFR lost SID decoder comparison: frame={i} mismatches=0' for i in range(518))
+        replay = 'TMS320C54x ROM4 EFR lost SID decoder replay: PASS frames=518 ram_words=65440 checkpoints=frame_input handset_audio_claim=0'
+        marker = 'TMS320C54x ROM4 EFR lost SID decoder: PASS frames=518 samples=82880 lost_sid=2 mismatches=0 handset_audio_claim=0'
+        complete = 'Fatal error: TMS320C54x ROM4 EFR lost SID decoder complete'
+        text = '\n'.join((frames, replay, marker, complete))
+        check_result(text, 3, efr_lost_sid=True)
+        staged = 'ROM4 EFR lost SID decoder frontend: staged handset_audio_claim=0\n' + text
+        check_result(staged, 3, efr_lost_sid=True, staged=True)
+        for bad in (text.replace(replay, ''), text.replace('frame=97 mismatches=0', 'frame=97 mismatches=1'),
+                    text.replace('frame=517 mismatches=0', 'frame=516 mismatches=0'),
+                    text.replace('lost_sid=2', 'lost_sid=0'), text.replace(complete, '')):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, efr_lost_sid=True)
+        with self.assertRaises(ValueError):
+            check_result(text, 0, efr_lost_sid=True)
+        with self.assertRaises(ValueError):
+            check_result(text, 3, efr_lost_sid=True, staged=True)
+
     def test_native_rf_pair_math_and_history_require_both_tc_paths(self):
         marker='TMS320C54x ROM4 RF pairs: PASS cases=32 vectors=8 tc=2 frct=2 replay=32 ram_words=65440 dot_cross_both_tc=1 history_copy_tc_only=1 rf_acquisition_claim=0'
         complete='Fatal error: TMS320C54x ROM4 RF pairs complete'
@@ -73,6 +92,7 @@ class Rom4HelperResultTest(unittest.TestCase):
             ('efr-enc-homing', 'efr-ehome-pipe', (('efr_homing_encoder_pcm', 'homing_enc.inp'), ('efr_homing_encoder_serial', 'homing_enc.cod'))),
             ('efr-homing', 'efr-homing-pipe', (('efr_homing_input', 'homing.dec'), ('efr_homing_pcm', 'homing.out'))),
             ('efr-invalid-sid', 'efr-isid-pipe', (('efr_invalid_sid_input', 'invalid_sid.dec'), ('efr_invalid_sid_pcm', 'invalid_sid.out'))),
+            ('efr-lost-sid', 'efr-lsid-pipe', (('efr_lost_sid_input', 'lost_sid.dec'), ('efr_lost_sid_pcm', 'lost_sid.out'))),
             ('efr-erasure', 'efr-erasure-pipe', (('efr_erasure_input', 'erasure.dec'), ('efr_erasure_pcm', 'erasure.out'))),
             ('efr-loss-observe', 'efr-loss-pipe', (('efr_erasure_input', 'erasure.dec'), ('efr_erasure_pcm', 'erasure.out'))),
         )

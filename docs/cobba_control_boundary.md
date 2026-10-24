@@ -2912,7 +2912,7 @@ not native RF SID detection, all corruption patterns, homing/error combinations,
 published conformance vectors or handset speech transport. No CPU, codec state,
 production clock or reference PCM was altered to obtain agreement.
 
-### Reference-only lost-SID muting fixture
+### Lost-SID muting and native recovery difference
 
 `tools/run_efr_lost_sid_reference.py` prepares the untested previous-muting
 branch using channel inputs, not internal state edits. Starting from the
@@ -2930,11 +2930,41 @@ the unobserved decoder before accepting the generated output.
 | `lost_sid.dec` | `98af464e95397ad9cfd14f23905060770b170ad706261766941294204ffc57d6` |
 | `lost_sid.out` | `771374b3a45dcd5286b4886b8d15ad55d3c5f6beace0b56a63ab3886fcc020c0` |
 
-This is reference-only evidence, not yet a native-DSP comparison or handset
-speech result. The next native check must load this declared input/output
-pair in a distinct bench profile, observe original `c79b` with0501 and
-retain full PCM comparison and frame/history replay. It must not substitute
-these files under an existing clean-DTX profile or force the internal flags.
+Distinct native BIOS profiles `efr-lost-sid` and `efr-lsid-pipe` load this
+declared input/output pair without replacing clean-DTX data. Both strict
+runs match all15520 PCM samples in frames0..96, then stop at97 with86
+sample differences. Thus the complete518-frame fixture is not validated.
+The observed muting flags0290/02c0 at95/96 match the reference, but native
+first-speech flags at97 are0401, not0501. The acquired recovery patch
+explains this flag divergence: before its RX handler, `28ee..28f3` clears
+history0ab9 and ANDs09c0 withff7f. Original/replay observations at28b0 and
+28f7 show02c0/history1 becoming0240/history0 with BFI0/SID0. The subsequent
+RX handler therefore no longer sees prior muting and `c79b` publishes0.
+Both frontends reproduce this sequence. The patch words are also pinned
+by `c54x_rom4_efr_homing_path_check.py`; no instruction is bypassed.
+
+The prediction that this input would execute the bit0100-set writer branch
+is falsified for this acquired patched decoder. It would be incorrect to
+force0501, disable the patch or change reference PCM to obtain a pass.
+This establishes the flag-policy difference, not a complete explanation
+of all86 PCM differences or a whole-ROM proof that the set branch is dead.
+The strict comparison deliberately remains failing; its completed prefix
+replays each frame's full ordinary RAM, not the unexecuted remainder.
+No handset speech or RF result follows.
+
+After preparing the declared reference files in the bench ROM directory:
+
+```sh
+python3 tools/run_c54x_rom4_crc.py --mame mame/mame --rompath mame/roms \
+  --efr-lost-sid --observe-dtx-history
+# Add --staged for the independent staged frontend; both return failure.
+python3 tools/c54x_rom4_efr_dtx_history_check.py RUN/error.log \
+  --lost-sid-failure-console RUN/console.log
+```
+
+The second command checks the bounded negative result and reports
+`conformance_claim=False`, not a full fixture pass. The ordinary DTX
+PCM/replay gate remains a separate positive regression control.
 
 ### Native EFR active-speech erasures
 

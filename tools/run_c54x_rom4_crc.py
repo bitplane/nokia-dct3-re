@@ -67,7 +67,7 @@ def file_identity(path):
     return {"path": str(path), "bytes": path.stat().st_size, "sha256": digest}
 
 
-def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=False, fr_encoder=False, efr_crc=False, efr_packing=False, efr_decoder=False, efr_encoder=False, efr_dtx_decoder=False, efr_dtx_encoder=False, efr_erasure_decoder=False, efr_homing_decoder=False, efr_homing_encoder=False, efr_invalid_sid=False, staged=False, verbose_teardown=False):
+def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=False, fr_encoder=False, efr_crc=False, efr_packing=False, efr_decoder=False, efr_encoder=False, efr_dtx_decoder=False, efr_dtx_encoder=False, efr_erasure_decoder=False, efr_homing_decoder=False, efr_homing_encoder=False, efr_invalid_sid=False, staged=False, verbose_teardown=False, efr_lost_sid=False):
     if re.search(r'^Driver .+: [1-9]\d* errors?,', text, re.MULTILINE):
         raise ValueError('MAME driver validity errors invalidate codec acceptance')
     lines = text.splitlines()
@@ -78,11 +78,20 @@ def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=Fa
                 'EFR encoder' if efr_encoder else 'EFR decoder' if efr_decoder else
                 'EFR DTX encoder' if efr_dtx_encoder else 'EFR DTX decoder' if efr_dtx_decoder else
                 'EFR homing encoder' if efr_homing_encoder else 'EFR homing decoder' if efr_homing_decoder else
-                'EFR invalid SID decoder' if efr_invalid_sid else 'EFR erasure decoder' if efr_erasure_decoder else None)
+                'EFR lost SID decoder' if efr_lost_sid else 'EFR invalid SID decoder' if efr_invalid_sid else 'EFR erasure decoder' if efr_erasure_decoder else None)
         check_staged_frontend(text, kind)
-    if (efr_decoder or efr_encoder or efr_dtx_decoder or efr_dtx_encoder or efr_erasure_decoder or efr_homing_decoder or efr_homing_encoder or efr_invalid_sid) and lines and re.fullmatch(r"Average speed: \d+(?:\.\d+)?% \(\d+ seconds\)", lines[-1]):
+    if (efr_decoder or efr_encoder or efr_dtx_decoder or efr_dtx_encoder or efr_erasure_decoder or efr_homing_decoder or efr_homing_encoder or efr_invalid_sid or efr_lost_sid) and lines and re.fullmatch(r"Average speed: \d+(?:\.\d+)?% \(\d+ seconds\)", lines[-1]):
         lines.pop()
     marker, complete = (PACKED_PASS, PACKED_COMPLETE) if packed else (PASS, COMPLETE)
+    if efr_lost_sid:
+        marker = 'TMS320C54x ROM4 EFR lost SID decoder: PASS frames=518 samples=82880 lost_sid=2 mismatches=0 handset_audio_claim=0'
+        complete = 'Fatal error: TMS320C54x ROM4 EFR lost SID decoder complete'
+        replay = 'TMS320C54x ROM4 EFR lost SID decoder replay: PASS frames=518 ram_words=65440 checkpoints=frame_input handset_audio_claim=0'
+        if lines.count(replay) != 1:
+            raise ValueError('missing unique native lost-SID frame/history replay')
+        for frame in range(518):
+            if lines.count(f'ROM4 EFR lost SID decoder comparison: frame={frame} mismatches=0') != 1:
+                raise ValueError('missing unique bit-exact lost-SID frame comparison')
     if efr_crc:
         marker, complete = EFR_CRC_PASS, EFR_CRC_COMPLETE
     if efr_packing:
@@ -218,6 +227,7 @@ def main():
     mode.add_argument("--efr-encoder", action="store_true", help="compare native EFR encoder with verified ETSI parameters and VAD/SP")
     mode.add_argument("--efr-dtx-decoder", action="store_true", help="compare native EFR silence/SID/unusable-frame decoding with the external reference")
     mode.add_argument('--efr-invalid-sid', action='store_true', help='compare payload-classified invalid and bad accepted SID frames against the reference')
+    mode.add_argument('--efr-lost-sid', action='store_true', help='compare lost-SID muting and first-speech recovery against the reference')
     mode.add_argument("--efr-dtx-encoder", action="store_true", help="compare native EFR VAD/DTX encoding with the external reference")
     mode.add_argument("--efr-erasure-decoder", action="store_true", help="compare native EFR active-speech erasure concealment with the external reference")
     mode.add_argument("--efr-erasure-observe", action="store_true", help="characterize all native EFR loss frames without claiming reference conformance")
@@ -225,6 +235,7 @@ def main():
     mode.add_argument('--efr-homing-errors', action='store_true', help='compare the full native homing/error PCM and reset sequence against the reference')
     mode.add_argument("--efr-homing-encoder", action="store_true", help="compare native EFR encoder homing and repeated speech with the external reference")
     parser.add_argument('--observe-homing-errors', action='store_true', help='capture all homing/error differences without claiming conformance')
+    parser.add_argument('--observe-dtx-history', action='store_true', help='observe original DTX first-speech history while retaining strict PCM acceptance')
     parser.add_argument('--staged', action='store_true', help='run supported codec or RF helper fixtures on the staged CPU, not a handset speech claim')
     parser.add_argument('--trace-fr', action='store_true', help='retain decoder frame 8 or encoder frame 0 encoding instructions, entry RAM and actual data accesses')
     parser.add_argument('--trace-efr', '--trace-efr-reset', dest='trace_efr_reset', action='store_true', help='observe at most 8192 EFR reset and 200000 first-frame instructions, without changing acceptance')
@@ -232,7 +243,7 @@ def main():
     args = parser.parse_args()
     if args.staged and not (args.fr_decoder or args.fr_encoder or args.efr_encoder or args.efr_decoder or
                            args.efr_dtx_encoder or args.efr_dtx_decoder or args.efr_homing_encoder or args.efr_homing_decoder or args.efr_invalid_sid or
-                           args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_errors or args.rf_bitmap or args.rf_pairs):
+                           args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_errors or args.efr_lost_sid or args.rf_bitmap or args.rf_pairs):
         parser.error('--staged requires a supported codec or RF helper mode')
     if args.trace_fr and not (args.fr_decoder or args.fr_encoder):
         parser.error('--trace-fr requires --fr-decoder or --fr-encoder')
@@ -242,6 +253,8 @@ def main():
         parser.error('--trace-efr-loss requires --efr-erasure-observe')
     if args.observe_homing_errors and not args.efr_homing_errors:
         parser.error('--observe-homing-errors requires --efr-homing-errors')
+    if args.observe_dtx_history and not (args.efr_dtx_decoder or args.efr_invalid_sid or args.efr_lost_sid):
+        parser.error('--observe-dtx-history requires a DTX decoder fixture')
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_rom4_crc_", dir=args.output_root))
     bios = "fr-encoder" if args.fr_encoder else "fr-decoder" if args.fr_decoder else "fr-packing" if args.fr_packing else "crc-packed" if args.packed else "crc-helper"
@@ -259,6 +272,8 @@ def main():
         bios = "efr-dtx-decoder"
     if args.efr_invalid_sid:
         bios = 'efr-invalid-sid'
+    if args.efr_lost_sid:
+        bios = 'efr-lost-sid'
     if args.efr_dtx_encoder:
         bios = "efr-dtx-encoder"
     if args.efr_erasure_decoder:
@@ -276,16 +291,23 @@ def main():
                 'efr-dtx-decoder': 'efr-dtx-dec-pipe',
                 'efr-enc-homing': 'efr-ehome-pipe',
                 'efr-invalid-sid': 'efr-isid-pipe',
+                'efr-lost-sid': 'efr-lsid-pipe',
                 'efr-home-errors': 'efr-herr-pipe',
                 'efr-loss-observe': 'efr-loss-pipe'}.get(bios, bios + '-pipe')
     command = [str(args.mame.resolve()), "tms54rom4", "-bios", bios,
                "-rompath", str(args.rompath.resolve()), "-video", "none",
                "-sound", "none", "-nothrottle", "-noreadconfig", "-log",
-               "-seconds_to_run", "30" if args.efr_dtx_decoder or args.efr_dtx_encoder or args.efr_invalid_sid else "10" if args.efr_decoder or args.efr_encoder or args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_decoder or args.efr_homing_encoder or args.efr_homing_errors else "2"]
+               "-seconds_to_run", "30" if args.efr_dtx_decoder or args.efr_dtx_encoder or args.efr_invalid_sid or args.efr_lost_sid else "10" if args.efr_decoder or args.efr_encoder or args.efr_erasure_decoder or args.efr_erasure_observe or args.efr_homing_decoder or args.efr_homing_encoder or args.efr_homing_errors else "2"]
     if args.trace_fr or args.trace_efr_reset or args.trace_efr_loss:
         command.append('-verbose')
     root = Path(__file__).resolve().parents[1]
+    if args.observe_dtx_history:
+        command.extend(['-debug', '-debugger', 'none', '-autoboot_delay', '0',
+                        '-autoboot_script', str(root / 'tools/c54x_rom4_efr_dtx_history_observe.lua')])
     inputs = [args.mame, Path(__file__), root / "driver/tms320c54x_test.cpp"]
+    if args.observe_dtx_history:
+        inputs.extend(root / name for name in ('tools/c54x_rom4_efr_dtx_history_observe.lua',
+                                               'tools/c54x_rom4_efr_dtx_history_check.py'))
     inputs.extend(root / name for name in ("lib/util/gsmfr.cpp", "lib/util/gsmfr.h",
                                            "driver/gsm_tch_f_l1.cpp", "driver/gsm_tch_f_l1.h",
                                            "cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h"))
@@ -301,6 +323,9 @@ def main():
             inputs.append(args.rompath / "tms54rom4" / name)
     if args.efr_invalid_sid:
         for name in ('invalid_sid.dec', 'invalid_sid.out'):
+            inputs.append(args.rompath / 'tms54rom4' / name)
+    if args.efr_lost_sid:
+        for name in ('lost_sid.dec', 'lost_sid.out'):
             inputs.append(args.rompath / 'tms54rom4' / name)
     if args.efr_dtx_encoder:
         for name in ("dtx.inp", "dtx.cod"):
@@ -368,7 +393,16 @@ def main():
         elif args.rf_pairs:
             check_rf_pairs(text,result.returncode,staged=args.staged)
         else:
-            check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder, args.efr_crc, args.efr_packing, args.efr_decoder, args.efr_encoder, args.efr_dtx_decoder, args.efr_dtx_encoder, args.efr_erasure_decoder, args.efr_homing_decoder, args.efr_homing_encoder, efr_invalid_sid=args.efr_invalid_sid, staged=args.staged, verbose_teardown=args.trace_fr or args.trace_efr_reset)
+            check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder, args.efr_crc, args.efr_packing, args.efr_decoder, args.efr_encoder, args.efr_dtx_decoder, args.efr_dtx_encoder, args.efr_erasure_decoder, args.efr_homing_decoder, args.efr_homing_encoder, efr_invalid_sid=args.efr_invalid_sid, staged=args.staged, verbose_teardown=args.trace_fr or args.trace_efr_reset, efr_lost_sid=args.efr_lost_sid)
+        if args.observe_dtx_history:
+            try:
+                from tools.c54x_rom4_efr_dtx_history_check import check_trace
+            except ModuleNotFoundError:
+                from c54x_rom4_efr_dtx_history_check import check_trace
+            writes = check_trace((run / 'error.log').read_text(), require_previous_muting=args.efr_lost_sid)
+            if writes != 2:
+                raise ValueError('expected two original first-speech transitions')
+            print(f'ROM4 EFR first-speech history: PASS transitions={writes} previous_muting_required={int(args.efr_lost_sid)}')
     except ValueError as error:
         print(f"ROM4 helper: FAIL: {error}", file=sys.stderr)
         return 1
