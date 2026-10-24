@@ -356,3 +356,62 @@ SIM parser, requires exact physical contact ordering and the matched-code
 branch, checks Saved/name/number pixel oracles, and compares whole-card storage.
 This qualifies laboratory SIM contact persistence, not handset-memory contacts,
 all SIM security services, ordinary idle content or radio completion.
+
+## Native radio-boundary inventory
+
+Own sender `29421a` forms a header from the supplied byte length and first
+message byte. Writer `29419e` packs subsequent payload bytes high-byte first,
+wraps the 82-word MCU-to-DSP ring before `100a4`, and publishes producer last
+at `2941fe`. Space reader `294374` compares producer `100a4` with consumer
+`100a6`, reserving one word. The sole direct BL to `29421a` in the qualified
+MCU extent is `2a928a`, after its queue/space checks; this is not proof that
+all higher-level message constructors have been enumerated.
+
+Receiver `294268` extracts header length/type and allocates a firmware object;
+`2942fe..29435a` copies its body and publishes the consumer. Own literal pool
+`29457c..294587` independently names consumer `101ca`, producer `101c8`, and
+ring start `10100`. Receive indices span `80..e3` relative to shared base
+`10000`. These routines and literals are pinned by `tools/nsb3_radio_check.py`.
+
+With the same fresh seven-byte/card/security fixture, passive observation
+records 32 MCU-to-DSP packets and 15 native DSP-to-MCU packets through 65 seconds:
+
+| Direction | Qualified bounded inventory |
+| --- | --- |
+| MCU to DSP | Two `05`; sixteen `70`; one `3c`; four `0d`; seven `51`; one `1a`; one `4a` |
+| DSP to MCU | Fourteen `74` packets, including `0d00`, `0a090004`, and repeated 52-byte bodies beginning `3532`; then one `8b` of 162 bytes |
+
+The final MCU packets are type `1a`, length 68, body beginning `00419800`
+with the remainder zero; then type `4a`, length four, body `02000000`.
+Their exact NSB-3 producer/consumer meanings are not yet qualified. Do not
+import another product's request/reply interpretation or fabricate an ack.
+All observed MCU packets are consumed. At 8, 20 and 35 seconds, TX
+producer/consumer are both `002d`, RX producer/consumer both `008b`, native
+PC is `09b9`, and illegal-instruction count is zero. No subsequent ring
+activity occurs in that shorter window. It is insufficient to diagnose a stall:
+the existing NSB-1 contract suggested extending the capture, and NSB-3 emits
+type `8b` at 41.035 seconds, beginning `00400328ff6f0329ff6f`. At 45 and 60
+seconds the RX pointers are both `00dd`, native execution remains legal, and
+TX remains drained at `002d`. This disproves a silent DSP in this fixture,
+not missing RF inputs or a compatible fitted-mask identity. Zero/default RF
+input cannot establish real reception or a usable network from that vector.
+
+Own receiver `2b3a7a..2b3a96` subtracts `80`, then `3`, before indexing the
+complete 13-entry `83..8f` dispatch table at `2b3a98`. Type `8b` is index eight,
+entry `2b3ab8`, selecting `2b3ae4 -> 28a5a2`. That wrapper replaces the status
+with own literal `13b8` at `28a690` and posts to task `0c` via `26c8cc`.
+The runtime observer checks entry to this own forwarder. Its task-12 consumer
+and candidate-acceptance lifecycle, not a guessed DSP ack, are the next boundary.
+
+Run `tools/nsb3_radio_observe.lua` on the fresh fixture for 65 seconds, then:
+
+```sh
+.venv/bin/python tools/nsb3_radio_check.py roms/noki6190/6190f613a.fls RADIO_RUN
+```
+
+The checker validates complete packet bytes, extent/wrap arithmetic, sequential
+indices, bounded capture counts, own sender/receiver code and settled native
+state. It also requires the physical matching-code/menu sequence. Decode the
+NSB-3 constructors/native dispatch for `1a`/`4a` alongside task-12 consumption
+of the late `8b`; this inventory alone is not registration,
+a missing-response diagnosis, or permission to add an HLE radio reply.
