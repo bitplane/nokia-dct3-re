@@ -1,15 +1,17 @@
 import unittest
 
-from tools.c54x_rom4_efr_lost_sid_state_check import compare, parse_native
+from tools.c54x_rom4_efr_lost_sid_state_check import compare, parse_native, characterize
 
 
-def fixture():
+def fixture(*, complete=False, difference_frame=None):
     native, reference = [], []
     for frame in range(518):
         group = ['efr_boundary: kind=entry']
         for kind in ('R2', 'LSF'):
             reference.append(f'EFRSTATE frame={frame} kind={kind} values=' + '0000' * 10)
-            group.append(f'efr_boundary: kind={kind} values=' + '0000' * 10)
+            values = ('0001' + '0000' * 9 if frame == difference_frame and kind == 'R2'
+                      else '0000' * 10)
+            group.append(f'efr_boundary: kind={kind} values=' + values)
         for sub in range(4):
             pitch, code = 0, 8 if frame == 97 else 0
             reference.extend((f'EFRGAIN frame={frame} kind=pitch subframe={sub} value={pitch:04x}',
@@ -26,12 +28,35 @@ def fixture():
         if frame == 97:
             for sub in range(4):
                 reference.append(f'EFRPOLICY frame=97 subframe={sub} prev_bf=0001 previous_gain={10 if sub == 0 else 8:04x} value=0008')
-        if frame < 98:
+        if frame < 98 or complete:
             native.extend(group * 2)
     return '\n'.join(native), '\n'.join(reference)
 
 
 class LostSidStateTests(unittest.TestCase):
+    def test_complete_semantic_characterization_retains_known_prefix(self):
+        report = characterize(*fixture(complete=True, difference_frame=100))
+        self.assertEqual(report['replayed_frames'], 518)
+        self.assertEqual(report['boundaries']['R2']['differing_frames'],
+                         [dict(frame=100, words=1)])
+        self.assertEqual(report['boundaries']['code']['last_difference'], 97)
+        self.assertIsNone(report['boundaries']['LSF']['first_difference'])
+        self.assertTrue(report['prefix']['reference_cap_reproduced'])
+        self.assertFalse(report['conformance_claim'])
+
+    def test_complete_mode_rejects_prefix_and_changed_known_entrance(self):
+        with self.assertRaisesRegex(ValueError, '518 original'):
+            characterize(*fixture())
+        native, reference = fixture(complete=True)
+        with self.assertRaisesRegex(ValueError, 'previous-bad'):
+            characterize(native, reference.replace('prev_bf=0001', 'prev_bf=0000'))
+        with self.assertRaisesRegex(ValueError, '518 original'):
+            characterize(native.rsplit('efr_boundary: kind=entry', 1)[0], reference)
+        head, last = native.rsplit('efr_boundary: kind=entry', 1)
+        with self.assertRaisesRegex(ValueError, 'restoration'):
+            characterize(head + 'efr_boundary: kind=entry' +
+                         last.replace('kind=R2 values=0000', 'kind=R2 values=0001'), reference)
+
     def test_bounded_gain_difference(self):
         report = compare(*fixture())
         self.assertTrue(report['reference_cap_reproduced'])

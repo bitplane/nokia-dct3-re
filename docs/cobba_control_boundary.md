@@ -3026,6 +3026,39 @@ reference PCM or internal codec state was changed to complete observation.
 The first differing gain boundary is explained above; equality of every
 later internal arithmetic boundary has not been established.
 
+The complete read-only semantic observer independently covers both frontends
+through all 518 original/replay frame pairs. Its reports and semantic logs
+are identical across atomic and staged execution:
+
+| Boundary | Compared words | Differences |
+| --- | --- | --- |
+| Saved R2 | 5,180 | None |
+| Saved LSF | 5,180 | None |
+| Pitch gain | 2,072 | None |
+| Code gain | 2,072 | Three, all in frame 97 |
+
+Thus the measured later PCM differences do not coincide with further saved
+R2/LSF or gain differences. This narrows the remaining explanation to the
+downstream excitation/synthesis/postprocessing histories after the known
+gain-policy divergence; it does not prove those histories or every arithmetic
+operation equivalent. Native PCM retains the same SHA-256 and 3,178 sample
+differences above. The strict prefix control still rejects frame 97 with
+86 differences. No codec state, patch instruction or reference output changes.
+
+```sh
+python3 tools/run_c54x_rom4_crc.py --mame mame/mame --rompath mame/roms \
+  --efr-lost-sid-observe --observe-lost-sid-state
+# Repeat with --staged, retaining independent PCM/replay characterization.
+python3 tools/c54x_rom4_efr_lost_sid_state_check.py RUN/error.log \
+  REFERENCE/state.log --complete --output RUN/semantic-characterization.json
+```
+
+Complete mode requires all 518 frame pairs, exact semantic replay, a complete
+reference and the previously explained 98-frame entrance. It reports later
+differences rather than accepting them as an oracle. Input-log hashes accompany
+the retained report. Default checker mode still requires the strict 98-frame
+prefix; neither mode claims codec conformance or handset speech.
+
 ### Native EFR active-speech erasures
 
 Atomic and staged execution complete all 163 frames and replay 65,440 ordinary

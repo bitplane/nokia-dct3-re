@@ -1,5 +1,6 @@
 """Locate the strict lost-SID prefix difference without claiming conformance."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -14,7 +15,7 @@ BOUNDARY = re.compile(r'efr_boundary: kind=(R2|LSF|pitch|code) values=([0-9a-f]+
 NATIVE_POLICY = re.compile(r'efr_gain_policy: previous=([0-9a-f]{4}) gain=([0-9a-f]{4}) candidate_b=([0-9a-f]{10})')
 
 
-def parse_native(text):
+def parse_native(text, *, frames=98):
     groups = []
     for line in text.splitlines():
         if line == 'efr_boundary: kind=entry':
@@ -24,8 +25,8 @@ def parse_native(text):
             if not match or not groups:
                 raise ValueError('malformed or unowned native boundary')
             groups[-1].append(line)
-    if len(groups) != 196:
-        raise ValueError('expected 98 original/replay frame pairs')
+    if len(groups) != frames * 2:
+        raise ValueError(f'expected {frames} original/replay frame pairs')
     frames = []
     for index in range(0, len(groups), 2):
         group = groups[index]
@@ -53,7 +54,10 @@ def parse_native(text):
 
 
 def compare(native, reference):
-    frames = parse_native(native)
+    return compare_prefix(parse_native(native), reference)
+
+
+def compare_prefix(frames, reference):
     states, gains = parse(reference, frames=518)
     for frame, actual in enumerate(frames):
         for kind in ('R2', 'LSF'):
@@ -91,16 +95,50 @@ def compare(native, reference):
                 complete_fixture_claim=False, handset_audio_claim=False)
 
 
+def characterize(native, reference):
+    frames = parse_native(native, frames=518)
+    prefix = compare_prefix(frames[:98], reference)
+    states, gains = parse(reference, frames=518)
+    boundaries = {}
+    for kind in ('R2', 'LSF', 'pitch', 'code'):
+        differences = []
+        for index, actual in enumerate(frames):
+            expected = (states[index, kind] if kind in ('R2', 'LSF') else
+                        [gains[index, kind, sub] for sub in range(4)])
+            count = sum(a != b for a, b in zip(actual[kind], expected))
+            if count:
+                differences.append(dict(frame=index, words=count))
+        boundaries[kind] = dict(
+            compared_words=518 * (10 if kind in ('R2', 'LSF') else 4),
+            differing_frames=differences,
+            differing_words=sum(row['words'] for row in differences),
+            first_difference=differences[0]['frame'] if differences else None,
+            last_difference=differences[-1]['frame'] if differences else None)
+    return dict(status='characterized', frames=518, replayed_frames=518,
+                prefix=prefix, boundaries=boundaries, conformance_claim=False,
+                handset_audio_claim=False)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('native', type=Path)
     parser.add_argument('reference', type=Path)
+    parser.add_argument('--complete', action='store_true',
+                        help='characterize all 518 frames; never promotes reference conformance')
+    parser.add_argument('--output', type=Path, help='retain the report with input hashes')
     args = parser.parse_args()
     try:
-        report = compare(args.native.read_text(), args.reference.read_text())
-    except ValueError as error:
+        report = (characterize if args.complete else compare)(
+            args.native.read_text(), args.reference.read_text())
+        report['input_sha256'] = {
+            name: hashlib.sha256(path.read_bytes()).hexdigest()
+            for name, path in (('native_log', args.native), ('reference_log', args.reference))}
+        rendered = json.dumps(report, indent=2) + '\n'
+        if args.output:
+            args.output.write_text(rendered)
+    except (OSError, ValueError) as error:
         parser.exit(1, f'FAIL: {error}\n')
-    print(json.dumps(report, indent=2))
+    print(rendered, end='')
 
 
 if __name__ == '__main__':

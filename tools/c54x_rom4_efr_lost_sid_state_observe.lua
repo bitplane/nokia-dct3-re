@@ -1,4 +1,4 @@
--- Read-only semantic boundaries in the isolated strict lost-SID fixture.
+-- Read-only semantic boundaries in the isolated lost-SID fixtures.
 local cpu = assert(manager.machine.devices[':maincpu'])
 local actions = {}
 local function observe(pc, kind, address, count)

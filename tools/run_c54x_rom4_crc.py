@@ -257,8 +257,8 @@ def main():
         parser.error('--observe-homing-errors requires --efr-homing-errors')
     if args.observe_dtx_history and not (args.efr_dtx_decoder or args.efr_invalid_sid or args.efr_lost_sid or args.efr_lost_sid_observe):
         parser.error('--observe-dtx-history requires a DTX decoder fixture')
-    if args.observe_lost_sid_state and (not args.efr_lost_sid or args.observe_dtx_history):
-        parser.error('--observe-lost-sid-state requires --efr-lost-sid without --observe-dtx-history')
+    if args.observe_lost_sid_state and (not (args.efr_lost_sid or args.efr_lost_sid_observe) or args.observe_dtx_history):
+        parser.error('--observe-lost-sid-state requires a lost-SID fixture without --observe-dtx-history')
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_rom4_crc_", dir=args.output_root))
     bios = "fr-encoder" if args.fr_encoder else "fr-decoder" if args.fr_decoder else "fr-packing" if args.fr_packing else "crc-packed" if args.packed else "crc-helper"
