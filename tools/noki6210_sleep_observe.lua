@@ -2,6 +2,9 @@
 local machine = manager.machine
 local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces.program
+machine.debugger:command('temp4=0')
+cpu.debug:bpset(0x3c19ba, 'r0==c7 && temp4<1024',
+    'temp4=temp4+1;logerror "6210_sleep_timer_arm: id=%02x delay=%04x lr=%08x owner=%02x flags=%02x state=%02x stored_id=%02x observer_writes=0\\n",r0,r1,r14,b@100b16,b@100b17,b@100b18,b@100b19;g')
 local transitions, previous = {}, nil
 _G.npe3_sleep_control_tap = memory:install_write_tap(0x2000c, 0x2000f,
     'npe3_sleep_control', function(address, data, mask)
@@ -36,12 +39,14 @@ local runner = coroutine.create(function()
             interval = memory:read_u16(head + 4)
         end
         machine:logerror(string.format(
-            '6210_sleep_state: port=%02x fiq=%02x irq=%02x fmask=%02x imask=%02x ctrl=%02x timer0=%04x baseline=%04x timer1=%04x destination=%04x head=%08x interval=%d cpsr=%08x idle_veto=%02x t=%.9f\n',
+            '6210_sleep_state: port=%02x fiq=%02x irq=%02x fmask=%02x imask=%02x ctrl=%02x timer0=%04x baseline=%04x timer1=%04x destination=%04x head=%08x interval=%d cpsr=%08x idle_veto=%02x timer_owner=%02x timer_flags=%02x timer_state=%02x timer_id=%02x t=%.9f\n',
             machine.ioport.ports[':COL.0']:read(), memory:read_u8(0x20008),
             memory:read_u8(0x20009), memory:read_u8(0x2000a), memory:read_u8(0x2000b),
             memory:read_u8(0x2000c), memory:read_u16(0x20010), memory:read_u16(0x173fe8),
             memory:read_u16(0x20004), memory:read_u16(0x20006), head, interval,
-            cpu.state.CPSR.value, memory:read_u8(0x17556c), machine.time:as_double()))
+            cpu.state.CPSR.value, memory:read_u8(0x17556c), memory:read_u8(0x100b16),
+            memory:read_u8(0x100b17), memory:read_u8(0x100b18), memory:read_u8(0x100b19),
+            machine.time:as_double()))
     end
 end)
 _G.npe3_sleep_observer = runner

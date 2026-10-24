@@ -117,7 +117,7 @@ not a completed regression qualification. Clock-enabled debugging now uses
 | Actual sleep and wake | Clock-stop31.039953s; FIQ0 wake31.492899s with control`0a`; subsequent sleep requests blocked by pending FIQ0. |
 | Initial compare works | Timer0 matches`0fa8`; ISR`0x4cc590` programs`1002` through`0x4cc24e`, then acknowledges at`0x4cc5ac`. |
 | Baseline is not corrupt | Writer`0x4cc27a` continues after wake through sleep-finalization`0x4cc4a4`; no lost initial compare or unexplained RAM overwrite is established. |
-| Queue stall is downstream | Head`0x100b10`, words`001003b4,00031501,02c70000`; interval3 is clamped to zero by elapsed-time adjustment. Queue root`0x100048`, baseline`0x173fe8`; object owner unclassified. |
+| Queue stall is downstream | Head`0x100b10`, words`001003b4,00031501,02c70000`; interval3 is clamped to zero by elapsed-time adjustment. Queue root`0x100048`, baseline`0x173fe8`; the head is task`15`'s timer`c7` record, not an opaque event`02c7`. |
 | FIQ3 honors masking | Live vector`ea1344a1` at`1c` reaches`0x4d12a8`, then`0x4dc1e2`; pending AND NOT mask at`0x4dc276..0x4dc27e`, bit3 wrapper`0x504712`. |
 
 Sleep predicate`0x4cc3e2` passes timer1-distance/FIQ5 checks and later rejects
@@ -169,6 +169,27 @@ that run; this is bounded runtime evidence, not a static unreachable claim.
 Own idle control flow reaches that store only through`0x4b03e2`; repeated
 sleep-finalization instead loops through`0x4b036a`. Do not replace either
 firmware branch or infer automatic hardware enabling from this distinction.
+
+Timer allocation/arming uses twelve-byte records based at`0x1001bc`
+(`0x3c19c4..0x3c19ca`), so index`c7` resolves exactly to`0x100b10`.
+The expiry dispatcher`0x3c1bb4` reads owner byte`+6` to select a task queue,
+flags`+7` to qualify delivery, and writes state3 at`+8`; cancellation
+`0x3c17fa` compares timer identity at`+9`. Thus the observed bytes decode
+as interval3, owner`15`, flags1, state2, ID`c7`. This is NPE-3-local
+task ownership, not a portable task-name assignment.
+
+The bounded own timer-arm trace observes initialization at`0x3d8356`
+(delay`3e`), shared tail`0x2c6600` (delays3/`0c`/`7d`), and direct arms
+`0x2c683a`/`0x2c69b8` (delay`7d`). Shared-tail predecessors include
+`0x2c6910`/`0x2c6914`, which select3/`0c` then branch through
+`0x2c672c`; a nearby-literal-only call census would miss these routes.
+The post-wake snapshots retain owner`15`, flags1, state2 and ID`c7`
+at all four sampled times. This classifies the impending deadline but
+does not make its delivery or global enabling a missing peer response.
+`tmp/npe3-mbus-timer-c7-complete` records32 arms below the1024-event cap;
+its final arm is delay`7d` from`0x2c683a`, before the retained three-tick
+remainder. Ordinary End-decode acceptance still fails; no timer expiry,
+owner state or pending interrupt is injected to satisfy it.
 
 A no-call/no-key control (`tmp/npe3-mbus-late-idle-query`) establishes the
 same boundary independently of call signaling or speech: clock-stop at
