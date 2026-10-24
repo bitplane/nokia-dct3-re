@@ -37,15 +37,31 @@ def wire(text):
     return list(apdus(bytes.fromhex(''.join(values))))
 
 
-def prepare_reload(source, target):
+def fixture_origin(source, seen=None):
+    source = source.resolve()
+    seen = set() if seen is None else seen
+    if source in seen:
+        raise ValueError('cyclic own-storage provenance')
+    seen.add(source)
+    if (source / 'input.json').is_file():
+        metadata = json.loads((source / 'input.json').read_text())
+        if (not metadata.get('insert_sim') or not metadata.get('fresh_phone_retry_initialized')
+                or metadata.get('image_sha256') != IMAGE_SHA256):
+            raise ValueError('requires explicit own inserted-card retry fixture')
+        return source
+    provenance = json.loads((source / 'cold_source.json').read_text())
+    if provenance.get('copied_guest_ram_or_save_state') is not False:
+        raise ValueError('source cold-run provenance missing')
+    return fixture_origin(Path(provenance['source']), seen)
+
+
+def prepare_reload(source, target, validate_card=check_card):
     storage = source / 'nvram/nsb3r4t'
     flash = (storage / 'flash').read_bytes()
     if hashlib.sha256(flash).hexdigest() != IMAGE_SHA256:
         raise ValueError('source executable is not own qualified NSB-3 input')
-    check_card((storage / 'sim_card').read_bytes())
-    metadata = json.loads((source / 'input.json').read_text())
-    if not metadata.get('insert_sim') or not metadata.get('fresh_phone_retry_initialized'):
-        raise ValueError('requires explicit own inserted-card retry fixture')
+    validate_card((storage / 'sim_card').read_bytes())
+    origin = fixture_origin(source)
     eeprom = (storage / 'eeprom').read_bytes()
     if len(eeprom) != 8192:
         raise ValueError('source EEPROM extent differs')
@@ -60,6 +76,7 @@ def prepare_reload(source, target):
     shutil.copyfile(source / 'cfg/nsb3r4t.cfg', target / 'cfg/nsb3r4t.cfg')
     (target / 'cold_source.json').write_text(json.dumps({
         'source': str(source.resolve()), 'storage_sha256': hashes,
+        'fixture_origin': str(origin),
         'copied_guest_ram_or_save_state': False}, indent=2) + '\n')
 
 

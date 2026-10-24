@@ -1,4 +1,4 @@
-"""Prepare one external ADC2 hypothesis; no EEPROM, RAM or SIM state supplied."""
+"""Prepare explicit own-ROM ADC, EEPROM-integrity/retry and SIM-presence fixtures."""
 import argparse
 import hashlib
 import json

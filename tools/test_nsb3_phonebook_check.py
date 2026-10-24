@@ -21,6 +21,14 @@ def trace(keys):
 
 
 class Nsb3PhonebookTest(unittest.TestCase):
+    def test_cold_source_cycle_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)
+            (source / 'cold_source.json').write_text(json.dumps(dict(
+                source=str(source), copied_guest_ram_or_save_state=False)))
+            with self.assertRaisesRegex(ValueError, 'cyclic'):
+                checker.fixture_origin(source)
+
     def test_contacts_require_exact_phase_and_matched_code(self):
         for readback, keys in ((False, checker.SAVE_KEYS), (True, checker.READ_KEYS)):
             text = trace(keys)
@@ -51,7 +59,8 @@ class Nsb3PhonebookTest(unittest.TestCase):
             (storage / 'flash').write_bytes(flash)
             (storage / 'eeprom').write_bytes(bytes(8192))
             (storage / 'sim_card').write_bytes(expected_record() + b'\xff' * (CURRENT_NVRAM_LENGTH - 32))
-            (source / 'input.json').write_text(json.dumps(dict(insert_sim=True, fresh_phone_retry_initialized=True)))
+            (source / 'input.json').write_text(json.dumps(dict(insert_sim=True, fresh_phone_retry_initialized=True,
+                                                              image_sha256=hashlib.sha256(flash).hexdigest())))
             (source / 'state.sta').write_bytes(b'not permitted')
             with patch.object(checker, 'IMAGE_SHA256', hashlib.sha256(flash).hexdigest()):
                 checker.prepare_reload(source, cold)
@@ -60,6 +69,9 @@ class Nsb3PhonebookTest(unittest.TestCase):
                     self.assertEqual((cold / 'nvram/nsb3r4t' / name).read_bytes(), (storage / name).read_bytes())
                 with self.assertRaises(FileExistsError):
                     checker.prepare_reload(source, cold)
+                second = root / 'second'
+                checker.prepare_reload(cold, second)
+                self.assertEqual(json.loads((second / 'cold_source.json').read_text())['fixture_origin'], str(source))
             with self.assertRaises(ValueError):
                 checker.prepare_reload(source, root / 'bad')
             self.assertFalse((root / 'bad').exists())

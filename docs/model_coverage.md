@@ -19,7 +19,9 @@ physical security entry and clean Messages/Names menus. Physical A/12345 save
 issues one EF_ADN update; an independent cold process retrieves the name and
 number without rewriting or changing the complete card. The boundary is checked
 by `tools/nsb3_menu_check.py` and `tools/nsb3_phonebook_check.py`.
-Ordinary idle-content provenance, fitted-mask identity and radio/call/SMS
+Physical offline SMS composition/save, cold Outbox read, confirmed deletion
+and a second cold empty-Outbox check also pass through the laboratory SIM.
+Ordinary idle-content provenance, fitted-mask identity and radio/call/SMS-delivery
 acceptance remain open; the unproved native compatibility input is unchanged.
 
 Nokia 8855 / NSM-4 v5.18 has a fail-closed `noki8855` MCU research profile.

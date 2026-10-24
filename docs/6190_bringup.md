@@ -10,7 +10,7 @@ An explicit laboratory card and separately initialized phone-code retry record
 then support physical security entry, a clean Messages menu, and SIM contact
 save/cold Details retrieval. No donor identity/calibration is imported.
 Ordinary idle-content provenance remains unresolved. Fitted-mask compatibility,
-RF registration, calls and SMS remain unqualified; native liveness is not
+RF registration, calls and SMS delivery remain unqualified; native liveness is not
 evidence for those contracts.
 
 Collection provenance and the unprovided MCU-to-PPM gap are in
@@ -513,3 +513,52 @@ policy. Thus no software RF environment is currently supplied to this native
 fixture. A received-block completion requires an evidenced RF/sample and
 activation contract, not fabricated MCU state. This boundary does not prevent
 independent SIM, storage and offline application work.
+
+## Offline SMS draft lifecycle
+
+The same fresh own-EEPROM/card/retry fixture accepts physical text composition
+and displays `A` with 159 characters remaining. Save emits exactly one
+`A0 DC 01 04 B0` UPDATE RECORD to EF_SMS `6f3c`, record one, then presents
+`Message saved`. The 176-byte unsent record begins
+`07 02 81 f0 01 ff 00 81 00 00 01 41`, followed by erased padding; the shared
+`sim_sms_draft.py` contract checks this byte-exactly and the other nine free
+records. ADN remains erased. No RF connection or submission is involved.
+
+A separate cold process physically authenticates, opens Outbox and reads `A`.
+It issues READ RECORD, no UPDATE RECORD, and preserves the whole SIM file.
+Physical Options/Erase and confirmation in a third process change only the
+saved record's status byte at serialized-card offset `664`, from `07` to `00`.
+A fourth cold process displays `No messages`, issues no UPDATE RECORD, and
+preserves that complete deleted-card image. Stale record payload bytes remain
+behind the free status; deleting is not modeled as blanking the whole record.
+
+Use `tools/nsb3_sms_input.lua` for 66 seconds on the fresh fixture. Prepare
+the cold read and deletion directories from that save with:
+
+```sh
+.venv/bin/python tools/nsb3_sms_check.py prepare-reload SAVE_RUN COLD_READ
+.venv/bin/python tools/nsb3_sms_check.py prepare-reload SAVE_RUN DELETE_RUN
+```
+
+Run `tools/nsb3_sms_reload.lua` for 50 seconds and
+`tools/nsb3_sms_delete.lua` for 60 seconds respectively. Then prepare and run
+the final empty check:
+
+```sh
+.venv/bin/python tools/nsb3_sms_check.py prepare-empty DELETE_RUN COLD_EMPTY
+```
+
+Use `tools/nsb3_sms_empty.lua` for 47 seconds, then accept all four phases:
+
+```sh
+.venv/bin/python tools/nsb3_sms_check.py check SAVE_RUN COLD_READ --deleted DELETE_RUN --empty COLD_EMPTY
+```
+
+The preparer copies only own executable/EEPROM/SIM and input configuration,
+hashes the immediate source files, and follows cold-run provenance back to
+the qualified original external fixture; cyclic or missing provenance fails.
+No guest RAM/save state or donor identity is transferred. The checker requires
+physical contacts, matching phone code, complete APDUs, exact whole-card
+transitions and reviewed editor/save/read/erase/empty pixel oracles.
+This qualifies offline draft persistence/deletion, not SMS transmission,
+reception, delivery reports or laboratory registration on NSB-3.
