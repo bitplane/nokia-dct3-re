@@ -20,5 +20,8 @@ for _, digits in ipairs(_G.nsb3_change_digits or {'1234', '4321', '4321'}) do
     _G.nsb3_security_steps[#_G.nsb3_security_steps + 1] = {when, 'Left Softkey / Menu'}
     when = when + 1.5
 end
+for _, step in ipairs(_G.nsb3_change_extra_steps or {}) do
+    _G.nsb3_security_steps[#_G.nsb3_security_steps + 1] = step
+end
 local source = debug.getinfo(1, 'S').source:sub(2)
 dofile(source:match('^(.*[/\\])') .. 'nsb3_security_input.lua')

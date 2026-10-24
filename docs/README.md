@@ -57,7 +57,7 @@ distinction.
 | `3610_bringup.md` | NAM-1 v5.11 executable profile, GENSIO/CCONT evidence and current bring-up boundary. |
 | `3350_bringup.md` | NHM-9 v5.30 own MCU upload/first-wait boundary and partial hardware map; no phone-boot acceptance. |
 | `5190_bringup.md` | NSB-1 v6.71 own MCU/storage contracts, native compatibility menus, physical SIM PIN, persistent phonebook and offline SMS drafts; fitted mask/provisioning remain unproved. |
-| `6190_bringup.md` | NSB-3 own provisioning/ROM4 compatibility, physical phone-code/menu, persistent SIM phonebook and offline SMS lifecycle; native radio/idle-content boundaries remain open. |
+| `6190_bringup.md` | NSB-3 own provisioning/ROM4 compatibility, physical menus, cold SIM phonebook/SMS/security and permanent PUK-loss controls; native radio, late reset and display-settlement boundaries remain open. |
 | `6110_bootstrap_capture.md` | Physical NSE-3 DSP-bootstrap capture format and acceptance contract. |
 | `structural_regression.md` | Acceptance profiles, semantic predicates, and frame oracles. |
 | `evidence_regime.md` | Normalized topology, hardware, predicate and falsification evidence rules. |

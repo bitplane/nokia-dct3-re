@@ -21,23 +21,15 @@ number without rewriting or changing the complete card. The boundary is checked
 by `tools/nsb3_menu_check.py` and `tools/nsb3_phonebook_check.py`.
 Physical offline SMS composition/save, cold Outbox read, confirmed deletion
 and a second cold empty-Outbox check also pass through the laboratory SIM.
-Wrong SIM PIN consumes exactly one persistent retry; a cold correct PIN restores
-it and then physical phone-code entry separately reaches the Messages menu.
-Three cold wrong-PIN phases also prove blocking, physical PUK1 recovery and
-fresh authentication with the persisted replacement PIN.
-Physical PIN-request Off/On also persists across cold boots: Off skips SIM
-VERIFY but retains the phone-code prompt, while On restores the SIM challenge.
-Physical menu PIN1 change survives cold old-PIN rejection/new-PIN acceptance.
-Physical PIN2 change and cold authenticated restoration preserve all unrelated
-card bytes. Physical PIN2 exhaustion, cold PUK2 recovery and automatic
-replacement-PIN2 verification also pass, followed by a cold authenticated
-restoration to the complete original card. First wrong-PUK1 retry loss also
-persists across a cold correct recovery and cold replacement-PIN login;
-Permanent PUK1 exhaustion additionally produces cold SIM-card rejection;
-physical digits remain responsive without credential admission or card
-mutation. First wrong-PUK2 retry loss also persists across cold correct
-recovery and ordinary PIN2 restoration, without affecting PIN1 authentication.
-Permanent PUK2 loss is not yet qualified. These credential fixtures are
+Physical SIM-security gates cover PIN-request Off/On, PIN1/PIN2 changes and
+cold restoration, retry persistence, physical PIN exhaustion, wrong-PUK
+persistence/recovery and replacement-credential authentication. Exact whole-card
+comparisons protect unrelated files and credentials. Permanent PUK1 loss causes
+cold SIM-card rejection with responsive dialing input but no authentication.
+Permanent PUK2 loss instead retains PIN1/phone login and Messages, while PIN2
+selection is refused without another credential APDU. Rejection pixels persist
+over a neighboring security-item redraw even at90s; that display-settlement
+defect remains explicit, not a clean-menu acceptance claim. These credential fixtures are
 bounded to 90–92 seconds: independent extended controls reset near 94 seconds
 after the DSP receive-activity window becomes empty and firmware publishes
 reason `68`. That trigger is mapped, not suppressed; the missing native

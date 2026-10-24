@@ -643,8 +643,8 @@ prompt/menu frames. No guest RAM/save state, forced authentication result or
 donor provisioning is supplied. Successful PIN1 exhaustion/PUK recovery is
 qualified below, as are menu-based PIN/PIN2 change and cold restoration.
 First wrong-PUK1 persistence/recovery, PIN2 exhaustion and successful PUK2
-recovery are qualified below. Permanent PUK1 rejection is also qualified;
-permanent PUK2 loss remains unqualified.
+recovery and permanent PUK1/PUK2 loss are qualified below, with separate
+card-rejection and PIN2-service-refusal boundaries.
 
 ### PIN1 exhaustion and PUK recovery
 
@@ -738,7 +738,7 @@ linked source hashes/initial card snapshots and Done/prompt/menu pixel oracles.
 Unrelated credential, file or Toolkit mutations fail. No firmware-state write,
 donor data or guest-state transfer is supplied. PIN/PIN2 change contracts
 are qualified below, including PIN2 exhaustion/PUK2 and first wrong-PUK1
-recovery; permanent PUK1 rejection is qualified below and PUK2 loss remains separate.
+recovery; permanent PUK1/PUK2 loss is qualified separately below.
 
 ### Menu PIN change and cold authentication
 
@@ -850,8 +850,8 @@ run its restore script for 90 seconds. `check SEED TWO ONE ZERO RECOVERY RESTORE
 requires exact linked storage, whole-card transitions, contacts,
 CHANGE/UNBLOCK/replacement-VERIFY order, statuses and reviewed frames.
 Reset requests and unrelated mutations fail. Wrong-PUK2 persistence is
-qualified below; permanent PUK2 loss, long-run native stability and radio
-service remain separate.
+qualified below, as is permanent PUK2 loss. Long-run native stability and
+radio service remain separate.
 
 ### Wrong PUK1 persistence and cold recovery
 
@@ -900,7 +900,7 @@ acceptance of the dialed digits. Exact rejected/dial pixels are required.
 The runner supports `--check-only` and explicit `--resume`; an existing run
 is always requalified rather than trusted. Completed logs are compressed
 losslessly and remain recheckable. No retry counter, firmware state or guest
-RAM/save state is supplied. Permanent PUK2 loss remains separate.
+RAM/save state is supplied. Permanent PUK2 loss is qualified below.
 
 ### Wrong PUK2 persistence and cold recovery
 
@@ -924,3 +924,28 @@ then prepare/run the ordinary 90-second PIN2 restore. The retry checker
 `check BLOCKED WRONG RECOVERY RESTORE` requires exact physical/APDU/status
 sequences, own executable, linked storage and error/accepted/changed/menu
 frames. No guest state, counter edit or firmware forcing is supplied.
+
+### Permanent PUK2 loss and cold PIN2 refusal
+
+`tools/nsb3_puk2_exhaust.py BLOCKED FIRST_WRONG OUTPUT` rechecks the actual
+PIN2-blocked source and first wrong PUK2, then performs nine further independent
+cold physical `87654322`/new `8765` attempts. Only PUK2 attempts change 9→0;
+all credentials/files and PIN1/PUK1 stay intact. Statuses are `9804` until
+the final `9840`, which paints **PIN2 code rejected**. Completed logs are
+losslessly compressed and `--check-only` requalifies the complete chain.
+
+Two further cold processes authenticate PIN1 and the separate phone code,
+open the reviewed Messages menu, navigate to Change PIN2 and press Select.
+Both receive the same PIN2 rejection without a new CHANGE/UNBLOCK/VERIFY2
+or storage mutation. Every card byte remains unchanged. This is permanent
+PIN2-menu refusal with working ordinary authentication, not global SIM-card
+rejection and not coverage of every PIN2-protected application.
+
+Physical Down changes the neighboring security-item text, but rejection
+pixels remain above it at both the initial capture and90seconds. The gate
+checks this actual partial redraw as a known display-settlement limit; it
+does not claim a clean neighboring menu. No synthetic clearing, frame mask
+or firmware-context write is supplied. `nsb3_puk2_permanent_input.lua` uses
+physical navigation and a read-only later snapshot; both runs end at92seconds
+before the separately qualified late-reset boundary. Native RF, long-run
+stability and complete idle/display correctness remain open.
