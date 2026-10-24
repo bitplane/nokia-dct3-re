@@ -241,6 +241,18 @@ both source pages identify their own update as 2005-02-21. Reference names
 do not justify enabling a new controller behavior without a matched consumer
 and runtime test. The current NAM-2 boundary remains wake without service.
 
+NPE-3 v5.56 independently reaches the same late no-sleep loop as NAM-2 v5.21:
+the guard declines deep sleep, both clock-helper arms clear CTSI`0d` bit0,
+and neither arm traverses the separate control-`05` write. The original
+Blacksphere table labels bit0 **ARM clock** but specifies no polarity,
+transition latency or relationship to global delivery. This is a shared
+unresolved clock/interrupt boundary, not evidence for automatic enable.
+`tools/noki6210_idle_contract.py` hash-pins the complete NPE-3 exit/helper
+blocks and resolves both MMIO literals; its tests compare only the established
+conclusions against NAM-2's separately decoded `idle_control_contract`, never
+their addresses or product profiles. Runtime scope remains in
+`mbus_controller.md` and `2100_bringup.md`.
+
 `make verify-mad2-sleep` validates this contract on both ROMs with an MMIO
 controller fixture: Timer 1 continues while the ARM is suspended, reaches
 destination `0x7fff`, raises FIQ5 and wakes the CPU. Each run saves and reloads
