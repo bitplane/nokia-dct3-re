@@ -44,7 +44,8 @@ def main():
     commands = []
     with (output / 'build.log').open('w') as log:
         command = ['make', '-f', 'makefile.gcc', '-f', str(tools / 'etsi_efr_state_observer.mk'),
-                   f'CFLAGS={CFLAGS}', f'DTX_OBSERVER_SOURCE={tools / "etsi_efr_dtx_observer.c"}', 'decoder_dtx_observed']
+                   f'CFLAGS={CFLAGS}', f'DTX_OBSERVER_SOURCE={tools / "etsi_efr_dtx_observer.c"}',
+                   f'OBSERVER_SOURCE={tools / "etsi_efr_state_observer.c"}', 'decoder_dtx_observed', 'decoder_observed']
         commands.append(command)
         subprocess.run(command, cwd=source, stdout=log, stderr=subprocess.STDOUT, check=True)
     installation = source / 'spch_dos.dec'
@@ -54,6 +55,8 @@ def main():
     runs = [('installation', 'decoder_dtx_observed', installation),
             ('lost_sid', 'decoder_dtx_observed', output / 'lost_sid.dec'),
             ('replay', 'decoder_dtx_observed', output / 'lost_sid.dec'),
+            ('state', 'decoder_observed', output / 'lost_sid.dec'),
+            ('state_replay', 'decoder_observed', output / 'lost_sid.dec'),
             ('unobserved', 'decoder', output / 'lost_sid.dec')]
     for name, executable, input_path in runs:
         command = [str(source / executable), str(input_path), str(output / f'{name}.out')]
@@ -63,13 +66,22 @@ def main():
     if hashlib.sha256((output / 'installation.out').read_bytes()).hexdigest() != EXPECTED['out'][1]:
         raise ValueError('observed reference fails installation PCM')
     pcm = (output / 'lost_sid.out').read_bytes()
-    if len(pcm) != 518 * 320 or any((output / f'{name}.out').read_bytes() != pcm for name in ('replay', 'unobserved')):
+    if len(pcm) != 518 * 320 or any((output / f'{name}.out').read_bytes() != pcm for name in ('replay', 'state', 'state_replay', 'unobserved')):
         raise ValueError('reference observer or fresh process changes PCM')
     for name in ('lost_sid', 'replay'):
         check_flags((output / f'{name}.log').read_text(), decoder)
+    from tools.c54x_rom4_efr_state_check import parse
+    states = []
+    for name in ('state', 'state_replay'):
+        text = (output / f'{name}.log').read_text()
+        parse(text, frames=518)
+        states.append([line for line in text.splitlines() if line.startswith(('EFRSTATE ', 'EFRGAIN ', 'EFRPOLICY '))])
+    if states[0] != states[1]:
+        raise ValueError('reference semantic observations differ across fresh processes')
     evidence = dict(commands=commands, frames=518, samples=82880,
                     input_sha256=hashlib.sha256(decoder).hexdigest(), pcm_sha256=hashlib.sha256(pcm).hexdigest(),
                     observer_sha256=hashlib.sha256((tools / 'etsi_efr_dtx_observer.c').read_bytes()).hexdigest(),
+                    state_observer_sha256=hashlib.sha256((tools / 'etsi_efr_state_observer.c').read_bytes()).hexdigest(),
                     installation_verified=True, fresh_process_replay=True, observer_pcm_unchanged=True,
                     native_dsp_claim=False, handset_audio_claim=False)
     (output / 'evidence.json').write_text(json.dumps(evidence, indent=2) + '\n')

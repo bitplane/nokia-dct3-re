@@ -236,6 +236,7 @@ def main():
     mode.add_argument("--efr-homing-encoder", action="store_true", help="compare native EFR encoder homing and repeated speech with the external reference")
     parser.add_argument('--observe-homing-errors', action='store_true', help='capture all homing/error differences without claiming conformance')
     parser.add_argument('--observe-dtx-history', action='store_true', help='observe original DTX first-speech history while retaining strict PCM acceptance')
+    parser.add_argument('--observe-lost-sid-state', action='store_true', help='capture lost-SID LSF/gain boundaries without relaxing strict PCM acceptance')
     parser.add_argument('--staged', action='store_true', help='run supported codec or RF helper fixtures on the staged CPU, not a handset speech claim')
     parser.add_argument('--trace-fr', action='store_true', help='retain decoder frame 8 or encoder frame 0 encoding instructions, entry RAM and actual data accesses')
     parser.add_argument('--trace-efr', '--trace-efr-reset', dest='trace_efr_reset', action='store_true', help='observe at most 8192 EFR reset and 200000 first-frame instructions, without changing acceptance')
@@ -255,6 +256,8 @@ def main():
         parser.error('--observe-homing-errors requires --efr-homing-errors')
     if args.observe_dtx_history and not (args.efr_dtx_decoder or args.efr_invalid_sid or args.efr_lost_sid):
         parser.error('--observe-dtx-history requires a DTX decoder fixture')
+    if args.observe_lost_sid_state and (not args.efr_lost_sid or args.observe_dtx_history):
+        parser.error('--observe-lost-sid-state requires --efr-lost-sid without --observe-dtx-history')
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_c54x_rom4_crc_", dir=args.output_root))
     bios = "fr-encoder" if args.fr_encoder else "fr-decoder" if args.fr_decoder else "fr-packing" if args.fr_packing else "crc-packed" if args.packed else "crc-helper"
@@ -304,10 +307,16 @@ def main():
     if args.observe_dtx_history:
         command.extend(['-debug', '-debugger', 'none', '-autoboot_delay', '0',
                         '-autoboot_script', str(root / 'tools/c54x_rom4_efr_dtx_history_observe.lua')])
+    if args.observe_lost_sid_state:
+        command.extend(['-debug', '-debugger', 'none', '-autoboot_delay', '0',
+                        '-autoboot_script', str(root / 'tools/c54x_rom4_efr_lost_sid_state_observe.lua')])
     inputs = [args.mame, Path(__file__), root / "driver/tms320c54x_test.cpp"]
     if args.observe_dtx_history:
         inputs.extend(root / name for name in ('tools/c54x_rom4_efr_dtx_history_observe.lua',
                                                'tools/c54x_rom4_efr_dtx_history_check.py'))
+    if args.observe_lost_sid_state:
+        inputs.extend(root / name for name in ('tools/c54x_rom4_efr_lost_sid_state_observe.lua',
+                                               'tools/c54x_rom4_efr_lost_sid_state_check.py'))
     inputs.extend(root / name for name in ("lib/util/gsmfr.cpp", "lib/util/gsmfr.h",
                                            "driver/gsm_tch_f_l1.cpp", "driver/gsm_tch_f_l1.h",
                                            "cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h"))

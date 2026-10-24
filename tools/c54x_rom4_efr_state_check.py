@@ -51,7 +51,7 @@ def parse_policy(text, candidate=False):
     return records
 
 
-def parse(text):
+def parse(text, frames=163):
     states, gains, events = {}, {}, []
     for line in text.splitlines():
         if line.startswith('EFRSTATE '):
@@ -72,13 +72,13 @@ def parse(text):
                 raise ValueError('duplicate EFR gain observation')
             gains[key] = int(match[4], 16)
             events.append(key)
-    expected_states = {(frame, kind) for frame in range(163) for kind in WIDTHS}
-    expected_gains = {(frame, kind, subframe) for frame in range(163)
+    expected_states = {(frame, kind) for frame in range(frames) for kind in WIDTHS}
+    expected_gains = {(frame, kind, subframe) for frame in range(frames)
                       for kind in ('pitch', 'code') for subframe in range(4)}
     if states.keys() != expected_states or gains.keys() != expected_gains:
         raise ValueError('incomplete or out-of-domain EFR state/gain coverage')
     expected_events = []
-    for frame in range(163):
+    for frame in range(frames):
         expected_events.extend([(frame, 'R2'), (frame, 'LSF')])
         expected_events.extend((frame, kind, subframe) for subframe in range(4) for kind in ('pitch', 'code'))
         expected_events.extend([(frame, 'RAW'), (frame, 'LPC')])

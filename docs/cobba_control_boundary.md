@@ -2966,6 +2966,38 @@ The second command checks the bounded negative result and reports
 `conformance_claim=False`, not a full fixture pass. The ordinary DTX
 PCM/replay gate remains a separate positive regression control.
 
+A passive semantic comparison narrows the first PCM difference to code
+gain. Through frame97, both native frontends match all980 reference R2
+words,980 LSF words and392 pitch gains. All code gains before97 match;
+at97 native gains are8/9/12/84 versus reference8/8/8/8 (pitch is zero in
+all four subframes). Native clamp-entry observations read previous-bad
+history0 and previous gains10/8/9/12. Their full B accumulator candidates
+have integer parts8/9/12/84, exactly the published gains. The reference
+reads previous-bad history1 and previous gains10/8/8/8. Applying that
+reference cap to each observed native candidate reproduces all four
+reference gains. This identifies the first differing semantic boundary
+and an evidenced cap-policy explanation for its values, not a proof that
+every later arithmetic/synthesis boundary is equivalent.
+
+`run_efr_lost_sid_reference.py` also generates `state.log` with the existing
+external link-time state/gain observer. All518 reference frames must have
+complete ordered observations; a fresh-process replay must reproduce them,
+and both observed PCM files must equal the unobserved reference output.
+The native observation checker requires98 original/replay frame pairs and
+rejects any earlier R2/LSF/pitch or code-gain difference. Reproduce with:
+
+```sh
+python3 tools/run_c54x_rom4_crc.py --mame mame/mame --rompath mame/roms \
+  --efr-lost-sid --observe-lost-sid-state
+# Strict failure is retained; add --staged for the other frontend.
+python3 tools/c54x_rom4_efr_lost_sid_state_check.py RUN/error.log REFERENCE/state.log
+```
+
+Neither observer writes firmware/codec state. No raw-synthesis equality,
+remaining420-frame result or handset speech claim is inferred from this
+prefix. The surviving native/reference mismatch should not be repaired
+by deleting the acquired recovery patch or importing the reference codec.
+
 ### Native EFR active-speech erasures
 
 Atomic and staged execution complete all 163 frames and replay 65,440 ordinary
