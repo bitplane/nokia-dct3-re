@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb6_sip_physical_audio_waveforms",
+      "owner": "nsb6_host_audio",
+      "status": "satisfied",
+      "predicate": "Physical incoming and outgoing NSB-6 research-HLE GSM900 calls carry sustained microphone and speaker tones through isolated host audio and real local SIP",
+      "current": "The shared isolated PulseAudio fixture feeds440Hz to MAME's actual microphone capture stream and records its speaker playback while the remote endpoint returns660Hz. Both own-PMM incoming/outgoing SIP gates retain physical Answer/Send/End, own registration/call/release/UI checks and exact512000/8000Hz PCM accounting. Both endpoint recordings require at least two consecutive1s windows with RMS>=500 and expected-tone energy fraction>=0.5, not frame counts or a transient beep. Outgoing has6s microphone/7s earpiece; incoming has8s/4s. No codec gain changes, firmware-state forcing or donor provisioning occur. Captures tmp/nsb6-sip-outgoing-waveform/handset and tmp/nsb6-sip-incoming-waveform/handset pass. This is HLE endpoint audio, not measured analogue gains, PCS1900 audio or native DSP speech.",
+      "evidence": ["docs/8xxx_bringup.md", "docs/external_call_bridge.md", "tools/run_sip_physical_audio_gate.sh", "tools/run_noki8890_sip_cancel.py", "tools/sip_handset_waveform_check.py", "tools/test_sip_handset_waveform_check.py", "gates.json"]
+    },
+    {
       "id": "nsb6_pcm_sip_four_phase_restoration",
       "owner": "nsb6_host_call_lifecycle",
       "status": "satisfied",

@@ -155,12 +155,12 @@ absent product is a coverage question, not a drifted gate.
 | `sip-incoming-connected-signaling` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — | — |
 | `sip-incoming-media` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
 | `sip-incoming-restore` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
-| `sip-incoming-waveform` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
+| `sip-incoming-waveform` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
 | `sip-outgoing-busy` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
 | `sip-outgoing-media` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
 | `sip-outgoing-restore` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
 | `sip-outgoing-unavailable` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | yes | yes |
-| `sip-outgoing-waveform` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
+| `sip-outgoing-waveform` | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
 | `sip-pending-outgoing-restore` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes |
 | `slow-pin-registration` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | — |
 | `sms-status-persistence` | — | — | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |

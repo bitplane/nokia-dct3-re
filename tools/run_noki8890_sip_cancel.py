@@ -142,6 +142,7 @@ def main():
                           dest='restore_incoming_connected_signaling', action='store_true',
                           help='physically answer, restore and clear an incoming HLE SIP dialog')
     parser.add_argument('--record-media', action='store_true')
+    parser.add_argument('--sound', choices=('none', 'pulse'), default='none')
     parser.add_argument('--http-port', type=int, default=18889)
     parser.add_argument('--sip-port', type=int, default=25889)
     args = parser.parse_args()
@@ -175,7 +176,7 @@ def main():
                        'noki8890_sip_cancel_observe.lua')),
                    '-state_directory', str(run / 'sta'),
                    '-snapshot_directory', str(run / 'snap'), '-seconds_to_run', '70',
-                   '-video', 'none', '-sound', 'none', '-throttle', '-log', '-verbose',
+                   '-video', 'none', '-sound', args.sound, '-throttle', '-log', '-verbose',
                    '-http', '-http_port', str(args.http_port)]
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),

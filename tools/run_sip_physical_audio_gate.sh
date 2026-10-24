@@ -53,6 +53,9 @@ case "$product" in
     8850)
         machine=nsm2hle bios=
         ;;
+    8890)
+        machine=nsb6hle bios=
+        ;;
     *) echo "unsupported SIP waveform product: $product" >&2; exit 1 ;;
 esac
 case "$direction" in
@@ -116,7 +119,7 @@ capture_pid=$!
 python3 tools/pulse_route_mame.py --source "$input_name.monitor" --sink "$output_name" \
     > "$run_dir/sip-pulse-routes.log" &
 router_pid=$!
-if [[ "$product" == 8210 || "$product" == 8850 ]]; then
+if [[ "$product" == 8210 || "$product" == 8850 || "$product" == 8890 ]]; then
     media_arg=--outgoing-media
     if [[ "$direction" == incoming ]]; then media_arg=--incoming-media; fi
     env PYTHONPATH="${SIP_PYTHON_PATH:-$(realpath "$sip_project_dir/pjsip-apps/src/swig/python"):$(realpath "$sip_project_dir"/pjsip-apps/src/swig/python/build/lib.*)}" \
@@ -137,7 +140,7 @@ wait "$capture_pid" || true
 capture_pid=
 grep -q '^pulse_route: source-output ' "$run_dir/sip-pulse-routes.log" || { echo 'missing MAME microphone stream' >&2; exit 1; }
 grep -q '^pulse_route: sink-input ' "$run_dir/sip-pulse-routes.log" || { echo 'missing MAME speaker stream' >&2; exit 1; }
-if [[ "$product" == 8210 || "$product" == 8850 ]]; then
+if [[ "$product" == 8210 || "$product" == 8850 || "$product" == 8890 ]]; then
     cp "$run_dir/sip-earpiece.wav" "$run_dir/handset/sip-earpiece.wav"
     run_dir="$run_dir/handset"
 fi

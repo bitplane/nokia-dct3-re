@@ -16,6 +16,7 @@ class SipHandsetWaveformTest(unittest.TestCase):
     def test_late_pin_profile_is_product_explicit_before_audio_setup(self):
         repository = Path(__file__).resolve().parents[1]
         for product, value, error in (('8850', '1', 'requires 8210'),
+                                       ('8890', '1', 'requires 8210'),
                                        ('8210', 'yes', 'must be 0 or 1')):
             environment = dict(os.environ, SIP_PRODUCT=product, SIP_LATE_PIN_DCS=value)
             result = subprocess.run(['bash', 'tools/run_sip_physical_audio_gate.sh'],
@@ -23,13 +24,15 @@ class SipHandsetWaveformTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(error, result.stderr)
 
-    def test_8850_invalid_direction_is_rejected_before_audio_setup(self):
+    def test_research_product_invalid_direction_is_rejected_before_audio_setup(self):
         repository = Path(__file__).resolve().parents[1]
-        environment = dict(os.environ, SIP_PRODUCT='8850', SIP_DIRECTION='invalid')
-        result = subprocess.run(['bash', 'tools/run_sip_physical_audio_gate.sh'],
-                                cwd=repository, env=environment, capture_output=True, text=True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('unsupported SIP waveform direction', result.stderr)
+        for product in ('8850', '8890'):
+            environment = dict(os.environ, SIP_PRODUCT=product, SIP_DIRECTION='invalid')
+            result = subprocess.run(['bash', 'tools/run_sip_physical_audio_gate.sh'],
+                                    cwd=repository, env=environment, capture_output=True, text=True)
+            with self.subTest(product=product):
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('unsupported SIP waveform direction', result.stderr)
 
     def test_audio_defaults_are_captured_before_modules_and_restored_on_failure(self):
         repository = Path(__file__).resolve().parents[1]
@@ -126,7 +129,7 @@ esac
             root = Path(directory)
             self.recording(root, [(440, 8000)] * 2).rename(root / 'sip-microphone.wav')
             self.recording(root, [(660, 8000)] * 2).rename(root / 'sip-earpiece.wav')
-            for product in ('3210', '3310', '3330', '3410', '5210', '8210'):
+            for product in ('3210', '3310', '3330', '3410', '5210', '8210', '8850', '8890'):
                 with self.subTest(product=product):
                     verify(root, product, 'incoming')
                     result = json.loads((root / 'sip-waveform-result.json').read_text())

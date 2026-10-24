@@ -693,7 +693,12 @@ uplink/downlink and host PCM frames. The independently acquired NSB-6 manual
 supplies512kHz/8kHz,64-clock framing; the own control writer and exact PCM
 clock/idle counters are checked separately. `--record-media` retains bridge
 PCM, but does not by itself qualify nonsilent physical microphone/earpiece
-waveforms. Native DSP speech and analogue gains remain unproved.
+waveforms. The separate `verify-8890-sip-outgoing-waveform` and
+`verify-8890-sip-incoming-waveform` gates do qualify sustained440Hz
+microphone-to-remote and660Hz remote-to-physical-speaker recordings through
+isolated host audio, retaining the same own PCM/call checks and neutral gains.
+This is GSM900 research-HLE audio, not native DSP speech or measured analogue
+gains.
 
 The connected outgoing/incoming restoration gates save at32/52 seconds,
 respectively, after physical input and real SIP connection. Exact
@@ -1302,8 +1307,9 @@ make verify-3330-radio-outgoing-call-sip-pending-restore RUN_DIR=run_3330_sip_ou
 
 Evidence is in each gate's `_call` directory; `_provision` contains only its
 own preceding PMM setup. Neither dialog nor provisioning is inherited from
-another product. All five SIP-tested HLE profiles now have independent
-incoming and outgoing restore evidence; native DSP speech remains unproven.
+another product. The original3210/3310/3330/3410/5210 HLE profiles have
+independent incoming and outgoing restore evidence; native DSP speech
+remains unproven.
 
 The 3310 NHM-5 v6.39 also completes a physical outgoing call through the local
 PJSIP bridge: handset SETUP, SIP confirmation, bidirectional host media, and

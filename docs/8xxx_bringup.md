@@ -652,6 +652,20 @@ clocks, with exact cumulative counters and transfers bounded by the own
 860b/840a writer. Recorded host PCM is not a nonsilent microphone/earpiece
 waveform test. Native speech and analogue gains remain unproved.
 
+`verify-8890-sip-outgoing-waveform` and
+`verify-8890-sip-incoming-waveform` independently qualify nonsilent physical
+host audio on GSM900. The isolated PulseAudio fixture routes a440Hz source
+into MAME's microphone stream and captures the actual speaker stream while
+the remote SIP endpoint returns660Hz. Both directions must retain the full
+own-product call/PCM checks and demonstrate at least two consecutive
+one-second windows per endpoint with RMS at least500 and expected-tone
+energy fraction at least0.5. This excludes silence, a transient beep and
+transport counters alone. No codec gain is changed. The outgoing capture
+has6/7 sustained microphone/earpiece seconds; incoming has8/4. Captures are
+`tmp/nsb6-sip-outgoing-waveform/handset` and
+`tmp/nsb6-sip-incoming-waveform/handset`. This is HLE endpoint audio, not
+native speech, measured analogue gain or independently tested PCS1900 audio.
+
 Accepted media captures are `tmp/nsb6-sip-outgoing-media-qualified` and
 `tmp/nsb6-sip-incoming-media-final`. The four restoration captures use
 `tmp/nsb6-pcm-v2-restore-` with suffixes `outgoing-connected`,
