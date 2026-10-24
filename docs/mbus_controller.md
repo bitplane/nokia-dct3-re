@@ -87,6 +87,33 @@ is not absence of traffic; the service fixture uses its independent bounded
 MMIO observation. Refreshed cross-ROM repeated-byte fixtures remain pending;
 the current NPE-3 repeated-byte gate passes at1.1ms.
 
+### NPE-3 service catalogue boundary
+
+Read-only observation of the version query resolves the source getter
+`0x4b0476` (reads pointer `0x286818` to own version text `0x2867f8`), called
+indirectly at `0x49fe92`, with return `0x49fe94`. The dispatcher beginning
+`0x49fda0` uses message byte8 as a function-table index, rejects indices
+at least `0x67` and null functions, and decodes arguments from byte10's
+selector before the indirect call. Its literal at `0x4a013c` selects table
+`0x255da0`: 103 slots, 94 non-null; slot0 is getter pointer `0x4b0477`.
+`tools/noki6210_service_catalogue.py` extracts this own-hash-pinned table.
+These are internal slots, not established MBUS command numbers. Next work is
+to classify the handlers and their wire mapping before trying further reads;
+no arbitrary memory/DSP acquisition capability is established by this table.
+
+The observed dispatcher message is the original query frame:
+`1f0010d10005000100030001d8`. Thus byte8 selects slot0, byte9 selects string
+return handling (3), and byte10 selects argument decoding (0); these offsets
+are runtime-confirmed, not a borrowed command-name mapping.
+
+Initial static classifications: slot1 (`0x4dbfea`) is a masked peripheral-byte
+**writer**, while slot2 (`0x4dc060`) reads the corresponding masked byte.
+Both split argument0 into an upper-byte register index and low-byte mask;
+indices below `0xf4` address base `0x20000`, others base `0x40000` (literals
+`0x4dc2a0/0x4dc2a4`). Slot2 is not arbitrary RAM or DSP-ROM access, and MMIO
+reads may have side effects. Neither slot has been exercised as a probe.
+Classify remaining handlers before choosing a read-only acquisition candidate.
+
 ## Timer and remaining uncertainty
 
 The controller uses the physical 9,600-baud rate with a ten-bit character time
