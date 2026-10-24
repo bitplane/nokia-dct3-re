@@ -129,7 +129,28 @@ phone authentication, native execution, raw SIMI TX/RX, card statuses, payload,
 response/contact ordering, complete storage, configuration and pixels are
 independently checked. Shared success/refusal parsing retains the6130's
 automatic refusal and the6150's physical-success contracts separately.
-Next, trace the record-write source bytes and read/default handling for0728..072a;
+An additional passive74s capture (`tmp/nsk1-toolkit-nv-source`) observes the
+write routine's entry at28ee2e before its prologue changes arguments. All18
+complete33-byte records already match the final EEPROM at that boundary,
+using RAM source10ce38 and caller28ca0f, in address order0550..0781 at
+17.074376..18.716675s. Thus these differences are not introduced after that
+boundary by I2C serialization or EEPROM persistence. This does not prove
+the source data valid, exclude an earlier read failure, or identify the
+record semantics. Static code at28c9da resolves the record address/length
+through28c956 before calling28ee2e; the latter transmits bytes loaded from
+the supplied buffer (28eebe/28eec0).
+
+`tools/nsk1_nv_source.lua` composes the same physical/card fixture with this
+bounded, read-only observation. Recheck both the complete experiment and
+the source comparison:
+
+```sh
+.venv/bin/python tools/nsk1_toolkit_check.py \
+  tmp/nsk1-diagnostic-display-cold tmp/nsk1-toolkit-nv-source
+.venv/bin/python tools/nsk1_nv_source_check.py tmp/nsk1-toolkit-nv-source
+```
+
+Next, recover who fills10ce38 and the read/default handling for0728..072a;
 do not erase records or alter timing merely to remove the observed changes.
 Normal-machine, fitted-mask, RF and speech claims are unchanged.
 
