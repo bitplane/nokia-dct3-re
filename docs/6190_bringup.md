@@ -643,7 +643,8 @@ prompt/menu frames. No guest RAM/save state, forced authentication result or
 donor provisioning is supplied. Successful PIN1 exhaustion/PUK recovery is
 qualified below, as are menu-based PIN/PIN2 change and cold restoration.
 First wrong-PUK1 persistence/recovery, PIN2 exhaustion and successful PUK2
-recovery are qualified below. Permanent PUK exhaustion remains unqualified.
+recovery are qualified below. Permanent PUK1 rejection is also qualified;
+permanent PUK2 loss remains unqualified.
 
 ### PIN1 exhaustion and PUK recovery
 
@@ -737,7 +738,7 @@ linked source hashes/initial card snapshots and Done/prompt/menu pixel oracles.
 Unrelated credential, file or Toolkit mutations fail. No firmware-state write,
 donor data or guest-state transfer is supplied. PIN/PIN2 change contracts
 are qualified below, including PIN2 exhaustion/PUK2 and first wrong-PUK1
-recovery; permanent PUK exhaustion remains separate.
+recovery; permanent PUK1 rejection is qualified below and PUK2 loss remains separate.
 
 ### Menu PIN change and cold authentication
 
@@ -875,4 +876,27 @@ new-PIN cold phase using `nsb3_puk_check.py prepare-new-pin` and run
 `check BLOCKED WRONG RECOVERY NEW_PIN` requires exact physical/APDU/status
 sequences, own executable, linked storage and blocked/phone/menu pixels.
 No guest state, PUK-counter edit or authentication result is supplied.
-Permanent PUK1 loss remains a separate unqualified lifecycle.
+Permanent PUK1 loss is qualified separately below.
+
+### Permanent PUK1 exhaustion and cold rejection
+
+`tools/nsb3_puk1_exhaust.py BLOCKED FIRST_WRONG OUTPUT` requalifies the first
+physical wrong-PUK1 transition, then performs nine more independent cold
+processes with the actual predecessor card. Only PUK1 attempts change 9→0;
+PIN1 stays at 0 attempts with unchanged credentials, while PIN2/PUK2 and all
+files remain intact. Every intermediate `9804` result and the final `9840`
+are checked against the complete physical UNBLOCK payload. The final attempt
+paints **Code error**; a further cold boot, not that immediate error frame,
+establishes the terminal **SIM card rejected** state.
+
+A second cold process physically presses `4321` and the left softkey. The
+firmware renders those as dialing input, rather than authenticating the
+rejected card. Both terminal processes issue no VERIFY/CHANGE/UNBLOCK or
+card mutation and retain every card byte. This proves permanent card
+rejection with responsive physical input, not a frozen phone or network
+acceptance of the dialed digits. Exact rejected/dial pixels are required.
+
+The runner supports `--check-only` and explicit `--resume`; an existing run
+is always requalified rather than trusted. Completed logs are compressed
+losslessly and remain recheckable. No retry counter, firmware state or guest
+RAM/save state is supplied. Wrong/permanent PUK2 remains separate.
