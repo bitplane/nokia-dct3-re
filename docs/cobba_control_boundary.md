@@ -3230,13 +3230,41 @@ python3 tools/run_efr_mixing_replay.py --source ACQUIRED_REFERENCE_SOURCE \
 ```
 
 Thus prediction, mixing and synthesis arithmetic all match their independent
-calculations on captured native arguments. This does not prove every CPU
-saturation/flag case, the enhancement gain-control path, sole-cause equivalence
+calculations on captured native arguments. This mixing result alone does not
+prove every CPU saturation/flag case, enhancement gain control, sole-cause equivalence
 of all later samples or whole-decoder conformance. The known gains remain
 different; neither decoder/emulator state nor reference PCM is changed to
 remove that difference. Native PCM and the strict frame 97/86 failure are
 preserved. Truncated argument cases, short or missing total vectors and changed
 replay are errors; computed arithmetic differences are reported explicitly.
+
+The independent enhancement check observes `c546` only for caller return
+`c885`: AR2 points to the subframe's total excitation, AR3 to scratch `0af2`,
+and AR6=1 selects unsmoothed normalization. Smoothed postfilter callers are
+excluded. Executed calls must agree with the original pitch-gain threshold
+(`pitch > 2048`), with complete before/after vectors and exact replay.
+
+`run_efr_agc_replay.py` calls the acquired reference's original `agc2` on copies
+of those two input vectors. Both frontends match all 39,080 normalized samples
+from 977 calls exactly. Every AGC input equals captured total excitation and
+every normalized output equals the later synthesis input. The other 1,095
+subframes independently prove direct total-excitation bypass into synthesis.
+These checks bind the arithmetic calculation to the observed handoffs rather
+than treating an isolated matching output as whole-path evidence.
+
+```sh
+python3 tools/run_efr_agc_replay.py --source ACQUIRED_REFERENCE_SOURCE \
+  --native RUN/error.log --output NEW_DIRECTORY
+```
+
+The shared isolated calculator additionally pins the original gain-control and
+inverse-square-root sources/table/headers. Predictor, mixing and synthesis-filter
+controls remain exact; installation PCM, immutable sources and two fresh-process
+outputs are still required. No implementation is transplanted into MAME and no
+decoder/emulator state is changed. Smoothed AGC, other energy/CPU states,
+every enhancement-input construction step, sole-cause equivalence and whole-
+decoder conformance are not promoted. Native PCM, semantic replay and the strict
+frame 97/86-sample failure remain unchanged.
 
 ### Native EFR active-speech erasures
 

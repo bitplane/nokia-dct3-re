@@ -9,6 +9,7 @@
 
 extern void Syn_filt(short *, short *, short *, short, short *, short);
 extern void Pred_lt_6(short *, short, short, short);
+extern void agc2(short *, short *, short);
 extern int L_mult(short, short);
 extern int L_mac(int, short, short);
 extern int L_shl(int, short);
@@ -45,9 +46,10 @@ int main(int argc, char **argv)
     if (argc == 4) {
         if (strcmp(argv[1], "--predictor") == 0) mode = 1;
         else if (strcmp(argv[1], "--mix") == 0) mode = 2;
+        else if (strcmp(argv[1], "--agc") == 0) mode = 3;
         else return 2;
     } else if (argc != 3) return 2;
-    width = mode == 1 ? 156 : mode == 2 ? 82 : 61;
+    width = mode == 1 ? 156 : mode == 2 ? 82 : mode == 3 ? 80 : 61;
     input = fopen(argv[1 + (mode != 0)], "rb");
     if (!input) return 2;
     output = fopen(argv[2 + (mode != 0)], "wb");
@@ -71,6 +73,9 @@ int main(int argc, char **argv)
                 result[i] = rounded_word(L_shl(value, 3));
             }
             if (!write_words(output, result, 40)) { status = -1; break; }
+        } else if (mode == 3) {
+            agc2(arguments, arguments + 40, 40);
+            if (!write_words(output, arguments + 40, 40)) { status = -1; break; }
         } else {
             Syn_filt(arguments, arguments + 11, result, 40, arguments + 51, 1);
             if (!write_words(output, result, 40) || !write_words(output, arguments + 51, 10)) {
@@ -84,6 +89,6 @@ int main(int argc, char **argv)
     if (fclose(output) != 0) status = -1;
     if (status < 0 || !count) return 1;
     printf("reference argument calls=%u mode=%s\n", count,
-            mode == 1 ? "predictor" : mode == 2 ? "mix" : "filter");
+            mode == 1 ? "predictor" : mode == 2 ? "mix" : mode == 3 ? "agc" : "filter");
     return 0;
 }

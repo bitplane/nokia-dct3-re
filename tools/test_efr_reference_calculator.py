@@ -14,7 +14,8 @@ class ReferenceCalculatorTests(unittest.TestCase):
             source = root / 'source'
             source.mkdir()
             for name in ('decoder', 'syn_filt.c', 'pred_lt6.c', 'basicop2.c',
-                         'basic_op.h', 'typedef.h', 'count.c', 'count.h'):
+                         'basic_op.h', 'typedef.h', 'count.c', 'count.h', 'agc.c',
+                         'inv_sqrt.c', 'inv_sqrt.tab', 'sig_proc.h', 'cnst.h'):
                 (source / name).write_bytes(b'original source or executable')
             (source / 'spch_dos.dec').write_bytes(b'installation input')
             expected = dict(dec=(None, hashlib.sha256(b'installation input').hexdigest()),
@@ -41,6 +42,7 @@ class ReferenceCalculatorTests(unittest.TestCase):
             self.assertEqual(commands[0][-1], str(root / 'output/reference-calculator'))
             self.assertEqual('--predictor' in commands[-1], mode == 'predictor')
             self.assertEqual('--mix' in commands[-1], mode == 'mix')
+            self.assertEqual('--agc' in commands[-1], mode == 'agc')
             self.assertEqual(result, b'calculated')
             self.assertTrue(evidence['installation_verified'])
             self.assertTrue(evidence['fresh_process_replay'])
@@ -50,6 +52,7 @@ class ReferenceCalculatorTests(unittest.TestCase):
         self.run_calculator()
         self.run_calculator(mode='predictor')
         self.run_calculator(mode='mix')
+        self.run_calculator(mode='agc')
 
     def test_bad_installation_pcm_rejected(self):
         with self.assertRaisesRegex(ValueError, 'installation PCM'):

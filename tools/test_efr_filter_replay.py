@@ -60,7 +60,9 @@ class FilterHarnessTests(unittest.TestCase):
                         'int L_mac(int v,short a,short b){return v+2*a*b;}\n'
                         'int L_shl(int v,short s){return v<<s;}\n'
                         'short fixture_round(int v)__asm__("round");\n'
-                        'short fixture_round(int v){return(short)((v+32768)>>16);}\n')
+                        'short fixture_round(int v){return(short)((v+32768)>>16);}\n'
+                        'void agc2(short*x,short*y,short n)'
+                        '{int i;for(i=0;i<n;i++)y[i]=x[i];}\n')
         cls.program = cls.root / 'calculator'
         subprocess.run(['gcc', '-std=gnu89', '-Wall', '-Wextra', '-o', str(cls.program),
                         str(Path(__file__).with_name('etsi_efr_argument_replay.c')), str(stub)],
@@ -110,4 +112,13 @@ class FilterHarnessTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(output, struct.pack('<40H', *((225,) * 40)))
         result, _ = self.run_harness(arguments[:-2], mode='mix')
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_agc_argument_order_and_partial_case(self):
+        signal = tuple(range(40))
+        arguments = struct.pack('<80H', *(signal + (99,) * 40))
+        result, output = self.run_harness(arguments, mode='agc')
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(output, struct.pack('<40H', *signal))
+        result, _ = self.run_harness(arguments[:-2], mode='agc')
         self.assertNotEqual(result.returncode, 0)

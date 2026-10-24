@@ -13,19 +13,20 @@ def digest(path):
 
 
 def calculate(source, output, vectors, *, mode='filter'):
-    if mode not in ('filter', 'predictor', 'mix'):
+    if mode not in ('filter', 'predictor', 'mix', 'agc'):
         raise ValueError('unknown reference argument mode')
     tools = Path(__file__).resolve().parent
     output.mkdir(parents=True, exist_ok=False)
     (output / 'arguments.bin').write_bytes(vectors)
     originals = [source / name for name in ('decoder', 'syn_filt.c', 'pred_lt6.c',
-                                           'basicop2.c', 'basic_op.h', 'typedef.h', 'count.c', 'count.h')]
+        'basicop2.c', 'basic_op.h', 'typedef.h', 'count.c', 'count.h', 'agc.c',
+        'inv_sqrt.c', 'inv_sqrt.tab', 'sig_proc.h', 'cnst.h')]
     originals += [tools / 'etsi_efr_argument_replay.c']
     identities = {str(path): digest(path) for path in originals}
     program = output / 'reference-calculator'
     commands = [
         ['gcc', *shlex.split(CFLAGS), *(str(source / name) for name in
-          ('syn_filt.c', 'pred_lt6.c', 'basicop2.c', 'count.c')),
+          ('syn_filt.c', 'pred_lt6.c', 'basicop2.c', 'count.c', 'agc.c', 'inv_sqrt.c')),
          str(tools / 'etsi_efr_argument_replay.c'), '-o', str(program)],
         [str(source / 'decoder'), str(source / 'spch_dos.dec'), str(output / 'installation.out')]]
     if digest(source / 'spch_dos.dec') != EXPECTED['dec'][1]:

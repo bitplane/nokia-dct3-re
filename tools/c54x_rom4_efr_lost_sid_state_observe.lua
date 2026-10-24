@@ -1,7 +1,8 @@
 -- Read-only semantic boundaries in the isolated lost-SID fixtures.
 local cpu = assert(manager.machine.devices[':maincpu'])
 local actions = {}
-local conditions = {[0xd014] = '(dw@sp==c890)||(dw@sp==c89c)', [0xd080] = 'dw@sp==c7fa'}
+local conditions = {[0xd014] = '(dw@sp==c890)||(dw@sp==c89c)',
+    [0xd080] = 'dw@sp==c7fa', [0xc546] = 'dw@sp==c885'}
 local function observe(pc, kind, address, count)
     -- Debugger commands accept at most 128 parameters; RAW contains 160 words.
     for first = 0, count - 1, 16 do
@@ -51,4 +52,10 @@ dynamic_vector(0xc85a, 'efr_excitation', 'ADAPT', '(dw@0ac9)+(dw@1312)', 40)
 -- d080 consumes AR0/A as lag/fraction and the 154 preceding excitation words.
 actions[0xd080] = 'logerror "efr_predictor_call: return=%04x output=%04x coefficients=%04x lag=%04x fraction=%04x saved_lag=%04x saved_fraction=%04x\\n",dw@sp,ar2,ar3,ar0,a&ffff,dw@130e,dw@1301;'
 dynamic_vector(0xd080, 'efr_predictor', 'HISTORY', 'ar2-009a', 154)
+-- AR6=1 selects the unsmoothed enhancement branch; postfilter callers differ.
+actions[0xc546] = 'logerror "efr_agc_call: return=%04x input=%04x output=%04x mode=%04x\\n",dw@sp,ar2,ar3,ar6;'
+dynamic_vector(0xc546, 'efr_agc', 'INPUT', 'ar2', 40)
+dynamic_vector(0xc546, 'efr_agc', 'PRE', 'ar3', 40)
+actions[0xc885] = ''
+dynamic_vector(0xc885, 'efr_agc', 'POST', '0af2', 40)
 for pc, action in pairs(actions) do cpu.debug:bpset(pc, conditions[pc] or '1', action .. 'g') end
