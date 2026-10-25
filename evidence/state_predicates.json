@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_native_late_decoder_zero_routes",
+      "owner": "native_aac_validation",
+      "status": "satisfied",
+      "predicate": "Complete observed late native worker invocations retain result zero across metadata handling and execute the source-pinned zero-result branch",
+      "current": "Fresh finalized-media cold capture tmp/mu4-native-return contains267 uncapped instruction-matched events in9.64..9.86s within the first verified AA99 session. Four complete invocations advance processing counts372->373 through375->376; all return0000, retain AR1=0 across method9, select0293e1 and reach0293fe then02940b. All27 availability checks pass; activity passes4 and skips23, including two skips after count376. The qualifier pairs actual successors, distinguishes invocation order from processing counters, reports partial leading coverage and rejects censored later calls. Synthetic checker controls cover2/ffff routes; those classes are not dynamically qualified by this capture. Binary SHA25641800b61c13a18396ffa20437c43b033c04e5581b08b96cb9ce3007f58060e0b. This is bounded native control flow, not whole-session return absence, final-input/drain completion, codec conformance, handset boot or speech.",
+      "evidence": ["docs/aac_validation.md", "driver/mu4_storage_test.cpp", "tools/mu4_decoder_gate_check.py", "tools/test_mu4_decoder_gate_check.py", "tools/mu4_context_contract.py"]
+    },
+    {
       "id": "mu4_decoder_worker_return_dispatch",
       "owner": "native_aac_validation",
       "status": "satisfied",

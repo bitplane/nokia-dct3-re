@@ -808,6 +808,35 @@ pinned word. Native invocation/branch selection, retry scheduling, helper
 `02061e`'s effects and the upstream final-input policy remain unqualified;
 do not synthesize result2 or infer that retrying unchanged short input is safe.
 
+The fresh finalized-media cold run`tmp/mu4-native-return` extends the
+read-only worker observation with the two return branches and their actual
+successors. All267 events in9.64..9.86s are uncapped, instruction-matched
+and bounded inside the first verified AA99 session. Four complete observed
+invocations advance processing counters372->373 through375->376. Each
+returns0000, retains AR1=0000 across metadata method9, takes`0293e1`,
+reaches common refresh`0293fe` and then`02940b`. No result2/ffff route is
+observed in this window; that is not a whole-session absence claim.
+
+All27 availability branches pass. Activity passes four times and skips23,
+including two skips after processing count376. Thus the late window is not
+blocked by the0400-word input threshold or a failed decoder return. The
+remaining native cleanup question is upstream activity/refill scheduling
+and the already-mapped one-pass short-input policy. This does not authorize
+setting15d9, changingaa1a or borrowing the isolated ABI's reserve rejection
+as the native session's cause.
+
+```sh
+.venv/bin/python tools/mu4_decoder_gate_check.py \
+  tmp/mu4-native-return/error.log --returns
+```
+
+The qualifier follows complete call/return/retained-result/successor groups;
+processing counters remain context, not invocation IDs. A window beginning
+mid-call reports its excluded prefix explicitly; censored later calls fail.
+Synthetic checker controls cover zero, two and other return classes, but
+only zero is runtime-qualified here. Tested executable SHA256:
+`41800b61c13a18396ffa20437c43b033c04e5581b08b96cb9ce3007f58060e0b`.
+
 ### Declared Packet-Lookahead Control
 
 `tools/mu4_aac_lookahead_fixture.py` preserves all original 65339 bytes and

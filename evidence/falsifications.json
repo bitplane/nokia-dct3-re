@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "mu4_late_native_worker_rejects_input_availability",
+      "status": "disproven",
+      "hypothesis": "The original native worker's0400-word availability threshold rejects work in the observed finalized-media tail window",
+      "conclusion": "Fresh read-only cold capture tmp/mu4-native-return has27 availability branches, all passing, in9.64..9.86s. Four complete observed decoder calls return0000 and take the zero-result route; the activity branch instead skips23 times, including twice after processing count376. The checker validates uncapped exact instruction identities and actual successors, not merely operand values. This falsifies availability rejection in that window, not every earlier/later gate, the isolated ABI reserve rejection, a whole-session return inventory or the original upstream EOF/drain policy. No input, activity flag, return code or policy word is changed.",
+      "evidence": ["docs/aac_validation.md", "tools/mu4_decoder_gate_check.py", "tools/test_mu4_decoder_gate_check.py", "driver/mu4_storage_test.cpp"]
+    },
+    {
       "id": "npe3_irq3_wake_report_alone_restores_call_input",
       "status": "disproven",
       "hypothesis": "Selecting the existing IRQ3 wake-report model alone in clock-enabled npe3mbus restores ordinary outgoing-call End input",
