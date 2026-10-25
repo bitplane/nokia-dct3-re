@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_context_lane_address_contract",
+      "owner": "native_aac_validation",
+      "status": "satisfied",
+      "predicate": "The original AA99 context wrappers select two paired local count and publication-link offsets",
+      "current": "Source contract context_lanes validates121 word checks over the four wrappers,0201b3 publication prefix,028fe6 paired caller and15 immediate-call candidates.020461 acquires at base+6 while020454 reaches the link at base+24;02044a acquires at base+22 while02046b reaches base+8. At baseD796 these are count/link-field pairsD79C/D7AE andD7AC/D79E, matching independently observed reciprocal links. The host address walk exhausts every unsigned16-bit base for both lanes including wrap; every pinned source word has mutation and omission tests. This assumes optional020198 returns normally, with AR2 restored from the stack, and does not model its memory effects.028fe6 calls02046b(AR1) only ifAAA2 is nonzero, then calls020461(AR1), setsAAA2=1 and clearsAAA4/AAA3. The49843-word scan closes only syntactic immediate-call candidates, not computed callers. Runtime wrapper/context ownership, AAA2/AAA3 lifecycle, physical units/capacity, scheduling, full helper effects and AAC tail draining remain unproved.",
+      "evidence": ["docs/aac_validation.md", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py"]
+    },
+    {
       "id": "mu4_native_context_increment_pointer",
       "owner": "native_aac_validation",
       "status": "satisfied",

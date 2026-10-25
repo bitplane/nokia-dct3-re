@@ -38,6 +38,8 @@ from tools.mu4_context_contract import (DECODER_RETURN_BASE, DECODER_RETURN_WITN
     DECODER_RETURN_WRAPPERS, decode_decoder_return_dispatch, reference_decoder_return_route)
 from tools.mu4_context_contract import (WORKER_RESERVATION_WITNESSES,
     decode_worker_reservation,reference_worker_reservation)
+from tools.mu4_context_contract import (CONTEXT_LANE_WITNESSES,
+    decode_context_lanes,reference_context_lane)
 from tools.mu4_context_contract import PLAYBACK_INFO_QUERY_WITNESSES, decode_playback_info_query
 from tools.mu4_context_contract import PLAYBACK_BUFFER_REFRESH_BASE, PLAYBACK_BUFFER_REFRESH_WITNESS, decode_playback_buffer_refresh
 from tools.mu4_context_contract import playback_final_input_words, decode_playback_final_input
@@ -90,6 +92,32 @@ from tools.mu4_context_contract import RECORD_WINDOW_BASE, RECORD_WINDOW_WITNESS
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_context_lane_source_and_address_walk(self):
+        words = {base+i:value for base,witness in CONTEXT_LANE_WITNESSES
+                 for i,value in enumerate(witness)}
+        result = decode_context_lanes(words)
+        self.assertEqual(result['pinned_words'],121)
+        self.assertEqual(sum(map(len,result['immediate_call_candidates'].values())),15)
+        with self.assertRaisesRegex(ValueError,'immediate-call census'):
+            decode_context_lanes(words | {0x2ffff:0xf982,0x30000:0x44a})
+        self.assertEqual(reference_context_lane(0xd796,0),
+                         dict(count_address=0xd79c,publication_entry=0xd7aa,link_address=0xd7ae))
+        self.assertEqual(reference_context_lane(0xd796,1),
+                         dict(count_address=0xd7ac,publication_entry=0xd79a,link_address=0xd79e))
+        for address in words:
+            with self.subTest(address=hex(address)),self.assertRaises(ValueError):
+                decode_context_lanes(words | {address:words[address]^1})
+            with self.subTest(missing=hex(address)),self.assertRaises(ValueError):
+                decode_context_lanes({a:v for a,v in words.items() if a!=address})
+        for base in range(0x10000):
+            for lane in (0,1):
+                model = reference_context_lane(base,lane)
+                self.assertEqual(model['count_address'],(base+6+16*lane)&0xffff)
+                self.assertEqual(model['link_address'],(base+24-16*lane)&0xffff)
+        for base,lane in ((-1,0),(65536,0),(True,0),(0,True),(0,2)):
+            with self.assertRaises(ValueError):
+                reference_context_lane(base,lane)
+
     def test_worker_reservation_source_and_literal_census(self):
         words = {base+i:value for base,witness in WORKER_RESERVATION_WITNESSES
                  for i,value in enumerate(witness)}

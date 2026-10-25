@@ -867,6 +867,28 @@ continues to exclude forwarded values. A zero count from an observer that
 covers only Read stage cannot exclude this producer; the live Execute PC
 is not its owner.
 
+`context_lanes` pins the four wrappers, publication helper and paired caller
+with121 word checks. Their local address contract is:
+
+| Acquire wrapper | Count offset | Publish wrapper | Link-field offset |
+| --- | --- | --- | --- |
+| `020461` | 6 | `020454` | 24 |
+| `02044a` | 22 | `02046b` | 8 |
+
+At base `d796`, these produce count/link-field pairs `d79c/d7ae` and
+`d7ac/d79e`, matching the reciprocal links observed below. The helper's
+AR2 walk is checked for every unsigned16-bit base, including wrapping;
+optional `020198` preserves AR2 on the stack if it returns normally.
+This is address algebra, not a simulation of that callback's effects.
+The full mapped-word census finds15 syntactic immediate-call candidates
+for the four wrappers; computed calls are not excluded.
+Source branch `028fe6` conditionally calls `02046b(AR1)` when `aaa2`
+is nonzero, then calls `020461(AR1)` and writes
+`aaa2=1,aaa4=0,aaa3=0`. Its runtime context and flag lifecycle remain
+unqualified. This is the next ownership boundary, not evidence for a
+physical ring size, sample unit, scheduling clock or permission to drain
+by manufacturing a ready token.
+
 Fresh cold capture `tmp/mu4-address-read-complete` qualifies126 uncapped
 Address-stage MVDK pointer reads in the same bounded first-session window:
 `d79e -> d7ac` four times, `d7ae -> d79c` four times,

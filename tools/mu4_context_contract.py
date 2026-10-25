@@ -750,6 +750,67 @@ def decode_worker_reservation(words):
         scope='Local counted-context reservation contract and exact literal census; not all computed writers, full helper call effects, downstream ownership, physical units or EOF/drain completion')
 
 
+CONTEXT_LANE_CALLS = {
+    0x44a:(0x204a6,0x27a99,0x29332,0x293c1),
+    0x454:(0x205f3,0x27a9c,0x2935a,0x293ed),
+    0x461:(0x20508,0x27a9f,0x28fee),
+    0x46b:(0x204bc,0x20581,0x2059c,0x28feb),
+}
+CONTEXT_LANE_WITNESSES = (
+    WORKER_RESERVATION_WITNESSES[1],
+    (0x20454,(0xf6be,0x8812,0xf495,0xf495,0xf495,0xf495,0x6dea,0x13,
+              0x4492,0xf074,0x1b3,0xf7be,0xf4e4)),
+    (0x20461,(0xf6be,0x8812,0xf495,0xf495,0xf274,0x182,0x6dea,6,0xf7be,0xf4e4)),
+    (0x2046b,(0xf6be,0x8812,0xf495,0xf495,0xf495,0xf495,0x4482,
+              0xf274,0x1b3,0x6dea,4,0xf7be,0xf4e4)),
+    (0x201b3,(0xf7b8,0x718a,0x13,0x6d8a,0x1a92,0xf540,0x8093,0x8293,
+              0x1283,0x809a,0x6dea,3,0x1292,0xf845,0x1c7,0x4a12,
+              0x6d8a,0xf074,0x198,0x8a12,0x7192,0x13,0x6d92,0x6b83,1,0xe723)),
+    (0x28fe6,(0x10f8,0xaaa2,0xf845,0x8fed,0x4811,0xf982,0x46b,
+              0x4811,0xf982,0x461,0x76f8,0xaaa2,1,0x76f8,0xaaa4,0,
+              0x76f8,0xaaa3,0)),
+) + tuple((site,(0xf982,target)) for target,sites in CONTEXT_LANE_CALLS.items() for site in sites)
+
+
+def decode_context_lanes(words):
+    for base,witness in CONTEXT_LANE_WITNESSES:
+        if any(words.get(base+i)!=value for i,value in enumerate(witness)):
+            raise ValueError('context lane source changed or absent')
+    calls = {target:tuple(sorted(address for address,opcode in words.items()
+             if opcode in (0xf074,0xf274,0xf982,0xfb82) and words.get(address+1)==target))
+             for target in CONTEXT_LANE_CALLS}
+    if calls != CONTEXT_LANE_CALLS:
+        raise ValueError('context lane immediate-call census changed')
+    return dict(pinned_words=sum(len(witness) for _,witness in CONTEXT_LANE_WITNESSES),
+        mapped_words_scanned=len(words),
+        immediate_call_candidates={f'{target:06x}':[f'{site:06x}' for site in sites]
+                                   for target,sites in calls.items()},
+        lanes=[dict(count_offset=6,acquire_wrapper='020461',publish_wrapper='020454',
+                    publish_entry_offset=20,link_offset=24),
+               dict(count_offset=22,acquire_wrapper='02044a',publish_wrapper='02046b',
+                    publish_entry_offset=4,link_offset=8)],
+        helper='0201b3 reaches the0201c7 link load at entry_AR2+4; optional020198 call preserves AR2 on the stack',
+        paired_caller=dict(entry='028fe6',condition='aaa2 != 0 calls02046b(AR1)',
+            unconditional='020461(AR1)',after=['aaa2 <- 1','aaa4 <- 0','aaa3 <- 0'],
+            scope='Local source branch, not runtime context ownership or flag lifecycle'),
+        precondition='Local address derivation assumes called helpers return normally; callbacks and full memory effects are not modeled',
+        scope='Two source-defined context lanes and exact syntactic immediate-call candidates; not all computed callers, physical rings, sample units, capacity, runtime wrapper ownership, scheduling or EOF policy')
+
+
+def reference_context_lane(base,lane):
+    """Sixteen-bit local address walk, conditional on normal helper return."""
+    if type(base) is not int or not 0<=base<=0xffff or type(lane) is not int or lane not in (0,1):
+        raise ValueError('context lane requires an unsigned base and lane0/1')
+    entry = (base+(20 if lane==0 else 4)) & 0xffff
+    ar2 = entry
+    # MVDK postdecrement, MAR decrement, OR postincrement, STL preincrement,
+    # MAR +3, then LDU postincrement before the common link load.
+    for delta in (-1,-1,1,1,3,1):
+        ar2 = (ar2+delta) & 0xffff
+    return dict(count_address=(base+(6 if lane==0 else 22)) & 0xffff,
+                publication_entry=entry,link_address=ar2)
+
+
 def reference_worker_reservation(held,count):
     """Gate and immediate decrement only, before unclosed callback effects."""
     if type(held) is not int or held not in (0,1) or type(count) is not int or not 0 <= count <= 0xffff:
@@ -2865,6 +2926,7 @@ def contract(source):
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
     result['decoder_return_dispatch'] = decode_decoder_return_dispatch(rel_words)
     result['worker_reservation'] = decode_worker_reservation(rel_words)
+    result['context_lanes'] = decode_context_lanes(rel_words)
     result['decoder_method_prefix'] = decode_decoder_method_prefix(rel_words)
     result['decoder_info_body'] = decode_decoder_info_body(rel_words,bootstrap_words)
     result['decoder_info_helpers'] = decode_decoder_info_helpers(rel_words,bootstrap_words)
