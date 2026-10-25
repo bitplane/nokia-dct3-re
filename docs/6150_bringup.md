@@ -140,6 +140,43 @@ This qualifies clean return after this follow-up command, not automatic return
 from the separate ACK-only profile, arbitrary Toolkit applications, native RF,
 speech or fitted-mask fidelity.
 
+### Toolkit REFRESH and SIM re-profiling
+
+External profile9 retains the same own cold input and physical text/input/menu
+route. Continue at86s returns pending-command status `910b`; firmware
+FETCHes the11-byte REFRESH qualifier00 payload
+`d009810309010082028182`, then sends its own `0b41ff7700` TERMINAL PROFILE
+again before terminal response `810309010002028281030100`. Both the new
+profile and REFRESH response receive9000. The88s frame reads `SIM card update
+started`; the91s frame matches the qualified Headset idle exactly.
+
+```sh
+.venv/bin/python tools/nsm1_toolkit_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-toolkit-refresh-accepted --refresh
+```
+
+Add `--mame mame/mame` with a fresh output directory to execute the92s gate.
+Whole flash and the original PIN-enabled card remain unchanged. Firmware
+changes one EEPROM byte, `03e8: 00 -> 06`; the accepted complete16KiB output
+SHA256 is `5d740b1c59aea38015e374499e3e8c4aeaccd46584c5077a00a0e46d4819e34e`.
+The gate requires that exact complete bank, not a changed-byte allowlist.
+The own directory maps the byte to one-byte descriptor0766 nested in
+44-byte record0702 at03d4. A separate read-only writer capture observes raw
+serial writer2bc9ca receiving that whole44-byte record from2b8b4c, with the
+byte06 after REFRESH; earlier writes contain00. The descriptor's general
+semantics remain unassigned. The separate profile4 ACK-only menu control
+preserves the original whole bank.
+
+REFRESH rereads enough SIM files to produce8749 observed RX bytes and2083 TX
+bytes. Its observer/parser cap is explicitly16384; ordinary Toolkit fixtures
+retain8192. Saturation fails acceptance at either bound. The original
+8192-byte discovery captures cannot qualify the complete exchange, even
+though MAME exits successfully; they only localize the writer. The accepted
+fresh run has complete wire capture, authentication, exact payload/status/
+physical ordering, whole storage and reviewed frame checks. It qualifies
+REFRESH re-profiling and idle return, not the later restarted application
+cycle, RF registration, sustained native operation or fitted-mask fidelity.
+
 ### Pending Toolkit command restoration
 
 An independent74s cold profile1 process saves at65s while the organically

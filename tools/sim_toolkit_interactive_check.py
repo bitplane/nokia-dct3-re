@@ -15,9 +15,15 @@ MENU = bytes.fromhex('d0268103042500820281828509') + b'DCT3 menu' + bytes.fromhe
 MENU_RESPONSE = bytes.fromhex('810304250002028281030100')
 SELECT_ITEM = bytes.fromhex('d0208103072400820281828506') + b'Choose' + bytes.fromhex('8f0601') + b'Alpha' + bytes.fromhex('8f0502') + b'Beta'
 ITEM_RESPONSE = bytes.fromhex('810307240002028281030100100102')
+REFRESH = bytes.fromhex('d009810309010082028182')
+REFRESH_RESPONSE = bytes.fromhex('810309010002028281030100')
 
 
-def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_item=None, select_item=False):
+def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_item=None, select_item=False, refresh=False):
+    if refresh:
+        if select_item or menu_item not in (None,1):
+            raise ValueError('REFRESH requires distinct Continue profile')
+        menu_item=1
     if select_item:
         if menu_item not in (None,1):
             raise ValueError('follow-up item requires Continue')
@@ -28,7 +34,8 @@ def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_
         raise ValueError('reset or failed observer')
     if re.search(r'illegal instruction|unimplemented|unsupported|unhandled|fatal',text,re.I):
         raise ValueError('execution failed')
-    tx,rx = wire(text,'TX',prefix),wire(text,'RX',prefix)
+    tx,rx = (wire(text,direction,prefix,limit=16384 if refresh else 8192)
+             for direction in ('TX','RX'))
     commands = list(apdus(tx))
     allowed=(0xa4,0x20,0xb0,0xb2,0xc0,0xf2,0x10,0x12,0x14)
     if any(row[0] not in allowed+((0xc2,) if menu_item is not None else ()) for row in commands):
@@ -47,6 +54,12 @@ def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_
         expected += [(0x12,0,0,len(SELECT_ITEM),b''),(0x14,0,0,len(ITEM_RESPONSE),ITEM_RESPONSE)]
         if rx.count(SELECT_ITEM+b'\x90\x00') != 1:
             raise ValueError('missing unique follow-up item payload')
+    if refresh:
+        expected += [(0x12,0,0,len(REFRESH),b''),
+                     (0x10,0,0,len(terminal_profile),terminal_profile),
+                     (0x14,0,0,len(REFRESH_RESPONSE),REFRESH_RESPONSE)]
+        if rx.count(REFRESH+b'\x90\x00') != 1:
+            raise ValueError('missing unique REFRESH payload')
     if [row[:5] for row in commands if row[0] in (0x10,0x12,0x14,0xc2)] != expected:
         raise ValueError('interactive profile/FETCH/response sequence differs')
     if 'read-binary fid=6fae offset=0 length=1 first=03' not in text or text.count('SIM completion ins=f2 sw=9116') != 1:
@@ -54,10 +67,10 @@ def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_
     results=[(0x9115,3,10),(0x911a,3,10),(0x9000,3,10)]
     if menu_item is not None:
         results[-1:]=[(0x9128,3,10),(0x9000,3,10)]
-    if select_item:
+    if select_item or refresh:
         results.append((0x9000,3,10))
-    if (statuses(text,0x10) != [(0x9000,3,10)] or statuses(text,0x14) != results
-            or statuses(text,0xc2) != ([(0x9122 if select_item else 0x9000,3,10)] if menu_item is not None else [])):
+    if (statuses(text,0x10) != [(0x9000,3,10)]*(2 if refresh else 1) or statuses(text,0x14) != results
+            or statuses(text,0xc2) != ([(0x910b if refresh else 0x9122 if select_item else 0x9000,3,10)] if menu_item is not None else [])):
         raise ValueError('interactive response status differs')
     marker = prefix+'_toolkit_physical: action=dismiss'
     if re.findall(re.escape(marker)+r' down=([01]) t=([0-9.]+)',text) != [('1','68.000000000'),('0','68.200000000')]:

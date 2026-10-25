@@ -38,20 +38,24 @@ ITEM_FRAMES = {
     'selected':'1a9cdbfa614372e7d78e887b5cc3be697a8e065e46b8ab0303b0caf13cd0f0ee',
     'result':MENU_FRAMES['open'],
 }
+REFRESH_EEPROM='5d740b1c59aea38015e374499e3e8c4aeaccd46584c5077a00a0e46d4819e34e'
+REFRESH_88='f9d0aea359d55cc7672b88d0a5bf6691351e2c8ddaaafe4e3b27e4f38977d3f8'
 
 
-def profile_for(control=False, interactive=False, menu_item=None, select_item=False):
+def profile_for(control=False, interactive=False, menu_item=None, select_item=False, refresh=False):
+    if refresh and (select_item or menu_item not in (None,1)):
+        raise ValueError('REFRESH requires distinct Continue profile')
     if menu_item not in (None,1,2):
         raise ValueError('unknown installed-menu item')
     if select_item and menu_item not in (None,1):
         raise ValueError('follow-up item requires Continue')
-    if control and (interactive or menu_item is not None or select_item):
+    if control and (interactive or menu_item is not None or select_item or refresh):
         raise ValueError('interactive card and Phase-2 control are distinct')
-    return 0 if control else 7 if select_item else 4 if menu_item is not None else 3 if interactive else 1
+    return 0 if control else 9 if refresh else 7 if select_item else 4 if menu_item is not None else 3 if interactive else 1
 
 
-def prepare(seed, run, control=False, interactive=False, menu_item=None, select_item=False):
-    profile=profile_for(control,interactive,menu_item,select_item)
+def prepare(seed, run, control=False, interactive=False, menu_item=None, select_item=False, refresh=False):
+    profile=profile_for(control,interactive,menu_item,select_item,refresh)
     prepare_cold(seed, run)
     path = run / 'cfg/nsm1r4t.cfg'
     tree = ET.parse(path)
@@ -63,16 +67,16 @@ def prepare(seed, run, control=False, interactive=False, menu_item=None, select_
     tree.write(path, encoding='utf-8', xml_declaration=True)
 
 
-def check_trace(text, control=False, interactive=False, menu_item=None, select_item=False):
-    profile_for(control,interactive,menu_item,select_item)
-    if select_item:
+def check_trace(text, control=False, interactive=False, menu_item=None, select_item=False, refresh=False):
+    profile_for(control,interactive,menu_item,select_item,refresh)
+    if select_item or refresh:
         menu_item=1
     check_pin(text, True, prefix='nsm1', tx_limit=4096)
     check_phone(text, True, ())
     if interactive or menu_item is not None:
         check_interactive(text, prefix='nsm1', terminal_profile=PROFILE,
                           reset_markers=('nsm1_reset_request:', 'nsm1_restart_request:'),
-                          menu_item=menu_item,select_item=select_item)
+                          menu_item=menu_item,select_item=select_item,refresh=refresh)
         if menu_item is not None:
             expected=('main','up1','open')+(('next',) if menu_item==2 else ())+('select',)
             if (re.findall(r'nsm1_toolkit_menu: action=(\w+) down=([01])',text) !=
@@ -84,8 +88,8 @@ def check_trace(text, control=False, interactive=False, menu_item=None, select_i
                       reset_markers=('nsm1_reset_request:', 'nsm1_restart_request:'))
 
 
-def check_configuration(seed, run, control=False, interactive=False, menu_item=None, select_item=False):
-    profile=profile_for(control,interactive,menu_item,select_item)
+def check_configuration(seed, run, control=False, interactive=False, menu_item=None, select_item=False, refresh=False):
+    profile=profile_for(control,interactive,menu_item,select_item,refresh)
     expected = signature(seed / 'cfg/nsm1r4t.cfg')
     actual = signature(run / 'cfg/nsm1r4t.cfg')
     card = ('port', sorted(dict(tag=':SATCFG', type='CONFIG', mask='15',
@@ -95,11 +99,14 @@ def check_configuration(seed, run, control=False, interactive=False, menu_item=N
         raise ValueError('unrelated external inputs changed')
 
 
-def check_inputs(seed, run, control=False, interactive=False, menu_item=None, select_item=False):
+def check_inputs(seed, run, control=False, interactive=False, menu_item=None, select_item=False, refresh=False):
     """Whole cold inputs and outputs shared by ordinary and restoration gates."""
-    profile_for(control,interactive,menu_item,select_item)
+    profile_for(control,interactive,menu_item,select_item,refresh)
     files = check_storage(seed)
-    check_storage(run)
+    if refresh:
+        check_storage(run,eeprom_sha256=REFRESH_EEPROM)
+    else:
+        check_storage(run)
     metadata = json.loads((run / 'cold_input.json').read_text())
     if metadata != dict(source=str(seed.resolve()), source_sha256={
             name: hashlib.sha256(data).hexdigest() for name, data in files.items()},
@@ -108,19 +115,19 @@ def check_inputs(seed, run, control=False, interactive=False, menu_item=None, se
     for name in ('eeprom', 'sim_card'):
         if (run / f'initial_{name}.bin').read_bytes() != files[name]:
             raise ValueError('initial complete storage differs')
-    check_configuration(seed, run, control, interactive, menu_item, select_item)
+    check_configuration(seed, run, control, interactive, menu_item, select_item,refresh)
     if json.loads((run / 'exit_status.json').read_text()) != dict(returncode=0):
         raise ValueError('MAME did not complete')
     check_observer_console((run/'console.log').read_text())
     return files
 
 
-def check(seed, run, control=False, interactive=False, menu_item=None, select_item=False):
-    check_inputs(seed,run,control,interactive,menu_item,select_item)
-    if select_item:
+def check(seed, run, control=False, interactive=False, menu_item=None, select_item=False, refresh=False):
+    check_inputs(seed,run,control,interactive,menu_item,select_item,refresh)
+    if select_item or refresh:
         menu_item=1
     interactive=interactive or menu_item is not None
-    check_trace((run / 'error.log').read_text(), control, interactive, menu_item, select_item)
+    check_trace((run / 'error.log').read_text(), control, interactive, menu_item, select_item,refresh)
     frame_check(run / 'snap/nsm1_toolkit_before.png', IDLE if control else PROMPT)
     frame_check(run / 'snap/nsm1_toolkit_after.png',
                 INTERACTIVE_FRAMES['inkey'] if interactive else MENU if control else IDLE)
@@ -130,18 +137,21 @@ def check(seed, run, control=False, interactive=False, menu_item=None, select_it
     if menu_item is not None:
         for label,expected in MENU_FRAMES.items():
             frame_check(run/f'snap/nsm1_toolkit_menu_{label}.png',expected)
-        if not select_item:
+        if not select_item and not refresh:
             frame_check(run/'snap/nsm1_toolkit_menu_select.png',MENU_WAIT)
         if menu_item==2:
             frame_check(run/'snap/nsm1_toolkit_menu_next.png',MENU_NEXT)
     if select_item:
         for label,expected in ITEM_FRAMES.items():
             frame_check(run/f'snap/nsm1_toolkit_item_{label}.png',expected)
+    if refresh:
+        frame_check(run/'snap/nsm1_toolkit_refresh_88.png',REFRESH_88)
+        frame_check(run/'snap/nsm1_toolkit_refresh_91.png',IDLE)
 
 
-def execute(binary, seed, run, control=False, interactive=False, menu_item=None, select_item=False):
-    prepare(seed, run, control, interactive, menu_item, select_item)
-    script = Path(__file__).with_name('nsm1_toolkit_select_item.lua' if select_item else
+def execute(binary, seed, run, control=False, interactive=False, menu_item=None, select_item=False, refresh=False):
+    prepare(seed, run, control, interactive, menu_item, select_item,refresh)
+    script = Path(__file__).with_name('nsm1_toolkit_refresh.lua' if refresh else 'nsm1_toolkit_select_item.lua' if select_item else
         'nsm1_toolkit_menu_exit.lua' if menu_item==2 else
         'nsm1_toolkit_menu.lua' if menu_item==1 else
         'nsm1_toolkit_interactive.lua' if interactive else 'nsm1_toolkit_input.lua').resolve()
@@ -149,7 +159,7 @@ def execute(binary, seed, run, control=False, interactive=False, menu_item=None,
                '-noreadconfig', '-video', 'none', '-sound', 'none', '-nothrottle',
                '-joystickprovider', 'none', '-midiprovider', 'none',
                '-debug', '-debugger', 'none', '-log', '-verbose', '-seconds_to_run',
-               '92' if select_item else '90' if menu_item is not None else '84' if interactive else '74',
+               '92' if select_item or refresh else '90' if menu_item is not None else '84' if interactive else '74',
                '-autoboot_delay', '0', '-autoboot_script', str(script)]
     (run / 'invocation.json').write_text(json.dumps(dict(command=command,
         mame_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
@@ -169,16 +179,18 @@ def main():
     mode.add_argument('--interactive', action='store_true')
     mode.add_argument('--menu-item',type=int,choices=(1,2))
     mode.add_argument('--select-item',action='store_true')
+    mode.add_argument('--refresh',action='store_true')
     parser.add_argument('--mame', type=Path)
     args = parser.parse_args()
     try:
         seed, run = args.seed.resolve(), args.run.resolve()
         if args.mame:
-            execute(args.mame.resolve(), seed, run, args.control, args.interactive, args.menu_item,args.select_item)
-        check(seed, run, args.control, args.interactive, args.menu_item,args.select_item)
+            execute(args.mame.resolve(), seed, run, args.control, args.interactive, args.menu_item,args.select_item,args.refresh)
+        check(seed, run, args.control, args.interactive, args.menu_item,args.select_item,args.refresh)
     except (OSError, ValueError, KeyError, ET.ParseError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f'NSM-1 Toolkit FAIL: {error}\n')
     print('NSM-1 Toolkit PASS: ' + ('matched Phase-2 control' if args.control else
+          'REFRESH re-profile, success and idle return; next application cycle unproved' if args.refresh else
           'physical follow-up SELECT ITEM; native RF/speech unproved' if args.select_item else
           f'physical installed-menu item{args.menu_item} envelope; final settlement unproved' if args.menu_item is not None else
           'physical DISPLAY TEXT, GET INKEY 5 and GET INPUT 42' if args.interactive else

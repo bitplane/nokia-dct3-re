@@ -31,13 +31,15 @@ def signature(path):
             for node in system.find('input').iter()]
 
 
-def check_storage(directory):
+def check_storage(directory, *, eeprom_sha256=None):
+    if eeprom_sha256 is None:
+        eeprom_sha256=SEED_EEPROM
     storage = directory / 'nvram/nsm1r4t'
     files = {name: (storage / name).read_bytes() for name in ('flash', 'eeprom', 'sim_card')}
     if hashlib.sha1(files['flash']).hexdigest() != SHA1:
         raise ValueError('own executable differs')
     if (len(files['eeprom']) != 0x4000
-            or hashlib.sha256(files['eeprom']).hexdigest() != SEED_EEPROM):
+            or hashlib.sha256(files['eeprom']).hexdigest() != eeprom_sha256):
         raise ValueError('complete qualified EEPROM differs')
     if files['sim_card'] != make_current_profile(True):
         raise ValueError('complete original PIN-enabled laboratory card differs')

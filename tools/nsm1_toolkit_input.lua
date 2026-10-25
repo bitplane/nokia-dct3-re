@@ -8,12 +8,13 @@ dofile(directory .. 'nsm1_security_input.lua')
 local machine = manager.machine
 local memory = machine.devices[':maincpu'].spaces.program
 local counts = {TX=0, RX=0}
+local wire_limit = _G.nsm1_toolkit_wire_limit or 8192
 local function wire(offset, data, mask, direction, address)
     for lane = 0, 3 do
         local shift = (3-lane)*8
         if offset+lane == address and mask & (255 << shift) ~= 0 then
             counts[direction] = counts[direction]+1
-            assert(counts[direction] <= 8192, 'Toolkit wire capture limit exceeded')
+            assert(counts[direction] <= wire_limit, 'Toolkit wire capture limit exceeded')
             machine:logerror(string.format(
                 'nsm1_sim_wire: direction=%s data=%02x t=%.9f observer_writes=0\n',
                 direction, (data >> shift) & 255, machine.time:as_double()))

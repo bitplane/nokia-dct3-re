@@ -572,6 +572,13 @@ A separate6150 profile7 follows Continue with SELECT ITEM. Physical Beta
 selection emits the exact item-2 terminal response, accepted with9000, and
 returns to the clean installed list with unchanged complete storage
 (`--select-item`). This does not change the ACK-only return boundary.
+Separate6150 profile9 accepts REFRESH qualifier00, re-downloads its own
+terminal profile before returning success, displays SIM card update started
+and returns to exact idle. Its complete EEPROM has a separately pinned
+firmware-owned settings update; card/flash stay unchanged. Full re-read wire
+capture uses an explicit higher observation cap, not a relaxed storage gate
+(`--refresh`; details in6150_bringup.md). A later application restart is not
+qualified by this92s window.
 The6150 pending DISPLAY TEXT also survives native save/load with one FETCH,
 two physical successful completions and exact observed architecture/I/O/pixel
 replay, preserving complete persistent storage (`nsm1_toolkit_state_check.py`).

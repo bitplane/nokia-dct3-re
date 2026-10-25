@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 from tools import nsm1_toolkit_check as checker
 from tools.sim_toolkit_display_check import DISPLAY, RESPONSE
-from tools.sim_toolkit_interactive_check import INKEY,INPUT,INKEY_RESPONSE,INPUT_RESPONSE,MENU,MENU_RESPONSE,SELECT_ITEM,ITEM_RESPONSE
+from tools.sim_toolkit_interactive_check import INKEY,INPUT,INKEY_RESPONSE,INPUT_RESPONSE,MENU,MENU_RESPONSE,SELECT_ITEM,ITEM_RESPONSE,REFRESH,REFRESH_RESPONSE
 from tools.test_nsm1_native_state_check import trace as startup
 
 
@@ -71,7 +71,36 @@ def select_item_trace():
     return text
 
 
+def refresh_trace():
+    text=menu_trace().replace('ins=c2 sw=9000','ins=c2 sw=910b')
+    text+='\n'+wire('TX',bytes.fromhex('a01200000b'))+'\n'+wire('RX',REFRESH+b'\x90\x00')
+    text+='\n'+wire('TX',bytes.fromhex('a010000005')+checker.PROFILE)
+    text+='\nSIM status ins=10 sw=9000 chv=3/3 puk=10/10 enabled=1'
+    text+='\n'+wire('TX',bytes.fromhex('a01400000c')+REFRESH_RESPONSE)
+    text+='\nSIM status ins=14 sw=9000 chv=3/3 puk=10/10 enabled=1'
+    return text
+
+
 class Nsm1ToolkitTest(unittest.TestCase):
+    def test_refresh_requires_reprofile_before_success_and_own_payload(self):
+        text=refresh_trace()
+        checker.check_trace(text,refresh=True)
+        profile=wire('TX',bytes.fromhex('a010000005')+checker.PROFILE)
+        response=wire('TX',bytes.fromhex('a01400000c')+REFRESH_RESPONSE)
+        missing=text.rsplit(profile,1)
+        for bad in (''.join(missing),text.replace('ins=c2 sw=910b','ins=c2 sw=9000'),
+                    text.replace(wire('RX',REFRESH+b'\x90\x00'),wire('RX',REFRESH[:-1]+b'\x83\x90\x00')),
+                    text.replace(response,response.replace('data=00 ','data=30 ')),
+                    text.replace('action=select','action=missing'),
+                    text+'\nSIM status ins=10 sw=9000 chv=3/3 puk=10/10 enabled=1'):
+            with self.subTest(tail=bad[-90:]),self.assertRaises(ValueError):
+                checker.check_trace(bad,refresh=True)
+        for kwargs in (dict(control=True),dict(select_item=True),dict(menu_item=2)):
+            with self.assertRaises(ValueError):
+                checker.profile_for(refresh=True,**kwargs)
+        with self.assertRaises(ValueError):
+            checker.check_trace(text,menu_item=1)
+
     def test_followup_item_requires_own_card_payload_and_physical_beta(self):
         text=select_item_trace()
         checker.check_trace(text,select_item=True)

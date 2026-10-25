@@ -112,6 +112,13 @@ additional handset-support promotion. Read-only version service passes there;
 post-wake call input remains unqualified. Established `npe3hle` call/software
 acceptance retains the timer-disabled composition until both contracts compose.
 
+The6150's separate native-compatibility Toolkit coverage additionally includes
+physical REFRESH selection, own terminal re-profiling, successful completion
+and exact idle return. Its one-byte firmware settings update is protected by
+an exact whole-EEPROM output hash; card/flash stay unchanged. This92s gate does
+not qualify the later restarted application or sustained native RF operation;
+see `nsm1_toolkit_check.py --refresh` and `6150_bringup.md`.
+
 NSB-7 media qualification: the `nsb7hle` ordinary incoming/outgoing SIP
 fixtures now pass own documented clocked HLE PCM and product-owned exact
 UI/storage checks (`nsb7_sip_check.py --media`, add `--incoming` for Answer).

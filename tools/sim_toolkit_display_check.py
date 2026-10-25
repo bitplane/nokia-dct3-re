@@ -21,10 +21,10 @@ def check_observer_console(text):
         raise ValueError('failed Lua observer in MAME console')
 
 
-def wire(text, direction, prefix):
+def wire(text, direction, prefix, *, limit=8192):
     marker = re.escape(prefix) + r'_sim_wire: direction=' + re.escape(direction)
     rows = re.findall(marker + r' data=([0-9a-f]{2}) ', text)
-    if not rows or len(rows) >= 8192 or len(rows) != text.count(
+    if not rows or len(rows) >= limit or len(rows) != text.count(
             f'{prefix}_sim_wire: direction={direction} '):
         raise ValueError('missing, malformed or capped SIM wire observation')
     return bytes.fromhex(''.join(rows))
