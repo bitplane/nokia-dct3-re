@@ -26,6 +26,33 @@ class ReferenceMetricsTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 compare(native, reference, channels)
 
+    def test_rms_boundary_is_strict(self):
+        limit = 2**-15 / math.sqrt(12)
+        below = math.nextafter(limit, 0)
+        above = math.nextafter(limit, math.inf)
+        self.assertTrue(compare([below], [0], 1)['channels'][0]['criterion_met'])
+        for value in (limit, above):
+            self.assertFalse(compare([value], [0], 1)['channels'][0]['criterion_met'])
+
+    def test_peak_boundary_is_inclusive_for_both_signs(self):
+        limit = 2**-14
+        for sign in (-1, 1):
+            samples = [sign * limit] + [0] * 4095
+            self.assertTrue(compare(samples, [0] * 4096, 1)['channels'][0]['criterion_met'])
+            samples[0] = sign * math.nextafter(limit, math.inf)
+            self.assertFalse(compare(samples, [0] * 4096, 1)['channels'][0]['criterion_met'])
+
+    def test_invalid_reference_samples_are_not_hidden(self):
+        for value in (math.nan, math.inf, -math.inf, 1.01, -1.01):
+            for native, reference in (([value], [0]), ([0], [value])):
+                with self.assertRaises(ValueError):
+                    compare(native, reference, 1)
+
+    def test_neither_tail_can_be_silently_discarded(self):
+        for native, reference in (([0, 0], [0]), ([0], [0, 0])):
+            with self.assertRaisesRegex(ValueError, 'no automatic trimming'):
+                compare(native, reference, 1)
+
     def test_original_precision_and_explicit_native_scale(self):
         with tempfile.TemporaryDirectory() as directory:
             reference = Path(directory) / 'reference.wav'
