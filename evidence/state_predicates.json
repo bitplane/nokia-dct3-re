@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_decoder_worker_return_dispatch",
+      "owner": "native_aac_validation",
+      "status": "satisfied",
+      "predicate": "The original worker's local post-decoder return routes distinguish zero, two and all other unsigned words without equating ffff with EOF completion",
+      "current": "The original AA99 span0293cf..029403 and three virtual wrappers are pinned over62 words. AR1 retains the returned low word across metadata method9 under the independently closed helper ABI. Zero selects the decoded stores and020454; two selects object15ea method12, decoder15eb method11 and02061e; all other words includingffff bypass those groups. Every route refreshes input15e9 through0296ac and branches02940b. Every pinned word has mutation/removal tests, and a host model exhausts all65536 unsigned results. This is static local control flow, not native worker invocation, dynamic branch selection, every callee effect, retry scheduling, EOF/drain completion or permission to synthesize a return value.",
+      "evidence": ["docs/aac_validation.md", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py"]
+    },
+    {
       "id": "mu4_al09_final_packet_reserve_rejection",
       "owner": "native_aac_validation",
       "status": "satisfied",

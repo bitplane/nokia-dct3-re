@@ -702,6 +702,43 @@ PLAYBACK_INFO_QUERY_WITNESSES = (
 )
 
 DECODER_METHOD_PREFIX_BASE = 0xc686
+DECODER_RETURN_BASE = 0x293cf
+DECODER_RETURN_WITNESS = (
+    0x8811,0x71e6,0x12,0xba9c,0xf020,0x15ee,0x8000,0x10f8,0x15eb,0xf982,0x9873,
+    0x10f8,0x15f0,0x6ff8,0x15f0,0xc81,0x6c81,0x93f1,0x76f8,0x15d9,0,
+    0x76f8,0x15f1,1,0x10f8,0x15ef,0x6fe6,0x13,0xc81,0x4816,0xf982,0x454,
+    0xf073,0x93fe,0x6ce1,0xfffe,0x93fe,0x10f8,0x15ea,0xf982,0x9885,
+    0x10f8,0x15eb,0xf982,0x9876,0xf982,0x61e,0x10f8,0x15e9,0xf982,0x96ac,
+    0xf073,0x940b)
+DECODER_RETURN_WRAPPERS = ((0x29873,(0xe909,0xf882,0x98b8)),
+                           (0x29876,(0xe90b,0xf882,0x98b8)),
+                           (0x29885,(0xe90c,0xf882,0x98b8)))
+
+
+def decode_decoder_return_dispatch(words):
+    for base,witness in ((DECODER_RETURN_BASE,DECODER_RETURN_WITNESS),
+                         *DECODER_RETURN_WRAPPERS):
+        if any(words.get(base+offset)!=value for offset,value in enumerate(witness)):
+            raise ValueError('decoder return dispatcher or wrapper changed')
+    return dict(entry='0293cf',last_word='029403',pinned_words=62,
+        retained_return='AR1 <- A; selected metadata method9 preserves AR1 under decoder_info_helpers ABI',
+        common_before_branch=['method9 on object15eb with record15ee', '15f0 <- low16(15f0 << 1)'],
+        zero=dict(branch='0293df falls through',writes=['15d9 <- 0','15f1 <- 1',
+                  'context[19] <- low16(record15ef << 1)'],call='020454',then='0293fe'),
+        two=dict(branch='0293f1 tests low16(AR1-2) == 0',
+                 calls=['method12 on object15ea','method11 on object15eb','02061e']),
+        other=dict(branch='0293f1 tests low16(AR1-2) != 0',then='0293fe',
+                   includes='ffff; no zero-result stores or result2 control calls'),
+        common_tail='refresh input object15e9 through0296ac, then branch02940b',
+        scope='Static local return routing with retained-AR1 ABI; not native worker invocation, all callee effects, retry scheduling, EOF/drain policy or complete playback')
+
+
+def reference_decoder_return_route(result):
+    if type(result) is not int or not 0 <= result <= 0xffff:
+        raise ValueError('decoder result must be an unsigned word')
+    return 'result_zero_group' if result == 0 else 'result_two_group' if result == 2 else 'refresh_only'
+
+
 DECODER_METHOD_PREFIX = (
     0xc686,0,0,0,0,0,0,0,0,0,0,0,2,0x3d27,0,0,0,0,
     2,0x3e64,2,0x3ef8,2,0x3d41,2,0x3d5a,2,0x3d5d)
@@ -2768,6 +2805,7 @@ def contract(source):
     result['decoder_sync'] = decode_decoder_sync(rel_words)
     result['decoder_mapped_alu'] = decode_decoder_mapped_alu(rel_words)
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
+    result['decoder_return_dispatch'] = decode_decoder_return_dispatch(rel_words)
     result['decoder_method_prefix'] = decode_decoder_method_prefix(rel_words)
     result['decoder_info_body'] = decode_decoder_info_body(rel_words,bootstrap_words)
     result['decoder_info_helpers'] = decode_decoder_info_helpers(rel_words,bootstrap_words)

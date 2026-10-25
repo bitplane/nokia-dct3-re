@@ -786,6 +786,28 @@ status setting. In particular, incoming multiplier flags remain relevant.
 It neither proves native invocation of method9 nor closes other EOF controls,
 the original controller's stop/drain policy or complete playback.
 
+The original worker's return routing is separately pinned over
+`0293cf..029403` and three virtual wrappers (62 words). It retains the
+decoder result in AR1 across metadata method9, whose preservation follows
+from the closed helper ABI above. It then distinguishes three local routes:
+
+- Result0 clears`15d9`, writes`15f1=1`, stores twice record`15ef` into
+  context word19 and calls`020454` before the common refresh.
+- Result2 selects method12 on object`15ea`, method11 on decoder`15eb`
+  and helper`02061e`, then reaches the common refresh.
+- Every other unsigned-word result, including`ffff`, bypasses both groups
+  and reaches the common refresh directly. The second BANZ tests
+  `low16(AR1-2)`, not a second memory-loaded result.
+
+All three routes refresh input object`15e9` through`0296ac` and branch
+to`02940b`. Thus the isolated ABI bench's deliberate stop on`ffff` is not
+itself the original caller's EOF transition or a sample-drain operation.
+This is a static local routing contract, with exhaustive host-model
+classification of the65536 result words and mutation coverage of every
+pinned word. Native invocation/branch selection, retry scheduling, helper
+`02061e`'s effects and the upstream final-input policy remain unqualified;
+do not synthesize result2 or infer that retrying unchanged short input is safe.
+
 ### Declared Packet-Lookahead Control
 
 `tools/mu4_aac_lookahead_fixture.py` preserves all original 65339 bytes and

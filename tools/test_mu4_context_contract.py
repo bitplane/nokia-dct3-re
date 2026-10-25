@@ -34,6 +34,8 @@ from tools.mu4_context_contract import DECODER_OUTPUT_WITNESSES, decode_decoder_
 from tools.mu4_context_contract import DECODER_FRAMING_BASE, DECODER_FRAMING_WITNESS, decode_decoder_framing
 from tools.mu4_context_contract import DECODER_INPUT_DESCRIPTOR_WITNESSES, decode_decoder_input_descriptor
 from tools.mu4_context_contract import DECODER_INPUT_RESERVE_BASE, DECODER_INPUT_RESERVE_WITNESS, decode_decoder_input_reserve
+from tools.mu4_context_contract import (DECODER_RETURN_BASE, DECODER_RETURN_WITNESS,
+    DECODER_RETURN_WRAPPERS, decode_decoder_return_dispatch, reference_decoder_return_route)
 from tools.mu4_context_contract import PLAYBACK_INFO_QUERY_WITNESSES, decode_playback_info_query
 from tools.mu4_context_contract import PLAYBACK_BUFFER_REFRESH_BASE, PLAYBACK_BUFFER_REFRESH_WITNESS, decode_playback_buffer_refresh
 from tools.mu4_context_contract import playback_final_input_words, decode_playback_final_input
@@ -86,6 +88,38 @@ from tools.mu4_context_contract import RECORD_WINDOW_BASE, RECORD_WINDOW_WITNESS
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_decoder_return_routes_pin_every_local_word(self):
+        words = {base+offset:value
+                 for base,witness in ((DECODER_RETURN_BASE,DECODER_RETURN_WITNESS),
+                                      *DECODER_RETURN_WRAPPERS)
+                 for offset,value in enumerate(witness)}
+        result = decode_decoder_return_dispatch(words)
+        self.assertEqual(result['pinned_words'], 62)
+        self.assertEqual(result['two']['calls'],
+                         ['method12 on object15ea','method11 on object15eb','02061e'])
+        self.assertIn('ffff', result['other']['includes'])
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=hex(address)), self.assertRaises(ValueError):
+                decode_decoder_return_dispatch(changed)
+            del changed[address]
+            with self.subTest(missing=hex(address)), self.assertRaises(ValueError):
+                decode_decoder_return_dispatch(changed)
+
+    def test_decoder_return_classes_cover_unsigned_word_domain(self):
+        counts = {'result_zero_group':0, 'result_two_group':0, 'refresh_only':0}
+        for result in range(0x10000):
+            expected = ('result_zero_group' if not result else
+                        'result_two_group' if ((result-2)&0xffff)==0 else 'refresh_only')
+            route = reference_decoder_return_route(result)
+            self.assertEqual(route, expected)
+            counts[route] += 1
+        self.assertEqual(counts, {'result_zero_group':1, 'result_two_group':1, 'refresh_only':65534})
+        for value in (-1,0x10000,True,1.5,'ffff'):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                reference_decoder_return_route(value)
+
     def test_literal_census_can_target_policy_fields_without_hiding_dynamic_store_patterns(self):
         words = {0x100: 0x7105, 0x101: 0xaa1a, 0x102: 0x76f8, 0x103: 0x12fc, 0x104: 1}
         self.assertEqual(playback_lifecycle_literal_census(words)['literal_references'], 0)
