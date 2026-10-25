@@ -39,29 +39,33 @@ ITEM_FRAMES = {
     'selected':'40644b3eb21317140cf86cd7b90949ad5f69b9128e800c763e047cc40a86adb2',
     'result':MENU_FRAMES['open'],
 }
+REFRESH_EEPROM='0a79d52b219fad8e29dc3ccbddfaa31b7e2d0da2330850231763f9d28e8884d8'
+REFRESH_88='6e0371efd02777b7a8908af941180a03614130cc5016cb514941b393f28b5d9d'
 
 
 def wire(text, direction):
     return display_wire(text, direction, 'nsb1')
 
 
-def profile_for(control=False,interactive=False,menu_item=None,select_item=False):
+def profile_for(control=False,interactive=False,menu_item=None,select_item=False,refresh=False):
+    if refresh and (select_item or menu_item not in (None,1)):
+        raise ValueError('REFRESH requires distinct Continue profile')
     if menu_item not in (None,1,2):
         raise ValueError('unknown installed-menu item')
     if select_item and menu_item not in (None,1):
         raise ValueError('follow-up item requires Continue')
-    if control and (interactive or menu_item is not None or select_item):
+    if control and (interactive or menu_item is not None or select_item or refresh):
         raise ValueError('interactive input and Phase-2 control are distinct')
-    return 0 if control else 7 if select_item else 4 if menu_item is not None else 3 if interactive else 1
+    return 0 if control else 9 if refresh else 7 if select_item else 4 if menu_item is not None else 3 if interactive else 1
 
 
-def check_trace(text, control=False, interactive=False,menu_item=None,select_item=False):
-    profile_for(control,interactive,menu_item,select_item)
-    if select_item:
+def check_trace(text, control=False, interactive=False,menu_item=None,select_item=False,refresh=False):
+    profile_for(control,interactive,menu_item,select_item,refresh)
+    if select_item or refresh:
         menu_item=1
     if interactive or menu_item is not None:
         check_interactive(text,prefix='nsb1',terminal_profile=TERMINAL_PROFILE,
-                          reset_markers=('nsb1_reset_reason:',),menu_item=menu_item,select_item=select_item)
+                          reset_markers=('nsb1_reset_reason:',),menu_item=menu_item,select_item=select_item,refresh=refresh)
         if menu_item is not None:
             actions=('main','fieldtest','last','open')+(('next',) if menu_item==2 else ())+('select',)
             if (re.findall(r'nsb1_toolkit_menu: action=(\w+) down=([01])',text) !=
@@ -107,16 +111,19 @@ def check_inputs(source,run,profile,seconds):
     return text,card
 
 
-def check(source, run, control=False, interactive=False,menu_item=None,select_item=False):
-    profile=profile_for(control,interactive,menu_item,select_item)
-    if select_item:
+def check(source, run, control=False, interactive=False,menu_item=None,select_item=False,refresh=False):
+    profile=profile_for(control,interactive,menu_item,select_item,refresh)
+    if select_item or refresh:
         menu_item=1
     interactive=interactive or menu_item is not None
-    text,card=check_inputs(source,run,profile,92 if select_item else 90 if menu_item is not None else 84 if interactive else 74)
-    check_trace(text, control, interactive,menu_item,select_item)
+    text,card=check_inputs(source,run,profile,92 if select_item or refresh else 90 if menu_item is not None else 84 if interactive else 74)
+    check_trace(text, control, interactive,menu_item,select_item,refresh)
     if interactive:
         check_storage(source)
-        check_storage(run)
+        if refresh:
+            check_storage(run,eeprom_sha256=REFRESH_EEPROM)
+        else:
+            check_storage(run)
         check_frame(run/'snap/nsb1_toolkit_display.png',DISPLAY_FRAME)
         check_frame(run/'snap/nsb1_toolkit_dismissed.png',INTERACTIVE_FRAMES['inkey'])
         for name,expected in INTERACTIVE_FRAMES.items():
@@ -124,7 +131,7 @@ def check(source, run, control=False, interactive=False,menu_item=None,select_it
         if menu_item is not None:
             for name,expected in MENU_FRAMES.items():
                 check_frame(run/f'snap/nsb1_toolkit_menu_{name}.png',expected)
-            if menu_item==1 and not select_item:
+            if menu_item==1 and not select_item and not refresh:
                 check_frame(run/'snap/nsb1_toolkit_menu_select.png',MENU_FRAMES['open'])
             elif menu_item==2:
                 check_frame(run/'snap/nsb1_toolkit_menu_next.png',MENU_NEXT)
@@ -132,6 +139,9 @@ def check(source, run, control=False, interactive=False,menu_item=None,select_it
         if select_item:
             for name,expected in ITEM_FRAMES.items():
                 check_frame(run/f'snap/nsb1_toolkit_item_{name}.png',expected)
+        if refresh:
+            check_frame(run/'snap/nsb1_toolkit_refresh_88.png',REFRESH_88)
+            check_frame(run/'snap/nsb1_toolkit_refresh_91.png',INTERACTIVE_FRAMES['interactive_final'])
         return
     if not control:
         check_frame(run / 'snap/nsb1_toolkit_display.png', DISPLAY_FRAME)
@@ -148,17 +158,18 @@ def main():
     mode.add_argument('--interactive', action='store_true')
     mode.add_argument('--menu-item',type=int,choices=(1,2))
     mode.add_argument('--select-item',action='store_true')
+    mode.add_argument('--refresh',action='store_true')
     parser.add_argument('--mame', type=Path, help='prepare and execute a fresh isolated run')
     args = parser.parse_args()
     source, run = args.source.resolve(), args.run.resolve()
     try:
         if args.mame:
-            if args.interactive or args.menu_item is not None or args.select_item:
+            if args.interactive or args.menu_item is not None or args.select_item or args.refresh:
                 check_storage(source)
-            profile=profile_for(args.control,args.interactive,args.menu_item,args.select_item)
-            seconds=92 if args.select_item else 90 if args.menu_item is not None else 84 if args.interactive else 74
+            profile=profile_for(args.control,args.interactive,args.menu_item,args.select_item,args.refresh)
+            seconds=92 if args.select_item or args.refresh else 90 if args.menu_item is not None else 84 if args.interactive else 74
             prepare(source, run, profile)
-            script = Path(__file__).with_name('nsb1_toolkit_select_item.lua' if args.select_item else
+            script = Path(__file__).with_name('nsb1_toolkit_refresh.lua' if args.refresh else 'nsb1_toolkit_select_item.lua' if args.select_item else
                 'nsb1_toolkit_menu_exit.lua' if args.menu_item==2 else
                 'nsb1_toolkit_menu.lua' if args.menu_item==1 else
                 'nsb1_toolkit_interactive.lua' if args.interactive else 'nsb1_toolkit_input.lua').resolve()
@@ -169,10 +180,11 @@ def main():
                 'seconds': seconds, 'profile': profile,
             }, indent=2) + '\n')
             run_mame(binary, run / 'inputs', run, script, seconds, True)
-        check(source, run, args.control, args.interactive,args.menu_item,args.select_item)
+        check(source, run, args.control, args.interactive,args.menu_item,args.select_item,args.refresh)
     except (OSError, ValueError, KeyError, ET.ParseError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f'NSB-1 Toolkit FAIL: {error}\n')
     print('NSB-1 Toolkit PASS: ' + ('Phase-2 negative control' if args.control else
+          'REFRESH re-profile, success and idle return; next application cycle unproved' if args.refresh else
           'physical follow-up SELECT ITEM and clean list return' if args.select_item else
           f'physical installed-menu item{args.menu_item} envelope and clean list return' if args.menu_item is not None else
           'physical GET INKEY5/GET INPUT42 and unchanged whole storage' if args.interactive else

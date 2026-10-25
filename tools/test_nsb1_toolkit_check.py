@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 from tools import nsb1_toolkit_check as checker
 from tools.nsb1_toolkit_prepare import profile_metadata
-from tools.sim_toolkit_interactive_check import INKEY,INPUT,INKEY_RESPONSE,INPUT_RESPONSE,MENU,MENU_RESPONSE,SELECT_ITEM,ITEM_RESPONSE
+from tools.sim_toolkit_interactive_check import INKEY,INPUT,INKEY_RESPONSE,INPUT_RESPONSE,MENU,MENU_RESPONSE,SELECT_ITEM,ITEM_RESPONSE,REFRESH,REFRESH_RESPONSE
 
 
 def wire(direction, data):
@@ -73,6 +73,30 @@ def select_item_trace():
 
 
 class Nsb1ToolkitTest(unittest.TestCase):
+    def test_refresh_requires_own_profile_and_complete_ordered_exchange(self):
+        text=menu_trace().replace('ins=c2 sw=9000','ins=c2 sw=910b')
+        fetch=wire('TX',bytes.fromhex('a01200000b'))
+        profile=wire('TX',bytes.fromhex('a010000005')+checker.TERMINAL_PROFILE)
+        response=wire('TX',bytes.fromhex('a01400000c')+REFRESH_RESPONSE)
+        text+='\n'+fetch+'\n'+wire('RX',REFRESH+b'\x90\x00')+'\n'+profile
+        text+='\nSIM status ins=10 sw=9000 chv=3/3 puk=10/10 enabled=1'
+        text+='\n'+response+'\nSIM status ins=14 sw=9000 chv=3/3 puk=10/10 enabled=1'
+        checker.check_trace(text,refresh=True)
+        for bad in (text.replace(fetch,''),text.replace('ins=c2 sw=910b','ins=c2 sw=9000'),
+                    ''.join(text.rsplit(profile,1)),
+                    text.replace(response,response.replace('data=00 ','data=30 ')),
+                    text.replace(profile,wire('TX',bytes.fromhex('a0100000050b41ff7700'))),
+                    text.replace('action=last','action=missing'),
+                    text+ '\nnsb1_reset_reason: reason=68'):
+            with self.subTest(tail=bad[-90:]),self.assertRaises(ValueError):
+                checker.check_trace(bad,refresh=True)
+        for kwargs in (dict(control=True),dict(select_item=True),dict(menu_item=2)):
+            with self.assertRaises(ValueError):
+                checker.profile_for(refresh=True,**kwargs)
+        self.assertEqual(profile_metadata(9)['profile'],9)
+        with self.assertRaises(ValueError):
+            checker.check_trace(text,menu_item=1)
+
     def test_followup_item_is_card_issued_and_physically_selected(self):
         text=select_item_trace()
         checker.check_trace(text,select_item=True)

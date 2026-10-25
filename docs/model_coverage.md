@@ -118,6 +118,10 @@ and exact idle return. Its one-byte firmware settings update is protected by
 an exact whole-EEPROM output hash; card/flash stay unchanged. This92s gate does
 not qualify the later restarted application or sustained native RF operation;
 see `nsm1_toolkit_check.py --refresh` and `6150_bringup.md`.
+The5190 independently passes the same command family with its own profile,
+physical route, exact idle pixels and a different complete settings-bank
+transition (`nsb1_toolkit_check.py --refresh`); no storage field or fitted-mask
+conclusion is transferred between those products.
 
 NSB-7 media qualification: the `nsb7hle` ordinary incoming/outgoing SIP
 fixtures now pass own documented clocked HLE PCM and product-owned exact

@@ -275,6 +275,38 @@ pixels. No response precedes the physical confirmation; no firmware state,
 message or completion is injected. This is not arbitrary Toolkit support,
 repeated-selection coverage, fitted-mask fidelity, registration or speech.
 
+#### REFRESH and terminal re-profiling
+
+External profile9 uses the own physical Continue route after the established
+text/input/menu commands. Its envelope receives910b; firmware FETCHes the
+11-byte REFRESH qualifier00 command, re-downloads own terminal profile
+`0f41ff7700`, then returns `810309010002028281030100`. The new profile and
+REFRESH response both receive9000. The reviewed88s frame says `SIM update
+started`;91s reproduces the exact qualified Headset idle frame.
+
+```sh
+.venv/bin/python tools/nsb1_toolkit_check.py \
+  tmp/nsb1-diagnostic-display-final-cold tmp/nsb1-toolkit-refresh-accepted --refresh
+```
+
+Use `--mame mame/mame` with a fresh output to execute the92s gate. Its complete
+8192-byte EEPROM output SHA256 is
+`0a79d52b219fad8e29dc3ccbddfaa31b7e2d0da2330850231763f9d28e8884d8`;
+only04cb changes02 to00. The whole output bank is pinned, not a changed-region
+allowlist. Own group7 directory maps that byte to descriptor0712, nested in
+48-byte record0702 at04b0. A separate read-only raw-writer trace observes
+2aafe2 receiving the whole record from wrapper2a792e: earlier buffers carry02,
+the post-REFRESH buffer carries00. General field semantics remain unassigned.
+The own profile4 ACK-only control preserves the original whole bank; do not
+borrow the6150's different record0766 update or its terminal profile.
+
+The full card and executable flash stay unchanged. The REFRESH-specific16384
+wire cap captures8670 RX and2042 TX bytes; ordinary fixtures retain8192 and
+saturation remains an error. The gate rechecks authentication, cold provenance,
+all exact preceding/REFRESH payloads, statuses, physical ordering, CFG, native
+continuation and reviewed pixels. This qualifies REFRESH completion and idle
+return, not a later restarted application cycle, fitted mask, RF or speech.
+
 #### Pending Toolkit command restoration
 
 An independent74s profile1 process starts from the same own clean-idle bank

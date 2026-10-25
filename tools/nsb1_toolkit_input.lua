@@ -4,12 +4,13 @@ dofile(directory .. 'nsb1_pin_reload.lua')
 local machine = manager.machine
 local memory = machine.devices[':maincpu'].spaces.program
 local counts = {TX=0, RX=0}
+local wire_limit = _G.nsb1_toolkit_wire_limit or 8192
 local function wire(offset, data, mask, direction, address)
     for lane = 0, 3 do
         local shift = (3-lane)*8
         if offset+lane == address and mask & (255 << shift) ~= 0 then
             counts[direction] = counts[direction]+1
-            if counts[direction] <= 8192 then
+            if counts[direction] <= wire_limit then
                 machine:logerror(string.format(
                     'nsb1_sim_wire: direction=%s data=%02x t=%.9f observer_writes=0\n',
                     direction, (data >> shift) & 255, machine.time:as_double()))

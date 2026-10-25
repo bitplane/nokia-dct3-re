@@ -558,6 +558,12 @@ two physical successful responses, observed native architecture/checksum/I/O
 restoration and identical returned-idle pixels with unchanged complete storage
 (`nsb1_toolkit_state_check.py`). This is not mid-character SIMI coverage.
 
+Separate5190 profile9 additionally completes REFRESH through own terminal
+re-profiling and successful response, displaying SIM update started before
+exact idle return. Its product-specific settings write has a pinned complete
+EEPROM output; card/flash remain unchanged (`nsb1_toolkit_check.py --refresh`).
+This is not inferred from the6150 result or a later application-cycle claim.
+
 The6150 also independently handles a three-command external card: physical
 DISPLAY TEXT dismissal, GET INKEY5 and GET INPUT42 produce exact successful
 responses and return to its own clean idle frame. Full persistent card,

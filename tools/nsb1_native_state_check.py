@@ -21,12 +21,14 @@ EEPROM = '4bd101b1c9089fed802aa5630135c4371f3bb070b136c7bfc15031917a598cad'
 MENU = 'ed5b9d247f48525c5f67b4ca71914bff1802af857d212e4dd5cb0e7e8c9a8b33'
 
 
-def check_storage(directory):
+def check_storage(directory, *, eeprom_sha256=None):
+    if eeprom_sha256 is None:
+        eeprom_sha256=EEPROM
     storage = directory / 'nvram/nsb1r4t'
     files = {name: (storage / name).read_bytes() for name in ('flash', 'eeprom', 'sim_card')}
     contract(files['flash'])
     card_check(files['sim_card'])
-    if len(files['eeprom']) != 8192 or hashlib.sha256(files['eeprom']).hexdigest() != EEPROM:
+    if len(files['eeprom']) != 8192 or hashlib.sha256(files['eeprom']).hexdigest() != eeprom_sha256:
         raise ValueError('complete physically selected own EEPROM differs')
     return files
 
