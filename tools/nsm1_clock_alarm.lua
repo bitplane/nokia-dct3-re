@@ -3,26 +3,8 @@ local directory=debug.getinfo(1,'S').source:sub(2):match('^(.*[/\\])')
 _G.nsm1_toolkit_observe_only=true
 dofile(directory..'nsm1_toolkit_input.lua')
 local machine=manager.machine
-local memory=machine.devices[':maincpu'].spaces.program
 local until_time=dofile(directory..'fixture_deadline.lua')
-local function key(name)
-    for column=0,4 do
-        for _,field in pairs(machine.ioport.ports[':COL.'..column].fields) do
-            if field.name==name then
-                local row=0
-                while (1<<row)~=field.mask do row=row+1 end
-                local code=memory:read_u8(0x2e0b18+row*5+column)
-                for _,down in ipairs({1,0}) do
-                    field:set_value(down)
-                    machine:logerror(string.format('nsm1_clock_contact: name=%s key=%02x down=%d t=%.9f physical_only=1\n',name,code,down,machine.time:as_double()))
-                    if down==1 then until_time(machine.time:as_double()+.2,.2) end
-                end
-                return
-            end
-        end
-    end
-    error('missing physical key '..name)
-end
+local key=dofile(directory..'nsm1_clock_key.lua')('nsm1_clock_contact')
 local actions=coroutine.create(function()
     local steps={{25,'Left Softkey','main'},{27,'Keypad 4','settings'},
         {29,'Left Softkey','clock_required'},{31,'Left Softkey','time_editor'},

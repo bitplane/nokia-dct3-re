@@ -130,8 +130,12 @@ Own physical clock/date setup additionally qualifies an awake RTC alarm,
 firmware acknowledgement, Alarm!/Stop/Snooze presentation and PUP buzzer output.
 A same-binary no-Stop control distinguishes physical Stop from automatic quieting.
 Exact whole storage and retained-clock endpoints are guarded by
-`nsm1_clock_alarm_check.py`; cold application retrieval, snooze and power-off
-alarm wake remain unqualified. See `6150_bringup.md` for the separate contracts.
+`nsm1_clock_alarm_check.py`. A separate cold process retrieves both12:35
+editors without reprogramming CCONT, acknowledges the retained counter's next
+minute event and redraws12:36 idle. Exact whole endpoints and the parent
+Stop/control pair are required by `nsm1_clock_cold_check.py`; calendar year/date
+interpretation, snooze and power-off alarm wake remain unqualified.
+See `6150_bringup.md` for the separate contracts.
 The5190 independently passes the same command family with its own profile,
 physical route, exact idle pixels and a different complete settings-bank
 transition (`nsb1_toolkit_check.py --refresh`); no storage field or fitted-mask

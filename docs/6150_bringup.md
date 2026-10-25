@@ -67,7 +67,37 @@ latch/acknowledgement errors and wrong Stop/control buzzer behavior.
 Use fresh outputs for execution and serialize processes. This remains the
 declared nominal-ADC2/NSE-1-mask compatibility fixture with inherited03ca=00
 timeout policy, not factory provisioning or fitted-mask proof. It establishes
-awake RTC/firmware/PUP behavior, not acoustic fidelity, production timing,+cold application retrieval, snooze, power-off alarm wake, RF or native speech.
+awake RTC/firmware/PUP behavior, not acoustic fidelity, production timing,
+calendar year interpretation, snooze, power-off alarm wake, RF or native speech.
+
+#### Independent cold clock readback
+
+`nsm1_clock_cold_check.py` revalidates the complete Stop/no-Stop pair, then
+starts a separate process copying only that Stop endpoint's NVRAM/CFG. The
+same executable and exact initial files are required; no RAM or save state
+is copied. Physical login and menu input retrieve12:35 in the alarm and clock
+editors, cancelling each with Back instead of confirming another setting.
+No CCONT alarm/counter writes occur. At46s the retained12:35:14 counter
+rolls to12:36:00; firmware acknowledges the minute cause and idle redraws
+12:36. No expired-alarm alert repeats in the late observation window.
+
+The whole cold EEPROM hash is
+`4fdb494b68a913e30f92a2c48cbff9cd2e17aff00395b6e84aeb9f1f40ac6e89`.
+It differs from the source only by the independently known ordinary boot
+transition03e8:06->00; this is not an allowed-mutation whitelist. The whole
+output is pinned. Card/flash remain unchanged. Retained CCONT ends as
+`10240c00001e0e5001`, accounting for62s of emulated time, not offline host time.
+
+```sh
+.venv/bin/python tools/nsm1_clock_cold_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-clock-alarm-stop-final tmp/nsm1-clock-alarm-control-final \
+  tmp/nsm1-clock-cold-qualified --mame mame/mame
+```
+
+Use a fresh output. Both awake scenarios also pass after extracting their
+shared physical-key helper. This qualifies cold clock/last-alarm-value readback
+and minute redraw, not independent calendar year/date interpretation, snooze,
+power-off wake, physical clock accuracy or native speech.
 
 ### Card-originated Toolkit DISPLAY TEXT
 

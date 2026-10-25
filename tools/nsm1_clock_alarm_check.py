@@ -19,6 +19,7 @@ from tools.sim_fdn_protocol_check import apdus
 
 EEPROM='f8da8575410d5a83aca7a73dffd9b3e320aefae4ce935df4190238ce886323d3'
 RTC_INPUT=bytes.fromhex('1a000c010000005000')
+RTC_ENDPOINT=bytes.fromhex('0e230c00001e0e5001')
 FRAMES={
     'clock_required':'b756853be083142f76ec7aca8397ac4bc8aedcd78e05467f2124577aa7fd3445',
     'time_1234':'48396da059bea79780fabbbe1477f3858daa5da1e3a4ebccbd5a6bff52a37bd5',
@@ -41,7 +42,7 @@ CONTACTS += [(55+i,'Keypad '+str(v),v) for i,v in enumerate((1,2,3,5))]
 CONTACTS += [(59,'Left Softkey',0x19),(63,'End / Mode',0x0f)]
 
 
-def check_trace(text,*,control=False):
+def check_authentication(text):
     check_observer_console(text)
     check_pin(text,True,prefix='nsm1',tx_limit=4096)
     check_phone(text,True,())
@@ -52,6 +53,10 @@ def check_trace(text,*,control=False):
     if (not commands or any(row[0] not in (0xa4,0x20,0xb0,0xb2,0xc0,0xf2) for row in commands)
             or 'read-binary fid=6fae offset=0 length=1 first=02' not in text):
         raise ValueError('unrelated or proactive SIM operation')
+
+
+def check_trace(text,*,control=False):
+    check_authentication(text)
     contacts=CONTACTS+([] if control else [(105,'Left Softkey',0x19)])
     expected=[(name,f'{key:02x}',str(down),f'{time+(0 if down else .2):.9f}')
               for time,name,key in contacts for down in (1,0)]
@@ -126,7 +131,7 @@ def check(seed,run,*,control=False):
     if not control:
         frame_check(run/'snap/clock_final.png',IDLE_AFTER)
     rtc=(run/'nvram/nsm1r4t/ccont').read_bytes()
-    if rtc!=bytes.fromhex('0e230c00001e0e5001'):
+    if rtc!=RTC_ENDPOINT:
         raise ValueError('complete retained RTC endpoint differs')
     return result
 
