@@ -136,7 +136,7 @@
       "status": "satisfied",
       "predicate": "The complete default C54x fixture reaches terminal conformance with every required marker exactly once after the source-admission corrections",
       "current": "The post-long-memory-alias full run contains all293 required markers exactly once, core conformance PASS, expected MAME exit3, runner exit0 and interrupted=false. Its5690 distinct executable-opcode assertions exactly equal the preceding full run, with zero added or removed forms. Tested binary SHA2563052c86d7b236382c741300ad9a3ac5fe44decdb76b57c514431c0f0edc71f1f, CPU source3e06383c729b7bb0fb2d0dd33c2f018032cc7a304d801212c54b5f30233b05b0 and fixture sourcec561cd0f297d3f7ba9065dbefa05d6e5abab7575f36e1afa015770de48a79f54 remain unchanged after completion. This includes load, memory-T multiply, MPY/MAC, LTD/DELAY, MACP/MACD, RMW, memory-logic, scalar-arithmetic and long-memory arithmetic alias guards; optional rejection matrices retain separate scopes. Both atomic and staged native EFR decoder controls pass163 frames,26080 reference-exact samples and65440-word per-frame RAM replay on the same binary; the staged5110 Phone book menu remains exact. Tool acceptance passes5285 tests with one skip. This checkpoint is not the entire ISA, measured physical timing, fitted DSP-mask compatibility, native RF or end-to-end handset speech.",
-      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/c54x_execution_contracts.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
       "id": "c54x_logic_absolute_alias_admission",

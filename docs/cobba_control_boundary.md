@@ -2692,7 +2692,7 @@ microtests occupy separate fixture program addresses.
 and the same 163-frame, 26,080-sample and full-RAM replay requirements.
 Its ten-case delayed-repeat preflight remains atomic, then an explicit
 frontend marker precedes staged decoder reset and all speech frames.
-The required [BD READA composition](rom4_dsp_loader.md#reada-in-unconditional-bd-delay-words)
+The required [BD READA composition](c54x_execution_contracts.md#reada-in-unconditional-bd-delay-words)
 has its own 512-case cleared-pipeline replay matrix. This is algorithm and
 ordering evidence, not measured physical bus timing.
 
@@ -2800,7 +2800,7 @@ matches 82,880 PCM samples, eight SID frames, 135 erased frames and 46 nonzero
 comfort-noise frames. Both include full-RAM replay. Acceptance targets are
 `check-c54x-rom4-efr-dtx-encoder-staged` and
 `check-c54x-rom4-efr-dtx-decoder-staged`. The
-[loader contract](rom4_dsp_loader.md#staged-lms) records instruction ownership
+[loader contract](c54x_execution_contracts.md#staged-lms) records instruction ownership
 and remaining composition limits. Staged frontend selection does not
 weaken the 518-frame comparisons or nonzero comfort-noise requirements.
 
@@ -2848,7 +2848,7 @@ the single read/write transaction. Decoder text also checks literal/address
 ordering. This fixture adds atomic execution, not staged timing, peripheral
 ownership, repeat legality or interrupt composition. The separate staged
 `xorm-absolute` qualification covers retained operands and adjacent forwarding
-for absolute RAM; see [the loader contract](rom4_dsp_loader.md#absolute-xorm).
+for absolute RAM; see [the loader contract](c54x_execution_contracts.md#absolute-xorm).
 
 The load-bearing CPU contract is XC's Access-stage predicate visibility
 ([SPRU131G 7.1.4, example 7-13](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)):
@@ -3290,7 +3290,7 @@ passing recovery comparison. The strict
 `check-c54x-rom4-efr-erasure-decoder-staged` remains rejecting.
 The staged path has independently qualified BD-delay long accumulator
 multiply, pending-PSHM SP forwarding into MVMM, and absolute XORM; see
-[the loader contract](rom4_dsp_loader.md#short-mapped-ar-addm).
+[the loader contract](c54x_execution_contracts.md#short-mapped-ar-addm).
 Staged/atomic profiles share hashed program/data and vectors; selection
 markers and driver-validity checks cannot be bypassed by characterization.
 
