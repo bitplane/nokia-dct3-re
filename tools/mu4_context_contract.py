@@ -811,6 +811,48 @@ def reference_context_lane(base,lane):
                 publication_entry=entry,link_address=ar2)
 
 
+EXCHANGE_PUBLICATION_WITNESSES = (
+    (0x20545,(0x10f8,0xaa5a,0xf982,0x989d,0x10f8,0xaa5b,0xf982,0x989d,
+        0x10f8,0xaa5a,0xf982,0x98a6,0xf495,0x4808,0xf845,0x586,
+        0x10f8,0x1310,0xf845,0x580,0x10f8,0x15e9,0xf982,0x96ac,
+        0x10f8,0x15e9,0x7716,0,0xf982,0x973c,0x8812,0xf495,0xf495,
+        0x6c82,0x56a,0x7716,1,0x11e1,0x16,0xe800,0xf84c,0x570,0xe801,
+        0x4916,0xf2a0,0x10f8,8,0xf845,0x580,0x10f8,0x15e7,0xf982,0x969e,
+        0x76f8,0x1310,0,0x76f8,0x12fa,1,0x4811,0xf982,0x46b,0x76f8,0xaa55,0)),
+    (0x2989d,(0xe90b,0xf882,0x98b8,0xe90c,0xf882,0x98b8,
+               0xe90d,0xf882,0x98b8,0xe90e,0xf882,0x98b8)),
+    (0xc70c,(2,0xa30b)),
+    (0x2a30b,(0x4a11,0xeeff,0x8811,0xf495,0xf495,0x10e1,9,0xee01,0x8a11,0xf4e4)),
+    (0x2973c,(0x4a11,0xeeff,0x8811,0xf495,0xf495,0x10e1,1,0x0881,0xee01,0x8a11,0xf4e4)),
+)
+
+
+def decode_exchange_publication(words):
+    for base,witness in EXCHANGE_PUBLICATION_WITNESSES:
+        if any(words.get(base+i)!=value for i,value in enumerate(witness)):
+            raise ValueError('exchange publication source changed or absent')
+    return dict(pinned_words=sum(len(witness) for _,witness in EXCHANGE_PUBLICATION_WITNESSES),
+        entry='020545',process='method11 on aa5a and aa5b, then method14 on aa5a',
+        publish='nonzero method14 low-word result reaches020581 ->02046b(AR1), then aa55=0; zero skips to020586',
+        selected_table_condition=dict(table='c6f0',method14_pointer='c70c ->02a30b',
+            getter='object[9], the source-exhausted field under the copy-adapter contract',
+            scope='Conditional table interpretation; late aa5a runtime binding is not proved'),
+        flag1310='zero bypasses the refresh/reset subsection, not publication',
+        nonzero_flag='refresh15e9 through0296ac, query end-cursor via02973c; if that result is zero OR AR1[22] is zero, call02969e(15e7), clear1310 and set12fa=1',
+        scope='Local branch and explicit stores conditional on normal helper returns; not helper memory effects, runtime branch selection, EOF flag semantics, physical units or drain completion')
+
+
+def reference_exchange_publication(status,flag,remaining,count):
+    """Explicit branch/store selection from the observed scalar operands only."""
+    if any(type(value) is not int or not 0<=value<=0xffff for value in (status,flag,remaining,count)):
+        raise ValueError('exchange publication requires unsigned words')
+    publish = status!=0
+    refresh = publish and flag!=0
+    reset = refresh and (remaining==0 or count==0)
+    return dict(publish=publish,refresh_input=refresh,reset_call=reset,
+                clear_1310=reset,set_12fa=reset,clear_aa55=publish)
+
+
 def reference_worker_reservation(held,count):
     """Gate and immediate decrement only, before unclosed callback effects."""
     if type(held) is not int or held not in (0,1) or type(count) is not int or not 0 <= count <= 0xffff:
@@ -2927,6 +2969,7 @@ def contract(source):
     result['decoder_return_dispatch'] = decode_decoder_return_dispatch(rel_words)
     result['worker_reservation'] = decode_worker_reservation(rel_words)
     result['context_lanes'] = decode_context_lanes(rel_words)
+    result['exchange_publication'] = decode_exchange_publication(rel_words)
     result['decoder_method_prefix'] = decode_decoder_method_prefix(rel_words)
     result['decoder_info_body'] = decode_decoder_info_body(rel_words,bootstrap_words)
     result['decoder_info_helpers'] = decode_decoder_info_helpers(rel_words,bootstrap_words)

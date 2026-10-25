@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_exchange_publication_status_contract",
+      "owner": "native_aac_validation",
+      "status": "satisfied",
+      "predicate": "The original020545 prefix selects context publication from method14 status independently of whether1310 is nonzero",
+      "current": "The source contract pins100 original words across020545..020585, method wrappers, the conditional C6F0 method14 far pointer and getter, and the remaining-count helper. After method11 on AA5A/AA5B, method14 onAA5A returning zero skips to020586; nonzero reaches020581->02046b and clearsAA55. C6F0 slot14 atC70C selects02A30B, reading object field9, the copy-adapter source-exhausted field. Early selector snapshots in tmp/mu4-context-callers show AA5A=13E0/headerC6F0 at1.028291089 and1.029389129s, without late-binding immutability.1310=0 bypasses refresh/reset, not publication. When nonzero, the source refreshes15E9 and tests its end-minus-cursor and context22; either zero selects02969E(15E7), explicit1310=0 and12FA=1 before publication. Host tests exhaust each unsigned scalar's zero boundary with the other inputs fixed, cover all representative zero/nonzero combinations, and mutate/remove every pinned word. This is local conditional control and explicit stores assuming normal helper returns, not those helpers' memory effects, actual late operands, whole flag lifecycle, EOF semantics or completed AAC draining.",
+      "evidence": ["docs/aac_validation.md", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py"]
+    },
+    {
       "id": "mu4_native_context_wrapper_callers",
       "owner": "native_aac_validation",
       "status": "satisfied",

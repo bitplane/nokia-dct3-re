@@ -40,6 +40,8 @@ from tools.mu4_context_contract import (WORKER_RESERVATION_WITNESSES,
     decode_worker_reservation,reference_worker_reservation)
 from tools.mu4_context_contract import (CONTEXT_LANE_WITNESSES,
     decode_context_lanes,reference_context_lane)
+from tools.mu4_context_contract import (EXCHANGE_PUBLICATION_WITNESSES,
+    decode_exchange_publication,reference_exchange_publication)
 from tools.mu4_context_contract import PLAYBACK_INFO_QUERY_WITNESSES, decode_playback_info_query
 from tools.mu4_context_contract import PLAYBACK_BUFFER_REFRESH_BASE, PLAYBACK_BUFFER_REFRESH_WITNESS, decode_playback_buffer_refresh
 from tools.mu4_context_contract import playback_final_input_words, decode_playback_final_input
@@ -92,6 +94,36 @@ from tools.mu4_context_contract import RECORD_WINDOW_BASE, RECORD_WINDOW_WITNESS
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_exchange_publication_source_and_zero_classes(self):
+        words = {base+i:value for base,witness in EXCHANGE_PUBLICATION_WITNESSES
+                 for i,value in enumerate(witness)}
+        result = decode_exchange_publication(words)
+        self.assertEqual(result['pinned_words'],100)
+        self.assertEqual(result['selected_table_condition']['method14_pointer'],'c70c ->02a30b')
+        for address in words:
+            with self.subTest(address=hex(address)),self.assertRaises(ValueError):
+                decode_exchange_publication(words | {address:words[address]^1})
+            with self.subTest(missing=hex(address)),self.assertRaises(ValueError):
+                decode_exchange_publication({a:v for a,v in words.items() if a!=address})
+        for status in (0,1,0xffff):
+            for flag in (0,1,0xffff):
+                for remaining in (0,1,0xffff):
+                    for count in (0,1,0xffff):
+                        r = reference_exchange_publication(status,flag,remaining,count)
+                        publish = status!=0
+                        refresh = publish and flag!=0
+                        reset = refresh and (remaining==0 or count==0)
+                        self.assertEqual(r,dict(publish=publish,refresh_input=refresh,
+                            reset_call=reset,clear_1310=reset,set_12fa=reset,clear_aa55=publish))
+        for value in range(0x10000):
+            self.assertEqual(reference_exchange_publication(value,0,0,0)['publish'],value!=0)
+            self.assertEqual(reference_exchange_publication(1,value,0,1)['reset_call'],value!=0)
+            self.assertEqual(reference_exchange_publication(1,1,value,1)['reset_call'],value==0)
+            self.assertEqual(reference_exchange_publication(1,1,1,value)['reset_call'],value==0)
+        for bad in (-1,65536,True,None):
+            with self.assertRaises(ValueError):
+                reference_exchange_publication(bad,0,0,0)
+
     def test_context_lane_source_and_address_walk(self):
         words = {base+i:value for base,witness in CONTEXT_LANE_WITNESSES
                  for i,value in enumerate(witness)}

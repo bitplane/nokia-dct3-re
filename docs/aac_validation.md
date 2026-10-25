@@ -938,6 +938,29 @@ Tested binary SHA256:
   tmp/mu4-context-callers/error.log --context-callers
 ```
 
+`exchange_publication` pins100 original words around `020545..020585`,
+the method wrappers and conditional adapter getter. Method11 runs on both
+`aa5a` and `aa5b`; method14 then runs on `aa5a`. Its zero low-word result skips
+publication. A nonzero result reaches `020581 -> 02046b(AR1)` and clears
+`aa55`. Under table `c6f0`, method14's far pointer at `c70c` selects
+`02a30b`, which reads object field9: the source-exhausted field in the
+independently mapped copy adapter. Early selector snapshots bind `aa5a`
+to object `13e0` with that header at1.028291089 and1.029389129s in
+`tmp/mu4-context-callers`; this is not proof of an immutable late binding.
+
+`1310=0` bypasses only the intervening refresh/reset subsection, **not**
+publication. With a nonzero flag, the source refreshes `15e9`, obtains
+end-minus-cursor through `02973c`, and tests that result and context[22].
+If either is zero, it calls `02969e(15e7)`, explicitly clears `1310`
+and sets `12fa=1`; publication follows either way. Tests exhaust the
+zero/nonzero boundary of each unsigned scalar input and reject every
+changed or missing source word. This models explicit branch/store selection
+assuming normal helper returns, not their memory effects or actual late
+branch operands. It does not make `1310` an EOF flag or establish whole-track
+draining. The remaining boundary is the actual adapter result/ownership and
+cleanup ordering, rather than a dependency on a nonzero `1310` to return
+the context token.
+
 Fresh read-only capture`tmp/mu4-context-count` qualifies four entry-state
 cycles on context`d796`: `(flag,count)=(0,1) -> (1,0) -> (0,0)` at gate,
 decoder call and common refresh. Its35 actual CPU operand bus reads of
