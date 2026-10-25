@@ -19595,6 +19595,13 @@ private:
 		m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
 		m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvdk_mapped_source",
 			[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
+				u32 instruction; u16 opcode;
+				u16 const expected = f.form == 0 ? 0x7100 | (f.source & 0x7f) : f.form == 1 ? 0x7196 : 0x71f8;
+				expect(m_cpu->observe_staged_data_read(at,instruction,opcode) && instruction == f.base+0x600 && opcode == expected,
+					"MVDK source observer owns the actual Address-stage instruction, including mapped aliases");
+				expect(!m_cpu->observe_staged_data_read(at^1,instruction,opcode), "Read ownership rejects another address");
+				{ auto const disable = machine().disable_side_effects();
+					expect(!m_cpu->observe_staged_data_read(at,instruction,opcode), "Debugger scope cannot claim the enclosing operand read"); }
 				expect(at == f.source && word == f.value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.access, "MVDK samples one mapped register in Access before alias publication"); ++m_pipeline_operand_reads; });
 		m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvdk_mapped_destination",
 			[this, f, clock](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
@@ -48998,6 +49005,9 @@ private:
 			bool const accumulator_destination = !strcmp(machine().options().bios(), "mvdk-acc");
 			bool const clock = !strcmp(machine().options().bios(), "clock-mvdk");
 			auto const f = mvdk_mapped_case(variant, accumulator_destination, clock);
+			u32 observed_instruction; u16 observed_opcode;
+			expect(!m_cpu->observe_staged_data_read(f.source,observed_instruction,observed_opcode),
+				"MVDK read ownership is transient outside the actual bus callback, including after restore");
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped MVDK remains in supported staged forms");
 			if (tick == 3) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
 			if (tick == 4 && f.form == 2) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x602, 0xdead); }
@@ -49036,14 +49046,14 @@ private:
 				if (variant < (clock ? 71U : accumulator_destination ? 8207U : 14255U)) { start_mvdk_mapped(variant + 1); return; }
 				if (clock)
 				{
-					osd_printf_info("TMS320C54x staged CLKMD MVDK: PASS cases=72 restore=72 forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 peripheral_extra_clock=1 retained_source=1 retained_literals=1 pll_reference=unconfigured physical_clock_claim=0\n");
+					osd_printf_info("TMS320C54x staged CLKMD MVDK: PASS cases=72 restore=72 forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 peripheral_extra_clock=1 retained_source=1 retained_literals=1 read_owner=Address observer_scope=bus_only debug_excluded=1 pll_reference=unconfigured physical_clock_claim=0\n");
 					throw emu_fatalerror(0, "TMS320C54x isolated staged CLKMD MVDK complete");
 				}
 				if (accumulator_destination)
 				{
-					osd_printf_info("TMS320C54x MVDK accumulator destinations: PASS cases=8208 restore=8208 sources=18_mapped,1_RAM destinations=AL,AH,AG,BL,BH,BG forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access write=next_clock retained_literals=1 aliases=1 guard_width=8 other_fields_preserved=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated MVDK accumulator destinations complete");
+					osd_printf_info("TMS320C54x MVDK accumulator destinations: PASS cases=8208 restore=8208 sources=18_mapped,1_RAM destinations=AL,AH,AG,BL,BH,BG forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access write=next_clock retained_literals=1 aliases=1 guard_width=8 other_fields_preserved=1 read_owner=Address observer_scope=bus_only debug_excluded=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated MVDK accumulator destinations complete");
 				}
-				osd_printf_info("TMS320C54x mapped MVDK: PASS cases=14256 restore=14256 sources=18 forms=direct,indirect,absolute destinations=11 patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access mapped_aliases=1 producer_composition=unvalidated physical_phase_claim=0\n");
+				osd_printf_info("TMS320C54x mapped MVDK: PASS cases=14256 restore=14256 sources=18 forms=direct,indirect,absolute destinations=11 patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access mapped_aliases=1 producer_composition=unvalidated read_owner=Address observer_scope=bus_only debug_excluded=1 physical_phase_claim=0\n");
 				throw emu_fatalerror(0, "TMS320C54x isolated mapped MVDK complete");
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;

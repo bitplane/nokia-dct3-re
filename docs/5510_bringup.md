@@ -1484,6 +1484,20 @@ projection, not a guaranteed silicon result for violating the latency rule.
 STLM-to-accumulator sources, general producer/interrupt/repeat compositions
 and measured physical timing remain unvalidated.
 
+Actual read-identity acceptance is separate from that timing projection.
+The mapped, accumulator-destination and CLKMD MVDK profiles now require
+the captured Address-slot instruction address/opcode inside every source
+bus callback. They reject another address and debugger scope, and require
+the identity to be unavailable between callbacks, including after restore.
+All22,536 cases/restores pass with the existing one-read/one-write counts.
+A control that bypasses only the Address-stage observer fails at case0's
+first source read; it does not establish a guest arithmetic fault.
+Restoring the observer reproduces the same executable SHA256
+`6c27ffa46fa576b480b2773e7e8c831e146fac44e3406104e65e8d88782413e3`
+and all three positive profiles. No CPU emulation change is retained.
+This tests the bounded diagnostic API, not every operand family, physical
+silicon phases or a renewed complete default-core checkpoint.
+
 `mvdk-map-edge` passes 48 cases/restores for 12 still-unadmitted status,
 repeat-control and peripheral sources on two pages with snapshots before/
 after the guard. They stop before data transactions or destination writes;

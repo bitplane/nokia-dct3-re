@@ -604,7 +604,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated staged CLKMD STM complete",
     ),
     "clock-mvdk": (
-        "TMS320C54x staged CLKMD MVDK: PASS cases=72 restore=72 forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 peripheral_extra_clock=1 retained_source=1 retained_literals=1 pll_reference=unconfigured physical_clock_claim=0",
+        "TMS320C54x staged CLKMD MVDK: PASS cases=72 restore=72 forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 peripheral_extra_clock=1 retained_source=1 retained_literals=1 read_owner=Address observer_scope=bus_only debug_excluded=1 pll_reference=unconfigured physical_clock_claim=0",
         "Fatal error: TMS320C54x isolated staged CLKMD MVDK complete",
     ),
     "clock-mvdk-edge": (
@@ -1013,7 +1013,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated MVKD forwarding complete",
     ),
     "mvdk-acc": (
-        "TMS320C54x MVDK accumulator destinations: PASS cases=8208 restore=8208 sources=18_mapped,1_RAM destinations=AL,AH,AG,BL,BH,BG forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access write=next_clock retained_literals=1 aliases=1 guard_width=8 other_fields_preserved=1 physical_phase_claim=0",
+        "TMS320C54x MVDK accumulator destinations: PASS cases=8208 restore=8208 sources=18_mapped,1_RAM destinations=AL,AH,AG,BL,BH,BG forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access write=next_clock retained_literals=1 aliases=1 guard_width=8 other_fields_preserved=1 read_owner=Address observer_scope=bus_only debug_excluded=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVDK accumulator destinations complete",
     ),
     "mvdk-acc-prod": (
@@ -1327,7 +1327,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated delayed block repeat interrupts complete",
     ),
     "mvdk-mapped": (
-        "TMS320C54x mapped MVDK: PASS cases=14256 restore=14256 sources=18 forms=direct,indirect,absolute destinations=11 patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access mapped_aliases=1 producer_composition=unvalidated physical_phase_claim=0",
+        "TMS320C54x mapped MVDK: PASS cases=14256 restore=14256 sources=18 forms=direct,indirect,absolute destinations=11 patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access mapped_aliases=1 producer_composition=unvalidated read_owner=Address observer_scope=bus_only debug_excluded=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated mapped MVDK complete",
     ),
     "mvdk-producer": (

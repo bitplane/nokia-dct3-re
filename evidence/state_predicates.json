@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_mvdk_actual_read_identity_scope",
+      "owner": "tms320c54x",
+      "status": "satisfied",
+      "predicate": "The tested staged MVDK source bus accesses expose the captured Address-slot identity only inside the actual read callback across restoration",
+      "current": "The mapped14256, accumulator-destination8208 and CLKMD72 profiles pass22536 cases/restores. Every source callback requires the original instruction address/opcode, rejects another address and debugger-disabled scope, and every fixture tick requires no exposed identity outside the actual callback, including after restore. Existing source-read/destination-write counts remain exactly one. A deliberate bypass of only the Address-stage observer fails at case0's first source read; the assertion identifies absent diagnostic ownership, not a guest arithmetic error. The original CPU source is restored byte-for-byte to SHA256335c09c52c345d266fe964f1c35e1d7e8507dab4b17bfe9b35a72bd8ae453e83. All three profiles pass again and executable SHA2566c27ffa46fa576b480b2773e7e8c831e146fac44e3406104e65e8d88782413e3 equals the pre-control positive build. No CPU emulation change is retained. This is bounded observer-API acceptance, not all operand families, physical phase validation or a renewed default full-core checkpoint.",
+      "evidence": ["docs/5510_bringup.md", "driver/tms320c54x_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "tools/run_c54x_core.py"]
+    },
+    {
       "id": "mu4_r060_r061_playback_policy_comparison",
       "owner": "native_aac_validation",
       "status": "satisfied",

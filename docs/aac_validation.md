@@ -948,9 +948,9 @@ Four entry-state cycles agree with acquisition and release:
 `(flag,count)=(0,1) -> (1,0) -> (0,0)` at gate, decoder call and refresh.
 These are actual read ownership and entry-state agreement, not observed
 write retirement, physical queue capacity or complete callback semantics.
-The observer extension separately passes14,256 mapped-MVDK cases/restores
-with one source read and one destination write per case; this is not a
-renewed full-CPU acceptance checkpoint.
+The observer has separate executable acceptance across22,536 MVDK
+cases/restores, including scope exclusion and a negative control; see
+[5510 bring-up](5510_bringup.md). This is not a renewed full-CPU checkpoint.
 
 The final owned status read is0 at9.725261143s; the selected branch at
 9.725261252s correctly skips publication. Its context-only snapshots show
@@ -2000,6 +2000,19 @@ both input identities in its JSON report:
   roms/5510-mu4-reference/InitData_R060.a00 \
   --compare-playback-revision roms/5510-mu4-reference/InitData_R061.a00
 ```
+
+External API material needs an implementation match before it can supply
+missing semantics. TI's [1Q2002 Audio Solutions Guide, pages18/24](https://www.ti.com/download/vf/audio/audiosolutionsguide1.pdf)
+describes the DA150 audio-library platform, but its cellphone example offers
+UART/HPI/SPI alternatives rather than Nokia-specific wiring or a drain ABI.
+The available [C55x codec package](https://www.ti.com/tool/C55XCODECS) instead
+targets C55x devices; its
+[AAC datasheet](https://dr-download.ti.com/software-development/software-codec/MD-SFKgRd85AD/1.00.002/MPEG4AAC_LC_Decoder_C55x_DataSheet_1_00_00_03.pdf)
+specifies a C5505 implementation. Those buffer sizes are not a recovered
+DA150/MU4 input contract, and TI's C5510 device name does not identify the
+Nokia5510 handset. No matching end-of-input contract was established from
+these materials. They do not justify extra encoded bytes, a guessed flush
+command or changed `aa1a` policy.
 
 ### Decoded-Bank Copy Correspondence
 
