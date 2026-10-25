@@ -14,6 +14,14 @@ their older executable hashes are not competing default-suite baselines.
 Passing CPU tests does not establish physical pipeline timing, a fitted
 handset DSP mask, RF acquisition or end-to-end speech.
 
+The absolute-alias fixtures share declarative family/count/status profiles in
+`driver/tms320c54x_test_profiles.h`; the CPU model does not consume this test
+metadata. `test_c54x_alias_profiles.py` executes the host C++ decoder and
+compares all10,304 encoded cases/status inputs with their retained domains.
+All ten separate MAME rejection matrices also pass with the original markers
+and restoration counts. This fixture-only refactor does not renew the older
+hash-bound default-suite checkpoint below or change silicon admission claims.
+
 Handset/MU4 state and media acceptance remain in
 [5510 bring-up](5510_bringup.md), [AAC validation](aac_validation.md)
 and [ROM4 loader](rom4_dsp_loader.md).

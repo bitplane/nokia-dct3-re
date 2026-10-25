@@ -14,6 +14,7 @@
 #include "tms320c54x_mcbsp.h"
 #include "tms320c54x_dma.h"
 #include "tms320c54x_bsp_state.h"
+#include "tms320c54x_test_profiles.h"
 #include <sstream>
 #include <bitset>
 
@@ -11594,27 +11595,20 @@ private:
 		m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
-	void start_mpy_absolute_edge(unsigned variant = 0)
+	void start_source_alias_case(unsigned variant = 0)
 	{
 		m_cpu->reset(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant; m_idle_fixture_tick = 0; m_pipeline_replay = false;
 		unsigned const flags = variant / 7;
-		bool const mac = !strcmp(machine().options().bios(), "mac-abs-edge");
-		bool const delay = !strcmp(machine().options().bios(), "delay-abs-edge");
-		bool const pmac = !strcmp(machine().options().bios(), "pmac-abs-edge");
-		bool const memory_t = !strcmp(machine().options().bios(), "mem-t-abs-edge");
-		bool const load = !strcmp(machine().options().bios(), "load-abs-edge");
-		bool const rmw = !strcmp(machine().options().bios(), "rmw-abs-edge");
-		bool const logic = !strcmp(machine().options().bios(), "logic-abs-edge");
-		bool const arithmetic = !strcmp(machine().options().bios(), "arith-abs-edge");
-		bool const long_memory = !strcmp(machine().options().bios(), "long-abs-edge");
+		auto const *profile = c54x_test::find_source_alias_profile(machine().options().bios());
+		expect(profile && variant < profile->cases(), "Known source-alias profile and bounded case");
 		u32 const base = flags & 4 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
-		program.write_word(base + 0x600, (rmw ? 0x6800 + (variant / 224) * 0x100 : long_memory ? std::array<u16,7>{0x5000,0x5200,0x5400,0x5800,0x5a00,0x5c00,0x5e00}[variant / 224] : arithmetic ? std::array<u16, 12>{0x0000, 0x0200, 0x0400, 0x0600, 0x0800, 0x0a00, 0x0c00, 0x1e00, 0x3c00, 0x3e00, 0x4000, 0x4200}[variant / 224] : logic ? 0x1800 + (variant / 224) * 0x200 : load ? std::array<u16, 6>{0x1000, 0x1200, 0x1400, 0x1600, 0x4400, 0x5600}[variant / 224] : memory_t ? 0x2000 + (variant / 224) * 0x200 : delay ? 0x4c00 : pmac ? 0x7800 | (flags & 32 ? 0x200 : 0) : mac ? 0x6400 | (flags & 32 ? 0x200 : 0) : 0x6200) | (!rmw && (flags & 1) ? 0x100 : 0) | (0xf9 + variant % 7));
+		program.write_word(base + 0x600, profile->opcode(variant));
 		program.write_word(base + 0x601, 0x1500);
 		program.write_word(base + 0x602, 3);
 		program.write_word(base + 0x603, 0xf4e1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, rmw && (flags & 1) ? 0x0804 : 0x1804);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, profile->st0(variant));
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (flags & 2 ? 0x20 : 0));
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
@@ -20302,16 +20296,16 @@ private:
 		if (!strcmp(machine().options().bios(), "rptb-branch")) { start_block_branch(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-mem-imm")) { start_memory_immediate_multiply(); return; }
 		if (!strcmp(machine().options().bios(), "mac-map-imm")) { start_mapped_immediate_mac(); return; }
-		if (!strcmp(machine().options().bios(), "mpy-abs-edge")) { start_mpy_absolute_edge(); return; }
-		if (!strcmp(machine().options().bios(), "mac-abs-edge")) { start_mpy_absolute_edge(); return; }
-		if (!strcmp(machine().options().bios(), "delay-abs-edge")) { start_mpy_absolute_edge(); return; }
-		if (!strcmp(machine().options().bios(), "mem-t-abs-edge")) { start_mpy_absolute_edge(); return; }
-		if (!strcmp(machine().options().bios(), "load-abs-edge")) { start_mpy_absolute_edge(); return; }
-		if (!strcmp(machine().options().bios(), "pmac-abs-edge")) { start_mpy_absolute_edge(); return; }
-		if (!strcmp(machine().options().bios(), "rmw-abs-edge")) { start_mpy_absolute_edge(); return; }
-		if (!strcmp(machine().options().bios(), "logic-abs-edge")) { start_mpy_absolute_edge(); return; }
-		if (!strcmp(machine().options().bios(), "arith-abs-edge")) { start_mpy_absolute_edge(); return; }
-		if (!strcmp(machine().options().bios(), "long-abs-edge")) { start_mpy_absolute_edge(); return; }
+		if (!strcmp(machine().options().bios(), "mpy-abs-edge")) { start_source_alias_case(); return; }
+		if (!strcmp(machine().options().bios(), "mac-abs-edge")) { start_source_alias_case(); return; }
+		if (!strcmp(machine().options().bios(), "delay-abs-edge")) { start_source_alias_case(); return; }
+		if (!strcmp(machine().options().bios(), "mem-t-abs-edge")) { start_source_alias_case(); return; }
+		if (!strcmp(machine().options().bios(), "load-abs-edge")) { start_source_alias_case(); return; }
+		if (!strcmp(machine().options().bios(), "pmac-abs-edge")) { start_source_alias_case(); return; }
+		if (!strcmp(machine().options().bios(), "rmw-abs-edge")) { start_source_alias_case(); return; }
+		if (!strcmp(machine().options().bios(), "logic-abs-edge")) { start_source_alias_case(); return; }
+		if (!strcmp(machine().options().bios(), "arith-abs-edge")) { start_source_alias_case(); return; }
+		if (!strcmp(machine().options().bios(), "long-abs-edge")) { start_source_alias_case(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-mod3-edge")) { start_short_read_mod3_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mmr-long-edge")) { start_mmr_long_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-xfer-edge")) { start_mmr_long_edge(); return; }
@@ -52119,6 +52113,8 @@ private:
 		if (m_phase == 254330) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254320; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 310700)
 		{
+			auto const *profile = c54x_test::find_source_alias_profile(machine().options().bios());
+			expect(profile, "Source-alias continuation retains its profile");
 			bool const long_memory = !strcmp(machine().options().bios(), "long-abs-edge");
 			bool const rmw = !strcmp(machine().options().bios(), "rmw-abs-edge");
 			bool const logic = !strcmp(machine().options().bios(), "logic-abs-edge");
@@ -52131,7 +52127,7 @@ private:
 			unsigned const variant = m_pipeline_peripheral_case, flags = variant / 7;
 			unsigned const tick = ++m_idle_fixture_tick, checkpoint = flags & 16 ? 10 : 1;
 			expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Unadmitted source absolute alias performs no data transaction");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xabcd && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (rmw && (flags & 1) ? 0x0804 : 0x1804) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (flags & 2 ? 0x20 : 0)), "Unadmitted source absolute alias preserves accumulators, T and status");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xabcd && m_cpu->state_int(tms320c54x_device::STATE_ST0) == profile->st0(variant) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (flags & 2 ? 0x20 : 0)), "Unadmitted source absolute alias preserves accumulators, T and status");
 			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x1400 + i, "Unadmitted source alias preserves every AR");
 			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save source alias before or after rejection"); }
 			if (tick == 20)
@@ -52139,7 +52135,7 @@ private:
 				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Both frontends reject unadmitted source absolute aliases");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore source rejection without operand effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310710; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (long_memory ? 1567 : rmw ? 895 : arithmetic ? 2687 : logic ? 671 : load ? 1343 : memory_t ? 1791 : mac || pmac ? 447 : 223)) { start_mpy_absolute_edge(variant + 1); return; }
+				if (variant + 1 < profile->cases()) { start_source_alias_case(variant + 1); return; }
 				if (long_memory)
 				{
 					osd_printf_info("TMS320C54x long-memory absolute alias exclusions: PASS cases=1568 restore=1568 modes=f9..ff families=7 destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n");

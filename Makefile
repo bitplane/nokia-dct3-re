@@ -83,7 +83,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_sim_card.cpp driver/nokia_sim_card.h \
 	driver/nokia_uif.cpp driver/nokia_uif.h \
 	driver/nokia_dct3_trace.inc
-TEST_DRIVER_COMPONENTS := driver/tms320c54x_test.cpp driver/sed1565_test.cpp driver/nandflash_test.cpp driver/mu4_storage_test.cpp driver/nokia_simi_test.cpp driver/intelfsh_c3_test.cpp
+TEST_DRIVER_COMPONENTS := driver/tms320c54x_test.cpp driver/tms320c54x_test_profiles.h driver/sed1565_test.cpp driver/nandflash_test.cpp driver/mu4_storage_test.cpp driver/nokia_simi_test.cpp driver/intelfsh_c3_test.cpp
 PHONE ?= noki3210
 BIOS ?=
 
