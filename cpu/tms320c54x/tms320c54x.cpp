@@ -5895,10 +5895,14 @@ void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
 	const auto transfer_pc = [this](u16 destination) { m_pc = destination; m_atomic_condition_redirect = true; };
-	// Match staged load/logic admission: f8 is absolute, f9..ff are unadmitted aliases.
+	const bool scalar_arithmetic = (op & 0xfe00) == 0x0000 || (op & 0xfe00) == 0x0200 ||
+			(op & 0xfe00) == 0x0400 || (op & 0xfe00) == 0x0600 || (op & 0xfe00) == 0x0800 ||
+			(op & 0xfe00) == 0x0a00 || (op & 0xfe00) == 0x0c00 || (op & 0xfe00) == 0x1e00 ||
+			(op & 0xfc00) == 0x3c00 || (op & 0xfc00) == 0x4000;
+	// Match staged load/logic/arithmetic admission: f8 is absolute, f9..ff are unadmitted aliases.
 	// Reject before operand reads; this is not a silicon-trap claim.
 	if (low > 0xf8 && ((op & 0xf800) == 0x1000 || (op & 0xfe00) == 0x4400 || (op & 0xfe00) == 0x5600 ||
-			(op & 0xfe00) == 0x1800 || (op & 0xfe00) == 0x1a00 || (op & 0xfe00) == 0x1c00))
+			(op & 0xfe00) == 0x1800 || (op & 0xfe00) == 0x1a00 || (op & 0xfe00) == 0x1c00 || scalar_arithmetic))
 	{
 		m_illegal = true;
 		return;

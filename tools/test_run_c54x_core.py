@@ -14,6 +14,20 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_arithmetic_alias_exclusions_require_all_families_and_no_operand_effects(self):
+        profile = 'arith-abs-edge'
+        marker, ending = EXTRA_PROFILES[profile]
+        text = marker + '\n' + ending
+        check_result(text, 3, profile=profile)
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'),
+                                 3, profile=profile)
+        for bad in (marker, ending, text + '\nunhandled opcode'):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile=profile)
+
     def test_logic_alias_exclusions_require_every_class_and_no_operand_effects(self):
         marker,ending=EXTRA_PROFILES['logic-abs-edge']
         text=marker+'\n'+ending

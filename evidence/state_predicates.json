@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_arithmetic_absolute_alias_admission",
+      "owner": "tms320c54x",
+      "status": "satisfied",
+      "predicate": "Both frontends reject the tested scalar arithmetic f9..ff aliases before operand effects across restoration",
+      "current": "Unchanged-core arith-abs-edge fails at case56, the first atomic case, on a forbidden data transaction with changed status. The early guard now matches staged admission for12 tested forms. All2688 cases/restores retain A/B/T, status and every AR with zero data reads/writes across seven aliases, both accumulator selections, CMPT, pages, frontends and two checkpoints. Legal staged absolute ADD passes2048 cases/restores and mapped AR arithmetic passes1024 direct/absolute cases/restores. This is fail-closed emulator admission consistency, not silicon trap behavior, every arithmetic instruction, measured pipeline timing, fitted-mask compatibility or native handset speech.",
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+    },
+    {
       "id": "aac_original_comparison_controls",
       "owner": "native_aac_validation",
       "status": "satisfied",
@@ -15,7 +23,7 @@
       "owner": "tms320c54x",
       "status": "satisfied",
       "predicate": "The complete default C54x fixture reaches terminal conformance with every required marker exactly once after the source-admission corrections",
-      "current": "The post-logic-alias full run contains all293 required markers exactly once, core conformance PASS, expected MAME exit3 with interrupted=false and runner exit0. Its5690 distinct executable-opcode assertions exactly equal the preceding full run, with zero added or removed forms. Tested binary SHA256983e29ada49d23115d25e26907b5b422a49d5d77ad0071c0dd786406a0b22084, CPU source2aca08f76601f01557a69a48de732eb07e5033a70475c4b7ee4479b06336c468 and fixture sourcebb90a4c74df180277a6bc14a1613171cf626bb75f26b06ae3fead56015da08d5 remain unchanged after completion. This includes load, memory-T multiply, MPY/MAC, LTD/DELAY, MACP/MACD, RMW and memory-logic alias guards; optional rejection matrices retain separate scopes. Both atomic and staged native EFR decoder controls pass163 frames,26080 reference-exact samples and65440-word per-frame RAM replay on the same binary; the staged5110 Phone book menu remains exact. This checkpoint is not the entire ISA, measured physical timing, fitted DSP-mask compatibility, native RF or end-to-end handset speech.",
+      "current": "The post-arithmetic-alias full run contains all293 required markers exactly once, core conformance PASS, expected MAME exit3 and runner exit0. Its5690 distinct executable-opcode assertions exactly equal the preceding full run, with zero added or removed forms. Tested binary SHA256355c73b2f2b0e6b6a34a4732a105140a72c3a41ee9dafb33d75f091dcf58ceb5, CPU sourcef162de390b239292cde6674d2fca61a4b49225659cb0d387ccb86ba55bd75c22 and fixture sourcef179174d941b8de83ada72ba739a4589cb309942a53e6b68f1fe469aefe174ac remain unchanged after completion. This includes load, memory-T multiply, MPY/MAC, LTD/DELAY, MACP/MACD, RMW, memory-logic and the tested scalar-arithmetic alias guards; optional rejection matrices retain separate scopes. Both atomic and staged native EFR decoder controls pass163 frames,26080 reference-exact samples and65440-word per-frame RAM replay on the same binary; the staged5110 Phone book menu remains exact. This checkpoint is not the entire ISA, measured physical timing, fitted DSP-mask compatibility, native RF or end-to-end handset speech.",
       "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {

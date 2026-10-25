@@ -631,6 +631,10 @@ EXTRA_PROFILES = {
         "TMS320C54x program multiply absolute alias exclusions: PASS cases=448 restore=448 modes=f9..ff instructions=MACP,MACD destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated program multiply absolute alias exclusions complete",
     ),
+    "arith-abs-edge": (
+        "TMS320C54x arithmetic absolute alias exclusions: PASS cases=2688 restore=2688 modes=f9..ff families=12 destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
+        "Fatal error: TMS320C54x isolated arithmetic absolute alias exclusions complete",
+    ),
     "logic-abs-edge": (
         "TMS320C54x logic absolute alias exclusions: PASS cases=672 restore=672 modes=f9..ff instructions=AND,OR,XOR destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated logic absolute alias exclusions complete",
@@ -2386,7 +2390,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("pmac-mod3-edge","delay-mod3-edge","store-observe","push-observe","dual-sub-native","idle-modes","clock-mvdk","clock-mvdk-edge","pop-irq","pop-irq-edge","mpy-abs-edge","mac-abs-edge","delay-abs-edge","pmac-abs-edge","mem-t-abs-edge"):
         machine = "tms54xtra"
-    if args.profile in ("load-abs-edge", "rmw-abs-edge", "logic-abs-edge"):
+    if args.profile in ("load-abs-edge", "rmw-abs-edge", "logic-abs-edge", "arith-abs-edge"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-joystickprovider", "none",
