@@ -5478,20 +5478,25 @@ public:
 };
 
 // Explicit laboratory attachment, not recovered COBBA clock-enable wiring.
-// Keeping it in a separate machine leaves ordinary NSE-1 execution unchanged.
-class nse1_pcm_fixture_state : public nokia_dct3_state
+// Separate machines leave ordinary product execution unchanged.
+class dct3_pcm_fixture_state : public nokia_dct3_state
 {
 public:
 	using nokia_dct3_state::nokia_dct3_state;
+	void nsm1pcm(machine_config &config)
+	{
+		nsm1r4t(config);
+		CLOCK(config, "external_pcm_frame", 8'000).signal_handler().set(FUNC(dct3_pcm_fixture_state::frame_w));
+	}
 	void nse1pcm(machine_config &config)
 	{
 		noki5110(config);
-		CLOCK(config, "external_pcm_frame", 8'000).signal_handler().set(FUNC(nse1_pcm_fixture_state::frame_w));
+		CLOCK(config, "external_pcm_frame", 8'000).signal_handler().set(FUNC(dct3_pcm_fixture_state::frame_w));
 	}
 	void nse1bit(machine_config &config)
 	{
 		noki5110(config);
-		CLOCK(config, "external_pcm_bit", 1'000'000).signal_handler().set(FUNC(nse1_pcm_fixture_state::bit_w));
+		CLOCK(config, "external_pcm_bit", 1'000'000).signal_handler().set(FUNC(dct3_pcm_fixture_state::bit_w));
 	}
 	void nse1pin(machine_config &config)
 	{
@@ -5503,7 +5508,7 @@ public:
 	{
 		nse1pin(config);
 		subdevice<tms320c54x_device>("dsp_c54x:cpu")->set_standard_swwsr(true);
-		subdevice<tms320c54x_device>("dsp_c54x:cpu")->instruction_observer_cb().set(FUNC(nse1_pcm_fixture_state::instruction_w));
+		subdevice<tms320c54x_device>("dsp_c54x:cpu")->instruction_observer_cb().set(FUNC(dct3_pcm_fixture_state::instruction_w));
 		m_execution_demand_observer = true;
 	}
 	void nse1pclk(machine_config &config)
@@ -5619,6 +5624,7 @@ private:
 };
 
 #define rom_nse1pcm rom_noki5110
+#define rom_nsm1pcm rom_nsm1r4t
 #define rom_nam2c3 rom_noki2100
 #define rom_nse1bit rom_noki5110
 #define rom_nse1pin rom_noki5110
@@ -5645,17 +5651,18 @@ SYST( 1998, nsb1r4t, noki5190, 0, nsb1r4t, nsb1r4t, nokia_dct3_state, empty_init
 SYST( 1998, nsk1r4t, 0, 0, nsk1r4t, nsk1r4t, nokia_dct3_state, empty_init, "Research", "NSK-1 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, noki6130, 0, 0, noki6130, noki5110, nokia_dct3_state, empty_init, "Nokia", "6130 own MCU research fixture (no DSP completion)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsk3r4t, noki6130, 0, nsk3r4t, nsk3r4t, nokia_dct3_state, empty_init, "Research", "NSK-3 with NSE-1 ROM4 compatibility input (unproved fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2026, nse1pcm, noki5110, 0, nse1pcm, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 8 kHz PCM frame fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2026, nse1bit, noki5110, 0, nse1bit, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 external 1 MHz PCM wire fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2026, nse1pin, noki5110, 0, nse1pin, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 clocked boot-loopback fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2026, nse1aclk, noki5110, 0, nse1aclk, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 atomic standard-SWWSR laboratory codec clocks", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2026, nse1pclk, noki5110, 0, nse1pclk, noki5110, nse1_pcm_fixture_state, empty_init, "Research", "NSE-1 staged standard-SWWSR laboratory codec clocks", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nse1pcm, noki5110, 0, nse1pcm, noki5110, dct3_pcm_fixture_state, empty_init, "Research", "NSE-1 external 8 kHz PCM frame fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nse1bit, noki5110, 0, nse1bit, noki5110, dct3_pcm_fixture_state, empty_init, "Research", "NSE-1 external 1 MHz PCM wire fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nse1pin, noki5110, 0, nse1pin, noki5110, dct3_pcm_fixture_state, empty_init, "Research", "NSE-1 clocked boot-loopback fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nse1aclk, noki5110, 0, nse1aclk, noki5110, dct3_pcm_fixture_state, empty_init, "Research", "NSE-1 atomic standard-SWWSR laboratory codec clocks", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nse1pclk, noki5110, 0, nse1pclk, noki5110, dct3_pcm_fixture_state, empty_init, "Research", "NSE-1 staged standard-SWWSR laboratory codec clocks", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1pipe, noki5110, 0, nse1pipe, noki5110, nse1_pipeline_fixture_state, empty_init, "Research", "NSE-1 staged DSP frontend integration probe", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1plg, noki5110, 0, nse1plg, noki5110, nse1_pipeline_fixture_state, empty_init, "Research", "NSE-1 staged DSP with legacy SWWSR comparison fixture", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2026, nse1astd, noki5110, 0, nse1astd, noki5110, nse1_pipeline_fixture_state, empty_init, "Research", "NSE-1 atomic DSP with standard SWWSR comparison fixture", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1997, noki6110, 0,      0,      noki6110, noki6110, nokia_dct3_state, empty_init, "Nokia", "Nokia 6110 (NSE-3)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki7110, 0,      0,      noki7110, noki7110, nokia_dct3_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsm1r4t,  0,        0,    nsm1r4t,  nsm1r4t,  nokia_dct3_state, empty_init, "Nokia", "NSM-1 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2026, nsm1pcm, nsm1r4t, 0, nsm1pcm, nsm1r4t, dct3_pcm_fixture_state, empty_init, "Research", "NSM-1 external 8 kHz PCM frame fixture (not product clock wiring)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nse6stage, 0,       0,    nse6stage, nsm1r4t, nokia_dct3_state, empty_init, "Nokia", "8810 NSE-6 (erased EEPROM, disabled DSP exchange research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nse6r4t, 0,         0,    nse6r4t, nsm1r4t, nokia_dct3_state, empty_init, "Nokia", "8810 NSE-6 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nse5r4t,  noki7110, 0,    nse5r4t,  noki7110, nokia_dct3_state, empty_init, "Nokia", "NSE-5 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

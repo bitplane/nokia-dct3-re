@@ -91,10 +91,10 @@ def check_trace(text, control=False, interactive=False, menu_item=None, select_i
                       reset_markers=('nsm1_reset_request:', 'nsm1_restart_request:'))
 
 
-def check_configuration(seed, run, control=False, interactive=False, menu_item=None, select_item=False, refresh=False, tone=None):
+def check_configuration(seed, run, control=False, interactive=False, menu_item=None, select_item=False, refresh=False, tone=None, *, machine='nsm1r4t'):
     profile=profile_for(control,interactive,menu_item,select_item,refresh,tone)
     expected = signature(seed / 'cfg/nsm1r4t.cfg')
-    actual = signature(run / 'cfg/nsm1r4t.cfg')
+    actual = signature(run / f'cfg/{machine}.cfg', machine=machine)
     card = ('port', sorted(dict(tag=':SATCFG', type='CONFIG', mask='15',
                                defvalue='0', value=str(profile)).items()), '')
     # MAME omits the explicitly selected zero/default after saving CFG.

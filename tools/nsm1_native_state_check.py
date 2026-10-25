@@ -23,18 +23,22 @@ from tools.nsm1_published_record_check import records
 SEED_EEPROM = '44493d3a303c99a1bc87d3320bc01bf292b7e18b581a2f17078159a12096987c'
 
 
-def signature(path):
+def signature(path, *, machine='nsm1r4t'):
+    if machine not in ('nsm1r4t','nsm1pcm'):
+        raise ValueError('undeclared NSM-1 machine')
     system = ET.parse(path).find('system')
-    if system is None or system.get('name') != 'nsm1r4t' or system.find('input') is None:
+    if system is None or system.get('name') != machine or system.find('input') is None:
         raise ValueError('own NSM-1 external inputs missing')
     return [(node.tag, sorted(node.attrib.items()), (node.text or '').strip())
             for node in system.find('input').iter()]
 
 
-def check_storage(directory, *, eeprom_sha256=None):
+def check_storage(directory, *, eeprom_sha256=None, machine='nsm1r4t'):
+    if machine not in ('nsm1r4t','nsm1pcm'):
+        raise ValueError('undeclared NSM-1 machine')
     if eeprom_sha256 is None:
         eeprom_sha256=SEED_EEPROM
-    storage = directory / 'nvram/nsm1r4t'
+    storage = directory / 'nvram' / machine
     files = {name: (storage / name).read_bytes() for name in ('flash', 'eeprom', 'sim_card')}
     if hashlib.sha1(files['flash']).hexdigest() != SHA1:
         raise ValueError('own executable differs')

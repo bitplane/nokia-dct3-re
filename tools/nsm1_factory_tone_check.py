@@ -120,10 +120,10 @@ def prepare(seed,reset,run):
     tree.write(run/'cfg/nsm1r4t.cfg',encoding='utf-8',xml_declaration=True)
 
 
-def check(seed,reset,run):
+def check_common(seed,reset,run,*,machine='nsm1r4t'):
     check_reset(seed,reset)
     before=check_storage(reset,eeprom_sha256=RESET_EEPROM)
-    after=check_storage(run,eeprom_sha256=COLD_EEPROM)
+    after=check_storage(run,eeprom_sha256=COLD_EEPROM,machine=machine)
     contract(after['flash'])
     if before['flash']!=after['flash'] or before['sim_card']!=after['sim_card']:
         raise ValueError('cold replay altered card or executable')
@@ -135,7 +135,7 @@ def check(seed,reset,run):
         copied_directories=['nvram','cfg'],ram_or_save_state_copied=False)
     if json.loads((run/'cold_input.json').read_text())!=metadata:
         raise ValueError('reset-bank cold provenance differs')
-    check_configuration(reset,run,tone='hold')
+    check_configuration(reset,run,tone='hold',machine=machine)
     if json.loads((run/'exit_status.json').read_text())!={'returncode':0}:
         raise ValueError('cold replay did not complete')
     check_observer_console((run/'console.log').read_text())
@@ -151,12 +151,17 @@ def check(seed,reset,run):
         raise ValueError('own physical installed-menu route differs')
     check_tone_native(text)
     check_publication(text)
-    check_serial(text)
     frames={'before':PROMPT,'after':INTERACTIVE_FRAMES['inkey'],
             **INTERACTIVE_FRAMES,**{'menu_'+k:v for k,v in MENU_FRAMES.items()},
             'tone_before':MENU_FRAMES['open'],'tone_active':TONE_FRAME,'tone_after':TONE_FRAME}
     for name,digest in frames.items():
         frame_check(run/f'snap/nsm1_toolkit_{name}.png',digest)
+    return text
+
+
+def check(seed,reset,run):
+    text=check_common(seed,reset,run)
+    check_serial(text)
 
 
 def execute(binary,seed,reset,run):

@@ -449,6 +449,47 @@ comparison, preserving the explicit clock assumptions and product-owned
 word format. Neither serial release nor successful control publication is
 proof that microphone/earpiece samples were transferred.
 
+#### Laboratory clocked native tone
+
+The separate `nsm1pcm` machine composes the unchanged NSM-1 compatibility
+profile with the existing laboratory8kHz completed-frame source and zero
+microphone words. It does not add clocks to `nsm1r4t`, set interrupt flags,
+modify guest state or substitute an HLE tone. Its explicit assumptions are
+recorded in `clock_assumptions.json`; no bit-clock wiring or analog encoding
+is inferred from this completed-word experiment.
+
+`tmp/nsm1-factory-tone-clock-qualified` passes the same cold provenance,
+PIN/Toolkit exchanges, pixels, complete EEPROM/card/flash and control-
+publication checks. The serial window now has52000 native BDXR writes at
+358b plus six reset/release writes, rather than zero samples. It captures
+291047 completed words overall and51998 in85..91.5s;51997 of the latter are
+compared byte-for-byte with the preceding native BDXR publication. The first
+window frame has no preceding write retained inside that observation window.
+All frame timestamps lie on the explicit125us grid at a62.5us phase.
+
+The before/after windows contain constant code55. The active86.14..86.35s
+window contains1680 bytes with values92/b8 and a centered raw-byte1750Hz
+projection of approximately0.81318 under the supplied8kHz clock. These are
+periodic native output bytes, not a decoded PCM amplitude or an analog
+compliance result. The8bit frame capture agrees with the standard BSP's FO
+setting; the product manual/fitted-backend caveat above remains open.
+External frames also change the boot ISR's first computed output to0000
+from the unclockedffd5: boot waveform timing is not claimed identical.
+
+```sh
+.venv/bin/python tools/nsm1_factory_clock_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-factory-reset-qualified tmp/nsm1-factory-tone-clock-qualified --mame mame/mame
+```
+
+Use a fresh output. The gate rejects lost/duplicate/off-grid samples, wrong
+native-byte projection, missing duplex frame delivery, flat or wrong-frequency
+output and changed clock assumptions. The shared validators accept only the
+declared NSM-1 product and laboratory machine names; ordinary locked/unlocked
+gates retain their original defaults. The existing5110 paired control/clock
+gate is the regression for the shared laboratory fixture implementation.
+The remaining production boundary is independently evidenced frame-clock
+enable/wiring and COBBA word/analog interpretation, not MCU tone delivery.
+
 ### Pending Toolkit command restoration
 
 An independent74s cold profile1 process saves at65s while the organically

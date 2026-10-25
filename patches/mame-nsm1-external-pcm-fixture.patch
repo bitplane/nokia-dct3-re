@@ -1,0 +1,11 @@
+diff --git a/src/mame/mame.lst b/src/mame/mame.lst
+--- a/src/mame/mame.lst
++++ b/src/mame/mame.lst
+@@ -36206,6 +36206,7 @@
+ nsk3r4t
+ noki6110
+ nsm1r4t
++nsm1pcm
+ nse6stage
+ nse6r4t
+ noki3310
