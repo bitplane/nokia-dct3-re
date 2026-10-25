@@ -532,6 +532,46 @@ retained triples, independent reference and unchanged serial byte. Tests reject
 wrong configuration, missing/malformed observations, changed code/hooks/masks
 and reference-input scaling/format drift. No HLE compander supplies DSP data.
 
+### Broader click-format comparison
+
+The same physical menu route supplies a wider native input domain without
+changing card commands or DSP data. Passive formatter/result/serial taps
+during84..84.25s retain2000 ordered triples, with unchanged serial output.
+The full clocked cold/protocol/storage/frame gate remains required.
+
+Of these accumulator inputs,1984 lie within signed16 range and cover538
+distinct values. Sixteen positive accumulator values exceed32767; the
+reference excludes them rather than truncating them into artificial negative
+samples. The one actual negative input,-13485, matches the independent
+FFmpeg A-law result3f. All833 zero inputs produce55 instead of reference d5.
+Five positive inputs also differ:
+
+| Native input | Native byte | FFmpeg byte |
+|---|---|---|
+| 2063 | 95 | ea |
+| 2059 | 95 | ea |
+| 8254 | b5 | 8a |
+| 8237 | b5 | 8a |
+| 8217 | b5 | 8a |
+
+These are retained discrepancies, not a full-conformance acceptance claim.
+The checker requires their exact classification, source code/sign-mask
+contract and independent reference; it neither rewrites native bytes nor
+changes the reference's input scale. Formatter conventions, segment-boundary
+arithmetic, observation context and CPU semantics must be separated before
+assigning a cause. In particular, zero55 is already the observed idle code;
+it must not be silently replaced with d5 on an assumed physical codec path.
+
+```sh
+.venv/bin/python tools/nsm1_click_format_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-factory-reset-qualified tmp/nsm1-click-format-qualified \
+  --mame mame/mame --ffmpeg /usr/bin/ffmpeg
+```
+
+Use a fresh output. `click_format_result.json` records the bounded
+classification and reference/mask identities. Physical codec law, full
+signed-domain behavior and native speech remain unproved.
+
 ### Active native tone restoration
 
 `tools/nsm1_tone_replay_check.py` composes the complete clocked cold-boot
