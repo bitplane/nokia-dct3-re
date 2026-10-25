@@ -5904,7 +5904,8 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	// SPRU131G table 5-4 and the pinned TI assembler probe exclude
 	// short MOD=3 from RMW operands too, before any operand side effect.
-	if ((op & 0xfc00) == 0x6800 && (low & 0xf8) == 0x98)
+	// f9..ff also match the staged path's fail-closed alias admission.
+	if ((op & 0xfc00) == 0x6800 && ((low & 0xf8) == 0x98 || low > 0xf8))
 	{
 		m_illegal = true;
 		return;

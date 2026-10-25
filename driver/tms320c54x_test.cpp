@@ -11604,13 +11604,14 @@ private:
 		bool const pmac = !strcmp(machine().options().bios(), "pmac-abs-edge");
 		bool const memory_t = !strcmp(machine().options().bios(), "mem-t-abs-edge");
 		bool const load = !strcmp(machine().options().bios(), "load-abs-edge");
+		bool const rmw = !strcmp(machine().options().bios(), "rmw-abs-edge");
 		u32 const base = flags & 4 ? 0x20000 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
-		program.write_word(base + 0x600, (load ? std::array<u16, 6>{0x1000, 0x1200, 0x1400, 0x1600, 0x4400, 0x5600}[variant / 224] : memory_t ? 0x2000 + (variant / 224) * 0x200 : delay ? 0x4c00 : pmac ? 0x7800 | (flags & 32 ? 0x200 : 0) : mac ? 0x6400 | (flags & 32 ? 0x200 : 0) : 0x6200) | (flags & 1 ? 0x100 : 0) | (0xf9 + variant % 7));
+		program.write_word(base + 0x600, (rmw ? 0x6800 + (variant / 224) * 0x100 : load ? std::array<u16, 6>{0x1000, 0x1200, 0x1400, 0x1600, 0x4400, 0x5600}[variant / 224] : memory_t ? 0x2000 + (variant / 224) * 0x200 : delay ? 0x4c00 : pmac ? 0x7800 | (flags & 32 ? 0x200 : 0) : mac ? 0x6400 | (flags & 32 ? 0x200 : 0) : 0x6200) | (!rmw && (flags & 1) ? 0x100 : 0) | (0xf9 + variant % 7));
 		program.write_word(base + 0x601, 0x1500);
 		program.write_word(base + 0x602, 3);
 		program.write_word(base + 0x603, 0xf4e1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1804);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, rmw && (flags & 1) ? 0x0804 : 0x1804);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (flags & 2 ? 0x20 : 0));
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
@@ -20297,6 +20298,7 @@ private:
 		if (!strcmp(machine().options().bios(), "mem-t-abs-edge")) { start_mpy_absolute_edge(); return; }
 		if (!strcmp(machine().options().bios(), "load-abs-edge")) { start_mpy_absolute_edge(); return; }
 		if (!strcmp(machine().options().bios(), "pmac-abs-edge")) { start_mpy_absolute_edge(); return; }
+		if (!strcmp(machine().options().bios(), "rmw-abs-edge")) { start_mpy_absolute_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mpy-mod3-edge")) { start_short_read_mod3_edge(); return; }
 		if (!strcmp(machine().options().bios(), "mmr-long-edge")) { start_mmr_long_edge(); return; }
 		if (!strcmp(machine().options().bios(), "rpt-xfer-edge")) { start_mmr_long_edge(); return; }
@@ -52101,6 +52103,7 @@ private:
 		if (m_phase == 254330) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254320; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return; }
 		if (m_phase == 310700)
 		{
+			bool const rmw = !strcmp(machine().options().bios(), "rmw-abs-edge");
 			bool const load = !strcmp(machine().options().bios(), "load-abs-edge");
 			bool const memory_t = !strcmp(machine().options().bios(), "mem-t-abs-edge");
 			bool const mac = !strcmp(machine().options().bios(), "mac-abs-edge");
@@ -52109,7 +52112,7 @@ private:
 			unsigned const variant = m_pipeline_peripheral_case, flags = variant / 7;
 			unsigned const tick = ++m_idle_fixture_tick, checkpoint = flags & 16 ? 10 : 1;
 			expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Unadmitted source absolute alias performs no data transaction");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xabcd && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1804 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (flags & 2 ? 0x20 : 0)), "Unadmitted source absolute alias preserves accumulators, T and status");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xabcd && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (rmw && (flags & 1) ? 0x0804 : 0x1804) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (flags & 2 ? 0x20 : 0)), "Unadmitted source absolute alias preserves accumulators, T and status");
 			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x1400 + i, "Unadmitted source alias preserves every AR");
 			if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save source alias before or after rejection"); }
 			if (tick == 20)
@@ -52117,7 +52120,12 @@ private:
 				expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Both frontends reject unadmitted source absolute aliases");
 				if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore source rejection without operand effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 310710; m_check_timer->enable(true); return; }
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (variant < (load ? 1343 : memory_t ? 1791 : mac || pmac ? 447 : 223)) { start_mpy_absolute_edge(variant + 1); return; }
+				if (variant < (rmw ? 895 : load ? 1343 : memory_t ? 1791 : mac || pmac ? 447 : 223)) { start_mpy_absolute_edge(variant + 1); return; }
+				if (rmw)
+				{
+					osd_printf_info("TMS320C54x RMW absolute alias exclusions: PASS cases=896 restore=896 modes=f9..ff families=4 initial_tc=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n");
+					throw emu_fatalerror(3, "TMS320C54x isolated RMW absolute alias exclusions complete");
+				}
 				if (load)
 				{
 					osd_printf_info("TMS320C54x load absolute alias exclusions: PASS cases=1344 restore=1344 modes=f9..ff families=6 destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n");
@@ -57616,6 +57624,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(213, "pmac-abs-edge", "Unadmitted MACP MACD absolute-alias exclusions")
 	ROM_SYSTEM_BIOS(214, "mem-t-abs-edge", "Unadmitted memory T multiply absolute-alias exclusions")
 	ROM_SYSTEM_BIOS(215, "load-abs-edge", "Unadmitted scalar load absolute-alias exclusions")
+	ROM_SYSTEM_BIOS(216, "rmw-abs-edge", "Unadmitted read-modify-write absolute-alias exclusions")
 ROM_END
 
 ROM_START(tms54rom4)

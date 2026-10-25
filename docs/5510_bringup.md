@@ -201,6 +201,24 @@ Native staged5110 Phone book menu acceptance and both3210 default/frontier
 regressions also pass without rebanking their oracles. This does not expand
 handset, RF or speech support.
 
+`rmw-abs-edge` checks896 cases/restores for ANDM/ORM/XORM/ADDM aliases
+`f9..ff`, both initial TC values, CMPT settings, program pages, frontends
+and two checkpoints. The unchanged core performed an operand transaction
+at case56, the first atomic case, while the staged prefix rejected them.
+The atomic RMW admission guard now rejects these unadmitted aliases before
+address-extension fetching or operand access. Every case retains A/B/T,
+ST0/ST1 and all ARs with zero data reads/writes. Canonical absolute `f8`
+and legal long MOD13 remain separate supported forms; this is fail-closed
+frontend consistency, not a claim that silicon traps or a handset uses an
+illegal opcode. Negative evidence is
+`tmp/c54x-rmw-alias-negative/run_c54x_core_fvfsp7hq`; corrected evidence is
+`tmp/c54x-rmw-alias-fixed/run_c54x_core_xglw8jax`.
+
+The legal atomic XORM, staged absolute XORM, mapped BRC/AR ADDM and active
+BRC-loop consumer controls have separate captures under
+`tmp/c54x-rmw-alias-controls`. Their scopes do not supersede the full-core
+checkpoint or establish untested instruction behavior.
+
 Corrected positive load domains are:
 
 | Profile | Admitted cases/restores | Domain |
