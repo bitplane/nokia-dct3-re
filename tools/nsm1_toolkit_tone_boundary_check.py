@@ -11,7 +11,17 @@ import sys
 if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from tools.nsm1_toolkit_check import check as check_hold,prepare
-from tools.nsm1_v523_static_check import literal,read32,direct_call_candidates,SHA1
+from tools.nsm1_v523_static_check import literal,read32,direct_call_candidates,instruction,SHA1
+from capstone.arm import ARM_OP_IMM,ARM_OP_REG,ARM_REG_R0,ARM_REG_R1,ARM_REG_R5
+
+
+def immediate(image,address,mnemonic,register):
+    insn=instruction(image,address)
+    if (insn.mnemonic!=mnemonic or len(insn.operands)!=2
+            or insn.operands[0].type!=ARM_OP_REG or insn.operands[0].reg!=register
+            or insn.operands[1].type!=ARM_OP_IMM):
+        raise ValueError('control argument instruction differs')
+    return insn.operands[1].imm
 
 
 def contract(image):
@@ -28,8 +38,34 @@ def contract(image):
     callers=direct_call_candidates(image,0x2a4a6c)
     if callers!=[0x2404f2,0x240e4c,0x240e56,0x2a2bf0,0x2a2c24,0x2a2c4c,0x2a4d5a]:
         raise ValueError('direct BL candidate census differs')
+    direct_fields={site:immediate(image,site-4,'movs',ARM_REG_R0)
+                   for site in (0x2404f2,0x240e4c,0x240e56)}
+    if direct_fields!={0x2404f2:0x12,0x240e4c:8,0x240e56:9}:
+        raise ValueError('direct candidate fields differ')
+    references=[]
+    start=0
+    while (start:=image.find(bytes.fromhex('002a4d57'),start))!=-1:
+        references.append(0x200000+start)
+        start+=1
+    if references!=[0x2dcefc]:
+        raise ValueError('literal wrapper-pointer inventory differs')
+    if (literal(image,0x2b2ca8)!=0x2dcea8 or read32(image,0x2dcefc)!=0x2a4d57
+            or immediate(image,0x2b2f1a,'movs',ARM_REG_R1)!=0xd0
+            or immediate(image,0x2b2f22,'subs',ARM_REG_R1)!=1
+            or immediate(image,0x2b2e74,'movs',ARM_REG_R0)!=0xd2):
+        raise ValueError('command table or D1/D2 route differs')
+    branch,call,indirect=(instruction(image,p) for p in (0x2b2f26,0x2b2f5e,0x2b2d8e))
+    if (branch.mnemonic!='beq' or branch.operands[0].type!=ARM_OP_IMM or branch.operands[0].imm!=0x2b2f5c
+            or call.mnemonic!='bl' or call.operands[0].type!=ARM_OP_IMM or call.operands[0].imm!=0x2b2c9a
+            or indirect.mnemonic!='bx' or indirect.operands[0].type!=ARM_OP_REG or indirect.operands[0].reg!=ARM_REG_R5):
+        raise ValueError('command indirect call chain differs')
     return dict(compiler=0x2a4a6c,table_records=47,fields=fields,
-                direct_bl_candidates=callers,indirect_callers_closed=False)
+                direct_bl_candidates=callers,direct_candidate_fields=direct_fields,
+                command_table=dict(base=0x2dcea8,index=0x15,entry=0x2dcefc,
+                                   wrapper=0x2a4d56,request=0xd1,reply=0xd2,
+                                   literal_wrapper_references=references,
+                                   ordinary_tone_producer_proved=False),
+                indirect_callers_closed=False)
 
 
 def check_trace(text):

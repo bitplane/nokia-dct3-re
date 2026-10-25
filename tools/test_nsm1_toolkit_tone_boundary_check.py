@@ -15,7 +15,7 @@ def trace():
 
 
 def image():
-    data=bytearray(0xa5000)
+    data=bytearray(0xdd000)
     for field in range(47):
         struct.pack_into('>I',data,0xa4aa0+4*field,0x2a4d16)
     for field,target,pool,value in (
@@ -27,6 +27,14 @@ def image():
         struct.pack_into('>I',data,pool-0x200000,value)
     struct.pack_into('>H',data,0xa4a80,0x4800|((0x2a4d04-0x2a4a84)//4))
     struct.pack_into('>I',data,0xa4d04,0x10000)
+    struct.pack_into('>I',data,0xdcefc,0x2a4d57)
+    struct.pack_into('>I',data,0xb3028,0x2dcea8)
+    for address,raw in ((0x2404ee,'2012'),(0x240e48,'2008'),(0x240e52,'2009'),
+                        (0x2b2f1a,'21d0'),(0x2b2f22,'3901'),(0x2b2f26,'d019'),
+                        (0x2b2f5e,'f7fffe9c'),(0x2b2d8e,'4728'),(0x2b2e74,'20d2'),
+                        (0x2b2ca8,'49df')):
+        start=address-0x200000
+        data[start:start+len(raw)//2]=bytes.fromhex(raw)
     return data
 
 
@@ -54,12 +62,25 @@ class ToneBoundaryTest(unittest.TestCase):
             self.assertEqual(result['fields'][0x24],0x100b6)
             self.assertEqual(result['fields'][0x25],0x100ac)
             self.assertFalse(result['indirect_callers_closed'])
+            self.assertEqual(result['direct_candidate_fields'],{0x2404f2:0x12,0x240e4c:8,0x240e56:9})
+            self.assertEqual(result['command_table']['request'],0xd1)
+            self.assertFalse(result['command_table']['ordinary_tone_producer_proved'])
             with self.assertRaises(ValueError):
                 checker.contract(data[:-1])
         struct.pack_into('>I',data,0xa4efc,0x100ac)
         with patch.object(checker,'SHA1',hashlib.sha1(data).hexdigest()),patch.object(checker,'direct_call_candidates',return_value=callers):
             with self.assertRaises(ValueError):
                 checker.contract(data)
+
+    def test_command_namespace_and_direct_fields_are_not_borrowed_or_inferred(self):
+        callers=[0x2404f2,0x240e4c,0x240e56,0x2a2bf0,0x2a2c24,0x2a2c4c,0x2a4d5a]
+        for offset,raw in ((0x404ee,'2020'),(0xb2f22,'3905'),(0xb2e74,'20d5'),
+                           (0xdcefc,'002a4a6d'),(0xb2d8e,'4720'),(0xdce00,'002a4d57')):
+            data=image()
+            data[offset:offset+len(raw)//2]=bytes.fromhex(raw)
+            with patch.object(checker,'SHA1',hashlib.sha1(data).hexdigest()),patch.object(checker,'direct_call_candidates',return_value=callers):
+                with self.subTest(offset=offset),self.assertRaises(ValueError):
+                    checker.contract(data)
 
 
 if __name__=='__main__':

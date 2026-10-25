@@ -230,7 +230,16 @@ observed seven times before5s but not during the late window. This is a
 branch-entry observation with positive controls, not an all-instruction
 execution census. Seven direct-BL candidates are2404f2,240e4c,240e56,
 2a2bf0,2a2c24,2a2c4c and2a4d5a; indirect/interior entrants are not closed.
-The first three are the next application-side leads, not confirmed owners.
+The first three select fixed fields12,08 and09, respectively, not the
+oscillator/amplitude fields. Wrapper2a4d56's only literal Thumb pointer is
+2a4d57 at2dcefc, index15 of function table2dcea8. Dispatcher2b2c9a loads
+that table using input byte8 and calls the selected pointer through BX R5 at
+2b2d8e. The recovered caller2b2f5e is the **D1** case of the command decoder
+at2b2ef8; its result builder writes **D2** at2b2e74. These decoded command
+and compiler-field namespaces are separate. No ordinary PLAY TONE producer
+has been established by this table entry; do not synthesize a D1 call to
+make the compiler fire. The remaining investigation starts from the live
+Toolkit tone handler/context, retaining indirect/interior-call uncertainty.
 
 ```sh
 .venv/bin/python tools/nsm1_toolkit_tone_boundary_check.py tmp/nsm1-pin-menu \
@@ -241,7 +250,7 @@ Add `--mame mame/mame` with a fresh output to reproduce. It also requires
 the ordinary hold fixture's exact prompts, no completion/physical Quit,
 native samples, authentication and unchanged complete storage. The tone
 screen therefore does not establish that a DSP tone request was published
-through this aperture. Trace the MCU-side callers before constructing a peer
+through this aperture. Trace the MCU-side request owner before constructing a peer
 reply; other transports, arbitrary time windows and physical clocks remain
 outside this absence result.
 
