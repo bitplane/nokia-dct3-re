@@ -10,7 +10,7 @@ import sys
 
 from mu4_aac_abi_check import check_refill_input, rows
 from mu4_context_contract import (SOURCE_SHA256, decode_mono_output, decode_pcm_conversion,
-                                  reference_pcm_conversion)
+                                  reference_pcm_conversion, decode_decoder_input_reserve)
 from mu4_recorder_media_inventory import adts_header
 from noki5510_a00_inventory import uploaded_word_image
 
@@ -49,7 +49,26 @@ def original_assets(encoded, reference, source):
             raise ValueError('requires unchanged original ISO inputs and R060 upload')
     words = uploaded_word_image(bytes.fromhex(source.decode('ascii')), 'aa99')
     decode_pcm_conversion(words)
+    decode_decoder_input_reserve(words)
     return decode_mono_output(words)
+
+
+def check_tail_reserve(text):
+    """Pin the observed AL09 rejection, not a general EOF or padding policy."""
+    expected = [dict(opcode='f6aa', candidate_index=candidate, reserve_limit='0040',
+                     extent='0048', remaining=remaining, identity='Execute_entry',
+                     observer_writes='0')
+                for candidate, remaining in (('0000', '0008'), ('0048', '0000'))]
+    if rows(text, 'mu4_aac_tail_reserve') != expected:
+        raise ValueError('original AL09 tail reserve observations changed')
+    markers = ('mu4_aac_session_return: call=342 ', 'mu4_aac_tail_reserve:',
+               'mu4_aac_wrapper_early_return:')
+    order = [marker for line in text.splitlines() for marker in markers if marker in line]
+    if order != [markers[0], markers[1], markers[1], markers[2]]:
+        raise ValueError('original AL09 tail reserve order changed')
+    return dict(extent_words=72, reserve_words=8, rejected_candidate=72,
+                reserve_limit=64, source_packet_bytes=147,
+                complete_stream=False, eof_policy_established=False)
 
 
 def check_stream(text, raw, converted, encoded, calls=342):
@@ -136,11 +155,14 @@ def check_stream(text, raw, converted, encoded, calls=342):
         word = reference_pcm_conversion(raw_values[2*sample] & 0xffffffff)['word']
         if any((output[2*sample+channel] & 0xffff) != word for channel in range(2)):
             raise ValueError('native mono conversion/duplication differs from source contract')
-    return dict(calls=calls, consumed_bytes=consumed, mono_samples=calls*1024,
+    result = dict(calls=calls, consumed_bytes=consumed, mono_samples=calls*1024,
                 input_reads=len(rows(text, 'mu4_aac_session_input_read')),
                 conformance=False, crc_validation=False, waveform_alignment=False,
                 complete_stream=False, handset_playback=False,
                 scope='Original packet acceptance and mono conversion only; final packet remains undecoded')
+    if calls == 342:
+        result['tail_reserve'] = check_tail_reserve(text)
+    return result
 
 
 def main():

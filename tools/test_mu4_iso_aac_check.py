@@ -3,7 +3,7 @@ import unittest
 
 from mu4_context_contract import (MONO_OUTPUT_BASE, MONO_OUTPUT_WITNESS,
                                   decode_mono_output)
-from mu4_iso_aac_check import check_stream, original_assets,compare_host_pcm
+from mu4_iso_aac_check import check_stream, original_assets,compare_host_pcm,check_tail_reserve
 
 
 def fixture(calls=6):
@@ -43,6 +43,27 @@ def fixture(calls=6):
 
 
 class IsoAacCheckTest(unittest.TestCase):
+    def test_original_tail_reserve_is_a_rejection_not_eof_completion(self):
+        lines = ['mu4_aac_session_return: call=342 result=0000',
+                 'mu4_aac_tail_reserve: opcode=f6aa candidate_index=0000 reserve_limit=0040 extent=0048 remaining=0008 identity=Execute_entry observer_writes=0',
+                 'mu4_aac_tail_reserve: opcode=f6aa candidate_index=0048 reserve_limit=0040 extent=0048 remaining=0000 identity=Execute_entry observer_writes=0',
+                 'mu4_aac_wrapper_early_return: result=ffff']
+        text = '\n'.join(lines)
+        result = check_tail_reserve(text)
+        self.assertEqual(result['reserve_words'], 8)
+        self.assertGreater(result['rejected_candidate'], result['reserve_limit'])
+        self.assertFalse(result['complete_stream'])
+        self.assertFalse(result['eof_policy_established'])
+        for field in ('opcode=f6aa', 'candidate_index=0048', 'reserve_limit=0040',
+                      'extent=0048', 'remaining=0008', 'identity=Execute_entry',
+                      'observer_writes=0'):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                check_tail_reserve(text.replace(field, field.split('=')[0]+'=invalid'))
+        for bad in (lines[:1]+lines[2:], lines[:2]+lines[1:],
+                    [lines[1], lines[0], *lines[2:]], lines[:-1]):
+            with self.assertRaises(ValueError):
+                check_tail_reserve('\n'.join(bad))
+
     def test_host_pcm_diagnostic_uses_first_source_and_no_fit(self):
         raw=struct.pack('<6i',0,999,16384,999,-32768,999)
         host=struct.pack('<4f',0,1/32768,-2/32768,0.25)

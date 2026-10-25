@@ -181,6 +181,26 @@ observed input reads bound to the unchanged source, then returns `ffff`
 before decoding the last 147-byte packet. The qualifier accepts this known
 short-input boundary, **not** full-stream success, CRC checking or conformance.
 
+The final rejection is now bound to the original skip helper's eight-word
+reserve, not inferred from the return code. At Execute entry`02442f`,
+the final call first compares candidate0 with limit`0040` and extent`0048`
+while eight reservoir bits remain. Its second comparison proposes
+candidate`0048` against the same limit`0040`, with no remaining bits.
+The pinned unsigned predicate rejects that candidate and rolls back its
+word-index increment. The early return retains cursor/base`17ee`,
+end`1836`, index0 and result`ffff`. The final1040-byte window starts at
+source byte63008 and ends exactly at64048: no odd source byte was discarded
+from this even-sized original input. Thus odd-byte packing alone cannot
+explain this rejection. The caller's required EOF/drain or lookahead policy
+remains open; do not bypass the reserve or append unlabelled bytes.
+
+`tmp/mu4-al09-tail-reserve` retains the read-only capture. The qualifier
+requires both reserve observations in order between successful call342
+and the early return, plus the source-pinned helper. Its350208-sample raw
+and converted outputs are byte-identical to the prior strict stream.
+This preserves the prefix while explaining the final-packet admission
+failure; it does not establish waveform alignment or complete decoding.
+
 At return, the observer sees source pointers `e800,f000`. Original AA99
 `023df6..023dfc` compares channel count `a89c` with one and aliases stack
 word 5 to word 6 for mono before conversion. Consequently only the first raw
@@ -188,8 +208,8 @@ pointer is a decoded-channel source; the other raw capture is not a second
 channel. All 350208 first-source words independently reproduce both native
 converted copies using the established argument-14 conversion. This is a
 conversion/dataflow result, not comparison against the ISO reference waveform.
-Alignment, applicable accuracy criteria, unquantized normalization and final
-packet handling remain open.
+Alignment, applicable accuracy criteria, unquantized normalization and the
+original caller's final-packet handling remain open.
 
 The optional`--ffmpeg ffmpeg` diagnostic decodes the same pinned ADTS input
 to mono float PCM and compares the complete native prefix at **zero offset**,

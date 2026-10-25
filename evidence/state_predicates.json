@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_al09_final_packet_reserve_rejection",
+      "owner": "native_aac_validation",
+      "status": "satisfied",
+      "predicate": "The original AL09 strict-input final-packet rejection reaches the source-pinned eight-word reserve guard without changing the decoded prefix",
+      "current": "Read-only Execute-entry observations at02442f in call343 show candidate0000/limit0040/extent0048/remaining0008, then candidate0048/limit0040/extent0048/remaining0000, followed by the existing ffff early return after342 successful calls and63901 consumed bytes. The unchanged original64048-byte source's final1040-byte window begins63008 and ends exactly at EOF; odd-byte truncation cannot explain this guard. All350208 mono-source raw samples and converted output remain byte-identical to the prior strict stream, with35011 source-owned input reads. The qualifier requires both ordered observations and the pinned original helper. This establishes the immediate admission failure, not the original caller's EOF/drain policy, permission to append lookahead, waveform alignment, complete-stream decoding, codec conformance or handset playback.",
+      "evidence": ["docs/aac_validation.md", "driver/mu4_storage_test.cpp", "tools/mu4_iso_aac_check.py", "tools/test_mu4_iso_aac_check.py", "tools/mu4_context_contract.py"]
+    },
+    {
       "id": "c54x_arithmetic_absolute_alias_admission",
       "owner": "tms320c54x",
       "status": "satisfied",

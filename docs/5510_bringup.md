@@ -2239,7 +2239,7 @@ CPU source SHA256 is
 `f162de390b239292cde6674d2fca61a4b49225659cb0d387ccb86ba55bd75c22`;
 fixture source SHA256 is
 `f179174d941b8de83ada72ba739a4589cb309942a53e6b68f1fe469aefe174ac`.
-All three still match after completion. Its5,690 distinct executable-opcode
+These identities were rechecked at completion. Its5,690 distinct executable-opcode
 assertions exactly match the preceding complete run, with no lost or added
 forms. Optional
 profiles retain their separate acceptance scopes; this run does not prove

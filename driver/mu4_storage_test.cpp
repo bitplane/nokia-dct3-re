@@ -6012,7 +6012,8 @@ public:
 		m_cpu->set_addrmap(AS_PROGRAM, &mu4_aac_test_state::program_map);
 		m_cpu->set_addrmap(AS_DATA, &mu4_aac_test_state::data_map);
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
-			if (address == 0x2442f && m_expected_calls == 174 && m_captured == 172)
+			if (address == 0x2442f && ((m_expected_calls == 174 && m_captured == 172) ||
+					(m_expected_calls == 343 && m_captured == 342)))
 			{
 				auto const disable = machine().disable_side_effects();
 				logerror("mu4_aac_tail_reserve: opcode=%04x candidate_index=%04x reserve_limit=%04x extent=%04x remaining=%04x identity=Execute_entry observer_writes=0\n",
