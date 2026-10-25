@@ -6,10 +6,11 @@ This is the processor-validation reference, separate from handset bring-up
 and loader ownership. The core implementation lives in
 `cpu/tms320c54x/`; executable acceptance lives in
 `driver/tms320c54x_test.cpp` and `tools/run_c54x_core.py`.
-The [default-suite checkpoint](#core-regression-checkpoint) is the current
-complete CPU regression. Other sections retain their explicitly bounded
+The [default-suite checkpoint](#core-regression-checkpoint) identifies the last
+fully qualified default run by executable and source hashes. A later focused
+fixture run does not silently renew that checkpoint. Other sections retain their explicitly bounded
 instruction, composition, original-firmware and negative-control scopes;
-their older executable hashes are not competing current baselines.
+their older executable hashes are not competing default-suite baselines.
 Passing CPU tests does not establish physical pipeline timing, a fitted
 handset DSP mask, RF acquisition or end-to-end speech.
 

@@ -2,6 +2,17 @@
 
 ## Current boundary
 
+Acceptance is profile-specific; these results must not be merged into a single
+claim that the5510 boots or that all recorder backends pass:
+
+| Composition | Accepted boundary | Not established |
+| --- | --- | --- |
+| `nmp5stage` / `nmp5hle` MCU | Own loader to missing resident code / graphical failure frame | Usable handset UI, SIM, RF or calls |
+| MU4 staged recorder, `bootrecmeta` and persistence gate | Original metadata save, retained storage and independent cold reopen | Complete recorded-file suffix or full playback |
+| MU4 atomic `bootrecsave` | Retained warm-return/timer negative control | Successful metadata delivery; this is not the staged recorder frontier |
+| MU4 staged `bootplaystage` | Bounded original decoding and digital output | Intended EOF/drain policy or whole-track waveform acceptance |
+| Standalone C54x instruction/codec controls | Their named matrices and original-code algorithm comparisons | Handset lifecycle, physical timing or native end-to-end speech |
+
 `make check-mu4-recorder-persistence` composes fresh original initialization,
 retained six-file readback, staged metadata save and a separate cold-open
 process. It uses the saved endpoint as its reopening input, verifies the
@@ -7943,7 +7954,7 @@ rejection. The independently verified stopped-PSC/read-only-TCR corrections
 did not change serial progress: RX/TX remained 36/47, with three responses,
 two ACKs and completion `8009`. Sampled handler PC and TIM depend on the
 observation phase; the replay below is the authoritative snapshot. The
-recorder acceptance checker still fails; passing timer-register conformance
+atomic `bootrecsave` recorder acceptance checker still fails; passing timer-register conformance
 must not promote it.
 A blanket return-instruction guard is not established by
 [SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf): section 6.10.7
@@ -8020,7 +8031,7 @@ Isolated replays after the MMR bus, INTR SP ordering and XC protection
 corrections distinguish this duplicate filter from the save fixture's CPU
 boundary. `tmp/mu4-recorder-control-xc/error.log` receives
 selector `36`/parameter `4` at 11.406 seconds with previous class/selector
-`1/36`; native receipt/acknowledgement passes, recording completion remains
+`1/36`; native receipt/acknowledgement passes in this atomic diagnostic, while recording completion remains
 unclaimed.
 With input-derived CLKMD rates and the C5416-compatible reset profile,
 `bootrecsave` receives control at 10.086 seconds with previous selector `49`.
@@ -8062,8 +8073,9 @@ Fresh original provisioning, reset/reload and fresh-process status service
 pass with this clock profile. The resulting NAND is byte-identical to the
 previous firmware-created source, without donor provisioning or a runtime
 snapshot. The independent complete-startup `bootstatus` gate also passes.
-The metadata gate currently fails at the stated receive boundary; that failure
-must not be treated as recorder acceptance. Use `bootrecord` for the initial
+The atomic `bootrecsave` metadata diagnostic fails at the stated receive boundary;
+this retained negative control does not contradict the staged `bootrecmeta`
+metadata/persistence acceptance above. Use `bootrecord` for the initial
 recorder-loader diagnostic.
 This runs in an isolated NAND copy, forbids NVRAM saving and verifies that
 the source disk file remains unchanged. `bootstatus` supplies the independent

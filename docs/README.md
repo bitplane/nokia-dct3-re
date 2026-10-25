@@ -46,7 +46,7 @@ distinction.
 | `6150_bringup.md` | NSM-1 compatibility boot/provisioning, physical UI/SIM/storage contracts and fitted DSP/radio prerequisites. |
 | `8810_bringup.md` | Own NSE-6 v6.02 graphical native compatibility fixture, upload geometry and unresolved native serial-control completion. |
 | `5210_bringup.md` | Validated NSM-5 v5.40 product contracts and remaining scope. |
-| `5510_bringup.md` | NPM-5 staged DSP/service frontier, erased NV journal and separate MU4/FBUS input ownership. |
+| `5510_bringup.md` | NPM-5 handset boundary and separate MU4 staged recording/storage/playback contracts; atomic negative controls are explicitly separate. |
 | `aac_validation.md` | Independent native music-decoder procedure, original reference fixtures and unresolved measurement contract. |
 | `8210_bringup.md` | NSM-3 normal/native boundary, acquired base-record research-HLE phone services, own PCM/audio and restoration acceptance. |
 | `8290_bringup.md` | Own NSB-7 uploads and explicit research-HLE UI, SIM security/storage/Toolkit, laboratory registration, host call/SMS signaling and restoration; native DSP/speech remain unproved. |
