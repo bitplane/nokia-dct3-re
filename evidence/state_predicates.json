@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_long_memory_absolute_alias_admission",
+      "owner": "tms320c54x",
+      "status": "satisfied",
+      "predicate": "Both frontends reject the tested long-memory arithmetic f9..ff forms before operand effects across restoration",
+      "current": "The unchanged-core long-abs-edge fixture fails at case56, its first atomic case, on a data transaction; ST0 changes1804->1004. The early guard now covers the5xxx memory family rather than DLD alone, preserving canonicalF8. All1568 cases/restores cover seven families (both DADD input selections, DSUB, DRSUB, DADST, DSUBT, DSADT), both destinations, seven aliases, CMPT, pages, frontends and two checkpoints. A/B/T/status and all ARs remain unchanged with zero data reads/writes. Legal long-pair controls separately pass18432 DADD/DSUB cases/restores and3584 MOD3 exclusions. This is model admission consistency, not silicon trap behavior, positive staged T-dependent arithmetic, all composition or native handset speech. Full-core and original-codec regressions retain separate checkpoint evidence.",
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+    },
+    {
       "id": "c54x_mvdk_actual_read_identity_scope",
       "owner": "tms320c54x",
       "status": "satisfied",
@@ -111,7 +119,7 @@
       "owner": "tms320c54x",
       "status": "satisfied",
       "predicate": "The complete default C54x fixture reaches terminal conformance with every required marker exactly once after the source-admission corrections",
-      "current": "The post-arithmetic-alias full run contains all293 required markers exactly once, core conformance PASS, expected MAME exit3 and runner exit0. Its5690 distinct executable-opcode assertions exactly equal the preceding full run, with zero added or removed forms. Tested binary SHA256355c73b2f2b0e6b6a34a4732a105140a72c3a41ee9dafb33d75f091dcf58ceb5, CPU sourcef162de390b239292cde6674d2fca61a4b49225659cb0d387ccb86ba55bd75c22 and fixture sourcef179174d941b8de83ada72ba739a4589cb309942a53e6b68f1fe469aefe174ac remain unchanged after completion. This includes load, memory-T multiply, MPY/MAC, LTD/DELAY, MACP/MACD, RMW, memory-logic and the tested scalar-arithmetic alias guards; optional rejection matrices retain separate scopes. Both atomic and staged native EFR decoder controls pass163 frames,26080 reference-exact samples and65440-word per-frame RAM replay on the same binary; the staged5110 Phone book menu remains exact. This checkpoint is not the entire ISA, measured physical timing, fitted DSP-mask compatibility, native RF or end-to-end handset speech.",
+      "current": "The post-long-memory-alias full run contains all293 required markers exactly once, core conformance PASS, expected MAME exit3, runner exit0 and interrupted=false. Its5690 distinct executable-opcode assertions exactly equal the preceding full run, with zero added or removed forms. Tested binary SHA2563052c86d7b236382c741300ad9a3ac5fe44decdb76b57c514431c0f0edc71f1f, CPU source3e06383c729b7bb0fb2d0dd33c2f018032cc7a304d801212c54b5f30233b05b0 and fixture sourcec561cd0f297d3f7ba9065dbefa05d6e5abab7575f36e1afa015770de48a79f54 remain unchanged after completion. This includes load, memory-T multiply, MPY/MAC, LTD/DELAY, MACP/MACD, RMW, memory-logic, scalar-arithmetic and long-memory arithmetic alias guards; optional rejection matrices retain separate scopes. Both atomic and staged native EFR decoder controls pass163 frames,26080 reference-exact samples and65440-word per-frame RAM replay on the same binary; the staged5110 Phone book menu remains exact. Tool acceptance passes5285 tests with one skip. This checkpoint is not the entire ISA, measured physical timing, fitted DSP-mask compatibility, native RF or end-to-end handset speech.",
       "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {

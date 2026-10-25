@@ -2232,34 +2232,59 @@ fixed:`tmp/c54x-arithmetic-alias-fixed/run_c54x_core_rjj2xv2d`;
 legal controls:`tmp/c54x-arithmetic-alias-legal-add/run_c54x_core_66hmi0hw`
 and`tmp/c54x-arithmetic-alias-legal-ar/run_c54x_core_icucz_yq`.
 
-## Core regression checkpoint
+### Long-memory arithmetic absolute aliases
 
-The default C54x suite passes with the source/RMW admission guards and
-atomic load, memory-T multiply, MPY/MAC, LTD/DELAY, MACP/MACD, RMW, memory-logic and scalar-arithmetic
-absolute-alias corrections.
-All 293 required markers appear exactly once, followed by core conformance
-PASS and intentional MAME exit 3; the isolated runner returns 0, with
-`interrupted=false`. The capture is
-`tmp/c54x-arithmetic-alias-full-regression/run_c54x_core_z5miw5dw`:
+Atomic long-memory arithmetic also treated unadmitted `f9..ff` operands as
+canonical absolute `f8`, unlike the staged frontend. The unchanged-core
+`long-abs-edge` control fails at case56, the first atomic case, on a data
+transaction; ST0 also changes from1804 to1004. The shared early admission
+guard now covers the full `5xxx` memory family before operand effects.
+Canonical `f8` remains admitted; this is emulator fail-closed consistency,
+not a silicon-trap claim or new staged support for T-dependent arithmetic.
+
+The1,568-case/restoration matrix covers seven families (both DADD input
+selections, DSUB, DRSUB, DADST, DSUBT and DSADT), two destinations,
+seven aliases, CMPT, two pages, both frontends and two checkpoints.
+A/B/T, status and every AR remain unchanged with zero data reads/writes.
+The legal long-pair control separately retains18,432 DADD/DSUB
+cases/restores and3,584 MOD3 exclusions. Other arithmetic composition
+and physical timing retain their independent scopes.
 
 ```sh
 .venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
-  --output-root tmp/c54x-arithmetic-alias-full-regression
+  --profile long-abs-edge --output-root tmp/c54x-long-alias-fixed
+.venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
+  --profile long-pair --output-root tmp/c54x-long-alias-fixed
+```
+
+## Core regression checkpoint
+
+The default C54x suite passes with the source/RMW admission guards and
+atomic load, memory-T multiply, MPY/MAC, LTD/DELAY, MACP/MACD, RMW, memory-logic, scalar-arithmetic
+and long-memory arithmetic absolute-alias corrections.
+All 293 required markers appear exactly once, followed by core conformance
+PASS and intentional MAME exit 3; the isolated runner returns 0, with
+`interrupted=false`. The capture is
+`tmp/c54x-long-alias-full/run_c54x_core_1q62jp7h`:
+
+```sh
+.venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
+  --output-root tmp/c54x-long-alias-full
 ```
 
 The recorded executable SHA256 is
-`355c73b2f2b0e6b6a34a4732a105140a72c3a41ee9dafb33d75f091dcf58ceb5`.
+`3052c86d7b236382c741300ad9a3ac5fe44decdb76b57c514431c0f0edc71f1f`.
 CPU source SHA256 is
-`f162de390b239292cde6674d2fca61a4b49225659cb0d387ccb86ba55bd75c22`;
+`3e06383c729b7bb0fb2d0dd33c2f018032cc7a304d801212c54b5f30233b05b0`;
 fixture source SHA256 is
-`f179174d941b8de83ada72ba739a4589cb309942a53e6b68f1fe469aefe174ac`.
+`c561cd0f297d3f7ba9065dbefa05d6e5abab7575f36e1afa015770de48a79f54`.
 These identities were rechecked at completion. Its5,690 distinct executable-opcode
 assertions exactly match the preceding complete run, with no lost or added
 forms. Optional
 profiles retain their separate acceptance scopes; this run does not prove
 the complete ISA, physical pipeline timing, fitted DSP-mask compatibility,
 native RF or end-to-end handset speech and calls. The separate tool suite passes
-5,267 tests (one skip). Revision-bound checkpoints below preserve their narrower
+5,285 tests (one skip). Revision-bound checkpoints below preserve their narrower
 instruction and original-firmware comparisons, not competing current
 default-suite baselines.
 
@@ -2268,7 +2293,7 @@ atomic and staged modes:163 frames,26,080 reference-exact PCM samples and
 65,440 ordinary RAM words replayed per frame. The staged NSE-1 physical
 Phone book menu oracle also remains exact. These are codec/component and
 handset-UI preservation controls, not native RF or call-media acceptance.
-The same binary also passes the full reset-bank6150 laboratory clocked-tone
+The preceding scalar-arithmetic checkpoint separately passed the full reset-bank6150 laboratory clocked-tone
 gate in `tmp/nsm1-post-arithmetic-native-tone`, preserving its cold-input, storage,
 SIM, pixel and waveform checks. This does not promote production audio clocks.
 
