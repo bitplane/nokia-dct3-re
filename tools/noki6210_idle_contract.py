@@ -52,6 +52,27 @@ def enable_predecessors(image):
         scope='R5-relative byte stores at offset12 and seven permission branches; excludes aliases and transitive helper writers')
 
 
+def wake_source_preparation(image):
+    """Own idle path acknowledges and unmasks IRQ3 before its deadline test."""
+    expected = {
+        0x4b0350: 0x2008, 0x4b0352: 0x4683,
+        0x4b0362: 0x4d3e,
+        0x4b03f6: 0x4658, 0x4b03f8: 0x7268,
+        0x4b03fa: 0x20f7, 0x4b03fc: 0x7ae9,
+        0x4b03fe: 0x4008, 0x4b0400: 0x72e8,
+    }
+    for address, opcode in expected.items():
+        if struct.unpack_from('>H', image, address-BASE)[0] != opcode:
+            raise ValueError('idle IRQ3 preparation differs')
+    literal = ((0x4b0362+4) & ~3) + (expected[0x4b0362] & 255)*4
+    if struct.unpack_from('>I', image, literal-BASE)[0] != 0x20000:
+        raise ValueError('idle IRQ3 MMIO base differs')
+    return dict(source=3, acknowledge_address='0x20009', acknowledge_value=8,
+                mask_address='0x2000b', mask_clear_bits=8,
+                preparation_before_deadline=True,
+                scope='Firmware source preparation only; does not establish the physical wake latch or global-enable behavior')
+
+
 def decode_blocks(image):
     """Validate complete blocks before interpreting their literals or successors."""
     for address, encoded in BLOCKS:
@@ -65,6 +86,7 @@ def decode_blocks(image):
             raise ValueError('clock-helper MMIO base differs')
     return {
         'permission_branch_inventory':enable_predecessors(image),
+        'wake_source_preparation':wake_source_preparation(image),
         'explicit_enable': '0x4b03ec', 'enable_value': 5,
         'guard_return': '0x4b040e', 'zero_guard_target': '0x4b0368',
         'nonzero_guard_target': '0x4b0412', 'clock_helper': '0x500a18',

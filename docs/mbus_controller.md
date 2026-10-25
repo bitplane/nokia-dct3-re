@@ -196,6 +196,17 @@ Capture:`tmp/npe3-mbus-late-sleep-decision`; the bounded observations do not
 identify whether the missing contract is clock-control semantics, wake
 delivery or another earlier lifecycle input.
 
+The own idle path explicitly prepares IRQ3 before that deadline decision:
+`4b0350..4b0352` retains bit mask08 in R11; `4b03f6..4b03f8`
+acknowledges it at CTSI+09, then `4b03fa..4b0400` clears bit3 of the
+CTSI+0b IRQ mask. `noki6210_idle_contract.py` now pins both operations,
+their MMIO base and register/value provenance with mutation tests. Thus
+IRQ3 preparation is an own-ROM fact, not merely a sibling's numeric label.
+It does not establish which hardware transition latches IRQ3, nor whether
+wake changes global delivery control. The NPE-3 profile still does not
+select the separately qualified 3310/3330 wake-report behavior; that is a
+bounded candidate for a controlled experiment, not a promoted hardware fix.
+
 Timer allocation/arming uses twelve-byte records based at`0x1001bc`
 (`0x3c19c4..0x3c19ca`), so index`c7` resolves exactly to`0x100b10`.
 The expiry dispatcher`0x3c1bb4` reads owner byte`+6` to select a task queue,

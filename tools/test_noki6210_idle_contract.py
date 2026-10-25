@@ -64,6 +64,23 @@ class IdleContractTest(unittest.TestCase):
             self.assertEqual(npe3[name], nam2[name], name)
         self.assertNotEqual(npe3['clock_helper'], nam2['clock_helper'])
 
+    @unittest.skipUnless(FLASH.exists(), 'requires own acquired NPE-3')
+    def test_wake_source_preparation_and_mutations(self):
+        image = FLASH.read_bytes()
+        result = contract.inspect(image)['wake_source_preparation']
+        self.assertEqual(result['source'], 3)
+        self.assertEqual(result['acknowledge_address'], '0x20009')
+        self.assertEqual(result['acknowledge_value'], 8)
+        self.assertEqual(result['mask_address'], '0x2000b')
+        self.assertEqual(result['mask_clear_bits'], 8)
+        for address in (0x4b0350, 0x4b0352, 0x4b0362, 0x4b045c,
+                        0x4b03f6, 0x4b03f8, 0x4b03fa, 0x4b03fc,
+                        0x4b03fe, 0x4b0400):
+            changed = bytearray(image)
+            changed[address-contract.BASE] ^= 1
+            with self.subTest(address=hex(address)), self.assertRaises(ValueError):
+                contract.wake_source_preparation(changed)
+
 
 if __name__ == '__main__':
     unittest.main()
