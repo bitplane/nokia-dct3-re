@@ -837,6 +837,41 @@ Synthetic checker controls cover zero, two and other return classes, but
 only zero is runtime-qualified here. Tested executable SHA256:
 `41800b61c13a18396ffa20437c43b033c04e5581b08b96cb9ce3007f58060e0b`.
 
+`worker_reservation` identifies the local meaning of the15d9 activity term.
+The79-word contract includes the worker's acquisition prefix, the delayed
+wrapper`02044a` and count-consumer prefix`020182`. A complete literal
+scan of49843 mapped AA99 words finds seven15d9 references: four direct
+literal writes (two to1, two to0) and three reads. This is not closure over
+computed/indirect writers. The worker permits work when15d9 or context[22]
+is nonzero. If15d9 is zero, it calls02044a with the context; that wrapper
+places AR2 at context+22 before020182 decrements the count. The worker then
+sets15d9=1. An already nonzero flag bypasses a fresh acquisition; the
+decoded zero-result path clears it. Model tests exhaust the unsigned count
+domain for both literal flag states, without assigning physical units or
+queue capacity. Helper callbacks beyond the pinned prefix remain open.
+
+Fresh read-only capture`tmp/mu4-context-count` qualifies four entry-state
+cycles on context`d796`: `(flag,count)=(0,1) -> (1,0) -> (0,0)` at gate,
+decoder call and common refresh. Its35 actual CPU operand bus reads of
+counter`d7ac` have captured instruction ownership: four at`0201ca/6b83`
+read0 for the source-pinned ADDM#1, four at`020182/6b82` read1 for the
+decrement, and27 at`0293b3/1ae6` implement the gate. DMA, debugger peeks
+and forwarded operands are excluded by the CPU read-identity API. These
+are read ownership plus entry-state agreement, not observed write ownership
+or instruction retirement. No missing hardware-ready event is established
+by this local gate; forcing15d9 would bypass acquisition state.
+
+```sh
+.venv/bin/python tools/mu4_decoder_gate_check.py \
+  tmp/mu4-context-count/error.log --counter-producers
+```
+
+The full call/branch qualifiers also pass on this fresh run. Tested binary
+SHA256:`562c0a8be985cc88ee300cbc04f0fe15ccb5698f860a87583eb13d6f025d6c19`.
+The downstream pointer/callback ownership and original one-pass cleanup's
+drain policy remain separate questions; this does not qualify whole-track
+decoding, physical clocks, codec conformance, handset boot or speech.
+
 ### Declared Packet-Lookahead Control
 
 `tools/mu4_aac_lookahead_fixture.py` preserves all original 65339 bytes and

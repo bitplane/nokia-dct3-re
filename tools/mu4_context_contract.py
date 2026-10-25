@@ -703,6 +703,54 @@ PLAYBACK_INFO_QUERY_WITNESSES = (
 
 DECODER_METHOD_PREFIX_BASE = 0xc686
 DECODER_RETURN_BASE = 0x293cf
+WORKER_RESERVATION_WITNESSES = (
+    (0x293b0,(0x7211,0x15d9,0x4811,0x1ae6,0x16,0xf845,0x940b,
+              0x10f8,0x15d8,0xf844,0x93be,0x76f8,0x15d8,1,0x6c81,0x93c6,
+              0x4816,0xf982,0x44a,0x76f8,0x15d9,1)),
+    (0x2044a,(0xf6be,0x8812,0xf495,0xf495,0xf274,0x182,0x6dea,0x16,0xf7be,0xf4e4)),
+    (0x20182,(0x6b82,0xffff,0x108a,0xfa45,0x18f,0x718a,0x13,
+              0x4a12,0xe734,0xf074,0x478,0x8a12,0xf495)),
+    (0x29321,(0x7211,0x15d9)),
+    (0x29334,(0x76f8,0x15d9,1)),
+    (0x2935c,(0x76f8,0x15d9,0)),
+    (0x293e1,(0x76f8,0x15d9,0)),
+    (0x201ca,(0x6b83,1)),
+    (SERVICE_GATE_BASE,SERVICE_GATE_WITNESS),
+)
+
+
+def decode_worker_reservation(words):
+    for base,witness in WORKER_RESERVATION_WITNESSES:
+        if any(words.get(base+offset)!=value for offset,value in enumerate(witness)):
+            raise ValueError('worker reservation source changed or absent')
+    hits = sorted(address for address,value in words.items() if value == 0x15d9)
+    if hits != [0x204c6,0x29322,0x29335,0x2935d,0x293b1,0x293c4,0x293e2]:
+        raise ValueError('worker15d9 literal census changed')
+    return dict(pinned_words=sum(len(w) for _,w in WORKER_RESERVATION_WITNESSES),
+        mapped_words_scanned=len(words),literal_references=[f'{a:06x}' for a in hits],
+        direct_literal_writes={'029334':1,'02935c':0,'0293c3':1,'0293e1':0},
+        gate='15d9 OR context[22] must be nonzero',
+        acquisition='If15d9 is zero after the gate, call02044a(context), then write15d9=1',
+        helper=dict(wrapper='02044a..020453; delayed MAR places AR2 at context+22 before020182',
+                    prefix='decrement word[AR2], load updated count while decrementing AR2',
+                    callback='nonzero updated count calls020478 before the common02018f continuation',
+                    scope='Pinned prefix only; callback/continuation effects and physical queue capacity remain open'),
+        retention='A nonzero15d9 bypasses a fresh count acquisition; the decoded zero-result path clears it',
+        increment='0201ca ADDM #1,*AR3; runtime target ownership must be established separately',
+        scope='Local counted-context reservation contract and exact literal census; not all computed writers, full helper call effects, downstream ownership, physical units or EOF/drain completion')
+
+
+def reference_worker_reservation(held,count):
+    """Gate and immediate decrement only, before unclosed callback effects."""
+    if type(held) is not int or held not in (0,1) or type(count) is not int or not 0 <= count <= 0xffff:
+        raise ValueError('reservation model requires literal flag0/1 and unsigned count')
+    eligible = bool(held or count)
+    acquire = eligible and not held
+    return dict(eligible=eligible,acquire=bool(acquire),
+                count_after_decrement=count-int(acquire),
+                flag_after_acquisition=1 if acquire else held)
+
+
 DECODER_RETURN_WITNESS = (
     0x8811,0x71e6,0x12,0xba9c,0xf020,0x15ee,0x8000,0x10f8,0x15eb,0xf982,0x9873,
     0x10f8,0x15f0,0x6ff8,0x15f0,0xc81,0x6c81,0x93f1,0x76f8,0x15d9,0,
@@ -2806,6 +2854,7 @@ def contract(source):
     result['decoder_mapped_alu'] = decode_decoder_mapped_alu(rel_words)
     result['decoder_dispatch'] = decode_decoder_dispatch(rel_words)
     result['decoder_return_dispatch'] = decode_decoder_return_dispatch(rel_words)
+    result['worker_reservation'] = decode_worker_reservation(rel_words)
     result['decoder_method_prefix'] = decode_decoder_method_prefix(rel_words)
     result['decoder_info_body'] = decode_decoder_info_body(rel_words,bootstrap_words)
     result['decoder_info_helpers'] = decode_decoder_info_helpers(rel_words,bootstrap_words)

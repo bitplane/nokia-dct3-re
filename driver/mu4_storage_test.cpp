@@ -986,6 +986,7 @@ private:
 	static constexpr u32 PLAYBACK_DAC_FRAME_CAP = 2'000'000;
 	u32 m_playback_decoded_hash = 2166136261U, m_playback_decoded_words = 0;
 	u32 m_decoder_gate_events = 0, m_decoder_gate_bad = 0;
+	u32 m_context_count_reads = 0;
 	u32 m_playback_slot_hash = 2166136261U;
 	u32 m_playback_dma_hash = 2166136261U;
 	std::array<double, 2> m_playback_audio_last_nonzero{};
@@ -1992,6 +1993,8 @@ private:
 		finish_playback_capture();
 		logerror("mu4_decoder_gate_terminal: events=%u bad=%u capped=%u first=9.640000000 last=9.860000000 t=%.9f identity=Execute_entry operands=context_only observer_writes=0\n",
 			m_decoder_gate_events,m_decoder_gate_bad,unsigned(m_decoder_gate_events>512),machine().time().as_double());
+		logerror("mu4_context_count_terminal: reads=%u capped=%u address=d7ac first=9.640000000 last=9.860000000 t=%.9f identity=Access_bus observer_writes=0\n",
+			m_context_count_reads,unsigned(m_context_count_reads>256),machine().time().as_double());
 		logerror("mu4_playback_method_terminal: entry=%u early=%u body=%u returned=%u result=%u publish=%u opcode_mismatch=%u selection=first_verified_aa99_session identity=Execute_entry observer_writes=0 audio_acceptance=0\n",
 			m_playback_method_entries[0], m_playback_method_entries[1], m_playback_method_entries[2],
 			m_playback_method_entries[3], m_playback_method_entries[4], m_playback_method_entries[5], m_playback_method_mismatch);
@@ -3038,6 +3041,19 @@ private:
 			}
 			if (playback_profile())
 			{
+				// Own initialized D796 context, word22. This observes CPU operand
+				// reads, not write ownership, instruction retirement or queue capacity.
+				m_cpu->space(AS_DATA).install_read_tap(0xd7ac,0xd7ac,"mu4_context_count_read",
+					[this](offs_t address,u16 &value,u16 mask) {
+						if (!m_playback_overlay_checked || m_playback_execute_entries[1]!=1 || machine().side_effects_disabled()) return;
+						double const time=machine().time().as_double();
+						if (time<9.64 || time>9.86) return;
+						u32 instruction; u16 opcode;
+						if (!m_cpu->observe_staged_data_read(address,instruction,opcode)) return;
+						if (++m_context_count_reads>256) return;
+						logerror("mu4_context_count_read: ordinal=%u address=%04x instruction=%06x opcode=%04x word=%04x mask=%04x t=%.9f identity=Access_bus observer_writes=0\n",
+							m_context_count_reads,unsigned(address),instruction,opcode,value,mask,time);
+					});
 				m_cpu->space(AS_DATA).install_write_tap(0x23, 0x23, "mu4_playback_dxr_owner",
 					[this](offs_t address, u16 &value, u16 mask) {
 						if (!m_playback_overlay_checked || machine().side_effects_disabled()) return;
@@ -3697,6 +3713,7 @@ private:
 		m_playback_tx_event_hash = 2166136261U; m_playback_tx_events = 0;
 		m_playback_decoded_hash = 2166136261U; m_playback_decoded_words = 0;
 		m_decoder_gate_events = m_decoder_gate_bad = 0;
+		m_context_count_reads = 0;
 		for (unsigned i=0;i<3;++i)
 		{
 			auto &stream=m_playback_word_capture[i];

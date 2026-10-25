@@ -36,6 +36,8 @@ from tools.mu4_context_contract import DECODER_INPUT_DESCRIPTOR_WITNESSES, decod
 from tools.mu4_context_contract import DECODER_INPUT_RESERVE_BASE, DECODER_INPUT_RESERVE_WITNESS, decode_decoder_input_reserve
 from tools.mu4_context_contract import (DECODER_RETURN_BASE, DECODER_RETURN_WITNESS,
     DECODER_RETURN_WRAPPERS, decode_decoder_return_dispatch, reference_decoder_return_route)
+from tools.mu4_context_contract import (WORKER_RESERVATION_WITNESSES,
+    decode_worker_reservation,reference_worker_reservation)
 from tools.mu4_context_contract import PLAYBACK_INFO_QUERY_WITNESSES, decode_playback_info_query
 from tools.mu4_context_contract import PLAYBACK_BUFFER_REFRESH_BASE, PLAYBACK_BUFFER_REFRESH_WITNESS, decode_playback_buffer_refresh
 from tools.mu4_context_contract import playback_final_input_words, decode_playback_final_input
@@ -88,6 +90,32 @@ from tools.mu4_context_contract import RECORD_WINDOW_BASE, RECORD_WINDOW_WITNESS
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_worker_reservation_source_and_literal_census(self):
+        words = {base+i:value for base,witness in WORKER_RESERVATION_WITNESSES
+                 for i,value in enumerate(witness)}
+        result = decode_worker_reservation(words)
+        self.assertEqual(len(result['literal_references']),7)
+        self.assertEqual(result['direct_literal_writes'],
+                         {'029334':1,'02935c':0,'0293c3':1,'0293e1':0})
+        for address in words:
+            changed = dict(words)
+            changed[address] ^= 1
+            with self.subTest(address=hex(address)),self.assertRaises(ValueError):
+                decode_worker_reservation(changed)
+        with self.assertRaisesRegex(ValueError,'literal census'):
+            decode_worker_reservation(words | {0x2ffff:0x15d9})
+
+    def test_worker_reservation_preserves_an_existing_acquisition(self):
+        for count in range(0x10000):
+            self.assertEqual(reference_worker_reservation(1,count),dict(
+                eligible=True,acquire=False,count_after_decrement=count,flag_after_acquisition=1))
+            self.assertEqual(reference_worker_reservation(0,count),dict(
+                eligible=count!=0,acquire=count!=0,count_after_decrement=max(0,count-1),
+                flag_after_acquisition=int(count!=0)))
+        for held,count in ((2,1),(-1,1),(True,1),(0,-1),(0,0x10000),(0,True)):
+            with self.subTest(held=held,count=count),self.assertRaises(ValueError):
+                reference_worker_reservation(held,count)
+
     def test_decoder_return_routes_pin_every_local_word(self):
         words = {base+offset:value
                  for base,witness in ((DECODER_RETURN_BASE,DECODER_RETURN_WITNESS),

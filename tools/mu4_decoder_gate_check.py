@@ -8,10 +8,10 @@ import sys
 
 if __package__:
     from .mu4_playback_frame_check import rows
-    from .mu4_context_contract import reference_decoder_return_route
+    from .mu4_context_contract import reference_decoder_return_route, reference_worker_reservation
 else:
     from mu4_playback_frame_check import rows
-    from mu4_context_contract import reference_decoder_return_route
+    from mu4_context_contract import reference_decoder_return_route, reference_worker_reservation
 
 SITES = dict(zip(
     (0x2936d, 0x293a2, 0x293a8, 0x293aa, 0x293ad, 0x293ae,
@@ -126,14 +126,101 @@ def check_return_routes(text):
     return result
 
 
+def check_activity_cycles(text):
+    """Require bounded entry-state agreement, not complete queue ownership."""
+    report = check_return_routes(text)
+    events = rows(text, 'mu4_decoder_gate')
+    starts = [i for i,event in enumerate(events) if int(event['address'],16)==0x293cd]
+    if len(starts)!=len(report['return_routes']):
+        raise ValueError('activity and complete-return coverage differ')
+    gates = [i for i,event in enumerate(events) if int(event['address'],16)==0x293b5]
+    for i in gates:
+        state = reference_worker_reservation(int(events[i]['activity'],16),
+                                            int(events[i]['context_activity'],16))
+        passed = int(events[i+1]['address'],16)==0x293b7
+        if state['eligible']!=passed:
+            raise ValueError('activity branch and entry-state model differ')
+    cycles,previous = [],-1
+    for start,route in zip(starts,report['return_routes']):
+        candidates = [i for i in gates if previous<i<start]
+        if not candidates or route['result']!='0000':
+            raise ValueError('missing acquisition context or changed zero-result control')
+        gate = events[candidates[-1]]
+        state = reference_worker_reservation(int(gate['activity'],16),int(gate['context_activity'],16))
+        entered = events[start]
+        refresh = next(event for event in events[start+1:] if int(event['address'],16)==0x293fe)
+        contexts = [int(event['context'],16) for event in (gate,entered,refresh)]
+        if not state['eligible'] or len(set(contexts))!=1 or not 0x60<=contexts[0]<=0xffe9:
+            raise ValueError('activity context identity or eligibility changed')
+        if (int(entered['activity'],16)!=state['flag_after_acquisition'] or
+                int(entered['context_activity'],16)!=state['count_after_decrement'] or
+                int(refresh['activity'],16)!=0):
+            raise ValueError('reservation acquisition or zero-result flag release changed')
+        cycles.append(dict(ordinal=len(cycles)+1,context=f'{contexts[0]:04x}',
+                           before_flag=int(gate['activity'],16),before_count=int(gate['context_activity'],16),
+                           call_flag=int(entered['activity'],16),call_count=int(entered['context_activity'],16),
+                           refresh_flag=int(refresh['activity'],16),
+                           refresh_count=int(refresh['context_activity'],16)))
+        previous = start
+    report['activity_cycles'] = cycles
+    report['activity_scope'] = ('Observed entry-state agreement with the source prefix; helper callbacks '
+                                'and indirect writers are not closed, physical queue capacity/units '
+                                'and EOF/drain completion remain unqualified')
+    return report
+
+
+def check_counter_producers(text):
+    """Identify actual operand-read owners; this does not observe their writes."""
+    report = check_activity_cycles(text)
+    reads = rows(text,'mu4_context_count_read')
+    terminals = rows(text,'mu4_context_count_terminal')
+    if len(terminals)!=1 or not reads:
+        raise ValueError('missing counter-read inventory')
+    end = terminals[0]
+    if (int(end['reads'])!=len(reads) or len(reads)>256 or end['capped']!='0' or
+            end['address']!='d7ac' or end['identity']!='Access_bus' or
+            (float(end['first']),float(end['last']))!=tuple(report['window']) or
+            float(end['t'])<float(end['last'])):
+        raise ValueError('incomplete or changed counter-read scope')
+    owners,increment,decrement = Counter(),[],[]
+    previous = float(end['first'])
+    for ordinal,event in enumerate(reads,1):
+        when = float(event['t'])
+        if (int(event['ordinal'])!=ordinal or not previous<=when<=float(end['last']) or
+                event['address']!='d7ac' or event['mask']!='ffff' or
+                event['identity']!='Access_bus' or not 0<=int(event['word'],16)<=0xffff):
+            raise ValueError('counter-read identity or chronology changed')
+        previous = when
+        owner = event['instruction'],event['opcode']
+        owners[owner] += 1
+        if owner==('0201ca','6b83'):
+            increment.append(int(event['word'],16))
+        if owner==('020182','6b82'):
+            decrement.append(int(event['word'],16))
+    acquired_counts = [cycle['before_count'] for cycle in report['activity_cycles'] if cycle['before_flag']==0]
+    if 0 not in increment or decrement!=acquired_counts:
+        raise ValueError('counter producer or acquisition-read control changed')
+    report['counter_reads'] = dict(total=len(reads),increment_reads=len(increment),
+        increment_before_values=dict(sorted(Counter(increment).items())),
+        decrement_reads=len(decrement),owners=[dict(instruction=pc,opcode=op,reads=count)
+                                             for (pc,op),count in sorted(owners.items())],
+        scope='Actual CPU operand-read ownership and bounded entry-state agreement; '
+              'not write ownership, retirement, all producers, queue capacity, clocks or EOF completion')
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     parser.add_argument('--returns', action='store_true', help='require complete observed post-metadata return routes')
+    parser.add_argument('--activity', action='store_true', help='also qualify counted-context reservation entry states')
+    parser.add_argument('--counter-producers', action='store_true', help='also require actual CPU count increment/decrement operand reads')
     args = parser.parse_args()
     try:
         text = args.log.read_text()
-        print(json.dumps((check_return_routes if args.returns else check)(text), indent=2))
+        checker = (check_counter_producers if args.counter_producers else check_activity_cycles
+                   if args.activity else check_return_routes if args.returns else check)
+        print(json.dumps(checker(text), indent=2))
     except (ValueError, KeyError, OSError) as error:
         print(f'decoder gate check: {error}', file=sys.stderr)
         return 1

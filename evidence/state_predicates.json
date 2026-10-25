@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_native_counted_context_reservation",
+      "owner": "native_aac_validation",
+      "status": "satisfied",
+      "predicate": "The native late worker's15d9/context22 gate follows a source-pinned counted-context acquisition and zero-result release cycle",
+      "current": "A79-word source contract plus complete49843-word literal scan identifies seven15d9 references and four direct literal writes, without excluding computed aliases. If the flag is zero and context22 nonzero, wrapper02044a leads to the count decrement at020182 before the worker sets15d9=1; a nonzero flag bypasses fresh acquisition and the zero-result branch clears it. A host model exhausts both literal flag states and all65536 unsigned counts before unclosed helper effects. Fresh tmp/mu4-context-count entry observations qualify four D796 cycles(0,1)->(1,0)->(0,0). CPU actual-read identity captures35 bus reads of D7AC: four0201ca/6b83 reads of0 for ADDM#1, four020182/6b82 reads of1 for decrement, and27 gate reads0293b3/1ae6. No peeks, DMA or forwarded operands are promoted to CPU bus ownership. Binary SHA256562c0a8be985cc88ee300cbc04f0fe15ccb5698f860a87583eb13d6f025d6c19. This is read ownership and bounded entry-state agreement, not write ownership, retirement, full indirect-writer/callback closure, physical units/capacity/clocks, EOF drain completion, handset boot or speech.",
+      "evidence": ["docs/aac_validation.md", "driver/mu4_storage_test.cpp", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "tools/mu4_decoder_gate_check.py", "tools/test_mu4_decoder_gate_check.py"]
+    },
+    {
       "id": "mu4_native_late_decoder_zero_routes",
       "owner": "native_aac_validation",
       "status": "satisfied",
