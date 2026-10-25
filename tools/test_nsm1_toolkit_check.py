@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 from tools import nsm1_toolkit_check as checker
 from tools.sim_toolkit_display_check import DISPLAY, RESPONSE
-from tools.sim_toolkit_interactive_check import INKEY,INPUT,INKEY_RESPONSE,INPUT_RESPONSE,MENU,MENU_RESPONSE,SELECT_ITEM,ITEM_RESPONSE,REFRESH,REFRESH_RESPONSE
+from tools.sim_toolkit_interactive_check import INKEY,INPUT,INKEY_RESPONSE,INPUT_RESPONSE,MENU,MENU_RESPONSE,SELECT_ITEM,ITEM_RESPONSE,REFRESH,REFRESH_RESPONSE,PLAY_TONE,TONE_CANCEL_RESPONSE
 from tools.test_nsm1_native_state_check import trace as startup
 
 
@@ -82,6 +82,39 @@ def refresh_trace():
 
 
 class Nsm1ToolkitTest(unittest.TestCase):
+    def test_tone_native_observation_requires_three_uncapped_nonstopped_samples(self):
+        text='\n'.join(f'nsm1_toolkit_tone_native: phase={p} pc=47a1 idle=0 stop=0 t={t:.9f} observer_writes=0'
+                       for p,t in (('before',85),('active',87),('after',91)))
+        self.assertEqual(len(checker.check_tone_native(text)),3)
+        for bad in (text.replace('stop=0','stop=1',1),text.split('\n',1)[1],
+                    text+'\nnsm1_toolkit_tone_native: malformed',
+                    text.replace('87.000000000','86.000000000'),text.replace('observer_writes=0','observer_writes=1')):
+            with self.assertRaises(ValueError):
+                checker.check_tone_native(bad)
+
+    def test_tone_cancel_and_no_key_control_are_distinct(self):
+        base=menu_trace().replace('ins=c2 sw=9000','ins=c2 sw=911c')
+        base+='\n'+wire('TX',bytes.fromhex('a01200001c'))+'\n'+wire('RX',PLAY_TONE+b'\x90\x00')
+        checker.check_trace(base,tone='hold')
+        action='\nnsm1_toolkit_tone: action=quit down=1\nnsm1_toolkit_tone: action=quit down=0'
+        response=wire('TX',bytes.fromhex('a01400000c')+TONE_CANCEL_RESPONSE)
+        complete=base+action+'\n'+response+'\nSIM status ins=14 sw=9000 chv=3/3 puk=10/10 enabled=1'
+        checker.check_trace(complete,tone='cancel')
+        for bad in (complete.replace(action,''),
+                    complete.replace(response,response.replace('data=11 ','data=00 ')),
+                    complete.replace('ins=c2 sw=911c','ins=c2 sw=9000'),
+                    complete.replace(wire('RX',PLAY_TONE+b'\x90\x00'),wire('RX',PLAY_TONE[:-1]+b'\x03\x90\x00')),
+                    action+complete.replace(action,''),
+                    complete+'\nnsm1_toolkit_tone: malformed'):
+            with self.subTest(tail=bad[-90:]),self.assertRaises(ValueError):
+                checker.check_trace(bad,tone='cancel')
+        for text,mode in ((complete,'hold'),(base,'cancel')):
+            with self.assertRaises(ValueError):
+                checker.check_trace(text,tone=mode)
+        for kwargs in (dict(control=True),dict(select_item=True),dict(refresh=True),dict(menu_item=2)):
+            with self.assertRaises(ValueError):
+                checker.profile_for(tone='cancel',**kwargs)
+
     def test_refresh_requires_reprofile_before_success_and_own_payload(self):
         text=refresh_trace()
         checker.check_trace(text,refresh=True)

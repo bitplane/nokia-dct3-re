@@ -17,9 +17,15 @@ SELECT_ITEM = bytes.fromhex('d0208103072400820281828506') + b'Choose' + bytes.fr
 ITEM_RESPONSE = bytes.fromhex('810307240002028281030100100102')
 REFRESH = bytes.fromhex('d009810309010082028182')
 REFRESH_RESPONSE = bytes.fromhex('810309010002028281030100')
+PLAY_TONE = bytes.fromhex('d01a81030c2000820281038508')+b'SAT tone'+bytes.fromhex('8e011084020102')
+TONE_CANCEL_RESPONSE = bytes.fromhex('81030c200002028281030111')
 
 
-def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_item=None, select_item=False, refresh=False):
+def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_item=None, select_item=False, refresh=False, tone=None):
+    if tone is not None:
+        if tone not in ('cancel','hold') or select_item or refresh or menu_item not in (None,1):
+            raise ValueError('PLAY TONE requires distinct Continue profile')
+        menu_item=1
     if refresh:
         if select_item or menu_item not in (None,1):
             raise ValueError('REFRESH requires distinct Continue profile')
@@ -60,6 +66,12 @@ def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_
                      (0x14,0,0,len(REFRESH_RESPONSE),REFRESH_RESPONSE)]
         if rx.count(REFRESH+b'\x90\x00') != 1:
             raise ValueError('missing unique REFRESH payload')
+    if tone is not None:
+        expected.append((0x12,0,0,len(PLAY_TONE),b''))
+        if tone=='cancel':
+            expected.append((0x14,0,0,len(TONE_CANCEL_RESPONSE),TONE_CANCEL_RESPONSE))
+        if rx.count(PLAY_TONE+b'\x90\x00') != 1:
+            raise ValueError('missing unique PLAY TONE payload')
     if [row[:5] for row in commands if row[0] in (0x10,0x12,0x14,0xc2)] != expected:
         raise ValueError('interactive profile/FETCH/response sequence differs')
     if 'read-binary fid=6fae offset=0 length=1 first=03' not in text or text.count('SIM completion ins=f2 sw=9116') != 1:
@@ -67,10 +79,10 @@ def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_
     results=[(0x9115,3,10),(0x911a,3,10),(0x9000,3,10)]
     if menu_item is not None:
         results[-1:]=[(0x9128,3,10),(0x9000,3,10)]
-    if select_item or refresh:
+    if select_item or refresh or tone=='cancel':
         results.append((0x9000,3,10))
     if (statuses(text,0x10) != [(0x9000,3,10)]*(2 if refresh else 1) or statuses(text,0x14) != results
-            or statuses(text,0xc2) != ([(0x910b if refresh else 0x9122 if select_item else 0x9000,3,10)] if menu_item is not None else [])):
+            or statuses(text,0xc2) != ([(0x911c if tone is not None else 0x910b if refresh else 0x9122 if select_item else 0x9000,3,10)] if menu_item is not None else [])):
         raise ValueError('interactive response status differs')
     marker = prefix+'_toolkit_physical: action=dismiss'
     if re.findall(re.escape(marker)+r' down=([01]) t=([0-9.]+)',text) != [('1','68.000000000'),('0','68.200000000')]:
@@ -113,3 +125,12 @@ def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_
                 or sum(row[0]==0x14 for row in apdus(wire(before,'TX',prefix))) != 4
                 or SELECT_ITEM+b'\x90\x00' not in wire(before,'RX',prefix)):
             raise ValueError('follow-up response precedes physical confirmation')
+    if tone is not None:
+        marker=prefix+'_toolkit_tone: action=quit'
+        actions=re.findall(re.escape(marker)+r' down=([01])',text)
+        if actions != (['1','0'] if tone=='cancel' else []) or text.count(prefix+'_toolkit_tone:') != len(actions):
+            raise ValueError('physical tone cancellation differs')
+        if tone=='cancel':
+            before=text.split(marker+' down=1',1)[0]
+            if len(statuses(before,0x14)) != 4 or PLAY_TONE+b'\x90\x00' not in wire(before,'RX',prefix):
+                raise ValueError('tone cancellation precedes command or response precedes physical Quit')

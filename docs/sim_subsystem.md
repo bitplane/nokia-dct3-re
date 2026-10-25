@@ -585,6 +585,11 @@ firmware-owned settings update; card/flash stay unchanged. Full re-read wire
 capture uses an explicit higher observation cap, not a relaxed storage gate
 (`--refresh`; details in6150_bringup.md). A later application restart is not
 qualified by this92s window.
+The6150 independently presents PLAY TONE and physically cancels it with
+result11, returning to the installed menu with unchanged whole storage.
+The matched no-key control remains pending through92s despite three nonstopped
+native samples. This is a cancellation contract, not timed/audible playback
+(`nsm1_toolkit_check.py --tone cancel` / `--tone hold`).
 The6150 pending DISPLAY TEXT also survives native save/load with one FETCH,
 two physical successful completions and exact observed architecture/I/O/pixel
 replay, preserving complete persistent storage (`nsm1_toolkit_state_check.py`).

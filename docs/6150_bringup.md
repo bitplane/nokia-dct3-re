@@ -177,6 +177,40 @@ physical ordering, whole storage and reviewed frame checks. It qualifies
 REFRESH re-profiling and idle return, not the later restarted application
 cycle, RF registration, sustained native operation or fitted-mask fidelity.
 
+### Toolkit PLAY TONE cancellation boundary
+
+The independent external profile11 pair follows the same own authentication,
+text/input/menu route. Physical Continue86 receives911c and FETCH28 retrieves
+`d01a81030c200082028103850853415420746f6e658e011084020102`.
+The87s frame reads `SAT tone` with a Quit softkey. Physical Right Softkey89
+returns `81030c200002028281030111` (user termination), accepted9000, and91s
+reproduces the exact installed Continue/Exit menu. The matched no-Quit process
+instead retains the same prompt through91s and sends no PLAY TONE terminal
+response through the92s horizon. No timeout result is supplied by the harness.
+
+```sh
+.venv/bin/python tools/nsm1_toolkit_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-toolkit-tone-cancel-qualified --tone cancel
+.venv/bin/python tools/nsm1_toolkit_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-toolkit-tone-hold-qualified --tone hold
+```
+
+Add `--mame mame/mame` with fresh outputs to execute. Both preserve the full
+qualified16KiB EEPROM, original3570-byte PIN-enabled card and own flash.
+Exact APDU/payload/status/physical ordering and product-owned frames are
+required; the hold control rejects a completion or extra Quit. Read-only
+samples before85s, active87s and after91s show native DSP PC47a1, IDLE0 and
+ILLEGAL0 in each run. The observer labels the last field `stop` so a passive
+zero register value is not mistaken for an execution-error diagnostic.
+These samples are bounded no-stop evidence, not complete instruction coverage.
+
+This proves firmware presentation and physical cancellation, not timed tone
+completion, audible output or native speech. Only the inactive reset-time HLE
+tone publication is logged; no active HLE tone is synthesized. The tone request
+and its native completion/codec path still need product-local tracing before
+assigning the missing behavior to a DSP opcode, peer or physical clock. The
+piezo-buzzer path must not be substituted for this DSP-controlled tone route.
+
 ### Pending Toolkit command restoration
 
 An independent74s cold profile1 process saves at65s while the organically
