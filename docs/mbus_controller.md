@@ -204,8 +204,16 @@ their MMIO base and register/value provenance with mutation tests. Thus
 IRQ3 preparation is an own-ROM fact, not merely a sibling's numeric label.
 It does not establish which hardware transition latches IRQ3, nor whether
 wake changes global delivery control. The NPE-3 profile still does not
-select the separately qualified 3310/3330 wake-report behavior; that is a
-bounded candidate for a controlled experiment, not a promoted hardware fix.
+select the separately qualified 3310/3330 wake-report behavior. A bounded
+candidate enabled only `mad2_sleep_wake_irq3` in `npe3mbus`, with unchanged
+physical outgoing-call acceptance. It positively latched IRQ08 on the FIQ
+wake at31.492898923s, but all four late snapshots remained control0a,
+timer-c7 interval3; physical End still raised IRQ0 without decoding.
+Capture:`tmp/npe3-mbus-irq3-wake-qualified-candidate`, experimental binary
+SHA-256 `9b84af764295ef31e431ad9183ac0187de5b2c42efadc6251607ce8b9c94b630`.
+The candidate was removed. A missing IRQ3 wake report alone therefore does
+not explain this fixture; this does not falsify IRQ3's physical role or
+establish automatic global enable on wake.
 
 Timer allocation/arming uses twelve-byte records based at`0x1001bc`
 (`0x3c19c4..0x3c19ca`), so index`c7` resolves exactly to`0x100b10`.

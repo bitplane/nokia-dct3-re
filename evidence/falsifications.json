@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "npe3_irq3_wake_report_alone_restores_call_input",
+      "status": "disproven",
+      "hypothesis": "Selecting the existing IRQ3 wake-report model alone in clock-enabled npe3mbus restores ordinary outgoing-call End input",
+      "conclusion": "With only mad2_sleep_wake_irq3 enabled in npe3mbus, the unchanged physical outgoing-call acceptance positively observes IRQ008 at FIQ wake31.492898923s, but fails End decode. All four late snapshots retain global control0a and timer-c7 interval3; physical End changes COL0 from1f to17 and raises IRQ0 from04 to05 without decoding. Experimental binary SHA2569b84af764295ef31e431ad9183ac0187de5b2c42efadc6251607ce8b9c94b630; capture tmp/npe3-mbus-irq3-wake-qualified-candidate. The candidate configuration was removed. This falsifies sufficiency in this fixture, not IRQ3's physical role, all wake behavior or any automatic global-enable contract.",
+      "evidence": ["docs/mbus_controller.md", "tools/noki6210_idle_contract.py", "tools/noki6210_sleep_observe.lua", "tools/run_noki6210_acceptance.py"]
+    },
+    {
       "id": "nsb1_idle_marks_are_erased_startup_text",
       "status": "disproven",
       "hypothesis": "NSB-1's repeated idle marks have the same erased startup-text cause as the independently decoded NSB-3 fixture",
