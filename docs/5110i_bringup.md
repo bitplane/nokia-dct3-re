@@ -1555,6 +1555,42 @@ wire comparison exercise this requirement. Wire artifacts are retained
 before an equality assertion, so a failure still provides its first
 divergent event instead of losing the evidence.
 
+## Proactive SIM capability boundary
+
+```sh
+.venv/bin/python tools/run_nse2_toolkit.py tmp/nse2-toolkit
+```
+
+Two independent31s cold runs retain the existing own-checksum/retry and
+nominal-ADC research inputs, full native compatibility backend and physical
+A/123 contact-save workflow. Only the external card's Phase-2/Phase-2+
+configuration differs. The Phase-2+ run sends own TERMINAL PROFILE
+`03 01 80 00`. The card's application becomes pending after its existing
+eight-second delay; the next observed ordinary command is the physical
+EF_ADN UPDATE at27.59s, which completes with`91 16`. The ME then FETCHes
+the exact22-byte DISPLAY TEXT and automatically returns
+`81 03 01 21 80 02 02 82 81 03 01 30`. This is a capability refusal,
+not displayed Toolkit text or user completion. The Phase-2 control has no
+TERMINAL PROFILE/FETCH/TERMINAL RESPONSE traffic. Do not infer absent
+notification from the earlier25s authentication-only control, which issued
+no new APDU after the card became pending.
+
+Both runs retain the reviewed Saved pixels and complete A/123 SIM contents;
+their whole flash and card endpoints match. EEPROM endpoints differ at
+exactly18 bytes:`06df + 33*i`, for`i=0..17`, each`00->01`. Their meaning is
+not decoded. The checker requires the complete endpoint hashes rather than
+masking these bytes or claiming unchanged handset storage:
+
+| Card | Complete EEPROM SHA256 |
+| --- | --- |
+| Phase2 | `9af2e8f7d726da1807577341af5885c7455ef4c7c4b7ca694afd67f753dfb645` |
+| Phase2+ | `ba749b88d2e1f770b62a1b58b2255d29689315f11a29bd50e0037c368ed2190d` |
+
+The paired accepted capture is`tmp/nse2-toolkit-final`. Physical contacts
+and real SIMI TX/RX taps establish the protocol; no firmware state or DSP
+reply is injected. This bounded refusal does not establish other Toolkit
+commands, fitted-mask compatibility, post-restart stability or radio service.
+
 ## Remaining work
 
 ### Backend ownership constraint

@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nse2_proactive_display_capability_refusal",
+      "owner": "nokia_5110i",
+      "status": "satisfied",
+      "predicate": "The bounded own NSE-2 firmware fetches and refuses the external DISPLAY TEXT command after ordinary physical contact-save notification",
+      "current": "Two independent31s fresh native-compatibility boots differ only in external Phase2/Phase2+ card configuration. Own terminal profile03018000 precedes physical EF_ADN UPDATE completion9116, one exact22-byte FETCH and automatic terminal response810301218002028281030130, accepted9000. The Phase2 control has no Toolkit APDUs. Both retain reviewed Saved pixels and A/123; complete card/flash endpoints match. EEPROM has18 exact00->01 differences at06df+33*i for i0..17, with meaning unresolved and both complete hashes checked. This qualifies capability refusal, not Toolkit display, other commands, fitted native mask, sustained service, registration or speech. The original native backend and supervision policy remain unchanged.",
+      "evidence": ["docs/5110i_bringup.md", "docs/model_coverage.md", "tools/run_nse2_toolkit.py", "tools/nse2_toolkit_check.py", "tools/nse2_toolkit_fixture.lua", "tools/test_nse2_toolkit_check.py"]
+    },
+    {
       "id": "c54x_long_memory_absolute_alias_admission",
       "owner": "tms320c54x",
       "status": "satisfied",

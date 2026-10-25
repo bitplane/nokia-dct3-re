@@ -107,6 +107,15 @@ Physical confirmed erasure of A also preserves Ada/123 across a separate
 cold process. Capacity, arbitrary record enumeration and failure atomicity
 remain open.
 
+The5110i's separate Phase-2+ card control qualifies own terminal profile
+`03018000`, organic FETCH after a physical contact-save completion and
+automatic DISPLAY TEXT result30 capability refusal, not Toolkit display.
+The matched Phase-2 control has no proactive traffic; both save A/123 with
+identical complete card/flash endpoints. Eighteen EEPROM byte differences
+remain semantically unmapped and are protected by exact whole-bank hashes.
+See`run_nse2_toolkit.py` and`5110i_bringup.md`; sustained native service
+remains unqualified.
+
 The 6210's `npe3mbus` is a clocked-MBUS/sleep research instrument, not an
 additional handset-support promotion. Read-only version service passes there;
 post-wake call input remains unqualified. Established `npe3hle` call/software
