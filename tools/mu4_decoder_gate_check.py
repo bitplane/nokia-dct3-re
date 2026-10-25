@@ -8,10 +8,10 @@ import sys
 
 if __package__:
     from .mu4_playback_frame_check import rows
-    from .mu4_context_contract import reference_decoder_return_route, reference_worker_reservation
+    from .mu4_context_contract import reference_decoder_return_route, reference_worker_reservation, CONTEXT_LANE_CALLS
 else:
     from mu4_playback_frame_check import rows
-    from mu4_context_contract import reference_decoder_return_route, reference_worker_reservation
+    from mu4_context_contract import reference_decoder_return_route, reference_worker_reservation, CONTEXT_LANE_CALLS
 
 SITES = dict(zip(
     (0x2936d, 0x293a2, 0x293a8, 0x293aa, 0x293ad, 0x293ae,
@@ -252,6 +252,78 @@ def check_counter_pointers(text):
     return report
 
 
+def check_context_callers(text):
+    report = check_counter_pointers(text)
+    events = rows(text,'mu4_context_call')
+    terminals = rows(text,'mu4_context_call_terminal')
+    if len(terminals)!=1 or not events:
+        raise ValueError('missing context call window')
+    end = terminals[0]
+    if (int(end['events'])!=len(events) or len(events)>1024 or end['bad']!='0' or end['capped']!='0'
+            or (float(end['first']),float(end['last']))!=tuple(report['window'])
+            or float(end['t'])<report['window'][1] or end['identity']!='Execute_entry'
+            or end['operands']!='context_only' or end['observer_writes']!='0'):
+        raise ValueError('incomplete context call window')
+    calls = {site:0x20000+target for target,sites in CONTEXT_LANE_CALLS.items() for site in sites}
+    returns = {0x20453:0x2044a,0x20460:0x20454,0x2046a:0x20461,0x20477:0x2046b}
+    previous = report['window'][0]
+    for ordinal,event in enumerate(events,1):
+        address,kind = int(event['address'],16),event['kind']
+        expected = 0xf982 if kind=='call' and address in calls else 0xf6be if kind=='entry' and address in calls.values() else 0xf4e4 if kind=='return' and address in returns else None
+        when = float(event['t'])
+        if (int(event['ordinal'])!=ordinal or not previous<=when<=report['window'][1]
+                or int(event['opcode'],16)!=expected or event['identity']!='Execute_entry'
+                or event['operands']!='context_only' or event['observer_writes']!='0'):
+            raise ValueError('context call identity or chronology changed')
+        previous = when
+    pointers = rows(text,'mu4_context_pointer_read')
+    stream = sorted([(float(event['t']),False,event) for event in events]+
+                    [(float(event['t']),True,event) for event in pointers],key=lambda item:item[0])
+    stack,pending,owners = [],None,Counter()
+    inventory = Counter()
+    matched,prefix = 0,0
+    for _,pointer,event in stream:
+        if pointer:
+            if event['word']!='d7ac':
+                continue
+            if not stack:
+                raise ValueError('target pointer outside observed context wrapper')
+            frame = stack[-1]
+            offset = {0x20454:24,0x2046b:8}.get(frame['wrapper'])
+            if offset is None or int(event['address'],16)!=((frame['base']+offset)&0xffff):
+                raise ValueError('target pointer disagrees with wrapper address walk')
+            owners[frame['caller'],frame['wrapper'],frame['base']] += 1
+            continue
+        address,kind = int(event['address'],16),event['kind']
+        if kind=='call':
+            if pending is not None:
+                raise ValueError('context call without matching entry')
+            pending = address
+        elif kind=='entry':
+            if pending is None or calls[pending]!=address:
+                raise ValueError('context wrapper entry without matching caller')
+            stack.append(dict(caller=pending,wrapper=address,base=int(event['a'],16)&0xffff))
+            inventory[pending,address,stack[-1]['base']] += 1
+            pending = None
+            matched += 1
+        elif not stack and not matched and pending is None:
+            prefix += 1
+        elif not stack or returns[address]!=stack[-1]['wrapper'] or pending is not None:
+            raise ValueError('context wrapper return order changed')
+        else:
+            stack.pop()
+    if pending is not None or stack or not owners:
+        raise ValueError('censored context wrapper or missing target ownership')
+    report['context_callers'] = dict(events=len(events),matched_calls=matched,leading_returns=prefix,
+        calls=[dict(caller=f'{caller:06x}',wrapper=f'{wrapper:06x}',context=f'{base:04x}',count=count)
+               for (caller,wrapper,base),count in sorted(inventory.items())],
+        target_owners=[dict(caller=f'{caller:06x}',wrapper=f'{wrapper:06x}',context=f'{base:04x}',reads=count)
+                       for (caller,wrapper,base),count in sorted(owners.items())],
+        scope='Observed call/entry/return intervals and actual pointer-read agreement with the source address walk; '
+              'entry registers remain context snapshots, not retired operands; no EOF policy or physical units')
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
@@ -259,10 +331,11 @@ def main():
     parser.add_argument('--activity', action='store_true', help='also qualify counted-context reservation entry states')
     parser.add_argument('--counter-producers', action='store_true', help='also require actual CPU count increment/decrement operand reads')
     parser.add_argument('--counter-pointers', action='store_true', help='also require Address-stage counter pointer reads')
+    parser.add_argument('--context-callers', action='store_true', help='also qualify wrapper call/entry/return ownership')
     args = parser.parse_args()
     try:
         text = args.log.read_text()
-        checker = (check_counter_pointers if args.counter_pointers else check_counter_producers if args.counter_producers else check_activity_cycles
+        checker = (check_context_callers if args.context_callers else check_counter_pointers if args.counter_pointers else check_counter_producers if args.counter_producers else check_activity_cycles
                    if args.activity else check_return_routes if args.returns else check)
         print(json.dumps(checker(text), indent=2))
     except (ValueError, KeyError, OSError) as error:

@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_native_context_wrapper_callers",
+      "owner": "native_aac_validation",
+      "status": "satisfied",
+      "predicate": "Observed native wrapper intervals attribute all four late D7AC replenishment-pointer reads to020581 through02046b on contextD796",
+      "current": "Fresh cold tmp/mu4-context-callers qualifies756 uncapped instruction-matched call/entry/return events and252 completed wrapper intervals, with zero leading partial returns. All four actual0201c7/7192 D79E->D7AC reads occur inside020581->02046b intervals whose entry A low wordD796 agrees with the source+8 address walk. The D796 census has four calls each020508->020461,020581->02046b,0293c1->02044a and0293ed->020454. D7B8 has59 each0204a6->02044a,0205f3->020454,028feb->02046b and028fee->020461. Existing counter-pointer, acquisition/release and decoder-return qualifiers pass. Synthetic controls cover nesting and reject wrong callers/wrappers, changed context/address agreement, early returns, bad identities, cap changes and censored intervals. Binary SHA25640a2a4bcffe638f00cfd1c1872ea2180d9f57334507a6ba84791f2b608dad415. Entry registers remain context snapshots, not retired operands; the actual pointer-read identity is independently captured. This identifies local context-exchange ownership, not encoded-input payload semantics, a dedicated hardware-ready source, complete flag/callback lifecycle, physical units, clock accuracy or final AAC draining.",
+      "evidence": ["docs/aac_validation.md", "driver/mu4_storage_test.cpp", "tools/mu4_context_contract.py", "tools/mu4_decoder_gate_check.py", "tools/test_mu4_decoder_gate_check.py"]
+    },
+    {
       "id": "mu4_context_lane_address_contract",
       "owner": "native_aac_validation",
       "status": "satisfied",

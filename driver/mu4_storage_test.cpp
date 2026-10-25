@@ -92,6 +92,12 @@ public:
 					++m_playback_execute_steps;
 					if (m_playback_execute_entries[1] == 1 && address >= 0x2936d && address <= 0x2940d)
 						observe_decoder_gate(address,opcode);
+					if (m_playback_execute_entries[1] == 1 &&
+						((address >= 0x2044a && address <= 0x205f3) ||
+						 (address >= 0x27a99 && address <= 0x27a9f) ||
+						 (address >= 0x28feb && address <= 0x28fee) ||
+						 (address >= 0x29332 && address <= 0x293ed)))
+						observe_context_calls(address,opcode);
 					// Whole-session counters must not widen the eight-call arithmetic snapshot budget.
 					bool const detailed = m_playback_execute_entries[1] == 1 && m_playback_processing[0] <= 8;
 					if (detailed && (address == 0x24a7e || address == 0x24af3))
@@ -988,6 +994,7 @@ private:
 	u32 m_decoder_gate_events = 0, m_decoder_gate_bad = 0;
 	u32 m_context_count_reads = 0;
 	u32 m_context_pointer_reads = 0;
+	u32 m_context_call_events = 0, m_context_call_bad = 0;
 	u32 m_playback_slot_hash = 2166136261U;
 	u32 m_playback_dma_hash = 2166136261U;
 	std::array<double, 2> m_playback_audio_last_nonzero{};
@@ -1860,6 +1867,27 @@ private:
 			unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)),unsigned(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST0),12)),
 			object,input.c_str(),data.read_word(0x1310),data.read_word(0x15d9),context,activity.c_str(),time);
 	}
+	void observe_context_calls(offs_t address, u16 opcode)
+	{
+		std::array<u32,23> const sites{0x2044a,0x20454,0x20461,0x2046b,
+			0x20453,0x20460,0x2046a,0x20477,
+			0x204a6,0x204bc,0x20508,0x20581,0x2059c,0x205f3,
+			0x27a99,0x27a9c,0x27a9f,0x28feb,0x28fee,0x29332,0x2935a,0x293c1,0x293ed};
+		auto const found = std::find(sites.begin(),sites.end(),address);
+		if (found == sites.end()) return;
+		double const time = machine().time().as_double();
+		if (time < 9.64 || time > 9.86) return;
+		unsigned const index = found-sites.begin();
+		char const *kind = index < 4 ? "entry" : index < 8 ? "return" : "call";
+		if (opcode != (index < 4 ? 0xf6be : index < 8 ? 0xf4e4 : 0xf982)) ++m_context_call_bad;
+		if (++m_context_call_events > 1024) return;
+		auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
+		logerror("mu4_context_call: ordinal=%u address=%06x opcode=%04x kind=%s a=%010llx ar1=%04x aa55=%04x aa56=%04x aaa2=%04x aaa3=%04x t=%.9f identity=Execute_entry operands=context_only observer_writes=0\n",
+				m_context_call_events,unsigned(address),opcode,kind,
+			(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A)&0xffffffffffULL,
+			unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)),data.read_word(0xaa55),data.read_word(0xaa56),
+			data.read_word(0xaaa2),data.read_word(0xaaa3),time);
+	}
 	void observe_playback_processing(offs_t address, u16 opcode)
 	{
 		if (address != 0x23de5 && address != 0x23de7 && address != 0x23e1b && address != 0x23e1d &&
@@ -1998,6 +2026,8 @@ private:
 			m_context_count_reads,unsigned(m_context_count_reads>256),machine().time().as_double());
 		logerror("mu4_context_pointer_terminal: reads=%u capped=%u first=9.640000000 last=9.860000000 t=%.9f identity=Access_bus observer_writes=0\n",
 			m_context_pointer_reads,unsigned(m_context_pointer_reads>256),machine().time().as_double());
+		logerror("mu4_context_call_terminal: events=%u bad=%u capped=%u first=9.640000000 last=9.860000000 t=%.9f identity=Execute_entry operands=context_only observer_writes=0\n",
+			m_context_call_events,m_context_call_bad,unsigned(m_context_call_events>1024),machine().time().as_double());
 		logerror("mu4_playback_method_terminal: entry=%u early=%u body=%u returned=%u result=%u publish=%u opcode_mismatch=%u selection=first_verified_aa99_session identity=Execute_entry observer_writes=0 audio_acceptance=0\n",
 			m_playback_method_entries[0], m_playback_method_entries[1], m_playback_method_entries[2],
 			m_playback_method_entries[3], m_playback_method_entries[4], m_playback_method_entries[5], m_playback_method_mismatch);
@@ -3726,6 +3756,7 @@ private:
 		m_decoder_gate_events = m_decoder_gate_bad = 0;
 		m_context_count_reads = 0;
 		m_context_pointer_reads = 0;
+		m_context_call_events = m_context_call_bad = 0;
 		for (unsigned i=0;i<3;++i)
 		{
 			auto &stream=m_playback_word_capture[i];

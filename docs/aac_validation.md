@@ -884,8 +884,8 @@ The full mapped-word census finds15 syntactic immediate-call candidates
 for the four wrappers; computed calls are not excluded.
 Source branch `028fe6` conditionally calls `02046b(AR1)` when `aaa2`
 is nonzero, then calls `020461(AR1)` and writes
-`aaa2=1,aaa4=0,aaa3=0`. Its runtime context and flag lifecycle remain
-unqualified. This is the next ownership boundary, not evidence for a
+`aaa2=1,aaa4=0,aaa3=0`. The observed calls below use context `d7b8`;
+the full flag lifecycle remains unqualified. None of this establishes a
 physical ring size, sample unit, scheduling clock or permission to drain
 by manufacturing a ready token.
 
@@ -907,6 +907,35 @@ Tested binary SHA256:
 ```sh
 .venv/bin/python tools/mu4_decoder_gate_check.py \
   tmp/mu4-address-read-complete/error.log --counter-pointers
+```
+
+Fresh cold capture `tmp/mu4-context-callers` qualifies756 uncapped
+call/entry/return events, closing252 wrapper intervals with no leading
+partial returns. Nested-interval checker controls prevent assigning a
+pointer read to an unrelated most-recent call. Entry registers are still
+context snapshots; the `d79e -> d7ac` Address-stage reads independently
+agree with the source-defined offset at all four publications.
+
+| Context | Calls to `02046b` | Calls to `02044a` | Calls to `020454` | Calls to `020461` | Count per column |
+| --- | --- | --- | --- | --- | --- |
+| `d796` | `020581` | `0293c1` | `0293ed` | `020508` | 4 |
+| `d7b8` | `028feb` | `0204a6` | `0205f3` | `028fee` | 59 |
+
+All four target-counter pointer reads belong to `020581 -> 02046b`
+on context `d796`, not the initial-publication candidate `0204bc`.
+The decoder's zero-result path publishes toward the reciprocal count
+through `0293ed -> 020454`. These are local pipeline exchanges, not a
+missing hardware-ready notification. Calling `d796` an encoded-input
+buffer would overstate the established payload ownership. The next open
+boundary is the source-defined work before `020581` and its return
+conditions, especially when one-pass cleanup overtakes the remaining
+buffered AAC tail; callback cadence alone does not establish drain policy.
+Tested binary SHA256:
+`40a2a4bcffe638f00cfd1c1872ea2180d9f57334507a6ba84791f2b608dad415`.
+
+```sh
+.venv/bin/python tools/mu4_decoder_gate_check.py \
+  tmp/mu4-context-callers/error.log --context-callers
 ```
 
 Fresh read-only capture`tmp/mu4-context-count` qualifies four entry-state

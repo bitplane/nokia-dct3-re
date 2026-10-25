@@ -2,7 +2,7 @@ import unittest
 import re
 
 from tools.mu4_decoder_gate_check import (check, check_return_routes, check_activity_cycles,
-                                         check_counter_producers, check_counter_pointers, SITES)
+                                         check_counter_producers, check_counter_pointers, check_context_callers, SITES)
 
 
 def fixture():
@@ -73,6 +73,35 @@ def counter_fixture():
 
 
 class DecoderGateTests(unittest.TestCase):
+    def test_context_caller_interval_and_pointer_agreement(self):
+        text = counter_fixture()+'\n'+'\n'.join([
+            'mu4_context_pointer_read: ordinal=1 address=d79e instruction=0201c7 opcode=7192 word=d7ac mask=ffff t=9.6504 identity=Access_bus observer_writes=0',
+            'mu4_context_pointer_terminal: reads=1 capped=0 first=9.64 last=9.86 t=10 identity=Access_bus observer_writes=0',
+            'mu4_context_call: ordinal=1 address=0204bc opcode=f982 kind=call a=000000d796 t=9.6501 identity=Execute_entry operands=context_only observer_writes=0',
+            'mu4_context_call: ordinal=2 address=02046b opcode=f6be kind=entry a=000000d796 t=9.6502 identity=Execute_entry operands=context_only observer_writes=0',
+            'mu4_context_call: ordinal=3 address=020477 opcode=f4e4 kind=return a=0000000000 t=9.6507 identity=Execute_entry operands=context_only observer_writes=0',
+            'mu4_context_call_terminal: events=3 bad=0 capped=0 first=9.64 last=9.86 t=10 identity=Execute_entry operands=context_only observer_writes=0'])
+        result = check_context_callers(text)['context_callers']
+        self.assertEqual(result['matched_calls'],1)
+        self.assertEqual(result['calls'],[dict(caller='0204bc',wrapper='02046b',context='d796',count=1)])
+        self.assertEqual(result['target_owners'],[dict(caller='0204bc',wrapper='02046b',context='d796',reads=1)])
+        for before,after in (('address=0204bc','address=0205f3'),('address=020477','address=020460'),
+                             ('a=000000d796','a=000000d797'),('events=3','events=2'),
+                             ('t=9.6507','t=9.6503'),('opcode=f6be','opcode=f6bf'),
+                             ('bad=0','bad=1'),('capped=0','capped=1')):
+            with self.subTest(before=before),self.assertRaises(ValueError):
+                check_context_callers(text.replace(before,after))
+        with self.assertRaises(ValueError):
+            check_context_callers('\n'.join(line for line in text.splitlines() if 'kind=return' not in line).replace('events=3','events=2'))
+        outer_call = 'mu4_context_call: ordinal=1 address=0293c1 opcode=f982 kind=call a=000000d796 t=9.65001 identity=Execute_entry operands=context_only observer_writes=0'
+        outer_entry = outer_call.replace('ordinal=1 address=0293c1 opcode=f982 kind=call','ordinal=2 address=02044a opcode=f6be kind=entry').replace('t=9.65001','t=9.65002')
+        outer_return = outer_call.replace('ordinal=1 address=0293c1 opcode=f982 kind=call','ordinal=6 address=020453 opcode=f4e4 kind=return').replace('t=9.65001','t=9.6508')
+        nested = text
+        for old,new in ((3,5),(2,4),(1,3)):
+            nested = nested.replace(f'mu4_context_call: ordinal={old} ',f'mu4_context_call: ordinal={new} ')
+        nested = '\n'.join([outer_call,outer_entry,nested.replace('events=3','events=6'),outer_return])
+        self.assertEqual(check_context_callers(nested)['context_callers']['matched_calls'],2)
+
     def test_counter_pointer_access_identity_and_pairing(self):
         text = counter_fixture()+'\n'+'\n'.join([
             'mu4_context_pointer_read: ordinal=1 address=d79e instruction=0201c7 opcode=7192 word=d7ac mask=ffff t=9.6504 identity=Access_bus observer_writes=0',
