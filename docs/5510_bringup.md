@@ -2167,7 +2167,7 @@ product, verifying availability at the boundary as well as independent
 40-bit arithmetic, overflow/saturation, frame/page ownership and one source
 read. Sixteen `mpy-delay-edge` cases reject straddling instructions without
 data accesses or atomic fallback. The signed MAC/MAS extension is covered
-separately in [Signed MAC/MAS in control delay words](#signed-macmas-in-control-delay-words).
+separately in [Signed MAC/MAS in control delay words](c54x_execution_contracts.md#signed-macmas-in-control-delay-words).
 Rounded/unsigned MPY and immediate-multiply delay compositions remain excluded. Exact stages remain
 manual-derived frontend projections, not silicon measurements.
 
@@ -4958,7 +4958,7 @@ against the stored media. Do not remove the programmed reload merely to keep
 resident-entry counts at one.
 
 The current broad CPU regression and remaining operand-domain audit are
-summarized under [Short-preincrement fixture audit](#short-preincrement-fixture-audit).
+summarized under [Operand-domain acceptance](c54x_execution_contracts.md#operand-domain-acceptance).
 The long-PSHD acceptance remains its three scoped profiles, with separate
 RPT, stack/repeat and PMST controls. These checks do not establish physical
 bank timing, all legal/illegal operand domains or decoded audio.
@@ -5617,7 +5617,7 @@ and post-FCALA-sample accumulator changes cannot change the call target.
 Zero-gap FCALA samples after older DLD Execute publication in the same
 clock. This validates that producer family, not every accumulator
 producer or a combined DLD-plus-interrupt cross-product. The separate
-[FCALAD contract](#delayed-far-accumulator-call) covers delayed calls but
+[FCALAD contract](c54x_execution_contracts.md#delayed-far-accumulator-call) covers delayed calls but
 does not inherit the nondelayed DLD-producer acceptance. The atomic,
 FCALLD and IFR reference gates still pass.
 SPRU172C page 4-55's
@@ -5817,7 +5817,7 @@ coverage. MP/MC and DROM physical decoding remain separate scope, not
 implied by an OVLY result. POPM REA/RSA/BRC (`8a1c/8a1b/8a1a`) also
 require their own block-repeat ownership contract, not a blanket pop-range
 change; separated outside-body active restoration is covered by the
-[retained context contract](#active-repeat-context-and-stack-bypass).
+[retained context contract](c54x_execution_contracts.md#active-repeat-context-and-stack-bypass).
 For POPM BRC followed by a new RPTB, SPRU131G table 7-24 and example
 7-54(d) require one intervening instruction; STM BRC has zero latency.
 This is distinct from the in-loop BRC-write latency in table 7-25. A
@@ -5855,7 +5855,7 @@ the same vector marker, so this checks IPTR, not vector OVLY bank ownership.
 The ISR does not return. A further mapping change between ISR Prefetch and
 Fetch, other interrupt sources and full return composition remain separate
 acceptance work. Broad regression coverage is indexed in
-[Core regression checkpoint](#core-regression-checkpoint); current resident
+[Core regression checkpoint](c54x_execution_contracts.md#core-regression-checkpoint); current resident
 execution is described separately in [Current boundary](#current-boundary).
 
 The `pop-repeat` prototype admits direct POPM BRC/RSA/REA only
@@ -5906,7 +5906,7 @@ One register read and no writes are observed. This is raw mapped-register
 read acceptance, not a claim about every ST1 producer latency or peripheral
 source. The existing 384-case IMR unsigned-read control also passes.
 Broad regression and native 5110 save-state coverage are indexed in
-[Core regression checkpoint](#core-regression-checkpoint), rather than
+[Core regression checkpoint](c54x_execution_contracts.md#core-regression-checkpoint), rather than
 inherited from the chronology of these individual instruction admissions.
 
 Short direct CMPM now shares the retained BITF/absolute-CMPM path for RAM
@@ -6220,7 +6220,7 @@ The POPD checkpoint `862b0ce1` passed twelve isolated profiles: the four POPD
 profiles, POPM BRC/repeat controls, PMST pop/prefetch controls, both stack-IRQ
 controls and PSHD/MVDD repeats, plus native 5110 save-state restoration.
 The shared broad acceptance is recorded in the
-[core regression checkpoint](#core-regression-checkpoint).
+[core regression checkpoint](c54x_execution_contracts.md#core-regression-checkpoint).
 
 Nondelayed BACC/FBACC A/B share the retained Class 30 transfer boundary
 with CALA/FCALA, but allocate no stack words and leave RTN unchanged.

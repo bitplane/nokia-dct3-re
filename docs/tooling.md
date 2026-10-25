@@ -197,18 +197,17 @@ byte-paired incorrectly and must not be used as evidence. The Ghidra scripts nam
 functions and export analysis. The naming list is also exported as a
   portable symbol map at `ghidra/symbols/3210.csv` (address, kind, name) so you
   get the names without running Ghidra.
-- `mame_nokia_dct3_coverage.lua`, `mame_nokia_dct3_snapshot.lua` and
-  `mame_nokia_dct3_force_game.lua` wrap the exerciser (`RUN_EXTRA_ARGS=
+- `mame_nokia_dct3_coverage.lua` and `mame_nokia_dct3_snapshot.lua`
+  wrap the exerciser (`RUN_EXTRA_ARGS=
   '-autoboot_script ../mame_nokia_dct3_coverage.lua -debug -debugger none'`):
   per-phase function coverage with an optional raw trace window
   (`NOKIA_DCT3_COVERAGE_ENTRIES`, `NOKIA_DCT3_COVERAGE_PHASES`,
   `NOKIA_DCT3_TRACE_WINDOW`), MAME's own screen snapshot
-  (`NOKIA_DCT3_SNAPSHOT_AT`), and the games research hook that pins
-  `game_index_11fd1b` (`NOKIA_DCT3_FORCE_GAME`, `NOKIA_DCT3_FORCE_GAME_AT`).
+  (`NOKIA_DCT3_SNAPSHOT_AT`). Neither writes firmware-owned state.
   `make run-keys KEYS=enter,x,x,6` drives a scripted key sequence headlessly.
 - `mame_nokia_dct3_ram_probe.lua` wraps the exerciser with a RAM write tap
-  (`NOKIA_DCT3_RAM_TAP=start:end`, logged as `RAMTAP t=... addr=...`) and an
-  optional held byte (`NOKIA_DCT3_RAM_POKE=addr:value:at`). It measured the
+  (`NOKIA_DCT3_RAM_TAP=start:end`, logged as `RAMTAP t=... addr=...`).
+  It observes writes without changing memory and measured the
   Snake step interval recorded in `games_applications.md`.
 - `mame_nokia_dct3_input_exerciser.lua` — MAME Lua harness used by the run targets
   to capture structural/LCD evidence and drive keypad input. Delayed input uses

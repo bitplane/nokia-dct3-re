@@ -4623,7 +4623,7 @@ original `7212 b6be` at `02:df9b` executes. MVDM `7211 b6a8` at
 `02:dfa6` also executes after a separate 576-case branch-delay gate,
 including both outcomes, pending IRQ/NMI and RETE/save/replay. Repeat
 remains unqualified in this AR gate; accumulator destinations have the
-separate [slice qualification](#mvdm-accumulator-slices). Other non-AR
+separate [slice qualification](c54x_execution_contracts.md#mvdm-accumulator-slices). Other non-AR
 destinations remain excluded. FCALLD `fb82 dfc2` at
 `02:dfaf` has a 243-case saved/replayed gate for caller-fetched delay
 words, stacked PC/XPC and IRQ/NMI return. Delay-slot mapped-XPC read
@@ -5080,7 +5080,7 @@ Short MOD=3 is write-only and is rejected by CMPM/BITF in both frontends.
 A separate 512-case replay bank checks rejection across both initial TC
 states without data, pointer, accumulator/T or status effects. Long MOD=13
 remains read-capable. These encoding checks do not settle the older circular
-fixtures' input-domain constraints; see the [addressing audit](5510_bringup.md#short-preincrement-fixture-audit).
+fixtures' input-domain constraints; see the [addressing audit](c54x_execution_contracts.md#operand-domain-acceptance).
 
 This establishes bounded CPU and real I/O-retirement evidence, not complete
 NAND-page, recorder, startup or speech acceptance. Existing atomic profiles

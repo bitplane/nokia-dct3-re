@@ -1,7 +1,6 @@
--- RAM probe wrapper for the input exerciser (external Lua only, no driver change).
+-- Observation-only RAM write-tap wrapper for the physical input exerciser.
 --   NOKIA_DCT3_RAM_TAP="start:end"        log every write in [start,end] as
 --                                         "RAMTAP t=<seconds> addr=<hex> data=<hex> mask=<hex>"
---   NOKIA_DCT3_RAM_POKE="addr:value:at"   from <at> seconds onward, hold byte <value> at <addr>
 local script_dir = (debug.getinfo(1, "S").source:match("^@(.*)/[^/]*$")) or "."
 dofile(script_dir .. "/mame_nokia_dct3_input_exerciser.lua")
 local machine = manager.machine
@@ -17,13 +16,5 @@ if tap then
 		machine:logerror(string.format("RAMTAP t=%.6f addr=%06x data=%04x mask=%04x\n",
 				machine.time:as_double(), offset, data, mask))
 		return data
-	end)
-end
-local poke = os.getenv("NOKIA_DCT3_RAM_POKE")
-if poke then
-	local addr, value, at = poke:match("([%w]+):([%w]+):([%d%.]+)")
-	addr, value, at = tonumber(addr), tonumber(value), tonumber(at)
-	emu.register_periodic(function()
-		if machine.time:as_double() >= at then space:write_u8(addr, value) end
 	end)
 end

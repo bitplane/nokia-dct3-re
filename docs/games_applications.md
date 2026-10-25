@@ -94,9 +94,9 @@ index 0. See `eeprom_analysis.md`.
   `0x26225e`, `0x263468`.
 - A raw PC trace window during play confirmed the tick path once the level
   record was provisioned; MAME plays all three menu games organically.
-- `mame_nokia_dct3_force_game.lua` (external research hook) pins
-  `game_index_11fd1b` to 3 before New game; the fourth handler runs to
-  completion with its own scene bitmaps and a game-over screen.
+- The fourth table entry renders its own scene bitmaps and reaches game-over
+  in an isolated index-selection diagnostic. This is not evidence that normal
+  menu navigation exposes it; the three menu games have organic input evidence.
 
 ## Address map
 
