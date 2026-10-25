@@ -122,8 +122,16 @@ The6150 also qualifies PLAY TONE presentation and physical cancellation with
 result11, paired with a no-key control that stays pending through92s. Whole
 storage stays unchanged. An independent93.5s no-key run completes organically
 after the current Timer1/FIQ5 event, returning success and the installed menu.
-Requested-duration accuracy and native audio remain open; this exposes calibrated
-clock debt, not a new DSP-reply requirement.
+Requested-duration accuracy and production audio remain open; this exposes calibrated
+clock debt, not a new DSP-reply requirement. A separate explicit8kHz laboratory
+composition now qualifies native tone output and selected active-output save/load;
+it does not establish the physical codec law or handset clock attachment.
+Own physical clock/date setup additionally qualifies an awake RTC alarm,
+firmware acknowledgement, Alarm!/Stop/Snooze presentation and PUP buzzer output.
+A same-binary no-Stop control distinguishes physical Stop from automatic quieting.
+Exact whole storage and retained-clock endpoints are guarded by
+`nsm1_clock_alarm_check.py`; cold application retrieval, snooze and power-off
+alarm wake remain unqualified. See `6150_bringup.md` for the separate contracts.
 The5190 independently passes the same command family with its own profile,
 physical route, exact idle pixels and a different complete settings-bank
 transition (`nsb1_toolkit_check.py --refresh`); no storage field or fitted-mask

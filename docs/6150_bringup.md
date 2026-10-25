@@ -23,6 +23,52 @@ below demonstrates that this materially delays a software deadline. These
 software gates do not qualify physical timer rates or requested-duration
 accuracy; no clock has been changed merely to pass an application fixture.
 
+### Physical clock, date and awake alarm
+
+The separate native compatibility composition accepts physical clock/date
+initialization and an awake alarm without an injected event or firmware flag.
+From the qualified PIN-enabled seed, own PIN1234 and phone code12345 lead
+through Menu/Settings4. The unset-clock notice consumes a separate acknowledgement
+before its time editor accepts12:34. Date01.01.2000 is then accepted, followed
+by alarm12:35. Own End/Mode key0f returns to idle. The
+[Nokia6150 user guide](https://josvandijken.nl/downloads/pdf/handleiding_nokia_6150.pdf)
+places Alarm Clock at Settings4-1; the actual route and pixels are independently
+checked against this image, not imported from another model.
+
+Firmware publishes minutes22/hour8c through CCONT's shared time-setting
+latch, then alarm minutes23/hour0c. At98s the retained counter reaches
+12:35:00, statusb3/mask50 presents alarm/minute causes, and firmware acknowledges
+a0. The native screen flashes Alarm! with Stop/Snooze. The MCU drives the
+PUP buzzer path with divider5285 (reported2459Hz). Physical Stop at105s
+returns to idle and leaves the late buzzer window quiet. A matched process
+omitting only Stop continues pulsing after106s. Both checks and a shared
+executable identity are required for the paired result.
+
+The complete EEPROM endpoint is
+`f8da8575410d5a83aca7a73dffd9b3e320aefae4ce935df4190238ce886323d3`
+in both runs, with unchanged whole card and flash. Retained CCONT input is
+exactly `1a000c010000005000`; both112s endpoints are
+`0e230c00001e0e5001`. Source/cold-copy provenance, external configuration,
+Phase2/read-only SIM conversation, authentication, all physical contacts,
+reviewed frames and late native execution without an unsupported stop are
+required. Tests reject mismatched executables, missing/changed contacts,
+latch/acknowledgement errors and wrong Stop/control buzzer behavior.
+
+```sh
+.venv/bin/python tools/nsm1_clock_alarm_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-clock-alarm-stop-final --mame mame/mame
+.venv/bin/python tools/nsm1_clock_alarm_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-clock-alarm-control-final --control --mame mame/mame
+.venv/bin/python tools/nsm1_clock_alarm_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-clock-alarm-stop-final \
+  --matched-control tmp/nsm1-clock-alarm-control-final
+```
+
+Use fresh outputs for execution and serialize processes. This remains the
+declared nominal-ADC2/NSE-1-mask compatibility fixture with inherited03ca=00
+timeout policy, not factory provisioning or fitted-mask proof. It establishes
+awake RTC/firmware/PUP behavior, not acoustic fidelity, production timing,+cold application retrieval, snooze, power-off alarm wake, RF or native speech.
+
 ### Card-originated Toolkit DISPLAY TEXT
 
 The qualified `nsm1r4t` composition accepts an explicit Phase-2+ external
