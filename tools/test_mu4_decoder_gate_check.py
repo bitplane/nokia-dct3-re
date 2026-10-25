@@ -2,7 +2,8 @@ import unittest
 import re
 
 from tools.mu4_decoder_gate_check import (check, check_return_routes, check_activity_cycles,
-                                         check_counter_producers, check_counter_pointers, check_context_callers, SITES)
+                                         check_counter_producers, check_counter_pointers, check_context_callers,
+                                         check_exchange_status, SITES)
 
 
 def fixture():
@@ -72,15 +73,43 @@ def counter_fixture():
         'mu4_context_count_terminal: reads=2 capped=0 address=d7ac first=9.64 last=9.86 t=10 identity=Access_bus observer_writes=0'])
 
 
-class DecoderGateTests(unittest.TestCase):
-    def test_context_caller_interval_and_pointer_agreement(self):
-        text = counter_fixture()+'\n'+'\n'.join([
+def caller_fixture():
+    return counter_fixture()+'\n'+'\n'.join([
             'mu4_context_pointer_read: ordinal=1 address=d79e instruction=0201c7 opcode=7192 word=d7ac mask=ffff t=9.6504 identity=Access_bus observer_writes=0',
             'mu4_context_pointer_terminal: reads=1 capped=0 first=9.64 last=9.86 t=10 identity=Access_bus observer_writes=0',
             'mu4_context_call: ordinal=1 address=0204bc opcode=f982 kind=call a=000000d796 t=9.6501 identity=Execute_entry operands=context_only observer_writes=0',
             'mu4_context_call: ordinal=2 address=02046b opcode=f6be kind=entry a=000000d796 t=9.6502 identity=Execute_entry operands=context_only observer_writes=0',
             'mu4_context_call: ordinal=3 address=020477 opcode=f4e4 kind=return a=0000000000 t=9.6507 identity=Execute_entry operands=context_only observer_writes=0',
             'mu4_context_call_terminal: events=3 bad=0 capped=0 first=9.64 last=9.86 t=10 identity=Execute_entry operands=context_only observer_writes=0'])
+
+
+class DecoderGateTests(unittest.TestCase):
+    def test_exchange_status_owned_read_and_both_successors(self):
+        text = caller_fixture().replace('address=0204bc','address=020581')
+        for ordinal,(when,value) in enumerate(((9.649,0),(9.65001,1)),1):
+            text += f'\nmu4_exchange_status_read: ordinal={ordinal} address=13e9 instruction=02a310 opcode=10e1 word={value:04x} mask=ffff t={when} identity=Access_bus observer_writes=0'
+        sequence = [(0x20553,9.64901,0),(0x20586,9.64902,0),
+                    (0x20553,9.65002,1),(0x20555,9.65003,1),
+                    (0x20580,9.65004,1),(0x20586,9.6508,1)]
+        for ordinal,(address,when,value) in enumerate(sequence,1):
+            opcode = 0xf845 if address==0x20553 else 0x4811 if address==0x20580 else 0x10f8
+            text += f'\nmu4_exchange_branch: ordinal={ordinal} address={address:06x} opcode={opcode:04x} receiver=13e0 table=c6f0 field9={value:04x} field13=0001 context=d796 count22=0000 flag1310=0000 t={when} identity=Execute_entry operands=context_only observer_writes=0'
+        text += '\nmu4_exchange_terminal: reads=2 events=6 bad=0 capped=0 first=9.64 last=9.86 t=10 identity=Access_bus_and_Execute_entry observer_writes=0'
+        report = check_exchange_status(text)['exchange_status']
+        self.assertEqual(report['outcomes'],{'skip':1,'publish':1})
+        self.assertEqual(report['publish_flags'],{'0000':1})
+        self.assertEqual(report['last_test']['word'],'0001')
+        self.assertEqual(report['last_test']['context_snapshots'],dict(field13='0001',count22='0000',flag1310='0000'))
+        for before,after in (('instruction=02a310','instruction=02a311'),('address=13e9','address=13ea'),
+                             ('table=c6f0','table=c738'),('field9=0001','field9=0000'),
+                             ('events=6','events=5'),('address=020555','address=020580'),
+                             ('t=9.65004','t=9.65011'),('t=9.6508','t=9.6505'),
+                             ('opcode=10e1','opcode=10e2'),('capped=0','capped=1')):
+            with self.subTest(before=before),self.assertRaises(ValueError):
+                check_exchange_status(text.replace(before,after))
+
+    def test_context_caller_interval_and_pointer_agreement(self):
+        text = caller_fixture()
         result = check_context_callers(text)['context_callers']
         self.assertEqual(result['matched_calls'],1)
         self.assertEqual(result['calls'],[dict(caller='0204bc',wrapper='02046b',context='d796',count=1)])

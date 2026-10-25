@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_native_adapter_publication_status",
+      "owner": "native_aac_validation",
+      "status": "satisfied",
+      "predicate": "Native late adapter getter reads select the observed publication/skip branches and complete their matched publication wrappers",
+      "current": "Managed cold capture tmp/mu4-exchange-status-qualified ends normally at10.016666667s with exit0/interrupted=false. The9.64..9.86s first-session window has118 uncapped actual02a310/10e1 operand reads and185 observed branch entries. All59 selected tests agree with actual getter values at13E0/headerC6F0:55 zero-result skips and four nonzero publications. Each publication encloses the matched020581->02046b entry, actualD79E->D7AC pointer read and observed wrapper return before the common continuation. All four eligible snapshots have1310=0;59 unselected common entries are separately reported. Existing counter/caller/acquisition/decoder-return qualifiers pass. Final owned status0 at9.725261143 selects the skip at9.725261252; context-only field13=1/count22=0/1310=0 snapshots accompany it. Loader entry at9.725659144 precedes another observed publication. This closes the local status/publication question, not original teardown/drain policy, whole-track playback, reference alignment, all clocks or speech. Binary SHA2564c59785f76edf1d6aea36b94e3a6d75c8ca78fb495e6990d4197a9cff6fa9b9e. Entry/field snapshots are not retired operands; actual getter reads and successors supply the bounded behavioral evidence.",
+      "evidence": ["docs/aac_validation.md", "driver/mu4_storage_test.cpp", "tools/mu4_context_contract.py", "tools/mu4_decoder_gate_check.py", "tools/test_mu4_decoder_gate_check.py"]
+    },
+    {
       "id": "mu4_exchange_publication_status_contract",
       "owner": "native_aac_validation",
       "status": "satisfied",

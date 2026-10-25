@@ -889,32 +889,9 @@ the full flag lifecycle remains unqualified. None of this establishes a
 physical ring size, sample unit, scheduling clock or permission to drain
 by manufacturing a ready token.
 
-Fresh cold capture `tmp/mu4-address-read-complete` qualifies126 uncapped
-Address-stage MVDK pointer reads in the same bounded first-session window:
-`d79e -> d7ac` four times, `d7ae -> d79c` four times,
-`d7c0 -> d7ce`59 times and `d7d0 -> d7be`59 times.
-Each of the four `d79e -> d7ac` reads precedes its corresponding
-`0201ca` counter operand read. The existing four acquisition/release cycles
-and decoder return-route qualifiers also pass. Thus the generic helper
-serves multiple context links; it is not a dedicated hardware-ready source.
-Initialization ownership, callback scheduling and final drain policy remain
-open. The executable mapped-MVDK control passes14,256 cases/restores with
-one source read and one destination write per case; the tools suite passes
-5,279 tests with one skip. This is not a new full-CPU acceptance checkpoint.
-Tested binary SHA256:
-`86ff037c3d450ab848901c3bc13ba5cadb1c3a53312c9b790a6a2b2db6adcd57`.
-
-```sh
-.venv/bin/python tools/mu4_decoder_gate_check.py \
-  tmp/mu4-address-read-complete/error.log --counter-pointers
-```
-
-Fresh cold capture `tmp/mu4-context-callers` qualifies756 uncapped
-call/entry/return events, closing252 wrapper intervals with no leading
-partial returns. Nested-interval checker controls prevent assigning a
-pointer read to an unrelated most-recent call. Entry registers are still
-context snapshots; the `d79e -> d7ac` Address-stage reads independently
-agree with the source-defined offset at all four publications.
+The combined native capture below closes252 wrapper intervals with no
+leading partial returns. Nested-interval checker controls prevent assigning
+a pointer read to an unrelated most-recent call. Its caller inventory is:
 
 | Context | Calls to `02046b` | Calls to `02044a` | Calls to `020454` | Calls to `020461` | Count per column |
 | --- | --- | --- | --- | --- | --- |
@@ -927,16 +904,8 @@ The decoder's zero-result path publishes toward the reciprocal count
 through `0293ed -> 020454`. These are local pipeline exchanges, not a
 missing hardware-ready notification. Calling `d796` an encoded-input
 buffer would overstate the established payload ownership. The next open
-boundary is the source-defined work before `020581` and its return
-conditions, especially when one-pass cleanup overtakes the remaining
-buffered AAC tail; callback cadence alone does not establish drain policy.
-Tested binary SHA256:
-`40a2a4bcffe638f00cfd1c1872ea2180d9f57334507a6ba84791f2b608dad415`.
-
-```sh
-.venv/bin/python tools/mu4_decoder_gate_check.py \
-  tmp/mu4-context-callers/error.log --context-callers
-```
+boundary is one-pass cleanup versus the remaining buffered AAC tail.
+Callback cadence alone does not establish drain policy.
 
 `exchange_publication` pins100 original words around `020545..020585`,
 the method wrappers and conditional adapter getter. Method11 runs on both
@@ -944,9 +913,8 @@ the method wrappers and conditional adapter getter. Method11 runs on both
 publication. A nonzero result reaches `020581 -> 02046b(AR1)` and clears
 `aa55`. Under table `c6f0`, method14's far pointer at `c70c` selects
 `02a30b`, which reads object field9: the source-exhausted field in the
-independently mapped copy adapter. Early selector snapshots bind `aa5a`
-to object `13e0` with that header at1.028291089 and1.029389129s in
-`tmp/mu4-context-callers`; this is not proof of an immutable late binding.
+independently mapped copy adapter. The bounded native capture verifies
+that binding for the selected late queries, not its lifetime immutability.
 
 `1310=0` bypasses only the intervening refresh/reset subsection, **not**
 publication. With a nonzero flag, the source refreshes `15e9`, obtains
@@ -957,31 +925,49 @@ zero/nonzero boundary of each unsigned scalar input and reject every
 changed or missing source word. This models explicit branch/store selection
 assuming normal helper returns, not their memory effects or actual late
 branch operands. It does not make `1310` an EOF flag or establish whole-track
-draining. The remaining boundary is the actual adapter result/ownership and
-cleanup ordering, rather than a dependency on a nonzero `1310` to return
-the context token.
+draining. The actual adapter result is qualified below; cleanup ordering
+remains separate from any dependency on a nonzero `1310` to return the token.
 
-Fresh read-only capture`tmp/mu4-context-count` qualifies four entry-state
-cycles on context`d796`: `(flag,count)=(0,1) -> (1,0) -> (0,0)` at gate,
-decoder call and common refresh. Its35 actual CPU operand bus reads of
-counter`d7ac` have captured instruction ownership: four at`0201ca/6b83`
-read0 for the source-pinned ADDM#1, four at`020182/6b82` read1 for the
-decrement, and27 at`0293b3/1ae6` implement the gate. DMA, debugger peeks
-and forwarded operands are excluded by the CPU read-identity API. These
-are read ownership plus entry-state agreement, not observed write ownership
-or instruction retirement. No missing hardware-ready event is established
-by this local gate; forcing15d9 would bypass acquisition state.
+Cold capture `tmp/mu4-exchange-status-qualified` completes under the managed
+runner with exit0/interrupted=false at10.016666667s. Its unchanged
+9.64..9.86s first-session window contains118 owned `02a310/10e1` getter
+reads and185 branch entries. All59 selected tests agree with the actual
+getter value at object `13e0`/header `c6f0`:55 zero-result skips and four
+nonzero publications. Each publication encloses the matched wrapper's
+entry, target-pointer read and observed return before the common
+continuation. All four eligible-branch snapshots have `1310=0`.
+There are59 other common entries without a selected status test; they are
+reported separately, not interpreted as extra branch outcomes. Existing
+counter, call-interval, acquisition/release and decoder-return checks pass.
+The756 call/entry/return events and126 owned pointer reads include
+`d79e -> d7ac` and `d7ae -> d79c` four times each, and
+`d7c0 -> d7ce` and `d7d0 -> d7be`59 times each. The35 owned counter
+reads are four increment operands0 at `0201ca/6b83`, four decrement
+operands1 at `020182/6b82`, and27 gate reads at `0293b3/1ae6`.
+Four entry-state cycles agree with acquisition and release:
+`(flag,count)=(0,1) -> (1,0) -> (0,0)` at gate, decoder call and refresh.
+These are actual read ownership and entry-state agreement, not observed
+write retirement, physical queue capacity or complete callback semantics.
+The observer extension separately passes14,256 mapped-MVDK cases/restores
+with one source read and one destination write per case; this is not a
+renewed full-CPU acceptance checkpoint.
+
+The final owned status read is0 at9.725261143s; the selected branch at
+9.725261252s correctly skips publication. Its context-only snapshots show
+destination-full field13=1, context[22]=0 and `1310=0`.
+The original loader entry at9.725659144s follows before another observed
+adapter publication. This local gate is behaving coherently; no missing
+hardware token is needed to explain its observed decisions. The remaining
+question is why the original session chooses teardown before draining its
+buffered material, not how to force this adapter to report exhaustion.
+This does not qualify whole-track playback or reference-waveform alignment.
+Tested binary SHA256:
+`4c59785f76edf1d6aea36b94e3a6d75c8ca78fb495e6990d4197a9cff6fa9b9e`.
 
 ```sh
 .venv/bin/python tools/mu4_decoder_gate_check.py \
-  tmp/mu4-context-count/error.log --counter-producers
+  tmp/mu4-exchange-status-qualified/error.log --exchange-status
 ```
-
-The full call/branch qualifiers also pass on this fresh run. Tested binary
-SHA256:`562c0a8be985cc88ee300cbc04f0fe15ccb5698f860a87583eb13d6f025d6c19`.
-The downstream pointer/callback ownership and original one-pass cleanup's
-drain policy remain separate questions; this does not qualify whole-track
-decoding, physical clocks, codec conformance, handset boot or speech.
 
 ### Declared Packet-Lookahead Control
 

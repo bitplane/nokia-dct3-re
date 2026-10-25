@@ -281,6 +281,7 @@ def check_context_callers(text):
                     [(float(event['t']),True,event) for event in pointers],key=lambda item:item[0])
     stack,pending,owners = [],None,Counter()
     inventory = Counter()
+    target_intervals = []
     matched,prefix = 0,0
     for _,pointer,event in stream:
         if pointer:
@@ -293,6 +294,7 @@ def check_context_callers(text):
             if offset is None or int(event['address'],16)!=((frame['base']+offset)&0xffff):
                 raise ValueError('target pointer disagrees with wrapper address walk')
             owners[frame['caller'],frame['wrapper'],frame['base']] += 1
+            frame['target_reads'] = frame.get('target_reads',0)+1
             continue
         address,kind = int(event['address'],16),event['kind']
         if kind=='call':
@@ -302,7 +304,8 @@ def check_context_callers(text):
         elif kind=='entry':
             if pending is None or calls[pending]!=address:
                 raise ValueError('context wrapper entry without matching caller')
-            stack.append(dict(caller=pending,wrapper=address,base=int(event['a'],16)&0xffff))
+            stack.append(dict(caller=pending,wrapper=address,base=int(event['a'],16)&0xffff,
+                              entry_time=float(event['t'])))
             inventory[pending,address,stack[-1]['base']] += 1
             pending = None
             matched += 1
@@ -311,16 +314,109 @@ def check_context_callers(text):
         elif not stack or returns[address]!=stack[-1]['wrapper'] or pending is not None:
             raise ValueError('context wrapper return order changed')
         else:
-            stack.pop()
+            frame = stack.pop()
+            if frame.get('target_reads'):
+                target_intervals.append(dict(caller=f"{frame['caller']:06x}",
+                    entry_time=frame['entry_time'],return_time=float(event['t']),reads=frame['target_reads']))
     if pending is not None or stack or not owners:
         raise ValueError('censored context wrapper or missing target ownership')
     report['context_callers'] = dict(events=len(events),matched_calls=matched,leading_returns=prefix,
+        target_intervals=target_intervals,
         calls=[dict(caller=f'{caller:06x}',wrapper=f'{wrapper:06x}',context=f'{base:04x}',count=count)
                for (caller,wrapper,base),count in sorted(inventory.items())],
         target_owners=[dict(caller=f'{caller:06x}',wrapper=f'{wrapper:06x}',context=f'{base:04x}',reads=count)
                        for (caller,wrapper,base),count in sorted(owners.items())],
         scope='Observed call/entry/return intervals and actual pointer-read agreement with the source address walk; '
               'entry registers remain context snapshots, not retired operands; no EOF policy or physical units')
+    return report
+
+
+def check_exchange_status(text):
+    report = check_context_callers(text)
+    reads,events,ends = (rows(text,tag) for tag in
+        ('mu4_exchange_status_read','mu4_exchange_branch','mu4_exchange_terminal'))
+    if len(ends)!=1 or not reads or not events:
+        raise ValueError('missing exchange status window')
+    end = ends[0]
+    if (int(end['reads'])!=len(reads) or int(end['events'])!=len(events)
+            or len(reads)>256 or len(events)>512 or end['bad']!='0' or end['capped']!='0'
+            or (float(end['first']),float(end['last']))!=tuple(report['window'])
+            or float(end['t'])<report['window'][1] or end['observer_writes']!='0'
+            or end['identity']!='Access_bus_and_Execute_entry'):
+        raise ValueError('incomplete exchange status window')
+    sites = {0x20553:0xf845,0x20555:0x10f8,0x20580:0x4811,0x20586:0x10f8}
+    for items,kind in ((reads,'read'),(events,'branch')):
+        previous = report['window'][0]
+        for ordinal,event in enumerate(items,1):
+            when = float(event['t'])
+            if (int(event['ordinal'])!=ordinal or not previous<=when<=report['window'][1]
+                    or event['observer_writes']!='0'):
+                raise ValueError('exchange event chronology changed')
+            if kind=='read':
+                valid = (event['instruction']=='02a310' and event['opcode']=='10e1'
+                    and event['mask']=='ffff' and event['identity']=='Access_bus'
+                    and 0x60<=int(event['address'],16)<=0xffff and 0<=int(event['word'],16)<=0xffff)
+            else:
+                valid = (sites.get(int(event['address'],16))==int(event['opcode'],16)
+                    and event['identity']=='Execute_entry' and event['operands']=='context_only')
+            if not valid:
+                raise ValueError('exchange status or branch identity changed')
+            previous = when
+    stream = sorted([(float(row['t']),True,row) for row in reads]+
+                    [(float(row['t']),False,row) for row in events],key=lambda item:item[0])
+    last_read,pending,phase,last_test = None,None,None,None
+    publication_start = 0.0
+    outcomes,flags = Counter(),Counter()
+    unselected = 0
+    publications = [row for row in rows(text,'mu4_context_call')
+                    if row['kind']=='call' and row['address']=='020581']
+    for when,is_read,event in stream:
+        if is_read:
+            last_read = event
+            continue
+        address = int(event['address'],16)
+        if address==0x20553:
+            if pending is not None or last_read is None:
+                raise ValueError('exchange query without a complete predecessor')
+            if (event['table']!='c6f0' or event['context']!='d796'
+                    or int(event['receiver'],16)+9!=int(last_read['address'],16)
+                    or event['field9']!=last_read['word'] or float(last_read['t'])>=when):
+                raise ValueError('exchange getter does not agree with selected adapter')
+            pending,phase = int(last_read['word'],16),'tested'
+            last_test = dict(time=when,getter_time=float(last_read['t']),word=last_read['word'],
+                receiver=event['receiver'],context_snapshots=dict(field13=event['field13'],
+                    count22=event['count22'],flag1310=event['flag1310']))
+            last_read = None
+        elif phase=='tested':
+            if address!=(0x20555 if pending else 0x20586):
+                raise ValueError('exchange status branch successor changed')
+            if pending:
+                flags[event['flag1310']] += 1
+                phase = 'eligible'
+            else:
+                outcomes['skip'] += 1
+                pending,phase = None,None
+        elif address==0x20580 and phase=='eligible':
+            phase,publication_start = 'publishing',when
+        elif address==0x20586 and phase=='publishing':
+            intervals = report['context_callers']['target_intervals']
+            if (sum(publication_start<float(row['t'])<when for row in publications)!=1
+                    or sum(row['caller']=='020581' and publication_start<row['entry_time']<row['return_time']<when
+                           for row in intervals)!=1):
+                raise ValueError('exchange publication interval is incomplete')
+            outcomes['publish'] += 1
+            pending,phase = None,None
+        elif address==0x20586 and pending is None:
+            unselected += 1
+        else:
+            raise ValueError('exchange publication route changed')
+    if pending is not None or not outcomes['skip'] or outcomes['publish']!=len(publications):
+        raise ValueError('censored exchange route or absent branch control')
+    report['exchange_status'] = dict(reads=len(reads),events=len(events),outcomes=dict(outcomes),
+        publish_flags=dict(flags),unselected_common_entries=unselected,
+        last_test=last_test,
+        scope='Owned getter reads and observed successors/publication intervals in the bounded window; '
+              'context snapshots are not retirement; no whole-track drain or EOF semantics')
     return report
 
 
@@ -332,10 +428,11 @@ def main():
     parser.add_argument('--counter-producers', action='store_true', help='also require actual CPU count increment/decrement operand reads')
     parser.add_argument('--counter-pointers', action='store_true', help='also require Address-stage counter pointer reads')
     parser.add_argument('--context-callers', action='store_true', help='also qualify wrapper call/entry/return ownership')
+    parser.add_argument('--exchange-status', action='store_true', help='also qualify actual adapter getter reads and publication branches')
     args = parser.parse_args()
     try:
         text = args.log.read_text()
-        checker = (check_context_callers if args.context_callers else check_counter_pointers if args.counter_pointers else check_counter_producers if args.counter_producers else check_activity_cycles
+        checker = (check_exchange_status if args.exchange_status else check_context_callers if args.context_callers else check_counter_pointers if args.counter_pointers else check_counter_producers if args.counter_producers else check_activity_cycles
                    if args.activity else check_return_routes if args.returns else check)
         print(json.dumps(checker(text), indent=2))
     except (ValueError, KeyError, OSError) as error:

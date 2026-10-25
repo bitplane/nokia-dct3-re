@@ -98,6 +98,8 @@ public:
 						 (address >= 0x28feb && address <= 0x28fee) ||
 						 (address >= 0x29332 && address <= 0x293ed)))
 						observe_context_calls(address,opcode);
+					if (m_playback_execute_entries[1] == 1 && address >= 0x20553 && address <= 0x20586)
+						observe_exchange_branch(address,opcode);
 					// Whole-session counters must not widen the eight-call arithmetic snapshot budget.
 					bool const detailed = m_playback_execute_entries[1] == 1 && m_playback_processing[0] <= 8;
 					if (detailed && (address == 0x24a7e || address == 0x24af3))
@@ -995,6 +997,7 @@ private:
 	u32 m_context_count_reads = 0;
 	u32 m_context_pointer_reads = 0;
 	u32 m_context_call_events = 0, m_context_call_bad = 0;
+	u32 m_exchange_status_reads = 0, m_exchange_branch_events = 0, m_exchange_branch_bad = 0;
 	u32 m_playback_slot_hash = 2166136261U;
 	u32 m_playback_dma_hash = 2166136261U;
 	std::array<double, 2> m_playback_audio_last_nonzero{};
@@ -1888,6 +1891,22 @@ private:
 			unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)),data.read_word(0xaa55),data.read_word(0xaa56),
 			data.read_word(0xaaa2),data.read_word(0xaaa3),time);
 	}
+	void observe_exchange_branch(offs_t address, u16 opcode)
+	{
+		if (address != 0x20553 && address != 0x20555 && address != 0x20580 && address != 0x20586) return;
+		double const time = machine().time().as_double();
+		if (time < 9.64 || time > 9.86) return;
+		if (opcode != (address == 0x20553 ? 0xf845 : address == 0x20580 ? 0x4811 : 0x10f8)) ++m_exchange_branch_bad;
+		if (++m_exchange_branch_events > 512) return;
+		auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
+		u16 const receiver = data.read_word(0xaa5a), context = m_cpu->state_int(tms320c54x_device::STATE_AR1);
+		bool const valid = receiver >= 0x60 && receiver <= 0xfff2 && context >= 0x60 && context <= 0xffe9;
+		if (!valid) ++m_exchange_branch_bad;
+		logerror("mu4_exchange_branch: ordinal=%u address=%06x opcode=%04x receiver=%04x table=%04x field9=%04x field13=%04x context=%04x count22=%04x flag1310=%04x t=%.9f identity=Execute_entry operands=context_only observer_writes=0\n",
+			m_exchange_branch_events,unsigned(address),opcode,receiver,valid ? data.read_word(receiver) : 0xffff,
+			valid ? data.read_word(receiver+9) : 0xffff,valid ? data.read_word(receiver+13) : 0xffff,
+			context,valid ? data.read_word(context+22) : 0xffff,data.read_word(0x1310),time);
+	}
 	void observe_playback_processing(offs_t address, u16 opcode)
 	{
 		if (address != 0x23de5 && address != 0x23de7 && address != 0x23e1b && address != 0x23e1d &&
@@ -2028,6 +2047,9 @@ private:
 			m_context_pointer_reads,unsigned(m_context_pointer_reads>256),machine().time().as_double());
 		logerror("mu4_context_call_terminal: events=%u bad=%u capped=%u first=9.640000000 last=9.860000000 t=%.9f identity=Execute_entry operands=context_only observer_writes=0\n",
 			m_context_call_events,m_context_call_bad,unsigned(m_context_call_events>1024),machine().time().as_double());
+		logerror("mu4_exchange_terminal: reads=%u events=%u bad=%u capped=%u first=9.640000000 last=9.860000000 t=%.9f identity=Access_bus_and_Execute_entry observer_writes=0\n",
+			m_exchange_status_reads,m_exchange_branch_events,m_exchange_branch_bad,
+			unsigned(m_exchange_status_reads>256 || m_exchange_branch_events>512),machine().time().as_double());
 		logerror("mu4_playback_method_terminal: entry=%u early=%u body=%u returned=%u result=%u publish=%u opcode_mismatch=%u selection=first_verified_aa99_session identity=Execute_entry observer_writes=0 audio_acceptance=0\n",
 			m_playback_method_entries[0], m_playback_method_entries[1], m_playback_method_entries[2],
 			m_playback_method_entries[3], m_playback_method_entries[4], m_playback_method_entries[5], m_playback_method_mismatch);
@@ -3117,10 +3139,15 @@ private:
 						if (m_playback_execute_entries[1] == 1 && machine().time() >= attotime::from_msec(9640) && machine().time() <= attotime::from_msec(9860))
 						{
 							u32 instruction; u16 opcode;
-							if (m_cpu->observe_staged_data_read(address,instruction,opcode) && instruction == 0x201c7)
-								if (++m_context_pointer_reads <= 256)
+							if (m_cpu->observe_staged_data_read(address,instruction,opcode))
+							{
+								if (instruction == 0x201c7 && ++m_context_pointer_reads <= 256)
 									logerror("mu4_context_pointer_read: ordinal=%u address=%04x instruction=%06x opcode=%04x word=%04x mask=%04x t=%.9f identity=Access_bus observer_writes=0\n",
 										m_context_pointer_reads,unsigned(address),instruction,opcode,value,mask,machine().time().as_double());
+								if (instruction == 0x2a310 && ++m_exchange_status_reads <= 256)
+									logerror("mu4_exchange_status_read: ordinal=%u address=%04x instruction=%06x opcode=%04x word=%04x mask=%04x t=%.9f identity=Access_bus observer_writes=0\n",
+										m_exchange_status_reads,unsigned(address),instruction,opcode,value,mask,machine().time().as_double());
+							}
 						}
 						if (!m_dma->source_read_matches(3, AS_DATA, address)) return;
 						++m_playback_dma_reads;
@@ -3757,6 +3784,7 @@ private:
 		m_context_count_reads = 0;
 		m_context_pointer_reads = 0;
 		m_context_call_events = m_context_call_bad = 0;
+		m_exchange_status_reads = m_exchange_branch_events = m_exchange_branch_bad = 0;
 		for (unsigned i=0;i<3;++i)
 		{
 			auto &stream=m_playback_word_capture[i];
