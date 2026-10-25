@@ -4,7 +4,7 @@ import unittest
 import wave
 from pathlib import Path
 
-from aac_reference_metrics import compare, read_native_s32, read_reference
+from tools.aac_reference_metrics import compare, read_native_s32, read_reference
 
 
 class ReferenceMetricsTest(unittest.TestCase):

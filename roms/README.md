@@ -257,6 +257,17 @@ acceptance do not establish audio conformance or handset playback. See
 `docs/aac_validation.md#original-mpeg-2-al09-input` for exact identities and
 the still-open alignment/end-buffer contract.
 
+`roms/research/mpeg2-aac-reference/` separately retains the original
+[ISO/IEC13818-5:2005 reference-software archive](https://standards.iso.org/ittf/PubliclyAvailableStandards/c039486_ISO_IEC_13818-5_2005_Reference_Software.zip)
+and [McGill AFsp6r8](https://www.mmsp.ece.mcgill.ca/Documents/Downloads/AFsp/AFsp-v6r8.tar.gz).
+Local provenance records the immutable hashes, retrieval and original licence
+notices. These are private research tools, never MAME dependencies or
+redistributed assets. `tools/aac_iso_reference_control.py` builds the original
+SSNRCD1.8 comparator and checks six synthetic equal-interval outcomes, explicitly
+retaining its strict peak-equality difference from the published at-most rule.
+No native-waveform alignment or codec-conformance promotion follows; see
+`docs/aac_validation.md#original-comparison-tool-controls`.
+
 ### Nokia 5110 DSP ROM4 research input
 
 A complete 5110 ROM4 DSP mask image was historically published by AlexD in

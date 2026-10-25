@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "aac_original_comparison_controls",
+      "owner": "native_aac_validation",
+      "status": "satisfied",
+      "predicate": "Pinned original SSNRCD and independent Python metrics retain their evidenced equal-interval synthetic-control outcomes",
+      "current": "The original ISO13818-5:2005 archive supplies mpeg2aac/SSNRCD1.8. Hash-pinned ISO/inner-AAC/AFsp6r8 archives are built privately without source edits; commands, compiler/source/binary hashes and raw reports are retained. Six synthetic24-bit controls cover identity, small error, RMS rejection, peak rejection, exact peak equality and a bad second stereo channel. Python and original verdicts agree in five controls. At exact maximum equality, the published at-most criterion and Python pass while SSNRCD's strict less-than test fails; that source-backed difference is required, not hidden by changing a threshold. Original default delay is zero and caller-supplied; its shorter-input truncation is not adopted by the equal-interval Python API. This validates selected metric outcomes, not native AL09 alignment, full-stream acceptance, codec conformance, playback, native handset speech or physical audio. Original licensed assets and dependency are outside SCM/MAME.",
+      "evidence": ["docs/aac_validation.md", "roms/README.md", "tools/aac_iso_reference_control.py", "tools/test_aac_iso_reference_control.py", "tools/aac_reference_metrics.py", "tools/test_aac_reference_metrics.py"]
+    },
+    {
       "id": "c54x_complete_default_checkpoint",
       "owner": "tms320c54x",
       "status": "satisfied",

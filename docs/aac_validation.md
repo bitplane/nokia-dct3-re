@@ -87,7 +87,49 @@ The captured media declares MPEG-2 AAC-LC. MPEG-4 LC adds tools including
 PNS; obtaining a MPEG-4 vector does not establish that the native library
 supports those tools. The small ADTS example package includes PNS/LTP cases
 and is not a substitute for a baseline LC test. The annex's `confTools.zip`
-contains ALS reference code, not an acquired AAC comparison utility.
+contains ALS reference code, not an AAC comparison utility. The original
+SSNRCD tool is acquired separately below.
+
+### Original comparison-tool controls
+
+The [ISO MPEG-2 reference-software archive](https://standards.iso.org/ittf/PubliclyAvailableStandards/c039486_ISO_IEC_13818-5_2005_Reference_Software.zip)
+contains `mpeg2aac.zip`, including the original SSNRCD1.8 conformance tool.
+Its README identifies the RMS/maximum-error criterion, caller-supplied signed
+sample delay (default zero), and truncation to the shorter input. None of
+these selects the correct AL09 alignment or authorizes a fitted offset.
+
+Private archives live in `roms/research/mpeg2-aac-reference/`:
+
+| Original archive | SHA-256 |
+| --- | --- |
+| `c039486_ISO_IEC_13818-5_2005_Reference_Software.zip` | `ba372c4069e9c96d0675e1442dbcb5a9c7f46d8ca760866bd51f185641ba759e` |
+| Inner `mpeg2aac.zip` | `c7037595f0152a0f8b3847a862789dcce1f8ac2c0b2b1d84f89e916434243f01` |
+| McGill `AFsp-v6r8.tar.gz` | `acf50ece855875be0233fc0848df02b106f93c7199d2410106ba27a47c2855c6` |
+
+`aac_iso_reference_control.py` checks those identities, builds the original
+SSNRCD source and [McGill's contemporaneous audio-I/O library](https://www.mmsp.ece.mcgill.ca/Documents/Downloads/AFsp/index.html)
+without source edits, and records build commands, compiler version, source
+and binary hashes. Six exactly aligned synthetic24-bit controls exercise
+identity, small error, isolated RMS/peak failures and independent stereo
+channels. Python and original-tool verdicts agree except for one deliberately
+retained boundary: at exactly the permitted maximum error, the published
+at-most rule and our helper pass, but SSNRCD1.8's strict`<` test fails.
+The original tool is not substituted for that published boundary condition.
+No delay/gain search, native sample modification or tolerance fitting occurs.
+
+```sh
+.venv/bin/python tools/aac_iso_reference_control.py \
+  roms/research/mpeg2-aac-reference/c039486_ISO_IEC_13818-5_2005_Reference_Software.zip \
+  roms/research/mpeg2-aac-reference/AFsp-v6r8.tar.gz \
+  tmp/iso-aac-metric-controls-final
+```
+
+Use a fresh output. `tmp/iso-aac-metric-controls-final` retains the qualified build,
+all generated controls, raw reports and provenance. These controls validate
+selected metric outcomes, not native decoding, AL09 alignment, complete-stream
+handling or codec conformance. ISO notices and AFsp's commercial-incorporation
+restriction remain with the original archives: neither source, library nor
+binary is included in MAME or redistributed by this project.
 
 ## Acquired Original Fixtures
 
