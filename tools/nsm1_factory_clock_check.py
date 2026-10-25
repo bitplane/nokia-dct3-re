@@ -120,9 +120,9 @@ def check(seed,reset,run):
     return check_waveform(text)
 
 
-def execute(binary,seed,reset,run):
+def execute(binary,seed,reset,run,*,observer=None):
     prepare(seed,reset,run)
-    script=Path(__file__).with_name('nsm1_factory_tone.lua').resolve()
+    script=(Path(observer) if observer is not None else Path(__file__).with_name('nsm1_factory_tone.lua')).resolve()
     command=[str(binary),'nsm1pcm','-rompath',str(Path(__file__).resolve().parents[1]/'roms'),
              '-noreadconfig','-video','none','-sound','none','-nothrottle','-joystickprovider','none',
              '-midiprovider','none','-debug','-debugger','none','-log','-verbose',

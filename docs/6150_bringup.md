@@ -440,6 +440,9 @@ confirms the generic FO=1/FE=0 eight-bit decode. The own service manual's
 16-bit PCM-frame description below is different evidence: reconcile it with
 this compatibility backend before promoting the observed width to fitted
 NSM-1 hardware. Do not silently change the generic BSP decode to match it.
+The paired software-format selection is recovered below; the observed8-bit
+choice is not, by itself, evidence that the generic BSP word-length mask is
+wrong.
 
 This reaches the same unclocked frame-delivery boundary already mapped for
 the5110, but with a different control word: do not import its16-bit `c0c8`
@@ -489,6 +492,45 @@ gates retain their original defaults. The existing5110 paired control/clock
 gate is the regression for the shared laboratory fixture implementation.
 The remaining production boundary is independently evidenced frame-clock
 enable/wiring and COBBA word/analog interpretation, not MCU tone delivery.
+
+#### Bounded native output formatting
+
+The MCU's boot compiler field28 publishes0dca at100bc, corresponding to DSP
+shared085e. Resident consumera53b/a53d copies085e to1f2b. Bit0040 of this
+configuration controls both thec00c/c0cc versusc008/c0c8 BSP setup ata49a
+and the output-formatting call at357f..3585. The latter reaches9435 through
+hook24d5. Encoder instructions and data-mask pair `ffc5/0045` atb3d7/b3d8
+are byte-pinned in the compatibility images. Why the MCU selects its complete
+configuration word remains a separate question; no emulator sets bit0040.
+
+`tmp/nsm1-factory-compand-qualified` composes the full clocked gate with
+passive program-read/register observations at9435,3587 and358a during
+86.14..86.15s. Each site is observed80 times, retaining the first32 triples.
+These are read-time register observations, not instruction-retirement claims.
+The retained inputs are positive3019 and15099. Their resulting low bytes
+92/b8 match an independent FFmpeg `pcm_alaw` encoding of unscaled signed16
+input byte-for-byte; the formatter result remains unchanged at the serial
+write point. The reference command and executable hash are recorded, and all
+underlying protocol/native/frame/storage checks remain mandatory.
+
+TI's [SPRA163A](https://www.ti.com/lit/an/spra163a/spra163a.pdf) independently
+describes EXP/NORM-based A-law companding. The structural match and observed
+positive-input comparison support an A-law-compatible interpretation here,
+not full-domain conformance. Negative inputs, zero conventions, other levels,
+the physical COBBA law and its analog transfer remain unqualified. Do not
+install a production decoder or change clocks merely from these32 samples.
+
+```sh
+.venv/bin/python tools/nsm1_factory_compand_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-factory-reset-qualified tmp/nsm1-factory-compand-qualified \
+  --mame mame/mame --ffmpeg /usr/bin/ffmpeg
+```
+
+Use a fresh output and an installed FFmpeg. The gate requires the exact
+configuration, code/sign-mask contract, complete80/80/80 coverage, ordered
+retained triples, independent reference and unchanged serial byte. Tests reject
+wrong configuration, missing/malformed observations, changed code/hooks/masks
+and reference-input scaling/format drift. No HLE compander supplies DSP data.
 
 ### Pending Toolkit command restoration
 
