@@ -5895,6 +5895,13 @@ void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
 	const auto transfer_pc = [this](u16 destination) { m_pc = destination; m_atomic_condition_redirect = true; };
+	// Match staged load admission: f8 is absolute, f9..ff are unadmitted aliases.
+	// Reject before operand reads; this is not a silicon-trap claim.
+	if (low > 0xf8 && ((op & 0xf800) == 0x1000 || (op & 0xfe00) == 0x4400 || (op & 0xfe00) == 0x5600))
+	{
+		m_illegal = true;
+		return;
+	}
 	// SPRU131G table 5-4 and the pinned TI assembler probe exclude
 	// short MOD=3 from RMW operands too, before any operand side effect.
 	if ((op & 0xfc00) == 0x6800 && (low & 0xf8) == 0x98)
