@@ -103,6 +103,18 @@ NSE-8 v6.00/v5.01 (`tmp/nse8-mbus-1100us-v600` and
 **Unresolved:** what restores global interrupt delivery after organic
 clock-stop/wake in the clock-enabled NPE-3 composition?
 
+The checked idle-body inventory in `noki6210_idle_contract.py` resolves R5
+to CTSI`20000` and the R8/R10 control constants to05/0a. Its two R5-relative
+byte stores at offset12 are disable`4b03a8` and enable`4b03ec`. Five conditional
+branches reach the enable path`4b03e2`: `4b03b0`, `4b03c0`, `4b03c8`,
+`4b03d0`, `4b03d8`. The other two permission branches target`4b03f6`,
+whose deadline rejection bypasses enable. This covers that addressing form
+within the idle body and all seven permission branches, not aliases or
+transitive helper stores. Signed branch-decoding and provenance mutations
+are tested. The current binary independently reproduces the End failure
+and all four late snapshots with global control0a, pending IRQ0 after End,
+timer-c7 interval3 and zero idle veto; no software workaround is promoted.
+
 Timer-disabled `state-call` passes; enabled ordinary outgoing and state-call
 runs fail End decode. Architectural restoration itself passes. Controls are
 `tmp/npe3-mbus-disabled-state-call`, `tmp/npe3-mbus-enabled-outgoing` and

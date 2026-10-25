@@ -10,6 +10,15 @@ NAM2 = ROOT / 'roms/noki2100/2100f521sharp.fls'
 
 
 class IdleContractTest(unittest.TestCase):
+    def test_conditional_branch_signedness(self):
+        self.assertEqual(contract.conditional_target(0x1000,0xd000),0x1004)
+        self.assertEqual(contract.conditional_target(0x1000,0xd07f),0x1102)
+        self.assertEqual(contract.conditional_target(0x1000,0xd080),0xf04)
+        self.assertEqual(contract.conditional_target(0x1000,0xd1ff),0x1002)
+        for word in (0xe000,0xde00,0xdf00):
+            with self.assertRaises(ValueError):
+                contract.conditional_target(0x1000,word)
+
     def test_unknown_image_rejected(self):
         with self.assertRaisesRegex(ValueError, 'unchanged acquired'):
             contract.inspect(b'unknown')
@@ -21,11 +30,29 @@ class IdleContractTest(unittest.TestCase):
         self.assertEqual(result['clock_store_targets'], ['0x2000d'] * 2)
         self.assertEqual(result['final_idle_predicate_constant'], 1)
         self.assertFalse(result['physical_clock_semantics_established'])
+        inventory=result['permission_branch_inventory']
+        self.assertEqual(inventory['enable_predecessors'],
+                         ['0x4b03b0','0x4b03c0','0x4b03c8','0x4b03d0','0x4b03d8'])
+        self.assertEqual(inventory['other_permission_targets'],['0x4b03f6']*2)
         for address in [row[0] for row in contract.BLOCKS] + [0x500a54]:
             changed = bytearray(image)
             changed[address-contract.BASE] ^= 1
             with self.subTest(address=hex(address)), self.assertRaises(ValueError):
                 contract.decode_blocks(changed)
+
+    @unittest.skipUnless(FLASH.exists(), 'requires own acquired NPE-3')
+    def test_permission_and_control_provenance_mutations(self):
+        image=FLASH.read_bytes()
+        for address in (0x4b0354,0x4b035e,0x4b0362,0x4b045c,0x4b03a8,
+                        0x4b03b0,0x4b03b8,0x4b03c0,0x4b03c8,0x4b03d0,0x4b03d8,0x4b03e0):
+            changed=bytearray(image)
+            changed[address-contract.BASE]^=1
+            with self.subTest(address=hex(address)),self.assertRaises(ValueError):
+                contract.enable_predecessors(changed)
+        changed=bytearray(image)
+        changed[0x4b034c-contract.BASE:0x4b034e-contract.BASE]=bytes.fromhex('7329')
+        with self.assertRaisesRegex(ValueError,'inventory differs'):
+            contract.enable_predecessors(changed)
 
     @unittest.skipUnless(FLASH.exists() and NAM2.exists(), 'requires both own images')
     def test_shared_conclusion_not_shared_addresses(self):

@@ -16,6 +16,42 @@ BLOCKS = (
 )
 
 
+def conditional_target(address,opcode):
+    """Thumb-1 conditional branch, including backward signed displacements."""
+    if opcode & 0xf000 != 0xd000 or (opcode >> 8) & 15 >= 14:
+        raise ValueError('requires Thumb conditional branch')
+    displacement=opcode & 255
+    if displacement & 128:
+        displacement-=256
+    return address+4+2*displacement
+
+
+def enable_predecessors(image):
+    def halfword(address):
+        return struct.unpack_from('>H',image,address-BASE)[0]
+    # R5 is the own MMIO base; R8/R10 carry the explicit enable/disable values.
+    expected={0x4b0340:0xb5f0,0x4b0354:0x2005,0x4b0356:0x4680,
+              0x4b035e:0x200a,0x4b0360:0x4682,0x4b0362:0x4d3e,
+              0x4b03a6:0x4650,0x4b03a8:0x7328,0x4b03ea:0x4640,0x4b03ec:0x7328}
+    if any(halfword(a)!=word for a,word in expected.items()):
+        raise ValueError('idle control register/value provenance differs')
+    literal=((0x4b0362+4)&~3)+(halfword(0x4b0362)&255)*4
+    if struct.unpack_from('>I',image,literal-BASE)[0]!=0x20000:
+        raise ValueError('idle control store MMIO base differs')
+    branches=[(0x4b03b0,0xd017),(0x4b03b8,0xd11d),(0x4b03c0,0xd00f),
+              (0x4b03c8,0xd00b),(0x4b03d0,0xd007),(0x4b03d8,0xd003),(0x4b03e0,0xd109)]
+    if any(halfword(a)!=word for a,word in branches):
+        raise ValueError('idle permission branch differs')
+    direct=[hex(a) for a in range(0x4b0340,0x4b041a,2) if halfword(a)&0xfff8==0x7328]
+    if direct!=['0x4b03a8','0x4b03ec']:
+        raise ValueError('idle direct control-store inventory differs')
+    return dict(direct_control_stores=direct,
+        enable_predecessors=[hex(a) for a,word in branches if conditional_target(a,word)==0x4b03e2],
+        other_permission_targets=[hex(conditional_target(a,word)) for a,word in branches
+                                  if conditional_target(a,word)!=0x4b03e2],
+        scope='R5-relative byte stores at offset12 and seven permission branches; excludes aliases and transitive helper writers')
+
+
 def decode_blocks(image):
     """Validate complete blocks before interpreting their literals or successors."""
     for address, encoded in BLOCKS:
@@ -28,6 +64,7 @@ def decode_blocks(image):
         if struct.unpack_from('>I', image, literal-BASE)[0] != 0x20000:
             raise ValueError('clock-helper MMIO base differs')
     return {
+        'permission_branch_inventory':enable_predecessors(image),
         'explicit_enable': '0x4b03ec', 'enable_value': 5,
         'guard_return': '0x4b040e', 'zero_guard_target': '0x4b0368',
         'nonzero_guard_target': '0x4b0412', 'clock_helper': '0x500a18',
