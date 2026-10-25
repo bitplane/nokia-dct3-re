@@ -277,6 +277,16 @@ Do not use a blanket`rm -rf tmp` as a substitute.
 
 ## MAME
 
+`tools/process_runner.py` owns process-group startup, timeout/SIGTERM cleanup,
+reaping and optional terminal metadata. The C54x runner and NSE-2 lifecycle
+runners share this implementation; product preparation and acceptance stay in
+their own modules. `run_emulator` records command/returncode/interrupted in
+the private run's`exit_status.json`; `run_stage` raises on a failed child
+without writing into a shared parent working directory. Older imports from
+the C54x and PUK2 runners remain thin compatibility exports, not another
+implementation. Lifecycle tests exercise real completion/timeout and mocked
+group termination.
+
 The driver `driver/nokia_dct3.cpp` is overlaid onto an upstream
 [MAME](https://github.com/mamedev/mame) checkout (pinned commit in the Makefile);
 MAME is not vendored. See `LICENSE` for the licensing split.

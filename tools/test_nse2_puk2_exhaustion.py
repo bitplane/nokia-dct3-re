@@ -9,8 +9,8 @@ from tools.sim_security_trace_check import ATTEMPTS_OFFSET,AOC_NVRAM_SIZE
 
 class ExhaustionTest(unittest.TestCase):
     def test_timeout_kills_the_owned_process_group(self):
-        with patch('tools.run_nse2_puk2_exhaustion.subprocess.Popen') as spawn, \
-             patch('tools.run_nse2_puk2_exhaustion.os.killpg') as kill:
+        with patch('tools.process_runner.subprocess.Popen') as spawn, \
+             patch('tools.process_runner.os.killpg') as kill:
             process=spawn.return_value
             process.pid=1234
             process.wait.side_effect=[subprocess.TimeoutExpired(['runner'],1),0]
@@ -21,7 +21,7 @@ class ExhaustionTest(unittest.TestCase):
             self.assertEqual(process.wait.call_count,2)
 
     def test_failed_stage_does_not_continue(self):
-        with patch('tools.run_nse2_puk2_exhaustion.subprocess.Popen') as spawn:
+        with patch('tools.process_runner.subprocess.Popen') as spawn:
             spawn.return_value.wait.return_value=2
             with self.assertRaises(subprocess.CalledProcessError):
                 run_stage(['runner'],'cwd',None)
@@ -30,8 +30,8 @@ class ExhaustionTest(unittest.TestCase):
         previous=signal.getsignal(signal.SIGTERM)
         def interrupted(*args,**kwargs):
             signal.getsignal(signal.SIGTERM)(signal.SIGTERM,None)
-        with patch('tools.run_nse2_puk2_exhaustion.subprocess.Popen') as spawn, \
-             patch('tools.run_nse2_puk2_exhaustion.os.killpg') as kill:
+        with patch('tools.process_runner.subprocess.Popen') as spawn, \
+             patch('tools.process_runner.os.killpg') as kill:
             process=spawn.return_value
             process.pid=1234
             # The second wait reaps the killed process rather than interrupting again.

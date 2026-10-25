@@ -13,7 +13,7 @@ if __package__ in (None, ''):
 from tools.nse2_fdn_check import check_phase, check_record, check_dial
 from tools.nse2_sim_check import verify_pin2_input, verify_security_attempt
 from tools.run_nse2_native import prepare_native
-from tools.run_nse2_puk2_exhaustion import run_stage
+from tools.process_runner import run_stage
 from tools.sim_fdn_profile import extend
 
 

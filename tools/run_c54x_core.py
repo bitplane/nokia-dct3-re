@@ -2,42 +2,14 @@
 """Isolated native C54x conformance run; intentional completion exits with code 3."""
 import argparse
 import json
-import os
 import re
 from pathlib import Path
-import signal
-import subprocess
 import sys
 import tempfile
 
-
-def run_emulator(command, run, output, timeout=None):
-    """Own and reap the complete child group even if the launcher is interrupted."""
-    def terminate(signum, frame):
-        raise SystemExit(128 + signum)
-
-    previous = signal.signal(signal.SIGTERM, terminate)
-    process = None
-    interrupted = False
-    try:
-        process = subprocess.Popen(command, cwd=run, stdout=output,
-                                   stderr=subprocess.STDOUT, start_new_session=True)
-        try:
-            return process.wait(timeout=timeout)
-        except BaseException:
-            interrupted = True
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            process.wait()
-            raise
-    finally:
-        signal.signal(signal.SIGTERM, previous)
-        (run / 'exit_status.json').write_text(json.dumps({
-            'returncode': process.returncode if process is not None else None,
-            'command': command, 'interrupted': interrupted,
-        }, indent=2) + '\n')
+if __package__ in (None, ''):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools.process_runner import run_emulator
 
 IMMEDIATE_MAPPED_REQUIRED = (
     "TMS320C54x original byte-count prefix: PASS cases=16 restore=16 words=13 sizes=8 pages=2 mapped_reads=2 data_writes=3 silicon_phase_claim=0",

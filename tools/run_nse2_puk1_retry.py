@@ -10,7 +10,7 @@ from PIL import Image
 if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from tools.run_nse2_native import prepare_native
-from tools.run_nse2_puk2_exhaustion import run_stage
+from tools.process_runner import run_stage
 from tools.nse2_puk1_check import check_wrong, check_cold, input_remaining
 
 

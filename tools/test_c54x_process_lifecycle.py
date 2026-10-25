@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools.run_c54x_core import run_emulator
+from tools.process_runner import run_emulator
 
 
 class ProcessLifecycleTest(unittest.TestCase):
@@ -33,8 +33,8 @@ class ProcessLifecycleTest(unittest.TestCase):
     def test_sigterm_cleans_group_and_restores_handler(self):
         previous = signal.getsignal(signal.SIGTERM)
         with tempfile.TemporaryDirectory() as directory, \
-                patch('tools.run_c54x_core.subprocess.Popen') as spawn, \
-                patch('tools.run_c54x_core.os.killpg') as kill:
+                patch('tools.process_runner.subprocess.Popen') as spawn, \
+                patch('tools.process_runner.os.killpg') as kill:
             child = spawn.return_value
             child.pid = 1234
             child.returncode = -signal.SIGKILL

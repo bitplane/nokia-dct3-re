@@ -12,6 +12,7 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.nse2_package_check import inspect
 from tools.nse2_boot_check import NV_BLOCKS, verify, verify_record, verify_upload
+from tools.process_runner import run_emulator
 
 
 def checksum_fixture(*, record_checksum=False):
@@ -84,10 +85,9 @@ def main():
         report['command'] = command
         (run / 'inputs.json').write_text(json.dumps(report, indent=2) + '\n')
         with (run / 'console.log').open('w') as console:
-            completed = subprocess.run(command, cwd=run, stdout=console, stderr=subprocess.STDOUT)
-        (run / 'exit_status.json').write_text(json.dumps({'returncode': completed.returncode}) + '\n')
-        if completed.returncode != 0:
-            raise ValueError(f'NSE-2 MAME exited {completed.returncode}')
+            returncode = run_emulator(command, run, console)
+        if returncode != 0:
+            raise ValueError(f'NSE-2 MAME exited {returncode}')
         console = (run / 'console.log').read_text(errors='replace')
         if 'LUA ERROR' in console or 'Error in' in console:
             raise ValueError('NSE-2 observer failed')

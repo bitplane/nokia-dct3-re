@@ -9,7 +9,7 @@ import sys
 if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from tools.run_nse2_native import prepare_native
-from tools.run_nse2_puk2_exhaustion import run_stage
+from tools.process_runner import run_stage
 from tools.c54x_rom4_port_census import classify_candidates
 from tools.c54x_opcode_coverage import summarize,require_extension_decoding
 from tools.nse2_sampling_check import (inspect_word_configuration_contract,

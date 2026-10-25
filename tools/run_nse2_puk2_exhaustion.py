@@ -2,9 +2,7 @@
 import argparse
 import hashlib
 import json
-import os
 from pathlib import Path
-import signal
 import subprocess
 import sys
 
@@ -12,6 +10,7 @@ if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from tools.nse2_sim_check import verify_pin2_input
 from tools.sim_security_trace_check import ATTEMPTS_OFFSET,AOC_NVRAM_SIZE
+from tools.process_runner import run_stage
 
 
 def check_transition(before,after,remaining):
@@ -23,28 +22,6 @@ def check_transition(before,after,remaining):
     expected[ATTEMPTS_OFFSET+3]=remaining
     if after!=expected:
         raise ValueError('PUK2 exhaustion modified unrelated storage')
-
-
-def run_stage(command,cwd,stream,timeout=180):
-    def terminate(signum,frame):
-        raise SystemExit(128+signum)
-    previous=signal.signal(signal.SIGTERM,terminate)
-    try:
-        process=subprocess.Popen(command,cwd=cwd,stdout=stream,stderr=subprocess.STDOUT,start_new_session=True)
-        try:
-            status=process.wait(timeout=timeout)
-        except BaseException:
-            # Killing only the Python runner would leave its MAME child alive.
-            try:
-                os.killpg(process.pid,signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            process.wait()
-            raise
-        if status:
-            raise subprocess.CalledProcessError(status,command)
-    finally:
-        signal.signal(signal.SIGTERM,previous)
 
 
 def main():

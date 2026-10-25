@@ -11,7 +11,7 @@ from PIL import Image
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.run_nse2_native import prepare_native
-from tools.run_c54x_core import run_emulator
+from tools.process_runner import run_emulator
 from tools.nse2_toolkit_check import check_trace, check_storage
 from tools.nse2_sim_check import PHONEBOOK_SAVED_FRAME
 from tools.sim_phonebook_check import validate_phonebook_storage

@@ -25,7 +25,7 @@ class CoreCliTests(unittest.TestCase):
                 argv = ['run_c54x_core', '--mame', 'mame/mame', '--rompath', 'mame/roms', '--output-root', str(root)]
                 if verbose:
                     argv.append('--verbose')
-                with patch('sys.argv', argv), patch('tools.run_c54x_core.subprocess.Popen', side_effect=execute), contextlib.redirect_stdout(io.StringIO()):
+                with patch('sys.argv', argv), patch('tools.process_runner.subprocess.Popen', side_effect=execute), contextlib.redirect_stdout(io.StringIO()):
                     self.assertEqual(main(), 0)
                 self.assertEqual('-verbose' in command, verbose)
                 status = json.loads(next(root.glob('*/exit_status.json')).read_text())
@@ -38,7 +38,7 @@ class CoreCliTests(unittest.TestCase):
                 kwargs['stdout'].write('\n'.join(REQUIRED + [COMPLETION]) + '\n')
                 return SimpleNamespace(returncode=0, wait=lambda timeout=None: 0)
             argv = ['run_c54x_core', '--mame', 'mame/mame', '--rompath', 'mame/roms', '--output-root', str(root)]
-            with patch('sys.argv', argv), patch('tools.run_c54x_core.subprocess.Popen', side_effect=execute), \
+            with patch('sys.argv', argv), patch('tools.process_runner.subprocess.Popen', side_effect=execute), \
                  contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(main(), 1)
             self.assertEqual(json.loads(next(root.glob('*/exit_status.json')).read_text())['returncode'], 0)

@@ -4,7 +4,7 @@ import json
 from PIL import Image
 
 from tools.run_nse2_native import prepare_native
-from tools.run_nse2_puk2_exhaustion import run_stage
+from tools.process_runner import run_stage
 from tools.nse2_puk1_check import check_wrong, check_permanent, input_remaining
 
 

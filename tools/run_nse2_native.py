@@ -12,6 +12,7 @@ from PIL import Image
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.run_nse2_boundary import prepare
+from tools.process_runner import run_emulator
 from tools.nse2_native_check import verify_native, verify_menu_probe, verify_nominal_voltage
 from tools.nse2_sim_check import verify_sim_reads, verify_security_attempt, verify_post_auth_menu
 from tools.nse2_lifecycle_check import (
@@ -216,10 +217,9 @@ def main():
         report['command'] = command
         (run / 'inputs.json').write_text(json.dumps(report, indent=2) + '\n')
         with (run / 'console.log').open('w') as stream:
-            result = subprocess.run(command, cwd=run, stdout=stream, stderr=subprocess.STDOUT)
-        (run / 'exit_status.json').write_text(json.dumps({'returncode': result.returncode}) + '\n')
-        if result.returncode:
-            raise ValueError(f'native MAME exit {result.returncode}')
+            returncode = run_emulator(command, run, stream)
+        if returncode:
+            raise ValueError(f'native MAME exit {returncode}')
         console = (run / 'console.log').read_text(errors='replace')
         if 'LUA ERROR' in console or 'Error in' in console:
             raise ValueError('native observer failed')
