@@ -2161,34 +2161,63 @@ identifies separate MA4 and MU4 assemblies, including UI-module keypad,
 display, USB and music functions. These are product differences to recover,
 not permission to borrow another handset's keypad or UI completion events.
 
+### Scalar memory-logic absolute aliases
+
+Memory AND/OR/XOR must not treat reserved address bytes`f9..ff` as the
+canonical absolute form`f8`. The staged classifier already rejects these;
+the atomic frontend formerly fetched the extension, read data and changed
+the destination accumulator. The isolated `logic-abs-edge` unchanged-core
+control fails at case56, its first atomic case, on the no-data-access check.
+The early admission guard now rejects before operand effects. This is
+fail-closed emulator admission consistency, not a silicon-trap claim.
+
+The672-case/restoration matrix covers all three operations, both destination
+accumulators, seven aliases, CMPT settings, program pages, frontends and two
+checkpoints. A/B/T, status and every AR are retained with zero data reads or
+writes. The legal `logic-absolute` control separately retains1536 cases/restores
+with exactly one source read, no data write and retained operands. Long MOD13
+and ordinary source forms are unchanged; other instruction families remain
+outside this alias audit.
+
+```sh
+.venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
+  --profile logic-abs-edge --output-root tmp/c54x-logic-alias-fixed
+.venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
+  --profile logic-absolute --output-root tmp/c54x-logic-alias-legal
+```
+
+The negative capture is `tmp/c54x-logic-alias-negative/run_c54x_core_nqifkx2q`;
+accepted controls are `tmp/c54x-logic-alias-fixed/run_c54x_core_7s58o4k8`
+and `tmp/c54x-logic-alias-legal/run_c54x_core_piarsysf`.
+
 ## Core regression checkpoint
 
 The default C54x suite passes with the source/RMW admission guards and
-atomic load, memory-T multiply, MPY/MAC, LTD/DELAY, MACP/MACD and RMW
+atomic load, memory-T multiply, MPY/MAC, LTD/DELAY, MACP/MACD, RMW and memory-logic
 absolute-alias corrections.
 All 293 required markers appear exactly once, followed by core conformance
 PASS and intentional MAME exit 3; the isolated runner returns 0, with
 `interrupted=false`. The capture is
-`tmp/c54x-rmw-full-regression/run_c54x_core_n33owkhx`:
+`tmp/c54x-logic-alias-full-regression/run_c54x_core_1zn8i2k4`:
 
 ```sh
-.venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath roms \
-  --output-root tmp/c54x-rmw-full-regression
+.venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
+  --output-root tmp/c54x-logic-alias-full-regression
 ```
 
 The recorded executable SHA256 is
-`37a0107ab3c3a14a57b5d03bffc2003c0f71d635b5ef7df635fde9b5bc4ec6d2`.
+`983e29ada49d23115d25e26907b5b422a49d5d77ad0071c0dd786406a0b22084`.
 CPU source SHA256 is
-`b472c46d552ab9f2ca285063ed9ef01352955b3427c807d7f82a26f51879414e`;
+`2aca08f76601f01557a69a48de732eb07e5033a70475c4b7ee4479b06336c468`;
 fixture source SHA256 is
-`ba15e9b5ee48cda36437a9e5ce0e2fd2a851fb96f87dc082fc4c0da885407468`.
+`bb90a4c74df180277a6bc14a1613171cf626bb75f26b06ae3fead56015da08d5`.
 All three still match after completion. Its5,690 distinct executable-opcode
 assertions exactly match the preceding complete run, with no lost or added
 forms. Optional
 profiles retain their separate acceptance scopes; this run does not prove
 the complete ISA, physical pipeline timing, fitted DSP-mask compatibility,
 native RF or end-to-end handset speech and calls. The separate tool suite passes
-5,230 tests (one skip). Revision-bound checkpoints below preserve their narrower
+5,256 tests (one skip). Revision-bound checkpoints below preserve their narrower
 instruction and original-firmware comparisons, not competing current
 default-suite baselines.
 
@@ -2198,7 +2227,7 @@ atomic and staged modes:163 frames,26,080 reference-exact PCM samples and
 Phone book menu oracle also remains exact. These are codec/component and
 handset-UI preservation controls, not native RF or call-media acceptance.
 The same binary also passes the full reset-bank6150 laboratory clocked-tone
-gate in `tmp/nsm1-post-rmw-native-tone`, preserving its cold-input, storage,
+gate in `tmp/nsm1-post-logic-native-tone`, preserving its cold-input, storage,
 SIM, pixel and waveform checks. This does not promote production audio clocks.
 
 The cold-catalogue checkpoint adds no CPU instruction admissions. Its staged

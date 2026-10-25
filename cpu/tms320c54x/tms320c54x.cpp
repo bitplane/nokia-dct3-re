@@ -5895,9 +5895,10 @@ void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
 	const auto transfer_pc = [this](u16 destination) { m_pc = destination; m_atomic_condition_redirect = true; };
-	// Match staged load admission: f8 is absolute, f9..ff are unadmitted aliases.
+	// Match staged load/logic admission: f8 is absolute, f9..ff are unadmitted aliases.
 	// Reject before operand reads; this is not a silicon-trap claim.
-	if (low > 0xf8 && ((op & 0xf800) == 0x1000 || (op & 0xfe00) == 0x4400 || (op & 0xfe00) == 0x5600))
+	if (low > 0xf8 && ((op & 0xf800) == 0x1000 || (op & 0xfe00) == 0x4400 || (op & 0xfe00) == 0x5600 ||
+			(op & 0xfe00) == 0x1800 || (op & 0xfe00) == 0x1a00 || (op & 0xfe00) == 0x1c00))
 	{
 		m_illegal = true;
 		return;
