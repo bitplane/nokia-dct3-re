@@ -1981,6 +1981,26 @@ firmware bug or an emulation bug. Preserve the rejecting completion gate until
 an independent intended extent or legitimate end-buffer control resolves that
 distinction.
 
+The bounded original R060/R061 comparison does not expose a revised drain
+contract in the surveyed AA99 paths. Across49,843 and49,863 mapped words,
+respectively, both images satisfy the same cleanup-ingress, reservation,
+context-lane, publication and decoder-return contracts, including their
+literal/immediate-call censuses. Of235 pinned final-input words, only
+`02958b` differs: the far-call operand changes from `9005` to `9019`
+in the separate control-2 cleanup branch. The default `aa1a=1` store and
+one-pass gate are unchanged. This is not optional-callee equivalence, R061
+execution, an all-image writer closure or proof that other revision changes
+cannot affect playback. Do not substitute R061 as an evidenced tail fix.
+
+The comparison requires the hash-pinned original R061 container and records
+both input identities in its JSON report:
+
+```sh
+.venv/bin/python tools/mu4_context_contract.py \
+  roms/5510-mu4-reference/InitData_R060.a00 \
+  --compare-playback-revision roms/5510-mu4-reference/InitData_R061.a00
+```
+
 ### Decoded-Bank Copy Correspondence
 
 `mu4_pcm_copy_observe.lua` captures actual copy-helper source reads from

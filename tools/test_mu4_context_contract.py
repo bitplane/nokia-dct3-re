@@ -45,6 +45,7 @@ from tools.mu4_context_contract import (EXCHANGE_PUBLICATION_WITNESSES,
 from tools.mu4_context_contract import PLAYBACK_INFO_QUERY_WITNESSES, decode_playback_info_query
 from tools.mu4_context_contract import PLAYBACK_BUFFER_REFRESH_BASE, PLAYBACK_BUFFER_REFRESH_WITNESS, decode_playback_buffer_refresh
 from tools.mu4_context_contract import playback_final_input_words, decode_playback_final_input
+from tools.mu4_context_contract import compare_playback_revision_words
 from tools.mu4_context_contract import pocp_count_words, decode_pocp_buffer_count
 from tools.mu4_context_contract import RECORDER_STOP_FRONTEND, decode_recorder_stop_frontend
 from tools.mu4_context_contract import RECORDER_STOP_MAILBOX, decode_recorder_stop_mailbox
@@ -94,6 +95,28 @@ from tools.mu4_context_contract import RECORD_WINDOW_BASE, RECORD_WINDOW_WITNESS
 
 
 class ContextContractTest(unittest.TestCase):
+    def test_playback_revision_comparison_keeps_optional_call_distinct(self):
+        reference = playback_final_input_words()
+        for spans in (PLAYBACK_CLEANUP_INGRESS.items(),WORKER_RESERVATION_WITNESSES,
+                      CONTEXT_LANE_WITNESSES,EXCHANGE_PUBLICATION_WITNESSES,
+                      ((DECODER_RETURN_BASE,DECODER_RETURN_WITNESS),*DECODER_RETURN_WRAPPERS)):
+            for base,witness in spans:
+                reference.update({base+i:value for i,value in enumerate(witness)})
+        candidate = reference | {0x2958b:0x9019}
+        result = compare_playback_revision_words(reference,candidate)
+        self.assertEqual(result['final_input_words'],235)
+        self.assertEqual(result['final_input_difference']['candidate'],'9019')
+        self.assertEqual(len(result['unchanged_contract_checks']),5)
+        for address in (0x294fd,0x2958b,0x20545,0x201c7,0x293cf):
+            with self.subTest(address=hex(address)),self.assertRaises(ValueError):
+                compare_playback_revision_words(reference,candidate | {address:candidate[address]^1})
+        with self.assertRaises(ValueError):
+            compare_playback_revision_words(reference,reference)
+        with self.assertRaisesRegex(ValueError,'census changed'):
+            compare_playback_revision_words(reference,candidate | {0x2ffff:0xaa1a})
+        with self.assertRaises(ValueError):
+            compare_playback_revision_words(reference,{a:v for a,v in candidate.items() if a!=0x294fd})
+
     def test_exchange_publication_source_and_zero_classes(self):
         words = {base+i:value for base,witness in EXCHANGE_PUBLICATION_WITNESSES
                  for i,value in enumerate(witness)}

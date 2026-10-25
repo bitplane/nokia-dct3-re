@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_r060_r061_playback_policy_comparison",
+      "owner": "native_aac_validation",
+      "status": "satisfied",
+      "predicate": "The acquired original R060/R061 AA99 images retain the surveyed playback policy and local context contracts apart from one explicit optional-call operand",
+      "current": "The hash-pinned CLI compares49843 R060 and49863 R061 mapped AA99 words. Cleanup-ingress103, reservation93, context-lane121, publication100 and decoder-return62 word-check contracts match, including the returned literal/immediate-call census data; mapped-word counts are retained separately. Of235 pinned final-input words, only02958B changes9005->9019, an operand in the separate control2 cleanup far call. The defaultAA1A=1 initialization and0294FD one-pass gate remain identical. Tests reject changed/missing gate, helper or routing words, an extraAA1A literal and an absent or altered expected difference. The CLI requires originalR061 SHA256fad9a4d8c340c91fc06355ba18b42cdff9f2682ed48abb88903344d281b89d99 and records both container identities. This is bounded source comparison, not optional-callee equivalence, all-image/indirect writer closure, R061 execution or evidence that switching revision fixes AAC draining.",
+      "evidence": ["docs/aac_validation.md", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py"]
+    },
+    {
       "id": "mu4_native_adapter_publication_status",
       "owner": "native_aac_validation",
       "status": "satisfied",

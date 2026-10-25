@@ -2104,6 +2104,33 @@ def decode_playback_final_input(words):
                 scope='Source-selected final-input control flow; not intended track sample count, all live message delivery, or correct whole-file/audio completion')
 
 
+def compare_playback_revision_words(reference,candidate):
+    """Bounded R060/R061 AA99 comparison, not product/runtime equivalence."""
+    checkers = (decode_playback_cleanup_ingress,decode_worker_reservation,
+                decode_context_lanes,decode_exchange_publication,decode_decoder_return_dispatch)
+    unchanged = {}
+    for checker in checkers:
+        left,right = checker(reference),checker(candidate)
+        if ({key:value for key,value in left.items() if key!='mapped_words_scanned'} !=
+                {key:value for key,value in right.items() if key!='mapped_words_scanned'}):
+            raise ValueError('revision contract data or census changed')
+        unchanged[checker.__name__] = left['pinned_words']
+    expected = playback_final_input_words()
+    decode_playback_final_input(reference)
+    if any(address not in candidate for address in expected):
+        raise ValueError('revision final-input source incomplete')
+    differences = {address:(reference[address],candidate[address]) for address in expected
+                   if reference[address]!=candidate[address]}
+    if differences != {0x2958b:(0x9005,0x9019)}:
+        raise ValueError('revision final-input difference changed')
+    return dict(reference_mapped_words=len(reference),candidate_mapped_words=len(candidate),
+        unchanged_contract_checks=unchanged,final_input_words=len(expected),
+        final_input_difference=dict(address='02958b',reference='9005',candidate='9019',
+            meaning='Operand of far call in control2 cleanup branch; target semantics not compared'),
+        scope='Original AA99 bounded source comparison and exact immediate-call/literal censuses; '
+              'not other images, all indirect writers, optional callee equivalence, R061 execution or full drain behavior')
+
+
 def reference_refill_completion(pending, supplied, field6):
     """Only the pending test and low-word cursor update, not the full receiver."""
     if any(not 0 <= word <= 0xffff for word in (pending, supplied, field6)):
@@ -3001,6 +3028,8 @@ def contract(source):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source', type=Path)
+    parser.add_argument('--compare-playback-revision',type=Path,
+                        help='compare bounded playback contracts against the original R061 image; not runtime support')
     parser.add_argument('--recording-header-log', type=Path,
                         help='check the bounded first-eight-header argument observation')
     parser.add_argument('--playback-poly-log', type=Path,
@@ -3015,7 +3044,18 @@ def main():
     if args.recording_session_reference_prefix and not args.recording_session_reference:
         parser.error('--recording-session-reference-prefix requires --recording-session-reference')
     try:
-        result = contract(args.source.read_bytes())
+        source = args.source.read_bytes()
+        result = contract(source)
+        if args.compare_playback_revision:
+            candidate = args.compare_playback_revision.read_bytes()
+            candidate_hash = hashlib.sha256(candidate).hexdigest()
+            if candidate_hash!='fad9a4d8c340c91fc06355ba18b42cdff9f2682ed48abb88903344d281b89d99':
+                raise ValueError('playback revision comparison requires the original R061 source')
+            comparison = compare_playback_revision_words(
+                uploaded_word_image(bytes.fromhex(source.decode('ascii')),'aa99'),
+                uploaded_word_image(bytes.fromhex(candidate.decode('ascii')),'aa99'))
+            comparison.update(reference_sha256=hashlib.sha256(source).hexdigest(),candidate_sha256=candidate_hash)
+            result['playback_revision_comparison'] = comparison
         if args.recording_header_log:
             result['recording_header_observation'] = recording_header_observations(args.recording_header_log.read_text())
         if args.playback_poly_log:
