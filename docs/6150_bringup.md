@@ -278,8 +278,8 @@ at2b2ef8; its result builder writes **D2** at2b2e74. These decoded command
 and compiler-field namespaces are separate. No ordinary PLAY TONE producer
 has been established by this table entry; do not synthesize a D1 call to
 make the compiler fire. The live Toolkit handler instead posts event4190;
-its output consumer remains the next lead, retaining indirect/interior-call
-uncertainty. Its separate timer completion is qualified above.
+its output consumer is traced below. Its separate timer completion is
+qualified above.
 
 ```sh
 .venv/bin/python tools/nsm1_toolkit_tone_boundary_check.py tmp/nsm1-pin-menu \
@@ -290,9 +290,107 @@ Add `--mame mame/mame` with a fresh output to reproduce. It also requires
 the ordinary hold fixture's exact prompts, no completion/physical Quit,
 native samples, authentication and unchanged complete storage. The tone
 screen therefore does not establish that a DSP tone request was published
-through this aperture. Trace event4190's consumer before constructing a peer
-reply; other transports, arbitrary time windows and physical clocks remain
-outside this absence result.
+through this aperture. Other transports, arbitrary time windows and physical
+clocks remain outside this absence result.
+
+The read-only `tmp/nsm1-toolkit-tone-policy-table` capture passes the ordinary
+hold checker. Event4190 is functional deferred work: task5 drains the ring
+at1112dc through2bd77c, and consumer2958e0 selects296594. Constructor2c005e
+posts task6 message `002db0380a02005a`; task6 receives that exact message.
+Its descriptor2db038 selects channel1, but admission byte111922 is zero and
+descriptor flags are zero. Execution therefore takes2a8748 to2a88e8 before
+script interpretation. This is not evidence of a missing DSP reply.
+
+Startup explicitly clears that admission byte twice at23.846s through
+2c0118. Direct ROM-data reads identify sequence interpreter2bd230 consuming
+`4194, 1` at2cb400, reached through callback handler2bd2d6 with callbacka5
+and sequence62b9. The sequence base2ca91c plus index2b9*4 gives2cb400;
+callback record2cbe7c in table2cb954 contains62b9. This is a data-driven
+producer, not an absent message-post callsite. Initialization2bffb8 also
+sets admission according to cached byte11fc07==4. Routine291fb0 copies that
+byte from byte5 of a selected12-byte record at111ee0+12*index. Loader2923a0
+loads seven variants of NV key0762 into that bank; the own descriptor at
+2da414 specifies offset3f9c, size12. Observed copies of records0 and6 contain
+12 erased bytes each. Routine292550 copies the selected record then emits
+0195,01a8 and01b1; callbacka5 is subsequently observed on0196. Event0196
+declares no arguments: leftover argument-buffer contents are not payload.
+
+Selector292bb8 chooses index6 when catalogue byte11fc8e equals1. Transition
+1e2 sets that byte on0720; transition1e8 clears it on0721. Task1 emits0720
+through2a1e64/2bd830 from callsite280c20. Header0720 also declares zero
+arguments. The task1 branch tests external-status2000e bit1 and CCONT
+selector0, read by2bb822/2c32f4 and compared with0312 and0390. Raw input
+comparisons do not establish physical pin ownership or open-pin voltage.
+
+| Raw selector0 | External status | Settings selection / tone admission |
+| --- | --- | --- |
+| 0 (default) | 0 (default) | 0720 sets state8e; record6; channel1 disabled |
+| 0 | 2 | Same0720, record6 and rejected task6 descriptor |
+| 1023 | 2 | No0720 observed; state8e stays0, record0; channel1 still disabled |
+
+The default captures pass the ordinary hold checker. The bit1-high capture
+`tmp/nsm1-toolkit-tone-policy-high` passes protocol, native samples, observer
+status and complete-storage checks under its explicitly different CFG;
+it is not a baseline configuration gate. Rebuilt default capture
+`tmp/nsm1-toolkit-tone-policy-low-rebuilt` passes the full hold checker.
+Neither a high bit1 alone nor an ff settings byte establishes correct
+unattached/silent-mode policy. Defaults remain unchanged.
+The combined-input capture `tmp/nsm1-toolkit-tone-policy-both-high` also
+passes protocol/native/storage/observer checks. Its task1 trace reaches
+28051e with sample03ff; callbacka5 still runs once on0196 with cachedff,
+and the actual tone message is still rejected before script interpretation.
+Input-driven record selection and erased record content are therefore
+separate observed issues; avoiding0720 is not sufficient to produce audio.
+`tools/nsm1_tone_policy_contract.py` checks the own instruction/literal
+anchors, descriptor, callback record, sequence arithmetic and tone descriptor;
+its mutation tests reject changed branches, sequence/channel and record data.
+Channel1's physical output identity and the script semantics remain
+unmapped. Recover the phone-owned settings initialization or physical settings
+workflow before supplying valid record contents; donor records, guessed
+enable bytes and forced admission/callback state are not justified.
+The concrete initialization lead is2920b0: it constructs record bytes and
+calls NV writer2b8b4a with key0762 and variant indices, including6 at292100
+and0 at292260. Direct-BL candidates29d452/29dc5a lead to this routine;
+recover their user-visible lifecycle before invoking or reproducing it.
+The qualified `tmp/nsm1-factory-reset-qualified` navigation reaches Menu,
+Settings(4), Restore factory settings(6), then the Security code prompt.
+Typing12345 through the matrix produces a second successful validator result
+and executes both initializer callers (returns29d457 and29dc5f), without
+observer calls or firmware writes. The phone returns to the settings menu.
+The saved16KiB EEPROM changes190 bytes, whole-bank SHA256
+`003f7ddd0966db0a90ae7fb418819ad3bb49e0d0ef272d6868bf3084100355ba`;
+card and executable flash are unchanged. Its seven0762 records are:
+
+```text
+0 0009012f010401010000ffff
+1 0006042fffff00000000ffff
+2 0006022f00ff00030000ffff
+3 000a011b020401020000ffff
+4 000a042f010401040000ffff
+5 0108012f010400010000ffff
+6 0009012f010401010000ffff
+```
+
+These are firmware-generated settings, not donor provisioning. Record0 and6
+byte5 now equals4, satisfying the decoded initial admission comparison.
+`nsm1_factory_reset.lua` logs all11 matrix contacts and both initializer
+entries. Its checker requires own PIN/phone authorization, all seven frames,
+exact whole-bank storage transition and cold-input/config provenance. Two
+focused tests reject changed/missing/extra contacts, wrong initializer callers
+and authorization ordering. Reproduce with:
+
+```sh
+.venv/bin/python tools/nsm1_factory_reset_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-factory-reset-qualified --mame mame/mame
+```
+
+Use a fresh output directory. Cold replay and a repeated PLAY TONE
+publication/output census on this saved bank remain separate requirements;
+a successful reset is not evidence of audio playback. The reset also changes
+the phone-lock lifecycle: do not replay the erased-bank phone-code keystrokes
+when no phone-code prompt is present. The failed first cold probe typed those
+digits into the UI, introducing unrelated SIM activity, so its publication
+counts cannot establish Toolkit output.
 
 ### Pending Toolkit command restoration
 

@@ -3607,6 +3607,18 @@ INPUT_PORTS_END
 static INPUT_PORTS_START( nsm1r4t )
 	PORT_INCLUDE(noki5110)
 	PORT_INCLUDE(dct3_research_adc2)
+	PORT_START("RESEARCH_ADC0")
+	// Own 2bb822 reads selector 0 for the 280b48 state-machine branch.
+	// Raw-input comparison, not a measured unattached-board voltage.
+	PORT_CONFNAME(0x03ff, 0, "Research CCONT ADC0 source")
+	PORT_CONFSETTING(0, "Low control (0)")
+	PORT_CONFSETTING(0x03ff, "High input comparison (1023)")
+	PORT_START("RESEARCH_EXT_STATUS")
+	// Own 280bf4..280c20 tests CTSI+0e bit 1 before emitting 0720.
+	// Raw-input contrast only; physical pin ownership remains unproved.
+	PORT_CONFNAME(0x07, 0, "Research MAD2 external status")
+	PORT_CONFSETTING(0, "Low control (0)")
+	PORT_CONFSETTING(2, "Bit 1 high comparison (2)")
 	// Own normal table 0x2e0b18: digits retain the NSE-1 cells, while
 	// navigation and side keys occupy different cells. Row zero is unused.
 	PORT_MODIFY("COL.0")
