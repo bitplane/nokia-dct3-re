@@ -532,6 +532,40 @@ retained triples, independent reference and unchanged serial byte. Tests reject
 wrong configuration, missing/malformed observations, changed code/hooks/masks
 and reference-input scaling/format drift. No HLE compander supplies DSP data.
 
+### Active native tone restoration
+
+`tools/nsm1_tone_replay_check.py` composes the complete clocked cold-boot
+gate with an active-tone save at86.2s and load after86.25s. The54 selected
+MCU/DSP register and non-destructive data fields restore exactly. Both legs
+produce the same400 output words and absolute125us-grid timestamps,400 native
+serial writes and22 DSP I/O writes. One frame-source observation repeats;
+no shared-memory/compiler publication or physical contact occurs inside
+either leg. The saved state must exist and all Lua observers must complete.
+
+Lua observation counters survive load. The checker retains raw logs and
+removes only the proved-identical replay interval in memory, subtracting
+its exact counts from the two observer summaries before invoking the
+unchanged ordinary waveform checks. It does not relax the291047-word
+capture requirement or any storage, SIM, configuration or frame oracle.
+Raw counts and the complete gate result are retained in `restore_result.json`.
+
+Save/load can wake `emu.wait` early with false. `fixture_deadline.lua`
+rechecks the deadline rather than treating that wakeup as completion or an
+error. Literal relative delays retain their original first wait: converting
+`.15` to `(now+.15)-now` changed earlier click samples at a scheduling
+boundary. A fresh no-restore control passes the original gate unchanged;
+the restore observer also executes a fake-clock false-wakeup helper test.
+
+```sh
+.venv/bin/python tools/nsm1_tone_replay_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-factory-reset-qualified tmp/nsm1-factory-tone-restore-qualified \
+  --mame mame/mame
+```
+
+Use a fresh output. This proves selected active native state and laboratory
+output replay, not all memory contents, physical clock wiring, analog
+audio, the fitted6150 DSP mask, native RF or call speech.
+
 ### Pending Toolkit command restoration
 
 An independent74s cold profile1 process saves at65s while the organically

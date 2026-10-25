@@ -120,7 +120,7 @@ def prepare(seed,reset,run):
     tree.write(run/'cfg/nsm1r4t.cfg',encoding='utf-8',xml_declaration=True)
 
 
-def check_common(seed,reset,run,*,machine='nsm1r4t'):
+def check_common(seed,reset,run,*,machine='nsm1r4t',active_replay=False):
     check_reset(seed,reset)
     before=check_storage(reset,eeprom_sha256=RESET_EEPROM)
     after=check_storage(run,eeprom_sha256=COLD_EEPROM,machine=machine)
@@ -140,6 +140,11 @@ def check_common(seed,reset,run,*,machine='nsm1r4t'):
         raise ValueError('cold replay did not complete')
     check_observer_console((run/'console.log').read_text())
     text=(run/'error.log').read_text()
+    if active_replay:
+        if machine!='nsm1pcm':
+            raise ValueError('active tone replay requires the declared lab machine')
+        from tools.nsm1_tone_replay_check import canonicalize
+        text,_=canonicalize(text)
     if any(marker in text for marker in ('nsm1_security_contact:','nsm1_security_submit:',
                                          'nsm1_security_gate:','nsm1_security_accepted:')):
         raise ValueError('obsolete phone-lock input/transaction in unlocked replay')

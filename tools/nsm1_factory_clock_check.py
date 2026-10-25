@@ -113,10 +113,10 @@ def prepare(seed,reset,run):
     (run/'clock_assumptions.json').write_text(json.dumps(CLOCK,indent=2)+'\n')
 
 
-def check(seed,reset,run):
+def check(seed,reset,run,*,active_replay=False):
     if json.loads((run/'clock_assumptions.json').read_text())!=CLOCK:
         raise ValueError('laboratory clock assumptions differ')
-    text=check_common(seed,reset,run,machine='nsm1pcm')
+    text=check_common(seed,reset,run,machine='nsm1pcm',active_replay=active_replay)
     return check_waveform(text)
 
 

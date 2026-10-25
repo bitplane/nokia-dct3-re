@@ -41,7 +41,7 @@ taps[#taps+1]=dsp.spaces.io:install_write_tap(0,0xffff,'nsm1_tone_dsp_io',functi
 end)
 _G.nsm1_tone_boundary_taps=taps
 local actions=coroutine.create(function()
-    assert(emu.wait(91.5))
+    dofile(directory..'fixture_deadline.lua')(91.5)
     machine:logerror(string.format('nsm1_tone_boundary_summary: start=85 end=91.5 mcu_early=%d mcu=%d dsp=%d io=%d compiler_early=%d compiler=%d observer_writes=0\n',counts.mcu_early,counts.mcu,counts.dsp,counts.io,counts.compiler_early,counts.compiler))
 end)
 assert(coroutine.resume(actions))

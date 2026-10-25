@@ -32,7 +32,7 @@ for _,range in ipairs({{0x20,0x23},{0x30,0x33}}) do
     end)
 end
 local serial=coroutine.create(function()
-    assert(emu.wait(91.5))
+    dofile(directory..'fixture_deadline.lua')(91.5)
     -- BSPC/BSPCE readback is non-destructive; never sample BDRR here.
     machine:logerror(string.format('nsm1_factory_wave_summary: early=%d late=%d control=%04x extension=%04x observer_writes=0\n',counts.early,counts.late,dsp.spaces.data:read_u16(0x22),dsp.spaces.data:read_u16(0x23)))
 end)
