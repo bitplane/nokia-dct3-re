@@ -17,6 +17,12 @@ not factory provisioning or fitted-chip proof. Negative saturated/original-
 retry controls remain distinct. No readiness event or firmware flag is
 synthesized.
 
+The research clock composition retains calibrated Timer1 input1057Hz and
+terminal7fff, giving an approximately31s FIQ5 cadence. The PLAY TONE fixture
+below demonstrates that this materially delays a software deadline. These
+software gates do not qualify physical timer rates or requested-duration
+accuracy; no clock has been changed merely to pass an application fixture.
+
 ### Card-originated Toolkit DISPLAY TEXT
 
 The qualified `nsm1r4t` composition accepts an explicit Phase-2+ external
@@ -177,7 +183,7 @@ physical ordering, whole storage and reviewed frame checks. It qualifies
 REFRESH re-profiling and idle return, not the later restarted application
 cycle, RF registration, sustained native operation or fitted-mask fidelity.
 
-### Toolkit PLAY TONE cancellation boundary
+### Toolkit PLAY TONE completion and cancellation
 
 The independent external profile11 pair follows the same own authentication,
 text/input/menu route. Physical Continue86 receives911c and FETCH28 retrieves
@@ -204,12 +210,45 @@ ILLEGAL0 in each run. The observer labels the last field `stop` so a passive
 zero register value is not mistaken for an execution-error diagnostic.
 These samples are bounded no-stop evidence, not complete instruction coverage.
 
-This proves firmware presentation and physical cancellation, not timed tone
-completion, audible output or native speech. Only the inactive reset-time HLE
+This pair proves firmware presentation and physical cancellation, not an
+indefinite wait: the extended gate below demonstrates organic completion.
+Audible output and native speech remain unproved. Only the inactive reset-time HLE
 tone publication is logged; no active HLE tone is synthesized. The remaining
 upstream request path is bounded below; no missing behavior has been assigned
 to a DSP opcode, peer or physical clock. The
 piezo-buzzer path must not be substituted for this DSP-controlled tone route.
+
+#### Organic completion on the current timer cadence
+
+An independent no-key run extends observation to93.5s without changing any
+clock, firmware state, card payload or hardware input. Own handler2737c4's
+PLAY TONE branch posts internal event4190 with tone identifier0a through
+2bd8de, then calls scheduler275106 with index52 and delay250 at86.064588s.
+Its descriptor at100510 becomes active. The natural Timer1/FIQ5 event processes
+that timer at93.002007s; the firmware acknowledges FIQ5 mask20 at2b96d8 and
+consumes the expired descriptor at275f9e. Only afterward does it transmit
+`81030c200002028281030100` (success), accepted9000. The93.3s frame exactly
+matches the installed Continue/Exit list; the descriptor is inactive again.
+
+```sh
+.venv/bin/python tools/nsm1_toolkit_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-toolkit-tone-late-qualified --tone late
+```
+
+Add `--mame mame/mame` with a fresh output to execute. The CLI94s limit is
+an upper bound; the observer exits cleanly at93.5s, before the separately
+mapped receive-supervision reset boundary. Complete EEPROM/card/flash remain
+unchanged, and DSP PC479e/IDLE0/ILLEGAL0 is sampled at93.3s. Exact request,
+250-tick scheduling, timer-state transitions, FIQ5 acknowledgement, response
+after descriptor consumption, native samples and reviewed frames are required.
+There is no application key after Continue and no synthetic expiry or reply.
+
+The earlier92s hold result is horizon-limited, not evidence of a permanently
+stalled timer or missing DSP completion. The late success still does not prove
+the card's requested duration in physical seconds, tone generation or sound.
+Current Timer1 calibration materially affects deadline service; independently
+recover its source/divider and reconcile the existing shutdown contracts before
+changing shared clock behavior. The ordinary tone output path remains separate.
 
 #### PLAY TONE publication boundary
 
@@ -238,8 +277,9 @@ that table using input byte8 and calls the selected pointer through BX R5 at
 at2b2ef8; its result builder writes **D2** at2b2e74. These decoded command
 and compiler-field namespaces are separate. No ordinary PLAY TONE producer
 has been established by this table entry; do not synthesize a D1 call to
-make the compiler fire. The remaining investigation starts from the live
-Toolkit tone handler/context, retaining indirect/interior-call uncertainty.
+make the compiler fire. The live Toolkit handler instead posts event4190;
+its output consumer remains the next lead, retaining indirect/interior-call
+uncertainty. Its separate timer completion is qualified above.
 
 ```sh
 .venv/bin/python tools/nsm1_toolkit_tone_boundary_check.py tmp/nsm1-pin-menu \
@@ -250,7 +290,7 @@ Add `--mame mame/mame` with a fresh output to reproduce. It also requires
 the ordinary hold fixture's exact prompts, no completion/physical Quit,
 native samples, authentication and unchanged complete storage. The tone
 screen therefore does not establish that a DSP tone request was published
-through this aperture. Trace the MCU-side request owner before constructing a peer
+through this aperture. Trace event4190's consumer before constructing a peer
 reply; other transports, arbitrary time windows and physical clocks remain
 outside this absence result.
 

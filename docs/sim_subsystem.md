@@ -588,11 +588,14 @@ qualified by this92s window.
 The6150 independently presents PLAY TONE and physically cancels it with
 result11, returning to the installed menu with unchanged whole storage.
 The matched no-key control remains pending through92s despite three nonstopped
-native samples. This is a cancellation contract, not timed/audible playback
+native samples. This is a cancellation contract, not audible playback
 (`nsm1_toolkit_check.py --tone cancel` / `--tone hold`).
+The separate `--tone late` window reaches organic Timer1/FIQ5 expiry near93s,
+successful response and exact menu return without a key. The shorter hold is
+horizon-limited; current clock calibration does not establish duration accuracy.
 The separate publication census observes no late compiler entry or MCU/DSP
 HPI write, with early compiler/aperture positives and continuing native I/O;
-the next boundary is MCU-side, not an established unanswered DSP tone request
+the output boundary is MCU-side, not an established unanswered DSP tone request
 (`nsm1_toolkit_tone_boundary_check.py`; scope in6150_bringup.md).
 The6150 pending DISPLAY TEXT also survives native save/load with one FETCH,
 two physical successful completions and exact observed architecture/I/O/pixel

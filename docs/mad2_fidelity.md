@@ -67,6 +67,14 @@ Address-map coverage therefore must not be read as peripheral completeness.
 | SIMI `36..3f` | stateful SIM UART, 16-byte TX FIFO, one-character RX holding state, IIR/control registers and FIQ6 delivery | Partial hardware | ATR, PPS and validated T=0 use the organic 9,600-bit/s path; larger card replies remain private serialization state. TX control `0x04`/`0x00`, live fill and multi-chunk TX-empty progression are modeled. All IIR causes are decoded; WWT and framing/error causes have a typed inactive ingress but remain unexercised until their physical sources are recovered. |
 | UIF control pins `30..33/70..73/b0..b3/f0..f3` | extracted neutral saved-latch device; `0x31.bit1` is power-duty-cycle owned | Mapped | `0x31` has six exhaustive RMW sites and no external-input consumer; map physical pin nets before adding callbacks or side effects. |
 
+NSM-1's explicit native-compatibility composition demonstrates an observable
+cost of the calibrated Timer1 input1057Hz/terminal7fff: its250-tick PLAY TONE
+deadline is serviced at the natural FIQ5 event near93s, rather than within
+the original92s fixture. An extended no-key gate proves organic completion
+and unchanged storage, not requested-duration accuracy or an independently
+measured physical clock. See [6150 bring-up](6150_bringup.md). Reconcile the
+source/divider with the paired shutdown contracts before changing shared rates.
+
 ## Interrupt ownership
 
 MAD2 owns aggregation and CPU-line assertion. Component devices expose level

@@ -19,11 +19,12 @@ REFRESH = bytes.fromhex('d009810309010082028182')
 REFRESH_RESPONSE = bytes.fromhex('810309010002028281030100')
 PLAY_TONE = bytes.fromhex('d01a81030c2000820281038508')+b'SAT tone'+bytes.fromhex('8e011084020102')
 TONE_CANCEL_RESPONSE = bytes.fromhex('81030c200002028281030111')
+TONE_COMPLETE_RESPONSE = bytes.fromhex('81030c200002028281030100')
 
 
 def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_item=None, select_item=False, refresh=False, tone=None):
     if tone is not None:
-        if tone not in ('cancel','hold') or select_item or refresh or menu_item not in (None,1):
+        if tone not in ('cancel','hold','late') or select_item or refresh or menu_item not in (None,1):
             raise ValueError('PLAY TONE requires distinct Continue profile')
         menu_item=1
     if refresh:
@@ -68,8 +69,9 @@ def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_
             raise ValueError('missing unique REFRESH payload')
     if tone is not None:
         expected.append((0x12,0,0,len(PLAY_TONE),b''))
-        if tone=='cancel':
-            expected.append((0x14,0,0,len(TONE_CANCEL_RESPONSE),TONE_CANCEL_RESPONSE))
+        if tone!='hold':
+            response=TONE_CANCEL_RESPONSE if tone=='cancel' else TONE_COMPLETE_RESPONSE
+            expected.append((0x14,0,0,len(response),response))
         if rx.count(PLAY_TONE+b'\x90\x00') != 1:
             raise ValueError('missing unique PLAY TONE payload')
     if [row[:5] for row in commands if row[0] in (0x10,0x12,0x14,0xc2)] != expected:
@@ -79,7 +81,7 @@ def check_interactive(text, *, prefix, terminal_profile, reset_markers=(), menu_
     results=[(0x9115,3,10),(0x911a,3,10),(0x9000,3,10)]
     if menu_item is not None:
         results[-1:]=[(0x9128,3,10),(0x9000,3,10)]
-    if select_item or refresh or tone=='cancel':
+    if select_item or refresh or tone in ('cancel','late'):
         results.append((0x9000,3,10))
     if (statuses(text,0x10) != [(0x9000,3,10)]*(2 if refresh else 1) or statuses(text,0x14) != results
             or statuses(text,0xc2) != ([(0x911c if tone is not None else 0x910b if refresh else 0x9122 if select_item else 0x9000,3,10)] if menu_item is not None else [])):

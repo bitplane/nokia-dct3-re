@@ -120,7 +120,10 @@ not qualify the later restarted application or sustained native RF operation;
 see `nsm1_toolkit_check.py --refresh` and `6150_bringup.md`.
 The6150 also qualifies PLAY TONE presentation and physical cancellation with
 result11, paired with a no-key control that stays pending through92s. Whole
-storage stays unchanged; timed tone completion and native audio remain open.
+storage stays unchanged. An independent93.5s no-key run completes organically
+after the current Timer1/FIQ5 event, returning success and the installed menu.
+Requested-duration accuracy and native audio remain open; this exposes calibrated
+clock debt, not a new DSP-reply requirement.
 The5190 independently passes the same command family with its own profile,
 physical route, exact idle pixels and a different complete settings-bank
 transition (`nsb1_toolkit_check.py --refresh`); no storage field or fitted-mask

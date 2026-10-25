@@ -44,7 +44,7 @@ TONE_FRAME='0af5d568c3b7d2a7a52dbf7308695172244ec42abf4545d952b44849e34b7de4'
 
 
 def profile_for(control=False, interactive=False, menu_item=None, select_item=False, refresh=False, tone=None):
-    if tone is not None and (tone not in ('cancel','hold') or refresh or select_item or menu_item not in (None,1)):
+    if tone is not None and (tone not in ('cancel','hold','late') or refresh or select_item or menu_item not in (None,1)):
         raise ValueError('PLAY TONE requires distinct Continue profile')
     if refresh and (select_item or menu_item not in (None,1)):
         raise ValueError('REFRESH requires distinct Continue profile')
@@ -164,11 +164,15 @@ def check(seed, run, control=False, interactive=False, menu_item=None, select_it
         frame_check(run/'snap/nsm1_toolkit_tone_active.png',TONE_FRAME)
         frame_check(run/'snap/nsm1_toolkit_tone_after.png',MENU_FRAMES['open'] if tone=='cancel' else TONE_FRAME)
         check_tone_native(text)
+        if tone=='late':
+            frame_check(run/'snap/nsm1_toolkit_tone_late.png',MENU_FRAMES['open'])
+            from tools.nsm1_toolkit_tone_timing_check import check_trace as check_timing
+            check_timing(text)
 
 
 def execute(binary, seed, run, control=False, interactive=False, menu_item=None, select_item=False, refresh=False, tone=None):
     prepare(seed, run, control, interactive, menu_item, select_item,refresh,tone)
-    script = Path(__file__).with_name('nsm1_toolkit_tone_hold.lua' if tone=='hold' else 'nsm1_toolkit_tone.lua' if tone=='cancel' else 'nsm1_toolkit_refresh.lua' if refresh else 'nsm1_toolkit_select_item.lua' if select_item else
+    script = Path(__file__).with_name('nsm1_toolkit_tone_late.lua' if tone=='late' else 'nsm1_toolkit_tone_hold.lua' if tone=='hold' else 'nsm1_toolkit_tone.lua' if tone=='cancel' else 'nsm1_toolkit_refresh.lua' if refresh else 'nsm1_toolkit_select_item.lua' if select_item else
         'nsm1_toolkit_menu_exit.lua' if menu_item==2 else
         'nsm1_toolkit_menu.lua' if menu_item==1 else
         'nsm1_toolkit_interactive.lua' if interactive else 'nsm1_toolkit_input.lua').resolve()
@@ -176,7 +180,7 @@ def execute(binary, seed, run, control=False, interactive=False, menu_item=None,
                '-noreadconfig', '-video', 'none', '-sound', 'none', '-nothrottle',
                '-joystickprovider', 'none', '-midiprovider', 'none',
                '-debug', '-debugger', 'none', '-log', '-verbose', '-seconds_to_run',
-               '92' if select_item or refresh or tone is not None else '90' if menu_item is not None else '84' if interactive else '74',
+               '94' if tone=='late' else '92' if select_item or refresh or tone is not None else '90' if menu_item is not None else '84' if interactive else '74',
                '-autoboot_delay', '0', '-autoboot_script', str(script)]
     (run / 'invocation.json').write_text(json.dumps(dict(command=command,
         mame_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
@@ -197,7 +201,7 @@ def main():
     mode.add_argument('--menu-item',type=int,choices=(1,2))
     mode.add_argument('--select-item',action='store_true')
     mode.add_argument('--refresh',action='store_true')
-    mode.add_argument('--tone',choices=('cancel','hold'))
+    mode.add_argument('--tone',choices=('cancel','hold','late'))
     parser.add_argument('--mame', type=Path)
     args = parser.parse_args()
     try:
@@ -208,7 +212,8 @@ def main():
     except (OSError, ValueError, KeyError, ET.ParseError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f'NSM-1 Toolkit FAIL: {error}\n')
     print('NSM-1 Toolkit PASS: ' + ('matched Phase-2 control' if args.control else
-          f'PLAY TONE {args.tone}; timed/native audio completion unproved' if args.tone is not None else
+          'PLAY TONE organic late completion on current Timer1 cadence; audio unproved' if args.tone=='late' else
+          f'PLAY TONE {args.tone}; completion beyond this window/native audio unproved' if args.tone is not None else
           'REFRESH re-profile, success and idle return; next application cycle unproved' if args.refresh else
           'physical follow-up SELECT ITEM; native RF/speech unproved' if args.select_item else
           f'physical installed-menu item{args.menu_item} envelope; final settlement unproved' if args.menu_item is not None else
