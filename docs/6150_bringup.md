@@ -206,10 +206,44 @@ These samples are bounded no-stop evidence, not complete instruction coverage.
 
 This proves firmware presentation and physical cancellation, not timed tone
 completion, audible output or native speech. Only the inactive reset-time HLE
-tone publication is logged; no active HLE tone is synthesized. The tone request
-and its native completion/codec path still need product-local tracing before
-assigning the missing behavior to a DSP opcode, peer or physical clock. The
+tone publication is logged; no active HLE tone is synthesized. The remaining
+upstream request path is bounded below; no missing behavior has been assigned
+to a DSP opcode, peer or physical clock. The
 piezo-buzzer path must not be substituted for this DSP-controlled tone route.
+
+#### PLAY TONE publication boundary
+
+The matched hold fixture has a separate read-only publication census over
+`85 <= t < 91.5` (`nsm1_toolkit_tone_boundary_check.py`). It observes **zero**
+MCU shared-memory writes and zero native DSP HPI writes. The ARM tap covers
+the10000..10fff aperture and declared8f000 mirror combinations; the DSP tap
+covers0800..0fff. Early boot supplies70514 MCU write callbacks and seven
+compiler-entry hits, with the first eight MCU writes and all seven entries
+retained as positives. Native DSP execution supplies2816 I/O writes in the
+late window:1408 each of port0021 values0e82/0682. No audio meaning is
+assigned to those words. Caps, malformed rows and missing positives fail.
+
+Own compiler2a4a6c has47 jump-table entries at2a4aa0. Mechanically decoded
+literal loads map fields20/21 to oscillator words100ae/100b0,22/23 to
+100b2/100b4, **24** to amplitude100b6, and25 to100ac. Its entry fetch is
+observed seven times before5s but not during the late window. This is a
+branch-entry observation with positive controls, not an all-instruction
+execution census. Seven direct-BL candidates are2404f2,240e4c,240e56,
+2a2bf0,2a2c24,2a2c4c and2a4d5a; indirect/interior entrants are not closed.
+The first three are the next application-side leads, not confirmed owners.
+
+```sh
+.venv/bin/python tools/nsm1_toolkit_tone_boundary_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-toolkit-tone-boundary-qualified
+```
+
+Add `--mame mame/mame` with a fresh output to reproduce. It also requires
+the ordinary hold fixture's exact prompts, no completion/physical Quit,
+native samples, authentication and unchanged complete storage. The tone
+screen therefore does not establish that a DSP tone request was published
+through this aperture. Trace the MCU-side callers before constructing a peer
+reply; other transports, arbitrary time windows and physical clocks remain
+outside this absence result.
 
 ### Pending Toolkit command restoration
 
