@@ -254,6 +254,27 @@ which correctly recovers Delphi forms/units and names. IDR's output (the `.pas`
 reconstruction, `.idc`, `.lst`) is a derivative of NokTool's copyrighted binary
 and is likewise **not redistributed** here.
 
+## Research-run retention
+
+`make clean` removes the ordinary root run state; it does not purge the
+disk-backed research collection under`tmp/`. Review that collection with:
+
+```sh
+.venv/bin/python tools/prune_research_runs.py --report tmp/retention.json
+.venv/bin/python tools/prune_research_runs.py --report tmp/retention.json --apply
+```
+
+The inventory protects runs named in tracked sources/docs and follows JSON
+seed/source dependencies from those runs. It also retains unknown directories,
+NAND images, source archives and runs modified within24 hours. Only
+unreferenced old directories with MAME console/error output are candidates.
+Apply recomputes references, rejects changed file counts/timestamps/inodes and
+checks process working directories before deletion. This is conservative
+retention, not proof that every unreferenced experiment is scientifically
+worthless. Review the JSON before applying; move irreplaceable inputs into the
+ROM/research collection and document their provenance before pruning.
+Do not use a blanket`rm -rf tmp` as a substitute.
+
 ## MAME
 
 The driver `driver/nokia_dct3.cpp` is overlaid onto an upstream
