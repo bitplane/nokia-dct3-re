@@ -2,9 +2,13 @@
 local directory = debug.getinfo(1, 'S').source:sub(2):match('^(.*[/\\])')
 _G.nsm1_correct_pin = true
 dofile(directory .. 'nsm1_pin_input.lua')
-_G.nsm1_phone_code_start = 15
-_G.nsm1_followup_contacts = {}
-dofile(directory .. 'nsm1_security_input.lua')
+-- A separately qualified factory-reset bank no longer requests the phone code.
+-- Keep the original locked-bank input sequence as the default.
+if not _G.nsm1_toolkit_skip_phone_authentication then
+    _G.nsm1_phone_code_start = 15
+    _G.nsm1_followup_contacts = {}
+    dofile(directory .. 'nsm1_security_input.lua')
+end
 local machine = manager.machine
 local memory = machine.devices[':maincpu'].spaces.program
 local counts = {TX=0, RX=0}

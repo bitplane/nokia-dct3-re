@@ -384,13 +384,48 @@ and authorization ordering. Reproduce with:
   tmp/nsm1-factory-reset-qualified --mame mame/mame
 ```
 
-Use a fresh output directory. Cold replay and a repeated PLAY TONE
-publication/output census on this saved bank remain separate requirements;
-a successful reset is not evidence of audio playback. The reset also changes
+Use a fresh output directory. A successful reset is not evidence of audio
+playback. The reset also changes
 the phone-lock lifecycle: do not replay the erased-bank phone-code keystrokes
 when no phone-code prompt is present. The failed first cold probe typed those
 digits into the UI, introducing unrelated SIM activity, so its publication
 counts cannot establish Toolkit output.
+
+#### Reset-bank cold tone publication
+
+`tmp/nsm1-factory-tone-qualified` cold-copies only the qualified reset's NVRAM
+and CFG, then selects the same external profile11. No phone-code contact or
+validator transaction occurs; PIN authentication and all Toolkit text/input/
+menu/tone exchanges still pass. The actual tone0a constructor296594/2c005e
+runs at86.065761s, and task6 reaches admission branch2a874a with descriptor
+2db038, enabled1 and cached setting4. The original erased-bank gate remains
+separate and unchanged.
+
+The85..91.5s census records18 MCU shared writes,10 native DSP shared writes,
+18 compiler entries and2854 native I/O writes, with early positive controls.
+The softkey click's oscillator-control value0e10 precedes the tone constructor;
+the later tone sequence publishes field20=1b58 after admission, then clears
+it. These are raw control values, not an established Hz scale. Five published
+commits are followed by native0866/0870 writes. Ports2c/2d reach the modeled
+COBBA control-select/data interface; emitted PCM or audible sound is not yet
+qualified. Native47a1/IDLE0/ILLEGAL0 samples and all reviewed Toolkit pixels
+pass. The cold EEPROM changes one byte,03e8:06->00, guarded by complete-bank
+SHA256 `e316e0bcef54ffc57df56d8bea63668c81aca19ca022218f1b94c087de7a0111`;
+card and flash remain unchanged. No record or firmware state is patched.
+
+```sh
+.venv/bin/python tools/nsm1_factory_tone_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-factory-reset-qualified tmp/nsm1-factory-tone-qualified --mame mame/mame
+```
+
+Use a fresh output. The checker composes the qualified reset, exact cold
+provenance/config/storage, absence of obsolete phone-code input, protocol,
+pixels, admission, compiler-to-HPI projection and native acknowledgement/I/O
+census. Mutation tests reject click-only/wrong-tone evidence, disabled
+admission, bad lanes, missing acknowledgements and malformed/extra rows.
+The next boundary is the native DSP/COBBA waveform path, not another guessed
+Toolkit reply or an injected channel enable. The acquired NSE-1 mask remains
+an explicit compatibility backend, not the missing fitted6150 mask.
 
 ### Pending Toolkit command restoration
 
