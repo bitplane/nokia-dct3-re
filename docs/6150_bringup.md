@@ -557,10 +557,30 @@ Five positive inputs also differ:
 These are retained discrepancies, not a full-conformance acceptance claim.
 The checker requires their exact classification, source code/sign-mask
 contract and independent reference; it neither rewrites native bytes nor
-changes the reference's input scale. Formatter conventions, segment-boundary
-arithmetic, observation context and CPU semantics must be separated before
-assigning a cause. In particular, zero55 is already the observed idle code;
-it must not be silently replaced with d5 on an assumed physical codec path.
+changes the reference's input scale.
+
+The bounded arithmetic audit explains all2000 native results directly from
+9435..944b. The ROM selects maskffc5 only for a strictly positive input,
+otherwise0045. After ABS, EXP gives30-floor(log2(magnitude)) for nonzero
+values; the ROM caps it at23 and derives a shift by subtracting23.
+NORM applies that shift, then SFTA shifts right3. The negated shift supplies
+the segment field XORed at bit4. If that field is zero, the ROM shifts once
+more and uses segment1. Zero follows this special case with mask0045,
+giving55, not d5. For2063, the intermediate shift is-4, segment4 and
+quantized value16; `16 XOR (4<<4) XOR ffc5` yields low byte95.
+For8254, shift-6, segment6 and quantized16 yieldb5. These exactly explain
+the observed boundary differences without changing the CPU or reference.
+
+The `--steps` observer independently retains native read-time intermediate
+registers for eight cases:0,-13485,37738 and the five positive differences.
+EXP/T, normalization, restored magnitude, segment, sign-mask address and
+unchanged return/serial results agree with the arithmetic model. Literal
+code/mask bytes remain pinned. TI SPRU172C's EXP and NORM descriptions
+support the used exponent/shift semantics; this is not an instruction-
+retirement trace or proof of every CPU case. The arithmetic reference is
+analysis-only, never a production sample source. Full-domain behavior and
+the physical codec convention remain separate questions. In particular,
+zero55 must not be silently replaced with d5 on an assumed codec path.
 
 ```sh
 .venv/bin/python tools/nsm1_click_format_check.py tmp/nsm1-pin-menu \
@@ -571,6 +591,8 @@ it must not be silently replaced with d5 on an assumed physical codec path.
 Use a fresh output. `click_format_result.json` records the bounded
 classification and reference/mask identities. Physical codec law, full
 signed-domain behavior and native speech remain unproved.
+Add `--steps` with a fresh output to require the eight native intermediate
+cases as well as the complete2000-triple comparison and underlying boot gate.
 
 ### Active native tone restoration
 
