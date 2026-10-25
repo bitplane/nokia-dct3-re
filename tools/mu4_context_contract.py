@@ -714,7 +714,8 @@ WORKER_RESERVATION_WITNESSES = (
     (0x29334,(0x76f8,0x15d9,1)),
     (0x2935c,(0x76f8,0x15d9,0)),
     (0x293e1,(0x76f8,0x15d9,0)),
-    (0x201ca,(0x6b83,1)),
+    (0x201c7,(0x7192,0x13,0x6d92,0x6b83,1)),
+    (0x27061,(0xd7ac,0x054f)),
     (SERVICE_GATE_BASE,SERVICE_GATE_WITNESS),
 )
 
@@ -726,6 +727,9 @@ def decode_worker_reservation(words):
     hits = sorted(address for address,value in words.items() if value == 0x15d9)
     if hits != [0x204c6,0x29322,0x29335,0x2935d,0x293b1,0x293c4,0x293e2]:
         raise ValueError('worker15d9 literal census changed')
+    counter_hits = sorted(address for address,value in words.items() if value == 0xd7ac)
+    if counter_hits != [0x27061]:
+        raise ValueError('worker counter pointer literal census changed')
     return dict(pinned_words=sum(len(w) for _,w in WORKER_RESERVATION_WITNESSES),
         mapped_words_scanned=len(words),literal_references=[f'{a:06x}' for a in hits],
         direct_literal_writes={'029334':1,'02935c':0,'0293c3':1,'0293e1':0},
@@ -737,6 +741,9 @@ def decode_worker_reservation(words):
                     scope='Pinned prefix only; callback/continuation effects and physical queue capacity remain open'),
         retention='A nonzero15d9 bypasses a fresh count acquisition; the decoded zero-result path clears it',
         increment='0201ca ADDM #1,*AR3; runtime target ownership must be established separately',
+        increment_pointer=dict(load='0201c7 MVDK *AR2+,AR3;0201c9 MAR *AR2+',
+            literal_references=[f'{a:06x}' for a in counter_hits],
+            scope='Single mapped literal in initialization data; runtime descriptor source address and initialization interpretation remain unproved'),
         scope='Local counted-context reservation contract and exact literal census; not all computed writers, full helper call effects, downstream ownership, physical units or EOF/drain completion')
 
 

@@ -838,7 +838,7 @@ only zero is runtime-qualified here. Tested executable SHA256:
 `41800b61c13a18396ffa20437c43b033c04e5581b08b96cb9ce3007f58060e0b`.
 
 `worker_reservation` identifies the local meaning of the15d9 activity term.
-The79-word contract includes the worker's acquisition prefix, the delayed
+The84-word contract includes the worker's acquisition prefix, the delayed
 wrapper`02044a` and count-consumer prefix`020182`. A complete literal
 scan of49843 mapped AA99 words finds seven15d9 references: four direct
 literal writes (two to1, two to0) and three reads. This is not closure over
@@ -849,6 +849,20 @@ sets15d9=1. An already nonzero flag bypasses a fresh acquisition; the
 decoded zero-result path clears it. Model tests exhaust the unsigned count
 domain for both literal flag states, without assigning physical units or
 queue capacity. Helper callbacks beyond the pinned prefix remain open.
+
+The increment's pointer comes from `0201c7 MVDK *AR2+,AR3`, followed by
+`MAR *AR2+` before `0201ca ADDM #1,*AR3`. The same complete mapped-word
+scan finds exactly one literal `d7ac`, at initialization-data address
+`027061` (followed by `054f`). Both sequences and the literal census are
+tested. This does not establish the runtime descriptor source address or
+the interpretation of that initialization record; those require separate
+dataflow evidence, not a presumed hardware-ready notification.
+The CPU's `observe_staged_data_read` interface does not cover this MVDK:
+its operand is retained in Address stage through a direct data-space read,
+not the Read-stage `pipeline_read_data` path. A zero count from that observer
+cannot exclude this producer. Any runtime pointer-ownership observation must
+cover the actual Address-stage access without using the live Execute PC as
+its owner.
 
 Fresh read-only capture`tmp/mu4-context-count` qualifies four entry-state
 cycles on context`d796`: `(flag,count)=(0,1) -> (1,0) -> (0,0)` at gate,
