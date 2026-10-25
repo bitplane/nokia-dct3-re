@@ -141,6 +141,34 @@ acoustic fidelity and native speech remain unqualified.
 Use fresh outputs and serialize MAME processes. Earlier awake/cold gates do
 not themselves qualify power-off wake; this separate gate supplies that evidence.
 
+#### Awake Snooze and second alarm
+
+`nsm1_alarm_snooze_check.py` retains the same physical clock setup but presses
+Snooze (Right Softkey) at105s rather than Stop. Firmware displays "Snooze
+active", silences the buzzer and programs CCONT alarm minutes29/hour0c,
+meaning12:41. The retained counter reaches12:41:00 at458s and presents
+statusb3/mask50; firmware acknowledgesa0 at458.000247s. The flashing Alarm!
+screen and native PUP divider5285 pulses return. Physical Stop at465s returns
+to the idle presentation with no further alarm pulses through480s.
+
+The gate checks both RTC deliveries, exact Snooze/Stop contacts, the quiet
+interval between alarms, reviewed Snooze/second-alarm/final pixels, complete
+authentication and Phase2 SIM conversation, cold provenance and late native
+execution. The passive wire budget is32768 bytes for this longer observation;
+truncated observations remain errors. Whole EEPROM output matches the original
+awake-alarm endpoint `f8da8575410d5a83aca7a73dffd9b3e320aefae4ce935df4190238ce886323d3`,
+with unchanged whole card/flash and exact CCONT endpoint`16290c00001e0e5001`.
+
+```sh
+.venv/bin/python tools/nsm1_alarm_snooze_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-alarm-snooze-qualified --mame mame/mame
+```
+
+Use a fresh output and serialize MAME. This establishes one awake Snooze/re-alarm/
+Stop cycle, not repeated snoozes, powered-off snooze, independent calendar-year
+interpretation, physical duration accuracy, acoustic fidelity or native speech.
+The retained compatibility-mask, ADC2 and diagnostic-timeout assumptions remain.
+
 ### Card-originated Toolkit DISPLAY TEXT
 
 The qualified `nsm1r4t` composition accepts an explicit Phase-2+ external

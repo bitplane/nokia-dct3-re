@@ -134,11 +134,15 @@ Exact whole storage and retained-clock endpoints are guarded by
 editors without reprogramming CCONT, acknowledges the retained counter's next
 minute event and redraws12:36 idle. Exact whole endpoints and the parent
 Stop/control pair are required by `nsm1_clock_cold_check.py`; calendar year/date
-interpretation and snooze remain unqualified. A separate physical power-off
+interpretation remains unqualified. A separate physical power-off
 alarm gate proves retained-RTC wake, Stop and both activation choices: No
 returns to sustained rail-off silence; Yes accepts PIN/phone authentication
 again and navigates Messages/Call register. Whole storage endpoints are exact;
 this does not prove complete clock gating or native radio/call functionality.
+One awake Snooze cycle also passes: physical Snooze silences the first alarm,
+firmware programs12:41, RTC re-alarm resumes native PUP output, and physical
+Stop restores the quiet idle presentation. Repeated/powered-off snooze and
+physical duration accuracy are not qualified.
 See `6150_bringup.md` for the separate contracts.
 The5190 independently passes the same command family with its own profile,
 physical route, exact idle pixels and a different complete settings-bank

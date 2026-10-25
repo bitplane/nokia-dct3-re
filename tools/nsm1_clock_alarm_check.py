@@ -42,14 +42,14 @@ CONTACTS += [(55+i,'Keypad '+str(v),v) for i,v in enumerate((1,2,3,5))]
 CONTACTS += [(59,'Left Softkey',0x19),(63,'End / Mode',0x0f)]
 
 
-def check_authentication(text):
+def check_authentication(text,*,wire_limit=8192):
     check_observer_console(text)
     check_pin(text,True,prefix='nsm1',tx_limit=4096)
     check_phone(text,True,())
     if any(s in text for s in ('nsm1_restart_request:','unimplemented C54x','unsupported C54x')):
         raise ValueError('restart or unsupported native execution')
-    commands=list(apdus(wire(text,'TX','nsm1')))
-    wire(text,'RX','nsm1')
+    commands=list(apdus(wire(text,'TX','nsm1',limit=wire_limit)))
+    wire(text,'RX','nsm1',limit=wire_limit)
     if (not commands or any(row[0] not in (0xa4,0x20,0xb0,0xb2,0xc0,0xf2) for row in commands)
             or 'read-binary fid=6fae offset=0 length=1 first=02' not in text):
         raise ValueError('unrelated or proactive SIM operation')
