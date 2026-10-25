@@ -2164,30 +2164,31 @@ not permission to borrow another handset's keypad or UI completion events.
 ## Core regression checkpoint
 
 The default C54x suite passes with the source/RMW admission guards and
-atomic MPY/MAC, LTD/DELAY and MACP/MACD absolute-alias corrections.
+atomic load, memory-T multiply, MPY/MAC, LTD/DELAY, MACP/MACD and RMW
+absolute-alias corrections.
 All 293 required markers appear exactly once, followed by core conformance
 PASS and intentional MAME exit 3; the isolated runner returns 0, with
 `interrupted=false`. The capture is
-`tmp/c54x-post-alias-default/run_c54x_core_who49g7h`:
+`tmp/c54x-rmw-full-regression/run_c54x_core_n33owkhx`:
 
 ```sh
 .venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath roms \
-  --output-root tmp/c54x-post-alias-default
+  --output-root tmp/c54x-rmw-full-regression
 ```
 
 The recorded executable SHA256 is
-`e9cefc83fd98bf799c08ad4e8374616f175a68bd347def3fe34235d3d27a5255`.
+`37a0107ab3c3a14a57b5d03bffc2003c0f71d635b5ef7df635fde9b5bc4ec6d2`.
 CPU source SHA256 is
-`5cd936357159c1d15150f6b83ea88e1557ec10128c906fdc56cda860772df41f`;
+`b472c46d552ab9f2ca285063ed9ef01352955b3427c807d7f82a26f51879414e`;
 fixture source SHA256 is
-`81892f0461ab906dbdd3f1e2552ef544b9a36c4b6d7d4f75c8fe270ccedffc0a`.
+`ba15e9b5ee48cda36437a9e5ce0e2fd2a851fb96f87dc082fc4c0da885407468`.
 All three still match after completion. Its5,690 distinct executable-opcode
 assertions exactly match the preceding complete run, with no lost or added
 forms. Optional
 profiles retain their separate acceptance scopes; this run does not prove
 the complete ISA, physical pipeline timing, fitted DSP-mask compatibility,
 native RF or end-to-end handset speech and calls. The separate tool suite passes
-5,123 tests. Revision-bound checkpoints below preserve their narrower
+5,230 tests (one skip). Revision-bound checkpoints below preserve their narrower
 instruction and original-firmware comparisons, not competing current
 default-suite baselines.
 
@@ -2196,6 +2197,9 @@ atomic and staged modes:163 frames,26,080 reference-exact PCM samples and
 65,440 ordinary RAM words replayed per frame. The staged NSE-1 physical
 Phone book menu oracle also remains exact. These are codec/component and
 handset-UI preservation controls, not native RF or call-media acceptance.
+The same binary also passes the full reset-bank6150 laboratory clocked-tone
+gate in `tmp/nsm1-post-rmw-native-tone`, preserving its cold-input, storage,
+SIM, pixel and waveform checks. This does not promote production audio clocks.
 
 The cold-catalogue checkpoint adds no CPU instruction admissions. Its staged
 `bootopenstage` gate passes with the saved recorder endpoint and rejects the
