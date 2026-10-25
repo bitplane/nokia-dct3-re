@@ -99,6 +99,48 @@ shared physical-key helper. This qualifies cold clock/last-alarm-value readback
 and minute redraw, not independent calendar year/date interpretation, snooze,
 power-off wake, physical clock accuracy or native speech.
 
+#### Powered-off alarm and activation choices
+
+`nsm1_alarm_power_check.py` extends the same own clock setup with physical
+Power contacts at70/72s. Firmware drops the digital rails at70.7765s;
+CCONT continues ticking and restores power with alarm cause80 at98s.
+The observed off interval contains27 continuous RTC ticks and no checked
+DSP/radio endpoint activity. This is not complete internal clock-gating proof.
+Firmware acknowledges the alarm after reboot at100.2376s, rings through
+native PUP control, and physical Stop at115s displays "Activate phone for calls?".
+
+Physical No at119s drops power again at124.9796s. The140s gate checks
+continued RTC progress, a blank panel and more than ten seconds of endpoint
+silence after that shutdown. Physical Yes instead presents PIN authentication;
+own PIN1234 and phone code12345 are accepted again after reset. Menu then
+Down displays Messages followed by Call register. The accepted-editor residue
+before Menu is not claimed as a clean idle screen. Activation wording is not
+evidence of native RF registration or calls.
+The Yes path deliberately calls restart reason0c from own2818dc/2818de;
+the checker permits exactly that task1 request immediately after Yes, not an
+arbitrary restart. Two boot epochs need a16384-byte passive wire-capture budget;
+the original8192-byte cap truncates the late RX observation and is rejected.
+
+Both whole EEPROM endpoints are
+`1ce678a609574b51dfccdaa7c091ea520302c718f996f46cf011f1fb1c0d6660`;
+whole card and flash remain unchanged. Exact CCONT endpoints are
+`2a230c00001e0e5001` (No140s) and `36230c00001e0e5001` (Yes152s).
+Cold provenance, physical contacts, authentication, reviewed frame hashes,
+configuration and native execution are checked without firmware-state writes.
+The existing nominal ADC2, compatibility-mask and diagnostic timeout-policy
+limitations remain. Snooze, calendar year interpretation, physical timing,
+acoustic fidelity and native speech remain unqualified.
+
+```sh
+.venv/bin/python tools/nsm1_alarm_power_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-alarm-power-no-qualified --mame mame/mame
+.venv/bin/python tools/nsm1_alarm_power_check.py tmp/nsm1-pin-menu \
+  tmp/nsm1-alarm-power-yes-final --activate --mame mame/mame
+```
+
+Use fresh outputs and serialize MAME processes. Earlier awake/cold gates do
+not themselves qualify power-off wake; this separate gate supplies that evidence.
+
 ### Card-originated Toolkit DISPLAY TEXT
 
 The qualified `nsm1r4t` composition accepts an explicit Phase-2+ external
