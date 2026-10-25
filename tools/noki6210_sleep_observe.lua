@@ -46,6 +46,13 @@ local runner = coroutine.create(function()
     machine.debugger:command('temp9=0')
     cpu.debug:bpset(0x500a18, 'temp9<16',
         'temp9=temp9+1;logerror "6210_sleep_late_request: argument=%08x ctrl=%02x interval=%04x observer_writes=0\\n",r0,b@2000c,w@100b14;g')
+    -- The predicate adjusts a stack copy, not the queue's stored interval.
+    machine.debugger:command('temp6=0')
+    cpu.debug:bpset(0x4cc3e2, 'temp6<16',
+        'temp6=temp6+1;logerror "6210_sleep_deadline_entry: flags=%02x stored=%04x timer0=%04x baseline=%04x timer1=%04x destination=%04x fiq=%02x ctrl=%02x observer_writes=0\\n",b@100024,w@100b14,w@20010,w@173fe8,w@20004,w@20006,b@20008,b@2000c;g')
+    machine.debugger:command('temp7=0')
+    cpu.debug:bpset(0x4cc43a, 'temp7<16',
+        'temp7=temp7+1;logerror "6210_sleep_deadline_reject: r0=%08x r1=%08x r2=%08x r3=%08x observer_writes=0\\n",r0,r1,r2,r3;g')
     for _, target in ipairs({35.99, 36.05, 36.2, 36.4}) do
         assert(emu.wait(target - machine.time:as_double()))
         if target == 35.99 then

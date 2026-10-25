@@ -239,8 +239,10 @@ owner state or pending interrupt is injected to satisfy it.
 The expiry observer independently records31 deliveries of that same record
 before its final arm (below the128-event cap), each with interval0, state2
 and global control05 at dispatcher entry. With observers installed at31.5s,
-neither timer-service entry`0x3c1c08` nor its head-interval adjustment helper
-`0x4cc3b2` is reached through the retained post-wake observation. The helper
+timer-service entry`0x3c1c08` is not observed. The helper probe at
+`0x4cc3b2` also has no hit with its explicit queue-record filter
+`r0==100b14`; this excludes stack-copy arguments and does not establish
+absence of all helper execution. The helper
 subtracts the wrapping Timer0 delta from the deadline and clamps underflow
 to zero; the service dispatches zero deadlines. A halfword-aligned direct-BL
 scan of the pinned MCU finds one call to that service, at`0x4cc598` inside
@@ -249,6 +251,21 @@ indirect entries. Thus the unchanged three-tick deadline is downstream of
 absent timer servicing, not evidence that task15 needs an invented reply.
 Capture:`tmp/npe3-mbus-timer-service-after-wake`; ordinary End acceptance
 still fails. The global-control/idle-loop boundary remains unresolved.
+
+The late deadline predicate independently adjusts a stack-local copy:
+`4cc428..4cc42e` copies the queue head's interval to SP and calls
+`4cc3b2`; `4cc434..4cc438` admits sleep only when the adjusted copy
+is at least3. Read-only capture`tmp/npe3-mbus-deadline-reject-inputs`
+records22 entry/rejection pairs (debugger literal16 is hexadecimal):
+flags`100024=03`, stored interval3, Timer0`121b..121c` versus
+baseline`1002`, control0a. At rejection, R0=0, R1=0, R2=fdea/fde9
+and R3=3, matching the helper's wrapping subtraction
+`3-(Timer0-1002)` followed by its underflow clamp. Timer1 has ample
+destination distance and FIQ5 is clear. Thus an elapsed stack copy and an
+unchanged queued interval coexist as the code specifies; neither is a
+reason to modify the queue or inject timer expiry. Ordinary End acceptance
+still fails. The earlier silent queue-address-filtered helper probe must
+not be used to exclude this stack-copy path.
 
 A no-call/no-key control (`tmp/npe3-mbus-late-idle-query`) establishes the
 same boundary independently of call signaling or speech: clock-stop at
