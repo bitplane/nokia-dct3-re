@@ -21,6 +21,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('output', type=Path)
     parser.add_argument('--mame', type=Path)
+    parser.add_argument('--observe-nv', action='store_true', help='qualify own empty-field write buffers in both runs')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     binary = (args.mame or root / 'mame/mame').resolve()
@@ -41,7 +42,7 @@ def main():
                 '-video', 'none', '-sound', 'none', '-joystickprovider', 'none',
                 '-midiprovider', 'none', '-nothrottle', '-noreadconfig', '-log', '-verbose',
                 '-seconds_to_run', '31', '-autoboot_delay', '0', '-autoboot_script',
-                str(root / 'tools/nse2_toolkit_fixture.lua')]
+                str(root / 'tools' / ('nse2_nv_source.lua' if args.observe_nv else 'nse2_toolkit_fixture.lua'))]
             metadata.update(command=command, external_toolkit_profile=profile,
                 mame_sha256=hashlib.sha256(binary.read_bytes()).hexdigest())
             (run / 'inputs.json').write_text(json.dumps(metadata, indent=2) + '\n')
@@ -60,6 +61,10 @@ def main():
                     raise ValueError('reviewed Saved frame differs')
             endpoint.append({name: (storage / name).read_bytes()
                              for name in ('eeprom', 'flash', 'sim_card')})
+            if args.observe_nv:
+                from tools.nse2_nv_source_check import check
+                check(trace, (run / 'roms/nse2r4v/5110i_5.53a.fls').read_bytes(),
+                      endpoint[-1]['eeprom'])
         check_storage(*endpoint)
     except (OSError, ValueError, ET.ParseError) as error:
         parser.exit(1, f'NSE-2 Toolkit refusal: FAIL: {error}\n')

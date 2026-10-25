@@ -111,8 +111,9 @@ The5110i's separate Phase-2+ card control qualifies own terminal profile
 `03018000`, organic FETCH after a physical contact-save completion and
 automatic DISPLAY TEXT result30 capability refusal, not Toolkit display.
 The matched Phase-2 control has no proactive traffic; both save A/123 with
-identical complete card/flash endpoints. Eighteen EEPROM byte differences
-remain semantically unmapped and are protected by exact whole-bank hashes.
+identical complete card/flash endpoints. Own encoder/write-buffer/decoder
+evidence bounds18 EEPROM differences to unused empty-field padding;
+exact whole-bank hashes remain required, not masked.
 See`run_nse2_toolkit.py` and`5110i_bringup.md`; sustained native service
 remains unqualified.
 

@@ -3,11 +3,19 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nse2_empty_field_record_padding",
+      "owner": "nokia_5110i",
+      "status": "satisfied",
+      "predicate": "The paired NSE-2 EEPROM differences originate in inactive empty-field RAM payload before serial storage",
+      "current": "Both Phase2 and Phase2+ cold native-compatibility runs independently capture18 ordered encoder/write pairs. Own28a1d0 receives empty10d68c from24599e and sets only the leading output length;2459d0..2459da copy the complete16-byte field. At293c8e, each33-byte buffer10d618 already equals its final bank record06d0+33*i. Own decoder28a17c, called at245bb2, emits empty output without reading payload when length is zero. All18 bank differences lie at unused field offset15. Exact instruction spans and complete source/output banks are checked; both original endpoint hashes remain required. This explains bounded padding drift, not all readers, valid provisioning, sustained native service or hardware EEPROM corruption. Guest buffers are not initialized or patched.",
+      "evidence": ["docs/5110i_bringup.md", "docs/model_coverage.md", "tools/nse2_nv_source.lua", "tools/nse2_nv_source_check.py", "tools/test_nse2_nv_source_check.py", "tools/run_nse2_toolkit.py"]
+    },
+    {
       "id": "nse2_proactive_display_capability_refusal",
       "owner": "nokia_5110i",
       "status": "satisfied",
       "predicate": "The bounded own NSE-2 firmware fetches and refuses the external DISPLAY TEXT command after ordinary physical contact-save notification",
-      "current": "Two independent31s fresh native-compatibility boots differ only in external Phase2/Phase2+ card configuration. Own terminal profile03018000 precedes physical EF_ADN UPDATE completion9116, one exact22-byte FETCH and automatic terminal response810301218002028281030130, accepted9000. The Phase2 control has no Toolkit APDUs. Both retain reviewed Saved pixels and A/123; complete card/flash endpoints match. EEPROM has18 exact00->01 differences at06df+33*i for i0..17, with meaning unresolved and both complete hashes checked. This qualifies capability refusal, not Toolkit display, other commands, fitted native mask, sustained service, registration or speech. The original native backend and supervision policy remain unchanged.",
+      "current": "Two independent31s fresh native-compatibility boots differ only in external Phase2/Phase2+ card configuration. Own terminal profile03018000 precedes physical EF_ADN UPDATE completion9116, one exact22-byte FETCH and automatic terminal response810301218002028281030130, accepted9000. The Phase2 control has no Toolkit APDUs. Both retain reviewed Saved pixels and A/123; complete card/flash endpoints match. EEPROM has18 exact00->01 differences at06df+33*i for i0..17; the separate empty-field predicate bounds them to inactive payload padding, while both complete hashes remain checked. This qualifies capability refusal, not Toolkit display, other commands, fitted native mask, sustained service, registration or speech. The original native backend and supervision policy remain unchanged.",
       "evidence": ["docs/5110i_bringup.md", "docs/model_coverage.md", "tools/run_nse2_toolkit.py", "tools/nse2_toolkit_check.py", "tools/nse2_toolkit_fixture.lua", "tools/test_nse2_toolkit_check.py"]
     },
     {

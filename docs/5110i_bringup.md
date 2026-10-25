@@ -1577,8 +1577,8 @@ no new APDU after the card became pending.
 
 Both runs retain the reviewed Saved pixels and complete A/123 SIM contents;
 their whole flash and card endpoints match. EEPROM endpoints differ at
-exactly18 bytes:`06df + 33*i`, for`i=0..17`, each`00->01`. Their meaning is
-not decoded. The checker requires the complete endpoint hashes rather than
+exactly18 bytes:`06df + 33*i`, for`i=0..17`, each`00->01`. These are unused
+empty-field payload bytes, as bounded below. The checker requires complete endpoint hashes rather than
 masking these bytes or claiming unchanged handset storage:
 
 | Card | Complete EEPROM SHA256 |
@@ -1590,6 +1590,38 @@ The paired accepted capture is`tmp/nse2-toolkit-final`. Physical contacts
 and real SIMI TX/RX taps establish the protocol; no firmware state or DSP
 reply is injected. This bounded refusal does not establish other Toolkit
 commands, fitted-mask compatibility, post-restart stability or radio service.
+
+### Empty-field EEPROM write contract
+
+```sh
+.venv/bin/python tools/run_nse2_toolkit.py tmp/nse2-nv-paired --observe-nv
+```
+
+Both profiles independently execute18 writes at`06d0..0901`, stride33,
+after physical phone-code acceptance. At own writer`293c8e`, each complete
+33-byte RAM buffer at`10d618` already equals its final EEPROM record;
+the byte difference therefore precedes serial EEPROM storage. Every write
+follows encoder`28a1d0`, called from`24599e` with empty input`10d68c`
+and destination`10d608`. Its empty-input branch writes only the leading
+zero length and returns at`28a242`. The two LDM/STM pairs at`2459d0..2459da`
+copy all16 bytes from SP+4 to SP+14, including uninitialized trailing payload.
+
+The corresponding decode call at`245bb2` receives that16-byte field;
+decoder`28a17c` branches directly to zero-terminated empty output when its
+leading length is zero, without reading the remaining15 bytes. All18 bank
+differences occur at field offset15, inside that inactive payload. This
+explains the specific drift as firmware-persisted empty-field padding, not
+evidence of a special Toolkit settings write or EEPROM corruption. Both
+profiles perform the writes; their stale padding differs. It does not prove
+all record readers or broader provisioning validity.
+
+`nse2_nv_source_check.py` pins the own encoder, zero-return, decoder, field
+copy and writer instruction spans; requires all18 ordered empty-input/write
+pairs; and matches every complete source buffer to the saved bank. The
+paired run still requires the exact whole-bank hashes above and unchanged
+card/flash comparison. No padding is initialized, erased or exempted from
+acceptance. The sibling NSK-1 pattern was a search hypothesis; own NSE-2
+code and runtime buffers establish this conclusion.
 
 ## Remaining work
 
