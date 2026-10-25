@@ -987,6 +987,7 @@ private:
 	u32 m_playback_decoded_hash = 2166136261U, m_playback_decoded_words = 0;
 	u32 m_decoder_gate_events = 0, m_decoder_gate_bad = 0;
 	u32 m_context_count_reads = 0;
+	u32 m_context_pointer_reads = 0;
 	u32 m_playback_slot_hash = 2166136261U;
 	u32 m_playback_dma_hash = 2166136261U;
 	std::array<double, 2> m_playback_audio_last_nonzero{};
@@ -1995,6 +1996,8 @@ private:
 			m_decoder_gate_events,m_decoder_gate_bad,unsigned(m_decoder_gate_events>512),machine().time().as_double());
 		logerror("mu4_context_count_terminal: reads=%u capped=%u address=d7ac first=9.640000000 last=9.860000000 t=%.9f identity=Access_bus observer_writes=0\n",
 			m_context_count_reads,unsigned(m_context_count_reads>256),machine().time().as_double());
+		logerror("mu4_context_pointer_terminal: reads=%u capped=%u first=9.640000000 last=9.860000000 t=%.9f identity=Access_bus observer_writes=0\n",
+			m_context_pointer_reads,unsigned(m_context_pointer_reads>256),machine().time().as_double());
 		logerror("mu4_playback_method_terminal: entry=%u early=%u body=%u returned=%u result=%u publish=%u opcode_mismatch=%u selection=first_verified_aa99_session identity=Execute_entry observer_writes=0 audio_acceptance=0\n",
 			m_playback_method_entries[0], m_playback_method_entries[1], m_playback_method_entries[2],
 			m_playback_method_entries[3], m_playback_method_entries[4], m_playback_method_entries[5], m_playback_method_mismatch);
@@ -3079,9 +3082,17 @@ private:
 						m_playback_buffer_writes[address - 0x1000] = {time, m_cpu->pc(), value, mask};
 					});
 				m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mu4_playback_dma_source",
-					[this](offs_t address, u16 &value, u16) {
-						if (!m_playback_overlay_checked || machine().side_effects_disabled() ||
-							!m_dma->source_read_matches(3, AS_DATA, address)) return;
+					[this](offs_t address, u16 &value, u16 mask) {
+						if (!m_playback_overlay_checked || machine().side_effects_disabled()) return;
+						if (m_playback_execute_entries[1] == 1 && machine().time() >= attotime::from_msec(9640) && machine().time() <= attotime::from_msec(9860))
+						{
+							u32 instruction; u16 opcode;
+							if (m_cpu->observe_staged_data_read(address,instruction,opcode) && instruction == 0x201c7)
+								if (++m_context_pointer_reads <= 256)
+									logerror("mu4_context_pointer_read: ordinal=%u address=%04x instruction=%06x opcode=%04x word=%04x mask=%04x t=%.9f identity=Access_bus observer_writes=0\n",
+										m_context_pointer_reads,unsigned(address),instruction,opcode,value,mask,machine().time().as_double());
+						}
+						if (!m_dma->source_read_matches(3, AS_DATA, address)) return;
 						++m_playback_dma_reads;
 						double const time = machine().time().as_double();
 						if (time >= 1.0 && time <= 1.25 && address >= 0x1000 && address <= 0x137f)
@@ -3714,6 +3725,7 @@ private:
 		m_playback_decoded_hash = 2166136261U; m_playback_decoded_words = 0;
 		m_decoder_gate_events = m_decoder_gate_bad = 0;
 		m_context_count_reads = 0;
+		m_context_pointer_reads = 0;
 		for (unsigned i=0;i<3;++i)
 		{
 			auto &stream=m_playback_word_capture[i];

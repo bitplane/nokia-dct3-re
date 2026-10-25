@@ -2,7 +2,7 @@ import unittest
 import re
 
 from tools.mu4_decoder_gate_check import (check, check_return_routes, check_activity_cycles,
-                                         check_counter_producers, SITES)
+                                         check_counter_producers, check_counter_pointers, SITES)
 
 
 def fixture():
@@ -73,6 +73,24 @@ def counter_fixture():
 
 
 class DecoderGateTests(unittest.TestCase):
+    def test_counter_pointer_access_identity_and_pairing(self):
+        text = counter_fixture()+'\n'+'\n'.join([
+            'mu4_context_pointer_read: ordinal=1 address=d79e instruction=0201c7 opcode=7192 word=d7ac mask=ffff t=9.6504 identity=Access_bus observer_writes=0',
+            'mu4_context_pointer_terminal: reads=1 capped=0 first=9.64 last=9.86 t=10 identity=Access_bus observer_writes=0'])
+        self.assertEqual(check_counter_pointers(text)['counter_pointers']['sources'],{'d79e':1})
+        other = ('mu4_context_pointer_read: ordinal=2 address=d7c0 instruction=0201c7 opcode=7192 word=d7ce mask=ffff t=9.651 identity=Access_bus observer_writes=0')
+        expanded = text.replace('reads=1 capped=0','reads=2 capped=0')+'\n'+other
+        result = check_counter_pointers(expanded)['counter_pointers']
+        self.assertEqual((result['reads'],result['target_reads']),(2,1))
+        for before,after in (('opcode=7192','opcode=7193'),('word=d7ac','word=d7ab'),
+                             ('address=d79e','address=0013'),('t=9.6504','t=9.6506'),
+                             ('reads=1 capped=0','reads=2 capped=0'),('capped=0','capped=1'),
+                             ('observer_writes=0','observer_writes=1')):
+            with self.subTest(before=before),self.assertRaises(ValueError):
+                check_counter_pointers(text.replace(before,after))
+        with self.assertRaises(ValueError):
+            check_counter_pointers(counter_fixture())
+
     def test_counter_producers_require_actual_read_ownership(self):
         result = check_counter_producers(counter_fixture())['counter_reads']
         self.assertEqual(result['total'],2)

@@ -838,7 +838,7 @@ only zero is runtime-qualified here. Tested executable SHA256:
 `41800b61c13a18396ffa20437c43b033c04e5581b08b96cb9ce3007f58060e0b`.
 
 `worker_reservation` identifies the local meaning of the15d9 activity term.
-The84-word contract includes the worker's acquisition prefix, the delayed
+The93-word contract includes the worker's acquisition prefix, the delayed
 wrapper`02044a` and count-consumer prefix`020182`. A complete literal
 scan of49843 mapped AA99 words finds seven15d9 references: four direct
 literal writes (two to1, two to0) and three reads. This is not closure over
@@ -854,15 +854,38 @@ The increment's pointer comes from `0201c7 MVDK *AR2+,AR3`, followed by
 `MAR *AR2+` before `0201ca ADDM #1,*AR3`. The same complete mapped-word
 scan finds exactly one literal `d7ac`, at initialization-data address
 `027061` (followed by `054f`). Both sequences and the literal census are
-tested. This does not establish the runtime descriptor source address or
-the interpretation of that initialization record; those require separate
-dataflow evidence, not a presumed hardware-ready notification.
-The CPU's `observe_staged_data_read` interface does not cover this MVDK:
-its operand is retained in Address stage through a direct data-space read,
-not the Read-stage `pipeline_read_data` path. A zero count from that observer
-cannot exclude this producer. Any runtime pointer-ownership observation must
-cover the actual Address-stage access without using the live Execute PC as
-its owner.
+tested. The surrounding words have the initialization-record shape
+`count=9,destination=d797`, with payload
+`0000,0000,0800,aa85,d7b0,0000,0000,d7ac,054f`; its `d7ac` entry
+would map to `d79e`. That mapping is an initialization candidate, not
+observed initialization ownership or a presumed hardware-ready notification.
+MVDK retains this operand in Address stage, not the ordinary Read-stage
+`pipeline_read_data` path. The CPU's `observe_staged_data_read` interface
+now also surrounds that actual MVDK bus access with its Address-slot
+instruction identity, without adding a read or changing its timing. It
+continues to exclude forwarded values. A zero count from an observer that
+covers only Read stage cannot exclude this producer; the live Execute PC
+is not its owner.
+
+Fresh cold capture `tmp/mu4-address-read-complete` qualifies126 uncapped
+Address-stage MVDK pointer reads in the same bounded first-session window:
+`d79e -> d7ac` four times, `d7ae -> d79c` four times,
+`d7c0 -> d7ce`59 times and `d7d0 -> d7be`59 times.
+Each of the four `d79e -> d7ac` reads precedes its corresponding
+`0201ca` counter operand read. The existing four acquisition/release cycles
+and decoder return-route qualifiers also pass. Thus the generic helper
+serves multiple context links; it is not a dedicated hardware-ready source.
+Initialization ownership, callback scheduling and final drain policy remain
+open. The executable mapped-MVDK control passes14,256 cases/restores with
+one source read and one destination write per case; the tools suite passes
+5,279 tests with one skip. This is not a new full-CPU acceptance checkpoint.
+Tested binary SHA256:
+`86ff037c3d450ab848901c3bc13ba5cadb1c3a53312c9b790a6a2b2db6adcd57`.
+
+```sh
+.venv/bin/python tools/mu4_decoder_gate_check.py \
+  tmp/mu4-address-read-complete/error.log --counter-pointers
+```
 
 Fresh read-only capture`tmp/mu4-context-count` qualifies four entry-state
 cycles on context`d796`: `(flag,count)=(0,1) -> (1,0) -> (0,0)` at gate,

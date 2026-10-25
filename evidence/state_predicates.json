@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_native_context_increment_pointer",
+      "owner": "native_aac_validation",
+      "status": "satisfied",
+      "predicate": "The native late worker's D7AC increment is preceded by an owned Address-stage MVDK read of its pointer from D79E",
+      "current": "Fresh cold tmp/mu4-address-read-complete qualifies126 uncapped actual0201c7/7192 reads in9.64..9.86s inside the first verified AA99 session. Links are D79E->D7AC four times, D7AE->D79C four times, D7C0->D7CE59 times and D7D0->D7BE59 times. Each target-D7AC pointer read precedes its corresponding0201ca/6b83 counter read; the existing35 counter reads and four acquisition/release cycles remain qualified. CPU observation now covers the actual MVDK Address-stage read as well as ordinary Read-stage accesses, without another operand read; no live Execute-PC attribution is used. The93-word source contract pins the load and candidate nine-word initialization record at027058, whose D7AC entry would map toD79E; initialization ownership is not dynamically proved. Mapped-MVDK executable control passes14256 cases/restores with one source read and one destination write;5279 tool tests pass with one skip. Binary SHA25686ff037c3d450ab848901c3bc13ba5cadb1c3a53312c9b790a6a2b2db6adcd57. This is a generic context-link observation, not dedicated peripheral readiness, descriptor initialization, write retirement, physical capacity, clock accuracy, final AAC drain, codec conformance or a renewed full-CPU checkpoint.",
+      "evidence": ["docs/aac_validation.md", "cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h", "driver/mu4_storage_test.cpp", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "tools/mu4_decoder_gate_check.py", "tools/test_mu4_decoder_gate_check.py"]
+    },
+    {
       "id": "mu4_native_counted_context_reservation",
       "owner": "native_aac_validation",
       "status": "satisfied",

@@ -715,7 +715,7 @@ WORKER_RESERVATION_WITNESSES = (
     (0x2935c,(0x76f8,0x15d9,0)),
     (0x293e1,(0x76f8,0x15d9,0)),
     (0x201c7,(0x7192,0x13,0x6d92,0x6b83,1)),
-    (0x27061,(0xd7ac,0x054f)),
+    (0x27058,(9,0xd797,0,0,0x0800,0xaa85,0xd7b0,0,0,0xd7ac,0x054f)),
     (SERVICE_GATE_BASE,SERVICE_GATE_WITNESS),
 )
 
@@ -743,6 +743,9 @@ def decode_worker_reservation(words):
         increment='0201ca ADDM #1,*AR3; runtime target ownership must be established separately',
         increment_pointer=dict(load='0201c7 MVDK *AR2+,AR3;0201c9 MAR *AR2+',
             literal_references=[f'{a:06x}' for a in counter_hits],
+            initialization_candidate=dict(source='027058',count=9,destination='d797',
+                values=['0000','0000','0800','aa85','d7b0','0000','0000','d7ac','054f'],
+                pointer_destination='d79e',pointer_source='027061'),
             scope='Single mapped literal in initialization data; runtime descriptor source address and initialization interpretation remain unproved'),
         scope='Local counted-context reservation contract and exact literal census; not all computed writers, full helper call effects, downstream ownership, physical units or EOF/drain completion')
 

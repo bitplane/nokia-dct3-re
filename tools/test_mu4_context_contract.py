@@ -96,6 +96,7 @@ class ContextContractTest(unittest.TestCase):
         result = decode_worker_reservation(words)
         self.assertEqual(len(result['literal_references']),7)
         self.assertEqual(result['increment_pointer']['literal_references'],['027061'])
+        self.assertEqual(result['increment_pointer']['initialization_candidate']['pointer_destination'],'d79e')
         self.assertEqual(result['direct_literal_writes'],
                          {'029334':1,'02935c':0,'0293c3':1,'0293e1':0})
         for address in words:

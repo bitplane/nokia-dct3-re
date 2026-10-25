@@ -209,16 +209,60 @@ def check_counter_producers(text):
     return report
 
 
+def check_counter_pointers(text):
+    report = check_counter_producers(text)
+    pointers = rows(text,'mu4_context_pointer_read')
+    terminals = rows(text,'mu4_context_pointer_terminal')
+    increments = [row for row in rows(text,'mu4_context_count_read')
+                  if (row['instruction'],row['opcode']) == ('0201ca','6b83')]
+    if len(terminals)!=1 or not pointers:
+        raise ValueError('missing or unmatched counter pointer reads')
+    end = terminals[0]
+    if (int(end['reads'])!=len(pointers) or len(pointers)>256 or end['capped']!='0'
+            or end['identity']!='Access_bus' or end['observer_writes']!='0'
+            or (float(end['first']),float(end['last']))!=tuple(report['window'])
+            or float(end['t'])<float(end['last'])):
+        raise ValueError('incomplete counter pointer window')
+    previous = report['window'][0]
+    sources,links = Counter(),Counter()
+    for ordinal,pointer in enumerate(pointers,1):
+        when = float(pointer['t'])
+        if (int(pointer['ordinal'])!=ordinal or not previous<=when<=report['window'][1]
+                or (pointer['instruction'],pointer['opcode'])!=('0201c7','7192')
+                or not 0x60<=int(pointer['word'],16)<=0xffff or pointer['mask']!='ffff'
+                or pointer['identity']!='Access_bus' or pointer['observer_writes']!='0'
+                or not 0x60<=int(pointer['address'],16)<=0xffff):
+            raise ValueError('counter pointer ownership, target or chronology changed')
+        previous = when
+        links[pointer['address'],pointer['word']] += 1
+        if pointer['word']=='d7ac':
+            sources[pointer['address']] += 1
+    selected = [pointer for pointer in pointers if pointer['word']=='d7ac']
+    if len(selected)!=len(increments):
+        raise ValueError('unmatched counter pointer reads')
+    previous = report['window'][0]
+    for pointer,increment in zip(selected,increments):
+        if not previous<=float(pointer['t'])<float(increment['t'])<=report['window'][1]:
+            raise ValueError('counter pointer and increment chronology changed')
+        previous = float(increment['t'])
+    report['counter_pointers'] = dict(reads=len(pointers),target_reads=len(selected),sources=dict(sorted(sources.items())),
+        links=[dict(source=source,target=target,reads=count) for (source,target),count in sorted(links.items())],
+        scope='Actual Address-stage MVDK reads preceding count increments; '
+              'not descriptor initialization ownership, write retirement, physical capacity or EOF policy')
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     parser.add_argument('--returns', action='store_true', help='require complete observed post-metadata return routes')
     parser.add_argument('--activity', action='store_true', help='also qualify counted-context reservation entry states')
     parser.add_argument('--counter-producers', action='store_true', help='also require actual CPU count increment/decrement operand reads')
+    parser.add_argument('--counter-pointers', action='store_true', help='also require Address-stage counter pointer reads')
     args = parser.parse_args()
     try:
         text = args.log.read_text()
-        checker = (check_counter_producers if args.counter_producers else check_activity_cycles
+        checker = (check_counter_pointers if args.counter_pointers else check_counter_producers if args.counter_producers else check_activity_cycles
                    if args.activity else check_return_routes if args.returns else check)
         print(json.dumps(checker(text), indent=2))
     except (ValueError, KeyError, OSError) as error:

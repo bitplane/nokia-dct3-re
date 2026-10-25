@@ -4127,7 +4127,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = source;
 		bool const mapped_write = pipeline_mapped_accumulator_write(source) ||
 			(m_pipeline_valid[5] && staged_mvmd_cleared_source(m_pipeline_word[3], m_pipeline_word[5]));
-		if (!mapped_write) m_pipeline_operand[3] = m_data.read_word(source);
+		if (!mapped_write) m_pipeline_operand[3] = pipeline_observed_read(source, 3);
 		// Retain the old-address sample, update the source AR, then publish
 		// the destination; source/destination AR aliasing must not re-read RAM.
 		if (BIT(mode, 7) && !extended) indirect_modify(mode, false, 3);
@@ -5864,11 +5864,17 @@ u16 tms320c54x_device::pipeline_read_data(u16 address)
 		return (m_pipeline_word[5] & 0xff00) == 0x6b00 ? add_memory_word(value, immediate, false) :
 			m_pipeline_word[5] == 0x6af8 ? value ^ immediate : BIT(m_pipeline_word[5], 8) ? value | immediate : value & immediate;
 	}
-	// Transient synchronous observer context; not hardware or save-state state.
-	m_observed_data_read = m_pipeline_valid[4];
+	return pipeline_observed_read(address, 4);
+}
+
+u16 tms320c54x_device::pipeline_observed_read(u16 address, unsigned stage)
+{
+	// MVDK retains its operand in Address; ordinary operands arrive in Read.
+	// This transient identity surrounds only the actual bus access, not forwarding.
+	m_observed_data_read = m_pipeline_valid[stage];
 	m_observed_data_address = address;
-	m_observed_data_instruction = m_pipeline_address[4];
-	m_observed_data_opcode = m_pipeline_word[4];
+	m_observed_data_instruction = m_pipeline_address[stage];
+	m_observed_data_opcode = m_pipeline_word[stage];
 	u16 const value = m_data.read_word(address);
 	m_observed_data_read = false;
 	return value;
