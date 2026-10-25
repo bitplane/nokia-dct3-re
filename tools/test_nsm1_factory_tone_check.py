@@ -29,6 +29,21 @@ def trace():
 
 
 class FactoryTonePublicationTest(unittest.TestCase):
+    def test_serial_release_is_not_sample_output_or_sibling_word_format(self):
+        rows=['nsm1_factory_wave_summary: early=17 late=6 control=c8cc extension=0000 observer_writes=0']
+        early=[('0022','c008','0e22'),('0022','c0c8','0e24'),
+               ('0021','0aaa','0e31'),('0021','ffd5','358b')]+[('0022','c008','3021')]*12
+        rows.extend(f'nsm1_factory_wave_data: phase=early address={a} value={v} mask=ffff pc={p} t=0.250000000 observer_writes=0' for a,v,p in early)
+        rows.extend(f'nsm1_factory_wave_data: phase=late address=0022 value={v} mask=ffff pc={p} t=86.123000000 observer_writes=0' for _ in range(3) for v,p in (('c00c','a4a1'),('c0cc','a4a3')))
+        good='\n'.join(rows)
+        checker.check_serial(good)
+        for bad in (good.replace('c0cc','c0c8'),good.replace('control=c8cc','control=c8c8'),
+                    good.replace('phase=late address=0022','phase=late address=0021'),
+                    good.replace('value=0aaa','value=0000'),good.replace('late=6','late=0'),
+                    good+'\nnsm1_factory_wave_data: malformed'):
+            with self.subTest(tail=bad[-80:]),self.assertRaises(ValueError):
+                checker.check_serial(bad)
+
     def test_complete_projected_publication_and_native_acknowledgements(self):
         checker.check_publication(trace())
 

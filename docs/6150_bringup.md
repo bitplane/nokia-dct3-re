@@ -393,7 +393,7 @@ counts cannot establish Toolkit output.
 
 #### Reset-bank cold tone publication
 
-`tmp/nsm1-factory-tone-qualified` cold-copies only the qualified reset's NVRAM
+`tmp/nsm1-factory-tone-serial-qualified` cold-copies only the qualified reset's NVRAM
 and CFG, then selects the same external profile11. No phone-code contact or
 validator transaction occurs; PIN authentication and all Toolkit text/input/
 menu/tone exchanges still pass. The actual tone0a constructor296594/2c005e
@@ -415,7 +415,7 @@ card and flash remain unchanged. No record or firmware state is patched.
 
 ```sh
 .venv/bin/python tools/nsm1_factory_tone_check.py tmp/nsm1-pin-menu \
-  tmp/nsm1-factory-reset-qualified tmp/nsm1-factory-tone-qualified --mame mame/mame
+  tmp/nsm1-factory-reset-qualified tmp/nsm1-factory-tone-serial-qualified --mame mame/mame
 ```
 
 Use a fresh output. The checker composes the qualified reset, exact cold
@@ -426,6 +426,28 @@ admission, bad lanes, missing acknowledgements and malformed/extra rows.
 The next boundary is the native DSP/COBBA waveform path, not another guessed
 Toolkit reply or an injected channel enable. The acquired NSE-1 mask remains
 an explicit compatibility backend, not the missing fitted6150 mask.
+
+The same gate now distinguishes data-space serial writes from DSP I/O:
+it observes20..23 and30..33, with17 boot writes and16 retained positive
+records, including BSPC reset/release, BDXR0aaa and ISR-producedffd5. In the
+85..91.5s window, six writes are exactly three BSPC pairs
+`c00c@a4a1 -> c0cc@a4a3`; no BDXR/sample write occurs. Non-destructive final
+BSPC/BSPCE readback is `c8cc/0000`. The current standard BSP model decodes
+that as released RX/TX, transmit-ready, and8-bit words. It does not establish
+the handset's physical word encoding, clock source or analog PCM law.
+TI [SPRU131G, table9-10](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
+confirms the generic FO=1/FE=0 eight-bit decode. The own service manual's
+16-bit PCM-frame description below is different evidence: reconcile it with
+this compatibility backend before promoting the observed width to fitted
+NSM-1 hardware. Do not silently change the generic BSP decode to match it.
+
+This reaches the same unclocked frame-delivery boundary already mapped for
+the5110, but with a different control word: do not import its16-bit `c0c8`
+wire fixture unchanged. Reuse the [existing clocked native-tone work](
+cobba_control_boundary.md#externally-clocked-native-dtmf) as a laboratory
+comparison, preserving the explicit clock assumptions and product-owned
+word format. Neither serial release nor successful control publication is
+proof that microphone/earpiece samples were transferred.
 
 ### Pending Toolkit command restoration
 

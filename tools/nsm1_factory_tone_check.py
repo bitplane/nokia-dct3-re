@@ -28,6 +28,25 @@ FIELDS=((9,0x20c),(0x25,0xbb9),(0x20,0xe10),(0x24,0x7fff),(0x2e,0),
         (0x25,0xbb8),(0x2e,0),(9,0x20f),(0x25,1),(0x20,0),(0x24,0),(0x2e,0))
 
 
+def check_serial(text):
+    if (re.findall(r'nsm1_factory_wave_summary: early=(\d+) late=(\d+) control=([0-9a-f]{4}) extension=([0-9a-f]{4}) observer_writes=0',text)
+            !=[('17','6','c8cc','0000')] or text.count('nsm1_factory_wave_summary:')!=1):
+        raise ValueError('unclocked serial-data census differs')
+    rows=re.findall(r'nsm1_factory_wave_data: phase=(early|late) address=([0-9a-f]{4}) value=([0-9a-f]{4}) mask=([0-9a-f]{4}) pc=([0-9a-f]{4}) t=([0-9.]+) observer_writes=0',text)
+    early=[r for r in rows if r[0]=='early']
+    late=[r for r in rows if r[0]=='late']
+    if (len(early)!=16 or len(late)!=6 or text.count('nsm1_factory_wave_data:')!=22
+            or [r[1:5] for r in early[:4]]!=[
+                ('0022','c008','ffff','0e22'),('0022','c0c8','ffff','0e24'),
+                ('0021','0aaa','ffff','0e31'),('0021','ffd5','ffff','358b')]
+            or any(not 0<=float(r[5])<5 for r in early)):
+        raise ValueError('serial data lacks boot positive controls')
+    if ([r[1:5] for r in late]!=[r for _ in range(3) for r in (
+            ('0022','c00c','ffff','a4a1'),('0022','c0cc','ffff','a4a3'))]
+            or any(not 86<float(r[5])<86.5 for r in late)):
+        raise ValueError('unclocked reset/release or scoped sample absence differs')
+
+
 def check_publication(text):
     summary=re.findall(r'nsm1_tone_boundary_summary: start=85 end=91.5 mcu_early=(\d+) mcu=(\d+) dsp=(\d+) io=(\d+) compiler_early=(\d+) compiler=(\d+) observer_writes=0',text)
     if summary != [('70528','18','10','2854','20','18')] or text.count('nsm1_tone_boundary_summary:')!=1:
@@ -132,6 +151,7 @@ def check(seed,reset,run):
         raise ValueError('own physical installed-menu route differs')
     check_tone_native(text)
     check_publication(text)
+    check_serial(text)
     frames={'before':PROMPT,'after':INTERACTIVE_FRAMES['inkey'],
             **INTERACTIVE_FRAMES,**{'menu_'+k:v for k,v in MENU_FRAMES.items()},
             'tone_before':MENU_FRAMES['open'],'tone_active':TONE_FRAME,'tone_after':TONE_FRAME}
