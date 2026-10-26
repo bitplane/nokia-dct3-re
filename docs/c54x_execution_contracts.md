@@ -2205,14 +2205,15 @@ and physical timing retain their independent scopes.
 
 ## Core regression checkpoint
 
-The modular default C54x suite retains the source/RMW admission guards and
+The current default C54x suite includes the completed single-address
+source/RMW exclusion census correction and retains the earlier
 atomic load, memory-T multiply, MPY/MAC, LTD/DELAY, MACP/MACD, RMW, memory-logic,
 scalar-arithmetic and long-memory arithmetic absolute-alias corrections.
 All 293 required markers appear exactly once, followed by core conformance
 PASS and intentional MAME exit 3; the isolated runner returns 0, with
 `interrupted=false`. Its 294 ordered PASS records and 5,690 distinct asserted
-opcode words exactly match the pre-extraction baseline. The capture is
-`tmp/c54x-modularization-step3/run_c54x_core_k9kppvgb`:
+opcode words exactly match the modularization baseline. The capture is
+`tmp/fidelity-source-domain-full/run_c54x_core_jkrbwol3`:
 
 ```sh
 .venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
@@ -2220,25 +2221,23 @@ opcode words exactly match the pre-extraction baseline. The capture is
 ```
 
 The recorded executable SHA256 is
-`fa6ef29c74120a86439db6cd58ecccb464c19a92158cd64e8be09d3d900ecced`.
-CPU source SHA256 remains
-`3e06383c729b7bb0fb2d0dd33c2f018032cc7a304d801212c54b5f30233b05b0`.
-`fixtures/c54x_modularization_checkpoint.json` banks CPU and split bench-source
-hashes, binary identity, result comparison and separate handset
-preservation checks. The full-run inputs were rechecked unchanged at
-completion; the later board-composition binary is recorded separately, not
-claimed to have rerun the full suite. The opcode-set SHA256 is
+`350683a309ba9cf2d65977bb6e1783725a09dad3d83cdf992fd0c4c85d3c60c2`.
+CPU source SHA256 is
+`7191436aa1d97343cf5b75a67b041f03fd884febd29757c2791fe2afca466e16`.
+`fixtures/c54x_fidelity_checkpoint.json` banks the CPU and split bench-source
+hashes, immutable binary identity and exact result comparison. Inputs were
+rechecked unchanged at completion. Later handset/device changes do not renew
+this CPU-only checkpoint. The opcode-set SHA256 is
 `7fd37083d052b81e65f629b5e2062965e612cab737cd54ee85a0f84d60ed76e4`
 (sorted four-digit opcode strings joined by newlines, without a final newline).
 Optional
 profiles retain their separate acceptance scopes; this run does not prove
 the complete ISA, physical pipeline timing, fitted DSP-mask compatibility,
-native RF or end-to-end handset speech and calls. The separate tool suite passes
-5,326 tests (one skip). Revision-bound checkpoints below preserve their narrower
+native RF or end-to-end handset speech and calls. Revision-bound checkpoints below preserve their narrower
 instruction and original-firmware comparisons, not competing current
 default-suite baselines.
 
-The modular binary separately passes seven named core scopes, representative
+The historical `c54x_modularization_checkpoint.json` separately records seven named core scopes, representative
 arithmetic, interrupt and restore profiles, and ROM4 CRC/FR decoder controls on
 both frontends. The board extraction preserves all 271 compiled machine/device
 XML records and passes eight handset gates: default and frontier 3210, v5.01
