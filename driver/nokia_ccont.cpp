@@ -415,6 +415,8 @@ uint8_t nokia_ccont_device::serial_r()
 		case RTC_SECOND: data |= 0x80; break;
 		}
 	}
+	if (machine().side_effects_disabled())
+		return data;
 	if (m_rtc_trace &&
 			((address >= RTC_SECOND && address <= RTC_ALARM_HOUR) || address == IRQ_STATUS))
 		LOGMASKED(LOG_CCONT, "ccont_rtc: event=read reg=%02x data=%02x t=%.9f\n",

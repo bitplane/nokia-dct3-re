@@ -70,6 +70,8 @@ u16 nokia_dspif_device::shared_r(offs_t offset)
 	offset &= 0x7ff;
 	const unsigned byte_offset = offset << 1;
 	const u16 value = m_ram[offset];
+	if (machine().side_effects_disabled())
+		return value;
 	if (offset == (0x0fe / 2))
 	{
 		m_shared_0fe_read_cb(1);

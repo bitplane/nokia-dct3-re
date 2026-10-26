@@ -55,7 +55,8 @@ u8 nokia_gensio_device::read(offs_t offset)
 	if (offset == m_wiring.ccont_read)
 	{
 		const u8 data = m_ccont_read_cb();
-		m_status &= ~STATUS_RX_READY;
+		if (!machine().side_effects_disabled())
+			m_status &= ~STATUS_RX_READY;
 		return data;
 	}
 	if (offset == m_wiring.status)

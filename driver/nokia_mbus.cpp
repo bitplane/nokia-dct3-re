@@ -88,6 +88,8 @@ u8 nokia_mbus_device::read(offs_t offset)
 	case 2:
 	{
 		const u8 result = m_data;
+		if (machine().side_effects_disabled())
+			return result;
 		m_rx_ready = false;
 		m_fiq2_cb(0);
 		trace_event("rx_read", result);

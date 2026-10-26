@@ -226,6 +226,8 @@ u8 nokia_simi_device::rxd_r()
 	if (!m_rx_ready || m_rx_count == 0)
 		return 0;
 	const u8 data = m_rx_fifo[m_rx_head];
+	if (machine().side_effects_disabled())
+		return data;
 	m_rx_head = (m_rx_head + 1) % std::size(m_rx_fifo);
 	m_rx_count--;
 	m_rx_ready = false;
