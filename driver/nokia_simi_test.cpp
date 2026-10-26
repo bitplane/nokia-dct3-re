@@ -977,6 +977,93 @@ private:
 		machine().schedule_exit();
 	}
 };
+// Card-byte conformance only: no claim about SIMI's unmeasured clock wiring.
+class nokia_sim_pts_test_state : public driver_device
+{
+public:
+	nokia_sim_pts_test_state(machine_config const &config, device_type type, char const *tag)
+		: driver_device(config, type, tag), m_card(*this, "card") { }
+	void test(machine_config &config)
+	{
+		NOKIA_SIM_CARD(config, m_card);
+		m_card->response_cb().set(FUNC(nokia_sim_pts_test_state::response));
+	}
+protected:
+	virtual void machine_start() override
+	{
+		m_timer = timer_alloc(FUNC(nokia_sim_pts_test_state::run), this);
+		m_timer->adjust(attotime::from_msec(1));
+	}
+private:
+	required_device<nokia_sim_card_device> m_card;
+	emu_timer *m_timer = nullptr;
+	unsigned m_case = 0;
+	std::vector<u8> m_response;
+	void response(u8 byte) { m_response.push_back(byte); }
+	void expect(bool value, char const *message)
+	{
+		if (!value) fatalerror("SIM PTS conformance: case=%u bytes=%u %s",
+				m_case, unsigned(m_response.size()), message);
+	}
+	void command(std::vector<u8> const &bytes, std::vector<u8> const &expected)
+	{
+		m_response.clear();
+		for (u8 byte : bytes) m_card->rx_w(byte);
+		expect(m_response == expected, "exact negotiation response");
+	}
+	void activate()
+	{
+		m_response.clear();
+		m_card->activate();
+		expect(m_response == std::vector<u8>({0x3b, 0x10, 0x05}), "unchanged ATR profile");
+	}
+	TIMER_CALLBACK_MEMBER(run)
+	{
+		struct pts_case { std::vector<u8> request, response; };
+		std::array<pts_case, 10> const cases = {{
+			{{0xff,0x00,0xff},{0xff,0x00,0xff}},
+			{{0xff,0x10,0x11,0xfe},{0xff,0x10,0x11,0xfe}},
+			{{0xff,0x10,0x94,0x7b},{0xff,0x00,0xff}},
+			{{0xff,0x10,0x05,0xea},{0xff,0x00,0xff}},
+			{{0xff,0x00,0xfe},{}},
+			{{0xff,0x01,0xfe},{}},
+			{{0xff,0x80,0x7f},{}},
+			{{0xff,0x20,0x00,0xdf},{}},
+			{{0xff,0x40,0x00,0xbf},{}},
+			{{0xff,0x70,0x11,0x22,0x33,0x8f},{}}
+		}};
+		for (auto const &item : cases)
+		{
+			activate();
+			command(item.request, item.response);
+			m_card->deactivate();
+			activate();
+			command({0xff,0,0xff},{0xff,0,0xff});
+			command({0xa0,0xa4,0,0,2,0x3f,0},{0xa4,0x9f,22});
+			++m_case;
+		}
+		// Both outcomes resume the same partial request, including its open
+		// negotiation window. The response observer is intentionally not saved.
+		activate();
+		command({0xff,0x10},{});
+		std::stringstream saved;
+		expect(machine().save().write_stream(saved) == STATERR_NONE, "save partial PTS");
+		command({0x94,0x7b},{0xff,0,0xff});
+		saved.seekg(0);
+		expect(machine().save().read_stream(saved) == STATERR_NONE, "restore partial PTS");
+		command({0x11,0xfe},{0xff,0x10,0x11,0xfe});
+		command({0xa0,0xa4,0,0,2,0x3f,0},{0xa4,0x9f,22});
+		command({0xff,0,0xff,0,0},{0x6e,0});
+		activate();
+		command({0xff},{});
+		m_card->deactivate();
+		activate();
+		command({0xff,0,0xff},{0xff,0,0xff});
+		osd_printf_info("SIM PTS conformance: PASS cases=10 default_speed=1 unsupported_speed_fallback=2 checksum=1 reserved_fields=1 partial_restore=1 following_apdu=10 late_pts_class_error=1 deactivation_abort=1 enhanced_clock_claim=0 handset_claim=0\n");
+		machine().schedule_exit();
+	}
+};
+ROM_START(simptst) ROM_END
 ROM_START(simfdnt) ROM_END
 ROM_START(simfdnrt) ROM_END
 }
@@ -986,3 +1073,5 @@ CONS(2026, simfdnt, 0, 0, strict, simi_test, nokia_sim_fdn_test_state, empty_ini
 		"Test", "SIM fixed dialling strict conformance", MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE)
 CONS(2026, simfdnrt, 0, 0, readable, simi_test, nokia_sim_fdn_test_state, empty_init,
 		"Test", "SIM fixed dialling readable-invalid conformance", MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE)
+CONS(2026, simptst, 0, 0, test, simi_test, nokia_sim_pts_test_state, empty_init,
+		"Test", "SIM PTS negotiation conformance", MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE)

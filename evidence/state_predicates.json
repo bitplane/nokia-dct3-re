@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "sim_pts_default_speed_negotiation",
+      "owner": "nokia_sim_card",
+      "status": "satisfied",
+      "predicate": "Byte-level T=0 PTS negotiation accepts supported default parameters without falsely acknowledging unsupported speeds",
+      "current": "The independent simptst fixture checks ten request families, explicit and implicit default F/D, two unsupported-speed fallbacks, checksum/protocol/reserved-field refusal, a following SELECT MF after every reset, partial-request save/load, deactivation abort and rejection of late ff-class APDUs. The old echo implementation fails the unsupported-speed case. The existing SIMI restoration and APDU suite and both 3210 physical-menu oracles pass. Unsupported speeds return default parameters under GSM11.11 section5.8.3; no enhanced clock, divider, physical error source or terminal waiting-time claim is made.",
+      "evidence": ["driver/nokia_sim_card.cpp", "driver/nokia_simi_test.cpp", "tools/run_sim_pts.py", "tools/test_sim_pts.py", "docs/sim_subsystem.md"]
+    },
+    {
       "id": "nse8_rom_owned_nv_fallback_and_checksum_refusal",
       "owner": "nokia_3210",
       "status": "satisfied",

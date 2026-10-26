@@ -171,6 +171,7 @@ private:
 	u8 m_tx[260] = { 0 };
 	u16 m_tx_len = 0;
 	u16 m_tx_expected = 0;
+	bool m_pts_pending = true;
 	u8 m_ins = 0;
 	u8 m_p1 = 0;
 	u8 m_p2 = 0;

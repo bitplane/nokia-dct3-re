@@ -35,6 +35,7 @@ void nokia_sim_card_device::device_start()
 	save_item(NAME(m_tx));
 	save_item(NAME(m_tx_len));
 	save_item(NAME(m_tx_expected));
+	save_item(NAME(m_pts_pending));
 	save_item(NAME(m_ins));
 	save_item(NAME(m_p1));
 	save_item(NAME(m_p2));
@@ -83,6 +84,7 @@ void nokia_sim_card_device::device_start()
 void nokia_sim_card_device::reset_session_state()
 {
 	m_tx_len = m_tx_expected = 0;
+	m_pts_pending = true;
 	m_selected_file = 0x3f00;
 	m_selected_df = 0x3f00;
 	m_record_pointer = 0;
@@ -531,16 +533,44 @@ void nokia_sim_card_device::rx_w(u8 data)
 	}
 
 	if (m_tx_len == 1)
-		m_tx_expected = data == 0xff ? 3 : 5;
+	{
+		if (data == 0xff && m_pts_pending)
+			m_tx_expected = 0; // PTS0 supplies the optional-byte presence bits.
+		else
+		{
+			m_pts_pending = false;
+			m_tx_expected = 5;
+		}
+	}
+	if (m_tx_len == 2 && m_tx[0] == 0xff && m_pts_pending)
+		m_tx_expected = 3 + BIT(data, 4) + BIT(data, 5) + BIT(data, 6);
 	if (m_tx_expected && m_tx_len >= m_tx_expected)
 		finish_header();
 }
 
 void nokia_sim_card_device::finish_header()
 {
-	if (m_tx[0] == 0xff)
+	if (m_tx[0] == 0xff && m_pts_pending)
 	{
-		emit_response(m_tx, m_tx_len);
+		u8 checksum = 0;
+		for (unsigned i = 0; i < m_tx_len; ++i)
+			checksum ^= m_tx[i];
+		// GSM 11.11 5.8.2/5.8.3: this card supports T=0/default speed.
+		// Consume the complete PTS frame before replying. Invalid check bytes,
+		// other protocols and reserved PTS2/3 fields get no successful echo.
+		if (checksum == 0 && (m_tx[1] & 0xef) == 0)
+		{
+			if (BIT(m_tx[1], 4) && m_tx[2] == 0x11)
+				emit_response(m_tx, m_tx_len);
+			else
+			{
+				// Unsupported F/D values negotiate the default, never a baud
+				// change that the controller cannot represent yet.
+				static constexpr u8 defaults[] = { 0xff, 0x00, 0xff };
+				emit_response(defaults, std::size(defaults));
+			}
+			m_pts_pending = false;
+		}
 		m_tx_len = m_tx_expected = 0;
 		return;
 	}

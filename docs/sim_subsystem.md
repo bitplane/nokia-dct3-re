@@ -101,6 +101,18 @@ approximately 1.042 ms per character. Although the synthetic ATR advertises TA1
 A bounded v6.00 trace observes consecutive ATR and PPS receive-register reads
 approximately 1.065 ms apart, with RX count one for each character.
 
+The card accepts a checksum-valid T=0 PTS request only before its first APDU.
+`ff 00 ff` retains default F/D; explicit default `ff 10 11 fe` is echoed.
+Unsupported F/D requests receive the default-parameter response, not an echo
+claiming an unimplemented speed. Bad checksums, reserved fields, other protocols
+and unsupported PTS2/PTS3 fields receive no response. Deactivation aborts a
+partial negotiation. This is byte-protocol coverage, not enhanced SIM clock or
+terminal waiting-time implementation. The default-speed fallback follows
+[GSM 11.11 v5.3.0, sections 5.8.2--5.8.3](https://www.etsi.org/deliver/etsi_gts/11/1111/05.03.00_60/gsmts_1111v050300p.pdf).
+`python3 tools/run_sim_pts.py RUN --mame mame/mame` checks ten request families,
+partial-request save/restore, reset recovery and a following SELECT MF; it
+claims neither a handset boot nor physical baud-divider validation.
+
 `verify-simi-restore` runs the development-only `simitest` controller/card
 composition without a handset CPU or ROM. It checkpoints SELECT MF with one
 body byte still in TX and the card awaiting that byte, then compares the replayed
