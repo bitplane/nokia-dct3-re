@@ -1,0 +1,132 @@
+{
+  "board_preservation": {
+    "base_state_declaration_identical": true,
+    "configuration_identical_except_inline_linkage": true,
+    "rom_and_system_catalogue_identical": true,
+    "unchanged_extracted_inline_bodies": 15,
+    "unchanged_input_compositions": 24,
+    "unchanged_out_of_line_method_bodies": 120
+  },
+  "default_suite": {
+    "asserted_opcodes": 5690,
+    "capture": "tmp/c54x-modularization-step3/run_c54x_core_k9kppvgb",
+    "executable_sha256": "fa6ef29c74120a86439db6cd58ecccb464c19a92158cd64e8be09d3d900ecced",
+    "inputs_unchanged_during_run": true,
+    "interrupted": false,
+    "mame_exit": 3,
+    "opcode_set_sha256": "7fd37083d052b81e65f629b5e2062965e612cab737cd54ee85a0f84d60ed76e4",
+    "ordered_pass_records": 294,
+    "ordered_results_identical_to_baseline": true,
+    "required_markers": 293,
+    "source_sha256": {
+      "cpu/tms320c54x/tms320c54x.cpp": "3e06383c729b7bb0fb2d0dd33c2f018032cc7a304d801212c54b5f30233b05b0",
+      "cpu/tms320c54x/tms320c54x.h": "8993f196aadc96bcb6cf89dba95ac586d580451a97a522050434717273e7f826",
+      "driver/tms320c54x_test.cpp": "9c9e05130de65382b1e859909b77a73752102b737d3928e44a56c74f54c1d5d9",
+      "driver/tms320c54x_test_addressing.cpp": "4baa520fc2530e755aac2ad7af5e185a30a49f1b93cedcfa823d6e7422dce7fc",
+      "driver/tms320c54x_test_arithmetic.cpp": "3ba811cc713760f7fb48954b084e3222d5a8f7cb2b8cb2498eb5d08d60d5f621",
+      "driver/tms320c54x_test_atomic.cpp": "bdb9c5b93a8395aac905246ace216988d6040f5c6f33c55e633006419a54d341",
+      "driver/tms320c54x_test_disassembler.cpp": "9232fc9a5767fc8dc681846f7a8bd17a2ad53949c03479394e927f8b1f904554",
+      "driver/tms320c54x_test_dispatch.cpp": "07a1a68a14ece26a6e65d83fd40278f3d67e03b5d0a22731282bdd605dee9e1f",
+      "driver/tms320c54x_test_interrupts.cpp": "95cea36810817128ac0563270455cade47d047298d8d7195ef6271e74df040a2",
+      "driver/tms320c54x_test_peripherals.cpp": "4f28e94910bf16e949ed8239e1a9a8bd403e63ff8adf8607c4d0acb5d5b8b520",
+      "driver/tms320c54x_test_pipeline.cpp": "5752b8947b5438436832aac64cf84507bddd2cba6a252695ffeccf82136f4cf1",
+      "driver/tms320c54x_test_profiles.h": "ad0c86216b73b757e50372675ff7df8cd53cda62aba903121d6e0df081879c5f",
+      "driver/tms320c54x_test_restore.cpp": "f330b1ea9151d5dc593a1b63ef46513fcb7f7a2c6dcfd0868206a4759cfcee9f",
+      "driver/tms320c54x_test_rom4.cpp": "a07e507f82ee67b66eeae4be7faa65fbb735c0bd16e9498590892cd54fc63256",
+      "driver/tms320c54x_test_state.cpp": "211cf374e901422b37b86d9da3d0cff0b8fe2893c1d8b37bc770e48b2e523f3a",
+      "driver/tms320c54x_test_state.h": "9fca12e7539772347436fdc346f43fc2f084189e493462d046ddeeb896d9ad30"
+    }
+  },
+  "dispatch_preservation": {
+    "conditions_and_actions_identical": true,
+    "lambda_returns_preserved": 23,
+    "ordered_groups": 219,
+    "phase_clauses": 1449,
+    "unchanged_noncallback_method_bodies": 732
+  },
+  "final_composition": {
+    "compiled_xml_records_identical": 271,
+    "executable_sha256": "7f13aba3a6ecf2b2a374720152f6cce62461cae6ab4ed219cdd06e93d2fd839e",
+    "handset_gates": [
+      {
+        "gate": "verify",
+        "returncode": 0
+      },
+      {
+        "gate": "verify-frontier",
+        "returncode": 0
+      },
+      {
+        "gate": "verify-mmi-menu-501",
+        "returncode": 0
+      },
+      {
+        "gate": "verify-3310-frontier",
+        "returncode": 0
+      },
+      {
+        "gate": "verify-3330-frontier",
+        "returncode": 0
+      },
+      {
+        "gate": "verify-3410-frontier",
+        "returncode": 0
+      },
+      {
+        "gate": "verify-5210-frontier",
+        "returncode": 0
+      },
+      {
+        "gate": "verify-5110-menu",
+        "returncode": 0
+      }
+    ],
+    "pcm_cases": [
+      {
+        "case": "control",
+        "status": "pass"
+      },
+      {
+        "case": "clock",
+        "status": "pass"
+      },
+      {
+        "case": "wire",
+        "status": "pass"
+      },
+      {
+        "case": "pin_boot",
+        "status": "pass"
+      },
+      {
+        "case": "restore",
+        "status": "pass"
+      },
+      {
+        "case": "wire_restore",
+        "status": "pass"
+      },
+      {
+        "case": "pin_restore",
+        "status": "pass"
+      }
+    ],
+    "save_state_gate": {
+      "gate": "verify-5110-save-state",
+      "machine": "nse1astd",
+      "returncode": 0
+    },
+    "skipped": 1,
+    "staged_rom4_fr_decoder": {
+      "frames": 32,
+      "handset_audio_claim": false,
+      "ram_words_replayed_per_frame": 65440,
+      "returncode": 0,
+      "samples": 5120
+    },
+    "tool_tests": 5326
+  },
+  "inventory_sha256": "be0ad1a48b880787e93b539fcdd4430bdcc3629f212dc5132ec1d02dbafb88cd",
+  "purpose": "Structural preservation checkpoint; not new ISA, silicon-timing or handset-capability coverage",
+  "schema": 1
+}

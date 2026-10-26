@@ -7,6 +7,11 @@ deleted incrementally as observed contracts become components.
 `upstream_architecture.md` is authoritative for the intended MAME device graph,
 the real-DSP/HLE substitution seam and internal-ROM ownership. This document
 describes the current source layout within that target.
+Its [machine-composition source map](upstream_architecture.md#machine-composition)
+defines the shared board state/product data and the separate research
+configuration module. The C54x bench has its own
+[compiled contract-family modules](c54x_execution_contracts.md#harness-preservation-contract),
+not hardware behavior embedded in handset configuration.
 
 The generic GSM-FR codec and receive-side bad-frame substitution live in
 `lib/util/gsmfr.cpp/.h`, over the bundled `third_party/libgsm` C library. MAME's

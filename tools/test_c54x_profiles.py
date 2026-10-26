@@ -18,6 +18,18 @@ class ProfileDeclarationTests(unittest.TestCase):
     def tearDown(self):
         profiles.declared_machines.cache_clear()
 
+    def test_source_inventory_includes_compiled_modules_and_headers_only(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            (root / 'driver').mkdir()
+            for filename in ('tms320c54x_test_state.h', 'tms320c54x_test.cpp',
+                             'tms320c54x_test_rom4.cpp', 'tms320c54x_test_notes.md',
+                             'tms320c54x.cpp', 'unrelated.h'):
+                (root / 'driver' / filename).write_text('')
+            self.assertEqual([p.name for p in profiles.harness_sources(root)], [
+                'tms320c54x_test.cpp', 'tms320c54x_test_rom4.cpp',
+                'tms320c54x_test_state.h'])
+
     def test_literal_metadata_ignores_commented_tables(self):
         actual = profiles.declarations('// ROM_START(fake)\n/*' + SOURCE + '*/\n' + SOURCE)
         self.assertEqual(actual, {'one': [

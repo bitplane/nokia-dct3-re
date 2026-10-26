@@ -9,6 +9,11 @@ import subprocess
 import sys
 import tempfile
 
+try:
+    from tools.c54x_profiles import harness_sources
+except ModuleNotFoundError:
+    from c54x_profiles import harness_sources
+
 PASS = "TMS320C54x ROM4 CRC helper: PASS cases=512 gsm_packing_claim=0 speech_claim=0"
 COMPLETE = "Fatal error: TMS320C54x ROM4 CRC helper complete"
 PACKED_PASS = "TMS320C54x ROM4 packed CRC: PASS cases=516 basis_bits=192 gsm_crc_claim=1 speech_claim=0"
@@ -314,7 +319,7 @@ def main():
     if args.observe_lost_sid_state:
         command.extend(['-debug', '-debugger', 'none', '-autoboot_delay', '0',
                         '-autoboot_script', str(root / 'tools/c54x_rom4_efr_lost_sid_state_observe.lua')])
-    inputs = [args.mame, Path(__file__), root / "driver/tms320c54x_test.cpp"]
+    inputs = [args.mame, Path(__file__), *harness_sources(root)]
     if args.observe_dtx_history:
         inputs.extend(root / name for name in ('tools/c54x_rom4_efr_dtx_history_observe.lua',
                                                'tools/c54x_rom4_efr_dtx_history_check.py'))

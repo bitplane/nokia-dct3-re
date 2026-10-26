@@ -1,10 +1,16 @@
 import unittest
+import contextlib
+import hashlib
+import io
+import json
 import tempfile
 import re
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
+from tools import run_c54x_rom4_crc as runner
 from tools.run_c54x_rom4_crc import COMPLETE, PASS, PACKED_COMPLETE, PACKED_PASS, FR_COMPLETE, FR_PASS, check_result
 from tools.run_c54x_rom4_crc import DECODER_PASS, DECODER_COMPLETE, DECODER_COMPARISON
 from tools.run_c54x_rom4_crc import ENCODER_PASS, ENCODER_COMPLETE, ENCODER_COMPARISON
@@ -27,6 +33,31 @@ from tools.run_c54x_rom4_crc import check_rf_bitmap, check_rf_pairs
 
 
 class Rom4HelperResultTest(unittest.TestCase):
+    def test_run_records_all_modular_bench_source_identities(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            binary = root / 'mame'
+            binary.write_bytes(b'test executable identity')
+            output = root / 'runs'
+            output.mkdir()
+
+            def execute(command, **kwargs):
+                kwargs['stdout'].write(PASS + '\n' + COMPLETE + '\n')
+                return subprocess.CompletedProcess(command, 3)
+
+            argv = ['run_c54x_rom4_crc', '--mame', str(binary),
+                    '--rompath', str(root), '--output-root', str(output)]
+            with patch('sys.argv', argv), patch.object(runner.subprocess, 'run', execute), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(runner.main(), 0)
+            evidence = json.loads(next(output.glob('*/evidence.json')).read_text())
+            identities = {Path(item['path']): item for item in evidence['inputs']}
+            sources = runner.harness_sources()
+            self.assertGreater(len(sources), 10)
+            self.assertTrue(any(path.suffix == '.h' for path in sources))
+            for path in sources:
+                self.assertEqual(identities[path]['sha256'], hashlib.sha256(path.read_bytes()).hexdigest())
+
     def test_lost_sid_requires_every_frame_replay_and_frontend(self):
         frames = '\n'.join(f'ROM4 EFR lost SID decoder comparison: frame={i} mismatches=0' for i in range(518))
         replay = 'TMS320C54x ROM4 EFR lost SID decoder replay: PASS frames=518 ram_words=65440 checkpoints=frame_input handset_audio_claim=0'

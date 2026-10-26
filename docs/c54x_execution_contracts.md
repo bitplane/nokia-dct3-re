@@ -5,7 +5,8 @@
 This is the processor-validation reference, separate from handset bring-up
 and loader ownership. The core implementation lives in
 `cpu/tms320c54x/`; executable acceptance lives in
-`driver/tms320c54x_test.cpp` and `tools/run_c54x_core.py`.
+the compiled `driver/tms320c54x_test*.cpp` modules and
+`tools/run_c54x_core.py`.
 The [default-suite checkpoint](#core-regression-checkpoint) identifies the last
 fully qualified default run by executable and source hashes. A later focused
 fixture run does not silently renew that checkpoint. Other sections retain their explicitly bounded
@@ -18,7 +19,8 @@ handset DSP mask, RF acquisition or end-to-end speech.
 
 `fixtures/c54x_conformance_baseline.json` freezes the declared BIOS inventory,
 463 isolated runner profiles, seven named scopes, 293 default-suite result
-requirements, fixture PASS formats and assertion-site count. Exact result
+requirements, fixture PASS formats and 4,196 lexical assertion-pattern sites
+(a source-pattern count, not an executed assertion count). Exact result
 strings retain case/restore counts and scope exclusions. Check it with:
 
 ```sh
@@ -73,14 +75,17 @@ not an unordered subsystem sweep. A handler returning false permits subsequent
 clauses to run even if an earlier clause changed the phase. The atomic program
 remains one coherent source unit because its inline program construction and
 continuations share this ordering contract.
+The shared bench declaration and legacy atomic program remain large. Further
+splitting needs an actual fixture/state boundary and an ordered-execution
+preservation check, not an arbitrary line-count target.
 
 The absolute-alias fixtures share declarative family/count/status profiles in
 `driver/tms320c54x_test_profiles.h`; the CPU model does not consume this test
 metadata. `test_c54x_alias_profiles.py` executes the host C++ decoder and
 compares all10,304 encoded cases/status inputs with their retained domains.
 All ten separate MAME rejection matrices also pass with the original markers
-and restoration counts. This fixture-only refactor does not renew the older
-hash-bound default-suite checkpoint below or change silicon admission claims.
+and restoration counts. These focused matrices do not extend the separately
+qualified default-suite population or change silicon admission claims.
 
 Handset/MU4 state and media acceptance remain in
 [5510 bring-up](5510_bringup.md), [AAC validation](aac_validation.md)
@@ -2174,43 +2179,57 @@ and physical timing retain their independent scopes.
 
 ## Core regression checkpoint
 
-The default C54x suite passes with the source/RMW admission guards and
-atomic load, memory-T multiply, MPY/MAC, LTD/DELAY, MACP/MACD, RMW, memory-logic, scalar-arithmetic
-and long-memory arithmetic absolute-alias corrections.
+The modular default C54x suite retains the source/RMW admission guards and
+atomic load, memory-T multiply, MPY/MAC, LTD/DELAY, MACP/MACD, RMW, memory-logic,
+scalar-arithmetic and long-memory arithmetic absolute-alias corrections.
 All 293 required markers appear exactly once, followed by core conformance
 PASS and intentional MAME exit 3; the isolated runner returns 0, with
-`interrupted=false`. The capture is
-`tmp/c54x-long-alias-full/run_c54x_core_1q62jp7h`:
+`interrupted=false`. Its 294 ordered PASS records and 5,690 distinct asserted
+opcode words exactly match the pre-extraction baseline. The capture is
+`tmp/c54x-modularization-step3/run_c54x_core_k9kppvgb`:
 
 ```sh
 .venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
-  --output-root tmp/c54x-long-alias-full
+  --output-root tmp/c54x-modularization
 ```
 
 The recorded executable SHA256 is
-`3052c86d7b236382c741300ad9a3ac5fe44decdb76b57c514431c0f0edc71f1f`.
-CPU source SHA256 is
-`3e06383c729b7bb0fb2d0dd33c2f018032cc7a304d801212c54b5f30233b05b0`;
-fixture source SHA256 is
-`c561cd0f297d3f7ba9065dbefa05d6e5abab7575f36e1afa015770de48a79f54`.
-These identities were rechecked at completion. Its5,690 distinct executable-opcode
-assertions exactly match the preceding complete run, with no lost or added
-forms. Optional
+`fa6ef29c74120a86439db6cd58ecccb464c19a92158cd64e8be09d3d900ecced`.
+CPU source SHA256 remains
+`3e06383c729b7bb0fb2d0dd33c2f018032cc7a304d801212c54b5f30233b05b0`.
+`fixtures/c54x_modularization_checkpoint.json` banks CPU and split bench-source
+hashes, binary identity, result comparison and separate handset
+preservation checks. The full-run inputs were rechecked unchanged at
+completion; the later board-composition binary is recorded separately, not
+claimed to have rerun the full suite. The opcode-set SHA256 is
+`7fd37083d052b81e65f629b5e2062965e612cab737cd54ee85a0f84d60ed76e4`
+(sorted four-digit opcode strings joined by newlines, without a final newline).
+Optional
 profiles retain their separate acceptance scopes; this run does not prove
 the complete ISA, physical pipeline timing, fitted DSP-mask compatibility,
 native RF or end-to-end handset speech and calls. The separate tool suite passes
-5,285 tests (one skip). Revision-bound checkpoints below preserve their narrower
+5,326 tests (one skip). Revision-bound checkpoints below preserve their narrower
 instruction and original-firmware comparisons, not competing current
 default-suite baselines.
 
-The same binary separately passes the isolated native EFR decoder in both
-atomic and staged modes:163 frames,26,080 reference-exact PCM samples and
-65,440 ordinary RAM words replayed per frame. The staged NSE-1 physical
-Phone book menu oracle also remains exact. These are codec/component and
-handset-UI preservation controls, not native RF or call-media acceptance.
-The preceding scalar-arithmetic checkpoint separately passed the full reset-bank6150 laboratory clocked-tone
-gate in `tmp/nsm1-post-arithmetic-native-tone`, preserving its cold-input, storage,
-SIM, pixel and waveform checks. This does not promote production audio clocks.
+The modular binary separately passes seven named core scopes, representative
+arithmetic, interrupt and restore profiles, and ROM4 CRC/FR decoder controls on
+both frontends. The board extraction preserves all 271 compiled machine/device
+XML records and passes eight handset gates: default and frontier 3210, v5.01
+menu, 3310/3330/3410/5210 frontiers and the native standard-SWWSR 5110 menu.
+That 5110 composition also passes its complete handset save-state gate.
+Seven native PCM cases cover external frame clocks, wire delivery, pin-clocked
+loopback and active save/load. These are preservation checks, not production
+clock, native RF or call-media acceptance.
+
+Separate revision-bound controls retain their narrower evidence: the
+pre-modularization EFR decoder passed both frontends with 163 frames,
+26,080 reference-exact PCM samples and 65,440 ordinary RAM words replayed per
+frame; its staged NSE-1 Phone book menu was exact. The scalar-arithmetic
+checkpoint passed the reset-bank6150 laboratory clocked-tone gate in
+`tmp/nsm1-post-arithmetic-native-tone`, preserving cold-input, storage, SIM,
+pixel and waveform checks. These additional runs are not silently renewed by
+the modularization checkpoint.
 
 The cold-catalogue checkpoint adds no CPU instruction admissions. Its staged
 `bootopenstage` gate passes with the saved recorder endpoint and rejects the

@@ -14,7 +14,7 @@ import sys
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tools.c54x_profiles import declarations as bios_declarations
+from tools.c54x_profiles import declarations as bios_declarations, harness_sources
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / 'fixtures/c54x_conformance_baseline.json'
@@ -44,7 +44,7 @@ def cpp_inventory(sources):
 
 def inventory(root=ROOT):
     from tools import run_c54x_core as runner
-    sources = [path.read_text() for path in sorted((root / 'driver').glob('tms320c54x_test*.cpp'))]
+    sources = [path.read_text() for path in harness_sources(root) if path.suffix == '.cpp']
     cpp = cpp_inventory(sources)
     machines = {}
     for machine, profiles in cpp['machines'].items():
@@ -82,7 +82,7 @@ def main():
         print(f'C54x harness inventory: {len(actual["cpp"]["machines"])} machines, '
               f'{len(actual["isolated"])} isolated profiles, '
               f'{len(actual["core"]["required"])} core requirements, '
-              f'{actual["cpp"]["assertion_sites"]} assertion sites')
+              f'{actual["cpp"]["assertion_sites"]} lexical assertion-pattern sites')
     except (OSError, ValueError) as error:
         parser.exit(1, f'C54x harness inventory: {error}\n')
 

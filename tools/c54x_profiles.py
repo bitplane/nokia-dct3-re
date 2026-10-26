@@ -8,6 +8,12 @@ ROOT = Path(__file__).resolve().parents[1]
 STRING = r'"(?:\\.|[^"\\])*"'
 
 
+def harness_sources(root=ROOT):
+    """Compiled bench modules and shared declarations, in reproducible order."""
+    return tuple(path for path in sorted((root / 'driver').glob('tms320c54x_test*'))
+                 if path.suffix in ('.cpp', '.h'))
+
+
 def declarations(source):
     source = re.sub(STRING + r'|//[^\n]*|/\*.*?\*/',
                     lambda match: match[0] if match[0].startswith('"') else
@@ -39,7 +45,9 @@ def declarations(source):
 @lru_cache(maxsize=1)
 def declared_machines(root=ROOT):
     result = {}
-    for source in sorted((root / 'driver').glob('tms320c54x_test*.cpp')):
+    for source in harness_sources(root):
+        if source.suffix != '.cpp':
+            continue
         found = declarations(source.read_text())
         duplicates = result.keys() & found.keys()
         if duplicates:
