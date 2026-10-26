@@ -104,10 +104,9 @@ RUN_ENV ?=
 RUN_VERBOSE ?= 0
 RUN_EXTRA_ARGS ?=
 RUN_NVRAM_DIR ?= $(abspath $(RUN_DIR))/nvram
-NVRAM_SYSTEM := $(strip $(if $(and $(filter noki3210,$(PHONE)),$(filter 501,$(BIOS))),noki3210_1,\
-	$(if $(and $(filter noki3310,$(PHONE)),$(filter 639,$(BIOS))),noki3310_3,\
-	$(if $(and $(filter noki3330,$(PHONE)),$(filter 450e,$(BIOS))),noki3330_1,\
-	$(if $(and $(filter noki5210,$(PHONE)),$(filter 540e,$(BIOS))),noki5210_3,$(PHONE))))))
+# Resolve lazily so target-specific PHONE/BIOS values are honored. Never clean
+# a guessed namespace when a selection is invalid or its declaration unknown.
+NVRAM_SYSTEM = $(or $(shell $(PYTHON) tools/dct3_products.py --nvram-system '$(PHONE)' --bios '$(BIOS)'),$(error Cannot resolve NVRAM namespace for $(PHONE) BIOS=$(BIOS)))
 NVRAM_SYSTEM_5210 := noki5210_3
 PRESERVE_NVRAM ?= 0
 PROVISIONED_IMEI_PREFIX ?=
