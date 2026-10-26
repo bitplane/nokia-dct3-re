@@ -47,6 +47,22 @@ class PruneTests(unittest.TestCase):
             self.assertFalse((root / 'tmp/old').exists())
             self.assertTrue((root / 'tmp/source/original.nand').exists())
 
+    def test_compressed_logs_keep_the_same_retention_rules(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            self.setup_root(root)
+            for path in (root / 'tmp').glob('*/console.log'):
+                path.rename(path.with_suffix('.log.zst'))
+            with patch('tools.prune_research_runs.subprocess.check_output', return_value=b'notes.md\0'), \
+                 patch('tools.prune_research_runs.active_run', return_value=False):
+                report = inventory(root)
+                self.assertEqual([row['name'] for row in report['runs'] if row['delete']], ['old'])
+                self.assertEqual(apply(root, report)[0], 1)
+            self.assertTrue((root / 'tmp/kept/console.log.zst').exists())
+            self.assertTrue((root / 'tmp/dependency/console.log.zst').exists())
+            self.assertTrue((root / 'tmp/source/original.nand').exists())
+            self.assertTrue((root / 'tmp/recent/console.log.zst').exists())
+
     def test_changed_active_or_newly_referenced_run_is_rejected(self):
         for mode in ('changed', 'active', 'referenced'):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as name:

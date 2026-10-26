@@ -1471,24 +1471,19 @@ dumps were removed. Ordinary cold-read acceptance retains a17s list capture.
 .venv/bin/python tools/nsm1_phonebook_check.py tmp/nsm1-phonebook-write tmp/nsm1-phonebook-cold
 ```
 
-The independent60s cold run `tmp/nsm1-startup-qualified` preserves the
-validated EEPROM exactly and passes the record checker. Uncapped entry
-counters at10/20/30/40/50/60s remain zero for280ac0,280b0c,2813a0,2bf2e6,
-2239f2 and2bc4d4; SIMI initialization2af080 runs twice. Report bitmap1126c1
-stays0e, charger-state1127d8 stays0, pending notification1127d9 stays1,
-SIM-ready10e6ce stays0 and selector10be8c staysff. This extends the earlier
-short negative control after storage validation; it does not close indirect
-report producers or establish a hardware absence.
+The 60-second saturated-input control `tmp/nsm1-startup-qualified` retains
+valid EEPROM; sampled report bitmap `1126c1` remains `0e` and SIM-ready
+`10e6ce` remains zero. This is not producer-absence evidence: the
+[own analog comparison](#own-analog-comparison-and-graphical-presentation)
+checks the responsible measurement/countdown path with both saturated and
+nominal inputs. Use that paired contract rather than requiring startup to
+remain inactive.
 
 The startup selector's reason0a path reads cached word90ff through2bf050.
 After the analog/key checks, bit7 selects class3, bit2 selects class1,
 otherwise bit1 selects class2. Thus the modeled ordinary PWRONX status03 is
 consistent with class2; the omitted class1 send is not by itself evidence
 of incorrect boot classification. Do not alter reset causes to select it.
-
-```sh
-.venv/bin/python tools/nsm1_startup_check.py tmp/nsm1-startup-qualified/error.log
-```
 
 `nsm1r4t` uses the own normalized flash and checksum-consistent EEPROM,
 128 KiB SRAM and the acquired NSE-1 ROM4 native DSP program/data. That mask

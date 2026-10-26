@@ -256,7 +256,7 @@ and is likewise **not redistributed** here.
 ## Research-run retention
 
 `make clean` removes the ordinary root run state; it does not purge the
-disk-backed research collection under`tmp/`. Review that collection with:
+disk-backed research collection under `tmp/`. Review that collection with:
 
 ```sh
 .venv/bin/python tools/prune_research_runs.py --report tmp/retention.json
@@ -265,14 +265,25 @@ disk-backed research collection under`tmp/`. Review that collection with:
 
 The inventory protects runs named in tracked sources/docs and follows JSON
 seed/source dependencies from those runs. It also retains unknown directories,
-NAND images, source archives and runs modified within24 hours. Only
+NAND images, source archives and runs modified within 24 hours. Only
 unreferenced old directories with MAME console/error output are candidates.
 Apply recomputes references, rejects changed file counts/timestamps/inodes and
 checks process working directories before deletion. This is conservative
 retention, not proof that every unreferenced experiment is scientifically
 worthless. Review the JSON before applying; move irreplaceable inputs into the
 ROM/research collection and document their provenance before pruning.
-Do not use a blanket`rm -rf tmp` as a substitute.
+Do not use a blanket `rm -rf tmp` as a substitute.
+
+Referenced evidence need not retain uncompressed trace logs. After checking
+that no process is still writing or consuming a run, older logs can be archived
+losslessly with `zstd --rm -- PATH/error.log`; this leaves `error.log.zst`.
+Keep summaries, input manifests, frames and source/seed artifacts in place.
+The pruner recognizes compressed console/error logs under the same retention
+rules. Checkers still expect plain text: run
+`zstd -d --keep -- PATH/error.log.zst` before replaying one. Use `zstd -t` to
+verify archive integrity. Compression is not evidence retirement; delete a
+referenced run only after preserving its needed conclusions and reproduction
+inputs, not simply because it is large or old.
 
 ## MAME
 

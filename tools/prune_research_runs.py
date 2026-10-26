@@ -74,7 +74,8 @@ def inventory(root):
     rows = []
     for name, path in sorted(directories.items()):
         state = snapshot(path)
-        recognized = (path / 'error.log').is_file() or (path / 'console.log').is_file()
+        recognized = any((path / name).is_file() for name in
+                         ('error.log', 'console.log', 'error.log.zst', 'console.log.zst'))
         if name in kept:
             reason = 'referenced evidence or dependency'
         elif state['sensitive']:
