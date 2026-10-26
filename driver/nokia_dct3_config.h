@@ -88,8 +88,9 @@ inline constexpr nokia_ccont_board_profile ADC_5210 = {
 	5, 0x03ff
 };
 
-// NAM-2 service material specifies 0.5 V at the BSI node in the service jig.
-// With CCONT's 2.8 V ADC reference this is 0.5 / 2.8 * 1023 ~= 0x0b6.
+// NAM-2 retains the historical raw BSI fixture 0x0b6. The service material's
+// 0.5 V test point does not establish this value: 2.8 V is VBB/pull-up supply,
+// not a recovered NAM-2 ADC reference. Do not call this factory calibration.
 // Full-scale selector 2 is rejected into the firmware's BOOT UP CHARGE / WAIT
 // CHARGER VOLTAGE lifecycle. Use the ordinary charged-pack sample shared by
 // the independently grounded DCT3 profiles until NAM-2 scaling is recovered.

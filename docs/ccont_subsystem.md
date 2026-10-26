@@ -245,6 +245,30 @@ explicit boot calibration, not a claim that their PCB nets are identical.
 
 ## ADC selectors
 
+### Product Input Evidence
+
+Channel numbers, board nets, analogue transfer and a safe raw fixture are
+different contracts. None can substitute for another:
+
+| Profile | Independently supported fact | Limit on the configured input |
+| --- | --- | --- |
+| NSE-8 | Own service-manual net/transfer table; paired firmware source-routing table | Selector 1's physical mux remains unidentified. Safe samples are not factory calibration. |
+| NPM-5 | Own 150 kohm BSI pull-up, BLB-2 identification and 100 kohm/47 kohm BTEMP divider | Nominal 595/327 depends on the explicitly sourced 1.5 V BSI reference, not VBB. Other raw channels remain research defaults. |
+| NSE-6 | Own schematic directly connects BVOLT to VBAT | Nominal 554 borrows a stated typical CCONT transfer; no measured part calibration. |
+| NSM-5 | Own firmware accepts the recorded BSI/BTEMP windows | Recognition bounds alone do not establish voltage/resistance scaling. |
+| NAM-2 | Own manual identifies a 100 kohm BSI pull-up to VBB and a service voltage point | Retained raw `0x0b6` is not proved to represent 0.5 V. A supply voltage does not identify ADC reference. |
+| Other compatibility tuples | Explicit raw product inputs with the acceptance stated in their product documents | Matching a donor's values is not independent board-wiring or analogue evidence. |
+
+NAM-2's System Module DF9 is retained under
+`roms/research/nam2-service-manual/2100/03-nam2-syst.pdf`; see the source
+identities in `2100_bringup.md`. The NPM-5 schematic/reference calculation is
+in `5510_bringup.md#analog-evidence-and-startup-rejection`. These documents
+do not supply a universal physical calibration for every CCONT revision.
+No new nominal tuple should be promoted by searching values until a boot
+passes. For NAM-2, first identify the fitted ADC transfer and distinguish
+the service jig from an ordinary pack; the previous one-value experiment
+does not close that question.
+
 The 3210 v6.00 firmware directly calls `0x2b52cc` with selector `0` in boot
 battery reader `0x2a84b0`, while the later ADC monitor maps logical source 7
 through ROM table `0x2e2d74` to selector 1. Those are distinct firmware paths.

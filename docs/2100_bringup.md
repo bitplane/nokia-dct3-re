@@ -707,9 +707,12 @@ idle-transition behavior to substitute for the unresolved own-ROM contract.
   at the blank frontier, so an injected host key reaches the physical matrix but
   is intentionally ignored by firmware. This is evidence that application/MMI
   initialization has not completed, not a keypad-device failure.
-- Primary NAM-2 service material specifies 0.5 V at BSI. Modeling the corresponding
-  CCONT sample (`0x0b6` with a 2.8 V reference) changes neither bit 6 nor the blank
-  frontier, excluding BSI alone as the missing readiness condition.
+- The bounded BSI experiment used raw `0x0b6` and changed neither bit 6 nor the
+  blank frontier. Its conversion of the manual's 0.5 V point assumed a 2.8 V
+  ADC reference without evidence: VBB/pull-up supply is not the ADC reference.
+  This excludes only that raw fixture, not correct physical BSI provisioning.
+  NAM-2's fitted transfer and the applicability of the shared 1.5 V BSI
+  reference remain to be established before choosing a replacement input.
 
 The runtime GENSIO observation supersedes the conservative static census's zero
 direct SELECT sites. That census excluded dynamic/table-derived addressing and

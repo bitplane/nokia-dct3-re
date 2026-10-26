@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nam2_bsi_fixture_is_not_physical_voltage_proof",
+      "status": "disproven",
+      "hypothesis": "The retained NAM-2 raw BSI input0b6 is established as the manual's0.5V point by a2.8V ADC reference, and its failed readiness experiment excludes correct BSI provisioning",
+      "conclusion": "The own System Module DF9 identifies the BSI pull-up to VBB, not a2.8V ADC reference. Treating the supply as reference was unsupported; shared CCONT evidence elsewhere explicitly distinguishes the1.5V BSI reference from VBB. The prior experiment excludes only raw0b6 in that boot, not a correctly provisioned physical input. Runtime data is retained as a declared compatibility fixture until the fitted transfer and service-jig versus ordinary-pack contract are established. No replacement raw value, factory calibration or new boot result is claimed.",
+      "evidence": ["driver/nokia_dct3_config.h", "docs/2100_bringup.md", "docs/ccont_subsystem.md", "docs/5510_bringup.md"]
+    },
+    {
       "id": "mu4_late_native_worker_rejects_input_availability",
       "status": "disproven",
       "hypothesis": "The original native worker's0400-word availability threshold rejects work in the observed finalized-media tail window",
