@@ -732,6 +732,7 @@ void nokia_dct3_state::reset_digital_baseband(bool retain_sram)
 	m_kbgpio->reset();
 	m_kbgpio->clear_power_on_latch();
 	m_pup->reset();
+	m_uif->reset();
 	m_gensio->reset();
 	m_mbus->reset();
 	m_dspif->reset();

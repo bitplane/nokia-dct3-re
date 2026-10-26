@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mad2_active_peripheral_warm_reset",
+      "owner": "nokia_dct3_board",
+      "status": "satisfied",
+      "predicate": "The declared digital reset domain clears active SIM/MBUS/GENSIO/UIF state while retaining CCONT state",
+      "current": "Both3210 BIOSes pass mapped-MMIO setup and immediate deferred-reset observation: pending SIM TX/ATR, SIM IIR, MBUS TX/RX and UIF latch clear; GENSIO returns03 and reset cause04; all16 CCONT registers remain byte-identical. The old board fails because UIF was omitted from the reset walk. A dedicated checker rejects missing, duplicated, reversed or Lua-failed completion. The observation delay is a scheduler boundary, not physical timing; this validates consistency with the declared digital domain, not silicon UIF reset values or analogue rail sequencing.",
+      "evidence": ["driver/nokia_dct3.cpp", "tools/mad2_active_reset.lua", "tools/mad2_active_reset_check.py", "tools/test_mad2_active_reset_check.py", "docs/mad2_fidelity.md"]
+    },
+    {
       "id": "b3_command_like_program_data",
       "owner": "nokia_b3_flash",
       "status": "satisfied",

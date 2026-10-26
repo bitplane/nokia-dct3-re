@@ -1,0 +1,40 @@
+-- Controller conformance: MMIO stimulus only, never firmware RAM or messages.
+local machine = manager.machine
+local space = machine.devices[':maincpu'].spaces.program
+local function item(tag, name)
+    return emu.item(assert(machine.devices[tag].items['0/' .. name]))
+end
+local function value(tag, name)
+    return item(tag, name):read(0)
+end
+local task = coroutine.create(function()
+    assert(emu.wait(0.2))
+    space:write_u8(0x20030, 0x5a)
+    space:write_u8(0x2002d, 0x04)
+    space:write_u8(0x2000d, space:read_u8(0x2000d) | 0x20)
+    space:write_u8(0x20039, 0x80)
+    space:write_u8(0x20036, 0xa0)
+    space:write_u8(0x2001a, 0x55)
+    assert(space:read_u8(0x20030) == 0x5a, 'UIF setup')
+    assert(value(':simi', 'm_uart_tx_count') == 1, 'SIM TX not pending')
+    assert(value(':simi', 'm_rx_count') > 0, 'ATR not pending')
+    assert(value(':mbus', 'm_tx_pending') == 1, 'MBUS TX not pending')
+    local ccont = item(':ccont', 'm_regs'):read_block(0, 16)
+    machine:logerror('active_reset: prepared uif=5a sim_tx=1 sim_rx=1 mbus_tx=1\n')
+    space:write_u8(0x20001, space:read_u8(0x20001) | 4)
+    -- Observe immediately after the deferred reset, before firmware can
+    -- reconfigure these blocks. This is a scheduler boundary, not pin timing.
+    assert(emu.wait(0.000000001))
+    assert(space:read_u8(0x20030) == 0, 'UIF retained across digital reset')
+    assert(value(':simi', 'm_uart_tx_count') == 0, 'SIM TX retained')
+    assert(value(':simi', 'm_rx_count') == 0, 'SIM RX retained')
+    assert(value(':simi', 'm_iir') == 0, 'SIM interrupt retained')
+    assert(value(':mbus', 'm_tx_pending') == 0, 'MBUS TX retained')
+    assert(value(':mbus', 'm_rx_ready') == 0, 'MBUS RX retained')
+    assert(value(':gensio', 'm_status') == 3, 'GENSIO status retained')
+    assert(item(':ccont', 'm_regs'):read_block(0, 16) == ccont, 'CCONT reset with digital domain')
+    assert(space:read_u8(0x20001) == 4, 'software reset cause')
+    machine:logerror('active_reset: PASS sim_tx_abort=1 sim_rx_abort=1 mbus_abort=1 uif_clear=1 gensio_clear=1 ccont_retained=1 cause=04 physical_timing_claim=0\n')
+    machine:exit()
+end)
+assert(coroutine.resume(task))

@@ -162,6 +162,29 @@ controller test rather than the boot trace. It also performs no MAD2-watchdog
 write in the bounded run; recovered `0x31` service sites are conditional, not a
 periodic startup requirement.
 
+### Active-peripheral digital reset
+
+`tools/mad2_active_reset.lua` seeds only mapped controller registers: a UIF
+latch, pending SIM TX/ATR delivery, an MBUS byte and GENSIO selection. It then
+requests the existing MCU warm reset. Both 3210 BIOSes clear UIF, SIM queues
+and causes, MBUS pending state and GENSIO status while preserving all sixteen
+CCONT register bytes and publishing software-reset cause `04`. UIF is inside
+MAD2; omitting its extracted device from the board's digital reset walk left
+its latches incorrectly retained. This is consistency with the established
+digital-domain model, not measured UIF silicon reset values.
+
+Run the fixture with `make run-prebuilt BIOS=600 RUN_DIR=tmp/active-reset
+SECONDS=1 RUN_EXTRA_ARGS='-autoboot_script /absolute/path/to/tools/mad2_active_reset.lua'`,
+capture console output, then require `tools/mad2_active_reset_check.py` on both
+the isolated `error.log` and console. Repeat with BIOS `501` and its own ROM.
+Lua assertion failures can leave MAME's exit status zero, so a process exit
+alone is not acceptance. The one-nanosecond observation delay is a scheduler
+boundary before firmware reconfiguration, not hardware propagation evidence.
+The separate sleep/reset gates retain timer/keypad/FIQ8 wake, sleep restore,
+CCONT/MAD2 watchdog and external-state persistence coverage. Physical rail
+sequencing, interrupted flash cells and complete peripheral sleep-clock
+ownership remain unmeasured or explicitly incomplete.
+
 The same paired-ROM census resolves the separate ARM clock-stop path. The
 helper at v6.00 `0x2b4e7a` / v5.01 `0x2b222e` clears bit 0 and, for a nonzero
 argument, pulses bit 1. Its callers are the task-0 idle-supervisor loop and the
