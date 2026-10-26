@@ -35,6 +35,24 @@ refactor pass; `--write` is reserved for an explicitly reviewed contract change.
 Expected arithmetic/timing results must remain independent of CPU execution
 helpers and shared profile-selection metadata.
 
+The bench is separate from the processor implementation. Its current source
+boundaries are:
+
+| Source | Responsibility |
+| --- | --- |
+| `driver/tms320c54x_test.cpp` | Machine/ROM declarations, backend serial bench and stock-loader verifier compositions |
+| `driver/tms320c54x_test_state.h` | Shared bench state, fixture types and method declarations; no CPU execution implementation |
+| `driver/tms320c54x_test_state.cpp` | Bench lifecycle, address maps, assertions and device wiring |
+| `driver/tms320c54x_test_arithmetic.cpp` | Rounded-multiply vectors, setup and result checks |
+| `driver/tms320c54x_test_cases.cpp` | Remaining fixture setup and ordered result dispatch, pending family extraction |
+
+The result dispatcher preserves phase-check order, including paths that update
+the phase and fall through within one callback. Family extraction must retain
+that ordering and distinguish callback returns from returns inside observers'
+lambdas. Shared bench state and snapshot/replay ownership are unchanged; moving
+a case does not authorize changing its inputs, expected values or observation
+boundaries.
+
 The absolute-alias fixtures share declarative family/count/status profiles in
 `driver/tms320c54x_test_profiles.h`; the CPU model does not consume this test
 metadata. `test_c54x_alias_profiles.py` executes the host C++ decoder and
