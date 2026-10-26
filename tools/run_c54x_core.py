@@ -2366,7 +2366,7 @@ def main():
         machine = "tms54xtra"
     if args.profile in ("pmac-mod3-edge","delay-mod3-edge","store-observe","push-observe","dual-sub-native","idle-modes","clock-mvdk","clock-mvdk-edge","pop-irq","pop-irq-edge","mpy-abs-edge","mac-abs-edge","delay-abs-edge","pmac-abs-edge","mem-t-abs-edge"):
         machine = "tms54xtra"
-    if args.profile in ("load-abs-edge", "rmw-abs-edge", "logic-abs-edge", "arith-abs-edge", "long-abs-edge"):
+    if args.profile in ("load-abs-edge", "rmw-abs-edge", "logic-abs-edge", "arith-abs-edge", "long-abs-edge", "stlm-st1-irq"):
         machine = "tms54xtra"
     command = [str(args.mame.resolve()), machine, "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-joystickprovider", "none",

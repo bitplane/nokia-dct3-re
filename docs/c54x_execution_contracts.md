@@ -14,6 +14,27 @@ their older executable hashes are not competing default-suite baselines.
 Passing CPU tests does not establish physical pipeline timing, a fitted
 handset DSP mask, RF acquisition or end-to-end speech.
 
+### Harness preservation contract
+
+`fixtures/c54x_conformance_baseline.json` freezes the declared BIOS inventory,
+463 isolated runner profiles, seven named scopes, 293 default-suite result
+requirements, fixture PASS formats and assertion-site count. Exact result
+strings retain case/restore counts and scope exclusions. Check it with:
+
+```sh
+.venv/bin/python tools/c54x_harness_inventory.py
+.venv/bin/python -m unittest tools.test_c54x_harness_inventory
+```
+
+The CLI test exercises every isolated profile's machine/BIOS selection and
+result checking using simulated process output. The inventory is a structural
+preservation check, not executed coverage, an independent arithmetic oracle
+or evidence of silicon timing. Native conformance and affected handset gates
+remain necessary. Never automatically regenerate the baseline to make a
+refactor pass; `--write` is reserved for an explicitly reviewed contract change.
+Expected arithmetic/timing results must remain independent of CPU execution
+helpers and shared profile-selection metadata.
+
 The absolute-alias fixtures share declarative family/count/status profiles in
 `driver/tms320c54x_test_profiles.h`; the CPU model does not consume this test
 metadata. `test_c54x_alias_profiles.py` executes the host C++ decoder and
