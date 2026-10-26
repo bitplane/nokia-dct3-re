@@ -3514,8 +3514,15 @@ void nokia_radio_peer_device::tick()
 			((!m_traffic_channel_active || queued_disconnect) &&
 				current_phase() == phase::service_uplink_wait)) &&
 			m_gsm_session->pending_downlink_kind() !=
-					nokia_gsm_session_device::downlink_kind::none)
+					nokia_gsm_session_device::downlink_kind::none &&
+			!m_lapdm_link->downlink_acknowledgement_pending(
+					m_gsm_session->pending_downlink().sapi) &&
+			!m_lapdm_link->awaiting_establishment(
+					m_gsm_session->pending_downlink().sapi))
 	{
+		// A queued Layer-3 message remains pending until its LAPDm ACK. Do
+		// not promote it again while that frame (or SABM) is outstanding:
+		// service_uplink_request must emit the handset's ACK opportunity.
 		set_phase(phase::service_downlink);
 		m_reports_remaining = 1;
 		m_wait_ticks = 0;

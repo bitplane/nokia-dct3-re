@@ -344,6 +344,12 @@ duplicate and MM-service-reject values fail the public post-SETUP submission
 contract. This establishes the scheduler/save-state seam for a future host
 adapter without making host wall-clock time part of GSM behavior.
 
+A queued session downlink remains pending until LAPDm acknowledges it. The
+radio scheduler must preserve the handset's uplink opportunity while that
+SAPI has an outstanding I frame or SABM, rather than promoting the same
+message again. Retransmission belongs to LAPDm's T200/N200 lifecycle, not to
+the host-policy polling cadence.
+
 The optional host binding is `nokia_gsm_call_adapter_device`, enabled
 independently of the laboratory fallback. With MAME's HTTP server enabled it
 registers `/nokia/dct3/calls` and publishes one text WebSocket event:
