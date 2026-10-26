@@ -185,9 +185,17 @@ void nokia_dspif_device::dsp_data_w(u16 address, u16 data)
 	}
 	if (m_trace_enabled && offset == RX_PRODUCER && data != m_ram[offset])
 	{
-		const u16 header = m_ram[m_ram[offset]];
-		LOGMASKED(LOG_DSPIF, "dspif_transport: DSP publish type=%02x payload=%u producer=%03x t=%.6f\n",
-				header & 0xff, header >> 8, data, machine().time().as_double());
+		const u16 cursor = m_ram[offset];
+		// The old producer is firmware-owned state, not a trusted array index.
+		if (cursor >= RX_START && cursor < RX_END)
+		{
+			const u16 header = m_ram[cursor];
+			LOGMASKED(LOG_DSPIF, "dspif_transport: DSP publish type=%02x payload=%u producer=%03x t=%.6f\n",
+					header & 0xff, header >> 8, data, machine().time().as_double());
+		}
+		else
+			LOGMASKED(LOG_DSPIF, "dspif_transport: DSP publish invalid-cursor=%04x producer=%04x t=%.6f\n",
+					cursor, data, machine().time().as_double());
 	}
 	peer_shared_w(offset, data);
 }
