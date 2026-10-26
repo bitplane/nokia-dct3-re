@@ -104,6 +104,9 @@ RUN_ENV ?=
 RUN_VERBOSE ?= 0
 RUN_EXTRA_ARGS ?=
 RUN_NVRAM_DIR ?= $(abspath $(RUN_DIR))/nvram
+# The isolated runner otherwise rebases relative MAME paths against MAME_DIR.
+# Unlike make's abspath function, realpath treats a quoted space as path data.
+RUN_NVRAM_ABSPATH = $(shell realpath -m -- "$(RUN_NVRAM_DIR)")
 # Resolve lazily so target-specific PHONE/BIOS values are honored. Never clean
 # a guessed namespace when a selection is invalid or its declaration unknown.
 NVRAM_SYSTEM = $(or $(shell $(PYTHON) tools/dct3_products.py --nvram-system '$(PHONE)' --bios '$(BIOS)'),$(error Cannot resolve NVRAM namespace for $(PHONE) BIOS=$(BIOS)))
@@ -961,14 +964,14 @@ run: prepare-run-nvram
 	env $(BOOT_ENV) $(RUN_ENV) NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- \
-		$(MAME_ARGS) $(RUN_EXTRA_ARGS) -nvram_directory $(RUN_NVRAM_DIR) -seconds_to_run $(SECONDS)
+		$(MAME_ARGS) $(RUN_EXTRA_ARGS) -nvram_directory "$(RUN_NVRAM_ABSPATH)" -seconds_to_run $(SECONDS)
 	@$(MAKE) --no-print-directory frame RUN_DIR=$(RUN_DIR)
 
 run-prebuilt: prepare-run-files
 	env $(BOOT_ENV) $(RUN_ENV) NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		NOKIA_DCT3_BOOT_SUMMARY=$(abspath $(RUN_DIR))/boot_summary.txt \
 		$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- \
-		$(MAME_ARGS) $(RUN_EXTRA_ARGS) -nvram_directory $(RUN_NVRAM_DIR) -seconds_to_run $(SECONDS)
+		$(MAME_ARGS) $(RUN_EXTRA_ARGS) -nvram_directory "$(RUN_NVRAM_ABSPATH)" -seconds_to_run $(SECONDS)
 	@$(MAKE) --no-print-directory frame RUN_DIR=$(RUN_DIR)
 
 run-captured: run
@@ -1001,7 +1004,7 @@ call-bridge:
 smoke: build prepare-run-files
 	env $(BOOT_ENV) NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- \
-		$(MAME_ARGS) -seconds_to_run $(SECONDS)
+		$(MAME_ARGS) -nvram_directory "$(RUN_NVRAM_ABSPATH)" -seconds_to_run $(SECONDS)
 
 smoke-3310-639:
 	@$(MAKE) --no-print-directory run PHONE=noki3310 BIOS=639 RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS)
