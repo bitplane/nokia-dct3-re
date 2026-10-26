@@ -14,6 +14,19 @@ from tools.run_c54x_core import (COMPLETION, REQUIRED, check_result,
 
 
 class CoreResultTests(unittest.TestCase):
+    def test_source_domain_census_requires_all_forms_and_no_side_effects(self):
+        marker, ending = EXTRA_PROFILES['source-domain']
+        text = marker + '\n' + ending
+        check_result(text, 3, profile='source-domain')
+        for field in marker.split():
+            if '=' in field:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    check_result(text.replace(field, field.split('=')[0] + '=invalid'),
+                                 3, profile='source-domain')
+        for bad in (marker, ending, text + '\nunhandled opcode'):
+            with self.assertRaises(ValueError):
+                check_result(bad, 3, profile='source-domain')
+
     def test_long_memory_alias_exclusions_require_complete_matrix(self):
         profile = 'long-abs-edge'
         marker,ending = EXTRA_PROFILES[profile]

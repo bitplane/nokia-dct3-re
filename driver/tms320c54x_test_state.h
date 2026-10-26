@@ -817,6 +817,8 @@ private:
 	void start_mapped_immediate_mac(unsigned variant=0);
 	void start_memory_immediate_mac_exclusion(unsigned variant = 0);
 	void start_source_alias_case(unsigned variant = 0);
+	void start_source_domains(unsigned variant = 0);
+	bool check_source_domains();
 	void start_short_read_mod3_edge(unsigned variant = 0);
 	void start_mmr_long_edge(unsigned variant = 0);
 	static unsigned block_branch_count(unsigned variant);

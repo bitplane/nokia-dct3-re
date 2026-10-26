@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_single_address_source_domain_exclusions",
+      "owner": "tms320c54x",
+      "status": "satisfied",
+      "predicate": "Every enumerated implemented single-address source/RMW form rejects short write-only or unadmitted absolute aliases without operand effects across restoration",
+      "current": "source-domain passes30000 cases/restores:111 ordinary Smem/Lmem high-byte classes,10 shifted read extensions and4 MMR-source forms; modes98..9f/f9..ff, CMPT, pages, atomic/staged and two snapshots. No data read/write, program write or I/O access occurs; A/B/T/status/RC/SP and every AR remain unchanged. The independent literal inventory does not consume CPU predicates. The prior core fails case3428 on atomic0ef9 SUBB, before the fix. This establishes the source/RMW exclusion census, not every positive operand domain, destination aliases, dual-memory grammar, physical timing, silicon trapping or native handset speech. Existing isolated/default result contracts are retained; one profile is added.",
+      "evidence": ["docs/c54x_execution_contracts.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test_operand_domains.cpp", "tools/test_c54x_operand_domains.py", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+    },
+    {
       "id": "nse2_empty_field_record_padding",
       "owner": "nokia_5110i",
       "status": "satisfied",

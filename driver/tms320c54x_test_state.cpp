@@ -169,6 +169,7 @@ void tms320c54x_test_state::machine_reset()
 	if (!strcmp(machine().options().bios(), "logic-abs-edge")) { start_source_alias_case(); return; }
 	if (!strcmp(machine().options().bios(), "arith-abs-edge")) { start_source_alias_case(); return; }
 	if (!strcmp(machine().options().bios(), "long-abs-edge")) { start_source_alias_case(); return; }
+	if (!strcmp(machine().options().bios(), "source-domain")) { start_source_domains(); return; }
 	if (!strcmp(machine().options().bios(), "mpy-mod3-edge")) { start_short_read_mod3_edge(); return; }
 	if (!strcmp(machine().options().bios(), "mmr-long-edge")) { start_mmr_long_edge(); return; }
 	if (!strcmp(machine().options().bios(), "rpt-xfer-edge")) { start_mmr_long_edge(); return; }

@@ -448,6 +448,18 @@ constexpr bool invalid_mmr_long_form(u16 word)
 	}
 }
 
+constexpr bool memory_source_operand(u16 word)
+{
+	// SPRU172C single-address Smem/Lmem read and RMW families. An implicit
+	// destination (LTD, DELAY, MACD) does not turn the encoded source into a
+	// write operand. MMR and shifted-extension grammars are handled separately.
+	unsigned const family = word >> 8;
+	return family <= 0x47 || (family >= 0x4b && family <= 0x4d) ||
+			(family >= 0x50 && family <= 0x6b) || family == 0x71 ||
+			family == 0x75 || (family >= 0x78 && family <= 0x7b) ||
+			family == 0x7d || family == 0x7f;
+}
+
 constexpr bool extended_repeat_transfer(u16 word)
 {
 	if (u8(word) < 0xe0 || u8(word) > 0xf8)
@@ -5901,34 +5913,20 @@ void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
 	const auto transfer_pc = [this](u16 destination) { m_pc = destination; m_atomic_condition_redirect = true; };
-	const bool scalar_arithmetic = (op & 0xfe00) == 0x0000 || (op & 0xfe00) == 0x0200 ||
-			(op & 0xfe00) == 0x0400 || (op & 0xfe00) == 0x0600 || (op & 0xfe00) == 0x0800 ||
-			(op & 0xfe00) == 0x0a00 || (op & 0xfe00) == 0x0c00 || (op & 0xfe00) == 0x1e00 ||
-			(op & 0xfc00) == 0x3c00 || (op & 0xfc00) == 0x4000;
-	// Match staged load/logic/arithmetic admission: f8 is absolute, f9..ff are unadmitted aliases.
-	// Reject before operand reads; this is not a silicon-trap claim.
-	if (low > 0xf8 && ((op & 0xf800) == 0x1000 || (op & 0xfe00) == 0x4400 || (op & 0xf000) == 0x5000 ||
-			(op & 0xfe00) == 0x1800 || (op & 0xfe00) == 0x1a00 || (op & 0xfe00) == 0x1c00 || scalar_arithmetic))
-	{
-		m_illegal = true;
-		return;
-	}
-	// SPRU131G table 5-4 and the pinned TI assembler probe exclude
-	// short MOD=3 from RMW operands too, before any operand side effect.
-	// f9..ff also match the staged path's fail-closed alias admission.
-	if ((op & 0xfc00) == 0x6800 && ((low & 0xf8) == 0x98 || low > 0xf8))
+	// SPRU131G table 5-4: short MOD=3 is write-only, including RMW
+	// exclusions. f8 alone is the admitted absolute form; f9..ff remain
+	// unvalidated aliases, not a claim about silicon traps. Reject before any
+	// operand, pointer or status effect, including special loads and transfers.
+	bool const short_preincrement = (low & 0xf8) == 0x98;
+	bool const mmr_source = (op & 0xfe00) == 0x4800 ||
+			(op & 0xff00) == 0x4a00 || (op & 0xff00) == 0x7300;
+	if ((memory_source_operand(op) && (short_preincrement || low > 0xf8)) ||
+			(mmr_source && short_preincrement) || ((op & 0xff00) == 0x6f00 && low > 0xf8))
 	{
 		m_illegal = true;
 		return;
 	}
 	if (invalid_mmr_long_form(op) || ((m_rpt_armed || m_rpt_end != REPEAT_END_UNSET) && extended_repeat_transfer(op)))
-	{
-		m_illegal = true;
-		return;
-	}
-	// These scalar arithmetic, multiply, load, repeat and test families read Smem.
-	// Short MOD=3 is write-only; long MOD=13 is a distinct valid read form.
-	if ((low & 0xf8) == 0x98 && ((op & 0xf000) == 0 || (op & 0xf000) == 0x2000 || (op & 0xf000) == 0x3000 || (op & 0xfc00) == 0x4000 || (op & 0xf000) == 0x1000 || (op & 0xfc00) == 0x4400 || (op & 0xfc00) == 0x4800 || (op & 0xf000) == 0x5000 || (op & 0xfe00) == 0x6000 || (op & 0xfc00) == 0x6400 || (op & 0xff00) == 0x7100 || (op & 0xff00) == 0x7300 || (op & 0xff00) == 0x7500 || (op & 0xff00) == 0x7d00 || (op & 0xff00) == 0x7f00))
 	{
 		m_illegal = true;
 		return;

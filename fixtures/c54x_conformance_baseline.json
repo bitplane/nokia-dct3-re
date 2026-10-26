@@ -298,7 +298,7 @@
     ]
   },
   "cpp": {
-    "assertion_sites": 4196,
+    "assertion_sites": 4202,
     "machines": {
       "nhm3verify": [
         {
@@ -3018,6 +3018,11 @@
           "description": "Unadmitted long-memory arithmetic absolute-alias exclusions",
           "index": 219,
           "name": "long-abs-edge"
+        },
+        {
+          "description": "Complete implemented single-memory read/RMW exclusion census",
+          "index": 220,
+          "name": "source-domain"
         }
       ]
     },
@@ -3489,6 +3494,7 @@
       "TMS320C54x software interrupt conformance: PASS variants=64\n": 1,
       "TMS320C54x software interrupt fast return: PASS variants=64\n": 1,
       "TMS320C54x software-saved IRQ repeat: PASS cases=3840 restore=3840 outer_counts=0,1,2,7,56 inner_counts=0,1,3,63 sources=IRQ,NMI pages=2 stacks=2 returns=FRETE,FRETED snapshots=6 leaf_return=inside,REA_plus_1 ordered_copies=1 balanced_frames=1 physical_phase_claim=0\n": 1,
+      "TMS320C54x source-domain exclusions: PASS cases=30000 restore=30000 instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x special load disassembler: PASS memory_forms=768 arp=8 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x stack address latency conformance: PASS variants=24\n": 1,
       "TMS320C54x staged ABS: PASS cases=13824 selectors=4 patterns=16 status_states=32 pages=2 producer_cases=1536 restore=13824 data_accesses=0 irq_acceptance=0 silicon_phase_claim=0\n": 1,
@@ -13027,6 +13033,33 @@
       ],
       "required": [
         "TMS320C54x staged software INTR: PASS cases=256 restore=256 vectors=32 masks=2 pages=2 snapshots=2 frame_writes=1 return_reads=1 silicon_phase_claim=0"
+      ]
+    },
+    "source-domain": {
+      "completion": "Fatal error: TMS320C54x isolated source-domain exclusions complete",
+      "machine": "tms54xtra",
+      "reported_fields": [
+        {
+          "cases": "30000",
+          "cmpt": "2",
+          "data_reads": "0",
+          "data_writes": "0",
+          "frontends": "2",
+          "instruction_forms": "125",
+          "io_accesses": "0",
+          "mmr_sources": "4",
+          "modes": "98..9f,f9..ff",
+          "pages": "2",
+          "program_writes": "0",
+          "restore": "30000",
+          "shifted_reads": "10",
+          "silicon_trap_claim": "0",
+          "smem_classes": "111",
+          "snapshots": "2"
+        }
+      ],
+      "required": [
+        "TMS320C54x source-domain exclusions: PASS cases=30000 restore=30000 instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0"
       ]
     },
     "sqacc-repeat": {

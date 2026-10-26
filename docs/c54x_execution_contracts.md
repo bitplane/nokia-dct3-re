@@ -18,8 +18,8 @@ handset DSP mask, RF acquisition or end-to-end speech.
 ### Harness preservation contract
 
 `fixtures/c54x_conformance_baseline.json` freezes the declared BIOS inventory,
-463 isolated runner profiles, seven named scopes, 293 default-suite result
-requirements, fixture PASS formats and 4,196 lexical assertion-pattern sites
+464 isolated runner profiles, seven named scopes, 293 default-suite result
+requirements, fixture PASS formats and 4,202 lexical assertion-pattern sites
 (a source-pattern count, not an executed assertion count). Exact result
 strings retain case/restore counts and scope exclusions. Check it with:
 
@@ -44,7 +44,7 @@ ambiguous declarations fail closed. Exact expected results live separately in
 `tools/run_c54x_core.py` owns CLI selection, process execution and result
 validation, retaining its established checker/import API. The seven named
 scopes share one selection table; the frozen baseline independently checks
-their result contracts and all 463 isolated machine/BIOS selections.
+their result contracts and all 464 isolated machine/BIOS selections.
 
 The bench is separate from the processor implementation. Its current source
 boundaries are:
@@ -93,9 +93,11 @@ and [ROM4 loader](rom4_dsp_loader.md).
 
 CPU admission remains fail-closed. In particular, short Smem MOD=3
 preincrement is write-only (SPRU131G table 5-4). The
-corrections below cover selected read families, not the entire ISA. Remaining
-read-source classifiers and older fixture input domains still require an audit;
-passing mechanically decoded cases is not hardware-legality evidence.
+corrections below cover selected read families, not the entire ISA. The
+single-address source/RMW exclusion census below closes the implemented
+Smem/Lmem and MMR-source classes, not every positive fixture domain or
+multi-operand grammar; passing mechanically decoded cases is not
+hardware-legality evidence.
 Long-offset MOD=13 preincrement is a distinct read-capable form and must not
 be removed by that audit.
 
@@ -115,6 +117,30 @@ The [full-core checkpoint](#core-regression-checkpoint) covers the current
 source-admission guards; optional profiles retain their separate scopes below.
 
 ### Operand-domain acceptance
+
+`source-domain` on `tms54xtra` enumerates all 111 implemented ordinary
+Smem/Lmem source/RMW high-byte classes, ten shifted read extensions and four
+MMR-source forms. All 30,000 cases and save/replays check short `98..9f` and
+unadmitted `f9..ff`, CMPT, two program pages, both CPU frontends and snapshots
+before/after rejection. Data reads/writes, program writes and I/O accesses stay
+zero; accumulators, T, status, repeat/stack pointers and all ARs are retained.
+The independent fixture inventory does not call CPU admission helpers.
+
+The unmodified core fails case 3428: atomic `0ef9` (SUBB) executes an operand
+transaction and changes status/repeat state instead of rejecting the alias.
+The shared atomic source-operand predicate now covers all implemented
+single-address source classes, including the special-load, test and transfer
+families omitted by the previous partial masks. Shifted `6fxx` aliases are
+rejected before addressing; short `6f98..9f` still uses its operation extension
+to distinguish invalid reads from valid destination stores. MMR long forms
+retain their separate grammar. The existing 463 isolated contracts, default
+requirements and seven named scopes are unchanged; this adds one profile.
+Capture: `tmp/fidelity-source-domain-green/run_c54x_core_5tmpwpkh`.
+
+This closes the source/RMW exclusion surface, not positive admission of every
+addressing mode, arbitrary repeat/delay compositions, destination-only alias
+policy, Xmem/Ymem encodings or physical silicon traps. Existing positive
+preincrement stores and long-MOD13 reads remain distinct contracts.
 
 [SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf) table 5-4 and
 section 5.5.3.1 restrict short MOD=3 (`*+ARx`, Smem byte `98..9f`) to writes.

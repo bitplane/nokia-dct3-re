@@ -1749,6 +1749,7 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(217, "logic-abs-edge", "Unadmitted memory logic absolute-alias exclusions")
 	ROM_SYSTEM_BIOS(218, "arith-abs-edge", "Unadmitted scalar arithmetic absolute-alias exclusions")
 	ROM_SYSTEM_BIOS(219, "long-abs-edge", "Unadmitted long-memory arithmetic absolute-alias exclusions")
+	ROM_SYSTEM_BIOS(220, "source-domain", "Complete implemented single-memory read/RMW exclusion census")
 ROM_END
 
 ROM_START(tms54rom4)
