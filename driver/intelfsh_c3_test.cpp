@@ -4,6 +4,7 @@
 // Development-only flash conformance fixture, not a handset provisioning path.
 #include "emu.h"
 #include "machine/intelfsh.h"
+#include "nokia_b3_flash.h"
 #include "util/ioprocs.h"
 #include <sstream>
 
@@ -209,3 +210,70 @@ ROM_START(c3test) ROM_END
 }
 CONS(2026, c3test, 0, 0, test, c3_test, c3_test_state, empty_init,
 		"Test", "Intel C3 flash conformance", MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE)
+
+namespace {
+class b3_test_state : public driver_device
+{
+public:
+	b3_test_state(machine_config const &config, device_type type, char const *tag)
+		: driver_device(config, type, tag), m_flash(*this, "flash"), m_adapter(*this, "adapter") { }
+	void test(machine_config &config)
+	{
+		ST_M28W320ECT(config, m_flash);
+		NOKIA_B3_FLASH(config, m_adapter);
+		m_adapter->set_enabled(true);
+		m_adapter->set_status_csr(CSR);
+	}
+private:
+	static constexpr u32 CSR = 0x100, ERASE = 0x10000, OTHER = 0x20000;
+	required_device<st_m28w320ect_device> m_flash;
+	required_device<nokia_b3_flash_device> m_adapter;
+	void require(bool value, char const *name)
+	{
+		if (!value) fatalerror("B3 adapter conformance: %s", name);
+	}
+	void program(u32 address, u16 value)
+	{
+		m_adapter->write(address, 0x40);
+		m_adapter->write(address, value);
+	}
+	virtual void machine_start() override
+	{
+		timer_alloc(FUNC(b3_test_state::check), this)->adjust(attotime::from_msec(1));
+	}
+	TIMER_CALLBACK_MEMBER(check)
+	{
+		m_adapter->write(0, 0x90);
+		require(m_adapter->read(0) == 0x20 && m_adapter->read(1) == 0x88ba, "fitted identity");
+		m_adapter->write(0, 0xff);
+		program(ERASE, 0);
+		program(ERASE + 0x8000, 0x1234);
+		m_adapter->write(ERASE, 0x20);
+		m_adapter->write(ERASE, 0xd0);
+		require(m_adapter->read(CSR) == 0, "active erase status");
+		// A program data word must never be reinterpreted as FF/Read Array.
+		program(OTHER, 0x12ff);
+		require(m_adapter->read(CSR) == 0, "command-like program data changed erase read mode");
+		m_adapter->write(0, 0xb0);
+		require(m_adapter->read(CSR) == 0xc0, "suspended erase status");
+		require(m_adapter->read(ERASE + 0x8000) == 0x1234, "neighbor block isolation");
+		require(m_adapter->read(OTHER) == 0x12ff, "programmed data preserved");
+		std::ostringstream saved(std::ios::binary);
+		require(machine().save().write_stream(saved) == STATERR_NONE, "suspended state save");
+		m_adapter->write(0, 0xd0);
+		require(m_adapter->read(CSR) == 0, "resume status");
+		std::istringstream restore(saved.str(), std::ios::binary);
+		require(machine().save().read_stream(restore) == STATERR_NONE, "suspended state restore");
+		require(m_adapter->read(CSR) == 0xc0, "restored suspended status");
+		m_adapter->write(0, 0xff);
+		program(OTHER, 0xfff0);
+		m_adapter->write(0, 0xff);
+		require(m_adapter->read(OTHER) == 0x12f0, "one-way NOR program");
+		osd_printf_info("B3 adapter conformance: PASS id=1 command_like_data=1 nor=1 erase_geometry=1 suspend_resume=1 restore=1 fixed_status_compatibility=1 protection_claim=0 timing_claim=0 handset_claim=0\n");
+		machine().schedule_exit();
+	}
+};
+ROM_START(b3test) ROM_END
+}
+CONS(2026, b3test, 0, 0, test, c3_test, b3_test_state, empty_init,
+		"Test", "ST B3 adapter conformance", MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE)

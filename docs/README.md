@@ -34,6 +34,7 @@ distinction.
 | `subscriber_profile.md` | Shared immutable SIM/network identity and authentication contract. |
 | `gsm_fr_codec.md` | Generic GSM-FR utility, bundled dependency, predictor snapshots and voice regression gates. |
 | `ccont_subsystem.md` | Current CCONT contract, conclusions and fidelity backlog. |
+| `flash_storage.md` | Native flash/3410 adapter contracts, datasheet mismatches and remaining protection/operation semantics. |
 | `gensio_controller.md` | Extracted GENSIO endpoint, serial and SELECT-latch contract. |
 | `mbus_controller.md` | Extracted MBUS controller, firmware data path, and attachment boundary. |
 | `cross_rom_confidence.md` | Cross-product and cross-ROM boot, idle, and input evidence. |

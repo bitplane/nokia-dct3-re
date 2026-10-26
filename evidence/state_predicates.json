@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "b3_command_like_program_data",
+      "owner": "nokia_b3_flash",
+      "status": "satisfied",
+      "predicate": "A program data word cannot also change the adapter command/read state",
+      "current": "Independent b3test fails the old adapter on program12ff during its modeled erase, then passes after the program-data branch forwards exactly once and returns. Identity20:88ba, one-way programming, neighboring erase-block isolation and suspended-state save/restore pass; the3410 compaction/cold-reload gate retains its exact idle frame. The focused test explicitly labels fixed-address status as compatibility, with protection/timing/handset claims zero. The ST datasheet instead requires status at any address, power-up block locks and suspend for other-block operations; those documented software gaps are not promoted to silicon facts or hidden as measurement dependencies.",
+      "evidence": ["driver/nokia_b3_flash.cpp", "driver/intelfsh_c3_test.cpp", "docs/flash_storage.md", "docs/hardware_atlas.md"]
+    },
+    {
       "id": "sim_pts_default_speed_negotiation",
       "owner": "nokia_sim_card",
       "status": "satisfied",

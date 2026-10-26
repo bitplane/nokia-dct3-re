@@ -79,6 +79,8 @@ void nokia_b3_flash_device::write(offs_t offset, u16 data, u16 mem_mask)
 		// The word following 40 is array data even when its low byte resembles
 		// another command opcode.
 		m_program_data = false;
+		m_flash->write(offset, data);
+		return;
 	}
 	else if (m_lock_command)
 	{

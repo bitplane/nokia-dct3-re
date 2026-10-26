@@ -1,12 +1,13 @@
 diff --git a/src/mame/mame.lst b/src/mame/mame.lst
 --- a/src/mame/mame.lst
 +++ b/src/mame/mame.lst
-@@ -21,6 +21,9 @@
+@@ -21,6 +21,10 @@
  virusrck
  virusrckxl
  
 +@source:nokia/intelfsh_c3_test.cpp
 +c3test
++b3test
 +
  @source:acorn/aa310.cpp
  aa500
