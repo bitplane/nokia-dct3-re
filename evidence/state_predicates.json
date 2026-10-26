@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nse8_rom_owned_nv_fallback_and_checksum_refusal",
+      "owner": "nokia_3210",
+      "status": "satisfied",
+      "predicate": "Both 3210 profiles extract fallback record0757 from their own constructor/descriptor and the v6 cold checksum controls refuse corrupt stored checksums without host failure",
+      "current": "The bounded Thumb constructor recognizer independently obtains v60026db44 sources2d7fdc/2d7c08 into0db0 and v501268bd4 sources2cd368/2ccf94 into0da8. Both9+391-byte payloads hash6a4f1801949f15a301f0785057a9e9e8797b9aded70dc751148ef66fdff33a7e. The whole v600 bank is unchanged;373 changed v501 bytes are confined to its own400-byte record. Golden, relocation, ambiguity, extent and malformed-image tests pass. Both physical menu oracles and the two-process mapped-pin persistence gate pass. Separate20s v600 inputs corrupt only checksum byte0245 or011f: both retain flags0b/service0009/no-SIM1/ENABLE0 and invalid checksums. Independent cold recovery after repairing only that external byte restores flags0f/service0049/ENABLE1. The harness honors machine-stop wait cancellation without changing save/load continuation. This does not establish automatic firmware repair, authentic factory provisioning, other products or physical EEPROM timing.",
+      "evidence": ["docs/eeprom_analysis.md", "tools/make_eeprom_profile.py", "tools/test_make_eeprom_profile.py", "mame_nokia_dct3_input_exerciser.lua", "tools/test_input_wait_lifecycle.py"]
+    },
+    {
       "id": "c54x_single_address_source_domain_exclusions",
       "owner": "tms320c54x",
       "status": "satisfied",

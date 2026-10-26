@@ -2,7 +2,9 @@
 """Build the documented synthetic 3210 24C128 self-test profile."""
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
+import struct
 
 
 SIZE = 0x4000
@@ -18,6 +20,8 @@ SECURITY_XOR = bytes((0x00, 0xFF, 0xFF, 0xFF))
 SECURITY_CALLBACK_STATE = 0x11
 DISPLAY_PROFILE_KEY = 0x0749
 DISPLAY_PROFILE_LENGTH = 12
+FALLBACK_RECORD_KEY = 0x0757
+FALLBACK_RECORD_LENGTH = 400
 # v6.00 0x29a802 and its v5.01 equivalent 0x296d6e construct these
 # three reset profiles before committing descriptor 0x0749 variants 0..2.
 # None marks bytes the constructor does not write; retain their erased state
@@ -68,7 +72,82 @@ def find_nv_descriptor(flash: bytes, key: int, length: int) -> int:
     return matches[0]
 
 
+@dataclass(frozen=True)
+class FallbackLayout:
+    constructor: int
+    header_source: int
+    body_source: int
+    location: int
+
+
+def find_fallback_layout(flash: bytes) -> FallbackLayout:
+    """Locate the reviewed 9+391-byte variant-zero constructor, not a ROM name.
+
+    Thumb halfwords and pool words are big-endian in the original .fls.
+    LDRB payload bytes use the separate flash byte-lane transform below.
+    Unrecognised or ambiguous constructor families are deliberately refused.
+    """
+    pattern = (
+        (0x1c20, 0xffff), (0x4900, 0xff00), (0x2209, 0xffff),
+        (0xf000, 0xf800), (0xf800, 0xf800), (0x4900, 0xff00),
+        (0x2009, 0xffff), (0x1900, 0xffff), (0x22ff, 0xffff),
+        (0x3288, 0xffff), (0xf000, 0xf800), (0xf800, 0xf800),
+        (0x2000, 0xffff), (0x9000, 0xffff), (0x1c20, 0xffff),
+        (0x4900, 0xff00), (0x4a00, 0xff00), (0x1c2b, 0xffff),
+        (0xf000, 0xf800), (0xf800, 0xf800),
+    )
+
+    def literal(offset: int, instruction: int) -> int:
+        pool = ((offset + 4) & ~3) + (instruction & 255) * 4
+        if pool + 4 > len(flash):
+            raise ValueError('fallback constructor literal is outside flash')
+        return int.from_bytes(flash[pool:pool + 4], 'big')
+
+    matches = []
+    anchor = flash.find(bytes.fromhex('2209'))
+    while anchor >= 0:
+        offset = anchor - 4
+        if offset >= 0x56 and not offset & 1 and offset + 40 <= len(flash):
+            words = struct.unpack_from('>20H', flash, offset)
+            if all(word & mask == value for word, (value, mask) in zip(words, pattern)):
+                selector = struct.unpack_from('>4H', flash, offset - 0x3e)
+                branch = selector[3]
+                displacement = (branch & 255) - (256 if branch & 128 else 0)
+                target = offset - 0x38 + 4 + displacement * 2
+                prologue = struct.unpack_from('>4H', flash, offset - 0x56)
+                if (selector[:3] == (0x2500, 0x1c28, 0x2800) and
+                        branch & 0xff00 == 0xd000 and target == offset and
+                        prologue == (0xb530, 0xb081, 0x20ff, 0x3091) and
+                        literal(offset + 30, words[15]) == FALLBACK_RECORD_KEY):
+                    header = literal(offset + 2, words[1])
+                    body = literal(offset + 10, words[5])
+                    for source, count in ((header, 9), (body, 391)):
+                        if (source < FLASH_BASE or
+                                any(((source - FLASH_BASE + i) ^ 1) >= len(flash)
+                                    for i in range(count))):
+                            raise ValueError('fallback payload source is outside flash')
+                    matches.append(FallbackLayout(FLASH_BASE + offset - 0x56,
+                        header, body, find_nv_descriptor(
+                            flash, FALLBACK_RECORD_KEY, FALLBACK_RECORD_LENGTH)))
+        anchor = flash.find(bytes.fromhex('2209'), anchor + 1)
+    if len(matches) != 1:
+        raise ValueError(f'NV fallback constructor has {len(matches)} usable matches')
+    return matches[0]
+
+
+def fallback_record(flash: bytes, layout: FallbackLayout) -> bytes:
+    if any(source < FLASH_BASE or
+           any(((source - FLASH_BASE + i) ^ 1) >= len(flash) for i in range(count))
+           for source, count in ((layout.header_source, 9), (layout.body_source, 391))):
+        raise ValueError('fallback payload source is outside flash')
+    return bytes(flash[(source - FLASH_BASE + i) ^ 1]
+                 for source, count in ((layout.header_source, 9), (layout.body_source, 391))
+                 for i in range(count))
+
+
 def validate_checksums(image: bytes) -> None:
+    if len(image) != SIZE:
+        raise ValueError('EEPROM profile must contain exactly 16384 bytes')
     tune_security_sum = sum16(image[:TUNE_SECURITY_CHECKSUM_END - 2])
     stored_tune_security = int.from_bytes(
         image[TUNE_SECURITY_CHECKSUM_OFFSET:TUNE_SECURITY_CHECKSUM_END], "big")
@@ -137,13 +216,10 @@ def build_profile(flash: bytes, provisioned_identity: str | None = None,
                   erased_identity_security_code: str | None = None) -> bytearray:
     image = bytearray([0xFF]) * SIZE
 
-    # Firmware fallback record for NV descriptor 0x0757, variant zero.
-    for index in range(0x190):
-        source = 0x2D7FDC + index if index < 9 else 0x2D7C08 + index - 9
-        raw = (source - FLASH_BASE) ^ 1
-        if raw >= len(flash):
-            raise ValueError(f"flash is too short for source address 0x{source:08x}")
-        image[0x0DB0 + index] = flash[raw]
+    # The constructor and descriptor independently own source and destination.
+    # Their addresses move between the reviewed v6.00 and v5.01 images.
+    fallback = find_fallback_layout(flash)
+    image[fallback.location:fallback.location + FALLBACK_RECORD_LENGTH] = fallback_record(flash, fallback)
 
     patches = {
         # Firmware default written by the service-session provisioning path at
@@ -178,6 +254,8 @@ def build_profile(flash: bytes, provisioned_identity: str | None = None,
     # through normal I2C/NV loading; no firmware RAM or LCD state is overridden.
     display_profile = find_nv_descriptor(
         flash, DISPLAY_PROFILE_KEY, DISPLAY_PROFILE_LENGTH)
+    if display_profile + len(DISPLAY_PROFILE_DEFAULTS) * DISPLAY_PROFILE_LENGTH > SIZE:
+        raise ValueError('display profile variants extend outside EEPROM')
     for variant, record in enumerate(DISPLAY_PROFILE_DEFAULTS):
         record_offset = display_profile + variant * DISPLAY_PROFILE_LENGTH
         for field, value in enumerate(record):

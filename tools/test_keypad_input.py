@@ -43,7 +43,7 @@ class KeypadInputTest(unittest.TestCase):
 
     def test_scripted_sequences_support_emulation_time_waits(self):
         self.assertIn('string.match(name, "^wait(%d+)$")', self.harness)
-        self.assertIn("emu.wait(tonumber(wait_ms) / 1000)", self.harness)
+        self.assertIn("wait_for(tonumber(wait_ms) / 1000)", self.harness)
 
     def test_harness_records_firmware_keypad_mask_changes(self):
         self.assertIn('if reg == 0x6b then', self.harness)

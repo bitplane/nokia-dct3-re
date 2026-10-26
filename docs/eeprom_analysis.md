@@ -28,7 +28,7 @@ Transport, storage, and provisioning are classified separately:
 | Firmware serial protocol | Derived contract | START, STOP, ACK sampling, device address `0xa0/0xa1`, 16-bit byte addresses, page wrap and busy-cycle ACK polling are exercised through mapped PUP pins. A two-process gate proves persistence. |
 | EEPROMSelX `0xa00000..0xdfffff` | Unmapped | The removed handler returned immutable input bytes and discarded writes. A five-ROM census finds no executable direct literal-derived access to its former 16 KiB slice; dynamic and table-derived accesses remain outside that absence proof. |
 | Checksummed startup blocks | Derived data contract | Both checksum algorithms and the firmware comparisons are mapped and generator-tested. This validates the format used by the ROM, not the provenance of the generated contents. |
-| Fallback NV record copied from flash | ROM-derived fixture | The v6.00 fallback bytes are copied with the required byte-lane transform. The hard-coded source addresses have not been validated for v5.01 or another product. |
+| Fallback NV record copied from flash | ROM-derived fixture | Both 3210 ROMs independently identify the variant-zero constructor, its 9+391-byte sources and descriptor-owned destination. Unknown or ambiguous constructor families are refused; this is not a generic factory profile. |
 | Identity/security profile | Synthetic provisioning | IMEI prefix, security code, and derived state are coherent with mapped firmware transformations but do not represent a dumped handset. |
 | ADC/config patches | Working fixture | Several non-erased values allow meaningful firmware paths. Until each field is decoded or sourced from legitimate PMM data, they are test inputs rather than factory defaults. |
 
@@ -52,9 +52,8 @@ The loader loops independently establish the five/three counts and copy only
 the score halfword and level byte. Both speed tables contain the same nine
 entries. The generator bounds game writes by the adjacent descriptor and
 rejects unsupported extents; writing five records on v5.01 would overwrite
-the start of another NV record. This contract does not validate the separate
-v5.01 fallback-copy source addresses listed above, nor apply to flash-backed
-permanent memory on other products.
+the start of another NV record. This contract does not establish other
+fallback constructor families or flash-backed permanent memory on other products.
 
 The GenIO input path must distinguish the output latch from the physical SDA
 level. When direction bit 0 is clear, the MCU has released SDA and must read the
@@ -101,7 +100,7 @@ cover more than a thousand byte accesses. Important observed ranges include:
 | `0x02e0..0x0353` | ADC-monitor calibration/configuration |
 | `0x0394..0x04ab` | configuration records |
 | `0x0544..0x05c6` | configuration records |
-| `0x06c8..0x06fb` | unknown record |
+| `0x06c8..0x06fb` | identity-derived security prefix; remaining fields unmapped |
 | `0x0db0..0x0f3f` | generated NV descriptor `0x0757`, variant zero |
 | `0x18a8..0x18cb` | v6.00 display-profile descriptor `0x0749`: three 12-byte records |
 
@@ -195,14 +194,54 @@ validity is one real service-session startup prerequisite, but not the only
 one. The check is demonstrated organically over the native serial path, with
 no firmware hook or RAM override.
 
+Three independent 20-second v6.00 cold controls distinguish checksum handling:
+the valid generated bank reaches flags `0x0f`, service status `0x0049` and
+SIM ENABLE. Flipping only stored checksum byte `0x0245` or `0x011f` instead
+leaves flags `0x0b`, status `0x0009`, no-SIM set and ENABLE clear; the bad
+checksum remains bad. An independent cold process after repairing only that
+external checksum byte restores the normal state in both cases. This is
+refusal and externally repaired recovery, not automatic firmware repair or
+general recovery from arbitrary corrupt records. Captures:
+`tmp/fidelity-nv-corruption-fixed/results.json` and `recovery.json`.
+
+Negative startup tests can leave scripted input waiting indefinitely. The Lua
+harness's `wait_for` policy exits on machine-stop cancellation but preserves
+the existing continuation after save/load cancellation. MAME returns false
+for both; attempting another wait after stop dereferences its removed timer.
+Executable Lua policy tests and a native MAD2 save/load gate protect this
+distinction; no handset state is changed by the guard.
+
 ## Synthetic self-test profile
+
+### Fallback-record extraction
+
+The generator locates the reviewed Thumb constructor shape rather than using
+a firmware filename or fixed source addresses. It checks the 400-byte
+allocation prologue, variant-zero branch, 9-byte header and 391-byte body copy
+sequence, and literal NV key `0x0757`. Sources come from the constructor's
+PC-relative pools; the destination comes independently from the unique
+`0x0757/400` descriptor. Instruction/pool reads use big-endian original-flash
+words; copied bytes use the MCU's `flash[(address - 0x200000) ^ 1]` lane.
+
+| ROM | Constructor | Header source | Body source | EEPROM destination |
+| --- | --- | --- | --- | --- |
+| v6.00 | `0x26db44` | `0x2d7fdc` | `0x2d7c08` | `0x0db0` |
+| v5.01 | `0x268bd4` | `0x2cd368` | `0x2ccf94` | `0x0da8` |
+
+Both independently extracted 400-byte payloads have SHA256
+`6a4f1801949f15a301f0785057a9e9e8797b9aded70dc751148ef66fdff33a7e`.
+The complete v6.00 generated bank remains byte-identical. In v5.01, 373 bytes
+change, all inside its own `0x0da8..0x0f37` record; the generator no longer
+copies from v6.00's unrelated ROM locations. Whole-bank golden tests protect
+both profiles. Malformed/ambiguous signatures, invalid source extents, truncated
+banks and display variants beyond the EEPROM capacity are rejected.
 
 `tools/make_eeprom_profile.py` generates the ignored local file
 `roms/noki3210/3210 selftest eeprom.bin` from the user-supplied 3210 flash. It:
 
 - starts with an erased 16 KiB image;
-- copies the firmware's fallback NV descriptor `0x0757` into
-  `0x0db0..0x0f3f`;
+- copies variant zero of firmware NV descriptor `0x0757` into its
+  ROM-owned destination (`0x0db0..0x0f3f` for v6.00);
 - supplies the firmware-defined default four-byte availability record
   `{30 00 80 90}` at `0x0150..0x0153`;
 - supplies the known checksum/config bytes; and
@@ -334,9 +373,9 @@ run as an unprovisioned security-editor result.
 4. Validate exact AT24C128 board timing and interrupted-write behavior.
 5. Decode flash-backed permanent-memory formats beyond their established
    product placement and persistence boundary.
-6. Parameterize or signature-locate the fallback-record source before treating
-   a v5.01-generated profile as a data-layout control; the current generator's
-   source addresses are v6.00-specific.
+6. Extend fallback constructor families only when another ROM's own
+   initialization, descriptor layout and runtime acceptance establish them.
+   The reviewed extractor currently covers the two 3210 ROMs, not other phones.
 
 Generator unit tests cover both checksum algorithms and the synthetic
 identity/security derivation. Integration oracles exercise organic serial reads,

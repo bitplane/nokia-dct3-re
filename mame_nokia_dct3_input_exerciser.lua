@@ -1,4 +1,11 @@
 local machine = manager.machine
+local function wait_for(seconds)
+	local expired = emu.wait(seconds)
+	-- Loading a state also cancels a wait: retain the existing continuation
+	-- there, but never schedule another timer after machine stop removed it.
+	return expired or machine.phase ~= "exit"
+end
+
 local cpu = machine.devices[":maincpu"]
 local space = cpu.spaces["program"]
 local call_alerting_output =
@@ -609,6 +616,7 @@ end)
 -- Frame notifications stop while this firmware gates the LCD clock.  Drive
 -- delayed input from an emulation-time coroutine so headless runs do not depend
 -- on either video frames or frontend periodic callbacks.
+-- Every wait uses wait_for so pending input exits cleanly at machine stop.
 if #post_keys > 0 then
 	local input_timer = coroutine.create(function()
 		if post_sequence_driven then
@@ -620,27 +628,27 @@ if #post_keys > 0 then
 				startup_ready_time = emulation_seconds()
 			else
 				repeat
-					emu.wait(0.01)
+					if not wait_for(0.01) then return end
 					sample_structural_state()
 				until (structural.final_startup_flags & 0x0f) == 0x0f
 				startup_ready_time = emulation_seconds()
 			end
 			machine:logerror(string.format("input-wait: t=%.6f delay=%.3f\n",
 					emulation_seconds(), post_delay))
-			emu.wait(post_delay)
+			if not wait_for(post_delay) then return end
 			machine:logerror(string.format("input-wake: t=%.6f\n",
 					emulation_seconds()))
 			for _, name in ipairs(post_keys) do
 				local wait_ms = string.match(name, "^wait(%d+)$")
 				if wait_ms then
-					emu.wait(tonumber(wait_ms) / 1000)
+					if not wait_for(tonumber(wait_ms) / 1000) then return end
 				elseif name == "waitbuzzer" then
 					-- Acceptance orchestration only: observe the mapped MAD2 PUP
 					-- buzzer gate, then deliver the next ordinary physical key.
 					-- This avoids coupling an answer fixture to firmware timing
 					-- without modifying call, UI or device state.
 					local deadline = emulation_seconds() + 20
-					repeat emu.wait(0.005) until
+					repeat if not wait_for(0.005) then return end until
 							(space:read_u8(0x20015) & 0x20) ~= 0 or
 							emulation_seconds() >= deadline
 					if (space:read_u8(0x20015) & 0x20) == 0 then
@@ -652,7 +660,7 @@ if #post_keys > 0 then
 					-- output is diagnostic only; the following key still crosses
 					-- the ordinary physical matrix and firmware UI.
 					local deadline = emulation_seconds() + 20
-					repeat emu.wait(0.005) until
+					repeat if not wait_for(0.005) then return end until
 							call_alerting_output:get() ~= 0 or
 							emulation_seconds() >= deadline
 					if call_alerting_output:get() == 0 then
@@ -661,20 +669,20 @@ if #post_keys > 0 then
 					end
 				else
 					press(name)
-					emu.wait(post_duration)
+					if not wait_for(post_duration) then return end
 					release(name)
-					emu.wait(post_gap)
+					if not wait_for(post_gap) then return end
 				end
 			end
 			if post_capture_delay >= 0 then
-				emu.wait(post_capture_delay)
+				if not wait_for(post_capture_delay) then return end
 				pending_lcd = {}
 				queue_lcd_dump()
 				write_lcd_dump()
 			end
 		else
 			repeat
-				emu.wait(0.01)
+				if not wait_for(0.01) then return end
 				sample_structural_state()
 				update_post_ready_key()
 			until false
@@ -685,9 +693,9 @@ end
 
 if charger_pulse_at >= 0 and charger_field then
 	local charger_timer = coroutine.create(function()
-		emu.wait(charger_pulse_at)
+		if not wait_for(charger_pulse_at) then return end
 		charger_field:set_value(1)
-		emu.wait(charger_pulse_duration)
+		if not wait_for(charger_pulse_duration) then return end
 		charger_field:clear_value()
 	end)
 	assert(coroutine.resume(charger_timer))
@@ -695,18 +703,18 @@ end
 
 if sim_remove_at >= 0 and sim_removed_field then
 	local sim_presence_timer = coroutine.create(function()
-		emu.wait(sim_remove_at)
+		if not wait_for(sim_remove_at) then return end
 		sim_removed_field:set_value(1)
 		machine:logerror(string.format("sim_presence_fixture: present=0 t=%.6f\n",
 				emulation_seconds()))
-		emu.wait(0.05)
+		if not wait_for(0.05) then return end
 		sim_removed_field:clear_value()
 		if sim_reinsert_after >= 0 then
-			emu.wait(sim_reinsert_after)
+			if not wait_for(sim_reinsert_after) then return end
 			sim_removed_field:set_value(1)
 			machine:logerror(string.format("sim_presence_fixture: present=1 t=%.6f\n",
 					emulation_seconds()))
-			emu.wait(0.05)
+			if not wait_for(0.05) then return end
 			sim_removed_field:clear_value()
 		end
 	end)
@@ -715,7 +723,7 @@ end
 
 if mbus_rx_fixture and mbus_rx_port then
 	local mbus_rx_timer = coroutine.create(function()
-		emu.wait(mbus_rx_fixture_at)
+		if not wait_for(mbus_rx_fixture_at) then return end
 		mbus_rx_port:write((mbus_rx_fixture & 0xff) | 0x100, 0x1ff)
 	end)
 	assert(coroutine.resume(mbus_rx_timer))
@@ -725,7 +733,7 @@ end
 -- registers only. They never write firmware RAM or construct RTOS messages.
 if irq_overlap_at >= 0 and charger_field and key_fields.up then
 	local overlap_timer = coroutine.create(function()
-		emu.wait(irq_overlap_at)
+		if not wait_for(irq_overlap_at) then return end
 		-- Input callbacks can let the CPU service the first edge before Lua
 		-- asserts the second. Gate delivery briefly so both physical sources
 		-- reach MAD2 pending state before testing aggregation.
@@ -739,11 +747,11 @@ if irq_overlap_at >= 0 and charger_field and key_fields.up then
 		charger_field:set_value(1)
 		-- The charger field callback is sampled on the next input frame,
 		-- unlike the keypad latch. Keep delivery gated across that boundary.
-		emu.wait(0.02)
+		if not wait_for(0.02) then return end
 		space:write_u8(0x2000b,
 			(space:read_u8(0x2000b) & 0xfa) | (old_mask & 0x05))
 		space:write_u8(0x2000c, old_ctrl | 0x04)
-		emu.wait(0.05)
+		if not wait_for(0.05) then return end
 		release("up")
 		charger_field:clear_value()
 	end)
@@ -752,7 +760,7 @@ end
 
 if irq_mask_fixture_at >= 0 and key_fields.up then
 	local mask_timer = coroutine.create(function()
-		emu.wait(irq_mask_fixture_at)
+		if not wait_for(irq_mask_fixture_at) then return end
 		-- This fixture assumes firmware does not intentionally reprogram these
 		-- controller gates during its bounded 40 ms test window.
 		local old_mask = space:read_u8(0x2000b)
@@ -762,14 +770,14 @@ if irq_mask_fixture_at >= 0 and key_fields.up then
 		space:write_u8(0x2000b, old_mask | 0x01)
 		press("up")
 		-- Hold across a video/input sampling boundary while delivery is gated.
-		emu.wait(0.02)
+		if not wait_for(0.02) then return end
 		space:write_u8(0x2000b, old_mask & 0xfe)
 		space:write_u8(0x2000c, old_ctrl | 0x04)
 		-- Disable delivery and acknowledge before firmware can consume the key.
 		space:write_u8(0x2000c, old_ctrl & 0xfb)
 		space:write_u8(0x20009, 0x01)
 		release("up")
-		emu.wait(0.02)
+		if not wait_for(0.02) then return end
 		space:write_u8(0x20009, 0x01)
 		space:write_u8(0x2000b, old_mask)
 		space:write_u8(0x2000c, old_ctrl)
@@ -779,13 +787,13 @@ end
 
 if fiq8_fixture_at >= 0 then
 	local fiq8_timer = coroutine.create(function()
-		emu.wait(fiq8_fixture_at)
+		if not wait_for(fiq8_fixture_at) then return end
 		local old_ctrl = space:read_u8(0x2000c) & 0xdf
 		local old_fiq8 = space:read_u8(0x20016) & 0x05
 		-- Enable FIQ8 while both its local mask and the global FIQ gate are set.
 		space:write_u8(0x2000c, old_ctrl & 0xfe)
 		space:write_u8(0x20016, 0x05)
-		emu.wait(0.003)
+		if not wait_for(0.003) then return end
 		space:read_u8(0x20016)
 		space:write_u8(0x20016, 0x01)
 		space:write_u8(0x2000c, old_ctrl | 0x01)
@@ -800,7 +808,7 @@ end
 
 if buzzer_fixture_at >= 0 then
 	local buzzer_timer = coroutine.create(function()
-		emu.wait(buzzer_fixture_at)
+		if not wait_for(buzzer_fixture_at) then return end
 		local old_pup = space:read_u8(0x20015)
 		-- 13 MHz / 6500 = 2 kHz. This is a controller conformance fixture,
 		-- not an emulated firmware ringtone or application-state shortcut.
@@ -808,7 +816,7 @@ if buzzer_fixture_at >= 0 then
 		space:write_u8(0x2001d, 0x64)
 		space:write_u8(0x2001e, 0x7f)
 		space:write_u8(0x20015, old_pup | 0x20)
-		emu.wait(0.05)
+		if not wait_for(0.05) then return end
 		space:write_u8(0x20015, old_pup & 0xdf)
 	end)
 	assert(coroutine.resume(buzzer_timer))
@@ -816,16 +824,16 @@ end
 
 if vibrator_fixture_at >= 0 then
 	local vibrator_timer = coroutine.create(function()
-		emu.wait(vibrator_fixture_at)
+		if not wait_for(vibrator_fixture_at) then return end
 		local old_pup = space:read_u8(0x20015)
 		local old_control = space:read_u8(0x2001b)
 		-- Controller conformance only: the firmware-owned incoming-call path has
 		-- not yet exercised these registers organically.
 		space:write_u8(0x2001b, 0x55)
 		space:write_u8(0x20015, old_pup | 0x10)
-		emu.wait(0.05)
+		if not wait_for(0.05) then return end
 		space:write_u8(0x20015, old_pup & 0xef)
-		emu.wait(0.01)
+		if not wait_for(0.01) then return end
 		space:write_u8(0x2001b, old_control)
 	end)
 	assert(coroutine.resume(vibrator_timer))
@@ -833,7 +841,7 @@ end
 
 if rtc_fixture_at >= 0 then
 	local rtc_timer = coroutine.create(function()
-		emu.wait(rtc_fixture_at)
+		if not wait_for(rtc_fixture_at) then return end
 		local old_control = space:read_u8(0x2002d)
 		local function ccont_write(reg, value)
 			-- Re-selecting CCONT begins a two-byte register transaction.
@@ -847,7 +855,7 @@ if rtc_fixture_at >= 0 then
 		ccont_write(0x0b, 0)
 		ccont_write(0x0c, 0x8c)
 		space:write_u8(0x2002d, old_control)
-		emu.wait(0.002)
+		if not wait_for(0.002) then return end
 		ccont_write(0x0b, 1)
 		ccont_write(0x0c, 12)
 		ccont_write(0x0f, 0x50) -- unmask alarm bit 7 for this controller test
@@ -858,7 +866,7 @@ end
 
 if mad2_reset_fixture_at >= 0 then
 	local reset_timer = coroutine.create(function()
-		emu.wait(mad2_reset_fixture_at)
+		if not wait_for(mad2_reset_fixture_at) then return end
 		-- Exercise the mapped MAD2 reset controller only. The device callback,
 		-- not this harness, determines reset extent and the resulting cause.
 		space:write_u8(0x20001, space:read_u8(0x20001) | 0x04)
@@ -868,7 +876,7 @@ end
 
 if mad2_watchdog_fixture_at >= 0 then
 	local watchdog_timer = coroutine.create(function()
-		emu.wait(mad2_watchdog_fixture_at)
+		if not wait_for(mad2_watchdog_fixture_at) then return end
 		-- Load a one-tick ASIC-watchdog interval through mapped MMIO. Device
 		-- timing and reset-domain behavior remain entirely driver-owned.
 		space:write_u8(0x20003, 0x01)
@@ -878,7 +886,7 @@ end
 
 if ccont_watchdog_fixture_at >= 0 then
 	local watchdog_timer = coroutine.create(function()
-		emu.wait(ccont_watchdog_fixture_at)
+		if not wait_for(ccont_watchdog_fixture_at) then return end
 		local old_control = space:read_u8(0x2002d)
 		-- Load CCONT register 5 through the mapped GENSIO transaction. The
 		-- device owns countdown timing, reset extent and retained status.
@@ -892,7 +900,7 @@ end
 
 if ccont_mask_fixture_at >= 0 then
 	local mask_timer = coroutine.create(function()
-		emu.wait(ccont_mask_fixture_at)
+		if not wait_for(ccont_mask_fixture_at) then return end
 		local old_control = space:read_u8(0x2002d)
 		local function ccont_write(reg, value)
 			space:write_u8(0x2002d, old_control | 0x04)
@@ -913,7 +921,7 @@ if ccont_mask_fixture_at >= 0 then
 		ccont_write(0x09, 12)
 		ccont_write(0x0b, 1)
 		ccont_write(0x0c, 12)
-		emu.wait(2.2)
+		if not wait_for(2.2) then return end
 		ccont_read(0x0e)
 		-- Unmask only alarm bit 7. The device must assert its existing pending
 		-- source now; firmware remains responsible for reading and acknowledging it.
@@ -926,7 +934,7 @@ end
 
 if eeprom_fixture_at >= 0 then
 	local eeprom_timer = coroutine.create(function()
-		emu.wait(eeprom_fixture_at)
+		if not wait_for(eeprom_fixture_at) then return end
 		local signal_address, direction_address = 0x20020, 0x20024
 		local old_signal = space:read_u8(signal_address)
 		local old_direction = space:read_u8(direction_address)
@@ -996,7 +1004,7 @@ if eeprom_fixture_at >= 0 then
 			end
 			stop()
 			start(); busy_ack = write_byte(0xa0); stop()
-			emu.wait(0.006)
+			if not wait_for(0.006) then return end
 			start(); ready_ack = write_byte(0xa0); stop()
 		end
 		local values, reads_ok = {}, true
@@ -1022,7 +1030,7 @@ end
 
 if mad2_sleep_fixture_at >= 0 then
 	local sleep_timer = coroutine.create(function()
-		emu.wait(mad2_sleep_fixture_at)
+		if not wait_for(mad2_sleep_fixture_at) then return end
 		local old_fiq_mask = space:read_u8(0x2000a)
 		local old_irq_mask = space:read_u8(0x2000b)
 		local old_ctrl = space:read_u8(0x2000c) & 0xdf
@@ -1067,7 +1075,7 @@ if mad2_sleep_fixture_at >= 0 then
 		end
 		space:write_u8(0x2000d, old_clock | 0x02)
 		if keypad_source then
-			emu.wait(0.05)
+			if not wait_for(0.05) then return end
 			if gated_keypad then
 				machine:logerror(string.format("mad2_wake_fixture: phase=edge source=%s ctrl=%02x mask=%02x t=%.6f\n",
 					mad2_sleep_fixture_source, space:read_u8(0x2000c), space:read_u8(0x2000b), emulation_seconds()))
@@ -1077,7 +1085,7 @@ if mad2_sleep_fixture_at >= 0 then
 				machine:logerror(string.format("mad2_wake_fixture: phase=qualified source=%s ctrl=%02x mask=%02x t=%.6f\n",
 					mad2_sleep_fixture_source, space:read_u8(0x2000c), space:read_u8(0x2000b), emulation_seconds()))
 			end
-			emu.wait(0.02)
+			if not wait_for(0.02) then return end
 			release("up")
 			if mad2_sleep_fixture_source == "keypad-masked-gated" then
 				machine:logerror(string.format("mad2_wake_fixture: phase=unmask source=%s ctrl=%02x mask=%02x t=%.6f\n",
@@ -1087,14 +1095,14 @@ if mad2_sleep_fixture_at >= 0 then
 					mad2_sleep_fixture_source, space:read_u8(0x2000c), space:read_u8(0x2000b), emulation_seconds()))
 			end
 			if gated_keypad then
-				emu.wait(0.02)
+				if not wait_for(0.02) then return end
 				machine:logerror(string.format("mad2_wake_fixture: phase=delivery source=%s ctrl=%02x mask=%02x t=%.6f\n",
 					mad2_sleep_fixture_source, space:read_u8(0x2000c), space:read_u8(0x2000b), emulation_seconds()))
 				space:write_u8(0x2000c, 0x05)
-				emu.wait(0.001)
+				if not wait_for(0.001) then return end
 			end
 		else
-			emu.wait(0.05)
+			if not wait_for(0.05) then return end
 		end
 		space:write_u8(0x2000a, old_fiq_mask)
 		space:write_u8(0x2000b, old_irq_mask)
@@ -1111,10 +1119,10 @@ end
 
 if state_roundtrip_at >= 0 then
 	local state_timer = coroutine.create(function()
-		emu.wait(state_roundtrip_at)
+		if not wait_for(state_roundtrip_at) then return end
 		if state_roundtrip_wait_release then
 			local deadline = emulation_seconds() + 60
-			repeat emu.wait(0.001) until
+			repeat if not wait_for(0.001) then return end until
 					call_release_waiting_output:get() ~= 0 or
 					emulation_seconds() >= deadline
 			if call_release_waiting_output:get() == 0 then
@@ -1144,18 +1152,18 @@ if state_roundtrip_at >= 0 then
 			-- Saving completes on the next scheduler boundary. Keep that
 			-- settling time inside the marked interval so the reference and
 			-- restored branches cover identical emulated timestamps.
-			emu.wait(0.01)
+			if not wait_for(0.01) then return end
 			if state_roundtrip_replay > 0.01 then
-				emu.wait(state_roundtrip_replay - 0.01)
+				if not wait_for(state_roundtrip_replay - 0.01) then return end
 			end
 			machine:logerror(string.format(
 				"state_replay: phase=reference event=end t=%.6f\n",
 				emulation_seconds()))
 		else
-			emu.wait(0.05)
+			if not wait_for(0.05) then return end
 		end
 		machine:load("nokia_dct3_mad2_contract")
-		emu.wait(0.01)
+		if not wait_for(0.01) then return end
 		if state_roundtrip_replay > 0 then
 			machine:logerror(string.format(
 				"state_replay: phase=restored event=begin t=%.6f\n",
@@ -1180,7 +1188,7 @@ if state_roundtrip_at >= 0 then
 			structural.state_roundtrip, counter_delta, snapshot.mode,
 			state_roundtrip_requested_at, emulation_seconds()))
 		if state_roundtrip_replay > 0 then
-			emu.wait(state_roundtrip_replay)
+			if not wait_for(state_roundtrip_replay) then return end
 			machine:logerror(string.format(
 				"state_replay: phase=restored event=end t=%.6f\n",
 				emulation_seconds()))
@@ -1190,16 +1198,16 @@ if state_roundtrip_at >= 0 then
 		-- save taken at a firmware UI boundary can be followed by ordinary
 		-- physical navigation without relying on a pre-save input timer.
 		if #state_roundtrip_keys > 0 then
-			emu.wait(state_roundtrip_key_delay)
+			if not wait_for(state_roundtrip_key_delay) then return end
 			for _, name in ipairs(state_roundtrip_keys) do
 				local wait_ms = string.match(name, "^wait(%d+)$")
 				if wait_ms then
-					emu.wait(tonumber(wait_ms) / 1000)
+					if not wait_for(tonumber(wait_ms) / 1000) then return end
 				else
 					press(name)
-					emu.wait(post_duration)
+					if not wait_for(post_duration) then return end
 					release(name)
-					emu.wait(post_gap)
+					if not wait_for(post_gap) then return end
 				end
 			end
 		end
@@ -1208,9 +1216,9 @@ if state_roundtrip_at >= 0 then
 		-- A pre-existing Lua wait is deliberately unsuitable because Lua
 		-- coroutine timers are outside MAME's machine save image.
 		if state_roundtrip_end_delay >= 0 then
-			emu.wait(state_roundtrip_end_delay)
+			if not wait_for(state_roundtrip_end_delay) then return end
 			press(state_roundtrip_end_key)
-			emu.wait(post_duration)
+			if not wait_for(post_duration) then return end
 			release(state_roundtrip_end_key)
 		end
 	end)
