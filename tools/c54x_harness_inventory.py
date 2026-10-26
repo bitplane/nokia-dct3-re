@@ -14,6 +14,8 @@ import sys
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from tools.c54x_profiles import declarations as bios_declarations
+
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / 'fixtures/c54x_conformance_baseline.json'
 STRING = r'"(?:\\.|[^"\\])*"'
@@ -27,13 +29,10 @@ def cpp_inventory(sources):
     declarations, formats = {}, Counter()
     assertions = 0
     for source in sources:
-        for machine, block in re.findall(r'ROM_START\((\w+)\)(.*?)ROM_END', source, re.S):
-            bios = re.findall(r'ROM_SYSTEM_BIOS\((\d+), "([^"]+)", "([^"]+)"\)', block)
-            if bios:
-                if machine in declarations:
-                    raise ValueError('duplicate machine declaration: ' + machine)
-                declarations[machine] = [dict(index=int(index), name=name, description=description)
-                                         for index, name, description in bios]
+        for machine, bios in bios_declarations(source).items():
+            if machine in declarations:
+                raise ValueError('duplicate machine declaration: ' + machine)
+            declarations[machine] = bios
         for match in re.finditer(r'osd_printf_info\s*\(\s*((?:' + STRING + r'\s*)+)', source):
             value = ''.join(ast.literal_eval(word) for word in re.findall(STRING, match[1]))
             if ': PASS' in value:

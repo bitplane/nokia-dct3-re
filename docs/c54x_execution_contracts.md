@@ -35,6 +35,15 @@ refactor pass; `--write` is reserved for an explicitly reviewed contract change.
 Expected arithmetic/timing results must remain independent of CPU execution
 helpers and shared profile-selection metadata.
 
+`tools/c54x_profiles.py` reads literal BIOS ownership from the C++ declarations;
+the runner does not maintain a second machine/profile list. Unsupported or
+ambiguous declarations fail closed. Exact expected results live separately in
+`tools/c54x_test_oracles.py`, without imports from the CPU or profile decoder.
+`tools/run_c54x_core.py` owns CLI selection, process execution and result
+validation, retaining its established checker/import API. The seven named
+scopes share one selection table; the frozen baseline independently checks
+their result contracts and all 463 isolated machine/BIOS selections.
+
 The bench is separate from the processor implementation. Its current source
 boundaries are:
 
