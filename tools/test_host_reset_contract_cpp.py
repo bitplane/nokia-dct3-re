@@ -1,4 +1,5 @@
 """Reset/restore correlation tests using the production adapter methods."""
+from tools.dct3_products import composition_source
 
 from pathlib import Path
 import unittest
@@ -101,7 +102,7 @@ int main() {
         board = contracts.method("nokia_dct3.cpp",
                                  "void nokia_dct3_state::reset_digital_baseband(bool retain_sram)")
         self.assertIn("m_gsm_session->reset();", board)
-        source = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        source = composition_source()
         self.assertIn("m_gsm_session->reset_cb().set(m_gsm_call_adapter,\n"
                       "\t\t\tFUNC(nokia_gsm_call_adapter_device::session_reset_w));", source)
 

@@ -1,3 +1,4 @@
+from tools.dct3_products import composition_source
 import pathlib
 import unittest
 
@@ -10,7 +11,7 @@ class UifDeviceSplitTest(unittest.TestCase):
 	def setUpClass(cls):
 		cls.device = (ROOT / "driver/nokia_uif.cpp").read_text()
 		cls.header = (ROOT / "driver/nokia_uif.h").read_text()
-		cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+		cls.phone = composition_source()
 
 	def test_device_owns_four_sparse_uif_banks(self):
 		self.assertIn("(offset & 0x3c) == 0x30", self.device)

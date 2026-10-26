@@ -1,3 +1,4 @@
+from tools.dct3_products import composition_source
 import pathlib
 import unittest
 
@@ -8,7 +9,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 class B3FlashDeviceSplitTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        cls.phone = composition_source()
         cls.device = (ROOT / "driver/nokia_b3_flash.cpp").read_text()
 
     def test_phone_only_routes_and_configures_b3_flash(self):

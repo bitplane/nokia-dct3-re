@@ -1,3 +1,4 @@
+from tools.dct3_products import composition_source
 import pathlib
 import unittest
 
@@ -10,7 +11,7 @@ class PupDeviceSplitTest(unittest.TestCase):
     def setUpClass(cls):
         cls.device = (ROOT / "driver/nokia_pup.cpp").read_text()
         cls.header = (ROOT / "driver/nokia_pup.h").read_text()
-        cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        cls.phone = composition_source()
 
     def test_device_owns_output_and_genio_registers(self):
         source = self.device + self.header

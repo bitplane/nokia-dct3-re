@@ -1,3 +1,4 @@
+from tools.dct3_products import composition_source
 import pathlib
 import unittest
 
@@ -14,7 +15,7 @@ class GsmAuthenticationSplitTest(unittest.TestCase):
         cls.session_header = (ROOT / "driver/nokia_gsm_session.h").read_text()
         cls.card = (ROOT / "driver/nokia_sim_card.cpp").read_text()
         cls.subscriber = (ROOT / "driver/gsm_subscriber.h").read_text()
-        cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        cls.phone = composition_source()
         cls.radio = (ROOT / "driver/nokia_radio_peer.cpp").read_text()
 
     def test_network_owns_challenge_and_expected_response(self):

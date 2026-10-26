@@ -1,3 +1,4 @@
+from tools.dct3_products import composition_source
 import pathlib
 import unittest
 
@@ -65,7 +66,7 @@ class GsmSmsSessionInvariantTest(unittest.TestCase):
             NETWORK_CPP)
 
     def test_application_frontier_profiles_are_network_compositions(self):
-        driver = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        driver = composition_source()
         for profile in (
                 "missing_second_part", "mismatched_reference",
                 "incorrect_total", "duplicate_first_part",

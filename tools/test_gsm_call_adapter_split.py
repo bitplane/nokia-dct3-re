@@ -1,3 +1,4 @@
+from tools.dct3_products import composition_source
 from pathlib import Path
 import unittest
 
@@ -10,7 +11,7 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
     def setUpClass(cls):
         cls.header = (ROOT / "driver/nokia_gsm_call_adapter.h").read_text()
         cls.source = (ROOT / "driver/nokia_gsm_call_adapter.cpp").read_text()
-        cls.driver = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        cls.driver = composition_source()
         cls.generic_sources = "\n".join(
             (ROOT / path).read_text()
             for path in (

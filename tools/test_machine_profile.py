@@ -1,3 +1,4 @@
+from tools.dct3_products import composition_source
 import pathlib
 import json
 import unittest
@@ -9,7 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 class MachineProfileTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.driver = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        cls.driver = composition_source()
         cls.b3_flash = (ROOT / "driver/nokia_b3_flash.cpp").read_text()
         cls.ccont = (ROOT / "driver/nokia_ccont.cpp").read_text()
         cls.pup = (ROOT / "driver/nokia_pup.cpp").read_text()

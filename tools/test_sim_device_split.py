@@ -1,3 +1,4 @@
+from tools.dct3_products import composition_source
 import pathlib
 import unittest
 
@@ -14,7 +15,7 @@ class SimDeviceSplitTest(unittest.TestCase):
         cls.simi = (ROOT / "driver/nokia_simi.cpp").read_text()
         cls.simi_header = (ROOT / "driver/nokia_simi.h").read_text()
         cls.mad2 = (ROOT / "driver/nokia_mad2.cpp").read_text()
-        cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        cls.phone = composition_source()
 
     def test_card_has_no_mad2_controller_state(self):
         for token in (

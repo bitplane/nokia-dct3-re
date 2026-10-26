@@ -1,3 +1,4 @@
+from tools.dct3_products import composition_source
 import pathlib
 import unittest
 
@@ -12,7 +13,7 @@ class MbusDeviceSplitTest(unittest.TestCase):
         cls.header = (ROOT / "driver/nokia_mbus.h").read_text()
         cls.terminal = (ROOT / "driver/nokia_mbus_terminal.cpp").read_text()
         cls.terminal_header = (ROOT / "driver/nokia_mbus_terminal.h").read_text()
-        cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        cls.phone = composition_source()
 
     def test_device_owns_controller_state(self):
         source = self.device + self.header

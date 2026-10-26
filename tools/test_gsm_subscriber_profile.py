@@ -1,3 +1,4 @@
+from tools.dct3_products import composition_source
 #!/usr/bin/env python3
 
 import pathlib
@@ -11,7 +12,7 @@ class GsmSubscriberProfileTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.profile = (ROOT / "driver/gsm_subscriber.h").read_text()
-        cls.phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        cls.phone = composition_source()
         cls.card = (ROOT / "driver/nokia_sim_card.cpp").read_text()
         cls.network = (ROOT / "driver/nokia_gsm_network.cpp").read_text()
 

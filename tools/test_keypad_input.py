@@ -1,3 +1,4 @@
+from tools.dct3_products import composition_source
 import pathlib
 import unittest
 
@@ -8,7 +9,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 class KeypadInputTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.driver = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        cls.driver = composition_source()
         cls.kbgpio = (ROOT / "driver/nokia_kbgpio.cpp").read_text()
         cls.harness = (ROOT / "mame_nokia_dct3_input_exerciser.lua").read_text()
 
@@ -64,7 +65,7 @@ class KeypadInputTest(unittest.TestCase):
         self.assertNotIn("space:write_", target)
 
     def test_2100_uses_its_rom_derived_key_matrix(self):
-        driver = (ROOT / "driver" / "nokia_dct3.cpp").read_text()
+        driver = composition_source()
         ports = driver.split("static INPUT_PORTS_START( noki2100 )", 1)[1]
         ports = ports.split("INPUT_PORTS_END", 1)[0]
         self.assertIn('PORT_START("COL.0")', ports)
@@ -156,7 +157,7 @@ class KeypadInputTest(unittest.TestCase):
         self.assertIn('["end"] = field_by_mask("COL.1", 0x02)', fixture)
 
     def test_5210_uses_family_a_matrix_and_capture_orientation(self):
-        ports = self.driver.split("static INPUT_PORTS_START( noki5210 )", 1)[1]
+        ports = self.driver.split("INPUT_PORTS_START( noki5210 )", 1)[1]
         ports = ports.split("INPUT_PORTS_END", 1)[0]
         for name in (
             "Left Softkey / Menu", "Right Softkey / C", "Scroll Up",

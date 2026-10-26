@@ -1,3 +1,4 @@
+from tools.dct3_products import composition_source
 import pathlib
 import unittest
 
@@ -13,7 +14,7 @@ class MamePatchHygieneTest(unittest.TestCase):
         cls.lcd = (ROOT / "mame/src/devices/video/pcd8544.cpp").read_text()
         cls.i2cmem = (ROOT / "mame/src/devices/machine/i2cmem.cpp").read_text()
         cls.i2cmem_h = (ROOT / "mame/src/devices/machine/i2cmem.h").read_text()
-        cls.driver = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        cls.driver = composition_source()
 
     def test_flash_behavior_uses_part_attributes(self):
         self.assertIn("m_device_id_address", self.flash_h)

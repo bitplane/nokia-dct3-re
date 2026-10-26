@@ -13,6 +13,17 @@ SYSTEM_RE = re.compile(r"^SYST\(\s*\d+\s*,\s*noki(\d+[a-z]*)\s*,", re.MULTILINE)
 RESEARCH_ONLY_PRODUCTS = frozenset({'5510', '6150'})
 
 
+def composition_source() -> str:
+    """Board source for convention checks, not preprocessed or executable code.
+
+    The main file still owns the single ROM/system catalogue. Configuration
+    and state declarations can live in sibling modules without disappearing
+    from checks that previously inspected that whole file.
+    """
+    return '\n'.join(path.read_text() for path in sorted(DRIVER.parent.glob('nokia_dct3*'))
+                     if path.suffix in ('.cpp', '.h'))
+
+
 @lru_cache(maxsize=1)
 def product_ids() -> frozenset[str]:
     return frozenset(SYSTEM_RE.findall(DRIVER.read_text())) | RESEARCH_ONLY_PRODUCTS

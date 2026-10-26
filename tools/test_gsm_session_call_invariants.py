@@ -1,3 +1,4 @@
+from tools.dct3_products import composition_source
 from pathlib import Path
 import unittest
 
@@ -215,7 +216,7 @@ class GsmSessionCallInvariantTest(unittest.TestCase):
 
     def test_ussd_outcomes_are_network_owned_and_fail_closed(self):
         network_header = (ROOT / "driver/nokia_gsm_network.h").read_text()
-        driver = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        driver = composition_source()
         for outcome in ("success", "return_error", "reject", "silence"):
             self.assertIn(outcome, network_header)
         self.assertIn('m_ussd_config(*this, "USSDCFG")', driver)

@@ -1,3 +1,4 @@
+from tools.dct3_products import composition_source
 import pathlib
 import unittest
 
@@ -39,7 +40,7 @@ class MameSourceComplianceTest(unittest.TestCase):
         self.assertNotIn("enqueue_rx_packet", text)
 
     def test_firmware_address_observations_stay_in_trace_quarantine(self):
-        driver = (DRIVER / "nokia_dct3.cpp").read_text()
+        driver = composition_source()
         for token in ("fw_byte(0x", "fw_word(0x", "fw_dword(0x", "FW_SCHED_RUNNING_TASK_ID"):
             with self.subTest(token=token):
                 self.assertNotIn(token, driver)
@@ -58,7 +59,8 @@ class MameSourceComplianceTest(unittest.TestCase):
             with self.subTest(source=source.name):
                 text = source.read_text()
                 self.assertNotIn("getenv", text)
-                self.assertNotIn("NOKIA_DCT3_", text)
+                guard = f"MAME_NOKIA_{source.stem.upper()}_H"
+                self.assertNotIn("NOKIA_DCT3_", text.replace(guard, ""))
 
     def test_generic_gsm_layers_do_not_branch_on_handset_families(self):
         for name in (
@@ -72,7 +74,7 @@ class MameSourceComplianceTest(unittest.TestCase):
                 self.assertNotIn("nhm5", text)
 
     def test_driver_has_no_runtime_handset_name_dispatch(self):
-        text = (DRIVER / "nokia_dct3.cpp").read_text()
+        text = composition_source()
         for token in (
             "machine().system().name",
             "machine().system().parent",

@@ -1,3 +1,4 @@
+from tools.dct3_products import composition_source
 from pathlib import Path
 import unittest
 
@@ -91,7 +92,7 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
 
     def test_cobba_owns_analogue_microphone_conversion_boundary(self):
         cobba = (ROOT / "driver/nokia_cobba.cpp").read_text()
-        phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        phone = composition_source()
         self.assertIn(
             "stream_alloc(microphone_inputs, audio_outputs, pcm_rate)", cobba
         )
@@ -122,7 +123,7 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
 
     def test_nse8_analogue_gains_are_product_configuration(self):
         cobba = (ROOT / "driver/nokia_cobba.cpp").read_text()
-        phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        phone = composition_source()
         self.assertIn("m_hle_microphone_gain_db / 20.0F", cobba)
         self.assertIn("m_hle_output_gain_db / 20.0F", cobba)
         self.assertIn("cobba_hle_voice.microphone_gain_db = 18.0F", phone)
@@ -132,7 +133,7 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn("set_pcm_sample_bits(product.cobba_pcm.sample_bits)", phone)
 
     def test_nhm5_uses_its_independent_pcm_profile_without_nse8_gains(self):
-        phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        phone = composition_source()
         nhm5 = phone[
             phone.index("constexpr nokia_product_config make_3310_config()"):
             phone.index("constexpr nokia_product_config make_3330_config()")
@@ -157,7 +158,7 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertNotIn("output_gain_db", nhm5)
 
     def test_nhm6_uses_documented_analogue_routes_without_guessed_gains(self):
-        phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        phone = composition_source()
         nhm6 = phone[
             phone.index("constexpr nokia_product_config make_3330_config()"):
             phone.index("constexpr nokia_product_config make_3410_config()")
@@ -179,7 +180,7 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn("m_cobba->add_route", machine)
 
     def test_nhm2_uses_independent_speech_and_digital_pcm_contracts(self):
-        phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        phone = composition_source()
         nhm2 = phone[
             phone.index("constexpr nokia_product_config make_3410_config()"):
             phone.index("constexpr nokia_product_config make_6110_config()")
@@ -210,7 +211,7 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertIn("m_cobba->add_route", machine)
 
     def test_nsm5_uses_its_documented_pcm_and_analogue_routes(self):
-        phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        phone = composition_source()
         nsm5 = phone[
             phone.index("constexpr nokia_product_config make_5210_config()"):
             phone.index("constexpr nokia_product_config make_2100_config()")
@@ -238,7 +239,7 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertNotIn("output_gain_db", nsm5)
 
     def test_audio_profiles_are_grouped_and_configuration_only(self):
-        phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        phone = composition_source()
         pcm = (ROOT / "driver/nokia_mad2_pcm.h").read_text()
         cobba = (ROOT / "driver/nokia_cobba.h").read_text()
         runtime = "".join(
@@ -301,7 +302,7 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
             (ROOT / "driver/nokia_dspif.cpp").read_text()
             + (ROOT / "driver/nokia_dspif.h").read_text()
         )
-        phone = (ROOT / "driver/nokia_dct3.cpp").read_text()
+        phone = composition_source()
         self.assertIn("struct tone_control_contract", header)
         self.assertIn("void mcu_shared_write(u16 byte_offset)", header)
         self.assertIn("m_tone_control.oscillator1_offset", dsp)

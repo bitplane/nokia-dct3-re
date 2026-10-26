@@ -10,6 +10,25 @@ differences belong in typed product contracts and machine configurations. The
 driver must not select behavior from firmware PCs, filenames, driver names or
 environment variables.
 
+The board source is divided by responsibility:
+
+- `driver/nokia_dct3.cpp`: runtime board wiring, ordinary handset machine
+  configurations, and the single ROM/system catalogue;
+- `driver/nokia_dct3_config.h`: typed product contracts, immutable product
+  data and shared register constants;
+- `driver/nokia_dct3_state.h`: the shared board-state declaration;
+- `driver/nokia_dct3_research.cpp` and `.h`: explicit compatibility and
+  staged-backend configurations, research input compositions, laboratory
+  PCM clocks and instruction observers.
+
+Research machines remain registered in the main catalogue because MAME's ROM
+tables have translation-unit-local linkage. This keeps ROM aliases, BIOS
+selection and storage namespaces authoritative in one place rather than
+duplicating product declarations. Their separate implementation is not a
+capability promotion: donor-mask compatibility, laboratory clocks and
+unvalidated bus dialects retain their explicit research status. Device models
+and ordinary board callbacks are shared, not forked for these machines.
+
 | Layer | Intended owner | Current implementation |
 | --- | --- | --- |
 | ARM execution | generic MAME ARM7 core | present |
