@@ -591,6 +591,8 @@ overlay: download-mame
 	@set -e; for src in $(LIBGSM_COMPONENTS); do dst="$(MAME_DIR)/3rdparty/$${src#third_party/}"; mkdir -p "$$(dirname "$$dst")"; cmp -s "$$src" "$$dst" 2>/dev/null || cp -f "$$src" "$$dst"; done
 	# makedep discovers a .cpp beside an included header; remove the retired overlay source.
 	rm -f $(MAME_DIR)/src/mame/nokia/nokia_gsm_fr_codec.cpp
+	# The ordered C54x dispatcher and family modules replace this bench monolith.
+	rm -f $(MAME_DIR)/src/mame/nokia/tms320c54x_test_cases.cpp
 
 # Replay in a temporary Git index; leave the local MAME overlay untouched.
 check-mame-patches: download-mame

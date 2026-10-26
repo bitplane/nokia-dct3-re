@@ -43,15 +43,27 @@ boundaries are:
 | `driver/tms320c54x_test.cpp` | Machine/ROM declarations, backend serial bench and stock-loader verifier compositions |
 | `driver/tms320c54x_test_state.h` | Shared bench state, fixture types and method declarations; no CPU execution implementation |
 | `driver/tms320c54x_test_state.cpp` | Bench lifecycle, address maps, assertions and device wiring |
-| `driver/tms320c54x_test_arithmetic.cpp` | Rounded-multiply vectors, setup and result checks |
-| `driver/tms320c54x_test_cases.cpp` | Remaining fixture setup and ordered result dispatch, pending family extraction |
+| `driver/tms320c54x_test_dispatch.cpp` | Ordered callback routing and the initial-program completion tail |
+| `driver/tms320c54x_test_arithmetic.cpp` | Arithmetic, multiplier and logical-operation fixtures and checks |
+| `driver/tms320c54x_test_addressing.cpp` | Address generation, memory/register transfers and operand-domain fixtures |
+| `driver/tms320c54x_test_pipeline.cpp` | Control flow, repeats, dependency and pipeline-composition fixtures |
+| `driver/tms320c54x_test_interrupts.cpp` | Interrupt acceptance, entry, return and mask-composition fixtures |
+| `driver/tms320c54x_test_peripherals.cpp` | Bus, clock, serial, DMA and timer fixtures |
+| `driver/tms320c54x_test_restore.cpp` | Explicit cross-context snapshot/restore fixtures; each other family retains its own replay checks |
+| `driver/tms320c54x_test_disassembler.cpp` | Bounded decoding and operand-domain matrices |
+| `driver/tms320c54x_test_rom4.cpp` | Acquired-ROM routine execution and independent reference comparisons |
+| `driver/tms320c54x_test_atomic.cpp` | The sequential legacy atomic test program, including same-callback fall-through |
 
 The result dispatcher preserves phase-check order, including paths that update
 the phase and fall through within one callback. Family extraction must retain
 that ordering and distinguish callback returns from returns inside observers'
 lambdas. Shared bench state and snapshot/replay ownership are unchanged; moving
 a case does not authorize changing its inputs, expected values or observation
-boundaries.
+boundaries. The dispatcher delegates consecutive clauses to ordered handlers,
+not an unordered subsystem sweep. A handler returning false permits subsequent
+clauses to run even if an earlier clause changed the phase. The atomic program
+remains one coherent source unit because its inline program construction and
+continuations share this ordering contract.
 
 The absolute-alias fixtures share declarative family/count/status profiles in
 `driver/tms320c54x_test_profiles.h`; the CPU model does not consume this test
