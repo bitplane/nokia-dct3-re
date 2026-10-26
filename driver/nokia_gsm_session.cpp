@@ -18,7 +18,8 @@ nokia_gsm_session_device::nokia_gsm_session_device(
 	m_network(*this, "^gsm_network"),
 	m_call_alerting_output(*this, "nokia_gsm_call_alerting"),
 	m_call_active_output(*this, "nokia_gsm_call_active"),
-	m_release_waiting_output(*this, "nokia_gsm_call_release_waiting_handset")
+	m_release_waiting_output(*this, "nokia_gsm_call_release_waiting_handset"),
+	m_reset_cb(*this)
 {
 }
 
@@ -209,6 +210,10 @@ void nokia_gsm_session_device::device_reset()
 	m_handover_target_arfcn = 0;
 	m_handover_reference = 0;
 	clear_pending_downlink();
+	// Also reached by radio-link failure and switched-baseband reset, neither
+	// of which necessarily resets the host adapter as a MAME device.
+	m_reset_cb(1);
+	m_reset_cb(0);
 }
 
 void nokia_gsm_session_device::clear_dedicated_cipher()

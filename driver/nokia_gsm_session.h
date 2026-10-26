@@ -13,6 +13,9 @@
 class nokia_gsm_session_device : public device_t
 {
 public:
+	// Invalidate host-side transactions whenever the session lifecycle resets.
+	auto reset_cb() { return m_reset_cb.bind(); }
+
 	static constexpr unsigned maximum_layer3_length =
 			nokia_gsm_network_device::maximum_layer3_length;
 
@@ -363,6 +366,7 @@ private:
 	output_finder<> m_call_alerting_output;
 	output_finder<> m_call_active_output;
 	output_finder<> m_release_waiting_output;
+	devcb_write_line m_reset_cb;
 	bool m_authentication_required = false;
 	bool m_authentication_for_service = false;
 	u8 m_cipher_algorithm = u8(gsm::a5::algorithm::a5_0);

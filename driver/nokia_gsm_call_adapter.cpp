@@ -521,6 +521,14 @@ void nokia_gsm_call_adapter_device::set_enabled(bool enabled)
 			enabled ? attotime::from_msec(10) : attotime::never);
 }
 
+void nokia_gsm_call_adapter_device::session_reset_w(int state)
+{
+	// A global MAME reset resets this device separately. Only session-local
+	// resets need forwarding, avoiding double-counting the initial reset wave.
+	if (state && machine().phase() == machine_phase::RUNNING)
+		device_reset();
+}
+
 void nokia_gsm_call_adapter_device::device_reset()
 {
 	m_last_published_request_id = 0;
@@ -535,8 +543,6 @@ void nokia_gsm_call_adapter_device::device_reset()
 	m_last_network_arfcn = 0xffff;
 	m_last_published_connected = false;
 	m_last_published_alerting = false;
-	m_last_network_registered = false;
-	m_last_network_arfcn = 0xffff;
 	m_incoming_request_id = 0;
 	m_incoming_digits.fill(0);
 	m_incoming_digits_length = 0;
@@ -545,7 +551,11 @@ void nokia_gsm_call_adapter_device::device_reset()
 	m_last_incoming_alerting = false;
 	m_incoming_started = false;
 	m_incoming_connected_once = false;
-	m_transport_epoch.store(1);
+	// Connections outlive both handset and radio-session resets. Never reuse
+	// their old correlation epoch when request counters restart at zero.
+	if (m_transport_initialized)
+		m_transport_epoch.fetch_add(1);
+	m_transport_initialized = true;
 	std::lock_guard<std::mutex> lock(m_host->mutex);
 	m_host->decisions.clear();
 	m_host->sms_decisions.clear();

@@ -33,8 +33,11 @@ using u8 = uint8_t;
 using u16 = uint16_t;
 using offs_t = unsigned;
 struct test_time { double as_double() const { return 0; } };
+enum class machine_phase { RESET, RUNNING };
 struct test_machine {
     bool suppressed = false;
+    machine_phase current_phase = machine_phase::RUNNING;
+    machine_phase phase() const { return current_phase; }
     bool side_effects_disabled() const { return suppressed; }
     test_time time() const { return {}; }
 };

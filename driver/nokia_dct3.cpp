@@ -3878,6 +3878,8 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	NOKIA_GSM_NETWORK(config, m_gsm_network);
 	NOKIA_GSM_SESSION(config, m_gsm_session);
 	NOKIA_GSM_CALL_ADAPTER(config, m_gsm_call_adapter);
+	m_gsm_session->reset_cb().set(m_gsm_call_adapter,
+			FUNC(nokia_gsm_call_adapter_device::session_reset_w));
 	NOKIA_LAPDM_LINK(config, m_lapdm_link);
 	NOKIA_RADIO_PEER(config, m_radio_peer);
 	m_dspif->tx_commit_cb().set(FUNC(nokia_dct3_state::dsp_tx_commit_w));
