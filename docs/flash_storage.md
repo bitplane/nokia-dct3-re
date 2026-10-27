@@ -28,6 +28,10 @@ part; its CFI/OTP layout is not reused.
 - Literal ST CFI query data at word offsets 0x10--0x47, with zero upper data
   bytes, x16 interface, 4 MiB capacity, ordered top-boot erase regions and
   eight-byte programming pages. Identity words remain 0x0020/0x88ba.
+- Separate protection plane: four immutable factory words and eight user OTP
+  words, visible through signature/CFI modes. C0h programs user bits only from
+  one to zero; clearing lock DQ1 permanently closes the user segment. WP,
+  device reset and array erase cannot undo this lock or erase OTP.
 
 Program data is not a command, even when its low byte is an opcode. Errors
 remain until Clear Status or reset. The model uses typical program/main-erase/
@@ -42,7 +46,34 @@ describes a security block removed in the later revision history. Do not add
 that preliminary-only protection mechanism to this part. The full CFI table
 still literally reports 0x03 at offset 0x47, despite the explicit protection
 map listing eight user words; query emulation preserves the published byte,
-not an inferred correction. Actual OTP storage remains a separate contract.
+not an inferred correction. The explicit protection map, not that size byte,
+defines the eight implemented user words.
+
+## OTP Identity And Persistence
+
+An optional `otp` region beneath the flash device supplies thirteen big-endian
+halfwords: lock at 0x80, factory identity at 0x81--0x84 and user data at
+0x85--0x8c. No handset configuration fabricates a factory identifier; without a
+dump those factory words remain 0xffff. Synthetic identity bytes exist only in
+the independent device fixture. Reserved lock bits retain their seed values;
+only DQ1 is writable, and DQ2 must not be programmed to zero (full Table 7).
+Malformed reserved-bit/address writes are refused without inventing a silicon
+error code. Factory/locked-segment writes produce protection/program errors.
+
+Protection programming is deferred and cannot be suspended. It can run during
+array-erase suspension without replacing that erase's remaining time. Reset
+cancels an unfinished OTP program under the same prior-cell-retention policy
+as array programming. Its nominal 10 us duration reuses the word-program
+interval; a separate OTP pulse duration is not established.
+
+Unchanged OTP preserves legacy raw-array NVRAM files. Changed OTP appends a
+part-specific 26-byte big-endian protection tail. Imports validate the complete
+array and optional tail before publishing either: truncated/oversized tails,
+reserved-lock changes, factory words differing from the configured seed and
+attempts to set seeded zero bits are rejected atomically. A raw-array import
+uses the configured OTP seed; it does not invent or import a factory identity.
+Loading an older NVRAM/save-state image can rewind emulated state, as with any
+other persistent MAME device; firmware commands cannot reverse the OTP lock.
 
 ## Independent Acceptance
 
@@ -65,12 +96,22 @@ fabricated to satisfy query reads.
 The runner requires a fresh directory and rejects incomplete/duplicate results.
 The separate `c3test` preserves its Intel-only conformance contract.
 
+The same runner executes `stotptst` twice in separate processes: fresh OTP
+conformance and cold reload of the files it wrote. It checks all eight user
+words in both read planes, factory immutability, one-way programming, permanent
+locking, WP/reset refusal, three partial/pending restore cases (including OTP
+inside suspended erase), seven atomic malformed-import controls, two short
+write failures, raw-array compatibility and binding to an explicit fixture
+seed. The second process verifies persisted user data, lock and array data,
+then attempts another protected write. This is a device-interface contract,
+not evidence that a handset's authentic factory OTP has been recovered.
+
 ## Remaining Limits
 
-- Unique ID, user OTP storage and its permanent lock remain unimplemented.
-  Unavailable signature/query words return erased data; this is not an
-  authentic identifier. CFI describes the physical part, not a claim that every
-  advertised electrical/protection feature is implemented.
+- Authentic factory unique IDs remain undumped. Unavailable identity and
+  reserved query words return erased data, not a valid recovered identifier.
+  CFI describes the physical part, not a claim that every advertised electrical
+  feature is implemented.
 - No VPP/voltage-margin, wear or program-pulse failure model exists.
 - Suspend completes immediately in the command abstraction. Electrical latency
   and board-specific timing are unmeasured.

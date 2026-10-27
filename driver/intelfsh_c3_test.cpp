@@ -474,3 +474,237 @@ ROM_START(sttest) ROM_END
 }
 CONS(2026, sttest, 0, 0, test, c3_test, st_test_state, empty_init,
 		"Test", "ST M28W320ECT engine conformance", MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE)
+
+namespace {
+class st_otp_test_state : public driver_device
+{
+public:
+	st_otp_test_state(machine_config const &config, device_type type, char const *tag)
+		: driver_device(config, type, tag), m_flash(*this, "flash"), m_seeded(*this, "seeded") { }
+	void test(machine_config &config) { ST_M28W320ECT(config, m_flash); ST_M28W320ECT(config, m_seeded); }
+private:
+	class capture_stream : public util::write_stream
+	{
+	public:
+		std::string bytes;
+		std::size_t limit = 0x400000 + 26;
+		virtual std::error_condition finalize() noexcept override { return {}; }
+		virtual std::error_condition flush() noexcept override { return {}; }
+		virtual std::error_condition write_some(void const *buffer, std::size_t length, std::size_t &actual) noexcept override
+		{
+			actual = 0;
+			if (bytes.size() >= limit) return std::make_error_condition(std::errc::no_space_on_device);
+			length = std::min(length, limit - bytes.size());
+			try { bytes.append(static_cast<char const *>(buffer), length); }
+			catch (...) { return std::make_error_condition(std::errc::not_enough_memory); }
+			actual = length;
+			return {};
+		}
+	};
+	required_device<st_m28w320ect_device> m_flash, m_seeded;
+	emu_timer *m_timer = nullptr;
+	unsigned m_phase = 0;
+	std::string m_saved;
+	void require(bool ok, char const *name) { if (!ok) fatalerror("ST OTP phase=%u: %s", m_phase, name); }
+	u16 otp(st_m28w320ect_device &device, u32 address, bool query = false)
+	{
+		device.write(0, query ? 0x98 : 0x90);
+		return device.read(address);
+	}
+	u16 otp(u32 address) { return otp(*m_flash, address); }
+	u16 status() { m_flash->write(0, 0x70); return m_flash->read(0); }
+	void program(u32 address, u16 data) { m_flash->write(0, 0xc0); m_flash->write(address, data); }
+	void next(attotime delay) { ++m_phase; m_timer->adjust(delay); }
+	void snapshot(bool load)
+	{
+		if (load)
+		{
+			std::istringstream stream(m_saved, std::ios::binary);
+			require(machine().save().read_stream(stream) == STATERR_NONE, "restore");
+		}
+		else
+		{
+			std::ostringstream stream(std::ios::binary);
+			require(machine().save().write_stream(stream) == STATERR_NONE, "save");
+			m_saved = stream.str();
+		}
+	}
+	std::string persist(st_m28w320ect_device &device)
+	{
+		capture_stream stream;
+		require(device.nvram_save(stream), "NVRAM write");
+		return std::move(stream.bytes);
+	}
+	bool load(st_m28w320ect_device &device, std::string const &bytes)
+	{
+		auto stream = util::ram_read(bytes.data(), bytes.size());
+		return stream && device.nvram_load(*stream);
+	}
+	void check_persistence()
+	{
+		auto good = persist(*m_flash);
+		require(good.size() == 0x400000 + 26, "ST tail has thirteen BE halfwords");
+		require(u8(good[0x400001]) == 0xfd && u8(good[0x40000a]) == 0x12 && u8(good[0x40000b]) == 0,
+				"serialized lock and user data");
+		// Malformed imports must not partially publish the new flash array.
+		for (unsigned kind = 0; kind < 7; ++kind)
+		{
+			auto bad = good;
+			bad[0] ^= 0x80;
+			if (kind < 3) bad.resize(0x400000 + (kind == 0 ? 1 : kind == 1 ? 25 : 27), char(0xff));
+			else if (kind == 3) bad[0x400001] &= ~4; // Forbidden DQ2.
+			else if (kind == 4) bad[0x400002] = 0; // Invented factory identity.
+			else if (kind == 5) bad[0x400000] = 0; // Reserved lock bits.
+			else bad.resize(0x400000 - 1); // Truncated array, no publication.
+			require(!load(*m_flash, bad) && persist(*m_flash) == good, "atomic malformed import refusal");
+		}
+		auto raw = good.substr(0, 0x400000);
+		require(load(*m_flash, raw) && otp(0x85) == 0xffff && (otp(0x80) & 2), "legacy raw-array import");
+		require(persist(*m_flash).size() == 0x400000, "unchanged OTP keeps raw-array format");
+		require(load(*m_flash, good) && persist(*m_flash) == good, "ST tail round trip");
+		for (std::size_t limit : {std::size_t(0x400000 - 1), std::size_t(0x400000 + 25)})
+		{
+			capture_stream short_write;
+			short_write.limit = limit;
+			require(!m_flash->nvram_save(short_write), "short array/tail write must fail");
+		}
+		auto seed = persist(*m_seeded);
+		require(seed.size() == 0x400000 && otp(*m_seeded, 0x81) == 0x1234, "explicit factory fixture seed");
+		auto wrong = good;
+		require(!load(*m_seeded, wrong) && persist(*m_seeded) == seed && otp(*m_seeded, 0x81) == 0x1234,
+				"foreign factory tail refused");
+		require(load(*m_seeded, seed) && otp(*m_seeded, 0x81) == 0x1234, "raw import preserves configured factory seed");
+		// A seeded user zero cannot be turned back into one by importing NVRAM.
+		auto seed_tail = seed;
+		seed_tail.append(26, char(0xff));
+		seed_tail[0x400002] = 0x12; seed_tail[0x400003] = 0x34;
+		seed_tail[0x40000a] = 0x7f;
+		require(load(*m_seeded, seed_tail) && otp(*m_seeded, 0x85) == 0x7fff, "valid explicit user seed");
+		seed_tail[0x40000a] = char(0xff);
+		require(!load(*m_seeded, seed_tail) && otp(*m_seeded, 0x85) == 0x7fff, "seeded user zero cannot be imported as one");
+	}
+	void check_words()
+	{
+		for (u32 address = 0x81; address <= 0x84; ++address)
+		{
+			require(otp(address) == 0xffff, "undumped factory words stay erased");
+			require(otp(*m_seeded, address) == (address == 0x81 ? 0x1234 : 0xffff), "explicit factory fixture words");
+		}
+		for (u32 address = 0x85; address <= 0x8c; ++address)
+		{
+			const u16 expected = address == 0x85 ? 0x1200 : address == 0x8c ? 0x9880 : 0x9800 + address;
+			require(otp(address) == expected && otp(*m_flash, address, true) == expected, "all eight user words in both planes");
+		}
+	}
+	virtual void machine_start() override
+	{
+		m_timer = timer_alloc(FUNC(st_otp_test_state::check), this);
+		m_timer->adjust(attotime::from_msec(1));
+	}
+	TIMER_CALLBACK_MEMBER(check)
+	{
+		switch (m_phase)
+		{
+		case 0:
+			require(otp(0x81) == 0xffff && otp(*m_seeded, 0x81) == 0x1234, "undumped versus explicit factory fixture");
+			if (otp(0x85) == 0x1200)
+			{
+				check_words();
+				require(otp(*m_seeded, 0x85) == 0x7f00, "cold nested OTP data");
+				require(!(otp(0x80) & 2) && otp(0x8c) == 0x9880 && m_flash->base()[0] == 0x12, "cold persisted lock/data/array");
+				program(0x85, 0); require(status() == 0x92 && otp(0x85) == 0x1200, "cold permanent lock enforced");
+				m_flash->reset(); require(!(otp(0x80) & 2), "cold reset cannot unlock");
+				osd_printf_info("ST flash OTP cold: PASS lock=1 user=8 factory_immutable=1 array=1 handset_claim=0\n");
+				machine().schedule_exit(); break;
+			}
+			require(persist(*m_flash).size() == 0x400000, "fresh raw-array persistence");
+			for (u32 address = 0x85; address <= 0x8c; ++address) require(otp(address) == 0xffff, "all eight user words erased");
+			m_flash->write(0, 0xc0); snapshot(false);
+			m_flash->reset(); snapshot(true); // Restore the second-cycle ownership.
+			m_flash->write(0x85, 0x12ff); // FFh is data, not a read-array command.
+			require(status() == 0 && m_flash->base()[0x10a] == 0xff, "OTP deferred and separate from array");
+			m_flash->write(0, 0xb0); require(status() == 0, "OTP cannot suspend");
+			snapshot(false); next(attotime::from_usec(20)); break;
+		case 1:
+			require(otp(0x85) == 0x12ff, "OTP first program");
+			snapshot(true); require(status() == 0, "pending OTP restored");
+			next(attotime::from_usec(20)); break;
+		case 2:
+			require(otp(0x85) == 0x12ff && otp(0x185) == 0x12ff && otp(*m_flash, 0x85, true) == 0x12ff, "OTP signature alias and CFI plane");
+			program(0x85, 0xff00); next(attotime::from_usec(20)); break;
+		case 3:
+			require(otp(0x85) == 0x1200, "OTP one-way bits");
+			for (u32 address = 0x81; address <= 0x84; ++address)
+			{
+				program(address, 0); require(status() == 0x92 && otp(address) == 0xffff, "factory write refused");
+			}
+			m_flash->write(0, 0x50);
+			m_seeded->write(0, 0xc0); m_seeded->write(0x81, 0);
+			require(otp(*m_seeded, 0x81) == 0x1234, "configured factory write refused");
+			program(0x8d, 0); require(m_flash->base()[0x11a] == 0xff, "reserved OTP write cannot alter array");
+			program(0x80, 0xfff9); require(otp(0x80) == 0xffff, "DQ2 prohibition cannot lock user segment");
+			// Program the seven remaining user words.
+			program(0x86, 0x9886); next(attotime::from_usec(20)); break;
+		case 4: case 5: case 6: case 7: case 8: case 9:
+			require(otp(0x82 + m_phase) == 0x9880 + 0x82 + m_phase - 0x80, "user word program");
+			program(0x83 + m_phase, 0x9800 + 0x83 + m_phase);
+			next(attotime::from_usec(20)); break;
+		case 10:
+			require(otp(0x8c) == 0x988c, "last user word");
+			program(0x8c, 0xfff0); next(attotime::from_usec(20)); break;
+		case 11:
+			require(otp(0x8c) == 0x9880, "last user word one-way");
+			program(0x87, 0); m_flash->reset();
+			next(attotime::from_usec(20)); break;
+		case 12:
+			require(otp(0x87) == 0x9887, "reset aborts pending OTP without late commit");
+			program(0x80, 0xfffd); next(attotime::from_usec(20)); break;
+		case 13:
+			require(otp(0x80) == 0xfffd, "only lock DQ1 programs");
+			m_flash->wp_w(1); m_flash->reset();
+			require(otp(0x80) == 0xfffd, "reset and WP cannot unlock OTP");
+			program(0x80, 0xffff); require(status() == 0x92 && otp(0x80) == 0xfffd, "OTP lock cannot reverse");
+			m_flash->write(0, 0x50); program(0x85, 0);
+			require(status() == 0x92 && otp(0x85) == 0x1200, "permanent lock protects user data");
+			m_flash->reset(); m_flash->base()[0] = 0x12;
+			check_words();
+			check_persistence();
+			m_seeded->write(0, 0x50);
+			m_seeded->write(0, 0x60); m_seeded->write(0x10000, 0xd0);
+			m_seeded->write(0, 0x40); m_seeded->write(0x10000, 0);
+			next(attotime::from_usec(20)); break;
+		case 14:
+			m_seeded->write(0, 0xff); require(m_seeded->read(0x10000) == 0, "nested erase precondition");
+			m_seeded->write(0, 0x20); m_seeded->write(0x10000, 0xd0);
+			next(attotime::from_msec(1)); break;
+		case 15:
+			m_seeded->write(0, 0xb0); require(m_seeded->read(0) == 0xc0, "erase suspended for OTP");
+			m_seeded->write(0, 0xc0); m_seeded->write(0x85, 0x7f00);
+			m_seeded->write(0, 0xb0); require(m_seeded->read(0) == 0x40, "nested OTP cannot suspend");
+			snapshot(false); next(attotime::from_usec(20)); break;
+		case 16:
+			require(otp(*m_seeded, 0x85) == 0x7f00, "nested OTP completion");
+			snapshot(true); require(m_seeded->read(0) == 0x40, "nested OTP pending restored");
+			next(attotime::from_usec(20)); break;
+		case 17:
+			require(otp(*m_seeded, 0x85) == 0x7f00, "restored nested OTP completion");
+			m_seeded->write(0, 0x70); require(m_seeded->read(0) == 0xc0, "erase stays suspended after OTP");
+			m_seeded->write(0, 0xd0); next(attotime::from_msec(1100)); break;
+		case 18:
+			m_seeded->write(0, 0xff); require(m_seeded->read(0x10000) == 0xffff, "erase resumes after nested OTP");
+			require(otp(*m_seeded, 0x85) == 0x7f00, "array erase cannot erase OTP");
+			osd_printf_info("ST flash OTP: PASS user_words=8 factory_words=4 deferred=1 one_way=1 immutable_factory=1 permanent_lock=1 wp_reset=1 nonsuspendable=1 restore=3 nested_erase=1 reset_abort=1 reserved_refusal=2 atomic_import_refusal=7 short_write_refusal=2 raw_compat=1 seed_binding=1 tail_bytes=26 handset_claim=0\n");
+			machine().schedule_exit(); break;
+		}
+	}
+};
+ROM_START(stotptst)
+	// Synthetic test-only identity, never supplied by handset configurations.
+	ROM_REGION(26, "seeded:otp", ROMREGION_ERASEFF)
+	ROM_FILL(2, 1, 0x12)
+	ROM_FILL(3, 1, 0x34)
+	ROM_FILL(10, 1, 0x7f)
+ROM_END
+}
+CONS(2026, stotptst, 0, 0, test, c3_test, st_otp_test_state, empty_init,
+		"Test", "ST M28W320ECT OTP conformance", MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE)

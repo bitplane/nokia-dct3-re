@@ -72,7 +72,7 @@ different dependencies and must not be conflated with them.
 1. Keep `nokia_dspif_device` transport-only and preserve the single swappable
    DSP-backend seam. Move no radio, service, bootstrap, or audio semantics down
    into the transport.
-2. Extend native ST OTP and electrical failure coverage independently of
+2. Extend native ST electrical failure coverage independently of
    Intel C3. The 3410 already uses native protection/status/deferred operations;
    do not reintroduce fixed-address status behavior. See `flash_storage.md`.
 3. Recover MAD2's remaining divider, transition, ninth-IRQ ownership, and rail

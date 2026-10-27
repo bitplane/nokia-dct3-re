@@ -1,6 +1,6 @@
 import unittest
 
-from tools.run_st_flash import RESULTS, check
+from tools.run_st_flash import OTP_COLD_PASS, OTP_PASS, RESULTS, check, check_otp
 
 COMPLETE = "\n".join(RESULTS)
 
@@ -28,3 +28,15 @@ class StFlashCheckTests(unittest.TestCase):
                     check(text, 0)
         with self.assertRaises(ValueError):
             check("\n".join(reversed(RESULTS)), 0)
+
+    def test_otp_and_cold_results(self):
+        for cold, marker in ((False, OTP_PASS), (True, OTP_COLD_PASS)):
+            check_otp(marker + "\n", 0, cold=cold)
+            for text, code in (("", 0), (marker, 1), (marker + "\n" + marker, 0),
+                               (marker + "\nFatal error: failed", 0),
+                               (OTP_PASS + "\n" + OTP_COLD_PASS, 0)):
+                with self.subTest(cold=cold, text=text), self.assertRaises(ValueError):
+                    check_otp(text, code, cold=cold)
+            for field in marker.split()[4:]:
+                with self.subTest(cold=cold, field=field), self.assertRaises(ValueError):
+                    check_otp(marker.replace(field, field + "0"), 0, cold=cold)
