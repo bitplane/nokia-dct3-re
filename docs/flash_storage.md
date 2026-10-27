@@ -32,6 +32,9 @@ part; its CFI/OTP layout is not reused.
   words, visible through signature/CFI modes. C0h programs user bits only from
   one to zero; clearing lock DQ1 permanently closes the user segment. WP,
   device reset and array erase cannot undo this lock or erase OTP.
+- Qualified VPP lockout input: word/page programming, erase and OTP programming
+  refuse to start when invalid, setting sticky status bit 3 without changing
+  either storage plane. Array/signature/CFI reads remain available.
 
 Program data is not a command, even when its low byte is an opcode. Errors
 remain until Clear Status or reset. The model uses typical program/main-erase/
@@ -75,6 +78,22 @@ uses the configured OTP seed; it does not invent or import a factory identity.
 Loading an older NVRAM/save-state image can rewind emulated state, as with any
 other persistent MAME device; firmware commands cannot reverse the OTP lock.
 
+## Supply Qualification
+
+`vpp_valid_w` supplies the logical qualification used at operation start. Its
+default is valid, preserving the handset profiles' existing supply assumption;
+no board pin or numerical voltage is inferred. Device reset clears sticky
+errors but does not change this external input. Save states preserve it.
+Supply recovery alone does not clear the error. Successful later operations
+can complete with the old error still set until 50h or reset clears it.
+
+The full datasheet's low-voltage control-input description samples VPP only
+at the start of ordinary word programming/erase. The model does not abort an
+accepted operation when this qualified input changes. This is not a model of
+high-VPP fast programming, unstable supplies, voltage margins or uncertain
+multiword results; those require separate electrical evidence. Competing
+simultaneous fault conditions have no validated status-priority contract.
+
 ## Independent Acceptance
 
 ```sh
@@ -93,6 +112,9 @@ capacity/region geometry, restore query mode, restore a half-collected page and
 a pending page program, reject locked/malformed pages, and bracket the nominal
 parameter erase between 350 and 450 ms. No flash array or factory ID is
 fabricated to satisfy query reads.
+The VPP result requires five refused operation families, three unaffected read
+planes, sticky-error recovery, sampled-start behavior, reset/input separation
+and pending-operation/input restoration.
 The runner requires a fresh directory and rejects incomplete/duplicate results.
 The separate `c3test` preserves its Intel-only conformance contract.
 
@@ -112,7 +134,9 @@ not evidence that a handset's authentic factory OTP has been recovered.
   reserved query words return erased data, not a valid recovered identifier.
   CFI describes the physical part, not a claim that every advertised electrical
   feature is implemented.
-- No VPP/voltage-margin, wear or program-pulse failure model exists.
+- VPP lockout qualification is implemented, not an analogue supply model.
+  Numerical voltage margins, high-VPP behavior, wear and pulse failures remain
+  unmodeled; the physical handset VPP/RP# connections remain unproved.
 - Suspend completes immediately in the command abstraction. Electrical latency
   and board-specific timing are unmeasured.
 - Reset cancels pending timers without committing their data. Retaining prior

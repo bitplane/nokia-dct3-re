@@ -466,6 +466,45 @@ private:
 		case 22:
 			if (status() != 0x80 || array(P) != 0xffff) fatalerror("ST parameter erase exceeded nominal interval");
 			osd_printf_info("ST flash page: PASS words=4 deferred=1 arbitrary_order=1 opcode_data=1 restore=2 locked_rejection=1 malformed_rejection=2 parameter_erase_ms=400 physical_cell_claim=0 handset_claim=0\n");
+			lock(A, 0xd0); m_flash->vpp_valid_w(0);
+			program(A + 16, 0);
+			if (status() != 0x88 || raw(A + 16) != 0xffff) fatalerror("ST VPP word refusal");
+			m_flash->write(0, 0x50);
+			m_flash->write(0, 0x30); m_flash->write(A + 24, 0); m_flash->write(A + 25, 0);
+			if (status() != 0x88 || raw(A + 24) != 0xffff || raw(A + 25) != 0xffff) fatalerror("ST VPP double-word refusal");
+			m_flash->write(0, 0x50); m_flash->write(0, 0x56);
+			for (unsigned i = 0; i < 4; ++i) m_flash->write(A + 20 + i, 0);
+			if (status() != 0x88) fatalerror("ST VPP page refusal");
+			for (unsigned i = 0; i < 4; ++i) if (raw(A + 20 + i) != 0xffff) fatalerror("ST VPP page changed array");
+			m_flash->write(0, 0x50); erase(A);
+			if (status() != 0x88 || raw(A) != 0x40ff) fatalerror("ST VPP erase refusal");
+			if (array(A) != 0x40ff) fatalerror("ST VPP lockout blocked array read");
+			m_flash->write(0, 0x90); if (m_flash->read(0) != 0x20) fatalerror("ST VPP lockout blocked signature read");
+			m_flash->write(0, 0x98); if (m_flash->read(0x10) != 0x51) fatalerror("ST VPP lockout blocked CFI read");
+			m_flash->write(0, 0x50); m_flash->write(0, 0xc0); m_flash->write(0x85, 0x1234);
+			if (status() != 0x88) fatalerror("ST VPP OTP refusal");
+			m_flash->write(0, 0x90); if (m_flash->read(0x85) != 0xffff) fatalerror("ST VPP changed OTP");
+			m_flash->reset(); lock(A, 0xd0); program(A + 16, 0);
+			if (status() != 0x88) fatalerror("ST reset altered external VPP input");
+			m_flash->vpp_valid_w(1); program(A + 16, 0x5a3c);
+			if (status() != 0x08) fatalerror("ST VPP recovery cleared sticky error");
+			m_flash->vpp_valid_w(0); page_snapshot(false);
+			next(attotime::from_usec(20)); break;
+		case 23:
+			if (status() != 0x88 || raw(A + 16) != 0x5a3c) fatalerror("ST VPP low-range start sample");
+			m_flash->vpp_valid_w(1); page_snapshot(true);
+			if (status() != 0x08 || raw(A + 16) != 0xffff) fatalerror("ST VPP pending restore");
+			next(attotime::from_usec(20)); break;
+		case 24:
+			if (status() != 0x88 || raw(A + 16) != 0x5a3c) fatalerror("ST VPP restored operation");
+			m_flash->write(0, 0x50); program(A + 17, 0);
+			if (status() != 0x88 || raw(A + 17) != 0xffff) fatalerror("ST saved VPP input not restored");
+			m_flash->reset(); if (status() != 0x80) fatalerror("ST reset did not clear VPP error");
+			m_flash->vpp_valid_w(1); lock(A, 0xd0); program(A + 17, 0x5678);
+			next(attotime::from_usec(20)); break;
+		case 25:
+			if (status() != 0x80 || raw(A + 17) != 0x5678) fatalerror("ST VPP valid recovery");
+			osd_printf_info("ST flash VPP: PASS refused_families=5 read_planes=3 sticky=1 start_sample=1 reset_input=1 restore=1 recovery=1 analogue_claim=0 handset_claim=0\n");
 			machine().schedule_exit(); break;
 		}
 	}
