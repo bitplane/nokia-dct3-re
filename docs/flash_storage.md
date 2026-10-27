@@ -9,7 +9,7 @@ sequence. Handset acceptance is not complete flash conformance.
 The independent `b3test` executable proves command-like program data remains
 data, one-way programming, neighboring-block isolation and suspend/resume
 state restoration. Its fixed-status check is explicitly compatibility coverage,
-not a silicon claim. Programming `12ff` during the modeled erase used to
+not a silicon claim. Programming `12ff` in another block during erase suspend used to
 incorrectly change read mode; data now bypasses command decoding entirely.
 
 ```sh

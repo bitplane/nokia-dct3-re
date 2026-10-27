@@ -3879,6 +3879,16 @@
       "variables": {},
       "steps": [
         {
+          "step": "prepare",
+          "silent": true,
+          "command": "mkdir -p $(RUN_DIR)_cobba_conformance/cfg"
+        },
+        {
+          "step": "prepare",
+          "silent": false,
+          "command": "cp fixtures/cobba_conformance/*.cfg $(RUN_DIR)_cobba_conformance/cfg/"
+        },
+        {
           "step": "run",
           "silent": true,
           "make_flags": [
@@ -3889,13 +3899,13 @@
             "RUN_DIR=$(RUN_DIR)_cobba_conformance",
             "RUN_VERBOSE=1",
             "SECONDS=1",
-            "RUN_EXTRA_ARGS='-cfg_directory ../fixtures/cobba_conformance'"
+            "RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR)_cobba_conformance/cfg)'"
           ],
           "parameters": {
             "RUN_DIR": "$(RUN_DIR)_cobba_conformance",
             "RUN_VERBOSE": "1",
             "SECONDS": "1",
-            "RUN_EXTRA_ARGS": "'-cfg_directory ../fixtures/cobba_conformance'"
+            "RUN_EXTRA_ARGS": "'-cfg_directory $(abspath $(RUN_DIR)_cobba_conformance/cfg)'"
           }
         },
         {

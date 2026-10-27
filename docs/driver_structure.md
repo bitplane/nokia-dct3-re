@@ -92,8 +92,10 @@ peripheral windows. Its MAD2 memory-map handlers delegate register ownership,
 interrupt routing and diagnostics to separate helpers so traces do not obscure the
 functional dispatch. `nokia_b3_flash_device` is a transitional wrapper over
 MAME's generic Intel-compatible flash core; it owns the 3410's independently
-observable B3 lock, erase-suspend, partition-status timer and save-state until
-those generic read-while-write semantics move into `intelfsh`. The phone state
+observable lock-command acknowledgement, erase-suspend, fixed-status timer and
+save-state. The status/address and protection behavior is not a complete ST
+silicon contract; `flash_storage.md` identifies the generic-core replacement
+requirements. The phone state
 only maps accesses and selects the product capability. `nokia_gensio_device`
 owns its sparse serial/status/SELECT
 registers and connects CCONT and the PCD8544 through callbacks. A separate

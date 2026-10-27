@@ -1,6 +1,6 @@
 import unittest
 
-from mad2_active_reset_check import PREPARED, PASS, check
+from tools.mad2_active_reset_check import PREPARED, PASS, check
 
 
 class ActiveResetCheckTests(unittest.TestCase):

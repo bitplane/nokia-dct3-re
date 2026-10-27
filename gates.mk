@@ -1843,7 +1843,9 @@ verify-dsp-transport:
 	@echo "OK — DSPIF transport, split peer composition and active-profile save state reproduced"
 
 verify-cobba-control:
-	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_cobba_conformance RUN_VERBOSE=1 SECONDS=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/cobba_conformance'
+	@mkdir -p $(RUN_DIR)_cobba_conformance/cfg
+	cp fixtures/cobba_conformance/*.cfg $(RUN_DIR)_cobba_conformance/cfg/
+	@$(MAKE) --no-print-directory run RUN_DIR=$(RUN_DIR)_cobba_conformance RUN_VERBOSE=1 SECONDS=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR)_cobba_conformance/cfg)'
 	test -f $(RUN_DIR)_cobba_conformance/error.log
 	$(PYTHON) tools/cobba_control_trace_check.py $(RUN_DIR)_cobba_conformance/error.log
 

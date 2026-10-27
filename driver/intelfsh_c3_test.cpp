@@ -251,11 +251,13 @@ private:
 		m_adapter->write(ERASE, 0x20);
 		m_adapter->write(ERASE, 0xd0);
 		require(m_adapter->read(CSR) == 0, "active erase status");
-		// A program data word must never be reinterpreted as FF/Read Array.
-		program(OTHER, 0x12ff);
-		require(m_adapter->read(CSR) == 0, "command-like program data changed erase read mode");
 		m_adapter->write(0, 0xb0);
 		require(m_adapter->read(CSR) == 0xc0, "suspended erase status");
+		// A program data word must never be reinterpreted as FF/Read Array.
+		// Programming another block is permitted while erase is suspended,
+		// not while the erase engine is running.
+		program(OTHER, 0x12ff);
+		require(m_adapter->read(CSR) == 0xc0, "command-like program data changed erase read mode");
 		require(m_adapter->read(ERASE + 0x8000) == 0x1234, "neighbor block isolation");
 		require(m_adapter->read(OTHER) == 0x12ff, "programmed data preserved");
 		std::ostringstream saved(std::ios::binary);

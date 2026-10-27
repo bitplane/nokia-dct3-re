@@ -1,6 +1,6 @@
 import unittest
 
-from run_sim_pts import PASS, check
+from tools.run_sim_pts import PASS, check
 
 
 class SimPtsCheckTests(unittest.TestCase):
