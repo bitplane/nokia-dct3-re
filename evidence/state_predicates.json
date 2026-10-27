@@ -11,12 +11,12 @@
       "evidence": ["driver/nokia_dct3.cpp", "tools/mad2_active_reset.lua", "tools/mad2_active_reset_check.py", "tools/test_mad2_active_reset_check.py", "docs/mad2_fidelity.md"]
     },
     {
-      "id": "b3_command_like_program_data",
-      "owner": "nokia_b3_flash",
+      "id": "st_flash_native_command_engine",
+      "owner": "st_m28w320ect",
       "status": "satisfied",
-      "predicate": "A program data word cannot also change the adapter command/read state",
-      "current": "Independent b3test fails the old adapter on program12ff in another block while erase is suspended, then passes after the program-data branch forwards exactly once and returns. The fixture suspends before programming, as the datasheet requires; it does not use an unsupported program-during-active-erase sequence. Identity20:88ba, one-way programming, neighboring erase-block isolation and suspended-state save/restore pass; the3410 compaction/cold-reload gate retains its exact idle frame. The focused test explicitly labels fixed-address status as compatibility, with protection/timing/handset claims zero. The ST datasheet instead requires status at any address, power-up block locks and suspend for other-block operations; those documented software gaps are not promoted to silicon facts or hidden as measurement dependencies.",
-      "evidence": ["driver/nokia_b3_flash.cpp", "driver/intelfsh_c3_test.cpp", "docs/flash_storage.md", "docs/hardware_atlas.md"]
+      "predicate": "Native ST flash owns block protection, global status and deferred operations without Nokia-side command state",
+      "current": "The independent sttest engine fixture has120 checks over all71 blocks, identity/signature don't-care bits, reset locking, WP/lockdown, sticky protection/erase-confirm errors, deferred word/double-word program and main/parameter erase, busy admission, suspend/resume, nested other-block program, four active/suspended save-state replays and two reset aborts. Data resembling FF/other opcodes cannot change command state. Fresh3410 compaction and cold reload preserve the exact idle oracle with direct native flash routing. The fixed-address status/lock-acknowledgement adapter, its device/knob and superseded conformance test are removed. Typical timings are datasheet nominal, not measured; interrupted-cell retention is explicit emulator policy. ST CFI/OTP, VPP/electrical behavior and unsupported own-block suspension accesses remain unvalidated. This does not promote full silicon fidelity.",
+      "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "tools/run_st_flash.py", "tools/test_st_flash.py", "docs/flash_storage.md", "docs/hardware_atlas.md"]
     },
     {
       "id": "sim_pts_default_speed_negotiation",

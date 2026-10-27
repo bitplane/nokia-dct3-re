@@ -7,7 +7,7 @@ diff --git a/src/mame/mame.lst b/src/mame/mame.lst
  
 +@source:nokia/intelfsh_c3_test.cpp
 +c3test
-+b3test
++sttest
 +
  @source:acorn/aa310.cpp
  aa500

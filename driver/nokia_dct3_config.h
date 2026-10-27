@@ -144,7 +144,6 @@ struct nokia_product_config
 	nokia_dsp_hle_device::tone_control_contract dsp_tone_control;
 	nokia_mad2_pcm_device::bus_profile cobba_pcm;
 	nokia_cobba_device::hle_voice_profile cobba_hle_voice;
-	bool flash_b3_block_lock = false;
 	nokia_mad2_device::dsp_reset_wiring_contract dsp_reset_wiring;
 	display_geometry_contract display;
 	u8 pup_eeprom_scl_bit = 3;
@@ -698,7 +697,6 @@ inline constexpr nokia_product_config make_3410_config()
 	// only; no NHM-2 analogue gain is inferred.
 	result.cobba_hle_voice.microphone = nokia_cobba_device::mic2;
 	result.cobba_hle_voice.output = nokia_cobba_device::ear;
-	result.flash_b3_block_lock = true;
 	result.dsp_reset_wiring = DSP_RESET_WIRING_3410;
 	result.display = DISPLAY_3410;
 	result.ccont_board = ADC_STANDARD;
@@ -1204,7 +1202,6 @@ inline constexpr nokia_product_config PRODUCT_7110 = make_7110_config();
 inline constexpr offs_t NOKIA_RAM_BASE = 0x100000;
 inline constexpr offs_t NOKIA_RAM_END = 0x180000;
 inline constexpr offs_t NOKIA_FLASH1_BASE = 0x00200000;
-inline constexpr offs_t NOKIA_3410_FLASH_STATUS_CSR = 0x003fff00;
 inline constexpr uint32_t NOKIA_FLASH_ENTRY = 0x200040;
 inline constexpr uint32_t NOKIA_BOOT_HLE_BRANCH =
 		0xea000000U | (((NOKIA_FLASH_ENTRY - 8U) >> 2) & 0x00ffffffU);

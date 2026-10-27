@@ -72,9 +72,9 @@ different dependencies and must not be conflated with them.
 1. Keep `nokia_dspif_device` transport-only and preserve the single swappable
    DSP-backend seam. Move no radio, service, bootstrap, or audio semantics down
    into the transport.
-2. Replace the 3410 B3 compatibility adapter with datasheet-backed generic
-   command/protection/suspend behavior. Its fixed-address status behavior is
-   not a proven partitioned-RWW feature; see `flash_storage.md`.
+2. Extend native ST CFI/OTP and electrical failure coverage independently of
+   Intel C3. The 3410 already uses native protection/status/deferred operations;
+   do not reintroduce fixed-address status behavior. See `flash_storage.md`.
 3. Recover MAD2's remaining divider, transition, ninth-IRQ ownership, and rail
    contracts before extracting additional uncertain register windows.
 4. Replace calibrated HLE timing only with measured hardware behavior or

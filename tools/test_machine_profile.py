@@ -11,7 +11,6 @@ class MachineProfileTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.driver = composition_source()
-        cls.b3_flash = (ROOT / "driver/nokia_b3_flash.cpp").read_text()
         cls.ccont = (ROOT / "driver/nokia_ccont.cpp").read_text()
         cls.pup = (ROOT / "driver/nokia_pup.cpp").read_text()
         cls.external_service = (
@@ -551,7 +550,6 @@ class MachineProfileTest(unittest.TestCase):
                 "cobba_pcm.frame_clock": "8'000",
                 "cobba_pcm.sample_bits": "13",
                 "cobba_pcm.word_clocks": "16",
-                "flash_b3_block_lock": "true",
                 "dsp_reset_wiring": "DSP_RESET_WIRING_3410",
                 "display": "DISPLAY_3410",
                 "ccont_board": "ADC_STANDARD",
@@ -561,14 +559,11 @@ class MachineProfileTest(unittest.TestCase):
         profile = profile.split("void nokia_dct3_state::noki7110", 1)[0]
         self.assertIn("apply_product_config(PRODUCT_3410);", profile)
 
-    def test_3410_owns_intel_b3_block_lock_protocol(self):
-        self.assertIn("bool flash_b3_block_lock = false;", self.driver)
-        self.assertIn("m_b3_flash->set_enabled(product.flash_b3_block_lock);", self.driver)
-        for confirm in ("0x01", "0xd0", "0x2f"):
-            self.assertIn(f"command == {confirm}", self.b3_flash)
-        self.assertIn("m_erase_suspended", self.b3_flash)
-        self.assertIn("return 0x00c0 & mem_mask; // ready + erase suspended", self.b3_flash)
-        self.assertNotIn("m_flash_b3_erase_suspended", self.driver)
+    def test_flash_commands_are_owned_by_native_parts(self):
+        self.assertNotIn("flash_b3_block_lock", self.driver)
+        self.assertNotIn("m_b3_flash", self.driver)
+        self.assertIn("const u16 data = m_flash->read(offset) & mem_mask;", self.driver)
+        self.assertIn("m_flash->write(offset, data);", self.driver)
 
     def test_contact_service_oracle_is_explicit_negative_profile(self):
         target = self.makefile.split("CONTACT_SERVICE_ARGS :=", 1)[1].split("\n\n", 1)[0]

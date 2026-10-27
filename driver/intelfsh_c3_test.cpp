@@ -4,7 +4,6 @@
 // Development-only flash conformance fixture, not a handset provisioning path.
 #include "emu.h"
 #include "machine/intelfsh.h"
-#include "nokia_b3_flash.h"
 #include "util/ioprocs.h"
 #include <sstream>
 
@@ -211,71 +210,178 @@ ROM_START(c3test) ROM_END
 CONS(2026, c3test, 0, 0, test, c3_test, c3_test_state, empty_init,
 		"Test", "Intel C3 flash conformance", MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE)
 
+
 namespace {
-class b3_test_state : public driver_device
+class st_test_state : public driver_device
 {
 public:
-	b3_test_state(machine_config const &config, device_type type, char const *tag)
-		: driver_device(config, type, tag), m_flash(*this, "flash"), m_adapter(*this, "adapter") { }
-	void test(machine_config &config)
-	{
-		ST_M28W320ECT(config, m_flash);
-		NOKIA_B3_FLASH(config, m_adapter);
-		m_adapter->set_enabled(true);
-		m_adapter->set_status_csr(CSR);
-	}
+	st_test_state(machine_config const &config, device_type type, char const *tag)
+		: driver_device(config, type, tag), m_flash(*this, "flash") { }
+	void test(machine_config &config) { ST_M28W320ECT(config, m_flash); }
 private:
-	static constexpr u32 CSR = 0x100, ERASE = 0x10000, OTHER = 0x20000;
+	static constexpr u32 A = 0x10000, B = 0x20000, P = 0x1f8000;
 	required_device<st_m28w320ect_device> m_flash;
-	required_device<nokia_b3_flash_device> m_adapter;
+	emu_timer *m_timer = nullptr;
+	unsigned m_phase = 0, m_checks = 0;
+	std::string m_saved, m_active_erase_saved;
 	void require(bool value, char const *name)
 	{
-		if (!value) fatalerror("B3 adapter conformance: %s", name);
+		++m_checks;
+		if (!value) fatalerror("ST flash conformance phase=%u: %s", m_phase, name);
 	}
-	void program(u32 address, u16 value)
+	u16 raw(u32 address) { return (u16(m_flash->base()[address * 2]) << 8) | m_flash->base()[address * 2 + 1]; }
+	u16 array(u32 address) { m_flash->write(0, 0xff); return m_flash->read(address); }
+	u16 status(u32 address = 0) { m_flash->write(0, 0x70); return m_flash->read(address); }
+	u16 locks(u32 address) { m_flash->write(0, 0x90); return m_flash->read(address + 2); }
+	void lock(u32 address, u16 data) { m_flash->write(0, 0x60); m_flash->write(address, data); }
+	void program(u32 address, u16 data) { m_flash->write(0, 0x40); m_flash->write(address, data); }
+	void erase(u32 address) { m_flash->write(0, 0x20); m_flash->write(address, 0xd0); }
+	void save()
 	{
-		m_adapter->write(address, 0x40);
-		m_adapter->write(address, value);
+		std::ostringstream stream(std::ios::binary);
+		require(machine().save().write_stream(stream) == STATERR_NONE, "save pending operation");
+		m_saved = stream.str();
 	}
+	void restore()
+	{
+		std::istringstream stream(m_saved, std::ios::binary);
+		require(machine().save().read_stream(stream) == STATERR_NONE, "restore pending operation");
+	}
+	void next(attotime delay) { ++m_phase; m_timer->adjust(delay); }
 	virtual void machine_start() override
 	{
-		timer_alloc(FUNC(b3_test_state::check), this)->adjust(attotime::from_msec(1));
+		m_timer = timer_alloc(FUNC(st_test_state::check), this);
+		m_timer->adjust(attotime::from_msec(1));
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
-		m_adapter->write(0, 0x90);
-		require(m_adapter->read(0) == 0x20 && m_adapter->read(1) == 0x88ba, "fitted identity");
-		m_adapter->write(0, 0xff);
-		program(ERASE, 0);
-		program(ERASE + 0x8000, 0x1234);
-		m_adapter->write(ERASE, 0x20);
-		m_adapter->write(ERASE, 0xd0);
-		require(m_adapter->read(CSR) == 0, "active erase status");
-		m_adapter->write(0, 0xb0);
-		require(m_adapter->read(CSR) == 0xc0, "suspended erase status");
-		// A program data word must never be reinterpreted as FF/Read Array.
-		// Programming another block is permitted while erase is suspended,
-		// not while the erase engine is running.
-		program(OTHER, 0x12ff);
-		require(m_adapter->read(CSR) == 0xc0, "command-like program data changed erase read mode");
-		require(m_adapter->read(ERASE + 0x8000) == 0x1234, "neighbor block isolation");
-		require(m_adapter->read(OTHER) == 0x12ff, "programmed data preserved");
-		std::ostringstream saved(std::ios::binary);
-		require(machine().save().write_stream(saved) == STATERR_NONE, "suspended state save");
-		m_adapter->write(0, 0xd0);
-		require(m_adapter->read(CSR) == 0, "resume status");
-		std::istringstream restore(saved.str(), std::ios::binary);
-		require(machine().save().read_stream(restore) == STATERR_NONE, "suspended state restore");
-		require(m_adapter->read(CSR) == 0xc0, "restored suspended status");
-		m_adapter->write(0, 0xff);
-		program(OTHER, 0xfff0);
-		m_adapter->write(0, 0xff);
-		require(m_adapter->read(OTHER) == 0x12f0, "one-way NOR program");
-		osd_printf_info("B3 adapter conformance: PASS id=1 command_like_data=1 nor=1 erase_geometry=1 suspend_resume=1 restore=1 fixed_status_compatibility=1 protection_claim=0 timing_claim=0 handset_claim=0\n");
-		machine().schedule_exit();
+		switch (m_phase)
+		{
+		case 0:
+			m_flash->wp_w(1);
+			m_flash->write(0, 0x90);
+			require(m_flash->read(0) == 0x20 && m_flash->read(1) == 0x88ba, "identity");
+			require(m_flash->read(0x100) == 0x20 && m_flash->read(0x100101) == 0x88ba, "identity address don't-care bits");
+			for (unsigned i = 0; i < 71; ++i)
+				require(locks(i < 63 ? i * 0x8000 : P + (i - 63) * 0x1000) == 1, "all 71 blocks reset locked");
+			program(A, 0);
+			require(status(A) == 0x92 && status(B) == 0x92 && raw(A) == 0xffff, "locked program/status any address");
+			erase(A);
+			require(status() == 0xb2 && raw(A) == 0xffff, "sticky locked erase");
+			m_flash->write(0, 0x50);
+			require(status() == 0x80, "clear sticky errors");
+			lock(A, 0xd0); lock(B, 0xd0); lock(P, 0xd0);
+			require(locks(A) == 0 && locks(A + 0x8000) == 1 && locks(P) == 0 && locks(P + 0x1000) == 1, "main/parameter lock isolation");
+			require(locks(A + 0x100) == 0, "block signature address don't-care bits");
+			program(A, 0x12ff);
+			require(status(A) == 0 && status(B) == 0 && raw(A) == 0xffff, "deferred program/data opcode");
+			// While busy, read-array/ID/setup commands cannot escape status mode.
+			m_flash->write(0, 0xff); m_flash->write(0, 0x90); m_flash->write(0, 0x40);
+			require(m_flash->read(A) == 0, "busy command admission");
+			next(attotime::from_usec(2)); break;
+		case 1:
+			require(raw(A) == 0xffff && status() == 0, "program still pending");
+			save(); next(attotime::from_usec(20)); break;
+		case 2:
+			require(status() == 0x80 && array(A) == 0x12ff, "program completion");
+			restore();
+			require(status(B) == 0 && raw(A) == 0xffff, "pending program array restored");
+			next(attotime::from_usec(20)); break;
+		case 3:
+			require(array(A) == 0x12ff, "program replay completion");
+			program(A, 0xfff0);
+			next(attotime::from_usec(20)); break;
+		case 4:
+			require(array(A) == 0x12f0, "NOR cannot set cleared bits");
+			program(B, 0x5678);
+			next(attotime::from_usec(20)); break;
+		case 5:
+			require(array(B) == 0x5678, "neighbor program");
+			erase(A);
+			require(status(B) == 0 && raw(A) == 0x12f0, "deferred erase/global busy");
+			next(attotime::from_msec(100)); break;
+		case 6:
+			save(); m_active_erase_saved = m_saved;
+			m_flash->write(0, 0xb0);
+			require(status(B) == 0xc0 && raw(A) == 0x12f0 && array(B) == 0x5678, "suspend/other block read");
+			save(); next(attotime::from_msec(1100)); break;
+		case 7:
+			require(status() == 0xc0 && raw(A) == 0x12f0, "suspended operation does not complete");
+			program(B + 1, 0x12ff);
+			require(status() == 0x40 && raw(B + 1) == 0xffff, "program during erase suspend");
+			next(attotime::from_usec(20)); break;
+		case 8:
+			require(status() == 0xc0 && array(B + 1) == 0x12ff, "nested program completion");
+			restore();
+			require(status() == 0xc0 && raw(B + 1) == 0xffff, "suspended erase restoration");
+			{
+				const std::string suspended = m_saved;
+				m_saved = m_active_erase_saved; restore();
+				require(status() == 0 && raw(A) == 0x12f0, "active erase restoration");
+				m_saved = suspended; restore();
+				require(status() == 0xc0, "suspended erase replay");
+			}
+			m_flash->write(0, 0xd0);
+			require(status(P) == 0, "erase resume");
+			next(attotime::from_msec(901)); break;
+		case 9:
+			require(status() == 0x80 && array(A) == 0xffff && array(B) == 0x5678, "main erase isolation/completion");
+			program(P, 0x1234);
+			next(attotime::from_usec(20)); break;
+		case 10:
+			require(array(P) == 0x1234, "parameter program");
+			lock(P + 0x1000, 0xd0); program(P + 0x1000, 0xabcd);
+			next(attotime::from_usec(20)); break;
+		case 11:
+			erase(P);
+			next(attotime::from_msec(801)); break;
+		case 12:
+			require(array(P) == 0xffff && array(P + 0x1000) == 0xabcd, "8KiB erase isolation");
+			lock(B, 0x2f); m_flash->wp_w(0); lock(B, 0xd0);
+			require(locks(B) == 3, "WP low blocks lockdown unlock");
+			program(B, 0);
+			require(status() == 0x92 && raw(B) == 0x5678, "lockdown blocks program");
+			m_flash->write(0, 0x50); m_flash->wp_w(1); lock(B, 0xd0);
+			require(locks(B) == 2, "WP high permits unlock retaining lockdown");
+			m_flash->wp_w(0);
+			require(locks(B) == 3, "WP low restores effective lock");
+			m_flash->wp_w(1); lock(B, 0xd0);
+			program(B + 2, 0x2468);
+			next(attotime::from_usec(2)); break;
+		case 13:
+			m_flash->write(0, 0xb0);
+			require(status() == 0x84 && raw(B + 2) == 0xffff, "program suspend");
+			next(attotime::from_msec(2)); break;
+		case 14:
+			require(status() == 0x84 && raw(B + 2) == 0xffff, "program stays suspended");
+			m_flash->write(0, 0xd0); next(attotime::from_usec(20)); break;
+		case 15:
+			require(array(B + 2) == 0x2468, "program resume");
+			m_flash->write(0, 0x30); m_flash->write(A, 0x40ff); m_flash->write(A + 1, 0x60b0);
+			require(status() == 0 && raw(A) == 0xffff, "double word deferred");
+			next(attotime::from_usec(20)); break;
+		case 16:
+			require(array(A) == 0x40ff && array(A + 1) == 0x60b0, "double word program");
+			m_flash->write(0, 0x20); m_flash->write(A, 0x40);
+			require(status() == 0xb0 && raw(A) == 0x40ff, "invalid erase confirm errors");
+			m_flash->write(0, 0x50); require(status() == 0x80, "error clear after bad sequence");
+			program(A + 3, 0);
+			m_flash->reset();
+			require(locks(A) == 1 && locks(B) == 1 && status() == 0x80, "reset locks and cancels operation");
+			next(attotime::from_msec(1100)); break;
+		case 17:
+			require(array(A + 3) == 0xffff && array(A) == 0x40ff, "reset cancellation policy/no late commit");
+			lock(A, 0xd0); erase(A);
+			require(status() == 0, "erase pending before reset");
+			m_flash->reset(); next(attotime::from_msec(1100)); break;
+		case 18:
+			require(array(A) == 0x40ff && locks(A) == 1 && status() == 0x80, "erase reset cancellation/no late commit");
+			osd_printf_info("ST flash engine: PASS checks=%u blocks=71 status_anywhere=1 sticky_errors=1 deferred_program=1 deferred_erase=1 suspend_resume=1 nested_program=1 restore=4 lockdown_wp=1 double_word=1 reset_abort=2 physical_cell_claim=0 handset_claim=0\n", m_checks);
+			machine().schedule_exit(); break;
+		}
 	}
 };
-ROM_START(b3test) ROM_END
+ROM_START(sttest) ROM_END
 }
-CONS(2026, b3test, 0, 0, test, c3_test, b3_test_state, empty_init,
-		"Test", "ST B3 adapter conformance", MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE)
+CONS(2026, sttest, 0, 0, test, c3_test, st_test_state, empty_init,
+		"Test", "ST M28W320ECT engine conformance", MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE)

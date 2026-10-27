@@ -33,7 +33,6 @@
 #include "video/sed1520.h"
 
 #include "nokia_ccont.h"
-#include "nokia_b3_flash.h"
 #include "nokia_cobba.h"
 #include "nokia_dsp_c54x.h"
 #include "nokia_dsp_hle.h"
@@ -266,7 +265,6 @@ void nokia_dct3_state::apply_product_config(nokia_product_config const &product)
 	m_external_service_peer->set_enabled(product.external_service_transport);
 	m_radio_peer->set_protocol_contract(product.radio);
 	m_radio_peer->set_enabled(product.radio.enabled());
-	m_b3_flash->set_enabled(product.flash_b3_block_lock);
 }
 
 void nokia_dct3_state::apply_sms_config()
@@ -992,7 +990,7 @@ uint16_t nokia_dct3_state::flash_r(offs_t offset, uint16_t mem_mask)
 	const u32 pc = m_maincpu->pc();
 	const u32 addr = NOKIA_FLASH1_BASE + (offset << 1);
 	flash_firmware_traces(pc, addr);
-	const u16 data = m_b3_flash->read(offset, mem_mask);
+	const u16 data = m_flash->read(offset) & mem_mask;
 	if (m_trace_enabled && m_product.flash_persistent_start &&
 			addr >= m_product.flash_persistent_start)
 	{
@@ -1021,7 +1019,7 @@ void nokia_dct3_state::flash_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 				m_maincpu->pc(), addr, data, mem_mask,
 				trace_running_task(),
 				machine().time().as_double());
-	m_b3_flash->write(offset, data, mem_mask);
+	m_flash->write(offset, data);
 }
 
 uint32_t nokia_dct3_state::rom2_mirror_r(offs_t offset, uint32_t mem_mask)
@@ -2138,8 +2136,6 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	NOKIA_COBBA(config, m_cobba);
 
 	INTEL_TE28F160(config, "flash");
-	NOKIA_B3_FLASH(config, m_b3_flash, 0);
-	m_b3_flash->set_status_csr((NOKIA_3410_FLASH_STATUS_CSR - NOKIA_FLASH1_BASE) >> 1);
 	NOKIA_MAD2(config, m_mad2);
 	NOKIA_MAD2_PCM(config, m_mad2_pcm);
 	NOKIA_GSM_VOICE_PEER(config, "gsm_voice_peer");

@@ -7,10 +7,10 @@
 #include "nokia_dct3_config.h"
 #include "cpu/arm7/arm7.h"
 #include "machine/i2cmem.h"
+#include "machine/intelfsh.h"
 #include "sound/beep.h"
 #include "video/pcd8544.h"
 #include "video/sed1520.h"
-#include "nokia_b3_flash.h"
 #include "nokia_ccont.h"
 #include "nokia_dsp_c54x.h"
 #include "nokia_dspif.h"
@@ -35,7 +35,7 @@ public:
 	nokia_dct3_state(const machine_config &mconfig, device_type type, const char *tag) :
 		driver_device(mconfig, type, tag),
 		m_maincpu(*this, "maincpu"),
-		m_b3_flash(*this, "b3_flash"),
+		m_flash(*this, "flash"),
 		m_eeprom(*this, "eeprom"),
 		m_ccont(*this, "ccont"),
 		m_cobba(*this, "cobba"),
@@ -239,7 +239,7 @@ private:
 	void trace_radio_pending_primitive_write(
 			offs_t address, uint16_t old_data, uint16_t data);
 	required_device<cpu_device> m_maincpu;
-	required_device<nokia_b3_flash_device> m_b3_flash;
+	required_device<intelfsh16_device> m_flash;
 	optional_device<i2cmem_device> m_eeprom;
 	required_device<nokia_ccont_device> m_ccont;
 	required_device<nokia_cobba_device> m_cobba;
