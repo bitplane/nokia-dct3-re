@@ -223,7 +223,62 @@ private:
 	required_device<st_m28w320ect_device> m_flash;
 	emu_timer *m_timer = nullptr;
 	unsigned m_phase = 0, m_checks = 0;
-	std::string m_saved, m_active_erase_saved;
+	std::string m_saved, m_active_erase_saved, m_page_saved;
+	void check_query()
+	{
+		// Independent transcription of ST full-datasheet Tables 27--30.
+		constexpr u8 expected[] = {
+			0x51, 0x52, 0x59, 0x03, 0x00, 0x35, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x27, 0x36, 0xb4, 0xc6, 0x04,
+			0x04, 0x0a, 0x00, 0x05, 0x05, 0x03, 0x00, 0x16,
+			0x01, 0x00, 0x03, 0x00, 0x02, 0x3e, 0x00, 0x00,
+			0x01, 0x07, 0x00, 0x20, 0x00, 0x50, 0x52, 0x49,
+			0x31, 0x30, 0x66, 0x00, 0x00, 0x00, 0x01, 0x03,
+			0x00, 0x30, 0xc0, 0x01, 0x80, 0x00, 0x03, 0x03
+		};
+		m_flash->write(0x55, 0x98);
+		for (unsigned i = 0; i < std::size(expected); ++i)
+			if (m_flash->read(0x10 + i) != expected[i])
+				fatalerror("ST CFI mismatch offset=%02x", 0x10 + i);
+		if (m_flash->read(0) != 0x20 || m_flash->read(1) != 0x88ba)
+			fatalerror("ST CFI identity plane");
+		u32 capacity = 0;
+		for (unsigned region = 0; region < m_flash->read(0x2c); ++region)
+		{
+			const u32 offset = 0x2d + region * 4;
+			const u32 blocks = 1 + m_flash->read(offset) + (m_flash->read(offset + 1) << 8);
+			const u32 bytes = 256 * (m_flash->read(offset + 2) + (m_flash->read(offset + 3) << 8));
+			if (blocks != (region ? 8 : 63) || bytes != (region ? 8192 : 65536))
+				fatalerror("ST CFI erase-region ordering");
+			capacity += blocks * bytes;
+		}
+		if (capacity != 0x400000 || capacity != (1U << m_flash->read(0x27)))
+			fatalerror("ST CFI capacity");
+		std::ostringstream saved(std::ios::binary);
+		if (machine().save().write_stream(saved) != STATERR_NONE) fatalerror("ST CFI save");
+		m_flash->write(0, 0x70);
+		if (m_flash->read(0x10) != 0x80) fatalerror("ST CFI mode exit");
+		std::istringstream restore(saved.str(), std::ios::binary);
+		if (machine().save().read_stream(restore) != STATERR_NONE || m_flash->read(0x10) != 0x51)
+			fatalerror("ST CFI mode restore");
+		m_flash->write(0, 0xff);
+		if (raw(0x10) != 0xffff) fatalerror("ST CFI changed array");
+		osd_printf_info("ST flash CFI: PASS bytes=56 x16=1 capacity=4194304 regions=63x65536,8x8192 page_bytes=8 restore=1 array_unchanged=1 full_datasheet=1 handset_claim=0\n");
+	}
+	void page_snapshot(bool load)
+	{
+		if (load)
+		{
+			std::istringstream stream(m_page_saved, std::ios::binary);
+			if (machine().save().read_stream(stream) != STATERR_NONE) fatalerror("ST page restore");
+		}
+		else
+		{
+			std::ostringstream stream(std::ios::binary);
+			if (machine().save().write_stream(stream) != STATERR_NONE) fatalerror("ST page save");
+			m_page_saved = stream.str();
+		}
+	}
 	void require(bool value, char const *name)
 	{
 		++m_checks;
@@ -259,6 +314,7 @@ private:
 		{
 		case 0:
 			m_flash->wp_w(1);
+			check_query();
 			m_flash->write(0, 0x90);
 			require(m_flash->read(0) == 0x20 && m_flash->read(1) == 0x88ba, "identity");
 			require(m_flash->read(0x100) == 0x20 && m_flash->read(0x100101) == 0x88ba, "identity address don't-care bits");
@@ -377,6 +433,39 @@ private:
 		case 18:
 			require(array(A) == 0x40ff && locks(A) == 1 && status() == 0x80, "erase reset cancellation/no late commit");
 			osd_printf_info("ST flash engine: PASS checks=%u blocks=71 status_anywhere=1 sticky_errors=1 deferred_program=1 deferred_erase=1 suspend_resume=1 nested_program=1 restore=4 lockdown_wp=1 double_word=1 reset_abort=2 physical_cell_claim=0 handset_claim=0\n", m_checks);
+			lock(A, 0xd0);
+			m_flash->write(0, 0x56);
+			m_flash->write(A + 6, 0x4090); m_flash->write(A + 4, 0x60b0);
+			page_snapshot(false);
+			m_flash->reset(); page_snapshot(true);
+			m_flash->write(A + 7, 0x98ff); m_flash->write(A + 5, 0x30d0);
+			if (status() != 0 || raw(A + 4) != 0xffff) fatalerror("ST page not deferred");
+			page_snapshot(false);
+			next(attotime::from_usec(20)); break;
+		case 19:
+			if (array(A + 4) != 0x60b0 || array(A + 5) != 0x30d0 ||
+					array(A + 6) != 0x4090 || array(A + 7) != 0x98ff || array(A + 8) != 0xffff)
+				fatalerror("ST page program/neighbor isolation");
+			page_snapshot(true);
+			if (raw(A + 4) != 0xffff || status() != 0) fatalerror("ST pending page restore");
+			next(attotime::from_usec(20)); break;
+		case 20:
+			if (array(A + 4) != 0x60b0 || array(A + 7) != 0x98ff) fatalerror("ST restored page completion");
+			m_flash->write(0, 0x56); m_flash->write(A + 8, 0); m_flash->write(A + 8, 0);
+			if (array(A + 8) != 0xffff) fatalerror("ST duplicate page changed array");
+			m_flash->write(0, 0x56); m_flash->write(A + 8, 0); m_flash->write(A + 12, 0);
+			if (array(A + 8) != 0xffff || array(A + 12) != 0xffff) fatalerror("ST cross-page changed array");
+			lock(A, 0x01); m_flash->write(0, 0x56);
+			for (unsigned i = 0; i < 4; ++i) m_flash->write(A + 8 + i, 0);
+			if (status() != 0x92 || raw(A + 8) != 0xffff) fatalerror("ST locked page accepted");
+			m_flash->write(0, 0x50); lock(P, 0xd0); erase(P);
+			next(attotime::from_msec(350)); break;
+		case 21:
+			if (status() != 0) fatalerror("ST parameter erase completed before nominal interval");
+			next(attotime::from_msec(100)); break;
+		case 22:
+			if (status() != 0x80 || array(P) != 0xffff) fatalerror("ST parameter erase exceeded nominal interval");
+			osd_printf_info("ST flash page: PASS words=4 deferred=1 arbitrary_order=1 opcode_data=1 restore=2 locked_rejection=1 malformed_rejection=2 parameter_erase_ms=400 physical_cell_claim=0 handset_claim=0\n");
 			machine().schedule_exit(); break;
 		}
 	}

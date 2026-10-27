@@ -168,7 +168,7 @@ part-specific protection, global status, pending program/erase and suspend
 state; the phone routes native flash accesses directly. Fresh 3410 PMM
 compaction/cold reload passes without a fixed-address status adapter.
 `flash_storage.md` defines conformance, typical-versus-measured timing,
-reset-abort policy and the remaining ST CFI/OTP/electrical limits.
+reset-abort policy, literal ST CFI and the remaining OTP/electrical limits.
 
 ## MAD2 I/O peripheral registers (`0x20000`, byte offsets)
 
