@@ -24,8 +24,9 @@ class DspDeviceSplitTest(unittest.TestCase):
                     (ROOT / "driver/nokia_mad2.h").read_text())
         cls.c54x = ((ROOT / "cpu/tms320c54x/tms320c54x.cpp").read_text() +
                     (ROOT / "cpu/tms320c54x/tms320c54x.h").read_text())
-        cls.c54x_test = '\n'.join(path.read_text() for path in
-                                  sorted((ROOT / 'driver').glob('tms320c54x_test*.cpp')))
+        from tools.c54x_profiles import harness_sources
+        cls.c54x_test = '\n'.join(path.read_text() for path in harness_sources(ROOT)
+                                  if path.suffix == '.cpp')
 
     def test_transport_has_no_service_protocol(self):
         for token in ("DISCOVERY_NODE", "registration_sent", "channel_map", "0x64, 0x01"):

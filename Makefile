@@ -6,6 +6,7 @@ MAME_COMMIT ?= 58fca9a8a20f75ac2010980e1a2ec0465c595583
 MAME_DIR    ?= mame
 JOBS        ?= 4
 DCT3_RESEARCH_TRACES ?= 1
+DCT3_TEST_DRIVERS ?= 1
 
 PYTHON ?= python3
 VENV   := .venv
@@ -86,12 +87,11 @@ DRIVER_COMPONENTS := $(filter-out driver/nokia_dct3_trace_config.h,$(wildcard dr
 	driver/nokia_sim_card.cpp driver/nokia_sim_card.h \
 	driver/nokia_uif.cpp driver/nokia_uif.h \
 	driver/nokia_dct3_trace.inc
-C54X_TEST_COMPONENTS := $(wildcard driver/tms320c54x_test*.cpp driver/tms320c54x_test*.h)
+C54X_TEST_COMPONENTS := $(wildcard tests/c54x/tms320c54x_test*.cpp tests/c54x/tms320c54x_test*.h tests/firmware/tms320c54x_test*.cpp)
 empty :=
 space := $(empty) $(empty)
 comma := ,
-C54X_TEST_MAME_SOURCES := $(subst $(space),$(comma),$(patsubst driver/%,src/mame/nokia/%,$(filter %.cpp,$(C54X_TEST_COMPONENTS))))
-TEST_DRIVER_COMPONENTS := $(C54X_TEST_COMPONENTS) driver/sed1565_test.cpp driver/nandflash_test.cpp driver/mu4_storage_test.cpp driver/nokia_simi_test.cpp driver/intelfsh_c3_test.cpp
+TEST_DRIVER_COMPONENTS := $(C54X_TEST_COMPONENTS) tests/devices/sed1565_test.cpp tests/devices/nandflash_test.cpp tests/firmware/mu4_storage_test.cpp tests/devices/nokia_simi_test.cpp tests/devices/intelfsh_c3_test.cpp
 PHONE ?= noki3210
 BIOS ?=
 
@@ -373,6 +373,8 @@ help:
 	@echo "DCT3_RESEARCH_TRACES=0 disables the trace quarantine (repository default: 1)"
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
 	@echo "make build          clone MAME at the pin, overlay $(DRIVER), build"
+	@echo "make build-handsets build without synthetic test drivers or firmware probes"
+	@echo "make build-conformance explicitly include the processor/device/firmware benches"
 	@echo "make swap16         derive $(SWAP) from $(ROM) (16-bit byteswap, for the static tools)"
 	@echo "make census         build the 3210 v6.00 message-topology JSON/report"
 	@echo "make controller-census exhaustively verify the 3210 controller dispatcher"
@@ -803,8 +805,25 @@ rom4-dsp-inputs:
 		roms/research/nse1-rom4/working/dsp_drom.txt \
 		roms/noki5110/nse1_rom4_dsp_data.bin
 
+HANDSET_MAME_SOURCES := src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/nokia_dct3_research.cpp,src/mame/nokia/tms320c54x_dma.cpp,src/mame/nokia/tms320c54x_mcbsp.cpp,src/mame/nokia/tlv320aic23.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_dsp_c54x.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dsp_staged.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_a3a8.cpp,src/mame/nokia/gsm_a5.cpp,src/mame/nokia/gsm_cell_broadcast.cpp,src/mame/nokia/gsm_ems.cpp,src/mame/nokia/gsm_mm_authentication.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/gsm_xcch_l1.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_mbus_terminal.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp,src/mame/nokia/nokia_uif.cpp
+CONFORMANCE_MAME_SOURCES := $(addprefix src/mame/nokia/,$(notdir $(filter %.cpp,$(TEST_DRIVER_COMPONENTS))))
+CONFORMANCE_MAME_SOURCES := $(subst $(space),$(comma),$(CONFORMANCE_MAME_SOURCES))
+BUILD_MAME_SOURCES := $(HANDSET_MAME_SOURCES)
+ifeq ($(DCT3_TEST_DRIVERS),1)
+BUILD_MAME_SOURCES := $(BUILD_MAME_SOURCES),$(CONFORMANCE_MAME_SOURCES)
+else ifneq ($(DCT3_TEST_DRIVERS),0)
+$(error DCT3_TEST_DRIVERS must be 0 or 1)
+endif
+
 build: overlay roms
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/intelfsh_c3_test.cpp,src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/nokia_dct3_research.cpp,$(C54X_TEST_MAME_SOURCES),src/mame/nokia/sed1565_test.cpp,src/mame/nokia/nandflash_test.cpp,src/mame/nokia/mu4_storage_test.cpp,src/mame/nokia/nokia_simi_test.cpp,src/mame/nokia/tms320c54x_dma.cpp,src/mame/nokia/tms320c54x_mcbsp.cpp,src/mame/nokia/tlv320aic23.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_dsp_c54x.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dsp_staged.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_a3a8.cpp,src/mame/nokia/gsm_a5.cpp,src/mame/nokia/gsm_cell_broadcast.cpp,src/mame/nokia/gsm_ems.cpp,src/mame/nokia/gsm_mm_authentication.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/gsm_xcch_l1.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_mbus_terminal.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp,src/mame/nokia/nokia_uif.cpp USE_QTDEBUG=0 -j$(JOBS)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=$(BUILD_MAME_SOURCES) USE_QTDEBUG=0 -j$(JOBS)
+
+.PHONY: build-handsets build-conformance
+build-handsets:
+	$(MAKE) --no-print-directory build DCT3_TEST_DRIVERS=0 DCT3_RESEARCH_TRACES=0
+
+build-conformance:
+	$(MAKE) --no-print-directory build DCT3_TEST_DRIVERS=1
 
 .PHONY: build-tracefree check-tracefree
 # These modes reuse one overlay/object tree. Never run builds/gates concurrently.

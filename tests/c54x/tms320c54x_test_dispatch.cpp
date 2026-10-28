@@ -294,14 +294,11 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 				++m_fast_stack_reads;
 		});
 	m_phase = 3;
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0400);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x0000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0x0004);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0a10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_PC, 0x0400}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_ST1, 0x0000},
+		{cpu_regs::STATE_PMST, 0x0000}, {cpu_regs::STATE_IMR, 0x0004}, {cpu_regs::STATE_AR0, 0x0a10},
+		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
+	});
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 

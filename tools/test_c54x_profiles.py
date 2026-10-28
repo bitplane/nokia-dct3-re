@@ -21,11 +21,13 @@ class ProfileDeclarationTests(unittest.TestCase):
     def test_source_inventory_includes_compiled_modules_and_headers_only(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
-            (root / 'driver').mkdir()
+            (root / 'tests' / 'c54x').mkdir(parents=True)
+            (root / 'tests' / 'firmware').mkdir()
             for filename in ('tms320c54x_test_state.h', 'tms320c54x_test.cpp',
                              'tms320c54x_test_rom4.cpp', 'tms320c54x_test_notes.md',
                              'tms320c54x.cpp', 'unrelated.h'):
-                (root / 'driver' / filename).write_text('')
+                directory = 'firmware' if filename == 'tms320c54x_test_rom4.cpp' else 'c54x'
+                (root / 'tests' / directory / filename).write_text('')
             self.assertEqual([p.name for p in profiles.harness_sources(root)], [
                 'tms320c54x_test.cpp', 'tms320c54x_test_rom4.cpp',
                 'tms320c54x_test_state.h'])
@@ -56,9 +58,9 @@ class ProfileDeclarationTests(unittest.TestCase):
     def test_duplicate_machine_across_modules_is_rejected(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
-            (root / 'driver').mkdir()
+            (root / 'tests' / 'c54x').mkdir(parents=True)
             for suffix in ('a', 'b'):
-                (root / f'driver/tms320c54x_test_{suffix}.cpp').write_text(SOURCE)
+                (root / f'tests/c54x/tms320c54x_test_{suffix}.cpp').write_text(SOURCE)
             with self.assertRaises(ValueError):
                 profiles.declared_machines(root)
 

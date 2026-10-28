@@ -32,14 +32,11 @@ void tms320c54x_test_state::start_far_save_case(bool returning)
 	}
 	data.write_word(0x03fe, 1);
 	data.write_word(0x03ff, 0x0604);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, returning ? 0x03fe : 0x0400);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0060);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
-	m_cpu->set_state_int(STATE_GENPC, origin);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_SP, returning ? 0x03fe : 0x0400}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0},
+		{cpu_regs::STATE_AR2, 0x0060}, {cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_ST1, 0x0800}, {STATE_GENPC, origin},
+		{cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 784;
 	m_check_timer->adjust(attotime::from_usec(100));
 }
@@ -58,7 +55,7 @@ u16 tms320c54x_test_state::saved_repeat_word(saved_repeat_fixture const &f, unsi
 
 void tms320c54x_test_state::start_saved_repeat(unsigned variant)
 {
-	bool const stlm = !strcmp(machine().options().bios(), "repeat-stlm");
+	bool const stlm = profile_is("repeat-stlm");
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	auto const f = saved_repeat_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 64; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(f.base + 0x700 + i, 0xf495); program.write_word(f.base + 0x900 + i, 0xf495); }
@@ -164,10 +161,9 @@ bool tms320c54x_test_state::check_far_save_results()
 			"uninterrupted and restored pending far transfer complete identically");
 		if (m_phase == 786)
 		{
-			m_cpu->set_state_int(STATE_GENPC, 0x7f0900);
-			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0500);
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, 99);
-			m_cpu->set_state_int(tms320c54x_device::STATE_B, 88);
+			set_registers(*m_cpu, {
+				{STATE_GENPC, 0x7f0900}, {cpu_regs::STATE_SP, 0x0500}, {cpu_regs::STATE_A, 99}, {cpu_regs::STATE_B, 88},
+			});
 			data.write_word(0x03fe, 0x7f);
 			data.write_word(0x03ff, 0xbad);
 			m_saved_repeat.clear();
@@ -203,10 +199,10 @@ bool tms320c54x_test_state::check_far_save_results()
 		program.write_word(0x00ffff, 0xbbbb);
 		program.write_word(0x000000, 0xcccc);
 		program.write_word(0x020000, 0xdddd);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0500);
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x02fffe);
-		m_cpu->set_state_int(STATE_GENPC, 0x010800);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_AR0, 0x0500}, {cpu_regs::STATE_A, 0x02fffe}, {STATE_GENPC, 0x010800},
+			{cpu_regs::STATE_IDLE, 0},
+		});
 		m_phase = 788;
 		m_check_timer->adjust(attotime::from_usec(100));
 		return true;
@@ -242,11 +238,10 @@ bool tms320c54x_test_state::check_far_save_results()
 		program.write_word(0x020007, 0xaaaa);
 		data.write_word(0x0500, 0x1234);
 		data.write_word(0x0501, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0500);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x0020);
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x020007);
-		m_cpu->set_state_int(STATE_GENPC, 0x020600);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_AR0, 0x0500}, {cpu_regs::STATE_PMST, 0x0020}, {cpu_regs::STATE_A, 0x020007},
+			{STATE_GENPC, 0x020600}, {cpu_regs::STATE_IDLE, 0},
+		});
 		m_phase = 60000;
 		m_check_timer->adjust(attotime::from_usec(100));
 		return true;
@@ -321,14 +316,10 @@ bool tms320c54x_test_state::check_far_save_results()
 		program.write_word(0x0602, 0xfa47);
 		program.write_word(0x0603, 0x060c);
 		program.write_word(0x0604, 0xe801); // Changes A after the branch predicate is captured.
-		program.write_word(0x0605, 0xe902);
-		program.write_word(0x0606, 0xe903);
-		program.write_word(0x0607, 0x75d6);
-		program.write_word(0x0608, 0x0124);
-		program.write_word(0x0609, 0xf4e1);
-		program.write_word(0x060c, 0x75d6);
-		program.write_word(0x060d, 0x0124);
-		program.write_word(0x060e, 0xf4e1);
+		write_words(program, {
+			{0x0605, 0xe902}, {0x0606, 0xe903}, {0x0607, 0x75d6}, {0x0608, 0x0124}, {0x0609, 0xf4e1}, {0x060c, 0x75d6},
+			{0x060d, 0x0124}, {0x060e, 0xf4e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x8000000000ULL);
 		m_cpu->set_state_int(STATE_GENPC, 0x0600);
@@ -346,7 +337,7 @@ bool tms320c54x_test_state::check_saved_repeat_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 255800)
 	{
-		unsigned const stlm = !strcmp(machine().options().bios(), "repeat-stlm");
+		unsigned const stlm = profile_is("repeat-stlm");
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = saved_repeat_case(variant); auto const &c = m_saved_repeat_counts;
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Software-saved callback repeat and architectural resumption remain admitted");
 		u64 const cycle = m_cpu->pipeline_cycles();

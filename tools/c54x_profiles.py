@@ -10,8 +10,10 @@ STRING = r'"(?:\\.|[^"\\])*"'
 
 def harness_sources(root=ROOT):
     """Compiled bench modules and shared declarations, in reproducible order."""
-    return tuple(path for path in sorted((root / 'driver').glob('tms320c54x_test*'))
-                 if path.suffix in ('.cpp', '.h'))
+    paths = [path for directory in ('c54x', 'firmware')
+             for path in (root / 'tests' / directory).glob('tms320c54x_test*')
+             if path.suffix in ('.cpp', '.h')]
+    return tuple(sorted(paths, key=lambda path: path.name))
 
 
 def declarations(source):

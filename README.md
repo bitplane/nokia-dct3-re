@@ -119,6 +119,7 @@ it identifies a 3210-specific assumption.
 
 ```text
 driver/                 MAME driver and extracted Nokia devices
+tests/                  C++ unit, processor, device and original-firmware benches
 tools/                  Thumb-1 disassembly and cross-ROM helpers
 ghidra/scripts/         headless analysis and symbol-export scripts
 ghidra/symbols/         firmware-specific symbol maps

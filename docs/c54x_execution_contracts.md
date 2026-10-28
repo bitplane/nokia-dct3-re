@@ -5,7 +5,8 @@
 This is the processor-validation reference, separate from handset bring-up
 and loader ownership. The core implementation lives in
 `cpu/tms320c54x/`; executable acceptance lives in
-the compiled `driver/tms320c54x_test*.cpp` modules and
+the compiled `tests/c54x/` modules, original-ROM fixtures under
+`tests/firmware/`, and
 `tools/run_c54x_core.py`.
 The [default-suite checkpoint](#core-regression-checkpoint) identifies the last
 fully qualified default run by executable and source hashes. A later focused
@@ -65,19 +66,23 @@ boundaries are:
 
 | Source | Responsibility |
 | --- | --- |
-| `driver/tms320c54x_test.cpp` | Machine/ROM declarations, backend serial bench and stock-loader verifier compositions |
-| `driver/tms320c54x_test_state.h` | Shared bench state, fixture types and method declarations; no CPU execution implementation |
-| `driver/tms320c54x_test_state.cpp` | Bench lifecycle, address maps, assertions and device wiring |
-| `driver/tms320c54x_test_dispatch.cpp` | Ordered callback routing and the initial-program completion tail |
-| `driver/tms320c54x_test_arithmetic.cpp` | Arithmetic, multiplier and logical-operation fixtures and checks |
-| `driver/tms320c54x_test_addressing.cpp` | Address generation, memory/register transfers and operand-domain fixtures |
-| `driver/tms320c54x_test_pipeline.cpp` | Control flow, repeats, dependency and pipeline-composition fixtures |
-| `driver/tms320c54x_test_interrupts.cpp` | Interrupt acceptance, entry, return and mask-composition fixtures |
-| `driver/tms320c54x_test_peripherals.cpp` | Bus, clock, serial, DMA and timer fixtures |
-| `driver/tms320c54x_test_restore.cpp` | Explicit cross-context snapshot/restore fixtures; each other family retains its own replay checks |
-| `driver/tms320c54x_test_disassembler.cpp` | Bounded decoding and operand-domain matrices |
-| `driver/tms320c54x_test_rom4.cpp` | Acquired-ROM routine execution and independent reference comparisons |
-| `driver/tms320c54x_test_atomic.cpp` | The sequential legacy atomic test program, including same-callback fall-through |
+| `tests/c54x/tms320c54x_test.cpp` | Machine/ROM declarations, backend serial bench and stock-loader verifier compositions |
+| `tests/c54x/tms320c54x_test_state.h` | Shared bench state, fixture types and method declarations; no CPU execution implementation |
+| `tests/c54x/tms320c54x_test_state.cpp` | Bench lifecycle, address maps, assertions and device wiring |
+| `tests/c54x/tms320c54x_test_dispatch.cpp` | Ordered callback routing and the initial-program completion tail |
+| `tests/c54x/tms320c54x_test_arithmetic.cpp` | Arithmetic, multiplier and logical-operation fixtures and checks |
+| `tests/c54x/tms320c54x_test_addressing.cpp` | Address generation, memory/register transfers and operand-domain fixtures |
+| `tests/c54x/tms320c54x_test_pipeline.cpp` | Control flow, repeats, dependency and pipeline-composition fixtures |
+| `tests/c54x/tms320c54x_test_interrupts.cpp` | Interrupt acceptance, entry, return and mask-composition fixtures |
+| `tests/c54x/tms320c54x_test_peripherals.cpp` | Bus, clock, serial, DMA and timer fixtures |
+| `tests/c54x/tms320c54x_test_restore.cpp` | Explicit cross-context snapshot/restore fixtures; each other family retains its own replay checks |
+| `tests/c54x/tms320c54x_test_disassembler.cpp` | Bounded decoding and operand-domain matrices |
+| `tests/firmware/tms320c54x_test_rom4.cpp` | Acquired-ROM routine execution and independent reference comparisons |
+| `tests/c54x/tms320c54x_test_atomic.cpp` | Routes atomic phases to their owning sequence without a global result scan |
+| `tests/c54x/tms320c54x_test_atomic_basic.cpp` | Synthetic basic-operation sequence |
+| `tests/c54x/tms320c54x_test_atomic_corpus.cpp` | Independently asserted instruction words observed in the ROM4 corpus, without loading the acquired image |
+| `tests/c54x/tms320c54x_test_atomic_reference.cpp` | TI instruction examples and arithmetic boundaries |
+| `tests/c54x/tms320c54x_test_atomic_control.cpp` | Extended program flow, RTN and pending-transfer restoration |
 
 The result dispatcher preserves phase-check order, including paths that update
 the phase and fall through within one callback. Family extraction must retain
@@ -86,15 +91,20 @@ lambdas. Shared bench state and snapshot/replay ownership are unchanged; moving
 a case does not authorize changing its inputs, expected values or observation
 boundaries. The dispatcher delegates consecutive clauses to ordered handlers,
 not an unordered subsystem sweep. A handler returning false permits subsequent
-clauses to run even if an earlier clause changed the phase. The atomic program
-remains one coherent source unit because its inline program construction and
-continuations share this ordering contract.
-The shared bench declaration and legacy atomic program remain large. Further
-splitting needs an actual fixture/state boundary and an ordered-execution
-preservation check, not an arbitrary line-count target.
+clauses to run even if an earlier clause changed the phase. Atomic routing
+has a separate exhaustive guard-partition check and a compiled host control;
+the three inter-sequence boundaries explicitly schedule the next timer callback.
+The sequential regression still inherits state between steps. The source split
+does not turn those steps into independent reset fixtures or remove their
+cross-instruction checks.
+
+Test ownership and build selection are defined in [the test contracts](../tests/README.md).
+Shared setup helpers write only stimulus; expected results remain in the test
+and independent runner oracles. Historical checkpoint hashes retain their
+original source paths: relocation does not renew their runtime qualification.
 
 The absolute-alias fixtures share declarative family/count/status profiles in
-`driver/tms320c54x_test_profiles.h`; the CPU model does not consume this test
+`tests/c54x/tms320c54x_test_profiles.h`; the CPU model does not consume this test
 metadata. `test_c54x_alias_profiles.py` executes the host C++ decoder and
 compares all10,304 encoded cases/status inputs with their retained domains.
 All ten separate MAME rejection matrices also pass with the original markers

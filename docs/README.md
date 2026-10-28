@@ -84,6 +84,9 @@ distinction.
 | `normalization_status.md` | Coverage boundary and remaining model, topology and instrumentation debt. |
 | `tooling.md` | Analysis, census and acceptance tooling reference. |
 
+The [C++ test contracts](../tests/README.md) define fixture ownership, build
+selection, coverage preservation and retirement rules.
+
 ## Validated startup and UI boundaries
 
 | Document | Purpose |

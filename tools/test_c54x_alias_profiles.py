@@ -26,7 +26,7 @@ class AliasProfileTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             binary = Path(name) / 'profiles'
             source = r'''
-#include "driver/tms320c54x_test_profiles.h"
+#include "tests/c54x/tms320c54x_test_profiles.h"
 #include <iostream>
 int main() {
     if (c54x_test::find_source_alias_profile("unknown")) return 1;

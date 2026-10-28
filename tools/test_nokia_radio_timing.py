@@ -11,7 +11,7 @@ class RadioTimingTests(unittest.TestCase):
         compiler = shutil.which('c++')
         if compiler is None:
             self.skipTest('C++ compiler unavailable')
-        source = Path(__file__).with_suffix('.cpp')
+        source = Path(__file__).resolve().parents[1] / 'tests/unit/test_nokia_radio_timing.cpp'
         with tempfile.TemporaryDirectory() as directory:
             binary = Path(directory) / 'radio-timing'
             subprocess.run([compiler, '-std=c++17', '-Wall', '-Wextra', '-Werror',

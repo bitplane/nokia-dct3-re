@@ -113,7 +113,7 @@ class Rom4HelperResultTest(unittest.TestCase):
         with self.assertRaises(ValueError): check_rf_bitmap(text,3,staged=True)
 
     def test_efr_lifecycle_frontends_load_the_same_vectors(self):
-        source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
+        source = (Path(__file__).resolve().parents[1] / 'tests/c54x/tms320c54x_test.cpp').read_text()
         body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
         bios = dict((name, int(number)) for number, name in
                     re.findall(r'ROM_SYSTEM_BIOS\((\d+), "([^"]+)"', body))
@@ -165,7 +165,7 @@ class Rom4HelperResultTest(unittest.TestCase):
                         check_result(bad, 3, staged=True, **mode)
 
     def test_efr_lifecycle_frontends_load_the_same_roms(self):
-        source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
+        source = (Path(__file__).resolve().parents[1] / 'tests/c54x/tms320c54x_test.cpp').read_text()
         body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
         bios = dict((name, int(number)) for number, name in
                     re.findall(r'ROM_SYSTEM_BIOS\((\d+), "([^"]+)"', body))
@@ -183,7 +183,7 @@ class Rom4HelperResultTest(unittest.TestCase):
                     self.assertEqual(by_bios[bios[atomic]], by_bios[bios[staged]], region)
 
     def test_efr_decoder_frontends_load_the_same_vectors(self):
-        source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
+        source = (Path(__file__).resolve().parents[1] / 'tests/c54x/tms320c54x_test.cpp').read_text()
         body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
         bios = dict((name, int(number)) for number, name in
                     re.findall(r'ROM_SYSTEM_BIOS\((\d+), "([^"]+)"', body))
@@ -198,7 +198,7 @@ class Rom4HelperResultTest(unittest.TestCase):
                              by_bios[bios['efr-decoder-pipe']], region)
 
     def test_efr_encoder_frontends_load_the_same_vectors(self):
-        source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
+        source = (Path(__file__).resolve().parents[1] / 'tests/c54x/tms320c54x_test.cpp').read_text()
         body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
         bios = dict((name, int(number)) for number, name in
                     re.findall(r'ROM_SYSTEM_BIOS\((\d+), "([^"]+)"', body))
@@ -213,7 +213,7 @@ class Rom4HelperResultTest(unittest.TestCase):
                              by_bios[bios['efr-encoder-pipe']], region)
 
     def test_every_rom4_bios_loads_program_and_data(self):
-        source = (Path(__file__).resolve().parents[1] / 'driver/tms320c54x_test.cpp').read_text()
+        source = (Path(__file__).resolve().parents[1] / 'tests/c54x/tms320c54x_test.cpp').read_text()
         body = source.split('ROM_START(tms54rom4)', 1)[1].split('ROM_END', 1)[0]
         declared = set(map(int, re.findall(r'ROM_SYSTEM_BIOS\((\d+),', body)))
         for region in ('dspprg', 'dspdata'):

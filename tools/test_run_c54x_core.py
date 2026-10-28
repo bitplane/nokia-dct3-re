@@ -982,7 +982,7 @@ class CoreResultTests(unittest.TestCase):
                 check_result(output.replace(old, new), 3, profile='pshd-long-edge')
 
     def test_fixture_bios_metadata_fits_mame_encoding(self):
-        source = (Path(__file__).resolve().parents[1] / 'driver' / 'tms320c54x_test.cpp').read_text()
+        source = (Path(__file__).resolve().parents[1] / 'tests' / 'c54x' / 'tms320c54x_test.cpp').read_text()
         blocks = re.findall(r'ROM_START\(([^)]+)\)(.*?)ROM_END', source, re.S)
         self.assertTrue(blocks)
         for driver, body in blocks:

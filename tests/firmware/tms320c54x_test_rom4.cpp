@@ -58,15 +58,11 @@ void tms320c54x_test_state::start_rom4_crc_packed(unsigned index)
 	for (unsigned i = 0; i < 12; ++i) m_cpu->space(AS_DATA).write_word(0x1400 + i, words[i]);
 	memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
 	m_cpu->space(AS_DATA).write_word(0x1ec3, 0x0f00);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x812f);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x1400);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xdeadbeef);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, index & 1 ? 0x0800 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_PC, 0x812f}, {cpu_regs::STATE_SP, 0x1ec3}, {cpu_regs::STATE_AR4, 0x1400},
+		{cpu_regs::STATE_A, 0x12345678}, {cpu_regs::STATE_B, 0xdeadbeef}, {cpu_regs::STATE_ST0, index & 1 ? 0x0800 : 0},
+		{cpu_regs::STATE_ST1, 0x4101}, {cpu_regs::STATE_PMST, 0xffac}, {cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 64000 + index;
 	m_check_timer->adjust(attotime::from_usec(100));
 }
@@ -213,14 +209,11 @@ void tms320c54x_test_state::start_rom4_delayed_repeat(unsigned index)
 	}
 	data.write_word(0x15ff, 0x1234); data.write_word(0x1628, 0x5678);
 	data.write_word(0x1ec3, 0x0e20);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0e00);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x1400);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x1600);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_PC, 0x0e00}, {cpu_regs::STATE_SP, 0x1ec3}, {cpu_regs::STATE_AR4, 0x1400},
+		{cpu_regs::STATE_AR5, 0x1600}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x4101},
+		{cpu_regs::STATE_PMST, 0xffac}, {cpu_regs::STATE_IDLE, 0},
+	});
 	m_rom4_codec_replay = false; m_rom4_codec_replays = 0;
 	m_phase = 303000 + index;
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -286,14 +279,11 @@ void tms320c54x_test_state::start_rom4_efr_encoder(unsigned frame, bool initiali
 	}
 	program[0x0f00] = 0xf4e1;
 	data.write_word(0x1ec3, 0x0f00);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC, initialize ? 0xcc0e : 0x0e00);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_PC, initialize ? 0xcc0e : 0x0e00}, {cpu_regs::STATE_SP, 0x1ec3}, {cpu_regs::STATE_A, 0},
+		{cpu_regs::STATE_B, 0}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x4101}, {cpu_regs::STATE_PMST, 0xffac},
+		{cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = initialize ? 304000 : 304001 + frame;
 	if (initialize || !frame) m_rom4_fr_trace_count = 0;
 	m_check_timer->adjust(attotime::from_msec(20));
@@ -353,11 +343,10 @@ void tms320c54x_test_state::start_rom4_efr_decoder(unsigned frame, bool initiali
 	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
 	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1344);
 	m_cpu->set_state_int(tms320c54x_device::STATE_A, initialize ? 0 : data.read_word(0x1343));
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_B, 0}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x4101}, {cpu_regs::STATE_PMST, 0xffac},
+		{cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = initialize ? 302000 : 302001 + frame;
 	m_check_timer->adjust(attotime::from_msec(20));
 	if (!initialize && frame == 8 && rom4_codec_is("efr-loss-observe") && machine().options().verbose())
@@ -437,16 +426,12 @@ void tms320c54x_test_state::start_rom4_efr_packing(unsigned vector, unsigned sta
 	data.write_word(0x09ba, 1); // Ordinary speech fixture, not SID/DTX transformation.
 	memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
 	data.write_word(0x1ec3, 0x0f00);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC, stage ? 0xc2b7 : 0xc28f);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, base);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x1500);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xdeadbeef);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_PC, stage ? 0xc2b7 : 0xc28f}, {cpu_regs::STATE_SP, 0x1ec3}, {cpu_regs::STATE_AR2, base},
+		{cpu_regs::STATE_AR3, 0x1500}, {cpu_regs::STATE_A, 0x12345678}, {cpu_regs::STATE_B, 0xdeadbeef},
+		{cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x4101}, {cpu_regs::STATE_PMST, 0xffac},
+		{cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 301000 + vector * 3 + stage;
 	m_check_timer->adjust(attotime::from_msec(1));
 }
@@ -463,16 +448,12 @@ void tms320c54x_test_state::start_rom4_efr_crc(unsigned index)
 	data.write_word(output - 1, 0x89ab); data.write_word(output, 0xdead); data.write_word(output + 1, 0xcdef);
 	memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
 	data.write_word(0x1ec3, 0x0f00);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0xc2f2);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, base);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR3, output);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xdeadbeef);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_PC, 0xc2f2}, {cpu_regs::STATE_SP, 0x1ec3}, {cpu_regs::STATE_AR2, base},
+		{cpu_regs::STATE_AR3, output}, {cpu_regs::STATE_A, 0x12345678}, {cpu_regs::STATE_B, 0xdeadbeef},
+		{cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x4101}, {cpu_regs::STATE_PMST, 0xffac},
+		{cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 300000 + index;
 	m_check_timer->adjust(attotime::from_msec(1));
 }
@@ -489,16 +470,12 @@ void tms320c54x_test_state::start_rom4_fr_packing(unsigned vector, unsigned stag
 	}
 	memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
 	data.write_word(0x1ec3, 0x0f00);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC, stage == 0 ? 0x80e7 : stage == 1 ? 0x812f : 0x80ff);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x1400);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x1500);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xdeadbeef);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_PC, stage == 0 ? 0x80e7 : stage == 1 ? 0x812f : 0x80ff}, {cpu_regs::STATE_SP, 0x1ec3},
+		{cpu_regs::STATE_AR3, 0x1400}, {cpu_regs::STATE_AR4, 0x1500}, {cpu_regs::STATE_A, 0x12345678},
+		{cpu_regs::STATE_B, 0xdeadbeef}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x4101},
+		{cpu_regs::STATE_PMST, 0xffac}, {cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 71000 + vector * 3 + stage;
 	m_check_timer->adjust(attotime::from_msec(1));
 }
@@ -613,15 +590,11 @@ void tms320c54x_test_state::start_rom4_fr_decoder(unsigned frame, bool initializ
 	}
 	memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
 	data.write_word(0x1ec3, 0x0f00);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC, initialize ? 0x8449 : 0x8458);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1500);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_PC, initialize ? 0x8449 : 0x8458}, {cpu_regs::STATE_SP, 0x1ec3}, {cpu_regs::STATE_AR2, 0x1500},
+		{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x4101},
+		{cpu_regs::STATE_PMST, 0xffac}, {cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 72000 + frame * 2 + (initialize ? 0 : 1);
 	m_check_timer->adjust(attotime::from_msec(5));
 	if (!initialize) save_rom4_codec_frame(frame);
@@ -669,15 +642,11 @@ void tms320c54x_test_state::start_rom4_fr_encoder(unsigned frame, unsigned stage
 	}
 	memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
 	data.write_word(0x1ec3, 0x0f00);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC, stage == 0 ? 0x8045 : stage == 1 ? 0x85e0 : 0x860c);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x1500);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_PC, stage == 0 ? 0x8045 : stage == 1 ? 0x85e0 : 0x860c}, {cpu_regs::STATE_SP, 0x1ec3},
+		{cpu_regs::STATE_AR4, 0x1500}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_ST0, 0},
+		{cpu_regs::STATE_ST1, 0x4101}, {cpu_regs::STATE_PMST, 0xffac}, {cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 74000 + frame * 3 + stage;
 	m_check_timer->adjust(attotime::from_msec(5));
 	if (stage == 1) save_rom4_codec_frame(frame);
@@ -696,15 +665,11 @@ void tms320c54x_test_state::start_rom4_pcm_mute(unsigned index)
 	data.write_word(0x1f2b, flags[index % 4]);
 	memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
 	data.write_word(0x1ec3, 0x0f00);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0xa0b8);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, base);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_PC, 0xa0b8}, {cpu_regs::STATE_SP, 0x1ec3}, {cpu_regs::STATE_AR2, base}, {cpu_regs::STATE_A, 0},
+		{cpu_regs::STATE_B, 0}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x4101}, {cpu_regs::STATE_PMST, 0xffac},
+		{cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 74100 + index;
 	m_check_timer->adjust(attotime::from_msec(5));
 }
@@ -732,15 +697,12 @@ void tms320c54x_test_state::start_rom4_pairs(unsigned index)
 	// Isolated algorithm inputs and caller return, never a handset state hook.
 	memregion("dspprg")->as_u16(0x0f00)=0xf4e1;
 	data.write_word(0x1ec3,0x0f00);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC,0x47e6);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP,0x1ec3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0,0x081f | (index&1 ? 0x1000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1,0x0900 | (index&2 ? 0x40 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST,0xffac);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A,0x123456);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B,0xabcdef);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T,0xa55a);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_PC, 0x47e6}, {cpu_regs::STATE_SP, 0x1ec3},
+		{cpu_regs::STATE_ST0, 0x081f | (index&1 ? 0x1000 : 0)}, {cpu_regs::STATE_ST1, 0x0900 | (index&2 ? 0x40 : 0)},
+		{cpu_regs::STATE_PMST, 0xffac}, {cpu_regs::STATE_A, 0x123456}, {cpu_regs::STATE_B, 0xabcdef},
+		{cpu_regs::STATE_T, 0xa55a}, {cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase=711000+index;
 	m_check_timer->adjust(attotime::from_msec(1));
 	save_rom4_codec_frame(index);
@@ -768,15 +730,11 @@ void tms320c54x_test_state::start_rom4_bitmap(unsigned index)
 		memregion("dspprg")->as_u16(0x48f7) == 0xf074,
 		"Acquired bitmap entry and optional hook are unchanged");
 	data.write_word(0x1ec3, 0x0f00);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x48f7);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x141f);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x55aa);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_PC, 0x48f7}, {cpu_regs::STATE_SP, 0x1ec3}, {cpu_regs::STATE_AR2, 0x141f},
+		{cpu_regs::STATE_AR3, 0x1000}, {cpu_regs::STATE_AR7, 0x55aa}, {cpu_regs::STATE_ST0, 0},
+		{cpu_regs::STATE_ST1, 0x4101}, {cpu_regs::STATE_PMST, 0xffac}, {cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 710000 + index;
 	m_check_timer->adjust(attotime::from_msec(1));
 	save_rom4_codec_frame(index);
@@ -792,18 +750,19 @@ void tms320c54x_test_state::start_rom4_crc_helper(unsigned index)
 	m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x8179);
 	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
 	m_cpu->set_state_int(tms320c54x_device::STATE_A, seeds[index / 64]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xdeadbeef);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BRC, (index / 2) % 32);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, index & 1 ? 0x0800 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_B, 0xdeadbeef}, {cpu_regs::STATE_BRC, (index / 2) % 32},
+		{cpu_regs::STATE_ST0, index & 1 ? 0x0800 : 0}, {cpu_regs::STATE_ST1, 0x4101}, {cpu_regs::STATE_PMST, 0xffac},
+		{cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 63000 + index;
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
 u16 tms320c54x_test_state::rom4_loader_entry_r()
 {
+	// Mask-only negative control: this fixture deliberately omits the MCU upload.
+	// Its retained "cold frontier" result is not the current handset boot boundary.
 	const u16 word = memregion("dspprg")->as_u16(0x0f00);
 	if (m_phase == rom4_staged_cold_phase && !machine().side_effects_disabled())
 	{
@@ -971,7 +930,7 @@ bool tms320c54x_test_state::check_rom4_fr_decoder_results()
 		}
 		if (index < 9) { start_rom4_delayed_repeat(index + 1); return true; }
 		osd_printf_info("TMS320C54x ROM4 delayed repeat: PASS cases=10 replay=10 controls=BD,RETD counts=0,1,2,9,39\n");
-		if(!strcmp(machine().options().bios(),"efr-decoder-pipe"))
+		if(profile_is("efr-decoder-pipe"))
 		{
 			// The existing delayed-repeat preflight is atomic; the acquired
 			// decoder reset and every frame below use the staged frontend.
@@ -1506,22 +1465,20 @@ bool tms320c54x_test_state::check_rom4_crc_input_results()
 			m_cpu->set_input_line(2, CLEAR_LINE);
 			m_irq_raised = false;
 			m_fast_stack_reads = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0400);
-			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			set_registers(*m_cpu, {
+				{cpu_regs::STATE_PC, 0x0400}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_ST1, 0},
+				{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_IDLE, 0},
+			});
 			m_check_timer->adjust(attotime::from_usec(100));
 			return true;
 		}
 		osd_printf_info("TMS320C54x fast return bus: PASS cases=3 stack_reads=0 delayed_words=2\n");
 		m_cpu->set_input_line(2, CLEAR_LINE);
 		m_phase = 1;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0300);
-		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_PC, 0x0300}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_ST1, 0x0100},
+			{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		m_check_timer->adjust(attotime::from_usec(100));
 		return true;
 	}
@@ -1575,10 +1532,10 @@ bool tms320c54x_test_state::check_rom4_crc_input_results()
 		expect(m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0,
 				"ROM4 challenge transform repeat count");
 		m_phase = 5;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0350);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_PC, 0x0350}, {cpu_regs::STATE_AR0, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+			{cpu_regs::STATE_IDLE, 0},
+		});
 		m_check_timer->adjust(attotime::from_usec(100));
 		return true;
 	}

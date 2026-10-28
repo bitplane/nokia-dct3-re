@@ -1,6 +1,6 @@
 // license:BSD-3-Clause
 // copyright-holders:Gaz
-#include "../driver/nokia_radio_timing.h"
+#include "../../driver/nokia_radio_timing.h"
 #include <cassert>
 
 int main()

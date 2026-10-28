@@ -521,7 +521,7 @@ The reference is retained locally as
 The overlay now provides a distinct generic `INTEL_28F160C3T` part with
 geometry-driven erases and per-block lock/reset/status state, including the
 WP# override of lock-down protection. Existing parts do not enable these
-semantics. `driver/intelfsh_c3_test.cpp` is a development-only executable
+semantics. `tests/devices/intelfsh_c3_test.cpp` is a development-only executable
 conformance fixture, not a handset provisioning route:
 
 ```sh

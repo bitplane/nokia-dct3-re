@@ -14,12 +14,12 @@ void tms320c54x_test_state::start_indirect_popm_case(unsigned index)
 	program.write_word(0x0800, opcodes[index]);
 	program.write_word(0x0801, 0xf4e1);
 	m_cpu->space(AS_DATA).write_word(0x1000, 0x1234);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0xdead);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR3, index == 1 ? 0x800f : index == 3 ? 0x8017 : 0x8010);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, index == 2 ? 0x6000 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, index == 2 ? 0x20 : 0);
-	m_cpu->set_state_int(STATE_GENPC, 0x0800);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR0, 0xdead},
+		{cpu_regs::STATE_AR3, index == 1 ? 0x800f : index == 3 ? 0x8017 : 0x8010},
+		{cpu_regs::STATE_ST0, index == 2 ? 0x6000 : 0}, {cpu_regs::STATE_ST1, index == 2 ? 0x20 : 0},
+		{STATE_GENPC, 0x0800},
+	});
 	m_phase = 160000 + index;
 	m_check_timer->adjust(attotime::from_usec(100));
 }
@@ -38,13 +38,11 @@ void tms320c54x_test_state::start_native_memory_gap_case(unsigned index)
 	data.write_word(0x0600, family == 0 ? (variant ? 0x7fff : 0xffff) : family == 2 ? 0xfffd : 0x8001);
 	data.write_word(0x0601, 0x2345);
 	data.write_word(0x0607, 2);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, family == 5 ? (variant ? 0x89abcdef : 0x23456789) : 5);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, 2);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0600);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR3, family == 3 ? 0x0607 : 0x0600);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, family == 3 && variant ? 8 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, family == 3 ? 0x0800 : 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_A, 3}, {cpu_regs::STATE_B, family == 5 ? (variant ? 0x89abcdef : 0x23456789) : 5},
+		{cpu_regs::STATE_T, 2}, {cpu_regs::STATE_AR2, 0x0600}, {cpu_regs::STATE_AR3, family == 3 ? 0x0607 : 0x0600},
+		{cpu_regs::STATE_BK, family == 3 && variant ? 8 : 0}, {cpu_regs::STATE_ST0, family == 3 ? 0x0800 : 0},
+	});
 	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, family == 0 ? (variant ? 0 : 0x0100) :
 		family == 1 || family == 4 ? (variant ? 0x0100 : 0) : family == 2 && variant ? 0x0040 : 0);
 	m_cpu->set_state_int(STATE_GENPC, 0x0800);
@@ -102,16 +100,12 @@ void tms320c54x_test_state::start_pipeline_store_case(unsigned variant)
 	program.write_word(0x600, 0x8020 + (variant % 4) * 0x100);
 	program.write_word(0x40, 0xe955);
 	data.write_word(0x420, 0xbeef); data.write_word(0x4a0, 0xbeef);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 8);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, variant >= 8 ? 0x0100 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, variant >= 4 ? 1 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, variant >= 8 ? 0xff00000000ULL : 0x0123456789ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, variant >= 8 ? 0xff00000001ULL : 0x0156789abcULL);
-	m_cpu->set_state_int(STATE_GENPC, 0x600);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 8}, {cpu_regs::STATE_ST1, variant >= 8 ? 0x0100 : 0},
+		{cpu_regs::STATE_PMST, variant >= 4 ? 1 : 0}, {cpu_regs::STATE_IMR, 1}, {cpu_regs::STATE_IFR, 0},
+		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, variant >= 8 ? 0xff00000000ULL : 0x0123456789ULL},
+		{cpu_regs::STATE_B, variant >= 8 ? 0xff00000001ULL : 0x0156789abcULL}, {STATE_GENPC, 0x600},
+	});
 	m_cpu->set_pipeline_frontend(true);
 	m_pipeline_operand_tap = data.install_write_tap(0x420, 0x420, "pipeline_store",
 		[this](offs_t, u16 &value, u16) {
@@ -151,16 +145,11 @@ void tms320c54x_test_state::start_pipeline_indirect_case(unsigned variant)
 	program.write_word(0x40, 0xe955);
 	m_cpu->space(AS_DATA).write_word(0x420, 0x1234);
 	m_cpu->space(AS_DATA).write_word(0x4a0, 0x5678);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x420);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-	m_cpu->set_state_int(STATE_GENPC, 0x600);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_IMR, 1},
+		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR1, 0x420}, {cpu_regs::STATE_A, 0},
+		{cpu_regs::STATE_B, 0}, {STATE_GENPC, 0x600},
+	});
 	m_cpu->set_pipeline_frontend(true);
 	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x420, 0x420, "pipeline_indirect",
 		[this](offs_t, u16 &, u16) {
@@ -231,7 +220,7 @@ void tms320c54x_test_state::start_constant_dagen_edge(unsigned variant)
 tms320c54x_test_state::indirect_stm_fixture tms320c54x_test_state::indirect_stm_case(unsigned v) const
 {
 	indirect_stm_fixture f{};
-	f.direct = !strcmp(machine().options().bios(), "stm-low-ram");
+	f.direct = profile_is("stm-low-ram");
 	if (f.direct)
 	{
 		f.destination = 0x60 + v % 32; v /= 32;
@@ -242,7 +231,7 @@ tms320c54x_test_state::indirect_stm_fixture tms320c54x_test_state::indirect_stm_
 		return f;
 	}
 	f.selector = v % 8;
-	f.edge = !strcmp(machine().options().bios(), "stm-ind-edge");
+	f.edge = profile_is("stm-ind-edge");
 	f.destination = (f.edge ? std::array<u16, 4>{0, 0x10, 0x28, 0x5f} : std::array<u16, 4>{0x60, 0x68, 0x70, 0x7f})[(v / 8) % 4];
 	f.literal = std::array<u16, 4>{0, 1, 0xb3a6, 0xffff}[(v / 32) % 4];
 	bool const cmpt = (v / 128) % 2;
@@ -293,17 +282,11 @@ void tms320c54x_test_state::start_pipeline_stm_case(unsigned variant)
 	program.write_word(0x600 + conflict, 0x7700 | target);
 	program.write_word(0x601 + conflict, 0x1234);
 	m_cpu->set_input_line(0, CLEAR_LINE);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x5678);
-	m_cpu->set_state_int(STATE_GENPC, 0x600);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST1, 0x800},
+		{cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR1, 0},
+		{cpu_regs::STATE_AR2, 0}, {cpu_regs::STATE_BK, 0}, {cpu_regs::STATE_A, 0x5678}, {STATE_GENPC, 0x600},
+	});
 	m_cpu->set_pipeline_frontend(true);
 	m_pipeline_replay = false;
 	m_pipeline_expected_cycle = 1;
@@ -332,12 +315,10 @@ void tms320c54x_test_state::start_pipeline_immediate_store(unsigned variant)
 	program.write_word(0x600, std::array<u16, 4>{0x7600, 0x7691, 0x76f8, 0x7681}[form]);
 	program.write_word(0x601, form == 2 ? target : 0xf495);
 	if (form == 2) program.write_word(0x602, 0xf495);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0e);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, target);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0x0e}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_AR1, target},
+	});
 	m_cpu->space(AS_DATA).write_word(target, 0xaaaa);
 	m_cpu->set_state_int(STATE_GENPC, 0x600);
 	m_cpu->set_pipeline_frontend(true);
@@ -361,11 +342,10 @@ void tms320c54x_test_state::start_pipeline_xpc_push(unsigned variant)
 	u16 const source = variant < 6 ? 0x1e : (variant - 6) / 6;
 	auto &program = m_cpu->space(AS_PROGRAM);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : 0x4a00 | source);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_SP, 0x1000},
+	});
 	m_cpu->space(AS_DATA).write_word(0xfff, 0xaaaa);
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600);
 	u16 const expected = m_cpu->space(AS_DATA).read_word(source);
@@ -405,15 +385,11 @@ void tms320c54x_test_state::start_pipeline_push_sp_latency(unsigned variant)
 	for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
 	program.write_word(0x600, pop ? (BIT(variant, 2) ? 0x8a0b : 0x8a11) : (BIT(variant, 2) ? 0x4a18 : 0x4a11));
 	program.write_word(0x601 + gap, BIT(variant, 0) ? 0x8027 : 0x1027);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x5678);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7777);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST1, 0x4800}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR1, 0x5678},
+		{cpu_regs::STATE_A, 0x7777}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
 	m_cpu->space(AS_DATA).write_word(0xfff, 0xaaaa);
 	m_cpu->space(AS_DATA).write_word(0x1000, 0x5678);
 	m_cpu->space(AS_DATA).write_word(0x1027, 0x1111);
@@ -429,22 +405,18 @@ void tms320c54x_test_state::start_pipeline_mmr_pop(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 	m_pipeline_peripheral_case = variant;
-	bool const irq = !strcmp(machine().options().bios(),"pop-irq") || !strcmp(machine().options().bios(),"pop-irq-edge"); auto const f = irq_pop_case(variant);
+	bool const irq = profile_is("pop-irq") || profile_is("pop-irq-edge"); auto const f = irq_pop_case(variant);
 	u16 const destination = irq ? f.destination : variant / 6 < 18 ? 6 + variant / 6 : 0x19;
 	u16 const value = irq ? f.value : 0x6aa5;
 	u32 const base = irq ? f.base : BIT(variant, 0) ? 0x10000 : 0;
 	auto &program = m_cpu->space(AS_PROGRAM);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : 0x8a00 | destination);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0e);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, irq ? f.pending : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, irq ? f.mask : 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0x0e}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_SP, 0x1000},
+		{cpu_regs::STATE_A, 0x123456789aULL}, {cpu_regs::STATE_B, 0x2233445566ULL},
+		{cpu_regs::STATE_IFR, irq ? f.pending : 0}, {cpu_regs::STATE_IMR, irq ? f.mask : 0},
+	});
 	m_cpu->space(AS_DATA).write_word(0x1000, value);
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600);
 	u16 const initial = m_cpu->space(AS_DATA).read_word(destination);
@@ -480,17 +452,12 @@ void tms320c54x_test_state::start_pipeline_pop_dagen_conflict(unsigned variant)
 	auto &program = m_cpu->space(AS_PROGRAM);
 	for (unsigned i = 0; i < 16; ++i)
 		program.write_word(base + 0x600 + i, i == 0 ? (conflict ? 0x8011 : 0x8070) : i == 1 ? 0x8a12 : 0xf495);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7777);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1111);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1234);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 0},
+		{cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, 0x7777},
+		{cpu_regs::STATE_AR1, 0x1111}, {cpu_regs::STATE_AR2, 0x1234}, {cpu_regs::STATE_IFR, 0},
+		{cpu_regs::STATE_IMR, 0},
+	});
 	m_cpu->space(AS_DATA).write_word(0x1000, 0xbeef);
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600);
 	m_cpu->set_pipeline_frontend(true);
@@ -528,16 +495,12 @@ void tms320c54x_test_state::start_pipeline_dst(unsigned variant)
 	u32 const stored = u32(sst ? std::clamp(signed_source, s64(-2147483648LL), s64(2147483647LL)) : signed_source);
 	auto &program = m_cpu->space(AS_PROGRAM);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, i ? 0xf495 : 0x4e00 | (b << 8) | offset);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, sst ? 1 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (compiler ? 0x4000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x500);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x1111222233ULL : source);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? source : 0x4444555566ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, sst ? 1 : 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x900 | (compiler ? 0x4000 : 0)},
+		{cpu_regs::STATE_SP, 0x500}, {cpu_regs::STATE_A, b ? 0x1111222233ULL : source},
+		{cpu_regs::STATE_B, b ? source : 0x4444555566ULL}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
 	m_cpu->space(AS_DATA).write_word(address, 0xaaaa);
 	m_cpu->space(AS_DATA).write_word(address ^ 1, 0xaaaa);
 	m_cpu->set_state_int(STATE_GENPC, 0x600);
@@ -564,17 +527,15 @@ void tms320c54x_test_state::start_pipeline_ldm(unsigned variant)
 	unsigned const wait = source == 0x25;
 	auto &program = m_cpu->space(AS_PROGRAM);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : 0x4800 | (BIT(variant, 0) << 8) | source);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa61a);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0xa61a},
+	});
 	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (BIT(variant, 1) << 8) | (BIT(variant, 2) << 14));
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0xffff);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456cafeULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x234567abcdULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR1, 0xffff}, {cpu_regs::STATE_A, 0x123456cafeULL},
+		{cpu_regs::STATE_B, 0x234567abcdULL}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
 	m_cpu->space(AS_DATA).write_word(0x7e, 0x8001);
 	m_cpu->space(AS_DATA).write_word(0x25, 0xabcd);
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600);
@@ -592,7 +553,7 @@ void tms320c54x_test_state::start_pipeline_ldm(unsigned variant)
 }
 
 bool tms320c54x_test_state::absolute_memory_dp() const
-{ return !strcmp(machine().options().bios(), "dp-absolute"); }
+{ return profile_is("dp-absolute"); }
 
 void tms320c54x_test_state::start_pipeline_memory_dp(unsigned variant)
 {
@@ -606,15 +567,11 @@ void tms320c54x_test_state::start_pipeline_memory_dp(unsigned variant)
 	program.write_word(0x600, absolute ? 0x46f8 : 0x467f);
 	program.write_word(0x601, absolute ? 0x47f : 0x107e);
 	if (absolute) program.write_word(0x602, 0x107e);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x123456789aULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_A, 0},
+		{cpu_regs::STATE_B, 0x123456789aULL}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
 	m_cpu->space(AS_DATA).write_word(0x47f, 0xe000 | page);
 	m_cpu->space(AS_DATA).write_word(0x47e, 0x1111);
 	m_cpu->space(AS_DATA).write_word(target, 0x2222);
@@ -654,17 +611,12 @@ void tms320c54x_test_state::start_pipeline_data_push(unsigned variant)
 	if (addm) { program.write_word(0x600, 0x6b82); program.write_word(0x601, 2); }
 	program.write_word(0x600 + (addm ? 2 : 0), addm ? 0x4b92 : std::array<u16, 4>{0x4b70, 0x4b20, 0x4b82, 0x4b92}[form]);
 	if (follower) program.write_word(0x601 + gap, 0x1027);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa208);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (form == 1 || follower ? 0x4000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x470);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0xa208}, {cpu_regs::STATE_ST1, 0x900 | (form == 1 || follower ? 0x4000 : 0)},
+		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR2, 0x470}, {cpu_regs::STATE_A, 0x123456789aULL},
+		{cpu_regs::STATE_B, 0x2233445566ULL}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
 	m_cpu->space(AS_DATA).write_word(source, word); m_cpu->space(AS_DATA).write_word(0xfff, 0xaaaa);
 	m_cpu->space(AS_DATA).write_word(0x1027, 0x1111); m_cpu->space(AS_DATA).write_word(0x1026, 0x2222);
 	m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true);
@@ -715,18 +667,14 @@ void tms320c54x_test_state::start_pipeline_data_pop(unsigned variant)
 	}
 	else program.write_word(origin, std::array<u16, 4>{0x8b70, 0x8b20, 0x8b83, 0x8b93}[form]);
 	if (follower) program.write_word(origin + 1 + gap, 0x1027);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa208);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (variant >= 44 ? 0x800 : 0x900) | (form == 1 || follower ? 0x4000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x470);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR3, copy ? 0x620 : 0x470);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0xa208},
+		{cpu_regs::STATE_ST1, (variant >= 44 ? 0x800 : 0x900) | (form == 1 || follower ? 0x4000 : 0)},
+		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR2, 0x470}, {cpu_regs::STATE_AR3, copy ? 0x620 : 0x470},
+		{cpu_regs::STATE_A, 0x123456789aULL}, {cpu_regs::STATE_B, 0x2233445566ULL}, {cpu_regs::STATE_IFR, 0},
+		{cpu_regs::STATE_IMR, 0},
+	});
 	auto &data = m_cpu->space(AS_DATA);
 	data.write_word(destination, 0xaaaa); data.write_word(stack, word);
 	data.write_word(0x1027, 0x1111); data.write_word(0x1028, 0x2222);
@@ -784,19 +732,13 @@ void tms320c54x_test_state::start_pipeline_register_store(unsigned variant)
 	}
 	else program.write_word(0x600, std::array<u16, 6>{0x8000, 0x8200, 0x8100, 0x8300, 0x8c00, 0x8d00}[kind] |
 		std::array<u16, 4>{0x70, 0x20, 0x83, 0x93}[form]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (!sequence && form == 1 ? 0x4000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x470);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2233445566ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, sequence ? 6 : 0xbeef);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0xcafe);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x800 | (!sequence && form == 1 ? 0x4000 : 0)},
+		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR3, 0x470}, {cpu_regs::STATE_A, 0x123456789aULL},
+		{cpu_regs::STATE_B, 0x2233445566ULL}, {cpu_regs::STATE_T, sequence ? 6 : 0xbeef}, {cpu_regs::STATE_TRN, 0xcafe},
+		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
 	for (unsigned i = 0; i < 3; ++i) m_cpu->space(AS_DATA).write_word(destination + i, 0xaaaa);
 	m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true);
 	m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_store_writes = 0;
@@ -825,17 +767,12 @@ void tms320c54x_test_state::start_pipeline_absolute_load(unsigned variant)
 	auto &program = m_cpu->space(AS_PROGRAM);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : b ? 0x11f8 : 0x10f8);
 	program.write_word(base + 0x601, address);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa61b);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4800 | (sxm ? 0x100 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x470);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x2233445566ULL : 0x123456789aULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? 0x123456789aULL : 0x2233445566ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0xa61b}, {cpu_regs::STATE_ST1, 0x4800 | (sxm ? 0x100 : 0)}, {cpu_regs::STATE_SP, 0x1000},
+		{cpu_regs::STATE_AR2, 0x470}, {cpu_regs::STATE_A, b ? 0x2233445566ULL : 0x123456789aULL},
+		{cpu_regs::STATE_B, b ? 0x123456789aULL : 0x2233445566ULL}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
 	m_cpu->space(AS_DATA).write_word(address, value);
 	m_cpu->space(AS_DATA).write_word(0x650, 0xbad);
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
@@ -863,16 +800,11 @@ void tms320c54x_test_state::start_repeat_pop_exclusion(unsigned variant)
 	auto &program = m_cpu->space(AS_PROGRAM);
 	std::array<u16, 5> const code{0xf072, 0x603, u16(0x8a1a + variant), 0xf495, 0xf4e1};
 	for (unsigned i = 0; i < code.size(); ++i) program.write_word(0x600 + i, code[i]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ST0, 0},
+		{cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_BRC, 1}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_IFR, 0},
+		{cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_TCR, 0x10},
+	});
 	m_pipeline_operand_reads = m_pipeline_store_writes = m_idle_fixture_tick = 0;
 	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x1000, 0x1000, "repeat_pop_excluded_stack",
 		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
@@ -899,13 +831,10 @@ void tms320c54x_test_state::start_pipeline_mvpd(unsigned variant)
 	program.write_word(source, 0x1111); program.write_word(base + source, 0x4444);
 	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, BIT(variant, 2) ? 0x20 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, mode == 1 ? 0x4800 : 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x400);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x420);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, mode == 1 ? 0x4800 : 0x800},
+		{cpu_regs::STATE_SP, 0x400}, {cpu_regs::STATE_AR2, 0x420}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
 	m_cpu->space(AS_DATA).write_word(0x420, 0xffff);
 	m_cpu->set_state_int(STATE_GENPC, base + 0x9000); m_cpu->set_pipeline_frontend(true);
 	m_pipeline_replay = false; m_idle_fixture_tick = 0;
@@ -1158,14 +1087,12 @@ void tms320c54x_test_state::start_pipeline_repeat_mvpd(unsigned variant)
 	}
 	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, BIT(variant, 3) ? 0x20 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, interrupt && !nmi ? 0 : 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x420);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, interrupt && !nmi ? 1 : 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 0xa608},
+		{cpu_regs::STATE_ST1, interrupt && !nmi ? 0 : 0x800}, {cpu_regs::STATE_SP, 0x1000},
+		{cpu_regs::STATE_AR2, 0x420}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_IFR, 0},
+		{cpu_regs::STATE_IMR, interrupt && !nmi ? 1 : 0},
+	});
 	m_cpu->set_state_int(STATE_GENPC, base + 0x9000); m_cpu->set_pipeline_frontend(true);
 	m_pipeline_replay = false; m_idle_fixture_tick = 0;
 	m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
@@ -1218,18 +1145,13 @@ void tms320c54x_test_state::start_pipeline_memory_repeat_read_a(unsigned variant
 		u32 const logical = source + i, physical = ovly && !(logical & 0x8000) ? logical & 0xffff : logical;
 		program.write_word(physical, 0x1200 + i); m_cpu->space(AS_DATA).write_word(0x420 + i, 0xffff);
 	}
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, ovly ? 0x20 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, interrupt && !nmi ? 0 : 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, count);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x420);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, source);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, interrupt && !nmi ? 1 : 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, ovly ? 0x20 : 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, interrupt && !nmi ? 0 : 0x800},
+		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR1, count}, {cpu_regs::STATE_AR2, 0x420},
+		{cpu_regs::STATE_A, source}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_IFR, 0},
+		{cpu_regs::STATE_IMR, interrupt && !nmi ? 1 : 0},
+	});
 	m_cpu->space(AS_DATA).write_word(0x500, count);
 	m_cpu->set_state_int(STATE_GENPC, 0x19000); m_cpu->set_pipeline_frontend(true);
 	m_pipeline_replay = false; m_idle_fixture_tick = 0;
@@ -1270,8 +1192,8 @@ void tms320c54x_test_state::start_pipeline_memory_repeat_read_a(unsigned variant
 void tms320c54x_test_state::start_pipeline_absolute_add(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const bk = !strcmp(machine().options().bios(), "add-bk");
-	bool const sp = !strcmp(machine().options().bios(), "add-sp");
+	bool const bk = profile_is("add-bk");
+	bool const sp = profile_is("add-sp");
 	u16 const operand = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[variant % 4];
 	u64 const initial = std::array<u64, 4>{0, 0x7fffffff, 0xff80000000ULL, 0xffffffffffULL}[(variant / 4) % 4];
 	bool const sxm = BIT(variant, 4), ovm = BIT(variant, 5), b = BIT(variant, 6), ram = BIT(variant, 7);
@@ -1280,18 +1202,18 @@ void tms320c54x_test_state::start_pipeline_absolute_add(unsigned variant)
 	auto &program = m_cpu->space(AS_PROGRAM);
 	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
 	program.write_word(base + 0x600, b ? 0x01f8 : 0x00f8); program.write_word(base + 0x601, source);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa008);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0xa008},
+	});
 	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0) | (sp && BIT(variant, 11) ? 0x4000 : 0));
 	m_cpu->set_state_int(tms320c54x_device::STATE_SP, sp && !ram ? operand : 0x1000);
 	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, operand);
 	if (bk) m_cpu->set_state_int(tms320c54x_device::STATE_BK, operand);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x2233445566ULL : initial);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? initial : 0x2233445566ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_A, b ? 0x2233445566ULL : initial}, {cpu_regs::STATE_B, b ? initial : 0x2233445566ULL},
+		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
 	m_cpu->space(AS_DATA).write_word(0x500, operand);
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
 	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
@@ -1316,14 +1238,11 @@ void tms320c54x_test_state::start_pipeline_direct_immediate_store(unsigned varia
 	auto &program = m_cpu->space(AS_PROGRAM);
 	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
 	program.write_word(base + 0x600, 0x7600 | offset); program.write_word(base + 0x601, value);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (compiler ? 0x4000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x900 | (compiler ? 0x4000 : 0)},
+		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
 	m_cpu->space(AS_DATA).write_word(target, 0xaaaa);
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
 	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
@@ -1390,8 +1309,8 @@ tms320c54x_test_state::extended_ar_store_fixture tms320c54x_test_state::extended
 void tms320c54x_test_state::start_extended_ar_store(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const consumer = !strcmp(machine().options().bios(), "st-ar-consumer") || !strcmp(machine().options().bios(), "st-shift-ar-use");
-	bool const shifted = !strcmp(machine().options().bios(), "st-shift-ar") || !strcmp(machine().options().bios(), "st-shift-ar-use");
+	bool const consumer = profile_is("st-ar-consumer") || profile_is("st-shift-ar-use");
+	bool const shifted = profile_is("st-shift-ar") || profile_is("st-shift-ar-use");
 	auto const f = extended_ar_store_case(variant, consumer, shifted);
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
@@ -1401,10 +1320,10 @@ void tms320c54x_test_state::start_extended_ar_store(unsigned variant)
 	if (shifted) program.write_word(f.base + 0x602, (f.kind & 2 ? 0x0c60 : 0x0c80) | ((f.kind & 1) << 8) | (f.shift & 31));
 	if (consumer) program.write_word(f.base + 0x602 + shifted + f.gap, 0x1280 | (((f.kind & 1) ^ 1) << 8) | f.reg);
 	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.flags & 1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4800 | ((f.flags & 2) ? 0x100 : 0));
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, f.flags & 1}, {cpu_regs::STATE_ST0, 0xa608},
+		{cpu_regs::STATE_ST1, 0x4800 | ((f.flags & 2) ? 0x100 : 0)},
+	});
 	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x6000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 8);
 	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x4000 + ar);
@@ -1442,16 +1361,12 @@ void tms320c54x_test_state::start_pipeline_stlm(unsigned variant)
 	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
 	program.write_word(base + 0x600, 0x8810 | (source << 8) | reg);
 	program.write_word(base + 0x601 + gap, 0x1080 | ((source ^ 1) << 8) | reg);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, (variant / 128) % 2);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4800 | (((variant / 64) % 2) << 8));
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, source ? 0xdead : value);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, source ? value : 0xdead);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + reg, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, (variant / 128) % 2}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x4800 | (((variant / 64) % 2) << 8)},
+		{cpu_regs::STATE_A, source ? 0xdead : value}, {cpu_regs::STATE_B, source ? value : 0xdead},
+		{cpu_regs::STATE_AR0 + reg, 0x1000}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
 	m_cpu->space(AS_DATA).write_word(0x1000, 0xaaaa);
 	if (result >= 0x60) m_cpu->space(AS_DATA).write_word(result, 0xbbbb);
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
@@ -1560,18 +1475,14 @@ void tms320c54x_test_state::start_pipeline_extended_dst(unsigned variant)
 	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
 	program.write_word(base + 0x600, 0x4e00 | (f.source << 8) | (short_form ? 0x80 + (f.kind - 4) * 8 + f.reg : f.kind == 3 ? 0xf8 : 0xe0 + f.kind * 8 + f.reg));
 	if (!short_form) program.write_word(base + 0x601, f.literal);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, (flags / (short_form ? 1536 : 512)) % 2);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x6608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4900 | (((flags / (short_form ? 768 : 256)) % 2) << 5));
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.source ? 0xdead : f.value);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, f.source ? f.value : 0xdead);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, f.initial);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, (flags / (short_form ? 1536 : 512)) % 2},
+		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 0x6608},
+		{cpu_regs::STATE_ST1, 0x4900 | (((flags / (short_form ? 768 : 256)) % 2) << 5)},
+		{cpu_regs::STATE_A, f.source ? 0xdead : f.value}, {cpu_regs::STATE_B, f.source ? f.value : 0xdead},
+		{cpu_regs::STATE_AR0, 3}, {cpu_regs::STATE_AR0 + f.selected, f.initial}, {cpu_regs::STATE_BK, f.bk},
+		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
 	m_cpu->space(AS_DATA).write_word(f.address, 0xaaaa);
 	m_cpu->space(AS_DATA).write_word(f.address ^ 1, 0xaaaa);
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
@@ -1610,17 +1521,12 @@ void tms320c54x_test_state::start_mvkd_sp(unsigned variant)
 	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, f.opcode); program.write_word(f.base + 0x601, f.literal);
 	if (f.form == 5 || f.form == 6) program.write_word(f.base + 0x602, 0x18);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (f.compiler ? 0x4000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1400);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x1357);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
+		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x900 | (f.compiler ? 0x4000 : 0)},
+		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR2, 0x1400}, {cpu_regs::STATE_AR3, 0x1357},
+		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
 	if (f.destination >= 0x60) m_cpu->space(AS_DATA).write_word(f.destination, 0xaaaa);
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
 	m_pipeline_replay = false; m_idle_fixture_tick = 0;
@@ -1663,16 +1569,12 @@ void tms320c54x_test_state::start_pipeline_data_copy(unsigned variant)
 	program.write_word(base + 0x601, f.form == 5 ? f.destination : f.source);
 	if (f.form == 5) program.write_word(base + 0x602, f.source);
 	if (f.form == 6) program.write_word(base + 0x602 + ((variant / 112) % 2), 0xf4a9); // CMPR with zero/one gap (table 7-7).
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.form == 6 ? 0xa600 : 0xa608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900 | (f.form == 1 ? 0x4000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, f.value);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, f.form == 6 ? 0xa600 : 0xa608}, {cpu_regs::STATE_ST1, 0x900 | (f.form == 1 ? 0x4000 : 0)},
+		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR1, 0x1000}, {cpu_regs::STATE_AR0, f.value},
+		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
 	if (f.destination >= 0x60) m_cpu->space(AS_DATA).write_word(f.destination, 0xaaaa);
 	if (f.source != 0x11 || (variant / 7) % 4 != 0) m_cpu->space(AS_DATA).write_word(f.source, f.value);
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
@@ -1708,23 +1610,22 @@ tms320c54x_test_state::long_store_fixture tms320c54x_test_state::immediate_long_
 void tms320c54x_test_state::start_pipeline_long_immediate_store(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const peripheral = !strcmp(machine().options().bios(), "st-long-periph");
+	bool const peripheral = profile_is("st-long-periph");
 	auto const f = peripheral ? peripheral_long_store_fixture(variant) : immediate_long_store_fixture(variant);
 	u32 const base = (variant / 768) % 2 ? 0x20000 : 0;
 	auto &program = m_cpu->space(AS_PROGRAM);
 	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
 	program.write_word(base + 0x600, 0x76e0 | (f.kind << 3) | f.reg);
 	program.write_word(base + 0x601, f.offset); program.write_word(base + 0x602, f.value);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (f.compatibility << 5));
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, f.st0}, {cpu_regs::STATE_ST1, 0x800 | (f.compatibility << 5)},
+	});
 	if (peripheral) for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5555);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, peripheral ? u16(f.address - f.offset) : f.initial);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_AR0 + f.selected, peripheral ? u16(f.address - f.offset) : f.initial},
+		{cpu_regs::STATE_BK, f.bk}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
 	m_cpu->space(AS_DATA).write_word(f.address, 0xaaaa);
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
 	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
@@ -1793,11 +1694,10 @@ void tms320c54x_test_state::start_pipeline_mvmm_sp(unsigned variant)
 	auto &program = m_cpu->space(AS_PROGRAM);
 	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
 	program.write_word(base + 0x600, 0xe718); program.write_word(base + 0x601 + gap, 0x1002);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 8);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (compiler ? 0x4000 : 0));
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 8},
+		{cpu_regs::STATE_ST1, 0x800 | (compiler ? 0x4000 : 0)},
+	});
 	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1200);
 	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
@@ -1819,9 +1719,9 @@ void tms320c54x_test_state::start_pipeline_mvmm_sp(unsigned variant)
 void tms320c54x_test_state::start_pipeline_mapped_load_age(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const arithmetic = !strcmp(machine().options().bios(), "addsub-ar-age");
-	bool const shifted = !strcmp(machine().options().bios(), "shift16-load-age");
-	bool const mapped = arithmetic || shifted || !strcmp(machine().options().bios(), "mapped-load-age");
+	bool const arithmetic = profile_is("addsub-ar-age");
+	bool const shifted = profile_is("shift16-load-age");
+	bool const mapped = arithmetic || shifted || profile_is("mapped-load-age");
 	unsigned const fields = shifted ? variant / 4 : mapped ? variant / 8 : variant, form = shifted ? variant%4 : mapped ? (variant / 2) % 4 : 0;
 	unsigned const ar = fields % 8, kind = (fields / 64) % 3, pointer = (ar + 2) % 8;
 	unsigned const words = mapped && form >= 2 ? 2 : 1, read_cycle = 4 + words;
@@ -1836,13 +1736,11 @@ void tms320c54x_test_state::start_pipeline_mapped_load_age(unsigned variant)
 	if (words == 2) program.write_word(base + 0x601, form == 2 ? 0x10 + ar : 0);
 	program.write_word(base + 0x600 + words, kind == 2 ? 0xe700 | (((ar + 1) % 8) << 4) | ar :
 		(kind ? 0x6d88 : 0x6d90) | ar);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1c00);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (sxm ? 0x100 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x123456789aULL);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0x1c00}, {cpu_regs::STATE_ST1, 0x800 | (sxm ? 0x100 : 0)},
+		{cpu_regs::STATE_A, 0x123456789aULL}, {cpu_regs::STATE_B, 0x123456789aULL},
+	});
 	if(arithmetic) m_cpu->set_state_int(destination_b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A,0);
 	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x3333);
 	m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, value);
@@ -1880,7 +1778,7 @@ void tms320c54x_test_state::start_pipeline_mapped_load_age(unsigned variant)
 void tms320c54x_test_state::start_pipeline_store_mvmm(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const accumulator = !strcmp(machine().options().bios(), "st-acc-mvmm");
+	bool const accumulator = profile_is("st-acc-mvmm");
 	unsigned const count = 1 + variant % 2, source = (variant / 2) % 8, destination = (variant / 16) % 8;
 	unsigned const width = accumulator ? 1 : 2, form=(variant/1536)%4;
 	u16 const stored=std::array<u16,4>{0,1,0x8000,0xffff}[variant/6144];
@@ -1895,13 +1793,11 @@ void tms320c54x_test_state::start_pipeline_store_mvmm(unsigned variant)
 	}
 	program.write_word(base + 0x600 + width * count + gap, 0xe700 | (source << 4) | destination);
 	program.write_word(base + 0x601 + width * count + gap, 0x1080 | destination);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A,u64(stored)<<(form&2 ? 16 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_B,u64(stored)<<(form&2 ? 16 : 0));
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 0},
+		{cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_A, u64(stored)<<(form&2 ? 16 : 0)},
+		{cpu_regs::STATE_B, u64(stored)<<(form&2 ? 16 : 0)},
+	});
 	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x1400);
 	m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + source, 0x1200);
 	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
@@ -1951,11 +1847,10 @@ void tms320c54x_test_state::start_pipeline_mvmm_producer(unsigned variant)
 	if (immediate) program.write_word(base + 0x601, 0x1200);
 	program.write_word(base + 0x600 + (immediate ? 2 : 1) + gap, 0xe715);
 	program.write_word(base + 0x601 + (immediate ? 2 : 1) + gap, 0x1085);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 8);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 8},
+		{cpu_regs::STATE_ST1, 0x800},
+	});
 	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x1300);
 	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1200);
 	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
@@ -1987,12 +1882,10 @@ void tms320c54x_test_state::start_pipeline_xmem_bit(unsigned variant)
 	program.write_word(0x600, 0x9600 | (x << 4) | bitcode);
 	program.write_word(0x601 + gap, 0xfd20); // XC 1,NTC samples in Access.
 	program.write_word(0x602 + gap, 0xe855);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x608 | (initial_tc ? 0x1000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0x608 | (initial_tc ? 0x1000 : 0)}, {cpu_regs::STATE_ST1, 0x800},
+	});
 	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
 	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0);
@@ -2065,7 +1958,7 @@ tms320c54x_test_state::imr_store_fixture tms320c54x_test_state::stlm_imr_case(un
 void tms320c54x_test_state::start_pipeline_imr_store(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const stlm = !strcmp(machine().options().bios(), "stlm-imr");
+	bool const stlm = profile_is("stlm-imr");
 	auto const f = stlm ? stlm_imr_case(variant) : imr_store_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
 	u32 const vector = f.base + (f.kind == 2 ? 4 : (16 + f.source) * 4);
 	for (unsigned i = 0; i < 32; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(vector + i, 0xf495); }
@@ -2233,12 +2126,11 @@ void tms320c54x_test_state::start_pipeline_indirect_dld(unsigned variant)
 	if (form >= 12) program.write_word(base + 0x601, f.literal);
 	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x6608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | ((flags & 1) << 8) | ((flags & 2) << 4) | ((flags & 4) << 5));
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, f.initial);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 0x6608},
+		{cpu_regs::STATE_ST1, 0x800 | ((flags & 1) << 8) | ((flags & 2) << 4) | ((flags & 4) << 5)},
+		{cpu_regs::STATE_AR0, 3}, {cpu_regs::STATE_AR0 + f.selected, f.initial}, {cpu_regs::STATE_BK, f.bk},
+	});
 	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1111222233ULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x4444555566ULL);
 	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 	m_cpu->space(AS_DATA).write_word(f.address, f.stored >> 16); m_cpu->space(AS_DATA).write_word(f.address ^ 1, f.stored);
@@ -2322,7 +2214,7 @@ tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::delay_co
 void tms320c54x_test_state::start_delay_copy(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const control = !strcmp(machine().options().bios(), "delay-copy-ctrl");
+	bool const control = profile_is("delay-copy-ctrl");
 	unsigned const kind = variant % 6, v = control ? (variant / 6 / 4) * 5 + std::array<unsigned, 4>{0, 2, 3, 4}[(variant / 6) % 4] : variant;
 	auto const f = delay_copy_case(v); u32 const base = (v / 2560) % 2 ? 0x20000 : 0, target = control && kind == 4 ? base ^ 0x20000 : base;
 	unsigned const read = control ? delay_multiply_fixture::operand_read(kind, 0) : 5;
@@ -2727,7 +2619,7 @@ void tms320c54x_test_state::start_stlm_pmst_edge(unsigned variant)
 tms320c54x_test_state::repeat_load_fixture tms320c54x_test_state::repeat_load_case(unsigned v)
 {
 	repeat_load_fixture f{}; unsigned snapshot = v % 3;
-	f.arithmetic = !strcmp(machine().options().bios(), "rpt-sfta");
+	f.arithmetic = profile_is("rpt-sfta");
 	if (v >= 198656)
 	{
 		v -= 198656; f.block = true; f.count = std::array<unsigned, 4>{0, 1, 7, 255}[v % 4]; v /= 4;
@@ -2832,9 +2724,9 @@ void tms320c54x_test_state::start_repeat_load_edge(unsigned variant)
 {
 	start_repeat_load(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-	bool const tmac = !strcmp(machine().options().bios(), "tmac-rpt-edge");
-	bool const square = !strcmp(machine().options().bios(), "sqacc-rpt-edge") || tmac;
-	bool const dual = !strcmp(machine().options().bios(), "mac-rpt-edge");
+	bool const tmac = profile_is("tmac-rpt-edge");
+	bool const square = profile_is("sqacc-rpt-edge") || tmac;
+	bool const dual = profile_is("mac-rpt-edge");
 	u32 const base = (dual ? (variant / 128) % 2 : square ? (variant / 16) % 2 : (variant / 8) % 2) ? 0x20000 : 0; auto &program = m_cpu->space(AS_PROGRAM);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
 	program.write_word(base + 0x600, 0xec01);
@@ -2899,10 +2791,10 @@ void tms320c54x_test_state::start_source_alias_case(unsigned variant)
 	program.write_word(base + 0x602, 3);
 	program.write_word(base + 0x603, 0xf4e1);
 	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, profile->st0(variant));
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (flags & 2 ? 0x20 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xabcd);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_ST1, 0x800 | (flags & 2 ? 0x20 : 0)}, {cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 0x5678},
+		{cpu_regs::STATE_T, 0xabcd},
+	});
 	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x1400 + i);
 	m_rptbd_counts = {};
 	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mpy_alias_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
@@ -2952,7 +2844,7 @@ void tms320c54x_test_state::start_short_read_mod3_edge(unsigned variant)
 
 void tms320c54x_test_state::start_mmr_long_edge(unsigned variant)
 {
-	bool const repeated = !strcmp(machine().options().bios(), "rpt-xfer-edge");
+	bool const repeated = profile_is("rpt-xfer-edge");
 	m_cpu->reset(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 	m_pipeline_peripheral_case = variant; m_idle_fixture_tick = 0; m_pipeline_replay = false;
 	u32 const base = (variant / (repeated ? 1200 : 576)) % 2 ? 0x20000 : 0;
@@ -3080,12 +2972,12 @@ void tms320c54x_test_state::start_delay_store_edge(unsigned variant)
 	start_delay_store(fixture); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 	auto const f = delay_store_case(fixture); auto &program = m_cpu->space(AS_PROGRAM);
 	u16 family = 0x8000;
-	if (!strcmp(machine().options().bios(), "asm-delay-edge")) family = 0x3200;
-	else if (!strcmp(machine().options().bios(), "dld-delay-edge")) family = 0x5600;
-	else if (!strcmp(machine().options().bios(), "mac-delay-edge")) family = 0x2800;
-	else if (!strcmp(machine().options().bios(), "mpy-delay-edge")) family = 0x2000;
-	else if (!strcmp(machine().options().bios(), "mpyr-delay-edge")) family = 0x2200;
-	else if (!strcmp(machine().options().bios(), "bd-maca-edge")) family = 0x3100;
+	if (profile_is("asm-delay-edge")) family = 0x3200;
+	else if (profile_is("dld-delay-edge")) family = 0x5600;
+	else if (profile_is("mac-delay-edge")) family = 0x2800;
+	else if (profile_is("mpy-delay-edge")) family = 0x2000;
+	else if (profile_is("mpyr-delay-edge")) family = 0x2200;
+	else if (profile_is("bd-maca-edge")) family = 0x3100;
 	program.write_word(f.base + 0x602, 0xf495); program.write_word(f.base + 0x603, family | f.mode); program.write_word(f.base + 0x604, f.literal);
 	m_pipeline_fetch_tap.remove(); m_pipeline_peripheral_case = variant; m_phase = 254500;
 	m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -3157,7 +3049,7 @@ tms320c54x_test_state::move_brc_fixture tms320c54x_test_state::move_brc_case(uns
 void tms320c54x_test_state::start_move_brc(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const control = !strcmp(machine().options().bios(), "move-brc-delay");
+	bool const control = profile_is("move-brc-delay");
 	auto const f = move_brc_case(variant, control);
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
@@ -3254,8 +3146,8 @@ u16 tms320c54x_test_state::asm_store_bypass_value(unsigned variant)
 void tms320c54x_test_state::start_store_bypass(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const xmem = !strcmp(machine().options().bios(), "xmem-store-bp");
-	bool const asm_store = !strcmp(machine().options().bios(), "asm-store-bp");
+	bool const xmem = profile_is("xmem-store-bp");
+	bool const asm_store = profile_is("asm-store-bp");
 	unsigned const kind = variant % 6, gap = (variant / (asm_store ? 256 : 12)) % 2;
 	bool const destination = (variant / (asm_store ? 128 : 6)) % 2, alias = (variant / (asm_store ? 512 : 24)) % 2;
 	u32 const base = (variant / (asm_store ? 4096 : 48)) % 2 ? 0x20000 : 0;
@@ -3403,11 +3295,10 @@ void tms320c54x_test_state::start_reverse_carry_case(unsigned index)
 	program.write_word(0x0109d0, (kind == 0 ? 0x6d00 : kind == 1 ? 0x1000 : 0x8000) | operand);
 	program.write_word(0x0109d1, 0xf4e1);
 	m_cpu->space(AS_DATA).write_word(addresses[value_case], 0x1234);
-	m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x5678);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 1U << offset_bit);
+	set_registers(*m_cpu, {
+		{STATE_GENPC, 0x0109d0}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x0900}, {cpu_regs::STATE_A, 0x5678},
+		{cpu_regs::STATE_AR0, 1U << offset_bit},
+	});
 	m_cpu->set_state_int(tms320c54x_device::STATE_AR1 + ar - 1, addresses[value_case]);
 	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 	m_phase = 3474 + index;
@@ -3424,11 +3315,10 @@ void tms320c54x_test_state::start_reverse_carry_sequence(bool subtract)
 		program.write_word(0x0109d2 + i * 3, subtract ? 0x6da3 : 0x6dbb);
 	}
 	program.write_word(0x010a00, 0xf4e1);
-	m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 8);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0060);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{STATE_GENPC, 0x0109d0}, {cpu_regs::STATE_ST1, 0x0900}, {cpu_regs::STATE_AR0, 8}, {cpu_regs::STATE_AR3, 0x0060},
+		{cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 6162 + subtract;
 	m_check_timer->adjust(attotime::from_usec(100));
 }
@@ -3439,14 +3329,11 @@ void tms320c54x_test_state::start_asm_store_case(unsigned index)
 	program.write_word(0x0109d0, 0x8493 | ((index / 32) << 8));
 	program.write_word(0x0109d1, 0xf4e1);
 	m_cpu->space(AS_DATA).write_word(0x0507, 0xbeef);
-	m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900 | (index & 31));
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff87654321ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0507);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{STATE_GENPC, 0x0109d0}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ST0, 0x0aa5},
+		{cpu_regs::STATE_ST1, 0x0900 | (index & 31)}, {cpu_regs::STATE_A, 0x12345678},
+		{cpu_regs::STATE_B, 0xff87654321ULL}, {cpu_regs::STATE_AR3, 0x0507}, {cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 3346 + index;
 	m_check_timer->adjust(attotime::from_usec(100));
 }
@@ -3458,15 +3345,11 @@ void tms320c54x_test_state::start_compact_store_case(unsigned index)
 	program.write_word(0x0109d0, 0x9800 | index);
 	program.write_word(0x0109d1, 0xf4e1);
 	m_cpu->space(AS_DATA).write_word(0x0507, 0xbeef);
-	m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff87654321ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + (operand & 3), 0x0507);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, 8);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{STATE_GENPC, 0x0109d0}, {cpu_regs::STATE_ST0, 0x0aa5}, {cpu_regs::STATE_ST1, 0x0900},
+		{cpu_regs::STATE_A, 0x12345678}, {cpu_regs::STATE_B, 0xff87654321ULL}, {cpu_regs::STATE_AR0, 3},
+		{cpu_regs::STATE_AR2 + (operand & 3), 0x0507}, {cpu_regs::STATE_BK, 8}, {cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 2765 + index;
 	m_check_timer->adjust(attotime::from_usec(100));
 }
@@ -3488,16 +3371,11 @@ void tms320c54x_test_state::start_trn_store_case(unsigned index)
 	program.write_word(next++, 0x0124);
 	program.write_word(next, 0xf4e1);
 	m_cpu->space(AS_DATA).write_word(mode == 0 ? 0x0045 : 0x0f67, 0xdead);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0xabcd);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x9876);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, 8);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f67);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x1100);
-	m_cpu->set_state_int(STATE_GENPC, 0x05e0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TRN, 0xabcd}, {cpu_regs::STATE_T, 0x9876}, {cpu_regs::STATE_B, 0x12345678},
+		{cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x0900}, {cpu_regs::STATE_BK, 8}, {cpu_regs::STATE_AR2, 0x0f67},
+		{cpu_regs::STATE_AR6, 0x1100}, {STATE_GENPC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+	});
 	m_port_writes = 0;
 	m_phase = 93000 + index;
 	m_check_timer->adjust(attotime::from_usec(100));
@@ -3517,12 +3395,10 @@ void tms320c54x_test_state::start_indirect_pshm_case(unsigned index)
 	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
 	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x01ff); // DP must not select an MMR page.
 	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4900); // CPL must not select a stack-relative MMR.
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0f0f);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f0f);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x1100);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
-	m_cpu->set_state_int(STATE_GENPC, 0x05e0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_AR0, 0x0f0f}, {cpu_regs::STATE_AR2, 0x0f0f}, {cpu_regs::STATE_AR6, 0x1100},
+		{cpu_regs::STATE_BK, 16}, {STATE_GENPC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+	});
 	m_port_writes = 0;
 	m_phase = 94000 + index;
 	m_check_timer->adjust(attotime::from_usec(100));
@@ -3545,13 +3421,11 @@ void tms320c54x_test_state::start_stack_address_latency_case(unsigned index)
 	program.write_word(cursor, 0xf4e1);
 	for (unsigned address = 0x0fff; address <= 0x1007; ++address) data.write_word(address, 0xcccc);
 	data.write_word(0x1000, 0x5566); data.write_word(0x1806, 0xcccc);
-	m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0030);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (index & 2) ? 0x0800 : 0x4800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x4044);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{STATE_GENPC, 0x0109d0}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_ST0, 0x0030},
+		{cpu_regs::STATE_ST1, (index & 2) ? 0x0800 : 0x4800}, {cpu_regs::STATE_A, 0x4044}, {cpu_regs::STATE_B, 0x1234},
+		{cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 2672 + index;
 	m_check_timer->adjust(attotime::from_usec(100));
 }
@@ -3564,13 +3438,11 @@ void tms320c54x_test_state::start_immediate_dp_case(unsigned index)
 	program.write_word(0x0109d3, 0x75d6); program.write_word(0x0109d4, 0x0124);
 	program.write_word(0x0109d5, 0xf4e1);
 	m_port_writes = 0;
-	m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x9876543210ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xfe00 | ((index ^ 0x1ff) & 0x1ff));
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (index & 512) ? 0x4800 : 0x0900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{STATE_GENPC, 0x0109d0}, {cpu_regs::STATE_AR6, 0x1000}, {cpu_regs::STATE_A, 0x123456789aULL},
+		{cpu_regs::STATE_B, 0x9876543210ULL}, {cpu_regs::STATE_ST0, 0xfe00 | ((index ^ 0x1ff) & 0x1ff)},
+		{cpu_regs::STATE_ST1, (index & 512) ? 0x4800 : 0x0900}, {cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 1648 + index;
 	m_check_timer->adjust(attotime::from_usec(100));
 }
@@ -3583,13 +3455,11 @@ void tms320c54x_test_state::start_compact_load_case(unsigned index)
 	program.write_word(0x0109d0, 0x9480 | ((index & 1) ? 0x100 : 0) | shift);
 	program.write_word(0x0109d1, 0xf4e1);
 	m_cpu->space(AS_DATA).write_word(0x1000, 0x8123);
-	m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (index & 2) ? 0x100 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{STATE_GENPC, 0x0109d0}, {cpu_regs::STATE_AR2, 0x1000}, {cpu_regs::STATE_A, 0x1234},
+		{cpu_regs::STATE_B, 0x1234}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, (index & 2) ? 0x100 : 0},
+		{cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 1632 + index;
 	m_check_timer->adjust(attotime::from_usec(100));
 }
@@ -3610,11 +3480,10 @@ void tms320c54x_test_state::start_banz_offset_case(unsigned index)
 	program.write_word(next++, 0xf4e1);
 	program.write_word(0x010970, 0xf020); program.write_word(0x010971, 0x2222);
 	program.write_word(0x010972, 0xf4e1);
-	m_cpu->set_state_int(STATE_GENPC, 0x010960);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, zero ? 1 : 5);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, 8);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{STATE_GENPC, 0x010960}, {cpu_regs::STATE_ST1, 0x0800}, {cpu_regs::STATE_AR0 + ar, zero ? 1 : 5},
+		{cpu_regs::STATE_BK, 8}, {cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 1331 + index;
 	m_check_timer->adjust(attotime::from_usec(100));
 }
@@ -3664,7 +3533,7 @@ tms320c54x_test_state::mvdd_fixture tms320c54x_test_state::mvdd_case(unsigned v,
 void tms320c54x_test_state::start_mvdd(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_mvdd_fixture = mvdd_case(variant, !strcmp(machine().options().bios(), "mvdd-repeat")); auto const &f = m_mvdd_fixture;
+	m_mvdd_fixture = mvdd_case(variant, profile_is("mvdd-repeat")); auto const &f = m_mvdd_fixture;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	if (f.prefix) program.write_word(f.base + 0x600, f.prefix == 2 ? 0xf070 : 0xec00 | f.count);
@@ -3730,7 +3599,7 @@ tms320c54x_test_state::popd_fixture tms320c54x_test_state::popd_case(unsigned v,
 void tms320c54x_test_state::start_popd_mapped(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_popd_fixture = popd_case(variant, !strcmp(machine().options().bios(), "popd-repeat")); auto &f = m_popd_fixture;
+	m_popd_fixture = popd_case(variant, profile_is("popd-repeat")); auto &f = m_popd_fixture;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	// PMST restoration may select the common lower program window.
 	for (u32 const base : {0U, 0x20000U})
@@ -3843,7 +3712,7 @@ tms320c54x_test_state::t_store_fixture tms320c54x_test_state::t_store_case(unsig
 void tms320c54x_test_state::start_t_store(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const consumer = !strcmp(machine().options().bios(), "st-t-consumer"); auto const f = t_store_case(variant, consumer); unsigned const gap = f.layout == 1 || f.layout == 3;
+	bool const consumer = profile_is("st-t-consumer"); auto const f = t_store_case(variant, consumer); unsigned const gap = f.layout == 1 || f.layout == 3;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, 0x8000 | (f.kind << 8) | f.mode); program.write_word(f.base + 0x601, f.literal);
@@ -3912,9 +3781,9 @@ tms320c54x_test_state::delay_load_fixture tms320c54x_test_state::delay_load_case
 void tms320c54x_test_state::start_delay_load(unsigned variant)
 {
 	bool const shifted = !strncmp(machine().options().bios(), "shift-delay", 11);
-	bool const shift_alu = !strcmp(machine().options().bios(), "shift-alu-delay");
-	bool const add = !strcmp(machine().options().bios(), "add-delay");
-	bool const dld = !strcmp(machine().options().bios(), "dld-delay");
+	bool const shift_alu = profile_is("shift-alu-delay");
+	bool const add = profile_is("add-delay");
+	bool const dld = profile_is("dld-delay");
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = shift_alu ? delay_shift_alu_case(variant) : dld ? delay_dld_case(variant) : add ? delay_add_case(variant) : delay_load_case(variant, shifted);
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.caller + 0x600 + i, 0xf495);
@@ -3994,8 +3863,8 @@ tms320c54x_test_state::asm_load_fixture tms320c54x_test_state::asm_load_case(uns
 void tms320c54x_test_state::start_asm_load(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const immediate = !strcmp(machine().options().bios(), "asm-immediate");
-	bool const consumer = immediate || !strcmp(machine().options().bios(), "asm-consumer"); auto const f = asm_load_case(variant, consumer);
+	bool const immediate = profile_is("asm-immediate");
+	bool const consumer = immediate || profile_is("asm-consumer"); auto const f = asm_load_case(variant, consumer);
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, immediate ? 0xed00 | f.raw : 0x3200 | f.mode); if (f.form >= 3) program.write_word(f.base + 0x601, f.form == 5 ? 0x1002 : 3);
@@ -4054,9 +3923,9 @@ tms320c54x_test_state::indexed_store_fixture tms320c54x_test_state::indexed_stor
 
 void tms320c54x_test_state::start_indexed_store(unsigned variant)
 {
-	bool const immediate = !strcmp(machine().options().bios(), "imm-index");
-	bool const asm_circular = !strcmp(machine().options().bios(), "asm-circular");
-	bool const circular = asm_circular || !strcmp(machine().options().bios(), "store-circular");
+	bool const immediate = profile_is("imm-index");
+	bool const asm_circular = profile_is("asm-circular");
+	bool const circular = asm_circular || profile_is("store-circular");
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = asm_circular ? asm_circular_store_case(variant) : circular ? circular_store_case(variant) : indexed_store_case(variant, immediate);
 	auto &program = m_cpu->space(AS_PROGRAM);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
@@ -4161,7 +4030,7 @@ tms320c54x_test_state::indexed_store_fixture tms320c54x_test_state::asm_circular
 
 void tms320c54x_test_state::start_indexed_load(unsigned variant)
 {
-	bool const circular = !strcmp(machine().options().bios(), "ld-circular");
+	bool const circular = profile_is("ld-circular");
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = circular ? circular_load_case(variant) : indexed_load_case(variant);
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
@@ -4209,7 +4078,7 @@ tms320c54x_test_state::indexed_mar_fixture tms320c54x_test_state::indexed_mar_ca
 void tms320c54x_test_state::start_indexed_mar(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const reverse = !strcmp(machine().options().bios(), "mar-reverse");
+	bool const reverse = profile_is("mar-reverse");
 	auto const f = indexed_mar_case(variant, reverse); auto &program = m_cpu->space(AS_PROGRAM);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, (reverse ? f.add ? 0x6db8 : 0x6da0 : f.add ? 0x6db0 : 0x6da8) | f.ar); program.write_word(f.base + 0x601, 0xf4e1);
@@ -4281,9 +4150,9 @@ tms320c54x_test_state::mapped_dual_fixture tms320c54x_test_state::mapped_dual_ca
 void tms320c54x_test_state::start_mapped_dual(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const edge = !strcmp(machine().options().bios(), "alu-map-edge");
-	bool const interrupt_registers = !strcmp(machine().options().bios(), "alu-map-irq");
-	bool const low_bus = !strcmp(machine().options().bios(), "alu-low-bus");
+	bool const edge = profile_is("alu-map-edge");
+	bool const interrupt_registers = profile_is("alu-map-irq");
+	bool const low_bus = profile_is("alu-low-bus");
 	auto const f = mapped_dual_case(variant, edge, interrupt_registers, low_bus); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, f.opcode); program.write_word(f.base + 0x601, 0xf4e1);
@@ -4312,7 +4181,7 @@ void tms320c54x_test_state::start_mapped_dual(unsigned variant)
 tms320c54x_test_state::repeated_stld_fixture tms320c54x_test_state::repeated_stld_case(unsigned v) const
 {
 	repeated_stld_fixture f{};
-	f.arithmetic = !strcmp(machine().options().bios(), "st-alu-rpt");
+	f.arithmetic = profile_is("st-alu-rpt");
 	unsigned const forms = f.arithmetic ? 8 : 6, modes = f.arithmetic ? 8 : 4;
 	unsigned const layouts = f.arithmetic ? 5 : 4;
 	f.form = v % forms; v /= forms; f.layout = v % layouts; v /= layouts;
@@ -4476,13 +4345,13 @@ tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::mapped_paral
 
 void tms320c54x_test_state::start_parallel_load(unsigned variant)
 {
-	bool const repeated_edge = !strcmp(machine().options().bios(), "stld-rpt-edge") || !strcmp(machine().options().bios(), "st-alu-rpt-edge");
-	bool const arithmetic = !strcmp(machine().options().bios(), "st-par-alu") || !strcmp(machine().options().bios(), "st-par-edge") || !strcmp(machine().options().bios(), "st-alu-rpt-edge");
-	bool const mapped = !strcmp(machine().options().bios(), "stld-map");
-	bool const multiply = !strcmp(machine().options().bios(), "st-par-mpy") || !strcmp(machine().options().bios(), "st-mpy-edge");
-	bool const bsp = !strcmp(machine().options().bios(), "stld-bsp");
-	bool const bus = !strcmp(machine().options().bios(), "stld-periph"), peripheral = bsp || bus;
-	bool const edge = repeated_edge || !strcmp(machine().options().bios(), "stld-edge") || !strcmp(machine().options().bios(), "st-par-edge") || !strcmp(machine().options().bios(), "st-mpy-edge"); auto const c = multiply ? parallel_multiply_case(variant, edge) : bus ? peripheral_parallel_load_case(variant) : bsp ? bsp_parallel_load_case(variant) : mapped ? mapped_parallel_load_case(variant) : arithmetic ? parallel_arithmetic_case(variant, edge) : parallel_load_case(variant, edge, repeated_edge); auto const &f = c.memory;
+	bool const repeated_edge = profile_is("stld-rpt-edge") || profile_is("st-alu-rpt-edge");
+	bool const arithmetic = profile_is("st-par-alu") || profile_is("st-par-edge") || profile_is("st-alu-rpt-edge");
+	bool const mapped = profile_is("stld-map");
+	bool const multiply = profile_is("st-par-mpy") || profile_is("st-mpy-edge");
+	bool const bsp = profile_is("stld-bsp");
+	bool const bus = profile_is("stld-periph"), peripheral = bsp || bus;
+	bool const edge = repeated_edge || profile_is("stld-edge") || profile_is("st-par-edge") || profile_is("st-mpy-edge"); auto const c = multiply ? parallel_multiply_case(variant, edge) : bus ? peripheral_parallel_load_case(variant) : bsp ? bsp_parallel_load_case(variant) : mapped ? mapped_parallel_load_case(variant) : arithmetic ? parallel_arithmetic_case(variant, edge) : parallel_load_case(variant, edge, repeated_edge); auto const &f = c.memory;
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
@@ -4615,8 +4484,8 @@ tms320c54x_test_state::circular_move_fixture tms320c54x_test_state::indexed_move
 void tms320c54x_test_state::start_circular_move(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const indexed = !strcmp(machine().options().bios(), "mvdk-index") || !strcmp(machine().options().bios(), "mvdk-index-edge");
-	bool const edge = !strcmp(machine().options().bios(), "mvdk-circ-edge") || !strcmp(machine().options().bios(), "mvdk-index-edge"); auto const c = indexed ? indexed_move_case(variant, edge) : circular_move_case(variant, edge); auto const &f = c.memory;
+	bool const indexed = profile_is("mvdk-index") || profile_is("mvdk-index-edge");
+	bool const edge = profile_is("mvdk-circ-edge") || profile_is("mvdk-index-edge"); auto const c = indexed ? indexed_move_case(variant, edge) : circular_move_case(variant, edge); auto const &f = c.memory;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, 0x7100 | f.mode); program.write_word(f.base + 0x601, c.destination); program.write_word(f.base + 0x602, 0xf4e1);
@@ -4697,7 +4566,7 @@ tms320c54x_test_state::repeated_mvdk_fixture tms320c54x_test_state::repeated_mvd
 tms320c54x_test_state::rptbd_t_load_fixture tms320c54x_test_state::rptbd_t_load_case(unsigned v) const
 {
 	rptbd_t_load_fixture f{};
-	f.ordinary = !strcmp(machine().options().bios(), "ctrl-t-load");
+	f.ordinary = profile_is("ctrl-t-load");
 	if (f.ordinary) { f.control = v % 6; v /= 6; }
 	f.count = std::array<unsigned, 3>{0, 1, 7}[v % 3];
 	f.value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / 3) % 4];
@@ -4707,7 +4576,7 @@ tms320c54x_test_state::rptbd_t_load_fixture tms320c54x_test_state::rptbd_t_load_
 	f.base = (v / 1536) % 2 ? 0x20000 : 0; f.snapshot = v / 3072;
 	f.mode = std::array<u16, 4>{0x12, 0x84, 0x94, 0x8c}[f.form];
 	f.source = f.form ? 0x2800 : f.status & 0x4000 ? 0x1e12 : 0x1412;
-	f.branch = !strcmp(machine().options().bios(), "banzd-t-load");
+	f.branch = profile_is("banzd-t-load");
 	if (f.branch) { f.branch_count = f.count; f.count = 0; }
 	if (f.ordinary) { f.late_t = v % 3; f.count = 0; if (!f.form && (f.status & 0x4000)) f.source = f.final_sp() + 0x12; }
 	return f;
@@ -4788,7 +4657,7 @@ tms320c54x_test_state::repeated_mvmd_fixture tms320c54x_test_state::repeated_mvm
 void tms320c54x_test_state::start_repeated_mvmd(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = repeated_mvmd_case(variant, !strcmp(machine().options().bios(), "mvmd-rptz"));
+	auto const f = repeated_mvmd_case(variant, profile_is("mvmd-rptz"));
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	unsigned pc = f.base + 0x600;
@@ -4829,8 +4698,8 @@ void tms320c54x_test_state::start_repeated_mvmd(unsigned variant)
 void tms320c54x_test_state::start_repeated_mvdk(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	bool const indexed = !strcmp(machine().options().bios(), "mvdk-index-rpt") || !strcmp(machine().options().bios(), "mvdk-irpt-edge");
-	bool const edge = !strcmp(machine().options().bios(), "mvdk-rpt-edge") || !strcmp(machine().options().bios(), "mvdk-irpt-edge"); auto f = repeated_mvdk_case(variant, edge, indexed);
+	bool const indexed = profile_is("mvdk-index-rpt") || profile_is("mvdk-irpt-edge");
+	bool const edge = profile_is("mvdk-rpt-edge") || profile_is("mvdk-irpt-edge"); auto f = repeated_mvdk_case(variant, edge, indexed);
 	// Self-indexed AR0 can enter mapped memory; that composition is not admitted.
 	while (!edge && f.excluded) f = repeated_mvdk_case(++variant, false, indexed);
 	m_pipeline_peripheral_case = variant;
@@ -4893,7 +4762,7 @@ tms320c54x_test_state::memory_copy_repeat_fixture tms320c54x_test_state::memory_
 void tms320c54x_test_state::start_memory_copy_repeat(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const wrap = !strcmp(machine().options().bios(), "rpt-mem-wrap"), chain = !strcmp(machine().options().bios(), "rpt-mem-chain"); auto const f = memory_copy_repeat_case(variant, wrap, chain); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+	bool const wrap = profile_is("rpt-mem-wrap"), chain = profile_is("rpt-mem-chain"); auto const f = memory_copy_repeat_case(variant, wrap, chain); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base | u16(f.origin + i), 0xf495);
 	program.write_word(f.base | f.origin, 0x4700 | f.mode); if (f.absolute) program.write_word(f.base | u16(f.origin + 1), f.address);
 	program.write_word(f.body, f.opcode); if (f.body_kind) program.write_word(f.body + 1, f.body_kind == 1 ? 0x5000 : 0x6000);
@@ -4942,7 +4811,7 @@ tms320c54x_test_state::xmem_load_fixture tms320c54x_test_state::xmem_load_case(u
 void tms320c54x_test_state::start_xmem_load(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = xmem_load_case(variant % 196608);
-	bool const arithmetic = !strcmp(machine().options().bios(), "xmem-alu");
+	bool const arithmetic = profile_is("xmem-alu");
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, (arithmetic ? 0x9000 | (variant >= 196608 ? 0x200 : 0) : 0x9400) | (f.destination << 8) | (f.x << 4) | f.shift); program.write_word(f.base + 0x601, 0xf4e1);
@@ -5105,7 +4974,7 @@ void tms320c54x_test_state::start_mapped_pshd(unsigned variant)
 }
 
 bool tms320c54x_test_state::standard_reada_brc() const
-{ return !strcmp(machine().options().bios(), "reada-brc16"); }
+{ return profile_is("reada-brc16"); }
 
 tms320c54x_test_state::reada_brc_fixture tms320c54x_test_state::reada_brc_case(unsigned v) const
 {
@@ -5229,7 +5098,7 @@ tms320c54x_test_state::page_zero_stack_fixture tms320c54x_test_state::page_zero_
 
 void tms320c54x_test_state::start_page_zero_stack(unsigned variant)
 {
-	bool const edge = !strcmp(machine().options().bios(), "stack-page0-edge"); auto const f = page_zero_stack_case(variant, edge);
+	bool const edge = profile_is("stack-page0-edge"); auto const f = page_zero_stack_case(variant, edge);
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
@@ -5267,7 +5136,7 @@ void tms320c54x_test_state::start_page_zero_stack(unsigned variant)
 
 void tms320c54x_test_state::start_mvdm_acc(unsigned variant)
 {
-	bool const edge = !strcmp(machine().options().bios(), "mvdm-acc-edge");
+	bool const edge = profile_is("mvdm-acc-edge");
 	auto const f = mvdm_acc_case(variant, edge);
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
@@ -5380,7 +5249,7 @@ void tms320c54x_test_state::start_mvdm_ar(unsigned variant)
 }
 
 bool tms320c54x_test_state::mvkd_delay() const
-{ return !strcmp(machine().options().bios(), "mvkd-delay"); }
+{ return profile_is("mvkd-delay"); }
 
 void tms320c54x_test_state::start_mvdm_delay(unsigned variant)
 {
@@ -5466,7 +5335,7 @@ tms320c54x_test_state::extended_t_store_fixture tms320c54x_test_state::extended_
 
 void tms320c54x_test_state::start_extended_t_store(unsigned variant)
 {
-	bool const excluded = !strcmp(machine().options().bios(), "st-t-long-edge");
+	bool const excluded = profile_is("st-t-long-edge");
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = extended_t_store_case(variant, excluded);
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
@@ -5521,16 +5390,12 @@ void tms320c54x_test_state::start_mvdp(unsigned variant)
 	program.write_word(base + 0x602 + extended, 0xf4e1);
 	program.write_word(base + 0x2e00, 0xbeef);
 	m_cpu->space(AS_DATA).write_word(source, 0x2468);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa624);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (form == 1 ? 0x4000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1200);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0},
+		{cpu_regs::STATE_ST0, 0xa624}, {cpu_regs::STATE_ST1, 0x800 | (form == 1 ? 0x4000 : 0)},
+		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_SP, 0x1200},
+		{cpu_regs::STATE_BK, 16},
+	});
 	for (unsigned ar = 0; ar < 8; ++ar)
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, ar == reg ? form == 6 ? 0x120f : 0x1230 : 0x3000 + ar);
 	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
@@ -5782,18 +5647,12 @@ void tms320c54x_test_state::start_return_load(unsigned variant)
 	program.write_word(base + 0x700, 0xf4e1);
 	m_cpu->space(AS_DATA).write_word(0x1200, zero ? 0 : 1);
 	m_cpu->space(AS_DATA).write_word(0x1000, 0x700);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1200);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, b ? 0x1234 : unsigned(zero));
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, b ? unsigned(zero) : 0x2345);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0},
+		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR2, 0x1200},
+		{cpu_regs::STATE_A, b ? 0x1234 : unsigned(zero)}, {cpu_regs::STATE_B, b ? unsigned(zero) : 0x2345},
+	});
 	m_pipeline_operand_reads = m_fast_stack_reads = m_pipeline_store_writes = 0;
 	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "return_load_reads",
 		[this, zero](offs_t at, u16 &, u16) {
@@ -5838,7 +5697,7 @@ tms320c54x_test_state::asm_store_fixture tms320c54x_test_state::asm_store_case(u
 void tms320c54x_test_state::start_asm_store(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const prefix = !strcmp(machine().options().bios(), "asm-store-ld"); auto const f = asm_store_case(variant, prefix);
+	bool const prefix = profile_is("asm-store-ld"); auto const f = asm_store_case(variant, prefix);
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	if (prefix) program.write_word(f.base + 0x600, 0xed00 | f.raw);
@@ -5975,8 +5834,8 @@ tms320c54x_test_state::mvdd_source_fixture tms320c54x_test_state::mvdd_source_ca
 void tms320c54x_test_state::start_mvdd_source(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const repeated = !strcmp(machine().options().bios(), "mvdd-source-rpt");
-	bool const edge = !strcmp(machine().options().bios(), "mvdd-source-edge");
+	bool const repeated = profile_is("mvdd-source-rpt");
+	bool const edge = profile_is("mvdd-source-edge");
 	auto const f = mvdd_source_case(variant, repeated, edge);
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
@@ -6024,7 +5883,7 @@ void tms320c54x_test_state::start_mvdd_source(unsigned variant)
 void tms320c54x_test_state::start_mvmd_word_register(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const bk = !strcmp(machine().options().bios(), "mvmd-bk"), producer = bk && variant >= 216;
+	bool const bk = profile_is("mvmd-bk"), producer = bk && variant >= 216;
 	unsigned const v = bk ? variant % 216 : variant, sources = bk ? 1 : 2, prefix = producer ? 2 : 0;
 	unsigned const source = bk ? 0x19 : 0x0e + v % sources, destination = (v / sources) % 9 < 8 ? 0x10 + (v / sources) % 9 : 0x19;
 	u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / (sources * 9)) % 4];
@@ -6073,8 +5932,8 @@ tms320c54x_test_state::mvdk_mapped_fixture tms320c54x_test_state::mvdk_mapped_ca
 void tms320c54x_test_state::start_mvdk_mapped(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const clock = !strcmp(machine().options().bios(), "clock-mvdk") || !strcmp(machine().options().bios(), "clock-mvdk-edge");
-	auto const f = mvdk_mapped_case(variant, !strcmp(machine().options().bios(), "mvdk-acc"), clock); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
+	bool const clock = profile_is("clock-mvdk") || profile_is("clock-mvdk-edge");
+	auto const f = mvdk_mapped_case(variant, profile_is("mvdk-acc"), clock); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, f.form == 0 ? 0x7100 | (f.source & 0x7f) : f.form == 1 ? 0x7196 : 0x71f8);
 	program.write_word(f.base + 0x601, f.form == 2 ? f.source : f.destination);
@@ -6133,7 +5992,7 @@ tms320c54x_test_state::mvdk_producer_fixture tms320c54x_test_state::mvdk_produce
 void tms320c54x_test_state::start_mvdk_producer(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = mvdk_producer_case(variant, !strcmp(machine().options().bios(), "mvdk-acc-prod")); bool const b = f.source >= 0x0b;
+	auto const f = mvdk_producer_case(variant, profile_is("mvdk-acc-prod")); bool const b = f.source >= 0x0b;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 20; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, f.producer == 0 ? (b ? 0x8000 : 0x8100) | f.source : f.producer == 1 ? 0x8a00 | f.source : (b ? 0xe900 : 0xe800) | u8(f.value));
@@ -6199,7 +6058,7 @@ tms320c54x_test_state::accumulator_store_fixture tms320c54x_test_state::preincre
 void tms320c54x_test_state::start_preincrement_store(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const immediate = !strcmp(machine().options().bios(), "preinc-st");
+	bool const immediate = profile_is("preinc-st");
 	auto const f = immediate ? preincrement_immediate_case(variant) : preincrement_store_case(variant); u32 const base = (immediate ? bool(variant & 256) : bool(variant & 1024)) ? 0x20000 : 0;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
@@ -6245,7 +6104,7 @@ tms320c54x_test_state::stlm_status_fixture tms320c54x_test_state::stlm_status_ca
 
 void tms320c54x_test_state::start_stlm_status(unsigned variant)
 {
-	bool const immediate = !strcmp(machine().options().bios(), "stm-st1");
+	bool const immediate = profile_is("stm-st1");
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	auto const f = stlm_status_case(variant, immediate); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
@@ -6370,8 +6229,8 @@ void tms320c54x_test_state::start_ldu_status(unsigned variant)
 void tms320c54x_test_state::start_mvmd_status_block(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const pop = !strcmp(machine().options().bios(), "pop-brc");
-	bool const stm = pop || !strcmp(machine().options().bios(), "stm-brc");
+	bool const pop = profile_is("pop-brc");
+	bool const stm = pop || profile_is("stm-brc");
 	unsigned const count = stm ? std::array<unsigned, 5>{0, 1, 2, 7, 127}[variant % 5] : std::array<unsigned, 4>{0, 1, 2, 7}[variant % 4]; u32 const base = (stm ? (variant / 5) % 2 : bool(variant & 4)) ? 0x20000 : 0;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	static constexpr u16 words[] = {0x730b, 7, 0xf072, 0x608, 0x1386, 0xf678, 0xf3e8, 0xf1a0, 0x8196, 0xf4e1};
@@ -6431,8 +6290,8 @@ void tms320c54x_test_state::stack_mmr_w(offs_t offset, u16 value)
 
 tms320c54x_test_state::staged_conditional_store_fixture tms320c54x_test_state::staged_conditional_store_case(unsigned v) const
 {
-	staged_conditional_store_fixture f{}; f.edge = !strcmp(machine().options().bios(), "cond-store-edge");
-	bool const mapped = !strcmp(machine().options().bios(), "cond-store-ar");
+	staged_conditional_store_fixture f{}; f.edge = profile_is("cond-store-edge");
+	bool const mapped = profile_is("cond-store-ar");
 	unsigned const target = mapped ? v % 8 : 0; if (mapped) v /= 8;
 	f.form = v % 4; v /= 4;
 	unsigned flags = 0; int shift = 0;
@@ -6468,7 +6327,7 @@ tms320c54x_test_state::staged_conditional_store_fixture tms320c54x_test_state::s
 void tms320c54x_test_state::start_staged_conditional_store(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const mapped = !strcmp(machine().options().bios(), "cond-store-ar");
+	bool const mapped = profile_is("cond-store-ar");
 	auto const f = staged_conditional_store_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, 0x9c00 | (f.form << 8) | (f.mode << 4) | (f.condition < 6 ? f.condition + 2 : f.condition + 4)); program.write_word(f.base + 0x601, 0xf4e1);
@@ -6498,21 +6357,16 @@ void tms320c54x_test_state::start_conditional_register_store(unsigned index)
 	program.write_word(0x600, (f.brc ? 0x9d00 : 0x9c00) | (f.x << 4) | (condition < 6 ? condition + 2 : condition + 4));
 	program.write_word(0x601, 0xf4e1);
 	data.write_word(f.address, 0xa55a);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x600);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, f.brc ? 0xbeef : f.source);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.brc ? f.source : 0x55aa);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 2);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_PC, 0x600}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, f.a}, {cpu_regs::STATE_B, f.b},
+		{cpu_regs::STATE_T, f.brc ? 0xbeef : f.source}, {cpu_regs::STATE_BRC, f.brc ? f.source : 0x55aa},
+		{cpu_regs::STATE_AR0, 2},
+	});
 	for (unsigned ar = 2; ar < 6; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x1403 + (ar - 2) * 16);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1e05);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_BK, 4}, {cpu_regs::STATE_ST0, 0x1e05}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_PMST, 0},
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
+	});
 	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
 	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "conditional_register_read", [this, f](offs_t at, u16 &word, u16) {
 		if (machine().side_effects_disabled()) return;
@@ -6544,11 +6398,10 @@ void tms320c54x_test_state::start_zero_bk_case(unsigned index)
 	m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0700);
 	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, steps[(index / 5) % 8]);
 	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, addresses[index / 40]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f00);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_AR3, 0x0f00}, {cpu_regs::STATE_BK, 0}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x0800},
+		{cpu_regs::STATE_IDLE, 0},
+	});
 	m_phase = 73000 + index;
 	m_check_timer->adjust(attotime::from_usec(100));
 }
@@ -6683,7 +6536,7 @@ bool tms320c54x_test_state::check_mmr_long_edge_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == mmr_long_phase)
 	{
-		bool const repeated = !strcmp(machine().options().bios(), "rpt-xfer-edge");
+		bool const repeated = profile_is("rpt-xfer-edge");
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 		unsigned const checkpoint = variant / (repeated ? 4800 : 2304) ? 12 : 1;
 		expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Rejected addressing performs no data or stack transaction");
@@ -7138,7 +6991,7 @@ bool tms320c54x_test_state::check_pipeline_store_results()
 			m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_store_case < 11) { start_pipeline_store_case(m_pipeline_store_case + 1); return true; }
 			osd_printf_info("TMS320C54x staged stores: PASS cases=12 address=Read write=Execute writes_per_leg=1 pending_store_restore=12\n");
-			if (!strcmp(machine().options().bios(), "store-observe"))
+			if (profile_is("store-observe"))
 			{
 				osd_printf_info("TMS320C54x store observation: PASS cases=12 restore=12 retained_address=1 exact_value=1 rejected_other_identity=1 observer_writes=0\n");
 				throw emu_fatalerror(0,"TMS320C54x isolated store observation complete");
@@ -7202,7 +7055,7 @@ bool tms320c54x_test_state::check_pipeline_store_results()
 			m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_indirect_case < 5) { start_pipeline_indirect_case(m_pipeline_indirect_case + 1); return true; }
 			osd_printf_info("TMS320C54x staged indirect loads: PASS cases=6 ar_update=Access read=Read execute=Execute captured_address_restore=6\n");
-			if (!strcmp(machine().options().bios(), "indirect-load")) throw emu_fatalerror(0, "TMS320C54x isolated indirect loads complete");
+			if (profile_is("indirect-load")) throw emu_fatalerror(0, "TMS320C54x isolated indirect loads complete");
 			start_pipeline_rmw_case();
 			return true;
 		}
@@ -7406,7 +7259,7 @@ bool tms320c54x_test_state::check_pipeline_immediate_store_results()
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 197) { start_pipeline_xpc_push(m_pipeline_peripheral_case + 1); return true; }
 			osd_printf_info("TMS320C54x staged MMR push: PASS cases=198 sources=32 pages=2 source_read=5 stack_write=6 restore=198 duplicate_accesses=0 silicon_phase_claim=0\n");
-			if (!strcmp(machine().options().bios(), "push-observe"))
+			if (profile_is("push-observe"))
 				throw emu_fatalerror(3, "TMS320C54x isolated push observation complete");
 			start_pipeline_far_return(); return true;
 		}
@@ -7477,7 +7330,7 @@ bool tms320c54x_test_state::check_pipeline_mmr_pop_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 251450)
 	{
-		bool const irq = !strcmp(machine().options().bios(),"pop-irq"); auto const f = irq_pop_case(m_pipeline_peripheral_case);
+		bool const irq = profile_is("pop-irq"); auto const f = irq_pop_case(m_pipeline_peripheral_case);
 		u64 const cycle = m_cpu->pipeline_cycles();
 		u64 const checkpoint = irq ? f.checkpoint : 4 + (m_pipeline_peripheral_case % 6) / 2;
 		u16 const destination = irq ? f.destination : m_pipeline_peripheral_case / 6 < 18 ? 6 + m_pipeline_peripheral_case / 6 : 0x19;
@@ -7846,7 +7699,7 @@ bool tms320c54x_test_state::check_pipeline_data_pop_results()
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 49) { start_pipeline_data_pop(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged POPD: PASS cases=50 address_forms=4 compiler_latency=6 original_copy_words=6 copy_cases=12 copy_sxm_states=2 restore=50 duplicate_stack_reads=0 duplicate_writes=0\n");
-			if (!strcmp(machine().options().bios(), "popd-ram")) { start_extended_pop(); return true; }
+			if (profile_is("popd-ram")) { start_extended_pop(); return true; }
 			start_pipeline_register_store(); return true;
 		}
 		++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -7964,11 +7817,11 @@ bool tms320c54x_test_state::check_repeat_pop_exclusion_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 252270)
 	{
-		bool const popd = !strcmp(machine().options().bios(), "pmst-popd");
-		bool const repeat = !strcmp(machine().options().bios(), "pop-repeat");
-		bool const iptr = !strcmp(machine().options().bios(), "pmst-iptr");
-		bool const boundary = !strcmp(machine().options().bios(), "pmst-prefetch");
-		bool const pop = popd || repeat || iptr || boundary || !strcmp(machine().options().bios(), "pmst-pop");
+		bool const popd = profile_is("pmst-popd");
+		bool const repeat = profile_is("pop-repeat");
+		bool const iptr = profile_is("pmst-iptr");
+		bool const boundary = profile_is("pmst-prefetch");
+		bool const pop = popd || repeat || iptr || boundary || profile_is("pmst-pop");
 		unsigned const variant = m_pipeline_peripheral_case;
 		u16 const value = (repeat ? std::array<u16, 4>{0, 1, 0x8000, 0xffff} : iptr ? std::array<u16, 4>{0, 0x20, 0x2020, 0x3020} : std::array<u16, 4>{0, 0x20, 0x2020, 0xffaa})[variant % 4];
 		u32 const base = (BIT(variant, 2) ? 3 : 2) << 16;
@@ -8041,7 +7894,7 @@ bool tms320c54x_test_state::check_repeat_pop_exclusion_results()
 				throw emu_fatalerror(3, "TMS320C54x isolated POPM PMST complete");
 			}
 			osd_printf_info("TMS320C54x staged STM PMST: PASS cases=64 values=4 source_pages=2 target_regions=2 restore=64 duplicate_literal_fetches=0 duplicate_register_writes=0\n");
-			if (!strcmp(machine().options().bios(), "pmst-map")) throw emu_fatalerror(3, "TMS320C54x isolated PMST mapping complete");
+			if (profile_is("pmst-map")) throw emu_fatalerror(3, "TMS320C54x isolated PMST mapping complete");
 			start_pipeline_mvpd(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -8134,7 +7987,7 @@ bool tms320c54x_test_state::check_repeat_pop_exclusion_results()
 			if (variant == 127) osd_printf_info("TMS320C54x staged RPT MVPD: PASS cases=128 counts=4 pages=2 ovly_states=2 destination_modes=2 restore=128 count_plus_one=1 duplicate_transfers=0\n");
 			if (variant < 143) { start_pipeline_repeat_mvpd(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged RPT interrupts: PASS cases=16 sources=IRQ,NMI counts=4 pages=2 restore=16 deferred_until_final_write=1 correct_continuation=1\n");
-			if (!strcmp(machine().options().bios(), "mvpd-controls")) throw emu_fatalerror(0, "TMS320C54x isolated MVPD controls complete");
+			if (profile_is("mvpd-controls")) throw emu_fatalerror(0, "TMS320C54x isolated MVPD controls complete");
 			start_pipeline_sp_rmw(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -8318,8 +8171,8 @@ bool tms320c54x_test_state::check_pipeline_direct_immediate_store_results()
 	if (m_phase == 254600)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const repeated = !strcmp(machine().options().bios(), "mvdd-source-rpt");
-		bool const edge = !strcmp(machine().options().bios(), "mvdd-source-edge");
+		bool const repeated = profile_is("mvdd-source-rpt");
+		bool const edge = profile_is("mvdd-source-edge");
 		auto const f = mvdd_source_case(variant, repeated, edge);
 		if (edge)
 		{
@@ -8411,8 +8264,8 @@ bool tms320c54x_test_state::check_extended_ar_store_results()
 	if (m_phase == 254560)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const consumer = !strcmp(machine().options().bios(), "st-ar-consumer") || !strcmp(machine().options().bios(), "st-shift-ar-use");
-		bool const shifted = !strcmp(machine().options().bios(), "st-shift-ar") || !strcmp(machine().options().bios(), "st-shift-ar-use");
+		bool const consumer = profile_is("st-ar-consumer") || profile_is("st-shift-ar-use");
+		bool const shifted = profile_is("st-shift-ar") || profile_is("st-shift-ar-use");
 		auto const f = extended_ar_store_case(variant, consumer, shifted);
 		unsigned const local = variant % (consumer ? 6144 : 24576);
 		unsigned const checkpoint = consumer ? std::array<unsigned, 3>{4, 7 + unsigned(shifted), 7 + unsigned(shifted) + f.gap}[local / 2048] : std::array<unsigned, 3>{4, 6 + unsigned(shifted), 7 + unsigned(shifted)}[local / 8192];
@@ -8578,7 +8431,7 @@ bool tms320c54x_test_state::check_extended_ar_store_results()
 			if (variant < 12287) { start_pipeline_extended_dst(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged extended DST: PASS cases=3072 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=4 compatibility=0,1 sst=0,1 restore=3072 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
 			osd_printf_info("TMS320C54x staged short-indirect DST: PASS cases=9216 modes=12 registers=8 accumulators=2 parity=even,odd compatibility=0,1 sst=0,1 restore=9216 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
-			if (!strcmp(machine().options().bios(), "indirect-dld")) { start_shifted_store_dld(); return true; }
+			if (profile_is("indirect-dld")) { start_shifted_store_dld(); return true; }
 			start_pipeline_accumulator_logic(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -8795,7 +8648,7 @@ bool tms320c54x_test_state::check_rptbd_t_load_results()
 	if (m_phase == 600020)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		auto const f = repeated_mvmd_case(variant, !strcmp(machine().options().bios(), "mvmd-rptz"));
+		auto const f = repeated_mvmd_case(variant, profile_is("mvmd-rptz"));
 		unsigned const checkpoint = f.snapshot == 0 ? 4 : f.snapshot == 1 ? f.read_clock : f.read_clock + f.count / 2;
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Repeated MVMD AL/BL to ordinary RAM is admitted");
 		if (tick == checkpoint && !m_pipeline_replay)
@@ -8852,9 +8705,9 @@ bool tms320c54x_test_state::check_rptbd_t_load_results()
 	if (m_phase == 600010)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const arithmetic = !strcmp(machine().options().bios(), "addsub-ar-age");
-		bool const shifted = !strcmp(machine().options().bios(), "shift16-load-age");
-		bool const mapped = arithmetic || shifted || !strcmp(machine().options().bios(), "mapped-load-age");
+		bool const arithmetic = profile_is("addsub-ar-age");
+		bool const shifted = profile_is("shift16-load-age");
+		bool const mapped = arithmetic || shifted || profile_is("mapped-load-age");
 		unsigned const fields = shifted ? variant / 4 : mapped ? variant / 8 : variant, form = shifted ? variant%4 : mapped ? (variant / 2) % 4 : 0;
 		unsigned const ar = fields % 8, kind = (fields / 64) % 3;
 		unsigned const checkpoint = 4 + unsigned(mapped && form >= 2) + fields / 768;
@@ -8912,7 +8765,7 @@ bool tms320c54x_test_state::check_rptbd_t_load_results()
 	if (m_phase == 600001)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const accumulator = !strcmp(machine().options().bios(), "st-acc-mvmm");
+		bool const accumulator = profile_is("st-acc-mvmm");
 		unsigned const count = 1 + variant % 2, source = (variant / 2) % 8, destination = (variant / 16) % 8;
 		unsigned const gap=(variant/128)%2, read_cycle = 3 + (accumulator ? 1 : 2) * count + gap;
 		unsigned const checkpoint = read_cycle - 1 + (variant / 512)%3;
@@ -9110,13 +8963,13 @@ bool tms320c54x_test_state::check_staged_load_results()
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant == 12671) osd_printf_info("TMS320C54x staged long-offset LD: PASS ram_cases=12288 mapped_ar_cases=384 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=8 sxm_ovm=4 compatibility=2 restore=12672 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
-			if (variant == 12671 && !strcmp(machine().options().bios(), "load-offset")) throw emu_fatalerror(0, "TMS320C54x isolated offset memory load complete");
+			if (variant == 12671 && profile_is("load-offset")) throw emu_fatalerror(0, "TMS320C54x isolated offset memory load complete");
 			if (variant == 70271) osd_printf_info("TMS320C54x staged LDU: PASS ram_cases=52224 mapped_ar_cases=2304 address_forms=17 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=54528 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
 			if (variant == 127871) osd_printf_info("TMS320C54x staged memory LD shift16: PASS ram_cases=52224 mapped_ar_cases=2304 address_forms=17 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=54528 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
-			if (variant == 127871 && !strcmp(machine().options().bios(), "ldu-shift16")) throw emu_fatalerror(0, "TMS320C54x isolated LDU and shift16 loads complete");
+			if (variant == 127871 && profile_is("ldu-shift16")) throw emu_fatalerror(0, "TMS320C54x isolated LDU and shift16 loads complete");
 			if (variant < 238463) { start_pipeline_offset_load(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged variable memory LD: PASS cases=104448 address_forms=17 registers=2 accumulators=2 values=4 shifts=32 sxm_ovm=4 restore=104448 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
-			if (!strcmp(machine().options().bios(), "load-variable")) throw emu_fatalerror(0, "TMS320C54x isolated variable memory loads complete");
+			if (profile_is("load-variable")) throw emu_fatalerror(0, "TMS320C54x isolated variable memory loads complete");
 			start_pipeline_indirect_dld(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -9178,7 +9031,7 @@ bool tms320c54x_test_state::check_staged_load_results()
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 24575) { start_pipeline_indirect_dld(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged indirect DLD: PASS cases=23040 forms=15 registers=8 accumulators=2 patterns=4 sxm=0,1 c16=0,1 compatibility=0,1 restore=23040 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
-			if (!strcmp(machine().options().bios(), "indirect-dld")) throw emu_fatalerror(0, "TMS320C54x isolated indirect double loads complete");
+			if (profile_is("indirect-dld")) throw emu_fatalerror(0, "TMS320C54x isolated indirect double loads complete");
 			start_pipeline_extended_banz(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -9236,7 +9089,7 @@ bool tms320c54x_test_state::check_memory_repeat_results()
 				if (variant < 76799) { start_pipeline_memory_repeat(variant + 1); return true; }
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 				osd_printf_info("TMS320C54x staged repeat immediate ST: PASS cases=38400 forms=5 rpt=short,long counts=0,1,15,32,255 values=4 sst_sxm_ovm=8 sources=none,IRQ,NMI pages=2 restore=38400 count_plus_one=1 literal_fetches=1 body_fetches=1 destination_reads=0 cycles_each=2 silicon_phase_claim=0\n");
-				if (!strcmp(machine().options().bios(), "rpt-subc-st")) throw emu_fatalerror(0, "TMS320C54x isolated repeated SUBC and ST complete");
+				if (profile_is("rpt-subc-st")) throw emu_fatalerror(0, "TMS320C54x isolated repeated SUBC and ST complete");
 				start_pipeline_banzd(); return true;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -9331,7 +9184,7 @@ bool tms320c54x_test_state::check_stlm_t_results()
 			if (variant == 12287) osd_printf_info("TMS320C54x staged STLM T/TRN: PASS cases=12288 sources=2 patterns=8 sst_sxm_ovm_frct=16 gaps=0,1,2,3 consumers=MPY,MPYR,MPYU,LDM restore=12288 register_write=Execute consumer_sample=Read zero_gap_claim=projection_only duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
 			if (variant < 15359) { start_pipeline_stlm_t(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged STLM BRC: PASS cases=3072 sources=2 patterns=8 flags=16 gaps=0,1,2,3 restore=3072 register_write=Execute ldm_sample=Read block_repeat_claim=0 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
-			if (!strcmp(machine().options().bios(), "stlm-t")) throw emu_fatalerror(0, "TMS320C54x isolated STLM T/TRN complete");
+			if (profile_is("stlm-t")) throw emu_fatalerror(0, "TMS320C54x isolated STLM T/TRN complete");
 			start_pipeline_swap_body(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -9377,7 +9230,7 @@ bool tms320c54x_test_state::check_asm_store_results_part2()
 	if (m_phase == 255580)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const prefix = !strcmp(machine().options().bios(), "asm-store-ld"); auto const f = asm_store_case(variant, prefix);
+		bool const prefix = profile_is("asm-store-ld"); auto const f = asm_store_case(variant, prefix);
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Short ASM accumulator stores remain admitted");
 		u16 const asm_bits = tick > f.read ? f.raw ^ 31 : prefix && tick < f.read ? f.raw ^ 31 : f.raw;
 		expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == (f.st1 | asm_bits) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa020 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "ASM stores preserve flags and non-source registers across retained publication");
@@ -9399,9 +9252,9 @@ bool tms320c54x_test_state::check_asm_store_results_part2()
 	if (m_phase == 255590) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255580; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 255560)
 	{
-		bool const unconditional = !strcmp(machine().options().bios(), "rptb-bd");
-		bool const tc = !strcmp(machine().options().bios(), "rptb-tc-delay");
-		bool const banz = !strcmp(machine().options().bios(), "rptb-banz");
+		bool const unconditional = profile_is("rptb-bd");
+		bool const tc = profile_is("rptb-tc-delay");
+		bool const banz = profile_is("rptb-banz");
 		unsigned const case_index = m_pipeline_peripheral_case, variant = unconditional || tc ? case_index * 6 : case_index, tick = ++m_idle_fixture_tick, count = std::array<unsigned, 4>{0, 1, 2, 7}[banz ? variant % 4 : (variant / 12) % 4], checkpoint = std::array<unsigned, 4>{7, 10, 12, 16}[banz ? variant / 192 : variant / 768];
 		bool const b = !banz && variant % 12 >= 6, wide = !banz && (variant / 192) % 2;
 		u32 const base = banz ? block_banz_case(variant).base : (variant / 384) % 2 ? 0x20000 : 0;
@@ -9457,7 +9310,7 @@ bool tms320c54x_test_state::check_mvdk_mapped_edge_results()
 	if (m_phase == 255380)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const accumulator_destination = !strcmp(machine().options().bios(), "mvdk-acc-prod");
+		bool const accumulator_destination = profile_is("mvdk-acc-prod");
 		auto const f = mvdk_producer_case(variant, accumulator_destination);
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Producer-composed MVDK stays within supported forms");
 		if (tick == 3 + f.prefix) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601 + f.prefix, 0xdead); }
@@ -9503,8 +9356,8 @@ bool tms320c54x_test_state::check_mvdk_mapped_results()
 	if (m_phase == 255360)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const accumulator_destination = !strcmp(machine().options().bios(), "mvdk-acc");
-		bool const clock = !strcmp(machine().options().bios(), "clock-mvdk");
+		bool const accumulator_destination = profile_is("mvdk-acc");
+		bool const clock = profile_is("clock-mvdk");
 		auto const f = mvdk_mapped_case(variant, accumulator_destination, clock);
 		u32 observed_instruction; u16 observed_opcode;
 		expect(!m_cpu->observe_staged_data_read(f.source,observed_instruction,observed_opcode),
@@ -9638,7 +9491,7 @@ bool tms320c54x_test_state::check_mvdk_mapped_results()
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 99695) { start_extended_push(variant + 1); return true; }
-			if (!strcmp(machine().options().bios(), "pshd-long-map")) { osd_printf_info("TMS320C54x extended PSHD mapped sources: PASS cases=3696 restore=3696 sources=26 forms=offset,preincrement,absolute self_modify_excluded=1 patterns=4 controls=safe pages=2 cmpt=2 snapshots=3 literal_fetches=1 source_reads=1 stack_writes=1 pointer_updates=once physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated extended PSHD mapped complete"); }
+			if (profile_is("pshd-long-map")) { osd_printf_info("TMS320C54x extended PSHD mapped sources: PASS cases=3696 restore=3696 sources=26 forms=offset,preincrement,absolute self_modify_excluded=1 patterns=4 controls=safe pages=2 cmpt=2 snapshots=3 literal_fetches=1 source_reads=1 stack_writes=1 pointer_updates=once physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated extended PSHD mapped complete"); }
 			osd_printf_info("TMS320C54x extended PSHD: PASS cases=99696 restore=99696 ram_cases=96000 mapped_cases=3696 forms=25 offsets=-1,0,4,32767 circular_offsets=-1,0,4,8 values=4 bk=0,9 cmpt=2 cpl=2 pages=2 sources=none,IRQ,NMI arrivals=early,late snapshots=3 literal_fetches=1 source_reads=1 stack_writes=1 pointer_updates=once source_retained=1 balanced_frames=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated extended PSHD complete");
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -9747,7 +9600,7 @@ bool tms320c54x_test_state::check_mvdk_mapped_results()
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < (f.arithmetic ? 16383U : 200703U)) { start_repeat_load(variant + 1); return true; }
 			if (f.arithmetic) { osd_printf_info("TMS320C54x repeated SFTA: PASS cases=16384 restore=16384 selectors=4 shifts=-16..15 patterns=8 sxm_ovm=4 counts=0,1,7,255 each_iteration=1 retained_opcode=1 carry_overflow=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated SFTA complete"); }
-			if (!strcmp(machine().options().bios(), "rpt-ld-block")) { osd_printf_info("TMS320C54x repeated accumulator LD in block: PASS cases=2048 restore=2048 outer_counts=0,2 inner_counts=0,1,7,255 selectors=4 shifts=-1,15 sxm_ovm=4 patterns=2 pages=2 snapshots=2 each_iteration=1 inner_continuations=outer+1 outer_counter_preserved=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated accumulator LD block complete"); }
+			if (profile_is("rpt-ld-block")) { osd_printf_info("TMS320C54x repeated accumulator LD in block: PASS cases=2048 restore=2048 outer_counts=0,2 inner_counts=0,1,7,255 selectors=4 shifts=-1,15 sxm_ovm=4 patterns=2 pages=2 snapshots=2 each_iteration=1 inner_continuations=outer+1 outer_counter_preserved=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated accumulator LD block complete"); }
 			osd_printf_info("TMS320C54x repeated accumulator LD: PASS cases=200704 restore=200704 arithmetic_cases=32768 composition_cases=165888 block_cases=2048 selectors=4 shifts=-16..15 shift_sources=opcode,ASM sxm_ovm=4 counts=0,1,7,255 count_sources=short,long,DP,SP,absolute_RAM,absolute_AR pages=2 sources=none,IRQ,NMI snapshots=3 each_iteration=1 retained_opcode=1 retained_count=1 fresh_continuation=1 balanced_frames=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated accumulator LD complete");
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -9755,9 +9608,9 @@ bool tms320c54x_test_state::check_mvdk_mapped_results()
 	if (m_phase == 310490) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310480; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 310500)
 	{
-		bool const tmac = !strcmp(machine().options().bios(), "tmac-rpt-edge");
-		bool const square = !strcmp(machine().options().bios(), "sqacc-rpt-edge") || tmac;
-		bool const dual = !strcmp(machine().options().bios(), "mac-rpt-edge");
+		bool const tmac = profile_is("tmac-rpt-edge");
+		bool const square = profile_is("sqacc-rpt-edge") || tmac;
+		bool const dual = profile_is("mac-rpt-edge");
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < (dual ? 256U : square ? 32U : 16U) ? 3 : 10;
 		expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Excluded register repeat performs no data transaction");
 		if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save excluded register repeat before or after rejection"); }
@@ -9843,7 +9696,7 @@ bool tms320c54x_test_state::check_long_mapped_original_results()
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant<4607) { start_dst_bypass(variant+1); return true; }
 			osd_printf_info("TMS320C54x DST read bypass: PASS cases=4608 restore=4608 accumulators=2 consumers=high,low,pair modes=3 patterns=4 gaps=0,1 aliases=2 sxm=2 sst=2 pages=2 save_points=2 writes_each=2 silicon_phase_claim=0\n");
-			if (!strcmp(machine().options().bios(),"mpy-mapped")) throw emu_fatalerror(0,"TMS320C54x isolated MPY mapped consumer complete");
+			if (profile_is("mpy-mapped")) throw emu_fatalerror(0,"TMS320C54x isolated MPY mapped consumer complete");
 			start_timer_boundary_probe(0,true); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true;
@@ -9881,7 +9734,7 @@ bool tms320c54x_test_state::check_long_mapped_original_results()
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 19199) { start_pipeline_long_mvkd(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged long MVKD: PASS cases=19200 forms=25 offsets=4 sources=selected_AR,AR2,RAM,alias values=4 compatibility=2 pages=2 restore=19200 reads_each=1 writes_each=1 extensions_each=2 silicon_phase_claim=0\n");
-			if (!strcmp(machine().options().bios(), "long-mvkd")) throw emu_fatalerror(0, "TMS320C54x isolated long MVKD complete");
+			if (profile_is("long-mvkd")) throw emu_fatalerror(0, "TMS320C54x isolated long MVKD complete");
 			start_pipeline_imr_store(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -9893,7 +9746,7 @@ bool tms320c54x_test_state::check_long_mapped_original_results()
 	if (m_phase == 253510)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const stlm = !strcmp(machine().options().bios(), "stlm-imr");
+		bool const stlm = profile_is("stlm-imr");
 		auto const f = stlm ? stlm_imr_case(variant) : imr_store_case(variant);
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IMR) == (tick < (stlm ? 6 : 7) ? f.old_mask : f.mask) &&
 			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1804 && m_pipeline_store_writes == unsigned(tick >= (stlm ? 6 : 7)), "IMR store leaves mask/status unchanged until its owned publication");
@@ -9927,7 +9780,7 @@ bool tms320c54x_test_state::check_long_mapped_original_results()
 				throw emu_fatalerror(0, "TMS320C54x isolated STLM IMR complete");
 			}
 			osd_printf_info("TMS320C54x staged STM IMR: PASS cases=4608 restore=4608 irq_bits=16 masks=4 initial_masks=2 intm=2 sources=none,IRQ,NMI pages=2 literal_fetches=1 writes_each=1 destination_reads=0 silicon_phase_claim=0\n");
-			if (!strcmp(machine().options().bios(), "imr-store")) throw emu_fatalerror(0, "TMS320C54x isolated STM IMR complete");
+			if (profile_is("imr-store")) throw emu_fatalerror(0, "TMS320C54x isolated STM IMR complete");
 			start_pipeline_accumulator_shift(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -9953,7 +9806,7 @@ bool tms320c54x_test_state::check_preincrement_immediate_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 253930)
 	{
-		bool const immediate = !strcmp(machine().options().bios(), "preinc-st");
+		bool const immediate = profile_is("preinc-st");
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = immediate ? std::array<unsigned, 3>{4, 6, 7}[variant / 512] : std::array<unsigned, 3>{4, 5, 6}[variant / 2048]; auto const f = immediate ? preincrement_immediate_case(variant) : preincrement_store_case(variant);
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Short preincrement accumulator stores remain staged");
 		if (immediate && tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word((variant & 256 ? 0x20000 : 0) + 0x601, 0xdead); }
@@ -10016,7 +9869,7 @@ bool tms320c54x_test_state::check_staged_conditional_store_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 620200)
 	{
-		bool const mapped = !strcmp(machine().options().bios(), "cond-store-ar");
+		bool const mapped = profile_is("cond-store-ar");
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = staged_conditional_store_case(variant);
 		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (f.edge && tick >= 4), "Conditional store rejects mapped RAM before pointer or bus effects");
 		if (tick == 3) { m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + 2 + (f.mode & 3), f.address); auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x600, 0xdead); }
@@ -10145,8 +9998,8 @@ bool tms320c54x_test_state::check_mvmd_status_block_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 253870)
 	{
-		bool const pop = !strcmp(machine().options().bios(), "pop-brc");
-		bool const stm = pop || !strcmp(machine().options().bios(), "stm-brc");
+		bool const pop = profile_is("pop-brc");
+		bool const stm = pop || profile_is("stm-brc");
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, count = stm ? std::array<unsigned, 5>{0, 1, 2, 7, 127}[variant % 5] : std::array<unsigned, 4>{0, 1, 2, 7}[variant % 4], checkpoint = stm ? std::array<unsigned, 3>{4, 5, 6}[variant / 10] : std::array<unsigned, 3>{5, 6, 12}[variant / 8];
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Full status followed by RPTB stays staged");
 		if (tick == 6) expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x8800, "Full status write does not erase the younger RPTB BRAF update");
@@ -10188,7 +10041,7 @@ bool tms320c54x_test_state::check_stm_status_edge_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62112)
 	{
-		bool const immediate = !strcmp(machine().options().bios(), "stm-st1-edge");
+		bool const immediate = profile_is("stm-st1-edge");
 		unsigned const tick = ++m_idle_fixture_tick, checkpoint = 2 + m_pipeline_peripheral_case / 32;
 		if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save excluded status/control prefix before admission"); }
 		if (tick == 12)
@@ -10220,7 +10073,7 @@ bool tms320c54x_test_state::check_delay_copy_results()
 	if (m_phase == 62174)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const control = !strcmp(machine().options().bios(), "delay-copy-ctrl");
+		bool const control = profile_is("delay-copy-ctrl");
 		unsigned const kind = variant % 6, v = control ? (variant / 6 / 4) * 5 + std::array<unsigned, 4>{0, 2, 3, 4}[(variant / 6) % 4] : variant;
 		auto const f = delay_copy_case(v); unsigned const read = control ? delay_multiply_fixture::operand_read(kind, 0) : 5;
 		unsigned const checkpoint = std::array<unsigned, 3>{3, read - 1, read}[v / 5120];
@@ -10252,9 +10105,9 @@ bool tms320c54x_test_state::check_mapped_dual_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62170)
 	{
-		bool const edge = !strcmp(machine().options().bios(), "alu-map-edge");
-		bool const interrupt_registers = !strcmp(machine().options().bios(), "alu-map-irq");
-		bool const low_bus = !strcmp(machine().options().bios(), "alu-low-bus");
+		bool const edge = profile_is("alu-map-edge");
+		bool const interrupt_registers = profile_is("alu-map-irq");
+		bool const low_bus = profile_is("alu-low-bus");
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 		auto const f = mapped_dual_case(variant, edge, interrupt_registers, low_bus);
 		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 4), "Dual ALU rejects unowned sources before Read and pointer updates");
@@ -10334,7 +10187,7 @@ bool tms320c54x_test_state::check_mapped_dual_results()
 	if (m_phase == 62171) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62170; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 62110)
 	{
-		bool const immediate = !strcmp(machine().options().bios(), "stm-st1");
+		bool const immediate = profile_is("stm-st1");
 		auto const f = stlm_status_case(m_pipeline_peripheral_case, immediate); unsigned const tick = ++m_idle_fixture_tick;
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "STLM status publication and qualified consumers stay staged");
 		if (tick == 4 || tick == 5) m_cpu->set_state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, tick == 4 ? f.value ^ 0xffff : f.value);
@@ -10758,7 +10611,7 @@ bool tms320c54x_test_state::check_extended_t_store_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62134)
 	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = extended_t_store_case(variant, !strcmp(machine().options().bios(), "st-t-long-edge"));
+		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = extended_t_store_case(variant, profile_is("st-t-long-edge"));
 		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (f.excluded && tick >= 6), "Extended T/TRN stores reject mapped destinations at Read without effects");
 		if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
 		if (!f.excluded && tick == f.write - 1) m_cpu->set_state_int(f.trn ? tms320c54x_device::STATE_TRN : tms320c54x_device::STATE_T, f.value);
@@ -11132,7 +10985,7 @@ bool tms320c54x_test_state::check_mvmd_word_register_results()
 	if (m_phase == 254300)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const bk = !strcmp(machine().options().bios(), "mvmd-bk"), producer = bk && variant >= 216;
+		bool const bk = profile_is("mvmd-bk"), producer = bk && variant >= 216;
 		unsigned const v = bk ? variant % 216 : variant, sources = bk ? 1 : 2, prefix = producer ? 2 : 0;
 		unsigned const source = bk ? 0x19 : 0x0e + v % sources, destination = (v / sources) % 9 < 8 ? 0x10 + (v / sources) % 9 : 0x19, checkpoint = 4 + prefix + v / (sources * 72);
 		u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(v / (sources * 9)) % 4];
@@ -11164,15 +11017,15 @@ bool tms320c54x_test_state::check_source_alias_results()
 	{
 		auto const *profile = c54x_test::find_source_alias_profile(machine().options().bios());
 		expect(profile, "Source-alias continuation retains its profile");
-		bool const long_memory = !strcmp(machine().options().bios(), "long-abs-edge");
-		bool const rmw = !strcmp(machine().options().bios(), "rmw-abs-edge");
-		bool const logic = !strcmp(machine().options().bios(), "logic-abs-edge");
-		bool const arithmetic = !strcmp(machine().options().bios(), "arith-abs-edge");
-		bool const load = !strcmp(machine().options().bios(), "load-abs-edge");
-		bool const memory_t = !strcmp(machine().options().bios(), "mem-t-abs-edge");
-		bool const mac = !strcmp(machine().options().bios(), "mac-abs-edge");
-		bool const delay = !strcmp(machine().options().bios(), "delay-abs-edge");
-		bool const pmac = !strcmp(machine().options().bios(), "pmac-abs-edge");
+		bool const long_memory = profile_is("long-abs-edge");
+		bool const rmw = profile_is("rmw-abs-edge");
+		bool const logic = profile_is("logic-abs-edge");
+		bool const arithmetic = profile_is("arith-abs-edge");
+		bool const load = profile_is("load-abs-edge");
+		bool const memory_t = profile_is("mem-t-abs-edge");
+		bool const mac = profile_is("mac-abs-edge");
+		bool const delay = profile_is("delay-abs-edge");
+		bool const pmac = profile_is("pmac-abs-edge");
 		unsigned const variant = m_pipeline_peripheral_case, flags = variant / 7;
 		unsigned const tick = ++m_idle_fixture_tick, checkpoint = flags & 16 ? 10 : 1;
 		expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Unadmitted source absolute alias performs no data transaction");
@@ -11277,7 +11130,7 @@ bool tms320c54x_test_state::check_source_alias_results()
 			if (variant >= 51712)
 			{
 				osd_printf_info("TMS320C54x paired arithmetic MOD3 exclusions: PASS cases=3584 restore=3584 opcode_classes=14 arf=8 cmpt=2 c16=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n");
-				throw emu_fatalerror(0, !strcmp(machine().options().bios(), "drsub") ? "TMS320C54x isolated DRSUB complete" : "TMS320C54x isolated long-pair controls complete");
+				throw emu_fatalerror(0, profile_is("drsub") ? "TMS320C54x isolated DRSUB complete" : "TMS320C54x isolated long-pair controls complete");
 			}
 			if (variant >= 51200)
 			{
@@ -11385,12 +11238,12 @@ bool tms320c54x_test_state::check_t_move_results()
 			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore the rejected delay without a memory write or atomic fallback"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254510; m_check_timer->enable(true); return true; }
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 15) { start_delay_store_edge(variant + 1); return true; }
-			if (!strcmp(machine().options().bios(), "mac-delay-edge")) { osd_printf_info("TMS320C54x delay MAC/MAS boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay MAC/MAS boundary complete"); }
-			if (!strcmp(machine().options().bios(), "dld-delay-edge")) { osd_printf_info("TMS320C54x delay DLD boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay DLD boundary complete"); }
-			if (!strcmp(machine().options().bios(), "asm-delay-edge")) { osd_printf_info("TMS320C54x delay ASM boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay ASM boundary complete"); }
-			if (!strcmp(machine().options().bios(), "mpy-delay-edge")) { osd_printf_info("TMS320C54x delay MPY boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated delay MPY boundary complete"); }
-			if (!strcmp(machine().options().bios(), "mpyr-delay-edge")) { osd_printf_info("TMS320C54x delay MPYR boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay MPYR boundary complete"); }
-			if (!strcmp(machine().options().bios(), "bd-maca-edge")) { osd_printf_info("TMS320C54x BD long accumulator boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated BD long accumulator boundary complete"); }
+			if (profile_is("mac-delay-edge")) { osd_printf_info("TMS320C54x delay MAC/MAS boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay MAC/MAS boundary complete"); }
+			if (profile_is("dld-delay-edge")) { osd_printf_info("TMS320C54x delay DLD boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay DLD boundary complete"); }
+			if (profile_is("asm-delay-edge")) { osd_printf_info("TMS320C54x delay ASM boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay ASM boundary complete"); }
+			if (profile_is("mpy-delay-edge")) { osd_printf_info("TMS320C54x delay MPY boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated delay MPY boundary complete"); }
+			if (profile_is("mpyr-delay-edge")) { osd_printf_info("TMS320C54x delay MPYR boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay MPYR boundary complete"); }
+			if (profile_is("bd-maca-edge")) { osd_printf_info("TMS320C54x BD long accumulator boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated BD long accumulator boundary complete"); }
 			osd_printf_info("TMS320C54x delay store boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n");
 			throw emu_fatalerror(0, "TMS320C54x isolated delay store boundary complete");
 		}
@@ -11462,7 +11315,7 @@ bool tms320c54x_test_state::check_move_brc_edge_results()
 	if (m_phase == 255650) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255640; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 255620)
 	{
-		bool const control = !strcmp(machine().options().bios(), "move-brc-delay");
+		bool const control = profile_is("move-brc-delay");
 		auto const f = move_brc_case(m_pipeline_peripheral_case, control);
 		unsigned const tick = ++m_idle_fixture_tick, checkpoint = f.read_tick - 1 + f.snapshot;
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Memory move BRC and following block repeat remain staged");
@@ -11491,9 +11344,9 @@ bool tms320c54x_test_state::check_move_brc_edge_results()
 	if (m_phase == 255630) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255620; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 254440)
 	{
-		bool const asm_store = !strcmp(machine().options().bios(), "asm-store-bp");
+		bool const asm_store = profile_is("asm-store-bp");
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 5 + variant / (asm_store ? 8192 : 96), gap = (variant / (asm_store ? 256 : 12)) % 2;
-		bool const xmem = !strcmp(machine().options().bios(), "xmem-store-bp");
+		bool const xmem = profile_is("xmem-store-bp");
 		bool const destination = (variant / (asm_store ? 128 : 6)) % 2, alias = (variant / (asm_store ? 512 : 24)) % 2;
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Store-to-load bypass remains staged");
 		if (tick == 5) m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x6000);
@@ -11533,7 +11386,7 @@ bool tms320c54x_test_state::check_circular_load_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 255300)
 	{
-		bool const circular = !strcmp(machine().options().bios(), "ld-circular");
+		bool const circular = profile_is("ld-circular");
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = circular ? circular_load_case(variant) : indexed_load_case(variant);
 		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (f.excluded && tick >= 4), "Indexed LD admits RAM and excludes low mapped sources before effects");
 		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (!f.excluded && tick >= 6 && !(f.selector & 1) ? f.value : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_B) == (!f.excluded && tick >= 6 && (f.selector & 1) ? f.value : 0xfedcba9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (!f.excluded && tick >= 4 ? f.st0 : 0x8608) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "Indexed LD publishes a signed or unsigned word only in Execute without SST OVM or status side effects");
@@ -11609,7 +11462,7 @@ bool tms320c54x_test_state::check_t_store_edge_results()
 	if (m_phase == 255130) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255120; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 255100)
 	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const consumer = !strcmp(machine().options().bios(), "st-t-consumer"); auto const f = t_store_case(variant, consumer);
+		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const consumer = profile_is("st-t-consumer"); auto const f = t_store_case(variant, consumer);
 		u64 const source = tick <= 6 ? f.value ^ 0xffffffffffULL : f.value, other = consumer && !f.merge && tick > f.consumer_read ? f.result : 0x2233445566ULL;
 		u16 const expected_t = tick < 7 ? 3 : !consumer ? tick == 7 ? f.word : 0xbeef : tick > f.consumer_read ? f.merge ? 0xbeef : f.word ^ 63 : f.merge && tick == f.consumer_read ? f.memory : f.word;
 		bool const ok = !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.kind & 1 ? other : source) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.kind & 1 ? source : other) && m_cpu->state_int(tms320c54x_device::STATE_T) == expected_t && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= 6 ? f.final_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst;
@@ -11658,8 +11511,8 @@ bool tms320c54x_test_state::check_asm_edge_results()
 	if (m_phase == 255050) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255040; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 255020)
 	{
-		bool const immediate = !strcmp(machine().options().bios(), "asm-immediate");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const consumer = immediate || !strcmp(machine().options().bios(), "asm-consumer"); auto const f = asm_load_case(variant, consumer);
+		bool const immediate = profile_is("asm-immediate");
+		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const consumer = immediate || profile_is("asm-consumer"); auto const f = asm_load_case(variant, consumer);
 		u16 const expected_st0 = consumer && tick >= f.consumer_clock ? f.final_st0 : !consumer && tick >= f.read - 1 ? f.final_st0 : f.st0;
 		bool const state_ok = !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (tick > f.read ? (f.st1 & ~31) | f.raw : f.st1) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == expected_st0 && m_cpu->state_int(tms320c54x_device::STATE_A) == f.a && m_cpu->state_int(tms320c54x_device::STATE_B) == (consumer && tick >= f.consumer_clock ? f.result : f.b) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5;
 		if (!state_ok) osd_printf_info("asm_load_state: consumer=%u case=%u tick=%u st0=%llx expected=%04x st1=%llx expected=%04x b=%llx expected=%llx\n", unsigned(consumer), variant, tick, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST0), expected_st0, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST1), tick > f.read ? (f.st1 & ~31) | f.raw : f.st1, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)(consumer && tick >= f.consumer_clock ? f.result : f.b));
@@ -11692,9 +11545,9 @@ bool tms320c54x_test_state::check_asm_circular_store_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 254960)
 	{
-		bool const immediate = !strcmp(machine().options().bios(), "imm-index");
-		bool const asm_circular = !strcmp(machine().options().bios(), "asm-circular");
-		bool const circular = asm_circular || !strcmp(machine().options().bios(), "store-circular");
+		bool const immediate = profile_is("imm-index");
+		bool const asm_circular = profile_is("asm-circular");
+		bool const circular = asm_circular || profile_is("store-circular");
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, read = immediate ? 6 : 5; auto const f = asm_circular ? asm_circular_store_case(variant) : circular ? circular_store_case(variant) : indexed_store_case(variant, immediate);
 		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (f.excluded && tick >= read), "Indexed store excludes low-page destinations before pointer or data effects");
 		u64 const value = !f.excluded && tick > read ? f.value : f.value ^ 0xffffffffffULL;
@@ -11730,7 +11583,7 @@ bool tms320c54x_test_state::check_indexed_mar_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 254920)
 	{
-		bool const reverse = !strcmp(machine().options().bios(), "mar-reverse");
+		bool const reverse = profile_is("mar-reverse");
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = indexed_mar_case(variant, reverse);
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfeabcd9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (f.compatibility ? 0x20 : 0)), "Indexed MAR preserves accumulators T and ST1");
 		expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= 4 ? f.st0 : 0x8608), "Indexed MAR publishes only compatibility ARP at Access");
@@ -11767,13 +11620,13 @@ bool tms320c54x_test_state::check_mapped_parallel_load_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62164)
 	{
-		bool const multiply = !strcmp(machine().options().bios(), "st-par-mpy") || !strcmp(machine().options().bios(), "st-mpy-edge");
-		bool const bsp = !strcmp(machine().options().bios(), "stld-bsp");
-		bool const bus = !strcmp(machine().options().bios(), "stld-periph"), peripheral = bsp || bus;
-		bool const repeated_edge = !strcmp(machine().options().bios(), "stld-rpt-edge") || !strcmp(machine().options().bios(), "st-alu-rpt-edge");
-		bool const arithmetic = !strcmp(machine().options().bios(), "st-par-alu") || !strcmp(machine().options().bios(), "st-par-edge") || !strcmp(machine().options().bios(), "st-alu-rpt-edge");
-		bool const mapped = !strcmp(machine().options().bios(), "stld-map");
-		bool const edge = repeated_edge || !strcmp(machine().options().bios(), "stld-edge") || !strcmp(machine().options().bios(), "st-par-edge") || !strcmp(machine().options().bios(), "st-mpy-edge");
+		bool const multiply = profile_is("st-par-mpy") || profile_is("st-mpy-edge");
+		bool const bsp = profile_is("stld-bsp");
+		bool const bus = profile_is("stld-periph"), peripheral = bsp || bus;
+		bool const repeated_edge = profile_is("stld-rpt-edge") || profile_is("st-alu-rpt-edge");
+		bool const arithmetic = profile_is("st-par-alu") || profile_is("st-par-edge") || profile_is("st-alu-rpt-edge");
+		bool const mapped = profile_is("stld-map");
+		bool const edge = repeated_edge || profile_is("stld-edge") || profile_is("st-par-edge") || profile_is("st-mpy-edge");
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const c = multiply ? parallel_multiply_case(variant, edge) : bus ? peripheral_parallel_load_case(variant) : bsp ? bsp_parallel_load_case(variant) : mapped ? mapped_parallel_load_case(variant) : arithmetic ? parallel_arithmetic_case(variant, edge) : parallel_load_case(variant, edge, repeated_edge); auto const &f = c.memory;
 		unsigned const checkpoint = 4 + f.snapshot;
 		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= (repeated_edge ? 5 : 4)), "Parallel load excludes mapped X or Y operands before data access or pointer changes");
@@ -11827,7 +11680,7 @@ bool tms320c54x_test_state::check_mapped_parallel_load_results()
 	if (m_phase == 62165) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62164; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 62162)
 	{
-		bool const edge = !strcmp(machine().options().bios(), "stack-page0-edge");
+		bool const edge = profile_is("stack-page0-edge");
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = page_zero_stack_case(variant, edge);
 		unsigned const checkpoint = edge ? f.snapshot ? 7 : 4 : std::array<unsigned, 3>{4, 6, 9}[f.snapshot];
 		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 3), "Page-zero stack admission excludes peripherals and indirect encodings before source access");
@@ -11857,7 +11710,7 @@ bool tms320c54x_test_state::check_memory_copy_repeat_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62154)
 	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const wrap = !strcmp(machine().options().bios(), "rpt-mem-wrap"), chain = !strcmp(machine().options().bios(), "rpt-mem-chain"); auto const f = memory_copy_repeat_case(variant, wrap, chain);
+		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const wrap = profile_is("rpt-mem-wrap"), chain = profile_is("rpt-mem-chain"); auto const f = memory_copy_repeat_case(variant, wrap, chain);
 		unsigned const checkpoint = std::array<unsigned, 4>{3, f.read_clock(), f.read_clock() + 2, f.read_clock() + 6}[f.snapshot];
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Memory-sourced count composes with pipelined data copies");
 		if (tick == f.read_clock()) set_repeat_count_source(f.address, f.address == 0x18 ? 0x3000 : 0xa55a);
@@ -11896,8 +11749,8 @@ bool tms320c54x_test_state::check_repeated_mvdk_results()
 	if (m_phase == 62148)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const indexed = !strcmp(machine().options().bios(), "mvdk-index-rpt") || !strcmp(machine().options().bios(), "mvdk-irpt-edge");
-		bool const edge = !strcmp(machine().options().bios(), "mvdk-rpt-edge") || !strcmp(machine().options().bios(), "mvdk-irpt-edge"); auto const f = repeated_mvdk_case(variant, edge, indexed); unsigned const checkpoint = 5 + f.snapshot;
+		bool const indexed = profile_is("mvdk-index-rpt") || profile_is("mvdk-irpt-edge");
+		bool const edge = profile_is("mvdk-rpt-edge") || profile_is("mvdk-irpt-edge"); auto const f = repeated_mvdk_case(variant, edge, indexed); unsigned const checkpoint = 5 + f.snapshot;
 		unsigned const rejection_tick = f.destination < 0x60 && (f.destination < 8 || f.destination > 0x1a) ? 5 : 6;
 		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= rejection_tick), "Repeated MVDK rejects mapped compositions before data or pointer effects");
 		if (tick == checkpoint && !m_pipeline_replay)
@@ -11931,8 +11784,8 @@ bool tms320c54x_test_state::check_repeated_mvdk_results()
 	if (m_phase == 62146)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const indexed = !strcmp(machine().options().bios(), "mvdk-index") || !strcmp(machine().options().bios(), "mvdk-index-edge");
-		bool const edge = !strcmp(machine().options().bios(), "mvdk-circ-edge") || !strcmp(machine().options().bios(), "mvdk-index-edge"); auto const c = indexed ? indexed_move_case(variant, edge) : circular_move_case(variant, edge); auto const &f = c.memory;
+		bool const indexed = profile_is("mvdk-index") || profile_is("mvdk-index-edge");
+		bool const edge = profile_is("mvdk-circ-edge") || profile_is("mvdk-index-edge"); auto const c = indexed ? indexed_move_case(variant, edge) : circular_move_case(variant, edge); auto const &f = c.memory;
 		unsigned const checkpoint = 4 + f.snapshot;
 		// Literal destinations are checked in Decode; resolved source addresses in Access.
 		bool const unsupported_destination = c.destination < 0x60 && (c.destination < 8 || c.destination > 0x1a);
@@ -12023,7 +11876,7 @@ bool tms320c54x_test_state::check_xmem_load_results()
 	if (m_phase == 254120)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + (variant % 196608) / 65536; auto const f = xmem_load_case(variant % 196608);
-		bool const arithmetic = !strcmp(machine().options().bios(), "xmem-alu");
+		bool const arithmetic = profile_is("xmem-alu");
 		auto const a = xmem_arithmetic_expected(variant);
 		u64 const result = arithmetic ? a.result : f.result();
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Xmem LD stays in the staged frontend");

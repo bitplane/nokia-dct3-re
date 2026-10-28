@@ -1,7 +1,7 @@
 // license:BSD-3-Clause
 // copyright-holders:Gaz
 
-#include "../driver/gsm_sms_transport.h"
+#include "../../driver/gsm_sms_transport.h"
 
 #include <array>
 #include <cassert>

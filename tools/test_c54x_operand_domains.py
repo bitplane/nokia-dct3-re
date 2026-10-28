@@ -7,7 +7,7 @@ import unittest
 class OperandDomainInventoryTest(unittest.TestCase):
     def test_census_has_every_reviewed_read_rmw_class_and_extension(self):
         source = (Path(__file__).resolve().parents[1] /
-                  'driver/tms320c54x_test_operand_domains.cpp').read_text()
+                  'tests/c54x/tms320c54x_test_operand_domains.cpp').read_text()
         table = source.split('source_domains[] = {', 1)[1].split('};', 1)[0]
         actual = [(int(word, 16), int(operation, 16)) for word, operation in
                   re.findall(r'\{\s*(0x[0-9a-f]+),\s*(0x[0-9a-f]+|0)\s*\}', table)]

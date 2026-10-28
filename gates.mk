@@ -1563,37 +1563,37 @@ verify-8210-bootstrap: normalize-8210 build
 	$(PYTHON) tools/nsm3_bootstrap_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)/boot_summary.txt
 
 verify-gsm-fr-codec: $(LIBGSM_ARCHIVE)
-	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic -Ilib -Ithird_party lib/util/gsmfr.cpp tools/test_gsm_fr_codec.cpp $(LIBGSM_ARCHIVE) -o scratchpad/test_gsm_fr_codec
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic -Ilib -Ithird_party lib/util/gsmfr.cpp tests/unit/test_gsm_fr_codec.cpp $(LIBGSM_ARCHIVE) -o scratchpad/test_gsm_fr_codec
 	scratchpad/test_gsm_fr_codec
 
 verify-gsm-tch-f-l1:
 	mkdir -p scratchpad
-	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_tch_f_l1.cpp tools/test_gsm_tch_f_l1.cpp -o scratchpad/test_gsm_tch_f_l1
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_tch_f_l1.cpp tests/unit/test_gsm_tch_f_l1.cpp -o scratchpad/test_gsm_tch_f_l1
 	scratchpad/test_gsm_tch_f_l1
 
 verify-gsm-a3a8:
 	mkdir -p scratchpad
-	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_a3a8.cpp driver/gsm_mm_authentication.cpp tools/test_gsm_a3a8.cpp -o scratchpad/test_gsm_a3a8
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_a3a8.cpp driver/gsm_mm_authentication.cpp tests/unit/test_gsm_a3a8.cpp -o scratchpad/test_gsm_a3a8
 	scratchpad/test_gsm_a3a8
 
 verify-gsm-a5:
 	mkdir -p scratchpad
-	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_a5.cpp tools/test_gsm_a5.cpp -o scratchpad/test_gsm_a5
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_a5.cpp tests/unit/test_gsm_a5.cpp -o scratchpad/test_gsm_a5
 	scratchpad/test_gsm_a5
 
 verify-gsm-xcch-l1:
 	mkdir -p scratchpad
-	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_a5.cpp driver/gsm_tch_f_l1.cpp driver/gsm_xcch_l1.cpp tools/test_gsm_xcch_l1.cpp -o scratchpad/test_gsm_xcch_l1
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_a5.cpp driver/gsm_tch_f_l1.cpp driver/gsm_xcch_l1.cpp tests/unit/test_gsm_xcch_l1.cpp -o scratchpad/test_gsm_xcch_l1
 	scratchpad/test_gsm_xcch_l1
 
 verify-gsm-mobility:
 	mkdir -p scratchpad
-	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic tools/test_gsm_mobility.cpp -o scratchpad/test_gsm_mobility
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic tests/unit/test_gsm_mobility.cpp -o scratchpad/test_gsm_mobility
 	scratchpad/test_gsm_mobility
 
 verify-gsm-sms-transport:
 	mkdir -p scratchpad
-	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_sms_transport.cpp tools/test_gsm_sms_transport.cpp -o scratchpad/test_gsm_sms_transport
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_sms_transport.cpp tests/unit/test_gsm_sms_transport.cpp -o scratchpad/test_gsm_sms_transport
 	scratchpad/test_gsm_sms_transport
 
 verify-radio-periodic-location-update:

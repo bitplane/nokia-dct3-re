@@ -15,6 +15,9 @@
 #include "tms320c54x_dma.h"
 #include "tms320c54x_bsp_state.h"
 #include "tms320c54x_test_profiles.h"
+#include "tms320c54x_test_selection.h"
+#include "tms320c54x_test_support.h"
+#include "tms320c54x_test_atomic_routes.h"
 #include <sstream>
 #include <bitset>
 
@@ -37,6 +40,13 @@ public:
 	void rom4(machine_config &config);
 
 private:
+	using cpu_regs = tms320c54x_device;
+
+	bool profile_is(std::string_view name) const
+	{
+		return name == machine().options().bios();
+	}
+
 	static constexpr u64 SMUL_RESULTS[4][3] = {
 		{0x003fffffffULL, 0x007fffffffULL, 0x007ffffffeULL},
 		{0x0040000000ULL, 0x0080000000ULL, 0x0080000000ULL},
@@ -2107,6 +2117,16 @@ private:
 	bool check_rounded_multiply_results();
 	bool check_stopped_timer_reload_results();
 	bool check_atomic_program_results();
+	bool next_atomic_phase(unsigned phase)
+	{
+		m_phase = phase;
+		m_check_timer->adjust(attotime::from_usec(100));
+		return true; // Timer callback handled, not an assertion of test success.
+	}
+	bool check_atomic_basic_results();
+	bool check_atomic_corpus_results();
+	bool check_atomic_reference_results();
+	bool check_atomic_control_results();
 	bool check_far_save_results();
 	bool check_bitf_offset_results();
 	bool check_bio_results();

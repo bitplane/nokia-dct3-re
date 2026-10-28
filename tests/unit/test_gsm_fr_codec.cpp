@@ -1,7 +1,7 @@
 // license:BSD-3-Clause
 // copyright-holders:Gaz
 
-#include "../driver/nokia_gsm_fr_codec.h"
+#include "../../driver/nokia_gsm_fr_codec.h"
 
 #include <algorithm>
 #include <cassert>

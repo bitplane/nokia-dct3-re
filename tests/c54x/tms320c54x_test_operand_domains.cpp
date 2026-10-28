@@ -71,16 +71,12 @@ void tms320c54x_test_state::start_source_domains(unsigned variant)
 	program.write_word(base + 0x601, instruction.operation && mode < 0xe0 ? instruction.operation : 0x1500);
 	program.write_word(base + 0x602, instruction.operation && mode >= 0xe0 ? instruction.operation : 3);
 	program.write_word(base + 0x603, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1804);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (context & 1 ? 0x20 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xabcd);
-	m_cpu->set_state_int(tms320c54x_device::STATE_RC, 7);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1600);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_ST0, 0x1804}, {cpu_regs::STATE_ST1, 0x800 | (context & 1 ? 0x20 : 0)},
+		{cpu_regs::STATE_A, 0x123456789aULL}, {cpu_regs::STATE_B, 0xfedcba9876ULL}, {cpu_regs::STATE_T, 0xabcd},
+		{cpu_regs::STATE_RC, 7}, {cpu_regs::STATE_SP, 0x1600}, {cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_IFR, 0},
+		{cpu_regs::STATE_TCR, 0x10},
+	});
 	for (unsigned i = 0; i < 8; ++i)
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x1400 + i);
 	m_rptbd_counts = {};

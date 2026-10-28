@@ -14,7 +14,7 @@
       "status": "disproven",
       "hypothesis": "The original native worker's0400-word availability threshold rejects work in the observed finalized-media tail window",
       "conclusion": "Fresh read-only cold capture tmp/mu4-native-return has27 availability branches, all passing, in9.64..9.86s. Four complete observed decoder calls return0000 and take the zero-result route; the activity branch instead skips23 times, including twice after processing count376. The checker validates uncapped exact instruction identities and actual successors, not merely operand values. This falsifies availability rejection in that window, not every earlier/later gate, the isolated ABI reserve rejection, a whole-session return inventory or the original upstream EOF/drain policy. No input, activity flag, return code or policy word is changed.",
-      "evidence": ["docs/aac_validation.md", "tools/mu4_decoder_gate_check.py", "tools/test_mu4_decoder_gate_check.py", "driver/mu4_storage_test.cpp"]
+      "evidence": ["docs/aac_validation.md", "tools/mu4_decoder_gate_check.py", "tools/test_mu4_decoder_gate_check.py", "tests/firmware/mu4_storage_test.cpp"]
     },
     {
       "id": "npe3_irq3_wake_report_alone_restores_call_input",
@@ -203,7 +203,7 @@
       "status": "disproven",
       "hypothesis": "Directly aliasing packed MCU parameter 100a8/0854 onto DSP port-1 requests and clearing its bits on acceptance is necessary for ordinary native 5110 boot and correctly delivers codec controls",
       "conclusion": "The original poster creates packed selector/value words and private selector-8/9 shadows, with an explicit HPINT notification handshake. The direct alias cleared physical level-3 word 9209 before native 27f2 consumed it, causing register-0 rather than register-9 delivery; limiting the clear to ISR mask union 17ff would still corrupt the selector. Keeping the live ring comparator and independently saved slot timer while removing only payload-derived requests/clears passes all four physical tone settings, exact native boot instruction fingerprints, paired frames and native save/load. Medium/High now deliver 920c/9209 intact and produce register-9 values 020c/0209. The older blank ring-only experiment also removed the slot source, so it did not falsify this composition. Do not restore the direct alias to manufacture other dispatcher bits. This does not close the electrical in-service-mask projection, other peripheral request sources, analog gain or production audio clocks.",
-      "evidence": ["docs/cobba_control_boundary.md", "driver/nokia_dsp_c54x.cpp", "driver/tms320c54x_test.cpp", "tools/c54x_rom4_host_poster.py", "tools/c54x_rom4_tone_levels_check.py", "tools/test_c54x_rom4_tone_levels_check.py", "tools/run_c54x_rom4_tone_levels.py", "tools/run_c54x_rom4_pcm_clock.py"]
+      "evidence": ["docs/cobba_control_boundary.md", "driver/nokia_dsp_c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/c54x_rom4_host_poster.py", "tools/c54x_rom4_tone_levels_check.py", "tools/test_c54x_rom4_tone_levels_check.py", "tools/run_c54x_rom4_tone_levels.py", "tools/run_c54x_rom4_pcm_clock.py"]
     },
     {
       "id": "nse1_data22_cxxx_proves_cobba_parallel_register_c",
@@ -217,7 +217,7 @@
       "status": "disproven",
       "hypothesis": "The generic STLM-to-T recommendation makes an adjacent register MPYA/MACA/MASA consumer use old T, so every such multiplier needs a separating word",
       "conclusion": "SPRU131G 7.5.6 and table 7-13 restrict the T hazard to the listed shift/bit-test and related Category-I consumers; other consumers have zero latency. Register MPYA and MACA/MASA are not Category I. An oracle derived only from table 7-3's conservative summary falsely accepted old T. The corrected adjacent-STLM fixture fails that implementation; retaining T after older Execute and before younger Read publication passes the 69120-case dependency bank. A following STM-to-T case prevents replacing this with a live Execute read. These are functional ordering checks, not measured silicon phases. Smem multiplier/POLY and other immediate T-input composition need their own category audit rather than inheriting either rule blindly.",
-      "evidence": ["docs/5510_bringup.md", "docs/research_cleanup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "docs/research_cleanup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
       "id": "mu4_clear_adts_chain_is_plaintext_recording_oracle",
@@ -231,77 +231,77 @@
       "status": "disproven",
       "hypothesis": "The native parameter-7 metadata rewrite removes the POCP marker or changes the recorded payload, and this update alone explains silent playback",
       "conclusion": "A buffer-only NAND snapshot immediately before the first metadata-request byte leaves the final NAND identical to the existing corrected-core recorder endpoint (523e9417a37fd2353edbcf3ad4d3f8bdc5231c184e8ac88ec8ae9639da8fc2f8). Independent FAT extraction yields REL_001.REL before and TEST afterward. Only 33 common bytes change, within the first 56 ID3 bytes; the remaining common extent is identical. POCP is already absent before the update. EOF extends from 142958 to 143168 with 210 ff bytes, whose correctness remains unresolved. Playing the untouched pre-request NAND for 20 seconds still yields zero TX/DIN and 1363518 zero DMA reads in 1000..137f, illegal=0, the same PC 02:b5e1 and 87390 completed arithmetic-loop calls as the post-update input. The pre-update title begins 000908 rather than MAME, so title_verified=0 and the strict title checker remains rejecting; this is coverage evidence, not playback acceptance. The result excludes metadata as the sole cause of silence, not other container/encoder/decoder defects or a possible response to the constant converted-ADC bench input. Audio provenance and the EOF extension remain open.",
-      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "tools/mu4_recorder_media_inventory.py", "tools/test_mu4_recorder_media_inventory.py", "tools/noki5510_bootstrap_check.py", "Makefile"]
+      "evidence": ["docs/5510_bringup.md", "tests/firmware/mu4_storage_test.cpp", "tools/mu4_recorder_media_inventory.py", "tools/test_mu4_recorder_media_inventory.py", "tools/noki5510_bootstrap_check.py", "Makefile"]
     },
     {
       "id": "c54x_dma_enable_relatches_live_element_count",
       "status": "disproven",
       "hypothesis": "Re-enabling a C54x DMA channel must replace its per-frame count shadow with the current decremented DMCTR value",
       "conclusion": "SPRU302B 3.2.3.2 requires each new frame to reload the original DMCTR shadow; DE independently controls channel enable (3.2.2.1). Original AA22 and AA99 both clear DE3 around a call and restore it. Playback MMIO observations show a pause immediately after the first element, with live count 0 and programmed count 1; no intervening zero count write occurs. Re-latching 0 converts subsequent two-element frames into one-element frames and walks downward by frame index -63 into unrelated data. A focused sorting fixture reproduces the defect, fails the explicit post-frame count assertion, and passes when DE no longer overwrites the shadow. Its paused save/restore disturbs DMCTR through MMIO before restoration and then requires four words and two frame interrupts. Full playback remains legal for 20 seconds with source addresses restricted to 1000..137f; its former 1277 nonzero outputs disappear and are not valid decoder-output evidence. CPU count writes and block auto-reload still update the shadow. This does not establish decoded music, physical DA150 timing or complete TX/DIN pairing.",
-      "evidence": ["docs/5510_bringup.md", "driver/tms320c54x_dma.cpp", "driver/tms320c54x_dma.h", "driver/mu4_storage_test.cpp", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "Makefile"]
+      "evidence": ["docs/5510_bringup.md", "driver/tms320c54x_dma.cpp", "driver/tms320c54x_dma.h", "tests/firmware/mu4_storage_test.cpp", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "Makefile"]
     },
     {
       "id": "c54x_repeat_endpoint_is_xpc_qualified",
       "status": "disproven",
       "hypothesis": "An active C54x repeat block belongs to its setup XPC, so a matching low PC on a foreign program page cannot consume its count or reload RSA",
       "conclusion": "TI SPRA599A section 2 page 4 explicitly documents an unintended repeat when another thread's foreign-page low PC matches REA. The comparator is 16-bit; an RSA reload changes PC without restoring the setup XPC. The old staged page qualifier hides this hardware hazard, while the atomic frontend already exposes it. A paired 384-case replay fixture covers BRC 0/1/2/7, caller pages 0/2/127, foreign-page collisions and safe controls with FCALL and FCALLD. Its minimal failing staged case has BRC=1: the old model calls twice from the original page, whereas the documented comparator consumes the loop in one foreign callee and executes its prefix once. The corrected staged path matches the independent counts and balances every PC/page frame through replay. This does not certify silicon phases or unrestricted far-call/repeat compositions, and does not justify copying the C55x compatibility mode's BRAF-clearing rule. Comparator acceptance remains separate from instruction/delay composition coverage.",
-      "evidence": ["docs/rom4_dsp_loader.md", "docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/rom4_dsp_loader.md", "docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
       "id": "mu4_recorder_first_zero_mvdd_source_is_staged_only",
       "status": "disproven",
       "hypothesis": "The first repeated recorder MVDD source 0000 is introduced by the staged TS load or staged pointer execution, while the equivalent atomic recorder uses a nonzero initialized source",
       "conclusion": "Byte-identical own NAND inputs, the same R060 image and paired bootrecstage/bootrecsave pin sequences produce the same initial field fe78=0000. The callback receives object fe76; MVDK at 03:8e9d loads [AR1+2] into AR3, and selector 05b8=0000 selects the first 128-word copy to 0e35 at 03:8eda. Staged execution rejects source 0000 before Read. The passive atomic observer records 128 ordered reads of 0000..007f before any nonzero write to fe78; the original firmware subsequently publishes 1800 and 1880 through context 02:1c96. This rules out a staged-only zero-source defect, not a shared board-model or physical-ordering defect. The atomic control is not a silicon oracle. Do not seed the pointer or suppress the callback; retained MVDD mapped-read, repeat-wait and exactly-once side-effect contracts must be tested independently, while DA150 physical register ownership remains unresolved.",
-      "evidence": ["docs/5510_bringup.md", "tools/mu4_recorder_source_observe.lua", "driver/mu4_storage_test.cpp", "cpu/tms320c54x/tms320c54x.cpp"]
+      "evidence": ["docs/5510_bringup.md", "tools/mu4_recorder_source_observe.lua", "tests/firmware/mu4_storage_test.cpp", "cpu/tms320c54x/tms320c54x.cpp"]
     },
     {
       "id": "mu4_staged_2050_zero_word_is_missing_add_or_resident_code",
       "status": "disproven",
       "hypothesis": "A staged ADD decoded as 0000 at logical 02:2050, where the resident image contains 4a1e, identifies a missing arithmetic form or missing resident program data",
       "conclusion": "The first wrong values arise in adjacent ordinary STL/LD pairs at 02:a39d/a39e and 02:a386/a387: the younger Read sampled old RAM while the older store published to the same location in Execute. That selected an invalid object branch and wrote bf7a through a null pointer into IMR. Source 4 then entered the intentionally self-looping default vector 2050; repeated pushes eventually overwrote PMST at stack address 001d, disabled OVLY and exposed zero physical program memory at 02:2050. SPRU131G 7.3.2 specifies a same-location on-chip internal-bus bypass. Extending the existing RMW bypass to ordinary STL/STH/T/TRN producers passes 288 red/green replay cases, preserves one real store and removes the original failure without accepting the spurious ADD or changing the resident map. Stack-return read-first ordering remains separate; this does not validate physical RAM banks, external-memory contention or the full recorder transaction.",
-      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
     },
     {
       "id": "c54x_explicit_sp_publication_is_immediate_compiler_base",
       "status": "disproven",
       "hypothesis": "Publishing SP through staged POPM SP, STM/MVDK SP or FRAME makes the new value immediately usable by a basic compiler-mode LD/ST",
       "conclusion": "TI SPRU131G table 7-9 distinguishes the architectural stack pointer from Category-I compiler-addressing visibility: POPM SP needs two cycles, STM/MVDK SP and FRAME need one, and a DAGEN-bank conflict adds one to POPM SP. The staged frontend now retains the prior compiler SP separately, with saved visibility-window state, while stack operations use architectural SP directly. The 320 replay cases distinguish zero through three NOPs for LD/ST, including an intermediate postincrement and deferred publication, with no duplicate reads or writes. Four additional cases execute the original POPM SP/NOP/NOP/RET idle-wrapper suffix and consume the caller return from the restored stack. This closes the tested basic consumers, not general multiword/Category-II consumers or all conflict chains; atomic handset execution remains unchanged.",
-      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
     },
     {
       "id": "mu4_complete_staged_isr_alone_removes_short_timer_starvation",
       "status": "disproven",
       "hypothesis": "Completing the original timer vector, active worker, context restoration and FRETE in the staged frontend is sufficient to advance foreground work with PRD=1",
       "conclusion": "The 96 recurring CPU-fixture cases execute eight original ISR returns per replay leg, with no worker-state reseeding. PRD=255 advances the retired ADDM foreground counter after the first return (representative totals 146/164 versus five); PRD=1 completes all eight returns but remains at five foreground writes with timer IFR bit 3 pending. Both naturally evolving worker-control outcomes, foreground pages and actual SXM states are covered. Replay reproduces the exact return cycle and foreground count after correcting a checker-callback scheduling error, without changing device timer semantics. This disproves ISR completion alone as the fix under the supplied standard CPU-timer workload; real DA150 clock units and the warm application's timer/mask/scheduling lifecycle remain unvalidated. Atomic handset and MU4 execution remain unchanged.",
-      "evidence": ["docs/rom4_dsp_loader.md", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
+      "evidence": ["docs/rom4_dsp_loader.md", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
     },
     {
       "id": "c54x_memory_logic_fixture_bit9_is_sxm",
       "status": "disproven",
       "hypothesis": "The staged logical-operation matrix's ST1 0200 toggle establishes both SXM states",
       "conclusion": "ST1 bit 9 is OVM; SXM is bit 8. The test incorrectly labeled overflow-mode coverage as sign-extension coverage. Its toggle and expected status were corrected to 0100, and all 576 logical replay cases rerun. The 48 complete original-worker cases also use the actual SXM bit while independently varying saved INTM and the CMPR conditional-store outcome. No CPU arithmetic semantics or atomic handset configuration were changed. The historical marker alone did not establish the claimed SXM coverage.",
-      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
     },
     {
       "id": "mu4_worker_1892_1a8a_are_memory_add_sub",
       "status": "disproven",
       "hypothesis": "The original R060 worker words 1892 and 1a8a require staged memory ADD and SUB",
       "conclusion": "TI SPRU172C syntax-1 logical opcode diagrams and the existing atomic decoder identify these words as AND *AR2+,A and OR *AR2-,A. The original upload pins the contiguous tail f000 0004 1892 1a8a 6d8a 8082: immediate ADD #4 followed by logical mask/merge and a pointer modification/store. Staged logical operands are zero-extended regardless of SXM. The read-only context tool rejects every mutated or absent witness word; 576 CPU replay cases cover the logical families, and five original-tail cases compose adjacent operations with retained reads and a final captured destination. This corrects the roadmap premise; it does not assign meanings to the input words or prove complete worker/recorder behavior.",
-      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py"]
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py"]
     },
     {
       "id": "c54x_popm_dagen_writes_only_in_execute",
       "status": "disproven",
       "hypothesis": "Staged POPM writes every supported MMR destination in Execute after its Read-stage stack sample",
       "conclusion": "TI SPRU131G table 7-4 explicitly assigns POPM writes to ARx/BK to Read. Those destinations now publish with the stack sample unless an older Execute-stage store occupies the DAGEN write bank; table 7-5 requires a one-clock deferral in that case. The 114 destination/page/replay cases distinguish DAGEN Read publication from other supported destinations' Execute publication. Twelve conflict/control replay cases require one stack read and increment, exactly one older store and one POPM write, with an independently changed stack source after Read unable to alter the retained result. This is bounded manual-derived timing coverage, not measured silicon or a global producer-latency proof. Atomic firmware execution remains unchanged.",
-      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
     },
     {
       "id": "c54x_daram_return_bypasses_same_clock_push",
       "status": "disproven",
       "hypothesis": "A staged RET/RETE/RETD stack read automatically consumes an older PSHM value written to the same DARAM address in that clock",
       "conclusion": "TI SPRU131G table 7-2 assigns DB reads to the first half-cycle and EB writes to the second. The old adjacent-push fixture encoded a prototype late-read assumption, not hardware bypass evidence. Stack return samples now precede Execute writes. Thirty-six RET/RETE replay cases require the old RAM target for an adjacent push and the new target after one NOP, with twelve RETD ordering controls establishing the same distinction. Both words remain observable and the sampled route survives restoration without duplicate accesses. Existing original MU4 context, worker and delayed-XC gates remain green. This closes the bounded DARAM ordering assumption; physical memory kind/bank arbitration and other late-read families remain separate unvalidated contracts.",
-      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
     },
     {
       "id": "nsb6_alarm_code_rejection_requires_wake_cause_override",
@@ -315,21 +315,21 @@
       "status": "disproven",
       "hypothesis": "The resident recorder metadata operation cannot select REL_001 because its returned filename context contains REL_ followed by padding",
       "conclusion": "Original AA22 routine 03:8dc3 scans file entries using a four-byte name comparison at 03:8e04..8e06, followed by extension comparison. It separately validates ASCII digits in entry-name bytes 4--6 and compares the resulting numeric suffix. The context is therefore an intentional prefix selector rather than a missing exact filename. Runtime writes show AA88 codec use of the same data range and resident initialization restoring the prefix at 13.908 seconds. No filename or context is patched; metadata reply and persistence remain separate unverified requirements.",
-      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "tools/noki5510_a00_inventory.py"]
+      "evidence": ["docs/5510_bringup.md", "tests/firmware/mu4_storage_test.cpp", "tools/noki5510_a00_inventory.py"]
     },
     {
       "id": "mu4_recorder_pending_receive_requires_firmware_interrupt_override",
       "status": "disproven",
       "hypothesis": "The recorder's post-startup unread serial byte requires an injected interrupt mask, scheduler event or software queue byte",
       "conclusion": "The last permanent IMR-zero write was a DST at 03:c85d in codec buffer reordering, not an interrupt handler. The core treated MOD4/MOD7 AR0 indexing as linear instead of reverse-carry/borrow arithmetic. Correcting those CPU semantics restores receipt of all nine token-2 control bytes and native 7f0255 acknowledgement, with drained RX, ring head/tail 15/15, 24 receive events and 33 output words. The packet checksum is independently compile-time checked as 86. The application dequeues class 1, selector 36, parameter 4 at 10.667 seconds; previous class/selector also equal 1/36, selecting the duplicate filter before the control handler. Forty application calls and zero processing-wait entries disprove an unconditional processing-completion prerequisite. No firmware masks or queues are modified and no completed recording is claimed.",
-      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "driver/mu4_storage_test.cpp", "Makefile"]
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tests/firmware/mu4_storage_test.cpp", "Makefile"]
     },
     {
       "id": "mu4_recorder_separate_ram_executes_selected_overlay",
       "status": "disproven",
       "hypothesis": "Separate program/data RAM allows the original aa88 recorder overlay to execute its selected startup, making the later NAND command-01 writes a recorder controller contract",
       "conclusion": "All 73762 non-register overlay destination words match the original before entry, but aa88 writes its reset vector and 0073f8 startup through data space; separate program RAM retains the resident vector to 02:6d62. A separate provisional static shared-RAM profile at 2000..7fff executes the genuine recorder startup, emits two checksum-valid native responses and completes the 20-second execution window with 160 NAND program setups/confirms and 84480 data bytes, beginning with REL_001 directory metadata. Exact DA150 shared-RAM extent remains unvalidated; a finalized recorded file is not verified and this is not a promoted handset map.",
-      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp"]
+      "evidence": ["docs/5510_bringup.md", "tests/firmware/mu4_storage_test.cpp"]
     },
     {
       "id": "mu4_selector3a_param1_unconditional_reload",
@@ -1145,55 +1145,55 @@
       "id": "c54x_short_mod3_is_a_valid_memory_repeat_read", "status": "disproven",
       "hypothesis": "Short preincrement Smem MOD=3 is a valid source form for RPT because its address and pointer effects can be implemented and replayed",
       "conclusion": "TI SPRU131G table 5-4 marks short MOD=3 preincrement as write-only; RPT Smem reads its operand. The earlier 4798..479f positive cases therefore tested an inadmissible domain rather than hardware behavior. These forms now reject before data or pointer effects, with all eight ARF values, compatibility states, pages and two snapshots covered. Long-offset MOD=13 preincrement is a distinct, read-capable form used by extended PSHD and must not inherit the short-mode restriction. The original REL repeat uses direct 4700 and is unaffected. Prototype rejection does not claim a silicon trap mechanism.",
-      "evidence": ["docs/5510_bringup.md", "docs/research_cleanup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp"]
+      "evidence": ["docs/5510_bringup.md", "docs/research_cleanup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp"]
     },
     {
       "id": "c54x_short_mod3_is_a_valid_accumulator_load_source", "status": "disproven",
       "hypothesis": "Short single-operand MOD=3 preincrement is a valid LD or DLD source because the address helper and positive replay fixtures can implement it",
       "conclusion": "SPRU131G table 5-4 and section 5.5.3.1 restrict short MOD=3 to write accesses, including paired accesses. LD, LDU, LD TS, LDR, LD shift-16, variable-shift LD and DLD now reject this encoding before data, pointer or arithmetic-result effects in both frontends. The variable-shift guard classifies the operation extension, preserving write-side forms; long MOD=13 remains read-capable. A 9728-case rejection/replay bank spans all ARs, destinations, CMPT settings, pages, frontends and snapshots, with all 32 variable shifts. Positive source fixtures omit the forbidden encoding instead of replacing it with duplicate valid cases. The legacy 569b DLD and 629b immediate-MPY checks are rejection controls, not positive timing evidence. This does not certify other read families, MMR-source legality, circular inputs outside TI's buffer/step constraints, or a silicon trap mechanism.",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
       "id": "c54x_short_mod3_is_a_valid_compare_or_bitfield_source", "status": "disproven",
       "hypothesis": "CMPM and BITF can use short MOD=3 preincrement because the shared address helper and positive fixtures implement the encoded source",
       "conclusion": "SPRU172C pages 4-22 and 4-33 define read-only Smem operands and a TC result; SPRU131G table 5-4 restricts short MOD=3 to writes. Both frontends now reject these CMPM/BITF source encodings before data, pointer or status effects. Each positive Smem bank omits 3072 invalid cases, retaining 52224 read-capable encoding cases/restores with stable raw IDs. A separate 512-case replay bank covers both operations, both initial TC states, all ARs, CMPT settings, pages, frontends and before/after-rejection snapshots. Mapped/peripheral reads, immediate TC consumers and delayed comparisons retain focused acceptance. This does not establish a silicon trap, permit generalizing the restriction to long MOD=13, settle read/modify/write sources, or validate older circular inputs outside TI's buffer/step constraints.",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
       "id": "c54x_short_mod3_is_a_valid_scalar_arithmetic_source", "status": "disproven",
       "hypothesis": "The mechanically decoded short MOD=3 source is valid for scalar ADD/SUB families and their variable-shift extensions",
       "conclusion": "SPRU131G table 5-4 restricts short MOD=3 to writes; the encoded operands in these arithmetic forms are reads. Both frontends now reject before data, pointer or arithmetic-result effects. A 35840-case replay bank covers all 24 scalar opcode classes in 00..0f and 3c..43, eight variable-shift operation/source/destination selectors with all 32 shifts, all ARs, CMPT settings, pages, frontends and two scheduler checkpoints. Scalar positive banks omit forbidden forms while retaining raw case IDs: ADD/SUB 104448, ADDS and SUBS 52224 each, shift-16 208896, and TS arithmetic 153984 (6528 address plus 147456 numeric cases). The 245760-case variable-shift bank already excluded the form and is unchanged. Producer, mapped-register, write-side and prior rejection controls pass. This does not add positive staged ADC/SUBB support, validate circular inputs outside TI's constraints, classify read/modify/write or packed operand grammars, or claim a silicon trap mechanism.",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
       "id": "c54x_short_mod3_is_a_valid_multiply_or_status_load_source", "status": "disproven",
       "hypothesis": "Multiply/MAC, T/ASM/DP loads, POLY, BITT and atomic RPT may read short MOD=3 because their shared address helper implements preincrement",
       "conclusion": "SPRU131G table 5-4 restricts short MOD=3 to writes; SPRU172C defines these operands as reads, including POLY's Smem-to-B load. Both frontends reject applicable forms before operand or result effects. A 4352-case bank covers 34 opcode classes, all ARs, CMPT settings, pages, frontends and two snapshots, preserving data, pointers, accumulators, T, status/ASM and RC. Four multiply/T-load banks omit the forbidden RAM form with stable raw IDs, retaining 52224 cases each (27648 RAM plus 24576 mapped), totaling 208896. The legacy 649b MAC fixture is a rejection control. Fifteen neighboring profiles retain legal MAC, ASM, repeat, T-load and write-side behavior. This adds no otherwise unsupported positive staged forms, validates no silicon trap, and leaves MMR grammar, implicit copies, read/modify/write and older circular input constraints for independent audit. Long MOD=13 remains read-capable.",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
       "id": "c54x_short_mod3_is_a_valid_mmr_load_or_push_source", "status": "disproven",
       "hypothesis": "LDM and PSHM may read short-preincrement MMR sources, and PSHD may read short-preincrement Smem, because the shared address helpers implement the pointer update",
       "conclusion": "SPRU131G table 5-4 and section 5.5.3.1 restrict short MOD=3 to writes; section 5.6 retains the indirect grammar for MMR with separate long-form exclusions. Atomic LDM/PSHM/PSHD now reject before operand effects, matching the staged exclusions. The legacy 489a positive test is a rejection control preserving the complete high-bit AR value, not a seven-bit-masked result. A bounded gate runs the legacy atomic prefix and 512 rejection/replay cases over four opcode classes, all ARs, CMPT settings, pages, frontends and snapshots. It requires no data access, pointer masking/modification, accumulator/T/status change or SP allocation. Twelve neighboring profiles preserve legal pushes, long MOD=13 Smem reads, stack interrupt composition, POPD and write-side preincrement. This is not a full staged-suite rerun, a silicon-trap claim, or closure of MMR long-form handling, implicit-copy/read-modify-write semantics or circular input constraints.",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
       "id": "c54x_short_mod3_is_a_valid_paired_arithmetic_source", "status": "disproven",
       "hypothesis": "The shared paired-word address path makes short-preincrement Lmem legal for DADD, DSUB, DRSUB and their T variants",
       "conclusion": "SPRU172C defines these Lmem operands as reads, while SPRU131G table 5-4 reserves short MOD=3 for writes, including paired accesses. The atomic paired-read families and staged DADD/DSUB/DRSUB classifier reject before operand effects. Positive fixtures omit form 4 with stable raw IDs, retaining 6144 DSUB, 12288 DADD and 6144 DRSUB cases/restores over eight forms. Both focused gates additionally require 3584 rejection/replay cases over all 14 opcode classes, all ARs, CMPT and C16 settings, pages, frontends and snapshots, with unchanged data, pointers and arithmetic state. The legacy atomic prefix, DLD and write-side preincrement controls pass. This does not admit positive staged T variants, reject paired stores or long MOD=13 reads, decide implicit-copy/read-modify-write grammar, validate physical timing or constitute a fresh full staged-suite run.",
-      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
       "id": "c54x_short_mod3_is_a_valid_logic_or_transfer_source", "status": "disproven",
       "hypothesis": "Short MOD=3 can feed logical operations or source-side transfers because the transfer eventually writes a different memory space",
       "conclusion": "SPRU172C defines AND/OR/XOR, MVDK, MVMD, PORTW and WRITA's encoded operands as reads. SPRU131G table 5-4 restricts short MOD=3 to write accesses. Their atomic entry points now reject before operand effects, matching their staged exclusions. The logic-short gate retains 576 positive cases and requires 2560 rejection/replay cases across ten opcode classes, ARs, CMPT settings, initial TC states, pages, frontends and snapshots. Independent data, program and I/O taps require no operand/output transactions, pointer or arithmetic effects. Thirteen neighboring profiles and three external-I/O controls pass. Destination-side MVKD/MVDM, PORTR and MVPD must not inherit the source restriction. This does not settle implicit-copy/RMW instructions, MMR long-form handling, circular fixture domains or physical timing; it is not a fresh full staged-suite run. POPD's encoded operand remains a destination.",
-      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
       "id": "mu4_playback_fetch_hits_establish_bootstrap_restarts", "status": "disproven",
       "hypothesis": "Three hits on the bootstrap entry bus tap and 24 resident hits prove three boot executions and 24 resident executions during original REL playback",
       "conclusion": "A retained Execute-entry observer records one logical 00:0e41 entry against three physical fetch hits, and 12 logical 02:6d62 entries against 24 physical 00:6d62 hits. OVLY requires translating physical tap addresses before comparing logical Execute identities. Actual resident recurrence remains, but three full boots do not follow from the fetch counter. Opcode-qualified AA99 loop observations separately prove 87613 completed 64-iteration calls, with one call in progress at the sampled 02:a2d5 PC; that PC is not evidence of a hung kernel. The old terminal playback, CPU/NAND/stream and lifecycle summaries are byte-identical after these observation-only additions. No retirement, decoded-music or analog-audio claim follows.",
-      "evidence": ["docs/5510_bringup.md", "docs/research_cleanup.md", "driver/mu4_storage_test.cpp", "tools/noki5510_bootstrap_check.py", "tools/test_noki5510_bootstrap_check.py"]
+      "evidence": ["docs/5510_bringup.md", "docs/research_cleanup.md", "tests/firmware/mu4_storage_test.cpp", "tools/noki5510_bootstrap_check.py", "tools/test_noki5510_bootstrap_check.py"]
     },
     {
       "id": "mad2_fiq1_ack_is_a_second_dsp_doorbell", "status": "disproven",
@@ -1211,19 +1211,19 @@
       "id": "rom4_pair_tc_set_reduces_arithmetic", "status": "disproven",
       "hypothesis": "TC-set selects reduced arithmetic in the resident adjacent-pair correlation helper, so the TC-clear dot/cross formula cannot be applied",
       "conclusion": "Original words47e6..47f5 contain a delayed conditional branch at47ee. Both following MAS/MAC words execute on either path. Independent isolated atomic and staged fixtures each pass32 cases/restores over eight bounded signed vectors, both TC states and FRCT off/on: A is the complete dot product and B the complete cross product in both modes. TC-set instead selects RETD47f3 and its two MVDD history copies; TC-clear returns at47f2 without those writes. This corrects a control-flow interpretation, not CPU arithmetic or a physical RF model. Overflow/saturation, caller-level TC meaning, I/Q assignment, sample clock and acquisition remain unproved.",
-      "evidence": ["docs/cobba_control_boundary.md", "tools/c54x_rom4_codec_contract.py", "driver/tms320c54x_test.cpp", "tools/run_c54x_rom4_crc.py", "tools/test_run_c54x_rom4_crc.py"]
+      "evidence": ["docs/cobba_control_boundary.md", "tools/c54x_rom4_codec_contract.py", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_rom4_crc.py", "tools/test_run_c54x_rom4_crc.py"]
     },
     {
       "id": "c54x_short_source_fixture_pmst_selects_cmpt", "status": "disproven",
       "hypothesis": "The shared short-source rejection fixture exercises both compatibility modes by toggling PMST bit 14",
       "conclusion": "CMPT is ST1 bit 5; the previous setup varied PMST while holding ST1.CMPT clear. Its cmpt=2 markers therefore overstated mode coverage, without invalidating the observed noncompatibility rejection results. The shared helper now varies ST1 bit 5 and asserts its preservation. All twelve documented source-rejection profiles pass again, including LTD/DELAY, MACP/MACD, loads, arithmetic, multiply, stack and transfers. This repair does not establish mode coverage for unrelated fixture helpers.",
-      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py"]
     },
     {
       "id": "c54x_delay_successor_write_permits_short_preincrement_source", "status": "disproven",
       "hypothesis": "LTD/DELAY may read short *+ARx because they also perform an implicit write to the successor address",
       "conclusion": "SPRU131G table5-4/5.5.3.1 limits short MOD3 to write operands, while SPRU172C4-41/4-81 defines the encoded Smem as a read source and the successor as a distinct implicit write. The previous default4d9b assertion encoded the same mistaken premise as the handler, not independent silicon evidence. The new no-effect matrix fails the unchanged atomic core at case58688; source admission now rejects before address or operand effects. Legal long-MOD13 preincrement is distinct and retained as4deb0001. This is a fail-closed emulator legality contract, not measurement of an invalid-opcode hardware trap or a claim about every RMW family.",
-      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
       "id": "nsm3_unlisted_mode4_silent_peer_is_sufficient", "status": "disproven",
@@ -1241,13 +1241,13 @@
       "id": "c54x_mpy_decoder_exclusion_implies_atomic_nonadmission", "status": "disproven",
       "hypothesis": "Memory/immediate MPY modes f9..ff already have no operand effects because the decoder and staged path leave them unsupported",
       "conclusion": "The unchanged atomic control reaches case56 for62f9, performs a data transaction and changes A to zero: prepare_smem_address treated every mode>=f8 as an absolute address. An early MPY-family guard now aligns atomic admission with the existing decoder/staged limit. The224-case matrix covers all seven aliases, both destinations, CMPT settings, pages, frontends and two save points, requiring no data transaction and unchanged A/B/T/status/ARs. This is a fail-closed emulator policy for unvalidated aliases, not evidence of a silicon trap, an exclusion of documented f8/long-MOD13, or an all-family legality closure.",
-      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
       "id": "mu4_state5_reload_requires_nonzero_worker_result", "status": "disproven",
       "hypothesis": "Repeated resident entry at lifecycle 5 requires a nonzero worker result published to 3742, indicating a failed decoder or missing external completion",
       "conclusion": "AA99 029575 uses 7212 3742, MVDM data-to-AR2, so 3742 is an input control rather than a result publication. The pinned 46-word cleanup and two-word AA55 API contract enumerates all 65536 controls: while lifecycle is 4, control 2 selects state 2 and every other control selects state 5; both join descriptor-0 reload through 002080 -> 003538. A passive three-second run reads control zero at 2.198518905 seconds, writes state 5 at 2.198519039 and re-enters state 4 at 2.588181162 without guest writes by the observer. The twenty-second Execute trails identify the AA99 02959b reload caller and AA22 0291c7 REL request; they do not show a reset-vector restart or corrupt FRET. The raw data tap is not an all-alias writer census, and its context PC is not instruction ownership. Why the worker reaches cleanup, whether this is EOF, and decoded PCM remain unproved.",
-      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "tools/mu4_playback_lifecycle_observe.lua", "tools/noki5510_bootstrap_check.py", "tools/test_noki5510_bootstrap_check.py"]
+      "evidence": ["docs/5510_bringup.md", "tests/firmware/mu4_storage_test.cpp", "tools/mu4_context_contract.py", "tools/test_mu4_context_contract.py", "tools/mu4_playback_lifecycle_observe.lua", "tools/noki5510_bootstrap_check.py", "tools/test_noki5510_bootstrap_check.py"]
     }
   ]
 }

@@ -2346,9 +2346,9 @@
           "silent": false,
           "sources": [
             "lib/util/gsmfr.cpp",
-            "tools/test_gsm_fr_codec.cpp"
+            "tests/unit/test_gsm_fr_codec.cpp"
           ],
-          "command": "$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic -Ilib -Ithird_party lib/util/gsmfr.cpp tools/test_gsm_fr_codec.cpp $(LIBGSM_ARCHIVE) -o scratchpad/test_gsm_fr_codec"
+          "command": "$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic -Ilib -Ithird_party lib/util/gsmfr.cpp tests/unit/test_gsm_fr_codec.cpp $(LIBGSM_ARCHIVE) -o scratchpad/test_gsm_fr_codec"
         },
         {
           "step": "execute",
@@ -2372,9 +2372,9 @@
           "silent": false,
           "sources": [
             "driver/gsm_tch_f_l1.cpp",
-            "tools/test_gsm_tch_f_l1.cpp"
+            "tests/unit/test_gsm_tch_f_l1.cpp"
           ],
-          "command": "$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_tch_f_l1.cpp tools/test_gsm_tch_f_l1.cpp -o scratchpad/test_gsm_tch_f_l1"
+          "command": "$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_tch_f_l1.cpp tests/unit/test_gsm_tch_f_l1.cpp -o scratchpad/test_gsm_tch_f_l1"
         },
         {
           "step": "execute",
@@ -2399,9 +2399,9 @@
           "sources": [
             "driver/gsm_a3a8.cpp",
             "driver/gsm_mm_authentication.cpp",
-            "tools/test_gsm_a3a8.cpp"
+            "tests/unit/test_gsm_a3a8.cpp"
           ],
-          "command": "$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_a3a8.cpp driver/gsm_mm_authentication.cpp tools/test_gsm_a3a8.cpp -o scratchpad/test_gsm_a3a8"
+          "command": "$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_a3a8.cpp driver/gsm_mm_authentication.cpp tests/unit/test_gsm_a3a8.cpp -o scratchpad/test_gsm_a3a8"
         },
         {
           "step": "execute",
@@ -2425,9 +2425,9 @@
           "silent": false,
           "sources": [
             "driver/gsm_a5.cpp",
-            "tools/test_gsm_a5.cpp"
+            "tests/unit/test_gsm_a5.cpp"
           ],
-          "command": "$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_a5.cpp tools/test_gsm_a5.cpp -o scratchpad/test_gsm_a5"
+          "command": "$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_a5.cpp tests/unit/test_gsm_a5.cpp -o scratchpad/test_gsm_a5"
         },
         {
           "step": "execute",
@@ -2453,9 +2453,9 @@
             "driver/gsm_a5.cpp",
             "driver/gsm_tch_f_l1.cpp",
             "driver/gsm_xcch_l1.cpp",
-            "tools/test_gsm_xcch_l1.cpp"
+            "tests/unit/test_gsm_xcch_l1.cpp"
           ],
-          "command": "$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_a5.cpp driver/gsm_tch_f_l1.cpp driver/gsm_xcch_l1.cpp tools/test_gsm_xcch_l1.cpp -o scratchpad/test_gsm_xcch_l1"
+          "command": "$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_a5.cpp driver/gsm_tch_f_l1.cpp driver/gsm_xcch_l1.cpp tests/unit/test_gsm_xcch_l1.cpp -o scratchpad/test_gsm_xcch_l1"
         },
         {
           "step": "execute",
@@ -2478,9 +2478,9 @@
           "step": "compile",
           "silent": false,
           "sources": [
-            "tools/test_gsm_mobility.cpp"
+            "tests/unit/test_gsm_mobility.cpp"
           ],
-          "command": "$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic tools/test_gsm_mobility.cpp -o scratchpad/test_gsm_mobility"
+          "command": "$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic tests/unit/test_gsm_mobility.cpp -o scratchpad/test_gsm_mobility"
         },
         {
           "step": "execute",
@@ -2504,9 +2504,9 @@
           "silent": false,
           "sources": [
             "driver/gsm_sms_transport.cpp",
-            "tools/test_gsm_sms_transport.cpp"
+            "tests/unit/test_gsm_sms_transport.cpp"
           ],
-          "command": "$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_sms_transport.cpp tools/test_gsm_sms_transport.cpp -o scratchpad/test_gsm_sms_transport"
+          "command": "$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic driver/gsm_sms_transport.cpp tests/unit/test_gsm_sms_transport.cpp -o scratchpad/test_gsm_sms_transport"
         },
         {
           "step": "execute",
