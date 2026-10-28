@@ -6,6 +6,8 @@ Native MAME `intelfsh` devices own identity, command mode, array data and
 persistent storage. The ST M28W320ECT subclass owns its part-specific command
 engine. The Nokia driver only routes reads/writes; it has no flash command
 state, fixed-status address, block-lock acknowledgement shim or erase timer.
+Named setup states collect word/page data independently of command dispatch;
+their saved byte values remain stable across the readability refactor.
 
 The 3410 uses this native engine for fresh PMM compaction and cold reload,
 retaining its exact idle-frame oracle. This establishes handset compatibility

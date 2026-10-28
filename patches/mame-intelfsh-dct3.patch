@@ -1,5 +1,5 @@
 diff --git a/src/devices/machine/intelfsh.cpp b/src/devices/machine/intelfsh.cpp
-index 5b41774ad3c..5577690d8c5 100644
+index 5b41774ad3c..27a6dafa218 100644
 --- a/src/devices/machine/intelfsh.cpp
 +++ b/src/devices/machine/intelfsh.cpp
 @@ -45,6 +45,8 @@ enum
@@ -51,7 +51,7 @@ index 5b41774ad3c..5577690d8c5 100644
  		m_status(0x80),
  		m_erase_sector(0),
  		m_flash_mode(FM_NORMAL),
-@@ -270,6 +280,413 @@ st_m29w640gb_device::st_m29w640gb_device(const machine_config &mconfig, const ch
+@@ -270,6 +280,406 @@ st_m29w640gb_device::st_m29w640gb_device(const machine_config &mconfig, const ch
  st_m29w640ft_device::st_m29w640ft_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
  	: intelfsh16_device(mconfig, ST_M29W640FT, tag, owner, clock, 0x800000, MFG_ST, 0x22ed) { m_bot_boot_sector = true; m_device_id2 = 0x2210; m_device_id3 = 0x2200; }
  
@@ -104,7 +104,8 @@ index 5b41774ad3c..5577690d8c5 100644
 +{
 +	intelfsh16_device::device_reset();
 +	m_st_locks.fill(1);
-+	m_setup = m_program_words = 0;
++	m_setup = SETUP_IDLE;
++	m_program_words = 0;
 +	m_program_active = m_program_suspended = false;
 +	m_program_otp = false;
 +	m_erase_active = m_erase_suspended = false;
@@ -239,7 +240,7 @@ index 5b41774ad3c..5577690d8c5 100644
 +
 +void st_m28w320ect_device::start_program(unsigned words)
 +{
-+	m_setup = 0;
++	m_setup = SETUP_IDLE;
 +	m_flash_mode = FM_READSTATUS;
 +	if (!check_vpp()) return;
 +	for (unsigned i = 0; i < words; ++i)
@@ -298,7 +299,7 @@ index 5b41774ad3c..5577690d8c5 100644
 +
 +void st_m28w320ect_device::start_otp_program(uint32_t address, uint16_t data)
 +{
-+	m_setup = 0;
++	m_setup = SETUP_IDLE;
 +	m_flash_mode = FM_READSTATUS;
 +	address &= 0xff; // Table 7: upper address bits are don't-care.
 +	if (address == 0x80 && !(data & 4))
@@ -335,57 +336,49 @@ index 5b41774ad3c..5577690d8c5 100644
 +	update_status();
 +}
 +
++bool st_m28w320ect_device::collect_program_data(uint32_t address, uint16_t data)
++{
++	unsigned index, words;
++	uint8_t next;
++	switch (m_setup)
++	{
++	case SETUP_WORD: index = 0; words = 1; next = SETUP_IDLE; break;
++	case SETUP_DOUBLE_FIRST: index = 0; words = 2; next = SETUP_DOUBLE_SECOND; break;
++	case SETUP_DOUBLE_SECOND: index = 1; words = 2; next = SETUP_IDLE; break;
++	case SETUP_QUAD_FIRST: index = 0; words = 4; next = SETUP_QUAD_SECOND; break;
++	case SETUP_QUAD_SECOND: index = 1; words = 4; next = SETUP_QUAD_THIRD; break;
++	case SETUP_QUAD_THIRD: index = 2; words = 4; next = SETUP_QUAD_FOURTH; break;
++	case SETUP_QUAD_FOURTH: index = 3; words = 4; next = SETUP_IDLE; break;
++	default: return false;
++	}
++	bool valid = !index || ((address & ~(words - 1)) == (m_program_address[0] & ~(words - 1)));
++	for (unsigned i = 0; i < index; ++i)
++		valid = valid && address != m_program_address[i];
++	if (!valid)
++	{
++		// Reject malformed pages without inferring a silicon error code.
++		logerror("invalid %u-word program page\n", words);
++		m_setup = SETUP_IDLE;
++		m_flash_mode = FM_NORMAL;
++		return true;
++	}
++	m_program_address[index] = address;
++	m_program_data[index] = data;
++	m_setup = next;
++	if (next == SETUP_IDLE) start_program(words);
++	return true;
++}
++
 +void st_m28w320ect_device::write_full(uint32_t address, uint32_t data)
 +{
 +	address %= m_size / 2;
 +	const uint8_t command = data;
 +	// Setup cycles own their next write, even if data resembles an opcode.
-+	if (m_setup == 10) { start_otp_program(address, data); return; }
-+	if (m_setup >= 6 && m_setup <= 9)
++	if (m_setup == SETUP_OTP) { start_otp_program(address, data); return; }
++	if (collect_program_data(address, data)) return;
++	if (m_setup == SETUP_ERASE)
 +	{
-+		const unsigned index = m_setup - 6;
-+		bool valid = !index || ((address & ~3U) == (m_program_address[0] & ~3U));
-+		for (unsigned i = 0; i < index; ++i)
-+			valid = valid && address != m_program_address[i];
-+		if (!valid)
-+		{
-+			// The specified sequence requires four distinct words in one page;
-+			// no silicon error code is inferred for malformed sequences.
-+			logerror("invalid quadruple-word program page\n");
-+			m_setup = 0;
-+			m_flash_mode = FM_NORMAL;
-+			return;
-+		}
-+		m_program_address[index] = address;
-+		m_program_data[index] = data;
-+		if (index == 3) start_program(4);
-+		else ++m_setup;
-+		return;
-+	}
-+	if (m_setup == 1 || m_setup == 4)
-+	{
-+		m_program_address[0] = address;
-+		m_program_data[0] = data;
-+		if (m_setup == 4) m_setup = 5;
-+		else start_program(1);
-+		return;
-+	}
-+	if (m_setup == 5)
-+	{
-+		m_setup = 0;
-+		m_program_address[1] = address;
-+		m_program_data[1] = data;
-+		if ((address ^ m_program_address[0]) == 1) start_program(2);
-+		else
-+		{
-+			logerror("nonadjacent double-word program is outside the supported contract\n");
-+			m_flash_mode = FM_NORMAL;
-+		}
-+		return;
-+	}
-+	if (m_setup == 2)
-+	{
-+		m_setup = 0;
++		m_setup = SETUP_IDLE;
 +		m_flash_mode = FM_READSTATUS;
 +		if (command != 0xd0) m_status |= 0x30;
 +		else if (!check_vpp()) return;
@@ -403,9 +396,9 @@ index 5b41774ad3c..5577690d8c5 100644
 +		update_status();
 +		return;
 +	}
-+	if (m_setup == 3)
++	if (m_setup == SETUP_LOCK)
 +	{
-+		m_setup = 0;
++		m_setup = SETUP_IDLE;
 +		auto &lock = m_st_locks[block(address)];
 +		if (command == 0x01) lock |= 1;
 +		else if (command == 0xd0) { if (m_wp || !(lock & 2)) lock &= ~1; }
@@ -452,12 +445,12 @@ index 5b41774ad3c..5577690d8c5 100644
 +	case 0x90: m_flash_mode = FM_READID; break;
 +	case 0x98: m_flash_mode = FM_READQUERY; break;
 +	case 0x50: m_status &= ~0x3a; update_status(); break;
-+	case 0x40: case 0x10: if (!m_program_suspended) m_setup = 1; break;
-+	case 0x30: if (!m_program_suspended) m_setup = 4; break;
-+	case 0x56: if (!m_program_suspended) m_setup = 6; break;
-+	case 0xc0: if (!m_program_active) m_setup = 10; break;
-+	case 0x20: if (!m_erase_active && !m_program_active) m_setup = 2; break;
-+	case 0x60: if (!m_program_suspended) m_setup = 3; break;
++	case 0x40: case 0x10: if (!m_program_suspended) m_setup = SETUP_WORD; break;
++	case 0x30: if (!m_program_suspended) m_setup = SETUP_DOUBLE_FIRST; break;
++	case 0x56: if (!m_program_suspended) m_setup = SETUP_QUAD_FIRST; break;
++	case 0xc0: if (!m_program_active) m_setup = SETUP_OTP; break;
++	case 0x20: if (!m_erase_active && !m_program_active) m_setup = SETUP_ERASE; break;
++	case 0x60: if (!m_program_suspended) m_setup = SETUP_LOCK; break;
 +	default: m_flash_mode = FM_NORMAL; break;
 +	}
 +}
@@ -465,7 +458,7 @@ index 5b41774ad3c..5577690d8c5 100644
  panasonic_mn63f805mnp_device::panasonic_mn63f805mnp_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
  	: intelfsh8_device(mconfig, PANASONIC_MN63F805MNP, tag, owner, clock, 0x10000, MFG_PANASONIC, 0x1b) { m_sector_is_4k = true; }
  
-@@ -297,6 +714,34 @@ sst_49lf020_device::sst_49lf020_device(const machine_config &mconfig, const char
+@@ -297,6 +707,34 @@ sst_49lf020_device::sst_49lf020_device(const machine_config &mconfig, const char
  sharp_lh28f400_device::sharp_lh28f400_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
  	: intelfsh16_device(mconfig, SHARP_LH28F400, tag, owner, clock, 0x80000, MFG_SHARP, 0xed) { }
  
@@ -500,7 +493,7 @@ index 5b41774ad3c..5577690d8c5 100644
  intel_te28f160_device::intel_te28f160_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
  	: intelfsh16_device(mconfig, INTEL_TE28F160, tag, owner, clock, 0x200000, MFG_SHARP, 0xd0) { }
  
-@@ -304,7 +749,12 @@ sharp_lh28f160s3_device::sharp_lh28f160s3_device(const machine_config &mconfig,
+@@ -304,7 +742,12 @@ sharp_lh28f160s3_device::sharp_lh28f160s3_device(const machine_config &mconfig,
  	: intelfsh16_device(mconfig, SHARP_LH28F160S3, tag, owner, clock, 0x200000, MFG_SHARP, 0xd0) { }
  
  intel_te28f320_device::intel_te28f320_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
@@ -514,7 +507,7 @@ index 5b41774ad3c..5577690d8c5 100644
  
  spansion_s29gl064s_device::spansion_s29gl064s_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
  	: intelfsh16_device(mconfig, SPANSION_S29GL064S, tag, owner, clock, 0x800000, MFG_SPANSION, 0x227e)
-@@ -356,6 +806,21 @@ void intelfsh_device::device_start()
+@@ -356,6 +799,21 @@ void intelfsh_device::device_start()
  {
  	m_data = std::make_unique<uint8_t []>(m_size);
  	m_timer = timer_alloc(FUNC(intelfsh_device::delay_tick), this);
@@ -536,7 +529,7 @@ index 5b41774ad3c..5577690d8c5 100644
  
  	save_item( NAME(m_status) );
  	save_item( NAME(m_erase_sector) );
-@@ -368,9 +833,34 @@ void intelfsh_device::device_start()
+@@ -368,9 +826,34 @@ void intelfsh_device::device_start()
  	save_item( NAME(m_write_buffer_start_address) );
  	save_item( NAME(m_write_buffer_count) );
  	save_item( NAME(m_fast_mode) );
@@ -571,7 +564,7 @@ index 5b41774ad3c..5577690d8c5 100644
  //-------------------------------------------------
  //  is_ready - emulates the *Busy/Ready pin on some
  //             flash devices.
-@@ -444,7 +934,24 @@ void intelfsh_device::nvram_default()
+@@ -444,7 +927,24 @@ void intelfsh_device::nvram_default()
  bool intelfsh_device::nvram_read(util::read_stream &file)
  {
  	auto const [err, actual] = read(file, &m_data[0], m_size);
@@ -597,7 +590,7 @@ index 5b41774ad3c..5577690d8c5 100644
  }
  
  
-@@ -456,7 +963,18 @@ bool intelfsh_device::nvram_read(util::read_stream &file)
+@@ -456,7 +956,18 @@ bool intelfsh_device::nvram_read(util::read_stream &file)
  bool intelfsh_device::nvram_write(util::write_stream &file)
  {
  	auto const [err, actual] = write(file, &m_data[0], m_size);
@@ -617,7 +610,7 @@ index 5b41774ad3c..5577690d8c5 100644
  }
  
  
-@@ -471,6 +989,16 @@ uint32_t intelfsh_device::read_full(uint32_t address)
+@@ -471,6 +982,16 @@ uint32_t intelfsh_device::read_full(uint32_t address)
  	address += m_bank << 16;
  	switch( m_flash_mode )
  	{
@@ -634,7 +627,7 @@ index 5b41774ad3c..5577690d8c5 100644
  	default:
  	case FM_NORMAL:
  		switch( m_bits )
-@@ -507,11 +1035,14 @@ uint32_t intelfsh_device::read_full(uint32_t address)
+@@ -507,11 +1028,14 @@ uint32_t intelfsh_device::read_full(uint32_t address)
  			switch (address & 0xff)
  			{
  				case 0x00: data = m_maker_id; break;
@@ -650,7 +643,7 @@ index 5b41774ad3c..5577690d8c5 100644
  			}
  		}
  		else if (m_maker_id == MFG_WINBOND)
-@@ -543,6 +1074,11 @@ uint32_t intelfsh_device::read_full(uint32_t address)
+@@ -543,6 +1067,11 @@ uint32_t intelfsh_device::read_full(uint32_t address)
  		}
  		break;
  	case FM_READID:
@@ -662,7 +655,7 @@ index 5b41774ad3c..5577690d8c5 100644
  		if (m_maker_id == MFG_INTEL && m_device_id == 0x16)
  		{
  			switch (address & 0xff)
-@@ -563,7 +1099,7 @@ uint32_t intelfsh_device::read_full(uint32_t address)
+@@ -563,7 +1092,7 @@ uint32_t intelfsh_device::read_full(uint32_t address)
  				data = m_device_id;
  				break;
  			case 2: // block lock config
@@ -671,7 +664,7 @@ index 5b41774ad3c..5577690d8c5 100644
  				break;
  			case 3: // master lock config
  				if (m_flash_master_lock)
-@@ -626,8 +1162,15 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+@@ -626,8 +1155,15 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
  	case FM_READSTATUS:
  	case FM_READID:
  	case FM_READAMDID3:
@@ -687,7 +680,7 @@ index 5b41774ad3c..5577690d8c5 100644
  		case 0xf0:
  		case 0xff:  // reset chip mode
  			m_flash_mode = FM_NORMAL;
-@@ -671,6 +1214,12 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+@@ -671,6 +1207,12 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
  		case 0x60:  // set master lock
  			m_flash_mode = FM_SETMASTER;
  			break;
@@ -700,7 +693,7 @@ index 5b41774ad3c..5577690d8c5 100644
  		case 0x70:  // read status
  			m_flash_mode = FM_READSTATUS;
  			break;
-@@ -1059,14 +1608,21 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+@@ -1059,14 +1601,21 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
  		m_flash_mode = FM_NORMAL;
  		break;
  	case FM_WRITEPART1:
@@ -725,7 +718,7 @@ index 5b41774ad3c..5577690d8c5 100644
  			break;
  		default:
  			logerror( "FM_WRITEPART1 not supported when m_bits == %d\n", m_bits );
-@@ -1136,6 +1692,13 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+@@ -1136,6 +1685,13 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
  	case FM_CLEARPART1:
  		if( ( data & 0xff ) == 0xd0 )
  		{
@@ -739,7 +732,7 @@ index 5b41774ad3c..5577690d8c5 100644
  			if (m_maker_id == MFG_SST && m_device_id == 0x04)
  			{
  				// clear the 256 bytes block containing the current address to all 0xffs
-@@ -1186,6 +1749,19 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+@@ -1186,6 +1742,19 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
  
  				m_timer->adjust( attotime::from_msec( duration ) );
  			}
@@ -759,7 +752,7 @@ index 5b41774ad3c..5577690d8c5 100644
  			else
  			{
  				// clear the 64k block containing the current address to all 0xffs
-@@ -1204,7 +1780,44 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+@@ -1204,7 +1773,44 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
  			logerror( "unexpected %02x in FM_CLEARPART1\n", data & 0xff );
  		}
  		break;
@@ -805,7 +798,7 @@ index 5b41774ad3c..5577690d8c5 100644
  		{
  		case 0xf1:
 diff --git a/src/devices/machine/intelfsh.h b/src/devices/machine/intelfsh.h
-index 5274f6b3d3c..ff10f380437 100644
+index 5274f6b3d3c..038b9583e25 100644
 --- a/src/devices/machine/intelfsh.h
 +++ b/src/devices/machine/intelfsh.h
 @@ -16,6 +16,7 @@ public:
@@ -869,7 +862,7 @@ index 5274f6b3d3c..ff10f380437 100644
  };
  
  
-@@ -236,6 +250,50 @@ public:
+@@ -236,6 +250,58 @@ public:
  	st_m29w640ft_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
  };
  
@@ -890,6 +883,14 @@ index 5274f6b3d3c..ff10f380437 100644
 +	virtual void write_full(uint32_t address, uint32_t data) override;
 +
 +private:
++	enum setup_state : uint8_t
++	{
++		SETUP_IDLE = 0, SETUP_WORD = 1, SETUP_ERASE = 2, SETUP_LOCK = 3,
++		SETUP_DOUBLE_FIRST = 4, SETUP_DOUBLE_SECOND = 5,
++		SETUP_QUAD_FIRST = 6, SETUP_QUAD_SECOND = 7,
++		SETUP_QUAD_THIRD = 8, SETUP_QUAD_FOURTH = 9, SETUP_OTP = 10
++	};
++	bool collect_program_data(uint32_t address, uint16_t data);
 +	unsigned block(uint32_t address) const;
 +	uint8_t protection(unsigned index) const;
 +	void update_status();
@@ -905,7 +906,7 @@ index 5274f6b3d3c..ff10f380437 100644
 +	bool m_vpp_valid = true;
 +	std::array<uint32_t, 4> m_program_address{};
 +	std::array<uint16_t, 4> m_program_data{};
-+	uint8_t m_setup = 0;
++	uint8_t m_setup = SETUP_IDLE;
 +	uint8_t m_program_words = 0;
 +	bool m_program_active = false;
 +	bool m_program_suspended = false;
@@ -920,7 +921,7 @@ index 5274f6b3d3c..ff10f380437 100644
  class panasonic_mn63f805mnp_device : public intelfsh8_device
  {
  public:
-@@ -309,6 +367,18 @@ public:
+@@ -309,6 +375,18 @@ public:
  	sharp_lh28f400_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
  };
  
@@ -939,7 +940,7 @@ index 5274f6b3d3c..ff10f380437 100644
  class intel_te28f160_device : public intelfsh16_device
  {
  public:
-@@ -440,6 +510,7 @@ DECLARE_DEVICE_TYPE(MACRONIX_29L001MC,       macronix_29l001mc_device)
+@@ -440,6 +518,7 @@ DECLARE_DEVICE_TYPE(MACRONIX_29L001MC,       macronix_29l001mc_device)
  DECLARE_DEVICE_TYPE(MACRONIX_29LV160TMC,     macronix_29lv160tmc_device)
  DECLARE_DEVICE_TYPE(ST_M29W640GB,            st_m29w640gb_device)
  DECLARE_DEVICE_TYPE(ST_M29W640FT,            st_m29w640ft_device)
@@ -947,7 +948,7 @@ index 5274f6b3d3c..ff10f380437 100644
  DECLARE_DEVICE_TYPE(TMS_29F040,              tms_29f040_device)
  
  DECLARE_DEVICE_TYPE(PANASONIC_MN63F805MNP,   panasonic_mn63f805mnp_device)
-@@ -453,7 +524,9 @@ DECLARE_DEVICE_TYPE(SST_49LF020,             sst_49lf020_device)
+@@ -453,7 +532,9 @@ DECLARE_DEVICE_TYPE(SST_49LF020,             sst_49lf020_device)
  
  DECLARE_DEVICE_TYPE(SHARP_LH28F400,          sharp_lh28f400_device)
  DECLARE_DEVICE_TYPE(INTEL_E28F008SA,         intel_e28f008sa_device)
