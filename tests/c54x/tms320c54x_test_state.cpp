@@ -1009,28 +1009,7 @@ void tms320c54x_test_state::test(machine_config &config)
 				"Staged vector IACK at cycle 6 clears its source and sets INTM");
 			++m_vector_acks;
 		}
-		if (m_phase >= 450000 && m_phase <= 450002)
-		{
-			expect(line == (m_stage_restore_case >= 5 ? INPUT_LINE_NMI : 0),
-				"Restored entry acknowledges only the originally accepted IRQ/NMI source");
-			++m_vector_acks;
-		}
-		if (m_phase >= 190000 && m_phase <= 190003)
-		{
-			expect(m_entry_ack_source == -1 && m_cpu->state_int(tms320c54x_device::STATE_IFR) == 2,
-				"Vector acknowledgement clears IFR exactly once at Fetch");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800,
-				"Maskable vector acknowledgement sets INTM with IFR clearance");
-			m_entry_ack_source = line;
-		}
-		if (m_phase >= 80000 && m_phase <= 80003)
-		{
-			expect(line == (m_vector_case ? INPUT_LINE_NMI : 0), "Vector acknowledgement retains accepted source identity");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff &&
-				m_cpu->space(AS_DATA).read_word(0x0fff) == 0xbeef,
-				"SPRU131G vector acknowledgement follows SP Access but precedes the continuation memory write");
-			++m_vector_acks;
-		}
+		acknowledge_entry_interrupt(line);
 		return 0;
 	}, "vector_acknowledge");
 	m_cpu->bio_in_cb().set(FUNC(tms320c54x_test_state::bio_r));

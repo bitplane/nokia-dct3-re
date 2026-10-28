@@ -75,7 +75,9 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_operand_domains.cpp` | Operand-domain, absolute-alias and short-source rejection fixtures with family-owned progress, observations, taps and snapshots |
 | `tests/c54x/tms320c54x_test_rejection_state.h` | Per-family rejection state; CPU and scheduler routing remain with the bench |
 | `tests/c54x/tms320c54x_test_pipeline.cpp` | Control flow, repeats, dependency and pipeline-composition fixtures |
-| `tests/c54x/tms320c54x_test_interrupts.cpp` | Interrupt acceptance, entry, return and mask-composition fixtures |
+| `tests/c54x/tms320c54x_test_interrupts.cpp` | Interrupt composition, returns, status masks and PLL/XC continuations |
+| `tests/c54x/tms320c54x_test_interrupt_entry.cpp` | Vector prefetch, entry spacing, accepted-source retention, stage restoration and their acknowledgement checks |
+| `tests/c54x/tms320c54x_test_entry_state.h` | Entry-family observations, taps and replay storage; predecessor tap cleanup remains explicit |
 | `tests/c54x/tms320c54x_test_peripherals.cpp` | Bus, clock, serial, DMA and timer fixtures |
 | `tests/c54x/tms320c54x_test_restore.cpp` | Explicit cross-context snapshot/restore fixtures; each other family retains its own replay checks |
 | `tests/c54x/tms320c54x_test_disassembler.cpp` | Bounded decoding and operand-domain matrices |

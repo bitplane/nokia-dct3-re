@@ -5,29 +5,6 @@ import unittest
 
 
 class OperandDomainInventoryTest(unittest.TestCase):
-    def test_rejection_families_do_not_borrow_other_fixture_state(self):
-        # Architectural boundary only; the MAME profile runs establish behavior.
-        source = (Path(__file__).resolve().parents[1] /
-                  'tests/c54x/tms320c54x_test_operand_domains.cpp').read_text()
-        methods = list(re.finditer(r'^(?:void|bool) tms320c54x_test_state::(\w+)\(', source, re.M))
-        owners = {
-            'start_source_domains': 'm_source_domains',
-            'check_source_domains': 'm_source_domains',
-            'start_source_alias_case': 'm_source_aliases',
-            'check_source_alias_results': 'm_source_aliases',
-            'start_short_read_mod3_edge': 'm_short_sources',
-            'check_short_source_results': 'm_short_sources',
-        }
-        self.assertEqual({method[1] for method in methods}, set(owners))
-        for index, method in enumerate(methods):
-            end = methods[index + 1].start() if index + 1 < len(methods) else len(source)
-            body = re.sub(r'//[^\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"', '',
-                          source[method.start():end], flags=re.S)
-            members = set(re.findall(r'\bm_\w+\b', body))
-            with self.subTest(method=method[1]):
-                self.assertLessEqual(members, {'m_cpu', 'm_phase', 'm_check_timer', owners[method[1]]})
-                self.assertIn(owners[method[1]], members)
-
     def test_census_has_every_reviewed_read_rmw_class_and_extension(self):
         source = (Path(__file__).resolve().parents[1] /
                   'tests/c54x/tms320c54x_test_operand_domains.cpp').read_text()

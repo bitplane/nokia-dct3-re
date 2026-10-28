@@ -53,7 +53,9 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_zero_bk_results()) return;
 	if (check_saccd_results()) return;
 	if (check_bsp_interrupt_results()) return;
+	if (check_idle_pll_results()) return;
 	if (check_vector_prefetch_results()) return;
+	if (check_xc_interrupt_results()) return;
 	if (check_braf_control_results()) return;
 	if (check_native_address_gap_results()) return;
 	if (check_native_math_gap_results()) return;
@@ -61,7 +63,7 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_native_final_gap_results()) return;
 	if (check_indirect_popm_results()) return;
 	if (check_shifted_arithmetic_selector_results()) return;
-	if (check_interrupt_entry_spacing_results()) return;
+	if (check_interrupt_entry_results()) return;
 	if (check_rounding_boundary_results()) return;
 	if (check_pipeline_frontend_results()) return;
 	if (check_multiword_pipeline_results()) return;

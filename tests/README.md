@@ -79,3 +79,9 @@ Their CPU, scheduler timer and outer phase routing remain bench-owned. Host
 observations deliberately survive CPU snapshot replay to detect duplicate bus
 effects; registering or clearing them during restoration would weaken the tests.
 The stack-transfer continuation is a separate handler, not an alias test.
+
+Interrupt entry owns its vector-prefetch, acceptance, spacing and per-stage
+restore observations in `interrupt_entry_fixture`. Its acknowledgement checks
+live beside the fixture rather than in the general IRQ callback. Entry setup
+retires predecessor taps at the handoff boundary; active entry
+observers use dedicated handles. Replay counter rewinds remain explicit.

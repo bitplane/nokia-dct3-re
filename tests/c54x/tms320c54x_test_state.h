@@ -19,6 +19,7 @@
 #include "tms320c54x_test_support.h"
 #include "tms320c54x_test_atomic_routes.h"
 #include "tms320c54x_test_rejection_state.h"
+#include "tms320c54x_test_entry_state.h"
 #include <sstream>
 #include <bitset>
 
@@ -86,6 +87,7 @@ private:
 	void start_shifted_arithmetic_selector_case(unsigned index);
 	void start_interrupt_entry_spacing_case(unsigned index);
 	void start_interrupt_acceptance_checkpoint();
+	void acknowledge_entry_interrupt(int line);
 	void start_entry_stage_restore_case(unsigned index);
 	void start_native_final_gap_case(unsigned index);
 	void start_native_memory_gap_case(unsigned index);
@@ -2152,6 +2154,8 @@ private:
 	bool check_saccd_results();
 	bool check_bsp_interrupt_results();
 	bool check_vector_prefetch_results();
+	bool check_idle_pll_results();
+	bool check_xc_interrupt_results();
 	bool check_braf_control_results();
 	bool check_native_address_gap_results();
 	bool check_native_math_gap_results();
@@ -2159,7 +2163,7 @@ private:
 	bool check_native_final_gap_results();
 	bool check_indirect_popm_results();
 	bool check_shifted_arithmetic_selector_results();
-	bool check_interrupt_entry_spacing_results();
+	bool check_interrupt_entry_results();
 	bool check_rounding_boundary_results();
 	bool check_pipeline_frontend_results();
 	bool check_multiword_pipeline_results();
@@ -2335,6 +2339,7 @@ private:
 	operand_rejection_fixture m_source_domains{311200};
 	operand_rejection_fixture m_source_aliases{310700};
 	operand_rejection_fixture m_short_sources{310600};
+	interrupt_entry_fixture m_entry;
 	u16 m_shifted_bus_word = 0;
 	tms320c54x_bsp_state m_shifted_bsp;
 	int m_bio_level = 1;
@@ -2361,12 +2366,7 @@ private:
 	u64 m_timer_probe_foreground_first_cycle = 0;
 	u64 m_timer_probe_write_cycle = 0, m_timer_probe_mask_cycle = 0;
 	unsigned m_timer_probe_writes = 0, m_timer_probe_masks = 0;
-	unsigned m_vector_reads = 0, m_vector_acks = 0, m_vector_case = 0;
-	unsigned m_entry_stack_writes = 0;
-	unsigned m_stage_restore_case = 0;
-	int m_entry_ack_source = -1;
-	u64 m_entry_fetch_cycle = 0, m_entry_stack_cycle = 0;
-	std::stringstream m_saved_vector;
+	unsigned m_vector_reads = 0, m_vector_acks = 0;
 	std::stringstream m_saved_pipeline;
 	std::vector<std::pair<offs_t, u16>> m_observed_instructions, m_saved_observed_instructions;
 	std::vector<std::array<u64, 3>> m_repeat_load_expected;
