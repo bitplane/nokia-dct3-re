@@ -510,3 +510,131 @@ and paging after reselection. They do not yet validate call media/audio,
 handset-local application writes, or another 5210 firmware revision. The unexercised external-service
 channel and placeholder MAD2 inputs must not be promoted to cross-product
 facts.
+
+## Additional acceptance qualifications
+
+`verify-5210-sim-pin-registration` independently proves early physical
+`1234`/OK, successful CHV1 verification before laboratory registration,
+reviewed masked-code/menu/idle frames and physical recovery.
+`verify-5210-late-pin-registration` additionally proves delayed physical
+entry, own-carrier background measurements and full Location Updating on a
+coherent ARFCN 86/87 laboratory topology, with registered idle/menu/recovery
+frames. `verify-5210-pin-incoming-call` extends that configuration through
+laboratory paging, reviewed caller pixels, physical Answer/End, full CC/RR
+closure and exact idle recovery. `verify-5210-pin-incoming-sms` independently
+adds segmented delivery, CP/RP/RR closure, persistent read-status SIM contents
+and physical Read with the existing exact `hello` frame. These gates establish
+HLE signaling and durable SIM/UI interaction, not native speech.
+`verify-5210-pin-idle-state` adds exact time/PC/SP/RAM restoration, identical
+registered-idle pixels and physical post-load Menu/End. `verify-5210-pin-call-state`
+adds exact answered-call restoration before physical End and complete release,
+with restored reference pixels and pinned registered-idle recovery; native
+speech and host media restoration are not established by it.
+`verify-5210-pin-sms-state` adds exact delivered-but-unread restoration,
+identical notification pixels and physical post-load Read, with the existing
+message-body oracle and persistent SIM read status.
+`verify-5210-pin-outgoing-call` adds physical dialling, exact called-party
+SETUP, connection and physical End release with pinned idle recovery. It is
+laboratory HLE signaling. `verify-5210-pin-outgoing-sms` adds physical `a`
+composition for `5551234`, exact one-character SMS-SUBMIT, CP/RP/RR closure
+and reviewed composer/`Message sent` pixels.
+`verify-5210-pin-outgoing-call-state` independently restores an outgoing
+connected call before physical End, requiring exact time/PC/SP/RAM and
+reference/restored pixels, complete release and the idle oracle.
+`verify-5210-pin-host-outgoing-sms` independently adds correlated loopback
+host acceptance to the physical composer, exact SMS-SUBMIT and CP/RP/RR
+closure. `verify-5210-pin-host-incoming-sms` independently adds correlated
+host delivery on ARFCN 86, CP/RP closure, physical Read, exact body pixels and
+persistent read-status SIM storage without automatic laboratory SMS.
+`verify-5210-pin-host-rejected-sms` independently verifies correlated RP-error,
+no success RP-ACK, closure, exact failure/idle/menu pixels and physical recovery.
+`verify-5210-pin-host-silent-sms` independently observes CP-ACK without RP
+result, firmware-owned timed DISC, UA/release and host termination, with
+reviewed timeout and physical idle/menu recovery pixels.
+`verify-5210-pin-host-outgoing-call` independently adds correlated host connect,
+wrong-id/duplicate rejection, physical End, CC/RR release and exact idle pixels.
+`verify-5210-pin-host-incoming-call` independently adds host paging after
+registered idle, correlated lifecycle states, reviewed caller pixels,
+physical Answer/End, CC/RR closure and exact idle recovery.
+`verify-5210-pin-sms-wait-state` independently restores exact architecture
+and pixels during a local-peer RP wait, then requires timed DISC, UA/release,
+paging and physical idle/menu recovery. Whole-interval reference/replay,
+external SMS transaction restoration remain separate.
+`verify-5210-pin-host-outgoing-call-state` restores a physically dialed,
+PIN-authenticated host-connected call with exact PC/SP/RAM and pixel equality.
+The backend remains attached through save/load; the adapter republishes the
+connected call in epoch 2 with `clients=1`, rejects a stale epoch-1 decision,
+then reaches ended after physical End and firmware CC/RR release. The ordinary
+host-connect mock, which disconnects before save/load, cannot prove this
+contract. This gate covers restored host signaling, not surviving or cleaned-up
+SIP dialogs, host media cursor restoration or native speech.
+`verify-5210-pin-host-incoming-call-state` independently adds readiness-gated
+host paging, physical Answer, exact active-call architecture/pixel restoration,
+epoch-2 connected republication without repeated paging, stale-epoch termination
+rejection and physical End/CC/RR closure. The backend stays attached through
+the restored ended state. This is host signaling restoration, not media or
+external SIP-dialog cleanup.
+`verify-5210-pin-host-incoming-media-state` independently adds incoming HLE
+frame echo across the same authenticated lifecycle. Its dedicated received
+adapter-state JSON pins the epoch-2 downlink cursor; the gate requires stale
+epoch-1 media rejection and 80 contiguous accepted frames from that cursor
+before physical End. Exact restored architecture/pixels and CC/RR teardown
+remain required. External SIP-dialog cleanup and native speech remain separate.
+`verify-5210-pin-outgoing-sip-state` independently verifies cold PIN acceptance,
+physical dialing, one confirmed real outgoing SIP dialog and exact handset
+architecture restoration. Epoch change closes the external dialog with BYE
+and clears the restored GSM call once under epoch 2, without redial. Physical
+continuation reaches the exact registered recovery frame. This gate proves
+external-dialog cleanup, not dialog survival, native speech or identical
+active-call pixels after intentional external teardown; the separate local
+and mock-host gates retain their active-call pixel-equality checks.
+`verify-5210-pin-incoming-sip-state` independently applies the same external
+cleanup policy to readiness-gated incoming SIP, physical Answer and connected
+save/load. One confirmed dialog closes with BYE on epoch change; the restored
+GSM call clears once without repeated SIP paging. PIN acceptance, exact
+architecture restoration and physical recovery pixels are checked separately
+from the real SIP/CC/RR evidence. Neither direction restores a live SIP dialog
+or establishes native speech.
+`verify-5210-pin-host-outgoing-media-state` independently adds a continuously
+attached host echo backend, restored GSM-FR cursors, rejection of stale
+epoch-1 media and at least 80 contiguous accepted epoch-2 downlink frames.
+It retains exact architecture/pixel restoration and physical End followed by
+CC/RR release, ended state and paging. The fixture allows three additional
+seconds before End to exercise sustained restored transport. This is HLE
+frame transport, not decoded speech, a microphone/earpiece waveform test or
+SIP-dialog restoration.
+`verify-5210-pin-outgoing-call-sip` independently combines cold PIN
+authentication, physical dialing and End, real loopback SIP confirmation,
+bidirectional host media transport, ordered DISCONNECT/RELEASE/RELEASE COMPLETE
+and exact idle recovery. This is research-HLE signaling and host media transport,
+not microphone/earpiece waveform fidelity or native DSP speech.
+`verify-5210-pin-incoming-call-sip` independently combines cold PIN
+authentication, registered-idle-gated SIP paging, physical Answer/End,
+confirmed dialog and bidirectional host media transport, ordered handset
+DISCONNECT/network RELEASE/handset RELEASE COMPLETE, correlated ended state
+and exact caller/idle recovery pixels. The checker keeps this physical-End
+contract separate from remote-ended fixtures; negative tests reject missing
+release steps and incorrect Answer keys. This remains research HLE, not
+microphone/earpiece waveform fidelity or native DSP speech.
+`verify-5210-pin-phonebook` independently adds physical `Ada/123` Save,
+exact ADN ownership, cold reauthentication and Search/Detail with retained
+record contents and reviewed number pixels; the cold read cannot rewrite ADN.
+`verify-5210-pin-ussd` independently combines an own fresh PIN-protected card,
+physical PIN acceptance, coherent NSM-5 registration and physical `*123#`/Send.
+It requires the exact GSM 04.80 request, correlated success response and RR
+release before dismissal, the existing product-specific USSD result pixels,
+and physical End returning to the exact registered-idle frame. This is
+laboratory HLE supplementary-service evidence, not native DSP execution or
+public-network connectivity.
+The isolated 5210 runner writes `invocation.json` before launching firmware:
+resolved command/cwd, actual executable and primary fixture/checker hashes,
+selected loose BIOS inputs, and initial config/NVRAM hashes. Missing loose
+inputs are explicit, not silently treated as hashed ROM evidence. The manifest
+does not prove source-to-binary correspondence or capture every Python/Lua
+dependency; the runtime checkers remain the behavioral acceptance evidence.
+`verify-5210-late-pin-boundary` independently proves an organic background
+measurement request, request-correlated reply and its own forty-record
+consumer before accepted delayed PIN; no random access follows within 45 s.
+This negative control deliberately uses mismatched ARFCN 1/2; it does not
+establish a missing firmware continuation or DSP acknowledgement. Correcting
+the external topology resolves the delayed-PIN registration boundary.

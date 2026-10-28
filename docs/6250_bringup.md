@@ -2092,3 +2092,20 @@ recovers the menu and idle. Any outgoing request, SETUP, traffic assignment
 or Connect fails this negative gate. Both gates retain independent own
 upload, registration and SIM-location checks. These are HLE laboratory call
 signaling and consent tests, not native DSP speech or end-to-end audio.
+
+## Additional acceptance qualifications
+
+The 6250's PIN-enabled gates independently cover delayed registration,
+incoming/outgoing host call signaling and SMS, and phonebook save followed by
+new-process PIN reauthentication and readback. They retain the declared PMM
+comparison and do not promote the normal machine or native speech.
+The three `verify-6250-pin-state-*` gates establish authenticated idle,
+connected-call and delivered-SMS restoration on coherent lab carrier 19,
+including architectural/protocol replay and physical menu, hang-up or read
+continuation. `verify-6250-coherent-call-state` and
+`verify-6250-coherent-sms-state` cover the corresponding no-PIN lifecycles.
+Registration and, where enabled, PIN acceptance must precede the save
+boundary; events after reload cannot satisfy those prerequisites.
+These local-peer fixtures disable the host adapter, while still requiring
+handset Location Updating and persistent SIM location; host-service gates
+retain their separate host/carrier agreement requirement.

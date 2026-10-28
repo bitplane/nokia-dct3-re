@@ -1118,9 +1118,10 @@ stream. The current paired runs each carried 150 microphone-side frames and
 This proves a standards-based codec and initial channel-coded media
 *transport* slice, a non-silent
 decoded downlink to COBBA, and non-silent physical-microphone uplink decoded
-at the network peer. It does not yet prove the constituent meanings of
-command-`0x08` bits 0 and 9, the MAD2 serial-port edge/idle-clock and register
-contract or firmware-selected COBBA analogue routing. SACCH coding,
+at the network peer. Those codec/media gates alone do not recover the
+constituent meanings of command-`0x08` bits 0 and 9 or firmware-selected
+COBBA analogue routing. The separately evidenced MAD2 serial bus is described
+above; it is not inferred from a successful codec comparison. SACCH coding,
 rectangular interleaving and timeslot coexistence are present. Independent
 stateful SACCH transmitters and receivers now wait for the correct
 timeslot-dependent phase in the 104-frame cycle; all eight timeslots are
@@ -1142,3 +1143,50 @@ consumption remain to be connected to their Layer-3 owners.
   [the loader contract](rom4_dsp_loader.md); it does not identify every
   NSE-8 table as executable code or codec data.
 - MCUIF (`0x40000`) memory-range configuration remains incompletely decoded.
+
+## Additional acceptance qualifications
+
+`verify-3410-radio-a5-1-degraded` independently proves NHM-2 encrypted
+incoming-call resilience: organic authentication/cipher completion, own
+physical Answer/End lifecycle, bidirectional impaired traffic bursts,
+bad-frame detection, handset/network concealment and non-silent recovery.
+The same gate independently requires organic FACCH stealing in both
+directions, BFI concealment and media recovery, plus four-phase SACCH/TF
+rotation while bidirectional speech continues.
+It uses NHM-2's evidenced 1 MHz/8 kHz, 125-clock, 16-bit PCM contract and
+external network fault selectors, not firmware state forcing. This gate
+does not by itself establish native DSP speech or physical host duplex under impairment.
+`verify-3410-radio-a5-1-degraded-state` separately saves the active encrypted
+call at 18.51 seconds, compares two-second reference/restored digital media
+records exactly, and requires post-load physical End plus clean release.
+It also independently requires cipher, degraded-media, FACCH and SACCH
+checks. The ordinary physical input plan finishes before save/load; the
+replay coroutine owns the later End key, explicitly selecting NHM-2 `end`
+rather than the historical NSE-8 `enter` default. Lua coroutines are not
+emulator-saved state, so an outstanding ordinary input wait must not be used
+to terminate the comparison interval. This is HLE deterministic replay,
+not native DSP execution or proof of every possible active-call save point.
+
+`verify-3410-radio-a5-1-degraded-physical-duplex` independently adds real host
+microphone/speaker streams under the same encrypted bidirectional impairment.
+Temporary isolated PulseAudio routes feed a non-clipping microphone stimulus
+and capture decoded speaker output; the gate requires sustained non-silent
+uplink at the network decoder, a sustained recorded 1 kHz downlink, own
+physical Answer/End, ciphering, error/concealment/recovery, FACCH and SACCH.
+The physical call holds for eleven seconds to include a peer observation
+after the final impaired block (peer logs are sampled every 50 exchanges).
+This proves the modeled MIC2/EAR host boundary with neutral gains, not native
+DSP speech, measured silicon gain or a real GSM network call.
+
+`verify-3410-radio-a5-1-outgoing-degraded` independently covers physical
+dialing of `5551234`, organic A5/1, the same external burst faults, FACCH/BFI
+recovery, SACCH coexistence and clean mobile-originated release to PCH.
+The fresh gate observes 550 microphone and 514 decoded earpiece frames,
+68 impaired bursts per direction and 32 downlink impairment-induced bad
+blocks. Network concealment also occurs at startup/FACCH boundaries; this
+does not establish that the configured uplink corruption defeats decoding.
+The recovery checker excludes bad ring blocks after the explicit firmware
+speech-stop event: the release tail cannot recover media already stopped by
+End. An unrecovered uplink bad frame before speech-stop still fails.
+Outgoing impaired host duplex and active-call restoration are not promoted
+by this internal-media gate, nor is native DSP speech.

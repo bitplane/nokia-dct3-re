@@ -3205,3 +3205,74 @@ composition, the normal 8250 boundary, 3210 baseline and coherent frontier
 still reproduce. C54x core conformance passes, including the new BLEQ cases.
 The tool suite passes; all 13 MAME overlay patches apply to the pinned
 upstream commit.
+
+## Additional acceptance qualifications
+
+`verify-8890-sim-pin-registration` independently proves delayed physical
+PIN acceptance and configured GSM900 registration through its own
+`57:01140000` measurement request and correlated type-8b consumer.
+`verify-8890-pin-host-*`, `verify-8890-pin-phonebook` and
+`verify-8890-pin-state-*` separately cover authenticated GSM900 host calls/SMS,
+cold persistent contacts and exact idle/call/SMS restoration.
+`verify-8890-pin-pcs-registration` and four `verify-8890-pin-pcs-host-*` gates
+independently add authenticated PCS acquisition and both host call/SMS
+directions. Three `verify-8890-pin-pcs-state-*` gates independently add exact
+authenticated PCS idle/call/SMS restoration and physical continuation.
+Native speech remains unproved.
+
+The 8850 research-HLE profile independently passes `verify-8850-sim-toolkit`:
+its own nine-byte TERMINAL PROFILE, STATUS/FETCH DISPLAY TEXT, physical OK,
+successful TERMINAL RESPONSE, reviewed 84x48 result/registered-idle frames
+and persisted EF_LOCI. `verify-8850-sim-toolkit-interactive` additionally
+accepts card-owned GET INKEY and GET INPUT: physical digit 5 plus OK and
+digits 4/2 plus OK produce the expected terminal responses, with reviewed
+prompt and registered-idle pixels. This uses unchanged own MCU/PMM and the
+Phase 2+ laboratory card. `verify-8850-sim-toolkit-menu` additionally proves
+card-owned SET UP MENU, physical menu navigation and accepted item-1 ENVELOPE,
+with reviewed entry/list/result pixels and physical End recovery to numeric
+`001 01` registered idle. Selection remains on the item list; it does not
+prove a menu-triggered application or network service.
+`verify-8850-sim-toolkit-menu-state` saves the open item list, restores
+identical CPU registers, RAM checksum and emulated time, then repeats physical
+selection with the same accepted SIM ENVELOPE and reviewed pixels. It does
+not establish restoration during an in-flight APDU or native DSP execution.
+`verify-8850-sim-toolkit-sms` separately proves card-requested SEND SHORT
+MESSAGE to `5551234`, one decoded SMS-SUBMIT, CP/RP acknowledgements,
+successful TERMINAL RESPONSE and RR release, followed by physical idle
+recovery. This remains laboratory HLE signaling, not native or public-network
+SMS delivery. `verify-8850-sim-toolkit-call` separately proves card-owned
+SET UP CALL, physical consent before SETUP, traffic assignment and CONNECT,
+successful TERMINAL RESPONSE, then physical End and complete CC/RR release
+to idle. Reviewed consent and active-call pixels do not establish speech.
+`verify-8850-sim-toolkit-call-decline` independently requires physical Cancel,
+user-rejected TERMINAL RESPONSE (`22`), no outgoing request, SETUP,
+assignment or connection, then physical End to registered idle.
+Other proactive
+commands and native DSP execution are not established by these gates.
+`verify-8890-sim-toolkit-busy` independently verifies nine-byte profile
+download, STATUS/FETCH and the explicit `20 01` screen-busy terminal response
+during physical date entry, followed by successful date-editor recovery and
+persisted laboratory registration. It does not prove displayed proactive
+text or successful physical dismissal on 8890.
+
+`verify-8890-sim-toolkit` separately proves retained-clock DISPLAY TEXT,
+physical dismissal and exact own idle recovery. Its interactive extension
+`verify-8890-sim-toolkit-interactive` independently proves GET INKEY and GET
+INPUT, exact `5`/`42` terminal replies and five own frames. NSB-6 requires
+an additional physical OK after the INKEY digit; the checker enforces that
+product difference. Both gates seed the clock physically from own PMM and
+require retained registration/SIM location. `verify-8890-sim-toolkit-menu`
+additionally proves SET UP MENU, physical navigation and item-1 selection,
+exact ENVELOPE and four own localized menu/recovery frames.
+`verify-8890-sim-toolkit-menu-state` independently restores the open list
+with exact CPU/RAM/time and repeated physical selection, accepted ENVELOPE
+and identical localized pixels. The retained-clock seed and NSB-6's extra
+INKEY confirmation remain product-specific; in-flight APDU restoration and
+native DSP behavior are not promoted.
+`verify-8890-sim-toolkit-sms` additionally proves card-requested SMS through
+exact laboratory CP/RP submission/acknowledgements, terminal success and RR
+release, with physical idle recovery. `verify-8890-sim-toolkit-call` additionally
+proves physical Call consent and complete laboratory CC/RR setup/release;
+`verify-8890-sim-toolkit-call-decline` proves physical Cancel, result `22`
+and no call establishment. Own localized frames and retained registration
+are required. Native DSP speech and end-to-end audio remain unpromoted.

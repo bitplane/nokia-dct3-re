@@ -2444,3 +2444,32 @@ Alternatively, core execution needs ROM6 PROM content/mapping at program
 `ff87` under PMST `ffa8`, plus the COBBA register-F/status-D contract.
 The stock MCU flash and PMM do not provide validated copies of those hardware inputs.
 The same staged code on another product is a comparison, not a substitute.
+
+## Additional acceptance qualifications
+
+`verify-6210-alarm-off-snooze-no` combines the independently validated
+powered-off and Snooze lifecycles: two natural RTC wakes, separately checked
+alarm-only uploads, silent endpoint intervals while powered off, physical
+Stop, the reviewed activation question, and physical No returning to a blank
+powered-off display. Its recurrence input waits for the second alarm boot;
+scripted key labels alone are not evidence that the intended UI consumed them.
+This remains research HLE, not native DSP or audible-output acceptance.
+The paired `verify-6210-alarm-off-snooze-yes` independently requires
+firmware-owned software restart after physical Yes, a separately validated
+normal upload/self-test phase, registration and exact registered-idle pixels.
+`verify-6210-alarm-snooze-countdown-restore` separately saves at second 100
+in the Snooze-induced off interval, checks exact CPU/banked state, SRAM,
+time and silent RTC/frame replay, then validates recurrence and physical No.
+
+`verify-6210-ussd` and `verify-6210-call-divert` independently establish physical
+supplementary requests, correlated laboratory responses, RR release, reviewed
+result/idle pixels and EF_LOCI persistence. `verify-6210-call-divert-lifecycle`
+extends forwarding through register/active-query/deactivate/inactive-query;
+`verify-6210-state-divert` additionally restores exact CPU/RAM/time and observed
+protocol replay before a fresh physical active query.
+`verify-6210-call-divert-cold` separately proves network-owned subscription
+NVRAM across independent processes: physical registration, retained active
+interrogation and host forwarding without paging, plus a fresh-storage inactive
+control. It uses unchanged own provisioning and separately reviewed idle pixels.
+These gates do not establish
+native DSP, speech or displayed forwarding-number content.

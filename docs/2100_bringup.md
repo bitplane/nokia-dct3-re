@@ -835,3 +835,7 @@ external follow-up rather than negative proof that no capture survives.
 - [Archived `2100FuBu0584` reference](https://gsmforum.ru/threads/podskazhite-kak-podnyat-ufsom-nokia-2100.6670/)
 - [Surviving v5.84 MCU+PPM listing](https://www.shram.kiev.ua/mob/proshnokia.shtml)
 - [Subscriber-gated 2 MB v5.84 service-box listing](https://www.telecelula.com.br/new/download_Procurar.asp?cod_categoria=7&cod_fabricante=2&pg=63)
+
+## Additional acceptance qualifications
+
+`verify-2100-frontier` proves reset, 16-Mbit flash execution, RAM/MAD2 access, product-local GENSIO/CCONT and display contracts, a 64-exchange DSP bootstrap, service discovery and application registration. `verify-2100-mbus` separately proves the physical single-wire request, sampled-line occupancy, one-shot 423.1 Hz terminal event, request-derived transport ACKs and complete organic terminal `D0/04` -> phone `D0/05` exchange. The sibling v5.21 image's distinct 992-pair DSP handoff and verdict publication are separately protected. `verify-2100-interactive` preserves the v5.84 executable, attaches only the v5.21 PMM tail, cleans stale snapshots, enters physical `12345` and pins the organic `Wrong code!` result. Both cipher calls use the same digits but invalid identity/FAID strings change during the boot; a matching PMM/full-flash capture is required before acceptance, idle or registration can be promoted.
