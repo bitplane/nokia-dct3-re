@@ -37,11 +37,6 @@ power/shutdown continuation and does not block the UI. Correct MAD2 IRQ0 keypad
 wiring reaches the firmware matrix scanner and decoded key resources. The
 unprovisioned Security-code editor also accepts a physical `12345` sequence.
 
-Report code 7 is a later power/shutdown report. Mapped callback, descriptor,
-timer, and task-6 selector paths are conditional firmware lifecycles rather
-than missing hardware acknowledgements. The detailed contract lives in
-[`docs/mmi_layer.md`](docs/mmi_layer.md).
-
 `make verify-frontier RUN_DIR=run_frontier` is the authoritative 3210 hardware
 baseline. It uses the request-driven external-service peer
 and ordinary SIMI/FIQ6 card model, ending in mode `0x0004` with service-session status
@@ -75,15 +70,15 @@ The labels below have precise meanings:
 
 | Subsystem | State | Evidence / next step |
 |---|---|---|
-| ARM7, flash, RAM mapping | Partial hardware | 3210 executes reliably; product layouts need cross-ROM validation. |
+| ARM7, flash, RAM mapping | Partial hardware | Product-owned layouts and native flash contracts have multi-ROM acceptance; exact RAM decode and physical flash timing remain qualified separately. |
 | MAD2 timers, sleep and IRQ/FIQ | Partial hardware | Boot-critical paths work; paired ROMs and focused tests cover ARM clock-stop, timer/key wake and save-state restoration, while exact divider and transition timing remain open. |
 | PCD8544 LCD and keypad | Partial hardware | Firmware renders authentic frames; MAD2 IRQ0 reaches the matrix scanner and decoded input resources. |
-| 24C128 EEPROM | Partial hardware | MAME's native I2C device is wired through GenIO and passes the oracle; provisioning and the parallel alias need validation. |
-| CCONT power/ADC/RTC | Partial hardware | Extracted MAME device passes the oracle; physical ADC latency, RTC encoding, watchdog clock and board-level analog signals remain open. |
+| 24C128 EEPROM | Partial hardware | Native serial transport, page writes, busy polling and persistence are tested. The unsupported parallel alias is unmapped; generated provisioning is not factory calibration. |
+| CCONT power/ADC/RTC | Partial hardware | Deterministic binary RTC, alarm IRQs, watchdog reload and power lifecycles are tested. Physical ADC/clock timing and board-level analogue quantities remain qualified separately. |
 | GENSIO serial/SELECT | Partial hardware | Extracted endpoint/status/LCD/CCONT transport passes two 3210 ROMs; physical timing and SELECT-attached peers remain open. |
-| SIMI controller and SIM card | Partial hardware | Separate devices compose through byte/reset callbacks; organic SIMI/FIQ6 and T=0 initialization work, and the GSM 11.11 linear-record path persistently stores firmware-written ADN contacts. Timing, errors, security and broader file coverage remain incomplete. |
+| SIMI controller and SIM card | Partial hardware | Separate controller/card devices support ordinary initialization, persistent contacts/SMS, CHV/PUK/FDN security and bounded Toolkit workflows. Physical timing/error sources and per-product application coverage remain scoped by their contracts. |
 | DSP mailbox/service corner | Partial | Bootstrap, service timing, packet rings, two firmware-programmed tone voices and GSM-FR speech work through HLE. The 5110 selects the clean-room C54x core for boot/menu/save-state; real-DSP RF acquisition, speech and DSP-local COBBA control interpretation remain incomplete. |
-| Startup/service/radio peers | Prototype | Separate service, Nokia L1 and standards-shaped GSM devices compose through DSPIF; one laboratory cell supports camp, Location Updating, release and operator presentation. Wider peer contracts remain incomplete. |
+| Startup/service/radio peers | Partial HLE | Separate service, Nokia L1 and standards-shaped GSM devices support laboratory registration and phone services, including multi-cell mobility. This is not native DSP/RF execution. |
 | Interactive startup | Mapped | Provisioned boot reaches the idle screen and opens `Phone book` through a protected physical-keypad oracle. Mode 4 is compatible with the UI; cross-ROM presentation parity remains open. |
 | MMI/RTOS internals | Mapped | Firmware owns these; observe them rather than emulate them. |
 | Audio, RF, network | Partial HLE | The laboratory network supports organic registration, T3212-driven periodic Location Updating, paging, MT call/SMS control, bidirectional GSM-FR TCH/F media, FACCH/SACCH coexistence, A5/1-preserving dedicated-mode handover, degraded frames and teardown. Idle-mode same-/different-LAC cell reselection, total-coverage loss/recovery and replacement-cell paging are validated; physical RF propagation, frequency hopping, wider services and DSP-local COBBA mux/control decoding remain open. |
@@ -94,15 +89,13 @@ supported, and it passes the reference and portability checks.
 
 ## Roadmap
 
-### Reference 3210 milestones
+### Acceptance and remaining work
 
-1. Stable default and modeled boot regressions.
-2. Organic SIM initialization and offline desktop.
-3. Reliable keypad navigation and persistent settings.
-4. Address book editing and text/T9 entry.
-5. Ringtone playback and audio output.
-6. Operator logos and other period content workflows.
-7. Snake and the other built-in games.
+The [model coverage matrix](docs/model_coverage.md) owns demonstrated handset
+capabilities and their acceptance gates. The [fidelity roadmap](docs/driver_vision.md)
+owns remaining hardware work. Working applications, HLE services and native DSP
+execution are separate claims; a passing menu or game does not promote the
+other boundaries.
 
 ### Platform work
 

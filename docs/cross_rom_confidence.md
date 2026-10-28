@@ -5,7 +5,10 @@
 Cross-ROM tests distinguish shared hardware contracts from product-specific
 flash, storage, display, keypad, and lifecycle behavior. A new firmware begins
 as a portability probe and becomes a supported profile only after a
-forcing-free device/UI acceptance gate exists.
+forcing-free device/UI acceptance gate exists. This document owns differential
+hardware observations, not the changing feature list. Use
+[model coverage](model_coverage.md) and each product contract for accepted
+applications, network services and restoration scope.
 
 ## Nokia 3330 NHM-6 v4.50
 
@@ -38,8 +41,10 @@ separate `450e` BIOS rather than disguising it as `3330f450c.fls`.
 
 ## Current result
 
-- 3210 v6.00: the default profile reproduces the exact fault-screen oracle
-  (`d8a9a7a58e587be8`) with the native 24C128 and extracted CCONT devices.
+- 3210 v6.00: the default composition enables the modeled devices and reaches
+  interactive UI. `make verify` selects an explicit missing-hardware negative
+  and checks semantic predicates, not the historical fault-screen hash.
+  [Structural regression](structural_regression.md) owns those profiles.
 - 3330 v4.50 PPM E now has an explicit product profile. It completes 64 DSP
   bootstrap exchanges, uses the request-driven DSP/external-service/SIM peers,
   the standard-channel `0x220/0x026/0x200` VBATT/BSI/BTEMP tuple and the shared
@@ -78,9 +83,11 @@ ordinary MT SMS traverses SAPI 3 and segmented CP-DATA, persists as unread in
 EF_SMS, displays the receipt notification, and can be physically opened as
 `hello`, changing the record to read. An incoming call reaches caller
 presentation, physical Answer, traffic assignment, NSM-5 speech-control
-request/release, physical End and registered idle. NSM-5 PCM/media, outgoing
-calls/SMS, mobility loss/recovery, other persistent application writes, and
-another firmware revision remain outside these gates.
+request/release, physical End and registered idle. These are distinct
+acceptance boundaries, not the limit of current NSM-5 support. Physical duplex,
+outgoing-call/SMS and storage gates are maintained in
+[the NSM-5 contract](5210_bringup.md); another firmware revision does not
+inherit them.
 
 ## Nokia 3410 NHM-2 v5.46
 
@@ -131,8 +138,10 @@ The same default-hardware profile then completes generic IMSI paging without
 new NHM-2 packet grammar: correctly grouped fill and one page lead to organic
 random access, assigned-SDCCH Paging Response, release and return to fill.
 Fresh/preserved PMM, two paging save-state boundaries and wrong-group,
-unmatched, malformed and barred-cell negatives pass. This proves paging but
-does not yet establish ringing or physical call control.
+unmatched, malformed and barred-cell negatives pass. Those paging gates alone
+do not establish call control. Independently promoted NHM-2 call/media and
+physical-duplex gates are recorded in [model coverage](model_coverage.md),
+not inferred from paging.
 
 ### Conditional power lifecycle control
 

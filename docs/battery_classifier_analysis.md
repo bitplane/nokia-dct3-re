@@ -189,9 +189,9 @@ temperature-like interpretation but does not prove the PCB net name.
 
 The independent selector-3 read at `0x2a90b4` consumes PSCC output `Vchout`;
 its former BSI label was an invalid import from conventional DCT3 wiring.
-Selector 2 is switcher output `Vdc_out`, and selector 4 is BTEMP. Selectors 6
-and 7 remain unnamed because their recovered consumers do not establish a
-board-level electrical quantity.
+Selector 2 is switcher output `Vdc_out`, and selector 4 is BTEMP. The
+service-manual wiring identifies selectors 6/7 as RF_temp/VCXOTEMP and EAD,
+respectively; their electrical units and conversion laws remain unestablished.
 
 Mode 4 has a distinct, external completion contract. Its event `0x43` has one
 recovered poster, `0x2a6880`, selected only by payload 3 of incoming class-`0x40`

@@ -9,23 +9,27 @@ events do not imply a shared transport.
 
 | Boundary | MCU producer | Peer owner | Completion mechanism | Current status |
 | --- | --- | --- | --- | --- |
-| Shared-control service | `0x290cf4` updates DSP RAM control words and writes retained DSPIF command 4 | DSP | DSP-owned counts at shared offsets `0xda`, `0xe2`, and `0xe4`; MAD2 IRQ 4 enters `0x291068` | Consumption/interrupt partially modelled; reply state incomplete. |
-| MCU-to-DSP packet ring | Task 3 calls `0x290840`; `0x2907c4` commits packets | DSP | DSP advances consumer `0x0a6` | Format and ownership mapped; current model only drains complete packets. |
-| DSP-to-MCU packet ring | DSP writes packets and advances producer `0x1c8` | MCU task 4 | FIQ 0, then `0x290904`; MCU advances consumer `0x1ca` | Boot-subset replies are focused-tested; wider reply vocabulary remains unknown. |
+| Shared-control service | `0x290cf4` updates DSP RAM control words and writes retained DSPIF command 4 | Selected DSP backend | DSP-owned counts at shared offsets `0xda`, `0xe2`, and `0xe4`; MAD2 IRQ 4 enters `0x291068` | Request-triggered HLE completion and finite code-block transfers are tested; physical timing remains qualified. |
+| MCU-to-DSP packet ring | Task 3 calls `0x290840`; `0x2907c4` commits packets | Selected DSP backend | DSP advances consumer `0x0a6` | DSPIF frames complete packets; the backend and attached peers supply their semantics. |
+| DSP-to-MCU packet ring | Backend/peer writes packets and advances producer `0x1c8` | MCU task 4 | FIQ 0, then `0x290904`; MCU advances consumer `0x1ca` | Transport conformance is distinct from product-specific service acceptance. |
 | L1 mailbox | MCU L1 constructors submit framed traffic through task 7 | DSP/task 22 | RX type `0x8e` -> task 7 -> `0x2827f8`/`0x282d64` -> task-22 class/primitive decoder `0x23d62c` | Firmware callback `0x0a` owns session startup; phase-1 class-`0x42`/command-`0x64` acknowledgement is mapped. No normal offline boot traffic reaches this call/session contract. |
 | Generic-service framework | Firmware registrations and queued objects | Firmware service framework | Task-5 dispatcher `0x2af652 -> 0x2638e4` | Runs organically; it is downstream of hardware ingress. |
 | External-service transport | Task 2 through task 7 | External service/test peer | Class-`0x40` framed responses | Separate protocol; not a DSP-radio completion path. |
 
 ## Implementation audit
 
-The implementation has three explicit owners:
+The implementation separates transport from the selected backend and peers:
 
 1. `nokia_dspif_device` owns shared RAM, DSPIF, ring indices, packet framing and
    FIQ0/IRQ4-facing completion;
 2. `nokia_dsp_hle_device` owns request-triggered shared-service completion, stateful bootstrap
-   publications and the established type-`0x70` completion;
+   publications and the established type-`0x70` completion on HLE compositions;
 3. `nokia_external_service_peer_device` owns discovery, class-`0x40` session
-   correlation, channel map and healthy-state sequencing.
+   correlation, channel map and healthy-state sequencing;
+4. the radio peer, GSM link/session and network layers own the separately
+   decoded Nokia L1 and standards-shaped laboratory services. They are not
+   transport policy. [Upstream architecture](upstream_architecture.md) owns
+   the full device graph and native/HLE substitution boundary.
 
 The transport contains no service commands, session state, bootstrap policy or
 DSP-product configuration. The selected HLE consumes one atomic typed
@@ -36,7 +40,8 @@ packets, maintains ring indices, and reports address-level mailbox accesses to
 the selected DSP backend. The HLE alone interprets the `0x002`, `0x0fe` and
 `0x100` bootstrap dialogue, publishes the 3410 parked-loader response, and
 publishes the code-block request before asking DSPIF to complete service IRQ4.
-This callback boundary is the attachment seam for a future real DSP backend.
+The native C54x backend already uses this attachment seam on the 5110;
+its acceptance and unresolved inputs are independent of HLE services.
 The external peer contains no shared-RAM offsets, ring arithmetic or interrupt ownership. The
 100 us producer wakeup, 5 ms peer packet poll, synchronous bootstrap replies and 36-tick
 external-session delay remain calibrated prototype behavior rather than
@@ -77,7 +82,12 @@ Packet header halfword `LLTT` contains payload length `LL` and packet type `TT`.
 The occupied size is `(LL + 3) / 2` halfwords. The peer must never advance a
 consumer over a partial packet or overwrite a producer owned by the other side.
 
-## Current organic channel-set publication
+## NSE-8 offline channel-set observation
+
+The following channel-set, dial and descriptor observations are scoped to the
+named offline boot, before laboratory network acquisition. They prevent false
+request/reply correlations; they are not current radio frontiers. Accepted
+network/call services live in [model coverage](model_coverage.md).
 
 The deep profile reaches the peer without an isolated producer probe:
 
@@ -126,7 +136,7 @@ semantic acknowledgement.
 
 ### Organic dial control update
 
-An organic `123` dial attempt does not create a call-signalling packet on the
+In that offline profile, an organic `123` dial attempt does not create a call-signalling packet on the
 MCU-to-DSP ring. Task 5 publishes `0x0fa3`; task 14 accepts it locally and
 publishes `0x09d2`; task 15 stores the dial object, produces internal result
 `0x0a02`, and registers an asynchronous activity slot. The resulting task-5 and
@@ -136,10 +146,10 @@ task-9 L1 configuration flush updates shared-control commands `0x08`, `0x09`,
 
 This distinction is runtime-reviewed: the shared-control peer completes the
 batch but the call remains pending, with no post-dial packet-ring request. The
-first network peer behavior is still an unsolicited search/camp ingress; the
-organic dial path becomes its downstream acceptance test.
+network acquisition ingress must be established independently; the offline
+control does not disprove the later registered call path.
 
-## Unreached lower-radio lifecycle
+## Conditional lower-service lifecycle
 
 The downstream chain is mapped independently of its ingress:
 
@@ -188,7 +198,7 @@ absence proof.
   numbers, and DSP packet type 5.
 - Do not make packet consumption timing responsible for semantic completion.
 
-## Next acceptance point
+## Transport acceptance and limits
 
 `make verify-dsp-transport` covers wraparound, full-ring rejection and
 partial-packet retention as transport-only conformance fixtures, plus the organic complete-packet lifecycle,
@@ -234,7 +244,7 @@ completed transfer, producing about 3,280 requests per second until a firmware
 counter wraps.  The NHM-2 long-idle gate requires one publication, exactly 151
 organic completions and the firmware-owned terminal values.
 
-A future lower-radio investigation succeeds only when a peer-owned state change
+An additional lower-radio contract is admitted only when a peer-owned state change
 or inbound packet correlates with a firmware consumer through the real hardware
 boundary. Type `0x1a` and service-5 `0x05e8` must not be assumed to be the two
 ends of such a contract: type `0x1a` has no reply dependency, while the

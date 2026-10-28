@@ -5,17 +5,13 @@ baseband + audio codec) in the Nokia 3210 firmware. It combines static
 disassembly with the reviewed shared-ring and service-boundary traces. Use the
 focused DSP-boundary MAME log category (`RUN_VERBOSE=1`) for live observation at this boundary.
 
-**TL;DR for emulation:** at boot the MCU treats the DSP interface as (a) a RAM
-self-test it passes by echo, (b) a handful of "DSP ready" status flags, (c) a
-download target for coefficient/program blobs, and (d) bidirectional lower-service
-message rings. The aggregate device carries organic D0 discovery,
-type-`0x70` DSP completion, the separate external-service session, and an
-opt-in deterministic radio peer through FIQ 0. The radio peer follows recovered
-SEARCH_LIST, measurement, channel-change, BCCH, random-access, LAPDm, Location
-Updating, RR release, and operator-presentation contracts for one deterministic
-laboratory cell. This proves that the transport composes in the normal
-scheduler, but not that the external class-`0x40` peer is DSP-owned or that
-unimplemented mobility, handover, MO SMS or broader services are implied.
+This is an address-level MCU map, not the capability catalogue. The MCU uses
+shared RAM for self-test, bootstrap publications, uploads and bidirectional
+service traffic. [The transport contract](dsp_service_transport_contract.md)
+owns the device/backend boundary; [model coverage](model_coverage.md) owns
+demonstrated HLE services and native handset acceptance. HLE registration,
+mobility, calls and SMS do not establish native DSP/RF execution or ownership
+of the separate external class-`0x40` peer.
 
 ## The two hardware windows
 
@@ -72,8 +68,9 @@ on an MCU read. It exposes backing RAM plus address-level access notifications;
 the selected DSP backend owns acknowledgement consumption and publication. For
 the current HLE this includes NHM-2's alternating `0x0fe`/`0x100` tokens, its
 parked-loader response at `0x002`, and the service code-block publication. A
-future DSP core therefore replaces the HLE at this seam without changing ring,
-doorbell or interrupt transport.
+native C54x backend uses the same attachment boundary on the 5110. Extending
+native execution to another product must preserve that transport boundary;
+it does not inherit the HLE's product or service acceptance.
 
 ## L1-to-DSP mailbox protocol
 
@@ -1132,11 +1129,16 @@ endpoint transmits nothing rather than manufacturing a measurement report.
 Meaningful measurement-report/system-information payload production and
 consumption remain to be connected to their Layer-3 owners.
 
-## Unresolved contracts
-- Decode the other recv handlers' primitives (`0x23c4fc/55c/9e8/be8/d158/d2fe/d430`) and the
-  full `0x2b66b0` routing table (same caveat: dormant, no runtime to validate).
-- Static RE of the `0x2b7xxx–0x2c9xxx` L1 driver *send* side: enumerate the 287 DSPIF
-  command stubs and their command encodings (large, code never runs on our boot).
-- Identify the two downloaded blobs (`[0x200+]` from flash `0x200040`; `[0xe00+]`): DSP
-  program vs coefficient tables vs audio codec params.
-- The MCUIF (`0x40000`) memory-range configuration.
+## Remaining map coverage
+
+- Primitives not exercised by a named scenario retain static-only status;
+  do not generalize an offline-boot absence to calls or other applications.
+- The generated [packet census](dsp_packet_semantics.md) and
+  [shared-memory inventory](dsp_shared_memory_inventory.md) own enumerated
+  coverage. Additional command-stub decoding requires a concrete consumer,
+  not the obsolete premise that the whole send side is dormant.
+- The `[0x200+]` strided table and `[0xe00+]` upload above describe the
+  NSE-8 input only. Recovered ROM4 loader/program provenance is maintained in
+  [the loader contract](rom4_dsp_loader.md); it does not identify every
+  NSE-8 table as executable code or codec data.
+- MCUIF (`0x40000`) memory-range configuration remains incompletely decoded.

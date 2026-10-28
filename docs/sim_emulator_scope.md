@@ -42,7 +42,8 @@ and returns serial bytes at that boundary and owns the removable card state.
 The card currently supports:
 
 - configurable ATR with the default `3b 10 05`;
-- PPS echo;
+- validated default-speed PPS negotiation and unsupported-speed fallback/refusal,
+  as specified in [the controller/card contract](sim_subsystem.md);
 - T=0 command header/body sequencing;
 - SELECT and GET RESPONSE for MF, DF_GSM, and known EFs;
 - STATUS for the current directory;

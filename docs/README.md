@@ -52,6 +52,7 @@ distinction.
 | `8210_bringup.md` | NSM-3 normal/native boundary, acquired base-record research-HLE phone services, own PCM/audio and restoration acceptance. |
 | `8290_bringup.md` | Own NSB-7 uploads and explicit research-HLE UI, SIM security/storage/Toolkit, laboratory registration, host call/SMS signaling and restoration; native DSP/speech remain unproved. |
 | `8xxx_bringup.md` | Acquired 8250/8850/8890 GENSIO contracts and bounded software-only frontiers. |
+| `8855_bringup.md` | Own NSM-4 MCU/storage, register/key/upload contracts and unacknowledged DSP ownership boundary. |
 | `6210_bringup.md` | NPE-3 normal/native boundary, own-PMM research-HLE phone services, accessory audit and isolated restoration acceptance. |
 | `6250_bringup.md` | Product-local staged DSP boundary and research boot, input, SIM, phonebook, registration, call-signaling and SMS acceptance. |
 | `7110_bringup.md` | NSE-5 upload, SED1565/keypad/roller contracts, fail-closed product boundary and explicit ROM4 compatibility instrument. |
@@ -72,7 +73,7 @@ distinction.
 
 | Document | Purpose |
 | --- | --- |
-| `sim_subsystem.md` | Concise SIM ownership and interface summary. |
+| `sim_subsystem.md` | Authoritative SIMI/controller and card interface, timing, persistence and acceptance contract. |
 | `mmi_layer.md` | Keypad, security editor, interactive idle/menu, and power/shutdown lifecycle. |
 | `resource_providers.md` | Resource-provider ownership and excluded conditional startup paths. |
 | `external_service_topology.md` | Class-`0x40` service-command producers, acknowledgements, and external-service boundary. |
@@ -82,7 +83,7 @@ distinction.
 | `eeprom_analysis.md` | EEPROM usage map, checksum contracts and the generated provisioning fixture. |
 | `storage_static_census.md` | Five-ROM direct EEPROMSelX and PUP access absence/ownership census. |
 | `dct3_type_1f.md` | Cross-model status-2 type-`0x1f` envelope shared by 3210, 3310 and 6110 images. |
-| `gate_migration.md` | How acceptance gates are authored in `gates.json` and generated into `gates.mk`. |
+| `gate_migration.md` | Acceptance-gate authoring, regeneration and independent GNU make database comparison. |
 | `gate_parity_audit.md` | Generated audit of where sibling product gates differ. |
 
 ## Active protocol and HLE boundaries

@@ -1,189 +1,51 @@
-# Normalization status
+# Evidence normalization and implementation debt
 
-This document identifies which conclusions have entered the repeatable evidence
-regime and which implementation areas remain provisional. It is not a claim
-that the driver is ready for upstream submission.
+This document owns the evidence regime's coverage, runtime-control classes and
+instrumentation limits. It is not another handset capability catalogue or a
+claim of upstream readiness.
 
-## Normalized acceptance profiles
+## Authorities
 
-- `make verify` protects the explicit missing-hardware structural summary; it
-  does not require a particular failure screen.
-- `make verify-frontier` protects the request-driven external-service peer plus ordinary
-  SIMI/FIQ6 card path. It ends in task-1 mode `0x0004`, flags `0x0f`, service-session
-  status `0x49`, no-SIM clear, and SIM enable set.
-- The NSE-8 v6.00 and v5.01 power gates distinguish frame-sampled firmware RAM
-  from physical power: a long key hold reaches mode `0x000c`/event `0x0074`
-  and organically removes the digital-baseband rail through CCONT after
-  save/load. The frozen `final_sim_enable` byte is diagnostic, not a rail
-  oracle.
-- Reviewed runtime manifests retain the class-`0x40` service and coherent
-  generic-service/SIM observations that established those contracts. Their
-  broad firmware-PC trace generators have been retired.
-- The 3330 and 3410 fresh-PMM frontier and navigation gates pass again. Both
-  firmware images organically emit compact DSP request `70/0d00`; their typed
-  product contracts return `74/0d00` through FIQ0 before the UI is promoted.
-- The 3410 registration profile is normalized through fresh/preserved PMM,
-  two save-state boundaries and three negative network compositions. Its
-  autonomous band scan and external-service sequences are explicit NHM-2
-  contracts; standards-level cell, assignment, LAPDm and MM behavior remains
-  shared.
-- NHM-2 paging is normalized without a driver branch: fresh/preserved,
-  pre-page/assigned save-state and wrong-group/unmatched/malformed/barred
-  compositions all use the generic network, paging-group, session and LAPDm
-  components.
-- Deterministic mobile-originated speech calls are normalized across NSE-8,
-  NHM-5, NHM-6 and NHM-2: physical dial, CM Service, called-number SETUP,
-  one TCH assignment, Alerting/Connect, bidirectional media, product-specific
-  release and restored PCH cadence. The generic session now retains a saved
-  request ID and called digits, while network-owned deterministic policy proves
-  busy, no-answer and CM-service-reject outcomes with clean RR release. An
-  ID-correlated, single-consumption submission interface and emulation-timed
-  delayed policy are save-state proven before busy teardown. The optional
-  WebSocket adapter publishes the same typed request and admits validated host
-  decisions, remote clears and GSM-FR through bounded cross-thread queues; GSM
-  sequencing remains in the session. Request IDs and transport epochs prevent
-  cross-call/restore leakage. Reconnect republishes request, phase and saved
-  media cursors. Live gates cover overload, local-End isolation, alerting and
-  traffic reconnect, sequential calls, non-silent physical host loopback and
-  save/load before decision, during media and within CC/RR release.
-- NHM-2 incoming calls and internal media are normalized through organic
-  ringing, physical Send/End, one TCH assignment despite repeated Call
-  Confirmed, command-`0x08` values `0x060b`/`0x040a`, timed 1 MHz/8 kHz
-  COBBA-GJP PCM, bidirectional GSM-FR and clean return to PCH. Fitted analogue
-  routing remains explicitly unknown.
-
-## Current application baseline
-
-The ordinary SIM initialization contract is satisfied. With provisioned phone
-identity data, firmware paints the idle `Menu` frame and a physical left-softkey
-press opens the `Phone book` menu organically. Task 1 remains in mode `0x0004`,
-which is now validated as compatible with the interactive UI rather than a
-blocked startup state.
-
-The keypad lifecycle is bounded and its MAD2 register contract is aligned in
-3210 v6.00 and v5.01:
-
-```text
-IRQ0 -> ISR 0x2b3084 -> task-1 event 0x41
-     -> firmware 0x41/0x42/0x43 sequence -> matrix scan 0x2b2f90
-     -> key decode 0x2b4628 -> resource 0x6e02
-```
-
-Mode 4 already runs keypad and security-editor interaction. Report code 7,
-callbacks `0x5d`, `0x01`, and `0x10`, and task-6 selector `0x0732` belong to
-conditional navigation, reinitialization, or shutdown lifecycles. They are not
-missing cold-boot entrances; MMI settlement is closed.
-
-The validated NSE-8/NHM-5 frontier includes deterministic menu traversal,
-user-data persistence, authenticated registration, call control and
-bidirectional physical speech on the declared research-HLE composition.
-This is not evidence of native DSP speech execution.
-
-Remaining native and product frontiers are independent, not a single
-project-wide bootstrap blocker:
-
-- NSE-3's bounded MCU loader still needs a matching internal DSP ROM or an
-  independently observed final completion publication; see
-  [6110 bring-up](6110_bringup.md).
-- NPE-3's normal 6210 remains fail-closed at native verification. Its separate
-  research-HLE composition validates graphical/input, SIM, persistent contacts,
-  laboratory registration, call signaling and SMS, not native speech. See
-  [6210 bring-up](6210_bringup.md).
-- NSE-5's ROM4 compatibility instrument executes uploads and delivers DSP
-  replies. The separate-PMM input and the intact backups have distinct
-  boundaries: the v5.01 whole backup reaches a stored-data checksum mismatch,
-  while the v5.00 whole backup passes its observed low-record checksum and
-  reaches a native serial-controller completion poll. A separately labelled
-  one-byte own-checksum consistency fixture releases v5.01's second task batch
-  but still ends blank in native913e/9140; it is not authentic provisioning.
-  The physical serial
-  completion contract, fitted mask/product identity and COBBA inputs remain
-  unresolved; none of these instruments establishes usable 7110 support. See
-  [7110 bring-up](7110_bringup.md).
-- NPM-5's isolated native MU4 staged recorder has metadata-save and cold-open
-  evidence. Fresh original initialization, complete readback, retained storage
-  and `bootrecmeta` pass after correcting repeat-guard instruction ownership.
-  Genuine repeated mapped moves remain excluded. The older atomic save
-  fixture's timer/interrupt stall is a separate boundary.
-  File/audio completeness, native playback and MA4 handset boot retain their
-  separately stated scope; see [5510 bring-up](5510_bringup.md).
-
-Continue software-accessible work at an evidenced unresolved boundary while
-retaining these product and HLE/native distinctions. A missing capture or
-matching ROM for one branch does not prevent progress on another.
+| Question | Authoritative document |
+| --- | --- |
+| What works on a product, and under which composition? | [Model coverage](model_coverage.md), then the linked product's acceptance contract. |
+| Which predicates, frames and profiles define acceptance? | [Structural regression](structural_regression.md), named manifests and reviewed evidence. |
+| Which hardware contracts remain unknown? | [Fidelity roadmap](driver_vision.md), then the owning subsystem contract. |
+| Which backend is selected, and where is HLE substituted? | [Upstream architecture](upstream_architecture.md) and product configuration. |
+| How are observations admitted, falsified and retained? | [Evidence regime](evidence_regime.md) and [cleanup protocol](research_cleanup.md). |
 
 ## Evidence coverage
 
-- Hardware contracts, state predicates, falsifications, topology nodes, and
-  runtime-pattern scope are machine validated by `make evidence-check`.
-- The message census includes reviewed producers/consumers, descriptor-derived
-  edges, positive fixtures, and negative fixtures for known decode traps.
-- Class-`0x40` service, SIM, DSP-ring, and task-mailbox conclusions have named
-  runtime manifests.
-- The 3330 is a validated third interactive product profile. Its acceptance is
-  UI/device-boundary based; the 3210-specific structural RAM summary is not
-  treated as cross-product evidence.
-- The 5210 v5.40 PPM E image is a validated interactive product profile. Its
-  exact standby gate depends on product-owned GENSIO, service, BLB-2 CCONT,
-  display-orientation, Family-A keypad and NSM-5 radio contracts. Ordinary and
-  SIM-authenticated Location Updating reach steady camp, update EF_LOCI and
-  render the operator; physical-key gates open the main menu, enter Messages,
-  return cleanly to registered standby, and repeat application entry after a
-  save/load. IMSI paging and ordinary MT SMS additionally reach persistent SIM
-  storage, notification, physical reading and the read-status update. Calls
-  are covered through incoming presentation, physical Answer/End, physical
-  outgoing dial/End and DSP speech-control selection. The physical message
-  composer additionally completes SMS-SUBMIT and its success UI. The
-  right-softkey Names route independently saves a contact to SIM `EF_ADN`
-  and renders it after a cold restart with the same card image. Physical
-  USSD and call-divert interrogation additionally cross the shared GSM 04.80
-  boundary through NSM-5's dedicated Send key. A Phase-2+ fixture also proves
-  its nine-byte TERMINAL PROFILE and proactive DISPLAY TEXT lifecycle. Same- and
-  different-LAC reselection, serving/all-cell loss, RF recovery and paging
-  after reselection are covered on the product's ARFCN-86/87 laboratory pair;
-  wrong-group, unmatched and malformed pages are rejected without RR access;
-  a focused authenticated incoming-call gate adds organic A5/1 control and
-  bidirectional ciphered SDCCH/traffic bursts. Save/load is also covered during
-  an active answered call through restored physical teardown. Separate
-  `verify-5210-radio-physical-duplex` and
-  `verify-5210-radio-outgoing-physical-duplex` gates establish HLE audio on
-  the documented 1 MHz/8 kHz PCM bus and MIC2/EAR routes; native DSP speech
-  and analogue gain behavior remain unproved. Its independently recovered
-  power-column wiring
-  covers the firmware power menu, sustained CCONT rail-off and charger-originated
-  baseband restart without borrowing 3210 task-RAM addresses.
-- The 3210 v5.01 full flash is a same-product runtime control. Its structural
-  oracle independently reaches mode `0x0004` with flags `0x0f`, clears no-SIM,
-  and sets SIM ENABLE through relocated v5 state fields. Its provisioned menu
-  oracle matches v6.00 exactly outside the shared animated-icon mask. Both
-  revisions now retain coherent service status `0x0049`.
+- `make evidence-check` validates hardware contracts, state predicates,
+  falsifications, topology and runtime-pattern scope.
+- The message census includes reviewed producer/consumer and descriptor-derived
+  edges, positive controls and negative fixtures for known decode traps.
+- Named manifests retain class-`0x40`, SIM, DSP-ring and mailbox observations;
+  retired broad trace generators are not required to preserve their conclusions.
+- Cross-ROM promotion requires a product-owned observation. NSE-8 RAM summaries
+  are not portable acceptance oracles for another handset.
+- PIN acceptance and registration must precede an authenticated save boundary;
+  post-load events cannot retroactively satisfy those prerequisites.
+- Native CPU, isolated codec, music-DSP, handset HLE and physical-interface
+  qualifications remain distinct. A missing ROM or capture for one boundary
+  does not block unrelated software work.
 
 ## Device and model debt
 
-| Area | Current role | Remaining work |
-| --- | --- | --- |
-| SIM | `nokia_simi_device` owns MAD2 registers/FIFOs/IIR, the default character rate retained by firmware PPS `ff 00 ff`, FIQ6 UART delivery, status-bit-3 socket presence and FIQ7 card-detect edges. The callback-connected card owns T=0, declared file metadata and persistent mutable records. A shared typed subscriber profile supplies coherent identity, PLMN/operator and A3/A8 data to card and network. Both 3210 ROMs complete physical removal and fresh initialization after reinsertion. Opt-in FDN profiles implement CHV2-controlled ADN INVALIDATE/REHABILITATE and the identity-session validity handshake; product-specific physical and cold-storage gates qualify their use. | Generalize timing beyond the current fixed ATR/PPS profile; recover ATR-start/turnaround and the physical sources of the typed timeout/parity causes. Extend commands only for organic requests or focused conformance tests. FDN validity/access scope and per-product acceptance are defined in `sim_emulator_scope.md` and `model_coverage.md`, not implied for every card or handset. |
-| CCONT/GENSIO | `nokia_ccont_device` owns selected-device registers and outputs, a deterministic binary RTC, recovered periodic IRQ sources, the documented watchdog counter and its WDDISX pin, plus retained power state. Five ROMs share an identical 18-entry descriptor vocabulary and a 933-transaction organic census. NSE-8 board wiring is classified; 3330/3410 explicitly retain the 3310 raw tuple as boot calibration rather than asserted PCB identity. | Measure GENSIO/ADC latency, sibling board wiring, raw electrical units, rail timing, interrupt bit 6 and compatibility-register effects. |
-| EEPROM | Product-owned serial EEPROMs on mapped PUP pins: 24C128 for NSE-8 and 24C64 for NSE-3. The 24C128 selects a conservative 5 ms busy cycle; mapped-pin page wrap, busy polling and two-process persistence pass. EEPROMSelX is unmapped after a five-ROM direct-access census disproved the old immutable-input alias. Both 3210 ROMs have constructor/descriptor-derived fallback extraction, checksum-refusal and externally repaired cold-recovery controls. | Decode remaining fields, validate exact timing/interrupted writes and establish other constructor families independently. |
-| Flash | Native Intel/ST parts; ST M28W320ECT owns protection, CFI, deferred word/page/OTP operations, persistent OTP lock and suspend/save state. No Nokia adapter. | Authentic factory identity and electrical/interrupted-cell behavior remain limited; see `flash_storage.md`. |
-| DSP/network/external-service | DSPIF transport, DSP HLE, Nokia L1 correlation, LAPDm, GSM session/network and external service are separate owners. The network owns cell topology/SI/RF conditions; the radio peer owns saved receiver/acquisition/retune state; firmware owns selection, MM and handover completion. NSE-8/NHM-5/NHM-6/NHM-2 independently pass idle mobility and A5/0/A5/1 handover/rollback/replay with product-specific contracts. A5 operates on the post-interleave burst seam, not product DSP grammar. Primary sources independently establish NHM-6/NHM-2 MIC2/EAR topology, with neutral-gain physical-duplex gates. NHM-2 encrypted degraded media, FACCH/BFI, SACCH, active-call replay and physical duplex pass the `verify-3410-radio-a5-1-degraded` gate family. Named product scope remains authoritative in `model_coverage.md`. | Obtain NSE-3's final DSP-bootstrap publication or matching internal ROMs. Recover real COBBA mux/gain behavior and native DSP speech, not merely HLE duplex. Retain A5/2 as unsupported. |
-| MAD2 | `nokia_mad2_device` owns the CTSI registers within `0x00..0x16`, timer-0/FIQ4, timer-1 current/terminal-count/FIQ5, the 100 Hz FIQ8 centisecond source, reset request/cause, pending/masks, IRQ/FIQ aggregation, cross-ROM ninth-IRQ status/ack semantics, read-only external-status input `0x0e`, one-shot ARM clock-stop/routed wake and save-state restoration. PUP, KBGPIO, UIF, SIMI, MBUS and GENSIO are separate devices. | Establish the ninth IRQ's physical owner, `0x0e` pin ownership, exact physical timer dividers and transition latency, remaining clock-gate consumers and rail timing. |
-| MBUS | `nokia_mbus_device` owns PUP offsets `0x18..0x1a`, receive/transmit holding state, physical single-wire TX echo, sampled peer-byte occupancy and wired-AND arbitration, 9,600-baud character timing, FIQ2 byte events and the one-shot 423.1 Hz FIQ3 MBUSTIM event. Ordinary v5.01/v6.00 boot initializes receive mode but transmits nothing; the NAM-2 profile attaches a product-local terminal only after its organic D0/01 request, and the D0/01-ACK-D0/04-D0/05-ACK exchange is gated. | Recover differing-bit collision/error flags and electrical edge timing beyond the evidenced byte boundary. |
-| Display/input | Native PCD8544, a cross-ROM LCD transport check, and extracted `nokia_kbgpio_device` matrix/IRQ0 behavior. Any unmasked column transition raises IRQ0; firmware masks row-drive transitions. The Lua mirror, handset key layout and timing remain acceptance/board fixtures. The generated EEPROM supplies fields authored by equivalent v6.00/v5.01 descriptor-`0x0749` reset constructors through normal NV loading. | Obtain an authentic configured `0x0749` profile; recover keypad debounce and display reset timing separately. |
-| Buzzer | Extracted `nokia_pup_device` bit 5 gates a MAME beeper and derives its clock from the two-byte `13 MHz / divider`; mapped-MMIO, organic user-alarm and the focused unlocked incoming-call/physical-Answer verifier validate the boundary. | Recover the physical volume/acoustic transfer. Ringing-tone preview and DSP/COBBA audio remain separate paths. Vibrator and backlight remain separate gaps. |
-| Vibrator/backlight | PUP bit 4 drives a named MAME `vibration` output; `0x1b.bits6..5` select four modes and bits 4..0 carry the mode parameter. A mapped-MMIO fixture validates the gate. Enabling `Vibrating alert` through the firmware UI and ringing an organic RTC alarm leaves both registers inactive, constraining that setting to another alert lifecycle rather than proving an output defect. The 3210 service manual establishes that COBBA drives separate LCD/key-light signals into the UI-Switch. Paired-ROM MAD2 traces and a complete changed-write census of MCU-visible DSP shared RAM find no key/timeout-specific output command. | Exercise vibra organically and map the mode/parameter fields to electrical behavior. Recover the lower DSP/COBBA light-control surface before exposing backlight outputs. |
+The component roadmap and subsystem contracts own device behavior and physical
+unknowns. Keep the following implementation-policy distinctions when extending
+those models:
 
-The headless LCD mirror and delayed-key fixture are acceptance tooling in
-`mame_nokia_dct3_input_exerciser.lua`.  Physical-End sequencing may wait for
-either the session's diagnostic Alerting output or its already-connected-call
-output, avoiding a missed sub-poll transition without changing CC state.
-These outputs are observational and restored from saved generic session state;
-the tooling does not add firmware shortcuts to the phone driver.
-
-The synthetic EEPROM provisions the three display profiles' ROM-authored reset
-fields at descriptor `0x0749`; firmware loads and copies them organically.
-Constructor-unassigned bytes remain erased because no configured factory record
-is available.
+- Raw ADC tuples and unmeasured serial/clock delays are declared inputs or
+  calibrations, not inferred electrical units.
+- Valid generated NV checksums do not establish factory provisioning.
+- Physical MIC/EAR routing evidence does not recover COBBA mux/gain controls
+  or establish native speech. NHM-6/NHM-2 routes and neutral-gain HLE duplex
+  have independent acceptance; they are not unknown topologies.
+- Headless LCD mirrors, delayed keys and diagnostic session outputs are harness
+  observations, not firmware state or alternative device interfaces.
+- Product-local native/mask compatibility and storage comparisons retain their
+  explicit qualification; no sibling success silently promotes them.
 
 ## Runtime-control ledger
 
@@ -254,61 +116,26 @@ configuration:
 The small firmware-address-specific set retained by focused radio, display,
 alarm, and watchdog gates lives in `driver/nokia_dct3_trace.inc`. A compliance
 test keeps this quarantine below 400 lines and rejects state-changing APIs.
-Hardware
-boundary traces remain beside their owning handlers. Closed task, service,
+Hardware boundary traces remain beside their owning handlers. Closed task, service,
 SIM-registration, and generic-display probes have been removed rather than
-preserved as an investigation journal.
+preserved as an investigation journal. The standalone overlay defaults to
+firmware probes disabled; the research build can enable them with
+`DCT3_RESEARCH_TRACES`. `make check-tracefree` protects the probe-free
+composition independently of the research build.
 
 ## Topology gaps
 
-- Most mechanically recovered ROM edges are not yet promoted to reviewed
-  semantic identities.
-- Dynamic generic-service descriptors are mapped far enough to exclude the
-  excluded registration paths, but the wider steady-state service
-  topology remains incomplete.
-- The DSP/external-service peer contract is proved only for requests exercised by
-  boot, authenticated registration, paging, answered MT call control and speech,
-  persistent ordinary MT SMS delivery and closed sequential multipart MT SMS
-  transport. Ordinary text additionally has complete NSE-8 notification,
-  preserved inbox, physical read/delete, save-state, malformed/duplicate,
-  organic capacity and selective two-message gates. NHM-5 and NHM-2
-  independently pass durable cold-boot read/delete. NHM-6 additionally
-  retains its physically entered RTC/date across the cold process and
-  completes phone-code entry plus acknowledgement through physical input:
-  `verify-3330-radio-sms-inbox` proves ordinary Inbox text, SIM read status
-  and physical erase. Fresh provisioning still uses the time/date editors;
-  the cold fixture does not replay their digits into the settled UI. Idle cell
-  loss/reselection now has four-product same-/different-
-  LAC, paging, negative and save-state gates. The bounded long-ringtone gate
-  proves both parts through independent paging, SAPI-3, CP/RP acknowledgement
-  and RR release transactions on all four promoted products, with replay at
-  transaction and queue boundaries. NSE-8 now additionally proves RAM-owned
-  concatenation across RR release, port dispatch, named ringtone receipt,
-  RTPL Play acceptance and physical PUP playback; NHM-2 and NHM-5 independently
-  corroborate receipt and playback. Negative compositions preserve its observed
-  out-of-order, missing-terminator and duplicate-sequence acceptance quirks
-  rather than imposing host-side normalization. NSE-8 additionally proves
-  promptless physical Save into its product-local 24C128 slot, ordinary
-  Menu-9-2 listing/playback after a preserved-NVRAM cold boot, and terminal
-  Discard with the slot erased. NHM-2 independently proves its distinct
-  three-slot/Replace flow, PMM-backed flash ownership, preserved cold-boot
-  listing and payload-correlated PUP replay. NHM-5 independently proves its
-  localized chooser, PMM-backed flash ownership, cold-boot listing and
-  sustained DSP output; fixed-frequency DSP HLE prevents promotion of its
-  playback to pitch-correlated. NHM-6 independently proves physical Save into
-  product-local PMM flash, preserved cold-boot listing and payload-correlated
-  PUP replay. Fresh virgin-PMM provisioning completes security/time editors
-  physically. Preserved cold runs retain RTC/date and complete phone-code
-  entry plus acknowledgement before Menu; the same cold-start contract is
-  shared with the ordinary inbox fixture. SIM and EEPROM remain identical
-  to the no-save reference throughout PMM-backed ringtone storage.
-  Dedicated-mode handover is independently gated on NSE-8, NHM-5, NHM-6 and
-  NHM-2 for success, rollback and mid-procedure save/load. NHM-2 additionally
-  proves physical Answer/End and sustained media across successful retuning.
-- The exact internal cold-boot UI selector remains unnamed, but its behavior is
-  no longer a topology gap: provisioned boot reaches an interactive idle screen
-  and opens the menu organically. Accepted-security, periodic-timer, conditional
-  reinitialization and shutdown paths remain separately classified.
+- Mechanically recovered ROM edges are not automatically reviewed semantic
+  identities. Quantify the covered producer classes before asserting absence.
+- Dynamic generic-service descriptors and wider steady-state topology remain
+  partially decoded; retained negative results are scoped to the searched
+  descriptors and named runtime inputs.
+- Peer behavior is admitted only for exercised requests and independently
+  qualified products. Feature coverage belongs in the model matrix, not an
+  expanding second list here.
+- The exact internal cold-boot UI selector remains unnamed, but organic idle
+  and menu input close the behavioral question. It is not a missing hardware
+  handoff. The MMI contract owns conditional reinitialization and shutdown.
 
 ## Completion gate
 
