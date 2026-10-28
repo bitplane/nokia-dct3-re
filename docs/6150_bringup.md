@@ -593,7 +593,7 @@ wrong.
 This reaches the same unclocked frame-delivery boundary already mapped for
 the5110, but with a different control word: do not import its16-bit `c0c8`
 wire fixture unchanged. Reuse the [existing clocked native-tone work](
-cobba_control_boundary.md#externally-clocked-native-dtmf) as a laboratory
+rom4_audio_transport.md#externally-clocked-native-dtmf) as a laboratory
 comparison, preserving the explicit clock assumptions and product-owned
 word format. Neither serial release nor successful control publication is
 proof that microphone/earpiece samples were transferred.

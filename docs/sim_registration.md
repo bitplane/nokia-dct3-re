@@ -16,11 +16,14 @@ coherent boot; **I** isolation experiment only, not an implementation contract.
 
 | owner | task | role |
 |---|---:|---|
-| SIM hardware manager | 21 (`0x15`) | reset, ATR/PPS, T=0 exchange, status; loop at `0x27eae0` |
-| SIM/configuration client | 20 (`0x14`) | parses replies, controls extended EF reads, owns ENABLE |
-| registration coordinator | 17 (`0x11`) | preliminary phase and `0x1583/0x1584` lifecycle |
-| generic result parser | 15 (`0x0f`) | converts lower object results into registration events |
+| SIM transaction manager | 21 (`0x15`) | reset, ATR/PPS, T=0 exchange, status; loop at `0x27eae0` |
+| SIM application/session router | 20 (`0x14`) | parses replies, controls extended EF reads, owns ENABLE |
+| registration-management task | 17 (`0x11`) | preliminary phase and `0x1583/0x1584` lifecycle |
+| mobility-management task | 15 (`0x0f`) | converts lower object results into registration events |
 | task-5 callback engine | 5 | owns radio/resource callback selection and packed events |
+
+Aliases follow [the RTOS task catalogue](rtos_tasks.md); the roles here describe
+only this mapped path, not a recovered Nokia server name.
 
 The physical SIM owns bytes and timing at the MAD2 SIM interface. Radio sessions, callback
 construction, task events, commit state, and configuration flags are phone/baseband state and

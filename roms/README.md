@@ -198,7 +198,7 @@ The optional `--encoder-homing-fixture` generates locally pinned
 The installation-verified reference encoder runs twice from fresh process
 state; steady EHF and repeated post-reset speech must reproduce. Files remain
 private research inputs. See
-`docs/cobba_control_boundary.md#native-efr-encoder-homing`.
+[native EFR encoder homing](../docs/native_efr_codec.md#native-efr-encoder-homing).
 
 The optional `--homing-fixture` derives a canonical DHF from the unmodified
 reference encoder's second EHF input frame. It generates a locally pinned
@@ -206,7 +206,7 @@ reference encoder's second EHF input frame. It generates a locally pinned
 two fresh interface/decoder sequences must agree. `homing.dec` and
 `homing.out` remain private research fixtures. The native acceptance and
 caller convention are documented in
-`docs/cobba_control_boundary.md#native-efr-decoder-homing`.
+[native EFR decoder homing](../docs/native_efr_codec.md#native-efr-decoder-homing).
 
 The optional `--erasure-fixture` generates fixed active-speech BFI bursts
 of 1, 3, 8 and 16 frames from the verified installation decoder input.
@@ -214,7 +214,7 @@ Payload and TAF are unchanged; two fresh decoder processes must reproduce
 the locally pinned `erasure.dec` and `erasure.out`. These generated files
 remain private research fixtures, not distributable MAME ROMs or published
 conformance vectors. Native recovery currently fails at frame 9; see
-`docs/cobba_control_boundary.md#native-efr-active-speech-erasures`.
+[native EFR active-speech erasures](../docs/native_efr_codec.md#native-efr-active-speech-erasures).
 
 The ETSI EFR ANSI-C reference and installation vectors are separate research
 inputs, not MAME runtime code or handset ROMs. The locally acquired mirrored
@@ -241,7 +241,7 @@ including nonzero comfort-noise output.
 These are generated research vectors, not published conformance files or
 handset ROMs. `--fixture-dir` exports them only into ignored private fixture
 storage; the native acceptance scope is documented in
-`docs/cobba_control_boundary.md#native-efr-dtx-conversation`.
+[native EFR DTX conversation](../docs/native_efr_codec.md#native-efr-dtx-conversation).
 
 ### Original ISO MPEG-2 AAC research input
 

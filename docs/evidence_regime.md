@@ -21,7 +21,8 @@ validation before static extraction.
 
 Runtime observations are scoped by manifests under `tools/run_manifests/`:
 
-- `default`: explicit missing-hardware CONTACT SERVICE negative oracle;
+- `default`: explicit missing-hardware structural negative (the manifest's
+  historical CONTACT SERVICE label does not require that LCD frame);
 - `deep-gsm`: coherent generic-service/GSM frontier trace;
 - `external-service`: class-`0x40` constructor/send/receive traces; and
 - `3330-smoke`: bounded second-ROM portability run.

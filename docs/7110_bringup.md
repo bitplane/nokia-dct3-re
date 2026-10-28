@@ -769,7 +769,7 @@ with exact initial sequence and firmware-producer evidence. A passive
 60-second run proves return and frame-period restoration at 36.156 seconds,
 followed by ordinary FIR queue production and consumption. The gate still
 rejects parallel burst activity, pending INT0 and changed interrupt masks.
-See [the native lifecycle contract](djr_dsp_integration.md#native-speech-activation-and-pcm-buffers).
+See [the native lifecycle contract](native_speech_activation.md#native-speech-activation-and-pcm-buffers).
 These are emulated-boundary observations, not RF electrical validation,
 network registration or handset speech evidence.
 

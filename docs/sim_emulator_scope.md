@@ -144,7 +144,7 @@ routing, not firmware reassembly, ringtone persistence or UI behavior. The
 contract is owned by the GSM fixture, not by a special SIM file or card-side
 decoder.
 
-## Remaining card work
+## Card capability boundary
 
 The card filesystem covers boot, mutable linear-record paths and the generic
 GSM 11.11 call-meter operation. `EF_ACM (6F39)` is a one-record, three-byte
@@ -172,8 +172,10 @@ The command-specific contracts and acceptance gates live in
 establish native DSP speech. All commands remain card-originated APDU/TLV
 transactions with firmware-owned UI and messaging.
 
-Extend it when an organic firmware request or focused protocol conformance test
-establishes a concrete requirement. Later work includes:
+### Remaining requirements
+
+Extend the card only when an organic request or focused protocol conformance
+test establishes a concrete requirement:
 
 - validity policies beyond the implemented CHV2-controlled ADN and
   ADM-denied FDN paths; organic REFRESH does not invalidate EFs;
@@ -236,7 +238,9 @@ Implementation status and remaining acceptance:
    the card's identity-session handshake, not a handset-state fixture.
 3. NSM-1 physical FDN save/cold-read, rejected PIN2 write and rejected
    activation with cold correct-PIN2 recovery are accepted with complete-card
-   and exact-frame checks. Other handset coverage remains open.
+   and exact-frame checks. Independently qualified sibling coverage lives in
+   each product contract linked by `model_coverage.md`; it is not inherited
+   from NSM-1.
    Physical in-place12345->12346 edit
    and independent cold read also pass, changing only the final BCD digit.
    Physical

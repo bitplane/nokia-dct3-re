@@ -15,6 +15,12 @@ their older executable hashes are not competing default-suite baselines.
 Passing CPU tests does not establish physical pipeline timing, a fitted
 handset DSP mask, RF acquisition or end-to-end speech.
 
+Supporting application maps are separate: [ROM4 execution](rom4_dsp_execution.md),
+[original-code arithmetic](c54x_arithmetic_observations.md) and
+[MU4 CPU composition](c54x_mu4_observations.md). They retain bounded operand,
+bus and negative-control observations without creating another default-suite
+baseline.
+
 The external observation-only ROM4 opcode inventory contains 628 distinct
 words in 112 high-byte groups after 30 million MCU instructions; sorted-set
 SHA-256 is `63ae45c872ccea39112898bfde7f5926acd675701675a860d765a66a35815d34`.
@@ -348,7 +354,7 @@ boot, all four keypad-tone settings, 5110 save/load, RF/processing and the
 3210 baseline/frontier regressions pass without rebanking their oracles.
 This closes the short-MOD=3 source-guard question for these named copy
 families, not the whole ISA or their positive timing/composition domains. The
-[pinned TI assembler control](rom4_dsp_loader.md#standalone-vendor-assembler-operand-control)
+[pinned TI assembler control](rom4_dsp_capture.md#standalone-vendor-assembler-operand-control)
 now warns on all four short-preincrement RMW forms just as on the forbidden
 LD source, while preserving ordinary stores and long-offset reads. This
 supports the atomic admission guard for ANDM/ORM/XORM/ADDM before operand
@@ -630,7 +636,7 @@ loop completes repeatedly. Correcting the DMA frame shadow removes the
 out-of-buffer source walk and its misleading nonzero output. The current
 boundary is why processing reaches its programmed reload tail with silent buffers and whether PCM
 has the expected media provenance, not an
-unsupported opcode. [Playback observations](5510_bringup.md#playback-execution-and-codec-observations)
+unsupported opcode. [Playback observations](mu4_playback.md#playback-execution-and-codec-observations)
 also cover a fresh recording made with corrected DMA and MAC support:
 it reaches `02:b5e1` without an illegal instruction but remains silent.
 Thus the older recording is not the sole explanation for the zero output.
@@ -1692,7 +1698,7 @@ frames and Access-time redirection preserve the caller's Decode-owned loop
 state and rebuild discarded endpoint predictions; no separate call/loop state
 or save fields are introduced. Code outside the low 16-bit interval does not
 acquire its body tags, but a foreign page's matching low PC can consume the
-loop. See the shared [repeat-endpoint contract](rom4_dsp_loader.md#repeat-endpoint-and-page-hazard).
+loop. See the shared [repeat-endpoint contract](rom4_dsp_execution.md#repeat-endpoint-and-page-hazard).
 
 `rptb-fcall` passes 768 cases/restores across counts 0/1/2/7, early/near-end
 placement, two caller pages, same/cross-page callees, one/two nested far-call

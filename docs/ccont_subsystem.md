@@ -262,7 +262,7 @@ different contracts. None can substitute for another:
 NAM-2's System Module DF9 is retained under
 `roms/research/nam2-service-manual/2100/03-nam2-syst.pdf`; see the source
 identities in `2100_bringup.md`. The NPM-5 schematic/reference calculation is
-in `5510_bringup.md#analog-evidence-and-startup-rejection`. These documents
+in [the MU4 acquisition map](mu4_hardware.md#analog-evidence-and-startup-rejection). These documents
 do not supply a universal physical calibration for every CCONT revision.
 No new nominal tuple should be promoted by searching values until a boot
 passes. For NAM-2, first identify the fitted ADC transfer and distinguish

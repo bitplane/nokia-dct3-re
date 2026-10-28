@@ -5,7 +5,9 @@ atlas maps the actual MMIO boundary — what the firmware touches, what is
 **emulated / partial / stubbed**, and where in the boot it's reached — so the *next* mystery hang
 becomes "look up which stub the firmware is poking" instead of a fresh labyrinth.
 
-Current fidelity claims are maintained in `mad2_fidelity.md`.
+MAD2 register fidelity is maintained in `mad2_fidelity.md`; other device
+contracts are indexed in `README.md`. Product acceptance belongs to
+`model_coverage.md`, not this physical/MMIO atlas.
 
 ## Physical board anchor
 
@@ -125,9 +127,10 @@ from the family name. The MCU
 runs the application/UI/control firmware; the DSP owns GSM Layer 1 and audio.
 `nokia_dspif_device` models firmware-visible shared memory, DSPIF and packet
 rings. It is deliberately transport-only so either the current compatibility
-HLE or a future TMS320C54x core can attach without changing the MCU-visible
-device. Separate DSP-HLE and external-service devices currently attach the
-semantic peers without executing DSP instructions. Companion devices are **CCONT** (power/ADC/RTC/charger), the
+HLE or the existing native TMS320C54x backend can attach without changing the
+MCU-visible device. The 3210 uses HLE; the 5110 independently qualifies native
+boot/menu execution, not native RF or speech. The external-service peer has
+its own transport and is not evidence of DSP ownership. Companion devices are **CCONT** (power/ADC/RTC/charger), the
 **PCD8544 LCD** (SED1565 with a 96-by-65 panel on the 7110),
 **24C128 EEPROM** (I2C on the 3210), and the SIM card behind MAD2 SIMI.
 

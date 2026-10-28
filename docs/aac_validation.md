@@ -268,7 +268,7 @@ replacing `TEST.REL` with this MP4 or a remuxed ADTS stream would not be an
 independent decoder test. Recover the original REL preprocessing and library
 configuration, or construct a separately identified decoder-ABI bench; do not
 cancel the transformation by pre-adjusting the payload. See the
-[native media boundary](5510_bringup.md#generated-aac-external-media-control).
+[native media boundary](mu4_recording.md#generated-aac-external-media-control).
 
 The AA99 wrapper at `023d73..023d9f` has a source-pinned 45-word framing
 branch. It initializes `b332` from the input receiver and clears cursor
@@ -1782,7 +1782,7 @@ recovered normal recording-finalization builder. The immediate peer of the
 music DSP is the separate MSP430, whose program and normal-operation
 transcript are absent. The MA4 service envelope is not the standalone DSP
 command envelope. See the source-pinned sender census and explicit scan
-exclusions in [5510 firmware consumers](5510_bringup.md#mu4-specific-receive-contract).
+exclusions in [5510 firmware consumers](mu4_hardware.md#mu4-specific-receive-contract).
 Resume the caller-policy branch on that missing evidence; keep independent
 codec/CPU validation separate instead of inventing a drain command.
 

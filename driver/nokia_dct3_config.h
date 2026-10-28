@@ -681,7 +681,8 @@ inline constexpr nokia_product_config make_3410_config()
 	// Nokia's combined NHM-2/5/6 repair material identifies COBBA-GJP N100.
 	// Its codec SIO derives 1 MHz PCMDClk from 13 MHz / 13 and 8 kHz PCMSClk
 	// by /125, with a one-clock sync and sign-extended 13-in-16 serial word.
-	// The fitted NHM-2 analogue microphone and receiver routes remain unknown.
+	// Fitted microphone/receiver connectivity is documented below; gain and
+	// firmware-controlled analogue mux semantics remain unverified.
 	result.cobba_pcm.data_clock = 1'000'000;
 	result.cobba_pcm.frame_clock = 8'000;
 	result.cobba_pcm.sample_bits = 13;

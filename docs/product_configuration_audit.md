@@ -1,9 +1,9 @@
-# Product configuration debt audit
+# Product configuration contracts
 
-This audit follows the radio, DSP service-control and DSP bootstrap contract
-refactors. Its purpose is to identify invalid product-config combinations and
-handset-family branching without turning independent evidence into a single
-guessed profile.
+These contracts prevent invalid product combinations and handset-family
+branching without turning independent evidence into one guessed profile.
+Product acceptance belongs to `model_coverage.md`; this document owns the
+configuration invariants, not the sequence of refactors that established them.
 
 ## Findings
 
@@ -38,9 +38,9 @@ override that replaces a complete bootstrap contract.
 Every retained firmware-address diagnostic in `nokia_dct3_trace.inc` has a
 named focused consumer. The quarantine remains observational, bounded by its
 structural test, and contains no firmware result writes or injected messages.
-There is therefore no dead trace family to retire in this pass.
+Retirement is decided by a named active consumer, not the age of a trace.
 
-## Completed bounded refactor
+## Speech-control contract
 
 DSP speech-control policy now forms one typed contract containing:
 
@@ -54,7 +54,7 @@ its evidenced command decoder with no speech predicate, so decoding cannot
 silently enable media. PCM, radio, service-control and analogue routing remain
 separate hardware and protocol boundaries.
 
-## Completed display-geometry refactor
+## Display geometry
 
 Display controller and viewport dimensions now form one typed geometry
 contract. The LCD controller and MAME screen consume the same contract, and
@@ -68,14 +68,14 @@ storage contract and a 96-by-65 panel window starting at column 18. That
 configuration does not promote its blocked native-DSP boot to graphical
 phone acceptance. Product boot status belongs to `model_coverage.md`.
 
-## Completed MAD2 DSP-reset wiring refactor
+## MAD2 DSP-reset wiring
 
 MAD2 DSP running-status readback and its release mask now form one typed wiring
 contract. The default contract preserves ordinary latch behavior; the 3410
 selects its evidenced `0x53`/`0x04` pair atomically, and half-configured pairs
 are rejected.
 
-## Completed KBGPIO board-wiring refactor
+## KBGPIO board wiring
 
 KBGPIO row topology and the power-on column mask now form one device-owned
 wiring contract. Each evidenced product selects a separately named complete
@@ -83,7 +83,7 @@ contract, even where NHM-5 and NHM-6 currently share values. Invalid row counts,
 multi-column power masks and masks outside the five physical columns are
 rejected by the device.
 
-## Acceptance status discovered by the audit
+## Service dependency and negative composition
 
 The audit's two divergences were caused by one omitted typed DSP contract.
 Both NHM-6 and NHM-2 organically send type `0x70` payload `0d00`; leaving their
@@ -101,7 +101,7 @@ service at that boundary. The 3330 then organically returns to CONTACT SERVICE
 without FIQ0, while the 3410 remains at its deterministic non-idle frontier
 without FIQ0; neither negative result is a promoted oracle.
 
-## Completed registration/paging cleanup
+## Registration and paging ownership
 
 The NHM-6 registration and paging passes introduced no product dispatch in the
 network, session or LAPDm devices. Their post-acquisition behavior remains the
@@ -141,7 +141,7 @@ NHM-2 paging adds no product field at all: page construction, DRX group
 selection, monitored/transmitted scheduling, session state and LAPDm release
 are the same generic components already exercised by NHM-5 and NHM-6.
 
-## Multi-cell mobility cleanup
+## Multi-cell mobility ownership
 
 Idle reselection adds no handset-model outcome selector.  The network's typed
 cell table owns ARFCN/band, BSIC, PLMN/LAC/identity, SI content, restrictions
@@ -164,47 +164,7 @@ in `network_scouting.md`. Dedicated-mode handover is validated independently on
 NSE-8, NHM-5, NHM-6 and NHM-2; their Nokia channel-confirmation values remain explicit product
 contracts rather than a cross-product default.
 
-## Post-NHM-2 regression reference
-
-The following established regression surface was recorded at commit
-`6b30852` (`speech control`). It is not the current model frontier or an
-exhaustive acceptance inventory; `gates.json` owns the live recipes and
-`model_coverage.md` owns demonstrated product scope:
-
-- `make verify-radio-incoming-call-lifecycle`;
-- `make verify-3310-radio-incoming-call-lifecycle`;
-- `make verify-3330-radio-media-resilience`;
-- `make verify-3410-radio-registration-preserved
-  verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells`;
-- `make verify-3410-radio-paging-preserved verify-3410-radio-paging-state
-  verify-3410-radio-paging-negatives`; and
-- `make verify-3410-radio-incoming-call-lifecycle`;
-- `make verify-radio-outgoing-call-lifecycle
-  verify-radio-outgoing-call-state`;
-- `make verify-radio-outgoing-call-busy
-  verify-radio-outgoing-call-no-answer
-  verify-radio-outgoing-call-no-answer-state
-  verify-radio-outgoing-call-service-reject
-  verify-radio-outgoing-call-delayed-decision-state`;
-- `make verify-radio-outgoing-call-host-adapter`;
-- `make verify-radio-outgoing-call-host-termination
-  verify-radio-outgoing-call-host-alerting-termination
-  verify-radio-outgoing-call-host-media
-  verify-radio-outgoing-call-host-physical-media`;
-- `make verify-radio-outgoing-call-host-reconnect
-  verify-radio-outgoing-call-host-alerting-reconnect
-  verify-radio-outgoing-call-host-media-restore
-  verify-radio-outgoing-call-host-release-restore`;
-- `make verify-radio-outgoing-call-host-hostile
-  verify-radio-outgoing-call-host-local-end
-  verify-radio-outgoing-call-host-two-calls`;
-- `make verify-3310-radio-outgoing-call-lifecycle`;
-- `make verify-3330-radio-outgoing-call-lifecycle`; and
-- `make verify-3410-radio-outgoing-call-lifecycle`;
-- `make verify-3310-radio-outgoing-call-host-termination
-  verify-3330-radio-outgoing-call-host-termination`; and
-- `make verify-3410-radio-outgoing-call-host-termination
-  verify-3410-radio-outgoing-call-host-media`.
+## Bootstrap and physical-bus qualification
 
 Shared Make variables and standards-level trace vocabulary do not replace
 product acceptance. Packet grammar, correlation values, ordering and release

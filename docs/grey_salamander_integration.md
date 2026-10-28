@@ -110,56 +110,13 @@ the upstream repository a build dependency:
 | `SmartMessageSms.cs` and tests | GS-12 port-addressed and multipart payload scenarios |
 | `PORTING.md`, `PROTOCOL-COVERAGE.md` and `SPEC-SOURCES.md` | host-boundary assumptions, stated coverage limits and specification routing |
 
-## Implementation sequence
+## Admission rule
 
-### Phase A: finish the registration link
-
-1. GS-00--02: decoded link extraction and both acknowledgement-gated
-   registration downlinks are landed.
-2. Preserve the exact registration and post-release BCCH gates.
-3. Keep DISC/UA and other GS-17 mechanics as references until observed.
-4. GS-16 is landed: mutable Layer-3 registration state is separate from link
-   sequencing and immutable cell data.
-5. Add MM Information/NITZ only as a separate GS-03 change.
-
-This phase proves that the extracted link is a real bidirectional protocol
-owner rather than only a downlink frame builder.
-
-### Phase B: create a network-originated entrance
-
-1. Idle PCH channel scheduling is landed without changing BCCH acquisition.
-2. No-identity PCH fill and steady camp are part of the registration gate.
-3. A named fixture queues exactly one incoming IMSI page.
-4. The existing correlated Immediate Assignment path preserves its RACH
-   octet and request frame.
-5. The organic Paging Response reaches LAPDm and the Layer-3 session, then a
-   bounded release returns the phone to PCH fill.
-
-This phase supplies the prerequisite entrance for incoming calls and SMS. Nokia
-L1 scheduling remains in
-`nokia_radio_peer_device`; Grey Salamander deliberately starts above the Nokia
-DSP/L1 boundary and cannot supply that mapping.
-
-### Phase C: Layer-3 services
-
-1. A5/0 remains the default composition. Separately named A5/1 gates require
-   organic authentication, DSP type `0x14`, Cipher Mode Complete and ciphered
-   xCCH/TCH bursts through the generic Layer-1 boundary.
-2. Mobile-originated call signalling is landed from physical dialling through
-   host-decided setup, traffic assignment, audio and clearing.
-3. Mobile-terminated call signalling is landed through organic TCH/F
-   Assignment Complete and bounded clearing. Physical answering, GSM-FR media,
-   local/remote release and restore are independently gated.
-4. SIM SMS files and bidirectional ordinary SMS are landed through physical
-   UI, CP/RP/RR, persistent storage, failures, save/load and the host boundary.
-5. The bounded long-ringtone codec and queue are landed after the ordinary
-   persisted-delivery oracle. Both parts are proved through separate pages and
-   complete stop-and-wait SAPI-3/CP/RP/RR transactions. Do not infer firmware
-   reassembly or UI/persistence from transport completion.
-
-Each service gets a small protocol-state fixture and a full-ROM organic
-acceptance test. A UI result alone is not sufficient: traces must also prove
-the expected Nokia packet, LAPDm and Layer-3 boundaries.
+The catalogue above records external leads and their local admission, not a
+second implementation roadmap. Product promotion belongs to
+[model coverage](model_coverage.md). Every extension needs both a focused
+protocol-state fixture and an organic full-ROM test: UI pixels alone do not
+prove the Nokia packet, LAPDm and Layer-3 transitions.
 
 ## Knowledge to retain without adopting
 

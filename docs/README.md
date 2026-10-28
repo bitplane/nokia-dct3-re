@@ -2,6 +2,21 @@
 
 Documentation is organized by authority rather than investigation date.
 
+## Ownership
+
+| Information | Single home |
+| --- | --- |
+| Demonstrated handset capability and composition | `model_coverage.md`; detailed gates and qualifications in the linked product contract. |
+| Remaining hardware work | `driver_vision.md`; register-level meaning and physical unknowns in the owning subsystem contract. |
+| Device graph and native/HLE substitution | `upstream_architecture.md` and `driver_structure.md`. |
+| Acceptance inputs, predicates and oracles | `structural_regression.md`, named manifests and reviewed evidence. |
+| Evidence coverage, runtime-control classes and instrumentation limits | `normalization_status.md`. |
+| Address-level supporting observations | The focused maps below; their bounded captures do not override current acceptance. |
+
+Overview documents link to these owners instead of maintaining additional
+feature lists. Generated censuses own their counts and must be regenerated,
+not hand-edited to match a narrative.
+
 When documents overlap, use this precedence:
 
 1. reviewed `evidence/*.json` and named runtime manifests state accepted or
@@ -29,7 +44,7 @@ distinction.
 | `driver_structure.md` | Code ownership and quarantine rules. |
 | `driver_vision.md` | Current modularization path and configuration taxonomy. |
 | `upstream_architecture.md` | Target MAME device graph, DSP substitution seam, ROM policy, and upstream staging. |
-| `product_configuration_audit.md` | Post-refactor product-contract dependency audit and next bounded refactor. |
+| `product_configuration_audit.md` | Product-contract invariants, independent evidence identities and configuration dependency limits. |
 | `external_call_bridge.md` | Versioned host telephony API for network state, calls, GSM-FR media, SMS and USSD. |
 | `subscriber_profile.md` | Shared immutable SIM/network identity and authentication contract. |
 | `gsm_fr_codec.md` | Generic GSM-FR utility, bundled dependency, predictor snapshots and voice regression gates. |
@@ -106,6 +121,28 @@ distinction.
 | `gsm_a5_ciphering.md` | Standards-owned A5 keystream boundary, `COUNT` derivation and ciphering lifecycle. |
 | `gsm_tch_f_l1_completion.md` | Audit of the generic GSM full-rate traffic-channel Layer 1 milestone against evidence. |
 | `ordinary_sms.md` | Authoritative boundary for ordinary `SMS-DELIVER` and `SMS-SUBMIT`. |
+
+## Native DSP and music-DSP reference maps
+
+These maps retain source identities, addresses, negative controls and bounded
+observations. They support the contracts above; an old capture is not a new
+acceptance baseline and an isolated codec is not a working handset.
+
+| Document | Owned detail |
+| --- | --- |
+| `rom4_dsp_execution.md` | Loader execution, staged/atomic comparison, instruction reachability and timing observations. |
+| `rom4_native_observations.md` | Native bootstrap, compatibility-assist negatives and unassisted capture controls. |
+| `rom4_dsp_capture.md` | RF/XF acquisition and vendor-tool reference methods and limits. |
+| `c54x_arithmetic_observations.md` | Independent arithmetic and original-code operand/result controls. |
+| `c54x_mu4_observations.md` | MU4 CPU composition, bus and atomic negative-control maps. |
+| `rom4_rf_control.md` | Synthesizer, tuning and receive-window maps. |
+| `rom4_audio_transport.md` | Data/I/O distinction, BSP, DTMF and physical clock observations. |
+| `native_speech_activation.md` | Handset activation and native PCM-buffer observations, separate from isolated codecs. |
+| `native_efr_codec.md` | Isolated EFR encoder/decoder, DTX, erasure, recovery and homing contracts. |
+| `mu4_hardware.md` | Music-DSP storage, clocks, DMA, serial and MCU consumer contracts. |
+| `mu4_recording.md` | Original recording, metadata and cold-catalogue maps. |
+| `mu4_playback.md` | Original playback, serial provenance, refill and pending-tail maps. |
+| `mad2_acquisition.md` | Retained MADos and physical acquisition references, not admitted peripheral semantics. |
 
 ## Address-level reverse-engineering references
 

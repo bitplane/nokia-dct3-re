@@ -56,7 +56,7 @@ validated instruction site or peripheral contract. The before/after inventories
 are `tmp/c54x-port-census-{before,after}.txt`.
 
 The recovered legacy IDA database also has no names or comments for this
-serial-control region; see the [archive annotation contract](djr_dsp_integration.md#recovered-ida-annotations).
+serial-control region; see the [archive annotation contract](rom4_dsp_loader.md#recovered-ida-annotations).
 Its codec-function labels are independent research leads, not a peripheral
 register specification.
 
