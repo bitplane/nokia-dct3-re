@@ -12,7 +12,8 @@ DSP HLE is a compatibility backend, not the permanent owner of DSP silicon.
 
 | Subsystem | Current shape | Next architectural step |
 | --- | --- | --- |
-| ARM7, flash and RAM | MAME CPU/flash devices plus product-owned maps. An explicit reset-vector HLE represents the undumped MAD2 mask ROM's branch to flash without forcing CPU state; reset and flash behavior are exercised across four products. | Obtain and identify real mask ROMs or recover their assumed exit state; validate further address-decode and retention behavior when another product diverges. |
+| ARM7 and RAM | MAME CPU plus product-owned maps. An explicit reset-vector HLE represents the undumped MAD2 mask ROM's branch to flash without forcing CPU state. | Obtain and identify real mask ROMs or recover their assumed exit state; validate further address-decode and retention behavior when another product diverges. |
+| Flash storage | Native Intel/ST devices own array, command and persistence state. ST has independent protection, CFI, deferred word/page/OTP operations, permanent OTP locking and qualified VPP refusal. Generic, C3 and ST changes form separate patches. | Preserve device conformance and handset persistence gates. Further work needs a specific evidenced contract; authentic factory identity, analogue margins, cell-failure behavior and board supply wiring are not established by the software tests. See `flash_storage.md`. |
 | PCD8544-family display | MAME device with one validated product contract applying controller geometry and viewport configuration atomically | Add a separate controller only when a recovered command set falls outside this family. |
 | External EEPROM | Product-owned MAME I2C parts on mapped MAD2 PUP pins, with opt-in self-timed write-cycle behavior and mapped-pin page/persistence coverage; no parallel EEPROMSelX alias. Both 3210 ROMs have constructor/descriptor-derived fallback extraction. | Validate exact board timing, interrupted writes, legitimate factory provisioning and further product-owned constructor families. |
 | CCONT/GENSIO | Separate `nokia_ccont_device` and `nokia_gensio_device`; organic two-ROM phase/status/SELECT regression; deterministic binary RTC and enabled documented watchdog/WDDISX boundary. Physical short/long power-key gates distinguish retained frame-sampled RAM from CCONT's digital-baseband rail state and survive pre-key save/load. | Establish physical GENSIO/ADC latency, board-level ADC signals and SELECT peers. Do not assume a conversion-complete IRQ absent hardware evidence. |
@@ -65,16 +66,18 @@ variant and a firmware-state poke are not equivalent. The useful measures are:
 
 ## Remaining architecture work
 
-Known datasheet-backed flash gaps are still software work, not a hardware
-blocker. Unmapped physical timing, pin identity and fitted DSP/RF data are
-different dependencies and must not be conflated with them.
+The flash command/protection/CFI/OTP and qualified-supply work is implemented
+and independently tested. Do not reopen it as a generic unfinished software
+campaign: further changes need a newly evidenced contract. Unmapped physical
+timing, pin identity, factory data and fitted DSP/RF data are separate
+dependencies, not missing implementations that can be filled by guessing.
 
 1. Keep `nokia_dspif_device` transport-only and preserve the single swappable
    DSP-backend seam. Move no radio, service, bootstrap, or audio semantics down
    into the transport.
-2. Extend native ST electrical failure coverage independently of
-   Intel C3. The 3410 already uses native protection/status/deferred operations;
-   do not reintroduce fixed-address status behavior. See `flash_storage.md`.
+2. Review C54x execution/addressing/pipeline/peripheral cohesion before any
+   further source split. A file-size target is not a hardware boundary; retain
+   the frozen test inventory and independent execution oracles.
 3. Recover MAD2's remaining divider, transition, ninth-IRQ ownership, and rail
    contracts before extracting additional uncertain register windows.
 4. Replace calibrated HLE timing only with measured hardware behavior or
