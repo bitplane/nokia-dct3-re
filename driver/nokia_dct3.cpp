@@ -2109,6 +2109,22 @@ static INPUT_PORTS_START( noki3350 )
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_UNUSED )
 INPUT_PORTS_END
 
+void nokia_dct3_state::configure_native_dsp_attachments(nokia_dsp_c54x_device &backend)
+{
+	backend.set_transport_tag("^dspif");
+	backend.set_cobba_tag("^cobba");
+	backend.set_ccont_tag("^ccont");
+	backend.set_program_rom_tag("^dsp_program");
+	backend.set_data_rom_tag("^dsp_data");
+}
+
+void nokia_dct3_state::configure_staged_dsp_attachments(nokia_dsp_staged_device &backend)
+{
+	backend.set_transport_tag("^dspif");
+	backend.set_cobba_tag("^cobba");
+	backend.set_flash_tag("^flash");
+}
+
 void nokia_dct3_state::dct3_base(machine_config &config)
 {
 	/* basic machine hardware */
@@ -2138,6 +2154,7 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	INTEL_TE28F160(config, "flash");
 	NOKIA_MAD2(config, m_mad2);
 	NOKIA_MAD2_PCM(config, m_mad2_pcm);
+	m_mad2_pcm->set_cobba_tag("^cobba");
 	NOKIA_GSM_VOICE_PEER(config, "gsm_voice_peer");
 	m_mad2->set_timer0_hz(33'055);
 	m_mad2->set_timer1_hz(1'057);
@@ -2162,6 +2179,7 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	NOKIA_UIF(config, m_uif);
 	NOKIA_MBUS(config, m_mbus);
 	NOKIA_MBUS_TERMINAL(config, m_mbus_terminal);
+	m_mbus_terminal->set_mbus_tag("^mbus");
 	m_mbus->tx_cb().set(FUNC(nokia_dct3_state::mbus_tx_w));
 	m_mbus->fiq2_cb().set(FUNC(nokia_dct3_state::mbus_fiq2_w));
 	m_mbus->fiq3_cb().set(FUNC(nokia_dct3_state::mbus_fiq3_w));
@@ -2184,6 +2202,12 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	m_gensio->lcd_sclk_cb().set(m_lcd, FUNC(pcd8544_device::sclk_w));
 	NOKIA_DSPIF(config, m_dspif);
 	NOKIA_DSP_HLE(config, m_dsp_hle);
+	m_dsp_hle->set_transport_tag("^dspif");
+	m_dsp_hle->set_cobba_tag("^cobba");
+	m_dsp_hle->set_staged_tag("^dsp_staged");
+	m_dsp_hle->set_external_peer_tag("^external_service_peer");
+	m_dsp_hle->set_radio_peer_tag("^radio_peer");
+	m_dsp_hle->set_pcm_tag("^mad2_pcm");
 	m_dsp_hle->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 	NOKIA_EXTERNAL_SERVICE_PEER(config, m_external_service_peer);
 	NOKIA_GSM_NETWORK(config, m_gsm_network);
@@ -2370,6 +2394,7 @@ void nokia_dct3_state::noki5110(machine_config &config)
 	// NSE-1 System Module 03/98, p. 3-33: the DSP multiplies the 13 MHz
 	// system reference to 52 MHz; native co-simulation independently agrees.
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	configure_native_dsp_attachments(*m_dsp_c54x);
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
 

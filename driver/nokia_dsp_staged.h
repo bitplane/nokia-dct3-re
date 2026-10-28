@@ -29,6 +29,10 @@ public:
 	void set_observe_after_missing_code(bool enable) { m_observe_after_missing_code = enable; }
 	void set_runtime_hle_after_loader(bool enable) { m_runtime_hle = enable; }
 
+	void set_transport_tag(char const *tag) { m_transport.set_tag(tag); }
+	void set_cobba_tag(char const *tag) { m_cobba.set_tag(tag); }
+	void set_flash_tag(char const *tag) { m_flash.set_tag(tag); }
+
 protected:
 	virtual void device_add_mconfig(machine_config &config) override;
 	virtual void device_start() override;

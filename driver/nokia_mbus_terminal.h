@@ -17,6 +17,8 @@ public:
 	void set_enabled(bool enabled) { m_enabled = enabled; }
 	void receive_phone_byte(u8 data);
 
+	void set_mbus_tag(char const *tag) { m_mbus.set_tag(tag); }
+
 protected:
 	virtual void device_start() override;
 	virtual void device_reset() override;

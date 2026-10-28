@@ -8,7 +8,7 @@ DEFINE_DEVICE_TYPE(NOKIA_DSP_STAGED, nokia_dsp_staged_device, "nokia_dsp_staged"
 
 nokia_dsp_staged_device::nokia_dsp_staged_device(const machine_config &config, const char *tag, device_t *owner, u32 clock) :
 	device_t(config, NOKIA_DSP_STAGED, tag, owner, clock),
-	m_cpu(*this, "cpu"), m_transport(*this, "^dspif"), m_cobba(*this, "^cobba"), m_flash(*this, "^flash")
+	m_cpu(*this, "cpu"), m_transport(*this, finder_base::DUMMY_TAG), m_cobba(*this, finder_base::DUMMY_TAG), m_flash(*this, finder_base::DUMMY_TAG)
 {
 }
 

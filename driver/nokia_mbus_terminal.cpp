@@ -26,7 +26,7 @@ constexpr u8 TERMINAL_NODE = 0x1d;
 nokia_mbus_terminal_device::nokia_mbus_terminal_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_MBUS_TERMINAL, tag, owner, clock),
-	m_mbus(*this, "^mbus")
+	m_mbus(*this, finder_base::DUMMY_TAG)
 {
 }
 

@@ -15,12 +15,12 @@ nokia_dsp_hle_device::nokia_dsp_hle_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_DSP_HLE, tag, owner, clock),
 	nokia_dsp_backend_interface(mconfig, *this),
-	m_transport(*this, "^dspif"),
-	m_cobba(*this, "^cobba"),
-	m_staged(*this, "^dsp_staged"),
-	m_external_peer(*this, "^external_service_peer"),
-	m_radio_peer(*this, "^radio_peer"),
-	m_mad2_pcm(*this, "^mad2_pcm"),
+	m_transport(*this, finder_base::DUMMY_TAG),
+	m_cobba(*this, finder_base::DUMMY_TAG),
+	m_staged(*this, finder_base::DUMMY_TAG),
+	m_external_peer(*this, finder_base::DUMMY_TAG),
+	m_radio_peer(*this, finder_base::DUMMY_TAG),
+	m_mad2_pcm(*this, finder_base::DUMMY_TAG),
 	m_mcu_control_word_cb(*this)
 {
 }

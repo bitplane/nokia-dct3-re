@@ -12,11 +12,11 @@ nokia_dsp_c54x_device::nokia_dsp_c54x_device(const machine_config &mconfig,
 	device_t(mconfig, NOKIA_DSP_C54X, tag, owner, clock),
 	nokia_dsp_backend_interface(mconfig, *this),
 	m_cpu(*this, "cpu"),
-	m_transport(*this, "^dspif"),
-	m_cobba(*this, "^cobba"),
-	m_ccont(*this, "^ccont"),
-	m_program_rom(*this, "^dsp_program"),
-	m_data_rom(*this, "^dsp_data")
+	m_transport(*this, finder_base::DUMMY_TAG),
+	m_cobba(*this, finder_base::DUMMY_TAG),
+	m_ccont(*this, finder_base::DUMMY_TAG),
+	m_program_rom(*this, finder_base::DUMMY_TAG),
+	m_data_rom(*this, finder_base::DUMMY_TAG)
 {
 }
 

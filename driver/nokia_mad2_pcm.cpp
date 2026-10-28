@@ -11,7 +11,7 @@ nokia_mad2_pcm_device::nokia_mad2_pcm_device(
 		const machine_config &mconfig, const char *tag,
 		device_t *owner, u32 clock) :
 	device_t(mconfig, NOKIA_MAD2_PCM, tag, owner, clock),
-	m_cobba(*this, "^cobba")
+	m_cobba(*this, finder_base::DUMMY_TAG)
 {
 }
 

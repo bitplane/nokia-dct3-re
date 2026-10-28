@@ -159,6 +159,13 @@ public:
 	virtual void shared_100_write_w(int state) override;
 	virtual void mcu_shared_write(u16 byte_offset) override;
 
+	void set_transport_tag(char const *tag) { m_transport.set_tag(tag); }
+	void set_cobba_tag(char const *tag) { m_cobba.set_tag(tag); }
+	void set_staged_tag(char const *tag) { m_staged.set_tag(tag); }
+	void set_external_peer_tag(char const *tag) { m_external_peer.set_tag(tag); }
+	void set_radio_peer_tag(char const *tag) { m_radio_peer.set_tag(tag); }
+	void set_pcm_tag(char const *tag) { m_mad2_pcm.set_tag(tag); }
+
 protected:
 	virtual void device_start() override;
 	virtual void device_reset() override;

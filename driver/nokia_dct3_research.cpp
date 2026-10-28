@@ -169,6 +169,7 @@ void nokia_dct3_state::nhm9stage(machine_config &config)
 	// Own 247-word upload and MCU-supplied source-end argument. The staged
 	// execution rate is a research cadence, not a measured DSP clock contract.
 	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	configure_staged_dsp_attachments(staged);
 	staged.set_program_fragment(0x1f0c54);
 	staged.set_verifier_program_words(247);
 	staged.set_verifier_source_end(0x8000);
@@ -180,6 +181,7 @@ void nokia_dct3_state::nsm4stage(machine_config &config)
 	noki8855(config);
 	// NSM-4 selector 15 fragment and selector 27 verifier, not a sibling mask.
 	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	configure_staged_dsp_attachments(staged);
 	staged.set_program_fragment(0x2007fc);
 	staged.set_verifier_program_words(246);
 	staged.set_verifier_source_end(0x0000);
@@ -202,6 +204,7 @@ void nokia_dct3_state::nsb7stage(machine_config &config)
 	research.cobba_pcm.data_edge = nokia_mad2_pcm_device::clock_edge::falling;
 	apply_product_config(research);
 	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	configure_staged_dsp_attachments(staged);
 	staged.set_program_fragment(0x11dcac);
 	staged.set_loader2_source(0x11ddd8, 623);
 	staged.set_loader_control_address(0x0880);
@@ -256,6 +259,7 @@ void nokia_dct3_state::nsm2stage(machine_config &config)
 	// flash-contained code only, leaving absent mask instructions unknown.
 	m_mad2->set_dsp_reset_wiring_contract({ 0x10, 0x01 });
 	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	configure_staged_dsp_attachments(staged);
 	staged.set_program_fragment(0x11ad54);
 	staged.set_loader2_source(0x11ae80);
 	staged.set_loader_control_address(0x0880);
@@ -309,6 +313,7 @@ void nokia_dct3_state::nsm3dr6(machine_config &config)
 	// loaders. Execute those bytes only; the complete fitted mask is absent.
 	m_mad2->set_dsp_reset_wiring_contract({ 0x10, 0x01 });
 	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	configure_staged_dsp_attachments(staged);
 	staged.set_program_fragment(0x11770c);
 	staged.set_loader2_source(0x117838);
 	// Diagnostic-only composition: stop before missing native code, retain
@@ -349,6 +354,7 @@ void nokia_dct3_state::nsb6stage(machine_config &config)
 	};
 	apply_product_config(research);
 	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	configure_staged_dsp_attachments(staged);
 	staged.set_program_fragment(0x11508c);
 	staged.set_loader2_source(0x1151b8);
 	staged.set_loader_control_address(0x0880);
@@ -400,6 +406,7 @@ void nokia_dct3_state::nhm3stage(machine_config &config)
 	noki6250(config);
 	// Execute this product's flash-contained bytes, not a fitted DSP mask.
 	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	configure_staged_dsp_attachments(staged);
 	staged.set_program_fragment(0x1d390);
 	staged.set_loader2_source(0x1d4bc);
 	staged.set_verifier_source_end(0xd000);
@@ -469,6 +476,7 @@ void nokia_dct3_state::nsm3stage(machine_config &config)
 	// ROM6 fragment and selector 14 are acquired NSM-3 uploads. The
 	// alternative ROM5 catalogue is not selected by this composition.
 	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	configure_staged_dsp_attachments(staged);
 	staged.set_program_fragment(0x11ab14);
 	staged.set_loader2_source(0x11ac40, 623);
 	staged.set_loader_control_address(0x0880);
@@ -533,6 +541,7 @@ void nokia_dct3_state::nsb3r4t(machine_config &config)
 	// Keep own firmware, erased storage, ADC configuration and empty SIM tray.
 	config.device_remove("dsp_hle");
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	configure_native_dsp_attachments(*m_dsp_c54x);
 	// Own catalogue-4 payload at 2bd548 installs through program word 2b2a.
 	// The observed 811 writes above 27ff must not disappear into mask ROM.
 	m_dsp_c54x->set_overlay_end(0x3000);
@@ -546,6 +555,7 @@ void nokia_dct3_state::nse2r4t(machine_config &config)
 	// identity. Preserve own firmware, ADC inputs and erased external EEPROM.
 	config.device_remove("dsp_hle");
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	configure_native_dsp_attachments(*m_dsp_c54x);
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
 
@@ -562,6 +572,7 @@ void nokia_dct3_state::nse2r4v(machine_config &config)
 	apply_product_config(research);
 	config.device_remove("dsp_hle");
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	configure_native_dsp_attachments(*m_dsp_c54x);
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
 
@@ -580,6 +591,7 @@ void nokia_dct3_state::nsb1r4t(machine_config &config)
 	// but fitted NSB-1 mask identity and DSP cadence remain unproved.
 	config.device_remove("dsp_hle");
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	configure_native_dsp_attachments(*m_dsp_c54x);
 	// Own executable upload reaches 2b38, including its 29e1 hook.
 	m_dsp_c54x->set_overlay_end(0x3000);
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
@@ -595,6 +607,7 @@ void nokia_dct3_state::nsk3r4t(machine_config &config)
 	// 52-MHz clock are explicit compatibility inputs, not a fitted NSK-3 dump.
 	config.device_remove("dsp_hle");
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	configure_native_dsp_attachments(*m_dsp_c54x);
 	// Own boot4 loader uploads 811 words above 2800, through 2b2a.
 	m_dsp_c54x->set_overlay_end(0x3000);
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
@@ -630,6 +643,7 @@ void nokia_dct3_state::nsk1r4t(machine_config &config)
 	// Explicit NSE-1 resident mask/clock compatibility input. No NSK-1
 	// fitted-mask, physical-clock, keypad or SIM acceptance is implied.
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	configure_native_dsp_attachments(*m_dsp_c54x);
 	// Own loader writes executable words through 2b2a; its 26d0 hook
 	// branches to uploaded 29d3. The default 2800 extent drops this code.
 	m_dsp_c54x->set_overlay_end(0x3000);
@@ -663,6 +677,7 @@ void nokia_dct3_state::nsm1r4t(machine_config &config)
 	apply_product_config(research);
 	config.device_remove("dsp_hle");
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	configure_native_dsp_attachments(*m_dsp_c54x);
 	// Own loader writes executable words through 2a5c. Preserve the
 	// uploaded bank instead of exposing the resident image at 2800.
 	m_dsp_c54x->set_overlay_end(0x3000);
@@ -700,6 +715,7 @@ void nokia_dct3_state::nse6r4t(machine_config &config)
 	// Compatibility instrument only: the fitted NSE-6 DSP mask is unknown.
 	config.device_remove("dsp_hle");
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	configure_native_dsp_attachments(*m_dsp_c54x);
 	// Own NSE-6 upload writes executable words at 0x2946; the patched
 	// continuation enters that bank. The fitted mask identity remains unknown.
 	m_dsp_c54x->set_overlay_end(0x3000);
@@ -713,6 +729,7 @@ void nokia_dct3_state::nse5r4t(machine_config &config)
 	noki7110(config);
 	config.device_remove("dsp_hle");
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	configure_native_dsp_attachments(*m_dsp_c54x);
 	// Research geometry: NSE-5 uploads executable code above 0x2800.
 	// This tests the missing overlay bank, not the fitted mask identity.
 	m_dsp_c54x->set_overlay_end(0x3000);
@@ -739,6 +756,7 @@ void nokia_dct3_state::nmp5stage(machine_config &config)
 	research.dsp_reset_wiring = { 0x0d, 0x01 };
 	apply_product_config(research);
 	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	configure_staged_dsp_attachments(staged);
 	staged.set_program_fragment(0x1e924c);
 	staged.set_loader2_source(0x1e9378, 629);
 	staged.set_verifier_source_end(0xa800);
@@ -769,6 +787,7 @@ void nokia_dct3_state::npe3stage(machine_config &config)
 	// Own NPE-3 uploads: descriptor 224a44 contains 104 words;
 	// descriptor 224b70 contains 629 second-loader words, not NSM-3's 623.
 	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	configure_staged_dsp_attachments(staged);
 	staged.set_program_fragment(0x24a50);
 	staged.set_loader2_source(0x24b7c, 629);
 	staged.set_verifier_source_end(0xd000);

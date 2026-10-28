@@ -48,6 +48,14 @@ Device boundaries follow independently stateful hardware interfaces, not
 package count. MAD2 is one physical ASIC, but retaining its internal peripheral
 blocks as devices keeps their contracts independently testable and reusable.
 
+The native/staged/HLE DSP backends, MAD2 PCM and MBUS terminal expose attachment
+setters rather than assuming parent sibling names. Board configuration binds
+their transport, codec, power, peer and ROM dependencies. Their own internal
+CPU child remains local. The native BSP fixture deliberately renames all five
+external dependencies to exercise this boundary. Laboratory network-peer
+internal attachments retain their existing composition; this is not a mandate
+to replace every finder with a callback or build a generic dependency framework.
+
 ## DSP substitution seam
 
 `nokia_dspif_device` is the MCU-visible transport and is the fixed boundary for

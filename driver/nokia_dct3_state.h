@@ -98,6 +98,8 @@ public:
 	void noki3410(machine_config &config);
 	void noki2100(machine_config &config);
 	void nam2c3(machine_config &config);
+	void configure_native_dsp_attachments(nokia_dsp_c54x_device &backend);
+	void configure_staged_dsp_attachments(nokia_dsp_staged_device &backend);
 	void noki5110(machine_config &config);
 	void noki5110i(machine_config &config);
 	void nse2r4t(machine_config &config);

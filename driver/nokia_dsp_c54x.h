@@ -52,6 +52,12 @@ public:
 	virtual u32 tone_frequency2() const override { return 0; }
 	virtual u16 tone_amplitude() const override { return 0; }
 
+	void set_transport_tag(char const *tag) { m_transport.set_tag(tag); }
+	void set_cobba_tag(char const *tag) { m_cobba.set_tag(tag); }
+	void set_ccont_tag(char const *tag) { m_ccont.set_tag(tag); }
+	void set_program_rom_tag(char const *tag) { m_program_rom.set_tag(tag); }
+	void set_data_rom_tag(char const *tag) { m_data_rom.set_tag(tag); }
+
 protected:
 	virtual void device_add_mconfig(machine_config &config) override;
 	virtual void device_start() override;

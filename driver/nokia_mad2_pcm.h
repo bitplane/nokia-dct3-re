@@ -65,6 +65,8 @@ public:
 	u64 idle_clocks_transferred() const { return m_idle_clocks_transferred; }
 	u64 transfer_failures() const { return m_transfer_failures; }
 
+	void set_cobba_tag(char const *tag) { m_cobba.set_tag(tag); }
+
 protected:
 	virtual void device_start() override;
 	virtual void device_reset() override;

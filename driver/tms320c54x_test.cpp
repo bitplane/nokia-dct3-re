@@ -27,14 +27,19 @@ class c54x_backend_bsp_test_state : public driver_device
 public:
 	c54x_backend_bsp_test_state(const machine_config &config, device_type type,
 			const char *tag) : driver_device(config, type, tag),
-		m_backend(*this, "backend"), m_cpu(*this, "backend:cpu"), m_cobba(*this, "cobba") { }
+		m_backend(*this, "backend"), m_cpu(*this, "backend:cpu"), m_cobba(*this, "test_codec") { }
 	void test(machine_config &config)
 	{
-		NOKIA_DSPIF(config, "dspif", 0);
+		NOKIA_DSPIF(config, "test_transport", 0);
 		NOKIA_COBBA(config, m_cobba, 0);
 		m_cobba->rf_receive_cb().set(FUNC(c54x_backend_bsp_test_state::rf_sample));
-		NOKIA_CCONT(config, "ccont", 0);
+		NOKIA_CCONT(config, "test_power", 0);
 		NOKIA_DSP_C54X(config, m_backend, 13'000'000);
+		m_backend->set_transport_tag("^test_transport");
+		m_backend->set_cobba_tag("^test_codec");
+		m_backend->set_ccont_tag("^test_power");
+		m_backend->set_program_rom_tag("^test_program");
+		m_backend->set_data_rom_tag("^test_data");
 		m_backend->set_external_codec_clock(true);
 	}
 protected:
@@ -2095,8 +2100,8 @@ ROM_END
 ROM_START(tms54bsp)
 	ROM_SYSTEM_BIOS(0, "bsp", "Native backend serial peripherals")
 	ROM_SYSTEM_BIOS(1, "requests", "Native backend slot request storage")
-	ROM_REGION16_LE(0x20000, "dsp_program", ROMREGION_ERASE00)
-	ROM_REGION16_LE(0x20000, "dsp_data", ROMREGION_ERASE00)
+	ROM_REGION16_LE(0x20000, "test_program", ROMREGION_ERASE00)
+	ROM_REGION16_LE(0x20000, "test_data", ROMREGION_ERASE00)
 ROM_END
 
 } // anonymous namespace
