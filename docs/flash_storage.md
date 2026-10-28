@@ -9,6 +9,13 @@ state, fixed-status address, block-lock acknowledgement shim or erase timer.
 Named setup states collect word/page data independently of command dispatch;
 their saved byte values remain stable across the readability refactor.
 
+The ordered source series separates `mame-intelfsh-geometry.patch` (shared
+geometry/identity attributes, Intel B3 part declarations and NOR programming),
+`mame-intelfsh-c3.patch` (opt-in Intel C3 protection/CFI), and
+`mame-intelfsh-st.patch` (the ST subclass and virtual dispatch seam). The
+combined series reproduces the same native source. Overlay application checks
+the complete patched tree, since later patches can change earlier context.
+
 The 3410 uses this native engine for fresh PMM compaction and cold reload,
 retaining its exact idle-frame oracle. This establishes handset compatibility
 alongside, not instead of, independent device conformance.

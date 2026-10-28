@@ -8,7 +8,7 @@
       "status": "satisfied",
       "predicate": "The native ST engine samples qualified VPP at operation start and refuses invalid-supply writes without mutating storage",
       "current": "The independent sttest VPP result requires refusal of word, double-word, quadruple-word, erase and OTP starts, all with sticky status bit3 and unchanged affected cells. Array, signature and CFI reads remain available. Supply recovery alone cannot clear an error; a later accepted word operation completes with the prior error still set. The low-voltage start-sampling fixture changes qualification after acceptance and replays the pending operation/input through save/load. Reset clears error status while preserving the external qualified input; subsequent invalid and recovered starts are checked separately. Default-valid qualification preserves current handset supply assumptions. This is a logical device-input contract from the full ST signal/status descriptions, not numeric analogue voltage, VPPH/page-voltage sufficiency, mid-pulse failure, simultaneous-error priority, wear or proof of handset VPP/RP wiring.",
-      "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "tools/run_st_flash.py", "tools/test_st_flash.py", "docs/flash_storage.md"]
+      "evidence": ["patches/mame-intelfsh-geometry.patch", "patches/mame-intelfsh-c3.patch", "patches/mame-intelfsh-st.patch", "driver/intelfsh_c3_test.cpp", "tools/run_st_flash.py", "tools/test_st_flash.py", "docs/flash_storage.md"]
     },
     {
       "id": "mad2_active_peripheral_warm_reset",
@@ -24,7 +24,7 @@
       "status": "satisfied",
       "predicate": "Native ST protection storage permits one-way user programming and irreversible firmware-visible locking without fabricating a factory identifier",
       "current": "The ROM-independent stotptst fixture checks all eight user words through signature and CFI modes, all four immutable factory words, explicit synthetic fixture seed versus undumped erased identity, deferred C0 programming, permanent DQ1 locking across reset/WP, reserved-DQ2/address refusal, nonsuspendability, reset abort, three partial/pending save-state restores and OTP programming inside suspended array erase followed by erase resume. Seven malformed NVRAM imports leave both planes byte-identical; short array/tail writes fail. Unchanged OTP retains raw-array files; changed OTP uses a26-byte BE tail bound to configured factory/reserved bits and one-way seeded user bits. A second process reloads both device files, checks all user words and lock/array data, and rejects another locked write. Full Table7/31 defines the thirteen-word map independently of the inconsistent CFI size byte. No authentic factory ID, physical OTP pulse timing, wear, voltage failure or interrupted-cell outcome is claimed; nominal word-program timing and prior-cell reset retention are explicit emulator policies.",
-      "evidence": ["patches/mame-intelfsh-dct3.patch", "patches/mame-intelfsh-c3-test.patch", "driver/intelfsh_c3_test.cpp", "tools/run_st_flash.py", "tools/test_st_flash.py", "docs/flash_storage.md"]
+      "evidence": ["patches/mame-intelfsh-geometry.patch", "patches/mame-intelfsh-c3.patch", "patches/mame-intelfsh-st.patch", "patches/mame-intelfsh-c3-test.patch", "driver/intelfsh_c3_test.cpp", "tools/run_st_flash.py", "tools/test_st_flash.py", "docs/flash_storage.md"]
     },
     {
       "id": "st_flash_native_command_engine",
@@ -32,7 +32,7 @@
       "status": "satisfied",
       "predicate": "Native ST flash owns block protection, global status and deferred operations without Nokia-side command state",
       "current": "The independent sttest engine fixture has120 checks over all71 blocks, identity/signature don't-care bits, reset locking, WP/lockdown, sticky protection/erase-confirm errors, deferred word/double-word program and main/parameter erase, busy admission, suspend/resume, nested other-block program, four active/suspended save-state replays and two reset aborts. Additional terminal results require all56 literal ST CFI bytes, independently derived4MiB/top-region geometry, query-mode restoration, four-word page programming in arbitrary address order, partial-command and pending-page restoration, locked/malformed-page refusal and nominal parameter-erase completion between350/450ms. Full-datasheet geometry advertises8-byte pages; its400ms parameter erase replaces the preliminary800ms interval. Data resembling FF/other opcodes cannot change command state. Fresh3410 compaction and cold reload preserve the exact idle oracle with direct native flash routing. The fixed-address status/lock-acknowledgement adapter, its device/knob and superseded conformance test are removed. Typical timings are datasheet nominal, not measured; interrupted-cell retention is explicit emulator policy. Authentic ST factory identity, analogue supply/electrical behavior and unsupported own-block suspension accesses remain unvalidated; the OTP programming/persistence contract has its own predicate. Published CFI is not complete feature fidelity or authentic unique-ID evidence.",
-      "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "tools/run_st_flash.py", "tools/test_st_flash.py", "docs/flash_storage.md", "docs/hardware_atlas.md"]
+      "evidence": ["patches/mame-intelfsh-geometry.patch", "patches/mame-intelfsh-c3.patch", "patches/mame-intelfsh-st.patch", "driver/intelfsh_c3_test.cpp", "tools/run_st_flash.py", "tools/test_st_flash.py", "docs/flash_storage.md", "docs/hardware_atlas.md"]
     },
     {
       "id": "sim_pts_default_speed_negotiation",
@@ -1744,7 +1744,7 @@
       "id": "nam2_c3_security_storage_checkpoint", "owner": "nam2_firmware", "status": "satisfied",
       "predicate": "The own v5.21 C3 research configuration preserves EEPROM storage across erases, renders Code accepted after physical input and validates checksum/startup release after a cold restart",
       "current": "The same two-byte own-image checksum fixture selects explicit ROM family 3 through 0089/88c2. Its identity callback reads user OTP words 85..88, now represented as erased rather than an unimplemented zero response. Physical 12345 and left softkey yield reviewed Code-accepted pixels. Persisted executable bytes remain unchanged, the EEPROM catalogue and identity checksum survive, and a separately restarted copy passes a0aa/a0aa and startup release 1. Fitted part and factory OTP remain unproved/undumped; Generic user-OTP programming/locking is separately conformance-tested; the handset checkpoint does not exercise it. Late input is unconsumed, so usable idle, security-context settlement, network services and service parity are not claimed.",
-      "evidence": ["docs/2100_bringup.md", "driver/nokia_dct3.cpp", "patches/mame-intelfsh-dct3.patch", "tools/nam2_c3_security_observe.lua", "tools/nam2_c3_checkpoint_check.py", "tools/test_nam2_c3_checkpoint_check.py"]
+      "evidence": ["docs/2100_bringup.md", "driver/nokia_dct3.cpp", "patches/mame-intelfsh-geometry.patch", "patches/mame-intelfsh-c3.patch", "patches/mame-intelfsh-st.patch", "tools/nam2_c3_security_observe.lua", "tools/nam2_c3_checkpoint_check.py", "tools/test_nam2_c3_checkpoint_check.py"]
     },
     {
       "id": "nam2_v521_early_security_editor", "owner": "nam2_firmware", "status": "satisfied",
@@ -2577,7 +2577,7 @@
       "id": "intel_c3_flash_conformance", "owner": "generic_flash", "status": "satisfied",
       "predicate": "The opt-in Intel 28F160C3-T model preserves block geometry, lock protection and saved state under an isolated executable controller fixture",
       "current": "c3test passes ID 0089/88c2, reset-locked program/erase rejection, NOR-only programming, independent 8 KiB top parameter and 64 KiB main erases, block-wide lock ownership, lockdown at both WP levels, reset relocking and save/load restoration of array, locks, WP pin and user OTP. Protection programming clears bits only, rejects factory/locked writes, and irreversible OTP survives reset and a separate-process NVRAM reload; malformed optional tails are rejected. The default 3210 and coherent frontier gates pass without selecting C3. This does not identify a fitted NAM-2 chip, validate a handset boot, implement CFI or establish physical operation timing.",
-      "evidence": ["patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp", "docs/2100_bringup.md"]
+      "evidence": ["patches/mame-intelfsh-geometry.patch", "patches/mame-intelfsh-c3.patch", "patches/mame-intelfsh-st.patch", "driver/intelfsh_c3_test.cpp", "docs/2100_bringup.md"]
     },
     {
       "id": "nsk3_pin2_change_cold_authentication", "owner": "nsk3_firmware", "status": "satisfied",
@@ -3045,7 +3045,7 @@
       "id": "intel_c3_query_geometry", "owner": "intel_28f160c3t", "status": "satisfied",
       "predicate": "The Intel 28F160C3-T model returns its datasheet CFI table and preserves query mode across save/load without mutating array or OTP",
       "current": "Read-query98 exposes all56 specified low-byte values at x16 word offsets10..47 from Intel290645-011 AppendixC. The executable c3test compares every value and zero upper bytes, independently derives2MiB from31 lower64KiB blocks plus eight top8KiB blocks, checks manufacturer/device and block-lock query reads, status/ID/array exits, reset and query-mode restoration. Fresh and cold processes pass alongside existing NOR/erase/lock/OTP conformance and cold OTP retention. NAM-2 physical security replay preserves accepted frames and own PMM, and the3210 frontier passes. Query capability bits describe the published part; suspend and physical operation timing remain unqualified. No fitted NAM-2 chip, idle wake, native radio or speech is promoted.",
-      "evidence": ["docs/2100_bringup.md", "patches/mame-intelfsh-dct3.patch", "driver/intelfsh_c3_test.cpp"]
+      "evidence": ["docs/2100_bringup.md", "patches/mame-intelfsh-geometry.patch", "patches/mame-intelfsh-c3.patch", "patches/mame-intelfsh-st.patch", "driver/intelfsh_c3_test.cpp"]
     },
     {
       "id": "nse2_completed_default_cpu_assertions", "owner": "tms320c54x", "status": "satisfied",

@@ -1,0 +1,373 @@
+diff --git a/src/devices/machine/intelfsh.cpp b/src/devices/machine/intelfsh.cpp
+index ad8718f5..006ce2bf 100644
+--- a/src/devices/machine/intelfsh.cpp
++++ b/src/devices/machine/intelfsh.cpp
+@@ -45,6 +45,8 @@ enum
+ 	FM_WRITEBUFFER2, // part 2 of write to buffer sequence
+ 	FM_FAST_RESET,
+ 	FM_WRITEPAGEWINBOND,
++	FM_PROTECTION_PROGRAM,
++	FM_READQUERY,
+ };
+ 
+ 
+@@ -125,6 +127,7 @@ DEFINE_DEVICE_TYPE(SST_49LF020,              sst_49lf020_device,              "s
+ DEFINE_DEVICE_TYPE(SHARP_LH28F400,           sharp_lh28f400_device,           "sharp_lh28f400",           "Sharp LH28F400 Flash")
+ DEFINE_DEVICE_TYPE(INTEL_E28F008SA,          intel_e28f008sa_device,          "intel_e28f008sa",          "Intel E28F008SA Flash")
+ DEFINE_DEVICE_TYPE(INTEL_TE28F160,           intel_te28f160_device,           "intel_te28f160",           "Intel TE28F160 Flash")
++DEFINE_DEVICE_TYPE(INTEL_28F160C3T,          intel_28f160c3t_device,          "intel_28f160c3t",          "Intel 28F160C3-T Flash")
+ DEFINE_DEVICE_TYPE(INTEL_28F800B3T,          intel_28f800b3t_device,          "intel_28f800b3t",          "Intel 28F800B3-T Flash")
+ DEFINE_DEVICE_TYPE(SHARP_LH28F160S3,         sharp_lh28f160s3_device,         "sharp_lh28f160s3",         "Sharp LH28F160S3 Flash")
+ DEFINE_DEVICE_TYPE(INTEL_TE28F320,           intel_te28f320_device,           "intel_te28f320",           "Intel TE28F320 Flash")
+@@ -157,6 +160,7 @@ intelfsh_device::intelfsh_device(const machine_config &mconfig, device_type type
+ 	: device_t(mconfig, type, tag, owner, clock),
+ 		device_nvram_interface(mconfig, *this),
+ 		m_region(*this, DEVICE_SELF),
++		m_protection_region(*this, "otp"),
+ 		m_size(size),
+ 		m_bits(bits),
+ 		m_addrmask(0),
+@@ -310,6 +314,26 @@ intel_28f800b3t_device::intel_28f800b3t_device(const machine_config &mconfig, co
+ 	m_parameter_block_count = 8;
+ }
+ 
++intel_28f160c3t_device::intel_28f160c3t_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
++	: intelfsh16_device(mconfig, INTEL_28F160C3T, tag, owner, clock, 0x200000, MFG_INTEL, 0x88c2)
++{
++	// Intel 290645-011: eight top 4-Kword parameter blocks, reset locked.
++	m_top_boot_sector = true;
++	m_parameter_block_size = 8 * 1024;
++	m_parameter_block_count = 8;
++	m_flexible_block_lock = true;
++	// Intel 290645-011, Appendix C: word-addressed query bytes 10h..47h.
++	m_cfi_query = {
++		0x51, 0x52, 0x59, 0x03, 0x00, 0x35, 0x00, 0x00,
++		0x00, 0x00, 0x00, 0x27, 0x36, 0xb4, 0xc6, 0x05,
++		0x00, 0x0a, 0x00, 0x04, 0x00, 0x03, 0x00, 0x15,
++		0x01, 0x00, 0x00, 0x00, 0x02, 0x1e, 0x00, 0x00,
++		0x01, 0x07, 0x00, 0x20, 0x00, 0x50, 0x52, 0x49,
++		0x31, 0x30, 0x66, 0x00, 0x00, 0x00, 0x01, 0x03,
++		0x00, 0x33, 0xc0, 0x01, 0x80, 0x00, 0x03, 0x03
++	};
++}
++
+ intel_te28f160_device::intel_te28f160_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
+ 	: intelfsh16_device(mconfig, INTEL_TE28F160, tag, owner, clock, 0x200000, MFG_SHARP, 0xd0) { }
+ 
+@@ -374,6 +398,21 @@ void intelfsh_device::device_start()
+ {
+ 	m_data = std::make_unique<uint8_t []>(m_size);
+ 	m_timer = timer_alloc(FUNC(intelfsh_device::delay_tick), this);
++	if (m_flexible_block_lock)
++	{
++		// Unknown factory words remain undumped; user words default erased.
++		// Optional region: lock word, four factory words, four user words (BE).
++		m_protection_data.fill(0xffff);
++		m_protection_data[0] = 0xfffe;
++		if (m_protection_region.found())
++		{
++			if (m_protection_region->bytes() != 18)
++				fatalerror("C3 OTP region must contain nine big-endian halfwords");
++			for (unsigned i = 0; i < m_protection_data.size(); ++i)
++				m_protection_data[i] = (u16(m_protection_region->as_u8(i * 2)) << 8)
++						| m_protection_region->as_u8(i * 2 + 1);
++		}
++	}
+ 
+ 	save_item( NAME(m_status) );
+ 	save_item( NAME(m_erase_sector) );
+@@ -386,9 +425,34 @@ void intelfsh_device::device_start()
+ 	save_item( NAME(m_write_buffer_start_address) );
+ 	save_item( NAME(m_write_buffer_count) );
+ 	save_item( NAME(m_fast_mode) );
++	save_item(NAME(m_block_locks));
++	save_item(NAME(m_wp));
++	save_item(NAME(m_protection_data));
++	save_item(NAME(m_protection_dirty));
+ 	save_pointer( &m_data[0], "m_data", m_size);
+ }
+ 
++void intelfsh_device::device_reset()
++{
++	if (m_flexible_block_lock)
++	{
++		m_block_locks.fill(1);
++		m_status = 0x80;
++		m_flash_mode = FM_NORMAL;
++		m_timer->adjust(attotime::never);
++	}
++}
++
++unsigned intelfsh_device::lock_index(uint32_t address) const
++{
++	uint32_t const byte_address = (address * 2) % m_size;
++	uint32_t const span = m_parameter_block_size * m_parameter_block_count;
++	bool const parameter = (m_top_boot_sector && byte_address >= m_size - span)
++			|| (m_bot_boot_sector && byte_address < span);
++	uint32_t const size = parameter ? m_parameter_block_size : m_main_block_size;
++	return (byte_address & ~(size - 1)) / m_parameter_block_size;
++}
++
+ //-------------------------------------------------
+ //  is_ready - emulates the *Busy/Ready pin on some
+ //             flash devices.
+@@ -462,7 +526,24 @@ void intelfsh_device::nvram_default()
+ bool intelfsh_device::nvram_read(util::read_stream &file)
+ {
+ 	auto const [err, actual] = read(file, &m_data[0], m_size);
+-	return !err && (actual == m_size);
++	if (err || actual != m_size)
++		return false;
++	if (!m_flexible_block_lock)
++		return true;
++	// Preserve raw-array compatibility; changed C3 OTP has an 18-byte BE tail.
++	std::array<u8, 19> tail{};
++	auto const [tail_err, tail_size] = read(file, tail.data(), tail.size());
++	if (tail_err || (tail_size && tail_size != 18))
++		return false;
++	if (tail_size)
++	{
++		if (tail[1] & 1) // Factory segment cannot be unlocked.
++			return false;
++		for (unsigned i = 0; i < m_protection_data.size(); ++i)
++			m_protection_data[i] = (u16(tail[i * 2]) << 8) | tail[i * 2 + 1];
++		m_protection_dirty = true;
++	}
++	return true;
+ }
+ 
+ 
+@@ -474,7 +555,18 @@ bool intelfsh_device::nvram_read(util::read_stream &file)
+ bool intelfsh_device::nvram_write(util::write_stream &file)
+ {
+ 	auto const [err, actual] = write(file, &m_data[0], m_size);
+-	return !err;
++	if (err || !m_flexible_block_lock || !m_protection_dirty)
++		return !err;
++	if (actual != m_size)
++		return false;
++	std::array<u8, 18> tail{};
++	for (unsigned i = 0; i < m_protection_data.size(); ++i)
++	{
++		tail[i * 2] = m_protection_data[i] >> 8;
++		tail[i * 2 + 1] = m_protection_data[i];
++	}
++	auto const [tail_err, tail_size] = write(file, tail.data(), tail.size());
++	return !tail_err && tail_size == tail.size();
+ }
+ 
+ 
+@@ -489,6 +581,16 @@ uint32_t intelfsh_device::read_full(uint32_t address)
+ 	address += m_bank << 16;
+ 	switch( m_flash_mode )
+ 	{
++	case FM_READQUERY:
++		if (address >= 0x10 && address - 0x10 < m_cfi_query.size())
++			data = m_cfi_query[address - 0x10];
++		else if (address == 0)
++			data = m_maker_id;
++		else if (address == 1)
++			data = m_device_id;
++		else if (m_flexible_block_lock && (address & 0xff) == 2)
++			data = m_block_locks[lock_index(address)];
++		break;
+ 	default:
+ 	case FM_NORMAL:
+ 		switch( m_bits )
+@@ -564,6 +666,11 @@ uint32_t intelfsh_device::read_full(uint32_t address)
+ 		}
+ 		break;
+ 	case FM_READID:
++		if (m_flexible_block_lock && address >= 0x80 && address <= 0x88)
++		{
++			data = m_protection_data[address - 0x80];
++			break;
++		}
+ 		if (m_maker_id == MFG_INTEL && m_device_id == 0x16)
+ 		{
+ 			switch (address & 0xff)
+@@ -584,7 +691,7 @@ uint32_t intelfsh_device::read_full(uint32_t address)
+ 				data = m_device_id;
+ 				break;
+ 			case 2: // block lock config
+-				data = 0; // we don't support this yet
++				data = m_flexible_block_lock ? m_block_locks[lock_index(address)] : 0;
+ 				break;
+ 			case 3: // master lock config
+ 				if (m_flash_master_lock)
+@@ -647,8 +754,15 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+ 	case FM_READSTATUS:
+ 	case FM_READID:
+ 	case FM_READAMDID3:
++	case FM_READQUERY:
+ 		switch( data & 0xff )
+ 		{
++		case 0x98:
++			if (!m_cfi_query.empty())
++				m_flash_mode = FM_READQUERY;
++			else
++				logerror("Unsupported flash query command\n");
++			break;
+ 		case 0xf0:
+ 		case 0xff:  // reset chip mode
+ 			m_flash_mode = FM_NORMAL;
+@@ -692,6 +806,12 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+ 		case 0x60:  // set master lock
+ 			m_flash_mode = FM_SETMASTER;
+ 			break;
++		case 0xc0:
++			if (m_flexible_block_lock)
++				m_flash_mode = FM_PROTECTION_PROGRAM;
++			else
++				logerror("unsupported protection program command\n");
++			break;
+ 		case 0x70:  // read status
+ 			m_flash_mode = FM_READSTATUS;
+ 			break;
+@@ -1080,6 +1200,13 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+ 		m_flash_mode = FM_NORMAL;
+ 		break;
+ 	case FM_WRITEPART1:
++		if (m_flexible_block_lock && ((m_block_locks[lock_index(address)] & 1)
++				|| (!m_wp && (m_block_locks[lock_index(address)] & 2))))
++		{
++			m_status = 0x92; // ready, program error, locked block
++			m_flash_mode = FM_READSTATUS;
++			break;
++		}
+ 		switch( m_bits )
+ 		{
+ 		case 8:
+@@ -1157,6 +1284,13 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+ 	case FM_CLEARPART1:
+ 		if( ( data & 0xff ) == 0xd0 )
+ 		{
++			if (m_flexible_block_lock && ((m_block_locks[lock_index(address)] & 1)
++					|| (!m_wp && (m_block_locks[lock_index(address)] & 2))))
++			{
++				m_status = 0xa2; // ready, erase error, locked block
++				m_flash_mode = FM_READSTATUS;
++				break;
++			}
+ 			if (m_maker_id == MFG_SST && m_device_id == 0x04)
+ 			{
+ 				// clear the 256 bytes block containing the current address to all 0xffs
+@@ -1238,7 +1372,44 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
+ 			logerror( "unexpected %02x in FM_CLEARPART1\n", data & 0xff );
+ 		}
+ 		break;
++	case FM_PROTECTION_PROGRAM:
++		// Intel 290645-011 3.4: factory words are immutable; user lock is OTP.
++		if (address == 0x80)
++		{
++			m_protection_data[0] &= data | 0xfffd; // Only user-lock bit 1 can clear.
++			m_protection_dirty = true;
++			m_status = 0x80;
++		}
++		else if (address >= 0x85 && address <= 0x88 && BIT(m_protection_data[0], 1))
++		{
++			m_protection_data[address - 0x80] &= data;
++			m_protection_dirty = true;
++			m_status = 0x80;
++		}
++		else if (address >= 0x81 && address <= 0x88)
++			m_status = 0x92;
++		else
++			// The datasheet reserves these addresses without defining a result.
++			logerror("unsupported protection-program address %x\n", address);
++		m_flash_mode = FM_READSTATUS;
++		break;
+ 	case FM_SETMASTER:
++		if (m_flexible_block_lock)
++		{
++			u8 &lock = m_block_locks[lock_index(address)];
++			switch (data & 0xff)
++			{
++			case 0x01: lock |= 1; m_status = 0x80; break;
++			case 0xd0:
++				if (m_wp || !(lock & 2)) lock &= ~1;
++				m_status = 0x80;
++				break;
++			case 0x2f: lock |= 3; m_status = 0x80; break;
++			default: m_status = 0xb0; break;
++			}
++			m_flash_mode = FM_READSTATUS;
++			break;
++		}
+ 		switch( data & 0xff )
+ 		{
+ 		case 0xf1:
+diff --git a/src/devices/machine/intelfsh.h b/src/devices/machine/intelfsh.h
+index dd2acc76..8ea2871f 100644
+--- a/src/devices/machine/intelfsh.h
++++ b/src/devices/machine/intelfsh.h
+@@ -16,6 +16,7 @@ public:
+ 	uint8_t *base() { return &m_data[0]; }
+ 
+ 	bool is_ready();
++	void wp_w(int state) { m_wp = bool(state); }
+ 
+ protected:
+ 	// construction/destruction
+@@ -23,6 +24,7 @@ protected:
+ 
+ 	// device-level overrides
+ 	virtual void device_start() override ATTR_COLD;
++	virtual void device_reset() override ATTR_COLD;
+ 
+ 	// device_nvram_interface overrides
+ 	virtual void nvram_default() override;
+@@ -32,10 +34,14 @@ protected:
+ 	// derived helpers
+ 	uint32_t read_full(uint32_t offset);
+ 	void write_full(uint32_t offset, uint32_t data);
++	unsigned lock_index(uint32_t address) const;
+ 
+ 	TIMER_CALLBACK_MEMBER(delay_tick);
+ 
+ 	optional_memory_region   m_region;
++	optional_memory_region   m_protection_region;
++	std::array<uint16_t, 9> m_protection_data{};
++	bool m_protection_dirty = false;
+ 
+ 	// configuration state
+ 	uint32_t                 m_size;
+@@ -53,6 +59,8 @@ protected:
+ 	uint32_t                 m_main_block_size;
+ 	uint32_t                 m_parameter_block_size;
+ 	uint8_t                  m_parameter_block_count;
++	bool                     m_flexible_block_lock = false;
++	std::vector<uint8_t>     m_cfi_query;
+ 	uint16_t                 m_page_size;
+ 
+ 	// internal state
+@@ -71,6 +79,8 @@ protected:
+ 	uint32_t                 m_write_buffer_count;
+ 
+ 	bool                     m_fast_mode;
++	std::array<uint8_t, 256> m_block_locks{};
++	bool m_wp = false;
+ };
+ 
+ 
+@@ -319,6 +329,12 @@ public:
+ 	intel_28f800b3t_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
+ };
+ 
++class intel_28f160c3t_device : public intelfsh16_device
++{
++public:
++	intel_28f160c3t_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
++};
++
+ class intel_te28f160_device : public intelfsh16_device
+ {
+ public:
+@@ -465,6 +481,7 @@ DECLARE_DEVICE_TYPE(SHARP_LH28F400,          sharp_lh28f400_device)
+ DECLARE_DEVICE_TYPE(INTEL_E28F008SA,         intel_e28f008sa_device)
+ DECLARE_DEVICE_TYPE(INTEL_28F800B3T,          intel_28f800b3t_device)
+ DECLARE_DEVICE_TYPE(INTEL_TE28F160,          intel_te28f160_device)
++DECLARE_DEVICE_TYPE(INTEL_28F160C3T,         intel_28f160c3t_device)
+ DECLARE_DEVICE_TYPE(SHARP_LH28F160S3,        sharp_lh28f160s3_device)
+ DECLARE_DEVICE_TYPE(INTEL_TE28F320,          intel_te28f320_device)
+ DECLARE_DEVICE_TYPE(SPANSION_S29GL064S,      spansion_s29gl064s_device)

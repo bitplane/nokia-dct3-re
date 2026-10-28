@@ -13,7 +13,9 @@ NSE1_MACHINE ?= $(if $(strip $(NSE1_MENU_MACHINE)),$(NSE1_MENU_MACHINE),noki5110
 DRIVER := driver/nokia_dct3.cpp
 MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-arm7-pc-export.patch \
-	patches/mame-intelfsh-dct3.patch patches/mame-pcd8544-geometry.patch \
+	patches/mame-intelfsh-geometry.patch \
+	patches/mame-intelfsh-c3.patch \
+	patches/mame-intelfsh-st.patch patches/mame-pcd8544-geometry.patch \
 	patches/mame-sed1565.patch \
 	patches/mame-nandflash-mu4.patch \
 	patches/mame-i2cmem-write-cycle.patch \
@@ -579,10 +581,7 @@ download-mame:
 
 # Overlay the local driver and component sources onto the upstream tree (MAME is not vendored).
 overlay: download-mame
-	@set -e; for patch in $(MAME_PATCHES); do \
-		if git -C $(MAME_DIR) apply --reverse --check "../$$patch" >/dev/null 2>&1; then :; \
-		else git -C $(MAME_DIR) apply "../$$patch"; fi; \
-	done
+	$(PYTHON) tools/check_mame_patch_stack.py --apply --repo $(MAME_DIR) --commit $(MAME_COMMIT) $(MAME_PATCHES)
 	@dst="$(MAME_DIR)/src/mame/nokia/nokia_dct3.cpp"; mkdir -p "$$(dirname "$$dst")"; cmp -s "$(DRIVER)" "$$dst" 2>/dev/null || cp -f "$(DRIVER)" "$$dst"
 	@set -e; for src in $(DRIVER_COMPONENTS); do dst="$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; mkdir -p "$$(dirname "$$dst")"; cmp -s "$$src" "$$dst" 2>/dev/null || cp -f "$$src" "$$dst"; done
 	@set -e; for src in $(TEST_DRIVER_COMPONENTS); do dst="$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; mkdir -p "$$(dirname "$$dst")"; cmp -s "$$src" "$$dst" 2>/dev/null || cp -f "$$src" "$$dst"; done

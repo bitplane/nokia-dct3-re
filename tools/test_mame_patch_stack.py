@@ -44,6 +44,24 @@ class MamePatchStackTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "first.patch"):
                 check_patch_stack(repo, commit, [first, first])
 
+            # Application uses the complete expected tree, not per-patch
+            # reverse checks that break on overlapping context.
+            git("read-tree", commit)
+            source.write_text("first\n")
+            check_patch_stack(repo, commit, [first, second], apply=True)
+            self.assertEqual(source.read_text(), "third\n")
+            self.assertEqual(git("diff", "--cached"), "")
+            check_patch_stack(repo, commit, [first, second], apply=True)
+            self.assertEqual(source.read_text(), "third\n")
+            source.write_text("second\n")
+            with self.assertRaises(subprocess.CalledProcessError):
+                check_patch_stack(repo, commit, [first, second], apply=True)
+            self.assertEqual(source.read_text(), "second\n")
+            source.write_text("first\n")
+            with self.assertRaises(RuntimeError):
+                check_patch_stack(repo, commit, [first, first], apply=True)
+            self.assertEqual(source.read_text(), "first\n")
+
 
 if __name__ == "__main__":
     unittest.main()
