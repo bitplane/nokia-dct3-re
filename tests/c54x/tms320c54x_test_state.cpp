@@ -773,12 +773,19 @@ void tms320c54x_test_state::expect(bool condition, const char *message)
 {
 	if (!condition)
 	{
+		operand_rejection_fixture const *rejection = nullptr;
+		for (auto const *fixture : {&m_source_domains, &m_source_aliases, &m_short_sources})
+			if (fixture->handles_phase(m_phase))
+				rejection = fixture;
 		osd_printf_info("c54x_failure: phase=%u case=%u tick=%u replay=%u pc=%06x rc=%04x ar1=%04x a=%010llx b=%010llx st0=%04x illegal=%u reads=%u writes=%u\n",
-			m_phase, m_pipeline_peripheral_case, m_idle_fixture_tick, unsigned(m_pipeline_replay), unsigned(m_cpu->state_int(STATE_GENPC)),
+			m_phase, rejection ? rejection->variant : m_pipeline_peripheral_case,
+			rejection ? rejection->tick : m_idle_fixture_tick,
+			unsigned(rejection ? rejection->replay : m_pipeline_replay), unsigned(m_cpu->state_int(STATE_GENPC)),
 			unsigned(m_cpu->state_int(tms320c54x_device::STATE_RC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)),
 			(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),
 			unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)),
-			m_pipeline_operand_reads, m_pipeline_store_writes);
+			rejection ? rejection->observed.reads : m_pipeline_operand_reads,
+			rejection ? rejection->observed.writes : m_pipeline_store_writes);
 		throw emu_fatalerror("TMS320C54x core conformance: %s", message);
 	}
 }

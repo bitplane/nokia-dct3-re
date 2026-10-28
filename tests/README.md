@@ -72,3 +72,10 @@ identifiers. Splitting its source does not remove inherited state between
 steps; further isolation requires retaining those cross-instruction contrasts.
 Batch setup is limited to independent values: later values must not depend on
 an earlier register or memory write. Live-state-dependent setup stays explicit.
+
+Operand-domain, absolute-alias and short-source rejection families own separate
+progress, observation, tap and snapshot state in `operand_rejection_fixture`.
+Their CPU, scheduler timer and outer phase routing remain bench-owned. Host
+observations deliberately survive CPU snapshot replay to detect duplicate bus
+effects; registering or clearing them during restoration would weaken the tests.
+The stack-transfer continuation is a separate handler, not an alias test.

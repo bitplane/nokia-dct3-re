@@ -18,6 +18,7 @@
 #include "tms320c54x_test_selection.h"
 #include "tms320c54x_test_support.h"
 #include "tms320c54x_test_atomic_routes.h"
+#include "tms320c54x_test_rejection_state.h"
 #include <sstream>
 #include <bitset>
 
@@ -2277,6 +2278,8 @@ private:
 	bool check_mvmd_word_register_results();
 	bool check_mvdd_peripheral_results();
 	bool check_source_alias_results();
+	bool check_short_source_results();
+	bool check_push_mvmm_results();
 	bool check_mapped_immediate_mac_results();
 	bool check_block_branch_count_results();
 	bool check_bd_long_accumulator_results();
@@ -2329,6 +2332,9 @@ private:
 	TIMER_CALLBACK_MEMBER(check_results);
 
 	required_device<tms320c54x_device> m_cpu;
+	operand_rejection_fixture m_source_domains{311200};
+	operand_rejection_fixture m_source_aliases{310700};
+	operand_rejection_fixture m_short_sources{310600};
 	u16 m_shifted_bus_word = 0;
 	tms320c54x_bsp_state m_shifted_bsp;
 	int m_bio_level = 1;

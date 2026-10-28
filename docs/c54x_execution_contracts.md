@@ -71,7 +71,9 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_state.cpp` | Bench lifecycle, address maps, assertions and device wiring |
 | `tests/c54x/tms320c54x_test_dispatch.cpp` | Ordered callback routing and the initial-program completion tail |
 | `tests/c54x/tms320c54x_test_arithmetic.cpp` | Arithmetic, multiplier and logical-operation fixtures and checks |
-| `tests/c54x/tms320c54x_test_addressing.cpp` | Address generation, memory/register transfers and operand-domain fixtures |
+| `tests/c54x/tms320c54x_test_addressing.cpp` | Address generation and memory/register transfers, including the stack-transfer continuation |
+| `tests/c54x/tms320c54x_test_operand_domains.cpp` | Operand-domain, absolute-alias and short-source rejection fixtures with family-owned progress, observations, taps and snapshots |
+| `tests/c54x/tms320c54x_test_rejection_state.h` | Per-family rejection state; CPU and scheduler routing remain with the bench |
 | `tests/c54x/tms320c54x_test_pipeline.cpp` | Control flow, repeats, dependency and pipeline-composition fixtures |
 | `tests/c54x/tms320c54x_test_interrupts.cpp` | Interrupt acceptance, entry, return and mask-composition fixtures |
 | `tests/c54x/tms320c54x_test_peripherals.cpp` | Bus, clock, serial, DMA and timer fixtures |
