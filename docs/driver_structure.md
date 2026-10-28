@@ -24,7 +24,13 @@ See `gsm_fr_codec.md` for the state and dependency contract.
 
 The memory-map-registered handlers are thin. Diagnostic execution observations
 are isolated in `driver/nokia_dct3_trace.inc`; no memory read path overrides a
-firmware result:
+firmware result.
+
+`DCT3_RESEARCH_TRACES=0` compiles out that quarantine and its call sites, not
+the hardware RAM/flash operations. `make check-tracefree` verifies both 3210
+physical-menu oracles and linked-probe absence. See the build-boundary contract
+in `upstream_architecture.md`; the default repository build retains the probes
+for their existing focused consumers.
 
 | hardware entry point | quarantined research helper |
 |---|---|

@@ -906,8 +906,11 @@ uint16_t nokia_dct3_state::ram_r(offs_t offset, uint16_t mem_mask)
 // Hardware RAM write entry point registered in the address map.
 void nokia_dct3_state::ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
+#if DCT3_RESEARCH_TRACES
 	const uint16_t old_data = m_ram[offset];
+#endif
 	COMBINE_DATA(&m_ram[offset]);
+#if DCT3_RESEARCH_TRACES
 	const offs_t address = NOKIA_RAM_BASE + (offset << 1);
 	if (m_trace_enabled && old_data != m_ram[offset])
 	{
@@ -915,6 +918,7 @@ void nokia_dct3_state::ram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 		trace_radio_pending_primitive_write(
 				address, old_data, m_ram[offset]);
 	}
+#endif
 }
 
 uint16_t nokia_dct3_state::dsp_ram_r(offs_t offset)
@@ -983,14 +987,19 @@ void nokia_dct3_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask
 	}
 }
 
+#if DCT3_RESEARCH_TRACES
 #include "nokia_dct3_trace.inc"
+#endif
 
 uint16_t nokia_dct3_state::flash_r(offs_t offset, uint16_t mem_mask)
 {
+#if DCT3_RESEARCH_TRACES
 	const u32 pc = m_maincpu->pc();
 	const u32 addr = NOKIA_FLASH1_BASE + (offset << 1);
 	flash_firmware_traces(pc, addr);
+#endif
 	const u16 data = m_flash->read(offset) & mem_mask;
+#if DCT3_RESEARCH_TRACES
 	if (m_trace_enabled && m_product.flash_persistent_start &&
 			addr >= m_product.flash_persistent_start)
 	{
@@ -1005,11 +1014,13 @@ uint16_t nokia_dct3_state::flash_r(offs_t offset, uint16_t mem_mask)
 					trace_running_task(),
 					machine().time().as_double());
 	}
+#endif
 	return data;
 }
 
 void nokia_dct3_state::flash_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
+#if DCT3_RESEARCH_TRACES
 	const u32 addr = NOKIA_FLASH1_BASE + (offset << 1);
 	if (m_trace_enabled && m_product.flash_persistent_start &&
 			addr >= m_product.flash_persistent_start)
@@ -1019,6 +1030,7 @@ void nokia_dct3_state::flash_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 				m_maincpu->pc(), addr, data, mem_mask,
 				trace_running_task(),
 				machine().time().as_double());
+#endif
 	m_flash->write(offset, data);
 }
 

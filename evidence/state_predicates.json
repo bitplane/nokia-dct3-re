@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "dct3_firmware_probe_build_separation",
+      "owner": "nokia_dct3_board",
+      "status": "satisfied",
+      "predicate": "The board firmware-address trace quarantine can be excluded at compile time without changing the paired 3210 physical-menu oracles",
+      "current": "check-tracefree builds with DCT3_RESEARCH_TRACES=0 and reproduces the existing v6.00/v5.01 Phone book menu hash and structural predicates. Three known linked probe canaries are absent; the research positive control contains all three. Helper declarations, definitions and call sites are guarded, while RAM COMBINE_DATA and native flash reads/writes remain unconditional. The standalone source template defaults off; the repository overlay explicitly defaults on and rewrites its generated header only on content change. This is a firmware-probe build boundary, not removal of private benches, research machine configurations, hardware logging or all upstream packaging work.",
+      "evidence": ["Makefile", "driver/nokia_dct3_trace_config.h", "driver/nokia_dct3.cpp", "driver/nokia_dct3_state.h", "tools/dct3_trace_build.py", "tools/test_dct3_trace_build.py", "docs/upstream_architecture.md", "docs/driver_structure.md"]
+    },
+    {
       "id": "st_flash_vpp_lockout_qualification",
       "owner": "st_m28w320ect",
       "status": "satisfied",

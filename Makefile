@@ -5,6 +5,7 @@ MAME_REPO   ?= https://github.com/mamedev/mame.git
 MAME_COMMIT ?= 58fca9a8a20f75ac2010980e1a2ec0465c595583
 MAME_DIR    ?= mame
 JOBS        ?= 4
+DCT3_RESEARCH_TRACES ?= 1
 
 PYTHON ?= python3
 VENV   := .venv
@@ -41,7 +42,7 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 LIB_COMPONENTS := lib/util/gsmfr.cpp lib/util/gsmfr.h
 CPU_COMPONENTS := cpu/tms320c54x/tms320c54x.cpp \
 	cpu/tms320c54x/tms320c54x.h
-DRIVER_COMPONENTS := $(wildcard driver/nokia_dct3*.h driver/nokia_dct3_research.cpp) \
+DRIVER_COMPONENTS := $(filter-out driver/nokia_dct3_trace_config.h,$(wildcard driver/nokia_dct3*.h driver/nokia_dct3_research.cpp)) \
 	driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_cobba.cpp driver/nokia_cobba.h \
 	driver/nokia_dsp_backend.h \
@@ -368,6 +369,8 @@ INTERACTIVE_EXTRA_ARGS ?=
 .PHONY: verify-3410-radio-outgoing-call-lifecycle
 
 help:
+	@echo "make check-tracefree exclude firmware-PC probes and reproduce both 3210 menu oracles"
+	@echo "DCT3_RESEARCH_TRACES=0 disables the trace quarantine (repository default: 1)"
 	@echo "make venv           create .venv from requirements.txt (for tools/)"
 	@echo "make build          clone MAME at the pin, overlay $(DRIVER), build"
 	@echo "make swap16         derive $(SWAP) from $(ROM) (16-bit byteswap, for the static tools)"
@@ -584,6 +587,7 @@ overlay: download-mame
 	$(PYTHON) tools/check_mame_patch_stack.py --apply --repo $(MAME_DIR) --commit $(MAME_COMMIT) $(MAME_PATCHES)
 	@dst="$(MAME_DIR)/src/mame/nokia/nokia_dct3.cpp"; mkdir -p "$$(dirname "$$dst")"; cmp -s "$(DRIVER)" "$$dst" 2>/dev/null || cp -f "$(DRIVER)" "$$dst"
 	@set -e; for src in $(DRIVER_COMPONENTS); do dst="$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; mkdir -p "$$(dirname "$$dst")"; cmp -s "$$src" "$$dst" 2>/dev/null || cp -f "$$src" "$$dst"; done
+	$(PYTHON) tools/dct3_trace_build.py configure driver/nokia_dct3_trace_config.h $(MAME_DIR)/src/mame/nokia/nokia_dct3_trace_config.h --enabled $(DCT3_RESEARCH_TRACES)
 	@set -e; for src in $(TEST_DRIVER_COMPONENTS); do dst="$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; mkdir -p "$$(dirname "$$dst")"; cmp -s "$$src" "$$dst" 2>/dev/null || cp -f "$$src" "$$dst"; done
 	@set -e; for src in $(CPU_COMPONENTS); do dst="$(MAME_DIR)/src/devices/$$src"; mkdir -p "$$(dirname "$$dst")"; cmp -s "$$src" "$$dst" 2>/dev/null || cp -f "$$src" "$$dst"; done
 	@set -e; for src in $(LIB_COMPONENTS); do dst="$(MAME_DIR)/src/$$src"; mkdir -p "$$(dirname "$$dst")"; cmp -s "$$src" "$$dst" 2>/dev/null || cp -f "$$src" "$$dst"; done
@@ -801,6 +805,16 @@ rom4-dsp-inputs:
 
 build: overlay roms
 	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/intelfsh_c3_test.cpp,src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/nokia_dct3_research.cpp,$(C54X_TEST_MAME_SOURCES),src/mame/nokia/sed1565_test.cpp,src/mame/nokia/nandflash_test.cpp,src/mame/nokia/mu4_storage_test.cpp,src/mame/nokia/nokia_simi_test.cpp,src/mame/nokia/tms320c54x_dma.cpp,src/mame/nokia/tms320c54x_mcbsp.cpp,src/mame/nokia/tlv320aic23.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_dsp_c54x.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dsp_staged.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_a3a8.cpp,src/mame/nokia/gsm_a5.cpp,src/mame/nokia/gsm_cell_broadcast.cpp,src/mame/nokia/gsm_ems.cpp,src/mame/nokia/gsm_mm_authentication.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/gsm_xcch_l1.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_mbus_terminal.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp,src/mame/nokia/nokia_uif.cpp USE_QTDEBUG=0 -j$(JOBS)
+
+.PHONY: build-tracefree check-tracefree
+# These modes reuse one overlay/object tree. Never run builds/gates concurrently.
+build-tracefree:
+	$(MAKE) --no-print-directory build DCT3_RESEARCH_TRACES=0
+
+check-tracefree:
+	$(MAKE) --no-print-directory verify-mmi-menu RUN_DIR=$(RUN_DIR)_tracefree_v600 DCT3_RESEARCH_TRACES=0
+	$(MAKE) --no-print-directory verify-mmi-menu-501 RUN_DIR=$(RUN_DIR)_tracefree_v501 DCT3_RESEARCH_TRACES=0
+	$(PYTHON) tools/dct3_trace_build.py check $(MAME_DIR)/mame --enabled 0
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }

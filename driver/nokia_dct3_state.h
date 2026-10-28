@@ -5,6 +5,7 @@
 #define MAME_NOKIA_NOKIA_DCT3_STATE_H
 
 #include "nokia_dct3_config.h"
+#include "nokia_dct3_trace_config.h"
 #include "cpu/arm7/arm7.h"
 #include "machine/i2cmem.h"
 #include "machine/intelfsh.h"
@@ -183,8 +184,10 @@ private:
 	uint16_t dsp_ram_r(offs_t offset);
 	void dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 	uint16_t flash_r(offs_t offset, uint16_t mem_mask = ~0);
+#if DCT3_RESEARCH_TRACES
 	void flash_firmware_traces(u32 pc, u32 addr);
 	u8 trace_running_task() const;
+#endif
 	void flash_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 	uint32_t rom2_mirror_r(offs_t offset, uint32_t mem_mask = ~0);
 	void rom2_mirror_w(offs_t offset, uint32_t data, uint32_t mem_mask = ~0);
@@ -233,6 +236,7 @@ private:
 	void dsp_shared_100_write_w(int state);
 	void dsp_tone_update_w(int state);
 	// Observation-only helpers implemented in nokia_dct3_trace.inc.
+#if DCT3_RESEARCH_TRACES
 	uint16_t fw_word(offs_t address) const;
 	uint8_t fw_byte(offs_t address) const;
 	uint32_t fw_dword(offs_t address) const;
@@ -240,6 +244,7 @@ private:
 			offs_t address, uint16_t old_data, uint16_t data);
 	void trace_radio_pending_primitive_write(
 			offs_t address, uint16_t old_data, uint16_t data);
+#endif
 	required_device<cpu_device> m_maincpu;
 	required_device<intelfsh16_device> m_flash;
 	optional_device<i2cmem_device> m_eeprom;

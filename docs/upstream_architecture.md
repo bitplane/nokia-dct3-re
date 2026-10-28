@@ -212,9 +212,27 @@ checkers remain in this repository. Upstream source keeps concise hardware
 comments, citations, ROM metadata, save-state support and user-visible
 limitations.
 
+The board firmware-trace quarantine has an explicit build boundary. The
+standalone source header defaults `DCT3_RESEARCH_TRACES` to zero; the repository
+overlay enables it by default for research acceptance. `make build-tracefree`
+and `make check-tracefree` select zero. The latter retains the existing exact
+v6.00/v5.01 menu oracles and checks three known probe strings are absent from
+the linked executable. RAM writes, native flash routing and hardware logs
+remain outside the guard; there are no production stubs that emulate firmware
+trace results. The positive research build must contain the same canaries.
+
+Both modes share one overlay/object tree: never build or run them concurrently.
+The generated configuration is rewritten only when its content changes, so
+mode changes rebuild the board through ordinary header dependencies. A normal
+`make build` restores the repository research mode. Trace-free is not a claim
+that the research machine catalogue, private benches or all upstream packaging
+have been removed; those still belong to the separate transplant series.
+
 Before submitting that series:
 
-- Retire `nokia_dct3_trace.inc` from the production source list. Its current
+- Retire `nokia_dct3_trace.inc` from the proposed distributable source series.
+  The trace-free build gate proves it can be excluded, not that the export is
+  already packaged. Its current
   firmware-PC probes are observation-only but are research instrumentation,
   not a MAME hardware contract; preserve their accepted conclusions in the
   subsystem documents and retain focused checks here.
