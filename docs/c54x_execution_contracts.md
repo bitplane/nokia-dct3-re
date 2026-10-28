@@ -15,6 +15,14 @@ their older executable hashes are not competing default-suite baselines.
 Passing CPU tests does not establish physical pipeline timing, a fitted
 handset DSP mask, RF acquisition or end-to-end speech.
 
+The external observation-only ROM4 opcode inventory contains 628 distinct
+words in 112 high-byte groups after 30 million MCU instructions; sorted-set
+SHA-256 is `63ae45c872ccea39112898bfde7f5926acd675701675a860d765a66a35815d34`.
+`tools/c54x_opcode_coverage.py` retains this reference. It measures reachability,
+not correctness or current core coverage; imported interrupt masks can change
+reachability without establishing a legitimate hardware reset state. The
+loader document owns that mask-provenance contract.
+
 ### Harness preservation contract
 
 `fixtures/c54x_conformance_baseline.json` freezes the declared BIOS inventory,

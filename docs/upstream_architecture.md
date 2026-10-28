@@ -103,103 +103,32 @@ profile behavior remain outside the CPU directory. The 5110 machine removes
 `dsp_hle` and instantiates `NOKIA_DSP_C54X` with its own ROM4 images; other
 handsets do not inherit that ROM or execution contract.
 
-Extended-program capability is explicit (`set_extended_program(true)`), not
-inferred from a handset name or inherited by the existing ROM4 profile.
-It provides seven-bit XPC at data MMR `1e`, 23-bit instruction fetches and
-accumulator-addressed program transfers, and far branches/calls/returns.
-PC remains a 16-bit architectural register; debugger GENPC combines XPC/PC.
-Sequential PC wrap does not increment XPC. Far calls push PC then XPC,
-whereas hardware interrupts retain XPC and push only PC. Delayed far
-transfers execute their two delay words on the original page.
+### CPU validation ownership
 
-`check-c54x-core` exercises all 16 immediate/accumulator/delayed far-control
-variants on distinct program pages, stack order, seven-bit masking, two-word
-delay instructions, XPC MMR access, extended READA/WRITA, near-call page
-retention and an ISR which explicitly saves XPC before a far branch. Rules
-and base cycle counts come from [TI SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
-and [SPRU131G, section 6](https://www.ti.com/lit/ug/spru131g/spru131g.pdf).
-This does not model a DA150 peripheral map, on-chip RAM aliases, external
-wait states or full pipeline timing. XPC and pending delayed-page state are
-save-registered. `check-c54x-core` requires executed save/replay of pending
-far calls and returns after the first delay word: restored XPC/PC,
-accumulators, stack RAM and the remaining delay word reproduce the original
-continuation after those values are deliberately changed in the fixture.
-This does not establish full pipeline timing or a fitted handset DSP mask.
+The CPU supports independently configured atomic/staged execution and explicit
+extended-program capability. Product wiring, internal-ROM provenance and bus
+profiles remain backend responsibilities; enabling a CPU feature does not
+qualify a new handset.
 
-The native gate also checks RND against explicit results from
-[SPRU172C page 4-142](https://www.ti.com/lit/ug/spru172c/spru172c.pdf):
-128 executions cover all four source/destination selectors, eight signed
-40-bit boundary inputs, OVM clear/set and two initial ST0 patterns. The
-result matrix distinguishes 40-bit wrap from signed 32-bit saturation,
-preserves the other accumulator and requires unchanged status flags.
-This is arithmetic conformance, not repeatability or pipeline timing.
+[C54x execution contracts](c54x_execution_contracts.md) owns ISA admission,
+arithmetic, pipeline/dependency semantics, synthetic fixtures and the qualified
+default-suite checkpoint. [ROM4 DSP loader](rom4_dsp_loader.md) owns upload,
+bootstrap, cold-entry masks and original-ROM routine/bus evidence.
+[5510 bring-up](5510_bringup.md) owns the separate MU4 application boundary.
 
-The first semantic tranche covers the generic encodings exercised at the
-transform boundary for CALL/RET, RPT/RPTB, immediate auxiliary-register loads,
-auxiliary-register moves, ordinary indirect pre/post addressing, accumulator
-loads/logical operations and low-word stores. Stack growth and block-repeat
-termination follow the TI CPU guide. Focused CPU conformance tests and the
-unassisted 5110 handset gates cover different levels of this implementation.
+Keep these acceptance levels distinct:
 
-`make check-c54x-core` executes distributable synthetic programs on the MAME
-CPU device itself. It currently checks the downward-growing CALL/RET stack,
-`RPT`'s `k+1` count, immediate MMR decoding, and an `RPTB` whose final
-instruction is a two-word CALL. The first run rejected an incorrect compact
-AR-index interpretation of MMR code `0x12`; the corrected decoder treats
-`0x10..0x17` as AR0..AR7. This executable gate, not source-token inspection,
-is the acceptance boundary for subsequent opcode families.
+| Acceptance | Scope |
+| --- | --- |
+| `check-c54x-core` and isolated CPU profiles | Executed ISA/composition contracts, not handset or physical timing proof |
+| `check-c54x-rom4-coherent` | Organic 5110 DSP service completion |
+| `verify-5110-menu` and `verify-5110-save-state` | Unassisted graphical/input and restoration behavior |
+| Staged/codec laboratory profiles | Only their separately documented clocks, media and replay contracts |
 
-The gate also executes the final six-iteration ROM4 challenge-transform loop
-from independently observed workspace operands. Its six output words reproduce
-`1cee 7cb6 d2a3 b986 4c57 e65e` exactly. This validates SXM-controlled
-16-to-40-bit operand extension, NOT/OR/XOR behavior, descending auxiliary
-pointers, low-word stores and the RPTB/CALL interaction in the MAME core; it
-does not yet claim that the preceding transform routines execute.
-
-`make check-c54x-rom4-execute` retains the private transform-entry fixture as a
-focused regression, not the full-phone frontier. `make check-c54x-rom4-coherent`
-checks the 5110's organic DSP service completion, and `make verify-5110-menu`
-checks an unassisted boot through a physical Menu key to an exact Phone book
-frame. `make verify-5110-save-state` repeats that UI path after restoring the
-running DSP composition. These gates establish useful ROM4 execution, not
-complete RF acquisition or speech behavior.
-
-The opt-in staged frontend passes clean cold boot to the same physical-menu
-oracle, late input, short/long power actions and exact save/replay. Its
-immediate-store postincrement now occurs in Access before an adjacent
-MVMM Decode source read, preventing the one-word response-buffer displacement
-and rejected challenge that caused an early MCU reset. A 1,536-case replay
-matrix protects that composition. The gates enable reset tracing and use
-explicit failure branches rather than ineffective shell-negation checks.
-The default 5110 still uses the atomic frontend. `NSE1_MACHINE=nse1pipe`
-selects staged execution for the four handset input/restoration gates.
-The duration-matched frontend comparison also qualified LDM's AR-source
-age ordering: retain the older Read before a younger MAR/MVMM Access update.
-A 2,304-case replay matrix and the pinned native descriptor-producer loop
-protect it. Atomic and staged first RF-control prefixes now agree, but their
-cutoff counts and mode cells still differ; complete frontend or physical
-bus-timing parity is not claimed.
-The same AR-source Read ordering is separately qualified for zero-shift
-LD/LDU with 18,432 replay cases through DP, indirect, absolute and offset
-addressing. This is ISA coverage, not an additional observed boot blocker;
-other mapped-read families are not silently included.
-The staged laboratory codec gate validates pin-clocked boot, physical key
-tone and active serial save/load. The isolated FR codec gates separately
-match 32 frames/5,120 decoded PCM samples and 2,432 encoded parameters,
-preprocessing histories and per-frame RAM replay on both CPU frontends.
-`check-c54x-rom4-fr-encoder-staged` also requires the native mute-buffer cases.
-RPTZ's clear precedes the first repeated MVMD sample; its matching
-and opposite-accumulator cases have independent replay tests. These results
-do not establish fitted codec clocks, native RF acquisition or handset calls.
-`make check-c54x-rom4-staged` separately checks the reset-free ten-second
-bus/upload checkpoint from fresh NVRAM. Its reviewed data fixture preserves
-the bounded event stream while the checker enforces fault rejection, accepted
-MCU challenge validation and unique MCU upload bindings. This is regression
-acceptance, not a measured physical bus-timing specification.
-Saves during calls/SMS,
-wider application coverage and the fitted bus dialect are not promoted.
-Its upload and
-instruction contracts are maintained in [ROM4 DSP loader](rom4_dsp_loader.md).
+The default 5110 frontend remains atomic; explicitly selected staged profiles
+do not silently promote fitted bus timing, native RF acquisition or speech.
+Research mask substitutions and opcode reachability counts are not hardware
+reset specifications or CPU correctness oracles.
 
 ## DSP ROM policy
 
@@ -318,49 +247,8 @@ so its real-DSP path is experimental for full phone operation. HLE remains the
 compatibility backend for the other handsets until their own ROM and boundary
 gates justify promotion.
 
-Before full-phone promotion, the new CPU core must pass smaller deterministic
-ROM4 gates for the instructions already known to be load-bearing: OVLY-aware
-MVDP, RPT/RPTB over multiword CALL, F0B0 status operations, repeat-mode
-immediate-address updates, 40-bit shifts/rotates and shifted cross-accumulator
-logical operations. These tests should be derived from TI semantics and small
-instruction fixtures; the external no-assist phone run supplies expected
-boundary results but no implementation source.
-
-An observation-only 30-million-MCU-instruction run through interactive ROM4
-idle executed 628 distinct 16-bit opcode words spanning 112 high-byte groups;
-the sorted opcode-set SHA-256 is
-`63ae45c872ccea39112898bfde7f5926acd675701675a860d765a66a35815d34`.
-This is a reference trace, not a coverage claim for the current core.
-`tools/c54x_opcode_coverage.py` preserves the opcode-set baseline; the
-unassisted handset gates establish current execution reachability.
-
-An earlier 12-second clean MAME NSE-1 checkpoint reached 437 distinct opcode words
-across 80 high-byte groups in twelve seconds (sorted-set SHA-256
-`523cd6019736d1fb7bb09cae8a0f96124a97a768f00e40df7c3933be6ba7c7bd`).
-The original 191-word count difference was a reachability delta rather than a
-CPU correctness failure. The earlier reference exercised the receiver loop at
-`0x3238` because its processor was seeded with an inadmissible cross-silicon
-`IMR=0x52fd` snapshot. Local static and runtime evidence now derives only the
-needed ROM4 cold-entry bit: firmware ORs its masks into retained IMR state,
-INT0 vectors to the receiver, INT3 is an empty fast-return handler, and setting
-only bit 0 produces terminal `0x035f` plus organic RF reads. The Nokia backend
-therefore configures `IMR=0x0001` at cold entry while subsequent resets retain
-firmware state; no other imported mask bits are used.
-
-Differential execution did identify one independent core defect in this path:
-the block-repeat engine failed to publish and retire `ST1.BRAF`. Synchronising
-that architectural flag makes the post-loader scheduler status agree with the
-reference and is covered by the core conformance gate.
-
-A disposable mask-substitution run confirms causality rather than provenance:
-`0x52fd` lets the corrected core reach the RF receive loop and exposes `EDxx`
-(`LD #k5, ASM`) as the next instruction family. That generic family is now
-implemented and unit-tested. No mask substitution remains in source; the run
-does not establish a ROM4 power-on value.
-
-That diagnostic reachability was also used to close the newly exposed generic
-CPU surface. `RPTBD`, class-7 MPY/MAC, class-14 parallel store/MAC, `SQDST`,
-delayed ANEQ and `NEG` now have focused conformance fixtures. With those
-instructions present, the disposable run executes 26,944 RF sample reads and
-returns to the scheduler without an illegal opcode, but produces no RF tuning
-pair. The unassisted composition remains the authority for supported behavior.
+Before promotion, require the current qualified CPU checkpoint and the affected
+handset gates, not a historical list of initially missing instruction families.
+The loader contract retains the rejected cross-silicon IMR substitution and
+the evidence for the product-specific cold-entry bit. Do not restore an imported
+mask to increase opcode reachability or treat reachability as silicon evidence.
