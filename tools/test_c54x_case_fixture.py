@@ -221,7 +221,9 @@ int main() {
         self.assertEqual(output[-1], 'digest=' + reviewed_profiles()['rmw-long']['coverage']['fnv64'])
 
     def test_reviewed_case_identities_are_required_in_order(self):
-        for profile in ('isa-square', 'isa-parallel'):
+        for profile, review in reviewed_profiles().items():
+            if not review['case_ids']:
+                continue
             marker, ending = EXTRA_PROFILES[profile]
             cases = ['C54x ISA case: PASS id=' + name
                      for name in reviewed_profiles()[profile]['case_ids']]

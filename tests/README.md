@@ -75,10 +75,18 @@ checkpoint-state coverage before reducing their Cartesian product.
 
 `make build-c54x-isa` builds only that bench and its CPU, without private ROMs
 or handset devices. Pass `--mame mame/c54xisa` to its runner.
-`--profile isa-square` and `isa-parallel` run architectural
-examples; `--profile source-domain` runs implementation-admission limits, not
+`--profile isa-square` and `isa-parallel` run independently reset architectural
+examples. `isa-scalars` runs 34 scalar boundaries in 19 reset groups; a
+continuation keeps the preceding checked flags, accumulator or instruction
+words live. Resetting every row would remove those interaction contracts.
+`--profile source-domain` runs implementation-admission limits, not
 silicon-illegality conformance. Use an empty `--rompath` to verify independence
 from the local firmware collection. Normal handset gates use `mame/mame`.
+
+`--profile legacy-atomic` on the normal binary stops the inherited sequence
+before the staged matrices. It includes a Nokia DSPIF save-state check and
+is deliberately not called CPU-only. Use it to verify legacy continuations
+after scalar-case extraction without running the full default checkpoint.
 
 Long RAM RMW uses all 38,400 distinct stimuli in its balanced default schedule.
 Each operation/address/compatibility/status group covers all four checkpoints

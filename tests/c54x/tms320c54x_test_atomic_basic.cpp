@@ -3,6 +3,7 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
+#include "tms320c54x_test_scalars.h"
 
 namespace c54x_test {
 
@@ -11,6 +12,81 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
+	auto prepare_scalar = [&](unsigned index) {
+		auto const &test = scalar_vectors().at(index).test;
+		if (test.port_writes) m_port_writes = 0;
+		prepare_case(*m_cpu, test);
+	};
+	if ((m_phase >= 45 && m_phase <= 60) || (m_phase >= 67 && m_phase <= 68) ||
+		(m_phase >= 70 && m_phase <= 77) || (m_phase >= 9100 && m_phase <= 9107))
+	{
+		unsigned const index = m_phase >= 9100 ? m_phase - 9100 : m_phase >= 70 ? m_phase - 70 + 26 :
+			m_phase >= 67 ? m_phase - 67 + 24 : m_phase - 45 + 8;
+		auto const &test = scalar_vectors().at(index).test;
+		if (index < 8) check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
+		else check_case_state(*m_cpu, test);
+		if (index < 8 || m_phase == 45 || (m_phase >= 75 && m_phase <= 77))
+			expect_opcode(test.opcode, true, "Scalar boundary reference");
+		if (profile_is("legacy-atomic")) osd_printf_info("C54x ISA case: PASS id=%s\n", test.id);
+		switch (m_phase)
+		{
+		case 9107:
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 3);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			program.write_word(0x0448, 0xf4e3); // CALA A
+			write_words(program, {
+				{0x0449, 0xf5e1}, {0x0450, 0x76f8}, {0x0451, 0x0944}, {0x0452, 0xbeef}, {0x0453, 0xfc00},
+			});
+			set_registers(*m_cpu, {
+				{cpu_regs::STATE_PC, 0x0448}, {cpu_regs::STATE_A, 0x0450}, {cpu_regs::STATE_SP, 0x0300},
+				{cpu_regs::STATE_IDLE, 0},
+			});
+			return next_atomic_phase(42);
+		case 60:
+			program.write_word(0x04e0, 0xec03); // RPT #3
+			program.write_word(0x04e1, 0x0082); // ADD *AR2, A
+			program.write_word(0x04e2, 0xf5e1);
+			program.write_word(0x0048, 0x0083); // Observe A on ISR entry.
+			program.write_word(0x0049, 0xf49b);
+			m_repeat_reads = 0;
+			m_irq_accumulator = 0;
+			set_registers(*m_cpu, {
+				{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_AR2, 0x0060}, {cpu_regs::STATE_AR3, 0x0061},
+				{cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_IMR, 4},
+				{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_PC, 0x04e0}, {cpu_regs::STATE_IDLE, 0},
+			});
+			return next_atomic_phase(61);
+		case 68:
+			program.write_word(0x0580, 0x0082);
+			program.write_word(0x0581, 0xf020); // LD #1234, A
+			program.write_word(0x0582, 0x1234);
+			program.write_word(0x0583, 0x0082);
+			program.write_word(0x0584, 0xf5e1);
+			m_repeat_reads = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0580);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			return next_atomic_phase(69);
+		case 77:
+			program.write_word(0x05e0, 0x74d6); // PORTR port, *AR6+%
+			program.write_word(0x05e1, 0x0123);
+			program.write_word(0x05e2, 0x74d6);
+			program.write_word(0x05e3, 0x0123);
+			program.write_word(0x05e4, 0xf5e1); // IDLE
+			data.write_word(0x0a03, 0);
+			data.write_word(0x0a00, 0);
+			m_port_reads = 0;
+			set_registers(*m_cpu, {
+				{cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_BK, 4}, {cpu_regs::STATE_PC, 0x05e0},
+				{cpu_regs::STATE_IDLE, 0},
+			});
+			return next_atomic_phase(78);
+		default:
+			prepare_scalar(index + 1);
+			return next_atomic_phase(m_phase + 1);
+		}
+	}
 	if (m_phase == 5)
 	{
 		expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE),
@@ -516,64 +592,8 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 				((u64(1) << 40) - 5) &&
 				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800),
 				"accumulator negate result and carry");
-		program.write_word(0x05e0, 0x75f8);
-		program.write_word(0x05e1, 0x0d00);
-		program.write_word(0x05e2, 0x0124);
-		program.write_word(0x05e3, 0xf684); // NEG B,A.
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x12345678}, {cpu_regs::STATE_B, 0xfffffffffeULL}, {cpu_regs::STATE_ST0, 0x1800},
-			{cpu_regs::STATE_ST1, 0x0100}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
+		prepare_scalar(0);
 		return next_atomic_phase(9100);
-	}
-	if (m_phase >= 9100 && m_phase <= 9107)
-	{
-		const unsigned index = m_phase - 9100;
-		const bool b = BIT(index, 0);
-		const u64 source = index < 2 ? 0xfffffffffeULL : index < 4 ? 0 : 0xff80000000ULL;
-		const u64 result = index < 2 ? 2 : index < 4 ? 0 : index < 6 ? 0x80000000 : 0x7fffffff;
-		const u16 st0 = index < 2 ? 0x1000 : index < 4 ? 0x1800 : b ? 0x1200 : 0x1400;
-		const u16 st1 = index < 6 ? 0x0100 : 0x0300;
-		expect_opcode(b ? 0xf784 : 0xf684,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (b ? 0x12345678 : result) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (b ? result : source) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == st1 &&
-			m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-			"ROM4 NEG B selects A/B destination, preserves unrelated accumulator/TC, sets carry only for zero and obeys destination overflow/OVM in one cycle");
-		if (index < 7)
-		{
-			const unsigned next = index + 1;
-			program.write_word(0x05e3, BIT(next, 0) ? 0xf784 : 0xf684);
-			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, 0x12345678},
-				{cpu_regs::STATE_B, next < 2 ? 0xfffffffffeULL : next < 4 ? 0 : 0xff80000000ULL},
-				{cpu_regs::STATE_ST0, 0x1800}, {cpu_regs::STATE_ST1, next < 6 ? 0x0100 : 0x0300},
-				{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-			});
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 3);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
-		program.write_word(0x0448, 0xf4e3); // CALA A
-		write_words(program, {
-			{0x0449, 0xf5e1}, {0x0450, 0x76f8}, {0x0451, 0x0944}, {0x0452, 0xbeef}, {0x0453, 0xfc00},
-		});
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_PC, 0x0448}, {cpu_regs::STATE_A, 0x0450}, {cpu_regs::STATE_SP, 0x0300},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(42);
 	}
 	if (m_phase == 42)
 	{
@@ -614,198 +634,8 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == 2,
 				"CALAD delay slots and return address");
-		program.write_word(0x0480, 0xf120); // LD #ffff, B
-		program.write_word(0x0481, 0xffff);
-		program.write_word(0x0482, 0xf5e1);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_PC, 0x0480}, {cpu_regs::STATE_A, 0x12345678}, {cpu_regs::STATE_ST1, 0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
+		prepare_scalar(8);
 		return next_atomic_phase(45);
-	}
-	if (m_phase >= 45 && m_phase <= 48)
-	{
-		static constexpr u64 expected[] = {
-			0x000000ffff, 0xffffff8000, 0xff80000000, 0x00ffff0000
-		};
-		osd_printf_info("TMS320C54x immediate B load: phase=%u pc=%04x a=%010llx b=%010llx expected=%010llx\n",
-				m_phase, unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)),
-				m_cpu->state_int(tms320c54x_device::STATE_A),
-				m_cpu->state_int(tms320c54x_device::STATE_B), expected[m_phase - 45]);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0483 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == expected[m_phase - 45],
-				"long-immediate B load destination, SXM and guard extension");
-		if (m_phase == 45)
-			expect_opcode(0xf120, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xffff,
-					"long-immediate LD B preserves unsigned value with SXM clear");
-		if (m_phase != 48)
-		{
-			++m_phase;
-			program.write_word(0x0480, m_phase == 46 ? 0xf120 : 0xf162);
-			program.write_word(0x0481, m_phase == 48 ? 0xffff : 0x8000);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0480);
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, m_phase == 48 ? 0 : 0x0100);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		program.write_word(0x0480, 0xf02f); // LD #8000, 15, A
-		program.write_word(0x0481, 0x8000);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0480);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(49);
-	}
-	if (m_phase == 49 || m_phase == 50)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) ==
-				(m_phase == 49 ? 0x0040000000ULL : 0xffc0000000ULL) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x00ffff0000,
-				"shifted immediate A load respects SXM and preserves B");
-		if (m_phase == 49)
-		{
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0480);
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(50);
-		}
-		program.write_word(0x0490, 0xf585); // ABS A, B
-		program.write_word(0x0491, 0xf5e1);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x0312345678ULL}, {cpu_regs::STATE_ST1, 0x0200}, {cpu_regs::STATE_ST0, 0x0800},
-			{cpu_regs::STATE_PC, 0x0490}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(51);
-	}
-	if (m_phase == 51 || m_phase == 52)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_B) ==
-				(m_phase == 51 ? 0x007fffffffULL : 0) &&
-				bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) ==
-				(m_phase == 52), "ABS saturation and zero carry");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0200,
-				"ABS guard-bit overflow is sticky across a zero result");
-		if (m_phase == 51)
-		{
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0490);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(52);
-		}
-		program.write_word(0x04a0, 0xf000); // ADD #1, A
-		program.write_word(0x04a1, 1);
-		program.write_word(0x04a2, 0xf5e1);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x007fffffffULL}, {cpu_regs::STATE_ST0, 0x0800}, {cpu_regs::STATE_ST1, 0x0200},
-			{cpu_regs::STATE_PC, 0x04a0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(53);
-	}
-	if (m_phase == 53 || m_phase == 54)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
-				(m_phase == 53 ? 0x007fffffffULL : 0xff80000000ULL),
-				"immediate ADD/SUB signed saturation");
-		expect((m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) ==
-				(m_phase == 53 ? 0x0400 : 0x0c00),
-				"immediate ADD/SUB overflow and bit-32 carry");
-		if (m_phase == 53)
-		{
-			program.write_word(0x04a0, 0xf010); // SUB #1, A
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff80000000ULL);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x04a0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(54);
-		}
-		program.write_word(0x04b0, 0xf47f); // SFTA A, -1
-		program.write_word(0x04b1, 0xf5e1);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0xffffffffffULL}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PC, 0x04b0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(55);
-	}
-	if (m_phase == 55 || m_phase == 56)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
-				(m_phase == 55 ? 0x7fffffffffULL : 0xffffffffffULL) &&
-				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800),
-				"SFTA right shift respects SXM and copies outgoing bit to carry");
-		if (m_phase == 55)
-		{
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, 0xffffffffffULL}, {cpu_regs::STATE_ST1, 0x0100}, {cpu_regs::STATE_PC, 0x04b0},
-				{cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(56);
-		}
-		program.write_word(0x04c0, 0x00f8); // ADD *abs, A
-		program.write_word(0x04c1, 0x0a80);
-		program.write_word(0x04c2, 0xf5e1);
-		data.write_word(0x0a80, 1);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0xffffffffffULL}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0},
-			{cpu_regs::STATE_PC, 0x04c0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(57);
-	}
-	if (m_phase == 57 || m_phase == 58)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
-				(m_phase == 57 ? 0 : 0xffffffffffULL) &&
-				bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) ==
-				(m_phase == 57), "memory ADD carry and SUB borrow at bit 32");
-		if (m_phase == 57)
-		{
-			program.write_word(0x04c0, 0x08f8); // SUB *abs, A
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x04c0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(58);
-		}
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200);
-		program.write_word(0x04d0, 0xf02f);
-		program.write_word(0x04d1, 0xffff);
-		program.write_word(0x04d2, 0xf5e1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x04d0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(59);
-	}
-	if (m_phase == 59)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x007fff8000ULL &&
-				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800),
-				"shifted unsigned immediate load preserves carry");
-		program.write_word(0x04d0, 0xf482); // LD A, ASM, A
-		program.write_word(0x04d1, 0xf5e1);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x0040000000ULL}, {cpu_regs::STATE_ST1, 0x0202}, {cpu_regs::STATE_PC, 0x04d0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(60);
-	}
-	if (m_phase == 60)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x007fffffffULL &&
-				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0c00,
-				"ASM shifted load saturates and preserves carry");
-		program.write_word(0x04e0, 0xec03); // RPT #3
-		program.write_word(0x04e1, 0x0082); // ADD *AR2, A
-		program.write_word(0x04e2, 0xf5e1);
-		program.write_word(0x0048, 0x0083); // Observe A on ISR entry.
-		program.write_word(0x0049, 0xf49b);
-		m_repeat_reads = 0;
-		m_irq_accumulator = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_AR2, 0x0060}, {cpu_regs::STATE_AR3, 0x0061},
-			{cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_IMR, 4},
-			{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_PC, 0x04e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(61);
 	}
 	if (m_phase == 61)
 	{
@@ -938,147 +768,16 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0527 &&
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
 				"CALLD two-cycle and RETD three-cycle timing with balanced delayed return");
-		program.write_word(0x0560, 0xf484);
-		program.write_word(0x0561, 0xf5e1);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x8000000000ULL}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0},
-			{cpu_regs::STATE_PC, 0x0560}, {cpu_regs::STATE_IDLE, 0},
-		});
+		prepare_scalar(24);
 		return next_atomic_phase(67);
-	}
-	if (m_phase == 67 || m_phase == 68)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
-				(m_phase == 67 ? 0x8000000000ULL : 0x007fffffffULL) &&
-				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0400,
-				"NEG 40-bit minimum sets overflow and obeys OVM");
-		if (m_phase == 67)
-		{
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0560);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(68);
-		}
-		program.write_word(0x0580, 0x0082);
-		program.write_word(0x0581, 0xf020); // LD #1234, A
-		program.write_word(0x0582, 0x1234);
-		program.write_word(0x0583, 0x0082);
-		program.write_word(0x0584, 0xf5e1);
-		m_repeat_reads = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0580);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(69);
 	}
 	if (m_phase == 69)
 	{
 		expect(m_repeat_reads == 2 && m_last_operand_cycle - m_first_operand_cycle == 3 &&
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1235,
 				"long-immediate LD consumes two cycles");
-		program.write_word(0x05a0, 0xf0ff); // SFTL A, -1
-		program.write_word(0x05a1, 0xf5e1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffffULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05a0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		prepare_scalar(26);
 		return next_atomic_phase(70);
-	}
-	if (m_phase >= 70 && m_phase <= 72)
-	{
-		const u64 expected = m_phase == 70 ? 0x007fffffffULL :
-				m_phase == 71 ? 0x00fffffffeULL : 0x00ffffffffULL;
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == expected &&
-				bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) == (m_phase != 72),
-				"SFTL uses low 32 bits clears guards and publishes carry");
-		if (m_phase != 72)
-		{
-			program.write_word(0x05a0, m_phase == 70 ? 0xf0e1 : 0xf0e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffffULL);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05a0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		program.write_word(0x05c0, 0xf765); // SFTA B, +5, B
-		program.write_word(0x05c1, 0xf5e1);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_B, 0x80aa001234ULL}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0},
-			{cpu_regs::STATE_PC, 0x05c0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(73);
-	}
-	if (m_phase == 73 || m_phase == 74)
-	{
-		osd_printf_info("SFTA left phase=%u b=%010llx st0=%04x\n", m_phase,
-				(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),
-				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)));
-		expect(m_cpu->state_int(tms320c54x_device::STATE_B) ==
-				(m_phase == 73 ? 0x1540024680ULL : 0xff80000000ULL) &&
-				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0a00) == 0x0200,
-				"SFTA guard-bit left shift carry overflow and negative saturation");
-		if (m_phase == 73)
-		{
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_B, 0x80aa001234ULL}, {cpu_regs::STATE_ST1, 0x0200}, {cpu_regs::STATE_PC, 0x05c0},
-				{cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(74);
-		}
-		program.write_word(0x05e0, 0xf491); // ROL A
-		program.write_word(0x05e1, 0xf5e1); // IDLE
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0xff80000000ULL}, {cpu_regs::STATE_B, 0x0012345678ULL}, {cpu_regs::STATE_ST0, 0},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(75);
-	}
-	if (m_phase == 75 || m_phase == 76)
-	{
-		const bool first = m_phase == 75;
-		expect_opcode(first ? 0xf491 : 0xf591, m_cpu->state_int(tms320c54x_device::STATE_A) ==
-				(first ? 0 : 0x0012345678ULL) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) ==
-				(first ? 0x0012345678ULL : 0x002468acf1ULL) &&
-				bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) == first,
-				"ROL rotates through carry, clears guard bits and preserves the other accumulator");
-		if (first)
-		{
-			program.write_word(0x05e0, 0xf591); // ROL B
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, 0x0012345678ULL}, {cpu_regs::STATE_B, 0x0012345678ULL},
-				{cpu_regs::STATE_ST0, 0x0800}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(76);
-		}
-		program.write_word(0x05e0, 0xf050); // XOR #lk, 0, A, A
-		program.write_word(0x05e1, 0x00ff);
-		program.write_word(0x05e2, 0xf5e1); // IDLE
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0xff12345678ULL}, {cpu_regs::STATE_B, 0x0012345678ULL}, {cpu_regs::STATE_ST0, 0x0800},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(77);
-	}
-	if (m_phase == 77)
-	{
-		expect_opcode(0xf050, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff12345687ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0012345678ULL &&
-				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
-				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e3,
-				"XOR long immediate consumes extension and preserves carry, guards and B");
-		program.write_word(0x05e0, 0x74d6); // PORTR port, *AR6+%
-		program.write_word(0x05e1, 0x0123);
-		program.write_word(0x05e2, 0x74d6);
-		program.write_word(0x05e3, 0x0123);
-		program.write_word(0x05e4, 0xf5e1); // IDLE
-		data.write_word(0x0a03, 0);
-		data.write_word(0x0a00, 0);
-		m_port_reads = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_BK, 4}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(78);
 	}
 	return false;
 }

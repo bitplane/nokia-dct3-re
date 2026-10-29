@@ -453,6 +453,11 @@
           "description": "Implemented single-memory operand admission limits",
           "index": 2,
           "name": "source-domain"
+        },
+        {
+          "description": "Scalar arithmetic boundaries with explicit stateful groups",
+          "index": 3,
+          "name": "isa-scalars"
         }
       ],
       "tms54rom4": [
@@ -1897,6 +1902,11 @@
           "description": "Read-capable memory multiply and T-load replay",
           "index": 247,
           "name": "mul-t-sources"
+        },
+        {
+          "description": "Legacy atomic prefix including DSPIF save integration",
+          "index": 248,
+          "name": "legacy-atomic"
         }
       ],
       "tms54xtra": [
@@ -2953,7 +2963,7 @@
       ]
     },
     "pass_formats": {
-      "C54x ISA case: PASS id=%s\n": 1,
+      "C54x ISA case: PASS id=%s\n": 2,
       "C54x native backend BSP clock inputs: PASS levels=4 save_replay=4 reset_inputs=1 handset_clock_claim=0\n": 1,
       "C54x native backend BSP clocked store: PASS opcode=7721 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 handset_clock_claim=0\n": 1,
       "C54x native backend BSP continuous RX: PASS words=5 partial_restore=1 single_sync_continuation=1 overrun_restart=1 reset_abort=1 source=4 handset_clock_claim=0\n": 1,
@@ -3222,6 +3232,7 @@
       "TMS320C54x forward block exits: PASS cases=1152 restore=1152 branches=B,BC_AEQ,BC_BEQ counts=0,1,2,7 exits=first,middle,last,never endpoint_layouts=2 pages=2 snapshots=6 source_reads=ordered body_writes=selected braf_not_auto_cleared=1 outside_rsbx=1 spaced_endpoint_revisit=1 interrupt_composition=unvalidated silicon_phase_claim=0\n": 1,
       "TMS320C54x frame/MMR move disassembler: PASS frames=256 moves=81 rejected=175 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x generic parallel: PASS cases=10 reset_each=1 nokia_devices=0 firmware=0\n": 1,
+      "TMS320C54x generic scalars: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic square: PASS cases=6 reset_each=1 nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x high memory ALU disassembler: PASS modes=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x immediate ALU disassembler: PASS forms=340 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
@@ -3251,6 +3262,7 @@
       "TMS320C54x interrupt POPM exclusions: PASS cases=24 restore=24 destinations=IMR,IFR contexts=RPT,BD_first,BD_last pages=2 snapshots=2 reads=0 writes=0 stack_changes=0 mask_changes=0 acknowledgements=0 hardware_trap_claim=0\n": 1,
       "TMS320C54x interrupt entry stages: PASS sources=irq,nmi fetch_to_stack_cycles=1 pipeline_drain_claim=0\n": 1,
       "TMS320C54x interrupt-register dual ALU: PASS cases=18432 restore=18432 registers=IMR,IFR lanes=3 selector_pairs=8 operations=ADD,SUB accumulators=2 sxm_ovm=4 bk_modes=2 patterns=2 pages=2 snapshots=3 interrupt_masked=1 reads_do_not_ack=1 source_sample=Read post_read_poison=1 reads=2 writes=0 reset_before_restore=1 physical_phase_claim=0\n": 1,
+      "TMS320C54x legacy atomic prefix: PASS transport_integration=1 staged_suite_claim=0\n": 1,
       "TMS320C54x literal disassembler: PASS decoded_modes=1472 pages=2 invalid_mmr=32 invalid_rmw=32 bounded_extensions=1 operand_order=1 pipeline_claim=0\n": 1,
       "TMS320C54x live BIO conformance: PASS variants=28\n": 1,
       "TMS320C54x live BIO wait release: PASS\n": 1,
@@ -6482,6 +6494,21 @@
         "TMS320C54x generic parallel: PASS cases=10 reset_each=1 nokia_devices=0 firmware=0"
       ]
     },
+    "isa-scalars": {
+      "completion": "Fatal error: TMS320C54x isolated generic scalars complete",
+      "machine": "tms54isa",
+      "reported_fields": [
+        {
+          "cases": "34",
+          "firmware": "0",
+          "nokia_devices": "0",
+          "reset_groups": "19"
+        }
+      ],
+      "required": [
+        "TMS320C54x generic scalars: PASS cases=34 reset_groups=19 nokia_devices=0 firmware=0"
+      ]
+    },
     "isa-square": {
       "completion": "Fatal error: TMS320C54x isolated generic square complete",
       "machine": "tms54isa",
@@ -6767,6 +6794,19 @@
       ],
       "required": [
         "TMS320C54x staged LDU ST1: PASS cases=288 restore=288 forms=direct,absolute,indirect values=8 accumulators=2 pages=2 snapshots=3 register_reads=1 writes=0 source_retained=1 unsigned_full_word=1 producer_latency_claim=0 silicon_phase_claim=0"
+      ]
+    },
+    "legacy-atomic": {
+      "completion": "Fatal error: TMS320C54x isolated legacy atomic prefix complete",
+      "machine": "tms54test",
+      "reported_fields": [
+        {
+          "staged_suite_claim": "0",
+          "transport_integration": "1"
+        }
+      ],
+      "required": [
+        "TMS320C54x legacy atomic prefix: PASS transport_integration=1 staged_suite_claim=0"
       ]
     },
     "literal-guard": {
@@ -15273,6 +15313,48 @@
       "decision": "rewrite",
       "family": "parallel-store-reference"
     },
+    "isa-scalars": {
+      "case_ids": [
+        "neg-b-to-a",
+        "neg-b-to-b",
+        "neg-b-zero-to-a",
+        "neg-b-zero-to-b",
+        "neg-b-overflow-to-a",
+        "neg-b-overflow-to-b",
+        "neg-b-saturate-to-a",
+        "neg-b-saturate-to-b",
+        "ld-b-unsigned",
+        "ld-b-signed",
+        "ld-b-shift16-signed",
+        "ld-b-shift16-unsigned",
+        "ld-a-shift15-unsigned",
+        "ld-a-shift15-signed",
+        "abs-saturate",
+        "abs-sticky-zero",
+        "immediate-add-saturate",
+        "immediate-sub-saturate",
+        "sfta-right-zero-fill",
+        "sfta-right-sign-fill",
+        "memory-add-wrap",
+        "memory-sub-borrow",
+        "shifted-immediate-carry",
+        "asm-load-saturate-carry",
+        "neg-40bit-minimum",
+        "neg-40bit-minimum-saturate",
+        "sftl-right",
+        "sftl-left",
+        "sftl-zero-clears-carry",
+        "sfta-left-guard-overflow",
+        "sfta-left-saturate",
+        "rol-a-carry-out",
+        "rol-b-carry-in",
+        "xor-immediate-guards"
+      ],
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "family": "scalar-boundaries",
+      "scope": "The 34 named scalar cases only. legacy-atomic also includes unreviewed atomic and DSPIF transport-integration contracts; it is not a CPU-only profile."
+    },
     "isa-square": {
       "case_ids": [
         "squr-fract-saturate",
@@ -15285,6 +15367,48 @@
       "classification": "isa_documented",
       "decision": "rewrite",
       "family": "square-reference"
+    },
+    "legacy-atomic": {
+      "case_ids": [
+        "neg-b-to-a",
+        "neg-b-to-b",
+        "neg-b-zero-to-a",
+        "neg-b-zero-to-b",
+        "neg-b-overflow-to-a",
+        "neg-b-overflow-to-b",
+        "neg-b-saturate-to-a",
+        "neg-b-saturate-to-b",
+        "ld-b-unsigned",
+        "ld-b-signed",
+        "ld-b-shift16-signed",
+        "ld-b-shift16-unsigned",
+        "ld-a-shift15-unsigned",
+        "ld-a-shift15-signed",
+        "abs-saturate",
+        "abs-sticky-zero",
+        "immediate-add-saturate",
+        "immediate-sub-saturate",
+        "sfta-right-zero-fill",
+        "sfta-right-sign-fill",
+        "memory-add-wrap",
+        "memory-sub-borrow",
+        "shifted-immediate-carry",
+        "asm-load-saturate-carry",
+        "neg-40bit-minimum",
+        "neg-40bit-minimum-saturate",
+        "sftl-right",
+        "sftl-left",
+        "sftl-zero-clears-carry",
+        "sfta-left-guard-overflow",
+        "sfta-left-saturate",
+        "rol-a-carry-out",
+        "rol-b-carry-in",
+        "xor-immediate-guards"
+      ],
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "family": "scalar-boundaries",
+      "scope": "The 34 named scalar cases only. legacy-atomic also includes unreviewed atomic and DSPIF transport-integration contracts; it is not a CPU-only profile."
     },
     "long-mvkd": {
       "case_ids": [],

@@ -49,13 +49,21 @@ devices or private firmware; legacy default continuations can reuse reviewed
 case data without making the entire sequenced bench generic.
 
 The compatibility-named `tms54isa` bench separates architectural examples
-(`isa-square`, `isa-parallel`) from implementation-admission checks
+(`isa-square`, `isa-parallel`, `isa-scalars`) from implementation-admission checks
 (`source-domain`) by explicit profile and review classification. Source-domain
 owns its case state, timer cadence, bus observers and replay without the legacy
 phase dispatcher. The base 30,000 cases retain their identities and checkpoint
 choices; 448 absolute TC-clear controls and 14,208 short-source controls retain
 status, shift-boundary and repeat contexts separately. The digest encodes the
 instruction, extension, context and control tag.
+
+`isa-scalars` runs 34 literal arithmetic-boundary cases in 19 reset groups.
+Fifteen rows deliberately continue from checked predecessor state rather than
+resetting: sticky overflow, retained instruction words, carry and preserved
+accumulators remain observable. The legacy basic sequence shares those case
+data without resetting its CPU. `legacy-atomic` is a fast continuation gate;
+it also includes existing DSPIF integration, so only its 34 named scalar
+results are covered by this family review, not the whole prefix.
 
 `isa-parallel` runs ten independently reset parallel store/arithmetic cases.
 The default sequence reuses their literal register, masked-status and RAM
@@ -137,10 +145,11 @@ boundaries are:
 | `tests/c54x/tms320c54x_test.cpp` | Machine/ROM declarations, backend serial bench and stock-loader verifier compositions |
 | `tests/c54x/tms320c54x_test_state.h` | Shared bench state, fixture types and method declarations; no CPU execution implementation |
 | `tests/c54x/tms320c54x_test_state.cpp` | Bench lifecycle, address maps, assertions and device wiring |
-| `tests/c54x/tms320c54x_test_isa.cpp` | CPU-only examples/admission bench with explicit per-case reset and no Nokia/firmware dependencies |
+| `tests/c54x/tms320c54x_test_isa.cpp` | CPU-only examples/admission bench with explicit reset groups and no Nokia/firmware dependencies |
 | `tests/c54x/tms320c54x_test_case.h` | Generic stimulus loading and independent register/bus comparisons; no instruction semantics |
 | `tests/c54x/tms320c54x_test_square.h` | Reviewed literal SQUR/SQURA/SQURS cases shared by generic and default-sequence entries |
 | `tests/c54x/tms320c54x_test_parallel.h` | Reviewed parallel store/arithmetic vectors, including same-cell ordering and circular pointer controls |
+| `tests/c54x/tms320c54x_test_scalars.h` | Literal scalar boundaries with explicit reset/continuation groups, shared with the legacy basic adapter |
 | `tests/c54x/tms320c54x_test_domains.h` | Independent single-memory admission fixture: catalogue, preserved state, bus observers and replay |
 | `tests/c54x/tms320c54x_test_dispatch.cpp` | Ordered callback routing and the initial-program completion tail |
 | `tests/c54x/tms320c54x_test_arithmetic.cpp` | Arithmetic, multiplier and logical-operation fixtures and checks |
@@ -165,7 +174,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_disassembler.cpp` | Bounded decoding and operand-domain matrices |
 | `tests/firmware/tms320c54x_test_rom4.cpp` | Acquired-ROM routine execution and independent reference comparisons |
 | `tests/c54x/tms320c54x_test_atomic.cpp` | Routes atomic phases to their owning sequence without a global result scan |
-| `tests/c54x/tms320c54x_test_atomic_basic.cpp` | Synthetic basic-operation sequence |
+| `tests/c54x/tms320c54x_test_atomic_basic.cpp` | Remaining synthetic basic sequence, scalar case adapter and legacy transport-save integration |
 | `tests/c54x/tms320c54x_test_atomic_corpus.cpp` | Independently asserted instruction words observed in the ROM4 corpus, without loading the acquired image |
 | `tests/c54x/tms320c54x_test_atomic_reference.cpp` | TI instruction examples and arithmetic boundaries |
 | `tests/c54x/tms320c54x_test_atomic_control.cpp` | Extended program flow, RTN and pending-transfer restoration |
@@ -2170,7 +2179,7 @@ Repeat/interrupt composition and physical timing remain separate scopes.
 
 ## Core regression checkpoint
 
-The current full default run passes all 293 required markers exactly once,
+The latest banked full default run (`a9ba030c`) passes all 293 required markers exactly once,
 with 294 ordered PASS records, intentional MAME exit 3 and runner exit 0.
 It takes 1,061.85 seconds, versus 1,517.76 at the previous measured checkpoint
 (`ca101ee8`), about 30% faster across the reviewed replay reductions.

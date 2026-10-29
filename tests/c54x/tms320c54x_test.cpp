@@ -1514,6 +1514,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(245, "memory-alu", "Read-capable scalar memory ADD and SUB replay")
 	ROM_SYSTEM_BIOS(246, "shifted-alu", "Read-capable shifted ADD/SUB and conditional SUBC replay")
 	ROM_SYSTEM_BIOS(247, "mul-t-sources", "Read-capable memory multiply and T-load replay")
+	ROM_SYSTEM_BIOS(248, "legacy-atomic", "Legacy atomic prefix including DSPIF save integration")
 	// BIOS selection is eight-bit (index + 1); further fixtures need another namespace.
 ROM_END
 

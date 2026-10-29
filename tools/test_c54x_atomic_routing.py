@@ -53,6 +53,7 @@ def guarded_partition():
             expression = guard.replace('m_phase', 'phase').replace('native_store_phase', str(native))
             expression = expression.replace('std::size(far_opcodes)', str(far_count))
             expression = expression.replace('&&', ' and ').replace('||', ' or ')
+            expression = ' '.join(expression.split())
             tree = ast.parse(expression, mode='eval')
             for node in ast.walk(tree):
                 if not isinstance(node, ALLOWED):

@@ -288,6 +288,57 @@
         "c54x_cpp_lines_after": 58044,
         "source_assessment": "This batch trades 3544 additional C++ bytes of schedule and coverage instrumentation for lower runtime. It is not a source-size reduction."
       }
+    },
+    {
+      "id": "scalar-boundaries",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "basis": "TI scalar NEG/ABS, immediate loads/arithmetic, SFTA/SFTL, ROL and XOR semantics. Every original literal result and partial/full register mask is retained; no CPU implementation helper supplies expectations. Deliberate checked-state continuations preserve carry, sticky overflow, source registers and instruction extensions.",
+      "source": "tests/c54x/tms320c54x_test_scalars.h",
+      "profiles": ["isa-scalars", "legacy-atomic"],
+      "scope": "The 34 named scalar cases only. legacy-atomic also includes unreviewed atomic and DSPIF transport-integration contracts; it is not a CPU-only profile.",
+      "legacy_entry": "basic phases9100..9107,45..60,67..68,70..77; default continuation routing remains outside the CPU-only case data",
+      "case_ids": [
+        "neg-b-to-a", "neg-b-to-b", "neg-b-zero-to-a", "neg-b-zero-to-b",
+        "neg-b-overflow-to-a", "neg-b-overflow-to-b", "neg-b-saturate-to-a", "neg-b-saturate-to-b",
+        "ld-b-unsigned", "ld-b-signed", "ld-b-shift16-signed", "ld-b-shift16-unsigned",
+        "ld-a-shift15-unsigned", "ld-a-shift15-signed", "abs-saturate", "abs-sticky-zero",
+        "immediate-add-saturate", "immediate-sub-saturate", "sfta-right-zero-fill", "sfta-right-sign-fill",
+        "memory-add-wrap", "memory-sub-borrow", "shifted-immediate-carry", "asm-load-saturate-carry",
+        "neg-40bit-minimum", "neg-40bit-minimum-saturate", "sftl-right", "sftl-left",
+        "sftl-zero-clears-carry", "sfta-left-guard-overflow", "sfta-left-saturate",
+        "rol-a-carry-out", "rol-b-carry-in", "xor-immediate-guards"
+      ],
+      "obligations": [
+        "all original accumulator, status, PC, idle/illegal and preservation expectations, without strengthening partial masks",
+        "NEG B source/destination, zero, overflow and saturation cases retain full status and one-cycle operation timing between two absolute port markers",
+        "nineteen independently reset groups on the standalone CPU, with fifteen continuations without a CPU reset preserving the original inter-case dependencies",
+        "sticky ABS overflow survives the zero result; SUB consumes the preceding zero accumulator; ASM load consumes preserved carry; SFTL zero shift clears an already-set carry",
+        "shared literal case data runs on the CPU-only bench with no private ROM, Nokia or GSM device dependencies",
+        "the legacy adapter keeps opcode accounting, initialization order and non-scalar continuations; the bounded prefix includes existing transport integration explicitly rather than reclassifying it"
+      ],
+      "limits": [
+        "no numeric operand or claimed assertion is deleted; repeated scalar setup and phase/checker boilerplate is replaced by case data",
+        "group reset boundaries are not a claim that every row is independent",
+        "unasserted inherited status is not promoted into a new preservation claim; explicit standalone setup supplies known context where needed",
+        "atomic execution only; no staged save/replay, silicon timing, all arithmetic values or handset behavior claim",
+        "both entrypoints share one expectation bank; the new profiles add isolation, not new ISA coverage"
+      ],
+      "measurement": {
+        "baseline_commit": "a9ba030c",
+        "c54x_cpp_bytes_before": 3791792,
+        "c54x_cpp_bytes_after": 3787494,
+        "c54x_cpp_lines_before": 58044,
+        "c54x_cpp_lines_after": 57890,
+        "basic_handler_lines_before": 1086,
+        "basic_handler_lines_after": 785,
+        "legacy_pass_records_unchanged": 137,
+        "legacy_opcode_words_unchanged": 2474,
+        "legacy_prefix_seconds_before": 0.22,
+        "legacy_prefix_seconds_after": 0.18,
+        "cpu_only_scalars_seconds": 0.11,
+        "scope": "This is a source/ownership change, not a claimed runtime optimization. Focused native timings include process startup; the existing full default checkpoint is not silently renewed."
+      }
     }
   ]
 }
