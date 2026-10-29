@@ -29,6 +29,41 @@ def compiled_cpp(source):
 
 class CaseFixtureTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
+    def test_dual_mac_schedule_keeps_address_banks_and_numeric_inputs(self):
+        source = r'''
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <cstdio>
+#include "tests/c54x/tms320c54x_test_dual_schedule.h"
+#include "tests/c54x/tms320c54x_test_support.h"
+int main() {
+    using s = c54x_test::dual_mac_schedule;
+    c54x_test::ordered_case_digest digest;
+    for (unsigned family = 0; family < 8; ++family) {
+        std::array<std::array<unsigned, 3>, 1024> counts{};
+        for (unsigned input = 0; input < s::per_family; ++input) {
+            unsigned const key = s::key(family * s::per_family + input);
+            digest.add(key);
+            assert(key / 215040 == family);
+            if (input < 18432) { assert(key == family * 215040 + input); continue; }
+            unsigned const relative = key - family * 215040 - 18432;
+            assert(relative % 65536 == input - 18432);
+            ++counts[(input - 18432) / 64][relative / 65536];
+        }
+        for (auto c : counts) {
+            std::sort(c.begin(), c.end());
+            assert((c == std::array<unsigned, 3>{21, 21, 22}));
+        }
+    }
+    std::printf("cases=%u digest=%016llx\n", digest.count, (unsigned long long)digest.value);
+}
+'''
+        with compiled_cpp(source) as program:
+            output = subprocess.check_output([str(program)], text=True).strip()
+        self.assertEqual(output, 'cases=671744 digest=a992a2f6ed8d9f42')
+
+    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_smem_schedule_keeps_every_input_and_balances_replay(self):
         source = r'''
 #include <array>

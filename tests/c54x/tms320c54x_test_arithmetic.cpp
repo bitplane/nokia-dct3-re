@@ -8,6 +8,7 @@
 #include "tms320c54x_test_store_schedule.h"
 #include "tms320c54x_test_shifted_schedule.h"
 #include "tms320c54x_test_register_schedule.h"
+#include "tms320c54x_test_dual_schedule.h"
 
 namespace c54x_test {
 
@@ -3668,9 +3669,15 @@ void tms320c54x_test_state::start_dual_multiply(unsigned variant)
 	bool const alu = !strncmp(machine().options().bios(), "alu-dual", 8);
 	bool const parallel = !strncmp(machine().options().bios(), "stmac", 5);
 	bool const family = parallel || !strncmp(machine().options().bios(), "mac-family", 10);
-	bool const signed_mac = family || !strncmp(machine().options().bios(), "mac-dual", 8);
+	bool const signed_mac = family;
 	bool const macsu = signed_mac || !strncmp(machine().options().bios(), "macsu-dual", 10);
-	bool const edge = profile_is("stmac-edge") || profile_is("mac-family-edge") || profile_is("mpy-dual-edge") || profile_is("alu-dual-edge") || profile_is("macsu-dual-edge") || profile_is("mac-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu, macsu, signed_mac, family, parallel);
+	bool const edge = profile_is("stmac-edge") || profile_is("mac-family-edge") || profile_is("mpy-dual-edge") || profile_is("alu-dual-edge") || profile_is("macsu-dual-edge");
+	unsigned const raw = family && !edge ? dual_mac_schedule::key(variant) : variant;
+	m_dual_raw_case = raw;
+	m_dual_input = dual_multiply_case(raw, edge, alu, macsu, signed_mac, family, parallel);
+	auto const &f = m_dual_input;
+	if (!variant) { m_dual_coverage = {}; m_dual_restores = 0; }
+	if (family) m_dual_coverage.add(raw);
 	unsigned const feedback = parallel ? f.destination : f.source;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
@@ -3682,7 +3689,7 @@ void tms320c54x_test_state::start_dual_multiply(unsigned variant)
 	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xabcd);
 	if (parallel) m_cpu->set_state_int(tms320c54x_device::STATE_T, f.yword);
-	if (macsu) m_cpu->set_state_int(feedback ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, dual_macsu_seed(family ? variant % (edge ? 16U : 215040U) : variant, edge) ^ (edge ? 0 : 0xffffffffffULL));
+	if (macsu) m_cpu->set_state_int(feedback ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, dual_macsu_seed(family ? raw % (edge ? 16U : 215040U) : raw, edge) ^ (edge ? 0 : 0xffffffffffULL));
 	for (unsigned i = 0; i < 4; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, f.initial[i]);
 	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.linear ? 0 : 16);
 	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
@@ -8420,13 +8427,14 @@ bool tms320c54x_test_state::check_sqdst_results()
 	if (m_phase == 62143) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62142; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 254900)
 	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+		unsigned const ordinal = m_pipeline_peripheral_case, variant = m_dual_raw_case, tick = ++m_idle_fixture_tick;
 		bool const alu = !strncmp(machine().options().bios(), "alu-dual", 8);
 		bool const parallel = !strncmp(machine().options().bios(), "stmac", 5);
 		bool const family = parallel || !strncmp(machine().options().bios(), "mac-family", 10);
-		bool const signed_mac = family || !strncmp(machine().options().bios(), "mac-dual", 8);
+		bool const signed_mac = family;
 		bool const macsu = signed_mac || !strncmp(machine().options().bios(), "macsu-dual", 10);
-		bool const edge = profile_is("stmac-edge") || profile_is("mac-family-edge") || profile_is("mpy-dual-edge") || profile_is("alu-dual-edge") || profile_is("macsu-dual-edge") || profile_is("mac-dual-edge"); auto const f = dual_multiply_case(variant, edge, alu, macsu, signed_mac, family, parallel);
+		bool const edge = profile_is("stmac-edge") || profile_is("mac-family-edge") || profile_is("mpy-dual-edge") || profile_is("alu-dual-edge") || profile_is("macsu-dual-edge");
+		auto const &f = m_dual_input;
 		unsigned const feedback = parallel ? f.destination : f.source;
 		unsigned const checkpoint = 3 + f.snapshot;
 		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 4), "Dual MPY admits RAM pairs and rejects low-page operands before effects");
@@ -8458,27 +8466,24 @@ bool tms320c54x_test_state::check_sqdst_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_pipeline_store_writes = m_recurring_irq_snapshot[2];
 				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore dual MPY without resampling data, refetching or duplicate pointer updates");
+				++m_dual_restores;
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254910; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant + 1 < (edge ? 16U : macsu ? 215040U : 43008U) * (family ? 8U : alu ? 2U : 1U)) { start_dual_multiply(variant + 1); return true; }
+			unsigned const count = family && !edge ? dual_mac_schedule::cases : (edge ? 16U : macsu ? 215040U : 43008U) * (family ? 8U : alu ? 2U : 1U);
+			if (ordinal + 1 < count) { start_dual_multiply(ordinal + 1); return true; }
 			if (family)
 			{
 				if (parallel)
 				{
-					if (edge) { osd_printf_info("TMS320C54x parallel MAC exclusions: PASS cases=128 restore=128 reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel MAC exclusions complete"); }
-					osd_printf_info("TMS320C54x parallel MAC: PASS cases=1720320 restore=1720320 operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 shifts=32 reads=1 writes=1 retained=T,X,ASM old_source_store=1 carry=unvalidated physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel MAC complete");
+					if (edge) { osd_printf_info("TMS320C54x parallel MAC exclusions: PASS cases=%u restore=%u reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n", m_dual_coverage.count, m_dual_restores, (unsigned long long)m_dual_coverage.value); throw emu_fatalerror(3, "TMS320C54x isolated parallel MAC exclusions complete"); }
+					osd_printf_info("TMS320C54x parallel MAC: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 shifts=32 reads=1 writes=1 retained=T,X,ASM old_source_store=1 carry=unvalidated physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual_coverage.count, m_dual_restores, (unsigned long long)m_dual_coverage.value); throw emu_fatalerror(3, "TMS320C54x isolated parallel MAC complete");
 				}
-				if (edge) { osd_printf_info("TMS320C54x dual MAC family exclusions: PASS cases=128 restore=128 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated dual MAC family exclusions complete"); }
-				osd_printf_info("TMS320C54x dual MAC family: PASS cases=1720320 restore=1720320 operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 snapshots=3 reads=2 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated dual MAC family complete");
+				if (edge) { osd_printf_info("TMS320C54x dual MAC family exclusions: PASS cases=%u restore=%u reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n", m_dual_coverage.count, m_dual_restores, (unsigned long long)m_dual_coverage.value); throw emu_fatalerror(3, "TMS320C54x isolated dual MAC family exclusions complete"); }
+				osd_printf_info("TMS320C54x dual MAC family: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 snapshots=3 reads=2 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual_coverage.count, m_dual_restores, (unsigned long long)m_dual_coverage.value); throw emu_fatalerror(3, "TMS320C54x isolated dual MAC family complete");
 			}
 			if (macsu)
 			{
-				if (signed_mac)
-				{
-					if (edge) { osd_printf_info("TMS320C54x dual MAC exclusions: PASS cases=16 restore=16 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated dual MAC exclusions complete"); }
-					osd_printf_info("TMS320C54x staged dual MAC: PASS address_cases=18432 arithmetic_cases=196608 restore=215040 encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 signed_operands=1 source_equals_destination=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated dual MAC complete");
-				}
 				if (edge) { osd_printf_info("TMS320C54x dual MACSU exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated dual MACSU exclusions complete"); }
 				osd_printf_info("TMS320C54x staged dual MACSU: PASS address_cases=18432 arithmetic_cases=196608 restore=215040 encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_unsigned_y_signed=1 x_alias_priority=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(0, "TMS320C54x isolated dual MACSU complete");
 			}

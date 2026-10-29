@@ -1346,6 +1346,9 @@ private:
 	static dual_multiply_fixture dual_multiply_case(unsigned variant, bool edge, bool alu = false, bool macsu = false, bool signed_mac = false, bool family = false, bool parallel = false);
 	static u64 dual_macsu_seed(unsigned variant, bool edge);
 	void start_dual_multiply(unsigned variant = 0);
+	dual_multiply_fixture m_dual_input{};
+	unsigned m_dual_raw_case = 0, m_dual_restores = 0;
+	ordered_case_digest m_dual_coverage;
 	struct mapped_dual_fixture
 	{
 		u32 base;

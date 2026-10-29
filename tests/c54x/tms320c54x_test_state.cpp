@@ -280,7 +280,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"mpy-dual", "mpy-dual-edge", "alu-dual", "alu-dual-edge"}, [](self &test) { test.start_dual_multiply(); } },
 		{ {"alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus"}, [](self &test) { test.start_mapped_dual(); } },
 		{ {"macsu-dual", "macsu-dual-edge"}, [](self &test) { test.start_dual_multiply(); } },
-		{ {"mac-dual", "mac-dual-edge"}, [](self &test) { test.start_dual_multiply(); } },
 		{ {"xc-signed"}, [](self &test) { test.start_signed_xc(); } },
 		{ {"xc-controls"}, [](self &test) { test.start_pipeline_xc_irq(); } },
 		{ {"xc-ret"}, [](self &test) { test.start_xc_return(); } },

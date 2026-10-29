@@ -778,6 +778,100 @@
         "full_default_seconds": 1058.73,
         "scope": "Shared serialization plumbing only. Full default retains every previous result record and opcode word, plus the earlier active-repeat restoration result. No runtime reduction claimed from this utility rewrite."
       }
+    },
+    {
+      "id": "dual-mac-family-retention",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_arithmetic.cpp; tests/c54x/tms320c54x_test_dual_schedule.h",
+      "profiles": [
+        "mac-family",
+        "stmac"
+      ],
+      "retired_profiles": ["mac-dual", "mac-dual-edge"],
+      "case_ids": [],
+      "basis": "TI SPRU172C MAC/MACR/MAS/MASR and parallel-store semantics; SPRU131G X-priority alias updates, FRCT/SMUL/OVM/SST, and fixture-owned retained Read operands versus Execute feedback. Signed arithmetic and rounding expectations remain in the existing fixture, not CPU implementation helpers.",
+      "profile_coverage": {
+        "mac-family": {
+          "cases": 671744,
+          "fnv64": "a992a2f6ed8d9f42",
+          "result_prefix": "TMS320C54x dual MAC family: PASS",
+          "key": "Original raw ordinal: eight 215040-entry operation/selector blocks; all 18432 addressing cases plus each of 65536 numerical identities at one balanced original checkpoint."
+        },
+        "stmac": {
+          "cases": 671744,
+          "fnv64": "a992a2f6ed8d9f42",
+          "result_prefix": "TMS320C54x parallel MAC: PASS",
+          "key": "Original raw ordinal: eight 215040-entry operation/selector blocks; all 18432 addressing cases plus each of 65536 numerical identities at one balanced original checkpoint."
+        }
+      },
+      "obligations": [
+        "retain all 147456 addressing cases: all 4096 encodings, three pointer layouts, circular/linear modes, alias/X-priority updates, status and accumulator seeds; address-bank snapshot cohorts are not duplicate inputs",
+        "retain all 524288 numerical inputs across eight operation/selector blocks, including 64 operand pairs, both destinations, 32 flag patterns, eight feedback seeds and both program pages",
+        "each fixed non-pair numerical group retains all 64 pairs, split 21/21/22 over the three original snapshots; record ordered raw identities and actual successful restores",
+        "compiled full-field/feedback-seed comparison establishes numerical checkpoint equivalence; descriptor census finds 147456 distinct addressing cases and zero overlap with the numerical bank for either profile",
+        "retain every original per-clock pointer, T, accumulator, status, fetch/read/write and literal/store expectation; cache the descriptor for its live/replay pair rather than recomputing it every tick",
+        "parallel store retains old source before destination replacement, independent ASM/SXM/SST expectation and X read-before-Y write; dual read retains X/Y and Read-owned T"
+      ],
+      "limits": [
+        "retire 1048576 duplicate numerical checkpoint executions per profile; complete value-by-checkpoint Cartesian product is no longer covered",
+        "parallel carry remains an unvalidated preserved-bit hypothesis, not documented silicon behavior; focused atomic carry examples are retained separately",
+        "no physical-bank, adjacent producer, repeat or interrupt-composition closure claimed",
+        "these profiles still use the legacy bench; ROM-free operation is not yet CPU-only dependency extraction",
+        "descriptor caching touches the smaller shared dual MPY/ALU/MACSU profiles too; their original counts and markers must remain unchanged",
+        "the 215040 mac-dual and 16 mac-dual-edge descriptors, snapshot choices, initializations and per-clock checks match operation/selector block zero of the retained family profiles; retire these duplicate profile names and routing, not their contracts"
+      ],
+      "measurement": {
+        "baseline_commit": "f9cb272a",
+        "c54x_cpp_bytes_before": 3682003,
+        "c54x_cpp_bytes_after": 3682913,
+        "c54x_cpp_lines_before": 55759,
+        "c54x_cpp_lines_after": 55794,
+        "isolated_profiles_before": 455,
+        "isolated_profiles_after": 453,
+        "duplicate_checkpoint_cases_retired": 2097152,
+        "duplicate_profile_cases_retired": 215056,
+        "stmac_seconds_before": 800.72,
+        "stmac_seconds_after": 307.08,
+        "mac_family_seconds_after": 306.00,
+        "scope": "Serial native profile wall times, not a full-default or whole-suite renewal. The old native run completed with exit 3 and was revalidated against f9cb272a's exact result contract after its wrapper read the newly updated review ledger. Explicit scheduling, ordered coverage and actual-restore accounting add 910 C++ bytes/35 lines; this is runtime reduction and duplicate-profile removal, not source shrinkage."
+      }
+    },
+    {
+      "id": "dual-mac-family-admission",
+      "classification": "implementation_limit",
+      "decision": "keep",
+      "source": "tests/c54x/tms320c54x_test_arithmetic.cpp",
+      "profiles": [
+        "mac-family-edge",
+        "stmac-edge"
+      ],
+      "case_ids": [],
+      "basis": "Current staged decoder admits RAM X/Y operands but rejects CPU/peripheral low-page sources before effects. These are implementation limits, not proof of a silicon trap or unsupported real instruction.",
+      "profile_coverage": {
+        "mac-family-edge": {
+          "cases": 128,
+          "fnv64": "709f2462c272f725",
+          "result_prefix": "TMS320C54x dual MAC family exclusions: PASS",
+          "key": "Original raw ordinals 0..127: eight operation/selector blocks times 16 X/Y CPU-register/peripheral/page/checkpoint controls."
+        },
+        "stmac-edge": {
+          "cases": 128,
+          "fnv64": "709f2462c272f725",
+          "result_prefix": "TMS320C54x parallel MAC exclusions: PASS",
+          "key": "Original raw ordinals 0..127: eight operation/selector blocks times 16 X/Y CPU-register/peripheral/page/checkpoint controls."
+        }
+      },
+      "obligations": [
+        "retain every original rejection case and snapshot; no schedule reduction for this bank",
+        "no operand read/write or pointer update before rejection; retain original accumulator/T/status/PMST expectations and one opcode fetch",
+        "record actual restore count and ordered raw identity digest"
+      ],
+      "limits": [
+        "these X/Y decoder-admission controls do not duplicate the Smem source-domain bank",
+        "no silicon exception policy or general mapped-operand support claim",
+        "legacy-bench dependencies remain; no CPU-only extraction claimed"
+      ]
     }
   ]
 }

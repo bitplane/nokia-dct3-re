@@ -1589,16 +1589,16 @@ reuses paired address capture and retained RAM reads. The accumulator
 remains Execute-owned, with FRCT, SMUL product handling, OVM and sticky
 destination overflow handled by the existing arithmetic helpers.
 
-`mac-dual` passes 215,040 cases/restores: 18,432 addressing cases and
-196,608 arithmetic cases, 512 same-accumulator encodings, three layouts,
-two BK modes, 64 input pairs, eight accumulator patterns, 32 flag states,
-two pages and three snapshots. Operand/pointer/BK mutation after capture
-detects rereads or repeated updates; accumulator mutation before Execute
-checks feedback ownership. `mac-dual-edge` rejects 16 low mapped operand
-cases before reads or pointer updates. Cross-accumulator MAC, rounded
-MACR, MAS/MASR, physical bank timing and interrupt/repeat composition are
-not admitted by this contract. Execution of the original MAC is not proof
-of valid recording or audio.
+The same-accumulator MAC contract belongs to operation/selector block zero
+of `mac-family`; its mapped-source exclusions belong to block zero of
+`mac-family-edge`. A compiled comparison establishes identical descriptors
+and snapshots for all 215,040 former `mac-dual` cases and 16 edge cases.
+The duplicate profile names, routing and completion paths are retired.
+Operand/pointer/BK mutation after capture detects rereads or repeated updates;
+accumulator mutation before Execute checks feedback ownership. The complete
+family includes cross-accumulator MAC, rounded MACR and MAS/MASR; physical
+bank timing and interrupt/repeat composition remain unvalidated. Execution
+of the original MAC is not proof of valid recording or audio.
 
 ### Active repeat context and stack bypass
 
@@ -4352,13 +4352,19 @@ and optional rounding by adding `0x8000` and clearing the low sixteen bits.
 The accumulator is sampled at Execute; SMUL product saturation precedes
 addition/subtraction, and rounding precedes destination overflow handling.
 
-The `mac-family` profile passes 1,720,320 cases and save-state replays,
+The `mac-family` profile passes 671,744 cases and save-state replays,
 covering all 4,096 encodings, aliased/distinct pointers, circular and legacy
 BK=0 addressing, both program pages, all four source/destination pairs,
 eight accumulator seeds, 64 numerical operand pairs and status combinations.
 Its expected rounding uses signed floor division rather than the CPU's bit
 mask implementation. Address/operand mutation and snapshots around Access,
 Read and Execute verify retained operands and Execute-owned feedback.
+All 147,456 addressing cases remain: their snapshot cohorts also change
+status and accumulator seeds. The 524,288 numerical inputs retain every
+operand pair, feedback seed, flag combination, selector and page, but each
+now uses one of the original three checkpoints. Every fixed non-pair group
+splits its 64 pairs 21/21/22 between those checkpoints. The former complete
+value-by-checkpoint Cartesian product is intentionally retired.
 `mac-family-edge` adds 128 exclusion/replay cases with no mapped reads or
 register publication. Physical memory-bank timing and interrupt/repeat
 composition remain unvalidated; this is not native handset acceptance.
@@ -4395,7 +4401,7 @@ adjacent-consumer composition is not qualified by the isolated fixture.
 Adjacent ASM/SXM/FRCT/OVM writers, physical memory-bank timing and
 interrupt/single-repeat composition remain unvalidated.
 
-The `stmac` profile passes 1,720,320 cases and save-state replays over all
+The `stmac` profile passes the same 671,744-case schedule and save-state replays over all
 4,096 encodings, all source/destination pairs, 32 ASM shifts, distinct and
 aliased addresses, both program pages, circular/legacy BK=0 modes, numerical
 operand/accumulator patterns and status combinations. These are distributed
@@ -4407,6 +4413,19 @@ SXM and SST to the shifted old source, including source/destination aliases.
 `stmac-edge` passes 128 mapped-operand exclusions/replays with no bus writes,
 reads or pointer updates. The acceptance marker explicitly leaves C
 unvalidated rather than promoting the carry-preservation hypothesis.
+Both profiles require ordered raw-case digest `a992a2f6ed8d9f42` and count
+successful restores, not requested ones. Their 128-case exclusion banks
+remain unchanged, with digest `709f2462c272f725`. A compiled descriptor/seed
+census establishes numerical snapshot equivalence, 147,456 distinct
+addressing cases and zero address/numerical overlap in either profile.
+The cached descriptor belongs to a complete live/replay pair; arithmetic
+expectations and all per-clock mutation/assertion points are unchanged.
+These banks still use the legacy bench, not the CPU-only machine.
+The measured serial `stmac` run falls from 800.72 to 307.08 seconds; the
+retained `mac-family` run takes 306.00 seconds. Explicit scheduling and
+coverage/restore accounting add 910 C++ bytes/35 lines across the C54x
+sources, despite removing two redundant profile names and their routing.
+This is not a source-size win or a renewal of the full-default checkpoint.
 
 ## Staged square distance
 
