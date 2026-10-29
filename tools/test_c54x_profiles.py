@@ -40,6 +40,7 @@ class ProfileDeclarationTests(unittest.TestCase):
 
     def test_unsupported_conditional_and_duplicate_entries_fail_closed(self):
         for source in (SOURCE.replace('0x1,', '0,'), SOURCE.replace('"second"', '"first"'),
+                       SOURCE.replace('0x1,', '0x2,'), SOURCE.replace('BIOS(0,', 'BIOS(2,'),
                        SOURCE.replace('0x1,', 'BASE + 1,'), SOURCE + SOURCE,
                        SOURCE.replace('"second"', '"profile-name-too-long"'),
                        SOURCE.replace('ROM_SYSTEM_BIOS(0x1', '#if ENABLED\nROM_SYSTEM_BIOS(0x1')):

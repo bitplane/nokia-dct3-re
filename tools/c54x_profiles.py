@@ -42,6 +42,8 @@ def declarations(source):
         if (len({entry['name'] for entry in entries}) != len(entries) or
                 len({entry['index'] for entry in entries}) != len(entries)):
             raise ValueError('duplicate conformance BIOS name/index: ' + machine)
+        if [entry['index'] for entry in entries] != list(range(len(entries))):
+            raise ValueError('non-sequential conformance BIOS indices: ' + machine)
         result[machine] = entries
     return result
 

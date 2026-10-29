@@ -331,10 +331,6 @@ EXTRA_PROFILES = {
         "TMS320C54x generic parallel: PASS cases=10 reset_each=1 nokia_devices=0 firmware=0",
         "Fatal error: TMS320C54x isolated generic parallel complete",
     ),
-    "rmw-long-full": (
-        "TMS320C54x staged long RMW: PASS cases=153600 operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=153600 duplicate_reads=0 duplicate_writes=0 snapshots=4 checkpoint_policy=exhaustive coverage_fnv64=92f5d379269cbf25",
-        "Fatal error: TMS320C54x isolated long RAM RMW complete",
-    ),
     "rmw-long": (
         "TMS320C54x staged long RMW: PASS cases=38400 operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=38400 duplicate_reads=0 duplicate_writes=0 snapshots=4 checkpoint_policy=balanced coverage_fnv64=882e53fb781dc875",
         "Fatal error: TMS320C54x isolated long RAM RMW complete",

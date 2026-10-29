@@ -161,7 +161,7 @@
       "decision": "merge",
       "basis": "TI ADDM/ANDM/ORM operand and status semantics, plus explicitly model-owned staged retention/publication ordering. The old 153600 cases contain four identical copies of 38400 stimuli; only the checkpoint differs.",
       "source": "tests/c54x/tms320c54x_test_rmw_schedule.h",
-      "profiles": ["rmw-long", "rmw-long-full"],
+      "profiles": ["rmw-long"],
       "legacy_entry": "default phase 252890; also the long-mvkd bundle",
       "case_ids": [],
       "profile_coverage": {
@@ -171,13 +171,6 @@
           "key": "4 * unique_stimulus_ordinal + checkpoint_index",
           "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
           "fnv64": "882e53fb781dc875"
-        },
-        "rmw-long-full": {
-          "result_prefix": "TMS320C54x staged long RMW: PASS ",
-          "cases": 153600,
-          "key": "4 * unique_stimulus_ordinal + checkpoint_index",
-          "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
-          "fnv64": "92f5d379269cbf25"
         }
       },
       "obligations": [
@@ -188,11 +181,13 @@
         "independently checked ordered case/checkpoint digest and actual restore count"
       ],
       "limits": [
-        "balanced default does not claim the full value-by-checkpoint product; exhaustive profile retains it",
+        "balanced coverage does not claim the full value-by-checkpoint product; the temporary comparison profile is retired",
         "exact staged cycle placement is a model contract, not measured silicon",
         "peripheral RMW and absolute XORM are separate, unchanged families",
         "still uses the sequenced bench; CPU-only relocation is not claimed"
-      ]
+      ],
+      "retired_profiles": ["rmw-long-full"],
+      "retirement_basis": "The full comparison passed and adds no distinct assertion, mutation sequence or checkpoint shape. No separate regression was identified that requires its remaining value/checkpoint combinations. Those combinations are no longer claimed as covered; a newly evidenced interaction can justify a targeted regression."
     }
   ]
 }

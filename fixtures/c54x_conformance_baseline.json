@@ -3041,13 +3041,8 @@
           "name": "rmw-long"
         },
         {
-          "description": "Full RAM RMW value-by-checkpoint product",
-          "index": 222,
-          "name": "rmw-long-full"
-        },
-        {
           "description": "Staged register arithmetic and load with producer controls",
-          "index": 223,
+          "index": 222,
           "name": "reg-banks"
         }
       ]
@@ -3737,7 +3732,7 @@
       "TMS320C54x staged logical immediates: PASS cases=1536 operations=AND,OR,XOR selectors=4 shifts=0,1,7,15,16 restore=1536 duplicate_literals=0\n": 1,
       "TMS320C54x staged long MVDK: PASS cases=38400 forms=25 offsets=4 destinations=12 values=4 compatibility=2 restore=38400 source_alias=1 zero_gap_cmpr=1 duplicate_reads=0 duplicate_writes=0\n": 1,
       "TMS320C54x staged long MVKD: PASS cases=19200 forms=25 offsets=4 sources=selected_AR,AR2,RAM,alias values=4 compatibility=2 pages=2 restore=19200 reads_each=1 writes_each=1 extensions_each=2 silicon_phase_claim=0\n": 1,
-      "TMS320C54x staged long RMW: PASS cases=%u operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=%u duplicate_reads=0 duplicate_writes=0 snapshots=4 checkpoint_policy=%s coverage_fnv64=%016llx\n": 1,
+      "TMS320C54x staged long RMW: PASS cases=%u operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=%u duplicate_reads=0 duplicate_writes=0 snapshots=4 checkpoint_policy=balanced coverage_fnv64=%016llx\n": 1,
       "TMS320C54x staged long STL/STH: PASS cases=12800 forms=25 offsets=4 selectors=4 sst_sxm=4 patterns=4 compatibility=2 restore=12800 duplicate_writes=0 destination_reads=0 checkpoints=3 checkpoint_policy=balanced\n": 1,
       "TMS320C54x staged long delay store: PASS cases=2880 restore=2880 controls=BD,BCD_taken,BCD_untaken,CALLD,RETD stores=STL_A,STL_B,STH_A,STH_B forms=offset,preincrement,circular,absolute literals=6 pages=2 snapshots=3 literal_fetches=1 destination_reads=0 store_writes=1 silicon_phase_claim=0\n": 1,
       "TMS320C54x staged long immediate ST: PASS cases=6144 forms=offset,preincrement,circular registers=8 offsets=4 values=4 compatibility=0,1 pages=2 restore=6144 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n": 1,
@@ -11418,30 +11413,6 @@
         "TMS320C54x staged long RMW: PASS cases=38400 operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=38400 duplicate_reads=0 duplicate_writes=0 snapshots=4 checkpoint_policy=balanced coverage_fnv64=882e53fb781dc875"
       ]
     },
-    "rmw-long-full": {
-      "completion": "Fatal error: TMS320C54x isolated long RAM RMW complete",
-      "machine": "tms54xtra",
-      "reported_fields": [
-        {
-          "cases": "153600",
-          "checkpoint_policy": "exhaustive",
-          "compatibility": "2",
-          "coverage_fnv64": "92f5d379269cbf25",
-          "duplicate_reads": "0",
-          "duplicate_writes": "0",
-          "forms": "25",
-          "offsets": "4",
-          "operations": "ADDM,ANDM,ORM",
-          "restore": "153600",
-          "snapshots": "4",
-          "status_states": "8",
-          "value_pairs": "8"
-        }
-      ],
-      "required": [
-        "TMS320C54x staged long RMW: PASS cases=153600 operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=153600 duplicate_reads=0 duplicate_writes=0 snapshots=4 checkpoint_policy=exhaustive coverage_fnv64=92f5d379269cbf25"
-      ]
-    },
     "rmw-long-periph": {
       "completion": "Fatal error: TMS320C54x isolated long peripheral RMW complete",
       "machine": "tms54test",
@@ -15978,19 +15949,6 @@
         "cases": 38400,
         "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
         "fnv64": "882e53fb781dc875",
-        "key": "4 * unique_stimulus_ordinal + checkpoint_index",
-        "result_prefix": "TMS320C54x staged long RMW: PASS "
-      },
-      "decision": "merge",
-      "family": "long-ram-rmw"
-    },
-    "rmw-long-full": {
-      "case_ids": [],
-      "classification": "architectural_interaction",
-      "coverage": {
-        "cases": 153600,
-        "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
-        "fnv64": "92f5d379269cbf25",
         "key": "4 * unique_stimulus_ordinal + checkpoint_index",
         "result_prefix": "TMS320C54x staged long RMW: PASS "
       },

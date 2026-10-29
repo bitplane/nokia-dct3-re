@@ -66,7 +66,7 @@ run handset gates on the test-free executable. A mocked runner test is not a
 substitute for those emulator runs.
 
 Development checks should use the affected isolated families. The large
-default regression remains the exhaustive compatibility contract, not a gate
+default regression remains a broad checkpoint for retained fixtures, not a gate
 after every small edit. The generic ISA entry is currently a reviewed pilot,
 not a replacement for all default coverage. Family review must track runtime
 as well as source size, and separate value-space coverage from distinct
@@ -74,8 +74,8 @@ checkpoint-state coverage before reducing their Cartesian product.
 
 Long RAM RMW uses all 38,400 distinct stimuli in its balanced default schedule.
 Each operation/address/compatibility/status group covers all four checkpoints
-twice across eight value pairs. `--profile rmw-long` runs that family directly;
-`--profile rmw-long-full` retains the 153,600-case Cartesian product. Both report
+twice across eight value pairs. `--profile rmw-long` runs that family directly,
+with no retained full value-by-checkpoint product. It reports
 actual case/restore counts and an independently checked ordered coverage digest.
 This is a reduction in repeated execution, not a claim of full value-by-phase
 coverage in the balanced run. The sequenced RMW fixture is not yet CPU-only.

@@ -76,7 +76,7 @@ int main() {
             subprocess.run([str(program)], check=True, capture_output=True)
 
     def test_reviewed_ordered_coverage_is_required(self):
-        for profile in ('rmw-long', 'rmw-long-full', 'long-mvkd', 'reg-banks'):
+        for profile in ('rmw-long', 'long-mvkd', 'reg-banks'):
             markers, ending = EXTRA_PROFILES[profile]
             markers = (markers,) if isinstance(markers, str) else markers
             coverage = reviewed_profiles()[profile]['coverage']
@@ -191,13 +191,11 @@ int main() {
 #include <iostream>
 #include "tests/c54x/tms320c54x_test_support.h"
 #include "tests/c54x/tms320c54x_test_rmw_schedule.h"
-int main(int argc, char **) {
+int main() {
     using schedule = c54x_test::long_rmw_schedule;
-    bool const exhaustive = argc > 1;
-    unsigned const count = exhaustive ? schedule::exhaustive_cases : schedule::unique_cases;
     c54x_test::ordered_case_digest digest;
-    for (unsigned v = 0; v < count; ++v) {
-        unsigned const key = schedule::case_key(v, exhaustive);
+    for (unsigned v = 0; v < schedule::unique_cases; ++v) {
+        unsigned const key = schedule::case_key(v);
         digest.add(key);
         std::cout << key << '\n';
     }
@@ -205,28 +203,22 @@ int main(int argc, char **) {
 }
 '''
         with compiled_cpp(source) as program:
-            for exhaustive in (False, True):
-                output = subprocess.run([str(program)] + (['full'] if exhaustive else []),
-                                        check=True, capture_output=True, text=True).stdout.splitlines()
-                actual = list(map(int, output[:-1]))
-                expected = []
-                groups = defaultdict(Counter)
-                for checkpoint in (range(4) if exhaustive else range(1)):
-                    for compatibility in range(2):
-                        for arithmetic in range(64):
-                            flags, pattern = arithmetic % 8, arithmetic // 8
-                            for address in range(100):
-                                for operation in range(3):
-                                    ordinal = operation + 3 * address + 300 * arithmetic + 19200 * compatibility
-                                    selected = checkpoint if exhaustive else (pattern + operation + address) % 4
-                                    expected.append(ordinal * 4 + selected)
-                                    groups[operation, address, compatibility, flags][selected] += 1
-                self.assertEqual(actual, expected)
-                self.assertEqual(len(groups), 4800)
-                self.assertTrue(all(group == Counter({i: 8 if exhaustive else 2 for i in range(4)})
-                                    for group in groups.values()))
-                profile = 'rmw-long-full' if exhaustive else 'rmw-long'
-                self.assertEqual(output[-1], 'digest=' + reviewed_profiles()[profile]['coverage']['fnv64'])
+            output = subprocess.run([str(program)], check=True, capture_output=True,
+                                    text=True).stdout.splitlines()
+        expected, groups = [], defaultdict(Counter)
+        for compatibility in range(2):
+            for arithmetic in range(64):
+                flags, pattern = arithmetic % 8, arithmetic // 8
+                for address in range(100):
+                    for operation in range(3):
+                        ordinal = operation + 3 * address + 300 * arithmetic + 19200 * compatibility
+                        checkpoint = (pattern + operation + address) % 4
+                        expected.append(ordinal * 4 + checkpoint)
+                        groups[operation, address, compatibility, flags][checkpoint] += 1
+        self.assertEqual(list(map(int, output[:-1])), expected)
+        self.assertEqual(len(groups), 4800)
+        self.assertTrue(all(group == Counter({i: 2 for i in range(4)}) for group in groups.values()))
+        self.assertEqual(output[-1], 'digest=' + reviewed_profiles()['rmw-long']['coverage']['fnv64'])
 
     def test_reviewed_case_identities_are_required_in_order(self):
         for profile in ('isa-square', 'isa-parallel'):

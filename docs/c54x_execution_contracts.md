@@ -58,8 +58,8 @@ pipeline retention, repeat or interrupt-composition coverage.
 The reviewed long RAM RMW schedule retains every distinct operation, addressing,
 value, status and compatibility stimulus once (38,400 cases). For each of its
 4,800 operation/address/compatibility/status groups, the eight value pairs cover
-all four checkpoints twice. `rmw-long` runs this balanced schedule;
-`rmw-long-full` retains all 153,600 value-by-checkpoint combinations. Ordered
+all four checkpoints twice. `rmw-long` runs this balanced schedule; the full
+value-by-checkpoint cross-product is not retained. Ordered
 case/checkpoint digests and actual replay counts are required acceptance, with
 the selector independently checked outside the CPU. The exact staged cycle
 placement remains a model contract, not measured silicon timing.
