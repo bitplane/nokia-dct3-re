@@ -9,6 +9,7 @@
 #include "tms320c54x_test_long_reference.h"
 #include "tms320c54x_test_product_examples.h"
 #include "tms320c54x_test_memory_examples.h"
+#include "tms320c54x_test_dual_reference.h"
 #include <algorithm>
 
 namespace c54x_test {
@@ -222,229 +223,22 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			m_check_timer->adjust(attotime::from_usec(100));
 			return true;
 		}
-		program.write_word(0x05e2, 0xb03a); // MAC *AR5,*AR4+,A,A
-		data.write_word(0x0f90, 2);
-		data.write_word(0x0f91, 3);
 		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x18000}, {cpu_regs::STATE_B, 0x28000}, {cpu_regs::STATE_T, 0},
-			{cpu_regs::STATE_ST0, 0x0800}, {cpu_regs::STATE_ST1, 0x0100}, {cpu_regs::STATE_AR4, 0x0f91},
-			{cpu_regs::STATE_AR5, 0x0f90}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
+		prepare_case(*m_cpu, dual_reference_cases().front());
 		return next_atomic_phase(614);
 	}
-	if (m_phase >= 614 && m_phase <= 629)
+	if (m_phase >= 614 && m_phase <= 652)
 	{
-		struct dual_mac_case { u16 opcode; u64 a_after, b_after; };
-		static constexpr dual_mac_case cases[] = {
-			{ 0xb03a, 0x18006, 0x28000 }, { 0xb13a, 0x18000, 0x18006 },
-			{ 0xb23a, 0x28006, 0x28000 }, { 0xb33a, 0x18000, 0x28006 },
-			{ 0xb43a, 0x20000, 0x28000 }, { 0xb53a, 0x18000, 0x20000 },
-			{ 0xb63a, 0x30000, 0x28000 }, { 0xb73a, 0x18000, 0x30000 },
-			{ 0xb83a, 0x17ffa, 0x28000 }, { 0xb93a, 0x18000, 0x17ffa },
-			{ 0xba3a, 0x27ffa, 0x28000 }, { 0xbb3a, 0x18000, 0x27ffa },
-			{ 0xbc3a, 0x10000, 0x28000 }, { 0xbd3a, 0x18000, 0x10000 },
-			{ 0xbe3a, 0x20000, 0x28000 }, { 0xbf3a, 0x18000, 0x20000 }
-		};
-		const unsigned index = m_phase - 614;
-		const dual_mac_case &row = cases[index];
-		expect_opcode(row.opcode,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 2 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f92 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
-			(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"dual MAC/MAS source, destination, rounding, pointer, and one-cycle timing");
-		if (m_phase < 629)
+		unsigned const index = m_phase - 614;
+		auto const &cases = dual_reference_cases();
+		auto const &test = cases[index];
+		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
+		expect_opcode(test.opcode, true, "dual/parallel MAC routing, literal results, and one-cycle timing");
+		if (index + 1 < cases.size())
 		{
-			const dual_mac_case &next = cases[index + 1];
-			program.write_word(0x05e2, next.opcode);
 			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, 0x18000}, {cpu_regs::STATE_B, 0x28000}, {cpu_regs::STATE_T, 0},
-				{cpu_regs::STATE_ST0, 0x0800}, {cpu_regs::STATE_ST1, 0x0100}, {cpu_regs::STATE_AR4, 0x0f91},
-				{cpu_regs::STATE_AR5, 0x0f90}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-			});
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		program.write_word(0x05e2, 0xd03a); // ST A,*AR4+ || MAC *AR5,A
-		data.write_word(0x0f90, 3);
-		data.write_word(0x0f91, 0);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x18000}, {cpu_regs::STATE_B, 0x28000}, {cpu_regs::STATE_T, 2},
-			{cpu_regs::STATE_ST0, 0x0800}, {cpu_regs::STATE_ST1, 0x0100}, {cpu_regs::STATE_AR4, 0x0f91},
-			{cpu_regs::STATE_AR5, 0x0f90}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(630);
-	}
-	if (m_phase >= 630 && m_phase <= 645)
-	{
-		struct parallel_mac_case { u16 opcode, store; u64 a_after, b_after; };
-		static constexpr parallel_mac_case cases[] = {
-			{ 0xd03a, 1, 0x18006, 0x28000 }, { 0xd13a, 1, 0x18000, 0x28006 },
-			{ 0xd23a, 2, 0x18006, 0x28000 }, { 0xd33a, 2, 0x18000, 0x28006 },
-			{ 0xd43a, 1, 0x20000, 0x28000 }, { 0xd53a, 1, 0x18000, 0x30000 },
-			{ 0xd63a, 2, 0x20000, 0x28000 }, { 0xd73a, 2, 0x18000, 0x30000 },
-			{ 0xd83a, 1, 0x17ffa, 0x28000 }, { 0xd93a, 1, 0x18000, 0x27ffa },
-			{ 0xda3a, 2, 0x17ffa, 0x28000 }, { 0xdb3a, 2, 0x18000, 0x27ffa },
-			{ 0xdc3a, 1, 0x10000, 0x28000 }, { 0xdd3a, 1, 0x18000, 0x20000 },
-			{ 0xde3a, 2, 0x10000, 0x28000 }, { 0xdf3a, 2, 0x18000, 0x20000 }
-		};
-		const unsigned index = m_phase - 630;
-		const parallel_mac_case &row = cases[index];
-		expect_opcode(row.opcode,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 2 &&
-			data.read_word(0x0f91) == row.store &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f92 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
-			(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"parallel store MAC/MAS routing, rounding, and one-cycle timing");
-		if (m_phase < 645)
-		{
-			const parallel_mac_case &next = cases[index + 1];
-			program.write_word(0x05e2, next.opcode);
-			data.write_word(0x0f91, 0);
-			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, 0x18000}, {cpu_regs::STATE_B, 0x28000}, {cpu_regs::STATE_T, 2},
-				{cpu_regs::STATE_ST0, 0x0800}, {cpu_regs::STATE_ST1, 0x0100}, {cpu_regs::STATE_AR4, 0x0f91},
-				{cpu_regs::STATE_AR5, 0x0f90}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-			});
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		program.write_word(0x05e2, 0xd93a); // TI SPRU172C: ST A,*AR4+ || MAS *AR5,B.
-		data.write_word(0x0f90, 0x4321);
-		data.write_word(0x0f91, 0x1234);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x111111}, {cpu_regs::STATE_B, 0x1111}, {cpu_regs::STATE_T, 0x0400},
-			{cpu_regs::STATE_ST0, 0},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0105); // ASM = 5.
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR4, 0x0f91}, {cpu_regs::STATE_AR5, 0x0f90}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(646);
-	}
-	if (m_phase == 646 || m_phase == 647)
-	{
-		const bool rounded = m_phase == 647;
-		expect_opcode(rounded ? 0xddba : 0xd93a,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x111111 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) ==
-				(rounded ? 0xfffef40000ULL : 0xfffef38d11ULL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x0400 &&
-			data.read_word(0x0f91) == (rounded ? 0x0022 : 0x0222) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f92 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR5) == (rounded ? 0x0f91 : 0x0f90) &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"TI parallel MAS/MASR examples match result, ASM store, pointer, and cycle cost");
-		if (!rounded)
-		{
-			program.write_word(0x05e2, 0xddba); // ST A,*AR4+ || MASR *AR5+,B.
-			data.write_word(0x0f91, 0x1234);
-			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, 0x111111}, {cpu_regs::STATE_B, 0x1111}, {cpu_regs::STATE_T, 0x0400},
-				{cpu_regs::STATE_ST0, 0},
-			});
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0101); // ASM = 1.
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_AR4, 0x0f91}, {cpu_regs::STATE_AR5, 0x0f90}, {cpu_regs::STATE_PC, 0x05e0},
-				{cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(647);
-		}
-		program.write_word(0x05e2, 0xd9b7); // ST A,*AR5- || MAS *AR5+,B.
-		data.write_word(0x0f90, 3);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x18000}, {cpu_regs::STATE_B, 0x28000}, {cpu_regs::STATE_T, 2},
-			{cpu_regs::STATE_ST0, 0x0800}, {cpu_regs::STATE_ST1, 0x0100}, {cpu_regs::STATE_AR5, 0x0f90},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(648);
-	}
-	if (m_phase == 648)
-	{
-		expect_opcode(0xd9b7,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x18000 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x27ffa &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 2 &&
-			data.read_word(0x0f90) == 1 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f91 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"parallel MAS reads X before aliased Y store and applies Xmod once");
-		program.write_word(0x05e2, 0xb83a); // MAS *AR5,*AR4+,A,A with FRCT.
-		data.write_word(0x0f90, 2);
-		data.write_word(0x0f91, 3);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x18000}, {cpu_regs::STATE_B, 0x28000}, {cpu_regs::STATE_T, 0},
-			{cpu_regs::STATE_ST0, 0},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0140); // SXM, FRCT.
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR4, 0x0f91}, {cpu_regs::STATE_AR5, 0x0f90}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(649);
-	}
-	if (m_phase >= 649 && m_phase <= 652)
-	{
-		struct multiply_mode_case {
-			u16 opcode, x, y, t_before, t_after, st1, st0_after, store;
-			u64 a_before, b_before, a_after, b_after;
-		};
-		static constexpr multiply_mode_case cases[] = {
-			{ 0xb83a, 2,      3, 0, 2,      0x0140, 0,      3,
-			  0x18000,    0x28000, 0x17ff4,    0x28000 },
-			{ 0xd93a, 3,      0, 2, 2,      0x0140, 0,      1,
-			  0x18000,    0x28000, 0x18000,    0x27ff4 },
-			{ 0xb83a, 0xffff, 2, 0, 0xffff, 0x0300, 0x0400, 2,
-			  0x7fffffff, 0,       0x7fffffff, 0 },
-			{ 0xd93a, 0xffff, 0, 2, 2,      0x0300, 0x0200, 1,
-			  0x18000,    0x7fffffff, 0x18000, 0x7fffffff }
-		};
-		const unsigned index = m_phase - 649;
-		const multiply_mode_case &row = cases[index];
-		expect_opcode(row.opcode,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == row.t_after &&
-			(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0600) == row.st0_after &&
-			data.read_word(0x0f91) == row.store &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f92 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"dual and parallel MAS FRCT doubling, OVM saturation, and one-cycle timing");
-		if (m_phase < 652)
-		{
-			const multiply_mode_case &next = cases[index + 1];
-			program.write_word(0x05e2, next.opcode);
-			data.write_word(0x0f90, next.x);
-			data.write_word(0x0f91, next.y);
-			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, next.a_before}, {cpu_regs::STATE_B, next.b_before},
-				{cpu_regs::STATE_T, next.t_before}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, next.st1},
-				{cpu_regs::STATE_AR4, 0x0f91}, {cpu_regs::STATE_AR5, 0x0f90}, {cpu_regs::STATE_PC, 0x05e0},
-				{cpu_regs::STATE_IDLE, 0},
-			});
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
+			prepare_case(*m_cpu, cases[index + 1]);
+			return next_atomic_phase(m_phase + 1);
 		}
 		program.write_word(0x05e2, 0xe13a); // LMS *AR5,*AR4+.
 		data.write_word(0x0f90, 0x0055);

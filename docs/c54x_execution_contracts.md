@@ -94,12 +94,24 @@ record and the explicit transport-free completion. Long-RMW replay and both
 3210 menu gates pass. The full-default checkpoint below also includes this
 separation.
 
-`isa-parallel` runs ten independently reset parallel store/arithmetic cases.
+`isa-parallel` runs 49 literal cases: ten independently reset parallel
+store/arithmetic controls, followed by 39 dual/parallel MAC/MACR/MAS/MASR
+references in one ordered reset group. The latter retain all source/destination
+combinations, two ASM examples, same-AR read-before-write and four FRCT/OVM
+controls. Partial RAM setup, the alias case's omitted AR4 setup/check and the
+original carry/overflow masks are intentional.
 The default sequence reuses their literal register, masked-status and RAM
 expectations through a short adapter; old phase numbers are compatibility
 routing, not the case identities. The aliasing case checks the loaded old RAM
 word and the newly stored word separately. These atomic cases do not replace
-pipeline retention, repeat or interrupt-composition coverage.
+pipeline retention, repeat or interrupt-composition coverage. In particular,
+the staged parallel-MAC matrix's carry policy is unvalidated; it does not
+subsume these atomic carry controls. A shared PORTW constructor builds stimulus
+only, not numeric expectations. Compiled comparison preserves all 39 old
+setup sequences and 22,464 predicate mutations; all 134 existing literal case
+records remain unchanged by the constructor consolidation. Including both new
+headers, the shared bank/constructor removes 2,476 C++ bytes/65 lines. No case
+or checkpoint is retired and no runtime improvement is claimed.
 
 `isa-long` runs 18 independently reset DADD/DSUB/DRSUB and T-based long-word
 examples. Literal accumulators, address updates, source/decoy RAM, cycle
@@ -263,6 +275,8 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_case.h` | Generic stimulus loading and independent register/bus comparisons; no instruction semantics |
 | `tests/c54x/tms320c54x_test_square.h` | Reviewed literal SQUR/SQURA/SQURS cases shared by generic and default-sequence entries |
 | `tests/c54x/tms320c54x_test_parallel.h` | Reviewed parallel store/arithmetic vectors, including same-cell ordering and circular pointer controls |
+| `tests/c54x/tms320c54x_test_dual_reference.h` | Ordered dual/parallel MAC literal references with explicit partial setup and status masks |
+| `tests/c54x/tms320c54x_test_port_case.h` | Common PORTW stimulus construction; no instruction arithmetic or reset policy |
 | `tests/c54x/tms320c54x_test_scalars.h` | Literal scalar boundaries with explicit reset/continuation groups, shared with the legacy basic adapter |
 | `tests/c54x/tms320c54x_test_memory_examples.h` | Ordered literal memory arithmetic/multiply/T examples, with original partial setup and assertion masks |
 | `tests/c54x/tms320c54x_test_domains.h` | Independent single-memory admission fixture: catalogue, preserved state, bus observers and replay |

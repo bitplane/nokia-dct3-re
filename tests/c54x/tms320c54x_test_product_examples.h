@@ -4,8 +4,7 @@
 #ifndef MAME_NOKIA_TMS320C54X_TEST_PRODUCT_EXAMPLES_H
 #define MAME_NOKIA_TMS320C54X_TEST_PRODUCT_EXAMPLES_H
 
-#include "tms320c54x_test_case.h"
-#include "cpu/tms320c54x/tms320c54x.h"
+#include "tms320c54x_test_port_case.h"
 #include <initializer_list>
 #include <utility>
 
@@ -23,13 +22,8 @@ inline auto const &product_examples()
 			std::vector<register_setting> initial, std::vector<register_check> expected,
 			std::vector<memory_word> data = {}, unsigned cycles = 3,
 			std::vector<memory_word> expected_data = {}, unsigned writes = 2) {
-			instruction_case test{id, *words.begin(), {{0x05e0, 0x75d6}, {0x05e1, 0x0124}},
-				std::move(data), std::move(initial), std::move(expected), writes, cycles, std::move(expected_data)};
+			auto test = port_case(id, words, std::move(initial), std::move(expected), std::move(data), cycles, std::move(expected_data), writes);
 			test.reset_before = result.empty();
-			unsigned pc = 0x05e2;
-			for (auto word : words) test.program.emplace_back(pc++, word);
-			for (u16 word : {0x75d6, 0x0124, 0xf5e1}) test.program.emplace_back(pc++, word);
-			test.initial.insert(test.initial.end(), {{r::STATE_PC, 0x05e0}, {r::STATE_IDLE, 0}});
 			result.push_back(std::move(test));
 		};
 		add("mpya-t-signed17", {0xf58c},

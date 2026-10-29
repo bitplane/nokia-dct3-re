@@ -3256,7 +3256,7 @@
       "TMS320C54x generic long arithmetic: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic memory examples: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic near flow: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
-      "TMS320C54x generic parallel: PASS cases=10 reset_each=1 nokia_devices=0 firmware=0\n": 1,
+      "TMS320C54x generic parallel: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic product sequence: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic scalars: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic square: PASS cases=6 reset_each=1 nokia_devices=0 firmware=0\n": 1,
@@ -6563,14 +6563,14 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
-          "cases": "10",
+          "cases": "49",
           "firmware": "0",
           "nokia_devices": "0",
-          "reset_each": "1"
+          "reset_groups": "11"
         }
       ],
       "required": [
-        "TMS320C54x generic parallel: PASS cases=10 reset_each=1 nokia_devices=0 firmware=0"
+        "TMS320C54x generic parallel: PASS cases=49 reset_groups=11 nokia_devices=0 firmware=0"
       ]
     },
     "isa-products": {
@@ -15546,7 +15546,46 @@
         "st-a-ld-t-circular",
         "st-b-ld-t-circular",
         "st-add-saturate",
-        "st-sub-saturate"
+        "st-sub-saturate",
+        "dual-mac-a-a",
+        "dual-mac-a-b",
+        "dual-mac-b-a",
+        "dual-mac-b-b",
+        "dual-macr-a-a",
+        "dual-macr-a-b",
+        "dual-macr-b-a",
+        "dual-macr-b-b",
+        "dual-mas-a-a",
+        "dual-mas-a-b",
+        "dual-mas-b-a",
+        "dual-mas-b-b",
+        "dual-masr-a-a",
+        "dual-masr-a-b",
+        "dual-masr-b-a",
+        "dual-masr-b-b",
+        "st-a-mac-to-a",
+        "st-a-mac-to-b",
+        "st-b-mac-to-a",
+        "st-b-mac-to-b",
+        "st-a-macr-to-a",
+        "st-a-macr-to-b",
+        "st-b-macr-to-a",
+        "st-b-macr-to-b",
+        "st-a-mas-to-a",
+        "st-a-mas-to-b",
+        "st-b-mas-to-a",
+        "st-b-mas-to-b",
+        "st-a-masr-to-a",
+        "st-a-masr-to-b",
+        "st-b-masr-to-a",
+        "st-b-masr-to-b",
+        "st-a-mas-asm5",
+        "st-a-masr-asm1",
+        "st-mas-same-ar",
+        "dual-mas-fract",
+        "st-mas-fract",
+        "dual-mas-saturate",
+        "st-mas-saturate"
       ],
       "classification": "isa_documented",
       "decision": "rewrite",

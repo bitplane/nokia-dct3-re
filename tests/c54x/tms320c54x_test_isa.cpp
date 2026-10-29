@@ -5,6 +5,7 @@
 #include "emuopts.h"
 #include "tms320c54x_test_square.h"
 #include "tms320c54x_test_parallel.h"
+#include "tms320c54x_test_dual_reference.h"
 #include "tms320c54x_test_domains.h"
 #include "tms320c54x_test_scalars.h"
 #include "tms320c54x_test_long_reference.h"
@@ -48,7 +49,11 @@ protected:
 			else if (scalars())
 				m_cases = c54x_test::scalar_vectors();
 			else if (parallel())
+			{
 				for (unsigned i = 0; i < c54x_test::parallel_vectors().size(); ++i) m_cases.push_back(c54x_test::parallel_case(i));
+				auto const &dual = c54x_test::dual_reference_cases();
+				m_cases.insert(m_cases.end(), dual.begin(), dual.end());
+			}
 			else
 				for (unsigned i = 0; i < c54x_test::square_vectors.size(); ++i) m_cases.push_back(c54x_test::square_case(i));
 			if (m_cases.empty() || !m_cases.front().reset_before)
@@ -155,7 +160,7 @@ private:
 		}
 		if (parallel())
 		{
-			osd_printf_info("TMS320C54x generic parallel: PASS cases=10 reset_each=1 nokia_devices=0 firmware=0\n");
+			osd_printf_info("TMS320C54x generic parallel: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n", m_case, m_resets);
 			throw emu_fatalerror(3, "TMS320C54x isolated generic parallel complete");
 		}
 		osd_printf_info("TMS320C54x generic square: PASS cases=6 reset_each=1 nokia_devices=0 firmware=0\n");

@@ -4,8 +4,7 @@
 #ifndef MAME_NOKIA_TMS320C54X_TEST_MEMORY_EXAMPLES_H
 #define MAME_NOKIA_TMS320C54X_TEST_MEMORY_EXAMPLES_H
 
-#include "tms320c54x_test_case.h"
-#include "cpu/tms320c54x/tms320c54x.h"
+#include "tms320c54x_test_port_case.h"
 #include <utility>
 
 namespace c54x_test {
@@ -22,13 +21,10 @@ inline auto const &memory_examples()
 			std::vector<register_check> expected, std::vector<memory_word> data = {},
 			unsigned cycles = 3, std::vector<memory_word> expected_data = {},
 			std::initializer_list<u16> extension = {}) {
-			instruction_case test{id, opcode, {{0x05e0, 0x75d6}, {0x05e1, 0x0124}, {0x05e2, opcode}},
-				std::move(data), std::move(initial), std::move(expected), 2, cycles, std::move(expected_data)};
+			std::vector<u16> words{opcode};
+			words.insert(words.end(), extension.begin(), extension.end());
+			auto test = port_case(id, std::move(words), std::move(initial), std::move(expected), std::move(data), cycles, std::move(expected_data));
 			test.reset_before = result.empty();
-			unsigned pc = 0x05e3;
-			for (auto word : extension) test.program.emplace_back(pc++, word);
-			for (u16 word : {0x75d6, 0x0124, 0xf5e1}) test.program.emplace_back(pc++, word);
-			test.initial.insert(test.initial.end(), {{r::STATE_PC, 0x05e0}, {r::STATE_IDLE, 0}});
 			result.push_back(std::move(test));
 		};
 		add("subc-b-preserves-a", 0x1f83,
