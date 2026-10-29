@@ -13,6 +13,9 @@ def harness_sources(root=ROOT):
     paths = [path for directory in ('c54x', 'firmware')
              for path in (root / 'tests' / directory).glob('tms320c54x_test*')
              if path.suffix in ('.cpp', '.h')]
+    backend = root / 'tests/devices/nokia_dsp_c54x_test.cpp'
+    if backend.is_file():
+        paths.append(backend)
     return tuple(sorted(paths, key=lambda path: path.name))
 
 

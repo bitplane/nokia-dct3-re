@@ -498,6 +498,25 @@
       }
     },
     {
+      "id": "nokia-integration-compositions",
+      "classification": "harness_infrastructure",
+      "decision": "relocate",
+      "source": "tests/devices/nokia_dsp_c54x_test.cpp; tests/firmware/tms320c54x_test_verifier.cpp; tests/firmware/tms320c54x_test_rom4_machine.cpp",
+      "profiles": [],
+      "case_ids": [],
+      "basis": "Device graph and ROM ownership: the backend fixture instantiates Nokia DSP/COBBA/CCONT/DSPIF devices; staged verifiers consume product flash; ROM4 execution consumes acquired PROM/DROM and ETSI vectors. None is CPU-only ISA conformance.",
+      "obligations": ["preserve all moved class bodies, ROM regions and SYST registrations byte-for-byte", "preserve all 11 machine identities, BIOS ownership, default requirements and result formats in the frozen inventory", "execute backend BSP and slot-request gates, ROM4 CRC and stock staged-verifier peripheral-sensitivity checks before/after", "preserve independently checked core legacy results and affected handset menus"],
+      "limits": ["ownership separation, not deletion or qualification of the underlying unreviewed instruction families", "legacy CPU state still shares ROM4/GSM declarations; the standalone ISA binary remains the dependency-free harness", "the earlier full-default checkpoint remains revision-bound; focused composition checks do not renew it"],
+      "measurement": {
+        "baseline_commit": "764ca1e7",
+        "all_test_cpp_bytes_before": 4370707,
+        "all_test_cpp_bytes_after": 4371242,
+        "all_test_cpp_lines_before": 68932,
+        "all_test_cpp_lines_after": 68965,
+        "scope": "All test C++/headers, including relocated device and firmware sources. Explicit includes/declarations add 535 bytes/33 lines; movement out of tests/c54x is not reported as net code reduction."
+      }
+    },
+    {
       "id": "shared-snapshot-stream-plumbing",
       "classification": "harness_infrastructure",
       "decision": "rewrite",

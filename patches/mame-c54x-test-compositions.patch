@@ -1,0 +1,24 @@
+diff --git a/src/mame/mame.lst b/src/mame/mame.lst
+--- a/src/mame/mame.lst
++++ b/src/mame/mame.lst
+@@ -36242,7 +36242,11 @@
+ @source:nokia/tms320c54x_test.cpp
+ tms54test
+ tms54xtra
++
++@source:nokia/tms320c54x_test_rom4_machine.cpp
+ tms54rom4
++
++@source:nokia/tms320c54x_test_verifier.cpp
+ nsm3verify
+ nsm3dverify
+ npe3verify
+@@ -49698,7 +49702,7 @@
+ monymony2
+ monymony3
+ 
+-@source:nokia/tms320c54x_test.cpp
++@source:nokia/nokia_dsp_c54x_test.cpp
+ tms54bsp
+ 
+ @source:zpa/iq151.cpp

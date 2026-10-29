@@ -79,6 +79,13 @@ iterations, then compares live and restored completion. Unrelated DSPIF RAM,
 queued-packet and register preservation runs separately in `make check-dspif-save`,
 on a device-only machine without a CPU or private firmware.
 
+Backend integration and private-ROM machine declarations have separate source
+owners, as listed below. Their classes, ROM regions and registrations were
+moved unchanged; this does not count as deleting tests or reviewing the
+underlying ISA families. Total test C++ grows by 535 bytes/33 lines of explicit
+includes and declarations. The legacy CPU class still shares firmware/GSM
+members, so this source split alone does not make its build CPU-only.
+
 This separation removes 1,215 bytes/28 lines from the C54x sources but adds a
 2,504-byte device fixture: it is an ownership correction, not a net source-size
 or runtime reduction. The bounded legacy run retains all 170 preceding PASS
@@ -226,7 +233,10 @@ boundaries are:
 
 | Source | Responsibility |
 | --- | --- |
-| `tests/c54x/tms320c54x_test.cpp` | Machine/ROM declarations, backend serial bench and stock-loader verifier compositions |
+| `tests/c54x/tms320c54x_test.cpp` | Synthetic core/extended conformance-machine declarations; no private ROM inputs or Nokia backend compositions |
+| `tests/devices/nokia_dsp_c54x_test.cpp` | Synthetic Nokia backend/COBBA/CCONT/DSPIF integration, not CPU-only ISA conformance |
+| `tests/firmware/tms320c54x_test_verifier.cpp` | Stock staged-verifier programs and product flash inputs; peripheral sensitivity, not fitted handset identity |
+| `tests/firmware/tms320c54x_test_rom4_machine.cpp` | Private ROM4/ETSI vector declarations and firmware-machine registration |
 | `tests/c54x/tms320c54x_test_state.h` | Shared bench state, fixture types and method declarations; no CPU execution implementation |
 | `tests/c54x/tms320c54x_test_state.cpp` | Bench lifecycle, address maps, assertions and device wiring |
 | `tests/c54x/tms320c54x_test_isa.cpp` | CPU-only examples/admission bench with explicit reset groups and no Nokia/firmware dependencies |

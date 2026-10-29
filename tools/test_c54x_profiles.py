@@ -23,12 +23,16 @@ class ProfileDeclarationTests(unittest.TestCase):
             root = Path(name)
             (root / 'tests' / 'c54x').mkdir(parents=True)
             (root / 'tests' / 'firmware').mkdir()
+            (root / 'tests' / 'devices').mkdir()
+            for filename in ('nokia_dsp_c54x_test.cpp', 'unrelated_test.cpp'):
+                (root / 'tests' / 'devices' / filename).write_text('')
             for filename in ('tms320c54x_test_state.h', 'tms320c54x_test.cpp',
                              'tms320c54x_test_rom4.cpp', 'tms320c54x_test_notes.md',
                              'tms320c54x.cpp', 'unrelated.h'):
                 directory = 'firmware' if filename == 'tms320c54x_test_rom4.cpp' else 'c54x'
                 (root / 'tests' / directory / filename).write_text('')
             self.assertEqual([p.name for p in profiles.harness_sources(root)], [
+                'nokia_dsp_c54x_test.cpp',
                 'tms320c54x_test.cpp', 'tms320c54x_test_rom4.cpp',
                 'tms320c54x_test_state.h'])
 

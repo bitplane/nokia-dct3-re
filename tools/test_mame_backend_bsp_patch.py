@@ -35,6 +35,30 @@ class BackendPatchTest(unittest.TestCase):
                                cwd=root, env=environment, check=True, capture_output=True, text=True)
             self.assertEqual(target.read_text().splitlines().count('tms54bsp'), 1)
             self.assertEqual(target.read_text().splitlines().count('tms54isa'), 1)
+            # The relocation is an ordered follow-up, not an independent
+            # registration. Its suffix must be reversed before older patches.
+            relocation = ROOT / 'patches/mame-c54x-test-compositions.patch'
+            subprocess.run(['git', 'apply', str(relocation)], cwd=root,
+                           env=environment, check=True, capture_output=True, text=True)
+            sources, owner = {}, None
+            for line in target.read_text().splitlines():
+                if line.startswith('@source:'):
+                    owner = line.removeprefix('@source:')
+                elif line.startswith(('tms54', 'nsm3', 'npe3', 'nhm3', 'nhm5', 'nse5')):
+                    self.assertNotIn(line, sources)
+                    sources[line] = owner
+            self.assertEqual(sources['tms54test'], 'nokia/tms320c54x_test.cpp')
+            self.assertEqual(sources['tms54xtra'], 'nokia/tms320c54x_test.cpp')
+            self.assertEqual(sources['tms54rom4'], 'nokia/tms320c54x_test_rom4_machine.cpp')
+            self.assertEqual(sources['tms54bsp'], 'nokia/nokia_dsp_c54x_test.cpp')
+            for machine in ('nsm3verify', 'nsm3dverify', 'npe3verify',
+                            'nhm3verify', 'nhm5verify', 'nse5verify'):
+                self.assertEqual(sources[machine], 'nokia/tms320c54x_test_verifier.cpp')
+            subprocess.run(['git', 'apply', '--reverse', str(relocation)], cwd=root,
+                           env=environment, check=True, capture_output=True, text=True)
+            for patch in patches:
+                subprocess.run(['git', 'apply', '--reverse', '--check', str(patch)],
+                               cwd=root, env=environment, check=True, capture_output=True, text=True)
 
 
 if __name__ == '__main__':
