@@ -57,10 +57,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_vector_prefetch_results()) return;
 	if (check_xc_interrupt_results()) return;
 	if (check_braf_control_results()) return;
-	if (check_native_address_gap_results()) return;
-	if (check_native_math_gap_results()) return;
-	if (check_native_memory_gap_results()) return;
-	if (check_native_final_gap_results()) return;
 	if (check_indirect_popm_results()) return;
 	if (check_shifted_arithmetic_selector_results()) return;
 	if (check_interrupt_entry_results()) return;

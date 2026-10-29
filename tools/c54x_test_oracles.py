@@ -241,11 +241,7 @@ REQUIRED = [
     "TMS320C54x ADDM disassembler: PASS forms=248 rejected=8 pages=2 bounded_extensions=1 pipeline_claim=0",
     "TMS320C54x operand fetch order: PASS cases=53 families=12 forms=direct,indirect,long,absolute,preincrement",
     "TMS320C54x accumulator call fast return: PASS cases=2 sources=A,B",
-    "TMS320C54x native gap arithmetic/load: PASS words=3 cases=6 sxm=0,1",
-    "TMS320C54x native gap branch/address: PASS words=6 cases=12 zero_nonzero=1 ar0_signed=1 stores=low,high",
-    "TMS320C54x native gap math: PASS words=4 cases=8 sxm=0,1 frct=0,1 carry=0,1",
-    "TMS320C54x native gap memory: PASS words=6 cases=12 sxm=0,1 frct=0,1 circular=0,8 double_step=2",
-    "TMS320C54x native final gaps: PASS words=6 cases=12 signed_shift=1 saturation=1 compact_store=1",
+    "TMS320C54x atomic instruction references: PASS cases=50 resets=50 firmware=0",
     "TMS320C54x move/test disassembler: PASS decoded_modes=2048 pages=2 bounded_extensions=1 operand_order=1 pipeline_claim=0",
     "TMS320C54x conditional disassembler: PASS forms=132 pages=2 named_predicates=22 bounded_extensions=1 pipeline_claim=0",
     "TMS320C54x load disassembler: PASS modes=1536 pages=2 bounded_extensions=1 pipeline_claim=0",
@@ -320,6 +316,10 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "isa-words": (
+        "TMS320C54x generic instruction words: PASS cases=50 reset_groups=50 nokia_devices=0 firmware=0",
+        "Fatal error: TMS320C54x isolated generic instruction words complete",
+    ),
     "isa-memory": (
         "TMS320C54x generic memory examples: PASS cases=150 reset_groups=5 nokia_devices=0 firmware=0",
         "Fatal error: TMS320C54x isolated generic memory examples complete",

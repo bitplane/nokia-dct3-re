@@ -56,6 +56,17 @@ post-load assertions retain their separate ordering. Executable stub tests
 check the real helper's success and failure paths; its use does not qualify
 the instruction cases that call it.
 
+`isa-words` owns fifty independently reset atomic instruction examples. The
+default suite shares the same bank through one loop, replacing five separate
+setup/check families. Ordered program/data/register seeds and partial result
+predicates are retained, including duplicate-register seed/override writes.
+Cold comparison against the old fixture formulas checks 14,500 register-bit
+and 992 RAM-bit mutations; setup/reference fingerprint is `765e62e11e66de52`.
+These atomic cases are not inferred redundant from staged tests. No numeric
+case is removed, and the standalone runner requires neither firmware nor Nokia
+devices. Five default result records become one; the full-default checkpoint
+is not silently renewed by this focused extraction.
+
 Unsupported delay combinations are not architectural conformance. The suite
 retains `st-delay-edge` as a sixteen-case fail-closed store-boundary/replay
 control, rather than a rejection matrix for each unsupported instruction family.

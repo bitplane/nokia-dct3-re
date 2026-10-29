@@ -233,11 +233,7 @@
       "TMS320C54x ADDM disassembler: PASS forms=248 rejected=8 pages=2 bounded_extensions=1 pipeline_claim=0",
       "TMS320C54x operand fetch order: PASS cases=53 families=12 forms=direct,indirect,long,absolute,preincrement",
       "TMS320C54x accumulator call fast return: PASS cases=2 sources=A,B",
-      "TMS320C54x native gap arithmetic/load: PASS words=3 cases=6 sxm=0,1",
-      "TMS320C54x native gap branch/address: PASS words=6 cases=12 zero_nonzero=1 ar0_signed=1 stores=low,high",
-      "TMS320C54x native gap math: PASS words=4 cases=8 sxm=0,1 frct=0,1 carry=0,1",
-      "TMS320C54x native gap memory: PASS words=6 cases=12 sxm=0,1 frct=0,1 circular=0,8 double_step=2",
-      "TMS320C54x native final gaps: PASS words=6 cases=12 signed_shift=1 saturation=1 compact_store=1",
+      "TMS320C54x atomic instruction references: PASS cases=50 resets=50 firmware=0",
       "TMS320C54x move/test disassembler: PASS decoded_modes=2048 pages=2 bounded_extensions=1 operand_order=1 pipeline_claim=0",
       "TMS320C54x conditional disassembler: PASS forms=132 pages=2 named_predicates=22 bounded_extensions=1 pipeline_claim=0",
       "TMS320C54x load disassembler: PASS modes=1536 pages=2 bounded_extensions=1 pipeline_claim=0",
@@ -593,6 +589,11 @@
           "description": "Accumulator absolute value with producer and replay",
           "index": 30,
           "name": "absolute"
+        },
+        {
+          "description": "Atomic instruction-word arithmetic and addressing examples",
+          "index": 31,
+          "name": "isa-words"
         }
       ],
       "tms54rom4": [
@@ -3091,6 +3092,7 @@
       "TMS320C54x atomic conditional returns: PASS cases=144 restore=144 predicates=12 patterns=6 snapshots=2 taken_reads=1 untaken_reads=0 stack_writes=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x atomic external I/O waits: PASS cases=2880 restore=2880 forms=short,offset,absolute,peripheral,AR_alias software_waits=0..14 ready_threshold=2 directions=read,write sources=none,IRQ,NMI timer_continues=1 duplicate_io=0 physical_mapping=unvalidated\n": 1,
       "TMS320C54x atomic far transfers: PASS encodings=16 caller_page=1 target_page=2 call_return_frame=1 delayed_target_retained=1 staged_acceptance=0 save_replay=0 silicon_phase_claim=0\n": 1,
+      "TMS320C54x atomic instruction references: PASS cases=%u resets=%u firmware=0\n": 1,
       "TMS320C54x atomic overflow branches: PASS cases=64 restore=64 forms=BC,BCD predicates=AOV,ANOV,BOV,BNOV flags=4 snapshots=2 selected_flag_clear=1 delay_condition_retained=1 silicon_phase_claim=0\n": 1,
       "TMS320C54x backward in-block branches: PASS cases=1536 restore=1536 outer_counts=4 inner_counts=4 forms=conditional_back,unconditional_back accumulators=2 pages=2 sources=none,IRQ,NMI snapshots=4 ordered_copies=1 outer_counts_preserved=1 held_words_restored=1 physical_phase_claim=0\n": 1,
       "TMS320C54x basic memory repeat exclusions: PASS cases=100 restore=100 forms=control,peripheral,write_only_MOD3,long_offset,nested,delay,block mod3_cases=64 arf=8 cmpt=2 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
@@ -3171,6 +3173,7 @@
       "TMS320C54x fast return bus: PASS cases=3 stack_reads=0 delayed_words=2\n": 1,
       "TMS320C54x forward block exits: PASS cases=1152 restore=1152 branches=B,BC_AEQ,BC_BEQ counts=0,1,2,7 exits=first,middle,last,never endpoint_layouts=2 pages=2 snapshots=6 source_reads=ordered body_writes=selected braf_not_auto_cleared=1 outside_rsbx=1 spaced_endpoint_revisit=1 interrupt_composition=unvalidated silicon_phase_claim=0\n": 1,
       "TMS320C54x frame/MMR move disassembler: PASS frames=256 moves=81 rejected=175 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
+      "TMS320C54x generic instruction words: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic long arithmetic: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic memory examples: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic near flow: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
@@ -3259,11 +3262,6 @@
       "TMS320C54x move/stack disassembler: PASS forms=960 rejected=64 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x move/test disassembler: PASS decoded_modes=2048 pages=2 bounded_extensions=1 operand_order=1 pipeline_claim=0\n": 1,
       "TMS320C54x native dual SUB: PASS cases=256 restore=256 opcode=a245 patterns=8x8 sxm=0,1 ovm=0,1 physical_phase_claim=0\n": 1,
-      "TMS320C54x native final gaps: PASS words=6 cases=12 signed_shift=1 saturation=1 compact_store=1\n": 1,
-      "TMS320C54x native gap arithmetic/load: PASS words=3 cases=6 sxm=0,1\n": 1,
-      "TMS320C54x native gap branch/address: PASS words=6 cases=12 zero_nonzero=1 ar0_signed=1 stores=low,high\n": 1,
-      "TMS320C54x native gap math: PASS words=4 cases=8 sxm=0,1 frct=0,1 carry=0,1\n": 1,
-      "TMS320C54x native gap memory: PASS words=6 cases=12 sxm=0,1 frct=0,1 circular=0,8 double_step=2\n": 1,
       "TMS320C54x nested repeats: PASS cases=4 counts=zero,two forms=short,long\n": 1,
       "TMS320C54x normalization disassembler: PASS forms=12 rejected=4 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x observer XC annulment: PASS cases=64 restore=64 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 forms=XC1,XC2 events_each=5 rejected_slots=absent accepted_source_nops=present observer_writes=0\n": 1,
@@ -6428,6 +6426,21 @@
       ],
       "required": [
         "TMS320C54x generic square: PASS cases=6 reset_each=1 nokia_devices=0 firmware=0"
+      ]
+    },
+    "isa-words": {
+      "completion": "Fatal error: TMS320C54x isolated generic instruction words complete",
+      "machine": "tms54isa",
+      "reported_fields": [
+        {
+          "cases": "50",
+          "firmware": "0",
+          "nokia_devices": "0",
+          "reset_groups": "50"
+        }
+      ],
+      "required": [
+        "TMS320C54x generic instruction words: PASS cases=50 reset_groups=50 nokia_devices=0 firmware=0"
       ]
     },
     "ld-ar0-index": {
@@ -15489,6 +15502,63 @@
       "classification": "isa_documented",
       "decision": "rewrite",
       "family": "square-reference"
+    },
+    "isa-words": {
+      "case_ids": [
+        "word-6f95-v0",
+        "word-6f95-v1",
+        "word-1087-v0",
+        "word-1087-v1",
+        "word-1182-v0",
+        "word-1182-v1",
+        "word-6c8d-v0",
+        "word-6c8d-v1",
+        "word-6c8e-v0",
+        "word-6c8e-v1",
+        "word-6db7-v0",
+        "word-6db7-v1",
+        "word-80b4-v0",
+        "word-80b4-v1",
+        "word-838a-v0",
+        "word-838a-v1",
+        "word-8383-v0",
+        "word-8383-v1",
+        "word-f67b-v0",
+        "word-f67b-v1",
+        "word-3185-v0",
+        "word-3185-v1",
+        "word-f301-v0",
+        "word-f301-v1",
+        "word-f648-v0",
+        "word-f648-v1",
+        "word-6b82-v0",
+        "word-6b82-v1",
+        "word-4583-v0",
+        "word-4583-v1",
+        "word-21f8-v0",
+        "word-21f8-v1",
+        "word-3ed3-v0",
+        "word-3ed3-v1",
+        "word-5793-v0",
+        "word-5793-v1",
+        "word-818b-v0",
+        "word-818b-v1",
+        "word-9a5f-v0",
+        "word-9a5f-v1",
+        "word-f20f-v0",
+        "word-f20f-v1",
+        "word-f47d-v0",
+        "word-f47d-v1",
+        "word-f50f-v0",
+        "word-f50f-v1",
+        "word-f736-v0",
+        "word-f736-v1",
+        "word-f761-v0",
+        "word-f761-v1"
+      ],
+      "classification": "isa_documented",
+      "decision": "rewrite",
+      "family": "atomic-instruction-word-examples"
     },
     "legacy-atomic": {
       "case_ids": [

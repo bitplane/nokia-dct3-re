@@ -3,6 +3,7 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
+#include "tms320c54x_test_word_examples.h"
 
 namespace c54x_test {
 
@@ -1616,28 +1617,22 @@ bool tms320c54x_test_state::check_braf_control_results()
 			data.read_word(0x03ff) == 0xdead, "CALA publishes RTN independently of its stack word");
 		if (!index) { start_cala_rtn_case(1); return true; }
 		osd_printf_info("TMS320C54x accumulator call fast return: PASS cases=2 sources=A,B\n");
-		start_native_gap_case(0); return true;
+		start_instruction_word_case(0); return true;
 	}
-	if (m_phase >= 88000 && m_phase < 88006)
+	if (m_phase >= 88000 && m_phase < 88000 + instruction_word_examples().size())
 	{
-		unsigned const index = m_phase - 88000, family = index / 2;
-		bool const signed_operand = index & 1;
-		u64 const loaded = signed_operand ? 0xffffff8001ULL : 0x8001;
-		u64 const a = family == 0 ? (signed_operand ? 0x8004 : 0xffffff8004ULL) : family == 1 ? loaded : 3;
-		u64 const b = family == 2 ? loaded : 5;
-		expect_opcode(family == 0 ? 0x6f95 : family == 1 ? 0x1087 : 0x1182,
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == a &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == b &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR5) == (family == 0 ? 0x0601 : 0x0600) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0600 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x0600 &&
-			m_cpu->space(AS_DATA).read_word(0x0600) == 0x8001,
-			"Native 6f95/0e20 and 1087/1182 preserve source, addressing and SXM results");
-		if (index < 5) { start_native_gap_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x native gap arithmetic/load: PASS words=3 cases=6 sxm=0,1\n");
-		start_native_address_gap_case(0); return true;
+		unsigned const index = m_phase - 88000;
+		auto const &test = instruction_word_examples().at(index);
+		check_case_state(*m_cpu, test);
+		expect_opcode(test.opcode, true, "Literal atomic instruction reference");
+		if (index + 1 < instruction_word_examples().size())
+		{
+			start_instruction_word_case(index + 1);
+			return true;
+		}
+		osd_printf_info("TMS320C54x atomic instruction references: PASS cases=%u resets=%u firmware=0\n",
+			unsigned(instruction_word_examples().size()), unsigned(instruction_word_examples().size()));
+		start_indirect_popm_case(0); return true;
 	}
 	return false;
 }

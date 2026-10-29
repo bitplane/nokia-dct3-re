@@ -87,6 +87,7 @@ private:
 	unsigned m_xf_publications = 0;
 	void start_repeat_endpoint_case(unsigned index);
 	void start_indirect_popm_case(unsigned index);
+	void start_instruction_word_case(unsigned index);
 	void start_shifted_arithmetic_selector_case(unsigned index);
 	void start_interrupt_entry_spacing_case(unsigned index);
 	void start_interrupt_acceptance_checkpoint();
@@ -94,11 +95,6 @@ private:
 	void acknowledge_frontend_interrupt(int line);
 	void acknowledge_rptbd_interrupt(int line);
 	void start_entry_stage_restore_case(unsigned index);
-	void start_native_final_gap_case(unsigned index);
-	void start_native_memory_gap_case(unsigned index);
-	void start_native_math_gap_case(unsigned index);
-	void start_native_address_gap_case(unsigned index);
-	void start_native_gap_case(unsigned index);
 	void start_cala_rtn_case(unsigned index);
 	void start_operand_fetch_case(unsigned index);
 	void start_loop_xc_case(unsigned index);
@@ -2063,10 +2059,6 @@ private:
 	bool check_idle_pll_results();
 	bool check_xc_interrupt_results();
 	bool check_braf_control_results();
-	bool check_native_address_gap_results();
-	bool check_native_math_gap_results();
-	bool check_native_memory_gap_results();
-	bool check_native_final_gap_results();
 	bool check_indirect_popm_results();
 	bool check_shifted_arithmetic_selector_results();
 	bool check_interrupt_entry_results();

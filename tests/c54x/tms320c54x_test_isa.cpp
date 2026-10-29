@@ -13,6 +13,7 @@
 #include "tms320c54x_test_memory_examples.h"
 #include "tms320c54x_test_memory_continuations.h"
 #include "tms320c54x_test_shift_examples.h"
+#include "tms320c54x_test_word_examples.h"
 #include "tms320c54x_test_near_flow.h"
 #include "tms320c54x_test_mapped_mac.h"
 #include "tms320c54x_test_dual.h"
@@ -78,6 +79,7 @@ protected:
 				auto const &atomic_shifts = c54x_test::atomic_shift_examples();
 				m_cases.insert(m_cases.end(), atomic_shifts.begin(), atomic_shifts.end());
 			}
+			else if (words()) m_cases = c54x_test::instruction_word_examples();
 			else if (products()) m_cases = c54x_test::product_examples();
 			else if (near_flow())
 				m_cases.assign(c54x_test::near_flow_cases().begin(), c54x_test::near_flow_cases().end());
@@ -202,6 +204,7 @@ private:
 	bool products() const { return !std::strcmp(machine().options().bios(), "isa-products"); }
 	bool memory_reference() const { return !std::strcmp(machine().options().bios(), "isa-memory"); }
 	bool near_flow() const { return !std::strcmp(machine().options().bios(), "isa-flow"); }
+	bool words() const { return !std::strcmp(machine().options().bios(), "isa-words"); }
 	unsigned count() const
 	{
 		return m_cases.size();
@@ -266,6 +269,11 @@ private:
 		c54x_test::check_case(*m_cpu, test, m_writes, m_last - m_first);
 		osd_printf_info("C54x ISA case: PASS id=%s\n", test.id);
 		if (++m_case < count()) { start(); return; }
+		if (words())
+		{
+			osd_printf_info("TMS320C54x generic instruction words: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n", m_case, m_resets);
+			throw emu_fatalerror(3, "TMS320C54x isolated generic instruction words complete");
+		}
 		if (near_flow())
 		{
 			osd_printf_info("TMS320C54x generic near flow: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n", m_case, m_resets);
@@ -351,6 +359,7 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(28, "reg-shifts", "Arithmetic and logical accumulator shifts")
 	ROM_SYSTEM_BIOS(29, "negate", "Accumulator negate with producer and replay")
 	ROM_SYSTEM_BIOS(30, "absolute", "Accumulator absolute value with producer and replay")
+	ROM_SYSTEM_BIOS(31, "isa-words", "Atomic instruction-word arithmetic and addressing examples")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
 ROM_END
 
