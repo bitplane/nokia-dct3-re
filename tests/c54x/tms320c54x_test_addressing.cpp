@@ -3,6 +3,7 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
+#include "tms320c54x_test_memory_immediate_schedule.h"
 
 namespace c54x_test {
 
@@ -2746,6 +2747,7 @@ void tms320c54x_test_state::start_repeat_load_edge(unsigned variant)
 
 tms320c54x_test_state::memory_immediate_fixture tms320c54x_test_state::memory_immediate_case(unsigned variant)
 {
+	variant = memory_immediate_key(variant);
 	bool const mac = variant >= 98304;
 	unsigned v = mac ? variant - 98304 : variant, form = v % (mac ? 8 : 12); v /= mac ? 8 : 12;
 	// Keep the original form indices, but omit write-only short MOD=3.

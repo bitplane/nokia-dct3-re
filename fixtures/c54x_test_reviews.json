@@ -408,6 +408,39 @@
       "legacy_entry": "control phases750..757,60040..60041; no changes to far-control or pending-transfer restoration cases",
       "obligations": ["RCD captures A/B before both delay words; taken consumes one stack word, fall-through preserves SP", "BCD ALT and BLEQ distinguish negative, zero and positive values before delay words change them", "seven-bit PSHM/POPM operands reach data0x62/0x63 and balance their stack while preserving the original swapped data expectations", "all ten cases independently reset in the CPU-only fixture; shared legacy adapter does not reset CPU state", "retain both opcode-accounting entries for the stack example"],
       "limits": ["no case or literal result removed", "only originally asserted accumulators, SP and data words are checked; no additional sibling-state preservation claim", "MMR operand-address decoding is not a model of a new physical peripheral at0x62", "the separately implemented staged frontend and far-transfer save/replay tests are not replaced by this atomic family"]
+    },
+    {
+      "id": "memory-immediate-multiply",
+      "classification": "architectural_interaction",
+      "decision": "merge",
+      "source": "tests/c54x/tms320c54x_test_memory_immediate_schedule.h",
+      "profiles": ["mpy-mem-imm"],
+      "case_ids": [],
+      "scope": "Successful MPY/MAC operand and retention cases only. The following 1408 implementation-admission exclusions remain unchanged and are not reviewed by this family.",
+      "basis": "The existing independent signed-product, accumulator-add, 40-bit mask and saturation references are unchanged. Literal source/immediate fixtures and bus observers determine expected values and transfers; no CPU implementation helper supplies a result. Declared publication clocks are implementation contracts, not measured silicon.",
+      "profile_coverage": {
+        "mpy-mem-imm": {
+          "result_prefix": "TMS320C54x memory immediate MAC: PASS ",
+          "cases": 90112,
+          "key": "Original checkpoint-expanded variant number; MPY has base0/stride24576, MAC base98304/stride65536. Execute each operand once with checkpoint balanced across its value/literal pair.",
+          "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
+          "fnv64": "085b13667b310f01"
+        }
+      },
+      "obligations": ["all 24576 MPY inputs:12 forms,64 value/literal pairs,8 flags,2 destinations,2 program pages", "all 65536 MAC inputs:8 RAM forms,64 pairs,16 flags,4 source/destination selectors,2 pages", "for every fixed operation/form/flags/selector/page group, exactly16 pairs at each of the original four checkpoints", "retain literal/address poisoning, captured pointer mutation, source/T mutation after Read, one operand read, no data writes and the observer's retained operand identity checks", "count actual successful restores and executed ordered input keys rather than reporting the retired Cartesian schedule"],
+      "limits": ["retire three checkpoint-only copies of every operand; not a numeric operand or expected arithmetic result", "a particular operand no longer runs at every checkpoint; a new evidenced interaction can justify a targeted regression", "no repeat, IRQ, physical timing or silicon memory-bank completeness claim", "this profile still uses the legacy sequenced bench; CPU-only relocation is not claimed"],
+      "measurement": {
+        "baseline_commit": "6eff484e",
+        "baseline_native_capture_seconds": 155.67,
+        "after_native_capture_seconds": 39.91,
+        "after_runner_wall_seconds": 40.00,
+        "method": "Native capture durations are console.log creation to final write, from filesystem timestamps; after runner wall time is separately measured by /usr/bin/time. Serial runs include unchanged 1408 exclusion cases.",
+        "c54x_cpp_bytes_before": 3774929,
+        "c54x_cpp_bytes_after": 3777446,
+        "c54x_cpp_lines_before": 57548,
+        "c54x_cpp_lines_after": 57591,
+        "source_assessment": "Adds 2517 C++ bytes/43 lines for schedule and actual coverage accounting. Runtime reduction, not source-size reduction; the existing full-default checkpoint is not renewed."
+      }
     }
   ]
 }

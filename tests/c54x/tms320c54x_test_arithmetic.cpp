@@ -3,6 +3,7 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
+#include "tms320c54x_test_memory_immediate_schedule.h"
 #include "tms320c54x_test_rmw_schedule.h"
 #include "tms320c54x_test_store_schedule.h"
 #include "tms320c54x_test_shifted_schedule.h"
@@ -2441,6 +2442,7 @@ void tms320c54x_test_state::start_rptbd_shift_store_edge(unsigned variant)
 
 void tms320c54x_test_state::start_memory_immediate_multiply(unsigned variant)
 {
+	if (!variant) { m_memory_immediate_coverage = {}; m_memory_immediate_restores = 0; }
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	auto const f = memory_immediate_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
@@ -8059,11 +8061,13 @@ bool tms320c54x_test_state::check_mapped_immediate_mac_results()
 		if (tick == 14)
 		{
 			expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == f.words - 1 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x3333 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x601 + f.words, "MPY keeps captured address/source/literals and resumes after the complete instruction");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Replay memory/immediate MPY without duplicate operand accesses"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254350; m_check_timer->enable(true); return true; }
+			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Replay memory/immediate MPY without duplicate operand accesses"); ++m_memory_immediate_restores; m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254350; m_check_timer->enable(true); return true; }
 			unsigned const variant = m_pipeline_peripheral_case; m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant == 98303) osd_printf_info("TMS320C54x memory immediate MPY: PASS cases=98304 restore=98304 forms=12 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n");
-			if (variant < 360447) { start_memory_immediate_multiply(variant + 1); return true; }
-			osd_printf_info("TMS320C54x memory immediate MAC: PASS cases=262144 restore=262144 ram_forms=8 values=8 literals=8 flags=16 selectors=4 pages=2 snapshots=4 source_reads=1 data_writes=0 t_publication=Read repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n");
+			m_memory_immediate_coverage.add(memory_immediate_key(variant));
+			expect(m_memory_immediate_restores == m_memory_immediate_coverage.count, "Every selected memory/immediate input completed a real restore");
+			if (variant + 1 == memory_immediate_mpy_inputs) osd_printf_info("TMS320C54x memory immediate MPY: PASS cases=%u restore=%u forms=12 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n", m_memory_immediate_coverage.count, m_memory_immediate_restores);
+			if (variant + 1 < memory_immediate_inputs) { start_memory_immediate_multiply(variant + 1); return true; }
+			osd_printf_info("TMS320C54x memory immediate MAC: PASS cases=%u restore=%u ram_forms=8 values=8 literals=8 flags=16 selectors=4 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0 coverage_cases=%u coverage_fnv64=%016llx\n", m_memory_immediate_coverage.count - memory_immediate_mpy_inputs, m_memory_immediate_restores - memory_immediate_mpy_inputs, m_memory_immediate_coverage.count, (unsigned long long)m_memory_immediate_coverage.value);
 			start_memory_immediate_mac_exclusion(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

@@ -121,6 +121,17 @@ No far-control or pending-transfer restoration case is deleted. This rewrite
 removes 1,781 C++ bytes/47 lines while preserving all 173 legacy PASS records
 and 2,474 asserted opcode words; it does not renew the full-default checkpoint.
 
+`mpy-mem-imm` retains all 24,576 MPY and 65,536 MAC inputs, with the original
+result references, address/literal poisoning, Read-owned T publication and
+operand-identity observer checks. Its 64 value/literal pairs in every fixed
+operation/form/flags/selector/page group now distribute evenly across all four
+checkpoints, instead of replaying every pair four times. The ordered original
+case-key digest is `085b13667b310f01`; actual successful restores are counted.
+The following 1,408 admission exclusions remain unchanged and separately
+unreviewed. Serial native capture time drops from about 156 to 40 seconds;
+this adds 2,517 C++ bytes/43 lines of scheduling and accounting rather than
+reducing source size. It does not change or renew the full-default checkpoint.
+
 The reviewed long RAM RMW schedule retains every distinct operation, addressing,
 value, status and compatibility stimulus once (38,400 cases). For each of its
 4,800 operation/address/compatibility/status groups, the eight value pairs cover

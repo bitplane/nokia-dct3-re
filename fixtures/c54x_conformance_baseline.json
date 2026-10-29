@@ -3326,8 +3326,8 @@
       "TMS320C54x memory MAC/MAS disassembler: PASS forms=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x memory SQUR: PASS cases=52224 restore=52224 forms=RAM,mapped accumulators=2 patterns=8 flags=16 t_publication=Read operand_retained=1 newer_t_preserved=1 duplicate_reads=0 data_writes=0 physical_phase_claim=0\n": 1,
       "TMS320C54x memory immediate MAC exclusions: PASS cases=1408 restore=1408 mapped_sources=80 mod3_forms=8 selectors=4 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
-      "TMS320C54x memory immediate MAC: PASS cases=262144 restore=262144 ram_forms=8 values=8 literals=8 flags=16 selectors=4 pages=2 snapshots=4 source_reads=1 data_writes=0 t_publication=Read repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n": 1,
-      "TMS320C54x memory immediate MPY: PASS cases=98304 restore=98304 forms=12 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n": 1,
+      "TMS320C54x memory immediate MAC: PASS cases=%u restore=%u ram_forms=8 values=8 literals=8 flags=16 selectors=4 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0 coverage_cases=%u coverage_fnv64=%016llx\n": 1,
+      "TMS320C54x memory immediate MPY: PASS cases=%u restore=%u forms=12 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x memory logical disassembler: PASS modes=1536 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x memory multiply/bit disassembler: PASS forms=2304 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x memory repeat in block: PASS cases=3840 restore=3840 forms=DP,SP,indirect,postincrement,absolute outer_counts=4 inner_counts=4 bodies=MVDD,ST,NOP positions=middle,end pages=2 snapshots=4 fresh_counts=1 consumed_counts_poisoned=1 outer_counts_preserved=1 physical_phase_claim=0\n": 1,
@@ -8336,7 +8336,8 @@
         {
           "accumulators": "2",
           "address_literal_retained": "1",
-          "cases": "98304",
+          "cases": "24576",
+          "checkpoint_policy": "balanced",
           "data_writes": "0",
           "flags": "8",
           "forms": "12",
@@ -8344,7 +8345,7 @@
           "literals": "8",
           "pages": "2",
           "repeat_acceptance": "0",
-          "restore": "98304",
+          "restore": "24576",
           "silicon_phase_claim": "0",
           "snapshots": "4",
           "source_reads": "1",
@@ -8352,7 +8353,10 @@
           "values": "8"
         },
         {
-          "cases": "262144",
+          "cases": "65536",
+          "checkpoint_policy": "balanced",
+          "coverage_cases": "90112",
+          "coverage_fnv64": "085b13667b310f01",
           "data_writes": "0",
           "flags": "16",
           "irq_acceptance": "0",
@@ -8360,7 +8364,7 @@
           "pages": "2",
           "ram_forms": "8",
           "repeat_acceptance": "0",
-          "restore": "262144",
+          "restore": "65536",
           "selectors": "4",
           "silicon_phase_claim": "0",
           "snapshots": "4",
@@ -8383,8 +8387,8 @@
         }
       ],
       "required": [
-        "TMS320C54x memory immediate MPY: PASS cases=98304 restore=98304 forms=12 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0",
-        "TMS320C54x memory immediate MAC: PASS cases=262144 restore=262144 ram_forms=8 values=8 literals=8 flags=16 selectors=4 pages=2 snapshots=4 source_reads=1 data_writes=0 t_publication=Read repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0",
+        "TMS320C54x memory immediate MPY: PASS cases=24576 restore=24576 forms=12 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0",
+        "TMS320C54x memory immediate MAC: PASS cases=65536 restore=65536 ram_forms=8 values=8 literals=8 flags=16 selectors=4 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0 coverage_cases=90112 coverage_fnv64=085b13667b310f01",
         "TMS320C54x memory immediate MAC exclusions: PASS cases=1408 restore=1408 mapped_sources=80 mod3_forms=8 selectors=4 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0"
       ]
     },
@@ -15566,6 +15570,20 @@
       "decision": "merge",
       "family": "long-accumulator-stores",
       "scope": "Long and shifted STL/STH results only; the bundle's immediate ST, MVDK and MVKD contracts remain unreviewed here. RMW has its own review."
+    },
+    "mpy-mem-imm": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 90112,
+        "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
+        "fnv64": "085b13667b310f01",
+        "key": "Original checkpoint-expanded variant number; MPY has base0/stride24576, MAC base98304/stride65536. Execute each operand once with checkpoint balanced across its value/literal pair.",
+        "result_prefix": "TMS320C54x memory immediate MAC: PASS "
+      },
+      "decision": "merge",
+      "family": "memory-immediate-multiply",
+      "scope": "Successful MPY/MAC operand and retention cases only. The following 1408 implementation-admission exclusions remain unchanged and are not reviewed by this family."
     },
     "reg-banks": {
       "case_ids": [],
