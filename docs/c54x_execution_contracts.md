@@ -48,6 +48,15 @@ Family retention/rewrite/merge/relocation/deletion decisions live in
 devices or private firmware; legacy default continuations can reuse reviewed
 case data without making the entire sequenced bench generic.
 
+The reviewed long RAM RMW schedule retains every distinct operation, addressing,
+value, status and compatibility stimulus once (38,400 cases). For each of its
+4,800 operation/address/compatibility/status groups, the eight value pairs cover
+all four checkpoints twice. `rmw-long` runs this balanced schedule;
+`rmw-long-full` retains all 153,600 value-by-checkpoint combinations. Ordered
+case/checkpoint digests and actual replay counts are required acceptance, with
+the selector independently checked outside the CPU. The exact staged cycle
+placement remains a model contract, not measured silicon timing.
+
 The CLI test exercises every isolated profile's machine/BIOS selection and
 result checking using simulated process output. The inventory is a structural
 preservation check, not executed coverage, an independent arithmetic oracle
@@ -401,7 +410,7 @@ separate positive controls. This is fail-closed admission, not a silicon
 trap specification or an all-ISA closure.
 
 Post-guard legal controls independently pass `long-mvkd` (427,784 shared
-cases/restores, including 153,600 RMW), `preinc-store` (6,144), `preinc-st`
+cases/restores in that retained exhaustive capture, including 153,600 RMW), `preinc-store` (6,144), `preinc-st`
 (1,536) and `xorm-absolute` (4,096). Their accepted runs are respectively
 `tmp/run_c54x_core_am84mku0`, `tmp/run_c54x_core_51wgjuyl`,
 `tmp/run_c54x_core_e65578ms` and `tmp/run_c54x_core_9yfpz7bw`.

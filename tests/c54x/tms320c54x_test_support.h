@@ -9,6 +9,23 @@
 
 namespace c54x_test {
 
+// Ordered case keys, not CPU state: retain this observer across guest replay.
+// FNV-1a consumes four little-endian bytes per key; runners check the result.
+struct ordered_case_digest
+{
+	std::uint64_t value = 14695981039346656037ULL;
+	unsigned count = 0;
+	void add(std::uint32_t key)
+	{
+		for (unsigned byte = 0; byte != 4; ++byte)
+		{
+			value ^= (key >> (byte * 8)) & 0xff;
+			value *= 1099511628211ULL;
+		}
+		++count;
+	}
+};
+
 struct register_setting
 {
 	int index;

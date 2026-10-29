@@ -1335,6 +1335,11 @@ void tms320c54x_test_state::start_pipeline_long_rmw(unsigned variant)
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	bool const peripheral = profile_is("rmw-long-periph");
 	bool const xorm = profile_is("xorm-absolute");
+	if (!variant && !peripheral && !xorm)
+	{
+		m_long_rmw_coverage = {};
+		m_long_rmw_replays = 0;
+	}
 	unsigned const operation = xorm ? 3 : variant % 3, arithmetic = (variant / (xorm ? 4 : peripheral ? 576 : 300)) % 64;
 	bool const compatibility = (variant / (peripheral ? 288 : 19200)) % 2;
 	auto const f = xorm ? absolute_xorm_fixture(variant) : peripheral ? peripheral_long_rmw_fixture(variant) : long_accumulator_store_fixture((variant / 3) % 100 + (compatibility ? 6400 : 0));

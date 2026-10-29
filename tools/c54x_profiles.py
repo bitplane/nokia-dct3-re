@@ -35,6 +35,8 @@ def declarations(source):
             raise ValueError('unsupported conformance BIOS declaration: ' + machine)
         if not entries:
             continue
+        if any(len(entry['name']) > 16 for entry in entries):
+            raise ValueError('conformance BIOS name exceeds MAME limit of 16 characters')
         if machine in result:
             raise ValueError('duplicate conformance machine: ' + machine)
         if (len({entry['name'] for entry in entries}) != len(entries) or

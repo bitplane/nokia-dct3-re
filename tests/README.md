@@ -57,8 +57,9 @@ acceptance requirements in `Makefile` and `gates.json`.
 | Device/firmware gate | Its register, serial or acquired-code contract | Full phone support |
 | Handset acceptance | The named product/composition and user workflow | Every underlying hardware contract |
 
-For source moves and independent setup batching, use the inventory, host suite,
-full default run and affected isolated profiles. For ownership changes, include
+For source moves and independent setup batching, use the inventory, host suite
+and affected isolated profiles. Run the full retained regression at shared-harness
+and broader campaign milestones, not after every edit. For ownership changes, include
 the family's rejection, interrupt and restore variants. For build-selection
 changes, build both modes sequentially, inspect actual bench registrations and
 run handset gates on the test-free executable. A mocked runner test is not a
@@ -70,6 +71,14 @@ after every small edit. The generic ISA entry is currently a reviewed pilot,
 not a replacement for all default coverage. Family review must track runtime
 as well as source size, and separate value-space coverage from distinct
 checkpoint-state coverage before reducing their Cartesian product.
+
+Long RAM RMW uses all 38,400 distinct stimuli in its balanced default schedule.
+Each operation/address/compatibility/status group covers all four checkpoints
+twice across eight value pairs. `--profile rmw-long` runs that family directly;
+`--profile rmw-long-full` retains the 153,600-case Cartesian product. Both report
+actual case/restore counts and an independently checked ordered coverage digest.
+This is a reduction in repeated execution, not a claim of full value-by-phase
+coverage in the balanced run. The sequenced RMW fixture is not yet CPU-only.
 
 ## Retention and consolidation
 

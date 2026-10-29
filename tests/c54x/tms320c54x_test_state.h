@@ -2344,6 +2344,8 @@ private:
 	unsigned m_pipeline_store_writes = 0;
 	unsigned m_pipeline_indirect_case = 0;
 	unsigned m_pipeline_rmw_case = 0;
+	ordered_case_digest m_long_rmw_coverage;
+	unsigned m_long_rmw_replays = 0;
 	unsigned m_pipeline_return_case = 0;
 	unsigned m_pipeline_branch_case = 0;
 	unsigned m_pipeline_stm_case = 0;

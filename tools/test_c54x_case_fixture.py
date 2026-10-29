@@ -1,5 +1,6 @@
 """Executable checks of the small case harness, not C54x instruction semantics."""
 from pathlib import Path
+from collections import Counter, defaultdict
 import shutil
 import subprocess
 import tempfile
@@ -14,6 +15,66 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CaseFixtureTests(unittest.TestCase):
+    def test_rmw_ordered_coverage_is_required(self):
+        for profile in ('rmw-long', 'rmw-long-full'):
+            marker, ending = EXTRA_PROFILES[profile]
+            text = marker + '\n' + ending
+            check_result(text, 3, profile=profile)
+            digest = reviewed_profiles()[profile]['coverage']['fnv64']
+            for changed in (text.replace(digest, '0' * 16),
+                            text.replace('coverage_fnv64=' + digest, ''),
+                            marker + '\n' + text):
+                with self.subTest(profile=profile), self.assertRaisesRegex(ValueError, 'coverage digest'):
+                    check_result(changed, 3, profile=profile)
+
+    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
+    def test_rmw_schedule_preserves_stimuli_and_checkpoint_shapes(self):
+        source = r'''
+#include <iostream>
+#include "tests/c54x/tms320c54x_test_support.h"
+#include "tests/c54x/tms320c54x_test_rmw_schedule.h"
+int main(int argc, char **) {
+    using schedule = c54x_test::long_rmw_schedule;
+    bool const exhaustive = argc > 1;
+    unsigned const count = exhaustive ? schedule::exhaustive_cases : schedule::unique_cases;
+    c54x_test::ordered_case_digest digest;
+    for (unsigned v = 0; v < count; ++v) {
+        unsigned const key = schedule::case_key(v, exhaustive);
+        digest.add(key);
+        std::cout << key << '\n';
+    }
+    std::cout << "digest=" << std::hex << digest.value << '\n';
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'schedule.cpp').write_text(source)
+            subprocess.run(['c++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT),
+                            str(root / 'schedule.cpp'), '-o', str(root / 'schedule')],
+                           check=True, capture_output=True)
+            for exhaustive in (False, True):
+                output = subprocess.run([str(root / 'schedule')] + (['full'] if exhaustive else []),
+                                        check=True, capture_output=True, text=True).stdout.splitlines()
+                actual = list(map(int, output[:-1]))
+                expected = []
+                groups = defaultdict(Counter)
+                for checkpoint in (range(4) if exhaustive else range(1)):
+                    for compatibility in range(2):
+                        for arithmetic in range(64):
+                            flags, pattern = arithmetic % 8, arithmetic // 8
+                            for address in range(100):
+                                for operation in range(3):
+                                    ordinal = operation + 3 * address + 300 * arithmetic + 19200 * compatibility
+                                    selected = checkpoint if exhaustive else (pattern + operation + address) % 4
+                                    expected.append(ordinal * 4 + selected)
+                                    groups[operation, address, compatibility, flags][selected] += 1
+                self.assertEqual(actual, expected)
+                self.assertEqual(len(groups), 4800)
+                self.assertTrue(all(group == Counter({i: 8 if exhaustive else 2 for i in range(4)})
+                                    for group in groups.values()))
+                profile = 'rmw-long-full' if exhaustive else 'rmw-long'
+                self.assertEqual(output[-1], 'digest=' + reviewed_profiles()[profile]['coverage']['fnv64'])
+
     def test_reviewed_case_identities_are_required_in_order(self):
         marker, ending = EXTRA_PROFILES['isa-square']
         cases = ['C54x ISA case: PASS id=' + name

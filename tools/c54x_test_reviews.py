@@ -16,13 +16,18 @@ def reviewed_profiles(root=ROOT):
             raise ValueError('duplicate C54x family review')
         families.add(family['id'])
         ids = family['case_ids']
-        if (family['profiles'] and not ids) or len(ids) != len(set(ids)):
-            raise ValueError('reviewed case identities must be nonempty and unique')
+        if len(ids) != len(set(ids)):
+            raise ValueError('reviewed case identities must be unique')
         for profile in family['profiles']:
             if profile in result:
                 raise ValueError('profile has multiple family reviews: ' + profile)
+            coverage = family.get('profile_coverage', {}).get(profile)
+            if not ids and not coverage:
+                raise ValueError('isolated review needs case identities or an ordered coverage digest')
             result[profile] = dict(family=family['id'], classification=family['classification'],
                                    decision=family['decision'], case_ids=ids)
+            if coverage:
+                result[profile]['coverage'] = coverage
     return result
 
 

@@ -71,6 +71,11 @@ def check_result(text, returncode, *, bus_registers=False, bus_io=False, atomic_
         actual = re.findall(r'^C54x ISA case: PASS id=(\S+)$', text, re.MULTILINE)
         if actual != review['case_ids']:
             raise ValueError('reviewed C54x case identities are missing, duplicated or reordered')
+        if coverage := review.get('coverage'):
+            digests = re.findall(r'^' + re.escape(coverage['result_prefix']) +
+                                 r'.*\bcoverage_fnv64=([0-9a-f]{16})$', text, re.MULTILINE)
+            if digests != [coverage['fnv64']]:
+                raise ValueError('reviewed C54x ordered coverage digest is missing or incorrect')
     # Verbose SDL shutdown follows the intentional fatal-error completion.
     # Admit only the exact suffix, never arbitrary output after the result.
     if verbose_teardown and lines[-2:] == ['Enter sdlwindow_exit', 'Leave sdlwindow_exit']:

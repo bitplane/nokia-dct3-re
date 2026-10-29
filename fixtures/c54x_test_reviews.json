@@ -59,6 +59,45 @@
         "no checkpoint/replay Cartesian product in this family"
       ],
       "rationale": "The 128-case matrix is already compact and protects distinct arithmetic and preservation boundaries. Keep it rather than force a rewrite for a small line-count gain; prioritize shared harness ownership and large replay matrices. CPU-only relocation remains separate from this retention decision."
+    },
+    {
+      "id": "long-ram-rmw",
+      "classification": "architectural_interaction",
+      "decision": "merge",
+      "basis": "TI ADDM/ANDM/ORM operand and status semantics, plus explicitly model-owned staged retention/publication ordering. The old 153600 cases contain four identical copies of 38400 stimuli; only the checkpoint differs.",
+      "source": "tests/c54x/tms320c54x_test_rmw_schedule.h",
+      "profiles": ["rmw-long", "rmw-long-full"],
+      "legacy_entry": "default phase 252890; also the long-mvkd bundle",
+      "case_ids": [],
+      "profile_coverage": {
+        "rmw-long": {
+          "result_prefix": "TMS320C54x staged long RMW: PASS ",
+          "cases": 38400,
+          "key": "4 * unique_stimulus_ordinal + checkpoint_index",
+          "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
+          "fnv64": "882e53fb781dc875"
+        },
+        "rmw-long-full": {
+          "result_prefix": "TMS320C54x staged long RMW: PASS ",
+          "cases": 153600,
+          "key": "4 * unique_stimulus_ordinal + checkpoint_index",
+          "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
+          "fnv64": "92f5d379269cbf25"
+        }
+      },
+      "obligations": [
+        "all 38400 operation/address/value/status/compatibility stimuli",
+        "all four checkpoints for each of 4800 operation/address/compatibility/status groups, twice each across eight value pairs",
+        "retained offset, literal, pointer and sampled operand despite later mutation",
+        "one read, one write, two extension fetches and operation-owned flags across replay",
+        "independently checked ordered case/checkpoint digest and actual restore count"
+      ],
+      "limits": [
+        "balanced default does not claim the full value-by-checkpoint product; exhaustive profile retains it",
+        "exact staged cycle placement is a model contract, not measured silicon",
+        "peripheral RMW and absolute XORM are separate, unchanged families",
+        "still uses the sequenced bench; CPU-only relocation is not claimed"
+      ]
     }
   ]
 }

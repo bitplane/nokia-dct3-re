@@ -117,6 +117,7 @@ void tms320c54x_test_state::machine_reset()
 		{ {"stack-irq-return"}, [](self &test) { test.start_stack_irq_order(); } },
 		{ {"mcbsp-control"}, [](self &test) { test.start_mcbsp_control_sequence(); } },
 		{ {"rmw-long-periph"}, [](self &test) { test.start_pipeline_long_rmw(); } },
+		{ {"rmw-long", "rmw-long-full"}, [](self &test) { test.start_pipeline_long_rmw(); } },
 		{ {"xorm-absolute"}, [](self &test) { test.start_pipeline_long_rmw(); } },
 		{ {"st-long-periph"}, [](self &test) { test.start_pipeline_long_immediate_store(); } },
 		{ {"st-mvmm"}, [](self &test) { test.start_pipeline_store_mvmm(); } },

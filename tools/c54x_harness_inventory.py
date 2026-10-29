@@ -87,7 +87,7 @@ def main():
         print(f'C54x harness inventory: {len(actual["cpp"]["machines"])} machines, '
               f'{len(actual["isolated"])} isolated profiles, '
               f'{len(actual["core"]["required"])} core requirements, '
-              f'{len(actual["reviewed"])} reviewed case-identity profiles')
+              f'{len(actual["reviewed"])} reviewed case-coverage profiles')
     except (OSError, ValueError) as error:
         parser.exit(1, f'C54x harness inventory: {error}\n')
 

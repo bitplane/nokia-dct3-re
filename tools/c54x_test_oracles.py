@@ -160,7 +160,7 @@ REQUIRED = [
     "TMS320C54x staged long MVDK: PASS cases=38400 forms=25 offsets=4 destinations=12 values=4 compatibility=2 restore=38400 source_alias=1 zero_gap_cmpr=1 duplicate_reads=0 duplicate_writes=0",
     "TMS320C54x staged original long MVDK pair: PASS cases=8 restore=8 stl_write=7 source_read=8 ar2_write=8 zero_gap_cmpr=1 duplicate_writes=0",
     "TMS320C54x staged TC branches: PASS cases=1536 forms=BC,BCD conditions=TC,NTC producers=BIT,CMPR_EQ,status_bit,CMPR_LT gaps=0,1,2 pages=2 restore=1536 post_evaluate_change=0,1 duplicate_fetches=0",
-    "TMS320C54x staged long RMW: PASS cases=153600 operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=153600 duplicate_reads=0 duplicate_writes=0",
+    "TMS320C54x staged long RMW: PASS cases=38400 operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=38400 duplicate_reads=0 duplicate_writes=0 snapshots=4 checkpoint_policy=balanced coverage_fnv64=882e53fb781dc875",
     "TMS320C54x staged memory ADD/SUB: PASS cases=104448 forms=17 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=104448 duplicate_reads=0 data_writes=0",
     "TMS320C54x staged mapped AR arithmetic: PASS cases=1024 registers=8 selectors=4 sxm_ovm=4 patterns=2 forms=direct,absolute restore=1024 duplicate_reads=0 data_writes=0",
     "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
@@ -320,6 +320,14 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "rmw-long-full": (
+        "TMS320C54x staged long RMW: PASS cases=153600 operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=153600 duplicate_reads=0 duplicate_writes=0 snapshots=4 checkpoint_policy=exhaustive coverage_fnv64=92f5d379269cbf25",
+        "Fatal error: TMS320C54x isolated long RAM RMW complete",
+    ),
+    "rmw-long": (
+        "TMS320C54x staged long RMW: PASS cases=38400 operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=38400 duplicate_reads=0 duplicate_writes=0 snapshots=4 checkpoint_policy=balanced coverage_fnv64=882e53fb781dc875",
+        "Fatal error: TMS320C54x isolated long RAM RMW complete",
+    ),
     "isa-square": (
         "TMS320C54x generic square: PASS cases=6 reset_each=1 nokia_devices=0 firmware=0",
         "Fatal error: TMS320C54x isolated generic square complete",
@@ -2083,7 +2091,7 @@ EXTRA_PROFILES = {
             "TMS320C54x staged shifted STL/STH: PASS cases=172032 forms=7 offsets=4 selectors=4 shifts=32 sst_sxm=4 patterns=4 restore=172032 duplicate_writes=0 destination_reads=0 silicon_phase_claim=0",
             "TMS320C54x staged long MVDK: PASS cases=38400 forms=25 offsets=4 destinations=12 values=4 compatibility=2 restore=38400 source_alias=1 zero_gap_cmpr=1 duplicate_reads=0 duplicate_writes=0",
             "TMS320C54x staged original long MVDK pair: PASS cases=8 restore=8 stl_write=7 source_read=8 ar2_write=8 zero_gap_cmpr=1 duplicate_writes=0",
-            "TMS320C54x staged long RMW: PASS cases=153600 operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=153600 duplicate_reads=0 duplicate_writes=0",
+            "TMS320C54x staged long RMW: PASS cases=38400 operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=38400 duplicate_reads=0 duplicate_writes=0 snapshots=4 checkpoint_policy=balanced coverage_fnv64=882e53fb781dc875",
             "TMS320C54x staged long MVKD: PASS cases=19200 forms=25 offsets=4 sources=selected_AR,AR2,RAM,alias values=4 compatibility=2 pages=2 restore=19200 reads_each=1 writes_each=1 extensions_each=2 silicon_phase_claim=0",
         ),
         "Fatal error: TMS320C54x isolated long MVKD complete",
