@@ -384,14 +384,6 @@ private:
 	void start_repeat_store(unsigned variant = 0);
 	void start_repeat_store_edge(unsigned variant = 0);
 	void start_rptz(unsigned variant = 0);
-	static constexpr std::array<u64, 16> sat_inputs = {
-		0, 1, 0x7ffffffeULL, 0x7fffffffULL, 0x80000000ULL, 0x80000001ULL,
-		0xff7fffffffULL, 0xff80000000ULL, 0xff80000001ULL, 0xffffffffffULL,
-		0x7fffffffffULL, 0x8000000000ULL, 0x0100000000ULL, 0xfeffffffffULL,
-		0x007fffff00ULL, 0xff80000100ULL
-	};
-	void start_sat(unsigned variant = 0);
-	void start_rotate(unsigned variant = 0);
 	void start_ar_addm_load(unsigned variant = 0);
 	void start_pipeline_repeat_mvpd(unsigned variant = 0);
 	void start_pipeline_sp_rmw(unsigned variant = 0);
@@ -2014,7 +2006,7 @@ private:
 	bool check_delay_bitt_results();
 	bool check_repeat_store_results();
 	bool check_rptz_results();
-	bool check_sat_results();
+	bool check_mapped_addm_results();
 	bool check_literal_guard_results();
 	bool check_mmr_long_edge_results();
 	bool check_shifted_store_dld_results();
@@ -2350,7 +2342,6 @@ private:
 	static constexpr unsigned bitt_phase = 62032;
 	static constexpr unsigned repeat_store_phase = 62028;
 	static constexpr unsigned rptz_phase = 62026;
-	static constexpr unsigned rotate_phase = 62024;
 	static constexpr unsigned ar_addm_phase = 62020;
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;

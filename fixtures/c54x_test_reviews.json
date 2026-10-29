@@ -942,6 +942,46 @@
       ]
     },
     {
+      "id": "adjacent-saturation-publications",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_register_pairs.h; tests/c54x/tms320c54x_test_register_sequence.h",
+      "profiles": ["sat"],
+      "case_ids": [],
+      "basis": "SPRU172C4-154 SAT clamps to signed32 independently of OVM and replaces the selected overflow flag. Fixture-owned unsigned40 region comparisons and literal clamp limits supply results, independently of CPU helpers. The second adjacent SAT must clear overflow raised by the first clamp; one-instruction examples do not protect that lifecycle.",
+      "profile_coverage": {
+        "sat": {"cases": 3072, "fnv64": "7351b9c205db7825", "result_prefix": "TMS320C54x staged SAT: PASS", "key": "Original raw ordinals0..3071, unchanged: A/B,16 values,4 initial overflow combinations,4 SXM/OVM states,2 pages,3 checkpoints."}
+      },
+      "obligations": ["keep every original numeric/status/page/checkpoint tuple; all16 values distinguish clamp boundaries, guarded extremes and in-range results", "observe the original input through tick5, first clamped result/overflow at6, and the second SAT's cleared target overflow at7 and later", "preserve the other accumulator, unrelated full ST0 bits and full ST1 modes at every clock; require admitted execution and a real final IDLE", "retain checkpoints5/6/7 before, between and after the adjacent publications; successful restores and the original-key digest are executable acceptance", "clocked cases own program words, initial state and full observation masks; the CPU-only runner owns only setup/timing/replay and adds no CPU reset between cases"],
+      "limits": ["no cases or snapshots pruned; this compact two-publication bank is kept rather than conflated with the single-instruction literal SAT examples", "ticks6/7 qualify the current staged model, not measured silicon phases", "no repeat, interrupt, bus-access or adjacent producer qualification beyond the two SAT instructions", "common setup writes the same final twelve-word program image; overwriting NOPs during suspended setup is not a retained bus transaction contract"]
+    },
+    {
+      "id": "adjacent-rotate-carry-publications",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_register_pairs.h; tests/c54x/tms320c54x_test_register_sequence.h",
+      "profiles": ["rotate"],
+      "case_ids": [],
+      "basis": "SPRU172C ROR/ROL/ROLTC: explicit bit-position arithmetic moves carry or TC into the low32 result, publishes the outgoing bit as carry, clears guards and preserves unrelated status. Expectations use masks and shifts, not CPU rotation helpers. Consecutive ROR/ROL consumes forwarded carry; ROLTC continues to consume preserved TC instead.",
+      "profile_coverage": {
+        "rotate": {"cases": 4608, "fnv64": "897bd2c47c8b0625", "result_prefix": "TMS320C54x staged rotates: PASS", "key": "Original raw ordinals0..4607, unchanged: six opcode/destination forms,eight values,four C/TC states,four SXM/OVM modes,two pages,three checkpoints."}
+      },
+      "obligations": ["retain all six ROR/ROL/ROLTC A/B encodings and all existing value/status/page/checkpoint inputs", "check input, first result and second result at every original CPU clock; preserve the unselected accumulator, full TC/overflow/status and modes", "keep guard-bearing inputs, C/TC combinations, and second-instruction carry forwarding distinct from atomic ROR/ROL reference examples", "retain the complete checkpoint5/6/7 bank and real final IDLE, with actual restore counts and ordered original identities", "share the CPU-only clocked register-case runner with SAT rather than keeping two hand-written phase/replay machines", "host case-data tests verify every program/clock/checkpoint/mask layout plus independent literal positive/negative SAT and carry/TC/guard rotation examples; native runs execute every case and restore"],
+      "limits": ["no case or checkpoint removed; no full-suite runtime optimization claimed", "the fixture observes registers, not data/I-O bus absence; no new bus ownership claim is added", "publication clocks remain model regressions, not hardware measurements; repeat/interrupt composition stays separate", "the reusable runner does not calculate instruction results or infer state transitions; case data explicitly supplies them"],
+      "measurement": {
+        "baseline_commit": "81ead04f",
+        "c54x_cpp_bytes_before": 3657005,
+        "c54x_cpp_bytes_after": 3657178,
+        "c54x_cpp_lines_before": 55200,
+        "c54x_cpp_lines_after": 55261,
+        "sat_seconds_before": 0.87,
+        "sat_seconds_after": 0.73,
+        "rotate_seconds_before": 1.27,
+        "rotate_seconds_after": 1.05,
+        "scope": "Serial native CPU-only pair fixtures with all7680 cases/restores retained. Including the reusable clocked-case schema/runner and all new C++ headers adds173 bytes/61 lines; this is ownership and boilerplate consolidation, not source shrinkage or a renewed full-default checkpoint. Four legacy global phases, two start functions, the SAT data member and rotate phase constant are retired. The residual mixed checker is renamed for its remaining mapped-ADDM owner."
+      }
+    },
+    {
       "id": "normalization-documented-counts",
       "classification": "architectural_interaction",
       "decision": "rewrite",

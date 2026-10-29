@@ -293,6 +293,8 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_normalization.h` | CPU-only staged NORM/EXP observations and shared snapshot continuation |
 | `tests/c54x/tms320c54x_test_normalization_input.h` | Independent bit-position/leading-bit expectations, shared with legacy EXP-product controls |
 | `tests/c54x/tms320c54x_test_normalization_schedule.h` | Unique normalization/exponent inputs with balanced replay checkpoints |
+| `tests/c54x/tms320c54x_test_register_sequence.h` | CPU-only clocked register observations and snapshot continuation; no instruction arithmetic |
+| `tests/c54x/tms320c54x_test_register_pairs.h` | SAT and carry/TC rotate pairs with independent expected register states |
 | `tests/c54x/tms320c54x_test_port_case.h` | Common PORTW stimulus construction; no instruction arithmetic or reset policy |
 | `tests/c54x/tms320c54x_test_scalars.h` | Literal scalar boundaries with explicit reset/continuation groups, shared with the legacy basic adapter |
 | `tests/c54x/tms320c54x_test_memory_examples.h` | Ordered literal memory arithmetic/multiply/T examples, with original partial setup and assertion masks |
@@ -4512,7 +4514,7 @@ unvalidated.
 
 SAT A/B is admitted as a register-only Execute operation. TI SPRU172C,
 page 4-154, specifies signed 32-bit saturation independently of OVM and
-replacement of the selected accumulator's overflow flag. The `sat` core
+replacement of the selected accumulator's overflow flag. The CPU-only `sat`
 profile verifies 3,072 cases and save-state replays: 16 signed 40-bit
 patterns around both clamp boundaries, both accumulators, all initial
 overflow-bit combinations, SXM/OVM combinations, two program pages and
@@ -4521,6 +4523,24 @@ SAT clears the overflow from a preceding clamp. The other accumulator,
 unrelated status bits and modes remain unchanged. This qualifies the
 declared staged schedule, not measured silicon pipeline phases;
 single-instruction repeat remains rejected by the existing repeat guard.
+
+`rotate` retains 4,608 cases/restores: ROR/ROL/ROLTC on A/B, eight values,
+all four C/TC combinations, all four SXM/OVM modes, both program pages and
+checkpoints 5/6/7. Two consecutive ROR/ROL instructions forward carry;
+ROLTC instead continues to use TC. The result clears guards and preserves
+the other accumulator and unrelated full status. These are staged pair
+interactions, not duplicates of the atomic single-instruction examples.
+
+Both banks retain every original input and checkpoint. Their case data
+explicitly specifies the program/setup and register observations at ticks
+0/6/7; the reusable runner observes each CPU clock, restores at the declared
+checkpoint and requires real IDLE at tick 16. It neither computes results
+nor resets the CPU between cases. Ordered original-key digests and actual
+successful restore counts qualify all 7,680 cases. No Nokia devices, GSM or
+private ROM are involved. The original fixtures did not observe data/I-O
+absence, and extraction does not add that claim. All new headers included,
+this separation adds 173 bytes/61 C++ lines rather than claiming source
+shrinkage; it removes duplicate legacy start/phase/replay ownership.
 
 ## Staged circular accumulator stores
 

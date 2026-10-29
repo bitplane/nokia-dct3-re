@@ -528,11 +528,11 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated staged RPTZ complete",
     ),
     "sat": (
-        "TMS320C54x staged SAT: PASS cases=3072 restore=3072 patterns=16 accumulators=2 initial_overflow=4 sxm_ovm=4 pages=2 snapshots=3 adjacent=2 silicon_phase_claim=0",
+        "TMS320C54x staged SAT: PASS cases=3072 restore=3072 patterns=16 accumulators=2 initial_overflow=4 sxm_ovm=4 pages=2 snapshots=3 adjacent=2 silicon_phase_claim=0 coverage_fnv64=7351b9c205db7825",
         "Fatal error: TMS320C54x isolated staged SAT complete",
     ),
     "rotate": (
-        "TMS320C54x staged rotates: PASS cases=4608 restore=4608 forms=ROR_A,ROR_B,ROL_A,ROL_B,ROLTC_A,ROLTC_B patterns=8 c_tc=4 sxm_ovm=4 pages=2 snapshots=3 adjacent=2 guard_clear=1 status_preserved=1 silicon_phase_claim=0",
+        "TMS320C54x staged rotates: PASS cases=4608 restore=4608 forms=ROR_A,ROR_B,ROL_A,ROL_B,ROLTC_A,ROLTC_B patterns=8 c_tc=4 sxm_ovm=4 pages=2 snapshots=3 adjacent=2 guard_clear=1 status_preserved=1 silicon_phase_claim=0 coverage_fnv64=897bd2c47c8b0625",
         "Fatal error: TMS320C54x isolated staged rotates complete",
     ),
     "addm-ar": (

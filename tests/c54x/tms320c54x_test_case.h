@@ -29,6 +29,13 @@ struct instruction_case
 	std::vector<memory_word> reset_data{};
 };
 
+struct clocked_register_state { unsigned tick; instruction_case observation; };
+struct clocked_register_case
+{
+	std::vector<clocked_register_state> states;
+	unsigned checkpoint, finish;
+};
+
 // No implicit reset: the standalone runner owns reset_* metadata.
 // Legacy adapters ignore it and retain their checked predecessor.
 template <typename Cpu>

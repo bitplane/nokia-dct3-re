@@ -20,7 +20,7 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_delay_bitt_results()) return;
 	if (check_repeat_store_results()) return;
 	if (check_rptz_results()) return;
-	if (check_sat_results()) return;
+	if (check_mapped_addm_results()) return;
 	if (check_literal_guard_results()) return;
 	if (check_mmr_long_edge_results()) return;
 	if (check_shifted_store_dld_results()) return;

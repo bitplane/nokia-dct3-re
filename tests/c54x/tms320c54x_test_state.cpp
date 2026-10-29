@@ -65,8 +65,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"rpt-store-edge"}, [](self &test) { test.start_repeat_store_edge(); } },
 		{ {"rpt-store"}, [](self &test) { test.start_repeat_store(); } },
 		{ {"rptz"}, [](self &test) { test.start_rptz(); } },
-		{ {"sat"}, [](self &test) { test.start_sat(); } },
-		{ {"rotate"}, [](self &test) { test.start_rotate(); } },
 		{ {"addm-ar"}, [](self &test) { test.start_ar_addm(); } },
 		{ {"addm-ar-short"}, [](self &test) { test.start_ar_addm(); } },
 		{ {"addm-brc"}, [](self &test) { test.start_ar_addm(); } },
