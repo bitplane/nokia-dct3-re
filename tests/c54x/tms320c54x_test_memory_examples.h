@@ -280,6 +280,70 @@ inline auto const &circular_marker_examples()
 	return cases;
 }
 
+inline auto const &paired_memory_examples()
+{
+	using r = tms320c54x_device;
+	static const auto cases = [] {
+		std::vector<instruction_case> result;
+		auto add = [&](const char *id, std::vector<u16> first, u16 second,
+			std::vector<register_setting> initial, std::vector<register_check> expected,
+			std::vector<memory_word> data = {}, std::vector<memory_word> expected_data = {},
+			unsigned first_interval = 3, unsigned second_interval = 3) {
+			first.insert(first.end(), {0x75d6, 0x0124, second});
+			auto test = port_case(id, std::move(first), std::move(initial), std::move(expected),
+				std::move(data), first_interval + second_interval, std::move(expected_data), 3);
+			test.split_port_intervals = std::array<unsigned, 2>{first_interval, second_interval};
+			test.additional_opcodes = {second};
+			test.reset_before = result.empty() || result.size() == 3;
+			if (test.reset_before) test.reset_initial = {{r::STATE_BK, 4}};
+			result.push_back(std::move(test));
+		};
+		// Both operation intervals and their shared pointer/data dependencies
+		// are checked; the middle PORTW is not just a final-state delimiter.
+		add("immediate-store-decrement-low-store-increment", {0x768a, 0xabcd}, 0x8092,
+			{{r::STATE_A, 0x12345678}, {r::STATE_AR2, 0x0d80}, {r::STATE_AR6, 0x0a03}, {r::STATE_ST1, 0}},
+			{{r::STATE_AR2, 0x0d80}}, {}, {{0x0d80, 0xabcd}, {0x0d7f, 0x5678}}, 4);
+		add("dual-move-increment-then-circular-source", {0xe5a8}, 0xe5ca,
+			{{r::STATE_AR0, 1}, {r::STATE_AR2, 0x0d02}, {r::STATE_AR4, 0x0e00}, {r::STATE_AR6, 0x0a03}, {r::STATE_BK, 4}},
+			{{r::STATE_AR2, 0x0d00}, {r::STATE_AR4, 0x0e02}}, {{0x0e00, 0x1357}, {0x0d03, 0x2468}}, {{0x0d02, 0x1357}, {0x0e01, 0x2468}});
+		add("unsigned-absolute-and-postdecrement-loads", {0x12f8, 0x0d40}, 0x138b,
+			{{r::STATE_A, 0}, {r::STATE_B, 0}, {r::STATE_AR3, 0x0d50}, {r::STATE_AR6, 0x0a03}, {r::STATE_ST1, 0x0100}},
+			{{r::STATE_A, 0x8001}, {r::STATE_B, 0xff80}, {r::STATE_AR3, 0x0d4f}}, {{0x0d40, 0x8001}, {0x0d50, 0xff80}}, {}, 4);
+		add("fixed-pointer-copy-and-low-b-store", {0x7182, 0x0d71}, 0x8183,
+			{{r::STATE_B, 0x1234abcd}, {r::STATE_AR2, 0x0d70}, {r::STATE_AR3, 0x0d72}, {r::STATE_AR6, 0x0a03}, {r::STATE_ST1, 0}},
+			{{r::STATE_AR2, 0x0d70}, {r::STATE_AR3, 0x0d72}}, {{0x0d70, 0xaaa5}}, {{0x0d71, 0xaaa5}, {0x0d72, 0xabcd}}, 4);
+		add("signed-high-loads-increment-decrement", {0x4492}, 0x458b,
+			{{r::STATE_A, 0}, {r::STATE_B, 0}, {r::STATE_AR2, 0x0d00}, {r::STATE_AR3, 0x0d10}, {r::STATE_AR6, 0x0a03}, {r::STATE_ST1, 0x0100}},
+			{{r::STATE_A, 0xff80010000ULL}, {r::STATE_AR2, 0x0d01}, {r::STATE_B, 0xffff800000ULL}, {r::STATE_AR3, 0x0d0f}}, {{0x0d00, 0x8001}, {0x0d10, 0xff80}});
+		add("positive-high-loads-opposite-pointers", {0x4493}, 0x458a,
+			{{r::STATE_A, 0}, {r::STATE_B, 0}, {r::STATE_AR2, 0x0d01}, {r::STATE_AR3, 0x0d11}, {r::STATE_AR6, 0x0a03}},
+			{{r::STATE_A, 0x7fff0000}, {r::STATE_AR3, 0x0d12}, {r::STATE_B, 0x00800000}, {r::STATE_AR2, 0x0d00}}, {{0x0d11, 0x7fff}, {0x0d01, 0x0080}});
+		add("or-fixed-ar2-a-ar3-b", {0x1a82}, 0x1b83,
+			{{r::STATE_A, 0x12340000}, {r::STATE_B, 0xaaaa0000}, {r::STATE_AR2, 0x0d20}, {r::STATE_AR3, 0x0d30}, {r::STATE_AR6, 0x0a03}, {r::STATE_ST0, 0}, {r::STATE_ST1, 0}},
+			{{r::STATE_A, 0x123400f0}, {r::STATE_AR2, 0x0d20}, {r::STATE_B, 0xaaaa0f0f}, {r::STATE_AR3, 0x0d30}}, {{0x0d20, 0x00f0}, {0x0d30, 0x0f0f}});
+		add("or-fixed-ar3-a-ar2-b", {0x1a83}, 0x1b82,
+			{{r::STATE_A, 0xaaaa0000}, {r::STATE_B, 0xcccc0000}, {r::STATE_AR2, 0x0d20}, {r::STATE_AR3, 0x0d30}, {r::STATE_AR6, 0x0a03}},
+			{{r::STATE_A, 0xaaaa5555}, {r::STATE_AR3, 0x0d30}, {r::STATE_B, 0xcccc3333}, {r::STATE_AR2, 0x0d20}}, {{0x0d20, 0x3333}, {0x0d30, 0x5555}});
+		add("mar-decrement-feeds-xor", {0x6d8c}, 0x1c84,
+			{{r::STATE_A, 0x12340000}, {r::STATE_AR4, 0x0d41}, {r::STATE_AR6, 0x0a03}},
+			{{r::STATE_AR4, 0x0d40}, {r::STATE_A, 0x12340f0f}}, {{0x0d40, 0x0f0f}, {0x0d41, 0xf0f0}});
+		add("signed-load-decrement-feeds-low-store", {0x108a}, 0x8084,
+			{{r::STATE_A, 0}, {r::STATE_AR2, 0x0d51}, {r::STATE_AR4, 0x0d60}, {r::STATE_AR6, 0x0a03}, {r::STATE_ST1, 0x0100}},
+			{{r::STATE_A, 0xffffff8001ULL}, {r::STATE_AR2, 0x0d50}, {r::STATE_AR4, 0x0d60}}, {{0x0d51, 0x8001}, {0x0d60, 0}}, {{0x0d60, 0x8001}});
+		add("or-decrement-feeds-dual-move", {0x1a8b}, 0xe598,
+			{{r::STATE_A, 0x100000}, {r::STATE_AR2, 0x0d80}, {r::STATE_AR3, 0x0d70}, {r::STATE_AR6, 0x0a03}, {r::STATE_ST1, 0}},
+			{{r::STATE_A, 0x1000f0}, {r::STATE_AR3, 0x0d70}, {r::STATE_AR2, 0x0d81}}, {{0x0d6f, 0x5555}, {0x0d70, 0x00f0}, {0x0d80, 0}}, {{0x0d80, 0x5555}});
+		add("mvmm-one-source-two-destinations", {0xe742}, 0xe743,
+			{{r::STATE_AR2, 0}, {r::STATE_AR3, 0}, {r::STATE_AR4, 0x0d90}, {r::STATE_AR6, 0x0a03}},
+			{{r::STATE_AR2, 0x0d90}, {r::STATE_AR3, 0x0d90}, {r::STATE_AR4, 0x0d90}});
+		add("mvmm-stack-pointer-round-trip", {0xe748}, 0xe782,
+			{{r::STATE_AR2, 0}, {r::STATE_AR4, 0x0d90}, {r::STATE_AR6, 0x0a03}, {r::STATE_SP, 0x0300}},
+			{{r::STATE_SP, 0x0d90}, {r::STATE_AR2, 0x0d90}});
+		return result;
+	}();
+	return cases;
+}
+
 } // namespace c54x_test
 
 #endif // MAME_NOKIA_TMS320C54X_TEST_MEMORY_EXAMPLES_H

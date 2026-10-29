@@ -5,6 +5,7 @@
 #define MAME_NOKIA_TMS320C54X_TEST_CASE_H
 
 #include "tms320c54x_test_support.h"
+#include <array>
 #include <vector>
 #include <optional>
 
@@ -28,6 +29,8 @@ struct instruction_case
 	bool reset_before = true;
 	std::vector<register_setting> reset_initial{};
 	std::vector<memory_word> reset_data{};
+	std::optional<std::array<unsigned, 2>> split_port_intervals{}; // First/middle and middle/last writes.
+	std::vector<u16> additional_opcodes{}; // Independent words retained in the legacy assertion trace.
 };
 
 struct clocked_register_state { unsigned tick; instruction_case observation; };
@@ -94,12 +97,17 @@ void check_case_state(Cpu &cpu, instruction_case const &test)
 
 template <typename Cpu>
 void check_case(Cpu &cpu, instruction_case const &test,
-		unsigned port_writes, u64 port_interval)
+		unsigned port_writes, u64 port_interval,
+		std::optional<std::array<u64, 2>> split_port_intervals = {})
 {
 	check_case_state(cpu, test);
 	if (port_writes != test.port_writes || port_interval != test.port_interval)
 		throw emu_fatalerror("C54x case %s: port writes=%u interval=%llu expected=%u/%u",
 			test.id, port_writes, (unsigned long long)port_interval, test.port_writes, test.port_interval);
+	if (test.split_port_intervals && (port_writes != 3 || !split_port_intervals ||
+		(*split_port_intervals)[0] != (*test.split_port_intervals)[0] ||
+		(*split_port_intervals)[1] != (*test.split_port_intervals)[1]))
+		throw emu_fatalerror("C54x case %s: missing or incorrect intermediate port intervals", test.id);
 }
 
 } // namespace c54x_test

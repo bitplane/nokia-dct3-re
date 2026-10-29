@@ -99,6 +99,8 @@ protected:
 				m_cases.insert(m_cases.end(), circular.begin(), circular.end());
 				auto const &routes = c54x_test::memory_route_examples();
 				m_cases.insert(m_cases.end(), routes.begin(), routes.end());
+				auto const &pairs = c54x_test::paired_memory_examples();
+				m_cases.insert(m_cases.end(), pairs.begin(), pairs.end());
 			}
 			else if (words()) m_cases = c54x_test::instruction_word_examples();
 			else if (products()) m_cases = c54x_test::product_examples();
@@ -272,6 +274,7 @@ private:
 	{
 		if (!m_writes++) m_first = m_cpu->total_cycles();
 		m_last = m_cpu->total_cycles();
+		if (m_writes == 2) m_middle = m_last;
 	}
 	void start()
 	{
@@ -287,7 +290,7 @@ private:
 			for (auto const &word : test_case().reset_data)
 				m_cpu->space(AS_DATA).write_word(word.address, word.value);
 		}
-		m_writes = 0; m_first = m_last = 0;
+		m_writes = 0; m_first = m_middle = m_last = 0;
 		c54x_test::prepare_case(*m_cpu, test_case());
 		m_timer->adjust(attotime::from_usec(100));
 	}
@@ -310,7 +313,8 @@ private:
 			throw emu_fatalerror(3, "TMS320C54x isolated source-domain exclusions complete");
 		}
 		auto const &test = test_case();
-		c54x_test::check_case(*m_cpu, test, m_writes, m_last - m_first);
+		c54x_test::check_case(*m_cpu, test, m_writes, m_last - m_first,
+			std::array<u64, 2>{m_middle - m_first, m_last - m_middle});
 		osd_printf_info("C54x ISA case: PASS id=%s\n", test.id);
 		if (++m_case < count()) { start(); return; }
 		if (words())
@@ -354,7 +358,7 @@ private:
 	required_device<tms320c54x_device> m_cpu;
 	emu_timer *m_timer = nullptr;
 	unsigned m_case = 0, m_writes = 0, m_resets = 0;
-	u64 m_first = 0, m_last = 0;
+	u64 m_first = 0, m_middle = 0, m_last = 0;
 	bool m_domain = false;
 	bool m_extended_program = false;
 	bool m_mapped_mac = false;

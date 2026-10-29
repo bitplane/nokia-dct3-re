@@ -6555,14 +6555,14 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
-          "cases": "282",
+          "cases": "295",
           "firmware": "0",
           "nokia_devices": "0",
-          "reset_groups": "17"
+          "reset_groups": "19"
         }
       ],
       "required": [
-        "TMS320C54x generic memory examples: PASS cases=282 reset_groups=17 nokia_devices=0 firmware=0"
+        "TMS320C54x generic memory examples: PASS cases=295 reset_groups=19 nokia_devices=0 firmware=0"
       ]
     },
     "isa-parallel": {
@@ -15498,7 +15498,20 @@
         "load-ar1-signed-stationary-source",
         "frame-increment-crosses-page",
         "or-immediate-b-retains-upper-bits",
-        "and-immediate-b-to-a-retains-b"
+        "and-immediate-b-to-a-retains-b",
+        "immediate-store-decrement-low-store-increment",
+        "dual-move-increment-then-circular-source",
+        "unsigned-absolute-and-postdecrement-loads",
+        "fixed-pointer-copy-and-low-b-store",
+        "signed-high-loads-increment-decrement",
+        "positive-high-loads-opposite-pointers",
+        "or-fixed-ar2-a-ar3-b",
+        "or-fixed-ar3-a-ar2-b",
+        "mar-decrement-feeds-xor",
+        "signed-load-decrement-feeds-low-store",
+        "or-decrement-feeds-dual-move",
+        "mvmm-one-source-two-destinations",
+        "mvmm-stack-pointer-round-trip"
       ],
       "classification": "architectural_interaction",
       "decision": "rewrite",

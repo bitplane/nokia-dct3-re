@@ -634,7 +634,15 @@ int main() {
     try { c54x_test::check_case(c, test, 2, 4); } catch (emu_fatalerror const &) { ++failures; }
     c.spaces[AS_DATA].words[4] = 6;
     try { c54x_test::check_case(c, test, 2, 3); } catch (emu_fatalerror const &) { ++failures; }
-    return failures != 4;
+    c.spaces[AS_DATA].words[4] = 5;
+    test.port_writes = 3;
+    test.port_interval = 7;
+    test.split_port_intervals = std::array<unsigned, 2>{4, 3};
+    c54x_test::check_case(c, test, 3, 7, std::array<u64, 2>{4, 3});
+    try { c54x_test::check_case(c, test, 3, 7); } catch (emu_fatalerror const &) { ++failures; }
+    try { c54x_test::check_case(c, test, 3, 7, std::array<u64, 2>{3, 4}); } catch (emu_fatalerror const &) { ++failures; }
+    try { c54x_test::check_case(c, test, 3, 7, std::array<u64, 2>{4, 4}); } catch (emu_fatalerror const &) { ++failures; }
+    return failures != 7;
 }
 '''
         with compiled_cpp(source) as program:

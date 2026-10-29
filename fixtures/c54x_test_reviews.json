@@ -1517,11 +1517,24 @@
         "load-ar1-signed-stationary-source",
         "frame-increment-crosses-page",
         "or-immediate-b-retains-upper-bits",
-        "and-immediate-b-to-a-retains-b"
+        "and-immediate-b-to-a-retains-b",
+        "immediate-store-decrement-low-store-increment",
+        "dual-move-increment-then-circular-source",
+        "unsigned-absolute-and-postdecrement-loads",
+        "fixed-pointer-copy-and-low-b-store",
+        "signed-high-loads-increment-decrement",
+        "positive-high-loads-opposite-pointers",
+        "or-fixed-ar2-a-ar3-b",
+        "or-fixed-ar3-a-ar2-b",
+        "mar-decrement-feeds-xor",
+        "signed-load-decrement-feeds-low-store",
+        "or-decrement-feeds-dual-move",
+        "mvmm-one-source-two-destinations",
+        "mvmm-stack-pointer-round-trip"
       ],
       "basis": "TI SPRU172C and independent literal results for memory arithmetic, multiply/ACCA/POLY, T loads, shifted arithmetic, ABDST/LTD, short SUB/XOR, negative MACR rounding, program-coefficient MACP/MACD, DP/SP addressing, squares and saturating ADDM. Expectations and original partial preservation masks do not use CPU implementation helpers. Port intervals retain an emulator regression contract, not measured physical DARAM timing. Signed-six-bit TS/encoded shifts, MAX/MIN signed-guard and tie selection, EXP/NORM and one-cycle RND/SAT examples retain literal documented results.",
       "obligations": [
-        "retain all original 100 case records, opcode words, literal results, partial setup and assertion masks as three ordered groups (45, 30 and 25); append twenty register-bit examples, thirty full-status shifts, twelve absolute-marker examples, thirty-four transfer/stack examples, thirty absolute-operand examples, fourteen long-offset examples and sixteen circular-marker examples as groups four through ten; append twenty-six operand-routing examples as seven more groups; no reset within a group, and legacy entries remain in their original positions",
+        "retain all original 100 case records, opcode words, literal results, partial setup and assertion masks as three ordered groups (45, 30 and 25); append twenty register-bit examples, thirty full-status shifts, twelve absolute-marker examples, thirty-four transfer/stack examples, thirty absolute-operand examples, fourteen long-offset examples and sixteen circular-marker examples as groups four through ten; append twenty-six operand-routing examples as seven more groups and thirteen paired-memory executions as two more groups; no reset within a group, and legacy entries remain in their original positions",
         "preserve carry across the checked AND-to-MPY and shifted-SUB continuations; retain A/B/T, selected/decoy AR and RAM checks only where originally asserted",
         "preserve the full ST1 checks in the 14 multiply rows without promoting the other carry-only checks to full status preservation",
         "standalone entry seeds the checked predecessor's C16 mode and circular timing-marker context; the legacy adapter retains its predecessor state without injecting that seed",
@@ -1548,6 +1561,20 @@
         "c54x_cpp_lines_before": 55429,
         "c54x_cpp_lines_after": 55140,
         "scope": "All tests/c54x C++ and headers including the new 25-case shift/scalar bank and CPU-only routing. Net reduction 10285 bytes/289 lines; no generated replacement bulk or removed instruction case. Existing 75 identities remain the exact prefix of the expanded profile."
+      },
+      "paired_memory_refactor": {
+        "baseline_commit": "7236483f",
+        "decision": "retain thirteen paired executions and their twenty-six independently asserted opcode words in shared descriptors",
+        "scope": "Both sides of the middle port marker retain their own interval. Preserve pointer decrement/increment dependencies, circular dual moves, signed/unsigned loads, source/destination selection, load-to-store data, MAR-to-XOR address use, MVMM copies and SP round trip. These marker-separated pairs do not establish adjacent-instruction hazards or silicon pipeline placement.",
+        "overlap": "Related scalar cases cover the same instruction families but do not replace the two independent operation intervals or checked shared pointer/data state. No input or expectation is deleted; this is a boilerplate rewrite, not equivalent-coverage substitution for staged replay matrices.",
+        "predicate_audit": "Compiled descriptors match all thirteen original ordered seeds, data writes, executed words, register/RAM predicates, three-write counts, both interval predicates and ordered pairs of asserted opcode words. Missing split observations and either wrong interval fail in the executable checker unit test, including a wrong split with the same total interval.",
+        "coverage": "The original 282 isa-memory identities remain the exact prefix of 295 cases in nineteen reset groups. Legacy adds no reset and retains both observed opcode identities per paired execution.",
+        "verification": "All nine CPU-only literal/disassembly profiles pass with an empty ROM directory, including all 295 memory identities in nineteen reset groups. The rebuilt legacy prefix preserves all 168 ordered PASS records and all 2474 asserted opcode words exactly. All 379 focused C54x and all 5076 host tests pass. No CPU implementation changes; full-default and handset checkpoints are not renewed by this test-only batch.",
+        "c54x_cpp_bytes_before": 3447679,
+        "c54x_cpp_bytes_after": 3439682,
+        "c54x_cpp_lines_before": 52203,
+        "c54x_cpp_lines_after": 51959,
+        "source_assessment": "7997 C++ bytes and 244 lines removed including the common observer extension and both adapters. No instruction case, expected result or individual interval predicate is dropped; no suite runtime improvement is claimed."
       },
       "memory_route_refactor": {
         "baseline_commit": "8f2fba10",
