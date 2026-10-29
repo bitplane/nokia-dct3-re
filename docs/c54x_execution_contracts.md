@@ -73,6 +73,11 @@ refactor pass; `--write` is reserved for an explicitly reviewed contract change.
 Expected arithmetic/timing results must remain independent of CPU execution
 helpers and shared profile-selection metadata.
 
+`tms320c54x_test_snapshot.h` centralizes buffer reset, rewind and MAME
+serialization. Restore cancels the check timer before loading, as the original
+fixtures did. Assertions, counter rewinds, CPU suspension and continuation stay
+explicit in each family; the helper does not save or restore host observations.
+
 Runner unit tests exercise the acceptance grammar across every declared
 isolated profile and named scope: exact marker multiplicity, every `key=value`
 field, terminal completion and scope separation. They do not restate CPU

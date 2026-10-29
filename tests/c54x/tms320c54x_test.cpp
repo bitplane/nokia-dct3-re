@@ -20,6 +20,8 @@
 
 namespace {
 
+using c54x_test::capture_snapshot;
+
 using c54x_test::tms320c54x_test_state;
 
 class c54x_backend_bsp_test_state : public driver_device
@@ -115,8 +117,7 @@ private:
 			m_backend->codec_receive_clock_w(pins & 1, false, false);
 			m_backend->codec_transmit_clock_w(pins & 2, false);
 			expect((data.read_word(0x22) & 0x300) == (pins << 8), "BSPC IN0/IN1 reflect external clocks while engines reset");
-			m_saved.str({}); m_saved.clear();
-			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save external serial clock levels");
+			expect(capture_snapshot(machine(), m_saved) == STATERR_NONE, "save external serial clock levels");
 			m_backend->codec_receive_clock_w(!(pins & 1), false, false);
 			m_backend->codec_transmit_clock_w(!(pins & 2), false);
 			expect((data.read_word(0x22) & 0x300) == ((pins ^ 3) << 8), "clock changes are visible without enabling serial engines");
@@ -170,8 +171,7 @@ private:
 		else if (m_stage == 22)
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20, "load-time BXINT0 arrives before the output word finishes");
-			m_saved.str({}); m_saved.clear();
-			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save partial XSR, queued BDXR and pending TX interrupt");
+			expect(capture_snapshot(machine(), m_saved) == STATERR_NONE, "save partial XSR, queued BDXR and pending TX interrupt");
 			transmit_pin_suffix(); m_cpu->resume(SUSPEND_REASON_DISABLE);
 			expect(data.read_word(0x22) & 0x1000, "queued BDXR prevents output-completion underrun");
 		}
@@ -270,8 +270,7 @@ private:
 				"continuous receiver publishes its initial word through source 4");
 			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 			continuous_receive_bits(0x5678, 0, 8);
-			m_saved.str({}); m_saved.clear();
-			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save continuous receive mode and partial successor");
+			expect(capture_snapshot(machine(), m_saved) == STATERR_NONE, "save continuous receive mode and partial successor");
 			continuous_receive_bits(0x5678, 8, 16);
 		}
 		else if (m_stage == 42)
@@ -361,8 +360,7 @@ private:
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20, "initial continuous load reaches source 5");
 			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-			m_saved.str({}); m_saved.clear();
-			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save continuous TX partial word and queued successor");
+			expect(capture_snapshot(machine(), m_saved) == STATERR_NONE, "save continuous TX partial word and queued successor");
 			continuous_transmit_suffix();
 		}
 		else if (m_stage == 52)
@@ -449,8 +447,7 @@ private:
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20, "FIG initial TX load raises source 5");
 			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-			m_saved.str({}); m_saved.clear();
-			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save FIG streams after initial sync release");
+			expect(capture_snapshot(machine(), m_saved) == STATERR_NONE, "save FIG streams after initial sync release");
 			frame_ignore_suffix();
 		}
 		else if (m_stage == 62)
@@ -539,8 +536,7 @@ private:
 		else if (m_stage == 71)
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x20, "Only TX load is pending halfway through a joined word");
-			m_saved.str({}); m_saved.clear();
-			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "Save both joined shifters and clock levels mid-word");
+			expect(capture_snapshot(machine(), m_saved) == STATERR_NONE, "Save both joined shifters and clock levels mid-word");
 			joined_bits(width / 2, width);
 		}
 		else if (m_stage == 72)
@@ -677,8 +673,7 @@ private:
 			receive_pin_cycle(true, false);
 			receive_pin_bits(0, 8, false);
 			expect(m_backend->codec_receive_clock_w(true, false, bool(0x5678 & 0x80)), "hold receive clock before the next sample");
-			m_saved.str({}); m_saved.clear();
-			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save backend with half a serial word received");
+			expect(capture_snapshot(machine(), m_saved) == STATERR_NONE, "save backend with half a serial word received");
 			receive_pin_suffix();
 		}
 		else if (m_stage == 11 || m_stage == 13 || m_stage == 16)
@@ -743,8 +738,7 @@ private:
 		expect(io.read_word(0x27) == 0x1311 && m_rf_source_reads == 1 && m_cobba->rf_receive_samples() == 1,
 			"ordinary RF read consumes exactly one source word");
 		peek(0x1311);
-		m_saved.str({}); m_saved.clear();
-		expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save RF observation latch and independent source cursor");
+		expect(capture_snapshot(machine(), m_saved) == STATERR_NONE, "save RF observation latch and independent source cursor");
 		expect(io.read_word(0x27) == 0x1422 && m_rf_source_reads == 2, "RF next source word");
 		m_saved.clear(); m_saved.seekg(0);
 		expect(machine().save().read_stream(m_saved) == STATERR_NONE && m_rf_source_reads == 1 && m_cobba->rf_receive_samples() == 1,
@@ -799,8 +793,7 @@ private:
 			// CPU input changes settle between callbacks, before the snapshot.
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4, "Unmasking the retained slot request asserts native source 2");
 			m_timer->adjust(attotime::never);
-			m_saved.str({}); m_saved.clear();
-			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "Save the pending slot and its independent payload");
+			expect(capture_snapshot(machine(), m_saved) == STATERR_NONE, "Save the pending slot and its independent payload");
 			io.write_word(accept_port, request);
 			expect(!io.read_word(1) && data.read_word(0x0854) == payload, "Either accept port retires the slot without changing these payloads");
 		}
@@ -825,8 +818,7 @@ private:
 			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 			io.write_word(compare_port, (io.read_word(0x0d) + 100) % 5000);
 			m_timer->adjust(attotime::never);
-			m_saved.str({}); m_saved.clear();
-			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "Save the armed timer before expiry");
+			expect(capture_snapshot(machine(), m_saved) == STATERR_NONE, "Save the armed timer before expiry");
 			m_backend->reset_line_w(0);
 		}
 		else if (m_stage == 97)
@@ -869,8 +861,7 @@ private:
 			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 			expect(io.read_word(1) == 0x1008 && !(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4),
 				"Masked coincident compares retain both independent requests");
-			m_timer->adjust(attotime::never); m_saved.str({}); m_saved.clear();
-			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "Save both pending comparators and their mask");
+			m_timer->adjust(attotime::never); expect(capture_snapshot(machine(), m_saved) == STATERR_NONE, "Save both pending comparators and their mask");
 			io.write_word(2, 8);
 			expect(io.read_word(1) == 0x1000, "Accepting the slot leaves the transfer pending");
 		}

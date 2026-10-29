@@ -58,8 +58,7 @@ bool tms320c54x_test_state::check_instruction_observer_results()
 		if (tick == checkpoint && !m_instruction_observer.replay)
 		{
 			m_instruction_observer.snapshot = m_instruction_observer.observed;
-			m_instruction_observer.saved.str({}); m_instruction_observer.saved.clear();
-			expect(machine().save().write_stream(m_instruction_observer.saved) == STATERR_NONE, "Save before or after observer entry without saving callback wiring");
+			expect(capture_snapshot(machine(), m_instruction_observer.saved) == STATERR_NONE, "Save before or after observer entry without saving callback wiring");
 		}
 		if (tick == 40)
 		{
@@ -86,8 +85,7 @@ bool tms320c54x_test_state::check_instruction_observer_results()
 			{
 				m_instruction_observer.replay = true; m_instruction_observer.tick = checkpoint;
 				m_instruction_observer.observed = m_instruction_observer.snapshot;
-				m_instruction_observer.saved.clear(); m_instruction_observer.saved.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_instruction_observer.saved) == STATERR_NONE, "Restore instruction identity without extra observer emissions");
+				expect(restore_snapshot(machine(), *m_check_timer, m_instruction_observer.saved) == STATERR_NONE, "Restore instruction identity without extra observer emissions");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 292010; m_check_timer->enable(true); return true;
 			}
 			m_cpu->set_pipeline_frontend(false);

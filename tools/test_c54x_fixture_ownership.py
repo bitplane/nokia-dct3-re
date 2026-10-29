@@ -60,6 +60,12 @@ class FixtureOwnershipTests(unittest.TestCase):
                     if stream in owners:
                         users[stream].add(name)
                         operations[stream].add(operation)
+                for operation, stream in re.findall(
+                        r'\b(capture_snapshot|restore_snapshot)\(machine\(\),\s*'
+                        r'(?:\*m_check_timer,\s*)?(m_\w+(?:\.\w+)?)\)', body):
+                    if stream in owners:
+                        users[stream].add(name)
+                        operations[stream].add('write_stream' if operation == 'capture_snapshot' else 'read_stream')
         self.assertEqual(users, owners)
         for owner in owners:
             with self.subTest(stream=owner):

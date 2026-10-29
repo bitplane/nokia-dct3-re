@@ -133,8 +133,7 @@ bool tms320c54x_test_state::check_pipeline_frontend_results()
 				m_cpu->space(AS_DATA).write_word(0x420, 0x5678);
 			}
 			expect(machine().scheduler().can_save(), "Decoded foreground and INTR checkpoint is saveable");
-			m_frontend.saved.str({}); m_frontend.saved.clear();
-			expect(machine().save().write_stream(m_frontend.saved) == STATERR_NONE,
+			expect(capture_snapshot(machine(), m_frontend.saved) == STATERR_NONE,
 				"Save decoded foreground and pending INTR before Access");
 		}
 		if (cycle == 10)

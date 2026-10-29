@@ -131,8 +131,7 @@ bool tms320c54x_test_state::check_saved_repeat_results()
 			f.snapshot == 4 ? c.controls >= 5 + stlm && cycle >= c.st1_cycle + 1 : c.resumed && cycle >= c.resume_cycle + 2;
 		if (checkpoint && !m_saved_irq_repeat.replay && m_saved_irq_repeat.checkpoint_tick == 0)
 		{
-			m_saved_irq_repeat.checkpoint_tick = tick; m_saved_irq_repeat.snapshot = c; m_saved_irq_repeat.saved.str({}); m_saved_irq_repeat.saved.clear();
-			expect(machine().save().write_stream(m_saved_irq_repeat.saved) == STATERR_NONE, "Save actual IRQ repeat state after queued input edges settle");
+			m_saved_irq_repeat.checkpoint_tick = tick; m_saved_irq_repeat.snapshot = c; expect(capture_snapshot(machine(), m_saved_irq_repeat.saved) == STATERR_NONE, "Save actual IRQ repeat state after queued input edges settle");
 		}
 		if (m_cpu->state_int(tms320c54x_device::STATE_IDLE) || tick == 5000)
 		{
@@ -151,8 +150,7 @@ bool tms320c54x_test_state::check_saved_repeat_results()
 			if (!m_saved_irq_repeat.replay)
 			{
 				m_saved_irq_repeat.replay = true; m_saved_irq_repeat.tick = m_saved_irq_repeat.checkpoint_tick; m_saved_irq_repeat.observed = m_saved_irq_repeat.snapshot;
-				m_saved_irq_repeat.saved.clear(); m_saved_irq_repeat.saved.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_irq_repeat.saved) == STATERR_NONE, "Restore software-saved repeat state without resubmitting physical input");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_irq_repeat.saved) == STATERR_NONE, "Restore software-saved repeat state without resubmitting physical input");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255810; m_check_timer->enable(true); return true;
 			}
 			m_saved_irq_repeat.read_tap.remove(); m_saved_irq_repeat.write_tap.remove(); m_saved_irq_repeat.fetch_tap.remove(); m_saved_irq_repeat.vector_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -250,7 +248,7 @@ bool tms320c54x_test_state::check_body_repeat_results()
 		bool const checkpoint = f.snapshot == 0 ? tick == 4 : f.snapshot == 1 ? c.vectors && cycle >= c.vector_cycle + 2 :
 			f.snapshot == 2 ? c.inner_writes && cycle >= c.inner_cycle + 2 : f.snapshot == 3 ? c.controls >= 4 && cycle >= c.restore_cycle + 2 :
 			f.snapshot == 4 ? c.controls >= 5 && cycle >= c.st1_cycle + 1 : c.resumed && cycle >= c.resume_cycle + 2;
-		if (checkpoint && !m_body_irq_repeat.replay && !m_body_irq_repeat.checkpoint_tick) { m_body_irq_repeat.checkpoint_tick = tick; m_body_irq_repeat.snapshot = c; m_body_irq_repeat.saved.str({}); m_body_irq_repeat.saved.clear(); expect(machine().save().write_stream(m_body_irq_repeat.saved) == STATERR_NONE, "Save direct IRQ repeat before and after context restoration"); }
+		if (checkpoint && !m_body_irq_repeat.replay && !m_body_irq_repeat.checkpoint_tick) { m_body_irq_repeat.checkpoint_tick = tick; m_body_irq_repeat.snapshot = c; expect(capture_snapshot(machine(), m_body_irq_repeat.saved) == STATERR_NONE, "Save direct IRQ repeat before and after context restoration"); }
 		if (m_cpu->state_int(tms320c54x_device::STATE_IDLE) || tick == 5000)
 		{
 			unsigned const iterations = f.count + 1;
@@ -264,7 +262,7 @@ bool tms320c54x_test_state::check_body_repeat_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x7101 + f.inner && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x1600 + iterations && m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x1701,
 				"FRETE and FRETED reactivate restored architectural loop bounds without a hidden context stack");
 			{ auto const disable = machine().disable_side_effects(); for (unsigned i = 0; i < iterations; ++i) expect(m_cpu->space(AS_DATA).read_word(0x6000 + i) == u16(0x1357 ^ (i * 0x2345)), "Final copied memory matches the independent iteration oracle"); }
-			if (!m_body_irq_repeat.replay) { m_body_irq_repeat.replay = true; m_body_irq_repeat.tick = m_body_irq_repeat.checkpoint_tick; m_body_irq_repeat.observed = m_body_irq_repeat.snapshot; m_body_irq_repeat.saved.clear(); m_body_irq_repeat.saved.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_body_irq_repeat.saved) == STATERR_NONE, "Restore direct IRQ repeat without replaying input or stack transactions"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255850; m_check_timer->enable(true); return true; }
+			if (!m_body_irq_repeat.replay) { m_body_irq_repeat.replay = true; m_body_irq_repeat.tick = m_body_irq_repeat.checkpoint_tick; m_body_irq_repeat.observed = m_body_irq_repeat.snapshot; expect(restore_snapshot(machine(), *m_check_timer, m_body_irq_repeat.saved) == STATERR_NONE, "Restore direct IRQ repeat without replaying input or stack transactions"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255850; m_check_timer->enable(true); return true; }
 			m_body_irq_repeat.read_tap.remove(); m_body_irq_repeat.write_tap.remove(); m_body_irq_repeat.fetch_tap.remove(); m_body_irq_repeat.vector_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 767) { start_body_repeat(variant + 1); return true; }
 			osd_printf_info("TMS320C54x direct IRQ repeat restoration: PASS cases=768 restore=768 outer_counts=1,2,7,56 inner_counts=0,1,3,63 sources=IRQ,NMI pages=2 returns=FRETE,FRETED snapshots=6 ordered_copies=1 balanced_frames=1 near_return=0 physical_phase_claim=0\n");
@@ -386,7 +384,7 @@ bool tms320c54x_test_state::check_repeat_context_results()
 		bool const indirect = profile_is("repeat-popd");
 		unsigned const variant = m_repeat_context.variant, tick = ++m_repeat_context.tick; auto const f = repeat_context_case(variant);
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Repeat-context restoration outside the loop body remains admitted");
-		if (tick == f.checkpoint && !m_repeat_context.replay) { m_repeat_context.snapshot = m_repeat_context.observed; m_repeat_context.saved.str({}); m_repeat_context.saved.clear(); expect(machine().save().write_stream(m_repeat_context.saved) == STATERR_NONE, "Save active repeat context around push pop publication and return"); }
+		if (tick == f.checkpoint && !m_repeat_context.replay) { m_repeat_context.snapshot = m_repeat_context.observed; expect(capture_snapshot(machine(), m_repeat_context.saved) == STATERR_NONE, "Save active repeat context around push pop publication and return"); }
 		if (tick == 600)
 		{
 			auto const &c = m_repeat_context.observed; unsigned const calls = f.calls();
@@ -399,7 +397,7 @@ bool tms320c54x_test_state::check_repeat_context_results()
 				c.body_reads == f.copies() && c.body_writes == f.copies() && c.mapped_reads == (f.replace ? 0 : 3 * calls) && c.saved_writes == (f.replace ? 0 : 3 * calls) && c.restore_reads == 3 * calls && c.control_writes == 3 * calls && c.frame_reads == calls && c.frame_writes == (f.replace ? 2 : calls),
 				"Same or replaced active repeat context resumes its actual saved registers with ordered copies and balanced frames");
 			{ auto const disable = machine().disable_side_effects(); for (unsigned i = 0; i < f.copies(); ++i) expect(m_cpu->space(AS_DATA).read_word(0x6000 + i) == u16(0x1357 ^ (i * 0x2345)), "Restored repeat context final buffer matches independent oracle"); }
-			if (!m_repeat_context.replay) { m_repeat_context.replay = true; m_repeat_context.tick = f.checkpoint; m_repeat_context.observed = m_repeat_context.snapshot; m_repeat_context.saved.clear(); m_repeat_context.saved.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_repeat_context.saved) == STATERR_NONE, "Restore suspended repeat context without duplicate stack or body work"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255490; m_check_timer->enable(true); return true; }
+			if (!m_repeat_context.replay) { m_repeat_context.replay = true; m_repeat_context.tick = f.checkpoint; m_repeat_context.observed = m_repeat_context.snapshot; expect(restore_snapshot(machine(), *m_check_timer, m_repeat_context.saved) == STATERR_NONE, "Restore suspended repeat context without duplicate stack or body work"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255490; m_check_timer->enable(true); return true; }
 			m_repeat_context.read_tap.remove(); m_repeat_context.write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 383) { start_repeat_context(variant + 1); return true; }
 			if (indirect)
@@ -495,7 +493,7 @@ bool tms320c54x_test_state::check_fcala_delay_results()
 			m_cpu->set_state_int(f.b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, 0xdeadbeef);
 			if (f.source) m_cpu->set_input_line(f.source == 2 ? INPUT_LINE_NMI : 0, ASSERT_LINE);
 		}
-		if (tick == f.checkpoint && !m_fcala_delay.replay) { m_fcala_delay.snapshot = c; m_fcala_delay.saved.str({}); m_fcala_delay.saved.clear(); expect(machine().save().write_stream(m_fcala_delay.saved) == STATERR_NONE, "Save delayed accumulator target frame delays and settled pending interrupt"); }
+		if (tick == f.checkpoint && !m_fcala_delay.replay) { m_fcala_delay.snapshot = c; expect(capture_snapshot(machine(), m_fcala_delay.saved) == STATERR_NONE, "Save delayed accumulator target frame delays and settled pending interrupt"); }
 		if (tick == 64)
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.caller + 0x604 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && c.frames == 2 && c.reads == 2 && c.delays == (f.wide ? 1U : 2U) && c.callee == 1 && c.vectors == unsigned(bool(f.source)) && c.irq_reads == unsigned(bool(f.source)) && c.target_fetches == 1 + unsigned(f.source && c.irq_pc == 0x700), "FCALAD reaches its retained target, retires delay work once and balances both call and interrupt frames");
@@ -503,7 +501,7 @@ bool tms320c54x_test_state::check_fcala_delay_results()
 			if (!m_fcala_delay.replay)
 			{
 				m_fcala_delay.replay = true; m_fcala_delay.tick = f.checkpoint; m_fcala_delay.observed = m_fcala_delay.snapshot;
-				m_fcala_delay.saved.clear(); m_fcala_delay.saved.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_fcala_delay.saved) == STATERR_NONE, "Restore delayed far call without duplicate target frame or IRQ"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255830; m_check_timer->enable(true); return true;
+				expect(restore_snapshot(machine(), *m_check_timer, m_fcala_delay.saved) == STATERR_NONE, "Restore delayed far call without duplicate target frame or IRQ"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255830; m_check_timer->enable(true); return true;
 			}
 			m_fcala_delay.read_tap.remove(); m_fcala_delay.write_tap.remove(); m_fcala_delay.fetch_tap.remove(); m_fcala_delay.vector_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 647) { start_fcala_delay(variant + 1); return true; }

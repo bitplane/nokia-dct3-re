@@ -15,6 +15,58 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CaseFixtureTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
+    def test_snapshot_service_preserves_stream_and_timer_order(self):
+        source = r'''
+#include <sstream>
+#include <string>
+struct attotime { static constexpr int never = -1; };
+#include "tests/c54x/tms320c54x_test_snapshot.h"
+struct machine {
+    std::string events, loaded;
+    bool fail = false;
+    machine &save() { return *this; }
+    int write_stream(std::stringstream &s) {
+        events += "save;";
+        if (!s.str().empty() || !s.good()) return 2;
+        s << "state";
+        return fail ? 1 : 0;
+    }
+    int read_stream(std::stringstream &s) {
+        events += "load;";
+        if (s.tellg() != 0 || !s.good()) return 2;
+        s >> loaded;
+        return fail ? 1 : 0;
+    }
+};
+struct timer {
+    machine &owner;
+    void adjust(int when) { owner.events += when == attotime::never ? "stop;" : "wrong;"; }
+};
+int main() {
+    machine m;
+    timer t{m};
+    std::stringstream saved("stale state");
+    saved.setstate(std::ios::failbit);
+    if (c54x_test::capture_snapshot(m, saved) != 0 || saved.str() != "state") return 1;
+    saved.seekg(3);
+    saved.setstate(std::ios::eofbit | std::ios::failbit);
+    if (c54x_test::restore_snapshot(m, t, saved) != 0 || m.loaded != "state" ||
+        m.events != "save;stop;load;") return 2;
+    // Helpers must return serializer failures, not turn them into success.
+    m.fail = true;
+    if (c54x_test::capture_snapshot(m, saved) != 1 ||
+        c54x_test::restore_snapshot(m, t, saved) != 1) return 3;
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'snapshot.cpp').write_text(source)
+            subprocess.run(['c++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT),
+                            str(root / 'snapshot.cpp'), '-o', str(root / 'snapshot')],
+                           check=True, capture_output=True)
+            subprocess.run([str(root / 'snapshot')], check=True, capture_output=True)
+
     def test_rmw_ordered_coverage_is_required(self):
         for profile in ('rmw-long', 'rmw-long-full'):
             marker, ending = EXTRA_PROFILES[profile]

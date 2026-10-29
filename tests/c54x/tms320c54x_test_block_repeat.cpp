@@ -119,7 +119,7 @@ bool tms320c54x_test_state::check_rptbd_layout_results()
 			{
 				m_rptbd.replay = true; m_rptbd.tick = checkpoint; m_rptbd.observed = m_rptbd.snapshot;
 				m_rptbd.return_pc = m_rptbd.saved_return_pc;
-				m_rptbd.saved.clear(); m_rptbd.saved.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_rptbd.saved) == STATERR_NONE, "Restore RPTBD without fetching retained words or duplicating delay effects");
+				expect(restore_snapshot(machine(), *m_check_timer, m_rptbd.saved) == STATERR_NONE, "Restore RPTBD without fetching retained words or duplicating delay effects");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255330; m_check_timer->enable(true); return true;
 			}
 			m_rptbd.read_tap.remove(); m_rptbd.write_tap.remove(); m_rptbd.fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -146,8 +146,7 @@ bool tms320c54x_test_state::check_rptbd_layout_results()
 		unsigned const guard = kind == 5 ? 8 : kind == 4 ? 6 : 5, checkpoint = guard - 1 + variant / 14;
 		if (tick == checkpoint && !m_rptbd.replay)
 		{
-			m_rptbd.snapshot = m_rptbd.observed; m_rptbd.saved.str({}); m_rptbd.saved.clear();
-			expect(machine().save().write_stream(m_rptbd.saved) == STATERR_NONE, "Save RPTBD exclusion before or after the guard");
+			m_rptbd.snapshot = m_rptbd.observed; expect(capture_snapshot(machine(), m_rptbd.saved) == STATERR_NONE, "Save RPTBD exclusion before or after the guard");
 		}
 		if (tick == 16)
 		{
@@ -159,7 +158,7 @@ bool tms320c54x_test_state::check_rptbd_layout_results()
 			if (!m_rptbd.replay)
 			{
 				m_rptbd.replay = true; m_rptbd.tick = checkpoint; m_rptbd.observed = m_rptbd.snapshot;
-				m_rptbd.saved.clear(); m_rptbd.saved.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_rptbd.saved) == STATERR_NONE, "Restore RPTBD exclusion at its exact retained guard");
+				expect(restore_snapshot(machine(), *m_check_timer, m_rptbd.saved) == STATERR_NONE, "Restore RPTBD exclusion at its exact retained guard");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255350; m_check_timer->enable(true); return true;
 			}
 			m_rptbd.read_tap.remove(); m_rptbd.write_tap.remove(); m_cpu->set_pipeline_frontend(false);

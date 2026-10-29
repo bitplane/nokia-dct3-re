@@ -22,6 +22,7 @@
 #include "tms320c54x_test_entry_state.h"
 #include "tms320c54x_test_repeat_state.h"
 #include "tms320c54x_test_snapshot_state.h"
+#include "tms320c54x_test_snapshot.h"
 #include "tms320c54x_test_pipeline_state.h"
 #include <sstream>
 #include <bitset>

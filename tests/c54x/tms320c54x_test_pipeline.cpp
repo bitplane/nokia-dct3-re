@@ -1557,7 +1557,7 @@ bool tms320c54x_test_state::check_literal_guard_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_recurring_irq_snapshot = {m_pipeline_store_writes};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save a block with an opcode-shaped extension");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save a block with an opcode-shaped extension");
 		}
 		if (tick == 64)
 		{
@@ -1566,7 +1566,7 @@ bool tms320c54x_test_state::check_literal_guard_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore a retained extension without duplicate block stores");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore a retained extension without duplicate block stores");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = literal_guard_phase + 1; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -1681,8 +1681,7 @@ bool tms320c54x_test_state::check_pipeline_rmw_results()
 		}
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE,
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE,
 				"Save partial RMW Decode or pending RMW write after Read");
 		}
 		if (cycle == isr_cycle)
@@ -1739,8 +1738,7 @@ bool tms320c54x_test_state::check_pipeline_rmw_results()
 		if (cycle == 2) m_cpu->set_input_line(0, ASSERT_LINE);
 		if (cycle == 7 && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE,
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE,
 				"Save sampled IMR operand before the hardware mask write");
 		}
 		if (cycle == 12)
@@ -1816,8 +1814,7 @@ bool tms320c54x_test_state::check_pipeline_rmw_results()
 		}
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save fast return around Access");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save fast return around Access");
 		}
 		if (cycle == (pending_irq ? acceptance + 4 : 13))
 		{
@@ -1885,8 +1882,7 @@ bool tms320c54x_test_state::check_pipeline_rmw_results()
 		}
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save branch partial Decode or redirected Prefetch");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save branch partial Decode or redirected Prefetch");
 		}
 		if (cycle == (pending_irq ? acceptance + 7 : 10))
 		{
@@ -1938,7 +1934,7 @@ bool tms320c54x_test_state::check_pipeline_rmw_results()
 		if (tick == 24)
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + f.store() + 2 && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == f.prefix() && m_pipeline_extensions_reads == unsigned(f.long_form()) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.result && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.pattern ? 0xfffffffff9ULL : 7) && m_cpu->state_int(tms320c54x_device::STATE_TRN) == u16(f.result) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1002 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa620 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x4444, "ASM delay and selected target preserve the sampled shift, source, status and one observed result");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[3]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay delayed ASM without repeated source reads or target writes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 311010; m_check_timer->enable(true); return true; }
+			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[3]; expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Replay delayed ASM without repeated source reads or target writes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 311010; m_check_timer->enable(true); return true; }
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 30719) { start_delay_asm(variant + 1); return true; }
 			osd_printf_info("TMS320C54x delayed LD ASM: PASS cases=30720 restore=30720 controls=BD,BCD_taken,BCD_untaken,BD_store_prefix forms=DP,SP,postincrement,offset,absolute shifts=32 patterns=2 sxm_ovm=4 pages=2 snapshots=3 source_reads=1 extension_fetches=owned t_preserved=1 adjacent_consumer=LD_B_ASM_A target_observes_result=1 call_interrupt_repeat_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delayed LD ASM complete");
@@ -1962,8 +1958,7 @@ bool tms320c54x_test_state::check_pipeline_intm_results()
 		if (cycle == 3) m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 2);
 		if (cycle == 4 && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save Decode-owned INTM follower protection with pending IRQ");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save Decode-owned INTM follower protection with pending IRQ");
 		}
 		if (cycle == 20)
 		{
@@ -2009,8 +2004,7 @@ bool tms320c54x_test_state::check_pipeline_intm_results()
 			"Staged status-bit retirement publishes XF at Execute and replay restores the pin");
 		if (cycle == 5 && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save staged status-bit operation before Execute");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save staged status-bit operation before Execute");
 		}
 		if (cycle == 9)
 		{
@@ -2050,8 +2044,7 @@ bool tms320c54x_test_state::check_pipeline_intm_results()
 		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "CPL/DP consumer executes without unsupported direct mode");
 		if (cycle == 4 + gap && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save retained Decode CPL before consumer address generation");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save retained Decode CPL before consumer address generation");
 		}
 		if (cycle == 11)
 		{
@@ -2124,8 +2117,7 @@ bool tms320c54x_test_state::check_pipeline_intm_results()
 			"Immediate DP forwards to adjacent LD without early ST0 commitment or unrelated status changes");
 		if (cycle == 4 + chain && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save forwarded immediate DP before either instruction retires");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save forwarded immediate DP before either instruction retires");
 		}
 		if (cycle == 10)
 		{
@@ -2163,8 +2155,7 @@ bool tms320c54x_test_state::check_pipeline_intm_results()
 			"FRAME applies its signed offset once before the following push without status changes");
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save FRAME before/after SP update or following push sample");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save FRAME before/after SP update or following push sample");
 		}
 		if (cycle == 10)
 		{
@@ -2204,8 +2195,7 @@ bool tms320c54x_test_state::check_pipeline_mu4_prologue_results()
 		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Original MU4 prologue advances without atomic fallback");
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save in-flight original MU4 context prologue");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save in-flight original MU4 context prologue");
 		}
 		if (cycle == 56)
 		{
@@ -2262,8 +2252,7 @@ bool tms320c54x_test_state::check_pipeline_mu4_prologue_results()
 			"DLD retires the retained pair with SXM guard extension without changing the other accumulator or status");
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save DLD before/after paired Read");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save DLD before/after paired Read");
 		}
 		if (cycle == 5) {
 			m_cpu->space(AS_DATA).write_word(address, 1);
@@ -2317,8 +2306,7 @@ bool tms320c54x_test_state::check_pipeline_mu4_prologue_results()
 			"Immediate ADD retires the retained literal with source/destination, carry, overflow and saturation semantics");
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save partial/complete immediate ADD Decode");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save partial/complete immediate ADD Decode");
 		}
 		if (cycle == 3) m_cpu->space(AS_PROGRAM).write_word(0x601, 0);
 		if (cycle == 9)
@@ -2390,8 +2378,7 @@ bool tms320c54x_test_state::check_pipeline_cmpr_results()
 		}
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save retained CMPR condition around Access and Execute");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save retained CMPR condition around Access and Execute");
 		}
 		if (cycle == execute + 4)
 		{
@@ -2453,8 +2440,7 @@ bool tms320c54x_test_state::check_pipeline_cmpr_results()
 		if (!sequence && cycle == access + 1) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + selected, 0x650);
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save MAR and follower around pointer update and operand capture");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save MAR and follower around pointer update and operand capture");
 		}
 		if (cycle == 12)
 		{
@@ -2503,8 +2489,7 @@ bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save SP setup before/after ADDM Read/write or ANDM Read");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save SP setup before/after ADDM Read/write or ANDM Read");
 		}
 		if (tick == 22)
 		{
@@ -2515,8 +2500,7 @@ bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore SP RMW state without repeating a read or publication");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore SP RMW state without repeating a read or publication");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252340; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -2543,8 +2527,7 @@ bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_pipeline_branch_case = m_pipeline_operand_reads;
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save ARP load, selected address, auxiliary update or retained Read");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save ARP load, selected address, auxiliary update or retained Read");
 		}
 		if (tick == 10)
 		{
@@ -2557,8 +2540,7 @@ bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_pipeline_branch_case;
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore ARP consumer without retargeting or repeating its auxiliary update");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore ARP consumer without retargeting or repeating its auxiliary update");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252360; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -2589,8 +2571,7 @@ bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_drained_fetches};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save READA literal, held clock, captured A or sampled program word");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save READA literal, held clock, captured A or sampled program word");
 		}
 		if (tick == 22)
 		{
@@ -2603,8 +2584,7 @@ bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_drained_fetches = m_recurring_irq_snapshot[2];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore READA source/wait/operand without retargeting the transfer");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore READA source/wait/operand without retargeting the transfer");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252380; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -2634,8 +2614,7 @@ bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save BANZ target, before/after predicate and AR update, or redirect");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save BANZ target, before/after predicate and AR update, or redirect");
 		}
 		if (tick == 22)
 		{
@@ -2649,8 +2628,7 @@ bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore BANZ without changing its target or repeating the auxiliary modification");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore BANZ without changing its target or repeating the auxiliary modification");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252400; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -2691,8 +2669,7 @@ bool tms320c54x_test_state::check_pipeline_add_sp_context_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save SP producer, retained ADD input or younger FRAME state");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save SP producer, retained ADD input or younger FRAME state");
 		}
 		if (tick == 24)
 		{
@@ -2710,8 +2687,7 @@ bool tms320c54x_test_state::check_pipeline_add_sp_context_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore mapped-SP operand without duplicate stack effects or reads");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore mapped-SP operand without duplicate stack effects or reads");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 291010; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -2765,8 +2741,7 @@ bool tms320c54x_test_state::check_pipeline_add_sp_context_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save absolute ADD address, sampled operand or arithmetic publication");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save absolute ADD address, sampled operand or arithmetic publication");
 		}
 		if (tick == 20)
 		{
@@ -2785,8 +2760,7 @@ bool tms320c54x_test_state::check_pipeline_add_sp_context_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore memory ADD without repeating its read or arithmetic update");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore memory ADD without repeating its read or arithmetic update");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252440; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -2835,8 +2809,7 @@ bool tms320c54x_test_state::check_pipeline_add_sp_context_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save direct RMW captured context, address, operand or completed write");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save direct RMW captured context, address, operand or completed write");
 		}
 		if (tick == 20)
 		{
@@ -2852,8 +2825,7 @@ bool tms320c54x_test_state::check_pipeline_add_sp_context_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore direct RMW without resampling modified context, literal or memory");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore direct RMW without resampling modified context, literal or memory");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252460; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -2897,8 +2869,7 @@ bool tms320c54x_test_state::check_pipeline_long_move_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save long MVDK during Decode or before/after publication");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save long MVDK during Decode or before/after publication");
 		}
 		if (tick == 16)
 		{
@@ -2924,8 +2895,7 @@ bool tms320c54x_test_state::check_pipeline_long_move_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore long MVDK without source resampling or duplicate writes");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore long MVDK without source resampling or duplicate writes");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252840; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -2949,8 +2919,7 @@ bool tms320c54x_test_state::check_pipeline_long_move_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original STL/MVDK pair across its two retirement boundaries");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save original STL/MVDK pair across its two retirement boundaries");
 		}
 		if (tick == 16)
 		{
@@ -2962,8 +2931,7 @@ bool tms320c54x_test_state::check_pipeline_long_move_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore original pair without repeating either write");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore original pair without repeating either write");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252860; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -2996,8 +2964,7 @@ bool tms320c54x_test_state::check_pipeline_long_move_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads, m_pipeline_register_writes};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save TC branch before/after evaluation and delay execution");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save TC branch before/after evaluation and delay execution");
 		}
 		if (tick == 32)
 		{
@@ -3013,8 +2980,7 @@ bool tms320c54x_test_state::check_pipeline_long_move_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore TC decision/held word without duplicate target or source fetches");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore TC decision/held word without duplicate target or source fetches");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252880; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_operand_data_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -3064,7 +3030,7 @@ bool tms320c54x_test_state::check_pipeline_swap_body_results()
 		if (tick == std::array<unsigned, 3>{3, 5, 9}[variant / 512] && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original byte-swap body before/after Read or before store Execute");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save original byte-swap body before/after Read or before store Execute");
 		}
 		if (tick == 18)
 		{
@@ -3076,7 +3042,7 @@ bool tms320c54x_test_state::check_pipeline_swap_body_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore original body without duplicate reads, writes or pointer modification");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore original body without duplicate reads, writes or pointer modification");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253320; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -3103,7 +3069,7 @@ bool tms320c54x_test_state::check_pipeline_swap_body_results()
 		if (tick == std::array<unsigned, 3>{3, 9, 10}[variant / 512] && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original body join before Read, after postincrement or after overlapping read/write");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save original body join before Read, after postincrement or after overlapping read/write");
 		}
 		if (tick == 24)
 		{
@@ -3118,7 +3084,7 @@ bool tms320c54x_test_state::check_pipeline_swap_body_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore consecutive bodies without repeating address updates or bus transactions");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore consecutive bodies without repeating address updates or bus transactions");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253340; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -3155,7 +3121,7 @@ bool tms320c54x_test_state::check_block_repeat_forwarding_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save block setup, prefetch/Decode loop state or pending interrupt");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save block setup, prefetch/Decode loop state or pending interrupt");
 		}
 		if (tick == 96)
 		{
@@ -3177,7 +3143,7 @@ bool tms320c54x_test_state::check_block_repeat_forwarding_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore speculative and architectural block states without duplicate work");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore speculative and architectural block states without duplicate work");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253360; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -3206,7 +3172,7 @@ bool tms320c54x_test_state::check_block_repeat_forwarding_results()
 		unsigned const variant = m_pipeline_peripheral_case, kind = variant & 7, tick = ++m_idle_fixture_tick;
 		if (tick == 2 && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save block edge before Decode");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save block edge before Decode");
 		}
 		if (tick == 32)
 		{
@@ -3218,7 +3184,7 @@ bool tms320c54x_test_state::check_block_repeat_forwarding_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = 2; m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore block edge without atomic fallback");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore block edge without atomic fallback");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253380; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -3258,8 +3224,7 @@ bool tms320c54x_test_state::check_block_repeat_forwarding_results()
 		if (copy && tick == 6 + extra) m_cpu->set_state_int(tms320c54x_device::STATE_AR1, literal ^ 0x5a5a);
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save dependency before Read, before Write or after forwarding");
+			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save dependency before Read, before Write or after forwarding");
 			if (immediate)
 				// A forwarded value must use the captured literal, not program RAM.
 				m_cpu->space(AS_PROGRAM).write_word((BIT(v, 6) ? 0x20000 : 0) + 0x601 + extra, (copy ? 0x11 : literal) ^ 0x5a5a);
@@ -3271,8 +3236,7 @@ bool tms320c54x_test_state::check_block_repeat_forwarding_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore dependency with its retained producer operand and follower");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore dependency with its retained producer operand and follower");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253400; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); if (copy) m_operand_data_tap.remove(); m_cpu->set_pipeline_frontend(false);

@@ -127,9 +127,7 @@ bool tms320c54x_test_state::check_source_domains()
 				"Rejected source preserves every address register");
 	if (tick == checkpoint && !m_source_domains.replay)
 	{
-		m_source_domains.saved.str({});
-		m_source_domains.saved.clear();
-		expect(machine().save().write_stream(m_source_domains.saved) == STATERR_NONE,
+		expect(capture_snapshot(machine(), m_source_domains.saved) == STATERR_NONE,
 				"Save source-domain exclusion before or after rejection");
 	}
 	if (tick == 20)
@@ -140,10 +138,7 @@ bool tms320c54x_test_state::check_source_domains()
 		{
 			m_source_domains.replay = true;
 			m_source_domains.tick = checkpoint;
-			m_source_domains.saved.clear();
-			m_source_domains.saved.seekg(0);
-			m_check_timer->adjust(attotime::never);
-			expect(machine().save().read_stream(m_source_domains.saved) == STATERR_NONE,
+			expect(restore_snapshot(machine(), *m_check_timer, m_source_domains.saved) == STATERR_NONE,
 					"Restore source-domain exclusion without operand effects");
 			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 			m_phase = 311210;
@@ -230,9 +225,7 @@ bool tms320c54x_test_state::check_source_alias_results()
 					"Unadmitted source alias preserves every AR");
 		if (tick == checkpoint && !m_source_aliases.replay)
 		{
-			m_source_aliases.saved.str({});
-			m_source_aliases.saved.clear();
-			expect(machine().save().write_stream(m_source_aliases.saved) == STATERR_NONE,
+			expect(capture_snapshot(machine(), m_source_aliases.saved) == STATERR_NONE,
 					"Save source alias before or after rejection");
 		}
 		if (tick == 20)
@@ -242,10 +235,7 @@ bool tms320c54x_test_state::check_source_alias_results()
 			{
 				m_source_aliases.replay = true;
 				m_source_aliases.tick = checkpoint;
-				m_source_aliases.saved.clear();
-				m_source_aliases.saved.seekg(0);
-				m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_source_aliases.saved) == STATERR_NONE,
+				expect(restore_snapshot(machine(), *m_check_timer, m_source_aliases.saved) == STATERR_NONE,
 						"Restore source rejection without operand effects");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 				m_phase = 310710;
@@ -372,9 +362,7 @@ bool tms320c54x_test_state::check_short_source_results()
 		for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x1400 + i, "Rejected source does not preincrement any AR");
 		if (tick == checkpoint && !m_short_sources.replay)
 		{
-			m_short_sources.saved.str({});
-			m_short_sources.saved.clear();
-			expect(machine().save().write_stream(m_short_sources.saved) == STATERR_NONE,
+			expect(capture_snapshot(machine(), m_short_sources.saved) == STATERR_NONE,
 					"Save source before or after rejection");
 		}
 		if (tick == 20)
@@ -384,10 +372,7 @@ bool tms320c54x_test_state::check_short_source_results()
 			{
 				m_short_sources.replay = true;
 				m_short_sources.tick = checkpoint;
-				m_short_sources.saved.clear();
-				m_short_sources.saved.seekg(0);
-				m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_short_sources.saved) == STATERR_NONE,
+				expect(restore_snapshot(machine(), *m_check_timer, m_short_sources.saved) == STATERR_NONE,
 						"Restore rejected source without operand effects");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 				m_phase = 310610;

@@ -1403,8 +1403,7 @@ void tms320c54x_test_state::start_xc_barrier(unsigned index)
 	m_phase = 524000 + index;
 	if (!((index / 6) % 2))
 	{
-		m_saved_pipeline.str({}); m_saved_pipeline.clear();
-		expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save status producer and sequential-target return barrier");
+		expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save status producer and sequential-target return barrier");
 		m_rom4_codec_replays = 1;
 	}
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -1450,8 +1449,7 @@ void tms320c54x_test_state::start_xc_latency(unsigned index)
 	m_phase = 523000 + index;
 	if (!f.snapshot)
 	{
-		m_saved_pipeline.str({}); m_saved_pipeline.clear();
-		expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save XC condition source before its producer");
+		expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save XC condition source before its producer");
 		m_rom4_codec_replays = 1;
 	}
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -1477,8 +1475,7 @@ void tms320c54x_test_state::start_xc_status(unsigned index)
 	m_phase = 522000 + index;
 	if (!(index & 32))
 	{
-		m_saved_pipeline.str({}); m_saved_pipeline.clear();
-		expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save XC/status producer before Access sampling or Execute publication");
+		expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save XC/status producer before Access sampling or Execute publication");
 		m_rom4_codec_replays = 1;
 	}
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -1510,8 +1507,7 @@ void tms320c54x_test_state::start_atomic_conditional_return(unsigned index)
 	if (index < 72)
 	{
 		m_recurring_irq_snapshot = {0};
-		m_saved_pipeline.str({}); m_saved_pipeline.clear();
-		expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save atomic return before predicate and optional stack read");
+		expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save atomic return before predicate and optional stack read");
 		m_rom4_codec_replays = 1;
 	}
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -1536,8 +1532,7 @@ void tms320c54x_test_state::start_atomic_overflow_branch(unsigned index)
 	m_phase = 305000 + index;
 	if (!(index & 32))
 	{
-		m_saved_pipeline.str({}); m_saved_pipeline.clear();
-		expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save overflow branch before predicate sampling");
+		expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save overflow branch before predicate sampling");
 		m_rom4_codec_replays = 1;
 	}
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -1561,8 +1556,7 @@ bool tms320c54x_test_state::check_tc_return_results()
 		}
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_fast_stack_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save TC return around producer, condition sampling and retained target");
+			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_fast_stack_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save TC return around producer, condition sampling and retained target");
 		}
 		if (tick == 32)
 		{
@@ -1572,8 +1566,7 @@ bool tms320c54x_test_state::check_tc_return_results()
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff12345678ULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x81abcdef01ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == (0xa5f0 | ((variant / 24) % 2 ? 15 : 0)), "TC/NTC return retains predicate and target, preserves registers and never touches an untaken stack");
 			if (!m_pipeline_replay)
 			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_fast_stack_reads = m_recurring_irq_snapshot[1]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore TC return without duplicate producer or stack accesses");
+				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_fast_stack_reads = m_recurring_irq_snapshot[1]; expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore TC return without duplicate producer or stack accesses");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = tc_return_phase + 1; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -1597,12 +1590,12 @@ bool tms320c54x_test_state::check_bd_read_a_results()
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),"Short READA in BD delay spans is admitted");
 		if(tick==f.read()) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR3)==unsigned(f.form==2 ? 0x4021 : 0x4020),"READA owns exactly one destination update at Read"); m_cpu->set_state_int(tms320c54x_device::STATE_AR3,0x7000); }
 		if(tick==f.read()+1) { expect(m_cpu->state_int(tms320c54x_device::STATE_A)==f.source,"READA's program address includes the older ADD result"); m_cpu->set_state_int(tms320c54x_device::STATE_A,0x5a5a); }
-		if(tick==f.checkpoint() && !m_pipeline_replay) { m_recurring_irq_snapshot={m_pipeline_operand_reads,m_pipeline_store_writes,m_port_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline)==STATERR_NONE,"Save BD READA before or across retained program transfer"); }
+		if(tick==f.checkpoint() && !m_pipeline_replay) { m_recurring_irq_snapshot={m_pipeline_operand_reads,m_pipeline_store_writes,m_port_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE,"Save BD READA before or across retained program transfer"); }
 		if(tick==32)
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC)==f.base+0x701 && m_cpu->state_int(tms320c54x_device::STATE_SP)==0x4000 && m_cpu->state_int(tms320c54x_device::STATE_A)==0x5a5a && m_cpu->state_int(tms320c54x_device::STATE_B)==0xfeabcd9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T)==0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_ST0)==0x1080 && m_cpu->state_int(tms320c54x_device::STATE_ST1)==(0x900|(f.form==3 ? 0x4000 : 0)),"BD READA retains the branch path, program source, modes and sibling registers");
 			expect(m_pipeline_operand_reads==1 && m_pipeline_store_writes==1 && m_port_reads==f.slot && m_cpu->state_int(tms320c54x_device::STATE_AR3)==0x7000 && m_cpu->state_int(tms320c54x_device::STATE_AR4)==0x5100,"READA neither resamples poisoned addresses nor duplicates transfers");
-			if(!m_pipeline_replay) { m_pipeline_replay=true; m_idle_fixture_tick=f.checkpoint(); m_pipeline_operand_reads=m_recurring_irq_snapshot[0]; m_pipeline_store_writes=m_recurring_irq_snapshot[1]; m_port_reads=m_recurring_irq_snapshot[2]; m_cpu->set_pipeline_frontend(true); m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline)==STATERR_NONE,"Restore BD READA after clearing future pipeline state"); m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_phase=bd_read_a_phase+1; m_check_timer->enable(true); return true; }
+			if(!m_pipeline_replay) { m_pipeline_replay=true; m_idle_fixture_tick=f.checkpoint(); m_pipeline_operand_reads=m_recurring_irq_snapshot[0]; m_pipeline_store_writes=m_recurring_irq_snapshot[1]; m_port_reads=m_recurring_irq_snapshot[2]; m_cpu->set_pipeline_frontend(true); expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE,"Restore BD READA after clearing future pipeline state"); m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_phase=bd_read_a_phase+1; m_check_timer->enable(true); return true; }
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if(m_pipeline_peripheral_case<511) { start_bd_read_a(m_pipeline_peripheral_case+1); return true; }
 			osd_printf_info("TMS320C54x BD READA: PASS cases=512 restore=512 slots=2 forms=DP,plain,postinc,SP values=4 caller_pages=2 source_pages=2 snapshots=4 older_ADD=slot1 retained_PAR=1 retained_destination=1 source_poison=1 reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated BD READA complete");
@@ -1735,8 +1728,7 @@ bool tms320c54x_test_state::check_pipeline_far_return_results()
 			m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= target_execute ? 0x55 : delayed && !long_delay && cycle >= 8 + prefix ? 0x22 : 0), "Far return preserves older POPM, its INTM contract and exactly its two delay words");
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save before or between retained far-return stack accesses");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save before or between retained far-return stack accesses");
 		}
 		if (cycle == target_execute)
 		{
@@ -1793,8 +1785,7 @@ bool tms320c54x_test_state::check_pipeline_conditional_branch_results()
 			"BCD retains the sampled 40-bit zero predicate, executes both delays and chooses only its proper continuation");
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save BCD bubble, sampled predicate or pending delay retirement");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save BCD bubble, sampled predicate or pending delay retirement");
 		}
 		if (cycle == 18)
 		{
@@ -1840,8 +1831,7 @@ bool tms320c54x_test_state::check_pipeline_conditional_branch_results()
 			"Plain return owns one pop/read/target fetch, preserves RET's INTM and clears RETE only at retirement");
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save plain return before/after Access or stack Read");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save plain return before/after Access or stack Read");
 		}
 		if (cycle == 14)
 		{
@@ -1894,8 +1884,7 @@ bool tms320c54x_test_state::check_pipeline_conditional_branch_results()
 			"CALL owns its stack/RTN phases, executes only delay slots and returns to the correct continuation");
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save CALL after allocation/RTN/write ownership");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save CALL after allocation/RTN/write ownership");
 		}
 		if (cycle == 22)
 		{
@@ -1950,8 +1939,7 @@ bool tms320c54x_test_state::check_pipeline_conditional_branch_results()
 			expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == (cycle >= 5 && !BIT(move_case, 2) ? 0x511 : 0x510), "Indirect MVDK updates its source AR once after retaining the old-address sample");
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save MVDK before/after source read or destination write");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save MVDK before/after source read or destination write");
 		}
 		if (cycle == read_clock) m_cpu->space(AS_DATA).write_word(source, 0);
 		if (cycle == 10)
@@ -2002,8 +1990,7 @@ bool tms320c54x_test_state::check_pipeline_conditional_branch_results()
 		if (branch && cycle == 13) m_cpu->set_state_int(tms320c54x_device::STATE_A, !nonzero);
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original XC prefix");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save original XC prefix");
 		}
 		if (composed && cycle == 9) m_cpu->space(AS_DATA).write_word(0x510, 0);
 		if (branch && cycle == 11) m_cpu->space(AS_DATA).write_word(0x511, 0xdead);
@@ -2059,8 +2046,7 @@ bool tms320c54x_test_state::check_pipeline_xc_tc_results()
 		if (cycle == 4 && !producer) m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa60e | (BIT(variant, 0) << 12));
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save XC before/after Access sampling or slot retirement");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save XC before/after Access sampling or slot retirement");
 		}
 		if (cycle == 12)
 		{
@@ -2099,8 +2085,7 @@ bool tms320c54x_test_state::check_pipeline_xc_tc_results()
 		if (cycle >= 11) expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (taken ? 0x55 : 0x66), "BC uses retained outcome despite accumulator changes after evaluation");
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save BC before/after held sequential word or decision");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save BC before/after held sequential word or decision");
 		}
 		if (cycle == 14)
 		{
@@ -2152,8 +2137,7 @@ bool tms320c54x_test_state::check_pipeline_delayed_return_results()
 		if (xc) expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == (irq && cycle >= 14 ? 0 : cycle >= 6 ? 1 : 0), "XC in RETD protects the resumed target before a pending IRQ is acknowledged");
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save RETD queued delay words and return sample");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save RETD queued delay words and return sample");
 		}
 		if (cycle == 15)
 		{
@@ -2198,8 +2182,7 @@ bool tms320c54x_test_state::check_pipeline_delayed_return_results()
 		if (cycle == 9) m_cpu->space(AS_DATA).write_word(0x1000, 0xdead);
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original tail around stack samples, AND and delay decision");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save original tail around stack samples, AND and delay decision");
 		}
 		if (cycle == 24)
 		{
@@ -2242,8 +2225,7 @@ bool tms320c54x_test_state::check_pipeline_original_context_call_results()
 		{
 			m_pipeline_register_writes = m_pipeline_store_writes;
 			m_pipeline_branch_case = m_pipeline_operand_reads; m_pipeline_stm_case = m_pipeline_extensions_reads;
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save coherent outer handler at ten nested ownership boundaries");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save coherent outer handler at ten nested ownership boundaries");
 		}
 		if (cycle == 100)
 		{
@@ -2299,8 +2281,7 @@ bool tms320c54x_test_state::check_pipeline_retd_data_order_results()
 			"RETD retains read-first DARAM target without changing pop, delays or interrupt mask semantics");
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save RETD before/after same-address read/write ordering");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save RETD before/after same-address read/write ordering");
 		}
 		if (cycle == 15)
 		{
@@ -2348,8 +2329,7 @@ bool tms320c54x_test_state::check_pipeline_mu4_full_worker_results()
 			m_pipeline_extensions_reads == unsigned(cycle >= 47), "Complete original body advances with retained bus ownership");
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save full original zero-control worker at composed ownership boundaries");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save full original zero-control worker at composed ownership boundaries");
 		}
 		if (cycle == 58)
 		{
@@ -2395,8 +2375,7 @@ bool tms320c54x_test_state::check_pipeline_mu4_full_worker_results()
 			m_pipeline_register_writes = m_pipeline_store_writes; m_pipeline_branch_case = m_pipeline_operand_reads;
 			m_pipeline_stm_case = m_pipeline_extensions_reads; m_pipeline_store_case = m_pipeline_drained_fetches;
 			m_pipeline_indirect_case = m_vector_reads;
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original outer handler with active body at eight ownership boundaries");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save original outer handler with active body at eight ownership boundaries");
 		}
 		if (cycle == 130)
 		{
@@ -2455,8 +2434,7 @@ bool tms320c54x_test_state::check_pipeline_mu4_full_worker_results()
 			"FB commits the explicit target page and flushes sequential instructions without call semantics");
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save FB partial target decode, redirected fetch and page commitment");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save FB partial target decode, redirected fetch and page commitment");
 		}
 		if (cycle == 14)
 		{
@@ -2514,8 +2492,7 @@ bool tms320c54x_test_state::check_pipeline_far_call_results()
 		}
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save FCALL's partial frame and FRET's retained caller operands");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save FCALL's partial frame and FRET's retained caller operands");
 		}
 		if (cycle == 20)
 		{
@@ -2523,8 +2500,7 @@ bool tms320c54x_test_state::check_pipeline_far_call_results()
 			{
 				m_pipeline_replay = true; m_pipeline_store_writes = writes_at(checkpoint); m_fast_stack_reads = reads_at(checkpoint);
 				m_pipeline_operand_reads = unsigned(checkpoint >= 3); m_pipeline_extensions_reads = unsigned(checkpoint >= 6); m_pipeline_drained_fetches = caller_fetches(checkpoint);
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore far call/return without duplicated pushes, reads or continuation execution");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore far call/return without duplicated pushes, reads or continuation execution");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252180;
 				m_check_timer->enable(true); return true;
 			}
@@ -2566,8 +2542,7 @@ bool tms320c54x_test_state::check_pipeline_far_call_results()
 		}
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save explicit SP source, publication and compiler forwarding window");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save explicit SP source, publication and compiler forwarding window");
 		}
 		if (cycle == 14)
 		{
@@ -2575,8 +2550,7 @@ bool tms320c54x_test_state::check_pipeline_far_call_results()
 			{
 				m_pipeline_replay = true; m_pipeline_operand_reads = reads_at(checkpoint); m_pipeline_store_writes = unsigned(store && checkpoint >= access + 2);
 				m_pipeline_register_writes = unsigned(kind != 3 && checkpoint >= publish);
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore explicit SP without a duplicated pop, register write or compiler address update");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore explicit SP without a duplicated pop, register write or compiler address update");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252200;
 				m_check_timer->enable(true); return true;
 			}
@@ -2615,8 +2589,7 @@ bool tms320c54x_test_state::check_signed_branch_taken_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save signed branch before/after predicate and delay-slot effects");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save signed branch before/after predicate and delay-slot effects");
 		}
 		if (tick == 30)
 		{
@@ -2630,8 +2603,7 @@ bool tms320c54x_test_state::check_signed_branch_taken_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore signed branch without refetching its literal or target");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore signed branch without refetching its literal or target");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252980; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_operand_data_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -2657,8 +2629,7 @@ bool tms320c54x_test_state::check_signed_branch_taken_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save original signed-branch producer across SUB retirement and evaluation");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save original signed-branch producer across SUB retirement and evaluation");
 		}
 		if (tick == 30)
 		{
@@ -2670,8 +2641,7 @@ bool tms320c54x_test_state::check_signed_branch_taken_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore original AGT producer without duplicate source or target reads");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore original AGT producer without duplicate source or target reads");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253000; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -2721,8 +2691,7 @@ bool tms320c54x_test_state::check_pipeline_extended_banz_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save BANZ after first literal, complete Decode or Access decision");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save BANZ after first literal, complete Decode or Access decision");
 		}
 		if (tick == 18)
 		{
@@ -2737,8 +2706,7 @@ bool tms320c54x_test_state::check_pipeline_extended_banz_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore BANZ without target refetch or duplicate pointer modification");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore BANZ without target refetch or duplicate pointer modification");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253100; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -2782,7 +2750,7 @@ bool tms320c54x_test_state::check_banzd_results()
 		if (tick == std::array<unsigned, 4>{4, 5, 8, 9}[variant / 768] && !m_pipeline_replay)
 		{
 			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save BANZD target/predicate or draining delay words");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save BANZD target/predicate or draining delay words");
 		}
 		if (tick == 22)
 		{
@@ -2794,7 +2762,7 @@ bool tms320c54x_test_state::check_banzd_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore delayed count branch without refetching target or repeating delay words");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore delayed count branch without refetching target or repeating delay words");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253260; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -2837,7 +2805,7 @@ bool tms320c54x_test_state::check_conditional_call_results()
 		if (tc_call && tick == 6) m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608 | ((((variant / 2) & 1) ^ 1) << 12));
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_fast_stack_reads}; m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save CC around predicate, held clock and conditional publication");
+			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_fast_stack_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save CC around predicate, held clock and conditional publication");
 		}
 		if (tick == 32)
 		{
@@ -2845,7 +2813,7 @@ bool tms320c54x_test_state::check_conditional_call_results()
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == base + (returning ? taken ? 0x701 : 0x602 : 0x603) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(returning && taken) && m_pipeline_operand_reads == unsigned(taken) && m_pipeline_store_writes == unsigned(!returning && taken) && m_pipeline_extensions_reads == unsigned(taken) && m_fast_stack_reads == unsigned(!returning) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa608 | (tc_call ? ((((variant / 2) & 1) ^ 1) << 12) : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800, "CC/RC retains its decision and target; untaken paths never touch SP or stack memory");
 			if (!m_pipeline_replay)
 			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_fast_stack_reads = m_recurring_irq_snapshot[3]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Replay conditional allocation and call/return without duplicate accesses"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253820; m_check_timer->enable(true); return true;
+				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_fast_stack_reads = m_recurring_irq_snapshot[3]; expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Replay conditional allocation and call/return without duplicate accesses"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253820; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_operand_data_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < (all_conditions ? 767 : 63)) { start_conditional_call(variant + 1); return true; }
@@ -2886,7 +2854,7 @@ bool tms320c54x_test_state::check_delayed_condition_return_results()
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + (f.taken ? 0x706 : 0x609) && m_cpu->state_int(tms320c54x_device::STATE_SP) == f.sp + unsigned(f.taken) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.final_a && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.taken ? 0x55 : 0x33) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.final_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == (f.layout ? 0xf4e1 : 0x1234), "RCD retains its predicate and target while both delay words retire and only taken paths pop");
 			expect(m_pipeline_operand_reads == unsigned(f.taken) && m_pipeline_store_writes == 2 && m_pipeline_extensions_reads == 3 && m_pipeline_drained_fetches == 1, "RCD has no untaken stack access no duplicate delay fetch and exactly one continuation");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_pipeline_drained_fetches = m_recurring_irq_snapshot[3]; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore RCD without repeated stack or delay transactions"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 276010; m_check_timer->enable(true); return true; }
+			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; m_pipeline_drained_fetches = m_recurring_irq_snapshot[3]; expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore RCD without repeated stack or delay transactions"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 276010; m_check_timer->enable(true); return true; }
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 4479) { start_delayed_condition_return(variant + 1); return true; }
 			osd_printf_info("TMS320C54x conditional delayed returns: PASS cases=4480 restore=4480 predicates=14 patterns=8 delay_layouts=2 stack_alignments=2 pages=2 snapshots=5 predicate_before_delay=1 taken_stack_reads=1 untaken_stack_reads=0 retained_target=1 delay_fetches=once interrupt_block_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated conditional delayed returns complete");
@@ -2911,7 +2879,7 @@ bool tms320c54x_test_state::check_signed_xc_results()
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
 			m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_extensions_reads};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear(); expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save signed XC before/after predicate and protected-slot decisions");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save signed XC before/after predicate and protected-slot decisions");
 		}
 		if (tick == 16)
 		{
@@ -2921,7 +2889,7 @@ bool tms320c54x_test_state::check_signed_xc_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore signed XC without resampling predicate or decoding rejected literal");
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore signed XC without resampling predicate or decoding rejected literal");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254890; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
@@ -2945,8 +2913,7 @@ bool tms320c54x_test_state::check_xc_barrier_results()
 		bool const initial = (index / 3) % 2, taken = index % 3 != 2;
 		if (!m_rom4_codec_replays && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x602)
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save return barrier after its optional stack read");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save return barrier after its optional stack read");
 			m_rom4_codec_replays = 1;
 		}
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Return barrier and XC remain admitted");
@@ -2960,8 +2927,7 @@ bool tms320c54x_test_state::check_xc_barrier_results()
 			"Return pipeline drain makes preceding status visible even at a sequential target or untaken conditional return");
 		if (!m_rom4_codec_replay)
 		{
-			m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-			expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore return drain and selected XC without reusing stale history");
+			expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore return drain and selected XC without reusing stale history");
 			m_phase = 524000 + index; m_rom4_codec_replay = true;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 		}
@@ -2976,8 +2942,7 @@ bool tms320c54x_test_state::check_xc_barrier_results()
 		auto const f = xc_latency_case(index);
 		if (!m_rom4_codec_replays && (f.staged ? m_cpu->pipeline_cycles() == 5 + f.prefix : m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x600 + f.prefix))
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save XC after its producer without replacing the retained Access condition");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save XC after its producer without replacing the retained Access condition");
 			m_rom4_codec_replays = 1;
 		}
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "XC producer and single predicate remain admitted");
@@ -2994,8 +2959,7 @@ bool tms320c54x_test_state::check_xc_barrier_results()
 			"XC retains old or settled TC/C/A/B once for all controlled words across one/two-word producers");
 		if (!m_rom4_codec_replay)
 		{
-			m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-			expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore XC condition history and selected/annulled words");
+			expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore XC condition history and selected/annulled words");
 			m_phase = 523000 + index; m_rom4_codec_replay = true;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 		}
@@ -3010,8 +2974,7 @@ bool tms320c54x_test_state::check_xc_barrier_results()
 		bool const staged = index < 64, set = (mode / 4) & 1, initial = (mode / 8) & 1, tc = (mode / 16) & 1;
 		if (!m_rom4_codec_replays && (staged ? m_cpu->pipeline_cycles() == 6 : m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x601))
 		{
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save XC/status after publication with an older retained predicate");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save XC/status after publication with an older retained predicate");
 			m_rom4_codec_replays = 1;
 		}
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "XC and status producers remain admitted");
@@ -3027,8 +2990,7 @@ bool tms320c54x_test_state::check_xc_barrier_results()
 			"XC tests its Access-stage status rather than either preceding Execute publication");
 		if (!m_rom4_codec_replay)
 		{
-			m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-			expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore XC/status with the original retained predicate");
+			expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore XC/status with the original retained predicate");
 			m_phase = 522000 + index; m_rom4_codec_replay = true;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 		}
@@ -3051,8 +3013,7 @@ bool tms320c54x_test_state::check_conditional_register_results()
 		if (!m_rom4_codec_replays && m_cpu->state_int(tms320c54x_device::STATE_PC) == (f.take ? 0x700 : 0x601))
 		{
 			m_recurring_irq_snapshot = {m_pipeline_operand_reads};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save atomic return after its optional stack read and PC publication");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save atomic return after its optional stack read and PC publication");
 			m_rom4_codec_replays = 1;
 		}
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "All twelve atomic signed accumulator return predicates are admitted");
@@ -3065,8 +3026,7 @@ bool tms320c54x_test_state::check_conditional_register_results()
 			"Atomic conditional return tests the full signed accumulator and preserves status and exact stack ownership");
 		if (!m_rom4_codec_replay)
 		{
-			m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-			expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore atomic conditional return without duplicating its stack read");
+			expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore atomic conditional return without duplicating its stack read");
 			m_pipeline_operand_reads = m_recurring_irq_snapshot[0];
 			m_phase = 519000 + index; m_rom4_codec_replay = true;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -3082,8 +3042,7 @@ bool tms320c54x_test_state::check_conditional_register_results()
 		if (!m_rom4_codec_replays && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x601)
 		{
 			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save conditional register store after its read/write and address update");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save conditional register store after its read/write and address update");
 			m_rom4_codec_replays = 1;
 		}
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Conditional register store remains admitted");
@@ -3100,8 +3059,7 @@ bool tms320c54x_test_state::check_conditional_register_results()
 			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (ar == 2 + (f.x & 3) ? f.next : 0x1403 + (ar - 2) * 16), "Conditional register store updates only its selected Xmem address, even when false");
 		if (!m_rom4_codec_replay)
 		{
-			m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-			expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore conditional register store without duplicating a completed bus transaction");
+			expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore conditional register store without duplicating a completed bus transaction");
 			m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
 			m_phase = 500000 + index; m_rom4_codec_replay = true;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -3119,8 +3077,7 @@ bool tms320c54x_test_state::check_conditional_register_results()
 		if (!m_rom4_codec_replays && m_cpu->state_int(tms320c54x_device::STATE_PC) == (delayed || !take ? 0x602 : 0x700))
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (initial & ~mask), "Overflow branch consumes only its selected flag before any delay word");
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save consumed overflow predicate and optional delayed transfer");
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save consumed overflow predicate and optional delayed transfer");
 			m_rom4_codec_replays = 1;
 		}
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Atomic single-overflow branch is admitted");
@@ -3137,8 +3094,7 @@ bool tms320c54x_test_state::check_conditional_register_results()
 			"Overflow branch retains its original condition across flag-changing delay words");
 		if (!m_rom4_codec_replay)
 		{
-			m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-			expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore overflow predicate or pending delayed transfer");
+			expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore overflow predicate or pending delayed transfer");
 			m_phase = 305000 + index; m_rom4_codec_replay = true;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 		}
