@@ -36,7 +36,9 @@ expect_opcode(0, true, "other sample");'''
 
                     def execute(command, run, output):
                         calls.append(command)
-                        output.write('\n'.join(contract['required'] + [contract['completion']]) + '\n')
+                        cases = ['C54x ISA case: PASS id=' + case_id for case_id in
+                                 baseline['reviewed'].get(name, {}).get('case_ids', [])]
+                        output.write('\n'.join(cases + contract['required'] + [contract['completion']]) + '\n')
                         return 3
 
                     argv = ['run_c54x_core', '--mame', 'mame/mame', '--rompath', 'mame/roms',

@@ -3,6 +3,7 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
+#include "tms320c54x_test_square.h"
 
 namespace c54x_test {
 
@@ -9146,19 +9147,8 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(index >= 27 ? 9250 + index - 27 : index >= 12 ? 9232 + index - 12 : index < 4 ? m_phase + 1 : 6576 + index - 4);
 		}
-		program.write_word(0x05e2, 0x2682); // SQUR *AR2,A
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
-		data.write_word(0x0f90, 0x8000);
 		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_T, 0}, {cpu_regs::STATE_AR2, 0x0f90}, {cpu_regs::STATE_ST0, 0},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0240); // OVM, FRCT
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		prepare_case(*m_cpu, square_case(0));
 		return next_atomic_phase(548);
 	}
 	return false;

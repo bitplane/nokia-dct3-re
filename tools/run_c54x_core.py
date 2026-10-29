@@ -10,6 +10,7 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.process_runner import run_emulator
 from tools.c54x_profiles import machine_for_profile
+from tools.c54x_test_reviews import reviewed_profiles
 
 # Keep the established checker imports available to callers.
 from tools.c54x_test_oracles import (
@@ -65,6 +66,11 @@ def check_result(text, returncode, *, bus_registers=False, bus_io=False, atomic_
     if returncode != 3:
         raise ValueError(f"unexpected MAME exit status {returncode}; expected test completion exit 3")
     lines = text.splitlines()
+    review = reviewed_profiles().get(profile)
+    if review is not None:
+        actual = re.findall(r'^C54x ISA case: PASS id=(\S+)$', text, re.MULTILINE)
+        if actual != review['case_ids']:
+            raise ValueError('reviewed C54x case identities are missing, duplicated or reordered')
     # Verbose SDL shutdown follows the intentional fatal-error completion.
     # Admit only the exact suffix, never arbitrary output after the result.
     if verbose_teardown and lines[-2:] == ['Enter sdlwindow_exit', 'Leave sdlwindow_exit']:

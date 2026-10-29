@@ -298,7 +298,6 @@
     ]
   },
   "cpp": {
-    "assertion_sites": 4202,
     "machines": {
       "nhm3verify": [
         {
@@ -437,6 +436,13 @@
           "description": "Native backend slot request storage",
           "index": 1,
           "name": "requests"
+        }
+      ],
+      "tms54isa": [
+        {
+          "description": "TI square arithmetic reference cases",
+          "index": 0,
+          "name": "isa-square"
         }
       ],
       "tms54rom4": [
@@ -3027,6 +3033,7 @@
       ]
     },
     "pass_formats": {
+      "C54x ISA case: PASS id=%s\n": 1,
       "C54x native backend BSP clock inputs: PASS levels=4 save_replay=4 reset_inputs=1 handset_clock_claim=0\n": 1,
       "C54x native backend BSP clocked store: PASS opcode=7721 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 handset_clock_claim=0\n": 1,
       "C54x native backend BSP continuous RX: PASS words=5 partial_restore=1 single_sync_continuation=1 overrun_restart=1 reset_abort=1 source=4 handset_clock_claim=0\n": 1,
@@ -3306,6 +3313,7 @@
       "TMS320C54x fast return bus: PASS cases=3 stack_reads=0 delayed_words=2\n": 1,
       "TMS320C54x forward block exits: PASS cases=1152 restore=1152 branches=B,BC_AEQ,BC_BEQ counts=0,1,2,7 exits=first,middle,last,never endpoint_layouts=2 pages=2 snapshots=6 source_reads=ordered body_writes=selected braf_not_auto_cleared=1 outside_rsbx=1 spaced_endpoint_revisit=1 interrupt_composition=unvalidated silicon_phase_claim=0\n": 1,
       "TMS320C54x frame/MMR move disassembler: PASS frames=256 moves=81 rejected=175 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
+      "TMS320C54x generic square: PASS cases=6 reset_each=1 nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x high memory ALU disassembler: PASS modes=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x immediate ALU disassembler: PASS forms=340 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x immediate ALU mapped consumer: PASS cases=960 restore=960 operations=ADD,SUB,AND,OR,XOR accumulators=2 parts=3 patterns=4 gaps=0,1 sxm=2 pages=2 reads=1 writes=0 silicon_phase_claim=0\n": 1,
@@ -6699,6 +6707,21 @@
       "required": [
         "TMS320C54x instruction observer: PASS cases=32 restore=32 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 events_each=7 logical_address=1 captured_opcode=1 repeat_entries=3 ordinary_reads=0 annulled_fetches=0 observer_writes=0",
         "TMS320C54x observer XC annulment: PASS cases=64 restore=64 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 forms=XC1,XC2 events_each=5 rejected_slots=absent accepted_source_nops=present observer_writes=0"
+      ]
+    },
+    "isa-square": {
+      "completion": "Fatal error: TMS320C54x isolated generic square complete",
+      "machine": "tms54isa",
+      "reported_fields": [
+        {
+          "cases": "6",
+          "firmware": "0",
+          "nokia_devices": "0",
+          "reset_each": "1"
+        }
+      ],
+      "required": [
+        "TMS320C54x generic square: PASS cases=6 reset_each=1 nokia_devices=0 firmware=0"
       ]
     },
     "ld-ar0-index": {
@@ -15747,7 +15770,22 @@
       ]
     }
   },
-  "schema": 1,
+  "reviewed": {
+    "isa-square": {
+      "case_ids": [
+        "squr-fract-saturate",
+        "squr-absolute-b",
+        "squr-register-a",
+        "squr-register-b-saturate",
+        "squra-preserve-carry",
+        "squrs-absolute-b"
+      ],
+      "classification": "isa_documented",
+      "decision": "rewrite",
+      "family": "square-reference"
+    }
+  },
+  "schema": 2,
   "scopes": {
     "ATOMIC_IO": {
       "completion": "Fatal error: TMS320C54x isolated atomic external I/O complete",

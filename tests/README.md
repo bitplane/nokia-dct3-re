@@ -23,6 +23,9 @@ compatibility, not a claim that ordinary native handset boot still stops there.
 
 - `make build` retains the complete research/conformance composition.
 - `make build-conformance` explicitly selects those test drivers.
+- `make build-c54x-isa` builds only the generic CPU instruction bench, without
+  Nokia devices, GSM utilities or firmware images. Its reviewed case catalogue
+  is `fixtures/c54x_test_reviews.json`; `--profile isa-square` selects the pilot.
 - `make build-handsets` excludes synthetic test drivers and firmware-PC probes.
   Research handset compositions remain available; this is not an upstream export.
 - Builds share the MAME overlay/object tree: never run the two modes or their
@@ -47,7 +50,7 @@ acceptance requirements in `Makefile` and `gates.json`.
 
 | Check | Establishes | Does not establish |
 | --- | --- | --- |
-| Harness inventory | Declared profiles, result text and lexical assertions remain intact | Those profiles actually execute or the assertions are correct |
+| Harness inventory | Declared profiles, result text and reviewed case identities remain intact | Those profiles actually execute or the assertions are correct |
 | Host layout/ownership tests | Source selection, ownership conventions and runner selection | CPU transitions, timing or restoration |
 | Full default C54x run | The ordered default instruction/composition regression | All optional BIOS profiles or physical silicon timing |
 | Isolated C54x profile | Its declared stimulus, rejection controls and replay result | Other profiles or a fitted handset |
@@ -61,6 +64,13 @@ changes, build both modes sequentially, inspect actual bench registrations and
 run handset gates on the test-free executable. A mocked runner test is not a
 substitute for those emulator runs.
 
+Development checks should use the affected isolated families. The large
+default regression remains the exhaustive compatibility contract, not a gate
+after every small edit. The generic ISA entry is currently a reviewed pilot,
+not a replacement for all default coverage. Family review must track runtime
+as well as source size, and separate value-space coverage from distinct
+checkpoint-state coverage before reducing their Cartesian product.
+
 ## Retention and consolidation
 
 Keep a test when it protects a distinct contract: legal/illegal operand
@@ -68,17 +78,28 @@ contrast, ordering, side-effect count, arithmetic boundary or restore point.
 An old bug's regression is not obsolete merely because the implementation
 now passes it.
 
-A fixture can be retired only when its replacement covers the same stimulus,
-expected behavior, negative controls and restoration obligations. A broad
-boot or final-frame oracle is not such a replacement for an instruction test.
+A justified fixture can be retired when a replacement covers its distinguishing
+stimulus, expected behavior, negative controls and restoration obligations.
+Redundant or unjustifiable fixtures may instead be deleted after bounded
+investigation and an explicit review decision; existence is not justification.
+A broad boot or final-frame oracle is not a replacement for an instruction test.
 Temporary sensitivity and frontier experiments may instead be removed after
 their reusable conclusion is retained in reviewed evidence.
 
 During behavior-preserving refactors, run `tools/c54x_harness_inventory.py`
-without rewriting its baseline. Its lexical assertion count and result-text
-inventory are structural guards, not executed coverage. A deliberate change
-to coverage requires a separately reviewed baseline change and executable
-acceptance, not an automatic `--write` to make the guard green.
+without rewriting its baseline. Its declarations and result-text inventory
+are structural guards, not executed coverage. Reviewed families additionally
+require named case identities in the native result stream. Lexical assertion
+counts measure footprint, not coverage: a table-driven rewrite can legitimately
+reduce them. Deliberate changes require a reviewed retention/replacement/deletion
+decision and executable acceptance, not an automatic `--write` to make a guard green.
+
+`fixtures/c54x_test_reviews.json` records reviewed families and their expectation
+basis, distinguishing obligations and limits. `python3 -m tools.c54x_test_reviews`
+reports reviewed profiles and the unreviewed remainder; unreviewed tests are not
+automatically classified or justified by their names. The generic fixture owns
+only program/data loading and register/bus comparisons. It has no opcode decoder,
+arithmetic oracle, implicit reset policy or replay scripting language.
 
 Fixture helpers may centralize stimulus, CPU reset, memory loading and result
 reporting. They must not calculate expected results through the CPU's own

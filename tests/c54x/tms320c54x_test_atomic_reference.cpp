@@ -3,6 +3,7 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
+#include "tms320c54x_test_square.h"
 
 namespace c54x_test {
 
@@ -11,126 +12,19 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 548)
+	if (m_phase >= 548 && m_phase <= 553)
 	{
-		expect_opcode(0x2682,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x7fffffff &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x8000 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f90 &&
-			(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0400) &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"SQUR fractional signed square saturates under OVM in one cycle");
-		program.write_word(0x05e2, 0x27f8); // SQUR *(absolute),B
-		program.write_word(0x05e3, 0x0f90);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
-		data.write_word(0x0f90, 0xfffe);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_T, 0}, {cpu_regs::STATE_ST0, 0},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM, no FRCT
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(549);
-	}
-	if (m_phase == 549)
-	{
-		expect_opcode(0x27f8,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 4 &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-			"absolute SQUR squares signed input into B in two cycles");
-		program.write_word(0x05e2, 0xf48d); // SQUR A,A
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0xfffffe0000ULL}, {cpu_regs::STATE_B, 0x1234}, {cpu_regs::STATE_T, 0xbeef},
-			{cpu_regs::STATE_ST0, 0},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(550);
-	}
-	if (m_phase == 550)
-	{
-		expect_opcode(0xf48d,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 4 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0xbeef &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"SQUR A,A squares signed AH without changing T in one cycle");
-		program.write_word(0x05e2, 0xf58d); // SQUR A,B
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff80000000ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0240); // OVM, FRCT
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(551);
-	}
-	if (m_phase == 551)
-	{
-		expect_opcode(0xf58d,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff80000000ULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x7fffffff &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0xbeef &&
-			(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0200) &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"SQUR A,B uses original signed AH and saturates under FRCT/OVM");
-		program.write_word(0x05e2, 0x3882); // SQURA *AR2,A
-		data.write_word(0x0f90, 0xfffe);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 10}, {cpu_regs::STATE_B, 0x1234}, {cpu_regs::STATE_T, 0}, {cpu_regs::STATE_AR2, 0x0f90},
-			{cpu_regs::STATE_ST0, 0x0800},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(552);
-	}
-	if (m_phase == 552)
-	{
-		expect_opcode(0x3882,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 14 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f90 &&
-			(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"SQURA adds signed square, publishes T, and preserves carry");
-		program.write_word(0x05e2, 0x3bf8); // SQURS *(absolute),B
-		program.write_word(0x05e3, 0x0f90);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
-		data.write_word(0x0f90, 3);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 5}, {cpu_regs::STATE_T, 0}, {cpu_regs::STATE_ST0, 0},
-			{cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(553);
-	}
-	if (m_phase == 553)
-	{
-		expect_opcode(0x3bf8,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfffffffffcULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-			"absolute SQURS subtracts signed square and costs two cycles");
+		unsigned const index = m_phase - 548;
+		auto const test = square_case(index);
+		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
+		// The verifier throws on mismatch; retain opcode accounting after success.
+		expect_opcode(test.opcode, true, "TI square reference case");
+		if (index + 1 < square_vectors.size())
+		{
+			m_port_writes = 0;
+			prepare_case(*m_cpu, square_case(index + 1));
+			return next_atomic_phase(m_phase + 1);
+		}
 		program.write_word(0x05e2, 0x5193); // DADD *AR3+,A,B
 		program.write_word(0x05e3, 0x75d6);
 		program.write_word(0x05e4, 0x0124);

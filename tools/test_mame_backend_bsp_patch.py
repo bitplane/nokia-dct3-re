@@ -20,9 +20,12 @@ class BackendPatchTest(unittest.TestCase):
                 '@source:nokia/nokia_dct3.cpp\nnoki8890\n\n'
                 '@source:northstar/horizon.cpp\nnshrz\nnshrz2mhz\n\n'
                 '@source:zaccaria/zaccaria.cpp\nmonymony2\nmonymony3\n\n'
-                '@source:zpa/iq151.cpp\niq151\n')
+                '@source:zpa/iq151.cpp\niq151\n\n'
+                '@source:zvt/pp01.cpp\npp01\n\n'
+                '@source:nokia/nokia_dct3.cpp\nnsb6stage\nnsb6hle\n')
             patches = [ROOT / 'patches' / name for name in (
-                'mame-tms320c54x-test.patch', 'mame-c54x-backend-bsp-test.patch')]
+                'mame-tms320c54x-test.patch', 'mame-c54x-backend-bsp-test.patch',
+                'mame-c54x-isa-test.patch')]
             environment = dict(os.environ, GIT_CEILING_DIRECTORIES=str(root.parent))
             for patch in patches:
                 subprocess.run(['git', 'apply', str(patch)], cwd=root,
@@ -31,6 +34,7 @@ class BackendPatchTest(unittest.TestCase):
                 subprocess.run(['git', 'apply', '--reverse', '--check', str(patch)],
                                cwd=root, env=environment, check=True, capture_output=True, text=True)
             self.assertEqual(target.read_text().splitlines().count('tms54bsp'), 1)
+            self.assertEqual(target.read_text().splitlines().count('tms54isa'), 1)
 
 
 if __name__ == '__main__':

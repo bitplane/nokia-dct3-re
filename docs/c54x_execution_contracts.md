@@ -33,15 +33,20 @@ loader document owns that mask-provenance contract.
 ### Harness preservation contract
 
 `fixtures/c54x_conformance_baseline.json` freezes the declared BIOS inventory,
-464 isolated runner profiles, seven named scopes, 293 default-suite result
-requirements, fixture PASS formats and 4,202 lexical assertion-pattern sites
-(a source-pattern count, not an executed assertion count). Exact result
+the isolated runner profiles, seven named scopes, default-suite result
+requirements, fixture PASS formats and reviewed case identities. Lexical
+assertion counts are footprint metrics, not coverage requirements. Exact result
 strings retain case/restore counts and scope exclusions. Check it with:
 
 ```sh
 .venv/bin/python tools/c54x_harness_inventory.py
 .venv/bin/python -m unittest tools.test_c54x_harness_inventory
 ```
+
+Family retention/rewrite/merge/relocation/deletion decisions live in
+`fixtures/c54x_test_reviews.json`. The generic ISA bench builds without Nokia
+devices or private firmware; legacy default continuations can reuse reviewed
+case data without making the entire sequenced bench generic.
 
 The CLI test exercises every isolated profile's machine/BIOS selection and
 result checking using simulated process output. The inventory is a structural
@@ -59,7 +64,7 @@ ambiguous declarations fail closed. Exact expected results live separately in
 `tools/run_c54x_core.py` owns CLI selection, process execution and result
 validation, retaining its established checker/import API. The seven named
 scopes share one selection table; the frozen baseline independently checks
-their result contracts and all 464 isolated machine/BIOS selections.
+their result contracts and every declared isolated machine/BIOS selection.
 
 The bench is separate from the processor implementation. Its current source
 boundaries are:
@@ -69,6 +74,9 @@ boundaries are:
 | `tests/c54x/tms320c54x_test.cpp` | Machine/ROM declarations, backend serial bench and stock-loader verifier compositions |
 | `tests/c54x/tms320c54x_test_state.h` | Shared bench state, fixture types and method declarations; no CPU execution implementation |
 | `tests/c54x/tms320c54x_test_state.cpp` | Bench lifecycle, address maps, assertions and device wiring |
+| `tests/c54x/tms320c54x_test_isa.cpp` | CPU-only ISA bench with explicit per-case reset and no Nokia/firmware dependencies |
+| `tests/c54x/tms320c54x_test_case.h` | Generic stimulus loading and independent register/bus comparisons; no instruction semantics |
+| `tests/c54x/tms320c54x_test_square.h` | Reviewed literal SQUR/SQURA/SQURS cases shared by generic and default-sequence entries |
 | `tests/c54x/tms320c54x_test_dispatch.cpp` | Ordered callback routing and the initial-program completion tail |
 | `tests/c54x/tms320c54x_test_arithmetic.cpp` | Arithmetic, multiplier and logical-operation fixtures and checks |
 | `tests/c54x/tms320c54x_test_addressing.cpp` | Address generation and memory/register transfers, including the stack-transfer continuation |

@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "starting_point": {
+    "commit": "5d2c4739",
+    "isolated_profiles": 464,
+    "c54x_source_bytes": 3844270,
+    "c54x_source_lines": 58397
+  },
+  "families": [
+    {
+      "id": "square-reference",
+      "classification": "isa_documented",
+      "decision": "rewrite",
+      "basis": "TI SPRU172C SQUR, SQURA and SQURS instruction descriptions; explicit signed and fractional arithmetic results, destination selection and instruction costs.",
+      "source": "tests/c54x/tms320c54x_test_square.h",
+      "profiles": ["isa-square"],
+      "legacy_entry": "default atomic phases 548 through 553",
+      "case_ids": [
+        "squr-fract-saturate",
+        "squr-absolute-b",
+        "squr-register-a",
+        "squr-register-b-saturate",
+        "squra-preserve-carry",
+        "squrs-absolute-b"
+      ],
+      "obligations": [
+        "literal accumulator and T results",
+        "opposite accumulator preservation where previously asserted",
+        "AR2 preservation where previously asserted",
+        "selected overflow and carry bits, without strengthening partial-mask expectations",
+        "two port writes separated by the original three or four instruction clocks",
+        "no illegal instruction and final idle state"
+      ],
+      "limits": [
+        "atomic execution only",
+        "no pipeline or silicon phase claim",
+        "no save-state coverage in the original family",
+        "the default sequence retains its explicit continuation; standalone cases reset independently"
+      ]
+    }
+  ]
+}

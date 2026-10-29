@@ -39,7 +39,8 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-libgsm-build.patch \
 	patches/mame-nse1-external-pcm-fixture.patch \
 	patches/mame-nse2-model.patch \
-	patches/mame-nse2-native-model.patch
+	patches/mame-nse2-native-model.patch \
+	patches/mame-c54x-isa-test.patch
 LIB_COMPONENTS := lib/util/gsmfr.cpp lib/util/gsmfr.h
 CPU_COMPONENTS := cpu/tms320c54x/tms320c54x.cpp \
 	cpu/tms320c54x/tms320c54x.h
@@ -375,6 +376,7 @@ help:
 	@echo "make build          clone MAME at the pin, overlay $(DRIVER), build"
 	@echo "make build-handsets build without synthetic test drivers or firmware probes"
 	@echo "make build-conformance explicitly include the processor/device/firmware benches"
+	@echo "make build-c54x-isa build the generic CPU-only instruction bench"
 	@echo "make swap16         derive $(SWAP) from $(ROM) (16-bit byteswap, for the static tools)"
 	@echo "make census         build the 3210 v6.00 message-topology JSON/report"
 	@echo "make controller-census exhaustively verify the 3210 controller dispatcher"
@@ -818,7 +820,10 @@ endif
 build: overlay roms
 	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=$(BUILD_MAME_SOURCES) USE_QTDEBUG=0 -j$(JOBS)
 
-.PHONY: build-handsets build-conformance
+.PHONY: build-handsets build-conformance build-c54x-isa
+build-c54x-isa: overlay
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/tms320c54x_test_isa.cpp USE_QTDEBUG=0 -j$(JOBS)
+
 build-handsets:
 	$(MAKE) --no-print-directory build DCT3_TEST_DRIVERS=0 DCT3_RESEARCH_TRACES=0
 

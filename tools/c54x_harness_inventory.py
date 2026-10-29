@@ -15,6 +15,7 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools.c54x_profiles import declarations as bios_declarations, harness_sources
+from tools.c54x_test_reviews import reviewed_profiles
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / 'fixtures/c54x_conformance_baseline.json'
@@ -46,6 +47,9 @@ def inventory(root=ROOT):
     from tools import run_c54x_core as runner
     sources = [path.read_text() for path in harness_sources(root) if path.suffix == '.cpp']
     cpp = cpp_inventory(sources)
+    # Lexical assertion sites remain a footprint metric, not a coverage
+    # obligation: a reviewed table-driven rewrite legitimately reduces them.
+    cpp.pop('assertion_sites')
     machines = {}
     for machine, profiles in cpp['machines'].items():
         for profile in profiles:
@@ -64,7 +68,8 @@ def inventory(root=ROOT):
         marker = getattr(runner, name + '_REQUIRED')
         markers = [marker] if isinstance(marker, str) else list(marker)
         scopes[name] = dict(required=markers, completion=getattr(runner, name + '_COMPLETION'))
-    return dict(schema=1, cpp=cpp, isolated=profiles, scopes=scopes,
+    return dict(schema=2, cpp=cpp, isolated=profiles, scopes=scopes,
+                reviewed=reviewed_profiles(root),
                 core=dict(required=list(runner.REQUIRED), completion=runner.COMPLETION))
 
 
@@ -82,7 +87,7 @@ def main():
         print(f'C54x harness inventory: {len(actual["cpp"]["machines"])} machines, '
               f'{len(actual["isolated"])} isolated profiles, '
               f'{len(actual["core"]["required"])} core requirements, '
-              f'{actual["cpp"]["assertion_sites"]} lexical assertion-pattern sites')
+              f'{len(actual["reviewed"])} reviewed case-identity profiles')
     except (OSError, ValueError) as error:
         parser.exit(1, f'C54x harness inventory: {error}\n')
 
