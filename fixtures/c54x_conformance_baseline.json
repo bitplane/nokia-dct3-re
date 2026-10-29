@@ -3221,7 +3221,7 @@
       "TMS320C54x double memory disassembler: PASS modes=1024 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x dual MAC family exclusions: PASS cases=%u restore=%u reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n": 1,
       "TMS320C54x dual MAC family: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 snapshots=3 reads=2 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n": 1,
-      "TMS320C54x dual MACSU exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n": 1,
+      "TMS320C54x dual MACSU exclusions: PASS cases=%u restore=%u operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n": 1,
       "TMS320C54x dual move/DP disassembler: PASS moves=256 dp=512 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x dual multiply disassembler: PASS forms=4608 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x dual/accumulator arithmetic disassembler: PASS dual_forms=1024 accumulator_forms=16 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
@@ -3606,11 +3606,11 @@
       "TMS320C54x staged direct RMW: PASS cases=768 operations=ANDM,ORM,ADDM offsets=2 values=4 immediates=2 cpl_states=2 pages=2 restore=768 retained_context=1 duplicate_reads=0 duplicate_writes=0\n": 1,
       "TMS320C54x staged direct immediate ST: PASS cases=128 values=4 offsets=2 cpl_states=2 pages=2 restore=128 retained_context=1 destination_reads=0 duplicate_writes=0\n": 1,
       "TMS320C54x staged direct load: PASS cases=2 read=5 execute=6 retained_operand=1 restore_after_read=1 bus_reads_per_case=1\n": 1,
-      "TMS320C54x staged dual ALU exclusions: PASS cases=32 restore=32 operations=ADD,SUB operands=X,Y sources=cpu_register,peripheral reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n": 1,
-      "TMS320C54x staged dual ALU: PASS address_cases=36864 arithmetic_cases=49152 restore=86016 operations=ADD,SUB encodings=1024 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_alias_priority=1 t_unchanged=1 result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated\n": 1,
-      "TMS320C54x staged dual MACSU: PASS address_cases=18432 arithmetic_cases=196608 restore=215040 encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_unsigned_y_signed=1 x_alias_priority=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n": 1,
-      "TMS320C54x staged dual MPY exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n": 1,
-      "TMS320C54x staged dual MPY: PASS address_cases=18432 arithmetic_cases=24576 restore=43008 encodings=512 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_alias_priority=1 t_publish=Read result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated\n": 1,
+      "TMS320C54x staged dual ALU exclusions: PASS cases=%u restore=%u operations=ADD,SUB operands=X,Y sources=cpu_register,peripheral reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n": 1,
+      "TMS320C54x staged dual ALU: PASS address_cases=36864 arithmetic_cases=16384 restore=%u operations=ADD,SUB encodings=1024 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 checkpoint_policy=balanced reads=2 data_writes=0 x_alias_priority=1 t_unchanged=1 result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated coverage_fnv64=%016llx\n": 1,
+      "TMS320C54x staged dual MACSU: PASS address_cases=18432 arithmetic_cases=65536 restore=%u encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 checkpoint_policy=balanced reads=2 data_writes=0 x_unsigned_y_signed=1 x_alias_priority=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n": 1,
+      "TMS320C54x staged dual MPY exclusions: PASS cases=%u restore=%u operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n": 1,
+      "TMS320C54x staged dual MPY: PASS address_cases=18432 arithmetic_cases=8192 restore=%u encodings=512 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 checkpoint_policy=balanced reads=2 data_writes=0 x_alias_priority=1 t_publish=Read result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated coverage_fnv64=%016llx\n": 1,
       "TMS320C54x staged empty frontend: PASS irq=1 nmi=1 return_pc=0600 vector_fetch=4 stack_write=5 isr_execute=8\n": 1,
       "TMS320C54x staged explicit SP: PASS cases=320 producers=POPM,STM,MVDK,FRAME,POPM_conflict compiler_consumers=LD,ST gap_nops=0,1,2,3 restore=320 duplicate_reads=0 duplicate_writes=0\n": 1,
       "TMS320C54x staged extended DST: PASS cases=3072 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=4 compatibility=0,1 sst=0,1 restore=3072 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n": 1,
@@ -4173,9 +4173,11 @@
       "reported_fields": [
         {
           "address_cases": "36864",
-          "arithmetic_cases": "49152",
+          "arithmetic_cases": "16384",
           "arithmetic_flags": "32",
           "bk_modes": "2",
+          "checkpoint_policy": "balanced",
+          "coverage_fnv64": "0e097cb7d60a0ad8",
           "data_writes": "0",
           "encodings": "1024",
           "layouts": "3",
@@ -4184,7 +4186,7 @@
           "physical_banks": "unvalidated",
           "reads": "2",
           "repeat_composition": "unvalidated",
-          "restore": "86016",
+          "restore": "53248",
           "result_publish": "Execute",
           "snapshots": "3",
           "t_unchanged": "1",
@@ -4193,7 +4195,7 @@
         }
       ],
       "required": [
-        "TMS320C54x staged dual ALU: PASS address_cases=36864 arithmetic_cases=49152 restore=86016 operations=ADD,SUB encodings=1024 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_alias_priority=1 t_unchanged=1 result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated"
+        "TMS320C54x staged dual ALU: PASS address_cases=36864 arithmetic_cases=16384 restore=53248 operations=ADD,SUB encodings=1024 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 checkpoint_policy=balanced reads=2 data_writes=0 x_alias_priority=1 t_unchanged=1 result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated coverage_fnv64=0e097cb7d60a0ad8"
       ]
     },
     "alu-dual-edge": {
@@ -4202,6 +4204,7 @@
       "reported_fields": [
         {
           "cases": "32",
+          "coverage_fnv64": "f77b12af4e26bfa5",
           "operands": "X,Y",
           "operations": "ADD,SUB",
           "pointer_updates": "0",
@@ -4213,7 +4216,7 @@
         }
       ],
       "required": [
-        "TMS320C54x staged dual ALU exclusions: PASS cases=32 restore=32 operations=ADD,SUB operands=X,Y sources=cpu_register,peripheral reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0"
+        "TMS320C54x staged dual ALU exclusions: PASS cases=32 restore=32 operations=ADD,SUB operands=X,Y sources=cpu_register,peripheral reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=f77b12af4e26bfa5"
       ]
     },
     "alu-low-bus": {
@@ -7736,9 +7739,11 @@
           "accumulator_patterns": "8",
           "accumulator_sample": "Execute",
           "address_cases": "18432",
-          "arithmetic_cases": "196608",
+          "arithmetic_cases": "65536",
           "arithmetic_flags": "32",
           "bk_modes": "2",
+          "checkpoint_policy": "balanced",
+          "coverage_fnv64": "a57c305fd5b3a3ba",
           "data_writes": "0",
           "encodings": "512",
           "interrupt_repeat_composition": "unvalidated",
@@ -7746,7 +7751,7 @@
           "pages": "2",
           "physical_banks": "unvalidated",
           "reads": "2",
-          "restore": "215040",
+          "restore": "83968",
           "snapshots": "3",
           "t_publish": "Read",
           "value_pairs": "64",
@@ -7755,7 +7760,7 @@
         }
       ],
       "required": [
-        "TMS320C54x staged dual MACSU: PASS address_cases=18432 arithmetic_cases=196608 restore=215040 encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_unsigned_y_signed=1 x_alias_priority=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated"
+        "TMS320C54x staged dual MACSU: PASS address_cases=18432 arithmetic_cases=65536 restore=83968 encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 checkpoint_policy=balanced reads=2 data_writes=0 x_unsigned_y_signed=1 x_alias_priority=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=a57c305fd5b3a3ba"
       ]
     },
     "macsu-dual-edge": {
@@ -7764,6 +7769,7 @@
       "reported_fields": [
         {
           "cases": "16",
+          "coverage_fnv64": "2135120b48416d25",
           "operands": "X,Y",
           "pages": "2",
           "pointer_updates": "0",
@@ -7776,7 +7782,7 @@
         }
       ],
       "required": [
-        "TMS320C54x dual MACSU exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0"
+        "TMS320C54x dual MACSU exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=2135120b48416d25"
       ]
     },
     "mapped-bitf": {
@@ -8195,9 +8201,11 @@
       "reported_fields": [
         {
           "address_cases": "18432",
-          "arithmetic_cases": "24576",
+          "arithmetic_cases": "8192",
           "arithmetic_flags": "32",
           "bk_modes": "2",
+          "checkpoint_policy": "balanced",
+          "coverage_fnv64": "48c359ad090cdc45",
           "data_writes": "0",
           "encodings": "512",
           "layouts": "3",
@@ -8205,7 +8213,7 @@
           "physical_banks": "unvalidated",
           "reads": "2",
           "repeat_composition": "unvalidated",
-          "restore": "43008",
+          "restore": "26624",
           "result_publish": "Execute",
           "snapshots": "3",
           "t_publish": "Read",
@@ -8214,7 +8222,7 @@
         }
       ],
       "required": [
-        "TMS320C54x staged dual MPY: PASS address_cases=18432 arithmetic_cases=24576 restore=43008 encodings=512 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_alias_priority=1 t_publish=Read result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated"
+        "TMS320C54x staged dual MPY: PASS address_cases=18432 arithmetic_cases=8192 restore=26624 encodings=512 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 checkpoint_policy=balanced reads=2 data_writes=0 x_alias_priority=1 t_publish=Read result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated coverage_fnv64=48c359ad090cdc45"
       ]
     },
     "mpy-dual-edge": {
@@ -8223,6 +8231,7 @@
       "reported_fields": [
         {
           "cases": "16",
+          "coverage_fnv64": "2135120b48416d25",
           "operands": "X,Y",
           "pages": "2",
           "pointer_updates": "0",
@@ -8235,7 +8244,7 @@
         }
       ],
       "required": [
-        "TMS320C54x staged dual MPY exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0"
+        "TMS320C54x staged dual MPY exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=2135120b48416d25"
       ]
     },
     "mpy-mapped": {
@@ -15368,6 +15377,30 @@
       "decision": "rewrite",
       "family": "smem-arithmetic-retention"
     },
+    "alu-dual": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 53248,
+        "fnv64": "0e097cb7d60a0ad8",
+        "key": "Two original 43008-ordinal ADD/SUB blocks, each reduced to its 18432 address cases and 8192 distinct numeric inputs with balanced checkpoint3/4/5 selection.",
+        "result_prefix": "TMS320C54x staged dual ALU: PASS"
+      },
+      "decision": "rewrite",
+      "family": "dual-ram-arithmetic"
+    },
+    "alu-dual-edge": {
+      "case_ids": [],
+      "classification": "implementation_limit",
+      "coverage": {
+        "cases": 32,
+        "fnv64": "f77b12af4e26bfa5",
+        "key": "Original raw ordinals0..31: ADD and SUB blocks, all retained.",
+        "result_prefix": "TMS320C54x staged dual ALU exclusions: PASS"
+      },
+      "decision": "keep",
+      "family": "dual-operand-admission-controls"
+    },
     "bitf-smem": {
       "case_ids": [],
       "classification": "architectural_interaction",
@@ -15773,6 +15806,30 @@
       "decision": "rewrite",
       "family": "mapped-memory-immediate-mac"
     },
+    "macsu-dual": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 83968,
+        "fnv64": "a57c305fd5b3a3ba",
+        "key": "Original raw ordinals: all18432 address cases, then all65536 distinct numeric inputs once with balanced checkpoint3/4/5 selection.",
+        "result_prefix": "TMS320C54x staged dual MACSU: PASS"
+      },
+      "decision": "rewrite",
+      "family": "dual-ram-unsigned-mac"
+    },
+    "macsu-dual-edge": {
+      "case_ids": [],
+      "classification": "implementation_limit",
+      "coverage": {
+        "cases": 16,
+        "fnv64": "2135120b48416d25",
+        "key": "Original raw ordinals0..15, all retained.",
+        "result_prefix": "TMS320C54x dual MACSU exclusions: PASS"
+      },
+      "decision": "keep",
+      "family": "dual-operand-admission-controls"
+    },
     "memory-alu": {
       "case_ids": [],
       "classification": "architectural_interaction",
@@ -15796,6 +15853,30 @@
       },
       "decision": "rewrite",
       "family": "smem-arithmetic-retention"
+    },
+    "mpy-dual": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 26624,
+        "fnv64": "48c359ad090cdc45",
+        "key": "Original raw ordinals: all 18432 address cases, then each of 8192 numeric inputs once with balanced checkpoint3/4/5 selection.",
+        "result_prefix": "TMS320C54x staged dual MPY: PASS"
+      },
+      "decision": "rewrite",
+      "family": "dual-ram-multiply"
+    },
+    "mpy-dual-edge": {
+      "case_ids": [],
+      "classification": "implementation_limit",
+      "coverage": {
+        "cases": 16,
+        "fnv64": "2135120b48416d25",
+        "key": "Original raw ordinals0..15, all retained.",
+        "result_prefix": "TMS320C54x staged dual MPY exclusions: PASS"
+      },
+      "decision": "keep",
+      "family": "dual-operand-admission-controls"
     },
     "mpy-mem-imm": {
       "case_ids": [],

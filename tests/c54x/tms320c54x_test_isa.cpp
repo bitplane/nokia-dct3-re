@@ -96,25 +96,25 @@ private:
 		}
 		if (macsu)
 		{
-			if (edge) { osd_printf_info("TMS320C54x dual MACSU exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated dual MACSU exclusions complete"); }
-			osd_printf_info("TMS320C54x staged dual MACSU: PASS address_cases=18432 arithmetic_cases=196608 restore=215040 encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_unsigned_y_signed=1 x_alias_priority=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(0, "TMS320C54x isolated dual MACSU complete");
+			if (edge) { osd_printf_info("TMS320C54x dual MACSU exclusions: PASS cases=%u restore=%u operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest()); throw emu_fatalerror(0, "TMS320C54x isolated dual MACSU exclusions complete"); }
+			osd_printf_info("TMS320C54x staged dual MACSU: PASS address_cases=18432 arithmetic_cases=65536 restore=%u encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 checkpoint_policy=balanced reads=2 data_writes=0 x_unsigned_y_signed=1 x_alias_priority=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->restores(), (unsigned long long)m_dual->digest()); throw emu_fatalerror(0, "TMS320C54x isolated dual MACSU complete");
 		}
 		if (alu)
 		{
 			if (edge)
 			{
-				osd_printf_info("TMS320C54x staged dual ALU exclusions: PASS cases=32 restore=32 operations=ADD,SUB operands=X,Y sources=cpu_register,peripheral reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n");
+				osd_printf_info("TMS320C54x staged dual ALU exclusions: PASS cases=%u restore=%u operations=ADD,SUB operands=X,Y sources=cpu_register,peripheral reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest());
 				throw emu_fatalerror(0, "TMS320C54x isolated dual ALU exclusions complete");
 			}
-			osd_printf_info("TMS320C54x staged dual ALU: PASS address_cases=36864 arithmetic_cases=49152 restore=86016 operations=ADD,SUB encodings=1024 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_alias_priority=1 t_unchanged=1 result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated\n");
+			osd_printf_info("TMS320C54x staged dual ALU: PASS address_cases=36864 arithmetic_cases=16384 restore=%u operations=ADD,SUB encodings=1024 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 checkpoint_policy=balanced reads=2 data_writes=0 x_alias_priority=1 t_unchanged=1 result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->restores(), (unsigned long long)m_dual->digest());
 			throw emu_fatalerror(0, "TMS320C54x isolated dual ALU complete");
 		}
 		if (edge)
 		{
-			osd_printf_info("TMS320C54x staged dual MPY exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n");
+			osd_printf_info("TMS320C54x staged dual MPY exclusions: PASS cases=%u restore=%u operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest());
 			throw emu_fatalerror(0, "TMS320C54x isolated dual MPY exclusions complete");
 		}
-		osd_printf_info("TMS320C54x staged dual MPY: PASS address_cases=18432 arithmetic_cases=24576 restore=43008 encodings=512 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_alias_priority=1 t_publish=Read result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated\n");
+		osd_printf_info("TMS320C54x staged dual MPY: PASS address_cases=18432 arithmetic_cases=8192 restore=%u encodings=512 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 checkpoint_policy=balanced reads=2 data_writes=0 x_alias_priority=1 t_publish=Read result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->restores(), (unsigned long long)m_dual->digest());
 		throw emu_fatalerror(0, "TMS320C54x isolated dual MPY complete");
 	}
 	bool parallel() const { return !std::strcmp(machine().options().bios(), "isa-parallel"); }

@@ -1928,11 +1928,13 @@ uses the current destination accumulator, FRCT and SMUL product handling,
 OVM and sticky destination overflow. Carry and other status bits are preserved.
 This follows SPRU172C 4-91 and the shared multiply-product/result helpers.
 
-`macsu-dual` passes 215,040 restores in factored matrices: 18,432 address cases
+`macsu-dual` retains 83,968 cases/restores in factored matrices: 18,432 address cases
 cover all 512 encodings, three alias/address layouts, linear/circular BK,
-two pages and three snapshots; 196,608 arithmetic cases cross 64 value pairs,
+two pages and three snapshots; 65,536 distinct arithmetic inputs cross 64 value pairs,
 both destinations, eight accumulator patterns, 32 status profiles, two pages
-and three snapshots. This is not the address/arithmetic full cross-product.
+with one checkpoint per numeric input, balanced across checkpoints 3/4/5.
+The full numeric-by-checkpoint Cartesian product is retired; all address cases
+remain. This is not the address/arithmetic full cross-product.
 Post-Access pointer replacement and post-Read RAM/T replacement cannot change
 retained inputs; replacing the accumulator after Read checks Execute ownership.
 Paired reads are ordered and occur twice even when logical addresses alias;
@@ -2120,28 +2122,36 @@ address/read machinery as dual MPY, but does not load T. Both operands are
 extended according to SXM and shifted left by 16; their sum/difference replaces
 the destination independently of its previous value. Execute publishes carry,
 sticky destination overflow and OVM saturation through the shared arithmetic
-helper. `alu-dual` passes 86,016 cases/restores: 36,864 address cases and 49,152
+helper. `alu-dual` retains 53,248 cases/restores: 36,864 address cases and 16,384
 arithmetic cases across ADD/SUB, all 1,024 encodings, three alias layouts,
 linear/circular addressing, 64 value pairs, 32 status combinations, two pages
-and three snapshots. These are factored matrices, not a full cross-product.
+and balanced numerical checkpoints 3/4/5. All address cases retain their original
+checkpoints; these are factored matrices, not a full cross-product.
 `alu-dual-edge` adds 32 low-page operand exclusions before reads or pointer
 updates. Physical bank timing, repeat composition and general producer latency
-remain unvalidated. The full 43,008-case dual-MPY control also passes after
-sharing the retained dual-read path.
+remain unvalidated. MPY's distinct signed product and T-publication contract
+has its own CPU-only profile rather than being inferred from ADD/SUB.
 
 Dual-memory MPY (`a400..a5ff`) captures both addresses before modifying either
 auxiliary register. SPRU131G section 5.5.4 gives Xmod priority when both operands
 use the same AR. Two logical reads supply signed 16-bit operands; X publishes T
 in Read, while the product publishes in Execute with FRCT and destination
 overflow/OVM handling. Execute does not rewrite a newer T value.
-`mpy-dual` passes 43,008 cases/restores: an 18,432-case address matrix covers
+`mpy-dual` retains 26,624 cases/restores: an 18,432-case address matrix covers
 all 512 encodings, three alias layouts, linear/circular addressing, two pages
-and three snapshots; a separate 24,576-case arithmetic matrix covers 64 value
-pairs and 32 status combinations. These are factored matrices, not their full
+and three snapshots; a separate 8,192-input arithmetic matrix covers 64 value
+pairs, both destinations, 32 status combinations and both pages. Each numeric
+input has one replay checkpoint, balanced 21/21/22 within each fixed group's
+64 operand pairs. These are factored matrices, not their full
 Cartesian product. `mpy-dual-edge` passes 16 exclusions for low-page CPU and
 peripheral sources before reads or pointer updates. Physical bank arbitration
 and repeat composition remain unvalidated; these exclusions are not silicon
-trap claims.
+trap claims. All three smaller dual-operand families have reviewed original-key
+coverage digests and actual restore counts. A compiled descriptor census shows
+the 180,224 retired numerical replays differ only in snapshot, including MACSU's
+feedback seed. No arithmetic helper, mutation point or observation is removed;
+the former value-by-checkpoint Cartesian product is no longer claimed.
+The unchanged exclusion banks retain 16 MPY, 32 ADD/SUB and 16 MACSU cases.
 The EXP/NORM, mapped repeated-MVDD and XC controls pass, as does the native
 5110 save-state round trip. The original resident-memory comparison still
 passes independently of the new Decode boundary.
@@ -4436,9 +4446,9 @@ addressing cases and zero address/numerical overlap in either profile.
 The cached descriptor belongs to a complete live/replay pair; arithmetic
 expectations and all per-clock mutation/assertion points are unchanged.
 These banks use the independent CPU-only machine. The shared staged fixture
-also hosts the MPY, dual ALU and MACSU profiles and their exclusion banks,
-without changing their case counts or acceptance markers. Relocation does
-not classify those remaining unreviewed semantic contracts.
+also hosts the MPY, dual ALU and MACSU profiles and their exclusion banks.
+Their separate family reviews own the retained inputs and reduced replay
+schedules described above; extraction alone was not semantic classification.
 Both expectation-function bodies are byte-identical to their former owners;
 all eleven predicates/messages, seventeen register-setting calls and five
 program/data write calls retain their arguments and order. The standalone

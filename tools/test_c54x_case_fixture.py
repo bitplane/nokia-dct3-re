@@ -29,39 +29,74 @@ def compiled_cpp(source):
 
 class CaseFixtureTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
-    def test_dual_mac_schedule_keeps_address_banks_and_numeric_inputs(self):
+    def test_dual_schedules_keep_address_banks_and_numeric_inputs(self):
         source = r'''
 #include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstdio>
+#include <cstdint>
+#include <tuple>
+#include <vector>
+using u16 = std::uint16_t; using u32 = std::uint32_t; using u64 = std::uint64_t;
+using s16 = std::int16_t; using s32 = std::int32_t; using s64 = std::int64_t;
+constexpr bool BIT(u64 value, unsigned bit) { return (value >> bit) & 1; }
+#include "tests/c54x/tms320c54x_test_dual_input.h"
 #include "tests/c54x/tms320c54x_test_dual_schedule.h"
 #include "tests/c54x/tms320c54x_test_support.h"
-int main() {
-    using s = c54x_test::dual_mac_schedule;
+auto state(c54x_test::dual_multiply_fixture const &f) {
+    return std::tie(f.x, f.y, f.destination, f.flags, f.source, f.operation, f.linear, f.base,
+        f.initial, f.final, f.xaddress, f.yaddress, f.xword, f.yword, f.st0, f.st1, f.pmst,
+        f.result_st0, f.stored, f.result);
+}
+template<class s> void check(unsigned blocks, unsigned numeric, bool alu = false, bool macsu = false) {
     c54x_test::ordered_case_digest digest;
-    for (unsigned family = 0; family < 8; ++family) {
-        std::array<std::array<unsigned, 3>, 1024> counts{};
+    unsigned const old_span = 18432 + 3 * numeric;
+    std::vector<unsigned> seen(blocks * old_span);
+    for (unsigned family = 0; family < blocks; ++family) {
+        std::vector<std::array<unsigned, 3>> counts(numeric / 64);
         for (unsigned input = 0; input < s::per_family; ++input) {
             unsigned const key = s::key(family * s::per_family + input);
             digest.add(key);
-            assert(key / 215040 == family);
-            if (input < 18432) { assert(key == family * 215040 + input); continue; }
-            unsigned const relative = key - family * 215040 - 18432;
-            assert(relative % 65536 == input - 18432);
-            ++counts[(input - 18432) / 64][relative / 65536];
+            assert(key < seen.size() && !seen[key]++ && key / old_span == family);
+            if (input < 18432) { assert(key == family * old_span + input); continue; }
+            unsigned const relative = key - family * old_span - 18432;
+            assert(relative % numeric == input - 18432);
+            ++counts[(input - 18432) / 64][relative / numeric];
+            // Small-family numeric copies must differ only in replay point.
+            if (blocks < 8) {
+                unsigned const raw = family * old_span + input;
+                auto const first = c54x_test::dual_multiply_case(raw, false, alu, macsu);
+                assert(first.snapshot == 0);
+                for (unsigned snap = 1; snap < 3; ++snap) {
+                    auto const other = c54x_test::dual_multiply_case(raw + snap * numeric, false, alu, macsu);
+                    assert(other.snapshot == snap && state(first) == state(other));
+                    if (macsu) assert(c54x_test::dual_macsu_seed(raw, false) ==
+                        c54x_test::dual_macsu_seed(raw + snap * numeric, false));
+                }
+            }
         }
         for (auto c : counts) {
             std::sort(c.begin(), c.end());
             assert((c == std::array<unsigned, 3>{21, 21, 22}));
         }
     }
+    assert(digest.count == s::cases);
     std::printf("cases=%u digest=%016llx\n", digest.count, (unsigned long long)digest.value);
+}
+int main() {
+    check<c54x_test::dual_mpy_schedule>(1, 8192);
+    check<c54x_test::dual_alu_schedule>(2, 8192, true);
+    check<c54x_test::dual_macsu_schedule>(1, 65536, false, true);
+    check<c54x_test::dual_mac_schedule>(8, 65536);
 }
 '''
         with compiled_cpp(source) as program:
-            output = subprocess.check_output([str(program)], text=True).strip()
-        self.assertEqual(output, 'cases=671744 digest=a992a2f6ed8d9f42')
+            output = subprocess.check_output([str(program)], text=True).splitlines()
+        self.assertEqual(output, ['cases=26624 digest=48c359ad090cdc45',
+                                 'cases=53248 digest=0e097cb7d60a0ad8',
+                                 'cases=83968 digest=a57c305fd5b3a3ba',
+                                 'cases=671744 digest=a992a2f6ed8d9f42'])
 
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_smem_schedule_keeps_every_input_and_balances_replay(self):

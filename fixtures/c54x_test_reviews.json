@@ -942,6 +942,79 @@
       ]
     },
     {
+      "id": "dual-ram-multiply",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_dual.h; tests/c54x/tms320c54x_test_dual_input.h; tests/c54x/tms320c54x_test_dual_schedule.h",
+      "profiles": ["mpy-dual"],
+      "case_ids": [],
+      "basis": "SPRU172C dual MPY signed 16-bit product, FRCT scaling and destination overflow/saturation; SPRU131G 5.5.4 X-priority alias modification. Fixture-owned signed 64-bit multiplication, explicit 32-bit thresholds and 40-bit masking supply numeric expectations without CPU helpers. Per-clock sampling is a software-model regression, not measured silicon timing.",
+      "profile_coverage": {
+        "mpy-dual": {"cases": 26624, "fnv64": "48c359ad090cdc45", "result_prefix": "TMS320C54x staged dual MPY: PASS", "key": "Original raw ordinals: all 18432 address cases, then each of 8192 numeric inputs once with balanced checkpoint3/4/5 selection."}
+      },
+      "obligations": ["retain all 512 encodings, three alias layouts, both BK modes and program pages in the address cohort", "retain all 64 operand pairs, both destinations, 32 flag patterns and both pages in the numeric cohort", "two ordered logical reads even on alias; X-priority pointer update once; T publishes at Read and result at Execute", "mutate pointers/BK after Access and RAM/T after Read; retain all live and replay checks and prevent duplicate fetches, reads, updates or result publication", "balanced schedule preserves each numeric input and distributes each fixed selector/flags/page group's 64 pairs as 21/21/22 across checkpoints3/4/5", "actual restore counter and ordered original-key digest are acceptance requirements; run CPU-only with an empty ROM directory"],
+      "limits": ["retire 16384 duplicate numeric checkpoint executions, not operand/status/page tuples; the value-by-checkpoint Cartesian product is no longer covered", "address cases vary other inputs with checkpoint, so none are pruned", "not a duplicate of MAC feedback, unsigned-X MACSU, mapped operands, producer, repeat or interrupt composition", "no physical bank arbitration or silicon phase claim; unrelated arithmetic/status combinations are not implied"]
+    },
+    {
+      "id": "dual-ram-arithmetic",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_dual.h; tests/c54x/tms320c54x_test_dual_input.h; tests/c54x/tms320c54x_test_dual_schedule.h",
+      "profiles": ["alu-dual"],
+      "case_ids": [],
+      "basis": "SPRU172C dual ADD/SUB: independently sign/zero-extend each word according to SXM and scale by65536, add/subtract using signed 64-bit arithmetic, apply explicit 32-bit saturation thresholds and 40-bit mask; word carry/no-borrow and sticky destination overflow are calculated separately. No CPU helper supplies expectations. The retained model's Access/Read/Execute publication is not physical timing evidence.",
+      "profile_coverage": {
+        "alu-dual": {"cases": 53248, "fnv64": "0e097cb7d60a0ad8", "result_prefix": "TMS320C54x staged dual ALU: PASS", "key": "Two original 43008-ordinal ADD/SUB blocks, each reduced to its 18432 address cases and 8192 distinct numeric inputs with balanced checkpoint3/4/5 selection."}
+      },
+      "obligations": ["retain both ADD/SUB blocks, all1024 encodings and both destination selectors; opcode selection uses original raw identity, not the reduced ordinal", "preserve all 36864 address cases and 16384 distinct numeric inputs, including alias layouts, BK modes, SXM, carry and sticky overflow patterns and both pages", "retain exactly two Read-owned operands, unchanged T until the fixture mutation, Execute-owned result and flags, X-priority address modification and all post-sampling mutation/restoration checks", "each fixed operation/destination/flags/page group retains all64 pairs split21/21/22 across checkpoints3/4/5", "record actual restores and ordered raw-key digest in CPU-only acceptance"],
+      "limits": ["retire32768 extra numeric checkpoint executions; no claim to retain the former numeric-by-checkpoint Cartesian product", "MPY does not cover ADD/SUB carry or T preservation, and MAC does not cover feedback-free dual arithmetic", "no physical bank, producer-latency, repeat or interrupt closure; expected arithmetic remains fixture-owned"]
+    },
+    {
+      "id": "dual-ram-unsigned-mac",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_dual.h; tests/c54x/tms320c54x_test_dual_input.h; tests/c54x/tms320c54x_test_dual_schedule.h",
+      "profiles": ["macsu-dual"],
+      "case_ids": [],
+      "basis": "SPRU172C4-91 MACSU: unsigned X times signed Y independent of SXM, FRCT scaling, explicit SMUL/FRCT/OVM product clamp, signed 40-bit accumulator feedback, destination saturation and sticky overflow. The fixture uses independent integer arithmetic, fixed accumulator seeds and explicit thresholds, not CPU implementation helpers.",
+      "profile_coverage": {
+        "macsu-dual": {"cases": 83968, "fnv64": "a57c305fd5b3a3ba", "result_prefix": "TMS320C54x staged dual MACSU: PASS", "key": "Original raw ordinals: all18432 address cases, then all65536 distinct numeric inputs once with balanced checkpoint3/4/5 selection."}
+      },
+      "obligations": ["retain all512 encodings and full18432-case address cohort; numeric cohort retains64 pairs, both destinations, eight accumulator seeds,32 flag patterns and both pages", "X and Y are retained Read-owned RAM operands; X publishes T, but the destination accumulator is replaced after Read and sampled at Execute", "retain aliased logical reads, X-priority pointer updates, post-Access pointer/BK mutation, post-Read RAM/T mutation, sticky-overflow/preservation checks and live/replayed bus counts", "every fixed destination/seed/flags/page group retains all64 pairs split21/21/22 across checkpoints3/4/5; actual restores and ordered raw-key digest are required", "compiled descriptor census compares every numeric tuple against both retired snapshot copies, including the accumulator seed; no difference except snapshot is admitted"],
+      "limits": ["retire 131072 duplicate numeric checkpoint executions; their value-by-checkpoint cross-product is intentionally absent", "unsigned X and Execute feedback make this distinct from signed MPY and signed MAC/MAS, even where positive operands happen to coincide", "per-clock sampling is a model contract, not measured physical timing; mapped operands, producer latency and interrupt/repeat composition remain separate"],
+      "measurement": {
+        "baseline_commit": "ed955e24",
+        "c54x_cpp_bytes_before": 3655633,
+        "c54x_cpp_bytes_after": 3656878,
+        "c54x_cpp_lines_before": 55093,
+        "c54x_cpp_lines_after": 55111,
+        "numeric_checkpoint_executions_retired": 180224,
+        "mpy_dual_seconds_before": 16.17,
+        "mpy_dual_seconds_after": 10.11,
+        "alu_dual_seconds_before": 32.85,
+        "alu_dual_seconds_after": 19.91,
+        "macsu_dual_seconds_before": 83.21,
+        "macsu_dual_seconds_after": 32.33,
+        "scope": "Shared review of MPY, ADD/SUB, MACSU and their three unchanged exclusion banks. Serial native CPU-only runner wall times with an empty ROM directory, not a full-default checkpoint renewal. Generic scheduling plus actual-restore/ordered-digest reporting adds1245 C++ bytes/18 lines; runtime reduction is not reported as source reduction. The existing eight-block MAC/STMAC key sequence remains unchanged."
+      }
+    },
+    {
+      "id": "dual-operand-admission-controls",
+      "classification": "implementation_limit",
+      "decision": "keep",
+      "source": "tests/c54x/tms320c54x_test_dual.h; tests/c54x/tms320c54x_test_dual_input.h",
+      "profiles": ["mpy-dual-edge", "alu-dual-edge", "macsu-dual-edge"],
+      "case_ids": [],
+      "basis": "The staged X/Y grammar rejects low-page CPU-register and peripheral sources before operand effects. Four X/Y source placements, two program pages and checkpoints3/4 retain distinct pending-instruction states. ADD/SUB have separate opcode blocks. This is implementation admission, not architectural illegality.",
+      "profile_coverage": {
+        "mpy-dual-edge": {"cases": 16, "fnv64": "2135120b48416d25", "result_prefix": "TMS320C54x staged dual MPY exclusions: PASS", "key": "Original raw ordinals0..15, all retained."},
+        "alu-dual-edge": {"cases": 32, "fnv64": "f77b12af4e26bfa5", "result_prefix": "TMS320C54x staged dual ALU exclusions: PASS", "key": "Original raw ordinals0..31: ADD and SUB blocks, all retained."},
+        "macsu-dual-edge": {"cases": 16, "fnv64": "2135120b48416d25", "result_prefix": "TMS320C54x dual MACSU exclusions: PASS", "key": "Original raw ordinals0..15, all retained."}
+      },
+      "obligations": ["retain every existing input/checkpoint and its unchanged setup; no positive scheduling reduction applies here", "preserve accumulator/T/status/PMST and all four relevant address registers; one opcode fetch and no data read/write or pointer update", "retain illegal-latch timing, live/replay observation rewinds, actual restore accounting and ordered raw identities"],
+      "limits": ["these use X/Y addressing, not the Smem source-domain grammar; opcode families have distinct admission paths", "only existing destination-A rejection cases are covered; no full encoding or silicon exception-policy claim", "keep separately classified from successful architectural examples"]
+    },
+    {
       "id": "dual-multiply-cpu-only-ownership",
       "classification": "harness_infrastructure",
       "decision": "relocate",
@@ -962,7 +1035,7 @@
       ],
       "basis": "CPU-only ownership: a typed staged fixture owns setup, per-clock mutation/assertion, bus taps, host observation rewinds and snapshot continuation. Shared fixture-owned integer expectations are independent of CPU implementation helpers; the generic machine maps only program pages zero/two and data RAM.",
       "obligations": [
-        "preserve all ten profile identities, ordered cases/checkpoints, exact result formats/fields and intentional completion messages; only BIOS machine ownership and sequential indices change",
+        "the ownership extraction preserves all ten profile identities, ordered cases/checkpoints and acceptance contracts; subsequent semantic reviews above explicitly own scheduling and result-field changes",
         "both integer expectation-function bodies remain byte-identical; all eleven assertion predicates/messages and all seventeen register-setting/five program-data-write calls retain normalized arguments and order",
         "preserve no-reset-between-case behavior, all counter rewinds, paired live/replay scheduling and resume on a separate callback; no CPU state or expected arithmetic result is synthesized by the runner",
         "run every moved profile in the independent executable with an empty ROM directory; its device graph must contain only root and C54x CPU",
@@ -970,8 +1043,8 @@
         "retain all default requirements, scope contracts, legacy atomic records/opcode words, existing generic references and affected handset menu gates"
       ],
       "limits": [
-        "ownership separation does not semantically review the smaller MPY/ALU/MACSU families; they remain outside the reviewed-profile count",
-        "no cases or checkpoints retired in this extraction; the previous schedule/deletion review remains authoritative",
+        "ownership separation alone does not classify MPY/ALU/MACSU; their separate family reviews now own the retained contracts and coverage",
+        "no cases or checkpoints retired by the extraction itself; semantic schedule/deletion reviews above own the current case selection",
         "explicit runner/mode ownership adds source; this is not reported as source reduction or renewal of the full-default checkpoint"
       ],
       "measurement": {

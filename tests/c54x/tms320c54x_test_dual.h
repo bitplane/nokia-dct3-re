@@ -22,7 +22,18 @@ struct dual_multiply_mode
 	bool parallel() const { return op == operation::parallel_mac; }
 	bool family() const { return op == operation::mac || parallel(); }
 	bool macsu() const { return family() || op == operation::unsigned_mac; }
-	unsigned count() const { return family() && !edge ? dual_mac_schedule::cases : (edge ? 16U : macsu() ? 215040U : 43008U) * (family() ? 8U : alu() ? 2U : 1U); }
+	unsigned count() const
+	{
+		if (edge) return 16 * (family() ? 8 : alu() ? 2 : 1);
+		return family() ? dual_mac_schedule::cases : macsu() ? dual_macsu_schedule::cases :
+			alu() ? dual_alu_schedule::cases : dual_mpy_schedule::cases;
+	}
+	unsigned key(unsigned ordinal) const
+	{
+		if (edge) return ordinal;
+		return family() ? dual_mac_schedule::key(ordinal) : macsu() ? dual_macsu_schedule::key(ordinal) :
+			alu() ? dual_alu_schedule::key(ordinal) : dual_mpy_schedule::key(ordinal);
+	}
 	static dual_multiply_mode select(std::string_view name)
 	{
 		bool const edge = name.size() >= 5 && name.substr(name.size() - 5) == "-edge";
@@ -103,14 +114,14 @@ private:
 	{
 		m_cpu.suspend(SUSPEND_REASON_DISABLE, true);
 		bool const alu = m_mode.alu(), parallel = m_mode.parallel(), family = m_mode.family(), macsu = m_mode.macsu(), edge = m_mode.edge;
-		m_raw = family && !edge ? dual_mac_schedule::key(m_ordinal) : m_ordinal;
+		m_raw = m_mode.key(m_ordinal);
 		m_input = dual_multiply_case(m_raw, edge, alu, macsu, family, family, parallel);
 		auto const &f = m_input;
-		if (family) m_coverage.add(m_raw);
+		m_coverage.add(m_raw);
 		unsigned const feedback = parallel ? f.destination : f.source;
 		auto &program = m_cpu.space(AS_PROGRAM); auto &data = m_cpu.space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		program.write_word(f.base + 0x600, (alu ? 0xa000 | (m_ordinal >= (edge ? 16U : 43008U) ? 0x200 : 0) : family ? (parallel ? 0xd000 : 0xb000) | (f.operation << 10) : macsu ? 0xa600 : 0xa400) | (family ? f.source << 9 : 0) | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
+		program.write_word(f.base + 0x600, (alu ? 0xa000 | (m_raw >= (edge ? 16U : 43008U) ? 0x200 : 0) : family ? (parallel ? 0xd000 : 0xb000) | (f.operation << 10) : macsu ? 0xa600 : 0xa400) | (family ? f.source << 9 : 0) | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
 		if (f.xaddress >= 0x60) data.write_word(f.xaddress, f.xword);
 		if (f.yaddress >= 0x60) data.write_word(f.yaddress, f.yword);
 		m_cpu.set_state_int(r::STATE_IDLE, 0); m_cpu.set_state_int(r::STATE_ILLEGAL, 0);
