@@ -30,18 +30,26 @@ public:
 		auto const *expected = &m_input.states.front().observation;
 		for (auto const &state : m_input.states) if (m_tick >= state.tick) expected = &state.observation;
 		check_case_state(m_cpu, *expected);
+		// A clock's mutations follow observation but precede snapshot capture.
+		for (auto const &action : m_input.actions) if (m_tick == action.tick)
+			for (auto const &value : action.values) m_cpu.set_state_int(value.index, value.value);
 		if (m_tick == m_input.checkpoint && !m_replay)
+		{
+			m_saved_fetches = m_fetches;
 			require(capture_snapshot(m_machine, m_saved) == STATERR_NONE, "capture register-sequence checkpoint");
+		}
 		if (m_tick == m_input.finish)
 		{
 			require(m_cpu.state_int(tms320c54x_device::STATE_IDLE), "sequence reaches its real IDLE instruction");
+			if (m_input.single_fetch) require(m_fetches == 1, "one opcode fetch");
 			if (!m_replay)
 			{
-				m_replay = true; m_tick = m_input.checkpoint;
+				m_replay = true; m_tick = m_input.checkpoint; m_fetches = m_saved_fetches;
 				require(restore_snapshot(m_machine, m_timer, m_saved) == STATERR_NONE, "restore register sequence");
 				++m_restores; m_cpu.suspend(SUSPEND_REASON_DISABLE, true); m_resume = true; m_timer.enable(true); return false;
 			}
-			m_cpu.set_pipeline_frontend(false); m_coverage.add(m_case);
+			m_data_tap.remove(); m_fetch_tap.remove(); m_cpu.set_pipeline_frontend(false);
+			m_coverage.add(m_input.identity.value_or(m_case));
 			if (++m_case < m_cases) { begin(); return false; }
 			return true;
 		}
@@ -59,11 +67,23 @@ private:
 		require(!m_input.states.empty() && m_input.states.front().tick == 0, "explicit initial observation");
 		for (unsigned i = 1; i < m_input.states.size(); ++i)
 			require(m_input.states[i - 1].tick < m_input.states[i].tick, "ordered observation clocks");
+		for (unsigned i = 0; i < m_input.actions.size(); ++i)
+			require(m_input.actions[i].tick && m_input.actions[i].tick <= m_input.finish &&
+				(!i || m_input.actions[i - 1].tick < m_input.actions[i].tick), "ordered action clocks before completion");
 		require(m_input.states.back().tick <= m_input.finish, "all observations precede completion");
 		require(m_input.checkpoint && m_input.checkpoint < m_input.finish, "checkpoint precedes completion");
-		m_label = std::string(m_input.states.front().observation.id) + "/" + std::to_string(m_case);
+		m_label = std::string(m_input.states.front().observation.id) + "/" + std::to_string(m_input.identity.value_or(m_case));
 		for (auto &state : m_input.states) state.observation.id = m_label.c_str();
 		prepare_case(m_cpu, m_input.states.front().observation);
+		m_fetches = 0;
+		if (m_input.forbid_data_access)
+		{
+			auto access = [this](offs_t, u16 &, u16) { if (!m_machine.side_effects_disabled()) require(false, "register-only sequence has no data access"); };
+			m_data_tap = m_cpu.space(AS_DATA).install_readwrite_tap(0, 0xffff, "register_sequence_data", access, access);
+		}
+		if (m_input.single_fetch)
+			m_fetch_tap = m_cpu.space(AS_PROGRAM).install_read_tap(*m_input.single_fetch, *m_input.single_fetch, "register_sequence_opcode",
+				[this](offs_t, u16 &, u16) { if (!m_machine.side_effects_disabled()) { require(!m_fetches, "opcode is fetched once"); ++m_fetches; } });
 		m_tick = 0; m_replay = m_resume = false;
 		m_cpu.set_pipeline_frontend(true); m_cpu.resume(SUSPEND_REASON_DISABLE); schedule();
 	}
@@ -71,12 +91,14 @@ private:
 	tms320c54x_device &m_cpu;
 	emu_timer &m_timer;
 	unsigned m_cases, m_case = 0, m_tick = 0, m_restores = 0;
+	unsigned m_fetches = 0, m_saved_fetches = 0;
 	builder m_build;
 	clocked_register_case m_input;
 	bool m_replay = false, m_resume = false;
 	std::string m_label;
 	std::stringstream m_saved;
 	ordered_case_digest m_coverage;
+	memory_passthrough_handler m_data_tap, m_fetch_tap;
 };
 
 } // namespace c54x_test

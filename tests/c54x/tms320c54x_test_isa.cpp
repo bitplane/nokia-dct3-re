@@ -19,6 +19,7 @@
 #include "tms320c54x_test_normalization.h"
 #include "tms320c54x_test_register_sequence.h"
 #include "tms320c54x_test_register_pairs.h"
+#include "tms320c54x_test_register_alu.h"
 #include <cstring>
 
 namespace {
@@ -35,8 +36,9 @@ public:
 		m_dual_mode = c54x_test::dual_multiply_mode::select(config.options().bios());
 		m_normalization_kind = c54x_test::select_normalization(config.options().bios());
 		m_register_pair_kind = c54x_test::select_register_pair(config.options().bios());
+		m_register_alu_kind = c54x_test::select_register_alu(config.options().bios());
 		m_extended_program = m_domain || m_mapped_mac || bool(m_dual_mode) ||
-			m_normalization_kind != c54x_test::normalization_kind::none || m_register_pair_kind != c54x_test::register_pair_kind::none;
+			m_normalization_kind != c54x_test::normalization_kind::none || m_register_pair_kind != c54x_test::register_pair_kind::none || m_register_alu_kind != c54x_test::register_alu_kind::none;
 		TMS320C54X(config, m_cpu, 13'000'000);
 		m_cpu->set_extended_program(m_extended_program);
 		m_cpu->set_addrmap(AS_PROGRAM, &c54x_isa_test_state::program_map);
@@ -47,9 +49,10 @@ protected:
 	void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(c54x_isa_test_state::check), this);
-		if (m_register_pair_kind != c54x_test::register_pair_kind::none)
-			m_register_pairs = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
-				c54x_test::register_pair_count(m_register_pair_kind), [this](unsigned key) { return c54x_test::register_pair_case<tms320c54x_device>(key, m_register_pair_kind); });
+		if (m_register_pair_kind != c54x_test::register_pair_kind::none || m_register_alu_kind != c54x_test::register_alu_kind::none)
+			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
+				m_register_pair_kind != c54x_test::register_pair_kind::none ? c54x_test::register_pair_count(m_register_pair_kind) : c54x_test::register_alu_count(m_register_alu_kind),
+				[this](unsigned key) { return m_register_pair_kind != c54x_test::register_pair_kind::none ? c54x_test::register_pair_case<tms320c54x_device>(key, m_register_pair_kind) : c54x_test::register_alu_case<tms320c54x_device>(key, m_register_alu_kind); });
 		else if (m_normalization_kind != c54x_test::normalization_kind::none)
 			m_normalization = std::make_unique<c54x_test::exponent_normalization_fixture>(machine(), *m_cpu, *m_timer, m_normalization_kind);
 		else if (m_dual_mode) m_dual = std::make_unique<c54x_test::dual_multiply_fixture_runner>(machine(), *m_cpu, *m_timer, m_dual_mode);
@@ -87,7 +90,7 @@ protected:
 	void machine_reset() override
 	{
 		m_case = m_resets = 0;
-		if (m_register_pairs) m_register_pairs->start();
+		if (m_register_sequence) m_register_sequence->start();
 		else if (m_normalization) m_normalization->start();
 		else if (m_dual) m_dual->start();
 		else if (m_mapped) m_mapped->start();
@@ -95,14 +98,24 @@ protected:
 		else start();
 	}
 private:
-	[[noreturn]] void register_pair_result() const
+	[[noreturn]] void register_sequence_result() const
 	{
+		if (m_register_alu_kind == c54x_test::register_alu_kind::minmax)
+		{
+			osd_printf_info("TMS320C54x staged MAX MIN: PASS cases=%u restore=%u selectors=4 value_pairs=256 status_states=8 pages=2 snapshots=4 checkpoint_policy=balanced_non_ties_all_ties operands=Execute signed_bits=40 equality=B carry_only=1 data_accesses=0 duplicate_fetches=0 producer_composition=unvalidated silicon_phase_claim=0 coverage_fnv64=%016llx\n", m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
+			throw emu_fatalerror(3, "TMS320C54x isolated MAX MIN complete");
+		}
+		if (m_register_alu_kind == c54x_test::register_alu_kind::square)
+		{
+			osd_printf_info("TMS320C54x staged accumulator SQUR: PASS cases=%u restore=%u destinations=2 a_patterns=16 b_patterns=2 flags=8 pages=2 snapshots=4 operand_bits=17 operand=Execute t_unchanged=1 sticky_overflow=1 data_accesses=0 producer_composition=unvalidated silicon_phase_claim=0 coverage_fnv64=%016llx\n", m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
+			throw emu_fatalerror(3, "TMS320C54x isolated accumulator SQUR complete");
+		}
 		if (m_register_pair_kind == c54x_test::register_pair_kind::saturation)
 		{
-			osd_printf_info("TMS320C54x staged SAT: PASS cases=%u restore=%u patterns=16 accumulators=2 initial_overflow=4 sxm_ovm=4 pages=2 snapshots=3 adjacent=2 silicon_phase_claim=0 coverage_fnv64=%016llx\n", m_register_pairs->count(), m_register_pairs->restores(), (unsigned long long)m_register_pairs->digest());
+			osd_printf_info("TMS320C54x staged SAT: PASS cases=%u restore=%u patterns=16 accumulators=2 initial_overflow=4 sxm_ovm=4 pages=2 snapshots=3 adjacent=2 silicon_phase_claim=0 coverage_fnv64=%016llx\n", m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
 			throw emu_fatalerror(3, "TMS320C54x isolated staged SAT complete");
 		}
-		osd_printf_info("TMS320C54x staged rotates: PASS cases=%u restore=%u forms=ROR_A,ROR_B,ROL_A,ROL_B,ROLTC_A,ROLTC_B patterns=8 c_tc=4 sxm_ovm=4 pages=2 snapshots=3 adjacent=2 guard_clear=1 status_preserved=1 silicon_phase_claim=0 coverage_fnv64=%016llx\n", m_register_pairs->count(), m_register_pairs->restores(), (unsigned long long)m_register_pairs->digest());
+		osd_printf_info("TMS320C54x staged rotates: PASS cases=%u restore=%u forms=ROR_A,ROR_B,ROL_A,ROL_B,ROLTC_A,ROLTC_B patterns=8 c_tc=4 sxm_ovm=4 pages=2 snapshots=3 adjacent=2 guard_clear=1 status_preserved=1 silicon_phase_claim=0 coverage_fnv64=%016llx\n", m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
 		throw emu_fatalerror(3, "TMS320C54x isolated staged rotates complete");
 	}
 	[[noreturn]] void normalization_result() const
@@ -214,7 +227,7 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
-		if (m_register_pairs) { if (m_register_pairs->step()) register_pair_result(); return; }
+		if (m_register_sequence) { if (m_register_sequence->step()) register_sequence_result(); return; }
 		if (m_normalization) { if (m_normalization->step()) normalization_result(); return; }
 		if (m_dual) { if (m_dual->step()) dual_result(); return; }
 		if (m_mapped)
@@ -277,7 +290,8 @@ private:
 	c54x_test::dual_multiply_mode m_dual_mode;
 	c54x_test::normalization_kind m_normalization_kind = c54x_test::normalization_kind::none;
 	c54x_test::register_pair_kind m_register_pair_kind = c54x_test::register_pair_kind::none;
-	std::unique_ptr<c54x_test::register_sequence_fixture> m_register_pairs;
+	c54x_test::register_alu_kind m_register_alu_kind = c54x_test::register_alu_kind::none;
+	std::unique_ptr<c54x_test::register_sequence_fixture> m_register_sequence;
 	std::unique_ptr<c54x_test::exponent_normalization_fixture> m_normalization;
 	std::unique_ptr<c54x_test::dual_multiply_fixture_runner> m_dual;
 	std::unique_ptr<c54x_test::source_domain_fixture> m_domains;
@@ -311,6 +325,8 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(22, "exp-t", "Staged exponent publication and T consumer latency")
 	ROM_SYSTEM_BIOS(23, "sat", "Staged signed saturation and overflow publication")
 	ROM_SYSTEM_BIOS(24, "rotate", "Staged accumulator rotates and carry forwarding")
+	ROM_SYSTEM_BIOS(25, "minmax", "Signed accumulator MAX MIN Execute ownership and replay")
+	ROM_SYSTEM_BIOS(26, "squr", "Accumulator square with signed 17-bit operand")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
 ROM_END
 

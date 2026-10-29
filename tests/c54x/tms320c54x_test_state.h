@@ -1309,15 +1309,6 @@ private:
 	static indexed_store_fixture circular_store_case(unsigned v);
 	static indexed_store_fixture asm_circular_store_case(unsigned v);
 	void start_indexed_load(unsigned variant = 0);
-	struct minmax_fixture
-	{
-		unsigned selector, snapshot;
-		u32 base;
-		u64 a, b, result;
-		u16 st0, st1, result_st0;
-	};
-	static minmax_fixture minmax_case(unsigned v, bool square = false);
-	void start_minmax(unsigned variant = 0);
 	struct indexed_mar_fixture
 	{
 		unsigned ar, selected, snapshot;
@@ -2205,7 +2196,6 @@ private:
 	bool check_poll_interrupt_results();
 	bool check_delay_compare_results();
 	bool check_asm_circular_store_results();
-	bool check_minmax_results();
 	bool check_indexed_mar_results();
 	bool check_addc_chain_results();
 	bool check_mapped_parallel_load_results();

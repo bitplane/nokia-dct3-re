@@ -6,6 +6,7 @@
 
 #include "tms320c54x_test_support.h"
 #include <vector>
+#include <optional>
 
 namespace c54x_test {
 
@@ -30,10 +31,14 @@ struct instruction_case
 };
 
 struct clocked_register_state { unsigned tick; instruction_case observation; };
+struct clocked_register_action { unsigned tick; std::vector<register_setting> values; };
 struct clocked_register_case
 {
 	std::vector<clocked_register_state> states;
 	unsigned checkpoint, finish;
+	std::vector<clocked_register_action> actions{};
+	std::optional<std::uint32_t> identity{}, single_fetch{};
+	bool forbid_data_access = false;
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

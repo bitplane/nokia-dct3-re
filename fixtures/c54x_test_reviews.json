@@ -942,6 +942,50 @@
       ]
     },
     {
+      "id": "execute-owned-signed-minmax",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_register_alu.h; tests/c54x/tms320c54x_test_register_sequence.h",
+      "profiles": ["minmax"],
+      "case_ids": [],
+      "basis": "SPRU172C4-99/100 signed40 MAX/MIN comparison, equality selecting B, carry reflecting selection and other status preserved. The unchanged fixture-owned signed64 comparison supplies expectations; a separate host sign-bit-biased unsigned ordering cross-checks all numeric outcomes without CPU helpers.",
+      "profile_coverage": {
+        "minmax": {"cases": 19456, "fnv64": "8e180db77f0a8b25", "result_prefix": "TMS320C54x staged MAX MIN: PASS", "key": "Original raw ordinals: first all16384 operand/selector/status/page tuples at one selected checkpoint, then the other three checkpoints of every tied tuple. Raw spans16384 per checkpoint; all4096 tie executions remain."}
+      },
+      "obligations": ["retain all256 ordered operand pairs, all four selectors, eight status configurations and both pages", "keep every equality tuple at all four checkpoints; each fixed selector/full-ST0/ST1/page and LT/EQ/GT class retains all four restore boundaries", "check complemented old A/B through tick5, replace both after that observation, then check Execute-owned operands/result/flags from tick6; preserve T and full ST1 at every clock", "retain no-data-read/write taps, exactly one opcode fetch and its saved observation count, real final IDLE at12 and actual successful restores", "case data owns explicit tick5 writes and observation clocks; the generic CPU-only runner contains no MIN/MAX comparison or undocumented register forcing", "preserve original raw identities and expectation-function body; host census proves unique keys, complete numeric inputs, all tie checkpoint copies and per-class restore coverage"],
+      "limits": ["retire46080 non-tie checkpoint copies; the full numeric-by-checkpoint Cartesian product is not retained", "host register replacement proves Execute sampling, not an instruction-driven adjacent producer or silicon phase latency", "atomic MIN/MAX literal examples retain independent interval checks and do not replace staged retention/restoration", "initial overflow remains correlated with A-pattern parity, as in the original fixture; no additional status cross-product is claimed"]
+    },
+    {
+      "id": "execute-owned-accumulator-square",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_register_alu.h; tests/c54x/tms320c54x_test_register_sequence.h",
+      "profiles": ["squr"],
+      "case_ids": [],
+      "basis": "SPRU172C accumulator-source SQUR uses signed17 A(32..16), FRCT, destination saturation and sticky overflow. B is never a multiplicand. Fixture-owned integer squaring and explicit signed17/32-bit thresholds remain byte-identical; literal +65535, -65536 and -1 squares independently guard the operand width.",
+      "profile_coverage": {
+        "squr": {"cases": 4096, "fnv64": "fac4cb2f8288e625", "result_prefix": "TMS320C54x staged accumulator SQUR: PASS", "key": "Original raw SQUR ordinals retaining all16 A patterns, B-pattern indices11/12, both destinations, eight flags, both pages and all four checkpoints."}
+      },
+      "obligations": ["retain every original signed17 A pattern, both destinations, eight flag combinations, both pages and every checkpoint3/5/6/8 for each retained numeric tuple", "replace the irrelevant16-value B cross-product with positive0x123456789a and negative0xedcba98765 sentinels: protect B preservation for destination A and B overwrite independence for destination B", "neither B sentinel can equal the squared result; both remain distinct from all supported A-source products, so stale-destination results cannot pass accidentally", "preserve all original per-clock A/B/ST0/ST1/T/illegal expectations, tick5 late operand replacement, data-bus absence, one opcode fetch, replay counter rewinds and final IDLE", "run without Nokia/GSM/private-ROM dependencies through the shared clocked-state runner; arithmetic stays in fixture-owned case construction", "host census quantifies exactly which B tuples remain and verifies every retained tuple at all four checkpoints; native acceptance requires ordered raw-key digest and completed restore count"],
+      "limits": ["retire28672 executions of B-pattern indices0..10 and13..15; these numeric stimuli are deleted, not claimed retained", "all four checkpoints remain for every retained A/B/destination/flags/page tuple; no blanket replay reduction for the square bank", "this is accumulator SQUR, not Smem SQUR, square-accumulate, repeat or IRQ composition", "SMUL and independently crossed initial overflow bits are not added; original sticky-overflow seeds remain correlated with A-pattern parity", "late debug-register stimulus is a sampling regression, not proof of adjacent instruction-producer latency or physical timing"],
+      "measurement": {
+        "baseline_commit": "3a5291f5",
+        "c54x_cpp_bytes_before": 3657178,
+        "c54x_cpp_bytes_after": 3658315,
+        "c54x_cpp_lines_before": 55261,
+        "c54x_cpp_lines_after": 55322,
+        "minmax_cases_before": 65536,
+        "minmax_cases_after": 19456,
+        "squr_cases_before": 32768,
+        "squr_cases_after": 4096,
+        "minmax_seconds_before": 28.10,
+        "minmax_seconds_after": 7.05,
+        "squr_seconds_before": 14.04,
+        "squr_seconds_after": 1.52,
+        "scope": "Serial isolated runner wall times; CPU-only extraction, cached case construction and case reduction all contribute. Shared clocked register writes/bus observers and every new C++ header included: source adds1137 bytes/61 lines, so no source shrinkage is claimed. Two legacy phases, starts/checker and private descriptor members are removed. No full-default checkpoint renewal or machine/profile deletion is implied."
+      }
+    },
+    {
       "id": "adjacent-saturation-publications",
       "classification": "architectural_interaction",
       "decision": "rewrite",

@@ -295,6 +295,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_normalization_schedule.h` | Unique normalization/exponent inputs with balanced replay checkpoints |
 | `tests/c54x/tms320c54x_test_register_sequence.h` | CPU-only clocked register observations and snapshot continuation; no instruction arithmetic |
 | `tests/c54x/tms320c54x_test_register_pairs.h` | SAT and carry/TC rotate pairs with independent expected register states |
+| `tests/c54x/tms320c54x_test_register_alu.h` | Signed40 MIN/MAX and signed17 SQUR expectations, retained inputs and explicit late operand writes |
 | `tests/c54x/tms320c54x_test_port_case.h` | Common PORTW stimulus construction; no instruction arithmetic or reset policy |
 | `tests/c54x/tms320c54x_test_scalars.h` | Literal scalar boundaries with explicit reset/continuation groups, shared with the legacy basic adapter |
 | `tests/c54x/tms320c54x_test_memory_examples.h` | Ordered literal memory arithmetic/multiply/T examples, with original partial setup and assertion masks |
@@ -1086,9 +1087,13 @@ in [Core regression checkpoint](#core-regression-checkpoint).
 
 ### Accumulator SQUR
 
-`--profile squr` passes 32,768 cases and save/replays: two destinations,
-16 A operands, 16 untouched-B patterns, eight FRCT/OVM/SXM combinations,
-two pages and four checkpoints. The independent expectation squares signed
+CPU-only `squr` retains 4,096 cases/restores: two destinations, 16 A operands,
+two opposite-sign B sentinels, eight FRCT/OVM/SXM combinations, two pages and
+all four checkpoints per retained tuple. B is never a multiplicand; the
+14 other B values are retired, not claimed as retained numeric coverage.
+The sentinels `123456789a`/`edcba98765` distinguish B preservation for an A
+destination from overwrite for a B destination, and neither equals any
+supported square result. The independent expectation squares signed
 A(32-16), including `10000` (-65536) and `0ffff` (+65535) high-part cases
 that a signed 16-bit AH implementation gets wrong. Tests check Execute
 operand publication, saturation, sticky destination overflow, unchanged T
@@ -1097,8 +1102,10 @@ The implementation reuses the existing multiply-result contract. Other
 producer compositions and physical pipeline phases are not established by
 this fixture. Original recorder execution now passes SQUR and reaches the
 internal BD at `03:da7e`.
-The shared MAX/MIN fixture, memory-MAC and saved-repeat profiles pass as
-controls.
+The shared runner checks observations before the explicit tick5 operand
+writes and captures checkpoints afterward. Cases own expected arithmetic;
+the runner owns only the CPU clock, optional bus observers and snapshot
+continuation. It neither resets between cases nor imports a handset device.
 
 ### Unconditional delayed branch in a block
 
@@ -2090,12 +2097,22 @@ phase timing, remain unvalidated. Store-bypass and indexed-MAR controls pass.
 MAX/MIN (`f486/f586/f487/f587`, SPRU172C 4-99/100) compares signed 40-bit
 accumulators in Execute and replaces only the selected destination and carry.
 Equality selects B and sets carry; SXM and OVM do not change comparison or
-saturate the selected value. `minmax` passes 65,536 cases/restores: all four
-selectors, 256 value pairs, eight status combinations, two pages and four
-snapshots. Guard-bit patterns distinguish signed 40-bit from signed 32-bit or
+saturate the selected value. CPU-only `minmax` retains 19,456 cases/restores:
+all four selectors, 256 value pairs, eight status combinations and two pages.
+Every numeric tuple remains; equality tuples retain all four checkpoints,
+while strict comparisons retain one each. A compiled census verifies all
+four restore boundaries in every selector/full-status/page and LT/EQ/GT
+class. Guard-bit patterns distinguish signed 40-bit from signed 32-bit or
 unsigned comparison. Replacing both accumulators after Read proves Execute
 ownership; no data access occurs. This is not an instruction-driven adjacent
 producer or interrupt-composition proof. Signed-XC and EXP/NORM controls pass.
+
+MIN/MAX and accumulator SQUR use the shared clocked register-case runner.
+Case data explicitly supplies the tick5 A/B replacement, tick6 observations,
+bus-access prohibition, opcode address and original raw identity. The runner
+rewinds the fetch observer separately from guest state; replay must not
+duplicate a fetch. Arithmetic remains in the unchanged independent reference,
+not the runner or a CPU implementation helper.
 
 Indexed MAR now admits the AR0 subtraction/addition forms (`6da8..6db7`).
 SPRU131G table 5-4 defines ordinary 16-bit auxiliary arithmetic, not reverse

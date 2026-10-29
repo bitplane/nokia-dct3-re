@@ -1068,7 +1068,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated unconditional delayed block branches complete",
     ),
     "squr": (
-        "TMS320C54x staged accumulator SQUR: PASS cases=32768 restore=32768 destinations=2 a_patterns=16 b_patterns=16 flags=8 pages=2 snapshots=4 operand_bits=17 operand=Execute t_unchanged=1 sticky_overflow=1 data_accesses=0 producer_composition=unvalidated silicon_phase_claim=0",
+        "TMS320C54x staged accumulator SQUR: PASS cases=4096 restore=4096 destinations=2 a_patterns=16 b_patterns=2 flags=8 pages=2 snapshots=4 operand_bits=17 operand=Execute t_unchanged=1 sticky_overflow=1 data_accesses=0 producer_composition=unvalidated silicon_phase_claim=0 coverage_fnv64=fac4cb2f8288e625",
         "Fatal error: TMS320C54x isolated accumulator SQUR complete",
     ),
     "repeat-body-isr": (
@@ -1471,7 +1471,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated indexed STL STH complete",
     ),
     "minmax": (
-        "TMS320C54x staged MAX MIN: PASS cases=65536 restore=65536 selectors=4 value_pairs=256 status_states=8 pages=2 snapshots=4 operands=Execute signed_bits=40 equality=B carry_only=1 data_accesses=0 duplicate_fetches=0 producer_composition=unvalidated silicon_phase_claim=0",
+        "TMS320C54x staged MAX MIN: PASS cases=19456 restore=19456 selectors=4 value_pairs=256 status_states=8 pages=2 snapshots=4 checkpoint_policy=balanced_non_ties_all_ties operands=Execute signed_bits=40 equality=B carry_only=1 data_accesses=0 duplicate_fetches=0 producer_composition=unvalidated silicon_phase_claim=0 coverage_fnv64=8e180db77f0a8b25",
         "Fatal error: TMS320C54x isolated MAX MIN complete",
     ),
     "mar-index": (
