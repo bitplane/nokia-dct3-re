@@ -66,6 +66,14 @@ refactor pass; `--write` is reserved for an explicitly reviewed contract change.
 Expected arithmetic/timing results must remain independent of CPU execution
 helpers and shared profile-selection metadata.
 
+Runner unit tests exercise the acceptance grammar across every declared
+isolated profile and named scope: exact marker multiplicity, every `key=value`
+field, terminal completion and scope separation. They do not restate CPU
+semantics per profile. Named-case and ordered-digest validation have separate
+negative tests in `test_c54x_case_fixture.py`. Consolidating these checker tests
+reduces host-test source only; it does not retire native CPU cases or shorten
+the native regression.
+
 `tools/c54x_profiles.py` reads literal BIOS ownership from the C++ declarations;
 the runner does not maintain a second machine/profile list. Unsupported or
 ambiguous declarations fail closed. Exact expected results live separately in
