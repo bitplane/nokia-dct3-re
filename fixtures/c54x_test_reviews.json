@@ -638,7 +638,7 @@
       "id": "memory-operand-literal-reference",
       "classification": "architectural_interaction",
       "decision": "rewrite",
-      "source": "tests/c54x/tms320c54x_test_memory_examples.h; tests/c54x/tms320c54x_test_memory_continuations.h; tests/c54x/tms320c54x_test_case.h",
+      "source": "tests/c54x/tms320c54x_test_memory_examples.h; tests/c54x/tms320c54x_test_memory_continuations.h; tests/c54x/tms320c54x_test_shift_examples.h; tests/c54x/tms320c54x_test_case.h",
       "profiles": [
         "isa-memory"
       ],
@@ -717,32 +717,60 @@
         "squrs-direct-a",
         "addc-direct-unsigned-sxm",
         "subb-direct-inverted-carry",
-        "addm-negative-saturation"
+        "addm-negative-saturation",
+        "add-smem-ts-a",
+        "add-smem-ts-negative-b",
+        "sub-smem-ts-no-borrow",
+        "sub-smem-ts-logical-a",
+        "load-smem-ts-signed-b",
+        "load-smem-ts-negative-a",
+        "add-xmem-shift-postincrement",
+        "sub-xmem-shift-signed-b",
+        "max-a-signed-negative",
+        "max-b-larger",
+        "min-a-inherited-b-tie",
+        "min-b-signed-guard",
+        "exp-a-negative",
+        "exp-b-guard",
+        "norm-a-left",
+        "norm-b-to-a-right",
+        "norm-b-left-preserves-status",
+        "norm-b-right-preserves-status",
+        "exp-zero",
+        "norm-ovm-carry",
+        "rnd-a-to-b-one-cycle",
+        "rnd-ovm-one-cycle",
+        "sat-b-positive-guard",
+        "sat-a-negative-guard",
+        "sat-b-in-range-clear-overflow"
       ],
-      "basis": "TI SPRU172C and independent literal results for memory arithmetic, multiply/ACCA/POLY, T loads, shifted arithmetic, ABDST/LTD, short SUB/XOR, negative MACR rounding, program-coefficient MACP/MACD, DP/SP addressing, squares and saturating ADDM. Expectations and original partial preservation masks do not use CPU implementation helpers. Port intervals retain an emulator regression contract, not measured physical DARAM timing.",
+      "basis": "TI SPRU172C and independent literal results for memory arithmetic, multiply/ACCA/POLY, T loads, shifted arithmetic, ABDST/LTD, short SUB/XOR, negative MACR rounding, program-coefficient MACP/MACD, DP/SP addressing, squares and saturating ADDM. Expectations and original partial preservation masks do not use CPU implementation helpers. Port intervals retain an emulator regression contract, not measured physical DARAM timing. Signed-six-bit TS/encoded shifts, MAX/MIN signed-guard and tie selection, EXP/NORM and one-cycle RND/SAT examples retain literal documented results.",
       "obligations": [
-        "retain all 75 opcodes, literal results, partial setup and assertion masks as two ordered groups (45 and 30); no reset within either group, and legacy entries remain in their original positions",
+        "retain all 100 case records, opcode words, literal results, partial setup and assertion masks as three ordered groups (45, 30 and 25); no reset within a group, and legacy entries remain in their original positions",
         "preserve carry across the checked AND-to-MPY and shifted-SUB continuations; retain A/B/T, selected/decoy AR and RAM checks only where originally asserted",
         "preserve the full ST1 checks in the 14 multiply rows without promoting the other carry-only checks to full status preservation",
         "standalone entry seeds the checked predecessor's C16 mode and circular timing-marker context; the legacy adapter retains its predecessor state without injecting that seed",
         "compiled comparison of old/new setup maps and 25200 single-register-bit, RAM-bit and marker mutations establishes predicate equivalence across 45 rows, without executing or consulting CPU arithmetic helpers",
         "the second group retains inherited source RAM, T/SXM context, MACR carry, program-coefficient versus address-literal order, LTD successor writes and DP/SP decoys; reset_data seeds only a standalone reset and is ignored by legacy prepare_case",
         "compiled comparison preserves all 30 added setup sequences and 23520 register-bit/RAM-bit/marker mutations; a mixed LD/ST case remains two instruction words, not a fused operation",
+        "retain the third group's inherited B in the MIN tie, ignoring upper T bits, SXM-dependent right shifts, signed guard-byte comparisons and full NORM B status preservation",
+        "compiled comparison preserves the 25 third-group setup sequences and 19600 register/RAM/marker mutations; retire only the inline initialization routing token, not either NORM B case",
         "native legacy result records and asserted opcode words remain identical; standalone runs in the independent CPU-only binary with an empty ROM directory"
       ],
       "limits": [
         "these are focused numeric/routing examples, not all-ISA, staged operand-retention, repeat or interrupt-composition closure",
-        "all 75 cases retained; no runtime optimization claimed; overlap with the existing scalar/product/dual literal banks has no identical opcode/setup/assertion record requiring deletion",
+        "all 100 cases retained; no runtime optimization claimed; normalized opcode/setup/assertion records have no exact duplicate in the existing literal banks",
         "legacy phase IDs remain compatibility routing outside the case data; other unreviewed prefix families still depend on the old driver",
-        "the last full-default checkpoint remains revision-bound; focused runs do not renew it"
+        "the last full-default checkpoint remains revision-bound; focused runs do not renew it",
+        "the 128-case RND boundary matrix overlaps numeric inputs but checks settled state, not the one-cycle PORTW interval retained by these two focused RND examples"
       ],
       "measurement": {
-        "baseline_commit": "bd4c2233",
-        "c54x_cpp_bytes_before": 3683604,
-        "c54x_cpp_bytes_after": 3668128,
-        "c54x_cpp_lines_before": 55872,
-        "c54x_cpp_lines_after": 55429,
-        "scope": "All tests/c54x C++ and headers including the new 30-case bank, reset-only RAM metadata and CPU-only routing. Net reduction 15476 bytes/443 lines; no generated replacement bulk or removed case. Existing 45-case identities remain the exact prefix of the expanded profile."
+        "baseline_commit": "21b4fc9f",
+        "c54x_cpp_bytes_before": 3668128,
+        "c54x_cpp_bytes_after": 3657843,
+        "c54x_cpp_lines_before": 55429,
+        "c54x_cpp_lines_after": 55140,
+        "scope": "All tests/c54x C++ and headers including the new 25-case shift/scalar bank and CPU-only routing. Net reduction 10285 bytes/289 lines; no generated replacement bulk or removed instruction case. Existing 75 identities remain the exact prefix of the expanded profile."
       }
     },
     {

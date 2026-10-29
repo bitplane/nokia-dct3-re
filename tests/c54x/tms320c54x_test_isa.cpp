@@ -12,6 +12,7 @@
 #include "tms320c54x_test_product_examples.h"
 #include "tms320c54x_test_memory_examples.h"
 #include "tms320c54x_test_memory_continuations.h"
+#include "tms320c54x_test_shift_examples.h"
 #include "tms320c54x_test_near_flow.h"
 #include "tms320c54x_test_mapped_mac.h"
 #include "tms320c54x_test_dual.h"
@@ -49,6 +50,8 @@ protected:
 				m_cases = c54x_test::memory_examples();
 				auto const &continuations = c54x_test::memory_continuations();
 				m_cases.insert(m_cases.end(), continuations.begin(), continuations.end());
+				auto const &shifts = c54x_test::shift_examples();
+				m_cases.insert(m_cases.end(), shifts.begin(), shifts.end());
 			}
 			else if (products()) m_cases = c54x_test::product_examples();
 			else if (near_flow())

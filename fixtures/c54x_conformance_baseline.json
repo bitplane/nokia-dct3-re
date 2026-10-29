@@ -6536,14 +6536,14 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
-          "cases": "75",
+          "cases": "100",
           "firmware": "0",
           "nokia_devices": "0",
-          "reset_groups": "2"
+          "reset_groups": "3"
         }
       ],
       "required": [
-        "TMS320C54x generic memory examples: PASS cases=75 reset_groups=2 nokia_devices=0 firmware=0"
+        "TMS320C54x generic memory examples: PASS cases=100 reset_groups=3 nokia_devices=0 firmware=0"
       ]
     },
     "isa-parallel": {
@@ -15510,7 +15510,32 @@
         "squrs-direct-a",
         "addc-direct-unsigned-sxm",
         "subb-direct-inverted-carry",
-        "addm-negative-saturation"
+        "addm-negative-saturation",
+        "add-smem-ts-a",
+        "add-smem-ts-negative-b",
+        "sub-smem-ts-no-borrow",
+        "sub-smem-ts-logical-a",
+        "load-smem-ts-signed-b",
+        "load-smem-ts-negative-a",
+        "add-xmem-shift-postincrement",
+        "sub-xmem-shift-signed-b",
+        "max-a-signed-negative",
+        "max-b-larger",
+        "min-a-inherited-b-tie",
+        "min-b-signed-guard",
+        "exp-a-negative",
+        "exp-b-guard",
+        "norm-a-left",
+        "norm-b-to-a-right",
+        "norm-b-left-preserves-status",
+        "norm-b-right-preserves-status",
+        "exp-zero",
+        "norm-ovm-carry",
+        "rnd-a-to-b-one-cycle",
+        "rnd-ovm-one-cycle",
+        "sat-b-positive-guard",
+        "sat-a-negative-guard",
+        "sat-b-in-range-clear-overflow"
       ],
       "classification": "architectural_interaction",
       "decision": "rewrite",
