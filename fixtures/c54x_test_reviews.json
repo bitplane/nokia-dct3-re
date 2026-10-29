@@ -571,16 +571,16 @@
       "profile_coverage": {
         "source-domain": {
           "result_prefix": "TMS320C54x source-domain exclusions: PASS ",
-          "cases": 54392,
-          "key": "(opcode_word << 16) | (operation_extension_or_mapped_source << 4) | context | control_tag; original 46,064 identities first, followed by 8,328 mapped-source rejection tuples. Tags 0x4000=ASM, 0x2000=C16, 0x1000=RPT, 0x8000=TC-clear, 0x0400=MAC prefetched short control.",
+          "cases": 61496,
+          "key": "Original 54,392 identities remain first. Append 2,304 MMR and 4,800 repeated-transfer tuples; new keys are 0x80000000 or 0xc0000000 OR the selected original raw ordinal (including its checkpoint stride). Earlier keys remain (opcode_word << 16) | (operation_extension_or_mapped_source << 4) | context | control_tag.",
           "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
-          "fnv64": "09bcb725ffd76435"
+          "fnv64": "df0d5af19745df89"
         }
       },
       "obligations": [
         "all 125 instruction forms: 111 Smem, 10 shifted extensions and four MMR-source classes",
         "all 15 aliases across CMPT, page, atomic/staged and before/after-rejection checkpoint choices",
-        "preserve A, B, T, TRN, BK, RC, SP, ST0, ST1 and all eight address registers at every sampled cycle",
+        "preserve A, B, T, TRN, BK, SP, ST0, ST1 and all eight address registers at every sampled cycle; preserve RC where no prefix owns its update",
         "no data reads/writes, program writes or I/O accesses; illegal latch reached by cycle 20",
         "all original 30000 identities and restores retain their ordering; 448 appended TC-clear RMW controls preserve the distinct status input from the retired alias profiles",
         "14208 short controls retain 5120 shifted extensions, 4352 nonzero-ASM inputs, 1792 C16 inputs, 256 prefixed SUBC inputs and 2688 TC-clear inputs",
@@ -607,6 +607,42 @@
         "affected_batch_seconds_before": 53.92,
         "affected_batch_seconds_after": 32.23,
         "scope": "Serial runner wall time: source-domain, eight pure short-source profiles, stack-mod3-edge, long-pair, drsub, logic-short and xorm before; source-domain and the four positive profiles after. Not a full-default-suite runtime measurement."
+      },
+      "mmr_transfer_merge": {
+        "classification": "implementation_limit",
+        "decision": "merge",
+        "retired_profiles": ["mmr-long-edge", "rpt-xfer-edge"],
+        "basis": "SPRU131G MMR operand exclusions and single-repeat transfer restrictions establish distinct admission inputs, but not a need for separate state/tap/snapshot machinery. Append their independent opcode inventories and explicit program shapes to the existing CPU-only no-effects census.",
+        "retained": [
+          "all nine MMR opcode classes, operand bytes e0..ff, both PMST-bit-14 values, program pages and atomic/staged frontends: 2304 tuples",
+          "all six repeated-transfer classes, bytes e0..f8, short/long RPT counts 0/2 and the same PMST/page/frontend contexts: 4800 tuples",
+          "original prefix/body words, high AR sentinels f040..f047 and early/late checkpoint choices 1/12, balanced equally within every opcode family",
+          "preservation of supplied state, explicit PMST and no data/stack effects; shared sentinels also protect TRN/BK, program writes and I/O accesses",
+          "the original 54392 keys remain byte-for-byte ordered prefix, followed by namespaced old raw ordinals for the selected checkpoint copies"
+        ],
+        "retired": [
+          "7104 duplicate checkpoint executions: every opcode/mode/status/page/frontend tuple remains, but its full before/after checkpoint cross-product does not",
+          "two BIOS entries, the legacy phase/counter/tap lifecycle and their dispatcher hook; CPU behavior is unchanged",
+          "old small A/B and SP seeds are replaced with the generic census's full-width accumulator and stack sentinels; raw initial state is not identical"
+        ],
+        "limits": [
+          "these are unsupported-form/no-effect contracts, not measured silicon exception timing",
+          "some reserved MMR modes overlap earlier source-domain encodings; the retained high-AR and PMST contexts are distinct, not claimed new instruction capabilities",
+          "the PMST input is recorded by its actual bit rather than inheriting the old fixture's CMPT label"
+        ],
+        "verification": "All three pre-change profiles pass. The independent host census checks every retained tuple, complete program word list, actual PMST/page/frontend/checkpoint fields, unique key and ordered digest, including the unchanged old prefix. The CPU-only rebuilt census passes all 61496 cases/restores with an empty ROM directory.",
+        "measurement": {
+          "baseline_commit": "4044e509",
+          "c54x_cpp_bytes_before": 3531105,
+          "c54x_cpp_bytes_after": 3527393,
+          "c54x_cpp_lines_before": 53929,
+          "c54x_cpp_lines_after": 53882,
+          "old_guard_case_restore_pairs": 14208,
+          "retained_guard_case_restore_pairs": 7104,
+          "affected_batch_seconds_before": 31.44,
+          "affected_batch_seconds_after": 29.08,
+          "scope": "3712 C++ bytes and 47 lines removed including new shared input/program support. Serial focused wall times compare the old census plus two old guard profiles with the expanded census, not the full CPU suite; no full-default checkpoint renewal."
+        }
       },
       "mapped_source_retirement": {
         "classification": "implementation_limit",

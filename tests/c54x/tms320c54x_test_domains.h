@@ -86,16 +86,23 @@ private:
 		}
 		else if (m_input.checkpoint && m_input.indirect_source == 0xffff)
 			m_case.program[2].value = 0xf4e1; // Retained two-word MAC guard program.
-		if (m_input.prefix)
+		if (!m_input.words.empty())
+		{
+			m_case.program.clear();
+			for (unsigned i = 0; i < m_input.words.size(); ++i)
+				m_case.program.push_back({base + 0x600 + i, m_input.words[i]});
+			m_case.expected.push_back({r::STATE_PMST, m_input.pmst});
+		}
+		else if (m_input.prefix)
 			m_case.program = {{base + 0x600, m_input.prefix}, {base + 0x601, m_case.opcode}, {base + 0x602, 0xf4e1}};
-		else
+		if (!m_input.prefix)
 			m_case.expected.push_back({r::STATE_RC, 7});
 		// Rejection preserves the supplied values, not results read from the CPU.
 		for (auto const &value : m_case.expected) m_case.initial.emplace_back(value.index, value.value);
 		m_case.initial.insert(m_case.initial.end(), {{r::STATE_IMR, 0}, {r::STATE_IFR, 0}, {r::STATE_TCR, 0x10}});
 		for (unsigned i = 0; i < 8; ++i)
 		{
-			unsigned const value = i == 3 && m_input.indirect_source != 0xffff ? m_input.indirect_source : 0x1400 + i;
+			unsigned const value = i == 3 && m_input.indirect_source != 0xffff ? m_input.indirect_source : m_input.ar_base + i;
 			m_case.initial.emplace_back(r::STATE_AR0 + i, value);
 			m_case.expected.push_back({int(r::STATE_AR0) + int(i), value});
 		}

@@ -2720,47 +2720,6 @@ tms320c54x_test_state::memory_immediate_fixture tms320c54x_test_state::memory_im
 	return {form, read, access, std::array<unsigned, 4>{3, access, read, read + 1}[v], words, mode, address, word, literal, u16(mode == 0xf8 ? address : 3), st0, st1, u16(st0 | (overflow ? b ? 0x200 : 0x400 : 0)), base, a, bb, u64(result) & 0xffffffffffULL, b, bsrc, mac, u16(mac && (flags & 8) ? 2 : 0)};
 }
 
-void tms320c54x_test_state::start_mmr_long_edge(unsigned variant)
-{
-	bool const repeated = profile_is("rpt-xfer-edge");
-	m_cpu->reset(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant; m_idle_fixture_tick = 0; m_pipeline_replay = false;
-	u32 const base = (variant / (repeated ? 1200 : 576)) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	if (repeated)
-	{
-		unsigned const count = (variant / 150) % 2 ? 2 : 0;
-		bool const long_count = (variant / 300) % 2;
-		program.write_word(base + 0x600, long_count ? 0xf070 : 0xec00 | count);
-		unsigned body = 0x601;
-		if (long_count) program.write_word(base + body++, count);
-		u16 const family = std::array<u16, 6>{0x7000,0x7100,0x7c00,0x7d00,0x7e00,0x7f00}[(variant / 25) % 6];
-		program.write_word(base + body++, family | (0xe0 + variant % 25));
-		program.write_word(base + body++, 0x0900); program.write_word(base + body++, 0x0a00);
-		program.write_word(base + body, 0xf4e1);
-	}
-	else
-	{
-		u16 const family = std::array<u16, 9>{0x4800,0x4900,0x4a00,0x7200,0x7300,0x7700,0x8800,0x8900,0x8a00}[(variant / 32) % 9];
-		program.write_word(base + 0x600, family | (0xe0 + variant % 32));
-		program.write_word(base + 0x601, 0x0900); program.write_word(base + 0x602, 0xf4e1);
-	}
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, (variant / (repeated ? 600 : 288)) % 2 ? 0x4000 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1804); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1400);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xabcd);
-	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0xf040 + ar);
-	m_rptbd_counts = {};
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mmr_long_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "mmr_long_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600);
-	m_cpu->set_pipeline_frontend(!((variant / (repeated ? 2400 : 1152)) % 2));
-	m_phase = mmr_long_phase; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::delay_multiply_fixture tms320c54x_test_state::delay_memory_square_case(unsigned variant)
 {
@@ -6380,53 +6339,6 @@ bool tms320c54x_test_state::check_repeat_store_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_mmr_long_edge_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == mmr_long_phase)
-	{
-		bool const repeated = profile_is("rpt-xfer-edge");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		unsigned const checkpoint = variant / (repeated ? 4800 : 2304) ? 12 : 1;
-		expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Rejected addressing performs no data or stack transaction");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0xabcd && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1400 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1804 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
-			"Rejected addressing preserves accumulators, T, stack and flags");
-		for (unsigned ar = 0; ar < 8; ++ar)
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == 0xf040 + ar, "Rejected addressing cannot modify or truncate AR upper bits");
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save rejected addressing at an early or rejected boundary");
-		}
-		if (tick == 20)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Both frontends fail closed on forbidden addressing");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint;
-				return restore_pipeline_at(mmr_long_phase + 1, "Restore rejected addressing without operand effects");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant + 1 < (repeated ? 9600 : 4608)) { start_mmr_long_edge(variant + 1); return true; }
-			if (repeated)
-			{
-				osd_printf_info("TMS320C54x repeated transfer exclusions: PASS cases=9600 restore=9600 opcode_classes=6 forbidden_modes=25 repeat_counts=0,2 count_forms=short,long cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 stack_changes=0 silicon_trap_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated repeated transfer exclusions complete");
-			}
-			osd_printf_info("TMS320C54x MMR long exclusions: PASS cases=4608 restore=4608 opcode_classes=9 forbidden_modes=25 reserved_modes=7 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 stack_changes=0 silicon_trap_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated MMR long exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == mmr_long_phase + 1)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = mmr_long_phase;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_banz_offset_results()
 {

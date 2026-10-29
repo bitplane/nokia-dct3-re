@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <iterator>
 #include <stdexcept>
+#include <vector>
 
 namespace c54x_test {
 
@@ -73,7 +74,9 @@ constexpr mapped_rejection_instruction mapped_rejections[] = {
 	{0x720b,86,true}, {0x720c,86,true}, {0x720d,86,true},
 };
 constexpr unsigned mapped_rejection_cases = 8328;
-constexpr unsigned domain_total_cases = domain_cases + domain_tc0_cases + domain_control_cases + domain_mac_source_cases + domain_mac_short_cases + mapped_rejection_cases;
+constexpr unsigned domain_mmr_cases = 9 * 32 * 8;
+constexpr unsigned domain_repeat_transfer_cases = 6 * 25 * 4 * 8;
+constexpr unsigned domain_total_cases = domain_cases + domain_tc0_cases + domain_control_cases + domain_mac_source_cases + domain_mac_short_cases + mapped_rejection_cases + domain_mmr_cases + domain_repeat_transfer_cases;
 
 struct domain_input
 {
@@ -83,8 +86,12 @@ struct domain_input
 	std::uint16_t absolute_source = 0xffff;
 	unsigned checkpoint = 0;
 	std::uint16_t indirect_source = 0xffff;
+	std::uint16_t pmst = 0, ar_base = 0x1400;
+	std::vector<std::uint16_t> words{};
+	std::uint32_t identity = 0;
 	std::uint32_t key() const
 	{
+		if (identity) return identity;
 		return (std::uint32_t(instruction.opcode | mode) << 16) |
 			(std::uint32_t(absolute_source != 0xffff ? absolute_source : indirect_source != 0xffff ? indirect_source : instruction.operation) << 4) | tag | context;
 	}
@@ -159,6 +166,41 @@ inline domain_input select_domain(unsigned index)
 		if (literal) result.absolute_source = address;
 		else if (form == 2) result.indirect_source = address;
 		result.checkpoint = (literal ? 4 : 3) + point;
+		return result;
+	}
+	// The former MMR/transfer guards differ in program shape and PMST, not
+	// rejection machinery. Keep every input tuple once, balancing old 1/12
+	// checkpoints rather than duplicating their full Cartesian product.
+	if (index < domain_mmr_cases + domain_repeat_transfer_cases)
+	{
+		bool const repeated = index >= domain_mmr_cases;
+		unsigned const v = repeated ? index - domain_mmr_cases : index;
+		unsigned const modes = repeated ? 25 : 32, families = repeated ? 6 : 9;
+		unsigned const mode = v % modes, family = (v / modes) % families;
+		unsigned const count = repeated && (v / 150) % 2 ? 2 : 0;
+		bool const long_count = repeated && (v / 300) % 2;
+		unsigned const pmst = (v / (repeated ? 600 : 288)) % 2;
+		unsigned const page = (v / (repeated ? 1200 : 576)) % 2;
+		unsigned const frontend = v / (repeated ? 2400 : 1152);
+		unsigned const point = (mode + family + pmst + page + frontend + unsigned(count != 0) + long_count) % 2;
+		static constexpr std::uint16_t mmr[] = {0x4800,0x4900,0x4a00,0x7200,0x7300,0x7700,0x8800,0x8900,0x8a00};
+		static constexpr std::uint16_t transfers[] = {0x7000,0x7100,0x7c00,0x7d00,0x7e00,0x7f00};
+		domain_input result{{repeated ? transfers[family] : mmr[family], 0}, 0xe0 + mode,
+			(page << 1) | (frontend << 2) | (point << 3)};
+		result.pmst = pmst ? 0x4000 : 0;
+		result.ar_base = 0xf040;
+		result.checkpoint = point ? 12 : 1;
+		result.identity = (repeated ? 0xc0000000 : 0x80000000) | (v + point * (repeated ? 4800 : 2304));
+		if (repeated)
+		{
+			result.prefix = long_count ? 0xf070 : 0xec00 | count;
+			result.words.push_back(result.prefix);
+			if (long_count) result.words.push_back(count);
+		}
+		result.words.push_back(result.instruction.opcode | result.mode);
+		result.words.push_back(0x0900);
+		if (repeated) result.words.push_back(0x0a00);
+		result.words.push_back(0xf4e1);
 		return result;
 	}
 	throw std::out_of_range("C54x domain case");

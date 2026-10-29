@@ -92,6 +92,35 @@ class OperandDomainInventoryTest(unittest.TestCase):
                         key = ((opcode | mode) << 16) | (operand << 4) | context
                         rows.append((key, opcode, 0, mode, context, 0x1800, 0x900 if move else 0x800,
                                      0, absolute, (4 if move or form == 1 else 3) + point, indirect))
+        rows = [row + (0, 0x1400, 0) for row in rows]
+        prefix_count = len(rows)
+        for repeated, families, modes in (
+                (False, (0x4800, 0x4900, 0x4a00, 0x7200, 0x7300, 0x7700, 0x8800, 0x8900, 0x8a00), 32),
+                (True, (0x7000, 0x7100, 0x7c00, 0x7d00, 0x7e00, 0x7f00), 25)):
+            span = 4800 if repeated else 2304
+            points = {}
+            for frontend in range(2):
+                for page in range(2):
+                    for pmst in range(2):
+                        for long_count in range(2 if repeated else 1):
+                            for count_index in range(2 if repeated else 1):
+                                for family, opcode in enumerate(families):
+                                    for mode in range(modes):
+                                        raw = mode + modes * family + (150 * count_index + 300 * long_count +
+                                              600 * pmst + 1200 * page + 2400 * frontend if repeated else
+                                              288 * pmst + 576 * page + 1152 * frontend)
+                                        point = (mode + family + pmst + page + frontend + count_index + long_count) % 2
+                                        points[(family, point)] = points.get((family, point), 0) + 1
+                                        prefix = (0xf070 if long_count else 0xec00 | (2 * count_index)) if repeated else 0
+                                        words = ([prefix, 2 * count_index] if long_count else [prefix]) if repeated else []
+                                        words += [opcode | (0xe0 + mode), 0x900] + ([0xa00] if repeated else []) + [0xf4e1]
+                                        key = (0xc0000000 if repeated else 0x80000000) | (raw + point * span)
+                                        rows.append((key, opcode, 0, 0xe0 + mode, (page << 1) | (frontend << 2) | (point << 3),
+                                                     0x1804, 0x800, prefix, 0xffff, 12 if point else 1, 0xffff,
+                                                     0x4000 if pmst else 0, 0xf040, len(words), *words))
+            self.assertEqual(sum(points.values()), span)
+            for family in range(len(families)):
+                self.assertEqual(points[(family, 0)], points[(family, 1)])
         if not shutil.which('c++'):
             self.skipTest('host C++ compiler unavailable')
         with compiled_cpp(r'''
@@ -102,7 +131,10 @@ int main() {
         auto const c = c54x_test::select_domain(i);
         std::cout << c.key() << ' ' << c.instruction.opcode << ' ' << c.instruction.operation
             << ' ' << c.mode << ' ' << c.context << ' ' << c.st0 << ' ' << c.st1 << ' ' << c.prefix
-            << ' ' << c.absolute_source << ' ' << c.checkpoint << ' ' << c.indirect_source << '\n';
+            << ' ' << c.absolute_source << ' ' << c.checkpoint << ' ' << c.indirect_source
+            << ' ' << c.pmst << ' ' << c.ar_base << ' ' << c.words.size();
+        for (auto word : c.words) std::cout << ' ' << word;
+        std::cout << '\n';
     }
     try { c54x_test::select_domain(c54x_test::domain_total_cases); }
     catch (std::out_of_range const &) { return 0; }
@@ -130,6 +162,8 @@ int main() {
                 self.assertEqual(f'{digest:016x}', '6ae942418d722665')
             if index == 46063:
                 self.assertEqual(f'{digest:016x}', '60d443519ef671c5')
+            if index == prefix_count - 1:
+                self.assertEqual(f'{digest:016x}', '09bcb725ffd76435')
         coverage = reviewed_profiles()['source-domain']['coverage']
         self.assertEqual(len(keys), coverage['cases'])
         self.assertEqual(f'{digest:016x}', coverage['fnv64'])

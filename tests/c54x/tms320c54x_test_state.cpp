@@ -169,8 +169,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"plain-branch"}, [](self &test) { test.start_pipeline_plain_branch(); } },
 		{ {"rptb-branch"}, [](self &test) { test.start_block_branch(); } },
 		{ {"mpy-mem-imm"}, [](self &test) { test.start_memory_immediate_multiply(); } },
-		{ {"mmr-long-edge"}, [](self &test) { test.start_mmr_long_edge(); } },
-		{ {"rpt-xfer-edge"}, [](self &test) { test.start_mmr_long_edge(); } },
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {

@@ -824,9 +824,10 @@ by this byte-oriented guard. Valid short MMR forms keep their page-zero and
 AR-upper-bit-clearing semantics. Ordinary Smem long MOD=13 (`e8..ef` plus
 offset) remains read-capable and must not be rejected by this MMR rule.
 
-`mmr-long-edge` in the `tms54xtra` namespace covers 4,608 cases/restores:
-nine classes, 25 forbidden plus seven reserved bytes, CMPT settings, two
-pages, both frontends and two checkpoints. It requires no data/stack access,
+The CPU-only `source-domain` census retains 2,304 MMR guard tuples:
+nine classes, 25 forbidden plus seven reserved bytes, both PMST-bit-14 inputs,
+two pages and both frontends. Old checkpoints 1/12 are balanced over the tuples
+instead of repeating every tuple twice. It requires no data/stack access,
 AR update/truncation, accumulator/T, SP or status effect. The guard applies
 to opcode words, not immediate extensions or annulled words. The old core
 fails this fixture with an operand transaction. The corrected behavior is
@@ -848,14 +849,21 @@ It also does not prohibit a standalone extended transfer or a transfer in a
 block repeat.
 
 The six MVKD/MVDK, MVPD/MVDP and READA/WRITA classes reject operand bytes
-`e0..f8` under an active single repeat before operand effects. The
-`rpt-xfer-edge` profile checks 9,600 cases/restores: six classes, all 25
-offset/absolute bytes, short and long immediate RPT counts 0 and 2, CMPT,
-two program pages, both frontends and two checkpoints. It requires no data
+`e0..f8` under an active single repeat before operand effects. `source-domain`
+retains all 4,800 transfer tuples: six classes, all 25 offset/absolute bytes,
+short and long immediate RPT counts 0 and 2, both PMST-bit-14 inputs,
+two program pages and both frontends, with balanced checkpoints 1/12. It requires no data
 or stack access, AR update/truncation, or accumulator/T/SP/status effect.
 The old core fails with an operand transaction. This is fail-closed emulator
 admission, not a silicon-trap claim. Other repeated operand families and
 RPTZ setup/operand combinations remain outside this fixture's closure.
+
+The former separate MMR/transfer profiles and replay paths are removed. Their
+7,104 duplicate checkpoint executions are no longer covered. The original
+54,392 census keys remain the exact prefix; appended keys identify the selected
+old raw ordinals in separate namespaces. New cohorts retain high AR sentinels,
+explicit PMST and complete prefix/body words, while using the shared full-width
+accumulator/stack sentinels. Program writes and I/O accesses are also forbidden.
 
 The staged C54x `bootrecstage` frontier is distinct from the atomic MU4
 profiles below. It loads all 48,261 resident program and 3,656 compared data

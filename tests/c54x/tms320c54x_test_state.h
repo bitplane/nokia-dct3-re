@@ -811,7 +811,6 @@ private:
 	};
 	static memory_immediate_fixture memory_immediate_case(unsigned variant);
 	void start_memory_immediate_multiply(unsigned variant = 0);
-	void start_mmr_long_edge(unsigned variant = 0);
 	static unsigned block_branch_count(unsigned variant);
 	static u16 block_branch_source(unsigned variant, unsigned i);
 	struct block_exit_fixture
@@ -1986,7 +1985,6 @@ private:
 	bool check_rptz_results();
 	bool check_mapped_addm_results();
 	bool check_literal_guard_results();
-	bool check_mmr_long_edge_results();
 	bool check_shifted_store_dld_results();
 	bool check_idle_nmi_result_results();
 	bool check_shifted_high_store_results();
@@ -2323,7 +2321,6 @@ private:
 	bool m_operand_order_violation = false;
 	unsigned m_phase = 0;
 	static constexpr unsigned native_store_phase = 1'000'000; // Outside legacy phase bands.
-	static constexpr unsigned mmr_long_phase = 1'000'010;
 	static constexpr unsigned delay_bitt_phase = 1'000'020;
 	static constexpr unsigned mvdd_follow_phase = 1'000'030;
 	static constexpr unsigned bd_read_a_phase = 1'000'040;
