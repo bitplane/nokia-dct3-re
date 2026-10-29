@@ -89,6 +89,8 @@ protected:
 				m_cases.insert(m_cases.end(), atomic_shifts.begin(), atomic_shifts.end());
 				auto const &absolute = c54x_test::absolute_arithmetic_examples();
 				m_cases.insert(m_cases.end(), absolute.begin(), absolute.end());
+				auto const &transfers = c54x_test::memory_transfer_examples();
+				m_cases.insert(m_cases.end(), transfers.begin(), transfers.end());
 			}
 			else if (words()) m_cases = c54x_test::instruction_word_examples();
 			else if (products()) m_cases = c54x_test::product_examples();

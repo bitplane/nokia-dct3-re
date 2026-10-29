@@ -6605,14 +6605,14 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
-          "cases": "162",
+          "cases": "196",
           "firmware": "0",
           "nokia_devices": "0",
-          "reset_groups": "6"
+          "reset_groups": "7"
         }
       ],
       "required": [
-        "TMS320C54x generic memory examples: PASS cases=162 reset_groups=6 nokia_devices=0 firmware=0"
+        "TMS320C54x generic memory examples: PASS cases=196 reset_groups=7 nokia_devices=0 firmware=0"
       ]
     },
     "isa-parallel": {
@@ -15512,7 +15512,41 @@
         "atomic-add-immediate-b-carry",
         "atomic-sub-immediate-cross-carry",
         "atomic-sub-immediate-cross-borrow",
-        "atomic-xor-immediate-cross"
+        "atomic-xor-immediate-cross",
+        "stm-brc-literal",
+        "store-literal-absolute",
+        "store-literal-indirect",
+        "push-absolute-word",
+        "pop-absolute-word",
+        "push-status0",
+        "pop-status0",
+        "addc-absolute-b",
+        "or-absolute-a",
+        "sub-absolute-a",
+        "mpyu-postincrement",
+        "mpyu-absolute",
+        "mvdk-postincrement",
+        "mvkd-repeat-three",
+        "load-high-absolute",
+        "store-low-absolute",
+        "store-high-absolute",
+        "store-t-absolute",
+        "mvdk-absolute",
+        "mvdk-repeat-three",
+        "load-extended-postdecrement",
+        "load-extended-absolute",
+        "add-extended-preserves-b",
+        "sub-extended-preserves-b",
+        "store-extended-low-postincrement",
+        "store-extended-high-postincrement",
+        "stm-ar-literal",
+        "push-ar",
+        "pop-ar",
+        "store-status1",
+        "load-status1-a",
+        "push-status1",
+        "pop-status1",
+        "load-status1-b-unsigned"
       ],
       "classification": "architectural_interaction",
       "decision": "rewrite",

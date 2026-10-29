@@ -236,8 +236,8 @@ No far-control or pending-transfer restoration case is deleted. This rewrite
 removes 1,781 C++ bytes/47 lines while preserving all 173 legacy PASS records
 and 2,474 asserted opcode words.
 
-`isa-memory` retains 162 memory/accumulator examples in six ordered reset
-groups (45, 30, 25, 20, 30 and 12). Legacy adapters share the literal data without resetting
+`isa-memory` retains 196 memory/accumulator examples in seven ordered reset
+groups (45, 30, 25, 20, 30, 12 and 34). Legacy adapters share the literal data without resetting
 their predecessor state. Carry retained across AND/MPY, shifted-SUB and
 negative-half MACR rows remains observable; the 14 multiply rows keep their
 full ST1 assertions, while other rows retain their original partial masks.
@@ -260,6 +260,11 @@ Their original partial carry masks, source/pointer checks and four/five-cycle
 PORTW intervals remain literal references, not staged-ALU-derived expectations.
 The absolute markers have their own retained program layout; circular markers
 remain unchanged for the existing groups. No reset is added in legacy execution.
+The seventh group covers literal/extended stores, stack round trips, status
+MMRs, carry-fed ADDC, unsigned MPY and three-word repeated data copies. Each
+row retains its original partial seeds, literal predicates and marker interval.
+The ST1 store preserves the REA guard against reactivating an old repeat
+endpoint. Repeated copies report their operation word, not the RPT setup word.
 Reset-only RAM metadata seeds inherited source words for standalone
 execution; `prepare_case` deliberately ignores it. The POLY values match
 the [SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf) page 4-126 example.
