@@ -56,6 +56,8 @@ constexpr source_domain_instruction source_domains[] = {
 };
 static_assert(std::size(source_domains) == 125);
 constexpr unsigned domain_cases = 125 * 15 * 16;
+constexpr unsigned domain_tc0_cases = 4 * 7 * 16;
+constexpr unsigned domain_total_cases = domain_cases + domain_tc0_cases;
 
 // Admission-limit checks, not a claim that every rejected form is illegal on
 // silicon. This fixture owns no handset devices or global phase identifiers.
@@ -92,14 +94,20 @@ public:
 			return false;
 		}
 		clear_taps(); m_cpu.set_pipeline_frontend(false);
-		auto const instruction = source_domains[m_variant / (15 * 16)];
-		m_coverage.add((u32(m_case.opcode) << 16) | (u32(instruction.operation) << 4) | context());
-		if (++m_variant < domain_cases) { begin(); return false; }
-		require(count() == domain_cases && m_restores == domain_cases, "complete case and replay counts");
+		auto const instruction = selected_instruction();
+		m_coverage.add((u32(m_case.opcode) << 16) | (u32(instruction.operation) << 4) | context() | (tc0() ? 0x8000 : 0));
+		if (++m_variant < domain_total_cases) { begin(); return false; }
+		require(count() == domain_total_cases && m_restores == domain_total_cases, "complete case and replay counts");
 		return true;
 	}
 private:
-	unsigned context() const { return (m_variant / 15) % 16; }
+	bool tc0() const { return m_variant >= domain_cases; }
+	unsigned context() const { return tc0() ? ((m_variant - domain_cases) / 7) % 16 : (m_variant / 15) % 16; }
+	source_domain_instruction selected_instruction() const
+	{
+		return tc0() ? source_domain_instruction{u16(0x6800 + ((m_variant - domain_cases) / (7 * 16)) * 0x100), 0}
+			: source_domains[m_variant / (15 * 16)];
+	}
 	void require(bool condition, const char *message) const
 	{
 		if (!condition) throw emu_fatalerror("C54x domain case=%u tick=%u replay=%u: %s",
@@ -113,8 +121,9 @@ private:
 		clear_taps(); m_cpu.reset(); m_cpu.suspend(SUSPEND_REASON_DISABLE, true);
 		m_tick = 0; m_replay = m_resume = false;
 		unsigned const mode_index = m_variant % 15;
-		u16 const mode = mode_index < 8 ? 0x98 + mode_index : 0xf9 + mode_index - 8;
-		auto const instruction = source_domains[m_variant / (15 * 16)];
+		u16 const mode = tc0() ? 0xf9 + (m_variant - domain_cases) % 7
+			: mode_index < 8 ? 0x98 + mode_index : 0xf9 + mode_index - 8;
+		auto const instruction = selected_instruction();
 		u32 const base = context() & 2 ? 0x20000 : 0;
 		m_id = "domain/" + std::to_string(m_variant);
 		m_case = {m_id.c_str(), u16(instruction.opcode | mode),
@@ -122,7 +131,7 @@ private:
 			 {base + 0x601, instruction.operation && mode < 0xe0 ? instruction.operation : 0x1500},
 			 {base + 0x602, instruction.operation && mode >= 0xe0 ? instruction.operation : 3},
 			 {base + 0x603, 0xf4e1}}, {}, {},
-			{{r::STATE_ST0, 0x1804}, {r::STATE_ST1, u64(0x800 | (context() & 1 ? 0x20 : 0))},
+			{{r::STATE_ST0, u64(tc0() ? 0x0804 : 0x1804)}, {r::STATE_ST1, u64(0x800 | (context() & 1 ? 0x20 : 0))},
 			 {r::STATE_A, 0x123456789aULL}, {r::STATE_B, 0xfedcba9876ULL},
 			 {r::STATE_T, 0xabcd}, {r::STATE_RC, 7}, {r::STATE_SP, 0x1600}}, 0, 0};
 		// Rejection preserves the supplied values, not results read from the CPU.

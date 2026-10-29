@@ -35,6 +35,16 @@ class OperandDomainInventoryTest(unittest.TestCase):
                     keys.add(key)
                     for byte in key.to_bytes(4, 'little'):
                         digest = ((digest ^ byte) * 1099511628211) & ((1 << 64) - 1)
+        # Supplemental RMW controls retain TC-clear rejection from the retired
+        # per-family alias fixtures. The base census initializes TC set.
+        for opcode in (0x6800, 0x6900, 0x6a00, 0x6b00):
+            for context in range(16):
+                for mode in range(0xf9, 0x100):
+                    key = ((opcode | mode) << 16) | 0x8000 | context
+                    self.assertNotIn(key, keys)
+                    keys.add(key)
+                    for byte in key.to_bytes(4, 'little'):
+                        digest = ((digest ^ byte) * 1099511628211) & ((1 << 64) - 1)
         coverage = reviewed_profiles()['source-domain']['coverage']
         self.assertEqual(len(keys), coverage['cases'])
         self.assertEqual(f'{digest:016x}', coverage['fnv64'])

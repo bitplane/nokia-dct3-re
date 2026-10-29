@@ -340,7 +340,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated generic square complete",
     ),
     "source-domain": (
-        "TMS320C54x source-domain exclusions: PASS cases=30000 restore=30000 instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=d1101a8b0da0c055",
+        "TMS320C54x source-domain exclusions: PASS cases=30448 restore=30448 base_cases=30000 rmw_tc0_cases=448 instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=ba74a1da74928725",
         "Fatal error: TMS320C54x isolated source-domain exclusions complete",
     ),
     "idle-modes": (
@@ -602,46 +602,6 @@ EXTRA_PROFILES = {
     "pop-irq-edge": (
         "TMS320C54x interrupt POPM exclusions: PASS cases=24 restore=24 destinations=IMR,IFR contexts=RPT,BD_first,BD_last pages=2 snapshots=2 reads=0 writes=0 stack_changes=0 mask_changes=0 acknowledgements=0 hardware_trap_claim=0",
         "Fatal error: TMS320C54x isolated interrupt POPM exclusions complete",
-    ),
-    "mac-abs-edge": (
-        "TMS320C54x MAC absolute alias exclusions: PASS cases=448 restore=448 modes=f9..ff sources=2 destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated MAC absolute alias exclusions complete",
-    ),
-    "delay-abs-edge": (
-        "TMS320C54x delay absolute alias exclusions: PASS cases=224 restore=224 modes=f9..ff instructions=LTD,DELAY cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated delay absolute alias exclusions complete",
-    ),
-    "pmac-abs-edge": (
-        "TMS320C54x program multiply absolute alias exclusions: PASS cases=448 restore=448 modes=f9..ff instructions=MACP,MACD destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated program multiply absolute alias exclusions complete",
-    ),
-    "arith-abs-edge": (
-        "TMS320C54x arithmetic absolute alias exclusions: PASS cases=2688 restore=2688 modes=f9..ff families=12 destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated arithmetic absolute alias exclusions complete",
-    ),
-    "long-abs-edge": (
-        "TMS320C54x long-memory absolute alias exclusions: PASS cases=1568 restore=1568 modes=f9..ff families=7 destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated long-memory absolute alias exclusions complete",
-    ),
-    "logic-abs-edge": (
-        "TMS320C54x logic absolute alias exclusions: PASS cases=672 restore=672 modes=f9..ff instructions=AND,OR,XOR destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated logic absolute alias exclusions complete",
-    ),
-    "rmw-abs-edge": (
-        "TMS320C54x RMW absolute alias exclusions: PASS cases=896 restore=896 modes=f9..ff families=4 initial_tc=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated RMW absolute alias exclusions complete",
-    ),
-    "load-abs-edge": (
-        "TMS320C54x load absolute alias exclusions: PASS cases=1344 restore=1344 modes=f9..ff families=6 destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated load absolute alias exclusions complete",
-    ),
-    "mem-t-abs-edge": (
-        "TMS320C54x memory T multiply absolute alias exclusions: PASS cases=1792 restore=1792 modes=f9..ff families=8 destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated memory T multiply absolute alias exclusions complete",
-    ),
-    "mpy-abs-edge": (
-        "TMS320C54x MPY absolute alias exclusions: PASS cases=224 restore=224 modes=f9..ff destinations=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated MPY absolute alias exclusions complete",
     ),
     "std-swwsr": (
         "TMS320C54x standard SWWSR: PASS encodings=65536 reserved_bit15=0 multiplier=0 separate_BSCR_SWCR=1 partial_writes=1 restore=1 reset=1 program_data_wait_claim=0 physical_mapping=unvalidated",

@@ -92,8 +92,6 @@ class FixtureOwnershipTests(unittest.TestCase):
 
     def test_operand_rejection_families(self):
         self.check_owners('tms320c54x_test_operand_domains.cpp', {
-            'start_source_alias_case': 'm_source_aliases',
-            'check_source_alias_results': 'm_source_aliases',
             'start_short_read_mod3_edge': 'm_short_sources',
             'check_short_source_results': 'm_short_sources',
         })

@@ -69,7 +69,7 @@ private:
 		if (m_domains)
 		{
 			if (!m_domains->step()) return;
-			osd_printf_info("TMS320C54x source-domain exclusions: PASS cases=%u restore=%u instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n",
+			osd_printf_info("TMS320C54x source-domain exclusions: PASS cases=%u restore=%u base_cases=30000 rmw_tc0_cases=448 instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n",
 				m_domains->count(), m_domains->restores(), (unsigned long long)m_domains->digest());
 			throw emu_fatalerror(3, "TMS320C54x isolated source-domain exclusions complete");
 		}

@@ -52,8 +52,10 @@ The compatibility-named `tms54isa` bench separates architectural examples
 (`isa-square`, `isa-parallel`) from implementation-admission checks
 (`source-domain`) by explicit profile and review classification. Source-domain
 owns its case state, timer cadence, bus observers and replay without the legacy
-phase dispatcher. Its 30,000 cases and both checkpoint choices are unchanged;
-the digest encodes the actual instruction, extension and context identity.
+phase dispatcher. The base 30,000 cases retain their identities and checkpoint
+choices; 448 appended TC-clear RMW controls retain the distinct status input
+from ten retired absolute-alias profiles. The digest encodes instruction,
+extension, context and the supplemental TC-clear tag.
 
 `isa-parallel` runs ten independently reset parallel store/arithmetic cases.
 The default sequence reuses their literal register, masked-status and RAM
@@ -219,11 +221,15 @@ source-admission guards; optional profiles retain their separate scopes below.
 
 `source-domain` on `tms54isa` enumerates all 111 implemented ordinary
 Smem/Lmem source/RMW high-byte classes, ten shifted read extensions and four
-MMR-source forms. All 30,000 cases and save/replays check short `98..9f` and
+MMR-source forms. The base 30,000 cases and save/replays check short `98..9f` and
 unadmitted `f9..ff`, CMPT, two program pages, both CPU frontends and snapshots
 before/after rejection. Data reads/writes, program writes and I/O accesses stay
 zero; accumulators, T, status, repeat/stack pointers and all ARs are retained.
 The independent fixture inventory does not call CPU admission helpers.
+Another 448 cases check `68xx..6bxx` absolute aliases with TC initially clear,
+for 30,448 total cases and actual restores. The retired per-family profiles
+repeated 9,856 instruction/context checks already in the base census; their
+small accumulator sentinels are not retained as separate stimulus coverage.
 
 A retained regression is case 3428: atomic `0ef9` (SUBB) must reject before
 an operand transaction or changes to status/repeat state. The shared atomic

@@ -92,7 +92,7 @@
     {
       "id": "single-memory-admission",
       "classification": "implementation_limit",
-      "decision": "relocate",
+      "decision": "merge",
       "basis": "Independent SPRU172C single-memory instruction inventory plus the model's declared operand-admission boundary. The instruction/extension catalogue is unchanged; expectations are rejection and preservation of supplied state, not values computed by CPU helpers.",
       "source": "tests/c54x/tms320c54x_test_domains.h",
       "profiles": ["source-domain"],
@@ -101,10 +101,10 @@
       "profile_coverage": {
         "source-domain": {
           "result_prefix": "TMS320C54x source-domain exclusions: PASS ",
-          "cases": 30000,
-          "key": "(opcode_word << 16) | (operation_extension << 4) | context; catalogue order, then context, then alias",
+          "cases": 30448,
+          "key": "(opcode_word << 16) | (operation_extension << 4) | context; original 30000 catalogue keys followed by four RMW families x 16 contexts x seven absolute aliases with low-half bit 15 tagging TC clear",
           "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
-          "fnv64": "d1101a8b0da0c055"
+          "fnv64": "ba74a1da74928725"
         }
       },
       "obligations": [
@@ -112,14 +112,17 @@
         "all 15 aliases across CMPT, page, atomic/staged and before/after-rejection checkpoint choices",
         "preserve A, B, T, RC, SP, ST0, ST1 and all eight address registers at every sampled cycle",
         "no data reads/writes, program writes or I/O accesses; illegal latch reached by cycle 20",
-        "all 30000 actual restores and semantic input identities, with unchanged checkpoint/cadence ordering",
+        "all original 30000 identities and restores retain their ordering; 448 appended TC-clear RMW controls preserve the distinct status input from the retired alias profiles",
         "CPU-only device graph and ROM-free execution; no shared phase dispatcher or handset state"
       ],
       "limits": [
         "this is an implementation-admission check, not proof that every rejected encoding is illegal on silicon",
         "legal operand contrasts and peripheral/interrupt/repeat composition remain separate contracts",
-        "the complete original matrix is retained; no coverage reduction is claimed"
-      ]
+        "9856 of the retired profiles' 10304 instruction/context checks overlap the base census; their 448 TC-clear RMW controls are retained separately",
+        "low A/B sentinel repetitions from the old alias fixtures are intentionally retired in favor of the census's wide 40-bit sentinels; raw stimuli are not identical"
+      ],
+      "retired_profiles": ["mpy-abs-edge", "mac-abs-edge", "delay-abs-edge", "pmac-abs-edge", "mem-t-abs-edge", "load-abs-edge", "rmw-abs-edge", "logic-abs-edge", "arith-abs-edge", "long-abs-edge"],
+      "retirement_basis": "All ten isolated baselines passed before removal. Their literal instruction families, f9..ff aliases, CMPT/page/frontend/checkpoint contexts and rejection-preservation assertions are subsumed by the CPU-only census, with TC-clear RMW supplemented explicitly. Removed per-profile setup, routing and table-decoder tests have no remaining consumer. Short-source MOD3 fixtures remain separate and unreviewed."
     },
     {
       "id": "register-arithmetic-load",
