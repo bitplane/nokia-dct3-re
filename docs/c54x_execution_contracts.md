@@ -72,6 +72,14 @@ retired; there is no claim of every value at every checkpoint. A combined
 ordered digest and actual replay count protect both matrices. The review on
 `long-mvkd` explicitly covers these store results, not all members of the bundle.
 
+`reg-banks` isolates register arithmetic and LD. Each bank retains all 65,536
+standalone stimuli once; its 8,192 fixed non-pattern groups cover all three
+Decode/Access/Read checkpoints across eight patterns. The 288 arithmetic and
+144 load producer/checkpoint combinations remain exhaustive and unchanged.
+Together the banks execute 131,504 replays instead of 393,648. The independent
+arithmetic/shift expectations and per-cycle publication assertions are unchanged;
+the ordered digest covers standalone and producer cases in execution order.
+
 The CLI test exercises every isolated profile's machine/BIOS selection and
 result checking using simulated process output. The inventory is a structural
 preservation check, not executed coverage, an independent arithmetic oracle

@@ -90,6 +90,39 @@
       "rationale": "The 128-case matrix is already compact and protects distinct arithmetic and preservation boundaries. Keep it rather than force a rewrite for a small line-count gain; prioritize shared harness ownership and large replay matrices. CPU-only relocation remains separate from this retention decision."
     },
     {
+      "id": "register-arithmetic-load",
+      "classification": "architectural_interaction",
+      "decision": "merge",
+      "basis": "TI register ADD/SUB/LD, signed 40-bit shift, saturation, carry and sticky-overflow contracts. The existing independent bit-position and integer arithmetic references remain unchanged. Exact staged publication and producer timing are model contracts, not measured silicon.",
+      "source": "tests/c54x/tms320c54x_test_register_schedule.h",
+      "profiles": ["reg-banks"],
+      "legacy_entry": "default phase 253130; isolated reg-banks starts at the same initializer",
+      "case_ids": [],
+      "profile_coverage": {
+        "reg-banks": {
+          "result_prefix": "TMS320C54x staged register LD: PASS ",
+          "cases": 131504,
+          "key": "3 * completed_case_ordinal + checkpoint_index; arithmetic standalone/producer then load standalone/producer",
+          "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
+          "fnv64": "5a72ece06325a68e"
+        }
+      },
+      "obligations": [
+        "all 65536 standalone stimuli in each bank, including all selectors, 32 shifts, opcode/ASM forms, eight patterns, status states and two pages",
+        "each of 8192 fixed non-pattern groups per bank covers all three checkpoints, two or three times across eight patterns",
+        "all original 288 arithmetic and 144 load producer/checkpoint combinations, including all three gap values",
+        "per-cycle accumulator/status publication, opposite accumulator preservation and carry policy",
+        "one opcode fetch, one producer literal where applicable, no data accesses or duplicate fetches",
+        "actual replay counters and independently checked ordered digest across both banks"
+      ],
+      "limits": [
+        "262144 repeated standalone value-by-checkpoint executions are retired; every pattern at every checkpoint is no longer claimed",
+        "producer checkpoint products are retained unchanged rather than inferred from standalone coverage",
+        "no claim of peripheral, interrupt or repeat composition",
+        "still uses the sequenced bench; CPU-only relocation is not claimed"
+      ]
+    },
+    {
       "id": "long-accumulator-stores",
       "classification": "architectural_interaction",
       "decision": "merge",

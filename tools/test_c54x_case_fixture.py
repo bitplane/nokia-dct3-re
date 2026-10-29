@@ -1,6 +1,7 @@
 """Executable checks of the small case harness, not C54x instruction semantics."""
 from pathlib import Path
 from collections import Counter, defaultdict
+from contextlib import contextmanager
 import shutil
 import subprocess
 import tempfile
@@ -12,6 +13,18 @@ from tools.run_c54x_core import check_result
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@contextmanager
+def compiled_cpp(source):
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        (root / 'fixture.cpp').write_text(source)
+        program = root / 'fixture'
+        subprocess.run(['c++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT),
+                        str(root / 'fixture.cpp'), '-o', str(program)],
+                       check=True, capture_output=True)
+        yield program
 
 
 class CaseFixtureTests(unittest.TestCase):
@@ -59,16 +72,11 @@ int main() {
         c54x_test::restore_snapshot(m, t, saved) != 1) return 3;
 }
 '''
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / 'snapshot.cpp').write_text(source)
-            subprocess.run(['c++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT),
-                            str(root / 'snapshot.cpp'), '-o', str(root / 'snapshot')],
-                           check=True, capture_output=True)
-            subprocess.run([str(root / 'snapshot')], check=True, capture_output=True)
+        with compiled_cpp(source) as program:
+            subprocess.run([str(program)], check=True, capture_output=True)
 
     def test_reviewed_ordered_coverage_is_required(self):
-        for profile in ('rmw-long', 'rmw-long-full', 'long-mvkd'):
+        for profile in ('rmw-long', 'rmw-long-full', 'long-mvkd', 'reg-banks'):
             markers, ending = EXTRA_PROFILES[profile]
             markers = (markers,) if isinstance(markers, str) else markers
             coverage = reviewed_profiles()[profile]['coverage']
@@ -81,6 +89,60 @@ int main() {
                             marker + '\n' + text):
                 with self.subTest(profile=profile), self.assertRaisesRegex(ValueError, 'coverage digest'):
                     check_result(changed, 3, profile=profile)
+
+    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
+    def test_register_schedule_preserves_stimuli_and_all_producer_replays(self):
+        source = r'''
+#include <iostream>
+#include "tests/c54x/tms320c54x_test_support.h"
+#include "tests/c54x/tms320c54x_test_register_schedule.h"
+int main() {
+    using s = c54x_test::register_bank_schedule;
+    c54x_test::ordered_case_digest digest;
+    for (unsigned v = 0; v < s::end; v = s::next(v)) {
+        unsigned const key = s::case_key(v);
+        digest.add(key);
+        std::cout << v << ' ' << key << '\n';
+    }
+    std::cout << "digest=" << std::hex << digest.value << '\n';
+}
+'''
+        expected, groups, producers = [], defaultdict(Counter), defaultdict(Counter)
+        for load in (False, True):
+            operations, base = (1, 196896) if load else (2, 0)
+            for page in range(2):
+                for asm in range(2):
+                    for flags in range(16 if load else 8):
+                        for pattern in range(8):
+                            for selector in range(4):
+                                for shift in range(32):
+                                    for op in range(operations):
+                                        group = (op + operations * (shift + 32 * selector + 128 * flags)
+                                                 + 2048 * asm + 4096 * page)
+                                        checkpoint = (pattern + group) % 3
+                                        variant = (base + op + operations * (shift + 32 * selector + 128 * pattern + 1024 * flags)
+                                                   + 16384 * asm + 32768 * page)
+                                        expected.append((variant, len(expected) * 3 + checkpoint))
+                                        groups[load, op, page, asm, flags, selector, shift][checkpoint] += 1
+            for checkpoint in range(3):
+                for gap in range(3):
+                    for pattern in range(4):
+                        for selector in range(4):
+                            for op in range(operations):
+                                local = op + operations * (selector + 4 * pattern + 16 * gap)
+                                variant = base + 196608 + checkpoint * (48 * operations) + local
+                                expected.append((variant, len(expected) * 3 + checkpoint))
+                                producers[load, gap, pattern, selector, op][checkpoint] += 1
+        self.assertEqual(len(expected), 131504)
+        self.assertEqual(len(groups), 16384)
+        self.assertTrue(all(sorted(group.values()) == [2, 3, 3] for group in groups.values()))
+        self.assertEqual(len(producers), 144)
+        self.assertTrue(all(group == Counter({0: 1, 1: 1, 2: 1}) for group in producers.values()))
+        with compiled_cpp(source) as program:
+            output = subprocess.run([str(program)], check=True, capture_output=True,
+                                    text=True).stdout.splitlines()
+        self.assertEqual([tuple(map(int, line.split())) for line in output[:-1]], expected)
+        self.assertEqual(output[-1], 'digest=' + reviewed_profiles()['reg-banks']['coverage']['fnv64'])
 
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_store_schedule_retains_each_stimulus_and_checkpoint_group(self):
@@ -117,13 +179,8 @@ int main() {
         self.assertEqual(ordinal, 70144)
         self.assertEqual(len(groups), 3200 + 14336)
         self.assertTrue(all(sorted(group.values()) == [1, 1, 2] for group in groups.values()))
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / 'store.cpp').write_text(source)
-            subprocess.run(['c++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT),
-                            str(root / 'store.cpp'), '-o', str(root / 'store')],
-                           check=True, capture_output=True)
-            output = subprocess.run([str(root / 'store')], check=True, capture_output=True,
+        with compiled_cpp(source) as program:
+            output = subprocess.run([str(program)], check=True, capture_output=True,
                                     text=True).stdout.splitlines()
         self.assertEqual([tuple(map(int, line.split())) for line in output[:-1]], expected)
         self.assertEqual(output[-1], 'digest=' + reviewed_profiles()['long-mvkd']['coverage']['fnv64'])
@@ -147,14 +204,9 @@ int main(int argc, char **) {
     std::cout << "digest=" << std::hex << digest.value << '\n';
 }
 '''
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / 'schedule.cpp').write_text(source)
-            subprocess.run(['c++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT),
-                            str(root / 'schedule.cpp'), '-o', str(root / 'schedule')],
-                           check=True, capture_output=True)
+        with compiled_cpp(source) as program:
             for exhaustive in (False, True):
-                output = subprocess.run([str(root / 'schedule')] + (['full'] if exhaustive else []),
+                output = subprocess.run([str(program)] + (['full'] if exhaustive else []),
                                         check=True, capture_output=True, text=True).stdout.splitlines()
                 actual = list(map(int, output[:-1]))
                 expected = []
@@ -232,10 +284,5 @@ int main() {
     return failures != 4;
 }
 '''
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / 'fixture.cpp').write_text(source)
-            subprocess.run(['c++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT),
-                            str(root / 'fixture.cpp'), '-o', str(root / 'fixture')],
-                           check=True, capture_output=True)
-            subprocess.run([str(root / 'fixture')], check=True, capture_output=True)
+        with compiled_cpp(source) as program:
+            subprocess.run([str(program)], check=True, capture_output=True)

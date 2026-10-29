@@ -5,6 +5,7 @@
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_rmw_schedule.h"
 #include "tms320c54x_test_store_schedule.h"
+#include "tms320c54x_test_register_schedule.h"
 
 namespace c54x_test {
 
@@ -2057,6 +2058,7 @@ tms320c54x_test_state::register_arithmetic_fixture tms320c54x_test_state::regist
 void tms320c54x_test_state::start_pipeline_accumulator_arithmetic(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+	if (!variant) { m_register_bank_coverage = {}; m_register_bank_replays = 0; }
 	auto const f = variant >= 196896 ? register_load_case(variant - 196896) : register_arithmetic_case_full(variant);
 	u32 const opcode_pc = f.base + 0x600 + (f.producer ? 2 + f.gap : 0);
 	auto &program = m_cpu->space(AS_PROGRAM);
@@ -6932,8 +6934,7 @@ bool tms320c54x_test_state::check_immediate_arithmetic_results()
 		bool const load = variant >= 196896;
 		unsigned const model_variant = load ? variant - 196896 : variant;
 		auto const f = load ? register_load_case(model_variant) : register_arithmetic_case_full(variant);
-		unsigned const checkpoint = f.producer ? std::array<unsigned, 3>{5 + f.gap, 6 + f.gap, 7 + f.gap}[(model_variant - 196608) / (load ? 48 : 96)] :
-			std::array<unsigned, 3>{3, 4, 5}[model_variant / 65536];
+		unsigned const checkpoint = (f.producer ? 5 + f.gap : 3) + register_bank_schedule::checkpoint_index(variant);
 		auto const expected = tick >= f.execute_cycle ? f.after : f.producer && tick >= 7 ? f.before : f.initial;
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
 			m_cpu->state_int(tms320c54x_device::STATE_A) == expected[0] && m_cpu->state_int(tms320c54x_device::STATE_B) == expected[1] &&
@@ -6961,14 +6962,25 @@ bool tms320c54x_test_state::check_immediate_arithmetic_results()
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_extensions_reads = m_recurring_irq_snapshot[0]; m_pipeline_operand_reads = m_recurring_irq_snapshot[1];
 				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore register arithmetic without opcode refetch or premature publication");
+				++m_register_bank_replays;
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253140; m_check_timer->enable(true); return true;
 			}
+			m_register_bank_coverage.add(register_bank_schedule::case_key(variant));
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 			if (variant == 196895)
-				osd_printf_info("TMS320C54x staged register arithmetic: PASS cases=196608 producer_cases=288 operations=ADD,SUB selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=8 pages=2 restore=196896 duplicate_opcodes=0 data_accesses=0 silicon_phase_claim=0\n");
-			if (variant < 393647) { start_pipeline_accumulator_arithmetic(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged register LD: PASS cases=196608 producer_cases=144 selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=16 pages=2 restore=196752 duplicate_opcodes=0 data_accesses=0 carry_preserved=1 silicon_phase_claim=0\n");
+			{
+				expect(m_register_bank_coverage.count == register_bank_schedule::arithmetic_cases && m_register_bank_replays == register_bank_schedule::arithmetic_cases,
+					"Register arithmetic counts completed standalone and producer restores");
+				osd_printf_info("TMS320C54x staged register arithmetic: PASS cases=65536 producer_cases=288 operations=ADD,SUB selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=8 pages=2 restore=65824 duplicate_opcodes=0 data_accesses=0 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced producer_policy=exhaustive\n");
+			}
+			if (auto const next = register_bank_schedule::next(variant); next < register_bank_schedule::end)
+				{ start_pipeline_accumulator_arithmetic(next); return true; }
+			expect(m_register_bank_coverage.count == register_bank_schedule::cases && m_register_bank_replays == register_bank_schedule::cases,
+				"Register-bank digest includes both banks and every retained producer checkpoint");
+			osd_printf_info("TMS320C54x staged register LD: PASS cases=65536 producer_cases=144 selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=16 pages=2 restore=65680 duplicate_opcodes=0 data_accesses=0 carry_preserved=1 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced producer_policy=exhaustive coverage_cases=%u coverage_restores=%u coverage_fnv64=%016llx\n",
+				m_register_bank_coverage.count, m_register_bank_replays, (unsigned long long)m_register_bank_coverage.value);
+			if (profile_is("reg-banks")) throw emu_fatalerror(3, "TMS320C54x isolated register banks complete");
 			start_pipeline_memory_multiply(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

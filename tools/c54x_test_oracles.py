@@ -138,8 +138,8 @@ REQUIRED = [
     "TMS320C54x staged indirect DLD: PASS cases=23040 forms=15 registers=8 accumulators=2 patterns=4 sxm=0,1 c16=0,1 compatibility=0,1 restore=23040 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
     "TMS320C54x staged long-offset BANZ: PASS cases=2304 forms=offset,preincrement,circular registers=8 offset_pairs=8 compatibility=0,1 pages=2 restore=2304 offset_fetches=1 target_fetches=1 data_accesses=0 silicon_phase_claim=0",
     "TMS320C54x staged immediate arithmetic: PASS sub_cases=26112 add16_cases=1536 producer_cases=144 selectors=4 shifts=0..16 patterns=8 status_states=8 pages=2 restore=27792 duplicate_literals=0 data_accesses=0 silicon_phase_claim=0",
-    "TMS320C54x staged register arithmetic: PASS cases=196608 producer_cases=288 operations=ADD,SUB selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=8 pages=2 restore=196896 duplicate_opcodes=0 data_accesses=0 silicon_phase_claim=0",
-    "TMS320C54x staged register LD: PASS cases=196608 producer_cases=144 selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=16 pages=2 restore=196752 duplicate_opcodes=0 data_accesses=0 carry_preserved=1 silicon_phase_claim=0",
+    "TMS320C54x staged register arithmetic: PASS cases=65536 producer_cases=288 operations=ADD,SUB selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=8 pages=2 restore=65824 duplicate_opcodes=0 data_accesses=0 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced producer_policy=exhaustive",
+    "TMS320C54x staged register LD: PASS cases=65536 producer_cases=144 selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=16 pages=2 restore=65680 duplicate_opcodes=0 data_accesses=0 carry_preserved=1 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced producer_policy=exhaustive coverage_cases=131504 coverage_restores=131504 coverage_fnv64=5a72ece06325a68e",
     "TMS320C54x staged memory multiply: PASS ram_cases=27648 mapped_cases=24576 operations=MPYA,MASA,MACA,MACAR patterns=8 flag_states=16 restore=52224 t_read_owned=1 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
     "TMS320C54x staged accumulator logic: PASS cases=6144 operations=AND,OR,XOR selectors=4 shifts=-16..15 patterns=4 sxm=0,1 restore=6144 duplicate_fetches=0 data_accesses=0",
     "TMS320C54x staged CMPL: PASS cases=64 selectors=4 patterns=4 sxm=0,1 restore=64 duplicate_fetches=0 data_accesses=0",
@@ -320,6 +320,13 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "reg-banks": (
+        (
+            "TMS320C54x staged register arithmetic: PASS cases=65536 producer_cases=288 operations=ADD,SUB selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=8 pages=2 restore=65824 duplicate_opcodes=0 data_accesses=0 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced producer_policy=exhaustive",
+            "TMS320C54x staged register LD: PASS cases=65536 producer_cases=144 selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=16 pages=2 restore=65680 duplicate_opcodes=0 data_accesses=0 carry_preserved=1 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced producer_policy=exhaustive coverage_cases=131504 coverage_restores=131504 coverage_fnv64=5a72ece06325a68e",
+        ),
+        "Fatal error: TMS320C54x isolated register banks complete",
+    ),
     "isa-parallel": (
         "TMS320C54x generic parallel: PASS cases=10 reset_each=1 nokia_devices=0 firmware=0",
         "Fatal error: TMS320C54x isolated generic parallel complete",

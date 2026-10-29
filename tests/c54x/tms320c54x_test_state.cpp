@@ -42,6 +42,7 @@ void tms320c54x_test_state::machine_reset()
 {
 	using self = tms320c54x_test_state;
 	if (start_profile(*this, machine().options().bios(), {
+		{ {"reg-banks"}, [](self &test) { test.start_pipeline_accumulator_arithmetic(); } },
 		{ {"idle-modes"}, [](self &test) { test.start_pipeline_idle1(); } },
 		{ {"pop-irq"}, [](self &test) { test.start_pipeline_mmr_pop(); } },
 		{ {"pop-irq-edge"}, [](self &test) { test.start_interrupt_pop_edge(); } },

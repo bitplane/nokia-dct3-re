@@ -130,8 +130,8 @@
       "TMS320C54x staged indirect DLD: PASS cases=23040 forms=15 registers=8 accumulators=2 patterns=4 sxm=0,1 c16=0,1 compatibility=0,1 restore=23040 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
       "TMS320C54x staged long-offset BANZ: PASS cases=2304 forms=offset,preincrement,circular registers=8 offset_pairs=8 compatibility=0,1 pages=2 restore=2304 offset_fetches=1 target_fetches=1 data_accesses=0 silicon_phase_claim=0",
       "TMS320C54x staged immediate arithmetic: PASS sub_cases=26112 add16_cases=1536 producer_cases=144 selectors=4 shifts=0..16 patterns=8 status_states=8 pages=2 restore=27792 duplicate_literals=0 data_accesses=0 silicon_phase_claim=0",
-      "TMS320C54x staged register arithmetic: PASS cases=196608 producer_cases=288 operations=ADD,SUB selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=8 pages=2 restore=196896 duplicate_opcodes=0 data_accesses=0 silicon_phase_claim=0",
-      "TMS320C54x staged register LD: PASS cases=196608 producer_cases=144 selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=16 pages=2 restore=196752 duplicate_opcodes=0 data_accesses=0 carry_preserved=1 silicon_phase_claim=0",
+      "TMS320C54x staged register arithmetic: PASS cases=65536 producer_cases=288 operations=ADD,SUB selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=8 pages=2 restore=65824 duplicate_opcodes=0 data_accesses=0 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced producer_policy=exhaustive",
+      "TMS320C54x staged register LD: PASS cases=65536 producer_cases=144 selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=16 pages=2 restore=65680 duplicate_opcodes=0 data_accesses=0 carry_preserved=1 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced producer_policy=exhaustive coverage_cases=131504 coverage_restores=131504 coverage_fnv64=5a72ece06325a68e",
       "TMS320C54x staged memory multiply: PASS ram_cases=27648 mapped_cases=24576 operations=MPYA,MASA,MACA,MACAR patterns=8 flag_states=16 restore=52224 t_read_owned=1 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
       "TMS320C54x staged accumulator logic: PASS cases=6144 operations=AND,OR,XOR selectors=4 shifts=-16..15 patterns=4 sxm=0,1 restore=6144 duplicate_fetches=0 data_accesses=0",
       "TMS320C54x staged CMPL: PASS cases=64 selectors=4 patterns=4 sxm=0,1 restore=64 duplicate_fetches=0 data_accesses=0",
@@ -3044,6 +3044,11 @@
           "description": "Full RAM RMW value-by-checkpoint product",
           "index": 222,
           "name": "rmw-long-full"
+        },
+        {
+          "description": "Staged register arithmetic and load with producer controls",
+          "index": 223,
+          "name": "reg-banks"
         }
       ]
     },
@@ -3792,8 +3797,8 @@
       "TMS320C54x staged preincrement store: PASS cases=6144 restore=6144 selectors=STL_A,STL_B,STH_A,STH_B registers=8 patterns=4 sst_sxm=4 compatibility=2 pages=2 snapshots=3 reads=0 writes=1 pointer_updates=1 wrap_imr=1 source_execute_live=1 interrupt_composition=unvalidated silicon_phase_claim=0\n": 1,
       "TMS320C54x staged read identity: PASS cases=1536 restore=1536 logical_instruction=1 captured_opcode=1 wrong_address_excluded=1 peeks_excluded=1\n": 1,
       "TMS320C54x staged recurring MU4 timer: PASS cases=96 returns_per_leg=8 periods=2 foreground_pages=2 sxm_states=2 control_outcomes=2 restore=96 exact_return_cycle=1 firmware_reseeding=0\n": 1,
-      "TMS320C54x staged register LD: PASS cases=196608 producer_cases=144 selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=16 pages=2 restore=196752 duplicate_opcodes=0 data_accesses=0 carry_preserved=1 silicon_phase_claim=0\n": 1,
-      "TMS320C54x staged register arithmetic: PASS cases=196608 producer_cases=288 operations=ADD,SUB selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=8 pages=2 restore=196896 duplicate_opcodes=0 data_accesses=0 silicon_phase_claim=0\n": 1,
+      "TMS320C54x staged register LD: PASS cases=65536 producer_cases=144 selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=16 pages=2 restore=65680 duplicate_opcodes=0 data_accesses=0 carry_preserved=1 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced producer_policy=exhaustive coverage_cases=%u coverage_restores=%u coverage_fnv64=%016llx\n": 1,
+      "TMS320C54x staged register arithmetic: PASS cases=65536 producer_cases=288 operations=ADD,SUB selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=8 pages=2 restore=65824 duplicate_opcodes=0 data_accesses=0 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced producer_policy=exhaustive\n": 1,
       "TMS320C54x staged remaining T dependencies: PASS cases=129792 restore=129792 POLY=2304 immediate=27648 absolute_Smem=64512 EXP_products=35328 patterns=8 layouts=6 pages=2 snapshots=3 poly_smul=excluded source_reads=0,1 literal_fetches=0,1 t_sample=Read repeat_acceptance=0 irq_acceptance=0 physical_phase_claim=0\n": 1,
       "TMS320C54x staged repeat NOP: PASS cases=240 forms=short,long counts=0,1,3,32,255 sources=none,IRQ,NMI pages=2 restore=240 count_plus_one=1 counter_each_clock=1 duplicate_body_fetches=0 deferred_interrupts=1\n": 1,
       "TMS320C54x staged repeat SUBC: PASS cases=38400 forms=5 rpt=short,long counts=0,1,15,32,255 sources=none,IRQ,NMI pages=2 restore=38400 count_plus_one=1 divisor_reads_each_iteration=1 duplicate_body_fetches=0 silicon_phase_claim=0\n": 1,
@@ -11076,6 +11081,55 @@
         "TMS320C54x in-body STM BRC exclusion: PASS cases=8 restore=8 pages=2 snapshots=4 write_owner=Access publications=0 body_effects=0 silicon_trap_claim=0"
       ]
     },
+    "reg-banks": {
+      "completion": "Fatal error: TMS320C54x isolated register banks complete",
+      "machine": "tms54xtra",
+      "reported_fields": [
+        {
+          "cases": "65536",
+          "checkpoint_policy": "balanced",
+          "checkpoints": "3",
+          "data_accesses": "0",
+          "duplicate_opcodes": "0",
+          "operations": "ADD,SUB",
+          "pages": "2",
+          "patterns": "8",
+          "producer_cases": "288",
+          "producer_policy": "exhaustive",
+          "restore": "65824",
+          "selectors": "4",
+          "shift_sources": "opcode,ASM",
+          "shifts": "-16..15",
+          "silicon_phase_claim": "0",
+          "status_states": "8"
+        },
+        {
+          "carry_preserved": "1",
+          "cases": "65536",
+          "checkpoint_policy": "balanced",
+          "checkpoints": "3",
+          "coverage_cases": "131504",
+          "coverage_fnv64": "5a72ece06325a68e",
+          "coverage_restores": "131504",
+          "data_accesses": "0",
+          "duplicate_opcodes": "0",
+          "pages": "2",
+          "patterns": "8",
+          "producer_cases": "144",
+          "producer_policy": "exhaustive",
+          "restore": "65680",
+          "selectors": "4",
+          "shift_sources": "opcode,ASM",
+          "shifts": "-16..15",
+          "silicon_phase_claim": "0",
+          "status_states": "16"
+        }
+      ],
+      "required": [
+        "TMS320C54x staged register arithmetic: PASS cases=65536 producer_cases=288 operations=ADD,SUB selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=8 pages=2 restore=65824 duplicate_opcodes=0 data_accesses=0 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced producer_policy=exhaustive",
+        "TMS320C54x staged register LD: PASS cases=65536 producer_cases=144 selectors=4 shifts=-16..15 shift_sources=opcode,ASM patterns=8 status_states=16 pages=2 restore=65680 duplicate_opcodes=0 data_accesses=0 carry_preserved=1 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced producer_policy=exhaustive coverage_cases=131504 coverage_restores=131504 coverage_fnv64=5a72ece06325a68e"
+      ]
+    },
     "repeat-body-isr": {
       "completion": "Fatal error: TMS320C54x isolated direct IRQ repeat restoration complete",
       "machine": "tms54test",
@@ -15903,6 +15957,19 @@
       "decision": "merge",
       "family": "long-accumulator-stores",
       "scope": "Long and shifted STL/STH results only; the bundle's immediate ST, MVDK and MVKD contracts remain unreviewed here. RMW has its own review."
+    },
+    "reg-banks": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 131504,
+        "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
+        "fnv64": "5a72ece06325a68e",
+        "key": "3 * completed_case_ordinal + checkpoint_index; arithmetic standalone/producer then load standalone/producer",
+        "result_prefix": "TMS320C54x staged register LD: PASS "
+      },
+      "decision": "merge",
+      "family": "register-arithmetic-load"
     },
     "rmw-long": {
       "case_ids": [],
