@@ -1168,7 +1168,6 @@ private:
 	};
 	static t_store_fixture t_store_case(unsigned v, bool consumer);
 	void start_t_store(unsigned variant = 0);
-	void start_t_store_edge(unsigned variant = 0);
 	struct ts_arithmetic_fixture
 	{
 		memory_arithmetic_fixture address;
@@ -1180,7 +1179,6 @@ private:
 	};
 	static ts_arithmetic_fixture ts_arithmetic_case(unsigned variant, bool producer);
 	void start_ts_arithmetic(unsigned variant = 0);
-	void start_ts_arithmetic_edge(unsigned variant = 0);
 	struct delay_load_fixture
 	{
 		unsigned kind, form, ar, selected, destination, flags, read, checkpoint;
@@ -1265,7 +1263,6 @@ private:
 	};
 	static asm_load_fixture asm_load_case(unsigned v, bool consumer);
 	void start_asm_load(unsigned variant = 0);
-	void start_asm_edge(unsigned variant = 0);
 	void start_poll_interrupt(unsigned variant = 0);
 	struct delay_compare_fixture
 	{
@@ -2177,9 +2174,9 @@ private:
 	bool check_circular_load_results();
 	bool check_delay_dld_results();
 	bool check_asm_mapped_results();
-	bool check_t_store_edge_results();
-	bool check_ts_arithmetic_edge_results();
-	bool check_asm_edge_results();
+	bool check_t_store_results();
+	bool check_ts_arithmetic_results();
+	bool check_asm_load_results();
 	bool check_addm_brc_loop_results();
 	bool check_delayed_condition_return_results();
 	bool check_poll_interrupt_results();

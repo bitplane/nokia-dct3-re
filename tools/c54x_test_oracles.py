@@ -1192,10 +1192,6 @@ EXTRA_PROFILES = {
         "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
         "Fatal error: TMS320C54x isolated signed branches complete",
     ),
-    "st-t-edge": (
-        "TMS320C54x mapped T store exclusions: PASS cases=64 restore=64 stores=4 other_destinations=4 pages=2 snapshots=2 data_reads=0 data_writes=0 register_publication=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated T store exclusions complete",
-    ),
     "st-t": (
         "TMS320C54x mapped T stores: PASS cases=49152 restore=49152 stores=STL_A,STL_B,STH_A,STH_B forms=absolute,offset,preincrement,circular registers=8 patterns=8 sst_sxm=4 compatibility_states=2 pages=2 snapshots=3 address=Read data=Execute writes=1 destination_reads=0 pointer_updates=once physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated T stores complete",
@@ -1211,10 +1207,6 @@ EXTRA_PROFILES = {
     "ts-alu-producer": (
         "TMS320C54x TS arithmetic producers: PASS cases=18432 restore=18432 producers=STM_T,LD_T,STLM_T gaps=0,1 shift_codes=8 memory_values=4 sxm_ovm=4 selectors=4 pages=2 snapshots=3 t_sample=Read projection_only_stlm_gap=0 duplicate_transactions=0 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated TS arithmetic producers complete",
-    ),
-    "ts-alu-edge": (
-        "TMS320C54x TS arithmetic exclusions: PASS cases=320 restore=320 invalid_shift_cases=256 mapped_cases=64 selectors=4 invalid_codes=32..47 pages=2 snapshots=2 invalid_count_reads=1 mapped_reads=0 alu_publication=0 data_writes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated TS arithmetic exclusions complete",
     ),
     "t-load-control": (
         "TMS320C54x T load control: PASS load_cases=52224 pair_cases=768 restore=52992 t_publish=Read no_retirement_rewrite=1 mapped_and_RAM=1 physical_phase_claim=0",
@@ -1371,10 +1363,6 @@ EXTRA_PROFILES = {
     "asm-consumer": (
         "TMS320C54x LD ASM consumers: PASS cases=9216 restore=9216 operations=LD,ADD,SUB shifts=32 patterns=2 sxm_ovm=4 gaps=0,1 pages=2 snapshots=3 latency=zero source_reads=1 data_writes=0 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated ASM consumers complete",
-    ),
-    "asm-edge": (
-        "TMS320C54x LD ASM exclusions: PASS cases=16 restore=16 sources=control,SP,peripheral pages=2 snapshots=2 source_reads=0 data_writes=0 register_publication=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated ASM exclusions complete",
     ),
     "compare-delay": (
         "TMS320C54x delayed CMPM BITF: PASS cases=27648 restore=27648 controls=BD,BCD_TC,BCD_NTC operations=2 forms=DP,SP,postincrement value_pairs=16 initial_tc=2 prefix=none,BITF sources=none,IRQ,NMI pages=2 snapshots=4 branch_decision=retained literal_reads=once operand_writes=0 interrupt_after_publication=1 physical_phase_claim=0",

@@ -8,6 +8,19 @@
   },
   "families": [
     {
+      "id": "unsupported-asm-ts-and-t-store-probes",
+      "classification": "implementation_limit",
+      "decision": "delete",
+      "profiles": [],
+      "case_ids": [],
+      "retired_profiles": ["asm-edge", "ts-alu-edge", "st-t-edge"],
+      "basis": "Three dedicated matrices freeze staged prototype rejection policy rather than specified architectural outcomes: ASM control/SP/peripheral sources, TS raw counts 32..47 and mapped sources, and non-T mapped store destinations. Remove dedicated setup/tap/snapshot/phase paths; do not promote the prototype illegal latch or its cycle into a silicon contract.",
+      "retained": ["ASM RAM/mapped sources, immediate publication and adjacent consumers", "TS supported address/arithmetic inputs and instruction-driven T producers", "T mapped stores, younger T publication and short/long consumer latency", "shared source-domain and representative unsupported-composition regressions"],
+      "limits": ["deliberately remove 400 rejected executions and 400 restores: ASM 16, TS 320, T store 64", "these exact rejected inputs no longer qualify no-bus-effect, unchanged-register or replay behavior", "mixed result handlers retain their positive branches under accurate names", "no CPU guard or supported instruction expectation is changed"],
+      "verification": "All three original negative profiles pass before removal. The supported reference factories, setup methods and complete positive result tails are byte-identical; only mixed handler names change. Retained BIOS names, descriptions and order are identical, and no retired phase remains. Rebuilt asm-load, asm-consumer, asm-immediate, asm-mapped, ts-alu, ts-alu-producer, st-t and st-t-consumer pass all original cases/restores. All 379 focused C54x and all 5076 host tests pass. Full-default and handset checkpoints are not renewed by this test-only pruning.",
+      "measurement": {"c54x_cpp_bytes_before": 3468159, "c54x_cpp_bytes_after": 3456834, "c54x_cpp_lines_before": 52581, "c54x_cpp_lines_after": 52478, "isolated_profiles_before": 431, "isolated_profiles_after": 428, "scope": "11325 bytes and 103 C++ lines removed, with 400 negative executions/restores deliberately retired; no supported case count or expected result changes."}
+    },
+    {
       "id": "shifted-peripheral-bus-cross-products",
       "classification": "architectural_interaction",
       "decision": "merge",

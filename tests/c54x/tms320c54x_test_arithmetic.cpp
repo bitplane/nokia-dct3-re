@@ -3207,26 +3207,6 @@ void tms320c54x_test_state::start_ts_arithmetic(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_ts_arithmetic_edge(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const mapped = variant >= 256; unsigned const v = mapped ? variant - 256 : variant;
-	unsigned const selector = mapped ? (v / 4) % 4 : (v / 16) % 4, code = mapped ? 0 : 32 + v % 16;
-	u32 const base = (mapped ? (v / 16) % 2 : (v / 64) % 2) ? 0x20000 : 0;
-	u16 const mode = mapped ? std::array<u16, 4>{8, 0x0e, 0x20, 0x33}[v % 4] : 2;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0x0400 | ((selector & 1) << 8) | (selector & 2 ? 0x800 : 0) | mode); program.write_word(base + 0x601, 0xf4e1); data.write_word(0x1002, 0xffff);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, mapped ? 0x8800 : 0x8820); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xa500 | code);
-	m_pipeline_operand_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "ts_arithmetic_edge_read", [this, mapped](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!mapped && at == 0x1002 && word == 0xffff && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 5, "Unsupported TS code may retain one RAM read; mapped sources stop before Read"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "ts_arithmetic_edge_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "TS arithmetic exclusions never write data memory"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255080;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
 tms320c54x_test_state::delay_load_fixture tms320c54x_test_state::delay_shift_alu_case(unsigned variant)
 {
 	unsigned const operation = variant % 4, v = variant / 4;
@@ -7302,27 +7282,10 @@ bool tms320c54x_test_state::check_asm_mapped_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_ts_arithmetic_edge_results()
+bool tms320c54x_test_state::check_ts_arithmetic_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 255080)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const mapped = variant >= 256; unsigned const v = mapped ? variant - 256 : variant;
-		unsigned const guard = mapped ? 4 : 5, checkpoint = mapped ? 3 + v / 32 : 4 + v / 128;
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (tick >= guard) && m_pipeline_operand_reads == unsigned(!mapped && tick >= 5), "TS arithmetic excludes unsupported counts in Read and mapped sources in Access");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfeabcd9876ULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (mapped ? 0x8800 : 0x8820) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_T) == (0xa500 | (mapped ? 0 : 32 + v % 16)), "TS arithmetic exclusions publish no ALU result or status change");
-		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save TS arithmetic exclusion before or after owned Read"); }
-		if (tick == 12)
-		{
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; return restore_pipeline_at(255090, "Restore TS arithmetic rejection without repeated source reads"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 319) { start_ts_arithmetic_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x TS arithmetic exclusions: PASS cases=320 restore=320 invalid_shift_cases=256 mapped_cases=64 selectors=4 invalid_codes=32..47 pages=2 snapshots=2 invalid_count_reads=1 mapped_reads=0 alu_publication=0 data_writes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated TS arithmetic exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255090) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255080; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 255060)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const producer = profile_is("ts-alu-producer"); auto const f = ts_arithmetic_case(variant, producer); auto const &o = f.address;

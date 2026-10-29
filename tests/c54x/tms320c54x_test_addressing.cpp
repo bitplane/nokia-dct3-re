@@ -3544,18 +3544,6 @@ void tms320c54x_test_state::start_t_store(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_t_store_edge(unsigned variant)
-{
-	unsigned const kind = variant % 4, destination = (variant / 4) % 4, page = (variant / 16) % 2;
-	start_t_store(kind * 32 + page * 8192);
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-	m_cpu->space(AS_PROGRAM).write_word((page ? 0x20000 : 0) + 0x601, std::array<u16, 4>{7, 15, 25, 32}[destination]);
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "t_store_edge_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "t_store_edge_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_phase = 255120; m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
-
 tms320c54x_test_state::delay_load_fixture tms320c54x_test_state::delay_load_case(unsigned v, bool shifted)
 {
 	delay_load_fixture f{};
@@ -3683,18 +3671,6 @@ void tms320c54x_test_state::start_asm_load(unsigned variant)
 	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "asm_load_literal", [this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || f.form < 3) return; expect(word == (f.form == 5 ? 0x1002 : 3) && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == 3, "LD ASM retains its address literal once"); ++m_pipeline_extensions_reads; });
 	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255020;
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_asm_edge(unsigned variant)
-{
-	u32 const base = (variant / 4) % 2 ? 0x20000 : 0;
-	start_asm_load(base ? 12288 : 0); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_cpu->space(AS_PROGRAM).write_word(base + 0x600, 0x3200 | std::array<u16, 4>{7, 0x18, 0x20, 0x33}[variant % 4]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x8800);
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "asm_edge_no_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_operand_reads; expect(false, "LD ASM mapped peripheral exclusions precede source reads"); } });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "asm_edge_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false, "LD ASM exclusions never write data memory"); } });
-	m_pipeline_peripheral_case = variant; m_phase = 255040; m_cpu->resume(SUSPEND_REASON_DISABLE);
 }
 
 tms320c54x_test_state::indexed_store_fixture tms320c54x_test_state::indexed_store_case(unsigned v, bool immediate)
@@ -10599,27 +10575,10 @@ bool tms320c54x_test_state::check_circular_load_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_t_store_edge_results()
+bool tms320c54x_test_state::check_t_store_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 255120)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, kind = variant % 4, checkpoint = 5 + variant / 32;
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (tick >= 6) && !m_pipeline_operand_reads && !m_pipeline_store_writes, "Other extended store MMR destinations remain excluded before data transactions");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_T) == 3 && m_cpu->state_int(tms320c54x_device::STATE_A) == (kind & 1 ? 0x2233445566ULL : 0xffffffffffULL) && m_cpu->state_int(tms320c54x_device::STATE_B) == (kind & 1 ? 0xffffffffffULL : 0x2233445566ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x8e20 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800, "Excluded store publishes no register result");
-		for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x3300 + i, "Excluded absolute store never updates ARs");
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save extended store exclusion before or after rejection"); }
-		if (tick == 12)
-		{
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(255130, "Restore excluded store without register or bus publication"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 63) { start_t_store_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x mapped T store exclusions: PASS cases=64 restore=64 stores=4 other_destinations=4 pages=2 snapshots=2 data_reads=0 data_writes=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated T store exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255130) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255120; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 255100)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const consumer = profile_is("st-t-consumer"); auto const f = t_store_case(variant, consumer);
@@ -10649,26 +10608,10 @@ bool tms320c54x_test_state::check_t_store_edge_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_asm_edge_results()
+bool tms320c54x_test_state::check_asm_load_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 255040)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + variant / 8;
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (tick >= 4) && !m_pipeline_operand_reads && !m_pipeline_store_writes, "LD ASM mapped peripheral source rejection precedes Read");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x8800 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x81f && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfeabcd9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "LD ASM exclusion publishes no register result");
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save LD ASM mapped peripheral source exclusion"); }
-		if (tick == 12)
-		{
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(255050, "Restore LD ASM exclusion without source or register effects"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 15) { start_asm_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x LD ASM exclusions: PASS cases=16 restore=16 sources=control,SP,peripheral pages=2 snapshots=2 source_reads=0 data_writes=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated ASM exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255050) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255040; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 255020)
 	{
 		bool const immediate = profile_is("asm-immediate");

@@ -1683,7 +1683,7 @@ all 32 shifts, two accumulator patterns, four SXM/OVM states, zero/one
 intervening NOP, two pages and three snapshots. Replacing the opcode
 after Fetch must not alter its immediate. Per-clock checks cover ASM,
 other status, accumulator results and absence of data transactions.
-The memory-sourced `asm-consumer`, `asm-edge` and `asm-mapped` profiles
+The memory-sourced `asm-consumer` and `asm-mapped` profiles
 also pass separately. This does not establish every immediate-ASM
 store consumer, interrupt/delay composition or physical phase timing.
 
@@ -2130,10 +2130,9 @@ four RAM values, two pages and three snapshots. Short gap 0 checks only the
 prototype's old-T projection, not guaranteed silicon behavior; long gap 0 uses
 the new T. Its 3,072 overlapping younger LD T cases preserve Read-owned
 publication after the older store's Execute, with no retirement rewrite.
-`st-t-edge` adds 64 cases/restores retaining the exclusion of four other low
-mapped/peripheral destinations before data reads, writes or register results.
-These exclusions are prototype limits, not silicon traps. General interrupt/
-control-delay composition and measured physical phases remain unvalidated.
+Other low mapped/peripheral destinations remain prototype limits, not
+silicon traps. General interrupt/control-delay composition and measured
+physical phases remain unvalidated.
 
 ADD/SUB Smem,TS,A/B retains both the RAM word and T in Read before older
 Execute publications, then shifts and adds/subtracts in Execute. Only T bits
@@ -2152,10 +2151,7 @@ inputs or duplicate auxiliary updates.
 `ts-alu-producer` passes 18,432 cases/restores with STM T, LD T and STLM T,
 gaps 0/1, eight supported counts, four memory values, SXM/OVM, A/B and ADD/SUB,
 two pages and three snapshots. STLM's forbidden zero-gap sequence checks the
-prototype's old-T projection, not a guaranteed hardware outcome. `ts-alu-edge`
-adds 256 unsupported-count and 64 direct mapped/peripheral-source exclusions.
-The former may perform one retained RAM read before rejection; the latter
-reject before Read. Neither publishes an ALU result or status change.
+prototype's old-T projection, not a guaranteed hardware outcome.
 Mapped sources and general interrupt/control-delay composition remain
 unvalidated. The neighboring legacy TS-load producer control passes without
 promoting its raw-64-code projection to an architectural oracle.
@@ -2167,11 +2163,9 @@ and memory multiplies, whose distinct T publication remains in Read. The
 offset, preincrement and absolute addressing, all eight AR fields, all 32 ASM
 encodings, four status/payload profiles, both CMPT states, two pages and three
 snapshots. Replacing the literal, source word and ARs after their owning stage
-cannot cause resampling or duplicate updates. `asm-edge` adds 16 direct mapped/
-peripheral exclusions for control, SP and peripheral sources before reads or
-register results; these are
-prototype exclusions, not silicon traps. Incrementing excluded forms and mapped
-ASM-source producer latency are not established by those tests.
+cannot cause resampling or duplicate updates. Control/SP/peripheral sources
+outside the mapped admission below remain prototype limits. Incrementing
+excluded forms and mapped ASM-source producer latency remain unvalidated.
 
 The separate `asm-mapped` fixture admits the existing register window
 `0008..0017` (AL/AH/AG, BL/BH/BG, T, TRN and AR0..AR7). It passes 49,152

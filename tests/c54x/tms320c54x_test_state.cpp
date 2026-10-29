@@ -192,15 +192,12 @@ void tms320c54x_test_state::machine_reset()
 		{ {"compare-delay"}, [](self &test) { test.start_delay_compare(); } },
 		{ {"asm-load", "asm-consumer"}, [](self &test) { test.start_asm_load(); } },
 		{ {"asm-immediate"}, [](self &test) { test.start_asm_load(); } },
-		{ {"asm-edge"}, [](self &test) { test.start_asm_edge(); } },
 	}))
 		return;
 	if (profile_is("t-load-control")) { start_pipeline_memory_multiply(165888); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"ts-alu", "ts-alu-producer"}, [](self &test) { test.start_ts_arithmetic(); } },
-		{ {"ts-alu-edge"}, [](self &test) { test.start_ts_arithmetic_edge(); } },
 		{ {"st-t", "st-t-consumer"}, [](self &test) { test.start_t_store(); } },
-		{ {"st-t-edge"}, [](self &test) { test.start_t_store_edge(); } },
 		{ {"asm-mapped"}, [](self &test) { test.start_asm_mapped(); } },
 		{ {"rptb-single"}, [](self &test) { test.start_block_single(); } },
 		{ {"rptb-memory"}, [](self &test) { test.start_block_single(); } },

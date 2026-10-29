@@ -199,9 +199,9 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_circular_load_results()) return;
 	if (check_delay_dld_results()) return;
 	if (check_asm_mapped_results()) return;
-	if (check_t_store_edge_results()) return;
-	if (check_ts_arithmetic_edge_results()) return;
-	if (check_asm_edge_results()) return;
+	if (check_t_store_results()) return;
+	if (check_ts_arithmetic_results()) return;
+	if (check_asm_load_results()) return;
 	if (check_addm_brc_loop_results()) return;
 	if (check_delayed_condition_return_results()) return;
 	if (check_poll_interrupt_results()) return;
