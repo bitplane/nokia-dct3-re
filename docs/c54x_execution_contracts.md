@@ -290,6 +290,9 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_dual_input.h` | Shared fixture-owned integer inputs/expectations; no CPU implementation helpers or Nokia dependencies |
 | `tests/c54x/tms320c54x_test_memory_continuations.h` | Ordered literal continuations with inherited RAM, partial masks and coefficient/address ordering |
 | `tests/c54x/tms320c54x_test_shift_examples.h` | Ordered TS/Xmem shifts, signed comparisons, normalization and one-cycle rounding/saturation references |
+| `tests/c54x/tms320c54x_test_normalization.h` | CPU-only staged NORM/EXP observations and shared snapshot continuation |
+| `tests/c54x/tms320c54x_test_normalization_input.h` | Independent bit-position/leading-bit expectations, shared with legacy EXP-product controls |
+| `tests/c54x/tms320c54x_test_normalization_schedule.h` | Unique normalization/exponent inputs with balanced replay checkpoints |
 | `tests/c54x/tms320c54x_test_port_case.h` | Common PORTW stimulus construction; no instruction arithmetic or reset policy |
 | `tests/c54x/tms320c54x_test_scalars.h` | Literal scalar boundaries with explicit reset/continuation groups, shared with the legacy basic adapter |
 | `tests/c54x/tms320c54x_test_memory_examples.h` | Ordered literal memory arithmetic/multiply/T examples, with original partial setup and assertion masks |
@@ -2261,21 +2264,40 @@ and decodes that retained count at Execute. SPRU172C 4-122 defines the
 documented shift domain as -16..31. ROM4's Pow2 helper additionally uses raw
 TS codes 32..47 as aliases of right shifts -16..-1, followed by conditional
 SFTA -16 for larger shifts. Atomic and staged NORM share this decode; see
-`docs/cobba_control_boundary.md` for its independent evidence and limits.
+[native EFR](native_efr_codec.md#native-efr-decoder-acceptance) for the
+Pow2 `d54e`/T=`ffe5` witness, independent reference result and limits.
 The shared shift helper supplies SXM right shifts, sticky destination overflow
 and OVM saturation while preserving carry and the unselected accumulator.
-`norm` passes 98,304 cases/restores over all selectors, 48 supported shifts,
-eight 40-bit patterns, eight status combinations, two pages and four snapshots.
+`norm` retains 24,576 cases/restores over all selectors, 48 supported shifts,
+eight 40-bit patterns, eight status combinations and two pages. Each unique
+input has one replay checkpoint, balanced two patterns per checkpoint within
+each fixed selector/count/status/page group, rather than four copies.
 Later T mutation cannot change the captured count. The compatibility profile
-name `norm-edge` now covers 16,384 alias cases/restores across all selectors,
-eight source patterns, eight status combinations, two pages and two snapshots.
+name `norm-edge` covers 8,192 alias cases/restores across all selectors,
+eight source patterns, eight status combinations and two pages, balanced four
+patterns at each of its two checkpoints. This is an inferred-model regression,
+not a documented-ISA or illegal-operand test.
 
 SPRU131G table 7-13 and example 7-40 require one separating word after EXP.
-`exp-norm` passes 6,144 cases/restores over all selectors, 16 patterns,
-gaps 0/1/2, SXM/OVM, two pages and four snapshots. Gap zero checks the
+`exp-norm` retains 1,536 unique inputs/restores over all selectors, 16 patterns,
+gaps 0/1/2, SXM/OVM and two pages. Its four checkpoints are balanced separately
+for each sticky-overflow seed parity. Gap zero checks the
 prototype's stale-T projection, not a guaranteed hardware result for an
 invalid-latency sequence. The original ABS/EXP/two-word move/NORM prefix at
 `03:de97..de9b` has the required separation and now executes.
+
+These profiles and `exp-t` share one CPU-only fixture, without Nokia/GSM or
+private-ROM inputs. `exp-t` retains all 3,072 LDU/no-producer, accumulator,
+value, gap, status and page tuples, balanced over its four checkpoints. It
+checks Execute T publication and a separately retained LDM sample, not NORM.
+Cached descriptors and the leading-bit expectation method are unchanged;
+the legacy register-product EXP-producer bank shares that same reference.
+All 95,744 removed executions are extra checkpoint copies, not numeric or
+producer/spacing tuples. The old value-by-checkpoint Cartesian products are
+no longer claimed. A compiled census compares every descriptor with its
+retired copies, including full status/context fields, and checks each fixed
+group's replay distribution. Native acceptance requires actual successful
+restores and ordered original-key digests, separate from full-default coverage.
 
 Staged XC accepts the twelve single signed accumulator predicates GE/LT/NE/EQ/
 GT/LE for A/B with XC1/XC2 protected spans. XC itself is a one-word opcode.

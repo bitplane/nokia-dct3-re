@@ -281,7 +281,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"xc-signed"}, [](self &test) { test.start_signed_xc(); } },
 		{ {"xc-controls"}, [](self &test) { test.start_pipeline_xc_irq(); } },
 		{ {"xc-ret"}, [](self &test) { test.start_xc_return(); } },
-		{ {"norm", "norm-edge", "exp-norm"}, [](self &test) { test.start_normalization(); } },
 		{ {"drsub", "long-pair"}, [](self &test) { test.start_pipeline_long_pair(); } },
 		{ {"xmem-store"}, [](self &test) { test.start_xmem_store(); } },
 		{ {"xmem-load", "xmem-alu"}, [](self &test) { test.start_xmem_load(); } },
@@ -418,7 +417,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"timer-stm"}, [](self &test) { test.start_staged_bus_stm(); } },
 		{ {"pshd-mapped"}, [](self &test) { test.start_mapped_pshd(); } },
 		{ {"pshd-repeat"}, [](self &test) { test.start_repeat_push(); } },
-		{ {"exp-t"}, [](self &test) { test.start_exponent(); } },
 		{ {"bus-io-compose"}, [](self &test) { test.start_atomic_io_composition(); } },
 	}))
 		return;

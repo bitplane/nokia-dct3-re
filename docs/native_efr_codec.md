@@ -139,7 +139,8 @@ Three CPU contracts are required by this ordinary native path:
   execution model outside the [TI documented range](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),
   not a new datasheet guarantee or a measurement of every silicon revision.
   Atomic and staged NORM share the decode; `norm-edge` is a compatibility
-  profile name for 16,384 alias cases/restores. Other TS instruction families
+  profile name for 8,192 distinct alias inputs/restores with balanced replay
+  checkpoints. Other TS instruction families
   are not broadened by this result.
 - **High logical immediates:** AND/OR/XOR with an unsigned literal shifted
   by sixteen support all A/B source/destination selectors. The postfilter

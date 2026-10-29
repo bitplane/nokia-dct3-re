@@ -20,6 +20,7 @@
 #include "tms320c54x_test_snapshot.h"
 #include "tms320c54x_test_smem_schedule.h"
 #include "tms320c54x_test_dual_input.h"
+#include "tms320c54x_test_normalization_input.h"
 #include "tms320c54x_test_pipeline_state.h"
 #include <sstream>
 #include <bitset>
@@ -1520,35 +1521,6 @@ private:
 	static u64 xmem_store_source(unsigned variant);
 	static u16 xmem_store_expected(unsigned variant);
 	void start_xmem_store(unsigned variant = 0);
-	struct exponent_fixture
-	{
-		u64 value;
-		bool b, producer;
-		unsigned gap;
-		u16 st0, st1;
-		u32 base;
-		u64 source() const { return producer ? u16(value) : value; }
-		u16 exponent() const
-		{
-			if (!source()) return 0;
-			u64 magnitude = source();
-			if (magnitude & 0x8000000000ULL) magnitude = (~magnitude) & 0xffffffffffULL;
-			unsigned significant = 0;
-			while (magnitude) { ++significant; magnitude >>= 1; }
-			return u16(s16(31 - int(significant)));
-		}
-	};
-	static exponent_fixture exponent_case(unsigned v);
-	struct normalization_fixture
-	{
-		unsigned selector, prefix, gap, read_cycle, execute_cycle;
-		u16 t, st0, st1, result_st0;
-		u32 base;
-		std::array<u64, 2> before, after;
-	};
-	static normalization_fixture normalization_case(unsigned variant, bool producer, bool edge);
-	void start_normalization(unsigned variant = 0);
-	void start_exponent(unsigned variant = 0);
 	struct repeat_push_fixture
 	{
 		unsigned count, kind, interrupt;
@@ -2252,9 +2224,7 @@ private:
 	bool check_portr_bypass_results();
 	bool check_sqdst_results();
 	bool check_signed_xc_results();
-	bool check_normalization_results();
 	bool check_xmem_load_results();
-	bool check_exponent_results();
 	bool check_repeat_push_results();
 	bool check_block_exit_results();
 	bool check_stlm_bsp_edge_results();

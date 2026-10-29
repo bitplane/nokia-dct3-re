@@ -16,6 +16,7 @@
 #include "tms320c54x_test_near_flow.h"
 #include "tms320c54x_test_mapped_mac.h"
 #include "tms320c54x_test_dual.h"
+#include "tms320c54x_test_normalization.h"
 #include <cstring>
 
 namespace {
@@ -30,8 +31,9 @@ public:
 		m_domain = !std::strcmp(config.options().bios(), "source-domain");
 		m_mapped_mac = !std::strcmp(config.options().bios(), "mac-map-imm");
 		m_dual_mode = c54x_test::dual_multiply_mode::select(config.options().bios());
+		m_normalization_kind = c54x_test::select_normalization(config.options().bios());
 		TMS320C54X(config, m_cpu, 13'000'000);
-		m_cpu->set_extended_program(m_domain || m_mapped_mac || bool(m_dual_mode));
+		m_cpu->set_extended_program(m_domain || m_mapped_mac || bool(m_dual_mode) || m_normalization_kind != c54x_test::normalization_kind::none);
 		m_cpu->set_addrmap(AS_PROGRAM, &c54x_isa_test_state::program_map);
 		m_cpu->set_addrmap(AS_DATA, &c54x_isa_test_state::ram_map);
 		m_cpu->set_addrmap(AS_IO, &c54x_isa_test_state::io_map);
@@ -40,7 +42,9 @@ protected:
 	void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(c54x_isa_test_state::check), this);
-		if (m_dual_mode) m_dual = std::make_unique<c54x_test::dual_multiply_fixture_runner>(machine(), *m_cpu, *m_timer, m_dual_mode);
+		if (m_normalization_kind != c54x_test::normalization_kind::none)
+			m_normalization = std::make_unique<c54x_test::exponent_normalization_fixture>(machine(), *m_cpu, *m_timer, m_normalization_kind);
+		else if (m_dual_mode) m_dual = std::make_unique<c54x_test::dual_multiply_fixture_runner>(machine(), *m_cpu, *m_timer, m_dual_mode);
 		else if (m_mapped_mac) m_mapped = std::make_unique<c54x_test::mapped_mac_fixture>(machine(), *m_cpu, *m_timer);
 		else if (m_domain) m_domains = std::make_unique<c54x_test::source_domain_fixture>(machine(), *m_cpu, *m_timer);
 		else
@@ -75,12 +79,36 @@ protected:
 	void machine_reset() override
 	{
 		m_case = m_resets = 0;
-		if (m_dual) m_dual->start();
+		if (m_normalization) m_normalization->start();
+		else if (m_dual) m_dual->start();
 		else if (m_mapped) m_mapped->start();
 		else if (m_domains) m_domains->start();
 		else start();
 	}
 private:
+	[[noreturn]] void normalization_result() const
+	{
+		using k = c54x_test::normalization_kind;
+		unsigned const count = m_normalization->count(), restores = m_normalization->restores();
+		auto const digest = (unsigned long long)m_normalization->digest();
+		if (m_normalization_kind == k::aliases)
+		{
+			osd_printf_info("TMS320C54x staged NORM aliases: PASS cases=%u restore=%u selectors=4 ts_codes=32..47 shifts=-16..-1 patterns=8 status_states=8 pages=2 snapshots=2 checkpoint_policy=balanced data_accesses=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n", count, restores, digest);
+			throw emu_fatalerror(3, "TMS320C54x isolated NORM aliases complete");
+		}
+		if (m_normalization_kind == k::producer)
+		{
+			osd_printf_info("TMS320C54x staged EXP NORM: PASS cases=%u restore=%u selectors=4 patterns=16 gaps=0,1,2 sxm_ovm=4 pages=2 snapshots=4 checkpoint_policy=balanced ts=Read zero_gap=projection_only data_accesses=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n", count, restores, digest);
+			throw emu_fatalerror(3, "TMS320C54x isolated EXP NORM complete");
+		}
+		if (m_normalization_kind == k::exponent)
+		{
+			osd_printf_info("TMS320C54x staged EXP T: PASS cases=%u restore=%u accumulators=2 vectors=16 gaps=0,1,2 status_states=8 producers=none,LDU pages=2 snapshots=4 checkpoint_policy=balanced publish=Execute adjacent_T=old gap_T=new retained_consumer=1 flags_preserved=1 data_writes=0 norm_acceptance=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n", count, restores, digest);
+			throw emu_fatalerror(3, "TMS320C54x isolated EXP T complete");
+		}
+		osd_printf_info("TMS320C54x staged NORM: PASS cases=%u restore=%u selectors=4 shifts=-16..31 patterns=8 status_states=8 pages=2 snapshots=4 checkpoint_policy=balanced ts=Read result=Execute carry_preserved=1 data_accesses=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n", count, restores, digest);
+		throw emu_fatalerror(3, "TMS320C54x isolated NORM complete");
+	}
 	[[noreturn]] void dual_result() const
 	{
 		bool const alu = m_dual_mode.alu(), parallel = m_dual_mode.parallel(), family = m_dual_mode.family(), macsu = m_dual_mode.macsu(), edge = m_dual_mode.edge;
@@ -135,7 +163,7 @@ private:
 	void program_map(address_map &map)
 	{
 		map(0, 0xffff).ram();
-		if (m_domain || m_mapped_mac || m_dual_mode) map(0x20000, 0x2ffff).ram();
+		if (m_domain || m_mapped_mac || m_dual_mode || m_normalization_kind != c54x_test::normalization_kind::none) map(0x20000, 0x2ffff).ram();
 	}
 	void io_map(address_map &map)
 	{
@@ -167,6 +195,7 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_normalization) { if (m_normalization->step()) normalization_result(); return; }
 		if (m_dual) { if (m_dual->step()) dual_result(); return; }
 		if (m_mapped)
 		{
@@ -225,6 +254,8 @@ private:
 	bool m_domain = false;
 	bool m_mapped_mac = false;
 	c54x_test::dual_multiply_mode m_dual_mode;
+	c54x_test::normalization_kind m_normalization_kind = c54x_test::normalization_kind::none;
+	std::unique_ptr<c54x_test::exponent_normalization_fixture> m_normalization;
 	std::unique_ptr<c54x_test::dual_multiply_fixture_runner> m_dual;
 	std::unique_ptr<c54x_test::source_domain_fixture> m_domains;
 	std::unique_ptr<c54x_test::mapped_mac_fixture> m_mapped;
@@ -251,6 +282,10 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(16, "mac-family-edge", "Dual MAC family mapped operand exclusions")
 	ROM_SYSTEM_BIOS(17, "stmac", "Parallel MAC stores with retained T X and ASM")
 	ROM_SYSTEM_BIOS(18, "stmac-edge", "Parallel MAC mapped operand exclusions")
+	ROM_SYSTEM_BIOS(19, "norm", "Retained normalization shift sampling and replay")
+	ROM_SYSTEM_BIOS(20, "norm-edge", "Recovered negative normalization-count aliases")
+	ROM_SYSTEM_BIOS(21, "exp-norm", "EXP producer and normalization T latency")
+	ROM_SYSTEM_BIOS(22, "exp-t", "Staged exponent publication and T consumer latency")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
 ROM_END
 

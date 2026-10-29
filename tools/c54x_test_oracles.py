@@ -1507,15 +1507,15 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated XC controls complete",
     ),
     "norm": (
-        "TMS320C54x staged NORM: PASS cases=98304 restore=98304 selectors=4 shifts=-16..31 patterns=8 status_states=8 pages=2 snapshots=4 ts=Read result=Execute carry_preserved=1 data_accesses=0 silicon_phase_claim=0",
+        "TMS320C54x staged NORM: PASS cases=24576 restore=24576 selectors=4 shifts=-16..31 patterns=8 status_states=8 pages=2 snapshots=4 checkpoint_policy=balanced ts=Read result=Execute carry_preserved=1 data_accesses=0 silicon_phase_claim=0 coverage_fnv64=6d96e57cd246b165",
         "Fatal error: TMS320C54x isolated NORM complete",
     ),
     "norm-edge": (
-        "TMS320C54x staged NORM aliases: PASS cases=16384 restore=16384 selectors=4 ts_codes=32..47 shifts=-16..-1 patterns=8 status_states=8 pages=2 snapshots=2 data_accesses=0 silicon_phase_claim=0",
+        "TMS320C54x staged NORM aliases: PASS cases=8192 restore=8192 selectors=4 ts_codes=32..47 shifts=-16..-1 patterns=8 status_states=8 pages=2 snapshots=2 checkpoint_policy=balanced data_accesses=0 silicon_phase_claim=0 coverage_fnv64=870eba4cadda7525",
         "Fatal error: TMS320C54x isolated NORM aliases complete",
     ),
     "exp-norm": (
-        "TMS320C54x staged EXP NORM: PASS cases=6144 restore=6144 selectors=4 patterns=16 gaps=0,1,2 sxm_ovm=4 pages=2 snapshots=4 ts=Read zero_gap=projection_only data_accesses=0 silicon_phase_claim=0",
+        "TMS320C54x staged EXP NORM: PASS cases=1536 restore=1536 selectors=4 patterns=16 gaps=0,1,2 sxm_ovm=4 pages=2 snapshots=4 checkpoint_policy=balanced ts=Read zero_gap=projection_only data_accesses=0 silicon_phase_claim=0 coverage_fnv64=9738168624bb55e5",
         "Fatal error: TMS320C54x isolated EXP NORM complete",
     ),
     "drsub": (
@@ -1799,7 +1799,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated staged ADDS complete",
     ),
     "exp-t": (
-        "TMS320C54x staged EXP T: PASS cases=12288 restore=12288 accumulators=2 vectors=16 gaps=0,1,2 status_states=8 producers=none,LDU pages=2 snapshots=4 publish=Execute adjacent_T=old gap_T=new retained_consumer=1 flags_preserved=1 data_writes=0 norm_acceptance=0 silicon_phase_claim=0",
+        "TMS320C54x staged EXP T: PASS cases=3072 restore=3072 accumulators=2 vectors=16 gaps=0,1,2 status_states=8 producers=none,LDU pages=2 snapshots=4 checkpoint_policy=balanced publish=Execute adjacent_T=old gap_T=new retained_consumer=1 flags_preserved=1 data_writes=0 norm_acceptance=0 silicon_phase_claim=0 coverage_fnv64=0f4f33ce639d0dc5",
         "Fatal error: TMS320C54x isolated EXP T complete",
     ),
     "pshd-repeat": (

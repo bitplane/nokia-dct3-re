@@ -942,6 +942,68 @@
       ]
     },
     {
+      "id": "normalization-documented-counts",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_normalization.h; tests/c54x/tms320c54x_test_normalization_input.h; tests/c54x/tms320c54x_test_normalization_schedule.h",
+      "profiles": ["norm"],
+      "case_ids": [],
+      "basis": "SPRU172C4-122's documented -16..31 count domain. A fixture-owned bit-position loop supplies 40-bit shift results, sign extension, wide-result overflow and explicit saturation thresholds, independently of CPU implementation helpers. The expectation-function body is unchanged. Read/Execute sampling remains a model regression, not measured silicon phase timing.",
+      "profile_coverage": {
+        "norm": {"cases": 24576, "fnv64": "6d96e57cd246b165", "result_prefix": "TMS320C54x staged NORM: PASS", "key": "Original ordinal input +24576*checkpoint_index; every selector/count/pattern/status/page tuple once, with balanced checkpoints3/4/5/6."}
+      },
+      "obligations": ["retain all four source/destination selectors,48 documented counts,eight source-pair patterns,eight status combinations and both program pages", "retain every per-clock accumulator/status check, Read-owned T mutation, one opcode fetch, no data access and final idle/new-T preservation", "each fixed selector/count/status/page group retains all eight patterns split two per checkpoint; assert complete original-key coverage and actual successful restores", "CPU-only fixture owns timer, taps, observations, cached inputs and host continuation; no CPU reset added between cases and no handset/GSM/private-ROM dependency", "share the snapshot loop with EXP/NORM and EXP/T but keep their input and publication contracts explicit"],
+      "limits": ["retire73728 extra numeric checkpoint executions; the old value-by-checkpoint Cartesian product is intentionally absent", "literal isa-memory examples overlap arithmetic but retain independent one-cycle interval checks and are not substitutes for staged T-retention/restoration", "no interrupt, repeat, adjacent accumulator-producer or physical phase closure"]
+    },
+    {
+      "id": "normalization-recovered-count-aliases",
+      "classification": "model_regression",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_normalization.h; tests/c54x/tms320c54x_test_normalization_input.h; tests/c54x/tms320c54x_test_normalization_schedule.h",
+      "profiles": ["norm-edge"],
+      "case_ids": [],
+      "scope": "Positive inferred count-alias model, not documented ISA conformance, an illegal-operand test or handset integration.",
+      "basis": "docs/native_efr_codec.md preserves the independent ROM4 Pow2 witness at d54e: T=ffe5 plus conditional SFTA-16 must reproduce the ETSI reference gain. Raw TS codes20..2f are modeled as right shifts-16..-1, like30..3f. This inferred extension is kept separately from SPRU172C's documented range; its fixture-owned arithmetic does not call the CPU decoder or shift helper.",
+      "profile_coverage": {
+        "norm-edge": {"cases": 8192, "fnv64": "870eba4cadda7525", "result_prefix": "TMS320C54x staged NORM aliases: PASS", "key": "Original ordinal input +8192*checkpoint_index; all original alias/count/selector/pattern/status/page inputs once."}
+      },
+      "obligations": ["retain all16 raw alias counts, four selectors, eight source-pair patterns, eight status combinations and both pages", "retain both pre-Read checkpoint states3/4 distributed four/four over each group's eight patterns; all live and restored result/status/T/fetch checks remain", "keep the compatibility profile name, but classify it as an inferred model and report ordered coverage plus actual restores"],
+      "limits": ["retire8192 duplicate checkpoint executions; not every value is replayed at both states", "native reference agreement motivates this model, but does not prove all16 aliases on every silicon revision", "not a duplicate of documented NORM: raw TS codes are different even when the modeled arithmetic result coincides; no other TS opcode gains alias support"]
+    },
+    {
+      "id": "exponent-producer-consumer-interactions",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_normalization.h; tests/c54x/tms320c54x_test_normalization_input.h; tests/c54x/tms320c54x_test_normalization_schedule.h",
+      "profiles": ["exp-norm", "exp-t"],
+      "case_ids": [],
+      "scope": "Documented EXP spacing and retained consumers; zero-gap stale-T behavior is explicitly only the current model's projection.",
+      "basis": "SPRU131G table7-13/example7-40 require a separating word after EXP. A fixture-owned significant-bit count gives the signed exponent (including zero), not a CPU helper. EXP/NORM's bit-position shift reference is shared unchanged; EXP/T uses literal initial/poison T values and an independent LDM observer. Valid spacing and zero-gap projection remain distinguished in acceptance.",
+      "profile_coverage": {
+        "exp-norm": {"cases": 1536, "fnv64": "9738168624bb55e5", "result_prefix": "TMS320C54x staged EXP NORM: PASS", "key": "Original input +1536*checkpoint_index; four selectors,16 pattern pairs,three gaps,four SXM/OVM states,two pages. Balance each sticky-overflow pattern parity separately."},
+        "exp-t": {"cases": 3072, "fnv64": "0f4f33ce639d0dc5", "result_prefix": "TMS320C54x staged EXP T: PASS", "key": "Original input +3072*checkpoint_index; A/B,16 patterns,three gaps,eight status states,LDU/no-producer,two pages."}
+      },
+      "obligations": ["retain all unique producer/value/gap/status/page inputs:1536 EXP/NORM and3072 EXP/T, without a full numeric-by-checkpoint Cartesian replay", "EXP/NORM retains all accumulator-selector pairs, post-Read T replacement and result/status preservation; each fixed context and sticky-seed parity covers all four checkpoints", "EXP/T retains LDU input poisoning after Read, Execute T publication, old T at zero-gap LDM versus new T with a gap, and poisoning after the consumer samples", "preserve exact producer/data-MMR read counts, opcode fetch, no writes, final source/status preservation, final idle, and observation rewinds on restore", "all four profiles share one CPU-only snapshot lifecycle with cached immutable inputs, actual restores and original-key digests; no private ROM or Nokia devices are instantiated", "expectation-function bodies and leading-bit method remain byte-identical apart from namespace ownership; the legacy register-product EXP-producer bank uses the same independent exponent reference"],
+      "limits": ["retire4608 EXP/NORM and9216 EXP/T extra checkpoint executions, retaining all data and spacing tuples", "zero-gap projection is not a valid-latency silicon guarantee; these tests do not qualify a new interlock", "literal EXP examples do not test retained T consumers; NORM-only and EXP/T protect different producer/consumer paths", "focused checks do not renew the revision-bound full-default checkpoint"],
+      "measurement": {
+        "baseline_commit": "69ef2580",
+        "c54x_cpp_bytes_before": 3656878,
+        "c54x_cpp_bytes_after": 3657005,
+        "c54x_cpp_lines_before": 55111,
+        "c54x_cpp_lines_after": 55200,
+        "checkpoint_executions_retired": 95744,
+        "norm_seconds_before": 43.65,
+        "norm_seconds_after": 9.23,
+        "norm_alias_seconds_before": 7.36,
+        "norm_alias_seconds_after": 3.10,
+        "exp_norm_seconds_before": 2.80,
+        "exp_norm_seconds_after": 0.65,
+        "exp_t_seconds_before": 5.46,
+        "exp_t_seconds_after": 1.22,
+        "scope": "Four-family CPU-only extraction and replay reduction, with serial empty-ROM runner wall times. The source change adds127 bytes/89 lines after accounting for every new C++ header; no source reduction claimed. Handwritten legacy starts/checks, four global phases and four BIOS-owner entries are removed, while no isolated profile or default requirement is retired. CPU-only snapshot scope and cached descriptors also change runtime, so speedup is not attributed solely to fewer replays."
+      }
+    },
+    {
       "id": "dual-ram-multiply",
       "classification": "architectural_interaction",
       "decision": "rewrite",

@@ -220,9 +220,7 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_portr_bypass_results()) return;
 	if (check_sqdst_results()) return;
 	if (check_signed_xc_results()) return;
-	if (check_normalization_results()) return;
 	if (check_xmem_load_results()) return;
-	if (check_exponent_results()) return;
 	if (check_repeat_push_results()) return;
 	if (check_block_exit_results()) return;
 	if (check_stlm_bsp_edge_results()) return;

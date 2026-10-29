@@ -1152,10 +1152,11 @@ EXP appears in the original sequence `LDU ...,B; EXP B; LD #1e,A; LDM T,B`.
 SPRU172C 4-52 defines EXP's signed exponent in T without accumulator or
 status changes, including zero's special result of zero. SPRU131G table
 7-13 requires one instruction of T-consumer latency; the original has that
-gap. The `exp-t` fixture now passes 12,288 cases/restores across both
+gap. The CPU-only `exp-t` fixture retains 3,072 distinct inputs/restores across both
 accumulators, sixteen 40-bit vectors, zero/one/two-gap LDM consumers,
 eight status configurations, adjacent unsigned LDU producers, two pages
-and four snapshots. EXP publishes T in Execute without changing its source
+with four balanced checkpoints rather than four copies of each tuple.
+EXP publishes T in Execute without changing its source
 or flags; the adjacent LDM retains old T while a gap exposes the new
 exponent. Mutating T after the consumer Read must not alter its result.
 The unsigned producer's RAM input is also changed after Read, checking

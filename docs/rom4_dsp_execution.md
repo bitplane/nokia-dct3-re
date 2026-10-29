@@ -245,17 +245,18 @@ atomic stream shortcut. Ordinary DAGEN reads are admitted, but SP,
 modifying self-AR aliases, peripheral sources and memory-count RPT remain
 excluded. The original `4b97` increments AR7 (`MOD=2`); its first window is
 BL..AR6. The decrementing form is `4b8f` (`MOD=1`).
-`exp-t` adds 12,288 replay cases for both EXP sources, sixteen 40-bit vectors,
+The CPU-only `exp-t` profile retains 3,072 inputs/restores for both EXP sources, sixteen 40-bit vectors,
 eight status configurations, optional adjacent LDU producers, two pages
 and zero/one/two-gap T consumers. T publishes at Execute: an adjacent LDM
 samples old T and a gap samples the new exponent. Source/flag preservation,
-mutation after the consumer Read and four snapshots are checked. NORM and
+mutation after the consumer Read and four balanced checkpoints are checked,
+without replaying every tuple at each checkpoint. NORM and
 interrupt composition remain outside this acceptance.
-ADDS adds 52,224 read-capable RAM-source replay cases through the shared memory-arithmetic
+ADDS retains 17,408 read-capable RAM-source inputs with balanced replay checkpoints through the shared memory-arithmetic
 fixture. The unsigned operand ignores SXM; carry, sticky destination overflow,
 OVM saturation, retained address/literal/read operands and single-access
-counts are checked over all eighteen covered forms. Its SUBS control also
-passes 52,224 replays. Mapped/peripheral sources remain excluded.
+counts are checked over all seventeen read-capable forms. Its SUBS control also
+retains 17,408 inputs with balanced replay. Mapped/peripheral sources remain excluded.
 Syntax-5 Xmem LD covers all 512 encodings in 196,608 replay cases, retaining
 the selected AR2..AR5 RAM address and Read word before Execute's shift.
 Distinct source pointers, source mutation, BK=0/nonzero wrap, both
