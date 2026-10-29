@@ -322,7 +322,7 @@ DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cas
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
     "isa-memory": (
-        "TMS320C54x generic memory examples: PASS cases=45 reset_groups=1 nokia_devices=0 firmware=0",
+        "TMS320C54x generic memory examples: PASS cases=75 reset_groups=2 nokia_devices=0 firmware=0",
         "Fatal error: TMS320C54x isolated generic memory examples complete",
     ),
     "isa-flow": (

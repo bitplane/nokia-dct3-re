@@ -148,17 +148,22 @@ No far-control or pending-transfer restoration case is deleted. This rewrite
 removes 1,781 C++ bytes/47 lines while preserving all 173 legacy PASS records
 and 2,474 asserted opcode words.
 
-`isa-memory` retains 45 ordered memory-operand arithmetic, multiply and T-load
-examples in one reset group. The legacy adapter shares the literal data without
-resetting its predecessor state. Carry retained across AND/MPY and shifted-SUB
-rows remains observable; the 14 multiply rows keep their full ST1 assertions,
-while the other rows keep their original partial masks. The POLY values match
+`isa-memory` retains 75 memory/accumulator examples in two ordered reset
+groups (45 and 30). Legacy adapters share the literal data without resetting
+their predecessor state. Carry retained across AND/MPY, shifted-SUB and
+negative-half MACR rows remains observable; the 14 multiply rows keep their
+full ST1 assertions, while other rows retain their original partial masks.
+The second group also covers ABDST, LTD successor writes, coefficient/address
+literal ordering, DP/SP addressing and preserved decoys, squares and saturating
+ADDM. Reset-only RAM metadata seeds inherited source words for standalone
+execution; `prepare_case` deliberately ignores it. The POLY values match
 the [SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf) page 4-126 example.
 An old/new setup and predicate comparison checks 25,200 register/RAM/marker
-mutations without CPU execution. Both native entries pass; the independent
-binary runs with an empty ROM directory and lists only the root and C54x CPU.
-The rewrite removes 6,681 C++ bytes/201 lines. It retains every case and makes
-no runtime, all-ISA or physical-timing claim.
+mutations in the first group and 23,520 in the second, without CPU execution.
+The independent binary runs with an empty ROM directory and lists only the
+root and C54x CPU. Sharing the second group removes 15,476 C++ bytes/443 lines,
+including its new literal bank and reset metadata. Every case is retained;
+no runtime, all-ISA or physical-timing claim follows.
 
 `mpy-mem-imm` retains all 24,576 MPY and 65,536 MAC inputs, with the original
 result references, address/literal poisoning, Read-owned T publication and
@@ -278,6 +283,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_dual_reference.h` | Ordered dual/parallel MAC literal references with explicit partial setup and status masks |
 | `tests/c54x/tms320c54x_test_dual.h` | CPU-only staged MPY/ALU/MACSU/MAC setup, per-clock checks and paired snapshot continuation |
 | `tests/c54x/tms320c54x_test_dual_input.h` | Shared fixture-owned integer inputs/expectations; no CPU implementation helpers or Nokia dependencies |
+| `tests/c54x/tms320c54x_test_memory_continuations.h` | Ordered literal continuations with inherited RAM, partial masks and coefficient/address ordering |
 | `tests/c54x/tms320c54x_test_port_case.h` | Common PORTW stimulus construction; no instruction arithmetic or reset policy |
 | `tests/c54x/tms320c54x_test_scalars.h` | Literal scalar boundaries with explicit reset/continuation groups, shared with the legacy basic adapter |
 | `tests/c54x/tms320c54x_test_memory_examples.h` | Ordered literal memory arithmetic/multiply/T examples, with original partial setup and assertion masks |

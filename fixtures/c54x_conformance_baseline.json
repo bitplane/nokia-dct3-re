@@ -6536,14 +6536,14 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
-          "cases": "45",
+          "cases": "75",
           "firmware": "0",
           "nokia_devices": "0",
-          "reset_groups": "1"
+          "reset_groups": "2"
         }
       ],
       "required": [
-        "TMS320C54x generic memory examples: PASS cases=45 reset_groups=1 nokia_devices=0 firmware=0"
+        "TMS320C54x generic memory examples: PASS cases=75 reset_groups=2 nokia_devices=0 firmware=0"
       ]
     },
     "isa-parallel": {
@@ -15480,7 +15480,37 @@
         "sub-shift16-b-retains-clear-carry",
         "sub-shift16-ar2-not-decoy",
         "sub-shift16-ar2-postincrement",
-        "sub-shift16-ar2-postdecrement"
+        "sub-shift16-ar2-postdecrement",
+        "abdst-old-a-high",
+        "abdst-signed-fractional",
+        "ltd-stationary",
+        "ltd-successor-before-postincrement",
+        "sub-half-signed",
+        "sub-half-logical",
+        "xor-long-shift16-other",
+        "macr-negative-half",
+        "macr-below-negative-half",
+        "macp-b-coefficient",
+        "macd-b-successor",
+        "macp-absolute-b",
+        "macd-absolute-b",
+        "macp-offset-coefficient-first",
+        "macd-offset-successor",
+        "ltd-absolute",
+        "ltd-offset",
+        "direct-load-store-dp",
+        "direct-load-store-sp",
+        "addm-direct-dp",
+        "ltd-direct-sp",
+        "mpy-direct-dp",
+        "mac-direct-sp",
+        "squr-offset-preincrement",
+        "squr-direct-b",
+        "squra-direct-b",
+        "squrs-direct-a",
+        "addc-direct-unsigned-sxm",
+        "subb-direct-inverted-carry",
+        "addm-negative-saturation"
       ],
       "classification": "architectural_interaction",
       "decision": "rewrite",

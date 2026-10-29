@@ -26,10 +26,11 @@ struct instruction_case
 	std::vector<memory_word> expected_data{};
 	bool reset_before = true;
 	std::vector<register_setting> reset_initial{};
+	std::vector<memory_word> reset_data{};
 };
 
-// No implicit reset: the standalone runner owns reset_before/reset_initial;
-// legacy adapters ignore that metadata and retain their checked predecessor.
+// No implicit reset: the standalone runner owns reset_* metadata.
+// Legacy adapters ignore it and retain their checked predecessor.
 template <typename Cpu>
 void prepare_case(Cpu &cpu, instruction_case const &test)
 {

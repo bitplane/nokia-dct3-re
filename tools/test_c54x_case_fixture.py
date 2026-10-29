@@ -427,13 +427,16 @@ int main() {
     cpu c;
     c54x_test::instruction_case test{"fixture", 1, {{2, 3}}, {{4, 5}},
         {{1, 0x1ff}}, {{1, 0xff, 0xff}}, 2, 3, {{4, 5}}};
-    if (!test.reset_before || !test.reset_initial.empty()) return 2;
+    if (!test.reset_before || !test.reset_initial.empty() || !test.reset_data.empty()) return 2;
     test.reset_before = false;
     test.reset_initial = {{2, 0xbeef}};
+    test.reset_data = {{6, 0xbeef}};
     c.registers[2] = 0x1234;
+    c.spaces[AS_DATA].words[6] = 0x1234;
     c54x_test::prepare_case(c, test);
     if (c.spaces[AS_PROGRAM].words[2] != 3 || c.spaces[AS_DATA].words[4] != 5 ||
-        c.registers[1] != 0x1ff || c.registers[2] != 0x1234) return 1;
+        c.registers[1] != 0x1ff || c.registers[2] != 0x1234 ||
+        c.spaces[AS_DATA].words[6] != 0x1234) return 1;
     c54x_test::check_case(c, test, 2, 3); // Bits outside the mask are deliberately ignored.
     unsigned failures = 0;
     c.registers[1] = 0xfe;

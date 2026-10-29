@@ -11,6 +11,7 @@
 #include "tms320c54x_test_long_reference.h"
 #include "tms320c54x_test_product_examples.h"
 #include "tms320c54x_test_memory_examples.h"
+#include "tms320c54x_test_memory_continuations.h"
 #include "tms320c54x_test_near_flow.h"
 #include "tms320c54x_test_mapped_mac.h"
 #include "tms320c54x_test_dual.h"
@@ -43,7 +44,12 @@ protected:
 		else if (m_domain) m_domains = std::make_unique<c54x_test::source_domain_fixture>(machine(), *m_cpu, *m_timer);
 		else
 		{
-			if (memory_reference()) m_cases = c54x_test::memory_examples();
+			if (memory_reference())
+			{
+				m_cases = c54x_test::memory_examples();
+				auto const &continuations = c54x_test::memory_continuations();
+				m_cases.insert(m_cases.end(), continuations.begin(), continuations.end());
+			}
 			else if (products()) m_cases = c54x_test::product_examples();
 			else if (near_flow())
 				m_cases.assign(c54x_test::near_flow_cases().begin(), c54x_test::near_flow_cases().end());
@@ -149,6 +155,8 @@ private:
 			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 			for (auto const &setting : test_case().reset_initial)
 				m_cpu->set_state_int(setting.index, setting.value);
+			for (auto const &word : test_case().reset_data)
+				m_cpu->space(AS_DATA).write_word(word.address, word.value);
 		}
 		m_writes = 0; m_first = m_last = 0;
 		c54x_test::prepare_case(*m_cpu, test_case());
