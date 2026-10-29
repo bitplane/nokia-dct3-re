@@ -995,7 +995,6 @@ void tms320c54x_test_state::test(machine_config &config)
 	}, "vector_acknowledge");
 	m_cpu->bio_in_cb().set(FUNC(tms320c54x_test_state::bio_r));
 	m_cpu->xf_out_cb().set(FUNC(tms320c54x_test_state::xf_w));
-	NOKIA_DSPIF(config, m_transport, 0);
 	TMS320C54X_MCBSP(config, m_idle_mcbsp, 13'000'000);
 	m_cpu->peripheral_clock_stop_cb().set(m_idle_mcbsp, FUNC(tms320c54x_mcbsp_device::internal_clock_stop_w));
 	m_idle_mcbsp->tx_word_cb().set([this](u16 value) {

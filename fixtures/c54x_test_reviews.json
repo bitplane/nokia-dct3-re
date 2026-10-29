@@ -296,7 +296,7 @@
       "basis": "TI scalar NEG/ABS, immediate loads/arithmetic, SFTA/SFTL, ROL and XOR semantics. Every original literal result and partial/full register mask is retained; no CPU implementation helper supplies expectations. Deliberate checked-state continuations preserve carry, sticky overflow, source registers and instruction extensions.",
       "source": "tests/c54x/tms320c54x_test_scalars.h",
       "profiles": ["isa-scalars", "legacy-atomic"],
-      "scope": "The 34 named scalar cases only. legacy-atomic also includes unreviewed atomic and DSPIF transport-integration contracts; it is not a CPU-only profile.",
+      "scope": "The 34 named scalar cases only. legacy-atomic also includes other atomic and CPU/peripheral contracts; shared firmware/GSM declarations still prevent an independent CPU-only build.",
       "legacy_entry": "basic phases9100..9107,45..60,67..68,70..77; default continuation routing remains outside the CPU-only case data",
       "case_ids": [
         "neg-b-to-a", "neg-b-to-b", "neg-b-zero-to-a", "neg-b-zero-to-b",
@@ -315,7 +315,7 @@
         "nineteen independently reset groups on the standalone CPU, with fifteen continuations without a CPU reset preserving the original inter-case dependencies",
         "sticky ABS overflow survives the zero result; SUB consumes the preceding zero accumulator; ASM load consumes preserved carry; SFTL zero shift clears an already-set carry",
         "shared literal case data runs on the CPU-only bench with no private ROM, Nokia or GSM device dependencies",
-        "the legacy adapter keeps opcode accounting, initialization order and non-scalar continuations; the bounded prefix includes existing transport integration explicitly rather than reclassifying it"
+        "the legacy adapter keeps opcode accounting, initialization order and non-scalar continuations; unrelated transport preservation is owned by the separate DSPIF device fixture"
       ],
       "limits": [
         "no numeric operand or claimed assertion is deleted; repeated scalar setup and phase/checker boilerplate is replaced by case data",
@@ -339,6 +339,28 @@
         "cpu_only_scalars_seconds": 0.11,
         "scope": "This is a source/ownership change, not a claimed runtime optimization. Focused native timings include process startup; the existing full default checkpoint is not silently renewed."
       }
+    },
+    {
+      "id": "active-repeat-interrupt-restoration",
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "decision": "keep",
+      "source": "tests/c54x/tms320c54x_test_atomic_basic.cpp",
+      "profiles": [],
+      "basis": "Literal 65536-iteration repeat count; a data-read observer raises IRQ during the repeat. Live and restored execution must independently finish with 65536 reads, accumulator and ISR snapshot, at PC 0x0506.",
+      "obligations": ["save inside the active repeat with IFR bit 4 pending", "restore CPU state and explicitly rewind the unsaved host read counter", "live and replay both reach the same literal final count and PC"],
+      "limits": ["covered by legacy-atomic and the default regression; not a review of the entire legacy prefix", "no DSPIF device or CPU-to-DSP signal contract participates", "implementation save-state contract, not silicon interrupt-latency evidence"]
+    },
+    {
+      "id": "dspif-state-preservation",
+      "case_ids": [],
+      "classification": "device_contract",
+      "decision": "relocate",
+      "source": "tests/devices/nokia_dspif_test.cpp",
+      "profiles": [],
+      "basis": "State-restoration identity: snapshot all 2048 shared words after queueing two packets and setting register 0, destroy RAM/register contents, restore, then compare every word and the literal register value 0x5a.",
+      "obligations": ["make check-dspif-save runs without CPU, firmware or private ROM", "preserve the original two queued payloads, ring cursors and interface register through the save round trip"],
+      "limits": ["not CPU conformance and no longer instantiated by ordinary CPU profiles", "identity comparison proves preservation, not independent packet-format correctness", "separate backend integration fixtures remain unchanged"]
     }
   ]
 }

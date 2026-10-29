@@ -38,7 +38,7 @@ class FixtureOwnershipTests(unittest.TestCase):
         # Architectural ownership only: the executable replay gates establish
         # restoration behavior, including checkpoints shared across modules.
         owners = {
-            'm_transport_repeat.saved': {'check_atomic_basic_results'},
+            'm_active_repeat.saved': {'check_atomic_basic_results'},
             'm_near_return_saved': {'check_atomic_control_results'},
             'm_far_transfer.saved': {'check_atomic_control_results', 'check_far_save_results'},
             'm_xf_saved': {'check_atomic_corpus_results'},

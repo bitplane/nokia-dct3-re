@@ -5743,7 +5743,7 @@ bool tms320c54x_test_state::check_rounding_boundary_results()
 		osd_printf_info("TMS320C54x POLY boundaries: PASS cases=64 frct=0,1 ovm=0,1 sxm=0,1 sticky_ova=1 pipeline_claim=0\n");
 		if (profile_is("legacy-atomic"))
 		{
-			osd_printf_info("TMS320C54x legacy atomic prefix: PASS transport_integration=1 staged_suite_claim=0\n");
+			osd_printf_info("TMS320C54x legacy atomic prefix: PASS transport_integration=0 staged_suite_claim=0\n");
 			throw emu_fatalerror(3, "TMS320C54x isolated legacy atomic prefix complete");
 		}
 		start_pipeline_frontend_case(); return true;

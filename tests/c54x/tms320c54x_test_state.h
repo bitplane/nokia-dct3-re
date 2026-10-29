@@ -6,9 +6,6 @@
 
 #include "emuopts.h"
 #include "cpu/tms320c54x/tms320c54x.h"
-#include "nokia_dspif.h"
-#include "nokia_cobba.h"
-#include "nokia_dsp_c54x.h"
 #include "gsm_tch_f_l1.h"
 #include "util/gsmfr.h"
 #include "tms320c54x_mcbsp.h"
@@ -34,7 +31,6 @@ public:
 			const char *tag) :
 		driver_device(mconfig, type, tag),
 		m_cpu(*this, "maincpu"),
-		m_transport(*this, "dspif"),
 		m_idle_mcbsp(*this, "idle_mcbsp"),
 		m_idle_dma(*this, "idle_dma")
 	{
@@ -2299,7 +2295,6 @@ private:
 	u16 m_shifted_bus_word = 0;
 	tms320c54x_bsp_state m_shifted_bsp;
 	int m_bio_level = 1;
-	optional_device<nokia_dspif_device> m_transport;
 	util::gsm_fr_codec m_rom4_codec;
 	util::gsm_fr_codec::pcm_block m_rom4_pcm{};
 	std::array<u16, 76> m_rom4_parameters{};
@@ -2443,7 +2438,7 @@ private:
 	offset_logic_fixture m_offset_logic_fixture = {};
 	unsigned m_acc_branch_mapped_writes = 0;
 	u32 m_popd_write_mask = 0;
-	transport_repeat_snapshot m_transport_repeat;
+	active_repeat_snapshot m_active_repeat;
 	far_transfer_snapshot m_far_transfer;
 	std::stringstream m_near_return_saved, m_xf_saved;
 	// Separate checkpoint lifetimes; host observations still rewind explicitly.

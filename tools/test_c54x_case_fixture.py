@@ -224,15 +224,16 @@ int main() {
         for profile, review in reviewed_profiles().items():
             if not review['case_ids']:
                 continue
-            marker, ending = EXTRA_PROFILES[profile]
+            markers, ending = EXTRA_PROFILES[profile]
+            markers = [markers] if isinstance(markers, str) else list(markers)
             cases = ['C54x ISA case: PASS id=' + name
                      for name in reviewed_profiles()[profile]['case_ids']]
-            text = '\n'.join(cases + [marker, ending])
+            text = '\n'.join(cases + markers + [ending])
             check_result(text, 3, profile=profile)
             for changed in (cases[1:], cases + cases[:1], list(reversed(cases)),
                             ['C54x ISA case: PASS id=unknown'] + cases[1:]):
                 with self.subTest(profile=profile, cases=changed), self.assertRaisesRegex(ValueError, 'identities'):
-                    check_result('\n'.join(changed + [marker, ending]), 3, profile=profile)
+                    check_result('\n'.join(changed + markers + [ending]), 3, profile=profile)
 
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_case_helper_detects_state_and_bus_mismatches(self):

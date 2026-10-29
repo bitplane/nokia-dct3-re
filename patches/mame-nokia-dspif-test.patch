@@ -1,0 +1,10 @@
+diff --git a/src/mame/mame.lst b/src/mame/mame.lst
+--- a/src/mame/mame.lst
++++ b/src/mame/mame.lst
+@@ -45,3 +45,6 @@
++@source:nokia/nokia_dspif_test.cpp
++dspiftst
++
+ @source:acorn/accomm.cpp
+ accomm
+ accommp

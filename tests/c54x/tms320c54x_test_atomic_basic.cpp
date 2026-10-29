@@ -698,18 +698,8 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 		expect(m_repeat_reads > 0 && m_repeat_reads < 65536 &&
 				(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4),
 				"save checkpoint has active repeat and pending IRQ");
-		m_transport_repeat.reads = m_repeat_reads;
-		static constexpr u8 payload[] = { 0x12, 0x34, 0x56, 0x78 };
-		m_transport->peer_shared_w(0x1c8 / 2, 0x100 / 2);
-		m_transport->peer_shared_w(0x1ca / 2, 0x100 / 2);
-		expect(m_transport->enqueue_rx_packet(0x83, payload, sizeof(payload)) &&
-				m_transport->enqueue_rx_packet(0x89, payload, sizeof(payload)),
-				"queue transport packets before save");
-		m_transport->dspif_w(0, 0x5a);
-		for (unsigned i = 0; i != m_transport_repeat.transport.size(); ++i)
-			m_transport_repeat.transport[i] = m_transport->shared_word(i);
-		m_transport_repeat.saved.str(std::string());
-		expect(machine().save().write_stream(m_transport_repeat.saved) == STATERR_NONE,
+		m_active_repeat.reads = m_repeat_reads;
+		expect(capture_snapshot(machine(), m_active_repeat.saved) == STATERR_NONE,
 				"write active-repeat save state");
 		m_phase = 64;
 		m_check_timer->adjust(attotime::from_msec(6));
@@ -727,24 +717,15 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 				"active-repeat save replay completes identically and services pending IRQ");
 		if (m_phase == 64)
 		{
-			for (unsigned i = 0; i != m_transport_repeat.transport.size(); ++i)
-				m_transport->peer_shared_w(i, 0);
-			m_transport->dspif_w(0, 0);
-			m_transport_repeat.saved.clear();
-			m_transport_repeat.saved.seekg(0);
-			expect(machine().save().read_stream(m_transport_repeat.saved) == STATERR_NONE,
+			expect(restore_snapshot(machine(), *m_check_timer, m_active_repeat.saved) == STATERR_NONE,
 					"restore active-repeat save state");
-			for (unsigned i = 0; i != m_transport_repeat.transport.size(); ++i)
-				expect(m_transport->shared_word(i) == m_transport_repeat.transport[i],
-						"restore queued DSPIF payloads and ring cursors");
-			expect(m_transport->dspif_r(0) == 0x5a,
-					"restore DSPIF interface registers");
-			m_repeat_reads = m_transport_repeat.reads;
+			m_repeat_reads = m_active_repeat.reads;
 			m_irq_accumulator = 0;
 			m_phase = 65;
 			m_check_timer->adjust(attotime::from_msec(6));
 			return true;
 		}
+		osd_printf_info("TMS320C54x active repeat restore: PASS iterations=65536 pending_irq=1 save_replay=1 live_and_replay=2 transport=0\n");
 		m_cpu->set_input_line(2, CLEAR_LINE);
 		program.write_word(0x0520, 0x0082);
 		program.write_word(0x0521, 0xf274); // CALLD 0540

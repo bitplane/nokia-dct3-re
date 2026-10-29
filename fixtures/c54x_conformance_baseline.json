@@ -2,6 +2,7 @@
   "core": {
     "completion": "Fatal error: TMS320C54x core tests complete",
     "required": [
+      "TMS320C54x active repeat restore: PASS iterations=65536 pending_irq=1 save_replay=1 live_and_replay=2 transport=0",
       "TMS320C54x immediate multiply disassembler: PASS memory_forms=512 immediate_forms=2 pages=2 bounded_extensions=1 operand_order=1 invalid_modes=1 execution_claim=0",
       "TMS320C54x original byte-count prefix: PASS cases=16 restore=16 words=13 sizes=8 pages=2 mapped_reads=2 data_writes=3 silicon_phase_claim=0",
       "TMS320C54x immediate ALU mapped consumer: PASS cases=960 restore=960 operations=ADD,SUB,AND,OR,XOR accumulators=2 parts=3 patterns=4 gaps=0,1 sxm=2 pages=2 reads=1 writes=0 silicon_phase_claim=0",
@@ -1904,7 +1905,7 @@
           "name": "mul-t-sources"
         },
         {
-          "description": "Legacy atomic prefix including DSPIF save integration",
+          "description": "Legacy atomic CPU/peripheral prefix and active-repeat restore",
           "index": 248,
           "name": "legacy-atomic"
         }
@@ -3131,6 +3132,7 @@
       "TMS320C54x active repeat POPD PMST: PASS cases=384 restore=384 contexts=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 pmst_unchanged=1 stack_retained=1 publications=once actual_iterations=1 interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x active repeat POPD context: PASS cases=384 restore=384 contexts=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 control_order=REA,RSA,BRC source_retained=1 publications=once actual_iterations=1 interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x active repeat context: PASS cases=384 restore=384 modes=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 control_order=REA,RSA,BRC source_reads=once publications=once source_mutation_after_read=1 ordered_copies=1 balanced_frames=1 brc_gap_words=6 interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
+      "TMS320C54x active repeat restore: PASS iterations=65536 pending_irq=1 save_replay=1 live_and_replay=2 transport=0\n": 1,
       "TMS320C54x adjacent PSHM POPM: PASS cases=2048 restore=2048 sources=8 destinations=T,AR3,BK,SP patterns=4 pages=2 stack_alignments=2 snapshots=4 source_reads=1 stack_reads=1 stack_writes=1 register_writes=1 source_mutation_after_read=1 stack_mutation_after_read=1 logical_bypass=1 interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x adjacent block rearm: PASS cases=64 restore=64 first_counts=0,1,3,7 second_counts=0,2 pages=2 snapshots=4 brc_publications=1 actual_iterations=1 write_owner=Access interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x atomic I/O composition: PASS cases=24 restore=24 contexts=repeat,delay,INTM pointer_updates=once interrupt_after_transfer=1 physical_mapping=unvalidated\n": 1,
@@ -3262,7 +3264,7 @@
       "TMS320C54x interrupt POPM exclusions: PASS cases=24 restore=24 destinations=IMR,IFR contexts=RPT,BD_first,BD_last pages=2 snapshots=2 reads=0 writes=0 stack_changes=0 mask_changes=0 acknowledgements=0 hardware_trap_claim=0\n": 1,
       "TMS320C54x interrupt entry stages: PASS sources=irq,nmi fetch_to_stack_cycles=1 pipeline_drain_claim=0\n": 1,
       "TMS320C54x interrupt-register dual ALU: PASS cases=18432 restore=18432 registers=IMR,IFR lanes=3 selector_pairs=8 operations=ADD,SUB accumulators=2 sxm_ovm=4 bk_modes=2 patterns=2 pages=2 snapshots=3 interrupt_masked=1 reads_do_not_ack=1 source_sample=Read post_read_poison=1 reads=2 writes=0 reset_before_restore=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x legacy atomic prefix: PASS transport_integration=1 staged_suite_claim=0\n": 1,
+      "TMS320C54x legacy atomic prefix: PASS transport_integration=0 staged_suite_claim=0\n": 1,
       "TMS320C54x literal disassembler: PASS decoded_modes=1472 pages=2 invalid_mmr=32 invalid_rmw=32 bounded_extensions=1 operand_order=1 pipeline_claim=0\n": 1,
       "TMS320C54x live BIO conformance: PASS variants=28\n": 1,
       "TMS320C54x live BIO wait release: PASS\n": 1,
@@ -6801,12 +6803,20 @@
       "machine": "tms54test",
       "reported_fields": [
         {
+          "iterations": "65536",
+          "live_and_replay": "2",
+          "pending_irq": "1",
+          "save_replay": "1",
+          "transport": "0"
+        },
+        {
           "staged_suite_claim": "0",
-          "transport_integration": "1"
+          "transport_integration": "0"
         }
       ],
       "required": [
-        "TMS320C54x legacy atomic prefix: PASS transport_integration=1 staged_suite_claim=0"
+        "TMS320C54x active repeat restore: PASS iterations=65536 pending_irq=1 save_replay=1 live_and_replay=2 transport=0",
+        "TMS320C54x legacy atomic prefix: PASS transport_integration=0 staged_suite_claim=0"
       ]
     },
     "literal-guard": {
@@ -15353,7 +15363,7 @@
       "classification": "architectural_interaction",
       "decision": "rewrite",
       "family": "scalar-boundaries",
-      "scope": "The 34 named scalar cases only. legacy-atomic also includes unreviewed atomic and DSPIF transport-integration contracts; it is not a CPU-only profile."
+      "scope": "The 34 named scalar cases only. legacy-atomic also includes other atomic and CPU/peripheral contracts; shared firmware/GSM declarations still prevent an independent CPU-only build."
     },
     "isa-square": {
       "case_ids": [
@@ -15408,7 +15418,7 @@
       "classification": "architectural_interaction",
       "decision": "rewrite",
       "family": "scalar-boundaries",
-      "scope": "The 34 named scalar cases only. legacy-atomic also includes unreviewed atomic and DSPIF transport-integration contracts; it is not a CPU-only profile."
+      "scope": "The 34 named scalar cases only. legacy-atomic also includes other atomic and CPU/peripheral contracts; shared firmware/GSM declarations still prevent an independent CPU-only build."
     },
     "long-mvkd": {
       "case_ids": [],

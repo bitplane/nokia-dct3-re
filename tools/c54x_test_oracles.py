@@ -12,6 +12,7 @@ DST_BYPASS_REQUIRED = (
 IMMEDIATE_MULTIPLY_DISASM = "TMS320C54x immediate multiply disassembler: PASS memory_forms=512 immediate_forms=2 pages=2 bounded_extensions=1 operand_order=1 invalid_modes=1 execution_claim=0"
 
 REQUIRED = [
+    "TMS320C54x active repeat restore: PASS iterations=65536 pending_irq=1 save_replay=1 live_and_replay=2 transport=0",
     IMMEDIATE_MULTIPLY_DISASM,
     *IMMEDIATE_MAPPED_REQUIRED,
     *DST_BYPASS_REQUIRED,
@@ -325,7 +326,10 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated generic scalars complete",
     ),
     "legacy-atomic": (
-        "TMS320C54x legacy atomic prefix: PASS transport_integration=1 staged_suite_claim=0",
+        (
+            "TMS320C54x active repeat restore: PASS iterations=65536 pending_irq=1 save_replay=1 live_and_replay=2 transport=0",
+            "TMS320C54x legacy atomic prefix: PASS transport_integration=0 staged_suite_claim=0",
+        ),
         "Fatal error: TMS320C54x isolated legacy atomic prefix complete",
     ),
     "reg-banks": (

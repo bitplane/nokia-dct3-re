@@ -62,8 +62,21 @@ Fifteen rows deliberately continue from checked predecessor state rather than
 resetting: sticky overflow, retained instruction words, carry and preserved
 accumulators remain observable. The legacy basic sequence shares those case
 data without resetting its CPU. `legacy-atomic` is a fast continuation gate;
-it also includes existing DSPIF integration, so only its 34 named scalar
-results are covered by this family review, not the whole prefix.
+only its 34 named scalar results are covered by this family review, not the
+whole prefix. The legacy machine contains the CPU, DMA and McBSP devices;
+its source still shares firmware/GSM declarations and is not the standalone
+CPU-only build. Its active-repeat restore checks an IRQ pending during 65,536
+iterations, then compares live and restored completion. Unrelated DSPIF RAM,
+queued-packet and register preservation runs separately in `make check-dspif-save`,
+on a device-only machine without a CPU or private firmware.
+
+This separation removes 1,215 bytes/28 lines from the C54x sources but adds a
+2,504-byte device fixture: it is an ownership correction, not a net source-size
+or runtime reduction. The bounded legacy run retains all 170 preceding PASS
+records (including the 34 scalar IDs), with one new required repeat-restoration
+record and the explicit transport-free completion. Long-RMW replay and both
+3210 menu gates pass; the older full-default checkpoint is not renewed by these
+focused runs.
 
 `isa-parallel` runs ten independently reset parallel store/arithmetic cases.
 The default sequence reuses their literal register, masked-status and RAM

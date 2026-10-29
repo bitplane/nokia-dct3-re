@@ -4,16 +4,13 @@
 #ifndef MAME_NOKIA_TMS320C54X_TEST_SNAPSHOT_STATE_H
 #define MAME_NOKIA_TMS320C54X_TEST_SNAPSHOT_STATE_H
 
-#include <array>
-#include <cstdint>
 #include <sstream>
 
 namespace c54x_test {
 
-struct transport_repeat_snapshot
+struct active_repeat_snapshot
 {
 	unsigned reads = 0;
-	std::array<std::uint16_t, 0x800> transport{};
 	std::stringstream saved;
 };
 

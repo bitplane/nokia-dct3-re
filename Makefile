@@ -28,6 +28,7 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-c54x-backend-bsp-test.patch \
 	patches/mame-sed1565-test.patch \
 	patches/mame-simi-test.patch \
+	patches/mame-nokia-dspif-test.patch \
 	patches/mame-intelfsh-c3-test.patch \
 	patches/mame-nandflash-test.patch \
 	patches/mame-nse5-rom4-compat.patch \
@@ -92,7 +93,7 @@ C54X_TEST_COMPONENTS := $(wildcard tests/c54x/tms320c54x_test*.cpp tests/c54x/tm
 empty :=
 space := $(empty) $(empty)
 comma := ,
-TEST_DRIVER_COMPONENTS := $(C54X_TEST_COMPONENTS) tests/devices/sed1565_test.cpp tests/devices/nandflash_test.cpp tests/firmware/mu4_storage_test.cpp tests/devices/nokia_simi_test.cpp tests/devices/intelfsh_c3_test.cpp
+TEST_DRIVER_COMPONENTS := $(C54X_TEST_COMPONENTS) $(wildcard tests/devices/*.cpp) tests/firmware/mu4_storage_test.cpp
 PHONE ?= noki3210
 BIOS ?=
 
@@ -1347,6 +1348,15 @@ check-c54x-backend-requests: build
 .PHONY: check-c54x-rom4-transfers
 check-c54x-rom4-transfers: build
 	$(PYTHON) -m tools.run_c54x_rom4_transfer --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --output-root tmp
+
+.PHONY: check-dspif-save
+check-dspif-save: build
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/dspif-save.XXXXXX")"; \
+		cd "$$tmp"; status=0; $(abspath $(MAME_DIR)/mame) dspiftst -video none -sound none \
+		-nothrottle -noreadconfig -debugger none -seconds_to_run 1 >output.log 2>&1 || status=$$?; \
+		cat output.log; test "$$status" -eq 3; \
+		test "$$(grep -Fxc 'Nokia DSPIF state: PASS ram_words=2048 queued_packets=2 registers=1 save_replay=1 cpu=0 firmware=0' output.log)" -eq 1; \
+		grep -Fxq 'Fatal error: Nokia DSPIF state fixture complete' output.log
 
 check-c54x-core: build
 	$(PYTHON) tools/run_c54x_core.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms
