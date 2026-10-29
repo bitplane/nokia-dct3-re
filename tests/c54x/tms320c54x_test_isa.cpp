@@ -13,6 +13,7 @@
 #include "tms320c54x_test_memory_examples.h"
 #include "tms320c54x_test_near_flow.h"
 #include "tms320c54x_test_mapped_mac.h"
+#include "tms320c54x_test_dual.h"
 #include <cstring>
 
 namespace {
@@ -26,8 +27,9 @@ public:
 	{
 		m_domain = !std::strcmp(config.options().bios(), "source-domain");
 		m_mapped_mac = !std::strcmp(config.options().bios(), "mac-map-imm");
+		m_dual_mode = c54x_test::dual_multiply_mode::select(config.options().bios());
 		TMS320C54X(config, m_cpu, 13'000'000);
-		m_cpu->set_extended_program(m_domain || m_mapped_mac);
+		m_cpu->set_extended_program(m_domain || m_mapped_mac || bool(m_dual_mode));
 		m_cpu->set_addrmap(AS_PROGRAM, &c54x_isa_test_state::program_map);
 		m_cpu->set_addrmap(AS_DATA, &c54x_isa_test_state::ram_map);
 		m_cpu->set_addrmap(AS_IO, &c54x_isa_test_state::io_map);
@@ -36,7 +38,8 @@ protected:
 	void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(c54x_isa_test_state::check), this);
-		if (m_mapped_mac) m_mapped = std::make_unique<c54x_test::mapped_mac_fixture>(machine(), *m_cpu, *m_timer);
+		if (m_dual_mode) m_dual = std::make_unique<c54x_test::dual_multiply_fixture_runner>(machine(), *m_cpu, *m_timer, m_dual_mode);
+		else if (m_mapped_mac) m_mapped = std::make_unique<c54x_test::mapped_mac_fixture>(machine(), *m_cpu, *m_timer);
 		else if (m_domain) m_domains = std::make_unique<c54x_test::source_domain_fixture>(machine(), *m_cpu, *m_timer);
 		else
 		{
@@ -63,11 +66,48 @@ protected:
 	void machine_reset() override
 	{
 		m_case = m_resets = 0;
-		if (m_mapped) m_mapped->start();
+		if (m_dual) m_dual->start();
+		else if (m_mapped) m_mapped->start();
 		else if (m_domains) m_domains->start();
 		else start();
 	}
 private:
+	[[noreturn]] void dual_result() const
+	{
+		bool const alu = m_dual_mode.alu(), parallel = m_dual_mode.parallel(), family = m_dual_mode.family(), macsu = m_dual_mode.macsu(), edge = m_dual_mode.edge;
+		if (family)
+		{
+			if (parallel)
+			{
+				if (edge) { osd_printf_info("TMS320C54x parallel MAC exclusions: PASS cases=%u restore=%u reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest()); throw emu_fatalerror(3, "TMS320C54x isolated parallel MAC exclusions complete"); }
+				osd_printf_info("TMS320C54x parallel MAC: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 shifts=32 reads=1 writes=1 retained=T,X,ASM old_source_store=1 carry=unvalidated physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest()); throw emu_fatalerror(3, "TMS320C54x isolated parallel MAC complete");
+			}
+			if (edge) { osd_printf_info("TMS320C54x dual MAC family exclusions: PASS cases=%u restore=%u reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest()); throw emu_fatalerror(3, "TMS320C54x isolated dual MAC family exclusions complete"); }
+			osd_printf_info("TMS320C54x dual MAC family: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 snapshots=3 reads=2 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest()); throw emu_fatalerror(3, "TMS320C54x isolated dual MAC family complete");
+		}
+		if (macsu)
+		{
+			if (edge) { osd_printf_info("TMS320C54x dual MACSU exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated dual MACSU exclusions complete"); }
+			osd_printf_info("TMS320C54x staged dual MACSU: PASS address_cases=18432 arithmetic_cases=196608 restore=215040 encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_unsigned_y_signed=1 x_alias_priority=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(0, "TMS320C54x isolated dual MACSU complete");
+		}
+		if (alu)
+		{
+			if (edge)
+			{
+				osd_printf_info("TMS320C54x staged dual ALU exclusions: PASS cases=32 restore=32 operations=ADD,SUB operands=X,Y sources=cpu_register,peripheral reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated dual ALU exclusions complete");
+			}
+			osd_printf_info("TMS320C54x staged dual ALU: PASS address_cases=36864 arithmetic_cases=49152 restore=86016 operations=ADD,SUB encodings=1024 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_alias_priority=1 t_unchanged=1 result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated\n");
+			throw emu_fatalerror(0, "TMS320C54x isolated dual ALU complete");
+		}
+		if (edge)
+		{
+			osd_printf_info("TMS320C54x staged dual MPY exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x isolated dual MPY exclusions complete");
+		}
+		osd_printf_info("TMS320C54x staged dual MPY: PASS address_cases=18432 arithmetic_cases=24576 restore=43008 encodings=512 layouts=3 bk_modes=2 value_pairs=64 arithmetic_flags=32 pages=2 snapshots=3 reads=2 data_writes=0 x_alias_priority=1 t_publish=Read result_publish=Execute physical_banks=unvalidated repeat_composition=unvalidated\n");
+		throw emu_fatalerror(0, "TMS320C54x isolated dual MPY complete");
+	}
 	bool parallel() const { return !std::strcmp(machine().options().bios(), "isa-parallel"); }
 	bool scalars() const { return !std::strcmp(machine().options().bios(), "isa-scalars"); }
 	bool long_reference() const { return !std::strcmp(machine().options().bios(), "isa-long"); }
@@ -86,7 +126,7 @@ private:
 	void program_map(address_map &map)
 	{
 		map(0, 0xffff).ram();
-		if (m_domain || m_mapped_mac) map(0x20000, 0x2ffff).ram();
+		if (m_domain || m_mapped_mac || m_dual_mode) map(0x20000, 0x2ffff).ram();
 	}
 	void io_map(address_map &map)
 	{
@@ -116,6 +156,7 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_dual) { if (m_dual->step()) dual_result(); return; }
 		if (m_mapped)
 		{
 			if (!m_mapped->step()) return;
@@ -172,6 +213,8 @@ private:
 	u64 m_first = 0, m_last = 0;
 	bool m_domain = false;
 	bool m_mapped_mac = false;
+	c54x_test::dual_multiply_mode m_dual_mode;
+	std::unique_ptr<c54x_test::dual_multiply_fixture_runner> m_dual;
 	std::unique_ptr<c54x_test::source_domain_fixture> m_domains;
 	std::unique_ptr<c54x_test::mapped_mac_fixture> m_mapped;
 	std::vector<c54x_test::instruction_case> m_cases;
@@ -187,6 +230,16 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(6, "isa-flow", "Conditional delayed branch return and high-address stack examples")
 	ROM_SYSTEM_BIOS(7, "mac-map-imm", "Read-retained mapped source with Execute-live immediate MAC")
 	ROM_SYSTEM_BIOS(8, "isa-memory", "Ordered literal memory arithmetic multiply and T examples")
+	ROM_SYSTEM_BIOS(9, "mpy-dual", "Dual-memory multiply addresses and arithmetic replay")
+	ROM_SYSTEM_BIOS(10, "mpy-dual-edge", "Excluded dual-memory multiply low-page operands")
+	ROM_SYSTEM_BIOS(11, "alu-dual", "Dual-memory ADD SUB retained arithmetic replay")
+	ROM_SYSTEM_BIOS(12, "alu-dual-edge", "Excluded dual-memory ADD SUB low-page operands")
+	ROM_SYSTEM_BIOS(13, "macsu-dual", "Dual signed unsigned multiply accumulate ownership")
+	ROM_SYSTEM_BIOS(14, "macsu-dual-edge", "Dual MACSU low mapped source exclusions")
+	ROM_SYSTEM_BIOS(15, "mac-family", "Dual MAC MACR MAS MASR with independent source and destination")
+	ROM_SYSTEM_BIOS(16, "mac-family-edge", "Dual MAC family mapped operand exclusions")
+	ROM_SYSTEM_BIOS(17, "stmac", "Parallel MAC stores with retained T X and ASM")
+	ROM_SYSTEM_BIOS(18, "stmac-edge", "Parallel MAC mapped operand exclusions")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
 ROM_END
 

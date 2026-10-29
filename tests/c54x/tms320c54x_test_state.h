@@ -19,6 +19,7 @@
 #include "tms320c54x_test_snapshot_state.h"
 #include "tms320c54x_test_snapshot.h"
 #include "tms320c54x_test_smem_schedule.h"
+#include "tms320c54x_test_dual_input.h"
 #include "tms320c54x_test_pipeline_state.h"
 #include <sstream>
 #include <bitset>
@@ -1334,21 +1335,6 @@ private:
 	};
 	static indexed_mar_fixture indexed_mar_case(unsigned v, bool reverse = false);
 	void start_indexed_mar(unsigned variant = 0);
-	struct dual_multiply_fixture
-	{
-		unsigned x, y, destination, snapshot, flags, source, operation;
-		bool linear;
-		u32 base;
-		std::array<u16, 4> initial, final;
-		u16 xaddress, yaddress, xword, yword, st0, st1, pmst, result_st0, stored;
-		u64 result;
-	};
-	static dual_multiply_fixture dual_multiply_case(unsigned variant, bool edge, bool alu = false, bool macsu = false, bool signed_mac = false, bool family = false, bool parallel = false);
-	static u64 dual_macsu_seed(unsigned variant, bool edge);
-	void start_dual_multiply(unsigned variant = 0);
-	dual_multiply_fixture m_dual_input{};
-	unsigned m_dual_raw_case = 0, m_dual_restores = 0;
-	ordered_case_digest m_dual_coverage;
 	struct mapped_dual_fixture
 	{
 		u32 base;

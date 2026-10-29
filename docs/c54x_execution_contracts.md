@@ -276,6 +276,8 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_square.h` | Reviewed literal SQUR/SQURA/SQURS cases shared by generic and default-sequence entries |
 | `tests/c54x/tms320c54x_test_parallel.h` | Reviewed parallel store/arithmetic vectors, including same-cell ordering and circular pointer controls |
 | `tests/c54x/tms320c54x_test_dual_reference.h` | Ordered dual/parallel MAC literal references with explicit partial setup and status masks |
+| `tests/c54x/tms320c54x_test_dual.h` | CPU-only staged MPY/ALU/MACSU/MAC setup, per-clock checks and paired snapshot continuation |
+| `tests/c54x/tms320c54x_test_dual_input.h` | Shared fixture-owned integer inputs/expectations; no CPU implementation helpers or Nokia dependencies |
 | `tests/c54x/tms320c54x_test_port_case.h` | Common PORTW stimulus construction; no instruction arithmetic or reset policy |
 | `tests/c54x/tms320c54x_test_scalars.h` | Literal scalar boundaries with explicit reset/continuation groups, shared with the legacy basic adapter |
 | `tests/c54x/tms320c54x_test_memory_examples.h` | Ordered literal memory arithmetic/multiply/T examples, with original partial setup and assertion masks |
@@ -4420,12 +4422,25 @@ census establishes numerical snapshot equivalence, 147,456 distinct
 addressing cases and zero address/numerical overlap in either profile.
 The cached descriptor belongs to a complete live/replay pair; arithmetic
 expectations and all per-clock mutation/assertion points are unchanged.
-These banks still use the legacy bench, not the CPU-only machine.
+These banks use the independent CPU-only machine. The shared staged fixture
+also hosts the MPY, dual ALU and MACSU profiles and their exclusion banks,
+without changing their case counts or acceptance markers. Relocation does
+not classify those remaining unreviewed semantic contracts.
+Both expectation-function bodies are byte-identical to their former owners;
+all eleven predicates/messages, seventeen register-setting calls and five
+program/data write calls retain their arguments and order. The standalone
+device graph contains only root and CPU, and every moved profile runs with
+an empty ROM directory. Program pages zero/two and data RAM replace the
+unused legacy program pages and I/O RAM window; case/reset policy is unchanged.
 The measured serial `stmac` run falls from 800.72 to 307.08 seconds; the
 retained `mac-family` run takes 306.00 seconds. Explicit scheduling and
 coverage/restore accounting add 910 C++ bytes/35 lines across the C54x
 sources, despite removing two redundant profile names and their routing.
 This is not a source-size win or a renewal of the full-default checkpoint.
+The subsequent CPU-only extraction measures 266.77 seconds for `stmac` and
+266.16 for `mac-family`, with the same cases, restores and digests. It adds
+691 C++ bytes/78 lines, including both new headers; dependency removal and
+roughly 13% focused runtime improvement are not claimed as source shrinkage.
 
 ## Staged square distance
 

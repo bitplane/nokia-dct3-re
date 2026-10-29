@@ -783,7 +783,7 @@
       "id": "dual-mac-family-retention",
       "classification": "architectural_interaction",
       "decision": "rewrite",
-      "source": "tests/c54x/tms320c54x_test_arithmetic.cpp; tests/c54x/tms320c54x_test_dual_schedule.h",
+      "source": "tests/c54x/tms320c54x_test_dual.h; tests/c54x/tms320c54x_test_dual_input.h; tests/c54x/tms320c54x_test_dual_schedule.h",
       "profiles": [
         "mac-family",
         "stmac"
@@ -817,8 +817,8 @@
         "retire 1048576 duplicate numerical checkpoint executions per profile; complete value-by-checkpoint Cartesian product is no longer covered",
         "parallel carry remains an unvalidated preserved-bit hypothesis, not documented silicon behavior; focused atomic carry examples are retained separately",
         "no physical-bank, adjacent producer, repeat or interrupt-composition closure claimed",
-        "these profiles still use the legacy bench; ROM-free operation is not yet CPU-only dependency extraction",
-        "descriptor caching touches the smaller shared dual MPY/ALU/MACSU profiles too; their original counts and markers must remain unchanged",
+        "these profiles execute in the independent CPU-only runner with program pages zero/two and data RAM; no Nokia/GSM/private-ROM dependency",
+        "the shared fixture also owns the smaller dual MPY/ALU/MACSU profiles; their original counts and markers remain unchanged, but relocation does not qualify their still-unreviewed semantic contracts",
         "the 215040 mac-dual and 16 mac-dual-edge descriptors, snapshot choices, initializations and per-clock checks match operation/selector block zero of the retained family profiles; retire these duplicate profile names and routing, not their contracts"
       ],
       "measurement": {
@@ -841,7 +841,7 @@
       "id": "dual-mac-family-admission",
       "classification": "implementation_limit",
       "decision": "keep",
-      "source": "tests/c54x/tms320c54x_test_arithmetic.cpp",
+      "source": "tests/c54x/tms320c54x_test_dual.h; tests/c54x/tms320c54x_test_dual_input.h",
       "profiles": [
         "mac-family-edge",
         "stmac-edge"
@@ -870,8 +870,54 @@
       "limits": [
         "these X/Y decoder-admission controls do not duplicate the Smem source-domain bank",
         "no silicon exception policy or general mapped-operand support claim",
-        "legacy-bench dependencies remain; no CPU-only extraction claimed"
+        "CPU-only fixture support does not establish the physical handset's mapped-operand behavior"
       ]
+    },
+    {
+      "id": "dual-multiply-cpu-only-ownership",
+      "classification": "harness_infrastructure",
+      "decision": "relocate",
+      "source": "tests/c54x/tms320c54x_test_dual.h; tests/c54x/tms320c54x_test_dual_input.h; tests/c54x/tms320c54x_test_isa.cpp",
+      "profiles": [],
+      "case_ids": [],
+      "moved_profiles": [
+        "mpy-dual",
+        "mpy-dual-edge",
+        "alu-dual",
+        "alu-dual-edge",
+        "macsu-dual",
+        "macsu-dual-edge",
+        "mac-family",
+        "mac-family-edge",
+        "stmac",
+        "stmac-edge"
+      ],
+      "basis": "CPU-only ownership: a typed staged fixture owns setup, per-clock mutation/assertion, bus taps, host observation rewinds and snapshot continuation. Shared fixture-owned integer expectations are independent of CPU implementation helpers; the generic machine maps only program pages zero/two and data RAM.",
+      "obligations": [
+        "preserve all ten profile identities, ordered cases/checkpoints, exact result formats/fields and intentional completion messages; only BIOS machine ownership and sequential indices change",
+        "both integer expectation-function bodies remain byte-identical; all eleven assertion predicates/messages and all seventeen register-setting/five program-data-write calls retain normalized arguments and order",
+        "preserve no-reset-between-case behavior, all counter rewinds, paired live/replay scheduling and resume on a separate callback; no CPU state or expected arithmetic result is synthesized by the runner",
+        "run every moved profile in the independent executable with an empty ROM directory; its device graph must contain only root and C54x CPU",
+        "retain shared input type/functions for legacy mapped-ALU and parallel consumers, but remove staged multiply fields and phase routing from the legacy state",
+        "retain all default requirements, scope contracts, legacy atomic records/opcode words, existing generic references and affected handset menu gates"
+      ],
+      "limits": [
+        "ownership separation does not semantically review the smaller MPY/ALU/MACSU families; they remain outside the reviewed-profile count",
+        "no cases or checkpoints retired in this extraction; the previous schedule/deletion review remains authoritative",
+        "explicit runner/mode ownership adds source; this is not reported as source reduction or renewal of the full-default checkpoint"
+      ],
+      "measurement": {
+        "baseline_commit": "11d88a17",
+        "c54x_cpp_bytes_before": 3682913,
+        "c54x_cpp_bytes_after": 3683604,
+        "c54x_cpp_lines_before": 55794,
+        "c54x_cpp_lines_after": 55872,
+        "stmac_seconds_before": 307.08,
+        "stmac_seconds_after": 266.77,
+        "mac_family_seconds_before": 306,
+        "mac_family_seconds_after": 266.16,
+        "scope": "Serial focused wall times with unchanged cases and digests; the after runs use the standalone CPU-only executable and empty ROM directory. No whole-suite speed claim. Typed fixture ownership and narrower mapped state add 691 C++ bytes/78 lines, including both new headers."
+      }
     }
   ]
 }

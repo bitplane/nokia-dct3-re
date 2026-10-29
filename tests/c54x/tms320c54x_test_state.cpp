@@ -277,9 +277,7 @@ void tms320c54x_test_state::machine_reset()
 		{ {"mvmd-acc", "mvmd-st1"}, [](self &test) { test.start_mvmd_accumulator(); } },
 		{ {"subs"}, [](self &test) { test.start_pipeline_memory_arithmetic(); } },
 		{ {"adds"}, [](self &test) { test.start_pipeline_memory_arithmetic(); } },
-		{ {"mpy-dual", "mpy-dual-edge", "alu-dual", "alu-dual-edge"}, [](self &test) { test.start_dual_multiply(); } },
 		{ {"alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus"}, [](self &test) { test.start_mapped_dual(); } },
-		{ {"macsu-dual", "macsu-dual-edge"}, [](self &test) { test.start_dual_multiply(); } },
 		{ {"xc-signed"}, [](self &test) { test.start_signed_xc(); } },
 		{ {"xc-controls"}, [](self &test) { test.start_pipeline_xc_irq(); } },
 		{ {"xc-ret"}, [](self &test) { test.start_xc_return(); } },
@@ -345,7 +343,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"portr-block"}, [](self &test) { test.start_circular_portr_block(); } },
 	}))
 		return;
-	if (!strncmp(machine().options().bios(), "mac-family", 10) || !strncmp(machine().options().bios(), "stmac", 5)) { start_dual_multiply(); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"sqdst", "sqdst-edge"}, [](self &test) { test.start_sqdst(); } },
 		{ {"stld", "stld-edge", "stld-rpt-edge", "st-par-alu", "st-par-edge"}, [](self &test) { test.start_parallel_load(); } },
