@@ -3565,7 +3565,7 @@
       "TMS320C54x staged long delay store: PASS cases=2880 restore=2880 controls=BD,BCD_taken,BCD_untaken,CALLD,RETD stores=STL_A,STL_B,STH_A,STH_B forms=offset,preincrement,circular,absolute literals=6 pages=2 snapshots=3 literal_fetches=1 destination_reads=0 store_writes=1 silicon_phase_claim=0\n": 1,
       "TMS320C54x staged long immediate ST: PASS cases=6144 forms=offset,preincrement,circular registers=8 offsets=4 values=4 compatibility=0,1 pages=2 restore=6144 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x staged long memory logic: PASS cases=294912 restore=294912 operations=AND,OR,XOR accumulators=2 modes=24 offsets=4 value_pairs=4 sxm_ovm=4 cmpt=2 bk=0,13 pages=2 snapshots=4 literal_fetches=1 source_reads=1 data_writes=0 pointer_updates_once=1 native_offset1462=1 mapped_acceptance=0 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n": 1,
-      "TMS320C54x staged long peripheral RMW: PASS cases=368640 restore=368640 operations=ADDM,ANDM,ORM registers=8 forms=offset,preincrement offsets=3b,39,49 spans=peripheral,RAM value_pairs=8 status_states=8 compatibility=2 pages=2 snapshots=5 reads=1 writes=1 literal_fetches=2 peripheral_extra=1 ram_extra=0 double_charge=0 device_semantics=unvalidated silicon_phase_claim=0\n": 1,
+      "TMS320C54x staged long peripheral RMW: PASS cases=%u restore=%u operations=ADDM,ANDM,ORM registers=8 forms=offset,preincrement offsets=3b,39,49 spans=peripheral,RAM value_pairs=8 status_states=8 compatibility=2 pages=2 snapshots=5 reads=1 writes=1 literal_fetches=2 peripheral_extra=1 ram_extra=0 double_charge=0 device_semantics=unvalidated silicon_phase_claim=0 checkpoint_policy=balanced coverage_fnv64=%016llx\n": 1,
       "TMS320C54x staged long peripheral ST: PASS cases=6144 restore=6144 registers=8 forms=offset,preincrement values=4 compatibility=2 offsets=3b,38,49 spans=peripheral,RAM pages=2 snapshots=4 literal_fetches=2 reads=0 writes=1 peripheral_extra=1 ram_extra=0 address_retained=1 device_semantics=unvalidated silicon_phase_claim=0\n": 1,
       "TMS320C54x staged long-offset BANZ: PASS cases=2304 forms=offset,preincrement,circular registers=8 offset_pairs=8 compatibility=0,1 pages=2 restore=2304 offset_fetches=1 target_fetches=1 data_accesses=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x staged long-offset BANZD: PASS cases=4608 restore=4608 forms=offset,preincrement,circular registers=8 offset_pairs=8 compatibility=0,1 pages=2 delay_forms=two_single,one_double offset_fetches=1 target_fetches=1 data_accesses=0 silicon_phase_claim=0\n": 1,
@@ -10683,8 +10683,10 @@
       "machine": "tms54test",
       "reported_fields": [
         {
-          "cases": "368640",
+          "cases": "73728",
+          "checkpoint_policy": "balanced",
           "compatibility": "2",
+          "coverage_fnv64": "22f5d1555357ece0",
           "device_semantics": "unvalidated",
           "double_charge": "0",
           "forms": "offset,preincrement",
@@ -10696,7 +10698,7 @@
           "ram_extra": "0",
           "reads": "1",
           "registers": "8",
-          "restore": "368640",
+          "restore": "73728",
           "silicon_phase_claim": "0",
           "snapshots": "5",
           "spans": "peripheral,RAM",
@@ -10706,7 +10708,7 @@
         }
       ],
       "required": [
-        "TMS320C54x staged long peripheral RMW: PASS cases=368640 restore=368640 operations=ADDM,ANDM,ORM registers=8 forms=offset,preincrement offsets=3b,39,49 spans=peripheral,RAM value_pairs=8 status_states=8 compatibility=2 pages=2 snapshots=5 reads=1 writes=1 literal_fetches=2 peripheral_extra=1 ram_extra=0 double_charge=0 device_semantics=unvalidated silicon_phase_claim=0"
+        "TMS320C54x staged long peripheral RMW: PASS cases=73728 restore=73728 operations=ADDM,ANDM,ORM registers=8 forms=offset,preincrement offsets=3b,39,49 spans=peripheral,RAM value_pairs=8 status_states=8 compatibility=2 pages=2 snapshots=5 reads=1 writes=1 literal_fetches=2 peripheral_extra=1 ram_extra=0 double_charge=0 device_semantics=unvalidated silicon_phase_claim=0 checkpoint_policy=balanced coverage_fnv64=22f5d1555357ece0"
       ]
     },
     "rotate": {
@@ -15765,6 +15767,18 @@
       },
       "decision": "merge",
       "family": "long-ram-rmw"
+    },
+    "rmw-long-periph": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 73728,
+        "fnv64": "22f5d1555357ece0",
+        "key": "original flat case ordinal = numeric ordinal + selected checkpoint index * 73728",
+        "result_prefix": "TMS320C54x staged long peripheral RMW: PASS "
+      },
+      "decision": "rewrite",
+      "family": "long-peripheral-rmw"
     },
     "rotate": {
       "case_ids": [],

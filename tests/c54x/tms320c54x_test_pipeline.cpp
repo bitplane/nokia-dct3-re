@@ -1335,7 +1335,7 @@ void tms320c54x_test_state::start_pipeline_long_rmw(unsigned variant)
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	bool const peripheral = profile_is("rmw-long-periph");
 	bool const xorm = profile_is("xorm-absolute");
-	if (!variant && !peripheral && !xorm)
+	if (!variant && !xorm)
 	{
 		m_long_rmw_coverage = {};
 		m_long_rmw_replays = 0;

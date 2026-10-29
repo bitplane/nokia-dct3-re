@@ -5763,7 +5763,7 @@ bool tms320c54x_test_state::check_absolute_xorm_results()
 		u16 const initial_st0 = (f.st0 & ~0x0400) | (BIT(arithmetic, 2) << 10) | 0x0800;
 		u16 const modified_st0 = compatibility && f.reg && f.kind != 3 ? (initial_st0 & 0x1fff) | (f.reg << 13) : initial_st0;
 		auto const expected = long_rmw_expected(arithmetic, operation, modified_st0);
-		unsigned const checkpoint = xorm ? std::array<unsigned, 4>{4, 6, 7, 8}[variant / 1024] : peripheral ? std::array<unsigned, 5>{4, 6, 7, 8, 9}[variant / 73728] : long_rmw_schedule::checkpoints[long_rmw_schedule::checkpoint_index(variant)];
+		unsigned const checkpoint = xorm ? std::array<unsigned, 4>{4, 6, 7, 8}[variant / 1024] : peripheral ? peripheral_rmw_schedule::checkpoints[peripheral_rmw_schedule::checkpoint_index(variant)] : long_rmw_schedule::checkpoints[long_rmw_schedule::checkpoint_index(variant)];
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Long-offset RMW has three-word staged ownership");
 		if (tick == 5)
 		{
@@ -5803,12 +5803,12 @@ bool tms320c54x_test_state::check_absolute_xorm_results()
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
 				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore long RMW without duplicate reads, writes or pointer updates");
-				if (!peripheral && !xorm) ++m_long_rmw_replays;
+				if (!xorm) ++m_long_rmw_replays;
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252900; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (!peripheral && !xorm) m_long_rmw_coverage.add(long_rmw_schedule::case_key(variant));
-			unsigned const limit = xorm ? 4096 : peripheral ? 368640 : long_rmw_schedule::unique_cases;
+			if (!xorm) m_long_rmw_coverage.add(peripheral ? peripheral_rmw_schedule::case_key(variant) : long_rmw_schedule::case_key(variant));
+			unsigned const limit = xorm ? 4096 : peripheral ? peripheral_rmw_schedule::unique_cases : long_rmw_schedule::unique_cases;
 			if (variant + 1 < limit) { start_pipeline_long_rmw(variant + 1); return true; }
 			if (xorm)
 			{
@@ -5817,7 +5817,10 @@ bool tms320c54x_test_state::check_absolute_xorm_results()
 			}
 			if (peripheral)
 			{
-				osd_printf_info("TMS320C54x staged long peripheral RMW: PASS cases=368640 restore=368640 operations=ADDM,ANDM,ORM registers=8 forms=offset,preincrement offsets=3b,39,49 spans=peripheral,RAM value_pairs=8 status_states=8 compatibility=2 pages=2 snapshots=5 reads=1 writes=1 literal_fetches=2 peripheral_extra=1 ram_extra=0 double_charge=0 device_semantics=unvalidated silicon_phase_claim=0\n");
+				expect(m_long_rmw_coverage.count == limit && m_long_rmw_replays == limit,
+					"Every scheduled peripheral RMW case executes and replays exactly once");
+				osd_printf_info("TMS320C54x staged long peripheral RMW: PASS cases=%u restore=%u operations=ADDM,ANDM,ORM registers=8 forms=offset,preincrement offsets=3b,39,49 spans=peripheral,RAM value_pairs=8 status_states=8 compatibility=2 pages=2 snapshots=5 reads=1 writes=1 literal_fetches=2 peripheral_extra=1 ram_extra=0 double_charge=0 device_semantics=unvalidated silicon_phase_claim=0 checkpoint_policy=balanced coverage_fnv64=%016llx\n",
+					m_long_rmw_coverage.count, m_long_rmw_replays, (unsigned long long)m_long_rmw_coverage.value);
 				throw emu_fatalerror(0, "TMS320C54x isolated long peripheral RMW complete");
 			}
 			expect(m_long_rmw_coverage.count == limit && m_long_rmw_replays == limit,

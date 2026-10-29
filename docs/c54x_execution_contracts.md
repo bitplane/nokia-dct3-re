@@ -233,6 +233,15 @@ case/checkpoint digests and actual replay counts are required acceptance, with
 the selector independently checked outside the CPU. The exact staged cycle
 placement remains a model contract, not measured silicon timing.
 
+`rmw-long-periph` retains all 73,728 operation/address/operand/status/page
+inputs once. Within each of 9,216 fixed groups, the eight operand pairs visit
+all five original checkpoints (4/6/7/8/9); the 294,912 additional checkpoint
+copies are retired. Original flat case IDs form the required ordered digest,
+with actual completed-case and restore counts. Literal/pointer/RAM poisoning,
+one read/write, two extension fetches, preserved state and the extra peripheral
+clock remain checked. These are synthetic peripheral-bus timing regressions,
+not evidence of real peripheral semantics or measured silicon phases.
+
 Long STL/STH uses the same retention policy: 12,800 regular and 57,344 shifted
 stimuli run once each, rather than three times each. Within each fixed
 address/selector/status/compatibility-or-shift group, the four value patterns

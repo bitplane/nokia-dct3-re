@@ -418,6 +418,45 @@ int main() {
         self.assertTrue(all(group == Counter({i: 2 for i in range(4)}) for group in groups.values()))
         self.assertEqual(output[-1], 'digest=' + reviewed_profiles()['rmw-long']['coverage']['fnv64'])
 
+    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
+    def test_peripheral_rmw_schedule_preserves_all_inputs_and_saved_shapes(self):
+        source = r'''
+#include <iostream>
+#include "tests/c54x/tms320c54x_test_support.h"
+#include "tests/c54x/tms320c54x_test_rmw_schedule.h"
+int main() {
+    using schedule = c54x_test::peripheral_rmw_schedule;
+    c54x_test::ordered_case_digest digest;
+    for (unsigned v = 0; v < schedule::unique_cases; ++v) {
+        unsigned const key = schedule::case_key(v);
+        digest.add(key); std::cout << key << '\n';
+    }
+    std::cout << "digest=" << std::hex << digest.value << '\n';
+}
+'''
+        with compiled_cpp(source) as program:
+            output = subprocess.run([str(program)], check=True, capture_output=True,
+                                    text=True).stdout.splitlines()
+        expected, groups = [], defaultdict(Counter)
+        for page in range(2):
+            for pair in range(8):
+                for flags in range(8):
+                    for address in range(192):
+                        for operation in range(3):
+                            ordinal = operation + 3 * address + 576 * (flags + 8 * pair) + 36864 * page
+                            point = (pair + operation + address) % 5
+                            old = ordinal + point * 73728
+                            expected.append(old)
+                            groups[operation, address, flags, page][point] += 1
+                            self.assertEqual(old % 73728, ordinal)
+        self.assertEqual(list(map(int, output[:-1])), expected)
+        self.assertEqual(len(set(expected)), 73728)
+        self.assertTrue(all(0 <= v < 368640 for v in expected))
+        self.assertEqual(len(groups), 9216)
+        self.assertTrue(all(set(g) == set(range(5)) and sorted(g.values()) == [1, 1, 2, 2, 2]
+                            for g in groups.values()))
+        self.assertEqual(output[-1], 'digest=' + reviewed_profiles()['rmw-long-periph']['coverage']['fnv64'])
+
     def test_reviewed_case_identities_are_required_in_order(self):
         for profile, review in reviewed_profiles().items():
             if not review['case_ids']:

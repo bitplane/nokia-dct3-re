@@ -1978,7 +1978,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated McBSP control complete",
     ),
     "rmw-long-periph": (
-        "TMS320C54x staged long peripheral RMW: PASS cases=368640 restore=368640 operations=ADDM,ANDM,ORM registers=8 forms=offset,preincrement offsets=3b,39,49 spans=peripheral,RAM value_pairs=8 status_states=8 compatibility=2 pages=2 snapshots=5 reads=1 writes=1 literal_fetches=2 peripheral_extra=1 ram_extra=0 double_charge=0 device_semantics=unvalidated silicon_phase_claim=0",
+        "TMS320C54x staged long peripheral RMW: PASS cases=73728 restore=73728 operations=ADDM,ANDM,ORM registers=8 forms=offset,preincrement offsets=3b,39,49 spans=peripheral,RAM value_pairs=8 status_states=8 compatibility=2 pages=2 snapshots=5 reads=1 writes=1 literal_fetches=2 peripheral_extra=1 ram_extra=0 double_charge=0 device_semantics=unvalidated silicon_phase_claim=0 checkpoint_policy=balanced coverage_fnv64=22f5d1555357ece0",
         "Fatal error: TMS320C54x isolated long peripheral RMW complete",
     ),
     "long-mvkd": (

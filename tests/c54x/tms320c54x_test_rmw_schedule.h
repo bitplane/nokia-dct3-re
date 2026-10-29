@@ -28,6 +28,22 @@ struct long_rmw_schedule
 	}
 };
 
+struct peripheral_rmw_schedule
+{
+	static constexpr unsigned unique_cases = 3 * 192 * 64 * 2;
+	inline static constexpr std::array<unsigned, 5> checkpoints{4, 6, 7, 8, 9};
+	static constexpr unsigned checkpoint_index(unsigned variant)
+	{
+		// Every fixed operation/address/status/page group keeps all eight pairs
+		// and visits all five saved shapes, instead of replaying every pair five times.
+		return ((variant / 4608) % 8 + variant % 3 + (variant / 3) % 192) % checkpoints.size();
+	}
+	static constexpr unsigned case_key(unsigned variant)
+	{
+		return variant + checkpoint_index(variant) * unique_cases;
+	}
+};
+
 } // namespace c54x_test
 
 #endif // MAME_NOKIA_TMS320C54X_TEST_RMW_SCHEDULE_H

@@ -8,6 +8,22 @@
   },
   "families": [
     {
+      "id": "long-peripheral-rmw",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "profiles": ["rmw-long-periph"],
+      "case_ids": [],
+      "source": "tests/c54x/tms320c54x_test_rmw_schedule.h; shared long-RMW initializer and result handler",
+      "basis": "TI ADDM/ANDM/ORM operand/status contracts and the unchanged fixture-owned integer/bitwise expectations. Peripheral-versus-RAM bus waits and exact publication clocks are implementation regressions; this synthetic bus does not establish real peripheral semantics.",
+      "profile_coverage": {
+        "rmw-long-periph": {"result_prefix": "TMS320C54x staged long peripheral RMW: PASS ", "cases": 73728, "key": "original flat case ordinal = numeric ordinal + selected checkpoint index * 73728", "fnv64": "22f5d1555357ece0"}
+      },
+      "obligations": ["retain all 73728 numeric/address/status/page tuples: three operations, eight registers, two forms, three offsets, peripheral/RAM spans, both compatibility states, eight operand pairs, eight status states and two pages", "each of 9216 fixed operation/address/status/page groups retains all eight pairs and all five original checkpoint clocks 4/6/7/8/9", "unchanged opcode/address/immediate order, literal poisoning after fetch, pointer replacement after Access and RAM replacement after Read", "retain one read, one write, two literal fetches, selected-pointer update, preserved decoys/accumulators/status and the peripheral extra clock without double charging", "count actual restores and completed cases; verify the independently derived ordered original-case digest"],
+      "limits": ["retire 294912 extra value-by-checkpoint case/restore pairs; every operand pair at every checkpoint is no longer covered", "this does not qualify actual peripheral side effects, silicon pipeline timing, IRQ or repeat compositions", "still executes in the legacy composition; no CPU-only relocation or source-size reduction claimed", "the default long RAM RMW and absolute XORM profiles retain their distinct schedules and contracts; focused checks do not renew the full-default checkpoint"],
+      "measurement": {"baseline_commit": "2b20cd37", "c54x_cpp_bytes_before": 3555912, "c54x_cpp_bytes_after": 3556898, "c54x_cpp_lines_before": 54334, "c54x_cpp_lines_after": 54353, "cases_before": 368640, "cases_after": 73728, "runner_seconds_after": 32.43, "scope": "80 percent fewer scheduled case/restore pairs, not a source win: the explicit balanced schedule and actual completion/replay accounting add 986 C++ bytes/19 lines. After time is serial runner wall time; no measured before/after wall-time ratio or full-default speedup is claimed."},
+      "validation": "The old exhaustive native capture passes its frozen pre-change contract. The new full peripheral matrix passes its count, actual restores and ordered digest. Unchanged shared rmw-long (38400 cases) and xorm-absolute (4096 cases) controls pass. All 374 focused host tests and evidence/parity/31-patch checks pass. Host enumeration proves every numeric tuple remains once and all five checkpoints occur per fixed group; arithmetic/input/address reference bodies are unchanged."
+    },
+    {
       "id": "legacy-timed-replay-tail",
       "classification": "harness_infrastructure",
       "decision": "merge",
@@ -439,7 +455,7 @@
       "limits": [
         "balanced coverage does not claim the full value-by-checkpoint product; the temporary comparison profile is retired",
         "exact staged cycle placement is a model contract, not measured silicon",
-        "peripheral RMW and absolute XORM are separate, unchanged families",
+        "peripheral RMW and absolute XORM are separately owned; this RAM decision does not qualify them",
         "still uses the sequenced bench; CPU-only relocation is not claimed"
       ],
       "retired_profiles": ["rmw-long-full"],
