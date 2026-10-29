@@ -97,6 +97,8 @@ protected:
 				m_cases.insert(m_cases.end(), offsets.begin(), offsets.end());
 				auto const &circular = c54x_test::circular_marker_examples();
 				m_cases.insert(m_cases.end(), circular.begin(), circular.end());
+				auto const &routes = c54x_test::memory_route_examples();
+				m_cases.insert(m_cases.end(), routes.begin(), routes.end());
 			}
 			else if (words()) m_cases = c54x_test::instruction_word_examples();
 			else if (products()) m_cases = c54x_test::product_examples();

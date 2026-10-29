@@ -6555,14 +6555,14 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
-          "cases": "256",
+          "cases": "282",
           "firmware": "0",
           "nokia_devices": "0",
-          "reset_groups": "10"
+          "reset_groups": "17"
         }
       ],
       "required": [
-        "TMS320C54x generic memory examples: PASS cases=256 reset_groups=10 nokia_devices=0 firmware=0"
+        "TMS320C54x generic memory examples: PASS cases=282 reset_groups=17 nokia_devices=0 firmware=0"
       ]
     },
     "isa-parallel": {
@@ -15472,7 +15472,33 @@
         "high-load-b-postincrement",
         "mapped-ar7-load-b-unsigned",
         "andm-retains-pointer-status",
-        "orm-uses-previous-andm-result"
+        "orm-uses-previous-andm-result",
+        "bitf-long-preupdate-retains-carry",
+        "cmpm-immediate-before-offset",
+        "bitf-ar0-absent-bit",
+        "mvmm-ar3-to-ar6",
+        "push-long-preupdated-source",
+        "pop-long-preupdated-destination",
+        "double-store-b-long-high-low",
+        "double-load-b-long-signed",
+        "sub-high-long-preupdated-source",
+        "bitt-long-stationary-source",
+        "multiply-long-preupdated-source",
+        "load-ar2-unsigned-with-sxm",
+        "load-ar2-signed-same-source",
+        "store-bl-to-ar4",
+        "mvdk-offset-before-destination",
+        "mvkd-offset-before-source",
+        "reada-long-preupdated-destination",
+        "mvpd-program-address-before-offset",
+        "load-shift-zero-offset-before-operation",
+        "mvdd-ar2-to-ar5-postincrement",
+        "ldu-b-ar2-circular-wrap",
+        "and-ar2-stationary-source",
+        "load-ar1-signed-stationary-source",
+        "frame-increment-crosses-page",
+        "or-immediate-b-retains-upper-bits",
+        "and-immediate-b-to-a-retains-b"
       ],
       "classification": "architectural_interaction",
       "decision": "rewrite",
