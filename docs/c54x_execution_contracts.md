@@ -158,8 +158,8 @@ No far-control or pending-transfer restoration case is deleted. This rewrite
 removes 1,781 C++ bytes/47 lines while preserving all 173 legacy PASS records
 and 2,474 asserted opcode words.
 
-`isa-memory` retains 100 memory/accumulator examples in three ordered reset
-groups (45, 30 and 25). Legacy adapters share the literal data without resetting
+`isa-memory` retains 111 memory/accumulator examples in four ordered reset
+groups (45, 30, 25 and 11). Legacy adapters share the literal data without resetting
 their predecessor state. Carry retained across AND/MPY, shifted-SUB and
 negative-half MACR rows remains observable; the 14 multiply rows keep their
 full ST1 assertions, while other rows retain their original partial masks.
@@ -168,6 +168,11 @@ literal ordering, DP/SP addressing and preserved decoys, squares and saturating
 ADDM. The third group covers signed-six-bit TS/encoded shifts, MAX/MIN signed
 guards and an inherited-B tie, EXP/NORM and one-cycle RND/SAT examples.
 The broader RND boundary matrix overlaps numbers but not these cycle checks.
+The fourth group covers atomic ROR, shifted register OR/XOR/SFTL and immediate
+AND/OR/XOR. It retains the checked carry entering ROR-B and cross-accumulator
+AND, partial carry masks, guard clearing/preservation and one/two-cycle PORTW
+contrasts. Its 11 legacy entries stay at their original continuation points;
+1,408 register-bit mutations and 66 marker controls preserve their predicates.
 Reset-only RAM metadata seeds inherited source words for standalone
 execution; `prepare_case` deliberately ignores it. The POLY values match
 the [SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf) page 4-126 example.
@@ -362,6 +367,8 @@ values that depend on preceding guest writes must remain sequential calls.
 and scheduling the existing 100-microsecond atomic observer, in that order.
 Neither helper resets the CPU, computes expectations, or makes sequential
 legacy cases independent.
+`begin_atomic_case` likewise retains predecessor state; reset-only metadata
+belongs to the standalone runner, not the legacy case-start helper.
 
 Register-only logic/CMPL (`reg-logic`), SFTA/SFTL (`reg-shifts`), NEG and ABS
 share the clocked CPU-only runner and independent integer case builders.

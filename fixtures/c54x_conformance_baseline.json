@@ -6497,14 +6497,14 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
-          "cases": "100",
+          "cases": "111",
           "firmware": "0",
           "nokia_devices": "0",
-          "reset_groups": "3"
+          "reset_groups": "4"
         }
       ],
       "required": [
-        "TMS320C54x generic memory examples: PASS cases=100 reset_groups=3 nokia_devices=0 firmware=0"
+        "TMS320C54x generic memory examples: PASS cases=111 reset_groups=4 nokia_devices=0 firmware=0"
       ]
     },
     "isa-parallel": {
@@ -15531,7 +15531,18 @@
         "rnd-ovm-one-cycle",
         "sat-b-positive-guard",
         "sat-a-negative-guard",
-        "sat-b-in-range-clear-overflow"
+        "sat-b-in-range-clear-overflow",
+        "ror-a-carry-in-guard-clear",
+        "ror-b-inherited-clear-carry",
+        "or-b-right-zero-fill",
+        "sftl-b-left-clears-guard",
+        "sftl-b-right-outgoing-carry",
+        "and-immediate-b-zero-extend",
+        "and-immediate-cross-accumulator",
+        "xor-b-left-truncates-forty-bits",
+        "and-immediate-a",
+        "or-immediate-a-preserves-guard",
+        "xor-immediate-high-word-a"
       ],
       "classification": "architectural_interaction",
       "decision": "rewrite",

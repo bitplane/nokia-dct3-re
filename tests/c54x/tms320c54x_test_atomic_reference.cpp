@@ -30,13 +30,9 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 		expect_opcode(test.opcode, true, "TI square reference case");
 		if (index + 1 < square_vectors.size())
 		{
-			m_port_writes = 0;
-			prepare_case(*m_cpu, square_case(index + 1));
-			return next_atomic_phase(m_phase + 1);
+			return begin_atomic_case(square_case(index + 1), m_phase + 1);
 		}
-		m_port_writes = 0;
-		prepare_case(*m_cpu, long_reference_cases()[0]);
-		return next_atomic_phase(554);
+		return begin_atomic_case(long_reference_cases()[0], 554);
 	}
 	if ((m_phase >= 554 && m_phase <= 562) || m_phase == 9211 || m_phase == 9212)
 	{
@@ -46,9 +42,7 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 		expect_opcode(test.opcode, true, "TI long-word arithmetic reference");
 		if (index + 1 < 11)
 		{
-			m_port_writes = 0;
-			prepare_case(*m_cpu, long_reference_cases()[index + 1]);
-			return next_atomic_phase(index < 8 ? m_phase + 1 : 9211 + index - 8);
+			return begin_atomic_case(long_reference_cases()[index + 1], index < 8 ? m_phase + 1 : 9211 + index - 8);
 		}
 		write_words(program, {
 			{0x05e0, 0x75f8}, {0x05e1, 0x0d00}, {0x05e2, 0x0124},
@@ -80,9 +74,7 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			"ROM4 DADD through stationary AR6 preserves B/status/source/pointers in one cycle with independent absolute port markers");
 		program.write_word(0x05e0, 0x75d6);
 		program.write_word(0x05e1, 0x0124);
-		m_port_writes = 0;
-		prepare_case(*m_cpu, long_reference_cases()[11]);
-		return next_atomic_phase(563);
+		return begin_atomic_case(long_reference_cases()[11], 563);
 	}
 	if (m_phase >= 563 && m_phase <= 569)
 	{
@@ -92,13 +84,9 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 		expect_opcode(test.opcode, true, "TI T-based long-word arithmetic reference");
 		if (m_phase < 569)
 		{
-			m_port_writes = 0;
-			prepare_case(*m_cpu, long_reference_cases()[index + 1]);
-			return next_atomic_phase(m_phase + 1);
+			return begin_atomic_case(long_reference_cases()[index + 1], m_phase + 1);
 		}
-		m_port_writes = 0;
-		prepare_case(*m_cpu, memory_examples()[0]);
-		return next_atomic_phase(570);
+		return begin_atomic_case(memory_examples()[0], 570);
 	}
 	static constexpr unsigned memory_phases[] = {
 		570, 571, 572, 573, 574, 575, 576, 577, 578, 579, 580, 581, 582, 583, 584, 585, 586,
@@ -114,9 +102,7 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 		expect_opcode(test.opcode, true, "Memory-operand literal reference");
 		if (index + 1 < memory_examples().size())
 		{
-			m_port_writes = 0;
-			prepare_case(*m_cpu, memory_examples()[index + 1]);
-			return next_atomic_phase(memory_phases[index + 1]);
+			return begin_atomic_case(memory_examples()[index + 1], memory_phases[index + 1]);
 		}
 		program.write_word(0x05e2, 0x5283); // DADD *AR3,B,A
 		data.write_word(0x0f90, 1);
@@ -221,9 +207,7 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			m_check_timer->adjust(attotime::from_usec(100));
 			return true;
 		}
-		m_port_writes = 0;
-		prepare_case(*m_cpu, dual_reference_cases().front());
-		return next_atomic_phase(614);
+		return begin_atomic_case(dual_reference_cases().front(), 614);
 	}
 	if (m_phase >= 614 && m_phase <= 652)
 	{
@@ -234,9 +218,7 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 		expect_opcode(test.opcode, true, "dual/parallel MAC routing, literal results, and one-cycle timing");
 		if (index + 1 < cases.size())
 		{
-			m_port_writes = 0;
-			prepare_case(*m_cpu, cases[index + 1]);
-			return next_atomic_phase(m_phase + 1);
+			return begin_atomic_case(cases[index + 1], m_phase + 1);
 		}
 		program.write_word(0x05e2, 0xe13a); // LMS *AR5,*AR4+.
 		data.write_word(0x0f90, 0x0055);
@@ -504,9 +486,7 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			});
 			return next_atomic_phase(6523);
 		}
-		m_port_writes = 0;
-		prepare_case(*m_cpu, memory_continuations().front());
-		return next_atomic_phase(665);
+		return begin_atomic_case(memory_continuations().front(), 665);
 	}
 	if (m_phase >= 665 && m_phase <= 694)
 	{
@@ -517,9 +497,7 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 		expect_opcode(test.opcode, true, "Literal memory/accumulator continuation");
 		if (index + 1 < cases.size())
 		{
-			m_port_writes = 0;
-			prepare_case(*m_cpu, cases[index + 1]);
-			return next_atomic_phase(m_phase + 1);
+			return begin_atomic_case(cases[index + 1], m_phase + 1);
 		}
 		m_phase = 9223;
 	}
@@ -551,9 +529,7 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			m_check_timer->adjust(attotime::from_usec(100));
 			return true;
 		}
-		m_port_writes = 0;
-		prepare_case(*m_cpu, parallel_case(0));
-		return next_atomic_phase(695);
+		return begin_atomic_case(parallel_case(0), 695);
 	}
 	if ((m_phase >= 695 && m_phase <= 702) || m_phase == 6503 || m_phase == 6533)
 	{
@@ -565,13 +541,9 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 		expect_opcode(test.opcode, true, "parallel store arithmetic reference case");
 		if (index + 1 < std::size(phases))
 		{
-			m_port_writes = 0;
-			prepare_case(*m_cpu, parallel_case(index + 1));
-			return next_atomic_phase(phases[index + 1]);
+			return begin_atomic_case(parallel_case(index + 1), phases[index + 1]);
 		}
-		m_port_writes = 0;
-		prepare_case(*m_cpu, shift_examples().front());
-		return next_atomic_phase(703);
+		return begin_atomic_case(shift_examples().front(), 703);
 	}
 	static constexpr unsigned shift_phases[] = {703, 7031, 704, 7041, 705, 706, 707, 708, 709, 710, 711, 712, 713, 714, 715, 716, 9248, 9249, 717, 718, 719, 720, 721, 722, 723};
 	auto const shift_phase = std::find(std::begin(shift_phases), std::end(shift_phases), m_phase);
@@ -584,9 +556,7 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 		expect_opcode(test.opcode, true, "Literal shift/comparison/normalization reference");
 		if (index + 1 < cases.size())
 		{
-			m_port_writes = 0;
-			prepare_case(*m_cpu, cases[index + 1]);
-			return next_atomic_phase(shift_phases[index + 1]);
+			return begin_atomic_case(cases[index + 1], shift_phases[index + 1]);
 		}
 		write_words(program, {
 			{0x05e2, 0x6283}, // MPY *AR3,#4,A.
@@ -923,9 +893,7 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			return true;
 		}
 		osd_printf_info("TMS320C54x ASM arithmetic shifts: PASS variants=512 shifts=32 sxm_settings=2 ovm_settings=2 sticky_settings=2\n");
-		m_port_writes = 0;
-		prepare_case(*m_cpu, product_examples()[0]);
-		return next_atomic_phase(730);
+		return begin_atomic_case(product_examples()[0], 730);
 	}
 	if ((m_phase >= 730 && m_phase <= 738) || (m_phase >= 740 && m_phase <= 749) ||
 		(m_phase >= 6558 && m_phase <= 6559))
@@ -943,9 +911,7 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			return next_atomic_phase(next < 3 ? 730 + next : next < 5 ? 6555 + next :
 				next <= 10 ? 728 + next : 729 + next);
 		}
-		m_port_writes = 0;
-		prepare_case(*m_cpu, near_flow_cases()[0]);
-		return next_atomic_phase(750);
+		return begin_atomic_case(near_flow_cases()[0], 750);
 	}
 	return false;
 }

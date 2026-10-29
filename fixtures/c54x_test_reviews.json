@@ -871,11 +871,22 @@
         "rnd-ovm-one-cycle",
         "sat-b-positive-guard",
         "sat-a-negative-guard",
-        "sat-b-in-range-clear-overflow"
+        "sat-b-in-range-clear-overflow",
+        "ror-a-carry-in-guard-clear",
+        "ror-b-inherited-clear-carry",
+        "or-b-right-zero-fill",
+        "sftl-b-left-clears-guard",
+        "sftl-b-right-outgoing-carry",
+        "and-immediate-b-zero-extend",
+        "and-immediate-cross-accumulator",
+        "xor-b-left-truncates-forty-bits",
+        "and-immediate-a",
+        "or-immediate-a-preserves-guard",
+        "xor-immediate-high-word-a"
       ],
       "basis": "TI SPRU172C and independent literal results for memory arithmetic, multiply/ACCA/POLY, T loads, shifted arithmetic, ABDST/LTD, short SUB/XOR, negative MACR rounding, program-coefficient MACP/MACD, DP/SP addressing, squares and saturating ADDM. Expectations and original partial preservation masks do not use CPU implementation helpers. Port intervals retain an emulator regression contract, not measured physical DARAM timing. Signed-six-bit TS/encoded shifts, MAX/MIN signed-guard and tie selection, EXP/NORM and one-cycle RND/SAT examples retain literal documented results.",
       "obligations": [
-        "retain all 100 case records, opcode words, literal results, partial setup and assertion masks as three ordered groups (45, 30 and 25); no reset within a group, and legacy entries remain in their original positions",
+        "retain all original 100 case records, opcode words, literal results, partial setup and assertion masks as three ordered groups (45, 30 and 25); append eleven register-bit examples as a fourth group; no reset within a group, and legacy entries remain in their original positions",
         "preserve carry across the checked AND-to-MPY and shifted-SUB continuations; retain A/B/T, selected/decoy AR and RAM checks only where originally asserted",
         "preserve the full ST1 checks in the 14 multiply rows without promoting the other carry-only checks to full status preservation",
         "standalone entry seeds the checked predecessor's C16 mode and circular timing-marker context; the legacy adapter retains its predecessor state without injecting that seed",
@@ -883,6 +894,8 @@
         "the second group retains inherited source RAM, T/SXM context, MACR carry, program-coefficient versus address-literal order, LTD successor writes and DP/SP decoys; reset_data seeds only a standalone reset and is ignored by legacy prepare_case",
         "compiled comparison preserves all 30 added setup sequences and 23520 register-bit/RAM-bit/marker mutations; a mixed LD/ST case remains two instruction words, not a fused operation",
         "retain the third group's inherited B in the MIN tie, ignoring upper T bits, SXM-dependent right shifts, signed guard-byte comparisons and full NORM B status preservation",
+        "eleven atomic ROR, register OR/XOR/SFTL and immediate AND/OR/XOR cases retain original ordered setup writes, partial A/B/carry predicates and one/two-cycle instruction-cost contrasts; ROR-B and cross-accumulator AND inherit checked carry rather than resetting it",
+        "the register subgroup uses literal independent expectations, not the staged ALU reference functions; compiled comparison retains all eleven ordered setup lists and acceptance under 1,408 register-bit mutations plus 66 marker controls",
         "compiled comparison preserves the 25 third-group setup sequences and 19600 register/RAM/marker mutations; retire only the inline initialization routing token, not either NORM B case",
         "native legacy result records and asserted opcode words remain identical; standalone runs in the independent CPU-only binary with an empty ROM directory"
       ],
@@ -900,6 +913,18 @@
         "c54x_cpp_lines_before": 55429,
         "c54x_cpp_lines_after": 55140,
         "scope": "All tests/c54x C++ and headers including the new 25-case shift/scalar bank and CPU-only routing. Net reduction 10285 bytes/289 lines; no generated replacement bulk or removed instruction case. Existing 75 identities remain the exact prefix of the expanded profile."
+      },
+      "register_bits_refactor": {
+        "baseline_commit": "4a297ce0",
+        "legacy_phases": [103, 113, 128, 191, 192, 195, 196, 197, 198, 199, 219],
+        "decision": "retain and rewrite as literal vectors shared by the original atomic continuations and the CPU-only bank",
+        "scope": "These eleven cases are atomic instruction-cost and partial-state controls, not duplicates of the staged ALU/restoration matrices. No instruction case, opcode, expected value, assertion mask or predecessor dependency is deleted. Canonical PORTW brackets are reasserted; unobserved marker payloads are not promoted to expectations.",
+        "verification": "All eleven ordered setup lists and predicates match under 1,408 register-bit mutations and 66 marker controls; seventeen existing case-start sequences expand to identical tokens. Native isa-memory passes all 111 IDs in four reset groups. The legacy prefix preserves all 172 PASS records and all 2,474 asserted opcode words in order. Both handset menu gates and 5,069 host tests pass; no full-default checkpoint renewal.",
+        "c54x_cpp_bytes_before": 3613249,
+        "c54x_cpp_bytes_after": 3609952,
+        "c54x_cpp_lines_before": 54730,
+        "c54x_cpp_lines_after": 54632,
+        "source_assessment": "3,297 C++ bytes and 98 lines removed, including the literal data and both common atomic helpers; no generated runtime replacement or test-time speedup claimed."
       }
     },
     {

@@ -15,7 +15,7 @@ class C54xSelectionTests(unittest.TestCase):
         from tools.test_c54x_case_fixture import compiled_cpp
         header = (ROOT / 'tests/c54x/tms320c54x_test_state.h').read_text()
         begin = header.index('\tbool next_atomic_phase(unsigned phase)')
-        end = header.index('\tbool check_atomic_basic_results();', begin)
+        end = header.index('\tbool begin_atomic_case(', begin)
         source = r'''
 #include <cassert>
 #include <vector>

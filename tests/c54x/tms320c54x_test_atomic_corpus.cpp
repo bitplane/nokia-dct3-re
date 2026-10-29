@@ -4,6 +4,7 @@
 #include "emu.h"
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_square.h"
+#include "tms320c54x_test_shift_examples.h"
 
 namespace c54x_test {
 
@@ -596,20 +597,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(102);
 		}
-		program.write_word(0x05e2, 0xf030); // AND #lk,A
-		program.write_word(0x05e3, 0x00f0);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(103);
+		return begin_atomic_case(register_bit_examples()[8], 103);
 	}
 	if (m_phase == 103)
 	{
-		expect_opcode(0xf030, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x30 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-				"ROM4 f030 AND uses zero-extended immediate and costs two cycles");
+		verify_atomic_case(register_bit_examples()[8]);
 		program.write_word(0x05e2, 0xf073); // B 05e4
 		program.write_word(0x05e3, 0x05e4);
 		m_port_writes = 0;
@@ -722,24 +714,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0400) &&
 				data.read_word(0x0d00) == 0x1234,
 				"parallel ST/MACR stores old B and sets OVA on saturated A");
-		write_words(program, {
-			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
-			{0x05e1, 0x0124},
-			{0x05e2, 0xf040}, // OR #lk,A
-			{0x05e3, 0x00f0}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
-		});
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0xff00000000ULL}, {cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(113);
+		return begin_atomic_case(register_bit_examples()[9], 113);
 	}
 	if (m_phase == 113)
 	{
-		expect_opcode(0xf040, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff000000f0ULL &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-				"ROM4 f040 OR zero-extends its immediate and costs two cycles");
+		verify_atomic_case(register_bit_examples()[9]);
 		program.write_word(0x05e2, 0x6082); // CMPM *AR2,#lk
 		program.write_word(0x05e3, 0x1234);
 		data.write_word(0x0e00, 0x1234);
@@ -975,24 +954,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234567654ULL &&
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
 				"ROM4 8a0b restores BL, preserves A, and advances SP");
-		write_words(program, {
-			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
-			{0x05e1, 0x0124},
-			{0x05e2, 0xf065}, // XOR #lk,16,A
-			{0x05e3, 0x00ff}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
-		});
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0xff00000000ULL}, {cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(128);
+		return begin_atomic_case(register_bit_examples()[10], 128);
 	}
 	if (m_phase == 128)
 	{
-		expect_opcode(0xf065, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff00ff0000ULL &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-				"ROM4 f065 XORs the shifted immediate and costs two cycles");
+		verify_atomic_case(register_bit_examples()[10]);
 		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
 		program.write_word(0x05e1, 0x0124);
 		program.write_word(0x05e2, 0xf071); // RPTZ A,#lk
@@ -1953,36 +1919,16 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f10 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 STL A,*AR3 stores the low word without pointer change in one cycle");
-		program.write_word(0x05e2, 0xf490); // ROR A
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0xab80000002ULL}, {cpu_regs::STATE_B, 0x1234}, {cpu_regs::STATE_ST0, 0x0800},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(191);
+		return begin_atomic_case(register_bit_examples()[0], 191);
 	}
 	if (m_phase == 191)
 	{
-		expect_opcode(0xf490, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xc0000001 &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 &&
-				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-				"ROM4 ROR A rotates old C into bit 31, clears guard and updates C in one cycle");
-		program.write_word(0x05e2, 0xf590); // ROR B
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff00000001ULL);
-		return resume_atomic_at(0x05e0, 192);
+		verify_atomic_case(register_bit_examples()[0]);
+		return begin_atomic_case(register_bit_examples()[1], 192);
 	}
 	if (m_phase == 192)
 	{
-		expect_opcode(0xf590, m_cpu->state_int(tms320c54x_device::STATE_B) == 0 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xc0000001 &&
-				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-				"ROR B clears guard, rotates old zero C and captures outgoing bit in one cycle");
+		verify_atomic_case(register_bit_examples()[1]);
 		program.write_word(0x05e2, 0xf845); // BC 05f0, AEQ
 		program.write_word(0x05e3, 0x05f0);
 		program.write_word(0x05e4, 0xffff);
@@ -2014,80 +1960,25 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(194);
 		}
-		program.write_word(0x05e2, 0xf3b0); // OR B >> 16, B
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 0xff80000001ULL}, {cpu_regs::STATE_ST0, 0x0800},
-			{cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(195);
+		return begin_atomic_case(register_bit_examples()[2], 195);
 	}
 	if (m_phase == 195)
 	{
-		expect_opcode(0xf3b0, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff80ff8001ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
-				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-				"ROM4 OR B >> 16 zero-fills, preserves flags and A, and costs one cycle");
-		program.write_word(0x05e2, 0xf3e8); // SFTL B, 8
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 0xff80000081ULL}, {cpu_regs::STATE_ST0, 0x0800},
-			{cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(196);
+		verify_atomic_case(register_bit_examples()[2]);
+		return begin_atomic_case(register_bit_examples()[3], 196);
 	}
 	if (m_phase == 196 || m_phase == 197)
 	{
-		expect_opcode(m_phase == 196 ? 0xf3e8 : 0xf3f8,
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (m_phase == 196 ? 0x8100 : 0x800000) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
-				bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) == (m_phase == 197) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-				"ROM4 SFTL B shifts low 32 bits, clears guard, updates C, and costs one cycle");
-		if (m_phase == 196)
-		{
-			program.write_word(0x05e2, 0xf3f8); // SFTL B, -8
-			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_B, 0xff80000081ULL}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_AR6, 0x0a03},
-				{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(197);
-		}
-		write_words(program, {
-			{0x05e2, 0xf330}, // AND #lk, B
-			{0x05e3, 0x0ff0}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
-		});
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 0xffab12cd34ULL}, {cpu_regs::STATE_ST0, 0x0800},
-			{cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(198);
+		verify_atomic_case(register_bit_examples()[m_phase == 196 ? 3 : 4]);
+		return m_phase == 196 ? begin_atomic_case(register_bit_examples()[4], 197) :
+			begin_atomic_case(register_bit_examples()[5], 198);
 	}
 	if (m_phase == 198 || m_phase == 199)
 	{
-		expect_opcode(m_phase == 198 ? 0xf330 : 0xf130,
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (m_phase == 198 ? 0x0d30 : 0x1030) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) ==
-						(m_phase == 198 ? 0x1234 : 0xffabcd1234ULL) &&
-				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-				"ROM4 AND #lk zeroes upper bits, preserves source and C, and costs two cycles");
+		verify_atomic_case(register_bit_examples()[m_phase == 198 ? 5 : 6]);
 		if (m_phase == 198)
 		{
-			program.write_word(0x05e2, 0xf130); // AND #lk, A, B
-			program.write_word(0x05e3, 0xf0f0);
-			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, 0xffabcd1234ULL}, {cpu_regs::STATE_B, 0x5678}, {cpu_regs::STATE_AR6, 0x0a03},
-				{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(199);
+			return begin_atomic_case(register_bit_examples()[6], 199);
 		}
 		program.write_word(0x05e2, 0xf010); // SUB #lk, A
 		program.write_word(0x05e3, 0xff80);
@@ -2397,26 +2288,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d4f &&
 				m_last_port_cycle - m_middle_port_cycle == 3,
 				"ROM4 indirect LDU reads before decrement and costs one cycle");
-		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xf3c8); // XOR B << 8, B
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x12345678}, {cpu_regs::STATE_B, 0x8080000001ULL}, {cpu_regs::STATE_ST0, 0x0800},
-			{cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(219);
+		return begin_atomic_case(register_bit_examples()[7], 219);
 	}
 	if (m_phase == 219)
 	{
-		expect_opcode(0xf3c8, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0080000101ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
-				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-				"ROM4 XOR B<<8,B uses the original 40-bit B, truncates the shift, and costs one cycle");
+		verify_atomic_case(register_bit_examples()[7]);
 		write_words(program, {
 			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
 			{0x05e1, 0x0124},

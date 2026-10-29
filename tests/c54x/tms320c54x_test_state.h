@@ -2015,6 +2015,17 @@ private:
 		m_cpu->set_state_int(cpu_regs::STATE_IDLE, 0);
 		return next_atomic_phase(phase);
 	}
+	bool begin_atomic_case(instruction_case const &test, unsigned phase)
+	{
+		m_port_writes = 0;
+		prepare_case(*m_cpu, test);
+		return next_atomic_phase(phase);
+	}
+	void verify_atomic_case(instruction_case const &test)
+	{
+		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
+		expect_opcode(test.opcode, true, "Literal atomic instruction case");
+	}
 	bool check_atomic_basic_results();
 	bool check_atomic_corpus_results();
 	bool check_atomic_reference_results();
