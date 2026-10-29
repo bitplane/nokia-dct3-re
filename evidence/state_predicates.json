@@ -63,8 +63,8 @@
       "owner": "tms320c54x",
       "status": "satisfied",
       "predicate": "Every enumerated implemented single-address source/RMW form rejects short write-only or unadmitted absolute aliases without operand effects across restoration",
-      "current": "source-domain passes30000 cases/restores:111 ordinary Smem/Lmem high-byte classes,10 shifted read extensions and4 MMR-source forms; modes98..9f/f9..ff, CMPT, pages, atomic/staged and two snapshots. No data read/write, program write or I/O access occurs; A/B/T/status/RC/SP and every AR remain unchanged. The independent literal inventory does not consume CPU predicates. The prior core fails case3428 on atomic0ef9 SUBB, before the fix. This establishes the source/RMW exclusion census, not every positive operand domain, destination aliases, dual-memory grammar, physical timing, silicon trapping or native handset speech. Existing isolated/default result contracts are retained; one profile is added.",
-      "evidence": ["docs/c54x_execution_contracts.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test_operand_domains.cpp", "tools/test_c54x_operand_domains.py", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
+      "current": "The ROM-free CPU-only source-domain fixture passes44656 actual cases/restores. The base30000 retains111 ordinary Smem/Lmem classes,10 shifted read extensions and4 MMR-source forms across98..9f/f9..ff, CMPT, pages, frontends and two checkpoints;448 absolute TC-clear and14208 short controls retain shift boundaries, ASM, C16, repeat and TC-clear contexts. No data/program/I-O effects occur; supplied A/B/T/status/SP/AR values are preserved, plus RC except where the explicit RPT prefix changes it. Independent host enumeration checks every stimulus field and ordered key; the original30448-key prefix remains unchanged. The prior-core atomic0ef9 SUBB failure at case3428 is retained. This is model admission coverage, not complete positive addressing, all shifts, dual-memory grammar, silicon traps or timing. The review ledger explicitly records removed repetition and profiles.",
+      "evidence": ["docs/c54x_execution_contracts.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test_domains.h", "tests/c54x/tms320c54x_test_domain_schedule.h", "fixtures/c54x_test_reviews.json", "tools/test_c54x_operand_domains.py", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
       "id": "nse2_empty_field_record_padding",
@@ -87,7 +87,7 @@
       "owner": "tms320c54x",
       "status": "satisfied",
       "predicate": "Both frontends reject the tested long-memory arithmetic f9..ff forms before operand effects across restoration",
-      "current": "The unchanged-core long-abs-edge fixture fails at case56, its first atomic case, on a data transaction; ST0 changes1804->1004. The early guard now covers the5xxx memory family rather than DLD alone, preserving canonicalF8. All1568 cases/restores cover seven families (both DADD input selections, DSUB, DRSUB, DADST, DSUBT, DSADT), both destinations, seven aliases, CMPT, pages, frontends and two checkpoints. A/B/T/status and all ARs remain unchanged with zero data reads/writes. Legal long-pair controls separately pass18432 DADD/DSUB cases/restores and3584 MOD3 exclusions. This is model admission consistency, not silicon trap behavior, positive staged T-dependent arithmetic, all composition or native handset speech. Full-core and original-codec regressions retain separate checkpoint evidence.",
+      "current": "The unchanged-core negative control performed an atomic operand transaction and changed ST0 from1804 to1004 on an f9 alias. The early guard covers the5xxx memory family, preserving canonicalf8. The CPU-only source-domain census now owns alias rejection and preservation, including C16 controls; separate long-pair positive acceptance retains18432 DADD/DSUB cases/restores without a duplicate MOD3 tail. No silicon-trap, positive staged T-dependent arithmetic, arbitrary composition or native speech claim follows.",
       "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
@@ -183,7 +183,7 @@
       "owner": "tms320c54x",
       "status": "satisfied",
       "predicate": "Both frontends reject the tested scalar arithmetic f9..ff aliases before operand effects across restoration",
-      "current": "Unchanged-core arith-abs-edge fails at case56, the first atomic case, on a forbidden data transaction with changed status. The early guard now matches staged admission for12 tested forms. All2688 cases/restores retain A/B/T, status and every AR with zero data reads/writes across seven aliases, both accumulator selections, CMPT, pages, frontends and two checkpoints. Legal staged absolute ADD passes2048 cases/restores and mapped AR arithmetic passes1024 direct/absolute cases/restores. This is fail-closed emulator admission consistency, not silicon trap behavior, every arithmetic instruction, measured pipeline timing, fitted-mask compatibility or native handset speech.",
+      "current": "The unchanged-core atomic alias negative control performed a forbidden data transaction and changed status. The early guard matches staged admission for the tested scalar families. The CPU-only source-domain census now owns f9..ff rejection and supplied-state preservation across accumulators, CMPT, pages, frontends and checkpoints. Separate positive absolute ADD and mapped-AR arithmetic retain2048 and1024 cases/restores. This is fail-closed model consistency, not all arithmetic semantics, measured timing, fitted-mask compatibility or native speech.",
       "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
@@ -207,7 +207,7 @@
       "owner": "tms320c54x",
       "status": "satisfied",
       "predicate": "Both frontends reject reserved memory AND/OR/XOR absolute aliases before operand effects across restoration",
-      "current": "The unchanged-core logic-abs-edge control fails at case56, the first atomic case, on a data transaction after changing A. The early atomic guard now matches staged admission. All672 cases/restores cover three operations, both accumulators, f9..ff, CMPT, pages, frontends and two checkpoints with unchanged A/B/T/status/all ARs and zero data transactions. The legal staged absolute-logic control retains1536 cases/restores with one owned source read and no writes. This is fail-closed emulator admission consistency, not silicon-trap behavior, complete source-domain or ISA conformance, physical timing, fitted-mask compatibility or handset speech.",
+      "current": "The unchanged-core atomic logic alias negative control performed a data transaction and changed A. The early guard matches staged admission. The CPU-only source-domain census now owns AND/OR/XOR f9..ff rejection and supplied-state preservation; legal staged absolute logic retains1536 cases/restores with one owned source read and no writes. No silicon-trap, all-ISA, physical timing, fitted-mask or native speech claim follows.",
       "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
@@ -215,7 +215,7 @@
       "owner": "tms320c54x",
       "status": "satisfied",
       "predicate": "Atomic and staged MACP/MACD reject unadmitted f9..ff absolute aliases before operand effects across restoration",
-      "current": "The unchanged-core negative control fails at case56, the first atomic case, on a data transaction. Corrected pmac-abs-edge passes448 cases/restores across both instructions/destinations, seven aliases, CMPT settings, pages, frontends and two checkpoints. A/B/T/status and all ARs remain unchanged with zero data transactions, excluding the implicit MACD copy as well as the source read. The existing512-case short-MOD3 control and224-case LTD/DELAY alias control pass. This is emulator admission consistency, not silicon-trap behavior, positive staged program-multiply support, fitted-mask compatibility or handset speech.",
+      "current": "The unchanged-core atomic MACP/MACD f9 alias negative control performed a data transaction. The guard rejects before operand/coefficient access, T publication or MACD successor copy. The CPU-only source-domain census now owns absolute and short-source exclusion, including TC-clear controls, with preservation and zero data/program/I-O effects. Canonicalf8 and supported long forms remain positive controls elsewhere. No silicon-trap, positive staged program-multiply, fitted-mask or speech claim follows.",
       "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
@@ -231,7 +231,7 @@
       "owner": "tms320c54x",
       "status": "satisfied",
       "predicate": "Atomic and staged LTD/DELAY reject unadmitted f9..ff absolute aliases without operand effects across restoration",
-      "current": "The unchanged-core negative control fails at case56, the first atomic case, because a data transaction occurs. The corrected delay-abs-edge profile passes224 cases/restores across both instruction classes, seven aliases, CMPT settings, two program pages, frontends and two checkpoints. A/B/T/status and all ARs remain unchanged with zero data transactions. The512-case short-MOD3 control and legal DELAY copy/delayed-control matrices pass separately. This is emulator admission consistency, not silicon-trap behavior, complete alias classification, a fitted-mask claim or a handset boot fix. The complete default suite is independently renewed in the shared core checkpoint; the isolated alias profile retains its own scope.",
+      "current": "The unchanged-core atomic LTD/DELAY f9 alias negative control performed a data transaction. The early guard now rejects before address/operand effects. The CPU-only source-domain census owns absolute and short-source rejection, including TC-clear controls, while legal DELAY copy/delayed-control matrices retain their positive scopes. This is frontend admission consistency, not silicon-trap behavior, a handset opcode gap or positive staged LTD support.",
       "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
@@ -2896,7 +2896,7 @@
     {
       "id": "c54x_ltd_delay_short_preincrement_source", "owner": "native_dsp_cpu", "status": "satisfied",
       "predicate": "LTD and DELAY reject write-only short preincrement sources before source reads, implicit successor writes, pointer updates or T publication",
-      "current": "TI SPRU131G table5-4/5.5.3.1 restricts short MOD3 to write operands; SPRU172C4-41/4-81 identifies DELAY/LTD Smem as the source copied to Smem+1. The original core fails the executable no-data-effect assertion at first atomic case58688. The scoped atomic admission guard rejects4c98..4c9f and4d98..4d9f before address generation. delay-mod3-edge covers512 cases/restores: two instructions, eight ARs, CMPT/initial TC, two pages, both frontends and two checkpoints, with zero data/program/IO writes or operand/pointer/T/status effects. The old default4d9b positive premise is retired in favor of legal long-MOD13 4deb0001 with its two-cycle contract; existing legal LTD/DELAY controls remain independent. No new positive staged LTD/long-DELAY support, physical trap or RF/speech claim follows. Other implicit-copy/RMW families require separate role audits.",
+      "current": "TI SPRU131G table5-4/5.5.3.1 restricts short MOD3 to write operands; SPRU172C4-41/4-81 identifies LTD/DELAY Smem as the source copied to Smem+1. The original core failed the no-data-effects assertion at atomic case58688. The guard rejects4c98..4c9f and4d98..4d9f before address generation. The CPU-only source-domain census now owns these exclusions, including TC-clear controls. The old default4d9b positive premise is replaced by legal long-MOD13 4deb0001 with its two-cycle contract; separate legal copy controls remain. This does not establish positive staged LTD, physical traps or RF/speech behavior.",
       "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py"]
     },
     {
@@ -3478,7 +3478,7 @@
     {
       "id": "c54x_memory_t_absolute_alias_admission", "owner": "c54x_execution_frontends", "status": "satisfied",
       "predicate": "Atomic and staged memory/T multiply families reject unvalidated f9..ff absolute aliases without operand transactions or register effects, including save/load",
-      "current": "The new native mem-t-abs-edge fixture first fails on the unfixed atomic case56: operand access occurs and A changes while ILLEGAL remains0. The atomic guard now rejects low-bytef9..ff before indirect_read and SQUR's T publication, matching the existing staged-memory-load admission. Fixed native execution passes1792 cases and1792 save/load replays: seven aliases, eight families MPY/MPYR/MPYU/SQUR/MAC/MACR/MAS/MASR, two accumulators, CMPT off/on, two program pages, both frontends and snapshots before/after rejection. Every case asserts zero operand data reads/writes and unchanged A/B/T/ST0/ST1 and every AR. Runner acceptance requires the complete marker and intentional terminal completion; mutation tests reject missing or altered fields and execution errors. Admittedf8 absolute execution is unchanged. This is a fail-closed supported-domain boundary, not a physical illegal-opcode trap, full operand admission for other Smem families, silicon pipeline timing or native handset/RF/speech acceptance.",
+      "current": "The unfixed atomic f9 alias control accessed an operand and changed A while ILLEGAL stayed0. The early guard now precedes indirect_read and SQUR T publication for MPY/MPYR/MPYU/SQUR/MAC/MACR/MAS/MASR, matching staged admission. The CPU-only source-domain census owns their alias rejection and supplied-state preservation across destinations, CMPT, pages, frontends and snapshots. Admittedf8 remains unchanged. This is a supported-domain boundary, not silicon trapping, arbitrary positive operand admission or native speech.",
       "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py", "docs/rom4_dsp_loader.md"]
     },
     {
@@ -3496,7 +3496,7 @@
     {
       "id": "c54x_scalar_load_absolute_alias_admission", "owner": "c54x_execution_frontends", "status": "satisfied",
       "predicate": "Atomic and staged scalar loads reject unadmitted f9..ff absolute aliases before operand effects, including save/load replay",
-      "current": "The unfixed native load-abs-edge fixture fails at atomic case56 with an operand transaction, changed A and ILLEGAL0. A narrow atomic guard now matches staged admission for LD, LDU, LD TS, LDR, shift16 LD and DLD. The fixed native fixture passes1344 cases and1344 replays across seven aliases, six families, two destinations, CMPT settings, program pages, frontends and checkpoint positions. Every case checks zero operand data reads/writes, unchanged A/B/T/ST0/ST1 and all ARs, and terminal rejection. Runner mutation tests require every marker field and intentional completion. Canonicalf8, long-offset reads and stores are unchanged. This establishes emulator supported-domain consistency, not a silicon illegal-opcode trap, complete Smem admission, newly observed handset opcode gap or native radio/speech completion.",
+      "current": "The unfixed atomic f9 alias control accessed an operand, changed A and left ILLEGAL0. The early guard matches staged admission for LD, LDU, LD TS, LDR, shift16 LD and DLD. The CPU-only source-domain census now owns alias rejection and supplied-state preservation across destinations, CMPT, pages, frontends and checkpoints. Canonicalf8, long-offset reads and stores are unchanged. No silicon-trap, complete Smem semantics, handset opcode gap or native speech claim follows.",
       "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "tests/c54x/tms320c54x_test.cpp", "tools/run_c54x_core.py", "tools/test_run_c54x_core.py", "docs/rom4_dsp_loader.md"]
     },
     {

@@ -1,15 +1,18 @@
 """Protect the independent instruction census, not the CPU's predicates."""
 from pathlib import Path
 import re
+import shutil
+import subprocess
 import unittest
 
 from tools.c54x_test_reviews import reviewed_profiles
+from tools.test_c54x_case_fixture import compiled_cpp
 
 
 class OperandDomainInventoryTest(unittest.TestCase):
     def test_census_has_every_reviewed_read_rmw_class_and_extension(self):
         source = (Path(__file__).resolve().parents[1] /
-                  'tests/c54x/tms320c54x_test_domains.h').read_text()
+                  'tests/c54x/tms320c54x_test_domain_schedule.h').read_text()
         table = source.split('source_domains[] = {', 1)[1].split('};', 1)[0]
         actual = [(int(word, 16), int(operation, 16)) for word, operation in
                   re.findall(r'\{\s*(0x[0-9a-f]+),\s*(0x[0-9a-f]+|0)\s*\}', table)]
@@ -27,24 +30,60 @@ class OperandDomainInventoryTest(unittest.TestCase):
         self.assertEqual(len(set(actual)), 125)
         self.assertEqual(len(scalar), 111)
         self.assertNotIn((0x6f00, 0x0c60), actual)  # STL's encoded operand is a destination.
-        digest, keys = 14695981039346656037, set()
+        rows = []
+
+        def append(opcode, operation, aliases, st0=0x1804, st1=0x0800, prefix=0, tag=0):
+            for context in range(16):
+                for mode in aliases:
+                    key = ((opcode | mode) << 16) | (operation << 4) | context | tag
+                    rows.append((key, opcode, operation, mode, context, st0, st1, prefix))
+
         for opcode, operation in expected:
-            for context in range(16):
-                for mode in (*range(0x98, 0xa0), *range(0xf9, 0x100)):
-                    key = ((opcode | mode) << 16) | (operation << 4) | context
-                    keys.add(key)
-                    for byte in key.to_bytes(4, 'little'):
-                        digest = ((digest ^ byte) * 1099511628211) & ((1 << 64) - 1)
-        # Supplemental RMW controls retain TC-clear rejection from the retired
-        # per-family alias fixtures. The base census initializes TC set.
+            append(opcode, operation, (*range(0x98, 0xa0), *range(0xf9, 0x100)))
         for opcode in (0x6800, 0x6900, 0x6a00, 0x6b00):
-            for context in range(16):
-                for mode in range(0xf9, 0x100):
-                    key = ((opcode | mode) << 16) | 0x8000 | context
-                    self.assertNotIn(key, keys)
-                    keys.add(key)
-                    for byte in key.to_bytes(4, 'little'):
-                        digest = ((digest ^ byte) * 1099511628211) & ((1 << 64) - 1)
+            append(opcode, 0, range(0xf9, 0x100), st0=0x0804, tag=0x8000)
+        for operation in shifted:
+            for shift in (1, 15, 16, 31):
+                append(0x6f00, operation | shift, range(0x98, 0xa0))
+        for opcode in (*range(0x2000, 0x3c00, 0x200), 0x6400, 0x6600, 0x4600):
+            for destination in (0, 0x100):
+                append(opcode | destination, 0, range(0x98, 0xa0), st1=0x0815, tag=0x4000)
+        for opcode in (0x5000, 0x5200, 0x5400, 0x5800, 0x5a00, 0x5c00, 0x5e00):
+            for destination in (0, 0x100):
+                append(opcode | destination, 0, range(0x98, 0xa0), st1=0x0880, tag=0x2000)
+        for opcode in (0x1e00, 0x1f00):
+            append(opcode, 0, range(0x98, 0xa0), prefix=0xec03, tag=0x1000)
+        for opcode in (0x6000, 0x6100, 0x1800, 0x1900, 0x1a00, 0x1b00, 0x1c00, 0x1d00,
+                       0x7100, 0x7300, 0x7500, 0x7f00, 0x7d00, 0x7900, 0x7b00, 0x4c00, 0x4d00,
+                       0x6800, 0x6900, 0x6a00, 0x6b00):
+            append(opcode, 0, range(0x98, 0xa0), st0=0x0804, tag=0x8000)
+        if not shutil.which('c++'):
+            self.skipTest('host C++ compiler unavailable')
+        with compiled_cpp(r'''
+#include "tests/c54x/tms320c54x_test_domain_schedule.h"
+#include <iostream>
+int main() {
+    for (unsigned i = 0; i < c54x_test::domain_total_cases; ++i) {
+        auto const c = c54x_test::select_domain(i);
+        std::cout << c.key() << ' ' << c.instruction.opcode << ' ' << c.instruction.operation
+            << ' ' << c.mode << ' ' << c.context << ' ' << c.st0 << ' ' << c.st1 << ' ' << c.prefix << '\n';
+    }
+    try { c54x_test::select_domain(c54x_test::domain_total_cases); }
+    catch (std::out_of_range const &) { return 0; }
+    return 1;
+}
+''') as binary:
+            actual_rows = [tuple(map(int, line.split())) for line in
+                           subprocess.check_output([str(binary)], text=True).splitlines()]
+        self.assertEqual(actual_rows, rows)
+        keys = [row[0] for row in rows]
+        self.assertEqual(len(keys), len(set(keys)))
+        digest = 14695981039346656037
+        for index, key in enumerate(keys):
+            for byte in key.to_bytes(4, 'little'):
+                digest = ((digest ^ byte) * 1099511628211) & ((1 << 64) - 1)
+            if index == 30447:
+                self.assertEqual(f'{digest:016x}', 'ba74a1da74928725')
         coverage = reviewed_profiles()['source-domain']['coverage']
         self.assertEqual(len(keys), coverage['cases'])
         self.assertEqual(f'{digest:016x}', coverage['fnv64'])

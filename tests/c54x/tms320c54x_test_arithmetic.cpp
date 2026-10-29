@@ -5739,11 +5739,6 @@ bool tms320c54x_test_state::check_rounding_boundary_results()
 			"POLY rounds old-B product sum, applies OVM/sticky OVA and independently loads SXM-extended memory into B");
 		if (index < 63) { start_poly_boundary_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x POLY boundaries: PASS cases=64 frct=0,1 ovm=0,1 sxm=0,1 sticky_ova=1 pipeline_claim=0\n");
-		if (profile_is("stack-mod3-edge"))
-		{
-			osd_printf_info("TMS320C54x atomic prefix: PASS staged_suite_claim=0 silicon_phase_claim=0\n");
-			start_short_read_mod3_edge(51200); return true;
-		}
 		start_pipeline_frontend_case(); return true;
 	}
 	return false;
@@ -6075,7 +6070,7 @@ bool tms320c54x_test_state::check_pipeline_memory_logic_results()
 			m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 575) { start_pipeline_memory_logic(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged memory logic: PASS cases=576 operations=3 accumulators=2 address_forms=4 value_pairs=4 sxm_states=2 restore=576 duplicate_reads=0\n");
-			if (profile_is("logic-short")) { start_short_read_mod3_edge(55296); return true; }
+			if (profile_is("logic-short")) throw emu_fatalerror(3, "TMS320C54x isolated short memory logic complete");
 			start_pipeline_mu4_logic_tail(); return true;
 		}
 		++m_pipeline_expected_cycle;
@@ -6384,7 +6379,7 @@ bool tms320c54x_test_state::check_accumulator_shift_results()
 			{
 				if (variant < 6911) { start_pipeline_long_pair(variant + 1); return true; }
 				osd_printf_info("TMS320C54x staged DRSUB: PASS cases=6144 restore=6144 address_forms=8 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 pair_reads=2 memory_writes=0 retained_pair=1 silicon_phase_claim=0\n");
-				start_short_read_mod3_edge(51712); return true;
+				throw emu_fatalerror(3, "TMS320C54x isolated DRSUB complete");
 			}
 			if (variant == 6911) osd_printf_info("TMS320C54x staged DSUB: PASS cases=6144 address_forms=8 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=6144 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0\n");
 			if (variant < 20735) { start_pipeline_long_pair(variant + 1); return true; }
@@ -6392,7 +6387,7 @@ bool tms320c54x_test_state::check_accumulator_shift_results()
 			if (profile_is("long-pair"))
 			{
 				osd_printf_info("TMS320C54x staged long-pair controls: PASS dsub=6144 dadd=12288 restore=18432 pair_reads=2 memory_writes=0\n");
-				start_short_read_mod3_edge(51712); return true;
+				throw emu_fatalerror(3, "TMS320C54x isolated long-pair controls complete");
 			}
 			start_pipeline_long_immediate_store(); return true;
 		}
@@ -8785,7 +8780,7 @@ bool tms320c54x_test_state::check_atomic_xorm_results()
 		if (index < 1023) { start_atomic_xorm(index + 1); return true; }
 		osd_printf_info("TMS320C54x atomic XORM: PASS cases=1024 restore=1024 forms=8 values=4 literals=4 sxm_ovm=4 snapshots=2 reads=1 writes=1 flags_preserved=1 staged_acceptance=0 silicon_phase_claim=0\n");
 		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
-		start_short_read_mod3_edge(59136); return true;
+		throw emu_fatalerror(3, "TMS320C54x isolated XORM complete");
 	}
 	return false;
 }

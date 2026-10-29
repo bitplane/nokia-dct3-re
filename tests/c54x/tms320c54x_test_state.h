@@ -17,7 +17,6 @@
 #include "tms320c54x_test_selection.h"
 #include "tms320c54x_test_support.h"
 #include "tms320c54x_test_atomic_routes.h"
-#include "tms320c54x_test_rejection_state.h"
 #include "tms320c54x_test_entry_state.h"
 #include "tms320c54x_test_repeat_state.h"
 #include "tms320c54x_test_snapshot_state.h"
@@ -834,7 +833,6 @@ private:
 	static mapped_immediate_mac_fixture mapped_immediate_mac_case(unsigned v);
 	void start_mapped_immediate_mac(unsigned variant=0);
 	void start_memory_immediate_mac_exclusion(unsigned variant = 0);
-	void start_short_read_mod3_edge(unsigned variant = 0);
 	void start_mmr_long_edge(unsigned variant = 0);
 	static unsigned block_branch_count(unsigned variant);
 	static u16 block_branch_source(unsigned variant, unsigned i);
@@ -2244,7 +2242,6 @@ private:
 	bool check_accumulator_branch_results();
 	bool check_mvmd_word_register_results();
 	bool check_mvdd_peripheral_results();
-	bool check_short_source_results();
 	bool check_push_mvmm_results();
 	bool check_mapped_immediate_mac_results();
 	bool check_block_branch_count_results();
@@ -2298,7 +2295,6 @@ private:
 	TIMER_CALLBACK_MEMBER(check_results);
 
 	required_device<tms320c54x_device> m_cpu;
-	operand_rejection_fixture m_short_sources{310600};
 	interrupt_entry_fixture m_entry;
 	u16 m_shifted_bus_word = 0;
 	tms320c54x_bsp_state m_shifted_bsp;

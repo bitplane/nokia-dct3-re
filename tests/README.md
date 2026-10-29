@@ -131,12 +131,13 @@ steps; further isolation requires retaining those cross-instruction contrasts.
 Batch setup is limited to independent values: later values must not depend on
 an earlier register or memory write. Live-state-dependent setup stays explicit.
 
-Operand-domain, absolute-alias and short-source rejection families own separate
-progress, observation, tap and snapshot state in `operand_rejection_fixture`.
-Their CPU, scheduler timer and outer phase routing remain bench-owned. Host
-observations deliberately survive CPU snapshot replay to detect duplicate bus
-effects; registering or clearing them during restoration would weaken the tests.
-The stack-transfer continuation is a separate handler, not an alias test.
+Operand-domain, absolute-alias and short-source rejection controls share the
+CPU-only `source_domain_fixture`, with a separate, host-testable stimulus
+schedule. It owns its progress, observations, taps and snapshots without the
+legacy phase router. Host observations deliberately survive CPU snapshot
+replay to detect duplicate bus effects; registering or clearing them during
+restoration would weaken the tests. Positive instruction and stack-transfer
+profiles remain separate from this implementation-admission census.
 
 Interrupt entry owns its vector-prefetch, acceptance, spacing and per-stage
 restore observations in `interrupt_entry_fixture`. Its acknowledgement checks

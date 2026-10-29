@@ -354,8 +354,8 @@ after the access, per SPRU131G section 5.6. Fixture-only `4882` and `8892`
 check read and postincrement write at one cycle. `489a` instead rejects:
 short MOD=3 is write-only, including in the MMR grammar. LDM, PSHM and
 PSHD reject this source encoding before data, AR masking/modification or
-stack effects; `stack-mod3-edge` checks 512 cases/restores and the legacy
-atomic prefix. The ordinary Smem long-offset preincrement form remains
+stack effects; the CPU-only `source-domain` census owns these exclusions,
+while default atomic coverage retains the `489a` example. The ordinary Smem long-offset preincrement form remains
 read-capable, but long forms are separately excluded from MMR addressing
 by section 5.6. Implicit-copy and read/modify/write forms are not decided
 by these tests.

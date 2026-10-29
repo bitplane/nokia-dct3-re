@@ -340,20 +340,12 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated generic square complete",
     ),
     "source-domain": (
-        "TMS320C54x source-domain exclusions: PASS cases=30448 restore=30448 base_cases=30000 rmw_tc0_cases=448 instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=ba74a1da74928725",
+        "TMS320C54x source-domain exclusions: PASS cases=44656 restore=44656 base_cases=30000 absolute_tc0_cases=448 short_control_cases=14208 base_instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 shifts=0,1,15,16,31 modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=6ae942418d722665",
         "Fatal error: TMS320C54x isolated source-domain exclusions complete",
     ),
     "idle-modes": (
         "TMS320C54x staged idle modes: PASS cases=96 modes=3 wake_profiles=4 pages=2 restore=96 timer_stop=1 suspended_younger_words=1 real_irq_return=1 physical_clock_claim=0",
         "Fatal error: TMS320C54x isolated staged idle modes complete",
-    ),
-    "delay-mod3-edge": (
-        "TMS320C54x delay MOD3 exclusions: PASS cases=512 restore=512 opcode_classes=2 arf=8 cmpt=2 initial_tc=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated delay MOD3 exclusions complete",
-    ),
-    "pmac-mod3-edge": (
-        "TMS320C54x program multiply MOD3 exclusions: PASS cases=512 restore=512 opcode_classes=4 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated program multiply MOD3 exclusions complete",
     ),
     "ov-branch-pipe": (
         "TMS320C54x staged overflow branches: PASS cases=4608 restore=4608 forms=BC,BCD predicates=AOV,ANOV,BOV,BNOV flags=4 producers=seed,SSBX,RSBX gaps=0,1,2 pages=2 snapshots=4 selected_flag_clear=1 post_evaluate_mutation=2 literal_reads=1 target_fetches=once writes=0 reset_before_restore=1 arithmetic_producers=unvalidated physical_phase_claim=0",
@@ -683,7 +675,6 @@ EXTRA_PROFILES = {
     "xorm": (
         (
         "TMS320C54x atomic XORM: PASS cases=1024 restore=1024 forms=8 values=4 literals=4 sxm_ovm=4 snapshots=2 reads=1 writes=1 flags_preserved=1 staged_acceptance=0 silicon_phase_claim=0",
-        "TMS320C54x RMW MOD3 exclusions: PASS cases=1024 restore=1024 opcode_classes=4 arf=8 cmpt=2 initial_tc=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0",
         ),
         "Fatal error: TMS320C54x isolated XORM complete",
     ),
@@ -793,13 +784,6 @@ EXTRA_PROFILES = {
     "ov-branch": (
         "TMS320C54x atomic overflow branches: PASS cases=64 restore=64 forms=BC,BCD predicates=AOV,ANOV,BOV,BNOV flags=4 snapshots=2 selected_flag_clear=1 delay_condition_retained=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated overflow branches complete",
-    ),
-    "stack-mod3-edge": (
-        (
-            "TMS320C54x atomic prefix: PASS staged_suite_claim=0 silicon_phase_claim=0",
-            "TMS320C54x MMR push MOD3 exclusions: PASS cases=512 restore=512 opcode_classes=4 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 stack_changes=0 silicon_trap_claim=0",
-        ),
-        "Fatal error: TMS320C54x isolated MMR push MOD3 exclusions complete",
     ),
     "pshd-long": (
         "TMS320C54x extended PSHD: PASS cases=99696 restore=99696 ram_cases=96000 mapped_cases=3696 forms=25 offsets=-1,0,4,32767 circular_offsets=-1,0,4,8 values=4 bk=0,9 cmpt=2 cpl=2 pages=2 sources=none,IRQ,NMI arrivals=early,late snapshots=3 literal_fetches=1 source_reads=1 stack_writes=1 pointer_updates=once source_retained=1 balanced_frames=1 physical_phase_claim=0",
@@ -1509,7 +1493,6 @@ EXTRA_PROFILES = {
     "drsub": (
         (
             "TMS320C54x staged DRSUB: PASS cases=6144 restore=6144 address_forms=8 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 pair_reads=2 memory_writes=0 retained_pair=1 silicon_phase_claim=0",
-            "TMS320C54x paired arithmetic MOD3 exclusions: PASS cases=3584 restore=3584 opcode_classes=14 arf=8 cmpt=2 c16=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
         ),
         "Fatal error: TMS320C54x isolated DRSUB complete",
     ),
@@ -1518,7 +1501,6 @@ EXTRA_PROFILES = {
             "TMS320C54x staged DSUB: PASS cases=6144 address_forms=8 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=6144 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0",
             "TMS320C54x staged DADD: PASS cases=12288 address_forms=8 selectors=4 patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=12288 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0",
             "TMS320C54x staged long-pair controls: PASS dsub=6144 dadd=12288 restore=18432 pair_reads=2 memory_writes=0",
-            "TMS320C54x paired arithmetic MOD3 exclusions: PASS cases=3584 restore=3584 opcode_classes=14 arf=8 cmpt=2 c16=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
         ),
         "Fatal error: TMS320C54x isolated long-pair controls complete",
     ),
@@ -1613,10 +1595,6 @@ EXTRA_PROFILES = {
         "TMS320C54x in-block branches: PASS cases=12288 restore=12288 layouts=diamond,endpoint counts=0,1,2,7 patterns=4 accumulators=2 pages=2 snapshots=8 arrivals=9,10,12,14 sources=none,IRQ,NMI source_reads_each=1 selected_writes_each=1 brc_decode=1 braf_final_decode=1 held_tags_restored=1 interrupt_return=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated in-block branches complete",
     ),
-    "mul-mod3-edge": (
-        "TMS320C54x multiply load MOD3 exclusions: PASS cases=4352 restore=4352 opcode_classes=34 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 asm_changes=0 rc_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated multiply load MOD3 exclusions complete",
-    ),
     "mul-t-sources": (
         (
             "TMS320C54x staged memory multiply: PASS ram_cases=27648 mapped_cases=24576 operations=MPYA,MASA,MACA,MACAR patterns=8 flag_states=16 restore=52224 t_read_owned=1 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
@@ -1625,10 +1603,6 @@ EXTRA_PROFILES = {
             "TMS320C54x staged memory LD T: PASS cases=52224 ram_and_mapped=1 restore=52224 read_publication=1 retirement_rewrite=0 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
         ),
         "Fatal error: TMS320C54x isolated multiply and T sources complete",
-    ),
-    "arith-mod3-edge": (
-        "TMS320C54x arithmetic MOD3 exclusions: PASS cases=35840 restore=35840 scalar_classes=24 variable_selectors=8 shifts=32 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 alu_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated arithmetic MOD3 exclusions complete",
     ),
     "memory-alu": (
         "TMS320C54x staged memory ADD/SUB: PASS cases=104448 forms=17 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=104448 duplicate_reads=0 data_writes=0",
@@ -1645,10 +1619,6 @@ EXTRA_PROFILES = {
     "mapped-bitf": (
         "TMS320C54x staged mapped BITF: PASS cases=13824 registers=AL,AH,AG,BL,BH,BG,T,TRN masks=4 initial_tc=2 producer_cases=1536 restore=13824 reads_each=1 data_writes=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated mapped BITF complete",
-    ),
-    "bitf-mod3-edge": (
-        "TMS320C54x bitfield MOD3 exclusions: PASS cases=512 restore=512 operations=CMPM,BITF initial_tc=2 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 tc_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated bitfield MOD3 exclusions complete",
     ),
     "indirect-dld": (
         (
@@ -1671,10 +1641,6 @@ EXTRA_PROFILES = {
         ),
         "Fatal error: TMS320C54x isolated LDU and shift16 loads complete",
     ),
-    "load-mod3-edge": (
-        "TMS320C54x load MOD3 exclusions: PASS cases=9728 restore=9728 families=7 variable_shifts=32 arf=8 accumulators=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated load MOD3 exclusions complete",
-    ),
     "indirect-load": (
         "TMS320C54x staged indirect loads: PASS cases=6 ar_update=Access read=Read execute=Execute captured_address_restore=6",
         "Fatal error: TMS320C54x isolated indirect loads complete",
@@ -1685,14 +1651,6 @@ EXTRA_PROFILES = {
             "TMS320C54x staged repeat immediate ST: PASS cases=38400 forms=5 rpt=short,long counts=0,1,15,32,255 values=4 sst_sxm_ovm=8 sources=none,IRQ,NMI pages=2 restore=38400 count_plus_one=1 literal_fetches=1 body_fetches=1 destination_reads=0 cycles_each=2 silicon_phase_claim=0",
         ),
         "Fatal error: TMS320C54x isolated repeated SUBC and ST complete",
-    ),
-    "subc-mod3-edge": (
-        "TMS320C54x SUBC MOD3 exclusions: PASS cases=512 restore=512 arf=8 accumulators=2 cmpt=2 pages=2 frontends=2 snapshots=2 repeat=none,short data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated SUBC MOD3 exclusions complete",
-    ),
-    "mpy-mod3-edge": (
-        "TMS320C54x memory MPY MOD3 exclusions: PASS cases=256 restore=256 arf=8 accumulators=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated memory MPY MOD3 exclusions complete",
     ),
     "mpy-mem-imm": (
         (
@@ -1729,7 +1687,6 @@ EXTRA_PROFILES = {
     "logic-short": (
         (
             "TMS320C54x staged memory logic: PASS cases=576 operations=3 accumulators=2 address_forms=4 value_pairs=4 sxm_states=2 restore=576 duplicate_reads=0",
-            "TMS320C54x logic transfer MOD3 exclusions: PASS cases=2816 restore=2816 opcode_classes=11 arf=8 cmpt=2 initial_tc=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0",
         ),
         "Fatal error: TMS320C54x isolated short memory logic complete",
     ),

@@ -90,12 +90,6 @@ class FixtureOwnershipTests(unittest.TestCase):
                 if owners[name] is not None:
                     self.assertIn(owners[name], members)
 
-    def test_operand_rejection_families(self):
-        self.check_owners('tms320c54x_test_operand_domains.cpp', {
-            'start_short_read_mod3_edge': 'm_short_sources',
-            'check_short_source_results': 'm_short_sources',
-        })
-
     def test_interrupt_entry_family(self):
         names = ('start_interrupt_entry_spacing_case', 'start_interrupt_acceptance_checkpoint',
                  'start_entry_stage_restore_case', 'start_vector_prefetch_case',

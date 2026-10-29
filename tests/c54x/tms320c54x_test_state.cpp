@@ -175,18 +175,10 @@ void tms320c54x_test_state::machine_reset()
 		{ {"rptb-branch"}, [](self &test) { test.start_block_branch(); } },
 		{ {"mpy-mem-imm"}, [](self &test) { test.start_memory_immediate_multiply(); } },
 		{ {"mac-map-imm"}, [](self &test) { test.start_mapped_immediate_mac(); } },
-		{ {"mpy-mod3-edge"}, [](self &test) { test.start_short_read_mod3_edge(); } },
 		{ {"mmr-long-edge"}, [](self &test) { test.start_mmr_long_edge(); } },
 		{ {"rpt-xfer-edge"}, [](self &test) { test.start_mmr_long_edge(); } },
 	}))
 		return;
-	if (profile_is("subc-mod3-edge")) { start_short_read_mod3_edge(256); return; }
-	if (profile_is("load-mod3-edge")) { start_short_read_mod3_edge(768); return; }
-	if (profile_is("bitf-mod3-edge")) { start_short_read_mod3_edge(10496); return; }
-	if (profile_is("arith-mod3-edge")) { start_short_read_mod3_edge(11008); return; }
-	if (profile_is("mul-mod3-edge")) { start_short_read_mod3_edge(46848); return; }
-	if (profile_is("pmac-mod3-edge")) { start_short_read_mod3_edge(58112); return; }
-	if (profile_is("delay-mod3-edge")) { start_short_read_mod3_edge(58624); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"store-observe"}, [](self &test) { test.start_pipeline_store_case(); } },
 		{ {"push-observe"}, [](self &test) { test.start_pipeline_xpc_push(); } },
@@ -771,12 +763,6 @@ void tms320c54x_test_state::expect(bool condition, const char *message)
 			tick = fixture.tick;
 			replay = fixture.replay;
 		};
-		operand_rejection_fixture const *rejection = nullptr;
-		if (m_short_sources.handles_phase(m_phase))
-		{
-			rejection = &m_short_sources;
-			progress(m_short_sources);
-		}
 		switch (m_phase)
 		{
 		case 255800: case 255810: progress(m_saved_irq_repeat); break;
@@ -797,8 +783,7 @@ void tms320c54x_test_state::expect(bool condition, const char *message)
 			unsigned(m_cpu->state_int(tms320c54x_device::STATE_RC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)),
 			(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),
 			unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)),
-			rejection ? rejection->observed.reads : m_pipeline_operand_reads,
-			rejection ? rejection->observed.writes : m_pipeline_store_writes);
+			m_pipeline_operand_reads, m_pipeline_store_writes);
 		throw emu_fatalerror("TMS320C54x core conformance: %s", message);
 	}
 }

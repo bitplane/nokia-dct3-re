@@ -1854,84 +1854,49 @@
           "name": "pshd-long-edge"
         },
         {
-          "description": "Write-only short-preincrement multiply exclusions",
-          "index": 239,
-          "name": "mpy-mod3-edge"
-        },
-        {
-          "description": "Write-only short-preincrement SUBC exclusions",
-          "index": 240,
-          "name": "subc-mod3-edge"
-        },
-        {
           "description": "Repeated legal SUBC and immediate store replay",
-          "index": 241,
+          "index": 239,
           "name": "rpt-subc-st"
         },
         {
-          "description": "Write-only short-preincrement load exclusions",
-          "index": 242,
-          "name": "load-mod3-edge"
-        },
-        {
           "description": "Legal short-indirect load address and read replay",
-          "index": 243,
+          "index": 240,
           "name": "indirect-load"
         },
         {
           "description": "Legal unsigned and shift16 load domains",
-          "index": 244,
+          "index": 241,
           "name": "ldu-shift16"
         },
         {
           "description": "Legal indirect double-word load replay",
-          "index": 245,
+          "index": 242,
           "name": "indirect-dld"
         },
         {
           "description": "Legal variable-shift memory load replay",
-          "index": 246,
+          "index": 243,
           "name": "load-variable"
         },
         {
-          "description": "Write-only short-preincrement compare and bitfield exclusions",
-          "index": 247,
-          "name": "bitf-mod3-edge"
-        },
-        {
           "description": "Read-capable Smem bitfield and immediate replay",
-          "index": 248,
+          "index": 244,
           "name": "bitf-smem"
         },
         {
-          "description": "Write-only short-preincrement arithmetic source exclusions",
-          "index": 249,
-          "name": "arith-mod3-edge"
-        },
-        {
           "description": "Read-capable scalar memory ADD and SUB replay",
-          "index": 250,
+          "index": 245,
           "name": "memory-alu"
         },
         {
           "description": "Read-capable variable-shift memory arithmetic replay",
-          "index": 251,
+          "index": 246,
           "name": "shifted-alu"
         },
         {
-          "description": "Write-only short-preincrement multiply and load exclusions",
-          "index": 252,
-          "name": "mul-mod3-edge"
-        },
-        {
           "description": "Read-capable memory multiply and T-load replay",
-          "index": 253,
+          "index": 247,
           "name": "mul-t-sources"
-        },
-        {
-          "description": "Atomic prefix and write-only MMR/push source exclusions",
-          "index": 254,
-          "name": "stack-mod3-edge"
         }
       ],
       "tms54xtra": [
@@ -2936,63 +2901,53 @@
           "name": "shift-bk-edge"
         },
         {
-          "description": "Write-only short-preincrement program multiply source exclusions",
-          "index": 200,
-          "name": "pmac-mod3-edge"
-        },
-        {
           "description": "Retained accumulator-store inspection across pending write restore",
-          "index": 201,
+          "index": 200,
           "name": "store-observe"
         },
         {
           "description": "Retained direct-PSHM stack and source inspection across restore",
-          "index": 202,
+          "index": 201,
           "name": "push-observe"
         },
         {
           "description": "Exact native dual-memory subtraction and pointer updates",
-          "index": 203,
+          "index": 202,
           "name": "dual-sub-native"
         },
         {
-          "description": "Write-only short-preincrement LTD DELAY source exclusions",
-          "index": 204,
-          "name": "delay-mod3-edge"
-        },
-        {
           "description": "Staged IDLE1/2/3 barriers, timer clocks, interrupt wake and replay",
-          "index": 205,
+          "index": 203,
           "name": "idle-modes"
         },
         {
           "description": "Retained RAM-to-CLKMD moves and peripheral access across restore",
-          "index": 206,
+          "index": 204,
           "name": "clock-mvdk"
         },
         {
           "description": "Excluded repeated/delayed CLKMD moves have no operand or clock effects",
-          "index": 207,
+          "index": 205,
           "name": "clock-mvdk-edge"
         },
         {
           "description": "Retained IMR/IFR stack writes and W1C acknowledgement across restore",
-          "index": 208,
+          "index": 206,
           "name": "pop-irq"
         },
         {
           "description": "Excluded repeated/delayed interrupt pops have no stack or acknowledgement effects",
-          "index": 209,
+          "index": 207,
           "name": "pop-irq-edge"
         },
         {
           "description": "Staged long RAM read-modify-write matrix",
-          "index": 210,
+          "index": 208,
           "name": "rmw-long"
         },
         {
           "description": "Staged register arithmetic and load with producer controls",
-          "index": 211,
+          "index": 209,
           "name": "reg-banks"
         }
       ]
@@ -3069,7 +3024,6 @@
       "TMS320C54x MMR bus: PASS unified_state=1 partial_write=1 ifr_clear=1 passive_tap=1 reserved_gap=1\n": 1,
       "TMS320C54x MMR disassembler: PASS modes=1344 rejected=192 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x MMR long exclusions: PASS cases=4608 restore=4608 opcode_classes=9 forbidden_modes=25 reserved_modes=7 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 stack_changes=0 silicon_trap_claim=0\n": 1,
-      "TMS320C54x MMR push MOD3 exclusions: PASS cases=512 restore=512 opcode_classes=4 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 stack_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x MVDD followers: PASS cases=1536 restore=1536 layouts=adjacent,CALLD_first,CALLD_second consumers=LD_Smem,LD_Xmem modifiers=4 values=4 gaps=0,1 pages=2 snapshots=4 source_poison=1 reset_before_restore=1 physical_phase_claim=0\n": 1,
       "TMS320C54x MVDK accumulator destinations: PASS cases=8208 restore=8208 sources=18_mapped,1_RAM destinations=AL,AH,AG,BL,BH,BG forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access write=next_clock retained_literals=1 aliases=1 guard_width=8 other_fields_preserved=1 read_owner=Address observer_scope=bus_only debug_excluded=1 physical_phase_claim=0\n": 1,
       "TMS320C54x MVDK accumulator producers: PASS cases=15552 restore=15552 sources=AL,AH,AG,BL,BH,BG destinations=AL,AH,AG,BL,BH,BG forms=3 producers=STL,POPM,LD gaps=0,1 patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 mapped_no_conflict=1 direct_ld_gap0=projection_only guard_width=8 physical_phase_claim=0\n": 1,
@@ -3089,7 +3043,6 @@
       "TMS320C54x READA BRC: PASS cases=18432 restore=18432 forms=DP,SP,absolute,plain,postinc,postdec registers=8 standalone_values=0,1,8000,ffff loop_counts=0,1,2,7 gaps=1,2,3 source_pages=2 ovly=2 snapshots=4 address_bits=%u program_reads=1 brc_writes=1 data_reads=0 retained_par=1 retained_word=1 source_poison=1 silicon_phase_claim=0\n": 1,
       "TMS320C54x RETD BITT: PASS cases=1536 restore=1536 forms=absolute,long_offset selectors=16 t_high=2 values=2 tc_initial=2 pages=2 snapshots=3 stack_reads=1 operand_reads=1 extension_fetches=1 retained_memory_t=1 target_only=1 silicon_phase_claim=0\n": 1,
       "TMS320C54x RETD delay repeat: PASS cases=5760 restore=5760 frontends=atomic,staged bodies=STL,MVDD,NOP counts=0,1,8,39,255 target_counts=0,2,7 directions=2 patterns=4 pages=2 snapshots=4 stack_reads=1 balanced_stack=1 target_poison=1 ordered_copies=1 fresh_target_repeat=1 opcode_poison=staged_only reset_before_restore=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x RMW MOD3 exclusions: PASS cases=1024 restore=1024 opcode_classes=4 arf=8 cmpt=2 initial_tc=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x RND boundaries: PASS cases=128 selectors=4 inputs=8 ovm=0,1 status_preserved=1 pipeline_claim=0\n": 1,
       "TMS320C54x ROLTC conformance: PASS variants=256\n": 1,
       "TMS320C54x ROM4 CRC helper: PASS cases=512 gsm_packing_claim=0 speech_claim=0\n": 1,
@@ -3141,7 +3094,6 @@
       "TMS320C54x STLM PMST exclusions: PASS cases=32 restore=32 forms=delay,repeat,block,RSA,REA,indirect,peripheral,SP pages=2 snapshots=2 data_reads=0 data_writes=0 control_changes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x STLM PMST: PASS cases=38912 restore=38912 mapping_cases=4096 interrupt_cases=34816 sources=A,B patterns=8 old_sst_sxm=4 cpl=0,1 pages=2 entry_regions=low,high old_overlay=0,1 interrupt_sources=IRQ0..15,NMI arrivals=early,late snapshots=4 writes=1 source_sample=Execute prefetched_mapping=retained next_mapping=new vector_mapping=Prefetch balanced_frames=1 physical_phase_claim=0\n": 1,
       "TMS320C54x STLM-suspended IRQ repeat: PASS cases=3840 restore=3840 outer_counts=0,1,2,7,56 inner_counts=0,1,3,63 sources=IRQ,NMI pages=2 stacks=2 returns=FRETE,FRETED snapshots=6 status_clear=Execute balanced_frames=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x SUBC MOD3 exclusions: PASS cases=512 restore=512 arf=8 accumulators=2 cmpt=2 pages=2 frontends=2 snapshots=2 repeat=none,short data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x T load control: PASS load_cases=52224 pair_cases=768 restore=52992 t_publish=Read no_retirement_rewrite=1 mapped_and_RAM=1 physical_phase_claim=0\n": 1,
       "TMS320C54x TC conditional calls: PASS cases=64 restore=64 predicates=TC,NTC initial_tc=2 pages=2 snapshots=4 literal_fetches=1 taken_frame=1 balanced_return=1 untaken_stack_accesses=0 predicate_retained=1 target_retained=1 delayed_acceptance=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x TC delayed calls: PASS cases=1280 restore=1280 predicates=TC,NTC initial_tc=2 accumulator_patterns=8 seed_accumulators=2 delay_layouts=2 pages=2 snapshots=5 tc_flip=organic_delay target_delay_poison=1 taken_frame=PC+4 untaken_stack_accesses=0 balanced_return=1 reset_before_restore=1 block_interrupt_acceptance=0 physical_phase_claim=0\n": 1,
@@ -3171,7 +3123,6 @@
       "TMS320C54x active repeat context: PASS cases=384 restore=384 modes=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 control_order=REA,RSA,BRC source_reads=once publications=once source_mutation_after_read=1 ordered_copies=1 balanced_frames=1 brc_gap_words=6 interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x adjacent PSHM POPM: PASS cases=2048 restore=2048 sources=8 destinations=T,AR3,BK,SP patterns=4 pages=2 stack_alignments=2 snapshots=4 source_reads=1 stack_reads=1 stack_writes=1 register_writes=1 source_mutation_after_read=1 stack_mutation_after_read=1 logical_bypass=1 interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x adjacent block rearm: PASS cases=64 restore=64 first_counts=0,1,3,7 second_counts=0,2 pages=2 snapshots=4 brc_publications=1 actual_iterations=1 write_owner=Access interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
-      "TMS320C54x arithmetic MOD3 exclusions: PASS cases=35840 restore=35840 scalar_classes=24 variable_selectors=8 shifts=32 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 alu_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x atomic I/O composition: PASS cases=24 restore=24 contexts=repeat,delay,INTM pointer_updates=once interrupt_after_transfer=1 physical_mapping=unvalidated\n": 1,
       "TMS320C54x atomic ST||SUB fractions: PASS cases=128 restore=128 source_dest_pairs=4 fractional_patterns=8 memory_patterns=4 ordinary_ram=1 physical_phase_claim=0\n": 1,
       "TMS320C54x atomic XC conditions: PASS cases=384 restore=384 sources=TC,C,A,B producer_words=1,2 gaps=0,1,2,3 controlled_words=1,2 snapshots=2 physical_phase_claim=0\n": 1,
@@ -3183,11 +3134,9 @@
       "TMS320C54x atomic external I/O waits: PASS cases=2880 restore=2880 forms=short,offset,absolute,peripheral,AR_alias software_waits=0..14 ready_threshold=2 directions=read,write sources=none,IRQ,NMI timer_continues=1 duplicate_io=0 physical_mapping=unvalidated\n": 1,
       "TMS320C54x atomic far transfers: PASS encodings=16 caller_page=1 target_page=2 call_return_frame=1 delayed_target_retained=1 staged_acceptance=0 save_replay=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x atomic overflow branches: PASS cases=64 restore=64 forms=BC,BCD predicates=AOV,ANOV,BOV,BNOV flags=4 snapshots=2 selected_flag_clear=1 delay_condition_retained=1 silicon_phase_claim=0\n": 1,
-      "TMS320C54x atomic prefix: PASS staged_suite_claim=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x backward in-block branches: PASS cases=1536 restore=1536 outer_counts=4 inner_counts=4 forms=conditional_back,unconditional_back accumulators=2 pages=2 sources=none,IRQ,NMI snapshots=4 ordered_copies=1 outer_counts_preserved=1 held_words_restored=1 physical_phase_claim=0\n": 1,
       "TMS320C54x basic memory repeat exclusions: PASS cases=100 restore=100 forms=control,peripheral,write_only_MOD3,long_offset,nested,delay,block mod3_cases=64 arf=8 cmpt=2 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x basic memory repeat: PASS cases=10376 restore=10376 forms=36 counts=0,1,7,255,32768,65535 pages=2 cpl=2 cmpt=2 sources=none,IRQ,NMI snapshots=3 count_reads=1 body_fetches=1 body_count=rc+1 pointer_effect=once retained_count=1 balanced_frames=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x bitfield MOD3 exclusions: PASS cases=512 restore=512 operations=CMPM,BITF initial_tc=2 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 tc_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x block XC exclusions: PASS cases=18 restore=18 forms=XC1,XC2 selected_span_crossings=3 pages=2 snapshots=3 data_reads=0 data_writes=0 pointer_effects=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x block XC: PASS cases=8704 restore=8704 predicates=17 layouts=XC1_single,XC2_two_single,XC2_one_double,XC1_penultimate counts=0,1,2,7 positions=interior,endpoint pages=2 snapshots=4 source_rotations=2 ordered_reads=1 selected_writes=1 rejected_writes=0 opcode_literal=1 counter_braf_owned=1 physical_phase_claim=0\n": 1,
       "TMS320C54x carry branch conformance: PASS variants=8\n": 1,
@@ -3216,7 +3165,6 @@
       "TMS320C54x delay DLD boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n": 1,
       "TMS320C54x delay LD exclusions: PASS cases=28 restore=28 spill_cases=16 other_family_cases=12 source_reads=0 data_writes=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x delay MAC/MAS boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n": 1,
-      "TMS320C54x delay MOD3 exclusions: PASS cases=512 restore=512 opcode_classes=2 arf=8 cmpt=2 initial_tc=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x delay MPY boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n": 1,
       "TMS320C54x delay MPYR boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n": 1,
       "TMS320C54x delay store boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n": 1,
@@ -3306,9 +3254,7 @@
       "TMS320C54x literal disassembler: PASS decoded_modes=1472 pages=2 invalid_mmr=32 invalid_rmw=32 bounded_extensions=1 operand_order=1 pipeline_claim=0\n": 1,
       "TMS320C54x live BIO conformance: PASS variants=28\n": 1,
       "TMS320C54x live BIO wait release: PASS\n": 1,
-      "TMS320C54x load MOD3 exclusions: PASS cases=9728 restore=9728 families=7 variable_shifts=32 arf=8 accumulators=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x load disassembler: PASS modes=1536 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
-      "TMS320C54x logic transfer MOD3 exclusions: PASS cases=2816 restore=2816 opcode_classes=11 arf=8 cmpt=2 initial_tc=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x logical shift disassembler: PASS forms=128 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x long BANZ within block: PASS cases=768 restore=768 counts=0,1,2,7 forms=offset,preincrement,circular offset_pairs=8 pages=2 snapshots=4 ordered_sources=1 selected_writes=1 ar_updates_once=1 actual_iterations=1 compatibility_composition=unvalidated interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x long logic exclusions: PASS cases=24 restore=24 mapped_peripheral=12 repeats=6 control_delays=6 data_reads=0 data_writes=0 pointer_updates=0 atomic_fallback=0 silicon_phase_claim=0\n": 1,
@@ -3346,7 +3292,6 @@
       "TMS320C54x memory ALU disassembler: PASS modes=4096 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x memory DP conformance: PASS variants=3\n": 1,
       "TMS320C54x memory MAC/MAS disassembler: PASS forms=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
-      "TMS320C54x memory MPY MOD3 exclusions: PASS cases=256 restore=256 arf=8 accumulators=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x memory SQUR: PASS cases=52224 restore=52224 forms=RAM,mapped accumulators=2 patterns=8 flags=16 t_publication=Read operand_retained=1 newer_t_preserved=1 duplicate_reads=0 data_writes=0 physical_phase_claim=0\n": 1,
       "TMS320C54x memory immediate MAC exclusions: PASS cases=1408 restore=1408 mapped_sources=80 mod3_forms=8 selectors=4 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x memory immediate MAC: PASS cases=262144 restore=262144 ram_forms=8 values=8 literals=8 flags=16 selectors=4 pages=2 snapshots=4 source_reads=1 data_writes=0 t_publication=Read repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n": 1,
@@ -3360,7 +3305,6 @@
       "TMS320C54x memory-count wrap: PASS cases=192 restore=192 count_sources=AL,RAM counts=0,1,7,31 bodies=MVDD,MVKD,MVDK pages=2 snapshots=4 header=fffe,ffff body=0000 count_reads=once physical_phase_claim=0\n": 1,
       "TMS320C54x move/stack disassembler: PASS forms=960 rejected=64 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x move/test disassembler: PASS decoded_modes=2048 pages=2 bounded_extensions=1 operand_order=1 pipeline_claim=0\n": 1,
-      "TMS320C54x multiply load MOD3 exclusions: PASS cases=4352 restore=4352 opcode_classes=34 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 asm_changes=0 rc_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x native dual SUB: PASS cases=256 restore=256 opcode=a245 patterns=8x8 sxm=0,1 ovm=0,1 physical_phase_claim=0\n": 1,
       "TMS320C54x native final gaps: PASS words=6 cases=12 signed_shift=1 saturation=1 compact_store=1\n": 1,
       "TMS320C54x native gap arithmetic/load: PASS words=3 cases=6 sxm=0,1\n": 1,
@@ -3377,7 +3321,6 @@
       "TMS320C54x original nibble helper: PASS cases=128 restore=128 words=23 selectors=4 values=8 sxm=2 pages=2 count_reads=1 input_reads=1 count_writes=2 silicon_phase_claim=0\n": 1,
       "TMS320C54x page-zero stack exclusions: PASS cases=1536 restore=1536 forms=PSHM,POPM encodings=192 pages=2 snapshots=2 data_reads=0 data_writes=0 stack_allocation=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x page-zero stack: PASS cases=73728 restore=73728 addresses=32 words=8 stacks=4 cpl=2 pages=2 snapshots=3 forms=push,pop,pair0,pair1,pair3,double_push source_retained=1 publications=once sp_updates=once status_preserved=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x paired arithmetic MOD3 exclusions: PASS cases=3584 restore=3584 opcode_classes=14 arf=8 cmpt=2 c16=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x paired circular fixture guard: PASS cases=14 nonzero_bk_domain=SPRU131G_5.5.3.4 cpu_execution=0\n": 1,
       "TMS320C54x parallel BSP load: PASS cases=6144 restore=6144 forms=6 selector_pairs=8 patterns=2 sxm_sst_ovm=8 pages=2 snapshots=4 extra_clock=1 reads=1 writes=1 ready_overrun_ack=1 next_frame_pending=1 store_source=Execute t_publish=Read reset_before_restore=1 carry_policy=preserve_unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x parallel MAC exclusions: PASS cases=128 restore=128 reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0\n": 1,
@@ -3395,7 +3338,6 @@
       "TMS320C54x peripheral MMR timing: PASS cases=20 families=STM,ANDM,ORM,ST,LD extra_cycles=1 rmw_double_charge=0 scratch_wait=0\n": 1,
       "TMS320C54x peripheral MVDD: PASS cases=1536 restore=1536 destinations=3 values=4 dual_modifiers=16 pages=2 snapshots=4 source_reads=1 peripheral_writes=1 extra_cycles=1 retained_address=1 retained_source=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x polling loop interrupts: PASS cases=384 restore=384 sources=IRQ,NMI arrivals=32 pages=2 snapshots=3 release=handler balanced_frames=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x program multiply MOD3 exclusions: PASS cases=512 restore=512 opcode_classes=4 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x program overlay conformance: PASS\n": 1,
       "TMS320C54x repeat endpoints: PASS cases=12 endpoints=ordinary,ffff,0000 counts=short,long sources=irq,nmi\n": 1,
       "TMS320C54x repeat page comparator: PASS cases=384 restore=384 frontends=atomic,staged counts=0,1,2,7 caller_pages=0,2,127 targets=foreign call_forms=FCALL,FCALLD hazard_controls=2 snapshots=4 rea_width=16 wrap_page=current balanced_frames=1 delay_effects=once physical_phase_claim=0\n": 1,
@@ -3458,7 +3400,7 @@
       "TMS320C54x software interrupt conformance: PASS variants=64\n": 1,
       "TMS320C54x software interrupt fast return: PASS variants=64\n": 1,
       "TMS320C54x software-saved IRQ repeat: PASS cases=3840 restore=3840 outer_counts=0,1,2,7,56 inner_counts=0,1,3,63 sources=IRQ,NMI pages=2 stacks=2 returns=FRETE,FRETED snapshots=6 leaf_return=inside,REA_plus_1 ordered_copies=1 balanced_frames=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x source-domain exclusions: PASS cases=%u restore=%u base_cases=30000 rmw_tc0_cases=448 instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n": 1,
+      "TMS320C54x source-domain exclusions: PASS cases=%u restore=%u base_cases=30000 absolute_tc0_cases=448 short_control_cases=14208 base_instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 shifts=0,1,15,16,31 modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n": 1,
       "TMS320C54x special load disassembler: PASS memory_forms=768 arp=8 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x stack address latency conformance: PASS variants=24\n": 1,
       "TMS320C54x staged ABS: PASS cases=13824 selectors=4 patterns=16 status_states=32 pages=2 producer_cases=1536 restore=13824 data_accesses=0 irq_acceptance=0 silicon_phase_claim=0\n": 1,
@@ -4406,32 +4348,6 @@
         "TMS320C54x staged mapped BK arithmetic: PASS cases=1024 restore=1024 selectors=ADD_A,ADD_B,SUB_A,SUB_B sxm_ovm=4 patterns=8 forms=direct,absolute pages=2 snapshots=2 source=Read post_read_change=1 duplicate_reads=0 data_writes=0 physical_phase_claim=0"
       ]
     },
-    "arith-mod3-edge": {
-      "completion": "Fatal error: TMS320C54x isolated arithmetic MOD3 exclusions complete",
-      "machine": "tms54test",
-      "reported_fields": [
-        {
-          "alu_changes": "0",
-          "arf": "8",
-          "cases": "35840",
-          "cmpt": "2",
-          "data_reads": "0",
-          "data_writes": "0",
-          "frontends": "2",
-          "pages": "2",
-          "pointer_changes": "0",
-          "restore": "35840",
-          "scalar_classes": "24",
-          "shifts": "32",
-          "silicon_trap_claim": "0",
-          "snapshots": "2",
-          "variable_selectors": "8"
-        }
-      ],
-      "required": [
-        "TMS320C54x arithmetic MOD3 exclusions: PASS cases=35840 restore=35840 scalar_classes=24 variable_selectors=8 shifts=32 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 alu_changes=0 silicon_trap_claim=0"
-      ]
-    },
     "asm-circular": {
       "completion": "Fatal error: TMS320C54x isolated circular ASM stores complete",
       "machine": "tms54xtra",
@@ -5088,31 +5004,6 @@
       ],
       "required": [
         "TMS320C54x staged BIO branches: PASS cases=256 forms=BC,BCD conditions=BIO,NBIO levels=0,1 transitions=4 pages=2 restore=256 line_sample=Read duplicate_callbacks=0 duplicate_fetches=0 silicon_phase_claim=0"
-      ]
-    },
-    "bitf-mod3-edge": {
-      "completion": "Fatal error: TMS320C54x isolated bitfield MOD3 exclusions complete",
-      "machine": "tms54test",
-      "reported_fields": [
-        {
-          "arf": "8",
-          "cases": "512",
-          "cmpt": "2",
-          "data_reads": "0",
-          "data_writes": "0",
-          "frontends": "2",
-          "initial_tc": "2",
-          "operations": "CMPM,BITF",
-          "pages": "2",
-          "pointer_changes": "0",
-          "restore": "512",
-          "silicon_trap_claim": "0",
-          "snapshots": "2",
-          "tc_changes": "0"
-        }
-      ],
-      "required": [
-        "TMS320C54x bitfield MOD3 exclusions: PASS cases=512 restore=512 operations=CMPM,BITF initial_tc=2 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 tc_changes=0 silicon_trap_claim=0"
       ]
     },
     "bitf-peripheral": {
@@ -6050,32 +5941,6 @@
         "TMS320C54x control-delay DELAY: PASS cases=73728 restore=73728 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=DP,indirect,postdecrement,postincrement registers=8 patterns=8 sxm_ovm=4 compatibility=2 pages=2 snapshots=3 reads=1 writes=1 stack=owned physical_phase_claim=0"
       ]
     },
-    "delay-mod3-edge": {
-      "completion": "Fatal error: TMS320C54x isolated delay MOD3 exclusions complete",
-      "machine": "tms54xtra",
-      "reported_fields": [
-        {
-          "arf": "8",
-          "cases": "512",
-          "cmpt": "2",
-          "data_reads": "0",
-          "data_writes": "0",
-          "frontends": "2",
-          "initial_tc": "2",
-          "io_writes": "0",
-          "opcode_classes": "2",
-          "pages": "2",
-          "pointer_changes": "0",
-          "program_writes": "0",
-          "restore": "512",
-          "silicon_trap_claim": "0",
-          "snapshots": "2"
-        }
-      ],
-      "required": [
-        "TMS320C54x delay MOD3 exclusions: PASS cases=512 restore=512 opcode_classes=2 arf=8 cmpt=2 initial_tc=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0"
-      ]
-    },
     "dld-delay": {
       "completion": "Fatal error: TMS320C54x isolated delayed DLD complete",
       "machine": "tms54test",
@@ -6144,26 +6009,10 @@
           "retained_pair": "1",
           "silicon_phase_claim": "0",
           "sxm": "0,1"
-        },
-        {
-          "arf": "8",
-          "c16": "2",
-          "cases": "3584",
-          "cmpt": "2",
-          "data_reads": "0",
-          "data_writes": "0",
-          "frontends": "2",
-          "opcode_classes": "14",
-          "pages": "2",
-          "pointer_changes": "0",
-          "restore": "3584",
-          "silicon_trap_claim": "0",
-          "snapshots": "2"
         }
       ],
       "required": [
-        "TMS320C54x staged DRSUB: PASS cases=6144 restore=6144 address_forms=8 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 pair_reads=2 memory_writes=0 retained_pair=1 silicon_phase_claim=0",
-        "TMS320C54x paired arithmetic MOD3 exclusions: PASS cases=3584 restore=3584 opcode_classes=14 arf=8 cmpt=2 c16=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0"
+        "TMS320C54x staged DRSUB: PASS cases=6144 restore=6144 address_forms=8 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 pair_reads=2 memory_writes=0 retained_pair=1 silicon_phase_claim=0"
       ]
     },
     "dual-sub-native": {
@@ -7014,31 +6863,6 @@
         "TMS320C54x delayed LD: PASS cases=147456 restore=147456 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=offset,preincrement,circular,absolute registers=8 offsets=2 destinations=2 memory_values=4 sxm_ovm=4 compatibility_states=2 pages=2 snapshots=3 source_reads=1 literal_fetches=1 pointer_updates=once target_observes_result=1 interrupt_composition=unvalidated physical_phase_claim=0"
       ]
     },
-    "load-mod3-edge": {
-      "completion": "Fatal error: TMS320C54x isolated load MOD3 exclusions complete",
-      "machine": "tms54test",
-      "reported_fields": [
-        {
-          "accumulators": "2",
-          "arf": "8",
-          "cases": "9728",
-          "cmpt": "2",
-          "data_reads": "0",
-          "data_writes": "0",
-          "families": "7",
-          "frontends": "2",
-          "pages": "2",
-          "pointer_changes": "0",
-          "restore": "9728",
-          "silicon_trap_claim": "0",
-          "snapshots": "2",
-          "variable_shifts": "32"
-        }
-      ],
-      "required": [
-        "TMS320C54x load MOD3 exclusions: PASS cases=9728 restore=9728 families=7 variable_shifts=32 arf=8 accumulators=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0"
-      ]
-    },
     "load-offset": {
       "completion": "Fatal error: TMS320C54x isolated offset memory load complete",
       "machine": "tms54test",
@@ -7253,28 +7077,10 @@
           "restore": "576",
           "sxm_states": "2",
           "value_pairs": "4"
-        },
-        {
-          "arf": "8",
-          "cases": "2816",
-          "cmpt": "2",
-          "data_reads": "0",
-          "data_writes": "0",
-          "frontends": "2",
-          "initial_tc": "2",
-          "io_writes": "0",
-          "opcode_classes": "11",
-          "pages": "2",
-          "pointer_changes": "0",
-          "program_writes": "0",
-          "restore": "2816",
-          "silicon_trap_claim": "0",
-          "snapshots": "2"
         }
       ],
       "required": [
-        "TMS320C54x staged memory logic: PASS cases=576 operations=3 accumulators=2 address_forms=4 value_pairs=4 sxm_states=2 restore=576 duplicate_reads=0",
-        "TMS320C54x logic transfer MOD3 exclusions: PASS cases=2816 restore=2816 opcode_classes=11 arf=8 cmpt=2 initial_tc=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0"
+        "TMS320C54x staged memory logic: PASS cases=576 operations=3 accumulators=2 address_forms=4 value_pairs=4 sxm_states=2 restore=576 duplicate_reads=0"
       ]
     },
     "long-mvkd": {
@@ -7426,28 +7232,12 @@
           "memory_writes": "0",
           "pair_reads": "2",
           "restore": "18432"
-        },
-        {
-          "arf": "8",
-          "c16": "2",
-          "cases": "3584",
-          "cmpt": "2",
-          "data_reads": "0",
-          "data_writes": "0",
-          "frontends": "2",
-          "opcode_classes": "14",
-          "pages": "2",
-          "pointer_changes": "0",
-          "restore": "3584",
-          "silicon_trap_claim": "0",
-          "snapshots": "2"
         }
       ],
       "required": [
         "TMS320C54x staged DSUB: PASS cases=6144 address_forms=8 destinations=A,B patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=6144 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0",
         "TMS320C54x staged DADD: PASS cases=12288 address_forms=8 selectors=4 patterns=8 c16=0,1 sxm=0,1 ovm=0,1 parity=0,1 restore=12288 duplicate_reads=0 memory_writes=0 silicon_phase_claim=0",
-        "TMS320C54x staged long-pair controls: PASS dsub=6144 dadd=12288 restore=18432 pair_reads=2 memory_writes=0",
-        "TMS320C54x paired arithmetic MOD3 exclusions: PASS cases=3584 restore=3584 opcode_classes=14 arf=8 cmpt=2 c16=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0"
+        "TMS320C54x staged long-pair controls: PASS dsub=6144 dadd=12288 restore=18432 pair_reads=2 memory_writes=0"
       ]
     },
     "mac-bk": {
@@ -8485,29 +8275,6 @@
         "TMS320C54x memory immediate MAC exclusions: PASS cases=1408 restore=1408 mapped_sources=80 mod3_forms=8 selectors=4 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0"
       ]
     },
-    "mpy-mod3-edge": {
-      "completion": "Fatal error: TMS320C54x isolated memory MPY MOD3 exclusions complete",
-      "machine": "tms54test",
-      "reported_fields": [
-        {
-          "accumulators": "2",
-          "arf": "8",
-          "cases": "256",
-          "cmpt": "2",
-          "data_reads": "0",
-          "data_writes": "0",
-          "frontends": "2",
-          "pages": "2",
-          "pointer_changes": "0",
-          "restore": "256",
-          "silicon_trap_claim": "0",
-          "snapshots": "2"
-        }
-      ],
-      "required": [
-        "TMS320C54x memory MPY MOD3 exclusions: PASS cases=256 restore=256 arf=8 accumulators=2 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0"
-      ]
-    },
     "mpy-t-imm": {
       "completion": "Fatal error: TMS320C54x isolated immediate MPY complete",
       "machine": "tms54test",
@@ -8574,31 +8341,6 @@
       ],
       "required": [
         "TMS320C54x delay MPYR boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0"
-      ]
-    },
-    "mul-mod3-edge": {
-      "completion": "Fatal error: TMS320C54x isolated multiply load MOD3 exclusions complete",
-      "machine": "tms54test",
-      "reported_fields": [
-        {
-          "arf": "8",
-          "asm_changes": "0",
-          "cases": "4352",
-          "cmpt": "2",
-          "data_reads": "0",
-          "data_writes": "0",
-          "frontends": "2",
-          "opcode_classes": "34",
-          "pages": "2",
-          "pointer_changes": "0",
-          "rc_changes": "0",
-          "restore": "4352",
-          "silicon_trap_claim": "0",
-          "snapshots": "2"
-        }
-      ],
-      "required": [
-        "TMS320C54x multiply load MOD3 exclusions: PASS cases=4352 restore=4352 opcode_classes=34 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 asm_changes=0 rc_changes=0 silicon_trap_claim=0"
       ]
     },
     "mul-t-sources": {
@@ -9950,31 +9692,6 @@
       ],
       "required": [
         "TMS320C54x staged plain conditional branches: PASS cases=48 conditions=AEQ,ANEQ,BEQ,BNEQ pages=2 outcomes=2 restore=48 duplicate_fetches=0 taken_data_reads=0"
-      ]
-    },
-    "pmac-mod3-edge": {
-      "completion": "Fatal error: TMS320C54x isolated program multiply MOD3 exclusions complete",
-      "machine": "tms54xtra",
-      "reported_fields": [
-        {
-          "arf": "8",
-          "cases": "512",
-          "cmpt": "2",
-          "data_reads": "0",
-          "data_writes": "0",
-          "frontends": "2",
-          "io_writes": "0",
-          "opcode_classes": "4",
-          "pages": "2",
-          "pointer_changes": "0",
-          "program_writes": "0",
-          "restore": "512",
-          "silicon_trap_claim": "0",
-          "snapshots": "2"
-        }
-      ],
-      "required": [
-        "TMS320C54x program multiply MOD3 exclusions: PASS cases=512 restore=512 opcode_classes=4 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0"
       ]
     },
     "pmst-iptr": {
@@ -12879,29 +12596,31 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
+          "absolute_tc0_cases": "448",
           "base_cases": "30000",
-          "cases": "30448",
+          "base_instruction_forms": "125",
+          "cases": "44656",
           "cmpt": "2",
-          "coverage_fnv64": "ba74a1da74928725",
+          "coverage_fnv64": "6ae942418d722665",
           "data_reads": "0",
           "data_writes": "0",
           "frontends": "2",
-          "instruction_forms": "125",
           "io_accesses": "0",
           "mmr_sources": "4",
           "modes": "98..9f,f9..ff",
           "pages": "2",
           "program_writes": "0",
-          "restore": "30448",
-          "rmw_tc0_cases": "448",
+          "restore": "44656",
           "shifted_reads": "10",
+          "shifts": "0,1,15,16,31",
+          "short_control_cases": "14208",
           "silicon_trap_claim": "0",
           "smem_classes": "111",
           "snapshots": "2"
         }
       ],
       "required": [
-        "TMS320C54x source-domain exclusions: PASS cases=30448 restore=30448 base_cases=30000 rmw_tc0_cases=448 instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=ba74a1da74928725"
+        "TMS320C54x source-domain exclusions: PASS cases=44656 restore=44656 base_cases=30000 absolute_tc0_cases=448 short_control_cases=14208 base_instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 shifts=0,1,15,16,31 modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=6ae942418d722665"
       ]
     },
     "sqacc-repeat": {
@@ -13769,35 +13488,6 @@
       ],
       "required": [
         "TMS320C54x staged stack IRQ return: PASS cases=80 restore=80 forms=PSHM,PSHD,POPM_T,POPM_SP sources=IRQ,NMI pages=2 snapshots=5 acknowledgements=1 return_reads=1 caller_cleanup=push_forms resumed_idle=1 intm_cleared=1 silicon_phase_claim=0"
-      ]
-    },
-    "stack-mod3-edge": {
-      "completion": "Fatal error: TMS320C54x isolated MMR push MOD3 exclusions complete",
-      "machine": "tms54test",
-      "reported_fields": [
-        {
-          "silicon_phase_claim": "0",
-          "staged_suite_claim": "0"
-        },
-        {
-          "arf": "8",
-          "cases": "512",
-          "cmpt": "2",
-          "data_reads": "0",
-          "data_writes": "0",
-          "frontends": "2",
-          "opcode_classes": "4",
-          "pages": "2",
-          "pointer_changes": "0",
-          "restore": "512",
-          "silicon_trap_claim": "0",
-          "snapshots": "2",
-          "stack_changes": "0"
-        }
-      ],
-      "required": [
-        "TMS320C54x atomic prefix: PASS staged_suite_claim=0 silicon_phase_claim=0",
-        "TMS320C54x MMR push MOD3 exclusions: PASS cases=512 restore=512 opcode_classes=4 arf=8 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 stack_changes=0 silicon_trap_claim=0"
       ]
     },
     "stack-page0": {
@@ -14830,30 +14520,6 @@
         "TMS320C54x store observation: PASS cases=12 restore=12 retained_address=1 exact_value=1 rejected_other_identity=1 observer_writes=0"
       ]
     },
-    "subc-mod3-edge": {
-      "completion": "Fatal error: TMS320C54x isolated SUBC MOD3 exclusions complete",
-      "machine": "tms54test",
-      "reported_fields": [
-        {
-          "accumulators": "2",
-          "arf": "8",
-          "cases": "512",
-          "cmpt": "2",
-          "data_reads": "0",
-          "data_writes": "0",
-          "frontends": "2",
-          "pages": "2",
-          "pointer_changes": "0",
-          "repeat": "none,short",
-          "restore": "512",
-          "silicon_trap_claim": "0",
-          "snapshots": "2"
-        }
-      ],
-      "required": [
-        "TMS320C54x SUBC MOD3 exclusions: PASS cases=512 restore=512 arf=8 accumulators=2 cmpt=2 pages=2 frontends=2 snapshots=2 repeat=none,short data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0"
-      ]
-    },
     "subs": {
       "completion": "Fatal error: TMS320C54x isolated staged SUBS complete",
       "machine": "tms54test",
@@ -15541,28 +15207,10 @@
           "sxm_ovm": "4",
           "values": "4",
           "writes": "1"
-        },
-        {
-          "arf": "8",
-          "cases": "1024",
-          "cmpt": "2",
-          "data_reads": "0",
-          "data_writes": "0",
-          "frontends": "2",
-          "initial_tc": "2",
-          "io_writes": "0",
-          "opcode_classes": "4",
-          "pages": "2",
-          "pointer_changes": "0",
-          "program_writes": "0",
-          "restore": "1024",
-          "silicon_trap_claim": "0",
-          "snapshots": "2"
         }
       ],
       "required": [
-        "TMS320C54x atomic XORM: PASS cases=1024 restore=1024 forms=8 values=4 literals=4 sxm_ovm=4 snapshots=2 reads=1 writes=1 flags_preserved=1 staged_acceptance=0 silicon_phase_claim=0",
-        "TMS320C54x RMW MOD3 exclusions: PASS cases=1024 restore=1024 opcode_classes=4 arf=8 cmpt=2 initial_tc=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_writes=0 pointer_changes=0 silicon_trap_claim=0"
+        "TMS320C54x atomic XORM: PASS cases=1024 restore=1024 forms=8 values=4 literals=4 sxm_ovm=4 snapshots=2 reads=1 writes=1 flags_preserved=1 staged_acceptance=0 silicon_phase_claim=0"
       ]
     },
     "xorm-absolute": {
@@ -15664,10 +15312,10 @@
       "case_ids": [],
       "classification": "implementation_limit",
       "coverage": {
-        "cases": 30448,
+        "cases": 44656,
         "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
-        "fnv64": "ba74a1da74928725",
-        "key": "(opcode_word << 16) | (operation_extension << 4) | context; original 30000 catalogue keys followed by four RMW families x 16 contexts x seven absolute aliases with low-half bit 15 tagging TC clear",
+        "fnv64": "6ae942418d722665",
+        "key": "(opcode_word << 16) | (operation_extension << 4) | context | control_tag; original 30448 identities first, followed by shift, ASM, C16, repeat and TC-clear short controls; tags 0x4000=ASM, 0x2000=C16, 0x1000=RPT, 0x8000=TC-clear (tags only for unshifted forms)",
         "result_prefix": "TMS320C54x source-domain exclusions: PASS "
       },
       "decision": "merge",

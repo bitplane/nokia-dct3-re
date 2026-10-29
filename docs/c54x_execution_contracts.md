@@ -53,9 +53,9 @@ The compatibility-named `tms54isa` bench separates architectural examples
 (`source-domain`) by explicit profile and review classification. Source-domain
 owns its case state, timer cadence, bus observers and replay without the legacy
 phase dispatcher. The base 30,000 cases retain their identities and checkpoint
-choices; 448 appended TC-clear RMW controls retain the distinct status input
-from ten retired absolute-alias profiles. The digest encodes instruction,
-extension, context and the supplemental TC-clear tag.
+choices; 448 absolute TC-clear controls and 14,208 short-source controls retain
+status, shift-boundary and repeat contexts separately. The digest encodes the
+instruction, extension, context and control tag.
 
 `isa-parallel` runs ten independently reset parallel store/arithmetic cases.
 The default sequence reuses their literal register, masked-status and RAM
@@ -136,8 +136,8 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_dispatch.cpp` | Ordered callback routing and the initial-program completion tail |
 | `tests/c54x/tms320c54x_test_arithmetic.cpp` | Arithmetic, multiplier and logical-operation fixtures and checks |
 | `tests/c54x/tms320c54x_test_addressing.cpp` | Address generation and memory/register transfers, including the stack-transfer continuation |
-| `tests/c54x/tms320c54x_test_operand_domains.cpp` | Remaining absolute-alias and short-source rejection fixtures with family-owned progress, observations, taps and snapshots |
-| `tests/c54x/tms320c54x_test_rejection_state.h` | Per-family rejection state; CPU and scheduler routing remain with the bench |
+| `tests/c54x/tms320c54x_test_domains.h` | CPU-only admission fixture with owned progress, observations, taps and snapshots |
+| `tests/c54x/tms320c54x_test_domain_schedule.h` | Independent instruction inventory and explicit admission-control schedule; no legacy phase routing |
 | `tests/c54x/tms320c54x_test_pipeline.cpp` | Dependency, status and data-path compositions and their sequenced continuations |
 | `tests/c54x/tms320c54x_test_pipeline_control.cpp` | Branch, call, return and conditional-control compositions and continuations |
 | `tests/c54x/tms320c54x_test_pipeline_repeat.cpp` | Repeat/block-control compositions and continuations |
@@ -226,10 +226,10 @@ unadmitted `f9..ff`, CMPT, two program pages, both CPU frontends and snapshots
 before/after rejection. Data reads/writes, program writes and I/O accesses stay
 zero; accumulators, T, status, repeat/stack pointers and all ARs are retained.
 The independent fixture inventory does not call CPU admission helpers.
-Another 448 cases check `68xx..6bxx` absolute aliases with TC initially clear,
-for 30,448 total cases and actual restores. The retired per-family profiles
-repeated 9,856 instruction/context checks already in the base census; their
-small accumulator sentinels are not retained as separate stimulus coverage.
+Another 448 cases check `68xx..6bxx` absolute aliases with TC initially clear.
+The 14,208 short-source controls below bring the total to 44,656 cases and
+actual restores. Small accumulator/stack sentinels and following-word literal
+repetitions are not retained as separate stimulus coverage.
 
 A retained regression is case 3428: atomic `0ef9` (SUBB) must reject before
 an operand transaction or changes to status/repeat state. The shared atomic
@@ -252,111 +252,34 @@ pointer change, accumulator/T or status effect; stack and transfer banks
 also observe stack, program and I/O effects as applicable. These are
 fail-closed emulator contracts, not claims about silicon traps.
 
-The shared rejection fixture selects CMPT through ST1 bit 5. Its older
-setup instead toggled PMST bit 14, so prior `cmpt=2` output did not establish
-compatibility-mode coverage. All twelve profiles in the table below pass
-with the corrected setup. This correction does not alter the encoded-source
-legality rule or establish CMPT coverage for unrelated fixture helpers.
+The CPU-only fixture selects CMPT through ST1 bit 5. PMST bit 14 is not a
+substitute; tests that only toggle it do not establish CMPT coverage.
+Ordinary short-source admissions are already covered by the base catalogue.
+Additional controls retain these distinct contexts:
 
-| Profile | Rejection cases/restores | Selected scope |
+| Control | Cases/restores | Scope beyond the base catalogue |
 | --- | --- | --- |
-| `load-mod3-edge` | 9,728 | LD/LDU/LD TS/LDR/shift-16/DLD/variable LD; all ARs and destinations, all 32 variable shifts. |
-| `mul-mod3-edge` | 4,352 | 34 classes covering multiply/MAC/square, T/ASM loads, BITT, POLY, immediate MAC, DP loads and RPT; ASM and RC retained. |
-| `mpy-mod3-edge` | 256 | Memory/immediate MPY to both destinations. |
-| `arith-mod3-edge` | 35,840 | 24 scalar classes and eight variable-shift selectors over all 32 shifts. |
-| `bitf-mod3-edge` | 512 | CMPM/BITF with both initial TC values. |
-| `subc-mod3-edge` | 512 | Both destinations; standalone and short-repeat SUBC. |
-| `long-pair` / `drsub` | 3,584 each | 14 paired-arithmetic classes including C16; rejection adds no positive staged T-variant support. |
-| `logic-short` | 2,816 | AND/OR/XOR plus source-side MVDK, MVMD, PORTW, WRITA and MVDP; 576 positive logic cases run separately. |
-| `xorm` | 1,024 | ANDM/ORM/XORM/ADDM short-preincrement exclusions; 1,024 legal XORM cases run separately in the same profile. |
-| `stack-mod3-edge` | 512 | LDM A/B, PSHM and PSHD; atomic prefix includes `489a` rejection; AR upper bits and SP retained. |
-| `pmac-mod3-edge` (`tms54xtra`) | 512 | MACP/MACD A/B; all ARs, CMPT modes, pages, frontends and two checkpoints; no data access or program/I/O write. |
-| `delay-mod3-edge` (`tms54xtra`) | 512 | LTD/DELAY source operands; all ARs, CMPT/TC settings, pages, frontends and two checkpoints; no source read, implicit successor write or pointer/T change. |
+| Shifted extensions | 5,120 | Ten operation/destination forms at shifts 1, 15, 16 and 31; shift 0 is in the base. |
+| Nonzero ASM | 4,352 | 34 multiply/load/application classes at ASM=-11; RC preserved. |
+| C16 | 1,792 | 14 paired-arithmetic opcode classes with C16 set. |
+| Short-repeat SUBC | 256 | Both destinations prefixed by `RPT #3`; the prefix legitimately changes RC. |
+| TC clear | 2,688 | Bitfield, logic/transfer, MACP/MACD, LTD/DELAY and RMW forms. |
 
-`mpy-abs-edge` independently checks224 cases/restores for memory/immediate
-MPY modes`f9..ff`: both destinations, CMPT settings, program pages, frontends
-and two checkpoints. The decoder and staged path do not admit these modes,
-but the former atomic helper interpreted every mode`>=f8` as absolute and
-read an operand in the first atomic control case. The MPY handler now rejects
-these unvalidated aliases before operand access, retaining A/B/T/status and
-all ARs. This aligns the emulator's fail-closed admission paths; it does not
-establish that silicon traps on these encodings or settle other families'
-alias behavior. Canonical`f8` absolute and legal long MOD13 remain distinct.
-Capture:`tmp/run_c54x_core_gfni9tle`; the unchanged-core diagnostic is retained
-in`tmp/c54x-mpy-alias-negative.log`.
+All controls cover eight AR selectors, CMPT, page, frontend and both
+checkpoints. Shift is a distinct encoding field from source admission; the
+interior shift Cartesian product is retired, not claimed as retained.
+Positive arithmetic profiles still test numeric results at every shift.
+The pure rejection profiles and the rejection tails of `long-pair`, `drsub`,
+`logic-short` and `xorm` are merged here. Those four profiles retain their
+positive operation contracts. The redundant atomic-prefix stack profile is
+removed; default atomic coverage, including `489a` rejection, remains.
 
-`mac-abs-edge` checks448 cases/restores for the same`f9..ff` admission
-boundary: both source and destination accumulators, CMPT settings, program
-pages, frontends and two checkpoints. The unchanged atomic MAC path attempted
-an operand read at case56 (the first atomic case), despite staged rejection.
-MAC now rejects before operand access or T publication, matching MPY and the
-staged classifier. All448 cases retain A/B/T/status/ARs with zero data reads
-or writes. This is an emulator admission-consistency correction, not a
-silicon-trap claim or evidence that a handset uses these aliases.
-Negative control:`tmp/mac-abs-edge-before/run_c54x_core_da4c3f2y`;
-corrected capture:`tmp/mac-abs-edge-after/run_c54x_core_28eddmjv`.
-The unchanged224-case MPY alias control and the complete legal MPY/MAC
-profile also pass after this correction; the latter capture is
-`tmp/mac-abs-edge-controls/run_c54x_core__82ilqn1`.
-The staged NSE-1 Phone book menu oracle also remains exact
-(`make verify-5110-menu NSE1_MACHINE=nse1pipe`).
-
-`delay-abs-edge` checks224 cases/restores for LTD/DELAY modes`f9..ff`,
-both CMPT settings, program pages, frontends and checkpoints before/after
-rejection. The unchanged atomic path performs a data transaction at case56,
-while staged execution rejects these aliases. Both handlers now reject before
-fetching an absolute address or reading/copying its operand. Canonical`f8`
-and legal long MOD13 are unchanged. This is fail-closed emulator admission
-consistency, not a silicon-trap claim or evidence of a handset opcode gap.
-The512-case short-MOD3 control,15,360 legal DELAY copies and73,728 delayed-control
-copies/restores pass separately. Negative capture:
-`tmp/c54x-delay-alias-negative/run_c54x_core__7hzrh5d`; corrected capture:
-`tmp/c54x-delay-alias-fixed/run_c54x_core_qyy685wz`.
-The native staged NSE-1 menu oracle and existing MPY/MAC alias controls also
-pass; the tool suite passes5,116 tests.
-The current full-default-suite checkpoint also includes this guard; the
-isolated rejection/copy matrices retain their own case counts and scopes.
-
-`pmac-abs-edge` separately checks448 cases/restores for MACP/MACD
-`f9..ff` aliases, both destinations, CMPT settings, program pages,
-frontends and two checkpoints. The unchanged atomic path performs a data
-transaction at case56. The corrected handler rejects before reading the
-source/coefficient, publishing T or performing MACD's successor copy.
-All cases preserve A/B/T/status and every AR with zero data transactions.
-The existing512-case short-MOD3 control remains unchanged. These are
-fail-closed admission contracts, not silicon-trap claims or positive staged
-MACP/MACD support. Negative capture:
-`tmp/c54x-pmac-alias-negative/run_c54x_core_dl6032t6`; corrected capture:
-`tmp/c54x-pmac-alias-fixed/run_c54x_core_9z1v8zec`.
-
-The existing256-case short-MOD3 MPY rejection control and the complete
-`mpy-mem-imm` profile pass separately:98,304 legal MPY cases,262,144 MAC
-cases and1,408 MAC exclusions, all with restoration. The legal profile's
-capture is`tmp/run_c54x_core_0izklf6w`. These are bounded instruction
-regressions; the [core checkpoint](#core-regression-checkpoint) separately
-qualifies the complete default suite including the LTD/DELAY and MACP/MACD
-absolute-alias guards.
-Native staged5110 Phone book menu acceptance and both3210 default/frontier
-regressions also pass without rebanking their oracles. This does not expand
-handset, RF or speech support.
-
-`rmw-abs-edge` checks896 cases/restores for ANDM/ORM/XORM/ADDM aliases
-`f9..ff`, both initial TC values, CMPT settings, program pages, frontends
-and two checkpoints. The unchanged core performed an operand transaction
-at case56, the first atomic case, while the staged prefix rejected them.
-The atomic RMW admission guard now rejects these unadmitted aliases before
-address-extension fetching or operand access. Every case retains A/B/T,
-ST0/ST1 and all ARs with zero data reads/writes. Canonical absolute `f8`
-and legal long MOD13 remain separate supported forms; this is fail-closed
-frontend consistency, not a claim that silicon traps or a handset uses an
-illegal opcode. Negative evidence is
-`tmp/c54x-rmw-alias-negative/run_c54x_core_fvfsp7hq`; corrected evidence is
-`tmp/c54x-rmw-alias-fixed/run_c54x_core_xglw8jax`.
-
-The legal atomic XORM, staged absolute XORM, mapped BRC/AR ADDM and active
-BRC-loop consumer controls have separate captures under
-`tmp/c54x-rmw-alias-controls`. Their scopes do not supersede the full-core
-checkpoint or establish untested instruction behavior.
+Absolute `f9..ff` must not silently alias canonical `f8`. The prior atomic
+MPY/MAC, LTD/DELAY, MACP/MACD and RMW paths read operands despite staged
+rejection; MAC/SQUR could publish T and RMW could fetch an address extension.
+Admission now precedes those effects. Canonical absolute and supported long
+MOD13 forms remain distinct positive contracts. This is emulator frontend
+consistency, not evidence that these aliases trap on silicon.
 
 Corrected positive load domains are:
 
@@ -475,17 +398,15 @@ MACP/MACD source admission is separately corrected. SPRU172C pages 4-87
 and 4-89 define Smem as the value read into the multiply and T; MACD's
 implicit copy writes its successor location, not the source operand. The
 atomic handler formerly applied short preincrement before reading that
-source. An unchanged-core run of `pmac-mod3-edge` fails on a data transaction;
+source. A negative control observed a data transaction before rejection;
 the guard now rejects `98..9f` before address modification or operand access.
 This is fail-closed emulation of an unsupported operand form, not a claimed
 silicon exception. It does not introduce positive staged MACP/MACD support.
 
-Run `tools/run_c54x_core.py --mame mame/mame --rompath mame/roms
---profile pmac-mod3-edge --output-root tmp`. Its 512 cases and restores cover
-four opcode classes across eight ARs, CMPT, page, frontend and save-point
-choices. Existing postdecrement/postincrement, absolute and long-offset
-MACP/MACD examples remain in the default core regression; long MOD=13 is not
-removed. The remaining source/RMW audit is still not an all-ISA closure.
+The CPU-only `source-domain` census owns this rejection contract, including
+TC-clear controls. Existing postdecrement/postincrement, absolute and
+long-offset MACP/MACD examples remain in the default core regression; long
+MOD=13 is not removed. This is still not an all-ISA closure.
 The cold finalized MU4 prefix preserves all seven prior digital captures
 byte-for-byte (decoded returns, DMA, DXR writes, TX words/times and DIN
 words/slots); its independent ideal-DAC checker also passes. This excludes
@@ -1221,8 +1142,8 @@ The existing `indirect-dld` profile now requires the guard, 3,072 extended
 DST cases, 9,216 short-indirect DST cases, 1,152 store/DLD composition cases
 and 23,040 DLD cases. Case IDs, instruction-shaped literals, save/restore
 and bus-access assertions are retained; no invalid case is replaced by a
-duplicate legal tuple. The full paired run passes, as does the neighboring
-9,728-case short-MOD3 load exclusion bank. CPU emulation code is unchanged.
+duplicate legal tuple. Load-source rejection is covered separately by the
+CPU-only `source-domain` census. CPU emulation code is unchanged.
 
 ```sh
 python3 tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
@@ -2223,87 +2144,19 @@ gap whose physical ownership remains unknown. Output words
 transaction or physical DA150 mapping is established.
 
 
-### Scalar memory-logic absolute aliases
+### Absolute-alias frontend consistency
 
-Memory AND/OR/XOR must not treat reserved address bytes`f9..ff` as the
-canonical absolute form`f8`. The staged classifier already rejects these;
-the atomic frontend formerly fetched the extension, read data and changed
-the destination accumulator. The isolated `logic-abs-edge` unchanged-core
-control fails at case56, its first atomic case, on the no-data-access check.
-The early admission guard now rejects before operand effects. This is
-fail-closed emulator admission consistency, not a silicon-trap claim.
+Memory AND/OR/XOR, scalar arithmetic and the `5xxx` long-memory arithmetic
+family reject unadmitted `f9..ff` before operand effects in both frontends.
+Negative controls exposed operand transactions and destination/status changes;
+long-memory arithmetic changed ST0 from `1804` to `1004` before the guard.
+These are fail-closed model contracts, not silicon-trap claims or positive
+staged support for T-dependent arithmetic.
 
-The672-case/restoration matrix covers all three operations, both destination
-accumulators, seven aliases, CMPT settings, program pages, frontends and two
-checkpoints. A/B/T, status and every AR are retained with zero data reads or
-writes. The legal `logic-absolute` control separately retains1536 cases/restores
-with exactly one source read, no data write and retained operands. Long MOD13
-and ordinary source forms are unchanged; other instruction families remain
-outside this alias audit.
-
-```sh
-.venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
-  --profile logic-abs-edge --output-root tmp/c54x-logic-alias-fixed
-.venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
-  --profile logic-absolute --output-root tmp/c54x-logic-alias-legal
-```
-
-The negative capture is `tmp/c54x-logic-alias-negative/run_c54x_core_nqifkx2q`;
-accepted controls are `tmp/c54x-logic-alias-fixed/run_c54x_core_7s58o4k8`
-and `tmp/c54x-logic-alias-legal/run_c54x_core_piarsysf`.
-
-### Scalar arithmetic absolute aliases
-
-The staged scalar arithmetic classifier excludes address bytes`f9..ff`,
-but the atomic frontend formerly read operands and changed status through
-those aliases. The unchanged-core `arith-abs-edge` fixture fails at case56,
-the first atomic case, on its no-data-transaction assertion. An early
-atomic admission guard now rejects the tested families before operand
-effects. This is fail-closed emulator consistency, not silicon trap behavior.
-
-The2688-case/restoration matrix covers12 forms (ADD, ADDS, ADD-TS, ADDC,
-SUB, SUBS, SUB-TS, SUBC, and the two source/destination selections of each
-high-word ADD/SUB family), both accumulator selections, all seven aliases,
-CMPT, program pages, both frontends and two checkpoints. A/B/T, status and
-all ARs remain unchanged with zero data transactions. Legal staged absolute
-ADD separately passes2048 cases/restores; mapped AR arithmetic passes1024
-cases/restores covering direct/absolute forms. These controls do not close
-every arithmetic opcode, repeat/interrupt composition or physical timing.
-
-```sh
-.venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
-  --profile arith-abs-edge --output-root tmp/c54x-arithmetic-alias-fixed
-```
-
-Negative capture:`tmp/c54x-arithmetic-alias-negative/run_c54x_core_160gph3i`;
-fixed:`tmp/c54x-arithmetic-alias-fixed/run_c54x_core_rjj2xv2d`;
-legal controls:`tmp/c54x-arithmetic-alias-legal-add/run_c54x_core_66hmi0hw`
-and`tmp/c54x-arithmetic-alias-legal-ar/run_c54x_core_icucz_yq`.
-
-### Long-memory arithmetic absolute aliases
-
-Atomic long-memory arithmetic also treated unadmitted `f9..ff` operands as
-canonical absolute `f8`, unlike the staged frontend. The unchanged-core
-`long-abs-edge` control fails at case56, the first atomic case, on a data
-transaction; ST0 also changes from1804 to1004. The shared early admission
-guard now covers the full `5xxx` memory family before operand effects.
-Canonical `f8` remains admitted; this is emulator fail-closed consistency,
-not a silicon-trap claim or new staged support for T-dependent arithmetic.
-
-The1,568-case/restoration matrix covers seven families (both DADD input
-selections, DSUB, DRSUB, DADST, DSUBT and DSADT), two destinations,
-seven aliases, CMPT, two pages, both frontends and two checkpoints.
-A/B/T, status and every AR remain unchanged with zero data reads/writes.
-The legal long-pair control separately retains18,432 DADD/DSUB
-cases/restores and3,584 MOD3 exclusions. Other arithmetic composition
-and physical timing retain their independent scopes.
-
-```sh
-.venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
-  --profile long-abs-edge --output-root tmp/c54x-long-alias-fixed
-.venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
-  --profile long-pair --output-root tmp/c54x-long-alias-fixed
-```
+The CPU-only `source-domain` census owns the rejection coverage. Separate
+legal controls remain in `logic-absolute`, `add-absolute`, `arith-ar` and
+`long-pair`; the latter retains 18,432 positive DADD/DSUB cases/restores.
+Repeat/interrupt composition and physical timing remain separate scopes.
 
 ## Core regression checkpoint
 

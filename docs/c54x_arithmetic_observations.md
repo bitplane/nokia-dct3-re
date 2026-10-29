@@ -33,39 +33,21 @@ absolute addressing is unchanged. This is an emulator-supported-domain
 boundary, not a claim that physical silicon traps on those aliases, and it
 does not close operand admission for every other Smem family.
 
-`run_c54x_core.py --profile mem-t-abs-edge` executes 1792 cases and 1792
-save/load replays: seven aliases, eight families, two accumulators, CMPT
-off/on, two program pages, atomic/staged frontends and snapshots before/after
-rejection. It asserts no operand data reads/writes, unchanged A/B/T/status
-and every AR, and rejected execution in both modes. The original failing
-case 56 and fixed acceptance are retained separately under
-`tmp/c54x-memory-t-alias-before` and `tmp/c54x-memory-t-alias-after`.
-The corrected core also passes the full default fixture (all 293 required
-markers exactly once, unchanged 5690 asserted opcode forms) and the native
-`nse1pipe` physical Phone book menu gate. This is regression evidence, not
-completion of the separate MAD2 serial/RF contracts.
+The CPU-only `source-domain` census owns these rejection controls across
+aliases, accumulators, CMPT, pages, frontends and before/after checkpoints.
+It checks zero operand effects and supplied-state preservation. The former
+per-family alias profiles are merged there; full regression and handset
+acceptance remain separate evidence, not a silicon-conformance claim.
 
 The six scalar load families LD, LDU, LD with TS, LDR, LD shifted by 16 and
 DLD have the same bounded absolute-alias admission. The negative native
 fixture failed at the first atomic case (56): an operand transaction and an
 A change occurred without rejection. The atomic guard now rejects `f9..ff`
 before those effects, matching staged admission without changing `f8`,
-long-offset reads or store instructions. `--profile load-abs-edge` passes
-1344 cases and 1344 save/load replays across six families, seven aliases,
-both destinations, CMPT settings, program pages and frontends, with two
-checkpoint positions. It checks zero operand transactions and preservation
-of A/B/T, status and all ARs. Before/after evidence lives separately in
-`tmp/c54x-load-alias-before` and `tmp/c54x-load-alias-after`. This is an
-emulator-domain consistency correction, not a newly observed handset opcode
-gap or proof that silicon traps on these aliases. Other read-source families
-still require independent admission audits.
-
-The corrected load core passes the complete default native conformance run
-(`tmp/c54x-load-alias-default`) and the `nse1pipe` unassisted physical Phone
-book menu gate. The final rebuilt fixture also repeats the 1344-case/replay
-acceptance (`tmp/c54x-load-alias-final`). All 5196 tool tests pass with one
-skip; the socket-dependent tests require the authorized localhost test
-environment. These regressions do not close the separate serial/RF boundary.
+long-offset reads or store instructions. The same CPU-only census checks
+rejection and preservation for these forms. This is an emulator-domain
+consistency correction, not a newly observed handset opcode gap or proof
+that silicon traps on these aliases.
 
 SPRU172C's listed cycle counts assume DARAM. The focused tests assert those
 baseline costs and selected absolute/long-offset surcharges; they do not

@@ -94,17 +94,17 @@
       "classification": "implementation_limit",
       "decision": "merge",
       "basis": "Independent SPRU172C single-memory instruction inventory plus the model's declared operand-admission boundary. The instruction/extension catalogue is unchanged; expectations are rejection and preservation of supplied state, not values computed by CPU helpers.",
-      "source": "tests/c54x/tms320c54x_test_domains.h",
+      "source": "tests/c54x/tms320c54x_test_domain_schedule.h",
       "profiles": ["source-domain"],
       "legacy_entry": "replaces the sequenced operand-domain fixture; no legacy implementation retained",
       "case_ids": [],
       "profile_coverage": {
         "source-domain": {
           "result_prefix": "TMS320C54x source-domain exclusions: PASS ",
-          "cases": 30448,
-          "key": "(opcode_word << 16) | (operation_extension << 4) | context; original 30000 catalogue keys followed by four RMW families x 16 contexts x seven absolute aliases with low-half bit 15 tagging TC clear",
+          "cases": 44656,
+          "key": "(opcode_word << 16) | (operation_extension << 4) | context | control_tag; original 30448 identities first, followed by shift, ASM, C16, repeat and TC-clear short controls; tags 0x4000=ASM, 0x2000=C16, 0x1000=RPT, 0x8000=TC-clear (tags only for unshifted forms)",
           "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
-          "fnv64": "ba74a1da74928725"
+          "fnv64": "6ae942418d722665"
         }
       },
       "obligations": [
@@ -113,16 +113,29 @@
         "preserve A, B, T, RC, SP, ST0, ST1 and all eight address registers at every sampled cycle",
         "no data reads/writes, program writes or I/O accesses; illegal latch reached by cycle 20",
         "all original 30000 identities and restores retain their ordering; 448 appended TC-clear RMW controls preserve the distinct status input from the retired alias profiles",
+        "14208 short controls retain 5120 shifted extensions, 4352 nonzero-ASM inputs, 1792 C16 inputs, 256 prefixed SUBC inputs and 2688 TC-clear inputs",
         "CPU-only device graph and ROM-free execution; no shared phase dispatcher or handset state"
       ],
       "limits": [
         "this is an implementation-admission check, not proof that every rejected encoding is illegal on silicon",
         "legal operand contrasts and peripheral/interrupt/repeat composition remain separate contracts",
         "9856 of the retired profiles' 10304 instruction/context checks overlap the base census; their 448 TC-clear RMW controls are retained separately",
-        "low A/B sentinel repetitions from the old alias fixtures are intentionally retired in favor of the census's wide 40-bit sentinels; raw stimuli are not identical"
+        "low A/B and stack sentinel repetitions and following-word literals from the old fixtures are intentionally retired in favor of the census's wide accumulators, stack sentinel and following-word layout; raw stimuli are not identical",
+        "the shift field is orthogonal to source admission; retain 0, 1, 15, 16 and 31 as field/word-width boundaries rather than all 32 encodings. Positive shifted arithmetic still owns numeric results for all shifts",
+        "prefixed SUBC retains the original no-operand-effects/preservation checks, not an invented RC-preservation assertion: RPT itself legitimately changes RC"
       ],
-      "retired_profiles": ["mpy-abs-edge", "mac-abs-edge", "delay-abs-edge", "pmac-abs-edge", "mem-t-abs-edge", "load-abs-edge", "rmw-abs-edge", "logic-abs-edge", "arith-abs-edge", "long-abs-edge"],
-      "retirement_basis": "All ten isolated baselines passed before removal. Their literal instruction families, f9..ff aliases, CMPT/page/frontend/checkpoint contexts and rejection-preservation assertions are subsumed by the CPU-only census, with TC-clear RMW supplemented explicitly. Removed per-profile setup, routing and table-decoder tests have no remaining consumer. Short-source MOD3 fixtures remain separate and unreviewed."
+      "retired_profiles": ["mpy-abs-edge", "mac-abs-edge", "delay-abs-edge", "pmac-abs-edge", "mem-t-abs-edge", "load-abs-edge", "rmw-abs-edge", "logic-abs-edge", "arith-abs-edge", "long-abs-edge", "mpy-mod3-edge", "subc-mod3-edge", "load-mod3-edge", "bitf-mod3-edge", "arith-mod3-edge", "mul-mod3-edge", "pmac-mod3-edge", "delay-mod3-edge", "stack-mod3-edge"],
+      "retirement_basis": "All retired isolated baselines and four mixed positive profiles passed before removal. Merge the 60160-case short-source dispatcher into the existing 30448-case CPU-only census, retaining distinct control contexts while reducing duplicate instruction admissions and shifted-field interior repetition: 90608 scheduled inputs become 44656 (before counting duplicate bundled tails). DRSUB, long-pair, logic-short and XORM retain their positive checks but no longer repeat the rejection tail; the stack profile's atomic prefix was already covered by default. This deletes the old phase-owned fixture and its state entirely.",
+      "short_merge_measurement": {
+        "baseline_commit": "243cb5dd",
+        "c54x_cpp_bytes_before": 3801409,
+        "c54x_cpp_bytes_after": 3788248,
+        "c54x_cpp_lines_before": 58126,
+        "c54x_cpp_lines_after": 57971,
+        "affected_batch_seconds_before": 53.92,
+        "affected_batch_seconds_after": 32.23,
+        "scope": "Serial runner wall time: source-domain, eight pure short-source profiles, stack-mod3-edge, long-pair, drsub, logic-short and xorm before; source-domain and the four positive profiles after. Not a full-default-suite runtime measurement."
+      }
     },
     {
       "id": "register-arithmetic-load",
