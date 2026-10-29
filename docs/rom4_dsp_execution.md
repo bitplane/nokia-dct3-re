@@ -95,12 +95,18 @@ This follows the peripheral-access cost in classes 4A/4B, pages 3-7/3-8
 of [SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf), not an
 independently measured placement of the peripheral bus cycle.
 
-`shift-periph` checks 245,760 cases with replay: all 64 peripheral addresses,
-shifts -16/-1/4/15, DP/SP/absolute/postincrement/long-offset addressing,
-SXM/OVM, A/B, four values, two pages and three snapshots. These are volatile
-synthetic endpoints, not assertions about the identity of every mapped
-register. Literals are poisoned after Decode and postincrement's pointer
-is changed after Access; the original address and word must still be used.
+`shift-periph` checks 11,400 cases with replay. The full shifts -16/-1/4/15,
+DP/SP/absolute/postincrement/long-offset, SXM/OVM, A/B, four-value, two-page
+and three-snapshot matrix runs at boundary addresses `0020` and `005f`
+(7,680 cases). Each interior address retains every form, shift and snapshot
+with unsigned `8000`, A, OVM clear and program page zero (3,720 cases).
+The removed 234,360 interior arithmetic/status/page cross-products are no
+longer qualified; the reduced schedule is not an equivalent-coverage claim.
+These are volatile synthetic endpoints, not assertions about the identity
+of every mapped register. Literals are poisoned after Decode and
+postincrement's pointer is changed after Access; the original address and
+word must still be used. Ordered original-matrix identities are checked by
+the host census and the native completion digest.
 
 `shift-bsp` checks 40,960 cases with replay against the existing completed-word
 BSP state, using all 32 shifts and an additional post-Execute snapshot.

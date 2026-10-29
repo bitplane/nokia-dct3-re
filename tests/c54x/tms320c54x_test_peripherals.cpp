@@ -3,6 +3,7 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
+#include "tms320c54x_test_peripheral_schedule.h"
 
 namespace c54x_test {
 
@@ -1532,6 +1533,7 @@ void tms320c54x_test_state::start_mcbsp_control_sequence(unsigned variant)
 tms320c54x_test_state::shifted_peripheral_fixture tms320c54x_test_state::shifted_peripheral_case(unsigned variant, bool bsp, bool unowned)
 {
 	shifted_peripheral_fixture f{}; f.bsp = bsp; f.unowned = unowned;
+	if (!bsp && !unowned) variant = shifted_bus_schedule::key(variant);
 	f.address = bsp ? 0x20 : unowned ? 2 + variant % 4 : 0x20 + variant % 64; if (!bsp) variant /= unowned ? 4 : 64;
 	unsigned const shift_code = bsp || unowned ? variant % 32 : std::array<unsigned, 4>{16, 31, 4, 15}[variant % 4]; variant /= bsp || unowned ? 32 : 4;
 	f.form = variant % 5; variant /= 5;
@@ -1557,6 +1559,7 @@ bool tms320c54x_test_state::shifted_bsp_fixture() const
 void tms320c54x_test_state::start_shifted_peripheral(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+	if (!variant) m_shifted_bus_coverage = {};
 	auto const f = shifted_peripheral_case(variant, shifted_bsp_fixture(), shifted_unowned_fixture()); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, f.opcode);
@@ -3194,10 +3197,11 @@ bool tms320c54x_test_state::check_shifted_peripheral_results()
 			if (f.bsp) expect(m_shifted_bsp.receive_ready && !m_shifted_bsp.receive_overrun && m_shifted_bsp.receive == u16(f.value ^ 0xffff), "The next BSP frame remains pending after CPU retirement and replay");
 			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; return restore_pipeline_at(62121, "Restore shifted peripheral operand without repeating an acknowledged bus read"); }
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case + 1 < (f.bsp ? 40960U : f.unowned ? 122880U : 245760U)) { start_shifted_peripheral(m_pipeline_peripheral_case + 1); return true; }
+			if (!f.bsp && !f.unowned) m_shifted_bus_coverage.add(shifted_bus_schedule::key(m_pipeline_peripheral_case));
+			if (m_pipeline_peripheral_case + 1 < (f.bsp ? 40960U : f.unowned ? 122880U : shifted_bus_schedule::cases)) { start_shifted_peripheral(m_pipeline_peripheral_case + 1); return true; }
 			if (f.unowned) osd_printf_info("TMS320C54x shifted unowned low bus: PASS cases=122880 restore=122880 addresses=0002..0005 shifts=32 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=0 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0\n");
 			else if (f.bsp) osd_printf_info("TMS320C54x shifted BSP receive: PASS cases=40960 restore=40960 shifts=32 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=4 extra_clock=1 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 original_word=1 next_frame_pending=1 ready_overrun_ack=1 debugger_peek=1 physical_clock_claim=0 silicon_phase_claim=0\n");
-			else osd_printf_info("TMS320C54x shifted peripheral load: PASS cases=245760 restore=245760 addresses=64 shifts=-16,-1,4,15 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=1 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0\n");
+			else osd_printf_info("TMS320C54x shifted peripheral load: PASS cases=%u restore=%u addresses=64 boundary_cross=0020,005f interior_cross=form,shift,snapshot shifts=-16,-1,4,15 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=1 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n", m_shifted_bus_coverage.count, m_shifted_bus_coverage.count, (unsigned long long)m_shifted_bus_coverage.value);
 			throw emu_fatalerror(0, "TMS320C54x isolated shifted peripheral load complete");
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

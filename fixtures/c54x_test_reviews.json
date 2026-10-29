@@ -8,6 +8,19 @@
   },
   "families": [
     {
+      "id": "shifted-peripheral-bus-cross-products",
+      "classification": "architectural_interaction",
+      "decision": "merge",
+      "profiles": ["shift-periph"],
+      "case_ids": [],
+      "profile_coverage": {"shift-periph": {"cases": 11400, "fnv64": "2496c383dd2c8dc5", "result_prefix": "TMS320C54x shifted peripheral load: PASS"}},
+      "basis": "SPRU172C classes 4A/4B peripheral access cost and the existing independent signed/unsigned shift expression. This profile supplies a volatile read tap at every address; it does not test 64 peripheral identities. Arithmetic/result, literal poisoning, retained address, single Read, no writes, unchanged flags/sibling state and restore predicates are unchanged.",
+      "obligations": ["all original arithmetic, status, accumulator, value, page and three snapshot combinations at both 0020 and 005f: 7680 original identities", "all 62 interior addresses crossed with all five forms, four shifts and three snapshots using A, unsigned 8000, OVM clear and page zero: 3720 original identities", "native digest counts original keys only after successful replay; host compiled selector is compared with independent exhaustive decoding of the old matrix"],
+      "limits": ["deliberately remove 234360 interior arithmetic/status/accumulator/value/page cross-products and their restores", "retaining bus/address classes is not a proof that removed interactions are equivalent", "actual BSP receive/overrun acknowledgement and next-frame retention remain in the unchanged shift-bsp profile", "no physical endpoint identity or silicon pipeline placement is asserted"],
+      "verification": "Rebuilt shift-periph completes all 11400 cases/restores with ordered original-key digest 2496c383dd2c8dc5 in 5.12 seconds, versus the preceding serial 108.08-second 245760-case measurement. The unchanged shift-bsp (40960) and shift-unowned (122880) controls pass on the rebuilt executable. All 379 focused C54x host tests and all 5076 host tests pass. No CPU implementation or positive result expression changed; this does not renew full-default or handset acceptance.",
+      "measurement": {"c54x_cpp_bytes_before": 3466405, "c54x_cpp_bytes_after": 3468159, "c54x_cpp_lines_before": 52543, "c54x_cpp_lines_after": 52581, "cases_before": 245760, "cases_after": 11400, "native_seconds_before": 108.08, "native_seconds_after": 5.12, "scope": "Runtime reduction, not source reduction: the explicit selector and ordered coverage observer add 38 C++ lines and 1754 bytes. Existing matrix generation was already compact. The roughly 103-second profile improvement is not a new full-default benchmark."}
+    },
+    {
       "id": "unsupported-shifted-composition-probes",
       "classification": "implementation_limit",
       "decision": "delete",

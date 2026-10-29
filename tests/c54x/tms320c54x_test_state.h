@@ -2213,6 +2213,7 @@ private:
 	required_device<tms320c54x_device> m_cpu;
 	interrupt_entry_fixture m_entry;
 	u16 m_shifted_bus_word = 0;
+	ordered_case_digest m_shifted_bus_coverage;
 	tms320c54x_bsp_state m_shifted_bsp;
 	int m_bio_level = 1;
 	util::gsm_fr_codec m_rom4_codec;

@@ -3232,7 +3232,7 @@
       "TMS320C54x shifted arithmetic selectors: PASS cases=104 operations=2 selectors=4 shifts=-16,-1,0,1,15 sxm=0,1 pipeline_claim=0\n": 1,
       "TMS320C54x shifted high store conformance: PASS variants=128\n": 1,
       "TMS320C54x shifted mapped load age: PASS cases=9216 restore=9216 forms=DP,indirect,absolute,offset registers=8 accumulators=2 values=4 younger=MAR_inc,MAR_dec,MVMM sxm=2 pages=2 snapshots=3 shift=16 retained_old_AR=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x shifted peripheral load: PASS cases=245760 restore=245760 addresses=64 shifts=-16,-1,4,15 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=1 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0\n": 1,
+      "TMS320C54x shifted peripheral load: PASS cases=%u restore=%u addresses=64 boundary_cross=0020,005f interior_cross=form,shift,snapshot shifts=-16,-1,4,15 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=1 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n": 1,
       "TMS320C54x shifted unowned low bus: PASS cases=122880 restore=122880 addresses=0002..0005 shifts=32 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=0 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x short ASM stores: PASS cases=122880 restore=122880 selectors=4 shifts=32 patterns=8 sxm_sst=4 forms=DP,SP,postincrement,indexed_sub,indexed_add pages=2 snapshots=3 source=Execute address_and_shift=Read writes=1 data_reads=0 asm_load_prefix=%u physical_phase_claim=0\n": 1,
       "TMS320C54x short block XC protection: PASS cases=384 restore=384 counts=0,1,3,7 forms=XC1,XC2 loop_words=3,4,5 sources=IRQ,NMI pages=2 snapshots=4 all_stores_before_vector=1 vector_fetches=1 stack_writes=1 physical_phase_claim=0\n": 1,
@@ -12266,17 +12266,20 @@
         {
           "accumulators": "A,B",
           "addresses": "64",
-          "cases": "245760",
+          "boundary_cross": "0020,005f",
+          "cases": "11400",
+          "coverage_fnv64": "2496c383dd2c8dc5",
           "data_writes": "0",
           "endpoint_identity_claim": "0",
           "extra_clock": "1",
           "flags": "SXM,OVM",
           "forms": "DP,SP,absolute,postinc,offset",
+          "interior_cross": "form,shift,snapshot",
           "literals_retained": "1",
           "pages": "2",
           "patterns": "4",
           "pointer_retained": "1",
-          "restore": "245760",
+          "restore": "11400",
           "shifts": "-16,-1,4,15",
           "silicon_phase_claim": "0",
           "snapshots": "3",
@@ -12284,7 +12287,7 @@
         }
       ],
       "required": [
-        "TMS320C54x shifted peripheral load: PASS cases=245760 restore=245760 addresses=64 shifts=-16,-1,4,15 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=1 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0"
+        "TMS320C54x shifted peripheral load: PASS cases=11400 restore=11400 addresses=64 boundary_cross=0020,005f interior_cross=form,shift,snapshot shifts=-16,-1,4,15 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=1 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0 coverage_fnv64=2496c383dd2c8dc5"
       ]
     },
     "shift-unowned": {
@@ -16091,6 +16094,17 @@
       },
       "decision": "rewrite",
       "family": "adjacent-saturation-publications"
+    },
+    "shift-periph": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 11400,
+        "fnv64": "2496c383dd2c8dc5",
+        "result_prefix": "TMS320C54x shifted peripheral load: PASS"
+      },
+      "decision": "merge",
+      "family": "shifted-peripheral-bus-cross-products"
     },
     "shifted-alu": {
       "case_ids": [],

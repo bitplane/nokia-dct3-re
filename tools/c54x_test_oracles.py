@@ -443,7 +443,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated shifted peripheral load complete",
     ),
     "shift-periph": (
-        "TMS320C54x shifted peripheral load: PASS cases=245760 restore=245760 addresses=64 shifts=-16,-1,4,15 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=1 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0",
+        "TMS320C54x shifted peripheral load: PASS cases=11400 restore=11400 addresses=64 boundary_cross=0020,005f interior_cross=form,shift,snapshot shifts=-16,-1,4,15 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=1 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0 coverage_fnv64=2496c383dd2c8dc5",
         "Fatal error: TMS320C54x isolated shifted peripheral load complete",
     ),
     "shift-bsp": (
