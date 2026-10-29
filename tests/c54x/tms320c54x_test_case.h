@@ -23,6 +23,7 @@ struct instruction_case
 	std::vector<register_setting> initial;
 	std::vector<register_check> expected;
 	unsigned port_writes, port_interval;
+	std::vector<memory_word> expected_data{};
 };
 
 // No implicit reset: standalone fixtures reset explicitly, while an existing
@@ -46,6 +47,13 @@ void check_case(Cpu &cpu, instruction_case const &test,
 			throw emu_fatalerror("C54x case %s: register %d actual=%llx expected=%llx mask=%llx",
 				test.id, expected.index, (unsigned long long)actual,
 				(unsigned long long)expected.value, (unsigned long long)expected.mask);
+	}
+	for (auto const &word : test.expected_data)
+	{
+		u16 const actual = cpu.space(AS_DATA).read_word(word.address);
+		if (actual != word.value)
+			throw emu_fatalerror("C54x case %s: data[%x]=%x expected=%x",
+				test.id, word.address, actual, word.value);
 	}
 	if (port_writes != test.port_writes || port_interval != test.port_interval)
 		throw emu_fatalerror("C54x case %s: port writes=%u interval=%llu expected=%u/%u",

@@ -39,6 +39,35 @@
       ]
     },
     {
+      "id": "parallel-store-reference",
+      "classification": "isa_documented",
+      "decision": "rewrite",
+      "basis": "TI SPRU172C parallel ST with MPY/ADD/SUB/LD instruction semantics; independent literal old-source stores, products, shifted arithmetic, saturation and address updates. Same-cell and circular controls retain synthetic fixtures, not private-ROM instructions.",
+      "source": "tests/c54x/tms320c54x_test_parallel.h",
+      "profiles": ["isa-parallel"],
+      "legacy_entry": "default atomic phases 695..702, 6503 and 6533, in original execution order",
+      "case_ids": [
+        "st-mpy-fract", "st-mpy-old-destination", "st-add-opposite",
+        "st-sub-circular-asm", "st-ld-signed", "st-ld-t-same-cell",
+        "st-a-ld-t-circular", "st-b-ld-t-circular",
+        "st-add-saturate", "st-sub-saturate"
+      ],
+      "obligations": [
+        "every original literal register and RAM result, including source-memory preservation where asserted",
+        "old accumulator store even when the arithmetic replaces that accumulator",
+        "read-before-write for an aliased load/store cell",
+        "independent linear and circular pointer updates with ASM store scaling",
+        "original partial status masks and exact status preservation controls",
+        "two port writes separated by three clocks in this RAM-only atomic fixture",
+        "default-sequence continuation and independently reset CPU-only execution"
+      ],
+      "limits": [
+        "atomic execution only; no staged retention, peripheral or silicon-phase claim",
+        "does not subsume the separate pipeline, repeat or interrupt composition matrices",
+        "case data supplies inputs and literal expectations; it is not an instruction interpreter"
+      ]
+    },
+    {
       "id": "rnd-boundaries",
       "classification": "isa_documented",
       "decision": "keep",

@@ -4,6 +4,7 @@
 #include "emu.h"
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_square.h"
+#include "tms320c54x_test_parallel.h"
 
 namespace c54x_test {
 
@@ -1789,218 +1790,24 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			m_check_timer->adjust(attotime::from_usec(100));
 			return true;
 		}
-		program.write_word(0x05e2, 0xcdb9); // ST A,*AR3+ || MPY *AR5+,B.
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
-		data.write_word(0x0200, 0x1111);
-		data.write_word(0x0300, 0x4000);
 		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0xff84211234ULL}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_T, 0x4000},
-			{cpu_regs::STATE_AR3, 0x0200}, {cpu_regs::STATE_AR5, 0x0300},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0140); // SXM, FRCT.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		prepare_case(*m_cpu, parallel_case(0));
 		return next_atomic_phase(695);
 	}
-	if (m_phase == 695)
+	if ((m_phase >= 695 && m_phase <= 702) || m_phase == 6503 || m_phase == 6533)
 	{
-		expect_opcode(0xcdb9,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff84211234ULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x20000000 &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x4000 &&
-			data.read_word(0x0200) == 0x8421 &&
-			data.read_word(0x0300) == 0x4000 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0201 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0301 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"TI ST||MPY stores old A and squares fractional 4000h into B in one cycle");
-		program.write_word(0x05e2, 0xcfb9); // ST B,*AR3+ || MPY *AR5+,B.
-		data.write_word(0x0200, 0);
-		data.write_word(0x0300, 3);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0xabcdef}, {cpu_regs::STATE_B, 0x12345678}, {cpu_regs::STATE_T, 2},
-			{cpu_regs::STATE_AR3, 0x0200}, {cpu_regs::STATE_AR5, 0x0300}, {cpu_regs::STATE_ST1, 0x0100},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(696);
-	}
-	if (m_phase == 696)
-	{
-		expect_opcode(0xcfb9,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0xabcdef &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 6 &&
-			data.read_word(0x0200) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 2 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0201 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0301 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"ST||MPY stores the old destination before replacing it with the product");
-		program.write_word(0x05e2, 0xc131); // ST A,*AR3 || ADD *AR5,B.
-		data.write_word(0x0200, 0);
-		data.write_word(0x0300, 2);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x12345678}, {cpu_regs::STATE_B, 0xdead}, {cpu_regs::STATE_AR3, 0x0200},
-			{cpu_regs::STATE_AR5, 0x0300}, {cpu_regs::STATE_ST1, 0x0100}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(697);
-	}
-	if (m_phase == 697)
-	{
-		expect_opcode(0xc131,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12365678 &&
-			data.read_word(0x0200) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0300 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"ST||ADD uses opposite accumulator and stores old source in one cycle");
-		program.write_word(0x05e2, 0xc5f5); // ST A,*AR3- || SUB *AR5+0%,B.
-		data.write_word(0x01ff, 0x1111);
-		data.write_word(0x0300, 0x8001);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0xff84210000ULL}, {cpu_regs::STATE_B, 0x0010000001ULL}, {cpu_regs::STATE_AR0, 2},
-			{cpu_regs::STATE_AR3, 0x01ff}, {cpu_regs::STATE_AR5, 0x0300}, {cpu_regs::STATE_BK, 4},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); // SST clear.
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0101); // SXM, ASM=1.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(698);
-	}
-	if (m_phase == 698)
-	{
-		expect_opcode(0xc5f5,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff84210000ULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfffbe00000ULL &&
-			data.read_word(0x01ff) == 0x0842 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x01fe &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0302 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"TI ST||SUB example subtracts opposite accumulator in one cycle");
-		program.write_word(0x05e2, 0xca31); // ST B,*AR3 || LD *AR5,A.
-		data.write_word(0x0200, 0);
-		data.write_word(0x0300, 0x8001);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0x12345678}, {cpu_regs::STATE_AR3, 0x0200},
-			{cpu_regs::STATE_AR5, 0x0300}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ST1, 0x0100},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(699);
-	}
-	if (m_phase == 699)
-	{
-		expect_opcode(0xca31,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff80010000ULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678 &&
-			data.read_word(0x0200) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0300 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"ST||LD sign-extends Xmem into A and stores B in one cycle");
-		program.write_word(0x05e2, 0xe411); // ST A,*AR3 || LD *AR3,T.
-		data.write_word(0x0200, 0x80ff);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x12345678}, {cpu_regs::STATE_T, 0}, {cpu_regs::STATE_AR3, 0x0200},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(700);
-	}
-	if (m_phase == 700)
-	{
-		expect_opcode(0xe411,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x80ff &&
-			data.read_word(0x0200) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"ST||LD T reads Xmem before writing the same Ymem cell");
-		program.write_word(0x05e2, 0xe4e9); // ST A,*AR3+ || LD *AR4+0%,T.
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x87654321);
-		data.write_word(0x0203, 0x80ff);
-		data.write_word(0x0300, 0xbeef);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_T, 0}, {cpu_regs::STATE_AR0, 1}, {cpu_regs::STATE_AR3, 0x0300},
-			{cpu_regs::STATE_AR4, 0x0203}, {cpu_regs::STATE_BK, 4}, {cpu_regs::STATE_ST0, 0x0aa5},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(6503);
-	}
-	if (m_phase == 6503 || m_phase == 6533)
-	{
-		bool const store_b = m_phase == 6533;
-		expect_opcode(store_b ? 0xe6e9 : 0xe4e9,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x87654321 &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x80ff &&
-			data.read_word(0x0300) == (store_b ? 0x8765 : 0x1234) && data.read_word(0x0203) == 0x80ff &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0301 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0200 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"ROM4 parallel load T selects old A/B store, independently advances Y and wraps circular X in one cycle");
-		if (!store_b)
+		static constexpr unsigned phases[] = {695, 696, 697, 698, 699, 700, 6503, 6533, 701, 702};
+		unsigned const index = std::find(std::begin(phases), std::end(phases), m_phase) - std::begin(phases);
+		auto const test = parallel_case(index);
+		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
+		// Record opcode coverage only after the shared checks succeed.
+		expect_opcode(test.opcode, true, "parallel store arithmetic reference case");
+		if (index + 1 < std::size(phases))
 		{
-			program.write_word(0x05e2, 0xe6e9);
-			data.write_word(0x0300, 0xbeef);
 			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_T, 0}, {cpu_regs::STATE_AR3, 0x0300}, {cpu_regs::STATE_AR4, 0x0203},
-				{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(6533);
+			prepare_case(*m_cpu, parallel_case(index + 1));
+			return next_atomic_phase(phases[index + 1]);
 		}
-		program.write_word(0x05e2, 0xc131); // ST A,*AR3 || ADD *AR5,B.
-		data.write_word(0x0300, 1);
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800); // Clear carry on ADD.
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0300); // SXM, OVM.
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR3, 0x0200}, {cpu_regs::STATE_AR5, 0x0300}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(701);
-	}
-	if (m_phase == 701)
-	{
-		expect_opcode(0xc131,
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x7fffffff &&
-			(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0e00) == 0x0200 &&
-			data.read_word(0x0200) == 0x7fff &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"ST||ADD saturates B, sets OVB and clears carry without altering the store");
-		program.write_word(0x05e2, 0xc531); // ST A,*AR3 || SUB *AR5,B.
-		data.write_word(0x0300, 0x8000);
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x00010000);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0300); // SXM, OVM.
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR3, 0x0200}, {cpu_regs::STATE_AR5, 0x0300}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(702);
-	}
-	if (m_phase == 702)
-	{
-		expect_opcode(0xc531,
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff80000000ULL &&
-			(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0e00) == 0x0a00 &&
-			data.read_word(0x0200) == 1 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"ST||SUB saturates negative B, sets OVB and carry, and stores old A");
 		program.write_word(0x05e2, 0x0483); // ADD *AR3,TS,A.
 		data.write_word(0x0200, 0x0100);
 		m_port_writes = 0;

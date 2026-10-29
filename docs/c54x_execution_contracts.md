@@ -48,6 +48,13 @@ Family retention/rewrite/merge/relocation/deletion decisions live in
 devices or private firmware; legacy default continuations can reuse reviewed
 case data without making the entire sequenced bench generic.
 
+`isa-parallel` runs ten independently reset parallel store/arithmetic cases.
+The default sequence reuses their literal register, masked-status and RAM
+expectations through a short adapter; old phase numbers are compatibility
+routing, not the case identities. The aliasing case checks the loaded old RAM
+word and the newly stored word separately. These atomic cases do not replace
+pipeline retention, repeat or interrupt-composition coverage.
+
 The reviewed long RAM RMW schedule retains every distinct operation, addressing,
 value, status and compatibility stimulus once (38,400 cases). For each of its
 4,800 operation/address/compatibility/status groups, the eight value pairs cover
@@ -94,6 +101,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_isa.cpp` | CPU-only ISA bench with explicit per-case reset and no Nokia/firmware dependencies |
 | `tests/c54x/tms320c54x_test_case.h` | Generic stimulus loading and independent register/bus comparisons; no instruction semantics |
 | `tests/c54x/tms320c54x_test_square.h` | Reviewed literal SQUR/SQURA/SQURS cases shared by generic and default-sequence entries |
+| `tests/c54x/tms320c54x_test_parallel.h` | Reviewed parallel store/arithmetic vectors, including same-cell ordering and circular pointer controls |
 | `tests/c54x/tms320c54x_test_dispatch.cpp` | Ordered callback routing and the initial-program completion tail |
 | `tests/c54x/tms320c54x_test_arithmetic.cpp` | Arithmetic, multiplier and logical-operation fixtures and checks |
 | `tests/c54x/tms320c54x_test_addressing.cpp` | Address generation and memory/register transfers, including the stack-transfer continuation |

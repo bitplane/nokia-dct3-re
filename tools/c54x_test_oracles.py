@@ -320,6 +320,10 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "isa-parallel": (
+        "TMS320C54x generic parallel: PASS cases=10 reset_each=1 nokia_devices=0 firmware=0",
+        "Fatal error: TMS320C54x isolated generic parallel complete",
+    ),
     "rmw-long-full": (
         "TMS320C54x staged long RMW: PASS cases=153600 operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=153600 duplicate_reads=0 duplicate_writes=0 snapshots=4 checkpoint_policy=exhaustive coverage_fnv64=92f5d379269cbf25",
         "Fatal error: TMS320C54x isolated long RAM RMW complete",

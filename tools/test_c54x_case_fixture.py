@@ -76,15 +76,16 @@ int main(int argc, char **) {
                 self.assertEqual(output[-1], 'digest=' + reviewed_profiles()[profile]['coverage']['fnv64'])
 
     def test_reviewed_case_identities_are_required_in_order(self):
-        marker, ending = EXTRA_PROFILES['isa-square']
-        cases = ['C54x ISA case: PASS id=' + name
-                 for name in reviewed_profiles()['isa-square']['case_ids']]
-        text = '\n'.join(cases + [marker, ending])
-        check_result(text, 3, profile='isa-square')
-        for changed in (cases[1:], cases + cases[:1], list(reversed(cases)),
-                        ['C54x ISA case: PASS id=unknown'] + cases[1:]):
-            with self.subTest(cases=changed), self.assertRaisesRegex(ValueError, 'identities'):
-                check_result('\n'.join(changed + [marker, ending]), 3, profile='isa-square')
+        for profile in ('isa-square', 'isa-parallel'):
+            marker, ending = EXTRA_PROFILES[profile]
+            cases = ['C54x ISA case: PASS id=' + name
+                     for name in reviewed_profiles()[profile]['case_ids']]
+            text = '\n'.join(cases + [marker, ending])
+            check_result(text, 3, profile=profile)
+            for changed in (cases[1:], cases + cases[:1], list(reversed(cases)),
+                            ['C54x ISA case: PASS id=unknown'] + cases[1:]):
+                with self.subTest(profile=profile, cases=changed), self.assertRaisesRegex(ValueError, 'identities'):
+                    check_result('\n'.join(changed + [marker, ending]), 3, profile=profile)
 
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_case_helper_detects_state_and_bus_mismatches(self):
@@ -102,6 +103,7 @@ struct emu_fatalerror : std::runtime_error {
 struct memory {
     std::array<u16, 16> words{};
     void write_word(unsigned address, u16 value) { words.at(address) = value; }
+    u16 read_word(unsigned address) { return words.at(address); }
 };
 struct cpu {
     std::array<memory, 2> spaces{};
@@ -113,7 +115,7 @@ struct cpu {
 int main() {
     cpu c;
     c54x_test::instruction_case test{"fixture", 1, {{2, 3}}, {{4, 5}},
-        {{1, 0x1ff}}, {{1, 0xff, 0xff}}, 2, 3};
+        {{1, 0x1ff}}, {{1, 0xff, 0xff}}, 2, 3, {{4, 5}}};
     c54x_test::prepare_case(c, test);
     if (c.spaces[AS_PROGRAM].words[2] != 3 || c.spaces[AS_DATA].words[4] != 5 ||
         c.registers[1] != 0x1ff) return 1;
@@ -124,7 +126,9 @@ int main() {
     c.registers[1] = 0xff;
     try { c54x_test::check_case(c, test, 1, 3); } catch (emu_fatalerror const &) { ++failures; }
     try { c54x_test::check_case(c, test, 2, 4); } catch (emu_fatalerror const &) { ++failures; }
-    return failures != 3;
+    c.spaces[AS_DATA].words[4] = 6;
+    try { c54x_test::check_case(c, test, 2, 3); } catch (emu_fatalerror const &) { ++failures; }
+    return failures != 4;
 }
 '''
         with tempfile.TemporaryDirectory() as directory:

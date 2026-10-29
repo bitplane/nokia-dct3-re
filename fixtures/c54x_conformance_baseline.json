@@ -443,6 +443,11 @@
           "description": "TI square arithmetic reference cases",
           "index": 0,
           "name": "isa-square"
+        },
+        {
+          "description": "Parallel store arithmetic reference cases",
+          "index": 1,
+          "name": "isa-parallel"
         }
       ],
       "tms54rom4": [
@@ -3323,6 +3328,7 @@
       "TMS320C54x fast return bus: PASS cases=3 stack_reads=0 delayed_words=2\n": 1,
       "TMS320C54x forward block exits: PASS cases=1152 restore=1152 branches=B,BC_AEQ,BC_BEQ counts=0,1,2,7 exits=first,middle,last,never endpoint_layouts=2 pages=2 snapshots=6 source_reads=ordered body_writes=selected braf_not_auto_cleared=1 outside_rsbx=1 spaced_endpoint_revisit=1 interrupt_composition=unvalidated silicon_phase_claim=0\n": 1,
       "TMS320C54x frame/MMR move disassembler: PASS frames=256 moves=81 rejected=175 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
+      "TMS320C54x generic parallel: PASS cases=10 reset_each=1 nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic square: PASS cases=6 reset_each=1 nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x high memory ALU disassembler: PASS modes=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x immediate ALU disassembler: PASS forms=340 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
@@ -6717,6 +6723,21 @@
       "required": [
         "TMS320C54x instruction observer: PASS cases=32 restore=32 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 events_each=7 logical_address=1 captured_opcode=1 repeat_entries=3 ordinary_reads=0 annulled_fetches=0 observer_writes=0",
         "TMS320C54x observer XC annulment: PASS cases=64 restore=64 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 forms=XC1,XC2 events_each=5 rejected_slots=absent accepted_source_nops=present observer_writes=0"
+      ]
+    },
+    "isa-parallel": {
+      "completion": "Fatal error: TMS320C54x isolated generic parallel complete",
+      "machine": "tms54isa",
+      "reported_fields": [
+        {
+          "cases": "10",
+          "firmware": "0",
+          "nokia_devices": "0",
+          "reset_each": "1"
+        }
+      ],
+      "required": [
+        "TMS320C54x generic parallel: PASS cases=10 reset_each=1 nokia_devices=0 firmware=0"
       ]
     },
     "isa-square": {
@@ -15832,6 +15853,23 @@
     }
   },
   "reviewed": {
+    "isa-parallel": {
+      "case_ids": [
+        "st-mpy-fract",
+        "st-mpy-old-destination",
+        "st-add-opposite",
+        "st-sub-circular-asm",
+        "st-ld-signed",
+        "st-ld-t-same-cell",
+        "st-a-ld-t-circular",
+        "st-b-ld-t-circular",
+        "st-add-saturate",
+        "st-sub-saturate"
+      ],
+      "classification": "isa_documented",
+      "decision": "rewrite",
+      "family": "parallel-store-reference"
+    },
     "isa-square": {
       "case_ids": [
         "squr-fract-saturate",
