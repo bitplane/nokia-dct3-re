@@ -464,6 +464,11 @@
           "description": "TI long-word arithmetic examples",
           "index": 4,
           "name": "isa-long"
+        },
+        {
+          "description": "Literal multiply arithmetic and DELAY continuation sequence",
+          "index": 5,
+          "name": "isa-products"
         }
       ],
       "tms54rom4": [
@@ -3240,6 +3245,7 @@
       "TMS320C54x frame/MMR move disassembler: PASS frames=256 moves=81 rejected=175 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x generic long arithmetic: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic parallel: PASS cases=10 reset_each=1 nokia_devices=0 firmware=0\n": 1,
+      "TMS320C54x generic product sequence: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic scalars: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic square: PASS cases=6 reset_each=1 nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x high memory ALU disassembler: PASS modes=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
@@ -6515,6 +6521,21 @@
       ],
       "required": [
         "TMS320C54x generic parallel: PASS cases=10 reset_each=1 nokia_devices=0 firmware=0"
+      ]
+    },
+    "isa-products": {
+      "completion": "Fatal error: TMS320C54x isolated generic product sequence complete",
+      "machine": "tms54isa",
+      "reported_fields": [
+        {
+          "cases": "21",
+          "firmware": "0",
+          "nokia_devices": "0",
+          "reset_groups": "1"
+        }
+      ],
+      "required": [
+        "TMS320C54x generic product sequence: PASS cases=21 reset_groups=1 nokia_devices=0 firmware=0"
       ]
     },
     "isa-scalars": {
@@ -15368,6 +15389,34 @@
       "classification": "isa_documented",
       "decision": "rewrite",
       "family": "parallel-store-reference"
+    },
+    "isa-products": {
+      "case_ids": [
+        "mpya-t-signed17",
+        "mpya-memory-publishes-t",
+        "maca-old-source",
+        "macar-integer-round",
+        "macar-fractional-round",
+        "masar-negative-product",
+        "sqdst-signed17",
+        "squr-signed17",
+        "mac-immediate-fractional",
+        "mac-memory-immediate-postincrement",
+        "mac-absolute-extension-order",
+        "add-immediate-shift16-carry",
+        "sub-immediate-shift16-carry",
+        "add-immediate-unsigned-overflow",
+        "mac-offset-extension-order",
+        "mac-immediate-fractional-saturate",
+        "delay-stationary",
+        "delay-preincrement",
+        "delay-absolute",
+        "delay-offset",
+        "mpyu-fractional-saturate"
+      ],
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "family": "product-arithmetic-delay-sequence"
     },
     "isa-scalars": {
       "case_ids": [

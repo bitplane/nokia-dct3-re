@@ -95,6 +95,22 @@ records unchanged. The independent CPU-only binary runs with an empty ROM
 directory. This batch changes total C54x source size by only -44 bytes/+4 lines;
 it is isolation and boilerplate replacement, not substantial source reduction.
 
+`isa-products` retains 21 literal multiply/arithmetic/DELAY examples as one
+ordered reset group. Partial setup remains partial: MPYA's memory form consumes
+the previous A, fractional MACAR retains checked B/T/status, and the DELAY
+addressing forms retain T. The same bank replaces the legacy reference phase
+blocks without resetting that CPU. Case identities and expectation masks, not
+phase numbers, describe the retained contracts.
+
+The duplicate phase739 `0x649b` rejection is deleted. `source-domain` already
+enumerates base `0x6400` plus mode `0x9b` with both frontends and replay,
+asserting register preservation and no data/program/I/O effects. Its old
+A=0x10/T=3/AR3=0x01ff tuple is not retained; the preceding port marker carried
+no separately asserted dependency. This keeps implementation admission policy
+out of the architectural example sequence. Total C54x sources shrink by
+9,525 bytes/271 lines in this batch; the full-default checkpoint remains older
+than these focused changes.
+
 The reviewed long RAM RMW schedule retains every distinct operation, addressing,
 value, status and compatibility stimulus once (38,400 cases). For each of its
 4,800 operation/address/compatibility/status groups, the eight value pairs cover

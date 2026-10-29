@@ -373,6 +373,29 @@
       "legacy_entry": "reference phases 554..562,9211..9212,563..569; stationary AR6 and later long-offset cases remain outside this review",
       "obligations": ["18 independently reset CPU-only cases, with the same data also consumed without reset by the legacy sequence", "full ST0 checks for DADD/DSUB/DRSUB; carry-only checks for T-based operations except the intentionally unchecked DSADT C16 carry", "AR2/AR5 source selection distinguished from decoy AR3 words, with source RAM and both stationary pointers preserved", "two port writes bracket each operation with the original three/four-cycle interval", "retain both accumulator expectations, T preservation and AR3 updates exactly where originally checked"],
       "limits": ["no source operand, result expectation or numeric case is deleted", "CPU-only reset isolation is not a claim about physical bus-cycle accuracy", "does not replace long-memory staged execution, interrupt composition or save/replay families", "shared expectation data adds isolation, not independent duplicate conformance coverage"]
+    },
+    {
+      "id": "product-arithmetic-delay-sequence",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_product_examples.h",
+      "profiles": ["isa-products"],
+      "basis": "Existing literal arithmetic results and transfer words; signed 17-bit high-word products, FRCT rounding, saturation, immediate/address extension order and four DELAY addressing forms. No expected result comes from CPU implementation helpers.",
+      "case_ids": ["mpya-t-signed17", "mpya-memory-publishes-t", "maca-old-source", "macar-integer-round", "macar-fractional-round", "masar-negative-product", "sqdst-signed17", "squr-signed17", "mac-immediate-fractional", "mac-memory-immediate-postincrement", "mac-absolute-extension-order", "add-immediate-shift16-carry", "sub-immediate-shift16-carry", "add-immediate-unsigned-overflow", "mac-offset-extension-order", "mac-immediate-fractional-saturate", "delay-stationary", "delay-preincrement", "delay-absolute", "delay-offset", "mpyu-fractional-saturate"],
+      "legacy_entry": "reference phases730..738,740..749,6558..6559; original phase739 rejection is retired separately",
+      "obligations": ["one reset group with 21 ordered cases; preserve original partial initializations and expectation masks", "MACAR fractional case inherits checked B/T/status; MPYA memory inherits the previous A multiplicand; DELAY retains T across addressing forms", "retain all 21 architectural result cases and three/four/five-cycle port intervals", "CPU-only build needs no private ROM or Nokia/GSM devices; legacy adapter does not reset the CPU"],
+      "limits": ["a sequence, not 21 independently reset cases", "only the declared masks are asserted; other inherited status is not newly claimed", "PORTW pointers in the standalone fixture are explicit marker scaffolding, not handset I/O", "no staged save-state or physical pipeline-timing claim"]
+    },
+    {
+      "id": "duplicate-mac-writeonly-source-control",
+      "classification": "implementation_limit",
+      "decision": "delete",
+      "source": "tests/c54x/tms320c54x_test_domain_schedule.h",
+      "profiles": [],
+      "case_ids": [],
+      "basis": "Legacy phase739's 0x649b operand rejection is covered by source-domain: source_domains contains 0x6400 and enumerates mode0x9b across both frontends and restored contexts; the fixture asserts preserved accumulators, T, pointers/status and zero data/program/I/O side effects.",
+      "obligations": ["retain the source-domain executable coverage and digest", "remove phase739 routing and its setup/check block instead of retaining a duplicate admission test among architectural examples"],
+      "limits": ["the old A=0x10/T=3/AR3=0x01ff stimulus is deleted, not claimed numerically retained", "its preceding PORTW was timing scaffolding with no asserted dependency on the rejection; it is not a distinct interrupt, pipeline or data-hazard interaction", "rejection remains an emulator admission policy, not a silicon illegality claim"]
     }
   ]
 }

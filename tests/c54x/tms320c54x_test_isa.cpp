@@ -8,6 +8,7 @@
 #include "tms320c54x_test_domains.h"
 #include "tms320c54x_test_scalars.h"
 #include "tms320c54x_test_long_reference.h"
+#include "tms320c54x_test_product_examples.h"
 #include <cstring>
 
 namespace {
@@ -31,19 +32,36 @@ protected:
 	{
 		m_timer = timer_alloc(FUNC(c54x_isa_test_state::check), this);
 		if (m_domain) m_domains = std::make_unique<c54x_test::source_domain_fixture>(machine(), *m_cpu, *m_timer);
+		else
+		{
+			if (products()) m_cases = c54x_test::product_examples();
+			else if (long_reference())
+				m_cases.assign(c54x_test::long_reference_cases().begin(), c54x_test::long_reference_cases().end());
+			else if (scalars())
+				for (auto const &row : c54x_test::scalar_vectors()) m_cases.push_back(row.test);
+			else if (parallel())
+				for (unsigned i = 0; i < c54x_test::parallel_vectors().size(); ++i) m_cases.push_back(c54x_test::parallel_case(i));
+			else
+				for (unsigned i = 0; i < c54x_test::square_vectors.size(); ++i) m_cases.push_back(c54x_test::square_case(i));
+			m_reset_before.assign(m_cases.size(), !products());
+			m_reset_before[0] = true;
+			if (scalars())
+				for (unsigned i = 0; i < m_cases.size(); ++i) m_reset_before[i] = c54x_test::scalar_vectors()[i].reset;
+		}
 	}
 	void machine_reset() override { m_case = m_resets = 0; if (m_domains) m_domains->start(); else start(); }
 private:
 	bool parallel() const { return !std::strcmp(machine().options().bios(), "isa-parallel"); }
 	bool scalars() const { return !std::strcmp(machine().options().bios(), "isa-scalars"); }
 	bool long_reference() const { return !std::strcmp(machine().options().bios(), "isa-long"); }
+	bool products() const { return !std::strcmp(machine().options().bios(), "isa-products"); }
 	unsigned count() const
 	{
-		return long_reference() ? c54x_test::long_reference_cases().size() : scalars() ? c54x_test::scalar_vectors().size() : parallel() ? c54x_test::parallel_vectors().size() : c54x_test::square_vectors.size();
+		return m_cases.size();
 	}
-	c54x_test::instruction_case test_case() const
+	c54x_test::instruction_case const &test_case() const
 	{
-		return long_reference() ? c54x_test::long_reference_cases().at(m_case) : scalars() ? c54x_test::scalar_vectors().at(m_case).test : parallel() ? c54x_test::parallel_case(m_case) : c54x_test::square_case(m_case);
+		return m_cases.at(m_case);
 	}
 	void ram_map(address_map &map) { map(0, 0xffff).ram(); }
 	void program_map(address_map &map)
@@ -63,13 +81,19 @@ private:
 	}
 	void start()
 	{
-		if (!scalars() || c54x_test::scalar_vectors().at(m_case).reset)
+		if (m_reset_before.at(m_case))
 		{
 			++m_resets;
 			m_cpu->reset();
 			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 			m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+			// The sequence uses circular PORTW timing markers, not firmware I/O.
+			if (products())
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			}
 		}
 		m_writes = 0; m_first = m_last = 0;
 		c54x_test::prepare_case(*m_cpu, test_case());
@@ -84,10 +108,15 @@ private:
 				m_domains->count(), m_domains->restores(), (unsigned long long)m_domains->digest());
 			throw emu_fatalerror(3, "TMS320C54x isolated source-domain exclusions complete");
 		}
-		auto const test = test_case();
+		auto const &test = test_case();
 		c54x_test::check_case(*m_cpu, test, m_writes, m_last - m_first);
 		osd_printf_info("C54x ISA case: PASS id=%s\n", test.id);
 		if (++m_case < count()) { start(); return; }
+		if (products())
+		{
+			osd_printf_info("TMS320C54x generic product sequence: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n", m_case, m_resets);
+			throw emu_fatalerror(3, "TMS320C54x isolated generic product sequence complete");
+		}
 		if (long_reference())
 		{
 			osd_printf_info("TMS320C54x generic long arithmetic: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n", m_case, m_resets);
@@ -112,6 +141,8 @@ private:
 	u64 m_first = 0, m_last = 0;
 	bool m_domain = false;
 	std::unique_ptr<c54x_test::source_domain_fixture> m_domains;
+	std::vector<c54x_test::instruction_case> m_cases;
+	std::vector<bool> m_reset_before;
 };
 
 ROM_START(tms54isa)
@@ -120,6 +151,7 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(2, "source-domain", "Implemented single-memory operand admission limits")
 	ROM_SYSTEM_BIOS(3, "isa-scalars", "Scalar arithmetic boundaries with explicit stateful groups")
 	ROM_SYSTEM_BIOS(4, "isa-long", "TI long-word arithmetic examples")
+	ROM_SYSTEM_BIOS(5, "isa-products", "Literal multiply arithmetic and DELAY continuation sequence")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
 ROM_END
 
