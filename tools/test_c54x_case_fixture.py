@@ -140,10 +140,16 @@ int main() {
     saved.setstate(std::ios::eofbit | std::ios::failbit);
     if (c54x_test::restore_snapshot(m, t, saved) != 0 || m.loaded != "state" ||
         m.events != "save;stop;load;") return 2;
+    saved.seekg(3);
+    saved.setstate(std::ios::failbit | std::ios::eofbit);
+    m.events.clear();
+    if (c54x_test::restore_snapshot(m, saved) != 0 || m.loaded != "state" ||
+        m.events != "load;") return 4; // Untimed overload must not cancel a timer.
     // Helpers must return serializer failures, not turn them into success.
     m.fail = true;
     if (c54x_test::capture_snapshot(m, saved) != 1 ||
-        c54x_test::restore_snapshot(m, t, saved) != 1) return 3;
+        c54x_test::restore_snapshot(m, t, saved) != 1 ||
+        c54x_test::restore_snapshot(m, saved) != 1) return 3;
 }
 '''
         with compiled_cpp(source) as program:

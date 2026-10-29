@@ -172,8 +172,7 @@ bool tms320c54x_test_state::check_vector_prefetch_results()
 				m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 80003;
 				m_check_timer->adjust(attotime::from_usec(100)); return true;
 			}
-			m_entry.saved.str(std::string()); m_entry.saved.clear();
-			expect(machine().save().write_stream(m_entry.saved) == STATERR_NONE, "Save retained vector opcode");
+			expect(capture_snapshot(machine(), m_entry.saved) == STATERR_NONE, "Save retained vector opcode");
 			program.write_word(address, 0xf4e1); // Must not replace the already fetched LD.
 			m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); // A later mask cannot revoke accepted entry.
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 80001;
@@ -187,8 +186,7 @@ bool tms320c54x_test_state::check_vector_prefetch_results()
 				"Retained vector opcode executes once with its normally fetched extension");
 			if (m_phase == 80001)
 			{
-				m_entry.saved.clear(); m_entry.saved.seekg(0);
-				expect(machine().save().read_stream(m_entry.saved) == STATERR_NONE, "Restore retained vector opcode");
+				expect(restore_snapshot(machine(), m_entry.saved) == STATERR_NONE, "Restore retained vector opcode");
 				program.write_word(address, 0xf4e1);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 				m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 80002;
@@ -239,8 +237,7 @@ bool tms320c54x_test_state::check_interrupt_entry_results()
 				!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800) &&
 				m_entry.acknowledged_source == -1 && data.read_word(0x0fff) == 0xbeef,
 				"INTR Decode captures continuation before Access decrements SP");
-			m_entry.saved.str(std::string()); m_entry.saved.clear();
-			expect(machine().save().write_stream(m_entry.saved) == STATERR_NONE,
+			expect(capture_snapshot(machine(), m_entry.saved) == STATERR_NONE,
 				"Save accepted interrupt before Access");
 			m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 2);
 			m_phase = 190001;
@@ -253,8 +250,7 @@ bool tms320c54x_test_state::check_interrupt_entry_results()
 			"Later IMR changes do not reselect the accepted source; vector Fetch clears only its IFR bit");
 		if (m_phase == 190001)
 		{
-			m_entry.saved.clear(); m_entry.saved.seekg(0);
-			expect(machine().save().read_stream(m_entry.saved) == STATERR_NONE,
+			expect(restore_snapshot(machine(), m_entry.saved) == STATERR_NONE,
 				"Restore accepted interrupt before Access");
 			expect(!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800) &&
 				m_cpu->state_int(tms320c54x_device::STATE_IFR) == 3,
@@ -280,8 +276,7 @@ bool tms320c54x_test_state::check_interrupt_entry_results()
 				m_entry.stack_writes == unsigned(stage >= 4) &&
 				m_cpu->state_int(tms320c54x_device::STATE_IFR) == (nmi || stage < 3 ? 3 : 2),
 				"Checkpoint separates acceptance, Decode, Access, Fetch/IACK and stack Execute");
-			m_entry.saved.str(std::string()); m_entry.saved.clear();
-			expect(machine().save().write_stream(m_entry.saved) == STATERR_NONE,
+			expect(capture_snapshot(machine(), m_entry.saved) == STATERR_NONE,
 				"Save each IRQ/NMI entry boundary");
 		}
 		else
@@ -301,8 +296,7 @@ bool tms320c54x_test_state::check_interrupt_entry_results()
 				osd_printf_info("TMS320C54x entry stage restoration: PASS cases=10 sources=irq,nmi boundaries=5 one_fetch=1 one_ack=1 one_stack_write=1 retained_opcode=1 pipeline_drain_claim=0\n");
 				start_rounding_boundary_case(0); return true;
 			}
-			m_entry.saved.clear(); m_entry.saved.seekg(0);
-			expect(machine().save().read_stream(m_entry.saved) == STATERR_NONE,
+			expect(restore_snapshot(machine(), m_entry.saved) == STATERR_NONE,
 				"Restore each IRQ/NMI entry boundary");
 			m_entry.reads = m_entry.acknowledgements = unsigned(stage >= 3);
 			m_entry.stack_writes = unsigned(stage >= 4);

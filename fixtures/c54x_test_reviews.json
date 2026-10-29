@@ -496,6 +496,26 @@
         "source_domain_seconds_after": 21.73,
         "scope": "Serial runner wall times; the after census includes 1408 cases previously bundled with mpy-mem-imm. Category/ownership and source reduction, not a claimed runtime optimization or renewal of the full-default checkpoint."
       }
+    },
+    {
+      "id": "shared-snapshot-stream-plumbing",
+      "classification": "harness_infrastructure",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_snapshot.h",
+      "profiles": [],
+      "case_ids": [],
+      "basis": "C++ stringstream cursor/error-state ownership and MAME stream serialization. Timed restoration cancels the current timer; the untimed overload intentionally leaves scheduling with its caller. Neither derives an instruction expectation.",
+      "obligations": ["all47 manual captures reset stream bytes/error state through capture_snapshot", "all82 manual loads rewind/error-clear through the untimed restore overload without introducing timer cancellation", "preserve each caller's original timer cancellation, frontend reset, CPU suspension, observation-counter rewinds and continuation", "normalized before/after comparison across13 C++ files differs only in stream reset/rewind and API calls; no guest setup, expectation, phase or result marker changes", "executable helper checks cover stale bytes, cursor/error flags, serializer failures and distinct timed/untimed event ordering"],
+      "limits": ["utility consolidation does not classify the underlying unreviewed instruction families", "no numeric case, assertion or checkpoint schedule removed", "backend/handset integration fixtures outside the sequenced CPU modules remain untouched"],
+      "measurement": {
+        "baseline_commit": "0c15830a",
+        "c54x_cpp_bytes_before": 3776316,
+        "c54x_cpp_bytes_after": 3769315,
+        "c54x_cpp_lines_before": 57682,
+        "c54x_cpp_lines_after": 57597,
+        "full_default_seconds": 1058.73,
+        "scope": "Shared serialization plumbing only. Full default retains every previous result record and opcode word, plus the earlier active-repeat restoration result. No runtime reduction claimed from this utility rewrite."
+      }
     }
   ]
 }

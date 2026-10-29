@@ -30,6 +30,17 @@ auto restore_snapshot(Machine &machine, Timer &timer, std::stringstream &saved)
 	return machine.save().read_stream(saved);
 }
 
+// Untimed restoration leaves scheduler ownership with the caller. In
+// particular, do not introduce timer cancellation into zero-time or
+// peripheral-triggered checkpoints merely to share the stream plumbing.
+template <typename Machine>
+auto restore_snapshot(Machine &machine, std::stringstream &saved)
+{
+	saved.clear();
+	saved.seekg(0);
+	return machine.save().read_stream(saved);
+}
+
 } // namespace c54x_test
 
 #endif // MAME_NOKIA_TMS320C54X_TEST_SNAPSHOT_H

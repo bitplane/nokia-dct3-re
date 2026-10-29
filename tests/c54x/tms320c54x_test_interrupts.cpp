@@ -654,8 +654,7 @@ bool tms320c54x_test_state::check_pipeline_far_irq_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore pending cross-page far-return IRQ");
+				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore pending cross-page far-return IRQ");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 				m_pipeline_expected_cycle = 6; m_phase = 251380;
 				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -731,8 +730,7 @@ bool tms320c54x_test_state::check_pipeline_xc_irq_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_pipeline_store_writes = checkpoint >= 8 ? 2 : 0; m_pipeline_operand_reads = 0;
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore XC interrupt guard and pending source");
+				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore XC interrupt guard and pending source");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251720;
 				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -1016,7 +1014,7 @@ bool tms320c54x_test_state::check_poll_interrupt_results()
 		u32 const base = (variant / 64) % 2 ? 0x20000 : 0;
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Polling loop and interrupt handler use supported instructions");
 		if (tick == arrival) m_cpu->set_input_line((variant / 32) % 2 ? INPUT_LINE_NMI : 0, ASSERT_LINE);
-		if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_vector_acks, 0}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save polling loop before during or after interrupt arrival"); }
+		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_vector_acks, 0}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save polling loop before during or after interrupt arrival"); }
 		if (tick == 160)
 		{
 			bool const passed = m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == base + 0x609 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x1003 && m_pipeline_store_writes == 1 && m_vector_acks == 1;

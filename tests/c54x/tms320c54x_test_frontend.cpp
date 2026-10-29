@@ -145,8 +145,7 @@ bool tms320c54x_test_state::check_pipeline_frontend_results()
 				m_frontend.replay = true;
 				m_frontend.vector_reads = m_frontend.acks = 0;
 				// The flush word was already fetched at the saved cycle-4 boundary.
-				m_frontend.saved.clear(); m_frontend.saved.seekg(0);
-				expect(machine().save().read_stream(m_frontend.saved) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint,
+				expect(restore_snapshot(machine(), m_frontend.saved) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint,
 					"Restore pending INTR and the decoded foreground slot");
 				// Loading inside a live callback rewinds device local times while
 				// the callback timestamp is still the old one. Let the scheduler

@@ -84,8 +84,8 @@ This separation removes 1,215 bytes/28 lines from the C54x sources but adds a
 or runtime reduction. The bounded legacy run retains all 170 preceding PASS
 records (including the 34 scalar IDs), with one new required repeat-restoration
 record and the explicit transport-free completion. Long-RMW replay and both
-3210 menu gates pass; the older full-default checkpoint is not renewed by these
-focused runs.
+3210 menu gates pass. The full-default checkpoint below also includes this
+separation.
 
 `isa-parallel` runs ten independently reset parallel store/arithmetic cases.
 The default sequence reuses their literal register, masked-status and RAM
@@ -117,8 +117,7 @@ asserting register preservation and no data/program/I/O effects. Its old
 A=0x10/T=3/AR3=0x01ff tuple is not retained; the preceding port marker carried
 no separately asserted dependency. This keeps implementation admission policy
 out of the architectural example sequence. Total C54x sources shrink by
-9,525 bytes/271 lines in this batch; the full-default checkpoint remains older
-than these focused changes.
+9,525 bytes/271 lines in this batch.
 
 `isa-flow` isolates ten conditional-delay and seven-bit stack-operand examples.
 RCD A/B and BCD ALT/BLEQ must decide before delay words overwrite the tested
@@ -128,7 +127,7 @@ data words, both stack words, balanced SP and its six-cycle interval. Standalone
 cases reset independently; the legacy adapter retains its existing CPU state.
 No far-control or pending-transfer restoration case is deleted. This rewrite
 removes 1,781 C++ bytes/47 lines while preserving all 173 legacy PASS records
-and 2,474 asserted opcode words; it does not renew the full-default checkpoint.
+and 2,474 asserted opcode words.
 
 `mpy-mem-imm` retains all 24,576 MPY and 65,536 MAC inputs, with the original
 result references, address/literal poisoning, Read-owned T publication and
@@ -140,7 +139,7 @@ Admission controls are owned separately by `source-domain`, not this positive
 profile. Serial native capture time for the original balanced bundle dropped
 from about 156 to 40 seconds;
 this adds 2,517 C++ bytes/43 lines of scheduling and accounting rather than
-reducing source size. It does not change or renew the full-default checkpoint.
+reducing source size. This isolated profile is not part of the default run.
 
 These are SPRU172C MPY syntax 3 and MAC syntax 4 (MAC page 4-82). The retained
 memory word and signed immediate produce the result at Execute; MAC adds the
@@ -195,9 +194,15 @@ Expected arithmetic/timing results must remain independent of CPU execution
 helpers and shared profile-selection metadata.
 
 `tms320c54x_test_snapshot.h` centralizes buffer reset, rewind and MAME
-serialization. Restore cancels the check timer before loading, as the original
-fixtures did. Assertions, counter rewinds, CPU suspension and continuation stay
-explicit in each family; the helper does not save or restore host observations.
+serialization. The three-argument restore cancels the check timer before
+loading; the two-argument overload leaves scheduling with its caller. Do not
+substitute one for the other: zero-time and peripheral-triggered restores have
+distinct timer ownership. Assertions, counter rewinds, CPU suspension and
+continuation stay explicit in each family; neither helper saves or restores
+host observations. Consolidating 47 captures and 82 loads across 13 modules
+removes 7,001 C++ bytes/85 lines without changing guest setup, expectations,
+phase routing or result records. Compiled helper tests check cursor/error
+state, serialization failures and both timer-ordering contracts.
 
 Runner unit tests exercise the acceptance grammar across every declared
 isolated profile and named scope: exact marker multiplicity, every `key=value`
@@ -248,7 +253,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_peripherals.cpp` | Bus, clock, serial, DMA and timer fixtures |
 | `tests/c54x/tms320c54x_test_restore.cpp` | Atomic far-transfer replay and extended program-memory continuations |
 | `tests/c54x/tms320c54x_test_repeat_restore.cpp` | Saved/body IRQ repeats, active-context restoration and delayed far-call/return replay |
-| `tests/c54x/tms320c54x_test_snapshot_state.h` | Atomic transport/repeat and cross-module far-transfer checkpoint storage; peripheral checkpoint streams remain family-specific bench members |
+| `tests/c54x/tms320c54x_test_snapshot_state.h` | Active-repeat and cross-module far-transfer checkpoint storage; peripheral checkpoint streams remain family-specific bench members |
 | `tests/c54x/tms320c54x_test_repeat_state.h` | Independent case inputs, observation types and per-family replay storage; no generic rewind policy |
 | `tests/c54x/tms320c54x_test_disassembler.cpp` | Bounded decoding and operand-domain matrices |
 | `tests/firmware/tms320c54x_test_rom4.cpp` | Acquired-ROM routine execution and independent reference comparisons |
@@ -520,7 +525,7 @@ execution. This is the existing emulator phase contract, not a new physical
 timing claim. Conformance failures now print the case, tick, replay, registers
 and transaction counters, and the runner rejects any such assertion diagnostic
 even if completion markers are also present.
-The current full default core gate reproduces all 293 required
+The current full default core gate reproduces all 294 required
 markers exactly once, including the legal MACP/MACD examples. The separate
 program-multiply rejection and repeated-SUBC/ST profiles and the complete tool
 suite also pass. These are executable emulator regressions, not all-ISA or
@@ -2258,16 +2263,15 @@ Repeat/interrupt composition and physical timing remain separate scopes.
 
 ## Core regression checkpoint
 
-The latest banked full default run (`a9ba030c`) passes all 293 required markers exactly once,
-with 294 ordered PASS records, intentional MAME exit 3 and runner exit 0.
-It takes 1,061.85 seconds, versus 1,517.76 at the previous measured checkpoint
-(`ca101ee8`), about 30% faster across the reviewed replay reductions.
+The latest banked full default run passes all 294 required markers exactly once,
+with 295 ordered PASS records, intentional MAME exit 3 and runner exit 0.
+It takes 1,058.73 seconds (17m39s), versus 1,061.85 at the previous measured
+checkpoint. The serialization cleanup is not a runtime optimization.
 
-Result names and order are unchanged. Exactly six records differ: regular and
-shifted STL/STH, register arithmetic and LD, shifted memory ADD/SUB, and SUBC.
-Their reviewed schedules change repetition counts and add coverage digests;
-they do not silently replace numeric expectations. All 5,690 asserted opcode
-words are unchanged, with set SHA256
+Every previous result record is byte-identical and in the same order. The one
+added record checks active-repeat restoration without a DSPIF device; it was
+introduced by the earlier ownership separation, not this stream cleanup.
+All 5,690 asserted opcode words are unchanged, with set SHA256
 `7fd37083d052b81e65f629b5e2062965e612cab737cd54ee85a0f84d60ed76e4`
 (sorted four-digit opcode strings joined by newlines, no final newline).
 
@@ -2770,8 +2774,8 @@ implementation contracts, not physical timing evidence.
 The standalone binary completes the retained profile with an empty ROM
 directory. Runner wall time drops from 339 to 104 seconds, including the
 balanced replay schedule and smaller save graph. Explicit ownership and
-formatting add 1,824 C++ bytes/114 lines; this is not a source-size reduction
-and does not renew the older full-default checkpoint.
+formatting add 1,824 C++ bytes/114 lines; this is not a source-size reduction.
+This isolated profile is not part of the default run.
 
 The `mpy-mem-imm` RAM/MPY controls retain their distinct inputs with balanced
 checkpoints, as described above. The implementation-limit controls for the

@@ -1269,8 +1269,7 @@ void tms320c54x_test_state::start_standard_swwsr_test()
 	data.write_word(0x28, 0x2000);
 	expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save original-family SWWSR");
 	data.write_word(0x28, 0);
-	m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
-	expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE && data.read_word(0x28) == 0x2000 && m_cpu->external_io_wait_states() == 2, "Restore the firmware's two-I/O-wait setting");
+	expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE && data.read_word(0x28) == 0x2000 && m_cpu->external_io_wait_states() == 2, "Restore the firmware's two-I/O-wait setting");
 	m_cpu->reset(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 	expect(data.read_word(0x28) == 0x7fff, "Reset restores the original SWWSR contract");
 	osd_printf_info("TMS320C54x standard SWWSR: PASS encodings=65536 reserved_bit15=0 multiplier=0 separate_BSCR_SWCR=1 partial_writes=1 restore=1 reset=1 program_data_wait_claim=0 physical_mapping=unvalidated\n");
@@ -1296,7 +1295,7 @@ void tms320c54x_test_state::start_bus_register_test()
 	data.write_word(0x28, 0x7fff); data.write_word(0x29, 0x8006); data.write_word(0x2b, 0);
 	expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save CPU-owned bus controls");
 	data.write_word(0x28, 0); data.write_word(0x29, 0xffff); data.write_word(0x2b, 1);
-	m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore bus controls and derived outputs");
+	expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore bus controls and derived outputs");
 	expect(data.read_word(0x28) == 0x7fff && data.read_word(0x29) == 0x8006 && !data.read_word(0x2b) && m_bus_divisor == 1 && m_bus_iack_enable && m_cpu->external_io_wait_states() == 7,
 		"Saved bus state re-drives exact configuration outputs");
 	data.write_word(0x29, 0, 0x8000); data.write_word(0x29, 0xffff, 0x0ff9);
@@ -1747,9 +1746,7 @@ bool tms320c54x_test_state::check_idle_nmi_result_results()
 				m_cpu->state_int(STATE_GENPC) == 0x010981 &&
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
 				"NMI request wakes idle but remains unserviced while fixture execution is suspended");
-			m_idle_nmi_saved.str(std::string());
-			m_idle_nmi_saved.clear();
-			expect(machine().save().write_stream(m_idle_nmi_saved) == STATERR_NONE,
+			expect(capture_snapshot(machine(), m_idle_nmi_saved) == STATERR_NONE,
 				"save latched NMI and held input before vector entry");
 			m_cpu->resume(SUSPEND_REASON_DISABLE);
 			++m_phase;
@@ -1759,9 +1756,7 @@ bool tms320c54x_test_state::check_idle_nmi_result_results()
 		check_idle_nmi_result(index);
 		if (step == 2)
 		{
-			m_idle_nmi_saved.clear();
-			m_idle_nmi_saved.seekg(0);
-			expect(machine().save().read_stream(m_idle_nmi_saved) == STATERR_NONE &&
+			expect(restore_snapshot(machine(), m_idle_nmi_saved) == STATERR_NONE &&
 				m_cpu->state_int(STATE_GENPC) == 0x010981 &&
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
 				m_cpu->space(AS_DATA).read_word(0x0fff) == 0x5a5a &&
@@ -1853,9 +1848,7 @@ bool tms320c54x_test_state::check_idle_wake_results()
 					m_cpu->state_int(tms320c54x_device::STATE_TCR) == m_idle_timer_control &&
 					!(m_idle_timer_control & 0x10),
 					"deep-idle timer counter is frozen, not reloaded or stopped through TSS");
-				m_idle_timer_saved.str(std::string());
-				m_idle_timer_saved.clear();
-				expect(machine().save().write_stream(m_idle_timer_saved) == STATERR_NONE,
+				expect(capture_snapshot(machine(), m_idle_timer_saved) == STATERR_NONE,
 					"save frozen deep-idle timer state");
 				m_cpu->set_input_line(0, ASSERT_LINE);
 				m_cpu->set_input_line(0, CLEAR_LINE);
@@ -1873,9 +1866,7 @@ bool tms320c54x_test_state::check_idle_wake_results()
 			"enabled external wake resumes timer operation; masked wake leaves deep idle intact");
 		if (step == 2)
 		{
-			m_idle_timer_saved.clear();
-			m_idle_timer_saved.seekg(0);
-			expect(machine().save().read_stream(m_idle_timer_saved) == STATERR_NONE &&
+			expect(restore_snapshot(machine(), m_idle_timer_saved) == STATERR_NONE &&
 				m_cpu->state_int(tms320c54x_device::STATE_TIM) == m_idle_timer_counter &&
 				m_cpu->state_int(tms320c54x_device::STATE_TCR) == m_idle_timer_control &&
 				m_cpu->space(AS_DATA).read_word(0x0501) == 0,
@@ -1930,9 +1921,7 @@ bool tms320c54x_test_state::check_idle_wake_results()
 			m_idle_dma_completions == 0 && m_cpu->space(AS_DATA).read_word(0x0530) == 0,
 			"DMA clock loss occurs halfway through its first four-clock word");
 		m_idle_dma->pll_clock_stop_w(1);
-		m_idle_dma_saved.str(std::string());
-		m_idle_dma_saved.clear();
-		expect(machine().save().write_stream(m_idle_dma_saved) == STATERR_NONE,
+		expect(capture_snapshot(machine(), m_idle_dma_saved) == STATERR_NONE,
 			"save clockless DMA with two clocks remaining on its first word");
 		m_phase = 6281 + index * 2;
 		m_check_timer->adjust(attotime::from_usec(100));
@@ -1957,9 +1946,7 @@ bool tms320c54x_test_state::check_idle_wake_results()
 				m_check_timer->adjust(attotime::from_ticks(2, m_idle_dma_rate));
 				return true;
 			}
-			m_idle_dma_saved.str(std::string());
-			m_idle_dma_saved.clear();
-			expect(machine().save().write_stream(m_idle_dma_saved) == STATERR_NONE,
+			expect(capture_snapshot(machine(), m_idle_dma_saved) == STATERR_NONE,
 				"save pending DMA transfer with CPU idle");
 			++m_phase;
 			m_check_timer->adjust(attotime::from_usec(100));
@@ -1989,9 +1976,7 @@ bool tms320c54x_test_state::check_idle_wake_results()
 			"DMA completion wakes each idle mode only when enabled in IMR, independently of INTM");
 		if (step == 1)
 		{
-			m_idle_dma_saved.clear();
-			m_idle_dma_saved.seekg(0);
-			expect(machine().save().read_stream(m_idle_dma_saved) == STATERR_NONE &&
+			expect(restore_snapshot(machine(), m_idle_dma_saved) == STATERR_NONE &&
 				(m_idle_dma->read(0) & 1) && m_cpu->state_int(STATE_GENPC) == 0x010961 &&
 				m_cpu->space(AS_DATA).read_word(0x0530) == 0,
 				"restore pending DMA and sleeping CPU before the first transfer");
@@ -2051,16 +2036,12 @@ bool tms320c54x_test_state::check_stopped_timer_reload_results()
 		expect(tim == 2 && tcr == ((divider - 1) << 6) &&
 			!m_cpu->state_int(tms320c54x_device::STATE_IFR),
 			"SPRU131G changing TDDR preserves current PSC until borrow or TRB");
-		m_timer_prescaler_saved.str(std::string());
-		m_timer_prescaler_saved.clear();
-		expect(machine().save().write_stream(m_timer_prescaler_saved) == STATERR_NONE,
+		expect(capture_snapshot(machine(), m_timer_prescaler_saved) == STATERR_NONE,
 			"save current PSC larger than new TDDR");
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 9);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x20);
-		m_timer_prescaler_saved.clear();
-		m_timer_prescaler_saved.seekg(0);
-		expect(machine().save().read_stream(m_timer_prescaler_saved) == STATERR_NONE &&
+		expect(restore_snapshot(machine(), m_timer_prescaler_saved) == STATERR_NONE &&
 			m_cpu->state_int(tms320c54x_device::STATE_TIM) == tim &&
 			m_cpu->state_int(tms320c54x_device::STATE_TCR) == tcr,
 			"restore current PSC interval independently of overwritten timer reload");
@@ -2272,9 +2253,7 @@ bool tms320c54x_test_state::check_bsp_interrupt_results()
 				m_cpu->state_int(tms320c54x_device::STATE_IFR) ==
 					(index == 8 ? 0x30 : u16(1U << source)),
 				"BSP source edge reaches IFR before snapshot and dispatch");
-			m_bsp_saved.str(std::string());
-			m_bsp_saved.clear();
-			expect(machine().save().write_stream(m_bsp_saved) == STATERR_NONE,
+			expect(capture_snapshot(machine(), m_bsp_saved) == STATERR_NONE,
 				"save pending BSP interrupt sources before CPU dispatch");
 			m_cpu->resume(SUSPEND_REASON_DISABLE);
 			++m_phase;
@@ -2294,9 +2273,7 @@ bool tms320c54x_test_state::check_bsp_interrupt_results()
 			"BSP source vectors, masked pending state, INTM wake and simultaneous priority");
 		if (stage == 2)
 		{
-			m_bsp_saved.clear();
-			m_bsp_saved.seekg(0);
-			expect(machine().save().read_stream(m_bsp_saved) == STATERR_NONE &&
+			expect(restore_snapshot(machine(), m_bsp_saved) == STATERR_NONE &&
 				m_cpu->state_int(STATE_GENPC) == 0x010a01 &&
 				m_cpu->state_int(tms320c54x_device::STATE_IFR) ==
 					(index == 8 ? 0x30 : u16(1U << source)),
@@ -2331,14 +2308,12 @@ bool tms320c54x_test_state::check_bsp_interrupt_results()
 		if (m_phase == 79500)
 		{
 			expect(data.read_word(0x58) == 0x77fe, "PLL lock counter remains pending at 200 us");
-			m_pll_saved.str(std::string()); m_pll_saved.clear();
-			expect(machine().save().write_stream(m_pll_saved) == STATERR_NONE, "save pending PLL lock timer");
+			expect(capture_snapshot(machine(), m_pll_saved) == STATERR_NONE, "save pending PLL lock timer");
 			data.write_word(0x58, 0);
 			expect(data.read_word(0x58) == 0, "cancel pending PLL before restoring checkpoint");
 			// Restore at the same scheduler timestamp: read_stream inside a
 			// later timer callback cannot rewind that callback's cached time.
-			m_pll_saved.clear(); m_pll_saved.seekg(0);
-			expect(machine().save().read_stream(m_pll_saved) == STATERR_NONE && data.read_word(0x58) == 0x77fe,
+			expect(restore_snapshot(machine(), m_pll_saved) == STATERR_NONE && data.read_word(0x58) == 0x77fe,
 				"restore pending PLL request and its original deadline after cancellation");
 			data.write_word(0x58, 0x77ff); // Repeating a request must retain its original deadline.
 			m_phase = 79501;
@@ -2420,13 +2395,11 @@ bool tms320c54x_test_state::check_bsp_interrupt_results()
 			expect(m_idle_mcbsp_words == 1, "internal McBSP word follows retimed system-clock generator");
 			u16 const tim = data.read_word(0x24);
 			expect(tim > 7'300 && tim < 7'500, "core timer retains count and advances at selected PLL rate");
-			m_clock_rates_saved.str(std::string()); m_clock_rates_saved.clear();
-			expect(machine().save().write_stream(m_clock_rates_saved) == STATERR_NONE, "save selected CPU and peripheral rates");
+			expect(capture_snapshot(machine(), m_clock_rates_saved) == STATERR_NONE, "save selected CPU and peripheral rates");
 			m_cpu->set_unscaled_clock(13'000'000);
 			expect(m_idle_dma->clock() == 13'000'000 && m_idle_mcbsp->clock() == 13'000'000,
 				"core runtime clock publication reaches both consumers");
-			m_clock_rates_saved.clear(); m_clock_rates_saved.seekg(0);
-			expect(machine().save().read_stream(m_clock_rates_saved) == STATERR_NONE &&
+			expect(restore_snapshot(machine(), m_clock_rates_saved) == STATERR_NONE &&
 				m_cpu->clock() == 119'952'000 && m_idle_dma->clock() == 119'952'000 &&
 				m_idle_mcbsp->clock() == 119'952'000 && data.read_word(0x24) == tim,
 				"restore selected rates without restarting core timer");
@@ -2509,8 +2482,7 @@ bool tms320c54x_test_state::check_peripheral_mmr_timing_audit_results()
 				m_pipeline_replay = true;
 				m_pipeline_operand_reads = unsigned(family != 1 && checkpoint >= read_cycle);
 				m_pipeline_store_writes = unsigned(family != 0 && checkpoint >= write_cycle);
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint, "Restore paid wait and operand ownership");
+				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint, "Restore paid wait and operand ownership");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 				m_pipeline_expected_cycle = checkpoint + 1;
 				m_phase = 251230;
@@ -2653,11 +2625,10 @@ bool tms320c54x_test_state::check_pipeline_mu4_timer_context_results()
 				m_fast_stack_reads = m_recurring_irq_snapshot[4]; m_pipeline_store_writes = m_recurring_irq_snapshot[5];
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[6]; m_timer_probe_return_pc = m_recurring_irq_snapshot[7];
 				m_recurring_irq_first_return_writes = m_recurring_irq_snapshot[8];
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
 				// Mark the executing check timer modified before restoring it.
 				// Resume at its restored deadline, not stale callback time.
 				m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore recurring interrupts without duplicate timer, stack or foreground effects");
+				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore recurring interrupts without duplicate timer, stack or foreground effects");
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = m_recurring_irq_checkpoint_cycle + 1; m_phase = 252140;
 				m_check_timer->enable(true); return true;
 			}
@@ -3329,7 +3300,7 @@ bool tms320c54x_test_state::check_circular_portr_results()
 			for (unsigned i = 0; i < 8; ++i) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (i == f.selected ? f.final_ar : f.initial[i]), "PORTR circular address modification belongs to Access once"); m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i); }
 		}
 		unsigned const checkpoint = 4 + f.snapshot;
-		if (tick == checkpoint && !m_pipeline_replay) { m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save circular PORTR literal, address or sampled I/O value"); }
+		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save circular PORTR literal, address or sampled I/O value"); }
 		if (tick == 16)
 		{
 			expect(m_pipeline_operand_reads == unsigned(!f.excluded) && m_pipeline_store_writes == unsigned(!f.excluded) && m_pipeline_extensions_reads == 1 && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !f.excluded && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x9876543210ULL, "Circular PORTR retains address and sample across replay without duplicate I/O, writes or flag changes");
@@ -3347,7 +3318,7 @@ bool tms320c54x_test_state::check_circular_portr_results()
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = circular_portr_block_case(variant);
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Circular PORTR composes with the firmware-owned RPTBD block");
 		bool const capture = f.snapshot == 1 ? m_pipeline_store_writes == 1 : m_pipeline_operand_reads == (f.snapshot ? f.count / 2 + 1 : 1) && m_pipeline_store_writes + 1 == m_pipeline_operand_reads;
-		if (capture && !m_pipeline_expected_cycle && !m_pipeline_replay) { m_pipeline_expected_cycle = tick; m_saved_pipeline.str({}); m_saved_pipeline.clear(); m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes}; expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save circular I/O block before/after publication or at mid-block Read"); }
+		if (capture && !m_pipeline_expected_cycle && !m_pipeline_replay) { m_pipeline_expected_cycle = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save circular I/O block before/after publication or at mid-block Read"); }
 		if (tick == 96)
 		{
 			expect(m_pipeline_expected_cycle && m_pipeline_operand_reads == f.count && m_pipeline_store_writes == f.count && m_pipeline_register_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && !m_cpu->state_int(tms320c54x_device::STATE_BRC) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x900 | (f.compatibility ? 0x20 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x9876543210ULL, "Circular PORTR block drains BRC and preserves status and accumulators without duplicate samples");

@@ -61,9 +61,7 @@ bool tms320c54x_test_state::check_far_save_results()
 			});
 			data.write_word(0x03fe, 0x7f);
 			data.write_word(0x03ff, 0xbad);
-			m_far_transfer.saved.clear();
-			m_far_transfer.saved.seekg(0);
-			expect(machine().save().read_stream(m_far_transfer.saved) == STATERR_NONE,
+			expect(restore_snapshot(machine(), m_far_transfer.saved) == STATERR_NONE,
 				"restore pending far-transfer save state");
 			expect(m_cpu->state_int(STATE_GENPC) == (m_far_transfer.returning ? 0x030602 : 0x010603) &&
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&

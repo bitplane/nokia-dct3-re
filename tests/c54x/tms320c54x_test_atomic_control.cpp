@@ -250,9 +250,7 @@ bool tms320c54x_test_state::check_atomic_control_results()
 			"near CALL reaches its callee and stacks the continuation before fast return");
 		data.write_word(0x03ff, 0xdead);
 		program.write_word(0x020701, 0xf49b); // RETF must use RTN, not the sentinel.
-		m_near_return_saved.str(std::string());
-		m_near_return_saved.clear();
-		expect(machine().save().write_stream(m_near_return_saved) == STATERR_NONE,
+		expect(capture_snapshot(machine(), m_near_return_saved) == STATERR_NONE,
 			"save CALL-published RTN before fast return");
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		return next_atomic_phase(62051);
@@ -277,9 +275,7 @@ bool tms320c54x_test_state::check_atomic_control_results()
 		expect(m_cpu->state_int(STATE_GENPC) == 0x030701 &&
 			data.read_word(0x03ff) == 0x0782,
 			"second real CALL replaces the RTN checkpoint before restoration");
-		m_near_return_saved.clear();
-		m_near_return_saved.seekg(0);
-		expect(machine().save().read_stream(m_near_return_saved) == STATERR_NONE,
+		expect(restore_snapshot(machine(), m_near_return_saved) == STATERR_NONE,
 			"restore CALL-published RTN checkpoint");
 		expect(m_cpu->state_int(STATE_GENPC) == 0x020701 &&
 			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x03ff &&
@@ -311,9 +307,7 @@ bool tms320c54x_test_state::check_atomic_control_results()
 			m_cpu->state_int(tms320c54x_device::STATE_B) == 0 &&
 			m_cpu->state_int(tms320c54x_device::STATE_SP) == (m_far_transfer.returning ? 0x0400 : 0x03fe),
 			"far save checkpoint retires exactly one delay word on the original page");
-		m_far_transfer.saved.str(std::string());
-		m_far_transfer.saved.clear();
-		expect(machine().save().write_stream(m_far_transfer.saved) == STATERR_NONE,
+		expect(capture_snapshot(machine(), m_far_transfer.saved) == STATERR_NONE,
 			"write pending far-transfer save state");
 		return next_atomic_phase(786);
 	}

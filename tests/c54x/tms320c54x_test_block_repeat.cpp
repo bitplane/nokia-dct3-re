@@ -98,9 +98,9 @@ bool tms320c54x_test_state::check_rptbd_layout_results()
 		if (interrupt && tick == 5 && !rptbd_late_irq(variant)) m_cpu->set_input_line(rptbd_irq_line(variant), ASSERT_LINE);
 		if (tick == checkpoint && !m_rptbd.replay)
 		{
-			m_rptbd.snapshot = m_rptbd.observed; m_rptbd.saved.str({}); m_rptbd.saved.clear();
+			m_rptbd.snapshot = m_rptbd.observed;
 			m_rptbd.saved_return_pc = m_rptbd.return_pc;
-			expect(machine().save().write_stream(m_rptbd.saved) == STATERR_NONE, "Save RPTBD header, delay span or active loop");
+			expect(capture_snapshot(machine(), m_rptbd.saved) == STATERR_NONE, "Save RPTBD header, delay span or active loop");
 		}
 		if (tick == (interrupt ? 160 : 96))
 		{
