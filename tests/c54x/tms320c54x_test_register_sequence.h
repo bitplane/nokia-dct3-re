@@ -22,6 +22,7 @@ public:
 	void start() { require(m_cases > 0, "nonempty register sequence"); m_case = m_restores = 0; m_coverage = {}; begin(); }
 	unsigned count() const { return m_case; }
 	unsigned restores() const { return m_restores; }
+	void set_opcode_observer(std::function<void(u16, u16)> observer) { m_opcode_observer = std::move(observer); }
 	u64 digest() const { return m_coverage.value; }
 	bool step()
 	{
@@ -83,7 +84,12 @@ private:
 		}
 		if (m_input.single_fetch)
 			m_fetch_tap = m_cpu.space(AS_PROGRAM).install_read_tap(*m_input.single_fetch, *m_input.single_fetch, "register_sequence_opcode",
-				[this](offs_t, u16 &, u16) { if (!m_machine.side_effects_disabled()) { require(!m_fetches, "opcode is fetched once"); ++m_fetches; } });
+				[this](offs_t, u16 &word, u16) {
+					if (m_machine.side_effects_disabled()) return;
+					u16 const opcode = m_input.states.front().observation.opcode;
+					require(!m_fetches && word == opcode, "one fetch of the specified opcode"); ++m_fetches;
+					if (m_opcode_observer) m_opcode_observer(word, opcode);
+				});
 		m_tick = 0; m_replay = m_resume = false;
 		m_cpu.set_pipeline_frontend(true); m_cpu.resume(SUSPEND_REASON_DISABLE); schedule();
 	}
@@ -93,6 +99,7 @@ private:
 	unsigned m_cases, m_case = 0, m_tick = 0, m_restores = 0;
 	unsigned m_fetches = 0, m_saved_fetches = 0;
 	builder m_build;
+	std::function<void(u16, u16)> m_opcode_observer;
 	clocked_register_case m_input;
 	bool m_replay = false, m_resume = false;
 	std::string m_label;

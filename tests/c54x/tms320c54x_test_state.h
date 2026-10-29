@@ -13,6 +13,8 @@
 #include "tms320c54x_bsp_state.h"
 #include "tms320c54x_test_selection.h"
 #include "tms320c54x_test_support.h"
+#include "tms320c54x_test_register_sequence.h"
+#include "tms320c54x_test_register_unary.h"
 #include "tms320c54x_test_atomic_routes.h"
 #include "tms320c54x_test_entry_state.h"
 #include "tms320c54x_test_repeat_state.h"
@@ -446,8 +448,7 @@ private:
 	void verify_paired_circular_domain();
 	static dst_extended_fixture extended_dst_fixture(unsigned variant);
 	void start_pipeline_extended_dst(unsigned variant = 0);
-	static std::array<u64, 2> accumulator_logic_fixture(unsigned variant, bool after);
-	void start_pipeline_accumulator_logic(unsigned variant = 0);
+	void start_pipeline_accumulator_logic();
 	struct mvkd_sp_fixture
 	{
 		unsigned form, read, checkpoint;
@@ -464,8 +465,7 @@ private:
 	};
 	static mvkd_fixture data_copy_fixture(unsigned variant);
 	void start_pipeline_data_copy(unsigned variant = 0);
-	static std::array<u64, 3> accumulator_shift_fixture(unsigned variant, bool after);
-	void start_pipeline_accumulator_shift(unsigned variant = 0);
+	void start_pipeline_accumulator_shift();
 	struct long_pair_fixture_data
 	{
 		unsigned form, reg, read_cycle;
@@ -1049,15 +1049,10 @@ private:
 
 	void start_pipeline_rmw_forward(unsigned variant = 0);
 
-	struct negate_fixture
-	{
-		u64 a, b, source, result;
-		u16 opcode, st0, result_st0, st1;
-		u32 base;
-		unsigned prefix;
-	};
-	static negate_fixture negate_case(unsigned variant, bool absolute = false);
-	void start_pipeline_negate(unsigned variant = 0);
+	void start_pipeline_negate();
+	void start_register_unary(register_unary_kind kind, unsigned phase);
+	void report_register_unary(register_unary_kind kind) const;
+	std::unique_ptr<register_sequence_fixture> m_register_sequence;
 
 	struct mapped_word_arithmetic_fixture
 	{

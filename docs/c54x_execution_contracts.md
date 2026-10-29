@@ -304,6 +304,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_arithmetic.cpp` | Arithmetic, multiplier and logical-operation fixtures and checks |
 | `tests/c54x/tms320c54x_test_addressing.cpp` | Address generation and memory/register transfers, including the stack-transfer continuation |
 | `tests/c54x/tms320c54x_test_domains.h` | CPU-only admission fixture with owned progress, observations, taps and snapshots |
+| `tests/c54x/tms320c54x_test_register_unary.h` | Independent register-logic, shift, NEG/ABS inputs, balanced replay keys and explicit clocked observations |
 | `tests/c54x/tms320c54x_test_domain_schedule.h` | Independent instruction inventory and explicit admission-control schedule; no legacy phase routing |
 | `tests/c54x/tms320c54x_test_pipeline.cpp` | Dependency, status and data-path compositions and their sequenced continuations |
 | `tests/c54x/tms320c54x_test_pipeline_control.cpp` | Branch, call, return and conditional-control compositions and continuations |
@@ -352,6 +353,17 @@ values that depend on preceding guest writes must remain sequential calls.
 and scheduling the existing 100-microsecond atomic observer, in that order.
 Neither helper resets the CPU, computes expectations, or makes sequential
 legacy cases independent.
+
+Register-only logic/CMPL (`reg-logic`), SFTA/SFTL (`reg-shifts`), NEG and ABS
+share the clocked CPU-only runner and independent integer case builders.
+They retain every original numeric/status/page tuple, assigning each one a
+balanced original replay point instead of replaying the whole matrix at every
+point. The host census checks the projection and checkpoint classes; the
+review ledger owns exact keys and digests. Default adapters retain their
+original successors. A real final IDLE replaces unobserved padding, not a
+consumer interaction. Repeat, IRQ and memory-operand compositions stay separate.
+The basis is [TI SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf);
+publication clocks and the documented left-carry policy are not silicon measurements.
 
 The absolute-alias fixtures share declarative family/count/status profiles in
 `tests/c54x/tms320c54x_test_profiles.h`; the CPU model does not consume this test

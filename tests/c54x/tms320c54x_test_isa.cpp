@@ -20,6 +20,7 @@
 #include "tms320c54x_test_register_sequence.h"
 #include "tms320c54x_test_register_pairs.h"
 #include "tms320c54x_test_register_alu.h"
+#include "tms320c54x_test_register_unary.h"
 #include <cstring>
 
 namespace {
@@ -37,8 +38,9 @@ public:
 		m_normalization_kind = c54x_test::select_normalization(config.options().bios());
 		m_register_pair_kind = c54x_test::select_register_pair(config.options().bios());
 		m_register_alu_kind = c54x_test::select_register_alu(config.options().bios());
+		m_register_unary_kind = c54x_test::select_register_unary(config.options().bios());
 		m_extended_program = m_domain || m_mapped_mac || bool(m_dual_mode) ||
-			m_normalization_kind != c54x_test::normalization_kind::none || m_register_pair_kind != c54x_test::register_pair_kind::none || m_register_alu_kind != c54x_test::register_alu_kind::none;
+			m_normalization_kind != c54x_test::normalization_kind::none || m_register_pair_kind != c54x_test::register_pair_kind::none || m_register_alu_kind != c54x_test::register_alu_kind::none || m_register_unary_kind != c54x_test::register_unary_kind::none;
 		TMS320C54X(config, m_cpu, 13'000'000);
 		m_cpu->set_extended_program(m_extended_program);
 		m_cpu->set_addrmap(AS_PROGRAM, &c54x_isa_test_state::program_map);
@@ -49,7 +51,11 @@ protected:
 	void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(c54x_isa_test_state::check), this);
-		if (m_register_pair_kind != c54x_test::register_pair_kind::none || m_register_alu_kind != c54x_test::register_alu_kind::none)
+		if (m_register_unary_kind != c54x_test::register_unary_kind::none)
+			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
+				c54x_test::register_unary_count(m_register_unary_kind),
+				[this](unsigned key) { return c54x_test::register_unary_case<tms320c54x_device>(key, m_register_unary_kind); });
+		else if (m_register_pair_kind != c54x_test::register_pair_kind::none || m_register_alu_kind != c54x_test::register_alu_kind::none)
 			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 				m_register_pair_kind != c54x_test::register_pair_kind::none ? c54x_test::register_pair_count(m_register_pair_kind) : c54x_test::register_alu_count(m_register_alu_kind),
 				[this](unsigned key) { return m_register_pair_kind != c54x_test::register_pair_kind::none ? c54x_test::register_pair_case<tms320c54x_device>(key, m_register_pair_kind) : c54x_test::register_alu_case<tms320c54x_device>(key, m_register_alu_kind); });
@@ -100,6 +106,15 @@ protected:
 private:
 	[[noreturn]] void register_sequence_result() const
 	{
+		if (m_register_unary_kind != c54x_test::register_unary_kind::none)
+		{
+			osd_printf_info("%s\n", c54x_test::register_unary_result(m_register_unary_kind, m_register_sequence->count(),
+				m_register_sequence->restores(), m_register_sequence->digest()).c_str());
+			char const *name = m_register_unary_kind == c54x_test::register_unary_kind::logic ? "register logic" :
+				m_register_unary_kind == c54x_test::register_unary_kind::shift ? "accumulator shifts" :
+				m_register_unary_kind == c54x_test::register_unary_kind::absolute ? "ABS" : "NEG";
+			throw emu_fatalerror(3, "TMS320C54x isolated %s complete", name);
+		}
 		if (m_register_alu_kind == c54x_test::register_alu_kind::minmax)
 		{
 			osd_printf_info("TMS320C54x staged MAX MIN: PASS cases=%u restore=%u selectors=4 value_pairs=256 status_states=8 pages=2 snapshots=4 checkpoint_policy=balanced_non_ties_all_ties operands=Execute signed_bits=40 equality=B carry_only=1 data_accesses=0 duplicate_fetches=0 producer_composition=unvalidated silicon_phase_claim=0 coverage_fnv64=%016llx\n", m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
@@ -291,6 +306,7 @@ private:
 	c54x_test::normalization_kind m_normalization_kind = c54x_test::normalization_kind::none;
 	c54x_test::register_pair_kind m_register_pair_kind = c54x_test::register_pair_kind::none;
 	c54x_test::register_alu_kind m_register_alu_kind = c54x_test::register_alu_kind::none;
+	c54x_test::register_unary_kind m_register_unary_kind = c54x_test::register_unary_kind::none;
 	std::unique_ptr<c54x_test::register_sequence_fixture> m_register_sequence;
 	std::unique_ptr<c54x_test::exponent_normalization_fixture> m_normalization;
 	std::unique_ptr<c54x_test::dual_multiply_fixture_runner> m_dual;
@@ -327,6 +343,10 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(24, "rotate", "Staged accumulator rotates and carry forwarding")
 	ROM_SYSTEM_BIOS(25, "minmax", "Signed accumulator MAX MIN Execute ownership and replay")
 	ROM_SYSTEM_BIOS(26, "squr", "Accumulator square with signed 17-bit operand")
+	ROM_SYSTEM_BIOS(27, "reg-logic", "Register logic and complement without memory access")
+	ROM_SYSTEM_BIOS(28, "reg-shifts", "Arithmetic and logical accumulator shifts")
+	ROM_SYSTEM_BIOS(29, "negate", "Accumulator negate with producer and replay")
+	ROM_SYSTEM_BIOS(30, "absolute", "Accumulator absolute value with producer and replay")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
 ROM_END
 

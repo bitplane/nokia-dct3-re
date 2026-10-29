@@ -8,6 +8,72 @@
   },
   "families": [
     {
+      "id": "register-logic-complement",
+      "classification": "isa_documented",
+      "decision": "merge",
+      "basis": "TI SPRU172C AND/OR/XOR accumulator and CMPL descriptions; independent bit-position reference, additionally checked by whole-word masked logical operations, not CPU helpers.",
+      "source": "tests/c54x/tms320c54x_test_register_unary.h; tests/c54x/tms320c54x_test_register_sequence.h",
+      "profiles": ["reg-logic"],
+      "legacy_entry": "default phases252570/252580; one adapter now delegates to the shared clocked runner, then continues to the original data-copy family",
+      "case_ids": [],
+      "profile_coverage": {
+        "reg-logic": {"cases": 3104, "fnv64": "55e8b6d128246315", "result_prefix": "TMS320C54x staged register logic: PASS", "key": "Original raw keys: logical tuple0..3071 plus its selected 3072-stride checkpoint; complement tuple0..31 plus6144 and its selected32-stride checkpoint."}
+      },
+      "obligations": ["retain all3072 AND/OR/XOR and32 CMPL numeric/status tuples, including all four source/destination selectors, every encoded shift, independent operand patterns and both SXM states", "preserve A/B, full ST0/ST1 and PMST observations before and after clock6; one matching opcode fetch and no data access", "both original checkpoint classes remain exercised within every operation/selector/full-status group; host checks prove the numeric projection is bijective", "standalone CPU-only root uses no Nokia devices or private ROM; default continuation uses the same builder and runner"],
+      "limits": ["retire3104 extra executions that differed only in checkpoint; not removal of any numeric tuple", "two old result records are merged into one bank record with an ordered digest; one new standalone BIOS exposes existing default-only coverage, not new instruction tests", "add a real final IDLE after the instruction; old unobserved NOP padding was not an instruction-interaction contract", "repeat, interrupt and memory-logic families remain separate; model publication clocks are not silicon timing evidence"]
+    },
+    {
+      "id": "register-arithmetic-logical-shifts",
+      "classification": "isa_documented",
+      "decision": "rewrite",
+      "basis": "TI SPRU172C SFTA and SFTL, pages4-155..4-159: signed40-bit versus zero-filled32-bit shifting, carry, saturation and destination overflow. Existing per-bit reference body is unchanged; independent whole-word arithmetic/division checks its retained results.",
+      "source": "tests/c54x/tms320c54x_test_register_unary.h; tests/c54x/tms320c54x_test_register_sequence.h",
+      "profiles": ["reg-shifts"],
+      "legacy_entry": "default phase252610, then the unchanged long-pair initializer; opcode coverage is observed at the actual matching fetch, while the runner owns all result/status checks",
+      "case_ids": [],
+      "profile_coverage": {
+        "reg-shifts": {"cases": 16384, "fnv64": "50bc9b13b4563125", "result_prefix": "TMS320C54x staged accumulator shifts: PASS", "key": "Original numeric ordinal0..16383 plus its balanced choice of original checkpoint key0/16384."}
+      },
+      "obligations": ["retain both operations, four selectors, every shift -16..15, eight40-bit patterns and every SXM/OVM/carry combination", "preserve exact A/B/ST0/ST1 publication checks at clock6, including sticky destination overflow and opposite-register preservation", "both original checkpoint classes remain present per operation/selector/full-status group, with bijective numeric projection", "one matching opcode fetch, no data access, actual paired restores and explicit final IDLE; no CPU expectation helpers"],
+      "limits": ["retire16384 extra checkpoint executions only; standalone BIOS is new exposure of an existing default-only matrix", "SPRU172C's SFTA left-carry equation uses source bit39-SHIFT; retain this declared manual-formula policy rather than claiming independently measured silicon behavior", "producer, repeat, branch-delay and IRQ compositions remain separately owned and are not subsumed", "default full-regression checkpoint is not renewed by focused standalone acceptance"]
+    },
+    {
+      "id": "register-negate-absolute",
+      "classification": "isa_documented",
+      "decision": "rewrite",
+      "basis": "TI SPRU172C NEG and ABS instruction descriptions: two's-complement/absolute arithmetic, zero-source carry, sticky destination overflow and optional32-bit saturation. Unchanged integer fixture body is checked independently by sign/magnitude arithmetic.",
+      "source": "tests/c54x/tms320c54x_test_register_unary.h; tests/c54x/tms320c54x_test_register_sequence.h",
+      "profiles": ["negate", "absolute"],
+      "legacy_entry": "NEG remains in the default sequence at phase253410 before mapped-word arithmetic; both isolated profiles move from the legacy composition to the CPU-only machine",
+      "case_ids": [],
+      "profile_coverage": {
+        "negate": {"cases": 4608, "fnv64": "1dd6c7685f95e5c7", "result_prefix": "TMS320C54x staged NEG: PASS", "key": "Original numeric ordinal0..4607 plus one of original0/4608/9216 replay-key offsets, balanced by selector, flags, pattern and page."},
+        "absolute": {"cases": 4608, "fnv64": "1dd6c7685f95e5c7", "result_prefix": "TMS320C54x staged ABS: PASS", "key": "Same retained numeric/checkpoint identities as NEG, independently executed with ABS semantics."}
+      },
+      "obligations": ["retain4096 numeric inputs and512 immediate-producer inputs per operation: all selectors, sixteen normal input patterns, thirty-two status states, both program pages and both produced zero/nonzero values", "preserve source publication at clock6 and operation publication at6+prefix, with full A/B/ST0/ST1 checks and no premature result", "all three original checkpoints remain represented in every selector/full-status/producer group; independent census proves each numeric tuple remains exactly once", "one matching opcode fetch, no data access, actual paired restore and explicit final IDLE; default and isolated modes share data/runner, not duplicate expected arithmetic"],
+      "limits": ["retire9216 extra checkpoint executions per operation, not numeric/status/page or producer coverage", "phase clocks are implementation regressions, not hardware pipeline proof; producer gap remains the original adjacent-immediate case only", "no IRQ/repeat/branch-delay claim; unrelated interaction regressions are retained", "focused acceptance does not renew the revision-bound full-default checkpoint"],
+      "measurement": {
+        "baseline_commit": "cc53cd78",
+        "c54x_cpp_bytes_before": 3620210,
+        "c54x_cpp_bytes_after": 3614939,
+        "c54x_cpp_lines_before": 54724,
+        "c54x_cpp_lines_after": 54721,
+        "negate_seconds_before": 6.07,
+        "negate_seconds_after": 1.70,
+        "absolute_seconds_before": 6.08,
+        "absolute_seconds_after": 1.68,
+        "register_logic_seconds_after": 1.17,
+        "register_shifts_seconds_after": 5.89,
+        "scope": "Combined logic/complement, shift, NEG and ABS batch: 66,624 to 28,704 paired case/restore executions, retiring 37,920 extra checkpoints and zero numeric tuples. All C54x C++ headers and sources included: 5,271 bytes and only 3 lines removed. This is chiefly case reduction and shared CPU-only ownership, not substantial line-count reduction. Serial isolated wall times use an empty ROM directory after extraction; no whole-default runtime claim or checkpoint renewal."
+      },
+      "validation": {
+        "native": "All four rewritten modes pass their independently computed ordered digests; shared-runner MAX/MIN, SQUR, SAT and rotation modes also pass",
+        "host": "Independent integer results, numeric-domain bijections, complete per-status checkpoint classes and unchanged expectation-function bodies checked; all5069 host tests pass with one established skip",
+        "handset": "Both 3210 v6.00/v5.01 menu structural predicates and exact stable-region frame oracles pass",
+        "composition": "Standalone device graph contains root and C54x CPU only; default adapters retain explicit original successors. The full default regression has not been rerun for this batch."
+      }
+    },
+    {
       "id": "legacy-ordered-stimulus-plumbing",
       "classification": "harness_infrastructure",
       "decision": "merge",
