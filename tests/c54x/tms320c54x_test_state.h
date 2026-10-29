@@ -1203,8 +1203,6 @@ private:
 	static delay_load_fixture delay_dld_case(unsigned v);
 	static delay_load_fixture delay_add_case(unsigned v);
 	void start_delay_load(unsigned variant = 0);
-	void start_delay_load_edge(unsigned variant = 0);
-	void start_shift_delay_edge(unsigned variant = 0);
 	struct block_back_fixture
 	{
 		unsigned outer, inner, kind, interrupt, checkpoint;
@@ -1286,7 +1284,6 @@ private:
 	};
 	static delay_compare_fixture delay_compare_case(unsigned v);
 	void start_delay_compare(unsigned variant = 0);
-	void start_delay_compare_edge(unsigned variant = 0);
 	struct indexed_store_fixture
 	{
 		unsigned ar, selected, selector, snapshot;
@@ -2134,7 +2131,6 @@ private:
 	bool check_stlm_t_results();
 	bool check_pipeline_swap_body_results();
 	bool check_push_pop_same_results();
-	bool check_shift_delay_edge_results();
 	bool check_asm_store_results_part2();
 	bool check_repeat_rearm_results();
 	bool check_fcala_delay_results();
@@ -2204,7 +2200,7 @@ private:
 	bool check_t_store_edge_results();
 	bool check_ts_arithmetic_edge_results();
 	bool check_asm_edge_results();
-	bool check_delay_compare_edge_results();
+	bool check_addm_brc_loop_results();
 	bool check_delayed_condition_return_results();
 	bool check_poll_interrupt_results();
 	bool check_delay_compare_results();

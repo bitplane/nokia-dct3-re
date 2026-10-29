@@ -134,7 +134,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_stlm_t_results()) return;
 	if (check_pipeline_swap_body_results()) return;
 	if (check_push_pop_same_results()) return;
-	if (check_shift_delay_edge_results()) return;
 	if (check_asm_store_results_part2()) return;
 	if (check_repeat_rearm_results()) return;
 	if (check_fcala_delay_results()) return;
@@ -204,7 +203,7 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_t_store_edge_results()) return;
 	if (check_ts_arithmetic_edge_results()) return;
 	if (check_asm_edge_results()) return;
-	if (check_delay_compare_edge_results()) return;
+	if (check_addm_brc_loop_results()) return;
 	if (check_delayed_condition_return_results()) return;
 	if (check_poll_interrupt_results()) return;
 	if (check_delay_compare_results()) return;

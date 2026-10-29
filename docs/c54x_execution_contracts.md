@@ -48,6 +48,15 @@ Family retention/rewrite/merge/relocation/deletion decisions live in
 devices or private firmware; legacy default continuations can reuse reviewed
 case data without making the entire sequenced bench generic.
 
+Unsupported delay combinations are not architectural conformance. The suite
+retains `st-delay-edge` as a sixteen-case fail-closed store-boundary/replay
+control, rather than a rejection matrix for each unsupported instruction family.
+Nine sibling probes and their 188 case/restore pairs are retired; their exact
+trap clocks, excluded extensions and per-family no-effect predicates are no
+longer coverage claims. Supported delay-slot arithmetic, addressing, control
+and restoration tests remain separate. Older revision-bound checkpoints below
+may name retired diagnostics; they are not the current test inventory.
+
 The compatibility-named `tms54isa` bench separates architectural examples
 (`isa-square`, `isa-parallel`, `isa-scalars`, `mac-map-imm`) from implementation-admission checks
 (`source-domain`) by explicit profile and review classification. Source-domain
@@ -1050,8 +1059,7 @@ Access, and memory/T after Read. It checks one source read, retained T,
 unchanged other accumulator, overflow/saturation and stack/page ownership;
 the selected target copies the completed result. This reuses the existing
 MAC execution path and complete delay-word accounting, with no new CPU state.
-`mac-delay-edge` separately checks that a two-word MAC cannot start in the
-last one-word slot. Interrupt arrival during these MAC delays, waited
+Interrupt arrival during these MAC delays, waited
 memory and physical phase timing remain unvalidated.
 
 ### Double-word loads in control delay words
@@ -1070,7 +1078,6 @@ source words after Read. It checks the full accumulator result and preserved
 other accumulator/status/T, one pointer update, exact call/return frames and
 the selected target's observation of the completed value. The existing DLD
 execution path and saved pipeline operands are reused; no CPU state is added.
-The separate `dld-delay-edge` fixture covers partial-slot rejection.
 Interrupt arrival, waited memory, repeat composition and physical phase timing
 are not established by these isolated fixtures.
 
@@ -1516,10 +1523,7 @@ snapshots. Replacing the fetched extension, source memory and address
 registers after capture must not change the result or duplicate updates.
 The selected continuation observes the completed load and the original
 call/return frame, while a conditional owner retains its earlier decision.
-`shift-delay-edge` passes 16 cases/restores for spill into the final delay
-word, store/arithmetic extensions and a long-source form, with no data
-access or pointer/accumulator effect. These are bounded conformance
-exclusions, not silicon traps. Mapped sources, SP-specific call/return
+Mapped sources, SP-specific call/return
 addressing, three-word forms, IRQ/NMI composition and physical phase
 timing are not established by these fixtures.
 
@@ -1911,11 +1915,8 @@ and RAM after Read cannot change the retained load or duplicate updates.
 The selected target observes the result once; BCD decisions survive delay
 loads that change A. Call frames and RETD's separate stack read are checked;
 the CALLD/FCALLD targets stop after observation, not a return round trip.
-`ld-delay-edge` adds 28 cases/restores: 16 two-word spills into a one-word
-remainder and 12 still-excluded offset LDU/TS/shift-16 family cases, before
-data reads, writes, pointer updates or result publication. Family exclusions
-are prototype limits, not silicon traps. Mapped sources, general interrupt
-composition and measured physical phases remain unvalidated.
+Family exclusions are prototype limits, not silicon traps. Mapped sources,
+general interrupt composition and measured physical phases remain unvalidated.
 
 Near B and non-delayed BC admit backward as well as forward targets inside
 the current block, provided the complete branch precedes REA. A taken branch
@@ -2109,10 +2110,7 @@ may overwrite TC without retargeting the branch. Replaced literals, RAM and
 postincrement pointers cannot change retained inputs; IRQ/NMI acknowledgement
 follows TC publication. Interrupt return is checked by the selected continuation,
 balanced SP and restored status, not an IDLE bit that the interrupt may wake.
-`cmp-delay-edge` adds 48 exclusions for a two-word instruction starting in the
-last delay word or a three-word comparison, before operand reads or register
-publication. Speculative literal prefetch is not claimed absent, and rejection
-is not a silicon trap claim. MVDM-delay, standalone CMPM-branch and delayed-store
+MVDM-delay, standalone CMPM-branch and delayed-store
 controls pass. These tests do not establish measured physical phase timing.
 
 AR0-indexed STL/STH now admits low-byte modes `a8..af` and `b0..b7` for
@@ -3032,8 +3030,7 @@ outcomes, CALLD, FCALLD and RETD; postincrement, absolute RAM/AR7 and offset;
 both destinations; sixteen signed operand pairs including positive/negative
 rounding ties; FRCT/OVM/SMUL; two pages and three checkpoints. Memory, T,
 pointer and literal poisoning reject resampling, while the target observes
-the completed result and stack effects remain exact. `mpyr-delay-edge`
-retains sixteen straddle rejections without data-side effects. Other
+the completed result and stack effects remain exact. Other
 addressing, interrupt composition and physical pipeline phases remain
 unqualified; ordinary MPY/MAC fixtures are separate controls.
 
@@ -3174,8 +3171,7 @@ paths including both BCD outcomes, DP/indirect/postincrement addressing,
 ADD/SUB, four source/destination pairs, all 32 signed shifts, four memory
 values, SXM/OVM, two pages and three checkpoints. Extension and memory
 poisoning check retained ownership; the target observes the result and
-stack/pointer counts remain exact. `shift-delay-edge` retains 16 negative
-cases for spill, store extension, write-only source and long source forms.
+stack/pointer counts remain exact.
 Interrupt composition and physical pipeline phases remain unvalidated.
 
 ## Overflow-only conditional branches
@@ -4648,8 +4644,7 @@ MPYA/MASA/MACA/MACAR to B within BD's two delay words: 98,304 cases and
 cleared-pipeline replays cover eight addressing ARs, three address forms,
 four operations, eight numeric patterns, sixteen arithmetic-mode combinations,
 two pages and four checkpoints. Smem and T are Read-owned; accumulator inputs
-remain Execute-owned. `bd-maca-edge` rejects sixteen final-delay-word spill
-cases and their replays. Other long addressing modes and control owners are
+remain Execute-owned. Other long addressing modes and control owners are
 not newly admitted.
 
 ## Pending stack allocation and MVMM

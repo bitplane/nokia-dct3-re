@@ -8,6 +8,26 @@
   },
   "families": [
     {
+      "id": "unsupported-delay-family-probes",
+      "classification": "implementation_limit",
+      "decision": "delete",
+      "profiles": [],
+      "case_ids": [],
+      "retired_profiles": ["mpy-delay-edge", "mac-delay-edge", "dld-delay-edge", "asm-delay-edge", "mpyr-delay-edge", "bd-maca-edge", "cmp-delay-edge", "ld-delay-edge", "shift-delay-edge"],
+      "basis": "These nine profiles establish intentional emulator rejection policies, not documented instruction results or measured silicon traps. Their partial-slot, unadmitted extension and source combinations were useful during implementation, but no distinct regression or external contract justifies retaining a separate matrix and replay lifecycle for every unsupported family.",
+      "retained": ["st-delay-edge retains sixteen existing store straddle cases, both pages and both replay checkpoints as a representative fail-closed delay-boundary regression", "all supported load, store, comparison, shifted-load, multiply, MAC, rounded multiply, DLD, ASM and long-accumulator delay fixtures remain unchanged, including their independent arithmetic, ownership, bus and restoration assertions", "the shared delay store setup and result function retain their original literal instruction and acceptance predicate"],
+      "coverage_loss": ["188 rejected case/restore pairs: six sixteen-case sibling matrices, 48 comparison cases, 28 load cases and 16 shifted cases", "family-specific fail-closed behavior, source rejection, literal/pointer preservation and exact illegal-latch clocks are no longer asserted for those combinations; the retained store check does not cover them", "no capability is enabled or disabled in the CPU; unsupported combinations remain implementation limits, not promised chip behavior"],
+      "verification": "All nine retired profiles and the retained sixteen-case store boundary pass on the pre-change binary. Six shared supported-case builders/references and all retained mixed-handler positive branches are byte-identical. All retained BIOS names/descriptions/order are unchanged. The rebuilt store boundary, ADDM/BRC loop and full load-delay, shifted-delay, MPY-delay, store-delay and compare-delay matrices pass. All 372 focused host tests and evidence/parity/31-patch checks pass. Focused host discovery also exposed and fixed a missing explicit mock-target import. The default's 293 result requirements are unchanged; no full-default checkpoint renewal.",
+      "measurement": {
+        "baseline_commit": "7ca91704",
+        "c54x_cpp_bytes_before": 3607031,
+        "c54x_cpp_bytes_after": 3592491,
+        "c54x_cpp_lines_before": 54557,
+        "c54x_cpp_lines_after": 54424,
+        "scope": "14540 C++ bytes/133 lines removed, including nine BIOS aliases and negative-only branches. These isolated probes cost under one second together before retirement; no default-suite runtime improvement is claimed."
+      }
+    },
+    {
       "id": "register-logic-complement",
       "classification": "isa_documented",
       "decision": "merge",

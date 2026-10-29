@@ -3223,20 +3223,6 @@ tms320c54x_test_state::delay_load_fixture tms320c54x_test_state::delay_shift_alu
 	return f;
 }
 
-void tms320c54x_test_state::start_shift_delay_edge(unsigned variant)
-{
-	unsigned const fixture = (variant / 4) % 2 ? 18432 : 0;
-	start_delay_load(fixture); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = delay_load_case(fixture, true); auto &program = m_cpu->space(AS_PROGRAM);
-	unsigned const kind = variant % 4;
-	if (!kind) { program.write_word(f.caller + 0x602, 0xf495); program.write_word(f.caller + 0x603, 0x6f02); program.write_word(f.caller + 0x604, 0x0c40); }
-	else { program.write_word(f.caller + 0x602, kind == 3 ? 0x6fe3 : kind == 2 ? 0x6f98 : 0x6f02); program.write_word(f.caller + 0x603, kind == 1 ? 0x0c60 : 0x0c00); }
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "shift_delay_edge_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "shift_delay_edge_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_phase = 255600; m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
-
 tms320c54x_test_state::asm_mapped_fixture tms320c54x_test_state::asm_mapped_case(unsigned v)
 {
 	asm_mapped_fixture f{};
@@ -3315,20 +3301,6 @@ void tms320c54x_test_state::start_delay_compare(unsigned variant)
 	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x605 + f.prefix, "delay_compare_literals", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (f.prefix && at == f.base + 0x601) { expect(word == 1 && !m_pipeline_extensions_reads, "Prefix BITF owns its mask literal"); ++m_pipeline_extensions_reads; } else if (at == f.base + 0x601 + f.prefix) { expect(word == 0x700 && m_pipeline_extensions_reads == unsigned(bool(f.prefix)), "Delayed branch owns its target literal"); ++m_pipeline_extensions_reads; } else if (at == f.base + 0x603 + f.prefix) { expect(word == f.literal && m_pipeline_extensions_reads == 1 + unsigned(bool(f.prefix)) && m_cpu->pipeline_cycles() == f.literal_clock, "Two-word comparison owns its delay literal, including opcode-shaped values"); ++m_pipeline_extensions_reads; } });
 	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254980;
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_delay_compare_edge(unsigned variant)
-{
-	unsigned const kind = variant % 3, operation = (variant / 3) % 2, layout = (variant / 6) % 2;
-	u32 const base = (variant / 12) % 2 ? 0x20000 : 0;
-	start_delay_compare(kind + operation * 3 + (base ? 3456 : 0)); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(base + 0x602, layout ? (operation ? 0x61f8 : 0x60f8) : 0xf495);
-	program.write_word(base + 0x603, layout ? 0x1002 : operation ? 0x6102 : 0x6002); program.write_word(base + 0x604, 0);
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "delay_compare_edge_no_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_operand_reads; expect(false, "Incomplete delay comparison cannot read its source"); } });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "delay_compare_edge_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false, "Incomplete delay comparison cannot write data memory"); } });
-	m_pipeline_peripheral_case = variant; m_phase = 255000; m_cpu->resume(SUSPEND_REASON_DISABLE);
 }
 
 tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::parallel_arithmetic_case(unsigned variant, bool edge)
@@ -6488,29 +6460,6 @@ bool tms320c54x_test_state::check_immediate_arithmetic_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_shift_delay_edge_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 255600)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant / 8 ? 7 : 4;
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save shifted-delay spill or non-load exclusion before and after Decode"); }
-		if (tick == 16)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads && !m_pipeline_store_writes && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x1002 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa620 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800, "Unadmitted shifted-delay forms reject before source, pointer, accumulator or data-write effects");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore shifted-delay exclusion without enabling data effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255610; m_check_timer->enable(true); return true; }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 15) { start_shift_delay_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x shifted-delay exclusions: PASS cases=16 restore=16 forms=spill,store_extension,write_only_source,long_source pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_updates=0 atomic_fallback=0 silicon_trap_claim=0\n");
-			throw emu_fatalerror(3, "TMS320C54x isolated shifted-delay exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255610) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255600; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
-
 bool tms320c54x_test_state::check_rptbd_shift_store_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
@@ -7481,27 +7430,10 @@ bool tms320c54x_test_state::check_ts_arithmetic_edge_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_delay_compare_edge_results()
+bool tms320c54x_test_state::check_addm_brc_loop_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 255000)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, kind = variant % 3, layout = (variant / 6) % 2;
-		unsigned const guard = layout ? 5 : 6 + unsigned(bool(kind)), checkpoint = guard - 1 + variant / 24;
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (tick >= guard), "CMPM BITF cannot straddle a delay boundary or use a three-word form there");
-		expect(!m_pipeline_operand_reads && !m_pipeline_store_writes && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xae20 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1002, "Delay comparison exclusion precedes operand reads and register publication");
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save before or after incomplete delayed comparison rejection"); }
-		if (tick == 12)
-		{
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore delayed comparison exclusion without operand effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255010; m_check_timer->enable(true); return true; }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 47) { start_delay_compare_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x delayed comparison exclusions: PASS cases=48 restore=48 controls=BD,BCD_TC,BCD_NTC operations=2 layouts=last_word,three_word pages=2 snapshots=2 operand_reads=0 data_writes=0 register_publication=0 literal_prefetch=unclaimed silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated delayed comparison exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255000; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 276020)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, count = std::array<unsigned, 4>{0, 1, 3, 7}[variant % 4], checkpoint = std::array<unsigned, 5>{6, 7, 8, 10, 16}[variant / 64];

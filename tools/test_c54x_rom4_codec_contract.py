@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
 
+import tools.mad2_static_census
 from tools.c54x_rom4_codec_contract import (SEQUENCES, SCHEDULE_LISTS, check,
                                           UPLOADED_COUNTER_BLOCKS, check_mcu_upload_counters,
                                           check_schedule_data, check_trace, check_restore, check_tone)

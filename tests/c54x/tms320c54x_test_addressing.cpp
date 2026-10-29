@@ -2908,14 +2908,7 @@ void tms320c54x_test_state::start_delay_store_edge(unsigned variant)
 	unsigned const fixture = (variant % 4) * 20 + ((variant / 4) % 2) * 480;
 	start_delay_store(fixture); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 	auto const f = delay_store_case(fixture); auto &program = m_cpu->space(AS_PROGRAM);
-	u16 family = 0x8000;
-	if (profile_is("asm-delay-edge")) family = 0x3200;
-	else if (profile_is("dld-delay-edge")) family = 0x5600;
-	else if (profile_is("mac-delay-edge")) family = 0x2800;
-	else if (profile_is("mpy-delay-edge")) family = 0x2000;
-	else if (profile_is("mpyr-delay-edge")) family = 0x2200;
-	else if (profile_is("bd-maca-edge")) family = 0x3100;
-	program.write_word(f.base + 0x602, 0xf495); program.write_word(f.base + 0x603, family | f.mode); program.write_word(f.base + 0x604, f.literal);
+	program.write_word(f.base + 0x602, 0xf495); program.write_word(f.base + 0x603, 0x8000 | f.mode); program.write_word(f.base + 0x604, f.literal);
 	m_pipeline_fetch_tap.remove(); m_pipeline_peripheral_case = variant; m_phase = 254500;
 	m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
@@ -3741,19 +3734,6 @@ void tms320c54x_test_state::start_delay_load(unsigned variant)
 	m_pipeline_fetch_tap = program.install_read_tap(f.caller + 0x601 + f.delay(), f.caller + 0x601 + f.delay(), "delay_load_literal", [this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == f.literal && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == f.literal_clock(), "Delayed LD owns one literal without decoding it as an opcode"); ++m_pipeline_extensions_reads; });
 	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255260;
 	m_cpu->set_state_int(STATE_GENPC, f.caller + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_delay_load_edge(unsigned variant)
-{
-	bool const late = variant < 16; unsigned const v = late ? variant : variant - 16;
-	unsigned const fixture = (late ? v % 4 : 0) * 6 + (late ? (v / 4) % 2 : (v / 3) % 2) * 24576;
-	start_delay_load(fixture); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = delay_load_case(fixture); auto &program = m_cpu->space(AS_PROGRAM);
-	if (late) { u16 const opcode = program.read_word(f.caller + 0x602); program.write_word(f.caller + 0x602, 0xf495); program.write_word(f.caller + 0x603, opcode); program.write_word(f.caller + 0x604, f.literal); }
-	else program.write_word(f.caller + 0x602, std::array<u16, 3>{0x12e0, 0x14e0, 0x44e0}[v % 3]);
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "delay_load_edge_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "delay_load_edge_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_phase = 255280; m_cpu->resume(SUSPEND_REASON_DISABLE);
 }
 
 tms320c54x_test_state::asm_load_fixture tms320c54x_test_state::asm_load_case(unsigned v, bool consumer)
@@ -10926,12 +10906,6 @@ bool tms320c54x_test_state::check_t_move_results()
 			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore the rejected delay without a memory write or atomic fallback"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254510; m_check_timer->enable(true); return true; }
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 15) { start_delay_store_edge(variant + 1); return true; }
-			if (profile_is("mac-delay-edge")) { osd_printf_info("TMS320C54x delay MAC/MAS boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay MAC/MAS boundary complete"); }
-			if (profile_is("dld-delay-edge")) { osd_printf_info("TMS320C54x delay DLD boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay DLD boundary complete"); }
-			if (profile_is("asm-delay-edge")) { osd_printf_info("TMS320C54x delay ASM boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay ASM boundary complete"); }
-			if (profile_is("mpy-delay-edge")) { osd_printf_info("TMS320C54x delay MPY boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated delay MPY boundary complete"); }
-			if (profile_is("mpyr-delay-edge")) { osd_printf_info("TMS320C54x delay MPYR boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delay MPYR boundary complete"); }
-			if (profile_is("bd-maca-edge")) { osd_printf_info("TMS320C54x BD long accumulator boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated BD long accumulator boundary complete"); }
 			osd_printf_info("TMS320C54x delay store boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n");
 			throw emu_fatalerror(0, "TMS320C54x isolated delay store boundary complete");
 		}
@@ -11107,23 +11081,6 @@ bool tms320c54x_test_state::check_circular_load_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 255310) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255300; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 255280)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, guard = variant < 16 ? 6 : 5, checkpoint = guard - 1 + (variant < 16 ? variant / 8 : (variant - 16) / 6);
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (tick >= guard) && !m_pipeline_operand_reads && !m_pipeline_store_writes, "Delay load spill and unvalidated load families reject before data work");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Rejected delay load changes neither result status nor frame");
-		for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (i ? 0x5100 + i : 0x5005), "Rejected delay load never updates an auxiliary pointer");
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save delay load exclusion before or after its Decode guard"); }
-		if (tick == 16)
-		{
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore delay load exclusion without changing body state"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255290; m_check_timer->enable(true); return true; }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 27) { start_delay_load_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x delay LD exclusions: PASS cases=28 restore=28 spill_cases=16 other_family_cases=12 source_reads=0 data_writes=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated delay LD exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255290) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255280; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 

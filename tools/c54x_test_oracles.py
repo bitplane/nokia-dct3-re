@@ -895,10 +895,6 @@ EXTRA_PROFILES = {
         "TMS320C54x BD long accumulator multiply: PASS cases=98304 restore=98304 operations=MPYA,MASA,MACA,MACAR forms=positive_offset,negative_offset,absolute address_registers=8 patterns=8 flags=16 pages=2 snapshots=4 extension_reads=1 source_reads=1 accumulators=Execute t_publish=Read target_observes_result=1 reset_before_restore=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated BD long accumulator multiply complete",
     ),
-    "bd-maca-edge": (
-        "TMS320C54x BD long accumulator boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0",
-        "Fatal error: TMS320C54x isolated BD long accumulator boundary complete",
-    ),
     "addm-ar-short": (
         "TMS320C54x short mapped AR ADDM: PASS cases=49152 restore=49152 forms=DP,indirect registers=8 values=4 immediates=4 sxm_ovm_c_ova=16 cmpt=2 pages=2 snapshots=3 read=6 write=7 retained_source=1 modifying_forms=excluded physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated short mapped AR ADDM complete",
@@ -1010,10 +1006,6 @@ EXTRA_PROFILES = {
         "TMS320C54x delayed LD ASM: PASS cases=30720 restore=30720 controls=BD,BCD_taken,BCD_untaken,BD_store_prefix forms=DP,SP,postincrement,offset,absolute shifts=32 patterns=2 sxm_ovm=4 pages=2 snapshots=3 source_reads=1 extension_fetches=owned t_preserved=1 adjacent_consumer=LD_B_ASM_A target_observes_result=1 call_interrupt_repeat_composition=unvalidated physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated delayed LD ASM complete",
     ),
-    "asm-delay-edge": (
-        "TMS320C54x delay ASM boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0",
-        "Fatal error: TMS320C54x isolated delay ASM boundary complete",
-    ),
     "st-dagen": (
         "TMS320C54x constant DAGEN ST: PASS cases=3840 excluded=80 restore=3920 forms=direct,absolute destinations=AR0..AR7,SP,BK patterns=4 older_stores=none,DAGEN,RAM gaps=0,1 pages=2 snapshots=4 consumers=indirect_LD,PSHM,circular_LD bk_min_gap=1_deferred_2 cpl=0 writes_each=1 extensions=retained repeated_publication=0 indirect_aliases=unvalidated physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated constant DAGEN ST complete",
@@ -1022,17 +1014,9 @@ EXTRA_PROFILES = {
         "TMS320C54x delayed DLD: PASS cases=147456 restore=147456 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=offset,preincrement,circular,absolute registers=8 offsets=-1,2 parity=even,odd destinations=2 patterns=4 sxm_c16=4 compatibility_states=2 pages=2 snapshots=3 ordered_reads=2 literal_fetches=1 pointer_updates=once target_observes_result=1 interrupt_repeat_composition=unvalidated physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated delayed DLD complete",
     ),
-    "dld-delay-edge": (
-        "TMS320C54x delay DLD boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0",
-        "Fatal error: TMS320C54x isolated delay DLD boundary complete",
-    ),
     "mac-delay": (
         "TMS320C54x staged delay MAC/MAS: PASS cases=147456 restore=147456 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD operations=MAC,MACR,MAS,MASR forms=short,absolute_RAM,absolute_AR5,offset destinations=2 operand_pairs=16 frct_ovm_smul=8 pages=2 snapshots=3 source_reads=1 t_retained=1 callee_observes_result=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated delay MAC/MAS complete",
-    ),
-    "mac-delay-edge": (
-        "TMS320C54x delay MAC/MAS boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0",
-        "Fatal error: TMS320C54x isolated delay MAC/MAS boundary complete",
     ),
     "mac-bk": (
         "TMS320C54x staged BK MAC/MAS: PASS cases=98304 restore=98304 operations=MAC,MACR,MAS,MASR destinations=A,B forms=direct,absolute pairs=64 flags=16 pages=2 snapshots=3 source_reads=1 data_writes=0 bk_retained=1 t_retained=1 physical_phase_claim=0",
@@ -1154,14 +1138,6 @@ EXTRA_PROFILES = {
         "TMS320C54x delayed MPYR: PASS cases=36864 restore=36864 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=postincrement,absolute_RAM,absolute_AR7,offset destinations=2 operand_pairs=16 frct_ovm_smul=8 pages=2 snapshots=3 source_reads=1 rounding=biased_high_word smul_product_clamp=0 t_retained=1 callee_observes_result=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated delayed MPYR complete",
     ),
-    "mpyr-delay-edge": (
-        "TMS320C54x delay MPYR boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0",
-        "Fatal error: TMS320C54x isolated delay MPYR boundary complete",
-    ),
-    "mpy-delay-edge": (
-        "TMS320C54x delay MPY boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0",
-        "Fatal error: TMS320C54x isolated delay MPY boundary complete",
-    ),
     "move-t": (
         "TMS320C54x staged T/TRN moves: PASS cases=1920 restore=1920 forms=MVMD_AR,MVDK_direct,MVDK_short,MVDK_offset,MVDK_absolute destinations=T,TRN values=4 frct_ovm=4 gaps=0,1 pages=2 snapshots=3 source_reads=1 destination_writes=1 consumers=MPY,LDM silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated T/TRN moves complete",
@@ -1260,10 +1236,6 @@ EXTRA_PROFILES = {
     "ld-ar0-index": (
         "TMS320C54x AR0 indexed LD: PASS cases=98304 restore=98304 ram_cases=96000 excluded_cases=2304 registers=8 index_directions=2 compatibility_states=2 destinations=2 index_values=8 memory_values=4 sxm_sst_ovm=8 pages=2 snapshots=3 address_index_sample=Access source_sample=Read result_publish=Execute self_index=1 pointer_updates=once data_writes=0 interrupt_delay_composition=unvalidated physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated AR0 indexed LD complete",
-    ),
-    "ld-delay-edge": (
-        "TMS320C54x delay LD exclusions: PASS cases=28 restore=28 spill_cases=16 other_family_cases=12 source_reads=0 data_writes=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated delay LD exclusions complete",
     ),
     "load-delay": (
         "TMS320C54x delayed LD: PASS cases=147456 restore=147456 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=offset,preincrement,circular,absolute registers=8 offsets=2 destinations=2 memory_values=4 sxm_ovm=4 compatibility_states=2 pages=2 snapshots=3 source_reads=1 literal_fetches=1 pointer_updates=once target_observes_result=1 interrupt_composition=unvalidated physical_phase_claim=0",
@@ -1424,10 +1396,6 @@ EXTRA_PROFILES = {
     "asm-edge": (
         "TMS320C54x LD ASM exclusions: PASS cases=16 restore=16 sources=control,SP,peripheral pages=2 snapshots=2 source_reads=0 data_writes=0 register_publication=0 silicon_trap_claim=0",
         "Fatal error: TMS320C54x isolated ASM exclusions complete",
-    ),
-    "cmp-delay-edge": (
-        "TMS320C54x delayed comparison exclusions: PASS cases=48 restore=48 controls=BD,BCD_TC,BCD_NTC operations=2 layouts=last_word,three_word pages=2 snapshots=2 operand_reads=0 data_writes=0 register_publication=0 literal_prefetch=unclaimed silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated delayed comparison exclusions complete",
     ),
     "compare-delay": (
         "TMS320C54x delayed CMPM BITF: PASS cases=27648 restore=27648 controls=BD,BCD_TC,BCD_NTC operations=2 forms=DP,SP,postincrement value_pairs=16 initial_tc=2 prefix=none,BITF sources=none,IRQ,NMI pages=2 snapshots=4 branch_decision=retained literal_reads=once operand_writes=0 interrupt_after_publication=1 physical_phase_claim=0",
@@ -1996,10 +1964,6 @@ EXTRA_PROFILES = {
     "shift-alu-delay": (
         "TMS320C54x delayed shifted ALU: PASS cases=442368 restore=442368 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=DP,indirect,postincrement operations=ADD,SUB source_destination_pairs=4 shifts=32 memory_values=4 sxm_ovm=4 pages=2 snapshots=3 source_reads=1 extension_fetches=1 pointer_updates=once target_observes_result=1 interrupt_composition=unvalidated physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated delayed shifted ALU complete",
-    ),
-    "shift-delay-edge": (
-        "TMS320C54x shifted-delay exclusions: PASS cases=16 restore=16 forms=spill,store_extension,write_only_source,long_source pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_updates=0 atomic_fallback=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated shifted-delay exclusions complete",
     ),
     "pmst-map": (
         "TMS320C54x staged STM PMST: PASS cases=64 values=4 source_pages=2 target_regions=2 restore=64 duplicate_literal_fetches=0 duplicate_register_writes=0",
