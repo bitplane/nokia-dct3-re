@@ -56,6 +56,10 @@ global phase routing. An owned continuation that is not recognized is
 a harness error, not a reason to try another fixture. The owner is host routing
 metadata, unchanged by guest snapshot replay and reset on machine reset.
 
+A shared runner can finish in architectural IDLE. A legacy successor must
+establish its runnable entry state explicitly; changing PC does not clear
+the previous fixture's IDLE latch.
+
 `isa-disasm` separately runs the debugger contract against the paged C54x
 disassembler in the CPU-only executable. It shares the legacy suite's 39 literal
 banks (360 rows), generated encoding/extension sweeps and 44 result families.
@@ -2512,7 +2516,8 @@ Repeat/interrupt composition and physical timing remain separate scopes.
 
 ## Core regression checkpoint
 
-The latest banked full default run passes all 294 required markers exactly once,
+The immutable `c54x_fidelity_checkpoint.json` capture records an earlier
+full default run with all 294 then-required markers exactly once,
 with 295 ordered PASS records, intentional MAME exit 3 and runner exit 0.
 It takes 1,058.73 seconds (17m39s), versus 1,061.85 at the previous measured
 checkpoint. The serialization cleanup is not a runtime optimization.

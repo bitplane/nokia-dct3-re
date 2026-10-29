@@ -8,6 +8,18 @@
   },
   "families": [
     {
+      "id": "shared-to-legacy-entry-state",
+      "classification": "harness_infrastructure",
+      "decision": "rewrite",
+      "profiles": [],
+      "case_ids": [],
+      "basis": "Shared clocked fixtures deliberately finish at a real IDLE. The legacy MVKD and long-pair setups inherited the predecessor's IDLE latch instead of establishing executable entry state. Their isolated controls began with a clear latch, so only the default sequence exposed the coupling.",
+      "obligations": ["clear IDLE explicitly in the MVKD and long-pair setup lists", "leave instruction words, values, independent references, checkpoints and CPU implementation unchanged", "audit every completion edge from the shared register runner: other successors either reset through the shared runner or already clear IDLE"],
+      "baseline": "Fresh default execution fails at MVKD phase 252590 with PC still at entry and zero reads/writes. Clearing its IDLE reaches and passes all 672 MVKD cases, then exposes the same issue at long-pair phase 252630. Both missing entry initializations predate the rejection-profile deletions.",
+      "verification": "The rebuilt complete default regression passes all 289 required result markers exactly once and the terminal completion, with intentional MAME exit 3 and runner exit 0. This includes logic to MVKD, shifts to all 18432 long-pair cases, mapped AR arithmetic to signed branches, and mapped BITF to immediate multiply. All 378 focused host tests pass after the entry repair. Capture: tmp/c54x-store-domain-review/run_c54x_core_ry48kweq. This is the default regression, not all 433 isolated profiles or handset acceptance.",
+      "limits": ["this repairs fixture entry, not CPU wake behavior", "remaining legacy fixtures can still have intentional predecessor-state dependencies; no blanket reset is added"]
+    },
+    {
       "id": "unsupported-store-and-counter-composition-probes",
       "classification": "implementation_limit",
       "decision": "delete",

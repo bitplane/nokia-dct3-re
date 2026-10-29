@@ -1276,6 +1276,7 @@ void tms320c54x_test_state::start_pipeline_long_pair(unsigned variant)
 	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : f.opcode);
 	if (f.form >= 5) program.write_word(base + 0x601, f.literal);
 	set_registers(*m_cpu, {
+		{cpu_regs::STATE_IDLE, 0},
 		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
 		{cpu_regs::STATE_ST0, f.st0}, {cpu_regs::STATE_ST1, f.st1}, {cpu_regs::STATE_SP, 0x1000},
 		{cpu_regs::STATE_AR0 + f.reg, (f.form == 7 ? 0x1007 : 0x1000) + (f.reg == 6)}, {cpu_regs::STATE_BK, 16},

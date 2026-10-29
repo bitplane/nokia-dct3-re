@@ -1511,7 +1511,9 @@ void tms320c54x_test_state::start_pipeline_data_copy(unsigned variant)
 	program.write_word(base + 0x601, f.form == 5 ? f.destination : f.source);
 	if (f.form == 5) program.write_word(base + 0x602, f.source);
 	if (f.form == 6) program.write_word(base + 0x602 + ((variant / 112) % 2), 0xf4a9); // CMPR with zero/one gap (table 7-7).
+	// A preceding shared fixture finishes in architectural IDLE.
 	set_registers(*m_cpu, {
+		{cpu_regs::STATE_IDLE, 0},
 		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
 		{cpu_regs::STATE_ST0, f.form == 6 ? 0xa600 : 0xa608}, {cpu_regs::STATE_ST1, 0x900 | (f.form == 1 ? 0x4000 : 0)},
 		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR1, 0x1000}, {cpu_regs::STATE_AR0, f.value},
