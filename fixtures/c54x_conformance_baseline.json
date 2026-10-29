@@ -6605,14 +6605,14 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
-          "cases": "196",
+          "cases": "226",
           "firmware": "0",
           "nokia_devices": "0",
-          "reset_groups": "7"
+          "reset_groups": "8"
         }
       ],
       "required": [
-        "TMS320C54x generic memory examples: PASS cases=196 reset_groups=7 nokia_devices=0 firmware=0"
+        "TMS320C54x generic memory examples: PASS cases=226 reset_groups=8 nokia_devices=0 firmware=0"
       ]
     },
     "isa-parallel": {
@@ -15546,7 +15546,37 @@
         "load-status1-a",
         "push-status1",
         "pop-status1",
-        "load-status1-b-unsigned"
+        "load-status1-b-unsigned",
+        "literal-load-b-retains-a",
+        "mmr-load-ar4-b-unsigned",
+        "logical-right-b-carry",
+        "compare-absolute-literal",
+        "subtract-signed-postincrement",
+        "store-low-retains-source-pointer",
+        "load-signed-circular-wrap",
+        "dual-copy-y-postincrement",
+        "load-signed-stationary",
+        "load-unsigned-stationary",
+        "mapped-t-store-from-b",
+        "logical-right-cross-carry",
+        "register-and-preserves-b",
+        "literal-xor-preserves-a",
+        "copy-circular-source-wrap",
+        "signed-add-stationary",
+        "mapped-move-auxiliary",
+        "timer-control-store-readback",
+        "fractional-mac-negative",
+        "fractional-dual-multiply",
+        "fractional-square-distance",
+        "rounded-multiply-negative-carry",
+        "rounded-mac-after-accumulation",
+        "rounded-mas-negative-carry",
+        "fractional-unsigned-multiply",
+        "load-high-ignores-ovm",
+        "mapped-ar5-load-a-unsigned",
+        "mapped-ar5-load-b-unsigned",
+        "indirect-mmr-address-mask",
+        "indirect-mmr-store-postincrement"
       ],
       "classification": "architectural_interaction",
       "decision": "rewrite",
