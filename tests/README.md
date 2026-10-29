@@ -23,9 +23,10 @@ compatibility, not a claim that ordinary native handset boot still stops there.
 
 - `make build` retains the complete research/conformance composition.
 - `make build-conformance` explicitly selects those test drivers.
-- `make build-c54x-isa` builds only the generic CPU instruction bench, without
-  Nokia devices, GSM utilities or firmware images. Its reviewed case catalogue
-  is `fixtures/c54x_test_reviews.json`; `--profile isa-square` selects the pilot.
+- `make build-c54x-isa` builds the CPU-only test sources without handset devices
+  or firmware images. The test sources have no Nokia/GSM dependencies. It produces
+  `mame/c54xisa`, leaving the normal `mame/mame` binary and driver archive
+  intact. Its reviewed case catalogue is `fixtures/c54x_test_reviews.json`.
 - `make build-handsets` excludes synthetic test drivers and firmware-PC probes.
   Research handset compositions remain available; this is not an upstream export.
 - Builds share the MAME overlay/object tree: never run the two modes or their
@@ -67,10 +68,17 @@ substitute for those emulator runs.
 
 Development checks should use the affected isolated families. The large
 default regression remains a broad checkpoint for retained fixtures, not a gate
-after every small edit. The generic ISA entry is currently a reviewed pilot,
+after every small edit. The CPU-only bench covers reviewed families,
 not a replacement for all default coverage. Family review must track runtime
 as well as source size, and separate value-space coverage from distinct
 checkpoint-state coverage before reducing their Cartesian product.
+
+`make build-c54x-isa` builds only that bench and its CPU, without private ROMs
+or handset devices. Pass `--mame mame/c54xisa` to its runner.
+`--profile isa-square` and `isa-parallel` run architectural
+examples; `--profile source-domain` runs implementation-admission limits, not
+silicon-illegality conformance. Use an empty `--rompath` to verify independence
+from the local firmware collection. Normal handset gates use `mame/mame`.
 
 Long RAM RMW uses all 38,400 distinct stimuli in its balanced default schedule.
 Each operation/address/compatibility/status group covers all four checkpoints

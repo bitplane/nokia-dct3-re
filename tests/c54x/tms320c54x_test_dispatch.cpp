@@ -189,7 +189,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_source_alias_results()) return;
 	if (check_short_source_results()) return;
 	if (check_push_mvmm_results()) return;
-	if (check_source_domains()) return;
 	if (check_mapped_immediate_mac_results()) return;
 	if (check_block_branch_count_results()) return;
 	if (check_bd_long_accumulator_results()) return;

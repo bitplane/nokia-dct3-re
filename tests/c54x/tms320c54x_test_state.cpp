@@ -185,7 +185,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"logic-abs-edge"}, [](self &test) { test.start_source_alias_case(); } },
 		{ {"arith-abs-edge"}, [](self &test) { test.start_source_alias_case(); } },
 		{ {"long-abs-edge"}, [](self &test) { test.start_source_alias_case(); } },
-		{ {"source-domain"}, [](self &test) { test.start_source_domains(); } },
 		{ {"mpy-mod3-edge"}, [](self &test) { test.start_short_read_mod3_edge(); } },
 		{ {"mmr-long-edge"}, [](self &test) { test.start_mmr_long_edge(); } },
 		{ {"rpt-xfer-edge"}, [](self &test) { test.start_mmr_long_edge(); } },
@@ -783,7 +782,7 @@ void tms320c54x_test_state::expect(bool condition, const char *message)
 			replay = fixture.replay;
 		};
 		operand_rejection_fixture const *rejection = nullptr;
-		for (auto const *fixture : {&m_source_domains, &m_source_aliases, &m_short_sources})
+		for (auto const *fixture : {&m_source_aliases, &m_short_sources})
 			if (fixture->handles_phase(m_phase))
 			{
 				rejection = fixture;

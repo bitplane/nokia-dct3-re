@@ -822,7 +822,7 @@ build: overlay roms
 
 .PHONY: build-handsets build-conformance build-c54x-isa
 build-c54x-isa: overlay
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/tms320c54x_test_isa.cpp USE_QTDEBUG=0 -j$(JOBS)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SUBTARGET=c54xisa SOURCES=src/mame/nokia/tms320c54x_test_isa.cpp USE_QTDEBUG=0 -j$(JOBS)
 
 build-handsets:
 	$(MAKE) --no-print-directory build DCT3_TEST_DRIVERS=0 DCT3_RESEARCH_TRACES=0

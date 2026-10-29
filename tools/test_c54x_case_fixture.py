@@ -76,7 +76,7 @@ int main() {
             subprocess.run([str(program)], check=True, capture_output=True)
 
     def test_reviewed_ordered_coverage_is_required(self):
-        for profile in ('rmw-long', 'long-mvkd', 'reg-banks'):
+        for profile in ('rmw-long', 'long-mvkd', 'reg-banks', 'source-domain'):
             markers, ending = EXTRA_PROFILES[profile]
             markers = (markers,) if isinstance(markers, str) else markers
             coverage = reviewed_profiles()[profile]['coverage']

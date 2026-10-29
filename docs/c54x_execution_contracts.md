@@ -44,9 +44,16 @@ strings retain case/restore counts and scope exclusions. Check it with:
 ```
 
 Family retention/rewrite/merge/relocation/deletion decisions live in
-`fixtures/c54x_test_reviews.json`. The generic ISA bench builds without Nokia
+`fixtures/c54x_test_reviews.json`. The CPU-only bench builds without Nokia
 devices or private firmware; legacy default continuations can reuse reviewed
 case data without making the entire sequenced bench generic.
+
+The compatibility-named `tms54isa` bench separates architectural examples
+(`isa-square`, `isa-parallel`) from implementation-admission checks
+(`source-domain`) by explicit profile and review classification. Source-domain
+owns its case state, timer cadence, bus observers and replay without the legacy
+phase dispatcher. Its 30,000 cases and both checkpoint choices are unchanged;
+the digest encodes the actual instruction, extension and context identity.
 
 `isa-parallel` runs ten independently reset parallel store/arithmetic cases.
 The default sequence reuses their literal register, masked-status and RAM
@@ -119,14 +126,15 @@ boundaries are:
 | `tests/c54x/tms320c54x_test.cpp` | Machine/ROM declarations, backend serial bench and stock-loader verifier compositions |
 | `tests/c54x/tms320c54x_test_state.h` | Shared bench state, fixture types and method declarations; no CPU execution implementation |
 | `tests/c54x/tms320c54x_test_state.cpp` | Bench lifecycle, address maps, assertions and device wiring |
-| `tests/c54x/tms320c54x_test_isa.cpp` | CPU-only ISA bench with explicit per-case reset and no Nokia/firmware dependencies |
+| `tests/c54x/tms320c54x_test_isa.cpp` | CPU-only examples/admission bench with explicit per-case reset and no Nokia/firmware dependencies |
 | `tests/c54x/tms320c54x_test_case.h` | Generic stimulus loading and independent register/bus comparisons; no instruction semantics |
 | `tests/c54x/tms320c54x_test_square.h` | Reviewed literal SQUR/SQURA/SQURS cases shared by generic and default-sequence entries |
 | `tests/c54x/tms320c54x_test_parallel.h` | Reviewed parallel store/arithmetic vectors, including same-cell ordering and circular pointer controls |
+| `tests/c54x/tms320c54x_test_domains.h` | Independent single-memory admission fixture: catalogue, preserved state, bus observers and replay |
 | `tests/c54x/tms320c54x_test_dispatch.cpp` | Ordered callback routing and the initial-program completion tail |
 | `tests/c54x/tms320c54x_test_arithmetic.cpp` | Arithmetic, multiplier and logical-operation fixtures and checks |
 | `tests/c54x/tms320c54x_test_addressing.cpp` | Address generation and memory/register transfers, including the stack-transfer continuation |
-| `tests/c54x/tms320c54x_test_operand_domains.cpp` | Operand-domain, absolute-alias and short-source rejection fixtures with family-owned progress, observations, taps and snapshots |
+| `tests/c54x/tms320c54x_test_operand_domains.cpp` | Remaining absolute-alias and short-source rejection fixtures with family-owned progress, observations, taps and snapshots |
 | `tests/c54x/tms320c54x_test_rejection_state.h` | Per-family rejection state; CPU and scheduler routing remain with the bench |
 | `tests/c54x/tms320c54x_test_pipeline.cpp` | Dependency, status and data-path compositions and their sequenced continuations |
 | `tests/c54x/tms320c54x_test_pipeline_control.cpp` | Branch, call, return and conditional-control compositions and continuations |
@@ -209,7 +217,7 @@ source-admission guards; optional profiles retain their separate scopes below.
 
 ### Operand-domain acceptance
 
-`source-domain` on `tms54xtra` enumerates all 111 implemented ordinary
+`source-domain` on `tms54isa` enumerates all 111 implemented ordinary
 Smem/Lmem source/RMW high-byte classes, ten shifted read extensions and four
 MMR-source forms. All 30,000 cases and save/replays check short `98..9f` and
 unadmitted `f9..ff`, CMPT, two program pages, both CPU frontends and snapshots
@@ -217,16 +225,13 @@ before/after rejection. Data reads/writes, program writes and I/O accesses stay
 zero; accumulators, T, status, repeat/stack pointers and all ARs are retained.
 The independent fixture inventory does not call CPU admission helpers.
 
-The unmodified core fails case 3428: atomic `0ef9` (SUBB) executes an operand
-transaction and changes status/repeat state instead of rejecting the alias.
-The shared atomic source-operand predicate now covers all implemented
-single-address source classes, including the special-load, test and transfer
-families omitted by the previous partial masks. Shifted `6fxx` aliases are
+A retained regression is case 3428: atomic `0ef9` (SUBB) must reject before
+an operand transaction or changes to status/repeat state. The shared atomic
+source-operand predicate covers the implemented single-address source classes,
+including special-load, test and transfer families. Shifted `6fxx` aliases are
 rejected before addressing; short `6f98..9f` still uses its operation extension
 to distinguish invalid reads from valid destination stores. MMR long forms
-retain their separate grammar. The existing 463 isolated contracts, default
-requirements and seven named scopes are unchanged; this adds one profile.
-Capture: `tmp/fidelity-source-domain-green/run_c54x_core_5tmpwpkh`.
+retain their separate grammar.
 
 This closes the source/RMW exclusion surface, not positive admission of every
 addressing mode, arbitrary repeat/delay compositions, destination-only alias

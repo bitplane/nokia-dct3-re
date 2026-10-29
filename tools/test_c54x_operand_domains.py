@@ -3,11 +3,13 @@ from pathlib import Path
 import re
 import unittest
 
+from tools.c54x_test_reviews import reviewed_profiles
+
 
 class OperandDomainInventoryTest(unittest.TestCase):
     def test_census_has_every_reviewed_read_rmw_class_and_extension(self):
         source = (Path(__file__).resolve().parents[1] /
-                  'tests/c54x/tms320c54x_test_operand_domains.cpp').read_text()
+                  'tests/c54x/tms320c54x_test_domains.h').read_text()
         table = source.split('source_domains[] = {', 1)[1].split('};', 1)[0]
         actual = [(int(word, 16), int(operation, 16)) for word, operation in
                   re.findall(r'\{\s*(0x[0-9a-f]+),\s*(0x[0-9a-f]+|0)\s*\}', table)]
@@ -25,6 +27,17 @@ class OperandDomainInventoryTest(unittest.TestCase):
         self.assertEqual(len(set(actual)), 125)
         self.assertEqual(len(scalar), 111)
         self.assertNotIn((0x6f00, 0x0c60), actual)  # STL's encoded operand is a destination.
+        digest, keys = 14695981039346656037, set()
+        for opcode, operation in expected:
+            for context in range(16):
+                for mode in (*range(0x98, 0xa0), *range(0xf9, 0x100)):
+                    key = ((opcode | mode) << 16) | (operation << 4) | context
+                    keys.add(key)
+                    for byte in key.to_bytes(4, 'little'):
+                        digest = ((digest ^ byte) * 1099511628211) & ((1 << 64) - 1)
+        coverage = reviewed_profiles()['source-domain']['coverage']
+        self.assertEqual(len(keys), coverage['cases'])
+        self.assertEqual(f'{digest:016x}', coverage['fnv64'])
 
 
 if __name__ == '__main__':

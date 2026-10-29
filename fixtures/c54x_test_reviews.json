@@ -90,6 +90,38 @@
       "rationale": "The 128-case matrix is already compact and protects distinct arithmetic and preservation boundaries. Keep it rather than force a rewrite for a small line-count gain; prioritize shared harness ownership and large replay matrices. CPU-only relocation remains separate from this retention decision."
     },
     {
+      "id": "single-memory-admission",
+      "classification": "implementation_limit",
+      "decision": "relocate",
+      "basis": "Independent SPRU172C single-memory instruction inventory plus the model's declared operand-admission boundary. The instruction/extension catalogue is unchanged; expectations are rejection and preservation of supplied state, not values computed by CPU helpers.",
+      "source": "tests/c54x/tms320c54x_test_domains.h",
+      "profiles": ["source-domain"],
+      "legacy_entry": "replaces the sequenced operand-domain fixture; no legacy implementation retained",
+      "case_ids": [],
+      "profile_coverage": {
+        "source-domain": {
+          "result_prefix": "TMS320C54x source-domain exclusions: PASS ",
+          "cases": 30000,
+          "key": "(opcode_word << 16) | (operation_extension << 4) | context; catalogue order, then context, then alias",
+          "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
+          "fnv64": "d1101a8b0da0c055"
+        }
+      },
+      "obligations": [
+        "all 125 instruction forms: 111 Smem, 10 shifted extensions and four MMR-source classes",
+        "all 15 aliases across CMPT, page, atomic/staged and before/after-rejection checkpoint choices",
+        "preserve A, B, T, RC, SP, ST0, ST1 and all eight address registers at every sampled cycle",
+        "no data reads/writes, program writes or I/O accesses; illegal latch reached by cycle 20",
+        "all 30000 actual restores and semantic input identities, with unchanged checkpoint/cadence ordering",
+        "CPU-only device graph and ROM-free execution; no shared phase dispatcher or handset state"
+      ],
+      "limits": [
+        "this is an implementation-admission check, not proof that every rejected encoding is illegal on silicon",
+        "legal operand contrasts and peripheral/interrupt/repeat composition remain separate contracts",
+        "the complete original matrix is retained; no coverage reduction is claimed"
+      ]
+    },
+    {
       "id": "register-arithmetic-load",
       "classification": "architectural_interaction",
       "decision": "merge",

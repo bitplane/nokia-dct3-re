@@ -37,8 +37,7 @@ void prepare_case(Cpu &cpu, instruction_case const &test)
 }
 
 template <typename Cpu>
-void check_case(Cpu &cpu, instruction_case const &test,
-		unsigned port_writes, u64 port_interval)
+void check_case_state(Cpu &cpu, instruction_case const &test)
 {
 	for (auto const &expected : test.expected)
 	{
@@ -55,6 +54,13 @@ void check_case(Cpu &cpu, instruction_case const &test,
 			throw emu_fatalerror("C54x case %s: data[%x]=%x expected=%x",
 				test.id, word.address, actual, word.value);
 	}
+}
+
+template <typename Cpu>
+void check_case(Cpu &cpu, instruction_case const &test,
+		unsigned port_writes, u64 port_interval)
+{
+	check_case_state(cpu, test);
 	if (port_writes != test.port_writes || port_interval != test.port_interval)
 		throw emu_fatalerror("C54x case %s: port writes=%u interval=%llu expected=%u/%u",
 			test.id, port_writes, (unsigned long long)port_interval, test.port_writes, test.port_interval);

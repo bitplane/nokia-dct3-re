@@ -50,6 +50,17 @@ class CppTestLayoutTests(unittest.TestCase):
             with self.subTest(source=source.name):
                 self.assertIn(f'src/mame/nokia/{source.name}', sources)
 
+    def test_cpu_only_build_uses_an_independent_subtarget_without_rom_preparation(self):
+        output = subprocess.run(
+            ['make', '--no-print-directory', '--dry-run', 'build-c54x-isa', 'MAKE=echo'],
+            cwd=ROOT, check=True, capture_output=True, text=True).stdout
+        commands = [line for line in output.splitlines() if 'SOURCES=' in line]
+        self.assertTrue(commands)
+        for command in commands:
+            self.assertIn('SUBTARGET=c54xisa', command)
+            self.assertIn('SOURCES=src/mame/nokia/tms320c54x_test_isa.cpp ', command)
+        self.assertNotIn('make_eeprom_profile.py', output)
+
     def test_invalid_selection_fails_closed(self):
         with self.assertRaises(subprocess.CalledProcessError):
             selected_sources('unknown')
