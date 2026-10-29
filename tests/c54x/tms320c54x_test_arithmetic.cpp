@@ -2854,31 +2854,63 @@ tms320c54x_test_state::mapped_word_arithmetic_fixture tms320c54x_test_state::map
 		u32(page ? 0x20000 : 0), prefix, (absolute ? 6U : 5U) + prefix, mutation_state, absolute};
 }
 
-void tms320c54x_test_state::start_pipeline_mapped_word_arithmetic(unsigned variant)
+clocked_register_case tms320c54x_test_state::mapped_register_sequence(unsigned variant, bool bitfield) const
 {
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = mapped_word_arithmetic_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	if (f.prefix) program.write_word(f.base + 0x600, 0xe800 | u16(f.after_a));
-	program.write_word(f.base + 0x600 + f.prefix, f.opcode);
-	if (f.absolute) program.write_word(f.base + 0x601 + f.prefix, f.address);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, f.trn);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mapped_word_arithmetic_read",
-		[this, f](offs_t address, u16 &value, u16) { if (machine().side_effects_disabled()) return;
-			expect(address == f.address && value == f.memory && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read_cycle, "Mapped word arithmetic samples its real register in Read, including producer latency"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "mapped_word_arithmetic_no_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Mapped word arithmetic does not publish through data memory"); });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601 + f.prefix, f.base + 0x601 + f.prefix, "mapped_word_arithmetic_literal",
-		[this, f](offs_t, u16 &value, u16) { if (machine().side_effects_disabled() || !f.absolute) return;
-			expect(value == f.address && !m_pipeline_extensions_reads, "Mapped word arithmetic retains its absolute address once"); ++m_pipeline_extensions_reads; });
-	m_phase = 253430; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	auto const c = bitfield ? mapped_bitfield_case(variant) : mapped_bitfield_fixture{};
+	auto const f = bitfield ? c.registers : mapped_word_arithmetic_case(variant);
+	unsigned const mutation = bitfield ? c.mutation_state : f.mutation_state;
+	u16 const initial_st0 = bitfield ? c.st0 : f.st0;
+	unsigned const finish = bitfield ? 18 : 16;
+	u16 const opcode = bitfield ? 0x6100 | (f.absolute ? 0xf8 : f.address) : f.opcode;
+	instruction_case initial{"mapped-register", opcode, {}, {}, {
+		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0},
+		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_A, f.a}, {cpu_regs::STATE_B, f.b},
+		{cpu_regs::STATE_T, f.t}, {cpu_regs::STATE_TRN, f.trn},
+		{cpu_regs::STATE_ST0, initial_st0}, {cpu_regs::STATE_ST1, f.st1},
+		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0}, {STATE_GENPC, f.base + 0x600}
+	}, {}, 0, 0};
+	for (unsigned i = 0; i < 24; ++i) initial.program.push_back({f.base + 0x600 + i, 0xf495});
+	if (f.prefix) initial.program.push_back({f.base + 0x600, 0xe800 | u16(f.after_a)});
+	initial.program.push_back({f.base + 0x600 + f.prefix, opcode});
+	clocked_register_case test{{{0, std::move(initial)}},
+		f.read_cycle - 1 + variant / (bitfield ? (status_bitfield() ? 256 : 4608) : 2304), finish, {}, variant};
+	u32 const extension = f.base + 0x601 + f.prefix;
+	if (f.absolute) test.retained_program_reads.push_back({extension, f.address});
+	if (bitfield) test.retained_program_reads.push_back({extension + unsigned(f.absolute), c.mask});
+	for (auto const &word : test.retained_program_reads) test.states.front().observation.program.push_back(word);
+	// Only the padding after the complete instruction changes: stop in real IDLE.
+	test.states.front().observation.program.push_back({extension + unsigned(f.absolute) + unsigned(bitfield), 0xf4e1});
+	if (mutation) test.actions.push_back({f.read_cycle, {{mutation,
+		mutation == cpu_regs::STATE_A || mutation == cpu_regs::STATE_B ? 0x012345abcdULL : 0x2222}}, true});
+	test.data_events = std::vector<clocked_data_event>{{false, f.address, bitfield ? c.memory : f.memory, f.read_cycle}};
+	for (unsigned tick = 1; tick <= finish; ++tick)
+	{
+		u64 a = f.prefix && tick >= 6 ? f.after_a : f.a, b = f.b;
+		if (tick >= f.read_cycle)
+		{
+			if (mutation == cpu_regs::STATE_A) a = bitfield ? 0x012345abcdULL : f.after_a;
+			if (mutation == cpu_regs::STATE_B) b = bitfield ? 0x012345abcdULL : f.after_b;
+		}
+		u16 const current_st0 = tick >= f.read_cycle && mutation == cpu_regs::STATE_ST0 ? 0x2222 : initial_st0;
+		u16 const st0 = tick > f.read_cycle ? (bitfield ?
+			(current_st0 & ~u16(0x1000)) | ((c.memory & c.mask) ? 0x1000 : 0) : f.result_st0) : current_st0;
+		if (!bitfield && tick > f.read_cycle) (BIT(f.opcode, 8) ? b : a) = f.result;
+		test.states.push_back({tick, {"mapped-register", opcode, {}, {}, {}, {
+			{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_A, a}, {cpu_regs::STATE_B, b},
+			{cpu_regs::STATE_ST0, st0},
+			{cpu_regs::STATE_ST1, tick >= f.read_cycle && mutation == cpu_regs::STATE_ST1 ? 0x2222ULL : f.st1},
+			{cpu_regs::STATE_T, tick >= f.read_cycle && mutation == cpu_regs::STATE_T ? 0x2222ULL : f.t},
+			{cpu_regs::STATE_TRN, tick >= f.read_cycle && mutation == cpu_regs::STATE_TRN ? 0x2222ULL : f.trn}
+		}, 0, 0}});
+	}
+	return test;
+}
+
+void tms320c54x_test_state::start_pipeline_mapped_word_arithmetic()
+{
+	m_register_sequence = std::make_unique<register_sequence_fixture>(machine(), *m_cpu, *m_check_timer,
+		6912, [this](unsigned key) { return mapped_register_sequence(key, false); });
+	m_phase = 253430; m_register_sequence->start();
 }
 
 bool tms320c54x_test_state::status_bitfield() const
@@ -2914,33 +2946,11 @@ tms320c54x_test_state::mapped_bitfield_fixture tms320c54x_test_state::mapped_bit
 		u16((f.st0 & ~u16(0x1000)) | (((variant / 2304) % 2) ? 0x1000 : 0)), mutation_state};
 }
 
-void tms320c54x_test_state::start_pipeline_mapped_bitfield(unsigned variant)
+void tms320c54x_test_state::start_pipeline_mapped_bitfield()
 {
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const c = mapped_bitfield_case(variant); auto const &f = c.registers; auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	if (f.prefix) program.write_word(f.base + 0x600, 0xe800 | u16(f.after_a));
-	program.write_word(f.base + 0x600 + f.prefix, 0x6100 | (f.absolute ? 0xf8 : f.address));
-	program.write_word(f.base + 0x601 + f.prefix, f.absolute ? f.address : c.mask);
-	if (f.absolute) program.write_word(f.base + 0x602 + f.prefix, c.mask);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, f.trn);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, c.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mapped_bitfield_read",
-		[this, c](offs_t address, u16 &value, u16) { if (machine().side_effects_disabled()) return;
-			expect(address == c.registers.address && value == c.memory && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == c.registers.read_cycle, "Mapped BITF retains one real register sample, including AL producers"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "mapped_bitfield_no_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Mapped BITF writes no data memory"); });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601 + f.prefix, f.base + 0x601 + f.prefix + f.absolute, "mapped_bitfield_literals",
-		[this, c](offs_t address, u16 &value, u16) { if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_extensions_reads < 1 + unsigned(c.registers.absolute) && address == c.registers.base + 0x601 + c.registers.prefix + m_pipeline_extensions_reads &&
-				value == (c.registers.absolute && !m_pipeline_extensions_reads ? c.registers.address : c.mask), "Mapped BITF retains address before mask without extension refetch"); ++m_pipeline_extensions_reads; });
-	m_phase = 253450; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	m_register_sequence = std::make_unique<register_sequence_fixture>(machine(), *m_cpu, *m_check_timer,
+		status_bitfield() ? 768 : 13824, [this](unsigned key) { return mapped_register_sequence(key, true); });
+	m_phase = 253450; m_register_sequence->start();
 }
 
 tms320c54x_test_state::accumulator_branch_fixture tms320c54x_test_state::accumulator_branch_case(unsigned v)
@@ -6509,85 +6519,26 @@ bool tms320c54x_test_state::check_negate_results()
 		return true;
 	}
 
-	if (m_phase == 253430)
+	if (m_phase == 253430 || m_phase == 253450)
 	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		auto const f = mapped_word_arithmetic_case(variant); unsigned const checkpoint = f.read_cycle - 1 + variant / 2304;
-		if (tick == f.read_cycle && f.mutation_state) m_cpu->set_state_int(f.mutation_state, f.mutation_state == tms320c54x_device::STATE_A || f.mutation_state == tms320c54x_device::STATE_B ? 0x012345abcdULL : 0x2222);
-		u64 a = f.a, b = f.b;
-		if (f.prefix && tick >= 6) a = f.after_a;
-		if (tick >= f.read_cycle) { if (f.mutation_state == tms320c54x_device::STATE_A) a = f.after_a; if (f.mutation_state == tms320c54x_device::STATE_B) b = f.after_b; }
-		if (tick > f.read_cycle) (BIT(f.opcode, 8) ? b : a) = f.result;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick > f.read_cycle ? f.result_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == (tick >= f.read_cycle && f.mutation_state == tms320c54x_device::STATE_T ? 0x2222 : f.t) &&
-			m_cpu->state_int(tms320c54x_device::STATE_TRN) == (tick >= f.read_cycle && f.mutation_state == tms320c54x_device::STATE_TRN ? 0x2222 : f.trn), "Mapped word ADD/SUB retains Read operands, honors accumulator latency and publishes arithmetic only in Execute");
-		if (tick == checkpoint && !m_pipeline_replay)
+		if (!m_register_sequence->step()) return true;
+		osd_printf_info("TMS320C54x mapped register coverage: PASS cases=%u restore=%u coverage_fnv64=%016llx\n",
+			m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
+		m_register_sequence.reset();
+		if (m_phase == 253430)
 		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save mapped word arithmetic before/after Read or Execute");
-		}
-		if (tick == 16)
-		{
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(f.absolute), "Mapped word arithmetic has one source sample and no literal refetch");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				return restore_pipeline_at(253440, "Restore mapped word arithmetic without resampling the changed register");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 6911) { start_pipeline_mapped_word_arithmetic(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged mapped word arithmetic: PASS cases=6912 registers=AL,AH,AG,BL,BH,BG,T,TRN selectors=4 forms=direct,absolute producer_cases=768 restore=6912 reads_each=1 data_writes=0 silicon_phase_claim=0\n");
 			if (profile_is("mapped-word")) throw emu_fatalerror(0, "TMS320C54x isolated mapped word arithmetic complete");
 			start_pipeline_mapped_bitfield(); return true;
 		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253440)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253430; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253450)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		auto const c = mapped_bitfield_case(variant); auto const &f = c.registers;
-		unsigned const checkpoint = f.read_cycle - 1 + variant / (status_bitfield() ? 256 : 4608);
-		if (tick == f.read_cycle && c.mutation_state) m_cpu->set_state_int(c.mutation_state, c.mutation_state == tms320c54x_device::STATE_A || c.mutation_state == tms320c54x_device::STATE_B ? 0x012345abcdULL : 0x2222);
-		u64 a = f.prefix && tick >= 6 ? f.after_a : f.a, b = f.b;
-		if (tick >= f.read_cycle) { if (c.mutation_state == tms320c54x_device::STATE_A) a = 0x012345abcdULL; if (c.mutation_state == tms320c54x_device::STATE_B) b = 0x012345abcdULL; }
-		u16 const current_st0 = tick >= f.read_cycle && c.mutation_state == tms320c54x_device::STATE_ST0 ? 0x2222 : c.st0;
-		u16 const st0 = tick > f.read_cycle ? (current_st0 & ~u16(0x1000)) | ((c.memory & c.mask) ? 0x1000 : 0) : current_st0;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (tick >= f.read_cycle && c.mutation_state == tms320c54x_device::STATE_ST1 ? 0x2222 : f.st1) &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == (tick >= f.read_cycle && c.mutation_state == tms320c54x_device::STATE_T ? 0x2222 : f.t) &&
-			m_cpu->state_int(tms320c54x_device::STATE_TRN) == (tick >= f.read_cycle && c.mutation_state == tms320c54x_device::STATE_TRN ? 0x2222 : f.trn), "Mapped BITF changes only TC in Execute using its retained source and mask");
-		if (tick == checkpoint && !m_pipeline_replay)
+		if (status_bitfield())
 		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save mapped BITF before/after source Read or TC publication");
+			osd_printf_info("TMS320C54x staged status BITF: PASS cases=768 restore=768 registers=ST0,ST1 forms=direct,absolute masks=4 initial_tc=2 pages=2 snapshots=3 reads_each=1 data_writes=0 retained_source=1 silicon_phase_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x isolated status BITF complete");
 		}
-		if (tick == 18)
-		{
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 + unsigned(f.absolute), "Mapped BITF has one source read and owns every extension exactly once");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				return restore_pipeline_at(253460, "Restore mapped BITF without rereading changed source registers or refetching its mask");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (status_bitfield() ? 767 : 13823)) { start_pipeline_mapped_bitfield(variant + 1); return true; }
-			if (status_bitfield())
-			{
-				osd_printf_info("TMS320C54x staged status BITF: PASS cases=768 restore=768 registers=ST0,ST1 forms=direct,absolute masks=4 initial_tc=2 pages=2 snapshots=3 reads_each=1 data_writes=0 retained_source=1 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated status BITF complete");
-			}
-			osd_printf_info("TMS320C54x staged mapped BITF: PASS cases=13824 registers=AL,AH,AG,BL,BH,BG,T,TRN masks=4 initial_tc=2 producer_cases=1536 restore=13824 reads_each=1 data_writes=0 silicon_phase_claim=0\n");
-			if (profile_is("mapped-bitf")) throw emu_fatalerror(0, "TMS320C54x isolated mapped BITF complete");
-			start_pipeline_immediate_multiply(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253460)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253450; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+		osd_printf_info("TMS320C54x staged mapped BITF: PASS cases=13824 registers=AL,AH,AG,BL,BH,BG,T,TRN masks=4 initial_tc=2 producer_cases=1536 restore=13824 reads_each=1 data_writes=0 silicon_phase_claim=0\n");
+		if (profile_is("mapped-bitf")) throw emu_fatalerror(0, "TMS320C54x isolated mapped BITF complete");
+		start_pipeline_immediate_multiply(); return true;
 	}
 	if (m_phase == 253290)
 	{

@@ -595,7 +595,8 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated BSP STLM exclusions complete",
     ),
     "status-bitf": (
-        "TMS320C54x staged status BITF: PASS cases=768 restore=768 registers=ST0,ST1 forms=direct,absolute masks=4 initial_tc=2 pages=2 snapshots=3 reads_each=1 data_writes=0 retained_source=1 silicon_phase_claim=0",
+        ("TMS320C54x staged status BITF: PASS cases=768 restore=768 registers=ST0,ST1 forms=direct,absolute masks=4 initial_tc=2 pages=2 snapshots=3 reads_each=1 data_writes=0 retained_source=1 silicon_phase_claim=0",
+         "TMS320C54x mapped register coverage: PASS cases=768 restore=768 coverage_fnv64=fe6d79b88cb7f625"),
         "Fatal error: TMS320C54x isolated status BITF complete",
     ),
     "serial-stm": (
@@ -1601,8 +1602,14 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated Smem BITF complete",
     ),
     "mapped-bitf": (
-        "TMS320C54x staged mapped BITF: PASS cases=13824 registers=AL,AH,AG,BL,BH,BG,T,TRN masks=4 initial_tc=2 producer_cases=1536 restore=13824 reads_each=1 data_writes=0 silicon_phase_claim=0",
+        ("TMS320C54x staged mapped BITF: PASS cases=13824 registers=AL,AH,AG,BL,BH,BG,T,TRN masks=4 initial_tc=2 producer_cases=1536 restore=13824 reads_each=1 data_writes=0 silicon_phase_claim=0",
+         "TMS320C54x mapped register coverage: PASS cases=13824 restore=13824 coverage_fnv64=af479ae211f6e725"),
         "Fatal error: TMS320C54x isolated mapped BITF complete",
+    ),
+    "mapped-word": (
+        ("TMS320C54x staged mapped word arithmetic: PASS cases=6912 registers=AL,AH,AG,BL,BH,BG,T,TRN selectors=4 forms=direct,absolute producer_cases=768 restore=6912 reads_each=1 data_writes=0 silicon_phase_claim=0",
+         "TMS320C54x mapped register coverage: PASS cases=6912 restore=6912 coverage_fnv64=377e1a1ed48a8825"),
+        "Fatal error: TMS320C54x isolated mapped word arithmetic complete",
     ),
     "indirect-dld": (
         (

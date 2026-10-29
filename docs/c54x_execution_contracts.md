@@ -68,6 +68,15 @@ the final arithmetic/status/source checks still occur at clock 16. This does
 not yet relocate either profile out of the legacy machine or qualify other
 memory families. Bus cycles are implementation observations, not silicon timing.
 
+`mapped-word`, `mapped-bitf` and `status-bitf` use the same runner with a shared
+mapped-register descriptor builder. The distinct ADD/SUB and TC reference rules
+remain fixture-owned. All 21,504 cases retain their per-clock register predicates,
+pre-observation source mutations and three checkpoint cohorts. Contiguous
+address/mask extension words are checked in order without inventing fetch-cycle
+requirements; their observer cursor is rewound alongside the data cursor.
+Instruction completion now reaches real IDLE rather than NOP padding. The
+previously existing `mapped-word` BIOS is also exposed by the CLI profile registry.
+
 `isa-words` owns fifty independently reset atomic instruction examples. The
 default suite shares the same bank through one loop, replacing five separate
 setup/check families. Ordered program/data/register seeds and partial result

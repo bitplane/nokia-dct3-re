@@ -29,16 +29,17 @@ public:
 	{
 		if (m_resume) { m_resume = false; m_cpu.resume(SUSPEND_REASON_DISABLE); schedule(); return false; }
 		++m_tick;
+		apply_actions(true);
 		auto const *expected = &m_input.states.front().observation;
 		for (auto const &state : m_input.states) if (m_tick >= state.tick) expected = &state.observation;
 		check_case_state(m_cpu, *expected);
 		// A clock's mutations follow observation but precede snapshot capture.
-		for (auto const &action : m_input.actions) if (m_tick == action.tick)
-			for (auto const &value : action.values) m_cpu.set_state_int(value.index, value.value);
+		apply_actions(false);
 		if (m_tick == m_input.checkpoint && !m_replay)
 		{
 			m_saved_fetches = m_fetches;
 			m_saved_data_cursor = m_data_cursor;
+			m_saved_program_cursor = m_program_cursor;
 			require(capture_snapshot(m_machine, m_saved) == STATERR_NONE, "capture register-sequence checkpoint");
 		}
 		if (m_tick == m_input.finish)
@@ -46,14 +47,16 @@ public:
 			require(m_cpu.state_int(tms320c54x_device::STATE_IDLE), "sequence reaches its real IDLE instruction");
 			if (m_input.single_fetch) require(m_fetches == 1, "one opcode fetch");
 			if (m_input.data_events) require(m_data_cursor == m_input.data_events->size(), "complete data-bus trace");
+			require(m_program_cursor == m_input.retained_program_reads.size(), "complete retained-program trace");
 			if (!m_replay)
 			{
 				m_replay = true; m_tick = m_input.checkpoint; m_fetches = m_saved_fetches;
 				m_data_cursor = m_saved_data_cursor;
+				m_program_cursor = m_saved_program_cursor;
 				require(restore_snapshot(m_machine, m_timer, m_saved) == STATERR_NONE, "restore register sequence");
 				++m_restores; m_cpu.suspend(SUSPEND_REASON_DISABLE, true); m_resume = true; m_timer.enable(true); return false;
 			}
-			m_data_tap.remove(); m_fetch_tap.remove(); m_cpu.set_pipeline_frontend(false);
+			m_data_tap.remove(); m_fetch_tap.remove(); m_program_tap.remove(); m_cpu.set_pipeline_frontend(false);
 			m_coverage.add(m_input.identity.value_or(m_case));
 			if (++m_case < m_cases) { begin(); return false; }
 			return true;
@@ -61,6 +64,11 @@ public:
 		schedule(); return false;
 	}
 private:
+	void apply_actions(bool before)
+	{
+		for (auto const &action : m_input.actions) if (m_tick == action.tick && action.before_observation == before)
+			for (auto const &value : action.values) m_cpu.set_state_int(value.index, value.value);
+	}
 	void require(bool value, char const *message) const
 	{
 		if (!value) throw emu_fatalerror("C54x register sequence case=%u tick=%u replay=%u: %s", m_case, m_tick, unsigned(m_replay), message);
@@ -80,7 +88,7 @@ private:
 		m_label = std::string(m_input.states.front().observation.id) + "/" + std::to_string(m_input.identity.value_or(m_case));
 		for (auto &state : m_input.states) state.observation.id = m_label.c_str();
 		prepare_case(m_cpu, m_input.states.front().observation);
-		m_fetches = m_data_cursor = 0;
+		m_fetches = m_data_cursor = m_program_cursor = 0;
 		require(!(m_input.forbid_data_access && m_input.data_events), "one data-bus observation policy");
 		if (m_input.data_events)
 		{
@@ -106,6 +114,20 @@ private:
 					require(!m_fetches && word == opcode, "one fetch of the specified opcode"); ++m_fetches;
 					if (m_opcode_observer) m_opcode_observer(word, opcode);
 				});
+		if (!m_input.retained_program_reads.empty())
+		{
+			auto const &words = m_input.retained_program_reads;
+			for (unsigned i = 1; i < words.size(); ++i)
+				require(words[i].address == words[i - 1].address + 1, "contiguous retained-program words");
+			m_program_tap = m_cpu.space(AS_PROGRAM).install_read_tap(words.front().address, words.back().address,
+				"register_sequence_literals", [this](offs_t at, u16 &word, u16) {
+					if (m_machine.side_effects_disabled()) return;
+					auto const &words = m_input.retained_program_reads;
+					require(m_program_cursor < words.size() && at == words[m_program_cursor].address &&
+						word == words[m_program_cursor].value, "ordered retained-program word");
+					++m_program_cursor;
+				});
+		}
 		m_tick = 0; m_replay = m_resume = false;
 		m_cpu.set_pipeline_frontend(true); m_cpu.resume(SUSPEND_REASON_DISABLE); schedule();
 	}
@@ -115,6 +137,7 @@ private:
 	unsigned m_cases, m_case = 0, m_tick = 0, m_restores = 0;
 	unsigned m_fetches = 0, m_saved_fetches = 0;
 	unsigned m_data_cursor = 0, m_saved_data_cursor = 0;
+	unsigned m_program_cursor = 0, m_saved_program_cursor = 0;
 	builder m_build;
 	std::function<void(u16, u16)> m_opcode_observer;
 	clocked_register_case m_input;
@@ -122,7 +145,7 @@ private:
 	std::string m_label;
 	std::stringstream m_saved;
 	ordered_case_digest m_coverage;
-	memory_passthrough_handler m_data_tap, m_fetch_tap;
+	memory_passthrough_handler m_data_tap, m_fetch_tap, m_program_tap;
 };
 
 } // namespace c54x_test

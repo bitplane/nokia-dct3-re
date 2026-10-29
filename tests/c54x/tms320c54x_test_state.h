@@ -1060,7 +1060,8 @@ private:
 		bool absolute;
 	};
 	static mapped_word_arithmetic_fixture mapped_word_arithmetic_case(unsigned variant);
-	void start_pipeline_mapped_word_arithmetic(unsigned variant = 0);
+	clocked_register_case mapped_register_sequence(unsigned variant, bool bitfield) const;
+	void start_pipeline_mapped_word_arithmetic();
 
 	struct mapped_bitfield_fixture
 	{
@@ -1070,7 +1071,7 @@ private:
 	};
 	bool status_bitfield() const;
 	mapped_bitfield_fixture mapped_bitfield_case(unsigned variant) const;
-	void start_pipeline_mapped_bitfield(unsigned variant = 0);
+	void start_pipeline_mapped_bitfield();
 
 	struct bus_io_fixture
 	{

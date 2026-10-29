@@ -8,6 +8,47 @@
   },
   "families": [
     {
+      "id": "mapped-word-and-bitfield-clocked-contracts",
+      "classification": "isa_documented",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_arithmetic.cpp; tests/c54x/tms320c54x_test_register_sequence.h",
+      "profiles": ["mapped-word", "mapped-bitf", "status-bitf"],
+      "case_ids": [],
+      "basis": "ADD/SUB uses the existing fixture-owned signed integer, carry and saturation reference, not CPU helpers. BITF uses the independent nonzero masked-word rule for TC. These are mapped accumulator/T/TRN and status operands, distinct from AR/BK and ordinary RAM; their AL producer adjacency and retained-source mutations justify keeping the interaction cohorts.",
+      "profile_coverage": {
+        "mapped-word": {"cases": 6912, "fnv64": "377e1a1ed48a8825", "result_prefix": "TMS320C54x mapped register coverage: PASS", "key": "Original ordinals 0..6911, including all three checkpoint copies."},
+        "mapped-bitf": {"cases": 13824, "fnv64": "af479ae211f6e725", "result_prefix": "TMS320C54x mapped register coverage: PASS", "key": "Original ordinals 0..13823, including all three checkpoint copies."},
+        "status-bitf": {"cases": 768, "fnv64": "fe6d79b88cb7f625", "result_prefix": "TMS320C54x mapped register coverage: PASS", "key": "Original ordinals 0..767, including all three checkpoint copies."}
+      },
+      "obligations": [
+        "retain all input formulas and arithmetic references, direct/absolute forms, source aliases, pages, flags, masks, initial TC and producer gaps",
+        "retain one exact data read at its pipeline cycle, no data writes, and exactly one ordered fetch of each monitored address/mask word",
+        "apply source mutation before the read-clock observation, preserving the old per-clock A/B/ST0/ST1/T/TRN and illegal-latch predicates",
+        "preserve before-Read, after-Read and after-Execute snapshots and rewind data/program observation cursors independently of guest state",
+        "expose the pre-existing mapped-word BIOS in the CLI acceptance registry; this repairs a tooling omission, not a new instruction fixture"
+      ],
+      "limits": [
+        "stop with real IDLE after the complete tested instruction instead of unobserved NOP padding; explicitly clear IDLE during setup",
+        "all 21504 cases and replay points retained; no numeric or checkpoint reduction is claimed",
+        "program extension timing was not asserted before and is not invented here; pipeline read/publication clocks remain implementation contracts, not measured silicon",
+        "these profiles still use the legacy machine and reference-factory types; shared clocked execution does not by itself complete CPU-only relocation"
+      ],
+      "measurement": {
+        "baseline_commit": "e0db51f3",
+        "c54x_cpp_bytes_before": 3552117,
+        "c54x_cpp_bytes_after": 3546494,
+        "c54x_cpp_lines_before": 54255,
+        "c54x_cpp_lines_after": 54231,
+        "mapped_word_seconds_before": 3.03,
+        "mapped_word_seconds_after": 2.9,
+        "mapped_bitf_seconds_before": 6.22,
+        "mapped_bitf_seconds_after": 5.77,
+        "status_bitf_seconds_before": 0.35,
+        "status_bitf_seconds_after": 0.39,
+        "scope": "Serial focused wall times, not a benchmark speed claim: baseline calls MAME directly while after includes the CLI wrapper. Shared lifecycle plus descriptor factoring removes 5623 C++ bytes and 24 lines, including new runner support. Input/reference function bodies remain unchanged; no full-default checkpoint renewal."
+      }
+    },
+    {
       "id": "mapped-register-arithmetic-clocked-runner",
       "classification": "isa_documented",
       "decision": "rewrite",

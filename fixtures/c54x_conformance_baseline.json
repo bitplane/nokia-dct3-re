@@ -3246,6 +3246,7 @@
       "TMS320C54x mapped memory logic: PASS cases=110592 restore=110592 operations=AND,OR,XOR mapped_sources=16 modes=DP,absolute,indirect accumulators=2 flags=8 patterns=4 late_accumulator=2 pages=2 snapshots=3 zero_extend=1 source_sample=Read accumulator_sample=Execute flags_preserved=1 writes=0 reset_before_restore=1 physical_phase_claim=0 producer_control_composition=unvalidated\n": 1,
       "TMS320C54x mapped move repeat ownership: PASS cases=64 restore=64 before_header=1 repeated_body_rejected=1 headers=short,long pages=2 values=2 counts=0,3 snapshots=2 physical_phase_claim=0\n": 1,
       "TMS320C54x mapped parallel load: PASS cases=147456 restore=147456 forms=6 source_addresses=0000..001f destination=RAM selector_pairs=8 patterns=2 sxm_sst_ovm=8 asm=0,-1 pages=2 snapshots=3 source_sample=Read store_source=Execute reads=1 writes=1 pointer_updates=once t_publish=Read carry_policy=preserve_unvalidated reset_before_restore=1 repeat_peripheral_composition=unvalidated endpoint_identity_claim=0 physical_phase_claim=0\n": 1,
+      "TMS320C54x mapped register coverage: PASS cases=%u restore=%u coverage_fnv64=%016llx\n": 1,
       "TMS320C54x mapped shift16 arithmetic: PASS cases=147456 restore=147456 forms=8 mapped_sources=16 modes=DP,absolute,indirect flags=8 patterns=4 late_source=2 pages=2 snapshots=3 source_sample=Read accumulator_sample=Execute partial_carry=1 sticky_overflow=1 ovm=1 writes=0 reset_before_restore=1 physical_phase_claim=0 producer_control_composition=unvalidated\n": 1,
       "TMS320C54x memory ALU disassembler: PASS modes=4096 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x memory DP conformance: PASS variants=3\n": 1,
@@ -7582,10 +7583,16 @@
           "registers": "AL,AH,AG,BL,BH,BG,T,TRN",
           "restore": "13824",
           "silicon_phase_claim": "0"
+        },
+        {
+          "cases": "13824",
+          "coverage_fnv64": "af479ae211f6e725",
+          "restore": "13824"
         }
       ],
       "required": [
-        "TMS320C54x staged mapped BITF: PASS cases=13824 registers=AL,AH,AG,BL,BH,BG,T,TRN masks=4 initial_tc=2 producer_cases=1536 restore=13824 reads_each=1 data_writes=0 silicon_phase_claim=0"
+        "TMS320C54x staged mapped BITF: PASS cases=13824 registers=AL,AH,AG,BL,BH,BG,T,TRN masks=4 initial_tc=2 producer_cases=1536 restore=13824 reads_each=1 data_writes=0 silicon_phase_claim=0",
+        "TMS320C54x mapped register coverage: PASS cases=13824 restore=13824 coverage_fnv64=af479ae211f6e725"
       ]
     },
     "mapped-load-age": {
@@ -7609,6 +7616,32 @@
       ],
       "required": [
         "TMS320C54x staged mapped load age: PASS cases=18432 restore=18432 loads=LD,LDU forms=DP,indirect,absolute,offset registers=8 accumulators=2 values=4 younger=MAR_inc,MAR_dec,MVMM sxm=2 pages=2 snapshots=3 physical_phase_claim=0"
+      ]
+    },
+    "mapped-word": {
+      "completion": "Fatal error: TMS320C54x isolated mapped word arithmetic complete",
+      "machine": "tms54test",
+      "reported_fields": [
+        {
+          "cases": "6912",
+          "data_writes": "0",
+          "forms": "direct,absolute",
+          "producer_cases": "768",
+          "reads_each": "1",
+          "registers": "AL,AH,AG,BL,BH,BG,T,TRN",
+          "restore": "6912",
+          "selectors": "4",
+          "silicon_phase_claim": "0"
+        },
+        {
+          "cases": "6912",
+          "coverage_fnv64": "377e1a1ed48a8825",
+          "restore": "6912"
+        }
+      ],
+      "required": [
+        "TMS320C54x staged mapped word arithmetic: PASS cases=6912 registers=AL,AH,AG,BL,BH,BG,T,TRN selectors=4 forms=direct,absolute producer_cases=768 restore=6912 reads_each=1 data_writes=0 silicon_phase_claim=0",
+        "TMS320C54x mapped register coverage: PASS cases=6912 restore=6912 coverage_fnv64=377e1a1ed48a8825"
       ]
     },
     "mar-circular": {
@@ -13410,10 +13443,16 @@
           "retained_source": "1",
           "silicon_phase_claim": "0",
           "snapshots": "3"
+        },
+        {
+          "cases": "768",
+          "coverage_fnv64": "fe6d79b88cb7f625",
+          "restore": "768"
         }
       ],
       "required": [
-        "TMS320C54x staged status BITF: PASS cases=768 restore=768 registers=ST0,ST1 forms=direct,absolute masks=4 initial_tc=2 pages=2 snapshots=3 reads_each=1 data_writes=0 retained_source=1 silicon_phase_claim=0"
+        "TMS320C54x staged status BITF: PASS cases=768 restore=768 registers=ST0,ST1 forms=direct,absolute masks=4 initial_tc=2 pages=2 snapshots=3 reads_each=1 data_writes=0 retained_source=1 silicon_phase_claim=0",
+        "TMS320C54x mapped register coverage: PASS cases=768 restore=768 coverage_fnv64=fe6d79b88cb7f625"
       ]
     },
     "std-io": {
@@ -15714,6 +15753,30 @@
       "decision": "keep",
       "family": "dual-operand-admission-controls"
     },
+    "mapped-bitf": {
+      "case_ids": [],
+      "classification": "isa_documented",
+      "coverage": {
+        "cases": 13824,
+        "fnv64": "af479ae211f6e725",
+        "key": "Original ordinals 0..13823, including all three checkpoint copies.",
+        "result_prefix": "TMS320C54x mapped register coverage: PASS"
+      },
+      "decision": "rewrite",
+      "family": "mapped-word-and-bitfield-clocked-contracts"
+    },
+    "mapped-word": {
+      "case_ids": [],
+      "classification": "isa_documented",
+      "coverage": {
+        "cases": 6912,
+        "fnv64": "377e1a1ed48a8825",
+        "key": "Original ordinals 0..6911, including all three checkpoint copies.",
+        "result_prefix": "TMS320C54x mapped register coverage: PASS"
+      },
+      "decision": "rewrite",
+      "family": "mapped-word-and-bitfield-clocked-contracts"
+    },
     "memory-alu": {
       "case_ids": [],
       "classification": "architectural_interaction",
@@ -15961,6 +16024,18 @@
       },
       "decision": "rewrite",
       "family": "execute-owned-accumulator-square"
+    },
+    "status-bitf": {
+      "case_ids": [],
+      "classification": "isa_documented",
+      "coverage": {
+        "cases": 768,
+        "fnv64": "fe6d79b88cb7f625",
+        "key": "Original ordinals 0..767, including all three checkpoint copies.",
+        "result_prefix": "TMS320C54x mapped register coverage: PASS"
+      },
+      "decision": "rewrite",
+      "family": "mapped-word-and-bitfield-clocked-contracts"
     },
     "stmac": {
       "case_ids": [],

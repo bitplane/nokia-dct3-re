@@ -29,6 +29,39 @@ def compiled_cpp(source):
 
 class CaseFixtureTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
+    def test_clocked_actions_preserve_observation_side_and_write_order(self):
+        case = (ROOT / 'tests/c54x/tms320c54x_test_case.h').read_text()
+        runner = (ROOT / 'tests/c54x/tms320c54x_test_register_sequence.h').read_text()
+        action = case[case.index('struct clocked_register_action'):case.index('struct clocked_data_event')]
+        method = runner[runner.index('\tvoid apply_actions('):runner.index('\tvoid require(')]
+        source = r'''
+#include <cassert>
+#include <vector>
+#include "tests/c54x/tms320c54x_test_support.h"
+using c54x_test::register_setting;
+''' + action + r'''
+struct bench {
+    unsigned m_tick = 5;
+    struct input { std::vector<clocked_register_action> actions; } m_input{
+        {{5, {{0, 10}, {0, 11}}, true}, {5, {{0, 12}}}, {6, {{0, 13}}, true}}};
+    struct cpu {
+        std::vector<unsigned> writes;
+        void set_state_int(int index, unsigned value) { assert(index == 0); writes.push_back(value); }
+    } m_cpu;
+''' + method + r'''
+};
+int main() {
+    bench b;
+    b.apply_actions(true); assert((b.m_cpu.writes == std::vector<unsigned>{10, 11}));
+    b.apply_actions(false); assert((b.m_cpu.writes == std::vector<unsigned>{10, 11, 12}));
+    b.m_tick = 6; b.apply_actions(false); assert(b.m_cpu.writes.size() == 3);
+    b.apply_actions(true); assert(b.m_cpu.writes.back() == 13);
+}
+'''
+        with compiled_cpp(source) as program:
+            subprocess.run([str(program)], check=True, capture_output=True)
+
+    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_ordered_data_events_reject_mismatch_and_rewind_at_checkpoint(self):
         header = (ROOT / 'tests/c54x/tms320c54x_test_case.h').read_text()
         begin = header.index('struct clocked_data_event')
