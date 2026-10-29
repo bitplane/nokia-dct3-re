@@ -75,6 +75,10 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_operand_domains.cpp` | Operand-domain, absolute-alias and short-source rejection fixtures with family-owned progress, observations, taps and snapshots |
 | `tests/c54x/tms320c54x_test_rejection_state.h` | Per-family rejection state; CPU and scheduler routing remain with the bench |
 | `tests/c54x/tms320c54x_test_pipeline.cpp` | Control flow, repeats, dependency and pipeline-composition fixtures |
+| `tests/c54x/tms320c54x_test_frontend.cpp` | Decoded/empty frontend entry, flush timing and acknowledgement ownership |
+| `tests/c54x/tms320c54x_test_observer.cpp` | Instruction identity, ordinary-read exclusion and XC annulment observations |
+| `tests/c54x/tms320c54x_test_block_repeat.cpp` | Delayed-block-repeat layout, exclusions, IRQ acknowledgement and replay |
+| `tests/c54x/tms320c54x_test_pipeline_state.h` | Family-owned frontend, observer and delayed-block-repeat storage |
 | `tests/c54x/tms320c54x_test_interrupts.cpp` | Interrupt composition, returns, status masks and PLL/XC continuations |
 | `tests/c54x/tms320c54x_test_interrupt_entry.cpp` | Vector prefetch, entry spacing, accepted-source retention, stage restoration and their acknowledgement checks |
 | `tests/c54x/tms320c54x_test_entry_state.h` | Entry-family observations, taps and replay storage; predecessor tap cleanup remains explicit |

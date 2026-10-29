@@ -22,6 +22,7 @@
 #include "tms320c54x_test_entry_state.h"
 #include "tms320c54x_test_repeat_state.h"
 #include "tms320c54x_test_snapshot_state.h"
+#include "tms320c54x_test_pipeline_state.h"
 #include <sstream>
 #include <bitset>
 
@@ -90,6 +91,8 @@ private:
 	void start_interrupt_entry_spacing_case(unsigned index);
 	void start_interrupt_acceptance_checkpoint();
 	void acknowledge_entry_interrupt(int line);
+	void acknowledge_frontend_interrupt(int line);
+	void acknowledge_rptbd_interrupt(int line);
 	void start_entry_stage_restore_case(unsigned index);
 	void start_native_final_gap_case(unsigned index);
 	void start_native_memory_gap_case(unsigned index);
@@ -2162,6 +2165,7 @@ private:
 	bool check_pipeline_sp_rmw_results();
 	bool check_pipeline_memory_repeat_read_a_results();
 	bool check_instruction_observer_results();
+	bool check_block_page_results();
 	bool check_mvkd_sp_results();
 	bool check_pipeline_add_sp_context_results();
 	bool check_pipeline_peripheral_logic_results();
@@ -2205,6 +2209,7 @@ private:
 	bool check_basic_repeat_edge_results();
 	bool check_rptbd_shift_store_results();
 	bool check_rptbd_layout_results();
+	bool check_block_repeat_forwarding_results();
 	bool check_negate_results();
 	bool check_long_mapped_original_results();
 	bool check_mcbsp_control_sequence_results();
@@ -2332,9 +2337,7 @@ private:
 	std::vector<std::pair<offs_t, u16>> m_observed_instructions, m_saved_observed_instructions;
 	std::vector<std::array<u64, 3>> m_repeat_load_expected;
 	u64 m_pipeline_expected_cycle = 0;
-	bool m_pipeline_empty_nmi = false;
 	bool m_pipeline_memory_case = false;
-	bool m_pipeline_memory_b = false;
 	unsigned m_pipeline_operand_reads = 0;
 	unsigned m_pipeline_long_case = 0;
 	unsigned m_pipeline_store_case = 0;
@@ -2351,7 +2354,9 @@ private:
 	unsigned m_pipeline_register_writes = 0;
 	memory_passthrough_handler m_pipeline_operand_tap;
 	bool m_pipeline_replay = false;
-	struct rptbd_observations { unsigned reads = 0, writes = 0, fetches = 0, delay_reads = 0, delay_writes = 0, acks = 0, stack_reads = 0, stack_writes = 0; };
+	frontend_entry_fixture m_frontend;
+	instruction_observer_fixture m_instruction_observer;
+	delayed_block_repeat_fixture m_rptbd;
 	rptbd_observations m_rptbd_counts, m_rptbd_saved_counts;
 	replay_fixture<saved_repeat_observations> m_saved_irq_repeat, m_body_irq_repeat;
 	replay_fixture<repeat_context_observations> m_repeat_context;

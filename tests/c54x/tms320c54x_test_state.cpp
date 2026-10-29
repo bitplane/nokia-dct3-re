@@ -793,6 +793,14 @@ void tms320c54x_test_state::expect(bool condition, const char *message)
 		case 255840: case 255850: progress(m_body_irq_repeat); break;
 		case 255480: case 255490: progress(m_repeat_context); break;
 		case 255820: case 255830: progress(m_fcala_delay); break;
+		case 292000: case 292010: progress(m_instruction_observer); break;
+		case 255320: case 255330: case 255331: case 255340: case 255350:
+			progress(m_rptbd); break;
+		case 251000: case 251010: case 251020: case 251030:
+			case_index = unsigned(m_frontend.memory) + unsigned(m_frontend.memory_b);
+			tick = m_frontend.expected_cycle;
+			replay = m_frontend.replay;
+			break;
 		}
 		osd_printf_info("c54x_failure: phase=%u case=%u tick=%u replay=%u pc=%06x rc=%04x ar1=%04x a=%010llx b=%010llx st0=%04x illegal=%u reads=%u writes=%u\n",
 			m_phase, case_index, tick, unsigned(replay), unsigned(m_cpu->state_int(STATE_GENPC)),
@@ -819,7 +827,9 @@ void tms320c54x_test_state::expect_opcode(u16 opcode, bool condition, const char
 void tms320c54x_test_state::test(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
-	if (!strcmp(config.options().bios(), "instr-observer") || !strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-sfta") || !strcmp(config.options().bios(), "rpt-ld-block") || !strcmp(config.options().bios(), "rptb-call") || !strcmp(config.options().bios(), "rpt-mem-chain") || !strcmp(config.options().bios(), "bd-rpt") || !strcmp(config.options().bios(), "retd-rpt") || !strcmp(config.options().bios(), "calld-rpt") || !strcmp(config.options().bios(), "bcd-rpt"))
+	if (!strcmp(config.options().bios(), "instr-observer"))
+		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_instruction_observer.observed.emplace_back(address, opcode); });
+	else if (!strcmp(config.options().bios(), "rpt-smem") || !strcmp(config.options().bios(), "rpt-ld") || !strcmp(config.options().bios(), "rpt-sfta") || !strcmp(config.options().bios(), "rpt-ld-block") || !strcmp(config.options().bios(), "rptb-call") || !strcmp(config.options().bios(), "rpt-mem-chain") || !strcmp(config.options().bios(), "bd-rpt") || !strcmp(config.options().bios(), "retd-rpt") || !strcmp(config.options().bios(), "calld-rpt") || !strcmp(config.options().bios(), "bcd-rpt"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) { m_observed_instructions.emplace_back(address, opcode); });
 	if (!strcmp(config.options().bios(), "mpy-mem-imm"))
 		m_cpu->instruction_observer_cb().set([this](offs_t address, u16 opcode) {
@@ -880,13 +890,7 @@ void tms320c54x_test_state::test(machine_config &config)
 				osd_printf_info("Memory repeat interrupt mismatch case=%u replay=%u line=%d acks=%u iterations=%u count=%u cycle=%llu\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), line, m_rptbd_counts.acks, iterations, f.count, (unsigned long long)m_cpu->pipeline_cycles());
 			expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 2) && !m_rptbd_counts.acks++ && iterations == f.count + 1, "Memory repeat defers IRQ/NMI until its complete body count"); m_cpu->set_input_line(line, CLEAR_LINE);
 		}
-		if (m_phase == 255320)
-		{
-			unsigned const variant = m_pipeline_peripheral_case, layout = rptbd_layout(variant);
-			expect(variant >= 512 && line == rptbd_irq_line(variant) && !m_rptbd_counts.acks && m_cpu->pipeline_cycles() >= 9 &&
-				m_rptbd_counts.delay_reads == unsigned(layout == 2) && m_rptbd_counts.delay_writes == unsigned(layout == 1), "RPTBD acknowledges its pending source only after complete delay work");
-			++m_rptbd_counts.acks; m_cpu->set_input_line(line, CLEAR_LINE);
-		}
+		acknowledge_rptbd_interrupt(line);
 		if (m_phase == 310400)
 		{
 			auto const f = rptbd_shift_store_case(m_pipeline_peripheral_case);
@@ -1010,20 +1014,7 @@ void tms320c54x_test_state::test(machine_config &config)
 				"Two-word instruction completes Decode before interrupt IACK");
 			++m_vector_acks;
 		}
-		if (m_phase == 251030)
-		{
-			expect(line == (m_pipeline_empty_nmi ? INPUT_LINE_NMI : 0) && m_cpu->pipeline_cycles() == 4,
-				"Empty frontend acknowledges the selected IRQ/NMI at vector Fetch");
-			++m_vector_acks;
-		}
-		if (m_phase == 251000)
-		{
-			expect(line == 0 && m_cpu->pipeline_cycles() == 6 &&
-				m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0 &&
-				(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800),
-				"Staged vector IACK at cycle 6 clears its source and sets INTM");
-			++m_vector_acks;
-		}
+		acknowledge_frontend_interrupt(line);
 		acknowledge_entry_interrupt(line);
 		return 0;
 	}, "vector_acknowledge");

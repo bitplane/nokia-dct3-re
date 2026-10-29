@@ -19,6 +19,21 @@ def methods(filename):
 
 
 class FixtureOwnershipTests(unittest.TestCase):
+    def test_pipeline_families(self):
+        self.check_owners('tms320c54x_test_frontend.cpp', dict.fromkeys((
+            'start_pipeline_frontend_case', 'start_empty_pipeline_case',
+            'check_pipeline_frontend_results', 'acknowledge_frontend_interrupt'), 'm_frontend'),
+            handoffs=('start_pipeline_frontend_case',),
+            legacy_taps=('m_pipeline_operand_tap', 'm_pipeline_fetch_tap',
+                         'm_vector_prefetch_tap', 'm_vector_stack_tap'))
+        self.check_owners('tms320c54x_test_observer.cpp', dict.fromkeys((
+            'start_instruction_observer', 'check_instruction_observer_results'), 'm_instruction_observer'))
+        self.check_owners('tms320c54x_test_block_repeat.cpp', dict.fromkeys((
+            'start_rptbd', 'start_rptbd_edge', 'check_rptbd_layout_results',
+            'acknowledge_rptbd_interrupt'), 'm_rptbd'),
+            handoffs=('start_rptbd',),
+            legacy_taps=('m_pipeline_operand_tap', 'm_pipeline_write_tap', 'm_pipeline_fetch_tap'))
+
     def test_snapshot_stream_boundaries(self):
         # Architectural ownership only: the executable replay gates establish
         # restoration behavior, including checkpoints shared across modules.

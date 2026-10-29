@@ -104,6 +104,7 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_pipeline_sp_rmw_results()) return;
 	if (check_pipeline_memory_repeat_read_a_results()) return;
 	if (check_instruction_observer_results()) return;
+	if (check_block_page_results()) return;
 	if (check_mvkd_sp_results()) return;
 	if (check_pipeline_add_sp_context_results()) return;
 	if (check_pipeline_peripheral_logic_results()) return;
@@ -147,6 +148,7 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_basic_repeat_edge_results()) return;
 	if (check_rptbd_shift_store_results()) return;
 	if (check_rptbd_layout_results()) return;
+	if (check_block_repeat_forwarding_results()) return;
 	if (check_negate_results()) return;
 	if (check_long_mapped_original_results()) return;
 	if (check_mcbsp_control_sequence_results()) return;

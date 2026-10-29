@@ -100,3 +100,9 @@ Transport/repeat retains its saved host read count and shared-RAM comparison;
 far-transfer capture and replay share one owner across the control and restore
 modules. These are storage boundaries, not reset-independent fixtures: phase
 order, host-counter rewinds and device mutation remain explicit at each site.
+
+Frontend entry/flush, instruction observation and delayed-block-repeat layout
+fixtures own their progress, observations, taps and checkpoints in separate
+modules. The CPU wiring delegates their acknowledgements without changing
+the ordered callback route. Other repeat and dependency fixtures still share
+the sequenced bench storage; that sharing is not evidence of reset isolation.

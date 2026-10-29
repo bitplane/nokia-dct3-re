@@ -282,100 +282,6 @@ void tms320c54x_test_state::start_braf_control_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_pipeline_frontend_case(bool memory, bool memory_b)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_memory_case = memory;
-	m_pipeline_memory_b = memory_b;
-	m_pipeline_operand_reads = 0;
-	m_vector_prefetch_tap.remove(); m_vector_stack_tap.remove();
-	auto &program = m_cpu->space(AS_PROGRAM);
-	auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i)
-	{
-		program.write_word(0x600 + i, 0xf495);
-		program.write_word(0x40 + i, 0xf495);
-	}
-	program.write_word(0x600, 0xe811); // Decoded before INTR, retires at cycle 6.
-	if (memory) program.write_word(0x600, memory_b ? 0x1120 : 0x1020);
-	program.write_word(0x601, 0xe822); // Fetched, not decoded; must not execute.
-	program.write_word(0x602, 0xe833); // Prefetch already in flight; Fetch must drain.
-	program.write_word(0x40, 0xe955); // One-word first ISR instruction, Execute at 10.
-	data.write_word(0xfff, 0xbeef);
-	data.write_word(0x420, 0x1234);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_ST0, 8}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_IMR, 1},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, 0},
-		{cpu_regs::STATE_B, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {STATE_GENPC, 0x600}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_expected_cycle = 1;
-	m_pipeline_replay = false;
-	m_vector_reads = m_vector_acks = 0;
-	m_pipeline_drained_fetches = 0;
-	if (memory)
-		m_pipeline_operand_tap = data.install_read_tap(0x420, 0x420, "pipeline_operand",
-			[this](offs_t, u16 &, u16) {
-				if (machine().side_effects_disabled()) return;
-				expect(m_cpu->pipeline_cycles() == 5, "DP-relative operand is read in Read, not Execute");
-				++m_pipeline_operand_reads;
-			});
-	m_pipeline_fetch_tap = program.install_read_tap(0x602, 0x602, "pipeline_flush_fetch",
-		[this](offs_t, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_cpu->pipeline_cycles() == 4, "Already-prefetched flush word reaches Fetch at cycle 4");
-			++m_pipeline_drained_fetches;
-		});
-	m_vector_prefetch_tap = program.install_read_tap(0x40, 0x40, "pipeline_vector",
-		[this](offs_t, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_cpu->pipeline_cycles() == 6 && m_vector_acks == 1,
-				"Vector Fetch occurs at cycle 6 once, after IACK");
-			++m_vector_reads;
-		});
-	m_vector_stack_tap = data.install_write_tap(0xfff, 0xfff, "pipeline_return_pc",
-		[this](offs_t, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_cpu->pipeline_cycles() == 7 && value == 0x601,
-				"INTR Execute writes the first not-decoded continuation at cycle 7");
-		});
-	m_phase = 251000;
-	m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_empty_pipeline_case(bool nmi)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_empty_nmi = nmi;
-	m_pipeline_expected_cycle = 1;
-	m_vector_reads = m_vector_acks = 0;
-	u16 const vector = nmi ? 4 : 0x40;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(vector + i, 0xf495);
-	program.write_word(vector, 0xe955);
-	program.write_word(0x600, 0xe811);
-	m_cpu->space(AS_DATA).write_word(0xfff, 0xbeef);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST1, nmi ? 0x0800 : 0}, {cpu_regs::STATE_IMR, nmi ? 0 : 1},
-		{cpu_regs::STATE_IFR, nmi ? 2 : 0}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, 0},
-		{cpu_regs::STATE_B, 0}, {STATE_GENPC, 0x600},
-	});
-	m_cpu->set_pipeline_frontend(true);
-	m_vector_prefetch_tap = program.install_read_tap(vector, vector, "empty_pipeline_vector",
-		[this](offs_t, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_cpu->pipeline_cycles() == 4 && m_vector_acks == 1,
-				"Empty frontend vector Fetch follows IACK at cycle 4");
-			++m_vector_reads;
-		});
-	m_phase = 251030;
-	m_cpu->set_input_line(nmi ? INPUT_LINE_NMI : 0, ASSERT_LINE);
-	m_cpu->set_input_line(nmi ? INPUT_LINE_NMI : 0, CLEAR_LINE);
-	m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
 void tms320c54x_test_state::start_pipeline_rmw_case(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
@@ -2415,34 +2321,6 @@ void tms320c54x_test_state::start_pipeline_banz(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_instruction_observer(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const xc = variant >= 32, two = xc && BIT(variant - 32, 5);
-	bool const staged = BIT(variant, 0), overlay = BIT(variant, 2);
-	u32 const base = BIT(variant, 1) ? 0x20000 : 0, physical = overlay ? 0 : base;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 48; ++i) program.write_word(physical + 0x600 + i, 0xf495);
-	std::array<u16, 10> const code{0xec02, 0xf495, 0xf073, 0x0608, 0xe966, 0xf495, 0xf495, 0xf495, 0xe977, 0xf4e1};
-	for (unsigned i = 0; i < code.size(); ++i) program.write_word(physical + 0x600 + i, code[i]);
-	if (xc)
-	{
-		std::array<u16, 7> const conditional{u16(two ? 0xff45 : 0xfd45), 0xe966, u16(two ? 0xe955 : 0xf495),
-			u16(two ? 0xff44 : 0xfd44), 0xe977, u16(two ? 0xf495 : 0xf4e1), 0xf4e1};
-		for (unsigned i = 0; i < conditional.size(); ++i) program.write_word(physical + 0x600 + i, conditional[i]);
-	}
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, overlay ? 0x20 : 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x900}, {cpu_regs::STATE_SP, 0x1000},
-		{cpu_regs::STATE_A, xc ? 1 : 0}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_observed_instructions.clear(); m_saved_observed_instructions.clear();
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(staged);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 292000;
-	m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
 void tms320c54x_test_state::start_pipeline_add_sp_context(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -3189,78 +3067,6 @@ void tms320c54x_test_state::start_rptbd_square(unsigned variant)
 	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x603, "rptbd_square_words", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_extensions_reads++; expect(i < 3 && at == f.base + 0x601 + i && word == (i ? f.opcode(i - 1) : 0x605), "RPTBD owns one endpoint and two non-repeated delay words"); });
 	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62178;
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_rptbd(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	u32 const base = rptbd_base(variant); unsigned const layout = rptbd_layout(variant);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0xf272); program.write_word(base + 0x601, 0x606);
-	program.write_word(base + 0x602, std::array<u16, 4>{0x6d95, 0x770e, 0x10e1, 0x6deb}[layout]);
-	program.write_word(base + 0x603, std::array<u16, 4>{0x6d96, 0x1234, 3, 0x0a40}[layout]);
-	program.write_word(base + 0x604, 0xe589); program.write_word(base + 0x605, 0x6d94);
-	// Keep the IRQ fixture's terminal IDLE beyond the interrupted body;
-	// this tests loop return, not the separately covered IDLE wake path.
-	program.write_word(base + (variant >= 512 ? 0x60f : 0x607), 0xf4e1);
-	if (variant >= 512)
-	{
-		u32 const vector = base + (rptbd_irq_line(variant) == INPUT_LINE_NMI ? 4 : 0x48);
-		program.write_word(vector, 0xf495); program.write_word(vector + 1, 0xf4eb);
-	}
-	for (unsigned i = 0; i < 8; ++i) { data.write_word(0x5000 + i, rptbd_source(variant, i)); data.write_word(0x6000 + i, 0xdead); }
-	data.write_word(0x4003, rptbd_source(variant, 0));
-	m_cpu->set_pipeline_frontend(false);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	if (variant >= 512) { m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x100); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, rptbd_irq_line(variant) == 2 ? 4 : 0); }
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x4000); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR3, layout == 3 ? 0x55c0 : 0x6000); m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x7000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x7100); m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x7200);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BRC, rptbd_count(variant));
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_rptbd_counts = {}; m_pipeline_replay = false; m_idle_fixture_tick = 0;
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x603, "rptbd_retained_words",
-		[this, base, layout](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			unsigned const i = m_rptbd_counts.fetches++;
-			u16 const expected = i == 0 ? 0x606 : i == 1 ? std::array<u16, 4>{0x6d95, 0x770e, 0x10e1, 0x6deb}[layout] : std::array<u16, 4>{0x6d96, 0x1234, 3, 0x0a40}[layout];
-			expect(i < 3 && at == base + 0x601 + i && word == expected, "RPTBD fetches endpoint and both delay words exactly once"); });
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "rptbd_ordered_reads",
-		[this, variant, layout](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			if (at == 0x2fff && variant >= 512) { expect(!m_rptbd_counts.stack_reads && m_rptbd_counts.stack_writes == 1 && word == m_rptbd_return, "RPTBD ISR reads its original continuation frame once"); ++m_rptbd_counts.stack_reads; return; }
-			if (at == 0x4003) { expect(layout == 2 && !m_rptbd_counts.delay_reads && word == rptbd_source(variant, 0), "RPTBD delay load samples its operand once"); ++m_rptbd_counts.delay_reads; return; }
-			unsigned const i = m_rptbd_counts.reads++;
-			expect(i <= rptbd_count(variant) && at == 0x5000 + i && word == rptbd_source(variant, i), "RPTBD repeats ordered source reads, excluding delay work"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "rptbd_ordered_writes",
-		[this, variant, layout](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			if (at == 0x2fff && variant >= 512) { expect(!m_rptbd_counts.stack_writes && word >= 0x604 && word <= 0x60f, "RPTBD interrupt stacks one continuation after the complete delay span"); ++m_rptbd_counts.stack_writes; m_rptbd_return = word; return; }
-			if (at == 0x0e) { expect(layout == 1 && !m_rptbd_counts.delay_writes && word == 0x1234, "RPTBD delay STM publishes T once"); ++m_rptbd_counts.delay_writes; return; }
-			unsigned const i = m_rptbd_counts.writes++;
-			expect(i <= rptbd_count(variant) && at == 0x6000 + i && word == rptbd_source(variant, i), "RPTBD repeats ordered destination writes without replay duplicates");
-			if (!i && variant >= 512 && rptbd_late_irq(variant)) m_cpu->set_input_line(rptbd_irq_line(variant), ASSERT_LINE); });
-	m_phase = 255320; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_rptbd_edge(unsigned variant)
-{
-	start_rptbd(2 + ((variant / 7) % 2) * 64);
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-	unsigned const kind = variant % 7; u32 const base = (variant / 7) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(base + 0x601, kind == 5 ? 0x605 : 0x606);
-	program.write_word(base + 0x602, std::array<u16, 7>{0x771a, 0x881a, 0x8a1a, 0xf073, 0xf495, 0xf495, 0xf272}[kind]);
-	program.write_word(base + 0x603, kind == 4 ? 0x10e1 : kind == 0 ? 1 : kind == 3 || kind == 6 ? 0x604 : 0xf495);
-	program.write_word(base + 0x604, kind == 5 ? 0xf272 : kind == 4 ? 3 : 0xf495);
-	program.write_word(base + 0x605, kind == 5 ? 0x606 : 0xf495);
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "rptbd_edge_no_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "rptbd_edge_no_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
-	m_phase = 255340; m_cpu->resume(SUSPEND_REASON_DISABLE);
 }
 
 void tms320c54x_test_state::start_pipeline_rptb_edge(unsigned variant)
@@ -5125,136 +4931,6 @@ bool tms320c54x_test_state::check_native_final_gap_results()
 		if (index < 11) { start_native_final_gap_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x native final gaps: PASS words=6 cases=12 signed_shift=1 saturation=1 compact_store=1\n");
 		start_indirect_popm_case(0); return true;
-	}
-	return false;
-}
-
-bool tms320c54x_test_state::check_pipeline_frontend_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 251000)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		osd_printf_info("TMS320C54x staged tick: cycle=%llu expected=%llu replay=%u pc=%06x a=%llx b=%llx sp=%04x ifr=%04x illegal=%u\n",
-			static_cast<unsigned long long>(cycle), static_cast<unsigned long long>(m_pipeline_expected_cycle), m_pipeline_replay,
-			unsigned(m_cpu->state_int(STATE_GENPC)), static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)),
-			static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_B)),
-			unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)),
-			unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
-			"Staged frontend advances exactly one clock per observation without unsupported forms");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle < 6 || m_pipeline_memory_b ? 0 : m_pipeline_memory_case ? 0x1234 : 0x11) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 10 ? 0x55 : cycle >= 6 && m_pipeline_memory_b ? 0x1234 : 0),
-			"Decoded foreground retires at 6; first ISR retires at 10; flushed immediate loads never execute");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle < 5 ? 0x1000 : 0xfff) &&
-			m_cpu->space(AS_DATA).read_word(0xfff) == (cycle < 7 ? 0xbeef : 0x601),
-			"INTR Access and Execute own separate cycles 5 and 7");
-		if (cycle == 2) m_cpu->set_input_line(0, ASSERT_LINE);
-		u64 const checkpoint = m_pipeline_memory_case ? 5 : 4;
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			if (m_pipeline_memory_case)
-			{
-				expect(m_pipeline_operand_reads == 1, "Operand bus read completed once before checkpoint");
-				m_cpu->space(AS_DATA).write_word(0x420, 0x5678);
-			}
-			expect(machine().scheduler().can_save(), "Decoded foreground and INTR checkpoint is saveable");
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE,
-				"Save decoded foreground and pending INTR before Access");
-		}
-		if (cycle == 10)
-		{
-			expect(m_vector_reads == 1 && m_vector_acks == 1 && m_pipeline_drained_fetches == 1,
-				"Each leg drains its prefetched word and fetches/acknowledges one vector");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true;
-				m_vector_reads = m_vector_acks = 0;
-				// The flush word was already fetched at the saved cycle-4 boundary.
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint,
-					"Restore pending INTR and the decoded foreground slot");
-				// Loading inside a live callback rewinds device local times while
-				// the callback timestamp is still the old one. Let the scheduler
-				// settle with this bench CPU suspended before single-clock replay.
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_phase = 251010;
-				m_pipeline_expected_cycle = checkpoint + 1;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-				return true;
-			}
-			if (m_pipeline_memory_case)
-			{
-				expect(m_pipeline_operand_reads == 1, "Retirement and restored retirement reuse the captured operand without another bus read");
-				if (m_pipeline_memory_b)
-					osd_printf_info("TMS320C54x staged direct load: PASS cases=2 read=5 execute=6 retained_operand=1 restore_after_read=1 bus_reads_per_case=1\n");
-			}
-			else
-				osd_printf_info("TMS320C54x staged frontend: PASS foreground_execute=6 vector_fetch=6 stack_write=7 isr_execute=10 pending_restore=1 coverage=register_one_word native_enabled=0\n");
-			m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_vector_stack_tap.remove();
-			m_pipeline_operand_tap.remove();
-			m_cpu->set_pipeline_frontend(false);
-			if (!m_pipeline_memory_case) { start_pipeline_frontend_case(true); return true; }
-			if (!m_pipeline_memory_b) { start_pipeline_frontend_case(true, true); return true; }
-			m_cpu->space(AS_PROGRAM).write_word(0x600, 0x77e1);
-			set_registers(*m_cpu, {
-				{STATE_GENPC, 0x600}, {cpu_regs::STATE_ST1, 0x0800}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_AR1, 0},
-			});
-			m_cpu->set_pipeline_frontend(true);
-			m_phase = 251020;
-			m_check_timer->adjust(attotime::from_ticks(3, m_cpu->clock()));
-			return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-		return true;
-	}
-	if (m_phase == 251010)
-	{
-		expect(m_cpu->pipeline_cycles() == (m_pipeline_memory_case ? 5 : 4), "Scheduler settlement does not retire restored instructions");
-		m_cpu->resume(SUSPEND_REASON_DISABLE);
-		m_phase = 251000;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-		return true;
-	}
-	if (m_phase == 251020)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0,
-			"Unsupported staged multiword form stops at Decode without atomic fallback");
-		m_cpu->set_pipeline_frontend(false);
-		osd_printf_info("TMS320C54x staged frontend exclusions: PASS unsupported_stops=1 atomic_fallback=0\n");
-		start_empty_pipeline_case(false);
-		return true;
-	}
-	if (m_phase == 251030)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
-			"Empty frontend advances one clock without fallback");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle < 8 ? 0 : 0x55),
-			"Undecoded foreground is flushed; ISR retires at cycle 8");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle < 3 ? 0x1000 : 0xfff) &&
-			m_cpu->space(AS_DATA).read_word(0xfff) == (cycle < 5 ? 0xbeef : 0x600),
-			"Empty frontend stacks the unexecuted first instruction at cycle 5");
-		if (cycle < 8)
-		{
-			++m_pipeline_expected_cycle;
-			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-			return true;
-		}
-		expect(m_vector_reads == 1 && m_vector_acks == 1 &&
-			m_cpu->state_int(tms320c54x_device::STATE_IFR) == (m_pipeline_empty_nmi ? 2 : 0),
-			"Empty IRQ/NMI acknowledges once and preserves unrelated pending sources");
-		m_vector_prefetch_tap.remove();
-		m_cpu->set_pipeline_frontend(false);
-		if (!m_pipeline_empty_nmi) { start_empty_pipeline_case(true); return true; }
-		osd_printf_info("TMS320C54x staged empty frontend: PASS irq=1 nmi=1 return_pc=0600 vector_fetch=4 stack_write=5 isr_execute=8\n");
-		start_multiword_pipeline_case();
-		return true;
 	}
 	return false;
 }
@@ -7167,71 +6843,10 @@ bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_instruction_observer_results()
+bool tms320c54x_test_state::check_block_page_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 292000)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const xc = variant >= 32, two = xc && BIT(variant - 32, 5);
-		u32 const base = BIT(variant, 1) ? 0x20000 : 0, physical = BIT(variant, 2) ? 0 : base;
-		unsigned const checkpoint = std::array<unsigned, 4>{1, 3, 6, 9}[(variant % 32) / 8];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Observer fixture executes only accepted instructions");
-		// Debugger-style inspection and plain program-bus reads are not execution.
-		unsigned const before = m_observed_instructions.size();
-		m_cpu->space(AS_PROGRAM).read_word(physical + 0x600);
-		{ auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).read_word(physical + 0x601); }
-		expect(m_observed_instructions.size() == before, "Program/data inspection cannot issue instruction observations");
-		if (tick == 5)
-		{
-			auto const disable = machine().disable_side_effects();
-			m_cpu->space(AS_PROGRAM).write_word(physical + 0x600, 0x0000);
-		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_saved_observed_instructions = m_observed_instructions;
-			m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save before or after observer entry without saving callback wiring");
-		}
-		if (tick == 40)
-		{
-			std::vector<std::pair<offs_t, u16>> expected{
-				{base + 0x600, 0xec02}, {base + 0x601, 0xf495}, {base + 0x601, 0xf495},
-				{base + 0x601, 0xf495}, {base + 0x602, 0xf073}, {base + 0x608, 0xe977}, {base + 0x609, 0xf4e1}};
-			if (xc)
-			{
-				expected = {{base + 0x600, u16(two ? 0xff45 : 0xfd45)}};
-				if (!two) expected.emplace_back(base + 0x602, 0xf495);
-				expected.emplace_back(base + 0x603, two ? 0xff44 : 0xfd44);
-				expected.emplace_back(base + 0x604, 0xe977);
-				if (two) expected.emplace_back(base + 0x605, 0xf495);
-				expected.emplace_back(base + (two ? 0x606 : 0x605), 0xf4e1);
-			}
-			if (m_observed_instructions != expected)
-			{
-				osd_printf_info("Instruction observer mismatch: case=%u replay=%u entries=%zu pc=%06x\n", variant, unsigned(m_pipeline_replay), m_observed_instructions.size(), unsigned(m_cpu->state_int(STATE_GENPC)));
-				for (auto const &[address, opcode] : m_observed_instructions) osd_printf_info("  entry=%06x opcode=%04x\n", unsigned(address), opcode);
-			}
-			expect(m_observed_instructions == expected && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x77 && m_cpu->state_int(tms320c54x_device::STATE_A) == (xc ? 1 : 0) && m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-				"Execute entries retain opcode and logical page, include real repeats and exclude extension/annulled fetches");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint;
-				m_observed_instructions = m_saved_observed_instructions;
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never);
-				expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore instruction identity without extra observer emissions");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 292010; m_check_timer->enable(true); return true;
-			}
-			m_cpu->set_pipeline_frontend(false);
-			if (variant == 31) osd_printf_info("TMS320C54x instruction observer: PASS cases=32 restore=32 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 events_each=7 logical_address=1 captured_opcode=1 repeat_entries=3 ordinary_reads=0 annulled_fetches=0 observer_writes=0\n");
-			if (variant < 95) { start_instruction_observer(variant + 1); return true; }
-			osd_printf_info("TMS320C54x observer XC annulment: PASS cases=64 restore=64 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 forms=XC1,XC2 events_each=5 rejected_slots=absent accepted_source_nops=present observer_writes=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated instruction observer complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 292010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 292000; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 294000)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = block_page_case(variant);
@@ -8380,95 +7995,10 @@ bool tms320c54x_test_state::check_basic_repeat_edge_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_rptbd_layout_results()
+bool tms320c54x_test_state::check_block_repeat_forwarding_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 255320)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, layout = rptbd_layout(variant), iterations = rptbd_count(variant) + 1;
-		bool const interrupt = variant >= 512;
-		unsigned const checkpoint = interrupt ? std::array<unsigned, 6>{3, 4, 6, 8, 11, 17}[(variant - 512) / 128] : std::array<unsigned, 4>{3, 6, 8, 13}[variant / 128];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "RPTBD fixture remains in supported staged forms");
-		// Replace fetched words and sampled RAM, never firmware architectural state.
-		if (tick == 3) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(rptbd_base(variant) + 0x601, 0xdead); }
-		if (tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(rptbd_base(variant) + 0x603, 0xdead); }
-		if (tick == 8 && layout == 2) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x4003, 0xdead); }
-		if (interrupt && tick == 5 && !rptbd_late_irq(variant)) m_cpu->set_input_line(rptbd_irq_line(variant), ASSERT_LINE);
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_rptbd_saved_counts = m_rptbd_counts; m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			m_rptbd_saved_return = m_rptbd_return;
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save RPTBD header, delay span or active loop");
-		}
-		if (tick == (interrupt ? 160 : 96))
-		{
-			u64 const a = layout == 2 ? u64(s64(s16(rptbd_source(variant, 0)))) & 0xffffffffffULL : 0x123456789aULL;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == rptbd_base(variant) + (interrupt ? 0x610 : 0x608) &&
-				!m_cpu->state_int(tms320c54x_device::STATE_BRC) && m_cpu->state_int(tms320c54x_device::STATE_RSA) == 0x604 && m_cpu->state_int(tms320c54x_device::STATE_REA) == 0x606 &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (interrupt ? 0x100 : 0x900) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x4000 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x5000 + iterations && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x6000 + iterations &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x7000 + iterations && m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x7100 + unsigned(layout == 0) && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x7200 + unsigned(layout == 0) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == (layout == 1 ? 0x1234 : 0x5aa5) &&
-				m_rptbd_counts.reads == iterations && m_rptbd_counts.writes == iterations && m_rptbd_counts.fetches == 3 && m_rptbd_counts.delay_reads == unsigned(layout == 2) && m_rptbd_counts.delay_writes == unsigned(layout == 1),
-				"RPTBD executes delay work once and body BRC+1 times, preserving unrelated state");
-			expect(m_rptbd_counts.acks == unsigned(interrupt) && m_rptbd_counts.stack_reads == unsigned(interrupt) && m_rptbd_counts.stack_writes == unsigned(interrupt), "RPTBD balances one optional interrupt frame and acknowledges its source once");
-			{ auto const disable = machine().disable_side_effects(); for (unsigned i = 0; i < iterations; ++i) expect(m_cpu->space(AS_DATA).read_word(0x6000 + i) == rptbd_source(variant, i), "RPTBD final copy matches independent source oracle"); }
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_rptbd_counts = m_rptbd_saved_counts;
-				m_rptbd_return = m_rptbd_saved_return;
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore RPTBD without fetching retained words or duplicating delay effects");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255330; m_check_timer->enable(true); return true;
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (interrupt ? 1279U : 511U)) { start_rptbd(variant + 1); return true; }
-			if (interrupt)
-			{
-				osd_printf_info("TMS320C54x delayed block repeat interrupts: PASS cases=768 restore=768 counts=0,1,2,7 delay_layouts=4 pages=2 sources=IRQ,NMI arrivals=delay,first_write snapshots=6 delay_effects=once ordered_copies=1 balanced_frames=1 retained_words=1 physical_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated delayed block repeat interrupts complete");
-			}
-			osd_printf_info("TMS320C54x delayed block repeat: PASS cases=512 restore=512 counts=0,1,2,7 delay_layouts=4 patterns=4 pages=2 snapshots=4 delay_effects=once ordered_copies=1 retained_words=1 interrupt_composition=unvalidated physical_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated delayed block repeat complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255330)
-	{
-		if (m_pipeline_peripheral_case >= 512) { m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_phase = 255331; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255320; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255331) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255320; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 255340)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, kind = variant % 7, tick = ++m_idle_fixture_tick;
-		unsigned const guard = kind == 5 ? 8 : kind == 4 ? 6 : 5, checkpoint = guard - 1 + variant / 14;
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_rptbd_saved_counts = m_rptbd_counts; m_saved_pipeline.str({}); m_saved_pipeline.clear();
-			expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save RPTBD exclusion before or after the guard");
-		}
-		if (tick == 16)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->pipeline_cycles() == guard && !m_rptbd_counts.reads && !m_rptbd_counts.writes &&
-				m_cpu->state_int(tms320c54x_device::STATE_BRC) == 2 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x5000 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x6000 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5,
-				"RPTBD exclusions stop before bus effects, pointer updates, BRC writes or frame allocation");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_rptbd_counts = m_rptbd_saved_counts;
-				m_saved_pipeline.clear(); m_saved_pipeline.seekg(0); m_check_timer->adjust(attotime::never); expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore RPTBD exclusion at its exact retained guard");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255350; m_check_timer->enable(true); return true;
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 27) { start_rptbd_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x delayed block repeat exclusions: PASS cases=28 restore=28 forms=STM_BRC,STLM_BRC,POPM_BRC,branch,spill,nested_body,nested_delay pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_updates=0 counters_preserved=1 silicon_trap_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated delayed block repeat exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255350) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255340; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 253350)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, count = rptb_count(variant);
@@ -9402,5 +8932,6 @@ bool tms320c54x_test_state::check_conditional_register_results()
 	}
 	return false;
 }
+
 
 } // namespace c54x_test
