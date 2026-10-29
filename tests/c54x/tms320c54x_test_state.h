@@ -2340,6 +2340,8 @@ private:
 	unsigned m_long_store_replays = 0;
 	ordered_case_digest m_register_bank_coverage;
 	unsigned m_register_bank_replays = 0;
+	ordered_case_digest m_shifted_coverage;
+	unsigned m_shifted_replays = 0;
 	unsigned m_pipeline_return_case = 0;
 	unsigned m_pipeline_branch_case = 0;
 	unsigned m_pipeline_stm_case = 0;

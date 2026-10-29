@@ -5,6 +5,7 @@
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_rmw_schedule.h"
 #include "tms320c54x_test_store_schedule.h"
+#include "tms320c54x_test_shifted_schedule.h"
 #include "tms320c54x_test_register_schedule.h"
 
 namespace c54x_test {
@@ -2302,6 +2303,7 @@ tms320c54x_test_state::shifted_arithmetic_fixture tms320c54x_test_state::shifted
 
 void tms320c54x_test_state::start_pipeline_shifted_arithmetic(unsigned variant)
 {
+	if (!variant) { m_shifted_coverage = {}; m_shifted_replays = 0; }
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	bool const bk = profile_is("shifted-bk");
 	auto const f = shifted_arithmetic_case(variant, bk); auto const &o = f.operand;
@@ -7121,7 +7123,7 @@ bool tms320c54x_test_state::check_immediate_arithmetic_results()
 			else m_cpu->set_state_int(bk ? tms320c54x_device::STATE_BK : tms320c54x_device::STATE_AR0 + o.address - 0x10, 0xdead);
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
 		}
-		unsigned const checkpoint_index = bk ? (variant / 4096) % 3 : subc ? variant - 245760 < 18432 ? (variant - 245760) / 6144 : (variant - 264192) / 4096 : variant < 147456 ? variant / 49152 : (variant - 147456) / 32768;
+		unsigned const checkpoint_index = shifted_memory_schedule::checkpoint_index(variant, bk);
 		unsigned const checkpoint = std::array<unsigned, 3>{!subc && o.form >= 14 ? 4U : 3U, o.read_cycle - 1, o.read_cycle}[checkpoint_index];
 		if (tick == checkpoint && !m_pipeline_replay)
 		{
@@ -7135,19 +7137,34 @@ bool tms320c54x_test_state::check_immediate_arithmetic_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
 				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore shifted arithmetic without duplicating sampling or publication");
+				++m_shifted_replays;
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253220; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+			m_shifted_coverage.add(shifted_memory_schedule::case_key(variant, bk));
 			if (bk)
 			{
-				if (variant < 24575) { start_pipeline_shifted_arithmetic(variant + 1); return true; }
-				osd_printf_info("TMS320C54x shifted BK arithmetic: PASS cases=24576 restore=24576 selectors=8 shifts=32 sxm_ovm=4 values=4 pages=2 snapshots=3 source_sample=Read post_read_change=1 extension_poison=1 writes=0 physical_phase_claim=0\n");
+				if (auto const next = shifted_memory_schedule::next(variant, true); next < shifted_memory_schedule::bk_end)
+				{ start_pipeline_shifted_arithmetic(next); return true; }
+				expect(m_shifted_coverage.count == shifted_memory_schedule::bk_cases && m_shifted_replays == shifted_memory_schedule::bk_cases,
+					"Every BK arithmetic stimulus and balanced replay completed once");
+				osd_printf_info("TMS320C54x shifted BK arithmetic: PASS cases=%u restore=%u selectors=8 shifts=32 sxm_ovm=4 values=4 pages=2 snapshots=balanced source_sample=Read post_read_change=1 extension_poison=1 writes=0 physical_phase_claim=0 coverage_fnv64=%016llx\n",
+					m_shifted_coverage.count, m_shifted_replays, (unsigned long long)m_shifted_coverage.value);
 				throw emu_fatalerror(3, "TMS320C54x isolated shifted BK arithmetic complete");
 			}
-			if (variant == 245759) osd_printf_info("TMS320C54x staged shifted memory ADD/SUB: PASS ram_cases=147456 mapped_ar_cases=98304 selectors=8 shifts=32 sxm_ovm=4 patterns=4 restore=245760 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
-			if (variant == 245759 && profile_is("shifted-alu")) throw emu_fatalerror(0, "TMS320C54x isolated shifted memory ADD SUB complete");
-			if (variant < 276479) { start_pipeline_shifted_arithmetic(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged SUBC: PASS ram_cases=18432 mapped_ar_cases=12288 value_pairs=64 sxm_ovm=4 accumulators=2 restore=30720 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+			if (variant + 1 == 147456 + shifted_memory_schedule::mapped_cases)
+			{
+				expect(m_shifted_coverage.count == shifted_memory_schedule::arithmetic_cases && m_shifted_replays == shifted_memory_schedule::arithmetic_cases,
+					"Every shifted ADD/SUB stimulus and balanced replay completed once");
+				osd_printf_info("TMS320C54x staged shifted memory ADD/SUB: PASS ram_cases=49152 mapped_ar_cases=32768 selectors=8 shifts=32 sxm_ovm=4 patterns=4 restore=81920 snapshots=balanced duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
+			}
+			if (auto const next = shifted_memory_schedule::next(variant, false); next < shifted_memory_schedule::end)
+			{ start_pipeline_shifted_arithmetic(next); return true; }
+			expect(m_shifted_coverage.count == shifted_memory_schedule::cases && m_shifted_replays == shifted_memory_schedule::cases,
+				"Every shifted-memory and SUBC stimulus and balanced replay completed once");
+			osd_printf_info("TMS320C54x staged SUBC: PASS ram_cases=6144 mapped_ar_cases=4096 value_pairs=64 sxm_ovm=4 accumulators=2 restore=10240 snapshots=balanced duplicate_reads=0 data_writes=0 silicon_phase_claim=0 combined_cases=%u combined_restore=%u coverage_fnv64=%016llx\n",
+				m_shifted_coverage.count, m_shifted_replays, (unsigned long long)m_shifted_coverage.value);
+			if (profile_is("shifted-alu")) throw emu_fatalerror(3, "TMS320C54x isolated shifted memory arithmetic complete");
 			start_pipeline_memory_repeat(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

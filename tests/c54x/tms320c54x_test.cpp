@@ -1512,7 +1512,7 @@ ROM_START(tms54test)
 	ROM_SYSTEM_BIOS(243, "load-variable", "Legal variable-shift memory load replay")
 	ROM_SYSTEM_BIOS(244, "bitf-smem", "Read-capable Smem bitfield and immediate replay")
 	ROM_SYSTEM_BIOS(245, "memory-alu", "Read-capable scalar memory ADD and SUB replay")
-	ROM_SYSTEM_BIOS(246, "shifted-alu", "Read-capable variable-shift memory arithmetic replay")
+	ROM_SYSTEM_BIOS(246, "shifted-alu", "Read-capable shifted ADD/SUB and conditional SUBC replay")
 	ROM_SYSTEM_BIOS(247, "mul-t-sources", "Read-capable memory multiply and T-load replay")
 	// BIOS selection is eight-bit (index + 1); further fixtures need another namespace.
 ROM_END

@@ -468,9 +468,10 @@ missing peripheral. The staged CPU's generic diagnostic calls this family
 "shifted load", but the operation here is ADD. The neighboring source
 `02558f..025598` (10 words) pins AR6/BK additions and AR2/AR1 publication.
 The absolute-address ADD/SUB family now has a bounded CPU admission.
-`shifted-bk` checks 24576 cases and replays: eight source/destination/operation
+`shifted-bk` checks 8192 cases and replays: eight source/destination/operation
 selectors, all 32 shifts, four values, SXM/OVM combinations, two program
-pages and three save checkpoints. It changes BK after Read, poisons fetched
+pages and balanced Decode/Access/Read checkpoints across each non-pattern
+group. It changes BK after Read, poisons fetched
 extensions, supplies live Execute accumulator operands, and requires one
 source read with no data writes. The unchanged CPU guard fails this fixture;
 the admitted implementation passes. `shift-bk-edge` checks 64 exclusions
@@ -478,7 +479,8 @@ and replays covering repeat, block, XC, delay, ST1, BRC and neighboring
 BK load/store forms, with zero data reads/writes. Indirect addressing,
 pending BK-writer composition and physical silicon phase timing are not
 qualified by these tests.
-The existing 245760-case shifted RAM/mapped-AR arithmetic profile and
+The 81920-input shifted RAM/mapped-AR arithmetic bank, its 10240-input SUBC
+tail (both in `shifted-alu`) and the
 1024-case ordinary BK ADD/SUB profile also pass with their save-state
 replays. These guard neighboring supported behavior; they do not widen
 the new absolute BK admission.

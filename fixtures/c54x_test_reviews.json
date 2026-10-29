@@ -236,6 +236,58 @@
       ],
       "retired_profiles": ["rmw-long-full"],
       "retirement_basis": "The full comparison passed and adds no distinct assertion, mutation sequence or checkpoint shape. No separate regression was identified that requires its remaining value/checkpoint combinations. Those combinations are no longer claimed as covered; a newly evidenced interaction can justify a targeted regression."
+    },
+    {
+      "id": "shifted-memory-arithmetic",
+      "classification": "architectural_interaction",
+      "decision": "merge",
+      "basis": "TI shifted ADD/SUB and conditional SUBC semantics; the existing independent signed-integer, 40-bit masking, carry, overflow and saturation references remain unchanged. Literal address fixtures and bus observations supply expectations, not CPU helpers. Exact staged publication clocks are implementation contracts, not measured silicon.",
+      "source": "tests/c54x/tms320c54x_test_shifted_schedule.h",
+      "profiles": ["shifted-alu", "shifted-bk"],
+      "legacy_entry": "phase253210/253220; preserve operand variant numbers while skipping checkpoint-only copies",
+      "case_ids": [],
+      "profile_coverage": {
+        "shifted-alu": {
+          "result_prefix": "TMS320C54x staged SUBC: PASS ",
+          "cases": 92160,
+          "key": "operand ordinal * 3 + balanced checkpoint index; RAM ADD/SUB, mapped AR ADD/SUB, RAM SUBC, mapped AR SUBC in that order",
+          "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
+          "fnv64": "e4f1288df090b9b4"
+        },
+        "shifted-bk": {
+          "result_prefix": "TMS320C54x shifted BK arithmetic: PASS ",
+          "cases": 8192,
+          "key": "operand ordinal * 3 + balanced checkpoint index; all 4096 BK inputs on page0, then page2",
+          "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
+          "fnv64": "6d4d03cf8d787ec9"
+        }
+      },
+      "obligations": [
+        "all 49152 RAM and 32768 mapped-AR ADD/SUB inputs: eight selectors, all 32 shifts, four value patterns and four SXM/OVM settings",
+        "all 6144 RAM and 4096 mapped-AR SUBC inputs: both destinations, 64 value pairs and four SXM/OVM settings",
+        "all 8192 BK inputs: eight selectors, 32 shifts, four value patterns, four flag settings and both program pages",
+        "Decode, Access and Read checkpoints for every fixed non-pattern group, distributed across all original value patterns",
+        "address and operation extension poisoning, post-read operand mutation, one source read, no data writes, retained pointer/operand, selected accumulator and flag publication",
+        "actual save/load count and ordered coverage digest; shifted-alu now completes through SUBC rather than omitting the default-only tail"
+      ],
+      "limits": [
+        "retire the full value-by-checkpoint Cartesian product, not any distinct operand or numeric expectation; a specific evidenced interaction can justify another targeted case",
+        "the matrix still uses the sequenced bench; CPU-only relocation is not claimed",
+        "no peripheral, repeat, interrupt, physical memory-bank or silicon-phase completeness claim"
+      ],
+      "measurement": {
+        "baseline_commit": "3e0e071e",
+        "shifted_alu_seconds_before": 108.33,
+        "shifted_alu_seconds_after": 40.72,
+        "shifted_bk_seconds_before": 10.81,
+        "shifted_bk_seconds_after": 3.68,
+        "scope": "Serial focused runner wall times. The after shifted-alu profile also covers SUBC, which the before profile omitted; this is not an equal-scope speedup ratio. Full default-suite comparison is banked separately in c54x_fidelity_checkpoint.json.",
+        "c54x_cpp_bytes_before": 3788248,
+        "c54x_cpp_bytes_after": 3791792,
+        "c54x_cpp_lines_before": 57971,
+        "c54x_cpp_lines_after": 58044,
+        "source_assessment": "This batch trades 3544 additional C++ bytes of schedule and coverage instrumentation for lower runtime. It is not a source-size reduction."
+      }
     }
   ]
 }

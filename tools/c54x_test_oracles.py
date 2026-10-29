@@ -123,8 +123,8 @@ REQUIRED = [
     "TMS320C54x staged MPY and MPYR: PASS cases=52224 accumulators=2 rounding=0,1 t_retained=1 restore=52224 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
     "TMS320C54x staged memory LD T: PASS cases=52224 ram_and_mapped=1 restore=52224 read_publication=1 retirement_rewrite=0 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
     "TMS320C54x staged LD T multiply pair: PASS cases=768 restore=768 t_read=6 multiply_read=8 publication=9 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
-    "TMS320C54x staged shifted memory ADD/SUB: PASS ram_cases=147456 mapped_ar_cases=98304 selectors=8 shifts=32 sxm_ovm=4 patterns=4 restore=245760 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
-    "TMS320C54x staged SUBC: PASS ram_cases=18432 mapped_ar_cases=12288 value_pairs=64 sxm_ovm=4 accumulators=2 restore=30720 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
+    "TMS320C54x staged shifted memory ADD/SUB: PASS ram_cases=49152 mapped_ar_cases=32768 selectors=8 shifts=32 sxm_ovm=4 patterns=4 restore=81920 snapshots=balanced duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
+    "TMS320C54x staged SUBC: PASS ram_cases=6144 mapped_ar_cases=4096 value_pairs=64 sxm_ovm=4 accumulators=2 restore=10240 snapshots=balanced duplicate_reads=0 data_writes=0 silicon_phase_claim=0 combined_cases=92160 combined_restore=92160 coverage_fnv64=e4f1288df090b9b4",
     "TMS320C54x staged repeat SUBC: PASS cases=38400 forms=5 rpt=short,long counts=0,1,15,32,255 sources=none,IRQ,NMI pages=2 restore=38400 count_plus_one=1 divisor_reads_each_iteration=1 duplicate_body_fetches=0 silicon_phase_claim=0",
     "TMS320C54x staged repeat immediate ST: PASS cases=38400 forms=5 rpt=short,long counts=0,1,15,32,255 values=4 sst_sxm_ovm=8 sources=none,IRQ,NMI pages=2 restore=38400 count_plus_one=1 literal_fetches=1 body_fetches=1 destination_reads=0 cycles_each=2 silicon_phase_claim=0",
     "TMS320C54x staged BANZD: PASS cases=3072 registers=8 values=4 modifications=3 cmpt_states=2 pages=2 delay_forms=two_single,one_double restore=3072 duplicate_target_fetches=0 data_accesses=0 silicon_phase_claim=0",
@@ -1609,8 +1609,11 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated memory ADD SUB complete",
     ),
     "shifted-alu": (
-        "TMS320C54x staged shifted memory ADD/SUB: PASS ram_cases=147456 mapped_ar_cases=98304 selectors=8 shifts=32 sxm_ovm=4 patterns=4 restore=245760 duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
-        "Fatal error: TMS320C54x isolated shifted memory ADD SUB complete",
+        (
+            "TMS320C54x staged shifted memory ADD/SUB: PASS ram_cases=49152 mapped_ar_cases=32768 selectors=8 shifts=32 sxm_ovm=4 patterns=4 restore=81920 snapshots=balanced duplicate_reads=0 data_writes=0 silicon_phase_claim=0",
+            "TMS320C54x staged SUBC: PASS ram_cases=6144 mapped_ar_cases=4096 value_pairs=64 sxm_ovm=4 accumulators=2 restore=10240 snapshots=balanced duplicate_reads=0 data_writes=0 silicon_phase_claim=0 combined_cases=92160 combined_restore=92160 coverage_fnv64=e4f1288df090b9b4",
+        ),
+        "Fatal error: TMS320C54x isolated shifted memory arithmetic complete",
     ),
     "bitf-smem": (
         "TMS320C54x staged BITF: PASS cases=52224 forms=17 registers=8 mask_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 restore=52224 duplicate_reads=0 data_writes=0",
@@ -2204,7 +2207,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated shifted BK exclusions complete",
     ),
     "shifted-bk": (
-        "TMS320C54x shifted BK arithmetic: PASS cases=24576 restore=24576 selectors=8 shifts=32 sxm_ovm=4 values=4 pages=2 snapshots=3 source_sample=Read post_read_change=1 extension_poison=1 writes=0 physical_phase_claim=0",
+        "TMS320C54x shifted BK arithmetic: PASS cases=8192 restore=8192 selectors=8 shifts=32 sxm_ovm=4 values=4 pages=2 snapshots=balanced source_sample=Read post_read_change=1 extension_poison=1 writes=0 physical_phase_claim=0 coverage_fnv64=6d4d03cf8d787ec9",
         "Fatal error: TMS320C54x isolated shifted BK arithmetic complete",
     ),
     "move-rpt-owner": (

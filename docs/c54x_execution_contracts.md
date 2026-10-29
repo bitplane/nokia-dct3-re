@@ -81,6 +81,15 @@ retired; there is no claim of every value at every checkpoint. A combined
 ordered digest and actual replay count protect both matrices. The review on
 `long-mvkd` explicitly covers these store results, not all members of the bundle.
 
+Shifted memory ADD/SUB and SUBC use a balanced schedule as well: 81,920
+ADD/SUB inputs and 10,240 SUBC inputs run once each. `shifted-alu` covers both
+banks, including the formerly default-only SUBC tail. `shifted-bk` retains
+8,192 inputs. Every fixed non-pattern group still visits Decode, Access and
+Read across its four or eight value patterns; the full value-by-checkpoint
+product is deliberately retired. Numeric expectations, extension poisoning,
+post-read mutation and publication checks are unchanged. Ordered input/stage
+digests and actual restore counts protect the retained schedules.
+
 `reg-banks` isolates register arithmetic and LD. Each bank retains all 65,536
 standalone stimuli once; its 8,192 fixed non-pattern groups cover all three
 Decode/Access/Read checkpoints across eight patterns. The 288 arithmetic and
@@ -310,7 +319,8 @@ pipeline phases or complete instruction-set conformance.
 
 Other positive domains retain 104,448 scalar ADD/SUB cases, 52,224 each for
 ADDS/SUBS, 208,896 shift-16 and 153,984 TS arithmetic cases (6,528 address
-plus 147,456 numeric). Variable-shift arithmetic retains 245,760 cases.
+plus 147,456 numeric). Variable-shift ADD/SUB retains 81,920 distinct stimuli,
+with balanced checkpoints rather than three copies of each input.
 CMPM and BITF each retain 52,224 cases over 17 forms, omitting 3,072 invalid
 cases. `rpt-subc-st` retains 38,400 SUBC and 38,400 repeated-store cases;
 memory/immediate MPY retains 98,304. Paired reads retain 6,144 DSUB,
@@ -1171,8 +1181,8 @@ Executable acceptance passes with `run_c54x_core.py --profile` for
 `memory-alu`, `memory-shift16`, `adds`, `subs`, `cmpm-smem`, `bitf-smem`,
 `load-offset`, `ldu-shift16`, `load-variable`, `ld-ts`, `ld-ts-producer`,
 `mul-t-sources`, `t-load-control`, `ts-alu`, `ts-alu-producer` and
-`shifted-alu`. These retain the existing complete case counts, bus assertions
-and save/restore checks; the Python suite passes 3,107 tests with one skip.
+`shifted-alu`. Bus and save/restore assertions remain; reviewed balanced
+schedules retain distinct stimuli without the full checkpoint product.
 
 Long BANZ/BANZD and repeat-block BANZ also carry BK through their shared
 fixture. Circular forms use BK=32768 with initial indices below that size;
@@ -2160,37 +2170,34 @@ Repeat/interrupt composition and physical timing remain separate scopes.
 
 ## Core regression checkpoint
 
-The current default C54x suite includes the completed single-address
-source/RMW exclusion census correction and retains the earlier
-atomic load, memory-T multiply, MPY/MAC, LTD/DELAY, MACP/MACD, RMW, memory-logic,
-scalar-arithmetic and long-memory arithmetic absolute-alias corrections.
-All 293 required markers appear exactly once, followed by core conformance
-PASS and intentional MAME exit 3; the isolated runner returns 0, with
-`interrupted=false`. Its 294 ordered PASS records and 5,690 distinct asserted
-opcode words exactly match the modularization baseline. The capture is
-`tmp/fidelity-source-domain-full/run_c54x_core_jkrbwol3`:
+The current full default run passes all 293 required markers exactly once,
+with 294 ordered PASS records, intentional MAME exit 3 and runner exit 0.
+It takes 1,061.85 seconds, versus 1,517.76 at the previous measured checkpoint
+(`ca101ee8`), about 30% faster across the reviewed replay reductions.
+
+Result names and order are unchanged. Exactly six records differ: regular and
+shifted STL/STH, register arithmetic and LD, shifted memory ADD/SUB, and SUBC.
+Their reviewed schedules change repetition counts and add coverage digests;
+they do not silently replace numeric expectations. All 5,690 asserted opcode
+words are unchanged, with set SHA256
+`7fd37083d052b81e65f629b5e2062965e612cab737cd54ee85a0f84d60ed76e4`
+(sorted four-digit opcode strings joined by newlines, no final newline).
+
+`fixtures/c54x_fidelity_checkpoint.json` owns the capture, immutable executable
+identity, current CPU/bench and acceptance-source hashes, and explicit result
+comparison. The inputs predate the run and their hashes were rechecked at
+completion. The separate ROM-free admission census retains its own capture.
 
 ```sh
-.venv/bin/python tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
-  --output-root tmp/c54x-modularization
+python3 tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
+  --output-root tmp/c54x-core-checkpoint
 ```
 
-The recorded executable SHA256 is
-`350683a309ba9cf2d65977bb6e1783725a09dad3d83cdf992fd0c4c85d3c60c2`.
-CPU source SHA256 is
-`7191436aa1d97343cf5b75a67b041f03fd884febd29757c2791fe2afca466e16`.
-`fixtures/c54x_fidelity_checkpoint.json` banks the CPU and split bench-source
-hashes, immutable binary identity and exact result comparison. Inputs were
-rechecked unchanged at completion. Later handset/device changes do not renew
-this CPU-only checkpoint. The opcode-set SHA256 is
-`7fd37083d052b81e65f629b5e2062965e612cab737cd54ee85a0f84d60ed76e4`
-(sorted four-digit opcode strings joined by newlines, without a final newline).
-Optional
-profiles retain their separate acceptance scopes; this run does not prove
-the complete ISA, physical pipeline timing, fitted DSP-mask compatibility,
-native RF or end-to-end handset speech and calls. Revision-bound checkpoints below preserve their narrower
-instruction and original-firmware comparisons, not competing current
-default-suite baselines.
+This qualifies the default regression, not every isolated profile, the complete
+ISA, physical pipeline timing, fitted DSP-mask compatibility, native RF or
+end-to-end handset speech/calls. Later source/device changes do not silently
+renew this checkpoint. Earlier revision-bound controls below preserve their
+narrower results, not competing current default-suite baselines.
 
 The historical `c54x_modularization_checkpoint.json` separately records seven named core scopes, representative
 arithmetic, interrupt and restore profiles, and ROM4 CRC/FR decoder controls on
