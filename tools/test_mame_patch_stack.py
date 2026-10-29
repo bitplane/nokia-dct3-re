@@ -29,6 +29,8 @@ class MamePatchStackTest(unittest.TestCase):
             git("add", "sample.txt")
             git("commit", "-qm", "base")
             commit = git("rev-parse", "HEAD")
+            check_patch_stack(repo, commit, [], apply=True)
+            self.assertEqual(source.read_text(), "first\n")
 
             source.write_text("second\n")
             first = root / "first.patch"
@@ -54,9 +56,13 @@ class MamePatchStackTest(unittest.TestCase):
             check_patch_stack(repo, commit, [first, second], apply=True)
             self.assertEqual(source.read_text(), "third\n")
             source.write_text("second\n")
-            with self.assertRaises(subprocess.CalledProcessError):
+            check_patch_stack(repo, commit, [first, second], apply=True)
+            self.assertEqual(source.read_text(), "third\n")
+            self.assertEqual(git("diff", "--cached"), "")
+            source.write_text("second\nlocal edit\n")
+            with self.assertRaisesRegex(RuntimeError, "left untouched"):
                 check_patch_stack(repo, commit, [first, second], apply=True)
-            self.assertEqual(source.read_text(), "second\n")
+            self.assertEqual(source.read_text(), "second\nlocal edit\n")
             source.write_text("first\n")
             with self.assertRaises(RuntimeError):
                 check_patch_stack(repo, commit, [first, first], apply=True)

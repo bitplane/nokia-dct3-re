@@ -13,10 +13,11 @@ def check_patch_stack(repo: Path, commit: str, patches: list[Path], *, apply=Fal
         index = Path(directory) / "index"
         env = {**os.environ, "GIT_INDEX_FILE": str(index)}
 
-        def git(*args: str) -> str:
+        def git(*args: str, input: str | None = None) -> str:
             return subprocess.run(
                 ["git", "-C", str(repo), *args],
                 env=env,
+                input=input,
                 check=True,
                 capture_output=True,
                 text=True,
@@ -31,7 +32,8 @@ def check_patch_stack(repo: Path, commit: str, patches: list[Path], *, apply=Fal
                 detail = error.stderr.strip() or error.stdout.strip()
                 raise RuntimeError(f"{patch}: {detail}") from error
         if apply:
-            paths = git("diff", "--cached", "--name-only", commit).splitlines()
+            expected = git("write-tree").strip()
+            paths = [path for path in git("diff", "--cached", "--no-renames", "--name-only", "-z", commit).split("\0") if path]
             if not paths:
                 return
             comparison = subprocess.run(
@@ -42,14 +44,36 @@ def check_patch_stack(repo: Path, commit: str, patches: list[Path], *, apply=Fal
                 return
             if comparison.returncode != 1:
                 raise RuntimeError(comparison.stderr.strip())
-            # Collapse the ordered index into one patch. Checking individual
-            # reverse patches is invalid when later patches edit their context.
             combined = git("diff", "--cached", "--binary", commit)
-            for arguments in (("--check",), ()):
-                subprocess.run(
-                    ["git", "-C", str(repo), "apply", *arguments, "-"],
-                    input=combined, check=True, capture_output=True, text=True,
-                )
+            # Snapshot only stack-owned paths into the disposable index. Never
+            # stage overlays/unrelated files or modify the repository's index.
+            tracked = set(git("ls-files", "-z", "--", *paths).split("\0"))
+            present = [path for path in paths if (repo / path).exists() or (repo / path).is_symlink() or path in tracked]
+            if present:
+                git("add", "-A", "--", *present)
+            current = git("write-tree").strip()
+
+            # Accept a clean base or one missing patch in an otherwise applied
+            # stack. The latter supports incremental registrations without
+            # trusting per-patch reverse checks with overlapping contexts.
+            for candidate in [combined, *(patch.read_text() for patch in patches)]:
+                git("read-tree", current)
+                try:
+                    git("apply", "--cached", "--check", "-", input=candidate)
+                    git("apply", "--cached", "-", input=candidate)
+                except subprocess.CalledProcessError:
+                    continue
+                if git("write-tree").strip() != expected:
+                    continue
+                delta = git("diff", "--binary", current, expected)
+                for arguments in (("--check",), ()):
+                    subprocess.run(
+                        ["git", "-C", str(repo), "apply", *arguments, "-"],
+                        input=delta, check=True, capture_output=True, text=True,
+                    )
+                return
+            raise RuntimeError("working tree is neither the pinned base nor a one-patch update; "
+                               "unrecognized changes were left untouched")
 
 
 def main() -> int:
