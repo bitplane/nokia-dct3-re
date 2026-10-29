@@ -29,6 +29,38 @@ def compiled_cpp(source):
 
 class CaseFixtureTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
+    def test_port_case_preserves_circular_and_absolute_marker_layouts(self):
+        source = r'''
+#include <cassert>
+#include <cstdint>
+#include <stdexcept>
+using u16 = std::uint16_t; using u64 = std::uint64_t;
+enum { AS_PROGRAM, AS_DATA };
+#define MAME_CPU_TMS320C54X_TMS320C54X_H
+struct tms320c54x_device { enum { STATE_PC, STATE_IDLE }; };
+struct emu_fatalerror : std::runtime_error {
+    template<class... T> emu_fatalerror(const char *s, T...) : std::runtime_error(s) { }
+};
+#include "tests/c54x/tms320c54x_test_port_case.h"
+int main() {
+    for (bool absolute : {false, true}) {
+        auto f = c54x_test::port_case("markers", {0xf300, 0xffff}, {{7, 11}}, {{8, 12}},
+            {{0x500, 13}}, 5, {{0x501, 14}}, 2, absolute ? std::optional<u16>(0xd00) : std::nullopt);
+        std::vector<u16> words = absolute ? std::vector<u16>{0x75f8,0xd00,0x124,0xf300,0xffff,0x75f8,0xd00,0x124,0xf5e1} :
+            std::vector<u16>{0x75d6,0x124,0xf300,0xffff,0x75d6,0x124,0xf5e1};
+        assert(f.program.size() == words.size());
+        for (unsigned i = 0; i < words.size(); ++i) assert(f.program[i].address == 0x5e0+i && f.program[i].value == words[i]);
+        assert(f.initial.size()==3 && f.initial[0].index==7 && f.initial[0].value==11);
+        assert(f.initial[1].index==tms320c54x_device::STATE_PC && f.initial[1].value==0x5e0);
+        assert(f.initial[2].index==tms320c54x_device::STATE_IDLE && f.initial[2].value==0);
+        assert(f.port_writes==2 && f.port_interval==5 && f.data[0].value==13 && f.expected_data[0].value==14);
+    }
+}
+'''
+        with compiled_cpp(source) as program:
+            subprocess.run([str(program)], check=True, capture_output=True)
+
+    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_clocked_actions_preserve_observation_side_and_write_order(self):
         case = (ROOT / 'tests/c54x/tms320c54x_test_case.h').read_text()
         runner = (ROOT / 'tests/c54x/tms320c54x_test_register_sequence.h').read_text()

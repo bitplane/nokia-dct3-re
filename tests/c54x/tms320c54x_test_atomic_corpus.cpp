@@ -5,6 +5,7 @@
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_square.h"
 #include "tms320c54x_test_shift_examples.h"
+#include "tms320c54x_test_absolute_examples.h"
 #include <algorithm>
 
 namespace c54x_test {
@@ -4013,168 +4014,16 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff12345678ULL &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 STLM A,T copies AL into T in one cycle");
-		program.write_word(0x05e3, 0x0af8); // SUBS *abs,A
-		write_words(program, {
-			{0x05e4, 0x0f64}, {0x05e5, 0x75f8}, {0x05e6, 0x0d00}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
-		});
-		data.write_word(0x0f64, 0xffff);
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		return resume_atomic_at(0x05e0, 300);
+		return begin_atomic_case(absolute_arithmetic_examples().front(), 300);
 	}
-	if (m_phase == 300 || m_phase == 301)
+	if ((m_phase >= 300 && m_phase <= 309) || m_phase == 6534 || m_phase == 6535)
 	{
-		expect_opcode(0x0af8,
-				m_cpu->state_int(tms320c54x_device::STATE_A) ==
-				(m_phase == 300 ? 1 : 0xffffff0001ULL) &&
-				bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) ==
-				(m_phase == 300) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
-				"ROM4 absolute SUBS suppresses sign extension, sets carry, and costs two cycles");
-		if (m_phase == 300)
-		{
-			m_port_writes = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-			return resume_atomic_at(0x05e0, 301);
-		}
-		write_words(program, {
-			{0x05e3, 0x1e82}, // SUBC *AR2,A
-			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
-		});
-		data.write_word(0x0f65, 1);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x8000}, {cpu_regs::STATE_AR2, 0x0f65}, {cpu_regs::STATE_ST0, 0},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(302);
-	}
-	if (m_phase == 302 || m_phase == 303)
-	{
-		expect_opcode(0x1e82,
-				m_cpu->state_int(tms320c54x_device::STATE_A) ==
-				(m_phase == 302 ? 1 : 0xfffe) &&
-				bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) ==
-				(m_phase == 302) &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f65 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-				"ROM4 SUBC sets quotient and carry only on successful subtraction in one cycle");
-		if (m_phase == 302)
-		{
-			m_port_writes = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fff);
-			return resume_atomic_at(0x05e0, 303);
-		}
-		program.write_word(0x05e3, 0x1e84); // SUBC *AR4,A.
-		data.write_word(0x0f66, 1);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x8000}, {cpu_regs::STATE_B, 0x12345678}, {cpu_regs::STATE_AR4, 0x0f66},
-			{cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(6534);
-	}
-	if (m_phase == 6534 || m_phase == 6535)
-	{
-		bool const subtracts = m_phase == 6534;
-		expect_opcode(0x1e84,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (subtracts ? 1 : 0xfffe) &&
-			bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) == subtracts &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f66 &&
-			data.read_word(0x0f66) == 1 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-			"ROM4 SUBC through AR4 checks both quotient/carry outcomes and preserves B/source/pointer in one cycle");
-		if (subtracts)
-		{
-			m_port_writes = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fff);
-			return resume_atomic_at(0x05e0, 6535);
-		}
-		program.write_word(0x05e3, 0x6dea); // MAR *+AR2(-7)
-		write_words(program, {
-			{0x05e4, 0xfff9}, {0x05e5, 0x75f8}, {0x05e6, 0x0d00}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
-		});
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1000);
-		return resume_atomic_at(0x05e0, 304);
-	}
-	if (m_phase == 304)
-	{
-		expect_opcode(0x6dea, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0ff9 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
-				"ROM4 MAR long-offset consumes signed extension and costs two cycles");
-		program.write_word(0x05e3, 0xf300); // ADD #lk,B
-		write_words(program, {
-			{0x05e4, 0xffff}, {0x05e5, 0x75f8}, {0x05e6, 0x0d00}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
-		});
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		return resume_atomic_at(0x05e0, 305);
-	}
-	if (m_phase == 305 || m_phase == 306)
-	{
-		expect_opcode(0xf300,
-				m_cpu->state_int(tms320c54x_device::STATE_B) ==
-				(m_phase == 305 ? 0xffffffffffULL : 0x100000000ULL) &&
-				bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) ==
-				(m_phase == 306) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
-				"ROM4 ADD #lk,B sign-extends under SXM and carries at bit 32 in two cycles");
-		if (m_phase == 305)
-		{
-			program.write_word(0x05e4, 1);
-			m_port_writes = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffULL);
-			return resume_atomic_at(0x05e0, 306);
-		}
-		program.write_word(0x05e3, 0xf210); // SUB #lk,B,A
-		program.write_word(0x05e4, 2);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 10}, {cpu_regs::STATE_ST0, 0},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(307);
-	}
-	if (m_phase == 307 || m_phase == 308)
-	{
-		expect_opcode(0xf210,
-				m_cpu->state_int(tms320c54x_device::STATE_A) ==
-				(m_phase == 307 ? 8 : 0xffffffffffULL) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) ==
-				(m_phase == 307 ? 10 : 0) &&
-				bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) ==
-				(m_phase == 307) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
-				"ROM4 SUB #lk,B,A uses B as source, preserves it, and costs two cycles");
-		if (m_phase == 307)
-		{
-			program.write_word(0x05e4, 1);
-			m_port_writes = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-			return resume_atomic_at(0x05e0, 308);
-		}
-		program.write_word(0x05e3, 0xf150); // XOR #lk,A,B
-		program.write_word(0x05e4, 0xff00);
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff12345678ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800); // C
-		return resume_atomic_at(0x05e0, 309);
-	}
-	if (m_phase == 309)
-	{
-		expect_opcode(0xf150,
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff12345678ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff1234a978ULL &&
-				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
-				"ROM4 XOR #lk,A,B uses unextended operand, preserves A/C, and costs two cycles");
+		static constexpr unsigned phases[] = {300, 301, 302, 303, 6534, 6535, 304, 305, 306, 307, 308, 309};
+		auto const &cases = absolute_arithmetic_examples();
+		expect(cases.size() == std::size(phases), "Absolute arithmetic case/continuation map is complete");
+		unsigned const index = unsigned(std::find(std::begin(phases), std::end(phases), m_phase) - std::begin(phases));
+		verify_atomic_case(cases[index]);
+		if (index + 1 < cases.size()) return begin_atomic_case(cases[index + 1], phases[index + 1]);
 		write_words(program, {
 			{0x05e3, 0x0282}, // ADDS *AR2,A
 			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},

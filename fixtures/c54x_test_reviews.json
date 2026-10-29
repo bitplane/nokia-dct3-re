@@ -1005,7 +1005,7 @@
       "id": "memory-operand-literal-reference",
       "classification": "architectural_interaction",
       "decision": "rewrite",
-      "source": "tests/c54x/tms320c54x_test_memory_examples.h; tests/c54x/tms320c54x_test_memory_continuations.h; tests/c54x/tms320c54x_test_shift_examples.h; tests/c54x/tms320c54x_test_case.h",
+      "source": "tests/c54x/tms320c54x_test_memory_examples.h; tests/c54x/tms320c54x_test_memory_continuations.h; tests/c54x/tms320c54x_test_shift_examples.h; tests/c54x/tms320c54x_test_absolute_examples.h; tests/c54x/tms320c54x_test_case.h",
       "profiles": [
         "isa-memory"
       ],
@@ -1159,11 +1159,23 @@
         "sfta-b-right2-sign-fill",
         "sfta-b-right2-zero-fill",
         "sftl-b-left6-carry",
-        "load-b-zero-shift-to-a"
+        "load-b-zero-shift-to-a",
+        "atomic-subs-absolute-carry",
+        "atomic-subs-absolute-borrow",
+        "atomic-subc-ar2-success",
+        "atomic-subc-ar2-failure",
+        "atomic-subc-ar4-success",
+        "atomic-subc-ar4-failure",
+        "atomic-mar-preoffset-negative",
+        "atomic-add-immediate-b-signed",
+        "atomic-add-immediate-b-carry",
+        "atomic-sub-immediate-cross-carry",
+        "atomic-sub-immediate-cross-borrow",
+        "atomic-xor-immediate-cross"
       ],
       "basis": "TI SPRU172C and independent literal results for memory arithmetic, multiply/ACCA/POLY, T loads, shifted arithmetic, ABDST/LTD, short SUB/XOR, negative MACR rounding, program-coefficient MACP/MACD, DP/SP addressing, squares and saturating ADDM. Expectations and original partial preservation masks do not use CPU implementation helpers. Port intervals retain an emulator regression contract, not measured physical DARAM timing. Signed-six-bit TS/encoded shifts, MAX/MIN signed-guard and tie selection, EXP/NORM and one-cycle RND/SAT examples retain literal documented results.",
       "obligations": [
-        "retain all original 100 case records, opcode words, literal results, partial setup and assertion masks as three ordered groups (45, 30 and 25); append twenty register-bit examples as a fourth group and thirty full-status shifts as a fifth group; no reset within a group, and legacy entries remain in their original positions",
+        "retain all original 100 case records, opcode words, literal results, partial setup and assertion masks as three ordered groups (45, 30 and 25); append twenty register-bit examples, thirty full-status shifts and twelve absolute-marker examples as groups four through six; no reset within a group, and legacy entries remain in their original positions",
         "preserve carry across the checked AND-to-MPY and shifted-SUB continuations; retain A/B/T, selected/decoy AR and RAM checks only where originally asserted",
         "preserve the full ST1 checks in the 14 multiply rows without promoting the other carry-only checks to full status preservation",
         "standalone entry seeds the checked predecessor's C16 mode and circular timing-marker context; the legacy adapter retains its predecessor state without injecting that seed",
@@ -1190,6 +1202,18 @@
         "c54x_cpp_lines_before": 55429,
         "c54x_cpp_lines_after": 55140,
         "scope": "All tests/c54x C++ and headers including the new 25-case shift/scalar bank and CPU-only routing. Net reduction 10285 bytes/289 lines; no generated replacement bulk or removed instruction case. Existing 75 identities remain the exact prefix of the expanded profile."
+      },
+      "absolute_marker_refactor": {
+        "baseline_commit": "3c5262e1",
+        "decision": "retain twelve literal arithmetic/address references and merge their setup/result routing into the shared case runner",
+        "scope": "Preserve SUBS, SUBC through AR2/AR4, signed MAR preoffset, immediate ADD/SUB/XOR, partial carry masks, preserved source/other accumulator and absolute PORTW timing. Paired outcomes retain their checked predecessor's status and RAM; standalone adds one reset group, legacy adds none.",
+        "predicate_audit": "Twelve predicates extracted from the old source agree with the new descriptors under 4208 register/RAM/marker mutations. No CPU arithmetic helper or CPU execution result supplies the expected values.",
+        "coverage": "Existing 150 isa-memory IDs remain the exact prefix of 162 cases in six reset groups. The rebuilt legacy prefix retains all 168 PASS records and all 2474 asserted opcode words in order. No case is deleted and no full-default checkpoint is renewed.",
+        "c54x_cpp_bytes_before": 3536883,
+        "c54x_cpp_bytes_after": 3535381,
+        "c54x_cpp_lines_before": 54138,
+        "c54x_cpp_lines_after": 54069,
+        "source_assessment": "1502 C++ bytes and 69 lines removed including the new shared bank and absolute-marker helper support. The standalone run uses only the generic CPU executable and an empty ROM directory."
       },
       "atomic_shift_refactor": {
         "baseline_commit": "f22bde4c",

@@ -14,6 +14,7 @@
 #include "tms320c54x_test_memory_continuations.h"
 #include "tms320c54x_test_shift_examples.h"
 #include "tms320c54x_test_word_examples.h"
+#include "tms320c54x_test_absolute_examples.h"
 #include "tms320c54x_test_near_flow.h"
 #include "tms320c54x_test_mapped_mac.h"
 #include "tms320c54x_test_dual.h"
@@ -78,6 +79,8 @@ protected:
 				m_cases.insert(m_cases.end(), registers.begin(), registers.end());
 				auto const &atomic_shifts = c54x_test::atomic_shift_examples();
 				m_cases.insert(m_cases.end(), atomic_shifts.begin(), atomic_shifts.end());
+				auto const &absolute = c54x_test::absolute_arithmetic_examples();
+				m_cases.insert(m_cases.end(), absolute.begin(), absolute.end());
 			}
 			else if (words()) m_cases = c54x_test::instruction_word_examples();
 			else if (products()) m_cases = c54x_test::product_examples();

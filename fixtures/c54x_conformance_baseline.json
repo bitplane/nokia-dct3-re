@@ -6354,14 +6354,14 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
-          "cases": "150",
+          "cases": "162",
           "firmware": "0",
           "nokia_devices": "0",
-          "reset_groups": "5"
+          "reset_groups": "6"
         }
       ],
       "required": [
-        "TMS320C54x generic memory examples: PASS cases=150 reset_groups=5 nokia_devices=0 firmware=0"
+        "TMS320C54x generic memory examples: PASS cases=162 reset_groups=6 nokia_devices=0 firmware=0"
       ]
     },
     "isa-parallel": {
@@ -15354,7 +15354,19 @@
         "sfta-b-right2-sign-fill",
         "sfta-b-right2-zero-fill",
         "sftl-b-left6-carry",
-        "load-b-zero-shift-to-a"
+        "load-b-zero-shift-to-a",
+        "atomic-subs-absolute-carry",
+        "atomic-subs-absolute-borrow",
+        "atomic-subc-ar2-success",
+        "atomic-subc-ar2-failure",
+        "atomic-subc-ar4-success",
+        "atomic-subc-ar4-failure",
+        "atomic-mar-preoffset-negative",
+        "atomic-add-immediate-b-signed",
+        "atomic-add-immediate-b-carry",
+        "atomic-sub-immediate-cross-carry",
+        "atomic-sub-immediate-cross-borrow",
+        "atomic-xor-immediate-cross"
       ],
       "classification": "architectural_interaction",
       "decision": "rewrite",

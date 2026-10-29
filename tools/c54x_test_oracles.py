@@ -321,7 +321,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated generic instruction words complete",
     ),
     "isa-memory": (
-        "TMS320C54x generic memory examples: PASS cases=150 reset_groups=5 nokia_devices=0 firmware=0",
+        "TMS320C54x generic memory examples: PASS cases=162 reset_groups=6 nokia_devices=0 firmware=0",
         "Fatal error: TMS320C54x isolated generic memory examples complete",
     ),
     "isa-flow": (
