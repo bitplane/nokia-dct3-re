@@ -316,6 +316,10 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "isa-disasm": (
+        tuple(marker for marker in REQUIRED if " disassembler: PASS" in marker),
+        "Fatal error: TMS320C54x isolated disassembly contracts complete",
+    ),
     "isa-words": (
         "TMS320C54x generic instruction words: PASS cases=50 reset_groups=50 nokia_devices=0 firmware=0",
         "Fatal error: TMS320C54x isolated generic instruction words complete",

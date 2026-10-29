@@ -15,6 +15,7 @@
 #include "tms320c54x_test_shift_examples.h"
 #include "tms320c54x_test_word_examples.h"
 #include "tms320c54x_test_absolute_examples.h"
+#include "tms320c54x_test_disassembly.h"
 #include "tms320c54x_test_near_flow.h"
 #include "tms320c54x_test_mapped_mac.h"
 #include "tms320c54x_test_dual.h"
@@ -41,7 +42,7 @@ public:
 		m_register_pair_kind = c54x_test::select_register_pair(config.options().bios());
 		m_register_alu_kind = c54x_test::select_register_alu(config.options().bios());
 		m_register_unary_kind = c54x_test::select_register_unary(config.options().bios());
-		m_extended_program = m_domain || m_mapped_mac || bool(m_dual_mode) ||
+		m_extended_program = !std::strcmp(config.options().bios(), "isa-disasm") || m_domain || m_mapped_mac || bool(m_dual_mode) ||
 			m_normalization_kind != c54x_test::normalization_kind::none || m_register_pair_kind != c54x_test::register_pair_kind::none || m_register_alu_kind != c54x_test::register_alu_kind::none || m_register_unary_kind != c54x_test::register_unary_kind::none;
 		TMS320C54X(config, m_cpu, 13'000'000);
 		m_cpu->set_extended_program(m_extended_program);
@@ -53,6 +54,7 @@ protected:
 	void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(c54x_isa_test_state::check), this);
+		if (disassembly()) return;
 		if (m_register_unary_kind != c54x_test::register_unary_kind::none)
 			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 				c54x_test::register_unary_count(m_register_unary_kind),
@@ -104,6 +106,16 @@ protected:
 	}
 	void machine_reset() override
 	{
+		if (disassembly())
+		{
+			c54x_test::check_disassembly(m_cpu->get_disassembler(),
+				[](bool valid, char const *contract) { if (!valid) throw emu_fatalerror("%s", contract); },
+				[](char const *id, char const *format, auto... values) {
+					osd_printf_info("C54x ISA case: PASS id=%s\n", id);
+					osd_printf_info(format, values...);
+				});
+			throw emu_fatalerror(3, "TMS320C54x isolated disassembly contracts complete");
+		}
 		m_case = m_resets = 0;
 		if (m_register_sequence) m_register_sequence->start();
 		else if (m_normalization) m_normalization->start();
@@ -208,6 +220,7 @@ private:
 	bool memory_reference() const { return !std::strcmp(machine().options().bios(), "isa-memory"); }
 	bool near_flow() const { return !std::strcmp(machine().options().bios(), "isa-flow"); }
 	bool words() const { return !std::strcmp(machine().options().bios(), "isa-words"); }
+	bool disassembly() const { return !std::strcmp(machine().options().bios(), "isa-disasm"); }
 	unsigned count() const
 	{
 		return m_cases.size();
@@ -363,6 +376,7 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(29, "negate", "Accumulator negate with producer and replay")
 	ROM_SYSTEM_BIOS(30, "absolute", "Accumulator absolute value with producer and replay")
 	ROM_SYSTEM_BIOS(31, "isa-words", "Atomic instruction-word arithmetic and addressing examples")
+	ROM_SYSTEM_BIOS(32, "isa-disasm", "Debugger syntax length page wrapping and stepping contracts")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
 ROM_END
 

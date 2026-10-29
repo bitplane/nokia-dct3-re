@@ -594,6 +594,11 @@
           "description": "Atomic instruction-word arithmetic and addressing examples",
           "index": 31,
           "name": "isa-words"
+        },
+        {
+          "description": "Debugger syntax length page wrapping and stepping contracts",
+          "index": 32,
+          "name": "isa-disasm"
         }
       ],
       "tms54rom4": [
@@ -2899,7 +2904,7 @@
       ]
     },
     "pass_formats": {
-      "C54x ISA case: PASS id=%s\n": 2,
+      "C54x ISA case: PASS id=%s\n": 3,
       "C54x native backend BSP clock inputs: PASS levels=4 save_replay=4 reset_inputs=1 handset_clock_claim=0\n": 1,
       "C54x native backend BSP clocked store: PASS opcode=7721 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 handset_clock_claim=0\n": 1,
       "C54x native backend BSP continuous RX: PASS words=5 partial_restore=1 single_sync_continuation=1 overrun_restart=1 reset_abort=1 source=4 handset_clock_claim=0\n": 1,
@@ -2917,13 +2922,11 @@
       "TMS320C54x ADDC chains: PASS cases=4096 restore=4096 destinations=AA,BA,AB,BB accumulator_pairs=4 word_pairs=4 carry_states=2 sxm_ovm=4 pages=2 snapshots=4 issue_gap=0 read_retention=1 carry_sample=Execute physical_phase_claim=0\n": 1,
       "TMS320C54x ADDC: PASS cases=110592 restore=110592 numeric_cases=73728 mapped_cases=36864 ram_forms=6 mapped_sources=16 accumulators=2 carry_states=2 sxm_ovm=4 words=8 accumulator_patterns=8 late_accumulator_carry=2 pages=2 snapshots=3 unsigned_smem=1 physical_phase_claim=0 control_composition=unvalidated\n": 1,
       "TMS320C54x ADDM BRC loop consumers: PASS cases=320 restore=320 counts=0,1,3,7 increments=1,-1 separators=NOP,CALL controls=RPTB,RPTBD pages=2 snapshots=5 ordered_publication=1 actual_iterations=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x ADDM disassembler: PASS forms=248 rejected=8 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x AR0 indexed LD: PASS cases=98304 restore=98304 ram_cases=96000 excluded_cases=2304 registers=8 index_directions=2 compatibility_states=2 destinations=2 index_values=8 memory_values=4 sxm_sst_ovm=8 pages=2 snapshots=3 address_index_sample=Access source_sample=Read result_publish=Execute self_index=1 pointer_updates=once data_writes=0 interrupt_delay_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x ASM accumulator add conformance: PASS left_shift=1 overflow_variants=4\n": 1,
       "TMS320C54x ASM accumulator subtract conformance: PASS overflow_variants=4 source_preserved=1\n": 1,
       "TMS320C54x ASM arithmetic shifts: PASS variants=512 shifts=32 sxm_settings=2 ovm_settings=2 sticky_settings=2\n": 1,
       "TMS320C54x ASM store conformance: PASS variants=128\n": 1,
-      "TMS320C54x BANZ disassembler: PASS indirect=240 unclaimed=272 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x BANZ offset conformance: PASS variants=96\n": 1,
       "TMS320C54x BANZD delay T load: PASS cases=9216 restore=9216 counters=0,1,7 patterns=4 forms=direct,plain,postinc,postdec cpl=2 slots=2 flags=4 accumulators=2 pages=2 snapshots=3 delay_reads=1 selected_path_multiply=1 source_opcode_target_poison=1 brc_preserved=1 physical_phase_claim=0\n": 1,
       "TMS320C54x BC T/TRN stores: PASS cases=32 restore=32 predicates=TC,NTC initial_tc=2 sources=T,TRN pages=2 snapshots=2 writes=1 reads=0 delayed_acceptance=0 silicon_phase_claim=0\n": 1,
@@ -2963,16 +2966,13 @@
       "TMS320C54x LD ASM consumers: PASS cases=9216 restore=9216 operations=LD,ADD,SUB shifts=32 patterns=2 sxm_ovm=4 gaps=0,1 pages=2 snapshots=3 latency=zero source_reads=1 data_writes=0 physical_phase_claim=0\n": 1,
       "TMS320C54x LD ASM exclusions: PASS cases=16 restore=16 sources=control,SP,peripheral pages=2 snapshots=2 source_reads=0 data_writes=0 register_publication=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x LMS exclusions: PASS cases=16 restore=16 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0\n": 1,
-      "TMS320C54x MAR disassembler: PASS indirect=128 direct_unclaimed=128 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x MIN/MAX conformance: PASS variants=256\n": 1,
       "TMS320C54x MMR bus: PASS unified_state=1 partial_write=1 ifr_clear=1 passive_tap=1 reserved_gap=1\n": 1,
-      "TMS320C54x MMR disassembler: PASS modes=1344 rejected=192 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x MMR long exclusions: PASS cases=4608 restore=4608 opcode_classes=9 forbidden_modes=25 reserved_modes=7 cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 stack_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x MVDD followers: PASS cases=1536 restore=1536 layouts=adjacent,CALLD_first,CALLD_second consumers=LD_Smem,LD_Xmem modifiers=4 values=4 gaps=0,1 pages=2 snapshots=4 source_poison=1 reset_before_restore=1 physical_phase_claim=0\n": 1,
       "TMS320C54x MVDK accumulator destinations: PASS cases=8208 restore=8208 sources=18_mapped,1_RAM destinations=AL,AH,AG,BL,BH,BG forms=direct,indirect,absolute patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access write=next_clock retained_literals=1 aliases=1 guard_width=8 other_fields_preserved=1 read_owner=Address observer_scope=bus_only debug_excluded=1 physical_phase_claim=0\n": 1,
       "TMS320C54x MVDK accumulator producers: PASS cases=15552 restore=15552 sources=AL,AH,AG,BL,BH,BG destinations=AL,AH,AG,BL,BH,BG forms=3 producers=STL,POPM,LD gaps=0,1 patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 mapped_no_conflict=1 direct_ld_gap0=projection_only guard_width=8 physical_phase_claim=0\n": 1,
       "TMS320C54x MVDM accumulator: PASS cases=110592 restore=110592 destinations=AL,AH,AG,BL,BH,BG sources=RAM,AR,BK words=8 patterns=8 status_modes=16 pages=2 snapshots=3 reads=1 writes=1 neighboring_slices=preserved guard_mask=8 source_mutation_after_read=1 consumer_gap=0 physical_phase_claim=0\n": 1,
-      "TMS320C54x MVPD disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x NMI idle wake: PASS cases=12 cycle_accuracy_claim=0\n": 1,
       "TMS320C54x NMI pending restore: PASS cases=12 held_line_cases=12 timing_claim=0\n": 1,
       "TMS320C54x PLL transition timing: PASS lock_delay=1 protected_exit=1 cancel=1 retained_lock=1 multiplier_relock=1 save_replay=1 execution_rate_claim=0\n": 1,
@@ -3048,19 +3048,14 @@
       "TMS320C54x TS arithmetic: PASS address_cases=6528 arithmetic_cases=147456 restore=153984 operations=ADD,SUB selectors=4 address_forms=17 registers=8 compatibility_states=2 shifts=48 memory_values=4 accumulator_patterns=8 sxm_ovm=4 pages=2 snapshots=3 t_sample=Read duplicate_transactions=0 mapped_sources=excluded physical_phase_claim=0\n": 1,
       "TMS320C54x TS load producers: PASS cases=4608 restore=4608 producers=STM_T,LD_T,STLM_T shift_codes=8 values=4 sxm_ovm=4 destinations=2 pages=2 snapshots=3 read_owned_t=1 forbidden_stlm_gap_claim=0 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x TS loads: PASS cases=208896 restore=208896 forms=17 registers=8 shift_codes=64 values=4 sxm_ovm=4 destinations=2 compatibility=2 snapshots=3 read_owned_t=1 source_reads=1 writes=0 status_preserved=1 mapped_sources=excluded silicon_phase_claim=0\n": 1,
-      "TMS320C54x WRITA disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x XC interrupt protection: PASS cases=4 spans=1,2 accepted,rejected=1 physical_pipeline_claim=0\n": 1,
       "TMS320C54x XC return protection: PASS cases=192 restore=192 predicates=BEQ,BNEQ outcomes=2 resumed_words=one,two pages=2 snapshots=4 sources=none,IRQ,NMI irq_selected_only=1 return_reads=once resumed_write=once later_STM_ST1=ordinary reset_before_restore=1 physical_phase_claim=0\n": 1,
       "TMS320C54x XF output: PASS status_variants=8 debugger=1 restore=1\n": 1,
       "TMS320C54x accepted interrupt checkpoint: PASS ifr_until_fetch=1 intm_at_iack=1 decode_before_access=1 later_imr=1 source_latched=1 save_replay=1 pipeline_drain_claim=0\n": 1,
-      "TMS320C54x accumulator ALU disassembler: PASS shifts=256 asm=12 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x accumulator CMPM: PASS cases=6912 restore=6912 lanes=6 forms=direct,indirect,absolute cpl=2 values=4 literals=2 conditions=TC,NTC initial_tc=2 pages=2 snapshots=3 reads=1 writes=0 source=Read tc=Execute retained=1 silicon_phase_claim=0\n": 1,
       "TMS320C54x accumulator STM: PASS cases=3456 restore=3456 lanes=6 literals=6 patterns=4 sxm_ovm=4 pages=2 snapshots=3 literal_retained=1 live_siblings=1 guard_mask=8 publication=Execute adjacent_mvdk=1 writes=2 reads=1 silicon_phase_claim=0\n": 1,
       "TMS320C54x accumulator call fast return: PASS cases=2 sources=A,B\n": 1,
-      "TMS320C54x accumulator disassembler: PASS shift_forms=384 rotate_forms=6 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
-      "TMS320C54x accumulator logical disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x accumulator store MVMM: PASS cases=24576 restore=24576 forms=STL_A,STL_B,STH_A,STH_B values=4 stores=1,2 source_registers=8 destination_registers=8 gap_nops=0,1 pages=2 snapshots=3 pending_dagen_bypass=1 original_write_addresses=1 reset_before_restore=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x accumulator-A multiply disassembler: PASS memory_forms=1024 short_forms=4 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x active repeat POPD PMST: PASS cases=384 restore=384 contexts=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 pmst_unchanged=1 stack_retained=1 publications=once actual_iterations=1 interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x active repeat POPD context: PASS cases=384 restore=384 contexts=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 control_order=REA,RSA,BRC source_retained=1 publications=once actual_iterations=1 interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x active repeat context: PASS cases=384 restore=384 modes=same,replaced counts=0,1,2,7 layouts=2 pages=2 stack_alignments=2 snapshots=6 control_order=REA,RSA,BRC source_reads=once publications=once source_mutation_after_read=1 ordered_copies=1 balanced_frames=1 brc_gap_words=6 interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
@@ -3096,14 +3091,9 @@
       "TMS320C54x compact store conformance: PASS variants=512\n": 1,
       "TMS320C54x conditional AR stores: PASS cases=221184 restore=221184 forms=4 predicates=12 patterns=6 xmem=16 destinations=AR0..AR7 asm=0,-1 flags=pattern_coupled bk=0 pages=2 snapshots=3 false_read_writeback=1 address_sample=Access read_after_pointer_update=1 predicate_source_sample=Execute pointer_target_alias=1 reset_before_restore=1 physical_phase_claim=0\n": 1,
       "TMS320C54x conditional delayed returns: PASS cases=4480 restore=4480 predicates=14 patterns=8 delay_layouts=2 stack_alignments=2 pages=2 snapshots=5 predicate_before_delay=1 taken_stack_reads=1 untaken_stack_reads=0 retained_target=1 delay_fetches=once interrupt_block_composition=unvalidated physical_phase_claim=0\n": 1,
-      "TMS320C54x conditional disassembler: PASS forms=132 pages=2 named_predicates=22 bounded_extensions=1 pipeline_claim=0\n": 1,
-      "TMS320C54x conditional return disassembler: PASS forms=44 pages=2 named_predicates=22 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x conditional store exclusions: PASS cases=1024 restore=1024 forms=4 xmem=16 addresses=4 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n": 1,
-      "TMS320C54x conditional subtract disassembler: PASS forms=512 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
-      "TMS320C54x conditional-store disassembler: PASS opcodes=1024 supported=768 rejected=256 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x constant DAGEN ST: PASS cases=3840 excluded=80 restore=3920 forms=direct,absolute destinations=AR0..AR7,SP,BK patterns=4 older_stores=none,DAGEN,RAM gaps=0,1 pages=2 snapshots=4 consumers=indirect_LD,PSHM,circular_LD bk_min_gap=1_deferred_2 cpl=0 writes_each=1 extensions=retained repeated_publication=0 indirect_aliases=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x control delay T load: PASS cases=55296 restore=55296 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD patterns=4 forms=direct,plain,postinc,postdec cpl=2 slots=2 flags=4 accumulators=2 pages=2 snapshots=3 t_cohorts=original,complement,5aa5 delay_reads=1 t_publish=Read newer_t_preserved=1 selected_path_multiply=1 source_opcode_target_poison=1 owner_stack_only=1 reset_before_restore=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x control disassembler: PASS vectors=%u pages=2\n": 1,
       "TMS320C54x control-delay DELAY: PASS cases=73728 restore=73728 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD forms=DP,indirect,postdecrement,postincrement registers=8 patterns=8 sxm_ovm=4 compatibility=2 pages=2 snapshots=3 reads=1 writes=1 stack=owned physical_phase_claim=0\n": 1,
       "TMS320C54x core conformance: PASS\n": 1,
       "TMS320C54x delay store boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n": 1,
@@ -3133,14 +3123,9 @@
       "TMS320C54x delayed square accumulation: PASS cases=55296 restore=55296 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD operations=SQURA,SQURS destinations=2 forms=DP,indirect,postincrement patterns=8 frct_ovm_smul_sxm=16 pages=2 snapshots=3 source_reads=1 t_publication=Read smul_product_clamp=0 target_observes_result=1 physical_phase_claim=0\n": 1,
       "TMS320C54x direct IRQ repeat restoration: PASS cases=768 restore=768 outer_counts=1,2,7,56 inner_counts=0,1,3,63 sources=IRQ,NMI pages=2 returns=FRETE,FRETED snapshots=6 ordered_copies=1 balanced_frames=1 near_return=0 physical_phase_claim=0\n": 1,
       "TMS320C54x direct low RAM STM: PASS cases=65536 restore=65536 destinations=0060..007f literals=8 dp=4 cpl_cmpt=4 pages=2 snapshots=4 consumer_gaps=0,1 writes=1 bus_reads=0,1 immediate_retained=1 address_absolute=1 dp_cpl_sp_poison=1 adjacent_forwarding=1 reset_before_restore=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x double arithmetic disassembler: PASS forms=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
-      "TMS320C54x double memory disassembler: PASS modes=1024 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x dual MAC family exclusions: PASS cases=%u restore=%u reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n": 1,
       "TMS320C54x dual MAC family: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 snapshots=3 reads=2 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n": 1,
       "TMS320C54x dual MACSU exclusions: PASS cases=%u restore=%u operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n": 1,
-      "TMS320C54x dual move/DP disassembler: PASS moves=256 dp=512 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
-      "TMS320C54x dual multiply disassembler: PASS forms=4608 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
-      "TMS320C54x dual/accumulator arithmetic disassembler: PASS dual_forms=1024 accumulator_forms=16 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x endpoint XC protection: PASS cases=64 restore=64 counts=0,1,3,7 loop_words=2 sources=IRQ,NMI pages=2 snapshots=4 wrapped_protection=1 final_fallthrough=1 all_stores_before_vector=1 vector_fetches=1 stack_writes=1 reset_before_restore=1 physical_phase_claim=0\n": 1,
       "TMS320C54x entry stage restoration: PASS cases=10 sources=irq,nmi boundaries=5 one_fetch=1 one_ack=1 one_stack_write=1 retained_opcode=1 pipeline_drain_claim=0\n": 1,
       "TMS320C54x extended AR store consumer: PASS cases=6144 restore=6144 destinations=8 stores=STL_A,STL_B,STH_A,STH_B patterns=4 sst_sxm=4 legal_gaps=2,3 pages=2 snapshots=3 publish_clock=7 consumer_reads=1 ar_writes=1 literal_fetches=1 forbidden_gap_claim=0 silicon_phase_claim=0\n": 1,
@@ -3157,7 +3142,6 @@
       "TMS320C54x extended save replay: PASS pending_call pending_return xpc stack delay\n": 1,
       "TMS320C54x fast return bus: PASS cases=3 stack_reads=0 delayed_words=2\n": 1,
       "TMS320C54x forward block exits: PASS cases=1152 restore=1152 branches=B,BC_AEQ,BC_BEQ counts=0,1,2,7 exits=first,middle,last,never endpoint_layouts=2 pages=2 snapshots=6 source_reads=ordered body_writes=selected braf_not_auto_cleared=1 outside_rsbx=1 spaced_endpoint_revisit=1 interrupt_composition=unvalidated silicon_phase_claim=0\n": 1,
-      "TMS320C54x frame/MMR move disassembler: PASS frames=256 moves=81 rejected=175 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x generic instruction words: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic long arithmetic: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic memory examples: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
@@ -3166,14 +3150,10 @@
       "TMS320C54x generic product sequence: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic scalars: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic square: PASS cases=6 reset_each=1 nokia_devices=0 firmware=0\n": 1,
-      "TMS320C54x high memory ALU disassembler: PASS modes=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
-      "TMS320C54x immediate ALU disassembler: PASS forms=340 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x immediate ALU mapped consumer: PASS cases=960 restore=960 operations=ADD,SUB,AND,OR,XOR accumulators=2 parts=3 patterns=4 gaps=0,1 sxm=2 pages=2 reads=1 writes=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x immediate ARP conformance: PASS variants=8\n": 1,
       "TMS320C54x immediate ASM consumers: PASS cases=9216 restore=9216 operations=LD,ADD,SUB shifts=32 patterns=2 sxm_ovm=4 gaps=0,1 pages=2 snapshots=3 latency=zero data_reads=0 data_writes=0 opcode_mutation_after_fetch=1 publication=Execute physical_phase_claim=0\n": 1,
       "TMS320C54x immediate DP conformance: PASS variants=1024\n": 1,
-      "TMS320C54x immediate load disassembler: PASS forms=34 rejected=34 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
-      "TMS320C54x immediate multiply disassembler: PASS memory_forms=512 immediate_forms=2 pages=2 bounded_extensions=1 operand_order=1 invalid_modes=1 execution_claim=0\n": 1,
       "TMS320C54x immediate repeat conformance: PASS variants=256\n": 1,
       "TMS320C54x in-block branch exclusions: PASS cases=32 restore=32 kinds=8 pages=2 snapshots=2 below_block_targets=1 endpoint_overlap=1 delayed_control=1 conditional_call=1 nested_blocks=1 far_branch=1 data_writes=0 atomic_fallback=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x in-block branches: PASS cases=12288 restore=12288 layouts=diamond,endpoint counts=0,1,2,7 patterns=4 accumulators=2 pages=2 snapshots=8 arrivals=9,10,12,14 sources=none,IRQ,NMI source_reads_each=1 selected_writes_each=1 brc_decode=1 braf_final_decode=1 held_tags_restored=1 interrupt_return=1 silicon_phase_claim=0\n": 1,
@@ -3192,11 +3172,8 @@
       "TMS320C54x interrupt entry stages: PASS sources=irq,nmi fetch_to_stack_cycles=1 pipeline_drain_claim=0\n": 1,
       "TMS320C54x interrupt-register dual ALU: PASS cases=18432 restore=18432 registers=IMR,IFR lanes=3 selector_pairs=8 operations=ADD,SUB accumulators=2 sxm_ovm=4 bk_modes=2 patterns=2 pages=2 snapshots=3 interrupt_masked=1 reads_do_not_ack=1 source_sample=Read post_read_poison=1 reads=2 writes=0 reset_before_restore=1 physical_phase_claim=0\n": 1,
       "TMS320C54x legacy atomic prefix: PASS transport_integration=0 staged_suite_claim=0\n": 1,
-      "TMS320C54x literal disassembler: PASS decoded_modes=1472 pages=2 invalid_mmr=32 invalid_rmw=32 bounded_extensions=1 operand_order=1 pipeline_claim=0\n": 1,
       "TMS320C54x live BIO conformance: PASS variants=28\n": 1,
       "TMS320C54x live BIO wait release: PASS\n": 1,
-      "TMS320C54x load disassembler: PASS modes=1536 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
-      "TMS320C54x logical shift disassembler: PASS forms=128 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x long BANZ within block: PASS cases=768 restore=768 counts=0,1,2,7 forms=offset,preincrement,circular offset_pairs=8 pages=2 snapshots=4 ordered_sources=1 selected_writes=1 ar_updates_once=1 actual_iterations=1 compatibility_composition=unvalidated interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x long logic exclusions: PASS cases=24 restore=24 mapped_peripheral=12 repeats=6 control_delays=6 data_reads=0 data_writes=0 pointer_updates=0 atomic_fallback=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x loop XC protection: PASS cases=4 body_words=1,2 sources=irq,nmi\n": 1,
@@ -3230,24 +3207,16 @@
       "TMS320C54x mapped parallel load: PASS cases=147456 restore=147456 forms=6 source_addresses=0000..001f destination=RAM selector_pairs=8 patterns=2 sxm_sst_ovm=8 asm=0,-1 pages=2 snapshots=3 source_sample=Read store_source=Execute reads=1 writes=1 pointer_updates=once t_publish=Read carry_policy=preserve_unvalidated reset_before_restore=1 repeat_peripheral_composition=unvalidated endpoint_identity_claim=0 physical_phase_claim=0\n": 1,
       "TMS320C54x mapped register coverage: PASS cases=%u restore=%u coverage_fnv64=%016llx\n": 1,
       "TMS320C54x mapped shift16 arithmetic: PASS cases=147456 restore=147456 forms=8 mapped_sources=16 modes=DP,absolute,indirect flags=8 patterns=4 late_source=2 pages=2 snapshots=3 source_sample=Read accumulator_sample=Execute partial_carry=1 sticky_overflow=1 ovm=1 writes=0 reset_before_restore=1 physical_phase_claim=0 producer_control_composition=unvalidated\n": 1,
-      "TMS320C54x memory ALU disassembler: PASS modes=4096 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x memory DP conformance: PASS variants=3\n": 1,
-      "TMS320C54x memory MAC/MAS disassembler: PASS forms=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x memory SQUR: PASS cases=52224 restore=52224 forms=RAM,mapped accumulators=2 patterns=8 flags=16 t_publication=Read operand_retained=1 newer_t_preserved=1 duplicate_reads=0 data_writes=0 physical_phase_claim=0\n": 1,
       "TMS320C54x memory immediate MAC: PASS cases=%u restore=%u ram_forms=8 values=8 literals=8 flags=16 selectors=4 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0 coverage_cases=%u coverage_fnv64=%016llx\n": 1,
       "TMS320C54x memory immediate MPY: PASS cases=%u restore=%u forms=12 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n": 1,
-      "TMS320C54x memory logical disassembler: PASS modes=1536 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
-      "TMS320C54x memory multiply/bit disassembler: PASS forms=2304 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x memory repeat in block: PASS cases=3840 restore=3840 forms=DP,SP,indirect,postincrement,absolute outer_counts=4 inner_counts=4 bodies=MVDD,ST,NOP positions=middle,end pages=2 snapshots=4 fresh_counts=1 consumed_counts_poisoned=1 outer_counts_preserved=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x memory repeat/store disassembler: PASS forms=768 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x memory-count chaining: PASS cases=384 restore=384 count_sources=AL,RAM bodies=MVDD,MVKD,MVDK then=RPT_NOP first_counts=0,1,7,31 second_count=3 flag_states=2 pages=2 snapshots=4 stale_body=excluded physical_phase_claim=0\n": 1,
       "TMS320C54x memory-count copies: PASS cases=27648 restore=27648 count_sources=24 owned_mapped_sources=18 counts=0,1,7,31 bodies=MVDD,MVKD,MVDK flag_states=2 pages=2 sources=none,IRQ,NMI snapshots=4 patterns=2 count_reads=once mutation_after_read=1 body_fetches=once physical_phase_claim=0\n": 1,
       "TMS320C54x memory-count wrap: PASS cases=192 restore=192 count_sources=AL,RAM counts=0,1,7,31 bodies=MVDD,MVKD,MVDK pages=2 snapshots=4 header=fffe,ffff body=0000 count_reads=once physical_phase_claim=0\n": 1,
-      "TMS320C54x move/stack disassembler: PASS forms=960 rejected=64 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
-      "TMS320C54x move/test disassembler: PASS decoded_modes=2048 pages=2 bounded_extensions=1 operand_order=1 pipeline_claim=0\n": 1,
       "TMS320C54x native dual SUB: PASS cases=256 restore=256 opcode=a245 patterns=8x8 sxm=0,1 ovm=0,1 physical_phase_claim=0\n": 1,
       "TMS320C54x nested repeats: PASS cases=4 counts=zero,two forms=short,long\n": 1,
-      "TMS320C54x normalization disassembler: PASS forms=12 rejected=4 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x observer XC annulment: PASS cases=64 restore=64 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 forms=XC1,XC2 events_each=5 rejected_slots=absent accepted_source_nops=present observer_writes=0\n": 1,
       "TMS320C54x opcode-shaped extensions: PASS cases=54 restore=54 literals=7cf8,7df8,7ff8 block_counts=0,1,2 pages=2 snapshots=3 instruction=ST_absolute writes=count+1 transfer_admission=0\n": 1,
       "TMS320C54x operand fetch order: PASS cases=53 families=12 forms=direct,indirect,long,absolute,preincrement\n": 1,
@@ -3262,8 +3231,6 @@
       "TMS320C54x parallel MAC: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 shifts=32 reads=1 writes=1 retained=T,X,ASM old_source_store=1 carry=unvalidated physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n": 1,
       "TMS320C54x parallel arithmetic exclusions: PASS cases=128 restore=128 forms=8 mapped_legs=X,Y pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n": 1,
       "TMS320C54x parallel arithmetic: PASS cases=540672 restore=540672 forms=8 address_cases=147456 numeric_cases=393216 pages=2 snapshots=3 read_retained=1 asm_sample=Read accumulator_sample=Execute old_source_store=1 subtraction=memory_minus_other carry_bit=32 sticky_overflow=1 ovm=1 saturation=1 pointer_updates=once reset_before_restore=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x parallel disassembler: PASS forms=4352 complement=4 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
-      "TMS320C54x parallel load disassembler: PASS forms=1536 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x parallel load multiply conformance: PASS variants=64\n": 1,
       "TMS320C54x parallel multiply exclusions: PASS cases=64 restore=64 forms=4 mapped_legs=X,Y pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n": 1,
       "TMS320C54x parallel multiply: PASS cases=270336 restore=270336 forms=4 address_cases=73728 numeric_cases=196608 encodings=1024 asm_modes=32 pages=2 snapshots=3 source_sample=Read t_sample=Read store_source=Execute asm_source=Read old_source_store=1 smul_product_clamp=0 pointer_updates=once reset_before_restore=1 carry_policy=preserve_unvalidated physical_phase_claim=0\n": 1,
@@ -3319,7 +3286,6 @@
       "TMS320C54x shifted arithmetic selectors: PASS cases=104 operations=2 selectors=4 shifts=-16,-1,0,1,15 sxm=0,1 pipeline_claim=0\n": 1,
       "TMS320C54x shifted high store conformance: PASS variants=128\n": 1,
       "TMS320C54x shifted mapped load age: PASS cases=9216 restore=9216 forms=DP,indirect,absolute,offset registers=8 accumulators=2 values=4 younger=MAR_inc,MAR_dec,MVMM sxm=2 pages=2 snapshots=3 shift=16 retained_old_AR=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x shifted memory disassembler: PASS forms=%u invalid_operands=%u rejected=130176 captured=18 syntax=20 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x shifted peripheral exclusions: PASS cases=64 restore=64 accumulators=A,B pages=2 snapshots=2 classes=repeat,block,XC,delay,ST1,BRC,ADD,SUB data_reads=0 data_writes=0 atomic_fallback=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x shifted peripheral load: PASS cases=245760 restore=245760 addresses=64 shifts=-16,-1,4,15 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=1 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x shifted unowned low bus: PASS cases=122880 restore=122880 addresses=0002..0005 shifts=32 forms=DP,SP,absolute,postinc,offset flags=SXM,OVM accumulators=A,B patterns=4 pages=2 snapshots=3 extra_clock=0 source_reads=1 data_writes=0 literals_retained=1 pointer_retained=1 endpoint_identity_claim=0 silicon_phase_claim=0\n": 1,
@@ -3328,14 +3294,12 @@
       "TMS320C54x short control delay BITT: PASS cases=49152 restore=49152 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD,BCD_NTC,BCD_TC forms=DP,plain,postinc,SP slots=2 slot1_producer=LD_T selectors=16 t_high=2 values=2 tc_initial=2 pages=2 snapshots=3 poison_cohorts=memory,T memory_t_sample=Read tc_publish=Execute old_branch_decision=1 owner_stack_only=1 opcode_target_poison=1 reset_before_restore=1 physical_phase_claim=0\n": 1,
       "TMS320C54x short immediate load conformance: PASS variants=512 sxm_settings=2\n": 1,
       "TMS320C54x short mapped AR ADDM: PASS cases=49152 restore=49152 forms=DP,indirect registers=8 values=4 immediates=4 sxm_ovm_c_ova=16 cmpt=2 pages=2 snapshots=3 read=6 write=7 retained_source=1 modifying_forms=excluded physical_phase_claim=0\n": 1,
-      "TMS320C54x short shifted store disassembler: PASS forms=1024 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x signed conditional calls: PASS cases=768 restore=768 predicates=AGEQ,ALT,ANEQ,AEQ,AGT,ALEQ,BGEQ,BLT,BNEQ,BEQ,BGT,BLEQ patterns=8 pages=2 snapshots=4 literal_fetches=1 taken_frame=1 balanced_return=1 untaken_stack_accesses=0 predicate_retained=1 target_retained=1 silicon_phase_claim=0\n": 1,
       "TMS320C54x single repeat in block: PASS cases=768 restore=768 outer_counts=4 inner_counts=4 bodies=MVDD,ST,NOP positions=middle,end pages=2 snapshots=4 ordered_memory=1 outer_counts_preserved=1 duplicate_transactions=0 interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x software interrupt conformance: PASS variants=64\n": 1,
       "TMS320C54x software interrupt fast return: PASS variants=64\n": 1,
       "TMS320C54x software-saved IRQ repeat: PASS cases=3840 restore=3840 outer_counts=0,1,2,7,56 inner_counts=0,1,3,63 sources=IRQ,NMI pages=2 stacks=2 returns=FRETE,FRETED snapshots=6 leaf_return=inside,REA_plus_1 ordered_copies=1 balanced_frames=1 physical_phase_claim=0\n": 1,
       "TMS320C54x source-domain exclusions: PASS cases=%u restore=%u base_cases=30000 absolute_tc0_cases=448 short_control_cases=14208 mac_source_cases=1280 mac_short_checkpoint_cases=128 mapped_rejection_cases=8328 mac_frontend=staged mac_checkpoints=3,5 mac_modes=f8,98..9f base_instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 shifts=0,1,15,16,31 base_modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n": 1,
-      "TMS320C54x special load disassembler: PASS memory_forms=768 arp=8 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x stack address latency conformance: PASS variants=24\n": 1,
       "TMS320C54x staged ADDM: PASS cases=768 address_forms=4 value_pairs=8 status_combinations=8 restore=768 duplicate_reads=0 duplicate_writes=0\n": 1,
       "TMS320C54x staged ADDS: PASS cases=%u restore=%u forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n": 1,
@@ -3642,14 +3606,11 @@
       "TMS320C54x store observation: PASS cases=12 restore=12 retained_address=1 exact_value=1 rejected_other_identity=1 observer_writes=0\n": 1,
       "TMS320C54x store shift boundaries: PASS cases=120 asm=-16,-1 sxm=0,1 sst=0,1 forms=5 sources=A,B pipeline_claim=0\n": 1,
       "TMS320C54x store/DLD address composition: PASS cases=1152 restore=1152 registers=8 patterns=4 gaps=0,1,2 forms=ordinary,shifted pages=2 snapshots=3 writes=2 reads=2 pointer_updates=once silicon_phase_claim=0\n": 1,
-      "TMS320C54x store/short disassembler: PASS stores=2048 immediates=544 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x timer counter write: PASS cases=14\n": 1,
       "TMS320C54x timer debugger registers: PASS independent=1 reload=1\n": 1,
       "TMS320C54x timer divider change: PASS cases=15 save_replay=15 borrow_expiry_checks=45\n": 1,
       "TMS320C54x timer reserved fields: PASS cases=64 debugger_free_soft_behavior_claim=0\n": 1,
-      "TMS320C54x unary disassembler: PASS forms=12 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x unconditional delayed block branches: PASS cases=512 restore=512 counts=0,1,2,7 patterns=4 accumulators=2 delay_layouts=2 pages=2 snapshots=4 ordered_sources=1 selected_writes=1 delay_words_once=1 actual_iterations=1 interrupt_composition=unvalidated physical_phase_claim=0\n": 1,
-      "TMS320C54x unsigned load disassembler: PASS forms=512 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x unsigned mapped arithmetic: PASS cases=221184 restore=221184 operations=ADDS,SUBS numeric_cases=147456 mapped_cases=73728 ram_forms=6 mapped_sources=16 accumulators=2 carry_inputs=ignored sxm_ovm=4 words=8 accumulator_patterns=8 late_accumulator=2 pages=2 snapshots=3 unsigned_smem=1 physical_phase_claim=0 control_composition=unvalidated\n": 1,
       "TMS320C54x vector prefetch: PASS sources=irq,nmi before_stack=1 sp_access=1 retained_opcode=1 extension_fetch=1 save_replay=2 single_ack=1 later_mask=1 reset=1 debugger_redirect=1 physical_latency_claim=0\n": 1,
       "TMS320C54x zero BK addressing: PASS variants=320\n": 1
@@ -6317,6 +6278,343 @@
       "required": [
         "TMS320C54x instruction observer: PASS cases=32 restore=32 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 events_each=7 logical_address=1 captured_opcode=1 repeat_entries=3 ordinary_reads=0 annulled_fetches=0 observer_writes=0",
         "TMS320C54x observer XC annulment: PASS cases=64 restore=64 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 forms=XC1,XC2 events_each=5 rejected_slots=absent accepted_source_nops=present observer_writes=0"
+      ]
+    },
+    "isa-disasm": {
+      "completion": "Fatal error: TMS320C54x isolated disassembly contracts complete",
+      "machine": "tms54isa",
+      "reported_fields": [
+        {
+          "bounded_extensions": "1",
+          "execution_claim": "0",
+          "immediate_forms": "2",
+          "invalid_modes": "1",
+          "memory_forms": "512",
+          "operand_order": "1",
+          "pages": "2"
+        },
+        {
+          "bounded_extensions": "1",
+          "captured": "18",
+          "forms": "108992",
+          "invalid_operands": "5696",
+          "pages": "2",
+          "pipeline_claim": "0",
+          "rejected": "130176",
+          "syntax": "20"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "256",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "1024",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "2048",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "memory_forms": "1024",
+          "pages": "2",
+          "pipeline_claim": "0",
+          "short_forms": "4"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "512",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "2048",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "768",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "accumulator_forms": "16",
+          "bounded_extensions": "1",
+          "dual_forms": "1024",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "128",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "2304",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "256",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "arp": "8",
+          "bounded_extensions": "1",
+          "memory_forms": "768",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "dp": "512",
+          "moves": "256",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "frames": "256",
+          "moves": "81",
+          "pages": "2",
+          "pipeline_claim": "0",
+          "rejected": "175"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "1536",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "256",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "512",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "34",
+          "pages": "2",
+          "pipeline_claim": "0",
+          "rejected": "34"
+        },
+        {
+          "asm": "12",
+          "bounded_extensions": "1",
+          "pages": "2",
+          "pipeline_claim": "0",
+          "shifts": "256"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "12",
+          "pages": "2",
+          "pipeline_claim": "0",
+          "rejected": "4"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "44",
+          "named_predicates": "22",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "12",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "248",
+          "pages": "2",
+          "pipeline_claim": "0",
+          "rejected": "8"
+        },
+        {
+          "bounded_extensions": "1",
+          "decoded_modes": "2048",
+          "operand_order": "1",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "132",
+          "named_predicates": "22",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "modes": "1536",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "modes": "1536",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "modes": "4096",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "pages": "2",
+          "pipeline_claim": "0",
+          "rotate_forms": "6",
+          "shift_forms": "384"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "340",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "4608",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "direct_unclaimed": "128",
+          "indirect": "128",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "modes": "2048",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "modes": "1024",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "indirect": "240",
+          "pages": "2",
+          "pipeline_claim": "0",
+          "unclaimed": "272"
+        },
+        {
+          "bounded_extensions": "1",
+          "modes": "1344",
+          "pages": "2",
+          "pipeline_claim": "0",
+          "rejected": "192"
+        },
+        {
+          "bounded_extensions": "1",
+          "complement": "4",
+          "forms": "4352",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "bounded_extensions": "1",
+          "immediates": "544",
+          "pages": "2",
+          "pipeline_claim": "0",
+          "stores": "2048"
+        },
+        {
+          "bounded_extensions": "1",
+          "forms": "960",
+          "pages": "2",
+          "pipeline_claim": "0",
+          "rejected": "64"
+        },
+        {
+          "bounded_extensions": "1",
+          "decoded_modes": "1472",
+          "invalid_mmr": "32",
+          "invalid_rmw": "32",
+          "operand_order": "1",
+          "pages": "2",
+          "pipeline_claim": "0"
+        },
+        {
+          "pages": "2",
+          "vectors": "48"
+        }
+      ],
+      "required": [
+        "TMS320C54x immediate multiply disassembler: PASS memory_forms=512 immediate_forms=2 pages=2 bounded_extensions=1 operand_order=1 invalid_modes=1 execution_claim=0",
+        "TMS320C54x shifted memory disassembler: PASS forms=108992 invalid_operands=5696 rejected=130176 captured=18 syntax=20 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x MVPD disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x short shifted store disassembler: PASS forms=1024 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x memory MAC/MAS disassembler: PASS forms=2048 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x accumulator-A multiply disassembler: PASS memory_forms=1024 short_forms=4 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x conditional subtract disassembler: PASS forms=512 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x double arithmetic disassembler: PASS forms=2048 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x memory repeat/store disassembler: PASS forms=768 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x dual/accumulator arithmetic disassembler: PASS dual_forms=1024 accumulator_forms=16 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x logical shift disassembler: PASS forms=128 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x memory multiply/bit disassembler: PASS forms=2304 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x accumulator logical disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x special load disassembler: PASS memory_forms=768 arp=8 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x dual move/DP disassembler: PASS moves=256 dp=512 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x frame/MMR move disassembler: PASS frames=256 moves=81 rejected=175 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x parallel load disassembler: PASS forms=1536 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x WRITA disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x unsigned load disassembler: PASS forms=512 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x immediate load disassembler: PASS forms=34 rejected=34 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x accumulator ALU disassembler: PASS shifts=256 asm=12 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x normalization disassembler: PASS forms=12 rejected=4 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x conditional return disassembler: PASS forms=44 pages=2 named_predicates=22 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x unary disassembler: PASS forms=12 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x ADDM disassembler: PASS forms=248 rejected=8 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x move/test disassembler: PASS decoded_modes=2048 pages=2 bounded_extensions=1 operand_order=1 pipeline_claim=0",
+        "TMS320C54x conditional disassembler: PASS forms=132 pages=2 named_predicates=22 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x load disassembler: PASS modes=1536 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x memory logical disassembler: PASS modes=1536 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x memory ALU disassembler: PASS modes=4096 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x accumulator disassembler: PASS shift_forms=384 rotate_forms=6 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x immediate ALU disassembler: PASS forms=340 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x dual multiply disassembler: PASS forms=4608 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x MAR disassembler: PASS indirect=128 direct_unclaimed=128 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x high memory ALU disassembler: PASS modes=2048 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x double memory disassembler: PASS modes=1024 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x BANZ disassembler: PASS indirect=240 unclaimed=272 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x MMR disassembler: PASS modes=1344 rejected=192 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x parallel disassembler: PASS forms=4352 complement=4 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x store/short disassembler: PASS stores=2048 immediates=544 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x move/stack disassembler: PASS forms=960 rejected=64 pages=2 bounded_extensions=1 pipeline_claim=0",
+        "TMS320C54x literal disassembler: PASS decoded_modes=1472 pages=2 invalid_mmr=32 invalid_rmw=32 bounded_extensions=1 operand_order=1 pipeline_claim=0",
+        "TMS320C54x control disassembler: PASS vectors=48 pages=2"
       ]
     },
     "isa-flow": {
@@ -15160,6 +15458,57 @@
       "decision": "rewrite",
       "family": "exponent-producer-consumer-interactions",
       "scope": "Documented EXP spacing and retained consumers; zero-gap stale-T behavior is explicitly only the current model's projection."
+    },
+    "isa-disasm": {
+      "case_ids": [
+        "disasm-control",
+        "disasm-literal",
+        "disasm-move-test",
+        "disasm-conditional",
+        "disasm-conditional-return",
+        "disasm-load",
+        "disasm-memory-logical",
+        "disasm-memory-alu",
+        "disasm-accumulator",
+        "disasm-immediate-alu",
+        "disasm-dual-multiply",
+        "disasm-mar",
+        "disasm-high-memory-alu",
+        "disasm-double-memory",
+        "disasm-banz",
+        "disasm-mmr",
+        "disasm-conditional-store",
+        "disasm-parallel",
+        "disasm-store-short",
+        "disasm-move-stack",
+        "disasm-addm",
+        "disasm-unary",
+        "disasm-normalization",
+        "disasm-accumulator-alu",
+        "disasm-immediate-load",
+        "disasm-unsigned-load",
+        "disasm-writa",
+        "disasm-parallel-load",
+        "disasm-frame-mmr-move",
+        "disasm-dual-move-dp",
+        "disasm-special-load",
+        "disasm-accumulator-logical",
+        "disasm-memory-multiply-bit",
+        "disasm-logical-shift",
+        "disasm-dual-accumulator-arithmetic",
+        "disasm-memory-repeat-store",
+        "disasm-double-arithmetic",
+        "disasm-conditional-subtract",
+        "disasm-accumulator-a-multiply",
+        "disasm-immediate-multiply",
+        "disasm-memory-mac-mas",
+        "disasm-short-shifted-store",
+        "disasm-mvpd",
+        "disasm-shifted-memory"
+      ],
+      "classification": "harness_infrastructure",
+      "decision": "rewrite",
+      "family": "cpu-only-disassembly-contracts"
     },
     "isa-flow": {
       "case_ids": [

@@ -48,6 +48,14 @@ Family retention/rewrite/merge/relocation/deletion decisions live in
 devices or private firmware; legacy default continuations can reuse reviewed
 case data without making the entire sequenced bench generic.
 
+`isa-disasm` separately runs the debugger contract against the paged C54x
+disassembler in the CPU-only executable. It shares the legacy suite's 39 literal
+banks (360 rows), generated encoding/extension sweeps and 44 result families.
+Family IDs distinguish debugger syntax, length, page wrapping and stepping from
+instruction execution; they are not a count of instruction encodings. A common
+literal checker preserves each bank's original PC set and optional exact-read
+mask, while the generated predicates remain unchanged. No case is retired.
+
 Timed replay uses one `restore_pipeline_at` tail: cancel the observer before
 loading the stream, reject load failure, suspend the CPU, publish its fixed
 continuation and enable the observer. Each fixture still explicitly owns its
