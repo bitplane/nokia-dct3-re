@@ -1,3 +1,6 @@
+// license:BSD-3-Clause
+// copyright-holders:Gaz
+
 #include "../../driver/gsm_xcch_l1.h"
 
 #include <cassert>

@@ -1,3 +1,6 @@
+// license:BSD-3-Clause
+// copyright-holders:Gaz
+
 #include "../../driver/gsm_a5.h"
 
 #include <array>

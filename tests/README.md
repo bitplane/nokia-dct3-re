@@ -27,6 +27,8 @@ compatibility, not a claim that ordinary native handset boot still stops there.
   Research handset compositions remain available; this is not an upstream export.
 - Builds share the MAME overlay/object tree: never run the two modes or their
   acceptance gates concurrently. Rebuild the required mode before its gates.
+- `-listfull` also includes device types in this build. Compare source-declared
+  system names, not raw output-line counts, when checking bench exclusion.
 
 Source files are overlaid by basename into MAME's Nokia directory for the
 existing local build. That compatibility mapping does not make a CPU test a
@@ -40,6 +42,24 @@ its build). For an already-built conformance executable, run
 `--profile` selects an isolated declared fixture rather than the default
 sequence. Firmware and device gates retain their individual input and
 acceptance requirements in `Makefile` and `gates.json`.
+
+## Validation boundaries
+
+| Check | Establishes | Does not establish |
+| --- | --- | --- |
+| Harness inventory | Declared profiles, result text and lexical assertions remain intact | Those profiles actually execute or the assertions are correct |
+| Host layout/ownership tests | Source selection, ownership conventions and runner selection | CPU transitions, timing or restoration |
+| Full default C54x run | The ordered default instruction/composition regression | All optional BIOS profiles or physical silicon timing |
+| Isolated C54x profile | Its declared stimulus, rejection controls and replay result | Other profiles or a fitted handset |
+| Device/firmware gate | Its register, serial or acquired-code contract | Full phone support |
+| Handset acceptance | The named product/composition and user workflow | Every underlying hardware contract |
+
+For source moves and independent setup batching, use the inventory, host suite,
+full default run and affected isolated profiles. For ownership changes, include
+the family's rejection, interrupt and restore variants. For build-selection
+changes, build both modes sequentially, inspect actual bench registrations and
+run handset gates on the test-free executable. A mocked runner test is not a
+substitute for those emulator runs.
 
 ## Retention and consolidation
 

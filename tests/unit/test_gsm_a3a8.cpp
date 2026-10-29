@@ -1,3 +1,6 @@
+// license:BSD-3-Clause
+// copyright-holders:Gaz
+
 #include "../../driver/gsm_a3a8.h"
 #include "../../driver/gsm_mm_authentication.h"
 

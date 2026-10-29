@@ -16,6 +16,24 @@ def selected_sources(enabled):
 
 
 class CppTestLayoutTests(unittest.TestCase):
+    def test_test_sources_follow_mame_headers(self):
+        # Source hygiene only, not an executed hardware/processor contract.
+        for source in (ROOT / 'tests').rglob('*'):
+            if source.suffix not in ('.cpp', '.h'):
+                continue
+            with self.subTest(source=source.relative_to(ROOT)):
+                text = source.read_text()
+                first = text.splitlines()[:2]
+                self.assertEqual(first[0], '// license:BSD-3-Clause')
+                self.assertTrue(first[1].startswith('// copyright-holders:'))
+                if source.suffix == '.h':
+                    guard = f'MAME_NOKIA_{source.stem.upper()}_H'
+                    self.assertIn(f'#ifndef {guard}', text)
+                    self.assertIn(f'#define {guard}', text)
+                    self.assertIn(f'#endif // {guard}', text)
+                    self.assertNotIn('#pragma once', text)
+                    self.assertNotIn('#include "emu.h"', text)
+
     def test_handset_build_excludes_every_synthetic_test_source(self):
         sources = selected_sources(0)
         self.assertIn('src/mame/nokia/nokia_dct3.cpp', sources)
