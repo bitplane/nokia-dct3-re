@@ -11,6 +11,39 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class C54xSelectionTests(unittest.TestCase):
+    def test_selected_result_owner_precedes_colliding_legacy_phase(self):
+        from tools.test_c54x_case_fixture import compiled_cpp
+        source = (ROOT / 'tests/c54x/tms320c54x_test_dispatch.cpp').read_text()
+        begin = source.index('\tif (m_result_owner)')
+        end = source.index('\tauto &program', begin)
+        cpp = r'''
+#include <cassert>
+#include <stdexcept>
+struct bench {
+    bool (bench::*m_result_owner)() = nullptr;
+    unsigned phase = 62134, selected = 0, legacy = 0;
+    bool owns_phase = true;
+    bool result() { assert(phase == 62134); ++selected; return owns_phase; }
+    void expect(bool valid, const char *) { if (!valid) throw std::runtime_error("unowned continuation"); }
+    void tick() {
+''' + source[begin:end] + r'''
+        assert(phase == 62134); ++legacy;
+    }
+};
+int main() {
+    bench old; old.tick(); assert(old.legacy == 1 && !old.selected);
+    bench scoped; scoped.m_result_owner = &bench::result;
+    scoped.tick(); assert(scoped.selected == 1 && !scoped.legacy);
+    scoped.owns_phase = false;
+    try { scoped.tick(); assert(false); } catch (std::runtime_error const &) { }
+    assert(scoped.selected == 2 && !scoped.legacy);
+}
+'''
+        if not shutil.which('c++'):
+            self.skipTest('C++ compiler unavailable')
+        with compiled_cpp(cpp) as program:
+            subprocess.run([str(program)], check=True, capture_output=True)
+
     def test_timed_restore_cancels_loads_then_suspends_before_continuation(self):
         from tools.test_c54x_case_fixture import compiled_cpp
         header = (ROOT / 'tests/c54x/tms320c54x_test_state.h').read_text()

@@ -2320,6 +2320,7 @@ private:
 	unsigned m_operand_extension_count = 0, m_operand_extensions = 0, m_operand_reads = 0;
 	bool m_operand_order_violation = false;
 	unsigned m_phase = 0;
+	bool (tms320c54x_test_state::*m_result_owner)() = nullptr;
 	static constexpr unsigned native_store_phase = 1'000'000; // Outside legacy phase bands.
 	static constexpr unsigned delay_bitt_phase = 1'000'020;
 	static constexpr unsigned mvdd_follow_phase = 1'000'030;

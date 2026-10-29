@@ -41,6 +41,7 @@ void tms320c54x_test_state::machine_start()
 void tms320c54x_test_state::machine_reset()
 {
 	using self = tms320c54x_test_state;
+	m_result_owner = nullptr;
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"reg-banks"}, [](self &test) { test.start_pipeline_accumulator_arithmetic(); } },
 		{ {"idle-modes"}, [](self &test) { test.start_pipeline_idle1(); } },
@@ -321,8 +322,14 @@ void tms320c54x_test_state::machine_reset()
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"bitf-peripheral"}, [](self &test) { test.start_pipeline_bitfield_ar7(); } },
 		{ {"t-peripheral"}, [](self &test) { test.start_t_peripheral(); } },
-		{ {"st-t-long", "st-t-long-edge"}, [](self &test) { test.start_extended_t_store(); } },
-		{ {"st-t-branch"}, [](self &test) { test.start_t_store_branch(); } },
+		{ {"st-t-long", "st-t-long-edge"}, [](self &test) {
+			test.m_result_owner = &self::check_extended_t_store_results;
+			test.start_extended_t_store();
+		} },
+		{ {"st-t-branch"}, [](self &test) {
+			test.m_result_owner = &self::check_extended_t_store_results;
+			test.start_t_store_branch();
+		} },
 		{ {"portr-circular"}, [](self &test) { test.start_circular_portr(); } },
 		{ {"portr-block"}, [](self &test) { test.start_circular_portr_block(); } },
 	}))

@@ -8,6 +8,27 @@
   },
   "families": [
     {
+      "id": "legacy-local-result-ownership",
+      "classification": "harness_infrastructure",
+      "decision": "rewrite",
+      "profiles": [],
+      "case_ids": [],
+      "affected_profiles": ["st-t-long", "st-t-long-edge", "st-t-branch"],
+      "basis": "The legacy dispatcher probes unrelated checker methods in fixed order, but extended T stores share phases 62134/62135 with indirect STM and branch/store shares 62136/62137 with repeated STLD. A selected fixture must own its continuations rather than depending on global probe order.",
+      "obligations": [
+        "select the result-owner method during profile startup, reset it on machine reset and invoke it before the legacy fallback dispatcher",
+        "reject an unrecognized owned continuation instead of falling through into another family's colliding phase",
+        "keep the owner outside guest snapshots: it is immutable host routing for the selected profile, not CPU state",
+        "leave input generation, arithmetic expectations, per-clock mutations, snapshot contents and CPU implementation untouched"
+      ],
+      "limits": [
+        "this fixes three isolated profile routes; it does not prove global uniqueness or correctness of the remaining legacy phase namespace",
+        "ownership repair is not a retention review of the T-store arithmetic and admission matrices"
+      ],
+      "baseline": "Both st-t-long and st-t-long-edge fail before any edit: case 0, tick 1, phase 62134 enters the RAM STM AR-preservation predicate. They had not reached their own result checker.",
+      "verification": "After ownership selection, full st-t-long and st-t-long-edge (6144 cases/restores each), st-t-branch (32), stm-ind (1536), stm-ind-edge (1536) and stld-repeat (9216) pass. All 378 focused host tests pass, including an executable check of the real dispatch block's owner-first and fail-closed behavior. No CPU source, input factory or result predicate changed."
+    },
+    {
       "id": "cpu-only-disassembly-contracts",
       "classification": "harness_infrastructure",
       "decision": "rewrite",

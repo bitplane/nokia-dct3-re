@@ -8,6 +8,11 @@ namespace c54x_test {
 
 TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 {
+	if (m_result_owner)
+	{
+		expect((this->*m_result_owner)(), "Selected fixture owns its local continuation");
+		return;
+	}
 	auto &program = m_cpu->space(AS_PROGRAM);
 	auto &data = m_cpu->space(AS_DATA);
 	if (check_repeated_writa_results()) return;

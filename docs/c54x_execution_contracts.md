@@ -48,6 +48,13 @@ Family retention/rewrite/merge/relocation/deletion decisions live in
 devices or private firmware; legacy default continuations can reuse reviewed
 case data without making the entire sequenced bench generic.
 
+Legacy phase numbers are not globally unique. The extended T/TRN store and
+branch/store profiles explicitly select their result owner before execution;
+their local `62134..62137` continuations must not enter the unrelated indirect
+STM or repeated-STLD checker. An owned continuation that is not recognized is
+a harness error, not a reason to try another fixture. The owner is host routing
+metadata, unchanged by guest snapshot replay and reset on machine reset.
+
 `isa-disasm` separately runs the debugger contract against the paged C54x
 disassembler in the CPU-only executable. It shares the legacy suite's 39 literal
 banks (360 rows), generated encoding/extension sweeps and 44 result families.
