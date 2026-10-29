@@ -20,6 +20,7 @@
 #include "tms320c54x_test_atomic_routes.h"
 #include "tms320c54x_test_rejection_state.h"
 #include "tms320c54x_test_entry_state.h"
+#include "tms320c54x_test_repeat_state.h"
 #include <sstream>
 #include <bitset>
 
@@ -1710,18 +1711,8 @@ private:
 	static t_peripheral_fixture t_peripheral_case(unsigned variant);
 	void start_t_peripheral(unsigned variant = 0);
 	bool near_accumulator_fixture() const;
-	struct fcala_delay_fixture
-	{
-		bool b, wide;
-		unsigned source, checkpoint;
-		u32 caller, target;
-	};
+	using fcala_delay_fixture = c54x_test::fcala_delay_fixture;
 	static fcala_delay_fixture fcala_delay_case(unsigned v);
-	struct fcala_delay_observations
-	{
-		unsigned frames = 0, reads = 0, delays = 0, callee = 0, vectors = 0, irq_reads = 0, target_fetches = 0;
-		u16 irq_pc = 0;
-	};
 	void start_fcala_delay(unsigned variant = 0);
 	void start_accumulator_call(unsigned variant = 0);
 	void start_mvdp(unsigned variant = 0);
@@ -1786,49 +1777,15 @@ private:
 	static u16 block_banz_resolved(unsigned v, unsigned iteration);
 	void start_block_bcd(unsigned variant = 0);
 	void start_repeat_rearm(unsigned variant = 0);
-	struct saved_repeat_fixture
-	{
-		unsigned count, inner, snapshot;
-		bool after_end, nmi, delayed;
-		u32 base;
-		u16 sp;
-		u16 end() const { return after_end ? 0x609 : 0x60b; }
-		u16 saved_count() const { return count - unsigned(after_end && count); }
-		u16 saved_st1() const { return 0x900 | (count ? 0x8000 : 0); }
-		u16 vector() const { return nmi ? 4 : 0x40; }
-	};
+	using saved_repeat_fixture = c54x_test::saved_repeat_fixture;
 	static saved_repeat_fixture saved_repeat_case(unsigned v);
-	struct saved_repeat_observations
-	{
-		unsigned outer_reads = 0, outer_writes = 0, leaves = 0, inner_writes = 0;
-		unsigned assertions = 0, vectors = 0, mapped_reads = 0, stack_reads = 0, stack_writes = 0, controls = 0, resumed = 0;
-		u16 return_pc = 0;
-		u64 vector_cycle = 0, inner_cycle = 0, restore_cycle = 0, st1_cycle = 0, resume_cycle = 0;
-	};
 	u16 saved_repeat_word(saved_repeat_fixture const &f, unsigned slot) const;
 	void start_saved_repeat(unsigned variant = 0);
 	static saved_repeat_fixture body_repeat_case(unsigned v);
 	u16 body_repeat_word(saved_repeat_fixture const &f, unsigned slot) const;
 	void start_body_repeat(unsigned variant = 0);
-	struct repeat_context_fixture
-	{
-		bool replace, span;
-		unsigned count, checkpoint;
-		u32 base;
-		u16 sp;
-		u16 old_end() const { return 0x60b + unsigned(span); }
-		u16 start() const { return replace ? span ? 0x1800 : 0x800 : 0x604; }
-		u16 end() const { return replace ? start() + 2 : old_end(); }
-		unsigned copies() const { return count + 1 + unsigned(replace); }
-		unsigned calls() const { return replace ? 1 : count + 1; }
-	};
+	using repeat_context_fixture = c54x_test::repeat_context_fixture;
 	static repeat_context_fixture repeat_context_case(unsigned v);
-	struct repeat_context_observations
-	{
-		unsigned body_reads = 0, body_writes = 0, mapped_reads = 0, saved_writes = 0;
-		unsigned restore_reads = 0, control_writes = 0, frame_reads = 0, frame_writes = 0;
-		unsigned pmst_reads = 0, pmst_saves = 0, pmst_pops = 0, pmst_writes = 0;
-	};
 	u16 repeat_context_word(repeat_context_fixture const &f, unsigned part) const;
 	void start_repeat_context(unsigned variant = 0);
 	struct push_pop_same_fixture
@@ -2236,8 +2193,11 @@ private:
 	bool check_shift_delay_edge_results();
 	bool check_asm_store_results_part2();
 	bool check_repeat_rearm_results();
+	bool check_fcala_delay_results();
+	bool check_body_repeat_results();
 	bool check_saved_repeat_results();
 	bool check_repeat_context_results();
+	bool check_delayed_call_replay_results();
 	bool check_mvdk_mapped_edge_results();
 	bool check_clkmd_move_edge_results();
 	bool check_mvdk_mapped_results();
@@ -2392,10 +2352,9 @@ private:
 	bool m_pipeline_replay = false;
 	struct rptbd_observations { unsigned reads = 0, writes = 0, fetches = 0, delay_reads = 0, delay_writes = 0, acks = 0, stack_reads = 0, stack_writes = 0; };
 	rptbd_observations m_rptbd_counts, m_rptbd_saved_counts;
-	repeat_context_observations m_repeat_context_counts, m_repeat_context_saved_counts;
-	saved_repeat_observations m_saved_repeat_counts, m_saved_repeat_snapshot;
-	unsigned m_saved_repeat_checkpoint = 0;
-	fcala_delay_observations m_fcala_delay_counts, m_fcala_delay_snapshot;
+	replay_fixture<saved_repeat_observations> m_saved_irq_repeat, m_body_irq_repeat;
+	replay_fixture<repeat_context_observations> m_repeat_context;
+	replay_fixture<fcala_delay_observations> m_fcala_delay;
 	u16 m_rptbd_return = 0, m_rptbd_saved_return = 0;
 	unsigned m_pipeline_drained_fetches = 0;
 	memory_passthrough_handler m_pipeline_fetch_tap;

@@ -79,7 +79,9 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_interrupt_entry.cpp` | Vector prefetch, entry spacing, accepted-source retention, stage restoration and their acknowledgement checks |
 | `tests/c54x/tms320c54x_test_entry_state.h` | Entry-family observations, taps and replay storage; predecessor tap cleanup remains explicit |
 | `tests/c54x/tms320c54x_test_peripherals.cpp` | Bus, clock, serial, DMA and timer fixtures |
-| `tests/c54x/tms320c54x_test_restore.cpp` | Explicit cross-context snapshot/restore fixtures; each other family retains its own replay checks |
+| `tests/c54x/tms320c54x_test_restore.cpp` | Atomic far-transfer replay and extended program-memory continuations |
+| `tests/c54x/tms320c54x_test_repeat_restore.cpp` | Saved/body IRQ repeats, active-context restoration and delayed far-call/return replay |
+| `tests/c54x/tms320c54x_test_repeat_state.h` | Independent case inputs, observation types and per-family replay storage; no generic rewind policy |
 | `tests/c54x/tms320c54x_test_disassembler.cpp` | Bounded decoding and operand-domain matrices |
 | `tests/firmware/tms320c54x_test_rom4.cpp` | Acquired-ROM routine execution and independent reference comparisons |
 | `tests/c54x/tms320c54x_test_atomic.cpp` | Routes atomic phases to their owning sequence without a global result scan |

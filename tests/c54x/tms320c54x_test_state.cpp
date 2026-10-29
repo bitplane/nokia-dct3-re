@@ -773,14 +773,29 @@ void tms320c54x_test_state::expect(bool condition, const char *message)
 {
 	if (!condition)
 	{
+		unsigned case_index = m_pipeline_peripheral_case, tick = m_idle_fixture_tick;
+		bool replay = m_pipeline_replay;
+		auto progress = [&](auto const &fixture) {
+			case_index = fixture.variant;
+			tick = fixture.tick;
+			replay = fixture.replay;
+		};
 		operand_rejection_fixture const *rejection = nullptr;
 		for (auto const *fixture : {&m_source_domains, &m_source_aliases, &m_short_sources})
 			if (fixture->handles_phase(m_phase))
+			{
 				rejection = fixture;
+				progress(*fixture);
+			}
+		switch (m_phase)
+		{
+		case 255800: case 255810: progress(m_saved_irq_repeat); break;
+		case 255840: case 255850: progress(m_body_irq_repeat); break;
+		case 255480: case 255490: progress(m_repeat_context); break;
+		case 255820: case 255830: progress(m_fcala_delay); break;
+		}
 		osd_printf_info("c54x_failure: phase=%u case=%u tick=%u replay=%u pc=%06x rc=%04x ar1=%04x a=%010llx b=%010llx st0=%04x illegal=%u reads=%u writes=%u\n",
-			m_phase, rejection ? rejection->variant : m_pipeline_peripheral_case,
-			rejection ? rejection->tick : m_idle_fixture_tick,
-			unsigned(rejection ? rejection->replay : m_pipeline_replay), unsigned(m_cpu->state_int(STATE_GENPC)),
+			m_phase, case_index, tick, unsigned(replay), unsigned(m_cpu->state_int(STATE_GENPC)),
 			unsigned(m_cpu->state_int(tms320c54x_device::STATE_RC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)),
 			(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),
 			unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)),

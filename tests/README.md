@@ -85,3 +85,10 @@ restore observations in `interrupt_entry_fixture`. Its acknowledgement checks
 live beside the fixture rather than in the general IRQ callback. Entry setup
 retires predecessor taps at the handoff boundary; active entry
 observers use dedicated handles. Replay counter rewinds remain explicit.
+
+Saved-IRQ repeat, direct-body repeat, active-context restoration and delayed
+far-call tests own separate `replay_fixture` instances. Their immutable inputs
+and observation types live in the repeat-state header. The template shares
+storage only: event-driven checkpoints, rewind order and input-edge handling
+stay in each family's code. Unrelated rearm and conditional-call handlers are
+dispatched separately in their original order.
