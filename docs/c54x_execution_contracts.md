@@ -74,7 +74,9 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_addressing.cpp` | Address generation and memory/register transfers, including the stack-transfer continuation |
 | `tests/c54x/tms320c54x_test_operand_domains.cpp` | Operand-domain, absolute-alias and short-source rejection fixtures with family-owned progress, observations, taps and snapshots |
 | `tests/c54x/tms320c54x_test_rejection_state.h` | Per-family rejection state; CPU and scheduler routing remain with the bench |
-| `tests/c54x/tms320c54x_test_pipeline.cpp` | Control flow, repeats, dependency and pipeline-composition fixtures |
+| `tests/c54x/tms320c54x_test_pipeline.cpp` | Dependency, status and data-path compositions and their sequenced continuations |
+| `tests/c54x/tms320c54x_test_pipeline_control.cpp` | Branch, call, return and conditional-control compositions and continuations |
+| `tests/c54x/tms320c54x_test_pipeline_repeat.cpp` | Repeat/block-control compositions and continuations |
 | `tests/c54x/tms320c54x_test_frontend.cpp` | Decoded/empty frontend entry, flush timing and acknowledgement ownership |
 | `tests/c54x/tms320c54x_test_observer.cpp` | Instruction identity, ordinary-read exclusion and XC annulment observations |
 | `tests/c54x/tms320c54x_test_block_repeat.cpp` | Delayed-block-repeat layout, exclusions, IRQ acknowledgement and replay |
@@ -98,7 +100,7 @@ boundaries are:
 The result dispatcher preserves phase-check order, including paths that update
 the phase and fall through within one callback. Family extraction must retain
 that ordering and distinguish callback returns from returns inside observers'
-lambdas. Shared bench state and snapshot/replay ownership are unchanged; moving
+lambdas. Source grouping does not establish independent fixture state; moving
 a case does not authorize changing its inputs, expected values or observation
 boundaries. The dispatcher delegates consecutive clauses to ordered handlers,
 not an unordered subsystem sweep. A handler returning false permits subsequent

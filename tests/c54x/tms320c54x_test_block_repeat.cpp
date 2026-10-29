@@ -28,9 +28,11 @@ void tms320c54x_test_state::start_rptbd(unsigned variant)
 	for (unsigned i = 0; i < 8; ++i) { data.write_word(0x5000 + i, rptbd_source(variant, i)); data.write_word(0x6000 + i, 0xdead); }
 	data.write_word(0x4003, rptbd_source(variant, 0));
 	m_cpu->set_pipeline_frontend(false);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0},
+		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x900}, {cpu_regs::STATE_IFR, 0},
+		{cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_TCR, 0x10},
+	});
 	m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
 	if (variant >= 512) { m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x100); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, rptbd_irq_line(variant) == 2 ? 4 : 0); }
 	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);

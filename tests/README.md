@@ -106,3 +106,8 @@ fixtures own their progress, observations, taps and checkpoints in separate
 modules. The CPU wiring delegates their acknowledgements without changing
 the ordered callback route. Other repeat and dependency fixtures still share
 the sequenced bench storage; that sharing is not evidence of reset isolation.
+
+The remaining pipeline compositions are grouped into data/dependency,
+control-flow and repeat-control modules. Each retains its ordered continuation
+handlers, including cross-family handoffs. These source boundaries improve
+navigation; they do not add another dispatcher or change BIOS ownership.
