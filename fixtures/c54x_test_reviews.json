@@ -8,6 +8,39 @@
   },
   "families": [
     {
+      "id": "mapped-register-arithmetic-clocked-runner",
+      "classification": "isa_documented",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_arithmetic.cpp; tests/c54x/tms320c54x_test_register_sequence.h",
+      "profiles": ["arith-ar", "arith-bk"],
+      "case_ids": [],
+      "basis": "Existing fixture-owned integer ADD/SUB expectations remain unchanged, independent of CPU arithmetic helpers. Mapped AR/BK sampling and replay are distinct from RAM operands and register-only ALU cases. The generic runner owns bus ordering and host cursor restoration, not arithmetic expectations.",
+      "profile_coverage": {
+        "arith-ar": {"cases": 1024, "fnv64": "b132ca6ceb3d4c25", "result_prefix": "TMS320C54x mapped arithmetic coverage: PASS", "key": "Original raw ordinals 0..1023 in order, including both checkpoint cohorts."},
+        "arith-bk": {"cases": 1024, "fnv64": "b132ca6ceb3d4c25", "result_prefix": "TMS320C54x mapped arithmetic coverage: PASS", "key": "Original raw ordinals 0..1023 in order, including both checkpoint cohorts."}
+      },
+      "obligations": [
+        "retain direct/absolute forms, both destinations, arithmetic flags, mapped register selection and original numeric inputs without changing register_arithmetic_case or memory_arithmetic_case",
+        "one exact data read at the original pipeline cycle and no writes; mutate the source at that cycle and preserve the retained result across replay",
+        "keep both checkpoint cohorts, rewind the host bus cursor independently of guest state, and check the complete bus trace on live and restored completion",
+        "retain final A/B, ST0, illegal latch and mutated source checks at clock 16; append actual case/restore counts and ordered identity digest"
+      ],
+      "limits": [
+        "unobserved NOP padding after the tested instruction becomes real IDLE; no assertion of unchanged subsequent NOP fetches or PC",
+        "all 2048 cases retained for this runner pilot; duplicate checkpoint/numeric reduction is not claimed",
+        "bus timing is an implementation contract, not measured hardware; legacy profile ownership and shared reference-factory dependencies remain",
+        "adding a generic bus observer does not classify other memory families"
+      ],
+      "measurement": {
+        "baseline_commit": "acaf6df4",
+        "c54x_cpp_bytes_before": 3552209,
+        "c54x_cpp_bytes_after": 3552117,
+        "c54x_cpp_lines_before": 54241,
+        "c54x_cpp_lines_after": 54255,
+        "scope": "Pilot removes bespoke taps, host counters and replay phases in favor of the shared runner. Its new bus capability offsets most source savings: 92 fewer bytes but 14 more lines. All 2048 cases and restores remain. No speedup or full-default checkpoint renewal is claimed."
+      }
+    },
+    {
       "id": "atomic-instruction-word-examples",
       "classification": "isa_documented",
       "decision": "rewrite",

@@ -56,6 +56,18 @@ post-load assertions retain their separate ordering. Executable stub tests
 check the real helper's success and failure paths; its use does not qualify
 the instruction cases that call it.
 
+The clocked case runner can also own a complete ordered data-bus trace
+(direction, address, value and CPU pipeline cycle). Its host event cursor is
+captured and rewound with the snapshot; replay must neither repeat a retained
+read nor omit a pending one. Register-only cases retain their no-access policy.
+`arith-ar` and `arith-bk` are the memory pilot: each retains all 1,024 original
+keys, reference arithmetic, before/after-read checkpoints and source-register
+mutation. Their former per-family taps, counters and replay phases are removed.
+The instruction now ends in real IDLE instead of unobserved NOP padding;
+the final arithmetic/status/source checks still occur at clock 16. This does
+not yet relocate either profile out of the legacy machine or qualify other
+memory families. Bus cycles are implementation observations, not silicon timing.
+
 `isa-words` owns fifty independently reset atomic instruction examples. The
 default suite shares the same bank through one loop, replacing five separate
 setup/check families. Ordered program/data/register seeds and partial result

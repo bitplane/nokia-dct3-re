@@ -1546,33 +1546,43 @@ tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::register
 	return f;
 }
 
-void tms320c54x_test_state::start_pipeline_register_arithmetic(unsigned variant)
+clocked_register_case tms320c54x_test_state::mapped_arithmetic_sequence(unsigned variant, bool bk)
 {
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const bk = profile_is("arith-bk");
 	auto const f = register_arithmetic_case(variant, bk);
 	u32 const base = f.reg == 6 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, f.opcode); if (f.form == 17) program.write_word(base + 0x601, f.literal);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(bk ? tms320c54x_device::STATE_BK : tms320c54x_device::STATE_AR0 + f.reg, f.memory);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, BIT(f.opcode, 8) ? 0x123456789aULL : f.source);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, BIT(f.opcode, 8) ? f.source : 0x123456789aULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "register_arithmetic_sample",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == f.address && word == f.memory && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read_cycle,
-				"Memory arithmetic samples the mapped AR register once before later register changes"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "register_arithmetic_no_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Memory arithmetic does not write its AR source"); });
-	m_phase = 252930; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	int const source = bk ? tms320c54x_device::STATE_BK : tms320c54x_device::STATE_AR0 + f.reg;
+	bool const dest_b = BIT(f.opcode, 8);
+	instruction_case initial{"mapped-arithmetic", f.opcode, {}, {}, {
+		{tms320c54x_device::STATE_IDLE, 0}, {tms320c54x_device::STATE_TCR, 0x10},
+		{tms320c54x_device::STATE_PMST, 0}, {tms320c54x_device::STATE_ILLEGAL, 0},
+		{tms320c54x_device::STATE_ST0, f.st0}, {tms320c54x_device::STATE_ST1, f.st1}, {source, f.memory},
+		{tms320c54x_device::STATE_A, dest_b ? 0x123456789aULL : f.source},
+		{tms320c54x_device::STATE_B, dest_b ? f.source : 0x123456789aULL},
+		{tms320c54x_device::STATE_IFR, 0}, {tms320c54x_device::STATE_IMR, 0}, {STATE_GENPC, base + 0x600}
+	}, {{tms320c54x_device::STATE_ILLEGAL, 0}}, 0, 0};
+	for (unsigned i = 0; i < 24; ++i) initial.program.push_back({base + 0x600 + i, 0xf495});
+	initial.program.push_back({base + 0x600, f.opcode});
+	if (f.form == 17) initial.program.push_back({base + 0x601, f.literal});
+	// Stop after the tested instruction instead of executing unobserved NOP padding.
+	initial.program.push_back({base + 0x601 + unsigned(f.form == 17), 0xf4e1});
+	instruction_case final{"mapped-arithmetic", f.opcode, {}, {}, {}, {
+		{tms320c54x_device::STATE_ILLEGAL, 0}, {tms320c54x_device::STATE_ST0, f.result_st0},
+		{tms320c54x_device::STATE_A, dest_b ? 0x123456789aULL : f.result},
+		{tms320c54x_device::STATE_B, dest_b ? f.result : 0x123456789aULL}, {source, 0x2222}
+	}, 0, 0};
+	clocked_register_case test{{{0, std::move(initial)}, {16, std::move(final)}},
+		variant / 512 ? f.read_cycle : f.read_cycle - 1, 16,
+		{{f.read_cycle, {{source, 0x2222}}}}, variant};
+	test.data_events = std::vector<clocked_data_event>{{false, f.address, f.memory, f.read_cycle}};
+	return test;
+}
+
+void tms320c54x_test_state::start_pipeline_register_arithmetic()
+{
+	bool const bk = profile_is("arith-bk");
+	m_register_sequence = std::make_unique<register_sequence_fixture>(machine(), *m_cpu, *m_check_timer,
+		1024, [bk](unsigned key) { return mapped_arithmetic_sequence(key, bk); });
+	m_phase = 252930; m_register_sequence->start();
 }
 
 void tms320c54x_test_state::start_pipeline_xc_arithmetic(unsigned variant)
@@ -5918,42 +5928,15 @@ bool tms320c54x_test_state::check_absolute_xorm_results()
 	}
 	if (m_phase == 252930)
 	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
+		if (!m_register_sequence->step()) return true;
+		osd_printf_info("TMS320C54x mapped arithmetic coverage: PASS cases=%u restore=%u coverage_fnv64=%016llx\n",
+			m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
+		m_register_sequence.reset();
 		bool const bk = profile_is("arith-bk");
-		auto const f = register_arithmetic_case(variant, bk);
-		unsigned const checkpoint = variant / 512 ? f.read_cycle : f.read_cycle - 1;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped AR arithmetic sources have staged ownership");
-		if (tick == f.read_cycle) m_cpu->set_state_int(bk ? tms320c54x_device::STATE_BK : tms320c54x_device::STATE_AR0 + f.reg, 0x2222);
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save mapped AR arithmetic before/after its retained read");
-		}
-		if (tick == 16)
-		{
-			expect(m_pipeline_operand_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.result_st0 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (BIT(f.opcode, 8) ? 0x123456789aULL : f.result) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (BIT(f.opcode, 8) ? f.result : 0x123456789aULL) &&
-				m_cpu->state_int(bk ? tms320c54x_device::STATE_BK : tms320c54x_device::STATE_AR0 + f.reg) == 0x2222,
-				"Mapped AR source is retained without duplicate reads or register publication");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0];
-				return restore_pipeline_at(252940, "Restore mapped AR arithmetic without rereading the changed source");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 1023) { start_pipeline_register_arithmetic(variant + 1); return true; }
-			if (bk) { osd_printf_info("TMS320C54x staged mapped BK arithmetic: PASS cases=1024 restore=1024 selectors=ADD_A,ADD_B,SUB_A,SUB_B sxm_ovm=4 patterns=8 forms=direct,absolute pages=2 snapshots=2 source=Read post_read_change=1 duplicate_reads=0 data_writes=0 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped BK arithmetic complete"); }
-			osd_printf_info("TMS320C54x staged mapped AR arithmetic: PASS cases=1024 registers=8 selectors=4 sxm_ovm=4 patterns=2 forms=direct,absolute restore=1024 duplicate_reads=0 data_writes=0\n");
-			if (profile_is("arith-ar")) throw emu_fatalerror(3, "TMS320C54x isolated mapped AR arithmetic complete");
-			start_pipeline_signed_branch(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252940)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252930;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+		if (bk) { osd_printf_info("TMS320C54x staged mapped BK arithmetic: PASS cases=1024 restore=1024 selectors=ADD_A,ADD_B,SUB_A,SUB_B sxm_ovm=4 patterns=8 forms=direct,absolute pages=2 snapshots=2 source=Read post_read_change=1 duplicate_reads=0 data_writes=0 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped BK arithmetic complete"); }
+		osd_printf_info("TMS320C54x staged mapped AR arithmetic: PASS cases=1024 registers=8 selectors=4 sxm_ovm=4 patterns=2 forms=direct,absolute restore=1024 duplicate_reads=0 data_writes=0\n");
+		if (profile_is("arith-ar")) throw emu_fatalerror(3, "TMS320C54x isolated mapped AR arithmetic complete");
+		start_pipeline_signed_branch(); return true;
 	}
 	if (m_phase == 252950)
 	{

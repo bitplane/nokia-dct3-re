@@ -575,7 +575,8 @@ private:
 	static memory_arithmetic_fixture memory_shift16_case(unsigned variant);
 	void start_pipeline_memory_arithmetic(unsigned variant = 0);
 	static memory_arithmetic_fixture register_arithmetic_case(unsigned variant, bool bk = false);
-	void start_pipeline_register_arithmetic(unsigned variant = 0);
+	static c54x_test::clocked_register_case mapped_arithmetic_sequence(unsigned variant, bool bk);
+	void start_pipeline_register_arithmetic();
 	void start_pipeline_xc_arithmetic(unsigned variant = 0);
 	static u64 signed_branch_source(unsigned variant);
 	static bool signed_branch_taken(unsigned variant);

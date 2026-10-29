@@ -32,6 +32,18 @@ struct instruction_case
 
 struct clocked_register_state { unsigned tick; instruction_case observation; };
 struct clocked_register_action { unsigned tick; std::vector<register_setting> values; };
+struct clocked_data_event { bool write; std::uint32_t address; u16 value; unsigned cycle; };
+
+inline bool accept_data_event(std::vector<clocked_data_event> const &events, unsigned &cursor, clocked_data_event actual)
+{
+	if (cursor >= events.size()) return false;
+	auto const &expected = events[cursor];
+	if (actual.write != expected.write || actual.address != expected.address ||
+		actual.value != expected.value || actual.cycle != expected.cycle) return false;
+	++cursor;
+	return true;
+}
+
 struct clocked_register_case
 {
 	std::vector<clocked_register_state> states;
@@ -39,6 +51,7 @@ struct clocked_register_case
 	std::vector<clocked_register_action> actions{};
 	std::optional<std::uint32_t> identity{}, single_fetch{};
 	bool forbid_data_access = false;
+	std::optional<std::vector<clocked_data_event>> data_events{};
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

@@ -29,6 +29,42 @@ def compiled_cpp(source):
 
 class CaseFixtureTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
+    def test_ordered_data_events_reject_mismatch_and_rewind_at_checkpoint(self):
+        header = (ROOT / 'tests/c54x/tms320c54x_test_case.h').read_text()
+        begin = header.index('struct clocked_data_event')
+        end = header.index('struct clocked_register_case', begin)
+        source = r'''
+#include <cassert>
+#include <cstdint>
+#include <vector>
+using u16 = std::uint16_t; using u32 = std::uint32_t;
+''' + header[begin:end] + r'''
+int main() {
+    std::vector<clocked_data_event> events{{false, 0x10, 0xabcd, 5}, {true, 0x20, 0x1234, 7}};
+    unsigned cursor = 0;
+    for (auto wrong : std::vector<clocked_data_event>{
+        {true, 0x10, 0xabcd, 5}, {false, 0x11, 0xabcd, 5},
+        {false, 0x10, 0xabcc, 5}, {false, 0x10, 0xabcd, 6}, events[1]}) {
+        assert(!accept_data_event(events, cursor, wrong) && cursor == 0);
+    }
+    unsigned const before_read = cursor;
+    assert(accept_data_event(events, cursor, events[0]) && cursor == 1);
+    unsigned const after_read = cursor;
+    assert(accept_data_event(events, cursor, events[1]) && cursor == 2);
+    assert(!accept_data_event(events, cursor, events[1]) && cursor == 2);
+    cursor = before_read;
+    assert(accept_data_event(events, cursor, events[0]));
+    cursor = after_read;
+    assert(!accept_data_event(events, cursor, events[0]) && cursor == 1);
+    assert(accept_data_event(events, cursor, events[1]) && cursor == events.size());
+    cursor = 0;
+    assert(!accept_data_event({}, cursor, events[0]) && cursor == 0);
+}
+'''
+        with compiled_cpp(source) as program:
+            subprocess.run([str(program)], check=True, capture_output=True)
+
+    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_dual_schedules_keep_address_banks_and_numeric_inputs(self):
         source = r'''
 #include <algorithm>

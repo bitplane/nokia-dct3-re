@@ -13,6 +13,7 @@ namespace c54x_test {
 
 // Explicit expected states at CPU clocks, with no implied arithmetic or reset.
 // The first state's case also owns setup; later states only own observations.
+// Optional data events specify the complete ordered bus trace, including cycles.
 class register_sequence_fixture
 {
 public:
@@ -37,15 +38,18 @@ public:
 		if (m_tick == m_input.checkpoint && !m_replay)
 		{
 			m_saved_fetches = m_fetches;
+			m_saved_data_cursor = m_data_cursor;
 			require(capture_snapshot(m_machine, m_saved) == STATERR_NONE, "capture register-sequence checkpoint");
 		}
 		if (m_tick == m_input.finish)
 		{
 			require(m_cpu.state_int(tms320c54x_device::STATE_IDLE), "sequence reaches its real IDLE instruction");
 			if (m_input.single_fetch) require(m_fetches == 1, "one opcode fetch");
+			if (m_input.data_events) require(m_data_cursor == m_input.data_events->size(), "complete data-bus trace");
 			if (!m_replay)
 			{
 				m_replay = true; m_tick = m_input.checkpoint; m_fetches = m_saved_fetches;
+				m_data_cursor = m_saved_data_cursor;
 				require(restore_snapshot(m_machine, m_timer, m_saved) == STATERR_NONE, "restore register sequence");
 				++m_restores; m_cpu.suspend(SUSPEND_REASON_DISABLE, true); m_resume = true; m_timer.enable(true); return false;
 			}
@@ -76,7 +80,19 @@ private:
 		m_label = std::string(m_input.states.front().observation.id) + "/" + std::to_string(m_input.identity.value_or(m_case));
 		for (auto &state : m_input.states) state.observation.id = m_label.c_str();
 		prepare_case(m_cpu, m_input.states.front().observation);
-		m_fetches = 0;
+		m_fetches = m_data_cursor = 0;
+		require(!(m_input.forbid_data_access && m_input.data_events), "one data-bus observation policy");
+		if (m_input.data_events)
+		{
+			auto access = [this](bool write, offs_t at, u16 word) {
+				if (!m_machine.side_effects_disabled())
+					require(accept_data_event(*m_input.data_events, m_data_cursor,
+						{write, u32(at), word, unsigned(m_cpu.pipeline_cycles())}), "ordered data-bus event");
+			};
+			m_data_tap = m_cpu.space(AS_DATA).install_readwrite_tap(0, 0xffff, "register_sequence_data",
+				[access](offs_t at, u16 &word, u16) { access(false, at, word); },
+				[access](offs_t at, u16 &word, u16) { access(true, at, word); });
+		}
 		if (m_input.forbid_data_access)
 		{
 			auto access = [this](offs_t, u16 &, u16) { if (!m_machine.side_effects_disabled()) require(false, "register-only sequence has no data access"); };
@@ -98,6 +114,7 @@ private:
 	emu_timer &m_timer;
 	unsigned m_cases, m_case = 0, m_tick = 0, m_restores = 0;
 	unsigned m_fetches = 0, m_saved_fetches = 0;
+	unsigned m_data_cursor = 0, m_saved_data_cursor = 0;
 	builder m_build;
 	std::function<void(u16, u16)> m_opcode_observer;
 	clocked_register_case m_input;
