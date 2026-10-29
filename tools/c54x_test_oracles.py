@@ -321,6 +321,10 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "isa-long": (
+        "TMS320C54x generic long arithmetic: PASS cases=18 reset_groups=18 nokia_devices=0 firmware=0",
+        "Fatal error: TMS320C54x isolated generic long arithmetic complete",
+    ),
     "isa-scalars": (
         "TMS320C54x generic scalars: PASS cases=34 reset_groups=19 nokia_devices=0 firmware=0",
         "Fatal error: TMS320C54x isolated generic scalars complete",

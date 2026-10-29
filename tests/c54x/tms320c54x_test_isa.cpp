@@ -7,6 +7,7 @@
 #include "tms320c54x_test_parallel.h"
 #include "tms320c54x_test_domains.h"
 #include "tms320c54x_test_scalars.h"
+#include "tms320c54x_test_long_reference.h"
 #include <cstring>
 
 namespace {
@@ -35,13 +36,14 @@ protected:
 private:
 	bool parallel() const { return !std::strcmp(machine().options().bios(), "isa-parallel"); }
 	bool scalars() const { return !std::strcmp(machine().options().bios(), "isa-scalars"); }
+	bool long_reference() const { return !std::strcmp(machine().options().bios(), "isa-long"); }
 	unsigned count() const
 	{
-		return scalars() ? c54x_test::scalar_vectors().size() : parallel() ? c54x_test::parallel_vectors().size() : c54x_test::square_vectors.size();
+		return long_reference() ? c54x_test::long_reference_cases().size() : scalars() ? c54x_test::scalar_vectors().size() : parallel() ? c54x_test::parallel_vectors().size() : c54x_test::square_vectors.size();
 	}
 	c54x_test::instruction_case test_case() const
 	{
-		return scalars() ? c54x_test::scalar_vectors().at(m_case).test : parallel() ? c54x_test::parallel_case(m_case) : c54x_test::square_case(m_case);
+		return long_reference() ? c54x_test::long_reference_cases().at(m_case) : scalars() ? c54x_test::scalar_vectors().at(m_case).test : parallel() ? c54x_test::parallel_case(m_case) : c54x_test::square_case(m_case);
 	}
 	void ram_map(address_map &map) { map(0, 0xffff).ram(); }
 	void program_map(address_map &map)
@@ -86,6 +88,11 @@ private:
 		c54x_test::check_case(*m_cpu, test, m_writes, m_last - m_first);
 		osd_printf_info("C54x ISA case: PASS id=%s\n", test.id);
 		if (++m_case < count()) { start(); return; }
+		if (long_reference())
+		{
+			osd_printf_info("TMS320C54x generic long arithmetic: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n", m_case, m_resets);
+			throw emu_fatalerror(3, "TMS320C54x isolated generic long arithmetic complete");
+		}
 		if (scalars())
 		{
 			osd_printf_info("TMS320C54x generic scalars: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n", m_case, m_resets);
@@ -112,6 +119,7 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(1, "isa-parallel", "Parallel store arithmetic reference cases")
 	ROM_SYSTEM_BIOS(2, "source-domain", "Implemented single-memory operand admission limits")
 	ROM_SYSTEM_BIOS(3, "isa-scalars", "Scalar arithmetic boundaries with explicit stateful groups")
+	ROM_SYSTEM_BIOS(4, "isa-long", "TI long-word arithmetic examples")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
 ROM_END
 

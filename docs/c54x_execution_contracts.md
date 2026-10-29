@@ -85,6 +85,16 @@ routing, not the case identities. The aliasing case checks the loaded old RAM
 word and the newly stored word separately. These atomic cases do not replace
 pipeline retention, repeat or interrupt-composition coverage.
 
+`isa-long` runs 18 independently reset DADD/DSUB/DRSUB and T-based long-word
+examples. Literal accumulators, address updates, source/decoy RAM, cycle
+intervals and status masks are shared with the legacy reference sequence.
+The T-based checks remain carry-only, with DSADT/C16 carry intentionally
+unchecked; extraction does not promote omitted flags into preservation claims.
+Both paths pass, including all 2,474 legacy asserted opcode words and 173 PASS
+records unchanged. The independent CPU-only binary runs with an empty ROM
+directory. This batch changes total C54x source size by only -44 bytes/+4 lines;
+it is isolation and boilerplate replacement, not substantial source reduction.
+
 The reviewed long RAM RMW schedule retains every distinct operation, addressing,
 value, status and compatibility stimulus once (38,400 cases). For each of its
 4,800 operation/address/compatibility/status groups, the eight value pairs cover

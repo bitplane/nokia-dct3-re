@@ -361,6 +361,18 @@
       "basis": "State-restoration identity: snapshot all 2048 shared words after queueing two packets and setting register 0, destroy RAM/register contents, restore, then compare every word and the literal register value 0x5a.",
       "obligations": ["make check-dspif-save runs without CPU, firmware or private ROM", "preserve the original two queued payloads, ring cursors and interface register through the save round trip"],
       "limits": ["not CPU conformance and no longer instantiated by ordinary CPU profiles", "identity comparison proves preservation, not independent packet-format correctness", "separate backend integration fixtures remain unchanged"]
+    },
+    {
+      "id": "long-arithmetic-examples",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_long_reference.h",
+      "profiles": ["isa-long"],
+      "basis": "Literal TI long-word arithmetic examples already present in the regression, including C16 lane carry/borrow and saturation. Expected values are preserved literals, not calculated through CPU implementation helpers.",
+      "case_ids": ["dadd-postincrement", "dadd-c16-postdecrement", "dsub-postincrement", "dsub-c16-postdecrement", "dadd-absolute-saturate", "dadd-c16-lane-carry", "dsub-c16-lane-borrow", "drsub-postincrement", "drsub-c16-postdecrement", "dadd-ar2-not-ar3", "dadd-ar5-not-ar3", "dadst-c16-postdecrement", "dadst-postincrement", "dsadt-postincrement", "dsadt-c16-postdecrement", "dsubt-postincrement", "dsubt-c16-postdecrement", "dadst-b-absolute"],
+      "legacy_entry": "reference phases 554..562,9211..9212,563..569; stationary AR6 and later long-offset cases remain outside this review",
+      "obligations": ["18 independently reset CPU-only cases, with the same data also consumed without reset by the legacy sequence", "full ST0 checks for DADD/DSUB/DRSUB; carry-only checks for T-based operations except the intentionally unchecked DSADT C16 carry", "AR2/AR5 source selection distinguished from decoy AR3 words, with source RAM and both stationary pointers preserved", "two port writes bracket each operation with the original three/four-cycle interval", "retain both accumulator expectations, T preservation and AR3 updates exactly where originally checked"],
+      "limits": ["no source operand, result expectation or numeric case is deleted", "CPU-only reset isolation is not a claim about physical bus-cycle accuracy", "does not replace long-memory staged execution, interrupt composition or save/replay families", "shared expectation data adds isolation, not independent duplicate conformance coverage"]
     }
   ]
 }

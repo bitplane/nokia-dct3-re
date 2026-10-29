@@ -5,6 +5,7 @@
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_square.h"
 #include "tms320c54x_test_parallel.h"
+#include "tms320c54x_test_long_reference.h"
 
 namespace c54x_test {
 
@@ -26,75 +27,20 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			prepare_case(*m_cpu, square_case(index + 1));
 			return next_atomic_phase(m_phase + 1);
 		}
-		program.write_word(0x05e2, 0x5193); // DADD *AR3+,A,B
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
-		data.write_word(0x0f90, 0x1534);
-		data.write_word(0x0f91, 0x3456);
 		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x56788933}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_AR3, 0x0f90},
-			{cpu_regs::STATE_ST0, 0},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		prepare_case(*m_cpu, long_reference_cases()[0]);
 		return next_atomic_phase(554);
 	}
 	if ((m_phase >= 554 && m_phase <= 562) || m_phase == 9211 || m_phase == 9212)
 	{
-		struct long_alu_case { u16 opcode; u64 a_before; u16 st1; u16 high; u16 low; u64 a_after; u64 b_after; u16 ar3_after; u16 st0_after; unsigned cycles; };
-		static constexpr long_alu_case cases[] = {
-			{ 0x5193, 0x56788933, 0x0100, 0x1534, 0x3456, 0x56788933, 0x6bacbd89, 0x0f92, 0, 3 },
-			{ 0x518b, 0x56783933, 0x0180, 0x1534, 0x3456, 0x56783933, 0x6bac6d89, 0x0f8e, 0, 3 },
-			{ 0x5493, 0x56788933, 0x0100, 0x1534, 0x3456, 0x414454dd, 0, 0x0f92, 0x0800, 3 },
-			{ 0x548b, 0x56783933, 0x0180, 0x1534, 0x3456, 0x414404dd, 0, 0x0f8e, 0x0800, 3 },
-			{ 0x50f8, 0x7fffffff, 0x0300, 0, 1, 0x7fffffff, 0, 0x0f90, 0x0400, 4 },
-			{ 0x5083, 0x7fffffff, 0x0380, 1, 1, 0x80000000, 0, 0x0f90, 0, 3 },
-			{ 0x5483, 0x00010000, 0x0380, 0, 1, 0x0001ffff, 0, 0x0f90, 0x0800, 3 },
-			{ 0x5893, 0x56788933, 0x0100, 0x1534, 0x3456, 0xffbebbab23ULL, 0, 0x0f92, 0, 3 },
-			{ 0x588b, 0x56783933, 0x0180, 0x1534, 0x3456, 0xffbebcfb23ULL, 0, 0x0f8e, 0, 3 },
-			{ 0x5082, 0x00010000, 0x0100, 1, 0xffff, 0x0002ffff, 0, 0x0f90, 0, 3 },
-			{ 0x5085, 0x00010000, 0x0100, 1, 0xffff, 0x0002ffff, 0, 0x0f90, 0, 3 }
-		};
-		const unsigned index = m_phase >= 9211 ? m_phase - 9211 + 9 : m_phase - 554;
-		const long_alu_case &row = cases[index];
-		expect_opcode(row.opcode,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == row.ar3_after &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == row.st0_after &&
-			(index < 9 || (m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f92 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f92 &&
-				data.read_word(0x0f92) == row.high && data.read_word(0x0f93) == row.low &&
-				data.read_word(0x0f90) == 2 && data.read_word(0x0f91) == 3)) &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == row.cycles,
-			"DADD/DSUB/DRSUB long-word arithmetic matches TI C16 examples and cycle costs");
-		if (index + 1 < std::size(cases))
+		unsigned const index = m_phase >= 9211 ? m_phase - 9211 + 9 : m_phase - 554;
+		auto const &test = long_reference_cases()[index];
+		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
+		expect_opcode(test.opcode, true, "TI long-word arithmetic reference");
+		if (index + 1 < 11)
 		{
-			const long_alu_case &next = cases[index + 1];
-			program.write_word(0x05e2, next.opcode);
-			program.write_word(0x05e3, next.opcode == 0x50f8 ? 0x0f90 : 0x75d6);
-			program.write_word(0x05e4, next.opcode == 0x50f8 ? 0x75d6 : 0x0124);
-			program.write_word(0x05e5, next.opcode == 0x50f8 ? 0x0124 : 0xf5e1);
-			program.write_word(0x05e6, 0xf5e1);
-			data.write_word(0x0f90, index >= 8 ? 2 : next.high);
-			data.write_word(0x0f91, index >= 8 ? 3 : next.low);
-			data.write_word(0x0f92, next.high);
-			data.write_word(0x0f93, next.low);
 			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, next.a_before}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_AR3, 0x0f90},
-				{cpu_regs::STATE_AR2, 0x0f92}, {cpu_regs::STATE_AR5, 0x0f92},
-			});
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST0,
-					next.opcode == 0x588b ? 0x0800 : 0);
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_ST1, next.st1}, {cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0},
-				{cpu_regs::STATE_IDLE, 0},
-			});
+			prepare_case(*m_cpu, long_reference_cases()[index + 1]);
 			return next_atomic_phase(index < 8 ? m_phase + 1 : 9211 + index - 8);
 		}
 		program.write_word(0x05e0, 0x75f8);
@@ -130,62 +76,21 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			"ROM4 DADD through stationary AR6 preserves B/status/source/pointers in one cycle with independent absolute port markers");
 		program.write_word(0x05e0, 0x75d6);
 		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x5a8b); // DADST *AR3-,A
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
-		data.write_word(0x0f90, 0x1534);
-		data.write_word(0x0f91, 0x3456);
 		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_T, 0x2345}, {cpu_regs::STATE_AR3, 0x0f90},
-			{cpu_regs::STATE_ST0, 0},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0180); // SXM, C16
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		prepare_case(*m_cpu, long_reference_cases()[11]);
 		return next_atomic_phase(563);
 	}
 	if (m_phase >= 563 && m_phase <= 569)
 	{
-		struct t_long_case { u16 opcode; u16 st1; u64 a_after; u64 b_after; u16 ar3_after; int carry; unsigned cycles; };
-		static constexpr t_long_case cases[] = {
-			{ 0x5a8b, 0x0180, 0x38791111, 0, 0x0f8e, 0, 3 },
-			{ 0x5a93, 0x0100, 0x3879579b, 0, 0x0f92, 0, 3 },
-			{ 0x5e93, 0x0100, 0xfff1ef1111ULL, 0, 0x0f92, 0, 3 },
-			{ 0x5e8b, 0x0180, 0xfff1ef579bULL, 0, 0x0f8e, -1, 3 },
-			{ 0x5c93, 0x0100, 0xfff1ef1111ULL, 0, 0x0f92, 0, 3 },
-			{ 0x5c8b, 0x0180, 0xfff1ef1111ULL, 0, 0x0f8e, 0, 3 },
-			{ 0x5bf8, 0x0180, 0, 0x38791111, 0x0f90, 0, 4 }
-		};
-		const unsigned index = m_phase - 563;
-		const t_long_case &row = cases[index];
-		expect_opcode(row.opcode,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x2345 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == row.ar3_after &&
-			(row.carry < 0 || bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) == bool(row.carry)) &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == row.cycles,
-			"T-based long-word arithmetic matches TI result and cycle examples");
+		unsigned const index = m_phase - 563 + 11;
+		auto const &test = long_reference_cases()[index];
+		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
+		expect_opcode(test.opcode, true, "TI T-based long-word arithmetic reference");
 		if (m_phase < 569)
 		{
-			const t_long_case &next = cases[index + 1];
-			program.write_word(0x05e2, next.opcode);
-			program.write_word(0x05e3, next.opcode == 0x5bf8 ? 0x0f90 : 0x75d6);
-			program.write_word(0x05e4, next.opcode == 0x5bf8 ? 0x75d6 : 0x0124);
-			program.write_word(0x05e5, next.opcode == 0x5bf8 ? 0x0124 : 0xf5e1);
-			program.write_word(0x05e6, 0xf5e1);
 			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_T, 0x2345},
-				{cpu_regs::STATE_AR3, 0x0f90}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, next.st1},
-				{cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-			});
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
+			prepare_case(*m_cpu, long_reference_cases()[index + 1]);
+			return next_atomic_phase(m_phase + 1);
 		}
 		program.write_word(0x05e2, 0x1f83); // SUBC *AR3,B
 		program.write_word(0x05e3, 0x75d6);
