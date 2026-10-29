@@ -62,9 +62,18 @@ absolute sources plus eight short forms, four selectors, two pages and the
 original checkpoints 3/5. These retain prefetched instruction state not
 covered by the base census's checkpoints 1/10. All original program words,
 asserted register seeds and no-operand-effects checks remain; census-wide
-program/I/O, SP and RC preservation checks also apply. The combined 46,064-case
-digest is `60d443519ef671c5`; its first 44,656 keys retain `6ae942418d722665`.
+program/I/O, SP and RC preservation checks also apply. The first 46,064 keys
+retain digest `60d443519ef671c5`; their first 44,656 keys retain `6ae942418d722665`.
 The old global-phase admission fixture is removed, not kept as a second copy.
+An explicit 26-opcode table adds 8,328 mapped-source rejection tuples for
+ADDC, ADDS/SUBS, shifted arithmetic, memory logic and MVDM accumulator slices.
+It retains every formerly tested opcode/source/addressing-form/page combination,
+with balanced original before/after checkpoints. The five separate rejection
+profiles and their mixed positive/negative branches are removed. The resulting
+54,392-case digest is `09bcb725ffd76435`. All census cases additionally preserve
+explicit BK/TRN sentinels. Exact rejection-clock and negative-only literal-fetch
+probes are retired; the contract is fail-closed admission without guest effects,
+not a measured silicon fault pipeline. Positive operand-retention matrices stay separate.
 
 `isa-scalars` runs 34 literal arithmetic-boundary cases in 19 reset groups.
 Fifteen rows deliberately continue from checked predecessor state rather than

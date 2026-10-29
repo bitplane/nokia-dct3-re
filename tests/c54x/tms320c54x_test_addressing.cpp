@@ -5073,8 +5073,7 @@ void tms320c54x_test_state::start_page_zero_stack(unsigned variant)
 
 void tms320c54x_test_state::start_mvdm_acc(unsigned variant)
 {
-	bool const edge = profile_is("mvdm-acc-edge");
-	auto const f = mvdm_acc_case(variant, edge);
+	auto const f = mvdm_acc_case(variant);
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
@@ -5089,15 +5088,15 @@ void tms320c54x_test_state::start_mvdm_acc(unsigned variant)
 	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
 	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
 	m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
-	if (!edge) data.write_word(f.source, f.value);
+	data.write_word(f.source, f.value);
 	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvdm_acc_source", [this, f, edge](offs_t at, u16 &word, u16) {
+	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvdm_acc_source", [this, f](offs_t at, u16 &word, u16) {
 		if (machine().side_effects_disabled()) return;
-		expect(!edge && !m_pipeline_operand_reads && at == f.source && word == f.value && m_cpu->pipeline_cycles() == 6, "MVDM accumulator captures one absolute source at its owned clock"); ++m_pipeline_operand_reads;
+		expect(!m_pipeline_operand_reads && at == f.source && word == f.value && m_cpu->pipeline_cycles() == 6, "MVDM accumulator captures one absolute source at its owned clock"); ++m_pipeline_operand_reads;
 	});
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvdm_acc_write", [this, f, edge](offs_t at, u16 &word, u16) {
+	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvdm_acc_write", [this, f](offs_t at, u16 &word, u16) {
 		if (machine().side_effects_disabled()) return;
-		expect(!edge && !m_pipeline_store_writes && at == 8 + f.reg && word == f.value && m_cpu->pipeline_cycles() == 6, "MVDM publishes exactly the encoded accumulator slice without saturation"); ++m_pipeline_store_writes;
+		expect(!m_pipeline_store_writes && at == 8 + f.reg && word == f.value && m_cpu->pipeline_cycles() == 6, "MVDM publishes exactly the encoded accumulator slice without saturation"); ++m_pipeline_store_writes;
 	});
 	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "mvdm_acc_literal", [this, f](offs_t, u16 &word, u16) {
 		if (machine().side_effects_disabled()) return;

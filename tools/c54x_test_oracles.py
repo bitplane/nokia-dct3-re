@@ -367,7 +367,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated generic square complete",
     ),
     "source-domain": (
-        "TMS320C54x source-domain exclusions: PASS cases=46064 restore=46064 base_cases=30000 absolute_tc0_cases=448 short_control_cases=14208 mac_source_cases=1280 mac_short_checkpoint_cases=128 mac_frontend=staged mac_checkpoints=3,5 mac_modes=f8,98..9f base_instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 shifts=0,1,15,16,31 base_modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=60d443519ef671c5",
+        "TMS320C54x source-domain exclusions: PASS cases=54392 restore=54392 base_cases=30000 absolute_tc0_cases=448 short_control_cases=14208 mac_source_cases=1280 mac_short_checkpoint_cases=128 mapped_rejection_cases=8328 mac_frontend=staged mac_checkpoints=3,5 mac_modes=f8,98..9f base_instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 shifts=0,1,15,16,31 base_modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=09bcb725ffd76435",
         "Fatal error: TMS320C54x isolated source-domain exclusions complete",
     ),
     "idle-modes": (
@@ -1341,25 +1341,13 @@ EXTRA_PROFILES = {
         "TMS320C54x mapped memory logic: PASS cases=110592 restore=110592 operations=AND,OR,XOR mapped_sources=16 modes=DP,absolute,indirect accumulators=2 flags=8 patterns=4 late_accumulator=2 pages=2 snapshots=3 zero_extend=1 source_sample=Read accumulator_sample=Execute flags_preserved=1 writes=0 reset_before_restore=1 physical_phase_claim=0 producer_control_composition=unvalidated",
         "Fatal error: TMS320C54x isolated mapped memory logic complete",
     ),
-    "logic-map-edge": (
-        "TMS320C54x mapped logic exclusions: PASS cases=1152 restore=1152 operations=AND,OR,XOR addresses=16 modes=DP,absolute,indirect accumulators=2 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated mapped logic exclusions complete",
-    ),
     "shift16-map": (
         "TMS320C54x mapped shift16 arithmetic: PASS cases=147456 restore=147456 forms=8 mapped_sources=16 modes=DP,absolute,indirect flags=8 patterns=4 late_source=2 pages=2 snapshots=3 source_sample=Read accumulator_sample=Execute partial_carry=1 sticky_overflow=1 ovm=1 writes=0 reset_before_restore=1 physical_phase_claim=0 producer_control_composition=unvalidated",
         "Fatal error: TMS320C54x isolated mapped shift16 arithmetic complete",
     ),
-    "shift16-map-edge": (
-        "TMS320C54x mapped shift16 exclusions: PASS cases=7680 restore=7680 forms=8 addresses=80 modes=DP,absolute,indirect pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated mapped shift16 exclusions complete",
-    ),
     "unsigned-map": (
         "TMS320C54x unsigned mapped arithmetic: PASS cases=221184 restore=221184 operations=ADDS,SUBS numeric_cases=147456 mapped_cases=73728 ram_forms=6 mapped_sources=16 accumulators=2 carry_inputs=ignored sxm_ovm=4 words=8 accumulator_patterns=8 late_accumulator=2 pages=2 snapshots=3 unsigned_smem=1 physical_phase_claim=0 control_composition=unvalidated",
         "Fatal error: TMS320C54x isolated unsigned mapped arithmetic complete",
-    ),
-    "unsigned-edge": (
-        "TMS320C54x unsigned mapped exclusions: PASS cases=3840 restore=3840 operations=ADDS,SUBS addresses=80 forms=DP,absolute,indirect accumulators=2 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated unsigned mapped exclusions complete",
     ),
     "stld": (
         "TMS320C54x parallel store/load: PASS cases=405504 restore=405504 forms=6 encodings=1536 address_cases=110592 numeric_cases=294912 words=8 patterns=8 asm_modes=32 pages=2 snapshots=3 read_retained=1 store_source=Execute asm_source=Read t_publication=Read alias_priority=X carry_policy=preserve_unvalidated physical_phase_claim=0",
@@ -1380,10 +1368,6 @@ EXTRA_PROFILES = {
     "mvdm-acc": (
         "TMS320C54x MVDM accumulator: PASS cases=110592 restore=110592 destinations=AL,AH,AG,BL,BH,BG sources=RAM,AR,BK words=8 patterns=8 status_modes=16 pages=2 snapshots=3 reads=1 writes=1 neighboring_slices=preserved guard_mask=8 source_mutation_after_read=1 consumer_gap=0 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVDM accumulator complete",
-    ),
-    "mvdm-acc-edge": (
-        "TMS320C54x MVDM accumulator exclusions: PASS cases=2064 restore=2064 destinations=6 control_sources=86 pages=2 snapshots=2 data_reads=0 data_writes=0 state_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated MVDM accumulator exclusions complete",
     ),
     "repeat-stlm": (
         "TMS320C54x STLM-suspended IRQ repeat: PASS cases=3840 restore=3840 outer_counts=0,1,2,7,56 inner_counts=0,1,3,63 sources=IRQ,NMI pages=2 stacks=2 returns=FRETE,FRETED snapshots=6 status_clear=Execute balanced_frames=1 physical_phase_claim=0",
@@ -1924,10 +1908,6 @@ EXTRA_PROFILES = {
     "addc": (
         "TMS320C54x ADDC: PASS cases=110592 restore=110592 numeric_cases=73728 mapped_cases=36864 ram_forms=6 mapped_sources=16 accumulators=2 carry_states=2 sxm_ovm=4 words=8 accumulator_patterns=8 late_accumulator_carry=2 pages=2 snapshots=3 unsigned_smem=1 physical_phase_claim=0 control_composition=unvalidated",
         "Fatal error: TMS320C54x isolated ADDC complete",
-    ),
-    "addc-edge": (
-        "TMS320C54x ADDC exclusions: PASS cases=1920 restore=1920 addresses=80 forms=DP,absolute,indirect accumulators=2 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated ADDC exclusions complete",
     ),
     "addc-chain": (
         "TMS320C54x ADDC chains: PASS cases=4096 restore=4096 destinations=AA,BA,AB,BB accumulator_pairs=4 word_pairs=4 carry_states=2 sxm_ovm=4 pages=2 snapshots=4 issue_gap=0 read_retention=1 carry_sample=Execute physical_phase_claim=0",

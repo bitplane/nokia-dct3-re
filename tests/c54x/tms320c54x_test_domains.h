@@ -78,13 +78,13 @@ private:
 			 {base + 0x603, 0xf4e1}}, {}, {},
 			{{r::STATE_ST0, u64(m_input.st0)}, {r::STATE_ST1, u64(m_input.st1 | (context() & 1 ? 0x20 : 0))},
 			 {r::STATE_A, 0x123456789aULL}, {r::STATE_B, 0xfedcba9876ULL},
-			 {r::STATE_T, 0xabcd}, {r::STATE_SP, 0x1600}}, 0, 0};
+			 {r::STATE_T, 0xabcd}, {r::STATE_SP, 0x1600}, {r::STATE_TRN, 0x9876}, {r::STATE_BK, 0x4321}}, 0, 0};
 		if (m_input.absolute_source != 0xffff)
 		{
 			m_case.program[1].value = m_input.absolute_source;
 			m_case.program[2].value = 9;
 		}
-		else if (m_input.checkpoint)
+		else if (m_input.checkpoint && m_input.indirect_source == 0xffff)
 			m_case.program[2].value = 0xf4e1; // Retained two-word MAC guard program.
 		if (m_input.prefix)
 			m_case.program = {{base + 0x600, m_input.prefix}, {base + 0x601, m_case.opcode}, {base + 0x602, 0xf4e1}};
@@ -95,8 +95,9 @@ private:
 		m_case.initial.insert(m_case.initial.end(), {{r::STATE_IMR, 0}, {r::STATE_IFR, 0}, {r::STATE_TCR, 0x10}});
 		for (unsigned i = 0; i < 8; ++i)
 		{
-			m_case.initial.emplace_back(r::STATE_AR0 + i, 0x1400 + i);
-			m_case.expected.push_back({int(r::STATE_AR0) + int(i), 0x1400 + i});
+			unsigned const value = i == 3 && m_input.indirect_source != 0xffff ? m_input.indirect_source : 0x1400 + i;
+			m_case.initial.emplace_back(r::STATE_AR0 + i, value);
+			m_case.expected.push_back({int(r::STATE_AR0) + int(i), value});
 		}
 		prepare_case(m_cpu, m_case);
 		m_reads = m_writes = m_program_writes = m_io = 0;

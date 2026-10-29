@@ -376,10 +376,10 @@ void tms320c54x_test_state::machine_reset()
 		{ {"rptb-call"}, [](self &test) { test.start_block_near_call(); } },
 		{ {"rptb-call-edge"}, [](self &test) { test.start_block_near_call_edge(); } },
 		{ {"rpt-mem-copy", "rpt-mem-wrap", "rpt-mem-chain"}, [](self &test) { test.start_memory_copy_repeat(); } },
-		{ {"addc", "addc-edge"}, [](self &test) { test.start_addc(); } },
-		{ {"unsigned-map", "unsigned-edge"}, [](self &test) { test.start_addc(); } },
-		{ {"shift16-map", "shift16-map-edge"}, [](self &test) { test.start_addc(); } },
-		{ {"logic-map", "logic-map-edge"}, [](self &test) { test.start_addc(); } },
+		{ {"addc"}, [](self &test) { test.start_addc(); } },
+		{ {"unsigned-map"}, [](self &test) { test.start_addc(); } },
+		{ {"shift16-map"}, [](self &test) { test.start_addc(); } },
+		{ {"logic-map"}, [](self &test) { test.start_addc(); } },
 		{ {"addc-chain"}, [](self &test) { test.start_addc_chain(); } },
 		{ {"mvkd-peripheral"}, [](self &test) { test.start_mvkd_peripheral(); } },
 		{ {"cmpm-absolute"}, [](self &test) { test.start_pipeline_bitfield_ar7(); } },
@@ -403,7 +403,7 @@ void tms320c54x_test_state::machine_reset()
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"mvdm-ar"}, [](self &test) { test.start_mvdm_ar(); } },
 		{ {"mvdm-t"}, [](self &test) { test.start_mvdm_t(); } },
-		{ {"mvdm-acc", "mvdm-acc-edge"}, [](self &test) { test.start_mvdm_acc(); } },
+		{ {"mvdm-acc"}, [](self &test) { test.start_mvdm_acc(); } },
 		{ {"stack-page0", "stack-page0-edge"}, [](self &test) { test.start_page_zero_stack(); } },
 	}))
 		return;

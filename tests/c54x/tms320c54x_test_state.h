@@ -1459,12 +1459,12 @@ private:
 		std::array<u16, 8> initial;
 		u16 next_ar3;
 		unsigned read_clock, snapshot;
-		bool extension, late, excluded = false;
+		bool extension, late;
 	};
 	static std::array<u64, 2> addc_expected(u64 source, u16 word, u16 st0, u16 st1, bool b, unsigned family = 0);
-	static addc_fixture addc_case(unsigned v, bool edge, unsigned family = 0);
-	static addc_fixture mapped_shift16_case(unsigned variant, bool edge);
-	static addc_fixture mapped_logic_case(unsigned variant, bool edge);
+	static addc_fixture addc_case(unsigned v, unsigned family = 0);
+	static addc_fixture mapped_shift16_case(unsigned variant);
+	static addc_fixture mapped_logic_case(unsigned variant);
 	void start_addc(unsigned variant = 0);
 	struct addc_chain_fixture
 	{
@@ -1546,7 +1546,7 @@ private:
 		u32 base;
 		u64 a, b;
 	};
-	static mvdm_acc_fixture mvdm_acc_case(unsigned v, bool edge);
+	static mvdm_acc_fixture mvdm_acc_case(unsigned v);
 	void start_mvdm_acc(unsigned variant = 0);
 	struct mvdm_t_fixture
 	{

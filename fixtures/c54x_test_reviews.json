@@ -254,20 +254,21 @@
       "profile_coverage": {
         "source-domain": {
           "result_prefix": "TMS320C54x source-domain exclusions: PASS ",
-          "cases": 46064,
-          "key": "(opcode_word << 16) | (operation_extension_or_absolute_source << 4) | context | control_tag; original 44656 identities first, then the1408 MAC guard inputs in original order. Tags0x4000=ASM,0x2000=C16,0x1000=RPT,0x8000=TC-clear,0x0400=MAC prefetched short control.",
+          "cases": 54392,
+          "key": "(opcode_word << 16) | (operation_extension_or_mapped_source << 4) | context | control_tag; original 46,064 identities first, followed by 8,328 mapped-source rejection tuples. Tags 0x4000=ASM, 0x2000=C16, 0x1000=RPT, 0x8000=TC-clear, 0x0400=MAC prefetched short control.",
           "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
-          "fnv64": "60d443519ef671c5"
+          "fnv64": "09bcb725ffd76435"
         }
       },
       "obligations": [
         "all 125 instruction forms: 111 Smem, 10 shifted extensions and four MMR-source classes",
         "all 15 aliases across CMPT, page, atomic/staged and before/after-rejection checkpoint choices",
-        "preserve A, B, T, RC, SP, ST0, ST1 and all eight address registers at every sampled cycle",
+        "preserve A, B, T, TRN, BK, RC, SP, ST0, ST1 and all eight address registers at every sampled cycle",
         "no data reads/writes, program writes or I/O accesses; illegal latch reached by cycle 20",
         "all original 30000 identities and restores retain their ordering; 448 appended TC-clear RMW controls preserve the distinct status input from the retired alias profiles",
         "14208 short controls retain 5120 shifted extensions, 4352 nonzero-ASM inputs, 1792 C16 inputs, 256 prefixed SUBC inputs and 2688 TC-clear inputs",
         "1408 appended staged MAC guards retain 80 unsupported absolute sources and8 short forms, four accumulator selectors, both pages and both original checkpoint3/5 choices; no CMPT/frontend Cartesian expansion",
+        "8,328 mapped-source cases retain every opcode/source/form/page tuple from the five retired mapped rejection profiles, with one balanced original before/after checkpoint per tuple",
         "CPU-only device graph and ROM-free execution; no shared phase dispatcher or handset state"
       ],
       "limits": [
@@ -289,6 +290,26 @@
         "affected_batch_seconds_before": 53.92,
         "affected_batch_seconds_after": 32.23,
         "scope": "Serial runner wall time: source-domain, eight pure short-source profiles, stack-mod3-edge, long-pair, drsub, logic-short and xorm before; source-domain and the four positive profiles after. Not a full-default-suite runtime measurement."
+      },
+      "mapped_source_retirement": {
+        "classification": "implementation_limit",
+        "decision": "merge",
+        "retired_profiles": ["addc-edge", "unsigned-edge", "shift16-map-edge", "logic-map-edge", "mvdm-acc-edge"],
+        "basis": "These are model-admission contracts, not numeric arithmetic or evidence of silicon faults. The former census did not cover their mapped sources; append an independent opcode/address/form inventory before removing the separate profiles.",
+        "retained": ["26 exact opcode forms, all former unowned source sets (80, 16 or 86 addresses), DP/absolute/plain-indirect forms where applicable, both program pages and both checkpoint classes", "rejection without data/program/I-O effects and preservation of supplied register state; explicit BK/TRN sentinels now cover every census case", "all successful arithmetic, immediate-consumer, literal-retention and post-Read mutation fixtures remain in their positive owners"],
+        "retired": ["8,328 extra executions that differed only in checkpoint; no opcode/source/form/page tuple is lost", "the old arbitrary accumulator/status/stack seeds are replaced by explicit census sentinels; raw stimuli are not identical", "exact per-clock illegal-latch assertions and negative-only extension-fetch/poison checks are not retained: neither is required for the declared fail-closed admission contract; positive literal-retention tests remain", "five BIOS declarations, dispatch aliases and their mixed edge flags/branches, not five instruction capabilities"],
+        "verification": ["all five former native rejection profiles pass before retirement", "independent host census reproduces the entire 54,392-key order, proves uniqueness and preserves the original 46,064-key prefix digest", "compiled old/new comparison retains all 700,416 positive fixture tuples, including every setup/result/status/clock/checkpoint field; no CPU expectation helper is used", "native source-domain passes its full count/digest; all five complete positive matrices, the legacy atomic prefix, both 3210 menu gates and all 5,069 host tests pass"],
+        "measurement": {
+          "baseline_commit": "fa4e61a7",
+          "c54x_cpp_bytes_before": 3614939,
+          "c54x_cpp_bytes_after": 3613249,
+          "c54x_cpp_lines_before": 54721,
+          "c54x_cpp_lines_after": 54730,
+          "rejection_executions_before": 62720,
+          "rejection_executions_after": 54392,
+          "source_domain_seconds_after": 24.93,
+          "scope": "Combined existing census plus the five mapped probes; 8,328 extra checkpoint executions retired, all mapped opcode/source/form/page tuples retained. C++ shrinks 1,690 bytes but grows nine lines: the explicit shared table replaces branch flags, not a large source reduction. Native positive validation covers 700,416 cases and costs 305.28 seconds; no positive-suite speedup or full-default checkpoint renewal is claimed."
+        }
       }
     },
     {
@@ -548,7 +569,7 @@
       "profiles": [],
       "case_ids": [],
       "basis": "Legacy DLD phase89 (0x569b), LDM phase423 (0x489a), MPY phase727 (0x629b) and MAC phase739 (0x649b) duplicate source-domain's write-only-source admission contract. Each exact word occurs in all 16 base contexts (CMPT, page, frontend and checkpoint), with register preservation and zero data/program/I/O effects checked before and after restoration.",
-      "obligations": ["retain the source-domain executable coverage and digest; the independent schedule test requires all 16 contexts for each retired opcode", "delete the four legacy rejection setup/check blocks and phase routes, not successful operand, timing or interrupt-interaction cases", "DST positive continuations explicitly retain A=0xabcdef01 and ST1=0 formerly seeded by the DLD rejection setup; later DST checks and stores depend on these inputs", "legacy-atomic retains its complete ordered PASS records and asserted-opcode set; the source-domain census remains 46064 cases/restores with digest 60d443519ef671c5"],
+      "obligations": ["retain the source-domain executable coverage and digest; the independent schedule test requires all 16 contexts for each retired opcode", "delete the four legacy rejection setup/check blocks and phase routes, not successful operand, timing or interrupt-interaction cases", "DST positive continuations explicitly retain A=0xabcdef01 and ST1=0 formerly seeded by the DLD rejection setup; later DST checks and stores depend on these inputs", "legacy-atomic retains its complete ordered PASS records and asserted-opcode set; the retained 46,064-key census prefix keeps digest 60d443519ef671c5"],
       "limits": ["old rejection stimuli are retired, not numerically retained: DLD AR3=0x0e00/data0x0e02..3=abcd,ef01; LDM AR2=0xff14; MPY A=T=0/AR3=0x01ff/data0x01ff=7; MAC A=0x10/T=3/AR3=0x01ff", "LDM's AR5=0x8001 already belongs to preceding positive LDM tests; later XC and AR2-store cases supply their own inputs; the removed rejection adds no required state", "MPY's following ADD/SUB ASM cases seed their own relevant inputs; no later positive check consumes the rejected MPY's T/AR3 tuple", "preceding PORTW markers are scaffolding, not separately asserted interrupt, pipeline or data-hazard interactions; source-domain instead observes every I/O access", "rejection remains an emulator admission policy, not a silicon illegality claim"],
       "measurement": {
         "baseline_commit": "a4795a80",

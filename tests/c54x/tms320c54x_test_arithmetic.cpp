@@ -3448,20 +3448,14 @@ std::array<u64, 2> tms320c54x_test_state::addc_expected(u64 source, u16 word, u1
 	return {result, status};
 }
 
-tms320c54x_test_state::addc_fixture tms320c54x_test_state::addc_case(unsigned v, bool edge, unsigned family)
+tms320c54x_test_state::addc_fixture tms320c54x_test_state::addc_case(unsigned v, unsigned family)
 {
 	static constexpr std::array<u64, 8> accumulators{0, 0xffffffffULL, 0x7fffffffULL, 0xff80000000ULL, 0x7fffffffffULL, 0x8000000000ULL, 0xffff, 0x123456789aULL};
 	static constexpr std::array<u16, 8> words{0, 1, 0x7fff, 0x8000, 0xffff, 0xaaaa, 0x5555, 0xfffe};
 	addc_fixture f{};
 	unsigned form, pattern = 0, flags = 0, destination = 0, page = 0, mode = 0;
-	bool mapped = !edge && v >= 73728;
-	if (edge)
-	{
-		unsigned const index = v % 80; v /= 80; f.address = index < 8 ? index : index + 0x10;
-		form = v % 3; v /= 3; destination = v % 2; v /= 2; page = v % 2; v /= 2; f.snapshot = v;
-		f.excluded = true;
-	}
-	else if (!mapped)
+	bool const mapped = v >= 73728;
+	if (!mapped)
 	{
 		form = v % 6; v /= 6; f.word = words[v % 8]; v /= 8; pattern = v % 8; v /= 8;
 		flags = v % 8; v /= 8; destination = v % 2; v /= 2; f.late = v % 2; v /= 2; page = v % 2; v /= 2; f.snapshot = v;
@@ -3476,10 +3470,10 @@ tms320c54x_test_state::addc_fixture tms320c54x_test_state::addc_case(unsigned v,
 	f.t = words[pattern]; f.trn = words[(pattern + 3) % 8]; f.base = page ? 0x20000 : 0;
 	for (unsigned i = 0; i < 8; ++i) f.initial[i] = 0x1200 + 0x100 * i;
 	f.initial[0] = 1;
-	f.st0 = 0x1000 | ((mapped || edge) && !form ? 0 : 0x20) | (flags & 1 ? 0x800 : 0) |
+	f.st0 = 0x1000 | (mapped && !form ? 0 : 0x20) | (flags & 1 ? 0x800 : 0) |
 		(pattern & 1 ? (destination ? 0x400 : 0x200) : 0) | (pattern & 2 ? (destination ? 0x200 : 0x400) : 0);
 	f.st1 = 0x800 | (flags & 2 ? 0x100 : 0) | (flags & 4 ? 0x200 : 0);
-	if (mapped || edge)
+	if (mapped)
 	{
 		mode = form == 0 ? f.address : form == 1 ? 0xf8 : 0x83;
 		f.extension = form == 1; f.literal = f.address;
@@ -3493,7 +3487,7 @@ tms320c54x_test_state::addc_fixture tms320c54x_test_state::addc_case(unsigned v,
 		f.address = form == 1 ? 0x3002 : form == 5 ? 0x100c : 0x1002;
 		f.initial[3] = form == 4 ? 0x1000 : f.address; if (form == 1) f.st1 |= 0x4000; if (form == 5) f.bk = 13;
 	}
-	f.next_ar3 = !mapped && !edge && form == 3 ? 0x1003 : !mapped && !edge && form == 5 ? 0x1000 : f.initial[3];
+	f.next_ar3 = !mapped && form == 3 ? 0x1003 : !mapped && form == 5 ? 0x1000 : f.initial[3];
 	f.opcode = (family == 1 ? 0x0200 : family == 2 ? 0x0a00 : 0x0600) | (destination << 8) | mode; f.read_clock = f.extension ? 6 : 5;
 	f.after_a = f.a; f.after_b = f.b;
 	if (mapped && f.address < 14)
@@ -3510,15 +3504,15 @@ tms320c54x_test_state::addc_fixture tms320c54x_test_state::addc_case(unsigned v,
 	return f;
 }
 
-tms320c54x_test_state::addc_fixture tms320c54x_test_state::mapped_shift16_case(unsigned variant, bool edge)
+tms320c54x_test_state::addc_fixture tms320c54x_test_state::mapped_shift16_case(unsigned variant)
 {
-	unsigned const extent = edge ? 1920 : 36864, selector = variant / extent, v = variant % extent;
-	auto f = addc_case(edge ? v : 73728 + v, edge, 1);
+	unsigned const extent = 36864, selector = variant / extent, v = variant % extent;
+	auto f = addc_case(73728 + v, 1);
 	bool const source_b = selector & 1, subtract = selector & 2, destination_b = BIT(f.opcode, 8);
 	if (source_b != destination_b) std::swap(f.a, f.b);
-	if (!edge && f.address < 14) { unsigned const part = (f.address - 8) % 3; f.word = u16((f.address < 11 ? f.a : f.b) >> (16 * part)) & (part == 2 ? 0xff : 0xffff); }
+	if (f.address < 14) { unsigned const part = (f.address - 8) % 3; f.word = u16((f.address < 11 ? f.a : f.b) >> (16 * part)) & (part == 2 ? 0xff : 0xffff); }
 	f.after_a = f.a; f.after_b = f.b;
-	if (!edge && f.address < 14) { unsigned const part = (f.address - 8) % 3; u64 const mask = part == 2 ? 0xff : 0xffff; u64 &source = f.address < 11 ? f.after_a : f.after_b; source = (source & ~(mask << (16 * part))) | ((0xa55aULL & mask) << (16 * part)); }
+	if (f.address < 14) { unsigned const part = (f.address - 8) % 3; u64 const mask = part == 2 ? 0xff : 0xffff; u64 &source = f.address < 11 ? f.after_a : f.after_b; source = (source & ~(mask << (16 * part))) | ((0xa55aULL & mask) << (16 * part)); }
 	if (f.late) (source_b ? f.after_b : f.after_a) = std::array<u64, 5>{0, 0xffffffffULL, 0x7fffffffULL, 0xff80000000ULL, 0x7fffffffffULL}[1 + (v / 48) % 4];
 	u64 const source = source_b ? f.after_b : f.after_a;
 	s64 const left = source & 0x8000000000ULL ? s64(source) - 0x10000000000LL : s64(source);
@@ -3534,10 +3528,10 @@ tms320c54x_test_state::addc_fixture tms320c54x_test_state::mapped_shift16_case(u
 	return f;
 }
 
-tms320c54x_test_state::addc_fixture tms320c54x_test_state::mapped_logic_case(unsigned variant, bool edge)
+tms320c54x_test_state::addc_fixture tms320c54x_test_state::mapped_logic_case(unsigned variant)
 {
-	unsigned const extent = edge ? 384 : 36864, operation = variant / extent, v = variant % extent;
-	auto f = addc_case(edge ? v % 16 + (v / 16) * 80 : 73728 + v, edge, 1);
+	unsigned const extent = 36864, operation = variant / extent, v = variant % extent;
+	auto f = addc_case(73728 + v, 1);
 	bool const b = BIT(f.opcode, 8); u64 const source = b ? f.after_b : f.after_a;
 	u64 const result = operation == 0 ? source & f.word : operation == 1 ? source | f.word : source ^ f.word;
 	f.final_a = b ? f.after_a : result; f.final_b = b ? result : f.after_b; f.final_st0 = f.execute_st0;
@@ -3548,12 +3542,11 @@ tms320c54x_test_state::addc_fixture tms320c54x_test_state::mapped_logic_case(uns
 void tms320c54x_test_state::start_addc(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const arithmetic = profile_is("unsigned-map") || profile_is("unsigned-edge");
-	bool const shift16 = profile_is("shift16-map") || profile_is("shift16-map-edge");
-	bool const logic = profile_is("logic-map") || profile_is("logic-map-edge");
-	bool const edge = profile_is("addc-edge") || profile_is("unsigned-edge") || profile_is("shift16-map-edge") || profile_is("logic-map-edge");
-	unsigned const extent = edge ? logic ? 384 : 1920 : shift16 || logic ? 36864 : 110592;
-	auto const f = logic ? mapped_logic_case(variant, edge) : shift16 ? mapped_shift16_case(variant, edge) : addc_case(variant % extent, edge, arithmetic ? 1 + variant / extent : 0);
+	bool const arithmetic = profile_is("unsigned-map");
+	bool const shift16 = profile_is("shift16-map");
+	bool const logic = profile_is("logic-map");
+	unsigned const extent = shift16 || logic ? 36864 : 110592;
+	auto const f = logic ? mapped_logic_case(variant) : shift16 ? mapped_shift16_case(variant) : addc_case(variant % extent, arithmetic ? 1 + variant / extent : 0);
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, f.opcode); if (f.extension) program.write_word(f.base + 0x601, f.literal);
@@ -3563,10 +3556,10 @@ void tms320c54x_test_state::start_addc(unsigned variant)
 	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, f.trn);
 	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
-	if (f.address >= 0x60 && !edge) data.write_word(f.address, f.word);
+	if (f.address >= 0x60) data.write_word(f.address, f.word);
 	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
 	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "unsigned_sample", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!f.excluded && !m_pipeline_operand_reads++ && at == f.address && word == f.word && m_cpu->pipeline_cycles() == f.read_clock, "Unsigned arithmetic retains one real source in Read"); });
+	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "unsigned_sample", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads++ && at == f.address && word == f.word && m_cpu->pipeline_cycles() == f.read_clock, "Unsigned arithmetic retains one real source in Read"); });
 	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "unsigned_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false, "Unsigned arithmetic writes no data memory"); } });
 	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "unsigned_literal", [this, f](offs_t, u16 &word, u16) { if (!machine().side_effects_disabled() && f.extension) { expect(!m_pipeline_extensions_reads++ && word == f.literal, "Unsigned arithmetic fetches its address extension once"); } });
 	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62156;
@@ -3627,14 +3620,8 @@ tms320c54x_test_state::xmem_arithmetic_result tms320c54x_test_state::xmem_arithm
 	return {source, u64(result) & 0xffffffffffULL, st0};
 }
 
-tms320c54x_test_state::mvdm_acc_fixture tms320c54x_test_state::mvdm_acc_case(unsigned v, bool edge)
+tms320c54x_test_state::mvdm_acc_fixture tms320c54x_test_state::mvdm_acc_case(unsigned v)
 {
-	if (edge)
-	{
-		unsigned const source = (v / 6) % 86;
-		return {v % 6, v / 1032, u16(source < 16 ? source : source + 10), 0, 0x900,
-			(v / 516) % 2 ? 0x20000U : 0U, 0x123456789aULL, 0xfedcba9876ULL};
-	}
 	unsigned const flags = (v / 1152) % 16;
 	u64 const a = std::array<u64, 8>{0, 1, 0x7fffffff, 0x80000000, 0x7fffffffffULL, 0x8000000000ULL, 0xffffffffffULL, 0x123456789aULL}[(v / 144) % 8];
 	return {v % 6, v / 36864, std::array<u16, 3>{0x500, 0x14, 0x19}[(v / 6) % 3],
@@ -7598,16 +7585,15 @@ bool tms320c54x_test_state::check_mvdm_acc_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62160)
 	{
-		bool const edge = profile_is("mvdm-acc-edge");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = mvdm_acc_case(variant, edge);
-		unsigned const checkpoint = edge ? 4 + f.snapshot : std::array<unsigned, 3>{5, 6, 9}[f.snapshot];
+		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = mvdm_acc_case(variant);
+		unsigned const checkpoint = std::array<unsigned, 3>{5, 6, 9}[f.snapshot];
 		unsigned const shift = (f.reg % 3) * 16;
 		u64 const mask = (f.reg % 3 == 2 ? 0xffULL : 0xffffULL) << shift;
 		u64 const merged = (((f.reg < 3 ? f.a : f.b) & ~mask) | ((u64(f.value) << shift) & mask));
-		u64 const a = !edge && f.reg < 3 ? merged : f.a, b = !edge && f.reg >= 3 ? merged : f.b;
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= 5), "MVDM rejects unowned/control sources before data access");
+		u64 const a = f.reg < 3 ? merged : f.a, b = f.reg >= 3 ? merged : f.b;
+		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Owned MVDM source remains admitted");
 		if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
-		if (tick == 6 && !edge)
+		if (tick == 6)
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1, "MVDM merges only its encoded slice at publication before the following consumer");
 			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, f.value ^ 0xffff);
@@ -7619,19 +7605,18 @@ bool tms320c54x_test_state::check_mvdm_acc_results()
 		}
 		if (tick == 12)
 		{
-			expect(m_pipeline_operand_reads == unsigned(!edge) && m_pipeline_store_writes == unsigned(!edge) && m_pipeline_extensions_reads == 1, "MVDM has one retained literal and no duplicate source or destination access");
+			expect(m_pipeline_operand_reads == 1U && m_pipeline_store_writes == 1U && m_pipeline_extensions_reads == 1, "MVDM has one retained literal and no duplicate source or destination access");
 			if (m_cpu->state_int(tms320c54x_device::STATE_A) != a || m_cpu->state_int(tms320c54x_device::STATE_B) != b || m_cpu->state_int(tms320c54x_device::STATE_ST0) != 0xa608 || m_cpu->state_int(tms320c54x_device::STATE_ST1) != f.st1)
 				osd_printf_info("MVDM accumulator mismatch: case=%u replay=%u a=%010llx expected=%010llx b=%010llx expected=%010llx st0=%04x st1=%04x expected_st1=%04x\n", variant, unsigned(m_pipeline_replay), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)a, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)b, unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), f.st1);
 			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xbeef && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "MVDM preserves neighboring slices and status independently of SXM OVM CPL and FRCT");
-			if (!edge) expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x605, "Immediate ALU consumer sees the new accumulator without a gap");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x605, "Immediate ALU consumer sees the new accumulator without a gap");
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
 				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Replay MVDM without recapturing its literal or source"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62161; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant + 1 < (edge ? 2064U : 110592U)) { start_mvdm_acc(variant + 1); return true; }
-			if (edge) { osd_printf_info("TMS320C54x MVDM accumulator exclusions: PASS cases=2064 restore=2064 destinations=6 control_sources=86 pages=2 snapshots=2 data_reads=0 data_writes=0 state_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated MVDM accumulator exclusions complete"); }
+			if (variant + 1 < 110592U) { start_mvdm_acc(variant + 1); return true; }
 			osd_printf_info("TMS320C54x MVDM accumulator: PASS cases=110592 restore=110592 destinations=AL,AH,AG,BL,BH,BG sources=RAM,AR,BK words=8 patterns=8 status_modes=16 pages=2 snapshots=3 reads=1 writes=1 neighboring_slices=preserved guard_mask=8 source_mutation_after_read=1 consumer_gap=0 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated MVDM accumulator complete");
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -7641,14 +7626,13 @@ bool tms320c54x_test_state::check_mvdm_acc_results()
 	if (m_phase == 62156)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const arithmetic = profile_is("unsigned-map") || profile_is("unsigned-edge");
-		bool const shift16 = profile_is("shift16-map") || profile_is("shift16-map-edge");
-		bool const logic = profile_is("logic-map") || profile_is("logic-map-edge");
-		bool const edge = profile_is("addc-edge") || profile_is("unsigned-edge") || profile_is("shift16-map-edge") || profile_is("logic-map-edge");
-		unsigned const extent = edge ? logic ? 384 : 1920 : shift16 || logic ? 36864 : 110592; auto const f = logic ? mapped_logic_case(variant, edge) : shift16 ? mapped_shift16_case(variant, edge) : addc_case(variant % extent, edge, arithmetic ? 1 + variant / extent : 0);
-		unsigned const checkpoint = f.read_clock - (edge ? 2 : 1) + f.snapshot;
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= f.read_clock - 1), "Unsigned arithmetic rejects unowned mapped/control sources before Read");
-		if (tick == f.read_clock && !edge)
+		bool const arithmetic = profile_is("unsigned-map");
+		bool const shift16 = profile_is("shift16-map");
+		bool const logic = profile_is("logic-map");
+		unsigned const extent = shift16 || logic ? 36864 : 110592; auto const f = logic ? mapped_logic_case(variant) : shift16 ? mapped_shift16_case(variant) : addc_case(variant % extent, arithmetic ? 1 + variant / extent : 0);
+		unsigned const checkpoint = f.read_clock - 1 + f.snapshot;
+		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Owned unsigned or logical source remains admitted");
+		if (tick == f.read_clock)
 		{
 			expect(m_pipeline_operand_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == f.next_ar3, "Unsigned arithmetic resolves and updates its address once before operand mutation");
 			set_repeat_count_source(f.address, 0xa55a);
@@ -7661,10 +7645,10 @@ bool tms320c54x_test_state::check_mvdm_acc_results()
 		}
 		if (tick == 12)
 		{
-			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !edge && m_pipeline_operand_reads == unsigned(!edge) && !m_pipeline_store_writes && m_pipeline_extensions_reads == unsigned(f.extension), "Unsigned arithmetic owns one source and optional extension but no memory write");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (edge ? f.a : f.final_a) && m_cpu->state_int(tms320c54x_device::STATE_B) == (edge ? f.b : f.final_b) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (edge ? f.st0 : f.final_st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1, "Unsigned arithmetic uses retained Smem and Execute-live accumulator with sticky overflow and OVM");
-			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (edge ? f.initial[i] : 0x3330 + i), "Unsigned arithmetic never reapplies an auxiliary update after Read or restore");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_T) == (!edge && f.address == 14 ? 0xa55a : f.t) && m_cpu->state_int(tms320c54x_device::STATE_TRN) == (!edge && f.address == 15 ? 0xa55a : f.trn) && m_cpu->state_int(tms320c54x_device::STATE_BK) == f.bk && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Unsigned arithmetic preserves unselected registers and does not rewrite a mutated mapped operand");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1U && !m_pipeline_store_writes && m_pipeline_extensions_reads == unsigned(f.extension), "Unsigned arithmetic owns one source and optional extension but no memory write");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == f.final_a && m_cpu->state_int(tms320c54x_device::STATE_B) == f.final_b && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.final_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1, "Unsigned arithmetic uses retained Smem and Execute-live accumulator with sticky overflow and OVM");
+			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (0x3330 + i), "Unsigned arithmetic never reapplies an auxiliary update after Read or restore");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_T) == (f.address == 14 ? 0xa55a : f.t) && m_cpu->state_int(tms320c54x_device::STATE_TRN) == (f.address == 15 ? 0xa55a : f.trn) && m_cpu->state_int(tms320c54x_device::STATE_BK) == f.bk && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Unsigned arithmetic preserves unselected registers and does not rewrite a mutated mapped operand");
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; if (shift16 || logic) m_cpu->set_pipeline_frontend(true); expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore unsigned arithmetic without duplicated reads or address updates"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62157; m_check_timer->enable(true); return true;
@@ -7673,20 +7657,16 @@ bool tms320c54x_test_state::check_mvdm_acc_results()
 			if (variant + 1 < extent * (logic ? 3U : shift16 ? 4U : arithmetic ? 2U : 1U)) { start_addc(variant + 1); return true; }
 			if (logic)
 			{
-				if (edge) { osd_printf_info("TMS320C54x mapped logic exclusions: PASS cases=1152 restore=1152 operations=AND,OR,XOR addresses=16 modes=DP,absolute,indirect accumulators=2 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped logic exclusions complete"); }
 				osd_printf_info("TMS320C54x mapped memory logic: PASS cases=110592 restore=110592 operations=AND,OR,XOR mapped_sources=16 modes=DP,absolute,indirect accumulators=2 flags=8 patterns=4 late_accumulator=2 pages=2 snapshots=3 zero_extend=1 source_sample=Read accumulator_sample=Execute flags_preserved=1 writes=0 reset_before_restore=1 physical_phase_claim=0 producer_control_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped memory logic complete");
 			}
 			if (shift16)
 			{
-				if (edge) { osd_printf_info("TMS320C54x mapped shift16 exclusions: PASS cases=7680 restore=7680 forms=8 addresses=80 modes=DP,absolute,indirect pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped shift16 exclusions complete"); }
 				osd_printf_info("TMS320C54x mapped shift16 arithmetic: PASS cases=147456 restore=147456 forms=8 mapped_sources=16 modes=DP,absolute,indirect flags=8 patterns=4 late_source=2 pages=2 snapshots=3 source_sample=Read accumulator_sample=Execute partial_carry=1 sticky_overflow=1 ovm=1 writes=0 reset_before_restore=1 physical_phase_claim=0 producer_control_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped shift16 arithmetic complete");
 			}
 			if (arithmetic)
 			{
-				if (edge) { osd_printf_info("TMS320C54x unsigned mapped exclusions: PASS cases=3840 restore=3840 operations=ADDS,SUBS addresses=80 forms=DP,absolute,indirect accumulators=2 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated unsigned mapped exclusions complete"); }
 				osd_printf_info("TMS320C54x unsigned mapped arithmetic: PASS cases=221184 restore=221184 operations=ADDS,SUBS numeric_cases=147456 mapped_cases=73728 ram_forms=6 mapped_sources=16 accumulators=2 carry_inputs=ignored sxm_ovm=4 words=8 accumulator_patterns=8 late_accumulator=2 pages=2 snapshots=3 unsigned_smem=1 physical_phase_claim=0 control_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated unsigned mapped arithmetic complete");
 			}
-			if (edge) { osd_printf_info("TMS320C54x ADDC exclusions: PASS cases=1920 restore=1920 addresses=80 forms=DP,absolute,indirect accumulators=2 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated ADDC exclusions complete"); }
 			osd_printf_info("TMS320C54x ADDC: PASS cases=110592 restore=110592 numeric_cases=73728 mapped_cases=36864 ram_forms=6 mapped_sources=16 accumulators=2 carry_states=2 sxm_ovm=4 words=8 accumulator_patterns=8 late_accumulator_carry=2 pages=2 snapshots=3 unsigned_smem=1 physical_phase_claim=0 control_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated ADDC complete");
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

@@ -69,6 +69,29 @@ class OperandDomainInventoryTest(unittest.TestCase):
                         key = ((opcode | mode) << 16) | ((address if absolute else operation) << 4) | tag | context
                         rows.append((key, opcode, operation, mode, context, 0x1028, 0x0800, 0,
                                      address if absolute else 0xffff, 5 if snapshot else 3))
+        rows = [row + (0xffff,) for row in rows]
+        # Retired mapped probes: ADDC, ADDS/SUBS, shifted ADD/SUB, logical
+        # memory operations, and MVDM's six accumulator slices. The source
+        # lists are the old fixtures' explicit unowned-address sets.
+        groups = [(opcode, 80, False) for opcode in
+                  (0x0600, 0x0700, 0x0200, 0x0300, 0x0a00, 0x0b00,
+                   *range(0x3c00, 0x4400, 0x100))]
+        groups += [(opcode, 16, False) for opcode in range(0x1800, 0x1e00, 0x100)]
+        groups += [(opcode, 86, True) for opcode in range(0x7208, 0x720e)]
+        for group_index, (opcode, sources, move) in enumerate(groups):
+            for page in range(2):
+                for form in range(1 if move else 3):
+                    for index in range(sources):
+                        address = index if index < (16 if move else 8) else index + (10 if move else 16)
+                        point = (index + form + page + group_index) % 2
+                        context = (page << 1) | (point << 3)
+                        mode = 0 if move else address if form == 0 else 0xf8 if form == 1 else 0x83
+                        absolute = address if move or form == 1 else 0xffff
+                        indirect = address if not move and form == 2 else 0xffff
+                        operand = address if absolute != 0xffff or indirect != 0xffff else 0
+                        key = ((opcode | mode) << 16) | (operand << 4) | context
+                        rows.append((key, opcode, 0, mode, context, 0x1800, 0x900 if move else 0x800,
+                                     0, absolute, (4 if move or form == 1 else 3) + point, indirect))
         if not shutil.which('c++'):
             self.skipTest('host C++ compiler unavailable')
         with compiled_cpp(r'''
@@ -79,7 +102,7 @@ int main() {
         auto const c = c54x_test::select_domain(i);
         std::cout << c.key() << ' ' << c.instruction.opcode << ' ' << c.instruction.operation
             << ' ' << c.mode << ' ' << c.context << ' ' << c.st0 << ' ' << c.st1 << ' ' << c.prefix
-            << ' ' << c.absolute_source << ' ' << c.checkpoint << '\n';
+            << ' ' << c.absolute_source << ' ' << c.checkpoint << ' ' << c.indirect_source << '\n';
     }
     try { c54x_test::select_domain(c54x_test::domain_total_cases); }
     catch (std::out_of_range const &) { return 0; }
@@ -105,6 +128,8 @@ int main() {
                 self.assertEqual(f'{digest:016x}', 'ba74a1da74928725')
             if index == 44655:
                 self.assertEqual(f'{digest:016x}', '6ae942418d722665')
+            if index == 46063:
+                self.assertEqual(f'{digest:016x}', '60d443519ef671c5')
         coverage = reviewed_profiles()['source-domain']['coverage']
         self.assertEqual(len(keys), coverage['cases'])
         self.assertEqual(f'{digest:016x}', coverage['fnv64'])

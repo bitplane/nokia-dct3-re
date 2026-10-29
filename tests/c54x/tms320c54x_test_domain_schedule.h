@@ -59,7 +59,21 @@ constexpr unsigned domain_tc0_cases = 4 * 7 * 16;
 constexpr unsigned domain_control_cases = (40 + 34 + 14 + 2 + 21) * 8 * 16;
 constexpr unsigned domain_mac_source_cases = 80 * 4 * 2 * 2;
 constexpr unsigned domain_mac_short_cases = 8 * 4 * 2 * 2;
-constexpr unsigned domain_total_cases = domain_cases + domain_tc0_cases + domain_control_cases + domain_mac_source_cases + domain_mac_short_cases;
+// Mapped-source admission is distinct from the write-only addressing grammar.
+// This table names the independently retained opcodes, not CPU predicates.
+struct mapped_rejection_instruction { std::uint16_t opcode; unsigned sources; bool literal_only; };
+constexpr mapped_rejection_instruction mapped_rejections[] = {
+	{0x0600,80,false}, {0x0700,80,false},
+	{0x0200,80,false}, {0x0300,80,false}, {0x0a00,80,false}, {0x0b00,80,false},
+	{0x3c00,80,false}, {0x3d00,80,false}, {0x3e00,80,false}, {0x3f00,80,false},
+	{0x4000,80,false}, {0x4100,80,false}, {0x4200,80,false}, {0x4300,80,false},
+	{0x1800,16,false}, {0x1900,16,false}, {0x1a00,16,false},
+	{0x1b00,16,false}, {0x1c00,16,false}, {0x1d00,16,false},
+	{0x7208,86,true}, {0x7209,86,true}, {0x720a,86,true},
+	{0x720b,86,true}, {0x720c,86,true}, {0x720d,86,true},
+};
+constexpr unsigned mapped_rejection_cases = 8328;
+constexpr unsigned domain_total_cases = domain_cases + domain_tc0_cases + domain_control_cases + domain_mac_source_cases + domain_mac_short_cases + mapped_rejection_cases;
 
 struct domain_input
 {
@@ -68,10 +82,11 @@ struct domain_input
 	std::uint16_t st0 = 0x1804, st1 = 0x0800, prefix = 0, tag = 0;
 	std::uint16_t absolute_source = 0xffff;
 	unsigned checkpoint = 0;
+	std::uint16_t indirect_source = 0xffff;
 	std::uint32_t key() const
 	{
 		return (std::uint32_t(instruction.opcode | mode) << 16) |
-			(std::uint32_t(absolute_source == 0xffff ? instruction.operation : absolute_source) << 4) | tag | context;
+			(std::uint32_t(absolute_source != 0xffff ? absolute_source : indirect_source != 0xffff ? indirect_source : instruction.operation) << 4) | tag | context;
 	}
 };
 
@@ -126,6 +141,25 @@ inline domain_input select_domain(unsigned index)
 			absolute ? 0xf8U : 0x98U + form - 80, context, 0x1028, 0x0800, 0,
 			std::uint16_t(absolute ? 0 : 0x0400),
 			std::uint16_t(absolute ? form < 8 ? form : form + 16 : 0xffff), index >= 704 ? 5U : 3U};
+	}
+	index -= domain_mac_source_cases + domain_mac_short_cases;
+	unsigned group_index = 0;
+	for (auto const &group : mapped_rejections)
+	{
+		unsigned const forms = group.literal_only ? 1 : 3;
+		unsigned const count = group.sources * forms * 2;
+		if (index >= count) { index -= count; ++group_index; continue; }
+		unsigned const source = index % group.sources, form = (index / group.sources) % forms;
+		unsigned const page = index / (group.sources * forms);
+		unsigned const point = (source + form + page + group_index) % 2;
+		std::uint16_t const address = group.literal_only ? source < 16 ? source : source + 10 : source < 8 ? source : source + 16;
+		bool const literal = group.literal_only || form == 1;
+		domain_input result{{group.opcode, 0}, group.literal_only ? 0U : form == 0 ? address : form == 1 ? 0xf8U : 0x83U,
+			(page << 1) | (point << 3), 0x1800, std::uint16_t(group.literal_only ? 0x900 : 0x800)};
+		if (literal) result.absolute_source = address;
+		else if (form == 2) result.indirect_source = address;
+		result.checkpoint = (literal ? 4 : 3) + point;
+		return result;
 	}
 	throw std::out_of_range("C54x domain case");
 }
