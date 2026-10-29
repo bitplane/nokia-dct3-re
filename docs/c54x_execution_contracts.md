@@ -236,8 +236,8 @@ No far-control or pending-transfer restoration case is deleted. This rewrite
 removes 1,781 C++ bytes/47 lines while preserving all 173 legacy PASS records
 and 2,474 asserted opcode words.
 
-`isa-memory` retains 226 memory/accumulator examples in eight ordered reset
-groups (45, 30, 25, 20, 30, 12, 34 and 30). Legacy adapters share the literal data without resetting
+`isa-memory` retains 256 memory/accumulator examples in ten ordered reset
+groups (45, 30, 25, 20, 30, 12, 34, 30, 14 and 16). Legacy adapters share the literal data without resetting
 their predecessor state. Carry retained across AND/MPY, shifted-SUB and
 negative-half MACR rows remains observable; the 14 multiply rows keep their
 full ST1 assertions, while other rows retain their original partial masks.
@@ -269,6 +269,13 @@ The eighth group retains absolute-marker load/store, masked carry/overflow,
 fractional and rounded products, MMR addressing and timer-control readback
 references. Legacy branch/call/return tests between its three segments remain
 separate; running the bank alone does not qualify those control compositions.
+The ninth group contrasts long-offset/address updates and extension ordering:
+ADDM/ST place the offset before the literal, while ANDM/ORM place their
+immediate before the offset. It retains carry-clear/set and circular-wrap
+examples. The tenth group retains NOP-primed immediate shifts, pointer and
+status-preserving memory logic, signed/unsigned loads and an ANDM-to-ORM RAM
+dependency under circular markers. Its NOP is stimulus, not the reported
+operation word. Intervening legacy BCD/XC tests remain outside these banks.
 Reset-only RAM metadata seeds inherited source words for standalone
 execution; `prepare_case` deliberately ignores it. The POLY values match
 the [SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf) page 4-126 example.

@@ -93,6 +93,10 @@ protected:
 				m_cases.insert(m_cases.end(), transfers.begin(), transfers.end());
 				auto const &operands = c54x_test::absolute_operand_examples();
 				m_cases.insert(m_cases.end(), operands.begin(), operands.end());
+				auto const &offsets = c54x_test::long_offset_examples();
+				m_cases.insert(m_cases.end(), offsets.begin(), offsets.end());
+				auto const &circular = c54x_test::circular_marker_examples();
+				m_cases.insert(m_cases.end(), circular.begin(), circular.end());
 			}
 			else if (words()) m_cases = c54x_test::instruction_word_examples();
 			else if (products()) m_cases = c54x_test::product_examples();

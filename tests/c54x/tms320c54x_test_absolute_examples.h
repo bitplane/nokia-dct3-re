@@ -149,6 +149,53 @@ inline auto const &absolute_operand_examples()
 	return cases;
 }
 
+inline auto const &long_offset_examples()
+{
+	using r = tms320c54x_device;
+	static const auto cases = [] {
+		std::vector<instruction_case> result;
+		auto add = [&](const char *id, std::vector<u16> words, std::vector<register_setting> initial,
+			std::vector<register_check> expected, std::vector<memory_word> data = {},
+			unsigned interval = 5, std::vector<memory_word> expected_data = {}) {
+			auto test = port_case(id, std::move(words), std::move(initial), std::move(expected),
+				std::move(data), interval, std::move(expected_data), 2, 0x0d00);
+			test.reset_before = result.empty();
+			result.push_back(std::move(test));
+		};
+		add("addc-long-preupdate-clear-carry", {0x06ea, 5}, {{r::STATE_A, 0x13}, {r::STATE_AR2, 0x0f00}, {r::STATE_ST0, 0x0800}},
+			{{r::STATE_A, 0x18}, {r::STATE_AR2, 0x0f05}, {r::STATE_ST0, 0, 0x0800}}, {{0x0f05, 4}});
+		add("adds-long-offset-stationary", {0x02e2, 5}, {{r::STATE_A, 1}, {r::STATE_AR2, 0x0f00}},
+			{{r::STATE_A, 0x10000}, {r::STATE_AR2, 0x0f00}}, {{0x0f05, 0xffff}});
+		add("adds-long-circular-preupdate", {0x02f2, 2}, {{r::STATE_A, 1}, {r::STATE_AR2, 0x0f03}, {r::STATE_BK, 4}},
+			{{r::STATE_A, 4}, {r::STATE_AR2, 0x0f01}}, {{0x0f01, 3}});
+		add("store-low-long-negative-preupdate", {0x80ea, 0xfffe}, {{r::STATE_A, 0x12345678}, {r::STATE_AR2, 0x0f10}},
+			{{r::STATE_AR2, 0x0f0e}}, {{0x0f0e, 0}}, 5, {{0x0f0e, 0x5678}});
+		add("addm-long-offset-before-immediate", {0x6bea, 5, 1}, {{r::STATE_AR2, 0x0f00}, {r::STATE_ST0, 0}, {r::STATE_ST1, 0x0100}},
+			{{r::STATE_AR2, 0x0f05}}, {{0x0f05, 3}}, 6, {{0x0f05, 4}});
+		add("andm-immediate-before-long-offset", {0x68e2, 0x0f0f, 5}, {{r::STATE_AR2, 0x0f00}, {r::STATE_ST0, 0x0800}},
+			{{r::STATE_AR2, 0x0f00}, {r::STATE_ST0, 0x0800, 0x0800}}, {{0x0f05, 0xff00}}, 6, {{0x0f05, 0x0f00}});
+		add("orm-long-circular-retains-carry", {0x69f2, 0x8000, 2}, {{r::STATE_AR2, 0x0f03}, {r::STATE_BK, 4}},
+			{{r::STATE_AR2, 0x0f01}, {r::STATE_ST0, 0x0800, 0x0800}}, {{0x0f01, 1}}, 6, {{0x0f01, 0x8001}});
+		add("store-long-offset-before-literal", {0x76ea, 5, 0xcafe}, {{r::STATE_AR2, 0x0f00}},
+			{{r::STATE_AR2, 0x0f05}}, {{0x0f05, 0}}, 6, {{0x0f05, 0xcafe}});
+		add("store-high-long-preupdate", {0x82ea, 5}, {{r::STATE_A, 0x12345678}, {r::STATE_AR2, 0x0f00}},
+			{{r::STATE_AR2, 0x0f05}}, {{0x0f05, 0}}, 5, {{0x0f05, 0x1234}});
+		add("store-high-b-long-stationary", {0x83e2, 5}, {{r::STATE_B, 0x56789abc}, {r::STATE_AR2, 0x0f00}},
+			{{r::STATE_AR2, 0x0f00}}, {{0x0f05, 0}}, 5, {{0x0f05, 0x5678}});
+		add("store-t-long-preupdate", {0x8cea, 5}, {{r::STATE_T, 0x4321}, {r::STATE_AR2, 0x0f00}},
+			{{r::STATE_AR2, 0x0f05}}, {{0x0f05, 0}}, 5, {{0x0f05, 0x4321}});
+		add("load-signed-long-preupdate", {0x10ea, 5}, {{r::STATE_ST1, 0x0100}, {r::STATE_AR2, 0x0f00}},
+			{{r::STATE_A, 0xffffff8001ULL}, {r::STATE_AR2, 0x0f05}}, {{0x0f05, 0x8001}});
+		add("load-unsigned-long-stationary", {0x12e2, 5}, {{r::STATE_AR2, 0x0f00}},
+			{{r::STATE_A, 0x8001}, {r::STATE_AR2, 0x0f00}});
+		add("load-high-b-long-preupdate", {0x45ea, 5}, {{r::STATE_AR2, 0x0f00}},
+			{{r::STATE_B, 0x12340000}, {r::STATE_AR2, 0x0f05}}, {{0x0f05, 0x1234}});
+		result.front().reset_initial = {{r::STATE_ST1, 0x0100}};
+		return result;
+	}();
+	return cases;
+}
+
 } // namespace c54x_test
 
 #endif // MAME_NOKIA_TMS320C54X_TEST_ABSOLUTE_EXAMPLES_H

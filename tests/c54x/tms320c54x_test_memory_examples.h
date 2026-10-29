@@ -232,6 +232,54 @@ inline auto const &memory_transfer_examples()
 	return cases;
 }
 
+inline auto const &circular_marker_examples()
+{
+	using r = tms320c54x_device;
+	static const auto cases = [] {
+		std::vector<instruction_case> result{
+			port_case("and-literal-shift2-carry", {0xf495, 0xf032, 0x0f0f}, {{r::STATE_A, 0xff12345678ULL}, {r::STATE_ST0, 0x0800}},
+				{{r::STATE_A, 0x1438}, {r::STATE_ST0, 0x0800, 0x0800}}, {}, 5),
+			port_case("and-literal-shift5-carry", {0xf495, 0xf035, 0x00ff}, {{r::STATE_A, 0xff12345678ULL}},
+				{{r::STATE_A, 0x1660}, {r::STATE_ST0, 0x0800, 0x0800}}, {}, 5),
+			port_case("logical-right5-guard-clear", {0xf495, 0xf0fb}, {{r::STATE_A, 0xff80000013ULL}, {r::STATE_ST0, 0}},
+				{{r::STATE_A, 0x04000000}, {r::STATE_ST0, 0x0800, 0x0800}}, {}, 4),
+			port_case("logical-right2-guard-clear", {0xf495, 0xf0fe}, {{r::STATE_A, 0xff80000003ULL}, {r::STATE_ST0, 0}},
+				{{r::STATE_A, 0x20000000}, {r::STATE_ST0, 0x0800, 0x0800}}, {}, 4),
+			port_case("mapped-auxiliary-copy-preserves-source", {0xe741}, {{r::STATE_AR1, 0x1234}, {r::STATE_AR4, 0xcdef}},
+				{{r::STATE_AR1, 0xcdef}, {r::STATE_AR4, 0xcdef}}),
+			port_case("signed-load-b-stationary", {0x1181}, {{r::STATE_B, 0}, {r::STATE_AR1, 0x0f20}, {r::STATE_ST1, 0x0100}},
+				{{r::STATE_B, 0xffffff8001ULL}, {r::STATE_AR1, 0x0f20}}, {{0x0f20, 0x8001}}),
+			port_case("memory-or-postdecrement", {0x1a8a}, {{r::STATE_A, 0x120000}, {r::STATE_AR2, 0x0f20}},
+				{{r::STATE_A, 0x1200f0}, {r::STATE_AR2, 0x0f1f}}, {{0x0f20, 0x00f0}}),
+			port_case("unsigned-load-circular-postincrement", {0x12d2},
+				{{r::STATE_A, 0}, {r::STATE_AR2, 0x0f23}, {r::STATE_BK, 4}, {r::STATE_ST1, 0x0100}},
+				{{r::STATE_A, 0x8001}, {r::STATE_AR2, 0x0f20}}, {{0x0f23, 0x8001}}),
+			port_case("absolute-xor-preserves-status", {0x1cf8, 0x0f20}, {{r::STATE_A, 0x12000f}, {r::STATE_ST0, 0x0800}},
+				{{r::STATE_A, 0x1200ff}, {r::STATE_ST0, 0x0800}}, {{0x0f20, 0x00f0}}, 4),
+			port_case("orm-retains-pointer-status", {0x6982, 0x00a0}, {{r::STATE_AR2, 0x0f20}, {r::STATE_ST0, 0x0800}},
+				{{r::STATE_AR2, 0x0f20}, {r::STATE_ST0, 0x0800}}, {{0x0f20, 0x1001}}, 4, {{0x0f20, 0x10a1}}),
+			port_case("orm-selects-other-pointer", {0x6984, 5}, {{r::STATE_AR4, 0x0f24}},
+				{{r::STATE_AR4, 0x0f24}}, {{0x0f24, 0x8000}}, 4, {{0x0f24, 0x8005}, {0x0f20, 0x10a1}}),
+			port_case("or-b-postdecrement-preserves-status", {0x1b8d}, {{r::STATE_B, 0x34000f}, {r::STATE_AR5, 0x0f25}},
+				{{r::STATE_B, 0x3400ff}, {r::STATE_AR5, 0x0f24}, {r::STATE_ST0, 0x0800}}, {{0x0f25, 0x00f0}}),
+			port_case("high-load-b-postincrement", {0x4595}, {{r::STATE_B, 0}, {r::STATE_AR5, 0x0f30}, {r::STATE_ST1, 0x0100}},
+				{{r::STATE_B, 0xffff800000ULL}, {r::STATE_AR5, 0x0f31}}, {{0x0f30, 0xff80}}),
+			port_case("mapped-ar7-load-b-unsigned", {0x4917}, {{r::STATE_B, 0}, {r::STATE_AR7, 0x8001}},
+				{{r::STATE_B, 0x8001}, {r::STATE_AR7, 0x8001}}),
+			port_case("andm-retains-pointer-status", {0x6883, 0x0ff0}, {{r::STATE_AR3, 0x0f33}, {r::STATE_ST0, 0x0800}},
+				{{r::STATE_AR3, 0x0f33}, {r::STATE_ST0, 0x0800}}, {{0x0f33, 0xff0f}}, 4, {{0x0f33, 0x0f00}}),
+			port_case("orm-uses-previous-andm-result", {0x6983, 0x00f0}, {},
+				{{r::STATE_AR3, 0x0f33}, {r::STATE_ST0, 0x0800}}, {}, 4, {{0x0f33, 0x0ff0}})
+		};
+		for (unsigned i = 0; i < result.size(); ++i) result[i].reset_before = !i;
+		result.front().reset_initial = {{r::STATE_AR6, 0x0a03}, {r::STATE_BK, 4}, {r::STATE_ST1, 0x0100}};
+		static constexpr u16 observed[] = {0xf032, 0xf035, 0xf0fb, 0xf0fe};
+		for (unsigned i = 0; i < std::size(observed); ++i) result[i].opcode = observed[i];
+		return result;
+	}();
+	return cases;
+}
+
 } // namespace c54x_test
 
 #endif // MAME_NOKIA_TMS320C54X_TEST_MEMORY_EXAMPLES_H

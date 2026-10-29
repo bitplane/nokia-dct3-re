@@ -6605,14 +6605,14 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
-          "cases": "226",
+          "cases": "256",
           "firmware": "0",
           "nokia_devices": "0",
-          "reset_groups": "8"
+          "reset_groups": "10"
         }
       ],
       "required": [
-        "TMS320C54x generic memory examples: PASS cases=226 reset_groups=8 nokia_devices=0 firmware=0"
+        "TMS320C54x generic memory examples: PASS cases=256 reset_groups=10 nokia_devices=0 firmware=0"
       ]
     },
     "isa-parallel": {
@@ -15576,7 +15576,37 @@
         "mapped-ar5-load-a-unsigned",
         "mapped-ar5-load-b-unsigned",
         "indirect-mmr-address-mask",
-        "indirect-mmr-store-postincrement"
+        "indirect-mmr-store-postincrement",
+        "addc-long-preupdate-clear-carry",
+        "adds-long-offset-stationary",
+        "adds-long-circular-preupdate",
+        "store-low-long-negative-preupdate",
+        "addm-long-offset-before-immediate",
+        "andm-immediate-before-long-offset",
+        "orm-long-circular-retains-carry",
+        "store-long-offset-before-literal",
+        "store-high-long-preupdate",
+        "store-high-b-long-stationary",
+        "store-t-long-preupdate",
+        "load-signed-long-preupdate",
+        "load-unsigned-long-stationary",
+        "load-high-b-long-preupdate",
+        "and-literal-shift2-carry",
+        "and-literal-shift5-carry",
+        "logical-right5-guard-clear",
+        "logical-right2-guard-clear",
+        "mapped-auxiliary-copy-preserves-source",
+        "signed-load-b-stationary",
+        "memory-or-postdecrement",
+        "unsigned-load-circular-postincrement",
+        "absolute-xor-preserves-status",
+        "orm-retains-pointer-status",
+        "orm-selects-other-pointer",
+        "or-b-postdecrement-preserves-status",
+        "high-load-b-postincrement",
+        "mapped-ar7-load-b-unsigned",
+        "andm-retains-pointer-status",
+        "orm-uses-previous-andm-result"
       ],
       "classification": "architectural_interaction",
       "decision": "rewrite",
