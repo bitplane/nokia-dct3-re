@@ -44,10 +44,9 @@ void tms320c54x_test_state::start_idle_dma_case(unsigned index)
 	auto &data = m_cpu->space(AS_DATA);
 	u16 const idle[] = {0xf4e1, 0xf6e1, 0xf5e1};
 	program.write_word(0x010960, idle[std::min(index / 2, 2U)]);
-	program.write_word(0x010961, 0x76f8);
-	program.write_word(0x010962, 0x0501);
-	program.write_word(0x010963, 1);
-	program.write_word(0x010964, 0xf4e1);
+	write_words(program, {
+		{0x010961, 0x76f8}, {0x010962, 0x0501}, {0x010963, 1}, {0x010964, 0xf4e1},
+	});
 	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 	m_idle_mcbsp_external = false;
@@ -2188,10 +2187,9 @@ bool tms320c54x_test_state::check_bio_results()
 			return true;
 		}
 		osd_printf_info("TMS320C54x live BIO conformance: PASS variants=28\n");
-		program.write_word(0x010930, 0xf803);
-		program.write_word(0x010931, 0x0930);
-		program.write_word(0x010932, 0xe807);
-		program.write_word(0x010933, 0xf4e1);
+		write_words(program, {
+			{0x010930, 0xf803}, {0x010931, 0x0930}, {0x010932, 0xe807}, {0x010933, 0xf4e1},
+		});
 		m_bio_level = 0;
 		m_cpu->set_state_int(STATE_GENPC, 0x010930);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);

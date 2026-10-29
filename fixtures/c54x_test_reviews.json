@@ -8,6 +8,40 @@
   },
   "families": [
     {
+      "id": "legacy-ordered-stimulus-plumbing",
+      "classification": "harness_infrastructure",
+      "decision": "merge",
+      "source": "tests/c54x/tms320c54x_test_atomic_basic.cpp; tests/c54x/tms320c54x_test_atomic_control.cpp; tests/c54x/tms320c54x_test_atomic_corpus.cpp; tests/c54x/tms320c54x_test_atomic_reference.cpp; tests/c54x/tms320c54x_test_peripherals.cpp; tests/c54x/tms320c54x_test_restore.cpp; tests/c54x/tms320c54x_test_state.cpp; tests/c54x/tms320c54x_test_state.h",
+      "profiles": [],
+      "case_ids": [],
+      "basis": "999 constant-only stimulus writes in 161 ordered batches use existing typed setup helpers; 207 identical PC/IDLE/100-microsecond observer tails share resume_atomic_at. Helpers issue the same device-state/memory writes in order and do not calculate instruction results.",
+      "obligations": [
+        "expanding both old and new helper calls yields identical source tokens, comments, expectations, phase continuations and guest-write order across all seven changed translation units",
+        "only constant expressions are batched; never pre-evaluate a value that depends on an earlier guest write",
+        "retain inherited CPU state, partial setup, every case identity and all existing assertion masks",
+        "exercise the actual restart helper with recording CPU/timer stubs to check PC then IDLE then phase publication then observer scheduling",
+        "validate the legacy atomic prefix and full default regression with unchanged result requirements, plus affected handset menus"
+      ],
+      "limits": [
+        "mechanical plumbing consolidation does not classify any of the remaining unreviewed instruction families",
+        "no profile, numeric input, checkpoint, assertion or independent expectation is retired",
+        "no full-suite runtime reduction is claimed"
+      ],
+      "measurement": {
+        "baseline_commit": "fad9823b",
+        "c54x_cpp_bytes_before": 3658315,
+        "c54x_cpp_bytes_after": 3620210,
+        "c54x_cpp_lines_before": 55322,
+        "c54x_cpp_lines_after": 54724,
+        "scope": "All C54x test C++ source and headers, including the new restart helper/comment: 38105 bytes and 598 lines removed without coverage changes. The host ordering test and contract note are outside this C++ inventory."
+      },
+      "validation": {
+        "legacy_atomic": "172 ordered native PASS records and 2474 asserted opcode words identical to the preceding reviewed batch",
+        "full_default": "Native completion exit 3, wrapper exit 0, no interruption; all 294 unchanged requirements pass, with 295 PASS records and 5690 asserted opcode words. This is not an all-isolated-profile or silicon-timing claim.",
+        "handset": "3210 v6.00 and v5.01 interactive Phone book menu structural predicates and exact stable-region frame oracles pass"
+      }
+    },
+    {
       "id": "square-reference",
       "classification": "isa_documented",
       "decision": "rewrite",

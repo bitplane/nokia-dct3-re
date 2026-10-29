@@ -26,9 +26,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0a10, 0xbeef);
 		m_port_reads = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0a13);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(6524);
+		return resume_atomic_at(0x05e0, 6524);
 	}
 	if (m_phase == 6524)
 	{
@@ -130,9 +128,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(84);
+		return resume_atomic_at(0x05e0, 84);
 	}
 	if (m_phase == 84)
 	{
@@ -168,9 +164,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{cpu_regs::STATE_AR4, 0x0c03}, {cpu_regs::STATE_AR2, 0x0d00}, {cpu_regs::STATE_BK, 4},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(86);
+		return resume_atomic_at(0x05e0, 86);
 	}
 	if (m_phase == 86)
 	{
@@ -261,14 +255,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e00,
 				"DST long circular operand advances by two and wraps");
 		program.write_word(0x05e0, 0x4fd2); // DST B,*AR2+%.
-		data.write_word(0x0e11, 0xbeef);
-		data.write_word(0x0e12, 0);
-		data.write_word(0x0e13, 0);
-		data.write_word(0x0e14, 0xcafe);
+		write_words(data, {
+			{0x0e11, 0xbeef}, {0x0e12, 0}, {0x0e13, 0}, {0x0e14, 0xcafe},
+		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0e12);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(6519);
+		return resume_atomic_at(0x05e0, 6519);
 	}
 	if (m_phase == 6519)
 	{
@@ -280,16 +271,14 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->state_int(tms320c54x_device::STATE_A) == 0xabcdef01ULL &&
 			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x76543210,
 			"ROM4 DST through AR2 stores high/low words then wraps by two without changing accumulators or adjacent cells");
-		program.write_word(0x05e0, 0x74d6);
-		program.write_word(0x05e1, 0x0123);
-		program.write_word(0x05e2, 0x4f90); // DST B,*AR0+.
-		program.write_word(0x05e3, 0x74d6);
-		program.write_word(0x05e4, 0x0123);
-		program.write_word(0x05e5, 0xf5e1);
-		data.write_word(0x0e21, 0xbeef);
-		data.write_word(0x0e22, 0);
-		data.write_word(0x0e23, 0);
-		data.write_word(0x0e24, 0xcafe);
+		write_words(program, {
+			{0x05e0, 0x74d6}, {0x05e1, 0x0123},
+			{0x05e2, 0x4f90}, // DST B,*AR0+.
+			{0x05e3, 0x74d6}, {0x05e4, 0x0123}, {0x05e5, 0xf5e1},
+		});
+		write_words(data, {
+			{0x0e21, 0xbeef}, {0x0e22, 0}, {0x0e23, 0}, {0x0e24, 0xcafe},
+		});
 		m_port_reads = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_AR0, 0x0e22}, {cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_ST0, 0x0aa5},
@@ -387,9 +376,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0e00);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(94);
+		return resume_atomic_at(0x05e0, 94);
 	}
 	if (m_phase == 94)
 	{
@@ -488,13 +475,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
 			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d01,
 			"ROM4 d6e9 stores old B, rounds signed MAC into A and updates both pointers independently");
-		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x6c8a); // BANZ 05e4, *AR2-
-		program.write_word(0x05e3, 0x05e4);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
+			{0x05e1, 0x0124},
+			{0x05e2, 0x6c8a}, // BANZ 05e4, *AR2-
+			{0x05e3, 0x05e4}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0a03, 0x1234);
 		data.write_word(0x0a00, 0x5678);
 		m_port_writes = 0;
@@ -528,12 +514,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e5, 0xf5e1);
 		data.write_word(0x0d00, 0xff80);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0d00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_AR3, 0x0d00}, {cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_B, 0},
+			{cpu_regs::STATE_ST1, 0x0100}, // SXM
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(100);
 	}
 	if (m_phase == 100)
@@ -585,20 +570,17 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			return next_atomic_phase(next);
 		}
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
-		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xf830); // BC 05e4, TC
-		program.write_word(0x05e3, 0x05e4);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
+			{0x05e1, 0x0124},
+			{0x05e2, 0xf830}, // BC 05e4, TC
+			{0x05e3, 0x05e4}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
 		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1000); // TC
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(101);
+		return resume_atomic_at(0x05e0, 101);
 	}
 	if (m_phase == 101 || m_phase == 102)
 	{
@@ -632,9 +614,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e3, 0x05e4);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(104);
+		return resume_atomic_at(0x05e0, 104);
 	}
 	if (m_phase == 104)
 	{
@@ -649,9 +629,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0d00, 0x9abc);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(105);
+		return resume_atomic_at(0x05e0, 105);
 	}
 	if (m_phase == 105)
 	{
@@ -664,9 +642,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0d00, 0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(106);
+		return resume_atomic_at(0x05e0, 106);
 	}
 	if (m_phase == 106)
 	{
@@ -676,13 +652,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e0, 0x2883); // MAC *AR3,A
 		program.write_word(0x05e1, 0xf5e1);
 		data.write_word(0x0d00, 1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0d00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_T, 1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800); // Preserve C.
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_AR3, 0x0d00}, {cpu_regs::STATE_T, 1}, {cpu_regs::STATE_A, 0x7fffffff},
+			{cpu_regs::STATE_ST0, 0x0800}, // Preserve C.
+			{cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(107);
 	}
 	if (m_phase == 107 || m_phase == 108)
@@ -696,18 +670,14 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200); // OVM
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(108);
+			return resume_atomic_at(0x05e0, 108);
 		}
 		data.write_word(0x0d00, 0x8000);
-		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x8000);
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffffULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0240); // OVM, FRCT
-		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_T, 0x8000}, {cpu_regs::STATE_A, 0xffffffffffULL}, {cpu_regs::STATE_ST0, 0},
+			{cpu_regs::STATE_ST1, 0x0240}, // OVM, FRCT
+			{cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(109);
 	}
 	if (m_phase == 109 || m_phase == 110)
@@ -720,9 +690,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		{
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffffULL);
 			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x0002); // SMUL
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(110);
+			return resume_atomic_at(0x05e0, 110);
 		}
 		program.write_word(0x05e0, 0xb03a); // MAC *AR5+,*AR4-,A,A
 		data.write_word(0x0b00, 1);
@@ -732,9 +700,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{cpu_regs::STATE_ST0, 0},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200); // OVM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(111);
+		return resume_atomic_at(0x05e0, 111);
 	}
 	if (m_phase == 111)
 	{
@@ -756,13 +722,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0400) &&
 				data.read_word(0x0d00) == 0x1234,
 				"parallel ST/MACR stores old B and sets OVA on saturated A");
-		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xf040); // OR #lk,A
-		program.write_word(0x05e3, 0x00f0);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
+			{0x05e1, 0x0124},
+			{0x05e2, 0xf040}, // OR #lk,A
+			{0x05e3, 0x00f0}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0xff00000000ULL}, {cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0},
@@ -797,9 +762,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			data.write_word(0x0e00, 0x5678);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(115);
+			return resume_atomic_at(0x05e0, 115);
 		}
 		program.write_word(0x05e2, 0x8093); // STL A,*AR3+
 		program.write_word(0x05e3, 0xf5e1);
@@ -833,9 +796,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e0, 0x8a08); // POPM AL
 		program.write_word(0x05e1, 0xf5e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12340000);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(118);
+		return resume_atomic_at(0x05e0, 118);
 	}
 	if (m_phase == 118)
 	{
@@ -847,9 +808,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e2, 0xf5e1);
 		data.write_word(0x0060, 0x1234);
 		data.write_word(0x0061, 0xabcd);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(6517);
+		return resume_atomic_at(0x05e0, 6517);
 	}
 	if (m_phase == 6517)
 	{
@@ -865,9 +824,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0061, 0);
 		program.write_word(0x05e0, 0x8a61); // POPM data address 61.
 		program.write_word(0x05e1, 0x8a60); // POPM data address 60.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(6518);
+		return resume_atomic_at(0x05e0, 6518);
 	}
 	if (m_phase == 6518)
 	{
@@ -880,21 +837,18 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e0, 0xf6bb); // RSBX INTM
 		program.write_word(0x05e1, 0xf5e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(119);
+		return resume_atomic_at(0x05e0, 119);
 	}
 	if (m_phase == 119)
 	{
 		expect_opcode(0xf6bb, !(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800),
 				"ROM4 f6bb clears INTM for interrupt return");
-		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x7212); // MVDM 0e00,AR2
-		program.write_word(0x05e3, 0x0e00);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
+			{0x05e1, 0x0124},
+			{0x05e2, 0x7212}, // MVDM 0e00,AR2
+			{0x05e3, 0x0e00}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0e00, 0x1234);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -913,21 +867,18 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0e01, 0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(121);
+		return resume_atomic_at(0x05e0, 121);
 	}
 	if (m_phase == 121)
 	{
 		expect_opcode(0x7312, data.read_word(0x0e01) == 0x1234 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"MVMD moves AR2 to data memory in two cycles");
-		program.write_word(0x05e2, 0xec02); // RPT #2
-		program.write_word(0x05e3, 0x7212); // MVDM 0e00,AR2
-		program.write_word(0x05e4, 0x0e00);
-		program.write_word(0x05e5, 0x75d6);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0xec02}, // RPT #2
+			{0x05e3, 0x7212}, // MVDM 0e00,AR2
+			{0x05e4, 0x0e00}, {0x05e5, 0x75d6}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0e00, 0x1111);
 		data.write_word(0x0e01, 0x2222);
 		data.write_word(0x0e02, 0x3333);
@@ -982,9 +933,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e1, 0x8a09); // POPM AH
 		program.write_word(0x05e2, 0xf5e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xabcd987654ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(125);
+		return resume_atomic_at(0x05e0, 125);
 	}
 	if (m_phase == 125)
 	{
@@ -998,9 +947,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e2, 0x4a0d); // PSHM BG
 		program.write_word(0x05e3, 0xf5e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x7f1234abcdULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(126);
+		return resume_atomic_at(0x05e0, 126);
 	}
 	if (m_phase == 126)
 	{
@@ -1016,9 +963,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e2, 0x8a0b); // POPM BL
 		program.write_word(0x05e3, 0xf5e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5511223344ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(127);
+		return resume_atomic_at(0x05e0, 127);
 	}
 	if (m_phase == 127)
 	{
@@ -1030,13 +975,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234567654ULL &&
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
 				"ROM4 8a0b restores BL, preserves A, and advances SP");
-		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xf065); // XOR #lk,16,A
-		program.write_word(0x05e3, 0x00ff);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
+			{0x05e1, 0x0124},
+			{0x05e2, 0xf065}, // XOR #lk,16,A
+			{0x05e3, 0x00ff}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0xff00000000ULL}, {cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0},
@@ -1116,13 +1060,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
 				!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x8000),
 				"ROM4 f072 costs four cycles and retires after its one-word block");
-		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x34f8); // BITT *(absolute)
-		program.write_word(0x05e3, 0x0d00);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
+			{0x05e1, 0x0124},
+			{0x05e2, 0x34f8}, // BITT *(absolute)
+			{0x05e3, 0x0d00}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0d00, 0x8000);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -1141,9 +1084,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		{
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_T, 15);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(133);
+			return resume_atomic_at(0x05e0, 133);
 		}
 		program.write_word(0x05e2, 0x70f8); // MVKD dmad, *(absolute)
 		write_words(program, {
@@ -1152,9 +1093,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0d00, 0);
 		data.write_word(0x0e00, 0x4567);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(134);
+		return resume_atomic_at(0x05e0, 134);
 	}
 	if (m_phase == 134)
 	{
@@ -1167,26 +1106,21 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0d00, 0x0140);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(135);
+		return resume_atomic_at(0x05e0, 135);
 	}
 	if (m_phase == 135)
 	{
 		expect_opcode(0x61f8, (m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 61f8 tests the masked absolute word in three cycles");
-		program.write_word(0x05e2, 0x6182); // BITF *AR2,#lk
-		program.write_word(0x05e3, 0x0040);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x6182}, // BITF *AR2,#lk
+			{0x05e3, 0x0040}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0d00, 0x0100);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(136);
+		return resume_atomic_at(0x05e0, 136);
 	}
 	if (m_phase == 136)
 	{
@@ -1218,9 +1152,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		{
 			data.write_word(0x0d10, 0x0100);
 			m_port_writes = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(6512);
+			return resume_atomic_at(0x05e0, 6512);
 		}
 		program.write_word(0x05e2, 0x68f8); // ANDM #lk,*(absolute)
 		write_words(program, {
@@ -1228,9 +1160,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		});
 		data.write_word(0x0d00, 0x0ff0);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(137);
+		return resume_atomic_at(0x05e0, 137);
 	}
 	if (m_phase >= 137 && m_phase <= 139)
 	{
@@ -1291,25 +1221,20 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e7, 0xf5e1);
 		data.write_word(0x0d00, 2);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(142);
+		return resume_atomic_at(0x05e0, 142);
 	}
 	if (m_phase == 142)
 	{
 		expect_opcode(0x47f8, m_port_writes == 2 &&
 				m_last_port_cycle - m_first_port_cycle == 9,
 				"ROM4 absolute RPT Smem costs four cycles and repeats the NOP three times");
-		program.write_word(0x05e2, 0x4782); // RPT *AR2
-		program.write_word(0x05e3, 0xf495);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x4782}, // RPT *AR2
+			{0x05e3, 0xf495}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(143);
+		return resume_atomic_at(0x05e0, 143);
 	}
 	if (m_phase == 143)
 	{
@@ -1317,17 +1242,14 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_last_port_cycle - m_first_port_cycle == 8 &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d00,
 				"indirect RPT Smem costs three cycles without moving AR2");
-		program.write_word(0x05e2, 0x7d92); // MVDP *AR2+,pmad
-		program.write_word(0x05e3, 0x0b00);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x7d92}, // MVDP *AR2+,pmad
+			{0x05e3, 0x0b00}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0d00, 0x2468);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(144);
+		return resume_atomic_at(0x05e0, 144);
 	}
 	if (m_phase == 144)
 	{
@@ -1335,16 +1257,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d01 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 				"ROM4 MVDP moves *AR2+ to program memory in four cycles");
-		program.write_word(0x05e2, 0x7c92); // MVPD pmad,*AR2+
-		program.write_word(0x05e3, 0x0b00);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x7c92}, // MVPD pmad,*AR2+
+			{0x05e3, 0x0b00}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d10);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(145);
+		return resume_atomic_at(0x05e0, 145);
 	}
 	if (m_phase == 145)
 	{
@@ -1357,9 +1276,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{0x05e3, 0x0d00}, {0x05e4, 0x0b01}, {0x05e5, 0x75d6}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
 		});
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(146);
+		return resume_atomic_at(0x05e0, 146);
 	}
 	if (m_phase == 146)
 	{
@@ -1371,9 +1288,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{0x05e3, 0x0d11}, {0x05e4, 0x0b01}, {0x05e5, 0x75d6}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
 		});
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(147);
+		return resume_atomic_at(0x05e0, 147);
 	}
 	if (m_phase == 147)
 	{
@@ -1388,9 +1303,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d20);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(148);
+		return resume_atomic_at(0x05e0, 148);
 	}
 	if (m_phase == 148)
 	{
@@ -1419,15 +1332,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d31 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 				"ROM4 WRITA writes A-addressed program memory in five cycles");
-		program.write_word(0x05e2, 0x7ef8); // READA *(absolute)
-		program.write_word(0x05e3, 0x0d31);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x7ef8}, // READA *(absolute)
+			{0x05e3, 0x0d31}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(150);
+		return resume_atomic_at(0x05e0, 150);
 	}
 	if (m_phase == 150)
 	{
@@ -1459,15 +1369,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d43 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 10,
 				"repeated WRITA advances program and data addresses at one cycle after setup");
-		program.write_word(0x05e2, 0x771a); // STM #lk,BRC
-		program.write_word(0x05e3, 0x0042);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x771a}, // STM #lk,BRC
+			{0x05e3, 0x0042}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(152);
+		return resume_atomic_at(0x05e0, 152);
 	}
 	if (m_phase == 152)
 	{
@@ -1479,25 +1386,20 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{0x05e3, 0x0d50}, {0x05e4, 0x5678}, {0x05e5, 0x75d6}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
 		});
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(153);
+		return resume_atomic_at(0x05e0, 153);
 	}
 	if (m_phase == 153)
 	{
 		expect_opcode(0x76f8, data.read_word(0x0d50) == 0x5678 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"absolute ST #lk,Smem fetches address first and costs three cycles");
-		program.write_word(0x05e2, 0x7682); // ST #lk,*AR2
-		program.write_word(0x05e3, 0x9abc);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x7682}, // ST #lk,*AR2
+			{0x05e3, 0x9abc}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d51);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(154);
+		return resume_atomic_at(0x05e0, 154);
 	}
 	if (m_phase == 154)
 	{
@@ -1505,17 +1407,14 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d51 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"indirect ST #lk,Smem preserves AR2 and costs two cycles");
-		program.write_word(0x05e2, 0x4bf8); // PSHD *(absolute)
-		program.write_word(0x05e3, 0x0d60);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x4bf8}, // PSHD *(absolute)
+			{0x05e3, 0x0d60}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0d60, 0xabcd);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0e00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(155);
+		return resume_atomic_at(0x05e0, 155);
 	}
 	if (m_phase == 155)
 	{
@@ -1523,15 +1422,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				data.read_word(0x0dff) == 0xabcd && m_port_writes == 2 &&
 				m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 absolute PSHD reads source and pushes in two cycles");
-		program.write_word(0x05e2, 0x8bf8); // POPD *(absolute)
-		program.write_word(0x05e3, 0x0d61);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x8bf8}, // POPD *(absolute)
+			{0x05e3, 0x0d61}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(156);
+		return resume_atomic_at(0x05e0, 156);
 	}
 	if (m_phase == 156)
 	{
@@ -1562,9 +1458,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e5, 0xf5e1);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(158);
+		return resume_atomic_at(0x05e0, 158);
 	}
 	if (m_phase == 158)
 	{
@@ -1572,11 +1466,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0005 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 POPM ST0 restores the MMR in one cycle");
-		program.write_word(0x05e2, 0x07f8); // ADDC *(absolute),B
-		program.write_word(0x05e3, 0x0d70);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x07f8}, // ADDC *(absolute),B
+			{0x05e3, 0x0d70}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0d70, 2);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -1590,34 +1483,28 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0x07f8, m_cpu->state_int(tms320c54x_device::STATE_B) == 8 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 absolute ADDC consumes carry and costs two cycles");
-		program.write_word(0x05e2, 0x1af8); // OR *(absolute),A
-		program.write_word(0x05e3, 0x0d70);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x1af8}, // OR *(absolute),A
+			{0x05e3, 0x0d70}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0d70, 0x00f0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0f00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(160);
+		return resume_atomic_at(0x05e0, 160);
 	}
 	if (m_phase == 160)
 	{
 		expect_opcode(0x1af8, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0ff0 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 absolute OR combines the operand in two cycles");
-		program.write_word(0x05e2, 0x08f8); // SUB *(absolute),A
-		program.write_word(0x05e3, 0x0d70);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x08f8}, // SUB *(absolute),A
+			{0x05e3, 0x0d70}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0d70, 3);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 10);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(161);
+		return resume_atomic_at(0x05e0, 161);
 	}
 	if (m_phase == 161)
 	{
@@ -1642,32 +1529,26 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0d81 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 MPYU multiplies unsigned operands and postincrements in one cycle");
-		program.write_word(0x05e2, 0x24f8); // MPYU *(absolute),A
-		program.write_word(0x05e3, 0x0d80);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x24f8}, // MPYU *(absolute),A
+			{0x05e3, 0x0d80}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(163);
+		return resume_atomic_at(0x05e0, 163);
 	}
 	if (m_phase == 163)
 	{
 		expect_opcode(0x24f8, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x2fffa &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"absolute MPYU keeps the unsigned product and costs two cycles");
-		program.write_word(0x05e2, 0x7192); // MVDK *AR2+,dmad
-		program.write_word(0x05e3, 0x0da0);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x7192}, // MVDK *AR2+,dmad
+			{0x05e3, 0x0da0}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0d90, 0x1234);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d90);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(164);
+		return resume_atomic_at(0x05e0, 164);
 	}
 	if (m_phase == 164)
 	{
@@ -1675,20 +1556,17 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d91 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 MVDK moves *AR2+ to immediate data address in two cycles");
-		program.write_word(0x05e2, 0xec02); // RPT #2
-		program.write_word(0x05e3, 0x7093); // MVKD dmad,*AR3+
-		program.write_word(0x05e4, 0x0d90);
-		program.write_word(0x05e5, 0x75d6);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0xec02}, // RPT #2
+			{0x05e3, 0x7093}, // MVKD dmad,*AR3+
+			{0x05e4, 0x0d90}, {0x05e5, 0x75d6}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0d90, 0x1111);
 		data.write_word(0x0d91, 0x2222);
 		data.write_word(0x0d92, 0x3333);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0db0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(165);
+		return resume_atomic_at(0x05e0, 165);
 	}
 	if (m_phase == 165)
 	{
@@ -1698,16 +1576,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0db3 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 				"repeated MVKD advances source and destination at one cycle after setup");
-		program.write_word(0x05e2, 0x44f8); // LD *(absolute),16,A
-		program.write_word(0x05e3, 0x0dc0);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x44f8}, // LD *(absolute),16,A
+			{0x05e3, 0x0dc0}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0dc0, 0x1234);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(166);
+		return resume_atomic_at(0x05e0, 166);
 	}
 	if (m_phase == 166)
 	{
@@ -1718,9 +1593,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e3, 0x0dc1);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(167);
+		return resume_atomic_at(0x05e0, 167);
 	}
 	if (m_phase == 167)
 	{
@@ -1730,9 +1603,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e2, 0x82f8); // STH A,*(absolute)
 		program.write_word(0x05e3, 0x0dc2);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(168);
+		return resume_atomic_at(0x05e0, 168);
 	}
 	if (m_phase == 168)
 	{
@@ -1743,9 +1614,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e3, 0x0dc3);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x4321);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(169);
+		return resume_atomic_at(0x05e0, 169);
 	}
 	if (m_phase == 169)
 	{
@@ -1758,29 +1627,24 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		});
 		data.write_word(0x0dd0, 0x4444);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(170);
+		return resume_atomic_at(0x05e0, 170);
 	}
 	if (m_phase == 170)
 	{
 		expect_opcode(0x71f8, data.read_word(0x0de0) == 0x4444 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 absolute MVDK reads source address before destination in three cycles");
-		program.write_word(0x05e2, 0xec02); // RPT #2
-		program.write_word(0x05e3, 0x7192); // MVDK *AR2+,dmad
-		program.write_word(0x05e4, 0x0de1);
-		program.write_word(0x05e5, 0x75d6);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0xec02}, // RPT #2
+			{0x05e3, 0x7192}, // MVDK *AR2+,dmad
+			{0x05e4, 0x0de1}, {0x05e5, 0x75d6}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0dd0, 0x1111);
 		data.write_word(0x0dd1, 0x2222);
 		data.write_word(0x0dd2, 0x3333);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0dd0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(171);
+		return resume_atomic_at(0x05e0, 171);
 	}
 	if (m_phase == 171)
 	{
@@ -1790,17 +1654,14 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0dd3 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 				"repeated MVDK advances both data addresses at one cycle after setup");
-		program.write_word(0x05e2, 0x6f8a); // LD *AR2-,0,A
-		program.write_word(0x05e3, 0x0c40);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x6f8a}, // LD *AR2-,0,A
+			{0x05e3, 0x0c40}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0df0, 0x2345);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0df0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(172);
+		return resume_atomic_at(0x05e0, 172);
 	}
 	if (m_phase == 172)
 	{
@@ -1813,20 +1674,17 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{0x05e3, 0x0df0}, {0x05e4, 0x0c40}, {0x05e5, 0x75d6}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
 		});
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(173);
+		return resume_atomic_at(0x05e0, 173);
 	}
 	if (m_phase == 173)
 	{
 		expect_opcode(0x6ff8, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x2345 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 extended absolute LD consumes address then extension in three cycles");
-		program.write_word(0x05e2, 0x6f82); // ADD *AR2,1,A
-		program.write_word(0x05e3, 0x0c01);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x6f82}, // ADD *AR2,1,A
+			{0x05e3, 0x0c01}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0df0, 2);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -1877,9 +1735,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e3, 0x0c60);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0df2);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(177);
+		return resume_atomic_at(0x05e0, 177);
 	}
 	if (m_phase == 177)
 	{
@@ -1887,16 +1743,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0df3 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 extended STH writes high accumulator word and postincrements");
-		program.write_word(0x05e2, 0x7712); // STM #lk, AR2
-		program.write_word(0x05e3, 0x4567);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x7712}, // STM #lk, AR2
+			{0x05e3, 0x4567}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(178);
+		return resume_atomic_at(0x05e0, 178);
 	}
 	if (m_phase == 178)
 	{
@@ -1909,9 +1762,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e5, 0xf5e1);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(179);
+		return resume_atomic_at(0x05e0, 179);
 	}
 	if (m_phase == 179)
 	{
@@ -1922,9 +1773,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e2, 0x8a12); // POPM AR2
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(180);
+		return resume_atomic_at(0x05e0, 180);
 	}
 	if (m_phase == 180)
 	{
@@ -1950,9 +1799,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e2, 0x4807); // LDM ST1, A
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(182);
+		return resume_atomic_at(0x05e0, 182);
 	}
 	if (m_phase == 182)
 	{
@@ -1962,9 +1809,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e2, 0x4a07); // PSHM ST1
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(183);
+		return resume_atomic_at(0x05e0, 183);
 	}
 	if (m_phase == 183)
 	{
@@ -1975,9 +1820,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e2, 0x8a07); // POPM ST1
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(184);
+		return resume_atomic_at(0x05e0, 184);
 	}
 	if (m_phase == 184)
 	{
@@ -1988,9 +1831,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e2, 0x4907); // LDM ST1, B
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(185);
+		return resume_atomic_at(0x05e0, 185);
 	}
 	if (m_phase == 185)
 	{
@@ -2007,9 +1848,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			program.write_word(pc++, 0x4a00 | mmr); // PSHM MMR
 		program.write_word(pc, 0xf5e1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0600);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(186);
+		return resume_atomic_at(0x0600, 186);
 	}
 	if (m_phase == 186)
 	{
@@ -2034,9 +1873,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		for (u8 mmr : rom4_saved_mmr)
 			program.write_word(pc++, 0x4a00 | mmr);
 		program.write_word(pc, 0xf5e1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0640);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(187);
+		return resume_atomic_at(0x0640, 187);
 	}
 	if (m_phase == 187)
 	{
@@ -2082,9 +1919,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				"ROM4 XOR *AR3+ uses the second word and advances in one cycle");
 		program.write_word(0x05e2, 0xf4e1); // IDLE 1
 		program.write_word(0x05e3, 0xffff); // Must not execute before wake.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e2);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(189);
+		return resume_atomic_at(0x05e2, 189);
 	}
 	if (m_phase == 189)
 	{
@@ -2139,9 +1974,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e2, 0xf590); // ROR B
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff00000001ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(192);
+		return resume_atomic_at(0x05e0, 192);
 	}
 	if (m_phase == 192)
 	{
@@ -2225,11 +2058,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(197);
 		}
-		program.write_word(0x05e2, 0xf330); // AND #lk, B
-		program.write_word(0x05e3, 0x0ff0);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0xf330}, // AND #lk, B
+			{0x05e3, 0x0ff0}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 0xffab12cd34ULL}, {cpu_regs::STATE_ST0, 0x0800},
@@ -2263,9 +2095,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // SXM clear
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(200);
+		return resume_atomic_at(0x05e0, 200);
 	}
 	if (m_phase == 200 || m_phase == 201)
 	{
@@ -2279,18 +2109,14 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM set
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(201);
+			return resume_atomic_at(0x05e0, 201);
 		}
 		program.write_word(0x05e2, 0xf000); // ADD #lk, A
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // SXM clear
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(202);
+		return resume_atomic_at(0x05e0, 202);
 	}
 	if (m_phase == 202 || m_phase == 203)
 	{
@@ -2304,9 +2130,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM set
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(203);
+			return resume_atomic_at(0x05e0, 203);
 		}
 		program.write_word(0x05e2, 0xf820); // BC 05f0, NTC
 		program.write_word(0x05e3, 0x05f0);
@@ -2319,9 +2143,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); // NTC true
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(204);
+		return resume_atomic_at(0x05e0, 204);
 	}
 	if (m_phase >= 204 && m_phase <= 207)
 	{
@@ -2441,12 +2263,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				"ROM4 SFTL A clears guard, shifts low 32 bits, updates C, and costs one cycle");
 		program.write_word(0x05e0, 0x6d90); // MAR *AR0+ (ARP-selected in compatibility mode)
 		program.write_word(0x05e1, 0xf5e1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0010);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0e00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 4 << 13);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0020); // CMPT
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_AR0, 0x0010}, {cpu_regs::STATE_AR4, 0x0e00}, {cpu_regs::STATE_ST0, 4 << 13},
+			{cpu_regs::STATE_ST1, 0x0020}, // CMPT
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(213);
 	}
 	if (m_phase == 213)
@@ -2458,9 +2279,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e0, 0x1090); // LD *AR0+, A
 		program.write_word(0x05e1, 0xf5e1);
 		data.write_word(0x0e01, 0x1234);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(214);
+		return resume_atomic_at(0x05e0, 214);
 	}
 	if (m_phase == 214)
 	{
@@ -2486,9 +2305,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800); // Preserve C.
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM must not sign-extend XOR.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(215);
+		return resume_atomic_at(0x05e0, 215);
 	}
 	if (m_phase == 215)
 	{
@@ -2501,16 +2318,14 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0x1c8b, xor_results, "ROM4 XOR *AR3- selects A and decrements AR3");
 		expect_opcode(0x1d93, xor_results, "ROM4 XOR *AR3+ selects B without SXM extension");
 		expect_opcode(0x1c82, xor_results, "ROM4 XOR *AR2 selects A; three XORs cost three cycles");
-		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x768a); // STM #lk, *AR2-
-		program.write_word(0x05e3, 0xabcd);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0x8092); // STL A, *AR2+
-		program.write_word(0x05e7, 0x75d6);
-		program.write_word(0x05e8, 0x0124);
-		program.write_word(0x05e9, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
+			{0x05e1, 0x0124},
+			{0x05e2, 0x768a}, // STM #lk, *AR2-
+			{0x05e3, 0xabcd}, {0x05e4, 0x75d6}, {0x05e5, 0x0124},
+			{0x05e6, 0x8092}, // STL A, *AR2+
+			{0x05e7, 0x75d6}, {0x05e8, 0x0124}, {0x05e9, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0x12345678}, {cpu_regs::STATE_AR2, 0x0d80}, {cpu_regs::STATE_AR6, 0x0a03},
@@ -2527,15 +2342,14 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d80 &&
 				m_last_port_cycle - m_middle_port_cycle == 3,
 				"ROM4 STL A,*AR2+ writes the low word and restores AR2 in one cycle");
-		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xe5a8); // MVDD *AR4+, *AR2+
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xe5ca); // MVDD *AR2+0%, *AR4+
-		program.write_word(0x05e6, 0x75d6);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
+			{0x05e1, 0x0124},
+			{0x05e2, 0xe5a8}, // MVDD *AR4+, *AR2+
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124},
+			{0x05e5, 0xe5ca}, // MVDD *AR2+0%, *AR4+
+			{0x05e6, 0x75d6}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+		});
 		data.write_word(0x0e00, 0x1357);
 		data.write_word(0x0d03, 0x2468);
 		m_port_writes = 0;
@@ -2556,16 +2370,14 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0e02 &&
 				m_port_writes == 3 && m_last_port_cycle - m_middle_port_cycle == 3,
 				"ROM4 MVDD *AR2+0%,*AR4+ wraps the X pointer in one cycle");
-		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x12f8); // LDU *(lk), A
-		program.write_word(0x05e3, 0x0d40);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0x138b); // LDU *AR3-, B
-		program.write_word(0x05e7, 0x75d6);
-		program.write_word(0x05e8, 0x0124);
-		program.write_word(0x05e9, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
+			{0x05e1, 0x0124},
+			{0x05e2, 0x12f8}, // LDU *(lk), A
+			{0x05e3, 0x0d40}, {0x05e4, 0x75d6}, {0x05e5, 0x0124},
+			{0x05e6, 0x138b}, // LDU *AR3-, B
+			{0x05e7, 0x75d6}, {0x05e8, 0x0124}, {0x05e9, 0xf5e1},
+		});
 		data.write_word(0x0d40, 0x8001);
 		data.write_word(0x0d50, 0xff80);
 		m_port_writes = 0;
@@ -2574,9 +2386,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{cpu_regs::STATE_AR6, 0x0a03},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM does not sign-extend LDU.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(218);
+		return resume_atomic_at(0x05e0, 218);
 	}
 	if (m_phase == 218)
 	{
@@ -2607,21 +2417,19 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 XOR B<<8,B uses the original 40-bit B, truncates the shift, and costs one cycle");
-		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x6b8a); // ADDM #lk, *AR2-
-		program.write_word(0x05e3, 0xfff8);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
+			{0x05e1, 0x0124},
+			{0x05e2, 0x6b8a}, // ADDM #lk, *AR2-
+			{0x05e3, 0xfff8}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0d20, 0x8007);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d20);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0300); // OVM and SXM.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_AR2, 0x0d20}, {cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_ST0, 0},
+			{cpu_regs::STATE_ST1, 0x0300}, // OVM and SXM.
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(220);
 	}
 	if (m_phase == 220)
@@ -2636,12 +2444,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e2, 0xf5e1);
 		data.write_word(0x0d30, 4);
 		data.write_word(0x0d40, 0x7777);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0d40);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0d30);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 4 << 13);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0020); // CMPT
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_AR0, 0x0d40}, {cpu_regs::STATE_AR4, 0x0d30}, {cpu_regs::STATE_ST0, 4 << 13},
+			{cpu_regs::STATE_ST1, 0x0020}, // CMPT
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(221);
 	}
 	if (m_phase == 221)
@@ -2659,9 +2466,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d60);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM; OVM clear.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(222);
+		return resume_atomic_at(0x05e0, 222);
 	}
 	if (m_phase == 222)
 	{
@@ -2687,12 +2492,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e4, 0xf5e1);
 		data.write_word(0x0d30, 0x00f0);
 		data.write_word(0x0d40, 0x7777);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0d40);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0d30);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 4 << 13);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0020); // CMPT
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_AR0, 0x0d40}, {cpu_regs::STATE_AR4, 0x0d30}, {cpu_regs::STATE_ST0, 4 << 13},
+			{cpu_regs::STATE_ST1, 0x0020}, // CMPT
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(224);
 	}
 	if (m_phase == 224)
@@ -2711,25 +2515,21 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d60);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // SXM and OVM clear.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(225);
+		return resume_atomic_at(0x05e0, 225);
 	}
 	if (m_phase == 225)
 	{
 		expect(data.read_word(0x0d60) == 0 &&
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0400,
 				"ADDM SXM-clear 16-bit wrap does not carry out of the 32-bit ALU");
-		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x7182); // MVDK *AR2, dmad
-		program.write_word(0x05e3, 0x0d71);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0x8183); // STL B, *AR3
-		program.write_word(0x05e7, 0x75d6);
-		program.write_word(0x05e8, 0x0124);
-		program.write_word(0x05e9, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
+			{0x05e1, 0x0124},
+			{0x05e2, 0x7182}, // MVDK *AR2, dmad
+			{0x05e3, 0x0d71}, {0x05e4, 0x75d6}, {0x05e5, 0x0124},
+			{0x05e6, 0x8183}, // STL B, *AR3
+			{0x05e7, 0x75d6}, {0x05e8, 0x0124}, {0x05e9, 0xf5e1},
+		});
 		data.write_word(0x0d70, 0xaaa5);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -2749,15 +2549,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d72 &&
 				m_last_port_cycle - m_middle_port_cycle == 3,
 				"ROM4 STL B,*AR3 stores BL without changing AR3 in one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x4492); // LD *AR2+,16,A
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0x458b); // LD *AR3-,16,B
-		program.write_word(0x05e6, 0x75d6);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0x4492}, // LD *AR2+,16,A
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124},
+			{0x05e5, 0x458b}, // LD *AR3-,16,B
+			{0x05e6, 0x75d6}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+		});
 		data.write_word(0x0d00, 0x8001);
 		data.write_word(0x0d10, 0xff80);
 		m_port_writes = 0;
@@ -2766,9 +2564,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{cpu_regs::STATE_AR3, 0x0d10}, {cpu_regs::STATE_AR6, 0x0a03},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(227);
+		return resume_atomic_at(0x05e0, 227);
 	}
 	if (m_phase == 227)
 	{
@@ -2780,15 +2576,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d0f &&
 				m_last_port_cycle - m_middle_port_cycle == 3,
 				"ROM4 LD *AR3-,16,B sign-extends, decrements, and costs one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x4493); // LD *AR3+,16,A
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0x458a); // LD *AR2-,16,B
-		program.write_word(0x05e6, 0x75d6);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0x4493}, // LD *AR3+,16,A
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124},
+			{0x05e5, 0x458a}, // LD *AR2-,16,B
+			{0x05e6, 0x75d6}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+		});
 		data.write_word(0x0d11, 0x7fff);
 		data.write_word(0x0d01, 0x0080);
 		m_port_writes = 0;
@@ -2809,15 +2603,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d00 &&
 				m_last_port_cycle - m_middle_port_cycle == 3,
 				"ROM4 LD *AR2-,16,B loads positive data and decrements in one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x1a82); // OR *AR2,A
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0x1b83); // OR *AR3,B
-		program.write_word(0x05e6, 0x75d6);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0x1a82}, // OR *AR2,A
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124},
+			{0x05e5, 0x1b83}, // OR *AR3,B
+			{0x05e6, 0x75d6}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+		});
 		data.write_word(0x0d20, 0x00f0);
 		data.write_word(0x0d30, 0x0f0f);
 		m_port_writes = 0;
@@ -2838,15 +2630,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d30 &&
 				m_last_port_cycle - m_middle_port_cycle == 3,
 				"ROM4 OR *AR3,B preserves AR3 and costs one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x1a83); // OR *AR3,A
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0x1b82); // OR *AR2,B
-		program.write_word(0x05e6, 0x75d6);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0x1a83}, // OR *AR3,A
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124},
+			{0x05e5, 0x1b82}, // OR *AR2,B
+			{0x05e6, 0x75d6}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+		});
 		data.write_word(0x0d20, 0x3333);
 		data.write_word(0x0d30, 0x5555);
 		m_port_writes = 0;
@@ -2867,15 +2657,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d20 &&
 				m_last_port_cycle - m_middle_port_cycle == 3,
 				"ROM4 OR *AR2,B loads AR2 data in one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x6d8c); // MAR *AR4-
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0x1c84); // XOR *AR4,A
-		program.write_word(0x05e6, 0x75d6);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0x6d8c}, // MAR *AR4-
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124},
+			{0x05e5, 0x1c84}, // XOR *AR4,A
+			{0x05e6, 0x75d6}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+		});
 		data.write_word(0x0d40, 0x0f0f);
 		data.write_word(0x0d41, 0xf0f0);
 		m_port_writes = 0;
@@ -2893,15 +2681,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0x1c84, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12340f0f &&
 				m_last_port_cycle - m_middle_port_cycle == 3,
 				"ROM4 XOR *AR4,A reads the decremented address in one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x108a); // LD *AR2-,A
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0x8084); // STL A,*AR4
-		program.write_word(0x05e6, 0x75d6);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0x108a}, // LD *AR2-,A
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124},
+			{0x05e5, 0x8084}, // STL A,*AR4
+			{0x05e6, 0x75d6}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+		});
 		data.write_word(0x0d51, 0x8001);
 		data.write_word(0x0d60, 0);
 		m_port_writes = 0;
@@ -2910,9 +2696,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{cpu_regs::STATE_AR6, 0x0a03},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(232);
+		return resume_atomic_at(0x05e0, 232);
 	}
 	if (m_phase == 232)
 	{
@@ -2924,15 +2708,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0d60 &&
 				m_last_port_cycle - m_middle_port_cycle == 3,
 				"ROM4 STL A,*AR4 stores AL without changing AR4 in one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x1a8b); // OR *AR3-,A
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xe598); // MVDD *AR3+,*AR2+
-		program.write_word(0x05e6, 0x75d6);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0x1a8b}, // OR *AR3-,A
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124},
+			{0x05e5, 0xe598}, // MVDD *AR3+,*AR2+
+			{0x05e6, 0x75d6}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+		});
 		data.write_word(0x0d6f, 0x5555);
 		data.write_word(0x0d70, 0x00f0);
 		data.write_word(0x0d80, 0);
@@ -2954,15 +2736,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d81 &&
 				m_last_port_cycle - m_middle_port_cycle == 3,
 				"ROM4 MVDD copies from decremented AR3 and advances both pointers in one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xe742); // MVMM AR4,AR2
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xe743); // MVMM AR4,AR3
-		program.write_word(0x05e6, 0x75d6);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xe742}, // MVMM AR4,AR2
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124},
+			{0x05e5, 0xe743}, // MVMM AR4,AR3
+			{0x05e6, 0x75d6}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_AR2, 0}, {cpu_regs::STATE_AR3, 0}, {cpu_regs::STATE_AR4, 0x0d90},
@@ -2979,15 +2759,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0d90 &&
 				m_last_port_cycle - m_middle_port_cycle == 3,
 				"ROM4 MVMM AR4,AR3 preserves its source in one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xe748); // MVMM AR4,SP
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xe782); // MVMM SP,AR2
-		program.write_word(0x05e6, 0x75d6);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xe748}, // MVMM AR4,SP
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124},
+			{0x05e5, 0xe782}, // MVMM SP,AR2
+			{0x05e6, 0x75d6}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_AR2, 0}, {cpu_regs::STATE_AR4, 0x0d90}, {cpu_regs::STATE_AR6, 0x0a03},
@@ -3003,12 +2781,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0xe782, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d90 &&
 				m_last_port_cycle - m_middle_port_cycle == 3,
 				"MVMM SP,AR2 accepts SP as source in one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xe5c9); // MVDD *AR2+0%,*AR3+
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xe5c9}, // MVDD *AR2+0%,*AR3+
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124}, {0x05e5, 0xf5e1},
+		});
 		data.write_word(0x0e04, 0x2468);
 		data.write_word(0x0e10, 0);
 		m_port_writes = 0;
@@ -3050,12 +2827,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1800 &&
 			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 			"ROM4 MVDD reads old AR4 before circular wrap and increments AR3 independently while preserving source/accumulators/status in one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xf0f8); // SFTL A,-8
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xf0f8}, // SFTL A,-8
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124}, {0x05e5, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0xff12348180ULL}, {cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_ST0, 0},
@@ -3069,20 +2845,18 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 SFTL A,-8 clears guard bits, captures carry, and costs one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x1293); // LDU *AR3+,A
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0x1293}, // LDU *AR3+,A
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124}, {0x05e5, 0xf5e1},
+		});
 		data.write_word(0x0ef0, 0xff80);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffabcdef00ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0ef0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM must not affect LDU.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 0xffabcdef00ULL}, {cpu_regs::STATE_AR3, 0x0ef0}, {cpu_regs::STATE_AR6, 0x0a03},
+			{cpu_regs::STATE_ST1, 0x0100}, // SXM must not affect LDU.
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(238);
 	}
 	if (m_phase == 238)
@@ -3091,12 +2865,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0ef1 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 LDU *AR3+,A ignores SXM, clears upper bits, and costs one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xf0c8); // XOR A<<8,A
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xf0c8}, // XOR A<<8,A
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124}, {0x05e5, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0x0001020304ULL}, {cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0},
@@ -3109,12 +2882,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0xf0c8, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0103010704ULL &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 XOR A<<8,A preserves the full 40-bit shifted result in one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xe800); // LD #0,A
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xe800}, // LD #0,A
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124}, {0x05e5, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0xff12345678ULL}, {cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0},
@@ -3127,12 +2899,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0xe800, m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 LD #0,A clears the 40-bit accumulator in one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xfc30); // RC TC, false
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xfc30}, // RC TC, false
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124}, {0x05e5, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_AR6, 0x0a03},
@@ -3145,13 +2916,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0xfc30, m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 RC TC false falls through without popping and costs three cycles");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xfc30); // RC TC, true
-		program.write_word(0x05e3, 0xf5e1); // Must be bypassed by the return.
-		program.write_word(0x05e6, 0x75d6);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xfc30}, // RC TC, true
+			{0x05e3, 0xf5e1}, // Must be bypassed by the return.
+			{0x05e6, 0x75d6}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+		});
 		data.write_word(0x0300, 0x05e6);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -3165,13 +2935,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0xfc30, m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 				"ROM4 RC TC true pops its target and costs five cycles");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x4ef8); // DST A, absolute Lmem
-		program.write_word(0x05e3, 0x0f00);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0x4ef8}, // DST A, absolute Lmem
+			{0x05e3, 0x0f00}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0f00, 0);
 		data.write_word(0x0f01, 0);
 		m_port_writes = 0;
@@ -3187,12 +2955,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				data.read_word(0x0f01) == 0x1234 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 absolute DST stores high then low word in three cycles");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x4e8b); // DST A,*AR3-
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0x4e8b}, // DST A,*AR3-
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124}, {0x05e5, 0xf5e1},
+		});
 		data.write_word(0x0f10, 0);
 		data.write_word(0x0f11, 0);
 		m_port_writes = 0;
@@ -3209,21 +2976,19 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f0f &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"odd-address DST stores its high word at AR3 and low word before it");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x5783); // DLD *AR3,B
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0x5783}, // DLD *AR3,B
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124}, {0x05e5, 0xf5e1},
+		});
 		data.write_word(0x0f20, 0x5678);
 		data.write_word(0x0f21, 0x8001);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f21);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_B, 0}, {cpu_regs::STATE_AR3, 0x0f21}, {cpu_regs::STATE_AR6, 0x0a03},
+			{cpu_regs::STATE_ST1, 0x0100}, // SXM
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(245);
 	}
 	if (m_phase == 245)
@@ -3232,15 +2997,14 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f21 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"odd-address DLD loads high word from AR3 and low word before it");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xfe00); // RETD
-		program.write_word(0x05e3, 0xe801); // LD #1,A, first delay word
-		program.write_word(0x05e4, 0xe802); // LD #2,A, second delay word
-		program.write_word(0x05e5, 0xf5e1); // Must be bypassed by the return.
-		program.write_word(0x05e8, 0x75d6);
-		program.write_word(0x05e9, 0x0124);
-		program.write_word(0x05ea, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xfe00}, // RETD
+			{0x05e3, 0xe801}, // LD #1,A, first delay word
+			{0x05e4, 0xe802}, // LD #2,A, second delay word
+			{0x05e5, 0xf5e1}, // Must be bypassed by the return.
+			{0x05e8, 0x75d6}, {0x05e9, 0x0124}, {0x05ea, 0xf5e1},
+		});
 		data.write_word(0x0300, 0x05e8);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -3257,20 +3021,18 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				"ROM4 RETD executes two delay words before return and costs three cycles");
 		expect_opcode(0xe802, m_cpu->state_int(tms320c54x_device::STATE_A) == 2,
 				"ROM4 LD #2,A executes as the second RETD delay word");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x1092); // LD *AR2+, A
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0x1092}, // LD *AR2+, A
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124}, {0x05e5, 0xf5e1},
+		});
 		data.write_word(0x0f20, 0x8001);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f20);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_AR2, 0x0f20}, {cpu_regs::STATE_AR6, 0x0a03},
+			{cpu_regs::STATE_ST1, 0x0100}, // SXM
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(247);
 	}
 	if (m_phase == 247)
@@ -3279,12 +3041,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f21 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 LD *AR2+,A sign-extends, postincrements, and costs one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xfc4b); // RC BLT, false
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xfc4b}, // RC BLT, false
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124}, {0x05e5, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_B, 1}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_AR6, 0x0a03},
@@ -3314,18 +3075,17 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0xfc4b, m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 				"ROM4 RC BLT true tests the 40-bit sign and costs five cycles");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xfa45); // BCD pmad, AEQ
-		program.write_word(0x05e3, 0x05ec);
-		program.write_word(0x05e4, 0xe801); // First delay word
-		program.write_word(0x05e5, 0xe802); // Second delay word
-		program.write_word(0x05e6, 0x75d6); // Fallthrough marker
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
-		program.write_word(0x05ec, 0x75d6); // Taken marker
-		program.write_word(0x05ed, 0x0124);
-		program.write_word(0x05ee, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xfa45}, // BCD pmad, AEQ
+			{0x05e3, 0x05ec},
+			{0x05e4, 0xe801}, // First delay word
+			{0x05e5, 0xe802}, // Second delay word
+			{0x05e6, 0x75d6}, // Fallthrough marker
+			{0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+			{0x05ec, 0x75d6}, // Taken marker
+			{0x05ed, 0x0124}, {0x05ee, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 1}, {cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0},
@@ -3352,16 +3112,15 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05ef &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 				"ROM4 BCD AEQ true executes both delay words before target in three cycles");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xf947); // CC pmad, ALEQ
-		program.write_word(0x05e3, 0x05ec);
-		program.write_word(0x05e4, 0x75d6); // Fallthrough marker
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
-		program.write_word(0x05ec, 0x75d6); // Called marker
-		program.write_word(0x05ed, 0x0124);
-		program.write_word(0x05ee, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xf947}, // CC pmad, ALEQ
+			{0x05e3, 0x05ec},
+			{0x05e4, 0x75d6}, // Fallthrough marker
+			{0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+			{0x05ec, 0x75d6}, // Called marker
+			{0x05ed, 0x0124}, {0x05ee, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 1}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_AR6, 0x0a03},
@@ -3483,13 +3242,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(6546);
 		}
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xf020); // LD #lk, A
-		program.write_word(0x05e3, 0xff80);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xf020}, // LD #lk, A
+			{0x05e3, 0xff80}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_AR6, 0x0a03},
@@ -3514,12 +3271,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(257);
 		}
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x8094); // STL A,*AR4+
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0x8094}, // STL A,*AR4+
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124}, {0x05e5, 0xf5e1},
+		});
 		data.write_word(0x0f20, 0);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -3534,13 +3290,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f21 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 STL A,*AR4+ stores AL, postincrements, and costs one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x00f8); // ADD *(lk),A
-		program.write_word(0x05e3, 0x0f20);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0x00f8}, // ADD *(lk),A
+			{0x05e3, 0x0f20}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0f20, 1);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -3644,13 +3398,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 SFTL A,-1,A shifts low 32 bits, publishes outgoing carry, and costs one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xec05); // RPT #5
-		program.write_word(0x05e3, 0x0082); // ADD *AR2,A
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xec05}, // RPT #5
+			{0x05e3, 0x0082}, // ADD *AR2,A
+			{0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0f20, 1);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -3683,11 +3436,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0f21 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 STL A,*AR1+ stores AL and postincrements in one cycle");
-		program.write_word(0x05e2, 0x7593); // PORTW *AR3+,PA
-		program.write_word(0x05e3, 0x0124);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x7593}, // PORTW *AR3+,PA
+			{0x05e3, 0x0124}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0f20, 0xabcd);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -3703,12 +3455,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_port_writes == 3 && m_middle_port_cycle - m_first_port_cycle == 2 &&
 				m_last_port_cycle - m_middle_port_cycle == 2,
 				"ROM4 PORTW *AR3+,PA transfers the old source and costs two cycles");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xfc20); // RC NTC, false
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xfc20}, // RC NTC, false
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124}, {0x05e5, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_ST0, 0x1000}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_AR6, 0x0a03},
@@ -3738,23 +3489,19 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0xfc20, m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 				"ROM4 RC NTC true pops its target and costs five cycles");
-		program.write_word(0x05e0, 0x75f8); // Absolute marker does not modify AR6.
-		program.write_word(0x05e1, 0x0d00);
-		program.write_word(0x05e2, 0x0124);
-		program.write_word(0x05e3, 0x1086); // LD *AR6,A
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75f8}, // Absolute marker does not modify AR6.
+			{0x05e1, 0x0d00}, {0x05e2, 0x0124},
+			{0x05e3, 0x1086}, // LD *AR6,A
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0d00, 0x1234);
 		data.write_word(0x0f20, 0xff80);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0f20);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(269);
+		return resume_atomic_at(0x05e0, 269);
 	}
 	if (m_phase == 269)
 	{
@@ -3774,9 +3521,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f21);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(270);
+		return resume_atomic_at(0x05e0, 270);
 	}
 	if (m_phase == 270)
 	{
@@ -3784,12 +3529,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f20 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 extended LD *AR3-,0,A sign-extends and costs two cycles");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xfc45); // RC AEQ, false with nonzero guard byte
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xfc45}, // RC AEQ, false with nonzero guard byte
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124}, {0x05e5, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0x0100000000ULL}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_PC, 0x05e0},
@@ -3830,9 +3574,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 5);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(273);
+		return resume_atomic_at(0x05e0, 273);
 	}
 	if (m_phase == 273)
 	{
@@ -3840,39 +3582,31 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 SUB #lk,B sign-extends with SXM and costs two cycles");
-		program.write_word(0x05e0, 0x75f8);
-		program.write_word(0x05e1, 0x0d00);
-		program.write_word(0x05e2, 0x0124);
-		program.write_word(0x05e3, 0x6d8a); // MAR *AR2-
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75f8}, {0x05e1, 0x0d00}, {0x05e2, 0x0124},
+			{0x05e3, 0x6d8a}, // MAR *AR2-
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f21);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // Standard addressing mode.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(274);
+		return resume_atomic_at(0x05e0, 274);
 	}
 	if (m_phase == 274)
 	{
 		expect_opcode(0x6d8a, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 MAR *AR2- modifies the pointer in one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xf846); // BC 05f0,AGT
-		program.write_word(0x05e3, 0x05f0);
-		program.write_word(0x05e4, 0xf5e1); // Taken branch bypasses fallthrough.
-		program.write_word(0x05f0, 0x75d6);
-		program.write_word(0x05f1, 0x0124);
-		program.write_word(0x05f2, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xf846}, // BC 05f0,AGT
+			{0x05e3, 0x05f0},
+			{0x05e4, 0xf5e1}, // Taken branch bypasses fallthrough.
+			{0x05f0, 0x75d6}, {0x05f1, 0x0124}, {0x05f2, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0100000000ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(275);
+		return resume_atomic_at(0x05e0, 275);
 	}
 	if (m_phase == 275)
 	{
@@ -3885,9 +3619,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e6, 0xf5e1);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x0100000000ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(276);
+		return resume_atomic_at(0x05e0, 276);
 	}
 	if (m_phase == 276)
 	{
@@ -3906,9 +3638,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(277);
+		return resume_atomic_at(0x05e0, 277);
 	}
 	if (m_phase == 277)
 	{
@@ -3922,9 +3652,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 5);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(278);
+		return resume_atomic_at(0x05e0, 278);
 	}
 	if (m_phase == 278)
 	{
@@ -3932,18 +3660,15 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 5 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 SUB #lk,A,B reads A, writes B, and costs two cycles");
-		program.write_word(0x05e3, 0x7482); // PORTR PA,*AR2
-		program.write_word(0x05e4, 0x0123);
-		program.write_word(0x05e5, 0x7482);
-		program.write_word(0x05e6, 0x0123);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x7482}, // PORTR PA,*AR2
+			{0x05e4, 0x0123}, {0x05e5, 0x7482}, {0x05e6, 0x0123}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0f21, 0);
 		m_port_reads = 0;
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f21);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(279);
+		return resume_atomic_at(0x05e0, 279);
 	}
 	if (m_phase == 279)
 	{
@@ -3991,9 +3716,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(280);
+		return resume_atomic_at(0x05e0, 280);
 	}
 	if (m_phase == 280)
 	{
@@ -4025,10 +3748,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				{0x05e3, index >= 2 ? 0x56d3 : 0x5685}, {0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124},
 				{0x05e7, 0xf5e1},
 			});
-			data.write_word(0x0f20, 0xff80);
-			data.write_word(0x0f21, 0x1234);
-			data.write_word(0x0f24, 0xff80);
-			data.write_word(0x0f25, 0x1234);
+			write_words(data, {
+				{0x0f20, 0xff80}, {0x0f21, 0x1234}, {0x0f24, 0xff80}, {0x0f25, 0x1234},
+			});
 			m_port_writes = 0;
 			set_registers(*m_cpu, {
 				{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0x76543210}, {cpu_regs::STATE_AR5, 0x0f20},
@@ -4040,19 +3762,16 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_check_timer->adjust(attotime::from_usec(100));
 			return true;
 		}
-		program.write_word(0x05e5, 0x75f8);
-		program.write_word(0x05e6, 0x0d00);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
+		write_words(program, {
+			{0x05e5, 0x75f8}, {0x05e6, 0x0d00}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
 		program.write_word(0x05e3, 0x7213); // MVDM dmad,AR3
 		program.write_word(0x05e4, 0x0f20);
 		data.write_word(0x0f20, 0x1234);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(281);
+		return resume_atomic_at(0x05e0, 281);
 	}
 	if (m_phase == 281)
 	{
@@ -4086,9 +3805,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f21, 0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f21);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(282);
+		return resume_atomic_at(0x05e0, 282);
 	}
 	if (m_phase == 282)
 	{
@@ -4100,9 +3817,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f23, 0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f23);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(6520);
+		return resume_atomic_at(0x05e0, 6520);
 	}
 	if (m_phase == 6520 || m_phase == 6531 || m_phase == 6532 || m_phase == 6563)
 	{
@@ -4126,13 +3841,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(m_phase == 6520 ? 6531 : m_phase == 6531 ? 6532 : 6563);
 		}
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xec0e); // RPT #14
-		program.write_word(0x05e3, 0x0082); // ADD *AR2,A
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xec0e}, // RPT #14
+			{0x05e3, 0x0082}, // ADD *AR2,A
+			{0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0f21, 1);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -4180,11 +3894,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x1234 &&
 			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 			"ROM4 MVMM selects AR2 rather than AR5, preserves source and costs one cycle");
-		program.write_word(0x05e2, 0x7194); // MVDK *AR4+,dmad
-		program.write_word(0x05e3, 0x0f22);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x7194}, // MVDK *AR4+,dmad
+			{0x05e3, 0x0f22}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0f21, 0xabcd);
 		data.write_word(0x0f22, 0);
 		m_port_writes = 0;
@@ -4221,19 +3934,15 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(9226);
 		}
-		program.write_word(0x05e0, 0x75f8);
-		program.write_word(0x05e1, 0x0d00);
-		program.write_word(0x05e2, 0x0124);
-		program.write_word(0x05e3, 0x6c88); // BANZ 05f0,*AR0-
-		program.write_word(0x05e4, 0x05f0);
-		program.write_word(0x05e5, 0x75f8); // Fallthrough marker.
-		program.write_word(0x05e6, 0x0d01);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
-		program.write_word(0x05f0, 0x75f8); // Taken marker.
-		program.write_word(0x05f1, 0x0d02);
-		program.write_word(0x05f2, 0x0124);
-		program.write_word(0x05f3, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75f8}, {0x05e1, 0x0d00}, {0x05e2, 0x0124},
+			{0x05e3, 0x6c88}, // BANZ 05f0,*AR0-
+			{0x05e4, 0x05f0},
+			{0x05e5, 0x75f8}, // Fallthrough marker.
+			{0x05e6, 0x0d01}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+			{0x05f0, 0x75f8}, // Taken marker.
+			{0x05f1, 0x0d02}, {0x05f2, 0x0124}, {0x05f3, 0xf5e1},
+		});
 		data.write_word(0x0d00, 0x1111);
 		data.write_word(0x0d01, 0x2222);
 		data.write_word(0x0d02, 0x3333);
@@ -4294,9 +4003,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff12345678ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800); // C
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(289);
+		return resume_atomic_at(0x05e0, 289);
 	}
 	if (m_phase == 289)
 	{
@@ -4305,11 +4012,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 AND #lk,16,A masks upper word and costs two cycles");
-		program.write_word(0x05e3, 0x8184); // STL B,*AR4
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x8184}, // STL B,*AR4
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0f21, 0);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -4350,9 +4056,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{0x05e4, 0xbeef}, {0x05e5, 0x75f8}, {0x05e6, 0x0d00}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
 		});
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(6574);
+		return resume_atomic_at(0x05e0, 6574);
 	}
 	if (m_phase == 6574)
 	{
@@ -4370,20 +4074,17 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(291);
+		return resume_atomic_at(0x05e0, 291);
 	}
 	if (m_phase == 291)
 	{
 		expect_opcode(0xf162, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xffff800000ULL &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 LD #lk,16,B sign-extends and costs two cycles");
-		program.write_word(0x05e3, 0x6d96); // MAR *AR6+
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x6d96}, // MAR *AR6+
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_AR6, 0x0f42}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PC, 0x05e0},
@@ -4400,9 +4101,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f50, 0xbeef);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f50);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(6537);
+		return resume_atomic_at(0x05e0, 6537);
 	}
 	if (m_phase == 6537)
 	{
@@ -4412,11 +4111,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			data.read_word(0x0f50) == 0xbeef &&
 			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 			"ROM4 MAR increments AR5 exactly once without changing AR6 or pointed memory in one cycle");
-		program.write_word(0x05e3, 0xe712); // MVMM AR1,AR2
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xe712}, // MVMM AR1,AR2
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_AR1, 0x1a23}, {cpu_regs::STATE_AR2, 0}, {cpu_regs::STATE_PC, 0x05e0},
@@ -4430,16 +4128,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x1a23 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 MVMM AR1,AR2 copies without modifying source in one cycle");
-		program.write_word(0x05e3, 0xe713); // MVMM AR1,AR3
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xe713}, // MVMM AR1,AR3
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(294);
+		return resume_atomic_at(0x05e0, 294);
 	}
 	if (m_phase == 294)
 	{
@@ -4454,9 +4149,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(295);
+		return resume_atomic_at(0x05e0, 295);
 	}
 	if (m_phase == 295 || m_phase == 296)
 	{
@@ -4468,16 +4161,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		{
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(296);
+			return resume_atomic_at(0x05e0, 296);
 		}
 		program.write_word(0x05e3, 0xf847); // BC 05eb,ALEQ
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff00000000ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(297);
+		return resume_atomic_at(0x05e0, 297);
 	}
 	if (m_phase == 297 || m_phase == 298)
 	{
@@ -4488,15 +4177,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		{
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(298);
+			return resume_atomic_at(0x05e0, 298);
 		}
-		program.write_word(0x05e3, 0x880e); // STLM A,T
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x880e}, // STLM A,T
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0xff12345678ULL}, {cpu_regs::STATE_T, 0}, {cpu_regs::STATE_PC, 0x05e0},
@@ -4519,9 +4205,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(300);
+		return resume_atomic_at(0x05e0, 300);
 	}
 	if (m_phase == 300 || m_phase == 301)
 	{
@@ -4536,15 +4220,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		{
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(301);
+			return resume_atomic_at(0x05e0, 301);
 		}
-		program.write_word(0x05e3, 0x1e82); // SUBC *AR2,A
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x1e82}, // SUBC *AR2,A
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0f65, 1);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -4567,9 +4248,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		{
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fff);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(303);
+			return resume_atomic_at(0x05e0, 303);
 		}
 		program.write_word(0x05e3, 0x1e84); // SUBC *AR4,A.
 		data.write_word(0x0f66, 1);
@@ -4595,9 +4274,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		{
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fff);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(6535);
+			return resume_atomic_at(0x05e0, 6535);
 		}
 		program.write_word(0x05e3, 0x6dea); // MAR *+AR2(-7)
 		write_words(program, {
@@ -4605,9 +4282,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1000);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(304);
+		return resume_atomic_at(0x05e0, 304);
 	}
 	if (m_phase == 304)
 	{
@@ -4622,9 +4297,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(305);
+		return resume_atomic_at(0x05e0, 305);
 	}
 	if (m_phase == 305 || m_phase == 306)
 	{
@@ -4640,9 +4313,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			program.write_word(0x05e4, 1);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffULL);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(306);
+			return resume_atomic_at(0x05e0, 306);
 		}
 		program.write_word(0x05e3, 0xf210); // SUB #lk,B,A
 		program.write_word(0x05e4, 2);
@@ -4669,9 +4340,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			program.write_word(0x05e4, 1);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(308);
+			return resume_atomic_at(0x05e0, 308);
 		}
 		program.write_word(0x05e3, 0xf150); // XOR #lk,A,B
 		program.write_word(0x05e4, 0xff00);
@@ -4679,9 +4348,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff12345678ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800); // C
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(309);
+		return resume_atomic_at(0x05e0, 309);
 	}
 	if (m_phase == 309)
 	{
@@ -4691,19 +4358,17 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 XOR #lk,A,B uses unextended operand, preserves A/C, and costs two cycles");
-		program.write_word(0x05e3, 0x0282); // ADDS *AR2,A
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x0282}, // ADDS *AR2,A
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0f66, 0xffff);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f66);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 1}, {cpu_regs::STATE_AR2, 0x0f66}, {cpu_regs::STATE_ST0, 0},
+			{cpu_regs::STATE_ST1, 0x0100}, // SXM
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(310);
 	}
 	if (m_phase == 310 || m_phase == 311 || m_phase == 90010 || m_phase == 90011)
@@ -4756,9 +4421,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x13);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800); // C
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(312);
+		return resume_atomic_at(0x05e0, 312);
 	}
 	if (m_phase == 312)
 	{
@@ -4823,9 +4486,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(316);
+		return resume_atomic_at(0x05e0, 316);
 	}
 	if (m_phase == 316)
 	{
@@ -4840,9 +4501,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800); // C
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(317);
+		return resume_atomic_at(0x05e0, 317);
 	}
 	if (m_phase == 317)
 	{
@@ -4875,9 +4534,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f05, 0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(319);
+		return resume_atomic_at(0x05e0, 319);
 	}
 	if (m_phase == 319)
 	{
@@ -4938,9 +4595,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(323);
+		return resume_atomic_at(0x05e0, 323);
 	}
 	if (m_phase == 323)
 	{
@@ -4951,9 +4606,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e3, 0x12e2); // LDU *AR2(5),A
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(324);
+		return resume_atomic_at(0x05e0, 324);
 	}
 	if (m_phase == 324)
 	{
@@ -4965,9 +4618,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f05, 0x1234);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(325);
+		return resume_atomic_at(0x05e0, 325);
 	}
 	if (m_phase == 325)
 	{
@@ -5012,10 +4663,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05ec &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 9,
 				"BCD NTC false executes delay words and falls through");
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		m_phase = 328;
 	}
 	if (m_phase >= 328 && m_phase <= 331)
@@ -5049,13 +4699,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0xcafe &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"STLM B writes AR2 in one cycle");
-		program.write_word(0x05e3, 0xec0c); // RPT #12
-		program.write_word(0x05e4, 0x6d10); // MAR *AR0+
-		program.write_word(0x05e5, 0xe80f); // LD #15,A
-		program.write_word(0x05e6, 0x75f8);
-		program.write_word(0x05e7, 0x0d00);
-		program.write_word(0x05e8, 0x0124);
-		program.write_word(0x05e9, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xec0c}, // RPT #12
+			{0x05e4, 0x6d10}, // MAR *AR0+
+			{0x05e5, 0xe80f}, // LD #15,A
+			{0x05e6, 0x75f8}, {0x05e7, 0x0d00}, {0x05e8, 0x0124}, {0x05e9, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_AR0, 0}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PC, 0x05e0},
@@ -5078,20 +4727,17 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(334);
+		return resume_atomic_at(0x05e0, 334);
 	}
 	if (m_phase == 334)
 	{
 		expect_opcode(0x13f8, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8001 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"absolute LDU B zero-extends even with SXM set in two cycles");
-		program.write_word(0x05e3, 0xe800); // LD #k8,A/B.
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xe800}, // LD #k8,A/B.
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0x11111111}, {cpu_regs::STATE_B, 0x22222222}, {cpu_regs::STATE_ST0, 0x1800},
@@ -5134,9 +4780,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f21, 0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234beef);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(335);
+		return resume_atomic_at(0x05e0, 335);
 	}
 	if (m_phase == 335)
 	{
@@ -5144,17 +4788,14 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234beef &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"absolute STL B stores the low word in two cycles");
-		program.write_word(0x05e3, 0x8192); // STL B,*AR2+.
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x8192}, // STL B,*AR2+.
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0f24, 0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f24);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(6538);
+		return resume_atomic_at(0x05e0, 6538);
 	}
 	if (m_phase == 6538)
 	{
@@ -5222,9 +4863,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f20, 0xface);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f20);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(336);
+		return resume_atomic_at(0x05e0, 336);
 	}
 	if (m_phase == 336)
 	{
@@ -5236,9 +4875,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f22, 0xbeef);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f22);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(6536);
+		return resume_atomic_at(0x05e0, 6536);
 	}
 	if (m_phase == 6536)
 	{
@@ -5252,9 +4889,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f26, 0xcafe);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f26);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(6551);
+		return resume_atomic_at(0x05e0, 6551);
 	}
 	if (m_phase == 6551 || m_phase == 6552)
 	{
@@ -5273,16 +4908,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			data.write_word(0x0f28, 0xface);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f28);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(6552);
+			return resume_atomic_at(0x05e0, 6552);
 		}
 		program.write_word(0x05e3, 0x758a); // PORTW *AR2-,0124h.
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f28);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(6571);
+		return resume_atomic_at(0x05e0, 6571);
 	}
 	if (m_phase == 6571)
 	{
@@ -5317,9 +4948,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f05, 0x1234);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(338);
+		return resume_atomic_at(0x05e0, 338);
 	}
 	if (m_phase == 338)
 	{
@@ -5345,11 +4974,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0f20 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"BITF *AR0 clears TC when masked bit is absent in two cycles");
-		program.write_word(0x05e3, 0xe736); // MVMM AR3,AR6
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xe736}, // MVMM AR3,AR6
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_AR3, 0x1357}, {cpu_regs::STATE_AR6, 0}, {cpu_regs::STATE_PC, 0x05e0},
@@ -5398,11 +5026,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05ec &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 9,
 				"BCD BEQ false executes slots and falls through");
-		program.write_word(0x05e3, 0xfc4d); // RC BEQ
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xfc4d}, // RC BEQ
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x02ff, 0x05f0);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -5430,13 +5057,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 				"RC BEQ leaves stack untouched in three cycles when B is nonzero");
-		program.write_word(0x05e3, 0x47e2); // RPT *AR2(5)
-		program.write_word(0x05e4, 5);
-		program.write_word(0x05e5, 0x6d10); // MAR *AR0+
-		program.write_word(0x05e6, 0x75f8);
-		program.write_word(0x05e7, 0x0d00);
-		program.write_word(0x05e8, 0x0124);
-		program.write_word(0x05e9, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x47e2}, // RPT *AR2(5)
+			{0x05e4, 5},
+			{0x05e5, 0x6d10}, // MAR *AR0+
+			{0x05e6, 0x75f8}, {0x05e7, 0x0d00}, {0x05e8, 0x0124}, {0x05e9, 0xf5e1},
+		});
 		data.write_word(0x0f05, 2);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -5476,9 +5102,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f05, 0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(347);
+		return resume_atomic_at(0x05e0, 347);
 	}
 	if (m_phase == 347)
 	{
@@ -5514,9 +5138,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(349);
+		return resume_atomic_at(0x05e0, 349);
 	}
 	if (m_phase == 349)
 	{
@@ -5572,19 +5194,16 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"long-offset MPY preupdates AR and takes two cycles");
-		program.write_word(0x05e3, 0x1282); // LDU *AR2,A
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x1282}, // LDU *AR2,A
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0f00, 0x8001);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM must not sign-extend LDU.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(353);
+		return resume_atomic_at(0x05e0, 353);
 	}
 	if (m_phase == 353)
 	{
@@ -5606,21 +5225,17 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f00 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 LD *AR2,A sign-extends without changing AR2 in one cycle");
-		program.write_word(0x05e3, 0xf84e); // BC 05f0,BGT
-		program.write_word(0x05e4, 0x05f0);
-		program.write_word(0x05e5, 0x75f8); // Fallthrough marker.
-		program.write_word(0x05e6, 0x0d00);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
-		program.write_word(0x05f0, 0x75f8); // Taken marker.
-		program.write_word(0x05f1, 0x0d00);
-		program.write_word(0x05f2, 0x0124);
-		program.write_word(0x05f3, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xf84e}, // BC 05f0,BGT
+			{0x05e4, 0x05f0},
+			{0x05e5, 0x75f8}, // Fallthrough marker.
+			{0x05e6, 0x0d00}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+			{0x05f0, 0x75f8}, // Taken marker.
+			{0x05f1, 0x0d00}, {0x05f2, 0x0124}, {0x05f3, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(355);
+		return resume_atomic_at(0x05e0, 355);
 	}
 	if (m_phase == 355 || m_phase == 356)
 	{
@@ -5632,36 +5247,30 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		{
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff00000000ULL);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(356);
+			return resume_atomic_at(0x05e0, 356);
 		}
-		program.write_word(0x05e3, 0xec01); // RPT #1
-		program.write_word(0x05e4, 0x6d10); // MAR *AR0+
-		program.write_word(0x05e5, 0x75f8);
-		program.write_word(0x05e6, 0x0d00);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xec01}, // RPT #1
+			{0x05e4, 0x6d10}, // MAR *AR0+
+			{0x05e5, 0x75f8}, {0x05e6, 0x0d00}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0f00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(357);
+		return resume_atomic_at(0x05e0, 357);
 	}
 	if (m_phase == 357)
 	{
 		expect_opcode(0xec01, m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0f02 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 				"ROM4 RPT #1 executes MAR twice after one-cycle setup");
-		program.write_word(0x05e3, 0xfa30); // BCD 05f0,TC
-		program.write_word(0x05e4, 0x05f0);
-		program.write_word(0x05e5, 0xe801); // Delay slot 1
-		program.write_word(0x05e6, 0xe902); // Delay slot 2
-		program.write_word(0x05e7, 0xe803); // Fallthrough only
-		program.write_word(0x05e8, 0x75f8);
-		program.write_word(0x05e9, 0x0d00);
-		program.write_word(0x05ea, 0x0124);
-		program.write_word(0x05eb, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xfa30}, // BCD 05f0,TC
+			{0x05e4, 0x05f0},
+			{0x05e5, 0xe801}, // Delay slot 1
+			{0x05e6, 0xe902}, // Delay slot 2
+			{0x05e7, 0xe803}, // Fallthrough only
+			{0x05e8, 0x75f8}, {0x05e9, 0x0d00}, {0x05ea, 0x0124}, {0x05eb, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1000); // TC true
 		set_registers(*m_cpu, {
@@ -5687,11 +5296,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(359);
 		}
-		program.write_word(0x05e3, 0x8914); // STLM B,AR4
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x8914}, // STLM B,AR4
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_B, 0x5678cafe}, {cpu_regs::STATE_AR4, 0}, {cpu_regs::STATE_PC, 0x05e0},
@@ -5712,9 +5320,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f20, 0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(361);
+		return resume_atomic_at(0x05e0, 361);
 	}
 	if (m_phase == 361)
 	{
@@ -5728,9 +5334,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f05, 0xabcd);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(362);
+		return resume_atomic_at(0x05e0, 362);
 	}
 	if (m_phase == 362)
 	{
@@ -5745,9 +5349,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f05, 0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(363);
+		return resume_atomic_at(0x05e0, 363);
 	}
 	if (m_phase == 363)
 	{
@@ -5762,9 +5364,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f05, 0xbeef);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(364);
+		return resume_atomic_at(0x05e0, 364);
 	}
 	if (m_phase == 364)
 	{
@@ -5795,9 +5395,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f05, 0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(366);
+		return resume_atomic_at(0x05e0, 366);
 	}
 	if (m_phase == 366)
 	{
@@ -5813,9 +5411,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f05, 0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(367);
+		return resume_atomic_at(0x05e0, 367);
 	}
 	if (m_phase == 367)
 	{
@@ -5830,9 +5426,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_port_reads = 0;
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(368);
+		return resume_atomic_at(0x05e0, 368);
 	}
 	if (m_phase == 368)
 	{
@@ -5858,11 +5452,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 				"long-offset shifted LD consumes offset before shift in three cycles");
-		program.write_word(0x05e3, 0xe58b); // MVDD *AR2+,*AR5+
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xe58b}, // MVDD *AR2+,*AR5+
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0d20, 0x4321);
 		data.write_word(0x0e20, 0);
 		m_port_writes = 0;
@@ -5915,9 +5508,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0f20);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(373);
+		return resume_atomic_at(0x05e0, 373);
 	}
 	if (m_phase == 373)
 	{
@@ -5952,17 +5543,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		{
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(6592);
+			return resume_atomic_at(0x05e0, 6592);
 		}
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
 		program.write_word(0x05e3, 0xee01); // FRAME #1
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x03ff);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(374);
+		return resume_atomic_at(0x05e0, 374);
 	}
 	if (m_phase == 374)
 	{
@@ -5975,9 +5562,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xab00123400ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(375);
+		return resume_atomic_at(0x05e0, 375);
 	}
 	if (m_phase == 375)
 	{
@@ -5999,18 +5584,15 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xffabcdf123ULL &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 AND #lk,B,A masks into A without changing B in two cycles");
-		program.write_word(0x05e3, 0xf517); // ADD A >> 9,B
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xf517}, // ADD A >> 9,B
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff80000000ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 3);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // SXM off
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(377);
+		return resume_atomic_at(0x05e0, 377);
 	}
 	if (m_phase == 377 || m_phase == 378)
 	{
@@ -6025,15 +5607,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 3);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM on
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(378);
+			return resume_atomic_at(0x05e0, 378);
 		}
-		program.write_word(0x05e3, 0xf4e2); // BACC A
-		program.write_word(0x05f0, 0x75f8);
-		program.write_word(0x05f1, 0x0d00);
-		program.write_word(0x05f2, 0x0124);
-		program.write_word(0x05f3, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xf4e2}, // BACC A
+			{0x05f0, 0x75f8}, {0x05f1, 0x0d00}, {0x05f2, 0x0124}, {0x05f3, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0x05f0}, {cpu_regs::STATE_B, 0x05e4}, {cpu_regs::STATE_SP, 0x0300},
@@ -6047,18 +5626,15 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 9,
 				"ROM4 BACC A branches to A's low word without a stack push in six cycles");
-		program.write_word(0x05e3, 0xf474); // SFTA A,-12
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xf474}, // SFTA A,-12
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff80000800ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // SXM off
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(380);
+		return resume_atomic_at(0x05e0, 380);
 	}
 	if (m_phase == 380 || m_phase == 381)
 	{
@@ -6074,9 +5650,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff80000800ULL);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM on
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(381);
+			return resume_atomic_at(0x05e0, 381);
 		}
 		program.write_word(0x05e3, 0x7722); // STM #lk, MMR 22h
 		write_words(program, {
@@ -6084,27 +5658,22 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		});
 		data.write_word(0x0022, 0);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(382);
+		return resume_atomic_at(0x05e0, 382);
 	}
 	if (m_phase == 382)
 	{
 		expect_opcode(0x7722, data.read_word(0x0022) == 0xa55a &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 				"ROM4 STM #lk,MMR22 includes the peripheral access cycle");
-		program.write_word(0x05e3, 0xf537); // SUB A >> 9,B
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xf537}, // SUB A >> 9,B
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff80000000ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // SXM off
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(383);
+		return resume_atomic_at(0x05e0, 383);
 	}
 	if (m_phase == 383 || m_phase == 384)
 	{
@@ -6119,9 +5688,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM on
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(384);
+			return resume_atomic_at(0x05e0, 384);
 		}
 		program.write_word(0x05e3, 0x6184); // BITF *AR4,#00f0
 		write_words(program, {
@@ -6147,22 +5714,17 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		{
 			data.write_word(0x0f20, 0x0a00);
 			m_port_writes = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(386);
+			return resume_atomic_at(0x05e0, 386);
 		}
-		program.write_word(0x05e3, 0xe908); // LD #8,B
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xe908}, // LD #8,B
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffffULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(387);
+		return resume_atomic_at(0x05e0, 387);
 	}
 	if (m_phase == 387)
 	{
@@ -6190,9 +5752,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff80000003ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM must not sign-fill SFTL.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(389);
+		return resume_atomic_at(0x05e0, 389);
 	}
 	if (m_phase == 389)
 	{
@@ -6208,28 +5768,23 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f24, 0x1234);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(390);
+		return resume_atomic_at(0x05e0, 390);
 	}
 	if (m_phase == 390)
 	{
 		expect_opcode(0x60f8, (m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1800) == 0x1800 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 				"ROM4 absolute CMPM consumes address before immediate and takes three cycles");
-		program.write_word(0x05e3, 0x0892); // SUB *AR2+,A
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x0892}, // SUB *AR2+,A
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0f20, 0xffff);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f20);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(391);
+		return resume_atomic_at(0x05e0, 391);
 	}
 	if (m_phase == 391)
 	{
@@ -6256,12 +5811,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e3, 0x10d2); // LD *AR2+%,A
 		data.write_word(0x0f23, 0x8001);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f23);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_BK, 4}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_AR2, 0x0f23},
+			{cpu_regs::STATE_ST1, 0x0100}, // SXM
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(393);
 	}
 	if (m_phase == 393)
@@ -6293,9 +5847,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f35);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(395);
+		return resume_atomic_at(0x05e0, 395);
 	}
 	if (m_phase == 395)
 	{
@@ -6397,21 +5949,17 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 MVDK copies before circular AR2 wrap in two cycles");
-		program.write_word(0x05e3, 0xf842); // BC 05f0,AGEQ
-		program.write_word(0x05e4, 0x05f0);
-		program.write_word(0x05e5, 0x75f8); // Fallthrough marker.
-		program.write_word(0x05e6, 0x0d00);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
-		program.write_word(0x05f0, 0x75f8); // Taken marker.
-		program.write_word(0x05f1, 0x0d00);
-		program.write_word(0x05f2, 0x0124);
-		program.write_word(0x05f3, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xf842}, // BC 05f0,AGEQ
+			{0x05e4, 0x05f0},
+			{0x05e5, 0x75f8}, // Fallthrough marker.
+			{0x05e6, 0x0d00}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+			{0x05f0, 0x75f8}, // Taken marker.
+			{0x05f1, 0x0d00}, {0x05f2, 0x0124}, {0x05f3, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(402);
+		return resume_atomic_at(0x05e0, 402);
 	}
 	if (m_phase == 402 || m_phase == 403)
 	{
@@ -6423,23 +5971,18 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		{
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff00000000ULL);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(403);
+			return resume_atomic_at(0x05e0, 403);
 		}
-		program.write_word(0x05e3, 0x0083); // ADD *AR3,A
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x0083}, // ADD *AR3,A
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0f52, 0xfffe);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f52);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(404);
+		return resume_atomic_at(0x05e0, 404);
 	}
 	if (m_phase == 404)
 	{
@@ -6461,34 +6004,29 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x4567 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 MVMM copies AR2 into AR6 in one cycle");
-		program.write_word(0x05e3, 0x7726); // STM #TSS,TCR
-		program.write_word(0x05e4, 0x0010);
-		program.write_word(0x05e5, 0x4826); // LDM TCR,A
-		program.write_word(0x05e6, 0x75f8);
-		program.write_word(0x05e7, 0x0d00);
-		program.write_word(0x05e8, 0x0124);
-		program.write_word(0x05e9, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x7726}, // STM #TSS,TCR
+			{0x05e4, 0x0010},
+			{0x05e5, 0x4826}, // LDM TCR,A
+			{0x05e6, 0x75f8}, {0x05e7, 0x0d00}, {0x05e8, 0x0124}, {0x05e9, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(406);
+		return resume_atomic_at(0x05e0, 406);
 	}
 	if (m_phase == 406)
 	{
 		expect_opcode(0x7726, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0010 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
 				"ROM4 STM #TSS,TCR and LDM readback each include the peripheral access cycle");
-		program.write_word(0x05e3, 0xf945); // CC 05f0,AEQ
-		program.write_word(0x05e4, 0x05f0);
-		program.write_word(0x05e5, 0x75f8); // Fallthrough marker.
-		program.write_word(0x05e6, 0x0d00);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
-		program.write_word(0x05f0, 0x75f8); // Taken marker.
-		program.write_word(0x05f1, 0x0d00);
-		program.write_word(0x05f2, 0x0124);
-		program.write_word(0x05f3, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xf945}, // CC 05f0,AEQ
+			{0x05e4, 0x05f0},
+			{0x05e5, 0x75f8}, // Fallthrough marker.
+			{0x05e6, 0x0d00}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
+			{0x05f0, 0x75f8}, // Taken marker.
+			{0x05f1, 0x0d00}, {0x05f2, 0x0124}, {0x05f3, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_PC, 0x05e0},
@@ -6543,19 +6081,17 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(410);
 		}
-		program.write_word(0x05e3, 0x2883); // MAC *AR3,A
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x2883}, // MAC *AR3,A
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0f52, 3);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 5);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f52);
-		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xfffe);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0040); // FRCT
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 5}, {cpu_regs::STATE_AR3, 0x0f52}, {cpu_regs::STATE_T, 0xfffe},
+			{cpu_regs::STATE_ST1, 0x0040}, // FRCT
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(411);
 	}
 	if (m_phase == 411)
@@ -6592,9 +6128,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{cpu_regs::STATE_AR3, 0x0f81},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0140); // Signed SQDST inputs and fractional square.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(413);
+		return resume_atomic_at(0x05e0, 413);
 	}
 	if (m_phase == 413)
 	{
@@ -6659,9 +6193,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xffff);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0040); // FRCT
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(417);
+		return resume_atomic_at(0x05e0, 417);
 	}
 	if (m_phase == 417)
 	{
@@ -6677,9 +6209,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f90);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0400); // Sticky OVA
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200); // OVM, no SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(418);
+		return resume_atomic_at(0x05e0, 418);
 	}
 	if (m_phase == 418)
 	{
@@ -6690,12 +6220,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				"fixed-16 LD zero-extends without SXM and ignores OVM without changing overflow");
 		program.write_word(0x05e3, 0x4815); // LDM AR5,A
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff12345678ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x8001);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0400);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 0xff12345678ULL}, {cpu_regs::STATE_AR5, 0x8001}, {cpu_regs::STATE_ST0, 0x0400},
+			{cpu_regs::STATE_ST1, 0x0100}, // SXM
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(419);
 	}
 	if (m_phase == 419)
@@ -6708,9 +6237,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e3, 0x4915); // LDM AR5,B
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff12345678ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(420);
+		return resume_atomic_at(0x05e0, 420);
 	}
 	if (m_phase == 420)
 	{
@@ -6748,13 +6275,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0018 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"indirect STLM writes the pointed MMR and postincrements masked AR2");
-		program.write_word(0x05e3, 0xff4d); // XC 2,BEQ
-		program.write_word(0x05e4, 0xe801); // LD #1,A
-		program.write_word(0x05e5, 0xe902); // LD #2,B
-		program.write_word(0x05e6, 0x75f8);
-		program.write_word(0x05e7, 0x0d00);
-		program.write_word(0x05e8, 0x0124);
-		program.write_word(0x05e9, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0xff4d}, // XC 2,BEQ
+			{0x05e4, 0xe801}, // LD #1,A
+			{0x05e5, 0xe902}, // LD #2,B
+			{0x05e6, 0x75f8}, {0x05e7, 0x0d00}, {0x05e8, 0x0124}, {0x05e9, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
@@ -6803,11 +6329,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 1,
 				"XC 2 releases a pending interrupt after one two-word instruction");
 		m_cpu->set_input_line(2, CLEAR_LINE);
-		program.write_word(0x05e3, 0x1183); // LD *AR3,B
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x1183}, // LD *AR3,B
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0fa0, 0xfffe);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
@@ -6827,12 +6352,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e3, 0x0093); // ADD *AR3+,A
 		data.write_word(0x0fa1, 1);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0fa1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200); // OVM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 0x7fffffff}, {cpu_regs::STATE_AR3, 0x0fa1}, {cpu_regs::STATE_ST0, 0},
+			{cpu_regs::STATE_ST1, 0x0200}, // OVM
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(428);
 	}
 	if (m_phase == 428)
@@ -6874,12 +6398,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				"ROM4 XOR B,A combines all 40 bits without changing source or status");
 		program.write_word(0x05e3, 0xf620); // SUB B,A
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffffULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200); // OVM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 0x7fffffff}, {cpu_regs::STATE_B, 0xffffffffffULL}, {cpu_regs::STATE_ST0, 0},
+			{cpu_regs::STATE_ST1, 0x0200}, // OVM
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(431);
 	}
 	if (m_phase == 431)
@@ -6929,9 +6452,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f90);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x0001); // SST
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(434);
+		return resume_atomic_at(0x05e0, 434);
 	}
 	if (m_phase == 434)
 	{
@@ -6986,9 +6507,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f96, 0xcafe);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f95);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(6575);
+		return resume_atomic_at(0x05e0, 6575);
 	}
 	if (m_phase == 6575)
 	{
@@ -7009,9 +6528,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x8ffff0000ULL);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f90);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // SXM clear
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(435);
+		return resume_atomic_at(0x05e0, 435);
 	}
 	if (m_phase == 435)
 	{
@@ -7030,9 +6547,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{cpu_regs::STATE_BK, 4},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM, ASM=0
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(436);
+		return resume_atomic_at(0x05e0, 436);
 	}
 	if (m_phase == 436)
 	{
@@ -7048,9 +6563,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{cpu_regs::STATE_AR4, 0x0f90},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0101); // SXM, ASM=1
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(437);
+		return resume_atomic_at(0x05e0, 437);
 	}
 	if (m_phase == 437)
 	{
@@ -7066,9 +6579,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{cpu_regs::STATE_ST0, 0x0800},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(438);
+		return resume_atomic_at(0x05e0, 438);
 	}
 	if (m_phase == 438)
 	{
@@ -7084,9 +6595,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f90);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // SXM clear
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(439);
+		return resume_atomic_at(0x05e0, 439);
 	}
 	if (m_phase == 439)
 	{
@@ -7099,9 +6608,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(440);
+		return resume_atomic_at(0x05e0, 440);
 	}
 	if (m_phase == 440)
 	{
@@ -7143,17 +6650,14 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0100 &&
 			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 			"ROM4 LDM AR1,B selects AR1 rather than AR2, zero-extends despite SXM and preserves A/status/source in one cycle");
-		program.write_word(0x05e3, 0x730b); // MVMD BL,dmad
-		program.write_word(0x05e4, 0x0fa0);
-		program.write_word(0x05e5, 0x75d6);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e3, 0x730b}, // MVMD BL,dmad
+			{0x05e4, 0x0fa0}, {0x05e5, 0x75d6}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0fa0, 0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(442);
+		return resume_atomic_at(0x05e0, 442);
 	}
 	if (m_phase == 442)
 	{
@@ -7166,9 +6670,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f90, 0xff00);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f90);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(443);
+		return resume_atomic_at(0x05e0, 443);
 	}
 	if (m_phase == 443)
 	{
@@ -7182,9 +6684,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f92, 0x1234);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f92);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(444);
+		return resume_atomic_at(0x05e0, 444);
 	}
 	if (m_phase == 444)
 	{
@@ -7198,12 +6698,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e5, 0x0124);
 		program.write_word(0x05e6, 0xf5e1);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0f10);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // CMPT clear
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_AR0, 3}, {cpu_regs::STATE_AR1, 0x0f10}, {cpu_regs::STATE_ST0, 0x0800},
+			{cpu_regs::STATE_ST1, 0}, // CMPT clear
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(445);
 	}
 	if (m_phase == 445)
@@ -7231,9 +6730,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e3, 0xe900); // LD #0,B
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffffULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(447);
+		return resume_atomic_at(0x05e0, 447);
 	}
 	if (m_phase == 447)
 	{
@@ -7244,9 +6741,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e3, 0xe901); // LD #1,B
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffffULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(448);
+		return resume_atomic_at(0x05e0, 448);
 	}
 	if (m_phase == 448)
 	{
@@ -7254,21 +6749,17 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0xe800) == 0x0800 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 LD #1,B clears prior guard bits in one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0xec1f); // RPT #31
-		program.write_word(0x05e3, 0x7693); // ST #lk,*AR3+
-		program.write_word(0x05e4, 0x5a3c);
-		program.write_word(0x05e5, 0x75d6);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
+			{0x05e2, 0xec1f}, // RPT #31
+			{0x05e3, 0x7693}, // ST #lk,*AR3+
+			{0x05e4, 0x5a3c}, {0x05e5, 0x75d6}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		for (unsigned i = 0; i != 32; ++i)
 			data.write_word(0x0d00 + i, 0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0d00);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(449);
+		return resume_atomic_at(0x05e0, 449);
 	}
 	if (m_phase == 449)
 	{
@@ -7311,12 +6802,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
 			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 			"ROM4 ST #lk,*AR0+ consumes the literal, preserves neighbors/arithmetic state and postincrements after a two-cycle store");
-		program.write_word(0x05e2, 0xf495); // NOP between marker and target
-		program.write_word(0x05e3, 0xf032); // AND #lk,2,A
-		program.write_word(0x05e4, 0x0f0f);
-		program.write_word(0x05e5, 0x75d6);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0xf495}, // NOP between marker and target
+			{0x05e3, 0xf032}, // AND #lk,2,A
+			{0x05e4, 0x0f0f}, {0x05e5, 0x75d6}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0xff12345678ULL}, {cpu_regs::STATE_ST0, 0x0800}, {cpu_regs::STATE_PC, 0x05e0},
@@ -7334,9 +6824,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e4, 0x00ff);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff12345678ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(451);
+		return resume_atomic_at(0x05e0, 451);
 	}
 	if (m_phase == 451)
 	{
@@ -7432,9 +6920,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0f20);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(457);
+		return resume_atomic_at(0x05e0, 457);
 	}
 	if (m_phase == 457)
 	{
@@ -7460,12 +6946,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e2, 0x12d2); // LDU *AR2+%,A
 		data.write_word(0x0f23, 0x8001);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f23);
-		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM must not sign-extend LDU.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_AR2, 0x0f23}, {cpu_regs::STATE_BK, 4},
+			{cpu_regs::STATE_ST1, 0x0100}, // SXM must not sign-extend LDU.
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(459);
 	}
 	if (m_phase == 459)
@@ -7474,11 +6959,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 LDU *AR2+%,A zero-extends and wraps after the read in one cycle");
-		program.write_word(0x05e2, 0x1cf8); // XOR *(lk),A
-		program.write_word(0x05e3, 0x0f20);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x1cf8}, // XOR *(lk),A
+			{0x05e3, 0x0f20}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0f20, 0x00f0);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -7515,9 +6999,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f24, 0x8000);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f24);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(462);
+		return resume_atomic_at(0x05e0, 462);
 	}
 	if (m_phase == 462)
 	{
@@ -7551,9 +7033,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f30);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(464);
+		return resume_atomic_at(0x05e0, 464);
 	}
 	if (m_phase == 464)
 	{
@@ -7575,11 +7055,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x8001 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 LDM AR7,B ignores SXM and preserves AR7 in one cycle");
-		program.write_word(0x05e2, 0x6883); // ANDM #lk,*AR3
-		program.write_word(0x05e3, 0x0ff0);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x6883}, // ANDM #lk,*AR3
+			{0x05e3, 0x0ff0}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0f33, 0xff0f);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -7598,9 +7077,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e2, 0x6983); // ORM #lk,*AR3
 		program.write_word(0x05e3, 0x00f0);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(467);
+		return resume_atomic_at(0x05e0, 467);
 	}
 	if (m_phase == 467)
 	{
@@ -7652,12 +7129,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e3, 0x0c45);
 		data.write_word(0x0f23, 0xff80);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f23);
-		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_AR2, 0x0f23}, {cpu_regs::STATE_BK, 4},
+			{cpu_regs::STATE_ST1, 0x0100}, // SXM
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(468);
 	}
 	if (m_phase == 468)
@@ -7666,11 +7142,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 shifted LD sign-extends before shift and wraps AR2 in two cycles");
-		program.write_word(0x05e2, 0x7e8b); // READA *AR3-
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
-		program.write_word(0x0d40, 0xabcd);
+		write_words(program, {
+			{0x05e2, 0x7e8b}, // READA *AR3-
+			{0x05e3, 0x75d6}, {0x05e4, 0x0124}, {0x05e5, 0xf5e1}, {0x0d40, 0xabcd},
+		});
 		data.write_word(0x0f33, 0);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -7691,9 +7166,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f34, 0);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f34);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(6539);
+		return resume_atomic_at(0x05e0, 6539);
 	}
 	if (m_phase == 6539)
 	{
@@ -7785,16 +7258,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0400) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 ADD A,A sets overflow across the 32-bit boundary in one cycle");
-		program.write_word(0x05e2, 0xf028); // LD #00aa,8,A
-		program.write_word(0x05e3, 0x00aa);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0xf028}, // LD #00aa,8,A
+			{0x05e3, 0x00aa}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(473);
+		return resume_atomic_at(0x05e0, 473);
 	}
 	if (m_phase == 473)
 	{
@@ -7824,9 +7294,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x800000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM, OVM clear.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(475);
+		return resume_atomic_at(0x05e0, 475);
 	}
 	if (m_phase == 475)
 	{
@@ -7837,13 +7305,12 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e2, 0x3182); // MPYA *AR2
 		data.write_word(0x0f20, 7);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xfffffd0000ULL); // A(32-16)=-3.
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f20);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // FRCT clear.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 0xfffffd0000ULL}, // A(32-16)=-3.
+			{cpu_regs::STATE_B, 0}, {cpu_regs::STATE_T, 0}, {cpu_regs::STATE_AR2, 0x0f20},
+			{cpu_regs::STATE_ST1, 0}, // FRCT clear.
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(476);
 	}
 	if (m_phase == 476)
@@ -7860,9 +7327,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f25);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(477);
+		return resume_atomic_at(0x05e0, 477);
 	}
 	if (m_phase == 477)
 	{
@@ -7870,11 +7335,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f25 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 SUB *AR5,A sign-extends the operand without pointer motion in one cycle");
-		program.write_word(0x05e2, 0x1df8); // XOR *(lk),B
-		program.write_word(0x05e3, 0x0f21);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x1df8}, // XOR *(lk),B
+			{0x05e3, 0x0f21}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0f21, 0x00f0);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -7896,10 +7360,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e6, 0x75d6);
 		program.write_word(0x05e7, 0x0124);
 		program.write_word(0x05e8, 0xf5e1);
-		data.write_word(0x0f22, 0);
-		data.write_word(0x0f23, 0);
-		data.write_word(0x0f24, 0);
-		data.write_word(0x0f25, 0);
+		write_words(data, {
+			{0x0f22, 0}, {0x0f23, 0}, {0x0f24, 0}, {0x0f25, 0},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 0x89ababcd}, {cpu_regs::STATE_AR2, 0x0f22},
@@ -7907,9 +7370,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); // SST clear.
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(479);
+		return resume_atomic_at(0x05e0, 479);
 	}
 	if (m_phase == 479)
 	{
@@ -8002,9 +7463,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05f2, 0xf5e1);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff00000000ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(481);
+		return resume_atomic_at(0x05e0, 481);
 	}
 	if (m_phase == 481 || m_phase == 482)
 	{
@@ -8018,9 +7477,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		{
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0100000000ULL);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(482);
+			return resume_atomic_at(0x05e0, 482);
 		}
 		program.write_word(0x05e2, 0xff30); // XC 2,TC
 		program.write_word(0x05e3, 0x6d91); // MAR *AR1+
@@ -8071,9 +7528,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{cpu_regs::STATE_ST0, 0x0800},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(485);
+		return resume_atomic_at(0x05e0, 485);
 	}
 	if (m_phase == 485)
 	{
@@ -8092,11 +7547,10 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 				"ROM4 load/MAR/immediate-store/accumulator-store cost 1+1+2+1 cycles");
-		program.write_word(0x05e2, 0x771d); // STM #lk,PMST
-		program.write_word(0x05e3, 0x4567);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x771d}, // STM #lk,PMST
+			{0x05e3, 0x4567}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_AR4, 0}, {cpu_regs::STATE_AR5, 0x0f13}, {cpu_regs::STATE_PMST, 0},
@@ -8160,9 +7614,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				{cpu_regs::STATE_AR5, 0x0f40}, {cpu_regs::STATE_AR7, 0x8007}, {cpu_regs::STATE_ST0, 0x0800},
 			});
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(491);
+			return resume_atomic_at(0x05e0, 491);
 		}
 		if (m_phase == 488)
 			program.write_word(0x05e2, 0xff4e); // XC 2,BGT
@@ -8196,18 +7648,16 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 11,
 				"five ROM4 LDM words and four STL stores cost one cycle each");
-		program.write_word(0x05e2, 0xf200); // ADD #lk,B,A
-		program.write_word(0x05e3, 0xfffe);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0xf200}, // ADD #lk,B,A
+			{0x05e3, 0xfffe}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x0100);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 0x0100}, {cpu_regs::STATE_ST0, 0},
+			{cpu_regs::STATE_ST1, 0x0100}, // SXM.
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(492);
 	}
 	if (m_phase == 492)
@@ -8253,21 +7703,19 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0a00 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 LD A,0,B preserves all 40 bits and sets OVB in one cycle");
-		program.write_word(0x05e2, 0x10da); // LD *AR2+0%,A
-		program.write_word(0x05e3, 0x6d93); // MAR *AR3+
-		program.write_word(0x05e4, 0x7308); // MVMD AL,dmad
-		program.write_word(0x05e5, 0x0f50);
-		program.write_word(0x05e6, 0x7313); // MVMD AR3,dmad
-		program.write_word(0x05e7, 0x0f51);
-		program.write_word(0x05e8, 0x7681); // ST #lk,*AR1
-		program.write_word(0x05e9, 0x5a5a);
-		program.write_word(0x05ea, 0x75d6);
-		program.write_word(0x05eb, 0x0124);
-		program.write_word(0x05ec, 0xf5e1);
-		data.write_word(0x0f22, 0x8001);
-		data.write_word(0x0f50, 0);
-		data.write_word(0x0f51, 0);
-		data.write_word(0x0f52, 0);
+		write_words(program, {
+			{0x05e2, 0x10da}, // LD *AR2+0%,A
+			{0x05e3, 0x6d93}, // MAR *AR3+
+			{0x05e4, 0x7308}, // MVMD AL,dmad
+			{0x05e5, 0x0f50},
+			{0x05e6, 0x7313}, // MVMD AR3,dmad
+			{0x05e7, 0x0f51},
+			{0x05e8, 0x7681}, // ST #lk,*AR1
+			{0x05e9, 0x5a5a}, {0x05ea, 0x75d6}, {0x05eb, 0x0124}, {0x05ec, 0xf5e1},
+		});
+		write_words(data, {
+			{0x0f22, 0x8001}, {0x0f50, 0}, {0x0f51, 0}, {0x0f52, 0},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0x1234}, {cpu_regs::STATE_AR0, 2},
@@ -8275,9 +7723,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{cpu_regs::STATE_BK, 4}, {cpu_regs::STATE_ST0, 0x0800},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(495);
+		return resume_atomic_at(0x05e0, 495);
 	}
 	if (m_phase == 495)
 	{
@@ -8396,9 +7842,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e6, 0xf5e1);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(499);
+		return resume_atomic_at(0x05e0, 499);
 	}
 	if (m_phase == 499)
 	{
@@ -8417,9 +7861,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05f2, 0xf5e1);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(500);
+		return resume_atomic_at(0x05e0, 500);
 	}
 	if (m_phase >= 500 && m_phase <= 503)
 	{
@@ -8569,9 +8011,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f22);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(510);
+		return resume_atomic_at(0x05e0, 510);
 	}
 	if (m_phase == 510)
 	{
@@ -8668,16 +8108,13 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 OR *AR4,B preserves guard, status, and pointer in one cycle");
-		program.write_word(0x05e2, 0x1bf8); // OR *(lk),B
-		program.write_word(0x05e3, 0x0f24);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x1bf8}, // OR *(lk),B
+			{0x05e3, 0x0f24}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff0000000fULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(512);
+		return resume_atomic_at(0x05e0, 512);
 	}
 	if (m_phase == 512)
 	{
@@ -8690,9 +8127,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		data.write_word(0x0f24, 0x8001);
 		m_port_writes = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(513);
+		return resume_atomic_at(0x05e0, 513);
 	}
 	if (m_phase == 513)
 	{
@@ -8713,9 +8148,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{cpu_regs::STATE_AR3, 0x8003},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(514);
+		return resume_atomic_at(0x05e0, 514);
 	}
 	if (m_phase == 514)
 	{
@@ -8728,16 +8161,15 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x8003 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 LDM AR3,B zero-extends despite SXM; both loads cost one cycle");
-		program.write_word(0x05e0, 0x75d6);
-		program.write_word(0x05e2, 0x7215); // MVDM dmad,AR5
-		program.write_word(0x05e3, 0x0f60);
-		program.write_word(0x05e4, 0x7314); // MVMD AR4,dmad
-		program.write_word(0x05e5, 0x0f62);
-		program.write_word(0x05e6, 0x7315); // MVMD AR5,dmad
-		program.write_word(0x05e7, 0x0f63);
-		program.write_word(0x05e8, 0x75d6);
-		program.write_word(0x05e9, 0x0124);
-		program.write_word(0x05ea, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75d6},
+			{0x05e2, 0x7215}, // MVDM dmad,AR5
+			{0x05e3, 0x0f60},
+			{0x05e4, 0x7314}, // MVMD AR4,dmad
+			{0x05e5, 0x0f62},
+			{0x05e6, 0x7315}, // MVMD AR5,dmad
+			{0x05e7, 0x0f63}, {0x05e8, 0x75d6}, {0x05e9, 0x0124}, {0x05ea, 0xf5e1},
+		});
 		data.write_word(0x0f60, 0x4321);
 		data.write_word(0x0f62, 0);
 		data.write_word(0x0f63, 0);
@@ -8780,9 +8212,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{cpu_regs::STATE_AR7, 0}, {cpu_regs::STATE_AR0, 0}, {cpu_regs::STATE_AR1, 0},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(516);
+		return resume_atomic_at(0x05e0, 516);
 	}
 	if (m_phase == 516)
 	{
@@ -8879,9 +8309,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			{cpu_regs::STATE_ST0, 0x0800},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(519);
+		return resume_atomic_at(0x05e0, 519);
 	}
 	if (m_phase >= 519 && m_phase <= 525)
 	{
@@ -8955,9 +8383,7 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x2000);
 		m_xf_publications = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(533);
+		return resume_atomic_at(0x05e0, 533);
 	}
 	if ((m_phase >= 533 && m_phase <= 536) || (m_phase >= 6547 && m_phase <= 6550))
 	{
@@ -9050,13 +8476,11 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		program.write_word(0x05e4, 0x0124);
 		program.write_word(0x05e5, 0xf5e1);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 0x12345678}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_ST0, 0},
+			{cpu_regs::STATE_ST1, 0x0100}, // SXM
+			{cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(543);
 	}
 	if ((m_phase >= 543 && m_phase <= 547) || (m_phase >= 6576 && m_phase <= 6583) || (m_phase >= 9232 && m_phase <= 9246) || m_phase == 9250 || m_phase == 9251)

@@ -65,9 +65,7 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 			program.write_word(0x0584, 0xf5e1);
 			m_repeat_reads = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0580);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(69);
+			return resume_atomic_at(0x0580, 69);
 		case 77:
 			program.write_word(0x05e0, 0x74d6); // PORTR port, *AR6+%
 			program.write_word(0x05e1, 0x0123);
@@ -146,9 +144,7 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 		expect(m_cpu->space(AS_PROGRAM).read_word(0x0924) == 0xaaaa &&
 				m_cpu->space(AS_PROGRAM).read_word(0x0925) == 0xbbbb,
 				"repeated MVDP advances its program destination");
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0380);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(10);
+		return resume_atomic_at(0x0380, 10);
 	}
 	if (m_phase == 10)
 	{
@@ -346,11 +342,10 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 				((u64(1) << 40) - 6), "MPYA signed product");
 		expect(m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe,
 				"MPYA loads T");
-		program.write_word(0x03f8, 0xf944); // CC 0400h, ANEQ
-		program.write_word(0x03f9, 0x0400);
-		program.write_word(0x03fa, 0xf5e1);
-		program.write_word(0x0400, 0xe85a);
-		program.write_word(0x0401, 0xfc00);
+		write_words(program, {
+			{0x03f8, 0xf944}, // CC 0400h, ANEQ
+			{0x03f9, 0x0400}, {0x03fa, 0xf5e1}, {0x0400, 0xe85a}, {0x0401, 0xfc00},
+		});
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_PC, 0x03f8}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_A, 1},
 			{cpu_regs::STATE_IDLE, 0},
@@ -667,9 +662,7 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 		m_irq_trigger_read = 2;
 		m_irq_accumulator = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x04f0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(62);
+		return resume_atomic_at(0x04f0, 62);
 	}
 	if (m_phase == 62)
 	{
@@ -689,9 +682,7 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 		m_irq_trigger_read = 1;
 		m_irq_accumulator = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0500);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(63);
+		return resume_atomic_at(0x0500, 63);
 	}
 	if (m_phase == 63)
 	{

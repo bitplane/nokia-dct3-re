@@ -19,12 +19,11 @@ void tms320c54x_test_state::start_far_save_case(bool returning)
 	program.write_word(next++, 0x0082); // First delay word schedules a zero-time checkpoint.
 	program.write_word(next++, 0xe905);
 	program.write_word(next, 0xf4e1);
-	program.write_word(0x020700, 0xe807);
-	program.write_word(0x020701, 0xf4e4);
-	program.write_word(0x000700, 0xe80f); // Wrong-page sentinels.
-	program.write_word(0x000701, 0xf4e4);
-	program.write_word(0x010700, 0xe80e);
-	program.write_word(0x010701, 0xf4e4);
+	write_words(program, {
+		{0x020700, 0xe807}, {0x020701, 0xf4e4},
+		{0x000700, 0xe80f}, // Wrong-page sentinels.
+		{0x000701, 0xf4e4}, {0x010700, 0xe80e}, {0x010701, 0xf4e4},
+	});
 	if (returning)
 	{
 		program.write_word(0x010604, 0xe807);
@@ -88,10 +87,9 @@ bool tms320c54x_test_state::check_far_save_results()
 		data.write_word(0x0502, 0x9abc);
 		for (unsigned address = 0x0503; address != 0x0506; ++address)
 			data.write_word(address, 0);
-		program.write_word(0x00fffe, 0xaaaa);
-		program.write_word(0x00ffff, 0xbbbb);
-		program.write_word(0x000000, 0xcccc);
-		program.write_word(0x020000, 0xdddd);
+		write_words(program, {
+			{0x00fffe, 0xaaaa}, {0x00ffff, 0xbbbb}, {0x000000, 0xcccc}, {0x020000, 0xdddd},
+		});
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_AR0, 0x0500}, {cpu_regs::STATE_A, 0x02fffe}, {STATE_GENPC, 0x010800},
 			{cpu_regs::STATE_IDLE, 0},
@@ -204,11 +202,10 @@ bool tms320c54x_test_state::check_far_save_results()
 			return true;
 		}
 		osd_printf_info("TMS320C54x memory DP conformance: PASS variants=3\n");
-		program.write_word(0x0600, 0x75d6);
-		program.write_word(0x0601, 0x0124);
-		program.write_word(0x0602, 0xfa47);
-		program.write_word(0x0603, 0x060c);
-		program.write_word(0x0604, 0xe801); // Changes A after the branch predicate is captured.
+		write_words(program, {
+			{0x0600, 0x75d6}, {0x0601, 0x0124}, {0x0602, 0xfa47}, {0x0603, 0x060c},
+			{0x0604, 0xe801}, // Changes A after the branch predicate is captured.
+		});
 		write_words(program, {
 			{0x0605, 0xe902}, {0x0606, 0xe903}, {0x0607, 0x75d6}, {0x0608, 0x0124}, {0x0609, 0xf4e1}, {0x060c, 0x75d6},
 			{0x060d, 0x0124}, {0x060e, 0xf4e1},

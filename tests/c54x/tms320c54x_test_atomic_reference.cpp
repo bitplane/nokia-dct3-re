@@ -50,14 +50,11 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			prepare_case(*m_cpu, long_reference_cases()[index + 1]);
 			return next_atomic_phase(index < 8 ? m_phase + 1 : 9211 + index - 8);
 		}
-		program.write_word(0x05e0, 0x75f8);
-		program.write_word(0x05e1, 0x0d00);
-		program.write_word(0x05e2, 0x0124);
-		program.write_word(0x05e3, 0x5086); // DADD *AR6,A.
-		program.write_word(0x05e4, 0x75f8);
-		program.write_word(0x05e5, 0x0d00);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		write_words(program, {
+			{0x05e0, 0x75f8}, {0x05e1, 0x0d00}, {0x05e2, 0x0124},
+			{0x05e3, 0x5086}, // DADD *AR6,A.
+			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
+		});
 		data.write_word(0x0f92, 1);
 		data.write_word(0x0f93, 0xffff);
 		m_port_writes = 0;
@@ -162,10 +159,9 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			program.write_word(0x05e2, next.opcode);
 			if (index >= 3)
 			{
-				data.write_word(0x0f90, 7);
-				data.write_word(0x0f91, 8);
-				data.write_word(0x0f92, 1);
-				data.write_word(0x0f93, 0xffff);
+				write_words(data, {
+					{0x0f90, 7}, {0x0f91, 8}, {0x0f92, 1}, {0x0f93, 0xffff},
+				});
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f92);
 			}
 			m_port_writes = 0;
@@ -412,10 +408,9 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			{0x05e4, 0x0700}, {0x05e5, 0x75d6}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1}, {0x0700, 1}, {0x0701, 2},
 			{0x0702, 3},
 		});
-		data.write_word(0x0f90, 1);
-		data.write_word(0x0f91, 2);
-		data.write_word(0x0f92, 2);
-		data.write_word(0x0f93, 2);
+		write_words(data, {
+			{0x0f90, 1}, {0x0f91, 2}, {0x0f92, 2}, {0x0f93, 2},
+		});
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
 			{cpu_regs::STATE_A, 0x770000}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_T, 0x4444},
@@ -593,11 +588,10 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			prepare_case(*m_cpu, cases[index + 1]);
 			return next_atomic_phase(shift_phases[index + 1]);
 		}
-		program.write_word(0x05e2, 0x6283); // MPY *AR3,#4,A.
-		program.write_word(0x05e3, 4);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
+		write_words(program, {
+			{0x05e2, 0x6283}, // MPY *AR3,#4,A.
+			{0x05e3, 4}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
+		});
 		data.write_word(0x0200, 3);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
@@ -605,9 +599,7 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			{cpu_regs::STATE_AR6, 0x0a03},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0040); // FRCT.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(724);
+		return resume_atomic_at(0x05e0, 724);
 	}
 	if (m_phase == 724)
 	{
@@ -758,12 +750,11 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 		program.write_word(0x05e4, 0x0124);
 		program.write_word(0x05e5, 0xf5e1);
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffff00ULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x011f); // SXM, ASM=-1.
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 0xffffffff00ULL}, {cpu_regs::STATE_ST0, 0},
+			{cpu_regs::STATE_ST1, 0x011f}, // SXM, ASM=-1.
+			{cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(728);
 	}
 	if (m_phase == 728)
@@ -775,12 +766,11 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			"ADD A,ASM sign-fills a right shift and records carry in one cycle");
 		program.write_word(0x05e2, 0xf681); // SUB B,ASM,A.
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x40);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0101); // SXM, ASM=1.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 0x10}, {cpu_regs::STATE_B, 0x40}, {cpu_regs::STATE_ST0, 0x0800},
+			{cpu_regs::STATE_ST1, 0x0101}, // SXM, ASM=1.
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(729);
 	}
 	if (m_phase == 729)
@@ -793,12 +783,11 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			"SUB B,ASM,A uses B as source and records borrow in one cycle");
 		program.write_word(0x05e2, 0xf480); // ADD A,ASM,A.
 		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x123456789aULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0103); // SXM, ASM=3.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 1}, {cpu_regs::STATE_B, 0x123456789aULL}, {cpu_regs::STATE_ST0, 0},
+			{cpu_regs::STATE_ST1, 0x0103}, // SXM, ASM=3.
+			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
+		});
 		return next_atomic_phase(40000);
 	}
 	if (m_phase == 40000)
@@ -813,9 +802,7 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM, ASM=0, OVM clear.
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(40001);
+		return resume_atomic_at(0x05e0, 40001);
 	}
 	if (m_phase >= 40001 && m_phase <= 40004)
 	{

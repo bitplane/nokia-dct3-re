@@ -218,11 +218,10 @@ bool tms320c54x_test_state::check_atomic_control_results()
 			"interrupt retains XPC and pushes only PC; explicit ISR XPC save allows a far return");
 		m_cpu->set_input_line(2, CLEAR_LINE);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-		program.write_word(0x020600, 0xf074); // Near CALL on page 2.
-		program.write_word(0x020601, 0x0700);
-		program.write_word(0x020602, 0xf4e1);
-		program.write_word(0x020700, 0xe803);
-		program.write_word(0x020701, 0xfc00);
+		write_words(program, {
+			{0x020600, 0xf074}, // Near CALL on page 2.
+			{0x020601, 0x0700}, {0x020602, 0xf4e1}, {0x020700, 0xe803}, {0x020701, 0xfc00},
+		});
 		m_cpu->set_state_int(STATE_GENPC, 0x020600);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		return next_atomic_phase(783);

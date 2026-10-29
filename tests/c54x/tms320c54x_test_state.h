@@ -2013,6 +2013,13 @@ private:
 		m_check_timer->adjust(attotime::from_usec(100));
 		return true; // Timer callback handled, not an assertion of test success.
 	}
+	bool resume_atomic_at(unsigned pc, unsigned phase)
+	{
+		// Preserve the inherited CPU state; only restart fetch and the observer.
+		m_cpu->set_state_int(cpu_regs::STATE_PC, pc);
+		m_cpu->set_state_int(cpu_regs::STATE_IDLE, 0);
+		return next_atomic_phase(phase);
+	}
 	bool check_atomic_basic_results();
 	bool check_atomic_corpus_results();
 	bool check_atomic_reference_results();

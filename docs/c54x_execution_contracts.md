@@ -346,6 +346,12 @@ Test ownership and build selection are defined in [the test contracts](../tests/
 Shared setup helpers write only stimulus; expected results remain in the test
 and independent runner oracles. Historical checkpoint hashes retain their
 original source paths: relocation does not renew their runtime qualification.
+Constant-only setup may use ordered `set_registers`/`write_words` batches;
+values that depend on preceding guest writes must remain sequential calls.
+`resume_atomic_at` preserves inherited state while setting PC, clearing IDLE,
+and scheduling the existing 100-microsecond atomic observer, in that order.
+Neither helper resets the CPU, computes expectations, or makes sequential
+legacy cases independent.
 
 The absolute-alias fixtures share declarative family/count/status profiles in
 `tests/c54x/tms320c54x_test_profiles.h`; the CPU model does not consume this test

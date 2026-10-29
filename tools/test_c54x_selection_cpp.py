@@ -11,6 +11,46 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class C54xSelectionTests(unittest.TestCase):
+    def test_atomic_restart_keeps_write_and_observer_order(self):
+        from tools.test_c54x_case_fixture import compiled_cpp
+        header = (ROOT / 'tests/c54x/tms320c54x_test_state.h').read_text()
+        begin = header.index('\tbool next_atomic_phase(unsigned phase)')
+        end = header.index('\tbool check_atomic_basic_results();', begin)
+        source = r'''
+#include <cassert>
+#include <vector>
+struct attotime { static int from_usec(int value) { return value; } };
+struct cpu_regs { enum { STATE_PC, STATE_IDLE }; };
+struct bench {
+    std::vector<int> events;
+    unsigned m_phase = 7;
+    struct cpu {
+        bench &owner;
+        void set_state_int(int index, unsigned value) {
+            assert(owner.m_phase == 7);
+            owner.events.push_back(index); owner.events.push_back(value);
+        }
+    } core{*this}, *m_cpu = &core;
+    struct timer {
+        bench &owner;
+        void adjust(int delay) {
+            assert(owner.m_phase == 123);
+            owner.events.push_back(delay);
+        }
+    } clock{*this}, *m_check_timer = &clock;
+''' + header[begin:end] + r'''
+};
+int main() {
+    bench b;
+    assert(b.resume_atomic_at(0x5e0, 123));
+    assert((b.events == std::vector<int>{cpu_regs::STATE_PC, 0x5e0, cpu_regs::STATE_IDLE, 0, 100}));
+}
+'''
+        if not shutil.which('c++'):
+            self.skipTest('C++ compiler unavailable')
+        with compiled_cpp(source) as program:
+            subprocess.run([str(program)], check=True, capture_output=True)
+
     def test_alias_order_missing_and_single_setup(self):
         compiler = os.environ.get('CXX', 'c++')
         if not shutil.which(compiler):
