@@ -441,15 +441,23 @@
       "limits": ["a sequence, not 21 independently reset cases", "only the declared masks are asserted; other inherited status is not newly claimed", "PORTW pointers in the standalone fixture are explicit marker scaffolding, not handset I/O", "no staged save-state or physical pipeline-timing claim"]
     },
     {
-      "id": "duplicate-mac-writeonly-source-control",
+      "id": "duplicate-writeonly-source-controls",
       "classification": "implementation_limit",
       "decision": "delete",
       "source": "tests/c54x/tms320c54x_test_domain_schedule.h",
       "profiles": [],
       "case_ids": [],
-      "basis": "Legacy phase739's 0x649b operand rejection is covered by source-domain: source_domains contains 0x6400 and enumerates mode0x9b across both frontends and restored contexts; the fixture asserts preserved accumulators, T, pointers/status and zero data/program/I/O side effects.",
-      "obligations": ["retain the source-domain executable coverage and digest", "remove phase739 routing and its setup/check block instead of retaining a duplicate admission test among architectural examples"],
-      "limits": ["the old A=0x10/T=3/AR3=0x01ff stimulus is deleted, not claimed numerically retained", "its preceding PORTW was timing scaffolding with no asserted dependency on the rejection; it is not a distinct interrupt, pipeline or data-hazard interaction", "rejection remains an emulator admission policy, not a silicon illegality claim"]
+      "basis": "Legacy DLD phase89 (0x569b), LDM phase423 (0x489a), MPY phase727 (0x629b) and MAC phase739 (0x649b) duplicate source-domain's write-only-source admission contract. Each exact word occurs in all 16 base contexts (CMPT, page, frontend and checkpoint), with register preservation and zero data/program/I/O effects checked before and after restoration.",
+      "obligations": ["retain the source-domain executable coverage and digest; the independent schedule test requires all 16 contexts for each retired opcode", "delete the four legacy rejection setup/check blocks and phase routes, not successful operand, timing or interrupt-interaction cases", "DST positive continuations explicitly retain A=0xabcdef01 and ST1=0 formerly seeded by the DLD rejection setup; later DST checks and stores depend on these inputs", "legacy-atomic retains its complete ordered PASS records and asserted-opcode set; the source-domain census remains 46064 cases/restores with digest 60d443519ef671c5"],
+      "limits": ["old rejection stimuli are retired, not numerically retained: DLD AR3=0x0e00/data0x0e02..3=abcd,ef01; LDM AR2=0xff14; MPY A=T=0/AR3=0x01ff/data0x01ff=7; MAC A=0x10/T=3/AR3=0x01ff", "LDM's AR5=0x8001 already belongs to preceding positive LDM tests; later XC and AR2-store cases supply their own inputs; the removed rejection adds no required state", "MPY's following ADD/SUB ASM cases seed their own relevant inputs; no later positive check consumes the rejected MPY's T/AR3 tuple", "preceding PORTW markers are scaffolding, not separately asserted interrupt, pipeline or data-hazard interactions; source-domain instead observes every I/O access", "rejection remains an emulator admission policy, not a silicon illegality claim"],
+      "measurement": {
+        "baseline_commit": "a4795a80",
+        "c54x_cpp_bytes_before": 3657843,
+        "c54x_cpp_bytes_after": 3655633,
+        "c54x_cpp_lines_before": 55140,
+        "c54x_cpp_lines_after": 55093,
+        "scope": "Additional retirement of DLD/LDM/MPY probes; the MAC probe was already absent at this baseline. All tests/c54x C++ and headers shrink by 2210 bytes/47 lines. Native legacy prefix retains 172 ordered PASS records and 2474 asserted opcode words; no machine, isolated profile or default result requirement is removed. No significant runtime reduction claimed."
+      }
     },
     {
       "id": "conditional-delay-and-stack-examples",

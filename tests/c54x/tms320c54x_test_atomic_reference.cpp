@@ -753,28 +753,6 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
 			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 			"MPY absolute Smem consumes address before immediate and costs three cycles");
-		program.write_word(0x05e2, 0x629b); // Invalid read: short MOD=3 is write-only.
-		program.write_word(0x05e3, 4);
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
-		data.write_word(0x01ff, 7);
-		data.write_word(0x0200, 3);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_T, 0}, {cpu_regs::STATE_AR3, 0x01ff},
-			{cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(727);
-	}
-	if (m_phase == 727)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x01ff && m_port_writes == 1,
-			"MPY rejects write-only short preincrement before operand effects and the following PORTW");
-		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		program.write_word(0x05e2, 0xf480); // ADD A,ASM,A.
 		program.write_word(0x05e3, 0x75d6);
 		program.write_word(0x05e4, 0x0124);

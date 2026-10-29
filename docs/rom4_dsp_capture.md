@@ -355,7 +355,8 @@ check read and postincrement write at one cycle. `489a` instead rejects:
 short MOD=3 is write-only, including in the MMR grammar. LDM, PSHM and
 PSHD reject this source encoding before data, AR masking/modification or
 stack effects; the CPU-only `source-domain` census owns these exclusions,
-while default atomic coverage retains the `489a` example. The ordinary Smem long-offset preincrement form remains
+including `489a` in all sixteen base contexts. Its duplicate legacy example
+is removed. The ordinary Smem long-offset preincrement form remains
 read-capable, but long forms are separately excluded from MMR addressing
 by section 5.6. Implicit-copy and read/modify/write forms are not decided
 by these tests.

@@ -89,6 +89,12 @@ int main() {
             actual_rows = [tuple(map(int, line.split())) for line in
                            subprocess.check_output([str(binary)], text=True).splitlines()]
         self.assertEqual(actual_rows, rows)
+        # These replace the deleted one-off DLD/LDM/MPY/MAC admission probes.
+        # Every base context must still exercise each exact instruction word.
+        for word in (0x569b, 0x489a, 0x629b, 0x649b):
+            contexts = [row[4] for row in actual_rows[:30000]
+                        if row[1] | row[3] == word]
+            self.assertEqual(contexts, list(range(16)), f'{word:04x}')
         keys = [row[0] for row in rows]
         self.assertEqual(len(keys), len(set(keys)))
         digest = 14695981039346656037

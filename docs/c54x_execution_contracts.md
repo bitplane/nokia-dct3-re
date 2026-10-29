@@ -130,13 +130,14 @@ addressing forms retain T. The same bank replaces the legacy reference phase
 blocks without resetting that CPU. Case identities and expectation masks, not
 phase numbers, describe the retained contracts.
 
-The duplicate phase739 `0x649b` rejection is deleted. `source-domain` already
-enumerates base `0x6400` plus mode `0x9b` with both frontends and replay,
-asserting register preservation and no data/program/I/O effects. Its old
-A=0x10/T=3/AR3=0x01ff tuple is not retained; the preceding port marker carried
-no separately asserted dependency. This keeps implementation admission policy
-out of the architectural example sequence. Total C54x sources shrink by
-9,525 bytes/271 lines in this batch.
+`source-domain` owns write-only-source rejection for DLD `569b`, LDM `489a`,
+MPY `629b` and MAC `649b`, including all sixteen base contexts and replay.
+The duplicate legacy setup/check blocks and routes are deleted. Their old
+numeric stimuli are explicitly retired in the review ledger, not claimed as
+retained cases; port markers carried no separate interaction contract.
+The positive DST continuations still seed A=`abcdef01` and ST1=0 explicitly,
+because later stores and preservation checks consume those inputs. Successful
+operand/timing examples remain separate from implementation admission policy.
 
 `isa-flow` isolates ten conditional-delay and seven-bit stack-operand examples.
 RCD A/B and BCD ALT/BLEQ must decide before delay words overwrite the tested
@@ -431,8 +432,9 @@ interior shift Cartesian product is retired, not claimed as retained.
 Positive arithmetic profiles still test numeric results at every shift.
 The pure rejection profiles and the rejection tails of `long-pair`, `drsub`,
 `logic-short` and `xorm` are merged here. Those four profiles retain their
-positive operation contracts. The redundant atomic-prefix stack profile is
-removed; default atomic coverage, including `489a` rejection, remains.
+positive operation contracts. The redundant atomic-prefix stack profile and
+one-off atomic rejection probes are removed; their admission contracts live
+in this CPU-only census rather than the architectural example sequence.
 
 Absolute `f9..ff` must not silently alias canonical `f8`. The prior atomic
 MPY/MAC, LTD/DELAY, MACP/MACD and RMW paths read operands despite staged

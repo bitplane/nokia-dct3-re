@@ -1250,8 +1250,9 @@ cycles, plus one for long-offset or absolute Smem. Fixture-only `6283`
 checks FRCT, T, and two-cycle timing; `f166` reproduces TI's signed
 `MPY #fffe,B` example and preserves T; `62f8` checks address-before-immediate
 extension order and the absolute three-cycle cost. `629b` is a write-only
-short-preincrement source and is now a rejection control, not a valid MPY
-timing fixture. Long-offset MOD=13 remains read-capable; its retained
+short-preincrement source, covered by the CPU-only `source-domain` census,
+not a valid MPY timing fixture or a second legacy rejection probe.
+Long-offset MOD=13 remains read-capable; its retained
 memory/immediate coverage is described above. Other addressing and multiplier
 saturation variants require their own acceptance scope.
 SPRU172C specifies A(32–16) as a signed **17-bit** multiplicand. The existing

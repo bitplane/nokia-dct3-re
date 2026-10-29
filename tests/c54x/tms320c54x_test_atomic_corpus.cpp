@@ -246,23 +246,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				data.read_word(0x0e01) == 0x5678 &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e02,
 				"DST long operand post-increments AR by two");
-		program.write_word(0x05e0, 0x569b); // Invalid read: short MOD=3 is write-only.
-		data.write_word(0x0e02, 0xabcd);
-		data.write_word(0x0e03, 0xef01);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR3, 0x0e00}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_A, 0xabcdef01ULL},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(89);
-	}
-	if (m_phase == 89)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0xabcdef01ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e00,
-				"DLD rejects write-only short preincrement without pointer or accumulator effects");
-		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		program.write_word(0x05e0, 0x4fd3); // DST B, *AR3+%
 		set_registers(*m_cpu, {
+			{cpu_regs::STATE_A, 0xabcdef01ULL}, {cpu_regs::STATE_ST1, 0},
 			{cpu_regs::STATE_B, 0x76543210}, {cpu_regs::STATE_AR3, 0x0e02}, {cpu_regs::STATE_BK, 4},
 			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
 		});
@@ -6762,20 +6748,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0018 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"indirect STLM writes the pointed MMR and postincrements masked AR2");
-		program.write_word(0x05e3, 0x489a); // LDM *+AR2,A
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_AR2, 0xff14}, {cpu_regs::STATE_AR5, 0x8001},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(423);
-	}
-	if (m_phase == 423)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0xff14 && m_port_writes == 1,
-				"LDM rejects write-only short preincrement without masking or modifying AR2");
-		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		program.write_word(0x05e3, 0xff4d); // XC 2,BEQ
 		program.write_word(0x05e4, 0xe801); // LD #1,A
 		program.write_word(0x05e5, 0xe902); // LD #2,B
