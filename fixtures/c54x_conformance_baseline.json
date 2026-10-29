@@ -6497,14 +6497,14 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
-          "cases": "111",
+          "cases": "150",
           "firmware": "0",
           "nokia_devices": "0",
-          "reset_groups": "4"
+          "reset_groups": "5"
         }
       ],
       "required": [
-        "TMS320C54x generic memory examples: PASS cases=111 reset_groups=4 nokia_devices=0 firmware=0"
+        "TMS320C54x generic memory examples: PASS cases=150 reset_groups=5 nokia_devices=0 firmware=0"
       ]
     },
     "isa-parallel": {
@@ -15542,7 +15542,46 @@
         "xor-b-left-truncates-forty-bits",
         "and-immediate-a",
         "or-immediate-a-preserves-guard",
-        "xor-immediate-high-word-a"
+        "xor-immediate-high-word-a",
+        "complement-a-forty-bits",
+        "sftl-a-left8-inherited-b",
+        "sftl-a-right8-carry",
+        "xor-a-left8-full-width",
+        "sftl-a-right1-carry",
+        "xor-a-to-b-preserves-guard-status",
+        "or-a-right8-to-b-preserves-status",
+        "sfta-a-left8-overflow-unsaturated",
+        "or-b-to-a-preserves-guard-status",
+        "sftl-a-right4-to-b",
+        "sfta-a-left3",
+        "sfta-a-right16-sign-fill",
+        "sfta-a-right8-to-b",
+        "sfta-b-left3",
+        "sfta-a-right9-sign-fill",
+        "sfta-a-right9-zero-fill",
+        "sfta-a-left1-to-b",
+        "sfta-b-right3-to-a-sign-fill",
+        "sfta-b-right3-to-a-zero-fill",
+        "sfta-b-left6",
+        "sfta-b-right6-sign-fill",
+        "sfta-b-right6-zero-fill",
+        "sfta-a-left2",
+        "sfta-a-right4-sign-fill",
+        "sfta-a-right4-zero-fill",
+        "sfta-a-right2-sign-fill",
+        "sfta-a-right2-zero-fill",
+        "sfta-a-right6-to-b-sign-fill",
+        "sfta-a-right6-to-b-zero-fill",
+        "sfta-b-right9-to-a-sign-fill",
+        "sfta-b-right9-to-a-zero-fill",
+        "sfta-b-left2",
+        "sfta-b-left7",
+        "sfta-b-right4-sign-fill",
+        "sfta-b-right4-zero-fill",
+        "sfta-b-right2-sign-fill",
+        "sfta-b-right2-zero-fill",
+        "sftl-b-left6-carry",
+        "load-b-zero-shift-to-a"
       ],
       "classification": "architectural_interaction",
       "decision": "rewrite",

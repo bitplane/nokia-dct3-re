@@ -75,6 +75,8 @@ protected:
 				m_cases.insert(m_cases.end(), shifts.begin(), shifts.end());
 				auto const &registers = c54x_test::register_bit_examples();
 				m_cases.insert(m_cases.end(), registers.begin(), registers.end());
+				auto const &atomic_shifts = c54x_test::atomic_shift_examples();
+				m_cases.insert(m_cases.end(), atomic_shifts.begin(), atomic_shifts.end());
 			}
 			else if (products()) m_cases = c54x_test::product_examples();
 			else if (near_flow())
