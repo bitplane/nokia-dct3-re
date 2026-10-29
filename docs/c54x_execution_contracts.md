@@ -49,7 +49,7 @@ devices or private firmware; legacy default continuations can reuse reviewed
 case data without making the entire sequenced bench generic.
 
 The compatibility-named `tms54isa` bench separates architectural examples
-(`isa-square`, `isa-parallel`, `isa-scalars`) from implementation-admission checks
+(`isa-square`, `isa-parallel`, `isa-scalars`, `mac-map-imm`) from implementation-admission checks
 (`source-domain`) by explicit profile and review classification. Source-domain
 owns its case state, timer cadence, bus observers and replay without the legacy
 phase dispatcher. The base 30,000 cases retain their identities and checkpoint
@@ -392,7 +392,7 @@ plus 147,456 numeric). Variable-shift ADD/SUB retains 81,920 distinct stimuli,
 with balanced checkpoints rather than three copies of each input.
 CMPM and BITF each retain 52,224 cases over 17 forms, omitting 3,072 invalid
 cases. `rpt-subc-st` retains 38,400 SUBC and 38,400 repeated-store cases;
-memory/immediate MPY retains 98,304. Paired reads retain 6,144 DSUB,
+memory/immediate MPY retains 24,576 inputs with balanced checkpoints. Paired reads retain 6,144 DSUB,
 12,288 DADD and 6,144 DRSUB cases over eight forms, omitting raw form 4.
 These totals describe selected fixture domains, not every legal operand.
 Circular-input constraints have their own
@@ -2727,18 +2727,35 @@ SMUL clamps the fractional product before accumulation only in its existing
 fractional-overflow mode; result saturation and sticky OVA/OVB remain
 destination-owned. No data-memory write is synthesized.
 
-`mac-map-imm` passes 786,432 cases and cleared-pipeline replays: all sixteen
+`mac-map-imm` runs on the CPU-only machine without ROMs or handset devices.
+Its fixture owns its observations, timer cadence and replay state rather than
+using the global phase dispatcher. It retains all 262,144 inputs: all sixteen
 mapped addresses, DP/plain-indirect/absolute/offset forms, four source-word
 patterns (guard fields retain their eight-bit width), eight literals, all
 FRCT/OVM/SXM/SMUL combinations, four accumulator selectors, two pages and
-three snapshots. A/B change after Read to distinguish retained memory data
+three checkpoint boundaries. The 32 source-pattern/literal pairs in every
+fixed source/form/flags/selectors/page group distribute across the checkpoints
+10/11/11 instead of executing every pair three times. The ordered original-key
+digest is `020c459448602a55`; actual completed cases and restores are counted.
+A/B change after Read to distinguish retained memory data
 from the Execute-live addend, including same-accumulator source aliases.
 T, TRN, pointers and literals are poisoned after their ownership boundaries.
 The fixture checks exact product/accumulation/saturation/status results,
 one source read, no bus write and no duplicate extension fetch. Restoring
-the old MAC mapped-source guard makes it fail.
+the old MAC mapped-source guard makes it fail. A compiled comparison of the
+old and relocated selectors checked setup and expected-result equivalence for
+all 262,144 retained inputs. Resetting each independent case does not claim
+preservation of unrelated legacy-machine state. Exact publication clocks are
+implementation contracts, not physical timing evidence.
 
-The existing `mpy-mem-imm` RAM/MPY controls retain their matrices. Their
+The standalone binary completes the retained profile with an empty ROM
+directory. Runner wall time drops from 339 to 104 seconds, including the
+balanced replay schedule and smaller save graph. Explicit ownership and
+formatting add 1,824 C++ bytes/114 lines; this is not a source-size reduction
+and does not renew the older full-default checkpoint.
+
+The `mpy-mem-imm` RAM/MPY controls retain their distinct inputs with balanced
+checkpoints, as described above. Their
 negative MAC fixture now excludes the remaining eighty low/control/peripheral
 addresses and eight write-only MOD=3 forms: 1,408 cases/replays across all
 selectors, two pages and two snapshots. Producer, control, repeat and

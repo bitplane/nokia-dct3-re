@@ -10,6 +10,7 @@
 #include "tms320c54x_test_long_reference.h"
 #include "tms320c54x_test_product_examples.h"
 #include "tms320c54x_test_near_flow.h"
+#include "tms320c54x_test_mapped_mac.h"
 #include <cstring>
 
 namespace {
@@ -22,8 +23,9 @@ public:
 	void test(machine_config &config)
 	{
 		m_domain = !std::strcmp(config.options().bios(), "source-domain");
+		m_mapped_mac = !std::strcmp(config.options().bios(), "mac-map-imm");
 		TMS320C54X(config, m_cpu, 13'000'000);
-		m_cpu->set_extended_program(m_domain);
+		m_cpu->set_extended_program(m_domain || m_mapped_mac);
 		m_cpu->set_addrmap(AS_PROGRAM, &c54x_isa_test_state::program_map);
 		m_cpu->set_addrmap(AS_DATA, &c54x_isa_test_state::ram_map);
 		m_cpu->set_addrmap(AS_IO, &c54x_isa_test_state::io_map);
@@ -32,7 +34,8 @@ protected:
 	void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(c54x_isa_test_state::check), this);
-		if (m_domain) m_domains = std::make_unique<c54x_test::source_domain_fixture>(machine(), *m_cpu, *m_timer);
+		if (m_mapped_mac) m_mapped = std::make_unique<c54x_test::mapped_mac_fixture>(machine(), *m_cpu, *m_timer);
+		else if (m_domain) m_domains = std::make_unique<c54x_test::source_domain_fixture>(machine(), *m_cpu, *m_timer);
 		else
 		{
 			if (products()) m_cases = c54x_test::product_examples();
@@ -52,7 +55,13 @@ protected:
 				for (unsigned i = 0; i < m_cases.size(); ++i) m_reset_before[i] = c54x_test::scalar_vectors()[i].reset;
 		}
 	}
-	void machine_reset() override { m_case = m_resets = 0; if (m_domains) m_domains->start(); else start(); }
+	void machine_reset() override
+	{
+		m_case = m_resets = 0;
+		if (m_mapped) m_mapped->start();
+		else if (m_domains) m_domains->start();
+		else start();
+	}
 private:
 	bool parallel() const { return !std::strcmp(machine().options().bios(), "isa-parallel"); }
 	bool scalars() const { return !std::strcmp(machine().options().bios(), "isa-scalars"); }
@@ -71,7 +80,7 @@ private:
 	void program_map(address_map &map)
 	{
 		map(0, 0xffff).ram();
-		if (m_domain) map(0x20000, 0x2ffff).ram();
+		if (m_domain || m_mapped_mac) map(0x20000, 0x2ffff).ram();
 	}
 	void io_map(address_map &map)
 	{
@@ -105,6 +114,12 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_mapped)
+		{
+			if (!m_mapped->step()) return;
+			osd_printf_info("TMS320C54x mapped memory immediate MAC: PASS cases=%u restore=%u sources=AL,AH,AG,BL,BH,BG,T,TRN,AR0_AR7 forms=DP,plain,absolute,offset values=4 literals=8 flags=16 selectors=4 pages=2 snapshots=3 checkpoint_policy=balanced source_sample=Read accumulator_sample=Execute t_publication=Read pointer_literal_poison=1 reset_before_restore=1 physical_phase_claim=0 cpu_only=1 coverage_fnv64=%016llx\n", m_mapped->count(), m_mapped->restores(), (unsigned long long)m_mapped->digest());
+			throw emu_fatalerror(3, "TMS320C54x isolated mapped memory immediate MAC complete");
+		}
 		if (m_domains)
 		{
 			if (!m_domains->step()) return;
@@ -149,7 +164,9 @@ private:
 	unsigned m_case = 0, m_writes = 0, m_resets = 0;
 	u64 m_first = 0, m_last = 0;
 	bool m_domain = false;
+	bool m_mapped_mac = false;
 	std::unique_ptr<c54x_test::source_domain_fixture> m_domains;
+	std::unique_ptr<c54x_test::mapped_mac_fixture> m_mapped;
 	std::vector<c54x_test::instruction_case> m_cases;
 	std::vector<bool> m_reset_before;
 };
@@ -162,6 +179,7 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(4, "isa-long", "TI long-word arithmetic examples")
 	ROM_SYSTEM_BIOS(5, "isa-products", "Literal multiply arithmetic and DELAY continuation sequence")
 	ROM_SYSTEM_BIOS(6, "isa-flow", "Conditional delayed branch return and high-address stack examples")
+	ROM_SYSTEM_BIOS(7, "mac-map-imm", "Read-retained mapped source with Execute-live immediate MAC")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
 ROM_END
 

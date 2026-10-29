@@ -819,15 +819,6 @@ private:
 	};
 	static memory_immediate_fixture memory_immediate_case(unsigned variant);
 	void start_memory_immediate_multiply(unsigned variant = 0);
-	struct mapped_immediate_mac_fixture
-	{
-		memory_immediate_fixture f;
-		unsigned pointer, pattern;
-		u64 late_a() const { return std::array<u64,4>{0,1,0x7fffffff,0xff80000000ULL}[pattern]; }
-		u64 late_b() const { return std::array<u64,4>{0xffffffffffULL,0x0080000000ULL,0xff80000001ULL,0x123456789aULL}[pattern]; }
-	};
-	static mapped_immediate_mac_fixture mapped_immediate_mac_case(unsigned v);
-	void start_mapped_immediate_mac(unsigned variant=0);
 	void start_memory_immediate_mac_exclusion(unsigned variant = 0);
 	void start_mmr_long_edge(unsigned variant = 0);
 	static unsigned block_branch_count(unsigned variant);
@@ -2239,7 +2230,7 @@ private:
 	bool check_mvmd_word_register_results();
 	bool check_mvdd_peripheral_results();
 	bool check_push_mvmm_results();
-	bool check_mapped_immediate_mac_results();
+	bool check_memory_immediate_results();
 	bool check_block_branch_count_results();
 	bool check_bd_long_accumulator_results();
 	bool check_t_move_results();
@@ -2380,7 +2371,6 @@ private:
 	static constexpr unsigned delay_bitt_phase = 1'000'020;
 	static constexpr unsigned mvdd_follow_phase = 1'000'030;
 	static constexpr unsigned bd_read_a_phase = 1'000'040;
-	static constexpr unsigned mapped_immediate_mac_phase = 1'000'050;
 	static constexpr unsigned push_mvmm_phase = 1'000'060;
 	static constexpr unsigned mvdm_t_phase = 1'000'070;
 	std::bitset<65536> m_asserted_opcodes;

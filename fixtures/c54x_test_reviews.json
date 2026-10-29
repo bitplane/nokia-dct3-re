@@ -441,6 +441,39 @@
         "c54x_cpp_lines_after": 57591,
         "source_assessment": "Adds 2517 C++ bytes/43 lines for schedule and actual coverage accounting. Runtime reduction, not source-size reduction; the existing full-default checkpoint is not renewed."
       }
+    },
+    {
+      "id": "mapped-memory-immediate-mac",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_mapped_mac.h",
+      "profiles": ["mac-map-imm"],
+      "case_ids": [],
+      "basis": "Independent signed product, SMUL clamp-before-add, signed 40-bit accumulation, result saturation and sticky overflow references are unchanged. Literal alias fields and post-Read accumulator mutations distinguish retained source data from the live Execute addend. No CPU implementation helper supplies expectations.",
+      "profile_coverage": {
+        "mac-map-imm": {
+          "result_prefix": "TMS320C54x mapped memory immediate MAC: PASS ",
+          "cases": 262144,
+          "key": "Original variant = operand ordinal + 262144 * checkpoint; one checkpoint per input, balanced 10/11/11 across each group's32 value/literal pairs",
+          "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
+          "fnv64": "020c459448602a55"
+        }
+      },
+      "obligations": ["all 262144 inputs:16 mapped addresses,4 addressing forms,4 source patterns,8 literals,16 flag combinations,4 accumulator selectors,2 pages", "retain source alias setup and Read sampling, guard-field8-bit width, T publication, late A/B/T/TRN/pointer mutation and poisoned extension words", "one source read, no data-bus writes, one fetch of every extension, exact per-clock result/status ownership and poisoned pointers remaining unchanged", "CPU-only build with no Nokia/GSM/private ROM dependency; fixture owns its timer cadence, observations, save stream and explicit replay rewinds", "count actual completed cases and successful restores; preserve original case identities in the ordered digest"],
+      "limits": ["remove the checkpoint Cartesian product, not a numeric input or arithmetic expectation", "particular input no longer runs at every checkpoint; all three boundaries remain represented in each fixed source/form/flags/selectors/page group", "execution modes and consumed inputs are explicit; independently reset cases do not claim preservation of unrelated inherited legacy state", "no control, repeat, interrupt, physical timing or silicon memory-bank completeness claim"],
+      "measurement": {
+        "baseline_commit": "dddb1c56",
+        "before_runner_seconds": 338.87,
+        "after_runner_seconds": 104.32,
+        "method": "Serial /usr/bin/time runner wall time; before uses legacy tms54xtra, after uses independent c54xisa binary with empty ROM directory. Includes both balanced checkpoint selection and a smaller save graph.",
+        "reference_equivalence_inputs": 262144,
+        "reference_equivalence_method": "Transient compiled comparison extracted the old and relocated selectors and compared setup fields, expected results/status and late accumulator values at each retained original key. No duplicated old reference is retained in SCM.",
+        "c54x_cpp_bytes_before": 3777446,
+        "c54x_cpp_bytes_after": 3779270,
+        "c54x_cpp_lines_before": 57591,
+        "c54x_cpp_lines_after": 57705,
+        "source_assessment": "Adds 1824 bytes/114 lines for explicit fixture ownership and formatting while removing legacy phase/setup/checker coupling. Architecture/runtime improvement, not source-size reduction."
+      }
     }
   ]
 }

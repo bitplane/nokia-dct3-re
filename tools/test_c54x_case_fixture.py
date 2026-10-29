@@ -29,6 +29,41 @@ def compiled_cpp(source):
 
 class CaseFixtureTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
+    def test_mapped_mac_schedule_preserves_alias_inputs_and_balances_checkpoints(self):
+        source = r'''
+#include <array>
+#include <cassert>
+#include <cstdio>
+#include <algorithm>
+#include "tests/c54x/tms320c54x_test_memory_immediate_schedule.h"
+#include "tests/c54x/tms320c54x_test_support.h"
+int main() {
+    using namespace c54x_test;
+    std::array<unsigned, 262144> seen{};
+    std::array<std::array<unsigned, 3>, 8192> groups{};
+    ordered_case_digest coverage;
+    for (unsigned i = 0; i < mapped_mac_inputs; ++i) {
+        unsigned const key = mapped_mac_key(i);
+        assert(key < 786432);
+        unsigned const input = key % 262144, checkpoint = key / 262144;
+        assert(input == i && !seen[input]++);
+        unsigned const group = input % 64 + 64 * (input / (64 * 32));
+        ++groups[group][checkpoint];
+        coverage.add(key);
+    }
+    for (auto n : seen) assert(n == 1);
+    for (auto group : groups) {
+        std::sort(group.begin(), group.end());
+        assert((group == std::array<unsigned, 3>{10, 11, 11}));
+    }
+    std::printf("cases=%u digest=%016llx\n", coverage.count, (unsigned long long)coverage.value);
+}
+'''
+        with compiled_cpp(source) as program:
+            output = subprocess.check_output([str(program)], text=True).strip()
+        self.assertEqual(output, 'cases=262144 digest=020c459448602a55')
+
+    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_memory_immediate_schedule_preserves_inputs_and_balances_checkpoints(self):
         source = r'''
 #include <array>

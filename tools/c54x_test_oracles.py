@@ -715,7 +715,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated TC delayed calls complete",
     ),
     "mac-map-imm": (
-        "TMS320C54x mapped memory immediate MAC: PASS cases=786432 restore=786432 sources=AL,AH,AG,BL,BH,BG,T,TRN,AR0_AR7 forms=DP,plain,absolute,offset values=4 literals=8 flags=16 selectors=4 pages=2 snapshots=3 source_sample=Read accumulator_sample=Execute t_publication=Read pointer_literal_poison=1 reset_before_restore=1 physical_phase_claim=0",
+        "TMS320C54x mapped memory immediate MAC: PASS cases=262144 restore=262144 sources=AL,AH,AG,BL,BH,BG,T,TRN,AR0_AR7 forms=DP,plain,absolute,offset values=4 literals=8 flags=16 selectors=4 pages=2 snapshots=3 checkpoint_policy=balanced source_sample=Read accumulator_sample=Execute t_publication=Read pointer_literal_poison=1 reset_before_restore=1 physical_phase_claim=0 cpu_only=1 coverage_fnv64=020c459448602a55",
         "Fatal error: TMS320C54x isolated mapped memory immediate MAC complete",
     ),
     "bd-read-a": (
