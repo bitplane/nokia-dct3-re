@@ -8,6 +8,19 @@
   },
   "families": [
     {
+      "id": "legacy-timed-replay-tail",
+      "classification": "harness_infrastructure",
+      "decision": "merge",
+      "profiles": [],
+      "case_ids": [],
+      "source": "tests/c54x/tms320c54x_test_state.h and seven sequenced CPU-test translation units",
+      "basis": "233 identical timed snapshot-load/suspend/continuation/observer-enable sequences delegate to restore_pipeline_at. Expanding each call reproduces every original C++ token, including the diagnostic text. All continuation arguments are literals or one of fifteen compile-time phase constants; evaluating them before loading state has no effect.",
+      "obligations": ["leave replay flags, tick rewinds, explicitly restored host counters, checkpoint selection, bus assertions, arithmetic references and CPU resume callbacks with each fixture", "retain timer cancellation before stream load, fail before suspension on a load error, then suspend CPU before publishing the continuation and enabling the observer", "untimed restores, extra post-load state checks and differently ordered lifecycles are not migrated"],
+      "limits": ["no case, checkpoint, assertion or profile removed; no runtime improvement claimed", "legacy bench still contains DMA/McBSP and shares firmware declarations; helper consolidation does not qualify unreviewed instruction families or make the whole bench CPU-only", "focused native acceptance does not renew the full-default checkpoint"],
+      "measurement": {"baseline_commit": "fec80f68", "c54x_cpp_bytes_before": 3592491, "c54x_cpp_bytes_after": 3555912, "c54x_cpp_lines_before": 54424, "c54x_cpp_lines_after": 54334, "scope": "36579 C++ bytes/90 lines removed; many old tails were already compressed onto one line. The new executable helper-order/failure test adds Python test source, not a second copy of instruction fixtures."},
+      "validation": "Actual helper success/failure ordering executes against CPU/timer/stream stubs. All 373 focused host tests pass. Native mar-circular, bcd-arithmetic, pop-irq-edge, idle-modes, literal-guard, tc-return and rptz cover each changed translation unit and pass their unchanged full profile requirements. Every C54x translation unit expands to identical baseline tokens."
+    },
+    {
       "id": "unsupported-delay-family-probes",
       "classification": "implementation_limit",
       "decision": "delete",

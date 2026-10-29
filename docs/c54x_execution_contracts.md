@@ -48,6 +48,14 @@ Family retention/rewrite/merge/relocation/deletion decisions live in
 devices or private firmware; legacy default continuations can reuse reviewed
 case data without making the entire sequenced bench generic.
 
+Timed replay uses one `restore_pipeline_at` tail: cancel the observer before
+loading the stream, reject load failure, suspend the CPU, publish its fixed
+continuation and enable the observer. Each fixture still explicitly owns its
+host-counter rewinds, checkpoint and resume callback. Untimed restoration and
+post-load assertions retain their separate ordering. Executable stub tests
+check the real helper's success and failure paths; its use does not qualify
+the instruction cases that call it.
+
 Unsupported delay combinations are not architectural conformance. The suite
 retains `st-delay-edge` as a sixteen-case fail-closed store-boundary/replay
 control, rather than a rejection matrix for each unsupported instruction family.

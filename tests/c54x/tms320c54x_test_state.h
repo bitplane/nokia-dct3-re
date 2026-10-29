@@ -1999,6 +1999,15 @@ private:
 	bool check_rounded_multiply_results();
 	bool check_stopped_timer_reload_results();
 	bool check_atomic_program_results();
+	bool restore_pipeline_at(unsigned phase, const char *message)
+	{
+		// Callers rewind host observations explicitly before loading guest state.
+		expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, message);
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_phase = phase;
+		m_check_timer->enable(true);
+		return true;
+	}
 	bool next_atomic_phase(unsigned phase)
 	{
 		m_phase = phase;

@@ -1566,8 +1566,7 @@ bool tms320c54x_test_state::check_literal_guard_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore a retained extension without duplicate block stores");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = literal_guard_phase + 1; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(literal_guard_phase + 1, "Restore a retained extension without duplicate block stores");
 			}
 			m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 53) { start_literal_guard(variant + 1); return true; }
@@ -1930,7 +1929,7 @@ bool tms320c54x_test_state::check_pipeline_rmw_results()
 		if (tick == 24)
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + f.store() + 2 && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == f.prefix() && m_pipeline_extensions_reads == unsigned(f.long_form()) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.result && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.pattern ? 0xfffffffff9ULL : 7) && m_cpu->state_int(tms320c54x_device::STATE_TRN) == u16(f.result) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1002 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa620 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x4444, "ASM delay and selected target preserve the sampled shift, source, status and one observed result");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[3]; expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Replay delayed ASM without repeated source reads or target writes"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 311010; m_check_timer->enable(true); return true; }
+			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[3]; return restore_pipeline_at(311010, "Replay delayed ASM without repeated source reads or target writes"); }
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 30719) { start_delay_asm(variant + 1); return true; }
 			osd_printf_info("TMS320C54x delayed LD ASM: PASS cases=30720 restore=30720 controls=BD,BCD_taken,BCD_untaken,BD_store_prefix forms=DP,SP,postincrement,offset,absolute shifts=32 patterns=2 sxm_ovm=4 pages=2 snapshots=3 source_reads=1 extension_fetches=owned t_preserved=1 adjacent_consumer=LD_B_ASM_A target_observes_result=1 call_interrupt_repeat_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delayed LD ASM complete");
@@ -2489,8 +2488,7 @@ bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore SP RMW state without repeating a read or publication");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252340; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(252340, "Restore SP RMW state without repeating a read or publication");
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 255) { start_pipeline_sp_rmw(variant + 1); return true; }
@@ -2529,8 +2527,7 @@ bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_pipeline_branch_case;
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore ARP consumer without retargeting or repeating its auxiliary update");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252360; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(252360, "Restore ARP consumer without retargeting or repeating its auxiliary update");
 			}
 			m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 511) { start_pipeline_arp(variant + 1); return true; }
@@ -2573,8 +2570,7 @@ bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_drained_fetches = m_recurring_irq_snapshot[2];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore READA source/wait/operand without retargeting the transfer");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252380; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(252380, "Restore READA source/wait/operand without retargeting the transfer");
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant == 191) osd_printf_info("TMS320C54x staged absolute READA AR1: PASS cases=192 source_pages=3 source_regions=2 ovly_states=2 consumer_gaps=4 restore=192 retained_accumulator_source=1 duplicate_program_reads=0 duplicate_register_writes=0\n");
@@ -2617,8 +2613,7 @@ bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore BANZ without changing its target or repeating the auxiliary modification");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252400; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(252400, "Restore BANZ without changing its target or repeating the auxiliary modification");
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 287) { start_pipeline_banz(variant + 1); return true; }
@@ -2676,8 +2671,7 @@ bool tms320c54x_test_state::check_pipeline_add_sp_context_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore mapped-SP operand without duplicate stack effects or reads");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 291010; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(291010, "Restore mapped-SP operand without duplicate stack effects or reads");
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 575) { start_pipeline_add_sp_context(variant + 1); return true; }
@@ -2749,8 +2743,7 @@ bool tms320c54x_test_state::check_pipeline_add_sp_context_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore memory ADD without repeating its read or arithmetic update");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252440; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(252440, "Restore memory ADD without repeating its read or arithmetic update");
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < (sp ? 4095 : 2047)) { start_pipeline_absolute_add(variant + 1); return true; }
@@ -2814,8 +2807,7 @@ bool tms320c54x_test_state::check_pipeline_add_sp_context_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore direct RMW without resampling modified context, literal or memory");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252460; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(252460, "Restore direct RMW without resampling modified context, literal or memory");
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 767) { start_pipeline_direct_rmw(variant + 1); return true; }
@@ -2884,8 +2876,7 @@ bool tms320c54x_test_state::check_pipeline_long_move_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore long MVDK without source resampling or duplicate writes");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252840; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(252840, "Restore long MVDK without source resampling or duplicate writes");
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 38399) { start_pipeline_long_move(variant + 1); return true; }
@@ -2920,8 +2911,7 @@ bool tms320c54x_test_state::check_pipeline_long_move_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore original pair without repeating either write");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252860; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(252860, "Restore original pair without repeating either write");
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 7) { start_pipeline_original_long_move(variant + 1); return true; }
@@ -2969,8 +2959,7 @@ bool tms320c54x_test_state::check_pipeline_long_move_results()
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore TC decision/held word without duplicate target or source fetches");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252880; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(252880, "Restore TC decision/held word without duplicate target or source fetches");
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_operand_data_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (raw_variant < (carry ? 383 : 1535)) { start_pipeline_tc_branch(raw_variant + 1); return true; }
@@ -3031,8 +3020,7 @@ bool tms320c54x_test_state::check_pipeline_swap_body_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore original body without duplicate reads, writes or pointer modification");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253320; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(253320, "Restore original body without duplicate reads, writes or pointer modification");
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 1535) { start_pipeline_swap_body(variant + 1); return true; }
@@ -3073,8 +3061,7 @@ bool tms320c54x_test_state::check_pipeline_swap_body_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore consecutive bodies without repeating address updates or bus transactions");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253340; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(253340, "Restore consecutive bodies without repeating address updates or bus transactions");
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 1535) { start_pipeline_swap_join(variant + 1); return true; }
@@ -3132,8 +3119,7 @@ bool tms320c54x_test_state::check_block_repeat_forwarding_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore speculative and architectural block states without duplicate work");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253360; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(253360, "Restore speculative and architectural block states without duplicate work");
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 6167) { start_pipeline_rptb(variant + 1); return true; }
@@ -3173,8 +3159,7 @@ bool tms320c54x_test_state::check_block_repeat_forwarding_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = 2; m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore block edge without atomic fallback");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253380; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(253380, "Restore block edge without atomic fallback");
 			}
 			m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 15) { start_pipeline_rptb_edge(variant + 1); return true; }
@@ -3225,8 +3210,7 @@ bool tms320c54x_test_state::check_block_repeat_forwarding_results()
 			if (!m_pipeline_replay)
 			{
 				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore dependency with its retained producer operand and follower");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253400; m_check_timer->enable(true); return true;
+				return restore_pipeline_at(253400, "Restore dependency with its retained producer operand and follower");
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); if (copy) m_operand_data_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < (immediate ? 6911 : 767)) { start_pipeline_rmw_forward(variant + 1); return true; }
