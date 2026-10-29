@@ -109,11 +109,10 @@ both, then supplies a second frame which must remain pending after Execute
 and replay. Debugger peeks cannot acknowledge either frame. This validates
 CPU/register composition, not a physical serial clock or handset speech.
 
-Mapped shifted ADD/SUB remain outside this admission, as do ST1/BRC sources
-and the tested repeat/block/XC/delay compositions. The 64-case
-`shift-per-edge` fixture requires rejection before data-side effects and
-reproduces it across save/load. These are implementation boundaries, not
-claims that real silicon prohibits those instructions.
+Mapped shifted ADD/SUB remain outside this peripheral-load admission, as do
+ST1/BRC sources and unqualified repeat/block/XC/delay compositions. These are
+implementation boundaries, not claims that real silicon prohibits those
+instructions. Supported mapped-BK arithmetic has its own acceptance scope.
 
 ## Repeat endpoint and page hazard
 

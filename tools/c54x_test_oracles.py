@@ -430,10 +430,6 @@ EXTRA_PROFILES = {
         "TMS320C54x repeated MVMD: PASS cases=1536 restore=1536 sources=AL,BL counts=0,1,39,255 patterns=4 flags=4 headers=short,long pages=2 snapshots=3 fixed_source_reads=each destination=EAR_increment literal_fetches=1 mid_repeat_source_change=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated repeated MVMD complete",
     ),
-    "shift-per-edge": (
-        "TMS320C54x shifted peripheral exclusions: PASS cases=64 restore=64 accumulators=A,B pages=2 snapshots=2 classes=repeat,block,XC,delay,ST1,BRC,ADD,SUB data_reads=0 data_writes=0 atomic_fallback=0 silicon_phase_claim=0",
-        "Fatal error: TMS320C54x isolated shifted peripheral exclusions complete",
-    ),
     "portr-circular": (
         "TMS320C54x circular PORTR: PASS cases=98304 restore=98304 modes=4 registers=8 compatibility=2 bk=4 indices=4 samples=4 ports=2 flags=2 pages=2 snapshots=3 literal_retained=1 sample_retained=1 pointer_updates=once destination_reads=0 excluded_io_reads=0 excluded_writes=0 bk_zero=legacy_linear silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated circular PORTR complete",
@@ -2146,10 +2142,6 @@ EXTRA_PROFILES = {
     "mvdm-ar": (
         "TMS320C54x staged MVDM AR: PASS cases=1152 restore=1152 registers=8 sources=RAM,self_AR,other_AR gaps=0,1 pages=2 literal_fetches=1 reads=1 writes=1 repeat_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated MVDM AR complete",
-    ),
-    "shift-bk-edge": (
-        "TMS320C54x shifted BK exclusions: PASS cases=64 restore=64 accumulators=A,B pages=2 snapshots=2 classes=repeat,block,XC,delay,ST1,BRC,LD,ST data_reads=0 data_writes=0 atomic_fallback=0 silicon_phase_claim=0",
-        "Fatal error: TMS320C54x isolated shifted BK exclusions complete",
     ),
     "shifted-bk": (
         "TMS320C54x shifted BK arithmetic: PASS cases=8192 restore=8192 selectors=8 shifts=32 sxm_ovm=4 values=4 pages=2 snapshots=balanced source_sample=Read post_read_change=1 extension_poison=1 writes=0 physical_phase_claim=0 coverage_fnv64=6d4d03cf8d787ec9",

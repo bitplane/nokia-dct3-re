@@ -1587,35 +1587,6 @@ void tms320c54x_test_state::start_shifted_peripheral(unsigned variant)
 	m_phase = 62120; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_shifted_peripheral_edge(unsigned variant)
-{
-	start_shifted_peripheral(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-	u32 const base = (variant / 16) % 2 ? 0x20000 : 0;
-	u16 const operation = 0x0c44 | ((variant / 8) % 2 ? 0x100 : 0);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	switch (variant % 8)
-	{
-	case 0: program.write_word(base + 0x600, 0xec01); program.write_word(base + 0x601, 0x6f20); program.write_word(base + 0x602, operation); break;
-	case 1: program.write_word(base + 0x600, 0xf072); program.write_word(base + 0x601, 0x604); program.write_word(base + 0x602, 0x6f20); program.write_word(base + 0x603, operation); break;
-	case 2: program.write_word(base + 0x600, 0xfd00); program.write_word(base + 0x601, 0x6f20); program.write_word(base + 0x602, operation); break;
-	case 3: program.write_word(base + 0x600, 0xf273); program.write_word(base + 0x601, 0x700); program.write_word(base + 0x602, 0x6f20); program.write_word(base + 0x603, operation); break;
-	case 4: case 5: program.write_word(base + 0x600, variant % 8 == 4 ? 0x6f07 : 0x6f1a); program.write_word(base + 0x601, operation); break;
-	case 6: case 7: program.write_word(base + 0x600, 0x6f20); program.write_word(base + 0x601, (operation & ~u16(0x0040)) | (variant % 8 == 7 ? 0x20 : 0)); break;
-	}
-	if (profile_is("shift-bk-edge"))
-	{
-		unsigned const prefix = variant % 8 == 0 || variant % 8 == 2 ? 1 : variant % 8 == 1 || variant % 8 == 3 ? 2 : 0;
-		program.write_word(base + 0x600 + prefix, 0x6ff8);
-		program.write_word(base + 0x601 + prefix, variant % 8 == 4 ? 7 : variant % 8 == 5 ? 0x1a : 0x19);
-		program.write_word(base + 0x602 + prefix, (operation & ~u16(0x0040)) | (variant % 8 == 6 ? 0x40 : variant % 8 == 7 ? 0x60 : 0));
-	}
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "shifted_peripheral_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "shifted_peripheral_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_phase = 62122; m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
-
 void tms320c54x_test_state::start_ldu_peripheral(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -3195,31 +3166,10 @@ bool tms320c54x_test_state::check_ldu_peripheral_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_shifted_peripheral_edge_results()
+bool tms320c54x_test_state::check_shifted_peripheral_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 62122)
-	{
-		unsigned const tick = ++m_idle_fixture_tick, checkpoint = 2 + m_pipeline_peripheral_case / 32;
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save excluded shifted peripheral form before its bus access"); }
-		if (tick == 14)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads && !m_pipeline_store_writes, "Excluded mapped shift/control form stops before any data-side effects");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(62123, "Restore excluded shifted operand without admitting its endpoint"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < 63) { start_shifted_peripheral_edge(m_pipeline_peripheral_case + 1); return true; }
-			if (profile_is("shift-bk-edge"))
-			{
-				osd_printf_info("TMS320C54x shifted BK exclusions: PASS cases=64 restore=64 accumulators=A,B pages=2 snapshots=2 classes=repeat,block,XC,delay,ST1,BRC,LD,ST data_reads=0 data_writes=0 atomic_fallback=0 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated shifted BK exclusions complete");
-			}
-			osd_printf_info("TMS320C54x shifted peripheral exclusions: PASS cases=64 restore=64 accumulators=A,B pages=2 snapshots=2 classes=repeat,block,XC,delay,ST1,BRC,ADD,SUB data_reads=0 data_writes=0 atomic_fallback=0 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated shifted peripheral exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62123) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62122; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 62120)
 	{
 		auto const f = shifted_peripheral_case(m_pipeline_peripheral_case, shifted_bsp_fixture(), shifted_unowned_fixture()); unsigned const tick = ++m_idle_fixture_tick;

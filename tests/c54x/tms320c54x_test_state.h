@@ -1776,7 +1776,6 @@ private:
 	bool shifted_bsp_fixture() const;
 	bool shifted_unowned_fixture() const;
 	void start_shifted_peripheral(unsigned variant = 0);
-	void start_shifted_peripheral_edge(unsigned variant = 0);
 	void start_ldu_peripheral(unsigned variant = 0);
 	void start_ldu_imr(unsigned variant = 0);
 	void start_mvmd_status_irq(unsigned variant = 0);
@@ -2140,7 +2139,7 @@ private:
 	bool check_ldu_status_value_results();
 	bool check_ldu_imr_results();
 	bool check_mvmd_status_block_results();
-	bool check_shifted_peripheral_edge_results();
+	bool check_shifted_peripheral_results();
 	bool check_rptbd_square_results();
 	bool check_delay_copy_results();
 	bool check_staged_overflow_results();

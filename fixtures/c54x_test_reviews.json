@@ -8,6 +8,19 @@
   },
   "families": [
     {
+      "id": "unsupported-shifted-composition-probes",
+      "classification": "implementation_limit",
+      "decision": "delete",
+      "profiles": [],
+      "case_ids": [],
+      "retired_profiles": ["shift-per-edge", "shift-bk-edge"],
+      "basis": "These isolated matrices assert the current prototype's rejection policy for unimplemented shifted operand/control combinations, not independently specified silicon outcomes. Retire their dedicated setup/tap/replay paths rather than carry one negative matrix per incremental admission. This is a deliberate coverage tradeoff, not an equivalent-coverage claim.",
+      "retained": ["shift-periph retains operand/literal capture, wait clocks, exact bus effects and replay for supported peripheral loads", "shift-bsp retains receive acknowledgement, next-frame preservation and debugger-peek behavior", "shifted-bk retains supported source sampling, arithmetic, flags and extension poisoning", "shared source-domain and representative block/store admission boundaries remain separate"],
+      "limits": ["remove 128 rejected executions and 128 restores, not supported instruction cases", "the specific repeat/block/XC/delay and ST1/BRC/other-operation combinations no longer have dedicated no-effect/replay coverage", "no CPU guard, supported factory, fixture setup or positive predicate is changed", "this does not renew the full-default or handset checkpoint"],
+      "verification": "Both retired profiles pass before removal. The shared positive reference factory, setup and complete result/replay tail are byte-identical. Rebuilt shift-periph (245760 cases/restores), shift-bsp (40960) and shifted-bk (8192) pass, as do all 5075 host tests. Retired helpers have no default-sequence callers.",
+      "measurement": {"c54x_cpp_bytes_before": 3471171, "c54x_cpp_bytes_after": 3466405, "c54x_cpp_lines_before": 52597, "c54x_cpp_lines_after": 52543, "isolated_profiles_before": 433, "isolated_profiles_after": 431, "positive_control_seconds": {"shift-periph": 108.08, "shift-bsp": 18.02, "shifted-bk": 3.67}, "scope": "54 C++ lines and 4766 bytes removed. Times are serial native wrapper wall times, not a measured speedup; these controls remain deliberately unchanged."}
+    },
+    {
       "id": "shared-to-legacy-entry-state",
       "classification": "harness_infrastructure",
       "decision": "rewrite",

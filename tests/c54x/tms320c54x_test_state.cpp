@@ -99,7 +99,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (profile_is("shift-periph") || shifted_bsp_fixture() || shifted_unowned_fixture()) { start_shifted_peripheral(); return; }
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"shift-per-edge", "shift-bk-edge"}, [](self &test) { test.start_shifted_peripheral_edge(); } },
 		{ {"stlm-cpl", "stlm-cmpt"}, [](self &test) { test.start_pipeline_cpl(); } },
 		{ {"stm-cpl", "stm-cmpt"}, [](self &test) { test.start_pipeline_cpl(); } },
 		{ {"stlm-imr"}, [](self &test) { test.start_pipeline_imr_store(); } },
