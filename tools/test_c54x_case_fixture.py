@@ -67,10 +67,13 @@ int main() {
                            check=True, capture_output=True)
             subprocess.run([str(root / 'snapshot')], check=True, capture_output=True)
 
-    def test_rmw_ordered_coverage_is_required(self):
-        for profile in ('rmw-long', 'rmw-long-full'):
-            marker, ending = EXTRA_PROFILES[profile]
-            text = marker + '\n' + ending
+    def test_reviewed_ordered_coverage_is_required(self):
+        for profile in ('rmw-long', 'rmw-long-full', 'long-mvkd'):
+            markers, ending = EXTRA_PROFILES[profile]
+            markers = (markers,) if isinstance(markers, str) else markers
+            coverage = reviewed_profiles()[profile]['coverage']
+            marker = next(m for m in markers if m.startswith(coverage['result_prefix']))
+            text = '\n'.join((*markers, ending))
             check_result(text, 3, profile=profile)
             digest = reviewed_profiles()[profile]['coverage']['fnv64']
             for changed in (text.replace(digest, '0' * 16),
@@ -78,6 +81,52 @@ int main() {
                             marker + '\n' + text):
                 with self.subTest(profile=profile), self.assertRaisesRegex(ValueError, 'coverage digest'):
                     check_result(changed, 3, profile=profile)
+
+    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
+    def test_store_schedule_retains_each_stimulus_and_checkpoint_group(self):
+        source = r'''
+#include <iostream>
+#include "tests/c54x/tms320c54x_test_support.h"
+#include "tests/c54x/tms320c54x_test_store_schedule.h"
+int main() {
+    using s = c54x_test::long_store_schedule;
+    c54x_test::ordered_case_digest digest;
+    for (unsigned v = 0; v < s::end; v = s::next(v)) {
+        unsigned const key = s::case_key(v);
+        digest.add(key);
+        std::cout << v << ' ' << key << ' ' << s::checkpoint(v) << '\n';
+    }
+    std::cout << "digest=" << std::hex << digest.value << '\n';
+}
+'''
+        expected, groups, ordinal = [], defaultdict(Counter), 0
+        for shifted in (False, True):
+            forms = 7 if shifted else 25
+            for major in range(32 if shifted else 2):
+                for pattern in range(4):
+                    for flags in range(4):
+                        for selector in range(4):
+                            for offset in range(4):
+                                for form in range(forms):
+                                    checkpoint = (form + offset + selector + flags + pattern + major) % 3
+                                    variant = 38400 + ordinal - 12800 if shifted else ordinal
+                                    tick = ((4, 7, 8) if shifted else (3, 6, 7))[checkpoint]
+                                    expected.append((variant, ordinal * 3 + checkpoint, tick))
+                                    groups[shifted, major, flags, selector, offset, form][checkpoint] += 1
+                                    ordinal += 1
+        self.assertEqual(ordinal, 70144)
+        self.assertEqual(len(groups), 3200 + 14336)
+        self.assertTrue(all(sorted(group.values()) == [1, 1, 2] for group in groups.values()))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'store.cpp').write_text(source)
+            subprocess.run(['c++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT),
+                            str(root / 'store.cpp'), '-o', str(root / 'store')],
+                           check=True, capture_output=True)
+            output = subprocess.run([str(root / 'store')], check=True, capture_output=True,
+                                    text=True).stdout.splitlines()
+        self.assertEqual([tuple(map(int, line.split())) for line in output[:-1]], expected)
+        self.assertEqual(output[-1], 'digest=' + reviewed_profiles()['long-mvkd']['coverage']['fnv64'])
 
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_rmw_schedule_preserves_stimuli_and_checkpoint_shapes(self):

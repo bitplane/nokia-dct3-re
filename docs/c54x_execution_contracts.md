@@ -64,6 +64,14 @@ case/checkpoint digests and actual replay counts are required acceptance, with
 the selector independently checked outside the CPU. The exact staged cycle
 placement remains a model contract, not measured silicon timing.
 
+Long STL/STH uses the same retention policy: 12,800 regular and 57,344 shifted
+stimuli run once each, rather than three times each. Within each fixed
+address/selector/status/compatibility-or-shift group, the four value patterns
+exercise all three checkpoints, one twice. The 140,288 repeated executions are
+retired; there is no claim of every value at every checkpoint. A combined
+ordered digest and actual replay count protect both matrices. The review on
+`long-mvkd` explicitly covers these store results, not all members of the bundle.
+
 The CLI test exercises every isolated profile's machine/BIOS selection and
 result checking using simulated process output. The inventory is a structural
 preservation check, not executed coverage, an independent arithmetic oracle
@@ -1253,7 +1261,7 @@ BK unless the instruction explicitly writes BK.
 The compatibility-named `long-mvkd` BIOS now isolates all seven shared
 consumers: immediate ST, ordinary and shifted STL/STH, MVDK, its original
 instruction-pair control, RMW and MVKD. Its runner requires every marker,
-covering 427,784 cases/restores without adding a BIOS slot or changing CPU
+covering 172,296 cases/restores without adding a BIOS slot or changing CPU
 emulation. The peripheral-only fixtures retain their separate register and
 latency contracts. `long-mvkd`, `st-long-periph`, `rmw-long-periph`,
 `preinc-store` and `preinc-st` all pass, including the unrelated short-store

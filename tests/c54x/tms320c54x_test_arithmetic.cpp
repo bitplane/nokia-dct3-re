@@ -4,6 +4,7 @@
 #include "emu.h"
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_rmw_schedule.h"
+#include "tms320c54x_test_store_schedule.h"
 
 namespace c54x_test {
 
@@ -1530,6 +1531,7 @@ void tms320c54x_test_state::start_shifted_store_dld(unsigned variant)
 void tms320c54x_test_state::start_pipeline_long_accumulator_store(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+	if (!variant) { m_long_store_coverage = {}; m_long_store_replays = 0; }
 	auto const f = long_accumulator_store_fixture(variant);
 	u32 const base = f.reg == 6 ? 0x20000 : 0;
 	auto &program = m_cpu->space(AS_PROGRAM);
@@ -6412,7 +6414,7 @@ bool tms320c54x_test_state::check_long_accumulator_store_results()
 		auto const f = long_accumulator_store_fixture(variant);
 		bool const shifted = variant >= 38400;
 		unsigned const read_cycle = shifted ? 7 : 6;
-		unsigned const checkpoint = shifted ? std::array<unsigned, 3>{4, 7, 8}[(variant - 38400) / 57344] : std::array<unsigned, 3>{3, 6, 7}[variant / 12800];
+		unsigned const checkpoint = long_store_schedule::checkpoint(variant);
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Long-offset accumulator store has staged ownership");
 		if (tick == 4)
 		{
@@ -6450,12 +6452,23 @@ bool tms320c54x_test_state::check_long_accumulator_store_results()
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
 				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore STL/STH without duplicate pointer update or RAM write");
+				++m_long_store_replays;
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252820; m_check_timer->enable(true); return true;
 			}
+			m_long_store_coverage.add(long_store_schedule::case_key(variant));
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant == 38399) osd_printf_info("TMS320C54x staged long STL/STH: PASS cases=38400 forms=25 offsets=4 selectors=4 sst_sxm=4 patterns=4 compatibility=2 restore=38400 duplicate_writes=0 destination_reads=0\n");
-			if (variant < 210431) { start_pipeline_long_accumulator_store(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged shifted STL/STH: PASS cases=172032 forms=7 offsets=4 selectors=4 shifts=32 sst_sxm=4 patterns=4 restore=172032 duplicate_writes=0 destination_reads=0 silicon_phase_claim=0\n");
+			if (variant + 1 == long_store_schedule::regular_cases)
+			{
+				expect(m_long_store_coverage.count == long_store_schedule::regular_cases && m_long_store_replays == long_store_schedule::regular_cases,
+					"Long store coverage counts completed cases and actual restores");
+				osd_printf_info("TMS320C54x staged long STL/STH: PASS cases=12800 forms=25 offsets=4 selectors=4 sst_sxm=4 patterns=4 compatibility=2 restore=12800 duplicate_writes=0 destination_reads=0 checkpoints=3 checkpoint_policy=balanced\n");
+			}
+			if (auto const next = long_store_schedule::next(variant); next < long_store_schedule::end)
+				{ start_pipeline_long_accumulator_store(next); return true; }
+			expect(m_long_store_coverage.count == long_store_schedule::cases && m_long_store_replays == long_store_schedule::cases,
+				"Store coverage digest includes every distinct regular and shifted stimulus after replay");
+			osd_printf_info("TMS320C54x staged shifted STL/STH: PASS cases=57344 forms=7 offsets=4 selectors=4 shifts=32 sst_sxm=4 patterns=4 restore=57344 duplicate_writes=0 destination_reads=0 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced coverage_cases=%u coverage_restores=%u coverage_fnv64=%016llx\n",
+				m_long_store_coverage.count, m_long_store_replays, (unsigned long long)m_long_store_coverage.value);
 			start_pipeline_long_move(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

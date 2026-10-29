@@ -90,6 +90,39 @@
       "rationale": "The 128-case matrix is already compact and protects distinct arithmetic and preservation boundaries. Keep it rather than force a rewrite for a small line-count gain; prioritize shared harness ownership and large replay matrices. CPU-only relocation remains separate from this retention decision."
     },
     {
+      "id": "long-accumulator-stores",
+      "classification": "architectural_interaction",
+      "decision": "merge",
+      "basis": "TI STL/STH addressing, shift and SST/SXM semantics; fixture-local independent shift/saturation expectations and explicitly model-owned checkpoint ordering. Both original matrices repeated every distinct stimulus three times, changing only the save checkpoint.",
+      "source": "tests/c54x/tms320c54x_test_store_schedule.h",
+      "profiles": ["long-mvkd"],
+      "scope": "Long and shifted STL/STH results only; the bundle's immediate ST, MVDK and MVKD contracts remain unreviewed here. RMW has its own review.",
+      "legacy_entry": "default and long-mvkd phase 252810",
+      "case_ids": [],
+      "profile_coverage": {
+        "long-mvkd": {
+          "result_prefix": "TMS320C54x staged shifted STL/STH: PASS ",
+          "cases": 70144,
+          "key": "3 * combined_unique_stimulus_ordinal + checkpoint_index; regular stimuli followed by shifted stimuli",
+          "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
+          "fnv64": "7bde6b25cde99875"
+        }
+      },
+      "obligations": [
+        "all 12800 regular and 57344 shifted stimuli, including every address, offset, selector, status, pattern, compatibility or shift value",
+        "all three checkpoints within each fixed non-pattern group: 3200 regular groups and 14336 shifted groups",
+        "literal poisoning, live source replacement at Read and pointer poisoning after address presentation",
+        "one write, no destination read, exact extension count and no repeated pointer update across restore",
+        "independent ordered case/checkpoint digest and actual restore counts"
+      ],
+      "limits": [
+        "the 140288 redundant value-by-checkpoint executions are retired, not moved to another required or optional profile",
+        "balanced coverage does not claim every value pattern at every checkpoint",
+        "staged publication clocks remain model contracts, not measured silicon timing",
+        "still uses the sequenced bench; CPU-only relocation is not claimed"
+      ]
+    },
+    {
       "id": "long-ram-rmw",
       "classification": "architectural_interaction",
       "decision": "merge",

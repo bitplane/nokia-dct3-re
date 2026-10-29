@@ -26,6 +26,8 @@ def reviewed_profiles(root=ROOT):
                 raise ValueError('isolated review needs case identities or an ordered coverage digest')
             result[profile] = dict(family=family['id'], classification=family['classification'],
                                    decision=family['decision'], case_ids=ids)
+            if 'scope' in family:
+                result[profile]['scope'] = family['scope']
             if coverage:
                 result[profile]['coverage'] = coverage
     return result
@@ -39,5 +41,5 @@ if __name__ == '__main__':
         raise SystemExit('unknown reviewed profiles: ' + ', '.join(sorted(unknown)))
     families = json.loads((ROOT / 'fixtures/c54x_test_reviews.json').read_text())['families']
     print(f'{len(families)} reviewed families; '
-          f'{len(reviews)} reviewed isolated profiles; '
-          f'{len(set(EXTRA_PROFILES) - set(reviews))} isolated profiles unreviewed')
+          f'{len(reviews)} profiles with reviewed contracts; '
+          f'{len(set(EXTRA_PROFILES) - set(reviews))} isolated profiles without a review')
