@@ -80,12 +80,10 @@ status publication, no source-memory read, at most one interrupt frame
 and exactly one foreground marker. It does not inherit the special
 SSBX/RSBX INTM guard or settle the unverified clearing policy.
 
-The `stlm-st1-edge` fixture rejects 64 cases with replay before data-side
-effects: delay slots, single/block repeat, XC, and adjacent RPTB/RPTBD,
-including adjacency across the 16-bit PC wrap on both tested pages.
-The adjacent-repeat case is a documented BRAF overwrite hazard (7.5.7.1),
-not a safe composition or an emulated hardware trap. Other excluded cases
-remain implementation boundaries, not claims that silicon forbids them.
+Delay/repeat/XC and adjacent RPTB/RPTBD status-store compositions remain
+implementation boundaries, not claims that silicon forbids them. The
+adjacent-repeat case is a documented BRAF overwrite hazard (7.5.7.1), not
+a safe composition or an emulated hardware trap.
 
 ## Shifted peripheral operand reads
 

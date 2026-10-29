@@ -8,6 +8,20 @@
   },
   "families": [
     {
+      "id": "unsupported-store-and-counter-composition-probes",
+      "classification": "implementation_limit",
+      "decision": "delete",
+      "profiles": [],
+      "case_ids": [],
+      "retired_profiles": ["write-a-edge", "move-brc-edge", "reada-brc-edge", "stlm-bsp-edge", "stm-st1-edge", "stlm-st1-edge"],
+      "basis": "These separate phase/tap/replay matrices freeze the prototype's current rejection policy for unimplemented compound owners. They do not establish the silicon outcome of those compositions. Retire the per-family negative matrices rather than preserve every unsupported combination as a permanent CPU contract; this is deliberate coverage loss, not an overlap or equivalent-coverage claim.",
+      "retained": ["WRITA supported address/source retention and repeated WRITA controls", "MVDK/MVMD-to-BRC publication and supported delayed controls", "READA-to-BRC publication, source capture and standard/extended address widths", "standalone BSP STLM and native transmit publication", "primary-source ST1 memory rules, STM/STLM publication and supported IRQ/consumer interactions", "shared source-domain admission and existing block-boundary controls"],
+      "limits": ["remove 164 cases and 164 restores: WRITA 12, move-BRC 24, READA-BRC 16, BSP STLM 32, STM ST1 16, STLM ST1 64", "specific unsupported compositions no longer have dedicated no-side-effect/replay coverage", "the documented adjacent-repeat BRAF hazard remains a limitation; deletion neither implements nor validates it", "no instruction, CPU guard or supported input/reference is changed; full-default runtime and handset acceptance are not renewed by focused controls"],
+      "baseline": "All six retired profiles pass their original native acceptance before removal. They are isolated routes, not default continuations. Supported setup/reference bodies are byte-identical after removal.",
+      "verification": "Rebuilt native write-a, move-brc, move-brc-delay, reada-brc, stlm-bsp, st1-rules, stlm-st1 and stm-st1 pass. All 378 focused and 5075 full host tests pass. Retained BIOS names, descriptions and order are unchanged; only their numeric indices close the six removed slots. A fresh default run fails at MVKD phase 252590 after the shared register-logic fixture: the legacy setup does not clear the preceding real IDLE. Both that setup and its predecessor are unchanged by these deletions; the aggregate checkpoint is not green and needs a separate harness transition repair.",
+      "measurement": {"c54x_cpp_bytes_before": 3527442, "c54x_cpp_bytes_after": 3508668, "c54x_cpp_lines_before": 53958, "c54x_cpp_lines_after": 53688, "isolated_profiles_before": 439, "isolated_profiles_after": 433}
+    },
+    {
       "id": "cpu-only-long-t-stores",
       "classification": "architectural_interaction",
       "decision": "rewrite",

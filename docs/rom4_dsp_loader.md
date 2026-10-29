@@ -275,9 +275,7 @@ subsequent loop counts and pointer updates, preserved status/accumulators,
 and no replay duplicates. Source aliases under OVLY and the standard
 address mask are checked separately; changed A has a different low-word
 decoy even when overlay masks its page.
-`reada-brc-edge` checks 16 repeated/active-block exclusions plus replay,
-with no program/data reads, data writes or BRC changes. New BRC admission
-requires an inactive staged block controller; it does not model in-loop
+New BRC admission requires an inactive staged block controller; it does not model in-loop
 count-write latency. Zero-gap RPTB and interrupt/conditional composition
 are not established by this fixture. Program-bus phase placement remains
 the declared partial READA model, not measured silicon timing.
@@ -290,9 +288,8 @@ CPL varies to distinguish encoded MMR addressing from ordinary Smem. Each
 case writes once to `0021`, performs no data reads, preserves accumulators
 and status, and applies the existing saturated-store semantics. The model
 adds one peripheral access clock (publication at core clock 7), not a
-measured silicon phase. `stlm-bsp-edge` checks 32 cases plus replay with no
-bus/accumulator effects for excluded delay, single-repeat, block-repeat
-and XC compositions. Only standalone STLM `0021` is newly admitted.
+measured silicon phase. Only standalone STLM `0021` is admitted by this
+contract; compound delay/repeat/XC behavior remains unvalidated.
 The native passive transmit tap proves the backend received the one `0aaa`
 write. This is register-level publication, not proof of PCM transport,
 speech or handset boot.

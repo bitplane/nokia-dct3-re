@@ -2930,24 +2930,6 @@ void tms320c54x_test_state::start_move_brc(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_move_brc_edge(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	u32 const base = (variant / 4) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, variant & 1 ? 0xf272 : 0xf072); program.write_word(base + 0x601, 0x608);
-	program.write_word(base + 0x602, variant & 2 ? 0x7314 : 0x7192); program.write_word(base + 0x603, 0x1a);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 3); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1400); m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 7); data.write_word(0x1400, 7);
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "move_brc_edge_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Rejected BRC move must not read a source or counter"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "move_brc_edge_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Rejected BRC move must not publish any memory write"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255640;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
 u16 tms320c54x_test_state::asm_store_bypass_value(unsigned variant)
 {
 	unsigned const selector = variant % 4, raw = (variant / 4) % 32, flags = (variant / 1024) % 4;
@@ -4857,24 +4839,6 @@ void tms320c54x_test_state::start_reada_brc(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_reada_brc_edge(unsigned variant)
-{
-	bool const absolute = variant % 2, block = (variant / 2) % 2;
-	start_reada_brc((absolute ? 2 : 0) + ((variant / 4) % 2) * 192);
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_vector_prefetch_tap.remove();
-	auto const f = reada_brc_case((absolute ? 2 : 0) + ((variant / 4) % 2) * 192);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x600, block ? 0xf072 : 0xec01);
-	if (block) program.write_word(0x601, 0x606);
-	unsigned const body = block ? 0x602 : 0x601;
-	program.write_word(body, absolute ? 0x7ef8 : 0x7e1a); if (absolute) program.write_word(body + 1, 0x1a);
-	m_pipeline_operand_tap = program.install_read_tap(f.physical, f.physical, "reada_brc_edge_program", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "reada_brc_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_vector_prefetch_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "reada_brc_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_fast_stack_reads; });
-	m_cpu->set_state_int(STATE_GENPC, 0x600); m_phase = 62068; m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
-
 void tms320c54x_test_state::start_mapped_read_a(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -5376,39 +5340,6 @@ void tms320c54x_test_state::start_write_a(unsigned variant)
 	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254800;
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_write_a_edge(unsigned variant)
-{
-	start_write_a(0);
-	m_pipeline_peripheral_case = variant;
-	unsigned const kind = variant % 6;
-	{ auto const disable = machine().disable_side_effects();
-		auto &program = m_cpu->space(AS_PROGRAM);
-		for (unsigned i = 0; i < 8; ++i) program.write_word(0x600 + i, 0xf495);
-		if (kind < 2)
-		{
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
-			program.write_word(0x600, kind ? 0x7f33 : 0x7f00);
-		}
-		else if (kind == 2)
-		{
-			program.write_word(0x600, 0xf070); program.write_word(0x601, 1); program.write_word(0x602, 0x7ff8); program.write_word(0x603, 0x1000);
-		}
-		else if (kind == 3)
-		{
-			program.write_word(0x600, 0xf273); program.write_word(0x601, 0x700); program.write_word(0x602, 0x7f03);
-		}
-		else if (kind == 4)
-		{
-			program.write_word(0x600, 0xf072); program.write_word(0x601, 0x603); program.write_word(0x602, 0x7f03);
-		}
-		else
-		{
-			program.write_word(0x600, 0xfd00); program.write_word(0x601, 0x7f03);
-		}
-	}
-	m_cpu->set_state_int(STATE_GENPC, 0x600); m_phase = 254820;
 }
 
 void tms320c54x_test_state::start_return_load(unsigned variant)
@@ -5923,38 +5854,6 @@ void tms320c54x_test_state::start_stlm_status(unsigned variant)
 	});
 	m_phase = 62110; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
 	m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_stlm_status_edge(unsigned variant)
-{
-	start_stlm_status((variant / 8) % 2 * 384 + (variant / 16) % 2 * 3072);
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
-	u32 const base = (variant / 16) % 2 ? 0x20000 : 0;
-	u16 const word = (variant / 8) % 2 ? 0x8907 : 0x8807;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	switch (variant % 8)
-	{
-	case 0: program.write_word(base + 0x600, 0xf273); program.write_word(base + 0x601, 0x700); program.write_word(base + 0x602, word); break;
-	case 1: program.write_word(base + 0x600, 0xec01); program.write_word(base + 0x601, word); break;
-	case 2: program.write_word(base + 0x600, 0xf072); program.write_word(base + 0x601, 0x603); program.write_word(base + 0x602, word); break;
-	case 3: program.write_word(base + 0x600, 0xfd00); program.write_word(base + 0x601, word); break;
-	case 4: case 5: program.write_word(base + 0x600, word); program.write_word(base + 0x601, variant % 8 == 4 ? 0xf072 : 0xf272); program.write_word(base + 0x602, 0x605); break;
-	case 6: case 7: program.write_word(base + 0xffff, word); program.write_word(base, variant % 8 == 6 ? 0xf072 : 0xf272); program.write_word(base + 1, 5); break;
-	}
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "stlm_status_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "stlm_status_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_cpu->set_state_int(STATE_GENPC, base + (variant % 8 >= 6 ? 0xffff : 0x600)); m_phase = 62112; m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
-
-void tms320c54x_test_state::start_stm_status_edge(unsigned ordinal)
-{
-	unsigned const kind = ordinal % 4, variant = kind + (ordinal / 4) * 16;
-	start_stlm_status_edge(variant);
-	u32 const base = (ordinal / 4) % 2 ? 0x20000 : 0;
-	unsigned const at = kind == 0 || kind == 2 ? 0x602 : 0x601;
-	m_cpu->space(AS_PROGRAM).write_word(base + at, 0x7707);
-	m_cpu->space(AS_PROGRAM).write_word(base + at + 1, 0x0740);
 }
 
 void tms320c54x_test_state::check_st1_memory_rules()
@@ -9592,37 +9491,6 @@ bool tms320c54x_test_state::check_mvmd_status_block_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_stm_status_edge_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 62112)
-	{
-		bool const immediate = profile_is("stm-st1-edge");
-		unsigned const tick = ++m_idle_fixture_tick, checkpoint = 2 + m_pipeline_peripheral_case / 32;
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save excluded status/control prefix before admission"); }
-		if (tick == 12)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads && !m_pipeline_store_writes, "Excluded STLM status control/repeat composition stops before data-side effects");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(62113, "Restore excluded STLM prefix"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (immediate)
-			{
-				unsigned const ordinal = (m_pipeline_peripheral_case / 16) * 4 + m_pipeline_peripheral_case % 8;
-				if (ordinal < 15) { start_stm_status_edge(ordinal + 1); return true; }
-				osd_printf_info("TMS320C54x staged STM ST1 exclusions: PASS cases=16 restore=16 pages=2 snapshots=2 classes=delay,repeat,block,XC data_reads=0 data_writes=0 silicon_trap_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated STM ST1 exclusions complete");
-			}
-			if (m_pipeline_peripheral_case < 63) { start_stlm_status_edge(m_pipeline_peripheral_case + 1); return true; }
-			osd_printf_info("TMS320C54x staged STLM ST1 exclusions: PASS cases=64 restore=64 sources=A,B pages=2 snapshots=2 classes=delay,repeat,block,XC,adjacent_RPTB,adjacent_RPTBD page_wrap=1 data_reads=0 data_writes=0 atomic_fallback=0 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated STLM ST1 exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62113) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62112; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
-
 bool tms320c54x_test_state::check_delay_copy_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
@@ -9814,33 +9682,10 @@ bool tms320c54x_test_state::check_mapped_dual_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_write_a_edge_results()
+bool tms320c54x_test_state::check_extended_mvpd_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 254820)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 2 + variant / 6;
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save WRITA exclusion before source or control decision");
-		}
-		if (tick == 24)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads && !m_pipeline_store_writes, "Unvalidated WRITA compositions reject before data reads or program writes");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint;
-				return restore_pipeline_at(254830, "Restore WRITA exclusion without effects");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 11) { start_write_a_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged WRITA exclusions: PASS cases=12 restore=12 classes=cpu_source,peripheral_source,repeat_extended,control_delay,block_repeat,XC source_reads=0 program_writes=0 atomic_fallback=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated WRITA exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254830) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254820; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 259995)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -10639,26 +10484,10 @@ bool tms320c54x_test_state::check_t_move_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_move_brc_edge_results()
+bool tms320c54x_test_state::check_move_brc_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 255640)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 5 + variant / 8;
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save before and after rejected BRC move Decode"); }
-		if (tick == 12)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 3 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1400 && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 7, "In-block and RPTBD-delay BRC moves reject before source or pointer effects");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(255650, "Restore BRC exclusion without allowing a second access"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 23) { start_move_brc_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged memory move BRC exclusions: PASS cases=24 restore=24 writers=MVDK,MVMD contexts=block_body,RPTBD_delay pages=2 snapshots=3 source_reads=0 counter_writes=0 pointer_effects=0 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated memory move BRC exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255650) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255640; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 255620)
 	{
 		bool const control = profile_is("move-brc-delay");
@@ -11328,30 +11157,6 @@ bool tms320c54x_test_state::check_repeat_push_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 254060) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254050; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 62068)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + variant / 8;
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save excluded repeated or active-block READA BRC before source access");
-		}
-		if (tick == 24)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads && !m_pipeline_store_writes && !m_fast_stack_reads &&
-				m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0x55aa, "Excluded READA BRC composition cannot sample program data or change the active count");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_pipeline_store_writes = m_fast_stack_reads = 0;
-				return restore_pipeline_at(62069, "Replay excluded READA BRC without source or destination side effects");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 15) { start_reada_brc_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x READA BRC exclusions: PASS cases=16 restore=16 forms=DP,absolute contexts=single_repeat,active_block source_pages=2 snapshots=2 program_reads=0 data_reads=0 data_writes=0 brc_changes=0 silicon_trap_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated READA BRC exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62069) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62068; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 62066)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = reada_brc_case(variant);

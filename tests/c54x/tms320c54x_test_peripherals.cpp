@@ -931,26 +931,6 @@ void tms320c54x_test_state::start_stlm_bsp(unsigned variant)
 	m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_stlm_bsp_edge(unsigned variant)
-{
-	start_stlm_bsp((variant / 4) % 2 + ((variant / 8) % 2) * 512);
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
-	u32 const base = (variant / 8) % 2 ? 0x20000 : 0;
-	u16 const word = (variant / 4) % 2 ? 0x8921 : 0x8821;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	switch (variant % 4)
-	{
-	case 0: program.write_word(base + 0x600, 0xf273); program.write_word(base + 0x601, 0x700); program.write_word(base + 0x602, word); break;
-	case 1: program.write_word(base + 0x600, 0xec01); program.write_word(base + 0x601, word); break;
-	case 2: program.write_word(base + 0x600, 0xf072); program.write_word(base + 0x601, 0x603); program.write_word(base + 0x602, word); break;
-	case 3: program.write_word(base + 0x600, 0xfd00); program.write_word(base + 0x601, word); break;
-	}
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "stlm_bsp_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "stlm_bsp_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_phase = 62062; m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
-
 void tms320c54x_test_state::start_pll_transition_case()
 {
 	// MMIO conformance, not handset provisioning. Suspend instruction
@@ -3443,39 +3423,6 @@ bool tms320c54x_test_state::check_portr_bypass_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 62145) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62144; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
-
-bool tms320c54x_test_state::check_stlm_bsp_edge_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 62062)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + variant / 16;
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save excluded STLM BSP before Decode admission");
-		}
-		if (tick == 12)
-		{
-			bool const source = (variant / 4) % 2;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads && !m_pipeline_store_writes &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (source ? 0xdead : 0x1111) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (source ? 0x1111 : 0xdead), "Excluded STLM BSP composition has no data-bus or accumulator effects");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
-				return restore_pipeline_at(62063, "Restore excluded STLM BSP before any peripheral publication");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 31) { start_stlm_bsp_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x BSP STLM exclusions: PASS cases=32 restore=32 compositions=delay,repeat,block,XC accumulators=2 pages=2 snapshots=2 data_reads=0 data_writes=0 accumulator_changes=0 silicon_trap_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated BSP STLM exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62063) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62062; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 

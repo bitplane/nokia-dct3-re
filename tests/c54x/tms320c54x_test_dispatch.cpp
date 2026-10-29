@@ -162,13 +162,12 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_ldu_imr_results()) return;
 	if (check_mvmd_status_block_results()) return;
 	if (check_shifted_peripheral_edge_results()) return;
-	if (check_stm_status_edge_results()) return;
 	if (check_rptbd_square_results()) return;
 	if (check_delay_copy_results()) return;
 	if (check_staged_overflow_results()) return;
 	if (check_mapped_dual_results()) return;
 	if (check_mvmd_accumulator_results()) return;
-	if (check_write_a_edge_results()) return;
+	if (check_extended_mvpd_results()) return;
 	if (check_repeat_mvdp_irq_results()) return;
 	if (check_repeat_mvkd_results()) return;
 	if (check_conditional_call_results()) return;
@@ -193,7 +192,7 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_block_xc_edge_results()) return;
 	if (check_block_xc_irq_results()) return;
 	if (check_move_repeat_owner_results()) return;
-	if (check_move_brc_edge_results()) return;
+	if (check_move_brc_results()) return;
 	if (check_nibble_input_results()) return;
 	if (check_software_intr_results()) return;
 	if (check_block_branch_edge_results()) return;
@@ -221,7 +220,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_xmem_load_results()) return;
 	if (check_repeat_push_results()) return;
 	if (check_block_exit_results()) return;
-	if (check_stlm_bsp_edge_results()) return;
 	if (check_stlm_t_results_part2()) return;
 	if (check_staged_bus_stm_results()) return;
 	if (check_rom4_fr_decoder_results()) return;

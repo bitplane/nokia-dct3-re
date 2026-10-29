@@ -1587,13 +1587,10 @@ following loop copies exactly count-plus-one words. Mutating the source
 after capture cannot change the loop count. The mapped-source cases do not
 independently establish every preceding accumulator-producer composition.
 
-`move-brc-edge` passes 24 cases/restores for MVDK/MVMD in a repeat body
-or RPTBD delay. Rejection precedes source reads, BRC writes and source-pointer
-updates, including restoration before/after Decode. The completing two-word
-move retains its delay context even when its extension consumes the final
-delay word. These are bounded model exclusions, not asserted silicon traps.
-In-loop modification (table 7-25), general control-delay composition,
-IRQ/NMI composition and physical bus timing remain unvalidated.
+In-loop BRC modification (table 7-25), unsupported repeat-owner composition,
+IRQ/NMI composition and physical bus timing remain unvalidated. Rejection of
+these combinations is an implementation limit, not an asserted silicon trap.
+The supported delayed-transfer coverage is owned by `move-brc-delay`.
 
 ### Shifted memory loads in control delays
 
@@ -2338,9 +2335,7 @@ The wait counter and mapped program destination are save-state registered.
 offset, long preincrement and circular sources; eight registers, four values,
 two logical code pages, two mapping states and four snapshots. It checks one
 source read and one program write, no destination read, status preservation
-and physical program-RAM readback. `write-a-edge` passes 12 cases/restores
-rejecting CPU/peripheral sources, RPT, RPTB, control-delay and XC composition
-before any data read or program write. Those excluded combinations remain
+and physical program-RAM readback. Excluded source/control combinations remain
 work to implement, not hardware-invalid forms. Mapped READA, PMST mapping,
 MVDD source repeats and load/return controls pass. WRITA's focused acceptance
 is separate from the versioned aggregate regression scopes.

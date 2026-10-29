@@ -685,7 +685,6 @@ private:
 	};
 	static stlm_t_fixture stlm_t_case(unsigned variant);
 	void start_stlm_bsp(unsigned variant = 0);
-	void start_stlm_bsp_edge(unsigned variant = 0);
 	void start_pipeline_stlm_t(unsigned variant = 0);
 	static u16 swap_body_source(unsigned variant);
 	void start_pipeline_swap_body(unsigned variant = 0);
@@ -952,7 +951,6 @@ private:
 	static move_brc_fixture move_brc_case(unsigned variant, bool control = false);
 	void start_move_brc(unsigned variant = 0);
 	void start_move_repeat_owner(unsigned variant = 0);
-	void start_move_brc_edge(unsigned variant = 0);
 	static u16 asm_store_bypass_value(unsigned variant);
 	static u16 nibble_input(unsigned variant);
 	void start_original_nibble(unsigned variant = 0);
@@ -1520,7 +1518,6 @@ private:
 	bool standard_reada_brc() const;
 	reada_brc_fixture reada_brc_case(unsigned v) const;
 	void start_reada_brc(unsigned variant = 0);
-	void start_reada_brc_edge(unsigned variant = 0);
 	void start_mapped_read_a(unsigned variant = 0);
 	struct page_zero_stack_fixture
 	{
@@ -1637,7 +1634,6 @@ private:
 	void start_repeat_mvdp_irq(unsigned variant = 0);
 	void start_mvdp_pair(unsigned variant = 0);
 	void start_write_a(unsigned variant = 0);
-	void start_write_a_edge(unsigned variant = 0);
 	void start_return_load(unsigned variant = 0);
 	struct delayed_conditional_call_fixture
 	{
@@ -1766,8 +1762,6 @@ private:
 	};
 	static stlm_status_fixture stlm_status_case(unsigned variant, bool immediate = false);
 	void start_stlm_status(unsigned variant = 0);
-	void start_stlm_status_edge(unsigned variant = 0);
-	void start_stm_status_edge(unsigned ordinal = 0);
 	void check_st1_memory_rules();
 	void start_ldu_status(unsigned variant = 0);
 	struct shifted_peripheral_fixture
@@ -2147,13 +2141,12 @@ private:
 	bool check_ldu_imr_results();
 	bool check_mvmd_status_block_results();
 	bool check_shifted_peripheral_edge_results();
-	bool check_stm_status_edge_results();
 	bool check_rptbd_square_results();
 	bool check_delay_copy_results();
 	bool check_staged_overflow_results();
 	bool check_mapped_dual_results();
 	bool check_mvmd_accumulator_results();
-	bool check_write_a_edge_results();
+	bool check_extended_mvpd_results();
 	bool check_repeat_mvdp_irq_results();
 	bool check_repeat_mvkd_results();
 	bool check_conditional_call_results();
@@ -2178,7 +2171,7 @@ private:
 	bool check_block_xc_edge_results();
 	bool check_block_xc_irq_results();
 	bool check_move_repeat_owner_results();
-	bool check_move_brc_edge_results();
+	bool check_move_brc_results();
 	bool check_nibble_input_results();
 	bool check_software_intr_results();
 	bool check_block_branch_edge_results();
@@ -2206,7 +2199,6 @@ private:
 	bool check_xmem_load_results();
 	bool check_repeat_push_results();
 	bool check_block_exit_results();
-	bool check_stlm_bsp_edge_results();
 	bool check_stlm_t_results_part2();
 	bool check_staged_bus_stm_results();
 	bool check_rom4_fr_decoder_results();

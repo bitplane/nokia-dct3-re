@@ -85,19 +85,15 @@ void tms320c54x_test_state::machine_reset()
 	if (status_bitfield()) { start_pipeline_mapped_bitfield(); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"stlm-bsp"}, [](self &test) { test.start_stlm_bsp(); } },
-		{ {"stlm-bsp-edge"}, [](self &test) { test.start_stlm_bsp_edge(); } },
 		{ {"rptb-exit", "rptb-exit-delay"}, [](self &test) { test.start_block_exit(); } },
 	}))
 		return;
 	if (profile_is("reada-brc") || standard_reada_brc()) { start_reada_brc(); return; }
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"reada-brc-edge"}, [](self &test) { test.start_reada_brc_edge(); } },
 		{ {"st1-rules"}, [](self &test) { test.check_st1_memory_rules(); } },
 		{ {"st1-bits"}, [](self &test) { test.start_pipeline_status_bit(); } },
 		{ {"stlm-st1"}, [](self &test) { test.start_stlm_status(); } },
 		{ {"stm-st1"}, [](self &test) { test.start_stlm_status(); } },
-		{ {"stm-st1-edge"}, [](self &test) { test.start_stm_status_edge(); } },
-		{ {"stlm-st1-edge"}, [](self &test) { test.start_stlm_status_edge(); } },
 		{ {"stlm-st1-irq"}, [](self &test) { test.start_mvmd_status_irq(); } },
 	}))
 		return;
@@ -130,7 +126,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"preinc-st"}, [](self &test) { test.start_preincrement_store(); } },
 		{ {"move-brc"}, [](self &test) { test.start_move_brc(); } },
 		{ {"move-brc-delay"}, [](self &test) { test.start_move_brc(); } },
-		{ {"move-brc-edge"}, [](self &test) { test.start_move_brc_edge(); } },
 		{ {"move-rpt-owner"}, [](self &test) { test.start_move_repeat_owner(); } },
 		{ {"block-xc-irq", "block-xc-end-irq"}, [](self &test) { test.start_block_xc_irq(); } },
 		{ {"block-xc"}, [](self &test) { test.start_block_xc(); } },
@@ -282,7 +277,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"logic-short"}, [](self &test) { test.start_pipeline_memory_logic(); } },
 		{ {"logic-peripheral"}, [](self &test) { test.start_pipeline_peripheral_logic(); } },
 		{ {"load-offset"}, [](self &test) { test.start_pipeline_offset_load(); } },
-		{ {"write-a-edge"}, [](self &test) { test.start_write_a_edge(); } },
 		{ {"write-a"}, [](self &test) { test.start_write_a(); } },
 		{ {"mvdp"}, [](self &test) { test.start_mvdp(); } },
 		{ {"mvdp-pair"}, [](self &test) { test.start_mvdp_pair(); } },

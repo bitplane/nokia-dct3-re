@@ -402,10 +402,6 @@ EXTRA_PROFILES = {
         "TMS320C54x staged STM ST1: PASS cases=18432 restore=18432 families=raw,SXM_LD,ASM_LD,long_SXM_LD,ASM_ADD,ASM_SUB gaps=0,1,2,3 pages=2 snapshots=3 literal_reads=1 literal_poison=1 status_writes=1 destination_reads=0 short_latency=0 long_latency=0 clear_policy=legacy_unverified reset_before_restore=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated STM ST1 complete",
     ),
-    "stm-st1-edge": (
-        "TMS320C54x staged STM ST1 exclusions: PASS cases=16 restore=16 pages=2 snapshots=2 classes=delay,repeat,block,XC data_reads=0 data_writes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated STM ST1 exclusions complete",
-    ),
     "stm-cpl": (
         "TMS320C54x staged STM CPL: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=2 interrupt_composition=unvalidated silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated STM addressing mode complete",
@@ -469,10 +465,6 @@ EXTRA_PROFILES = {
     "stlm-cmpt": (
         "TMS320C54x staged STLM CMPT: PASS cases=16 restore=16 directions=2 consumers=LD,ST gaps=0,1,2,3 latency=3 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated STLM addressing mode complete",
-    ),
-    "stlm-st1-edge": (
-        "TMS320C54x staged STLM ST1 exclusions: PASS cases=64 restore=64 sources=A,B pages=2 snapshots=2 classes=delay,repeat,block,XC,adjacent_RPTB,adjacent_RPTBD page_wrap=1 data_reads=0 data_writes=0 atomic_fallback=0 silicon_phase_claim=0",
-        "Fatal error: TMS320C54x isolated STLM ST1 exclusions complete",
     ),
     "stlm-st1": (
         "TMS320C54x staged STLM ST1: PASS cases=18432 restore=18432 sources=A,B families=raw,SXM_LD,ASM_LD,long_SXM_LD,ASM_ADD,ASM_SUB gaps=0,1,2,3 pages=2 snapshots=3 execute_live=1 status_writes=1 destination_reads=0 short_latency=1 long_latency=0 clear_policy=legacy_unverified silicon_phase_claim=0",
@@ -582,10 +574,6 @@ EXTRA_PROFILES = {
         "TMS320C54x READA BRC: PASS cases=18432 restore=18432 forms=DP,SP,absolute,plain,postinc,postdec registers=8 standalone_values=0,1,8000,ffff loop_counts=0,1,2,7 gaps=1,2,3 source_pages=2 ovly=2 snapshots=4 address_bits=16 program_reads=1 brc_writes=1 data_reads=0 retained_par=1 retained_word=1 source_poison=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated READA BRC complete",
     ),
-    "reada-brc-edge": (
-        "TMS320C54x READA BRC exclusions: PASS cases=16 restore=16 forms=DP,absolute contexts=single_repeat,active_block source_pages=2 snapshots=2 program_reads=0 data_reads=0 data_writes=0 brc_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated READA BRC exclusions complete",
-    ),
     "rptb-exit": (
         "TMS320C54x forward block exits: PASS cases=1152 restore=1152 branches=B,BC_AEQ,BC_BEQ counts=0,1,2,7 exits=first,middle,last,never endpoint_layouts=2 pages=2 snapshots=6 source_reads=ordered body_writes=selected braf_not_auto_cleared=1 outside_rsbx=1 spaced_endpoint_revisit=1 interrupt_composition=unvalidated silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated forward block exits complete",
@@ -593,10 +581,6 @@ EXTRA_PROFILES = {
     "stlm-bsp": (
         "TMS320C54x staged BSP STLM: PASS cases=3072 restore=3072 accumulators=2 patterns=8 flags=16 cpl=2 pages=2 snapshots=3 source_sample=Execute writes_each=1 data_reads=0 publish_clock=7 peripheral_extra_clock=1 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated BSP STLM complete",
-    ),
-    "stlm-bsp-edge": (
-        "TMS320C54x BSP STLM exclusions: PASS cases=32 restore=32 compositions=delay,repeat,block,XC accumulators=2 pages=2 snapshots=2 data_reads=0 data_writes=0 accumulator_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated BSP STLM exclusions complete",
     ),
     "status-bitf": (
         ("TMS320C54x staged status BITF: PASS cases=768 restore=768 registers=ST0,ST1 forms=direct,absolute masks=4 initial_tc=2 pages=2 snapshots=3 reads_each=1 data_writes=0 retained_source=1 silicon_phase_claim=0",
@@ -1510,10 +1494,6 @@ EXTRA_PROFILES = {
         "TMS320C54x delayed memory move BRC: PASS cases=1800 restore=1800 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD source_forms=DP,postincrement,MVDK_AR,MVDK_AL,MVMD_AL counts=0,1,2,7,127 rptb_rptbd=2 pages=2 snapshots=3 source_reads=1 counter_writes=1 source_retained=1 count_plus_one=1 stack=owned active_repeat_write_acceptance=0 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated delayed memory move BRC complete",
     ),
-    "move-brc-edge": (
-        "TMS320C54x staged memory move BRC exclusions: PASS cases=24 restore=24 writers=MVDK,MVMD contexts=block_body,RPTBD_delay pages=2 snapshots=3 source_reads=0 counter_writes=0 pointer_effects=0 silicon_phase_claim=0",
-        "Fatal error: TMS320C54x isolated memory move BRC exclusions complete",
-    ),
     "move-brc": (
         "TMS320C54x staged memory move BRC: PASS cases=960 restore=960 source_forms=8 counts=0,1,2,7,127 gaps=0,1 rptb_rptbd=2 pages=2 snapshots=3 source_reads=1 counter_reads=0 counter_writes=1 latency=0 source_retained=1 count_plus_one=1 active_repeat_write_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated memory move BRC complete",
@@ -1533,10 +1513,6 @@ EXTRA_PROFILES = {
     "xmem-alu": (
         "TMS320C54x staged Xmem arithmetic: PASS cases=393216 restore=393216 encodings=1024 operations=ADD,SUB xmem_modes=16 shifts=0..15 values=8 accumulators=2 status_states=8 pages=2 snapshots=3 read=5 publish=6 pointer_access=4 captured_source=1 bk_zero_and_wrap=1 data_writes=0 mapped_acceptance=0 repeat_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated Xmem arithmetic complete",
-    ),
-    "write-a-edge": (
-        "TMS320C54x staged WRITA exclusions: PASS cases=12 restore=12 classes=cpu_source,peripheral_source,repeat_extended,control_delay,block_repeat,XC source_reads=0 program_writes=0 atomic_fallback=0",
-        "Fatal error: TMS320C54x isolated WRITA exclusions complete",
     ),
     "write-a": (
         "TMS320C54x staged WRITA: PASS cases=3584 restore=3584 forms=7 registers=8 values=4 pages=2 mapping=2 snapshots=4 source_reads=1 program_writes=1 destination_reads=0 repeat=unvalidated mapped_source=excluded silicon_phase_claim=0",
