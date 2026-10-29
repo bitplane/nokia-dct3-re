@@ -78,29 +78,15 @@ protected:
 		{
 			if (memory_reference())
 			{
-				m_cases = c54x_test::memory_examples();
-				auto const &continuations = c54x_test::memory_continuations();
-				m_cases.insert(m_cases.end(), continuations.begin(), continuations.end());
-				auto const &shifts = c54x_test::shift_examples();
-				m_cases.insert(m_cases.end(), shifts.begin(), shifts.end());
-				auto const &registers = c54x_test::register_bit_examples();
-				m_cases.insert(m_cases.end(), registers.begin(), registers.end());
-				auto const &atomic_shifts = c54x_test::atomic_shift_examples();
-				m_cases.insert(m_cases.end(), atomic_shifts.begin(), atomic_shifts.end());
-				auto const &absolute = c54x_test::absolute_arithmetic_examples();
-				m_cases.insert(m_cases.end(), absolute.begin(), absolute.end());
-				auto const &transfers = c54x_test::memory_transfer_examples();
-				m_cases.insert(m_cases.end(), transfers.begin(), transfers.end());
-				auto const &operands = c54x_test::absolute_operand_examples();
-				m_cases.insert(m_cases.end(), operands.begin(), operands.end());
-				auto const &offsets = c54x_test::long_offset_examples();
-				m_cases.insert(m_cases.end(), offsets.begin(), offsets.end());
-				auto const &circular = c54x_test::circular_marker_examples();
-				m_cases.insert(m_cases.end(), circular.begin(), circular.end());
-				auto const &routes = c54x_test::memory_route_examples();
-				m_cases.insert(m_cases.end(), routes.begin(), routes.end());
-				auto const &pairs = c54x_test::paired_memory_examples();
-				m_cases.insert(m_cases.end(), pairs.begin(), pairs.end());
+				for (auto const *bank : {
+					&c54x_test::memory_examples(), &c54x_test::memory_continuations(),
+					&c54x_test::shift_examples(), &c54x_test::register_bit_examples(),
+					&c54x_test::atomic_shift_examples(), &c54x_test::absolute_arithmetic_examples(),
+					&c54x_test::memory_transfer_examples(), &c54x_test::absolute_operand_examples(),
+					&c54x_test::long_offset_examples(), &c54x_test::circular_marker_examples(),
+					&c54x_test::memory_route_examples(), &c54x_test::paired_memory_examples(),
+					&c54x_test::memory_address_examples()})
+					m_cases.insert(m_cases.end(), bank->begin(), bank->end());
 			}
 			else if (words()) m_cases = c54x_test::instruction_word_examples();
 			else if (products()) m_cases = c54x_test::product_examples();

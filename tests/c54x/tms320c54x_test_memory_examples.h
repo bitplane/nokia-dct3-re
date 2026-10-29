@@ -344,6 +344,101 @@ inline auto const &paired_memory_examples()
 	return cases;
 }
 
+inline auto const &memory_address_examples()
+{
+	using r = tms320c54x_device;
+	static const auto cases = [] {
+		std::vector<instruction_case> result;
+		auto add = [&](const char *id, bool absolute, std::vector<u16> words, unsigned interval,
+			std::vector<register_setting> initial, std::vector<register_check> expected,
+			std::vector<memory_word> data = {}, std::vector<memory_word> expected_data = {}) {
+			auto test = port_case(id, std::move(words), std::move(initial), std::move(expected),
+				std::move(data), interval, std::move(expected_data), 2,
+				absolute ? std::optional<u16>(0x0d00) : std::nullopt);
+			test.reset_before = false;
+			result.push_back(std::move(test));
+		};
+		add("dual-move-bk5-source-wrap", false, {0xe5c9}, 3,
+			{{r::STATE_AR0, 1}, {r::STATE_AR2, 0x0e04}, {r::STATE_AR3, 0x0e10}, {r::STATE_AR6, 0x0a03}, {r::STATE_BK, 5}},
+			{{r::STATE_AR2, 0x0e00}, {r::STATE_AR3, 0x0e11}}, {{0x0e04, 0x2468}, {0x0e10, 0}}, {{0x0e10, 0x2468}});
+		add("dual-move-ar4-bk5-preserves-state", false, {0xe5e9}, 3,
+			{{r::STATE_AR4, 0x0e04}, {r::STATE_AR3, 0x0e12}, {r::STATE_A, 0x12345678}, {r::STATE_B, 0x87654321}, {r::STATE_ST0, 0x1800}, {r::STATE_AR6, 0x0a03}},
+			{{r::STATE_AR4, 0x0e00}, {r::STATE_AR3, 0x0e13}, {r::STATE_AR2, 0x0e00}, {r::STATE_AR0, 1}, {r::STATE_A, 0x12345678}, {r::STATE_B, 0x87654321}, {r::STATE_ST0, 0x1800}},
+			{{0x0e04, 0x1357}, {0x0e12, 0}}, {{0x0e12, 0x1357}, {0x0e04, 0x1357}});
+		add("unsigned-ar3-load-clears-guard", false, {0x1293}, 3,
+			{{r::STATE_A, 0xffabcdef00ULL}, {r::STATE_AR3, 0x0ef0}, {r::STATE_AR6, 0x0a03}, {r::STATE_ST1, 0x0100}},
+			{{r::STATE_A, 0xff80}, {r::STATE_AR3, 0x0ef1}}, {{0x0ef0, 0xff80}});
+		add("byte-immediate-zero-clears-accumulator", false, {0xe800}, 3,
+			{{r::STATE_A, 0xff12345678ULL}, {r::STATE_AR6, 0x0a03}}, {{r::STATE_A, 0}});
+		add("absolute-double-store-high-low", false, {0x4ef8, 0x0f00}, 5,
+			{{r::STATE_A, 0xffabcd1234ULL}, {r::STATE_AR6, 0x0a03}}, {}, {{0x0f00, 0}, {0x0f01, 0}}, {{0x0f00, 0xabcd}, {0x0f01, 0x1234}});
+		add("odd-double-store-decrements-two", false, {0x4e8b}, 4,
+			{{r::STATE_A, 0x00abcd1234ULL}, {r::STATE_AR3, 0x0f11}, {r::STATE_AR6, 0x0a03}},
+			{{r::STATE_AR3, 0x0f0f}}, {{0x0f10, 0}, {0x0f11, 0}}, {{0x0f11, 0xabcd}, {0x0f10, 0x1234}});
+		add("odd-double-load-sign-extends-high", false, {0x5783}, 3,
+			{{r::STATE_B, 0}, {r::STATE_AR3, 0x0f21}, {r::STATE_AR6, 0x0a03}, {r::STATE_ST1, 0x0100}},
+			{{r::STATE_B, 0xff80015678ULL}, {r::STATE_AR3, 0x0f21}}, {{0x0f20, 0x5678}, {0x0f21, 0x8001}});
+		add("signed-ar2-load-postincrement", false, {0x1092}, 3,
+			{{r::STATE_A, 0}, {r::STATE_AR2, 0x0f20}, {r::STATE_AR6, 0x0a03}, {r::STATE_ST1, 0x0100}},
+			{{r::STATE_A, 0xffffff8001ULL}, {r::STATE_AR2, 0x0f21}}, {{0x0f20, 0x8001}});
+		add("store-low-ar1-postincrement", false, {0x8091}, 3,
+			{{r::STATE_A, 0x12345678}, {r::STATE_AR1, 0x0f20}, {r::STATE_AR6, 0x0a03}},
+			{{r::STATE_AR1, 0x0f21}}, {{0x0f20, 0}}, {{0x0f20, 0x5678}});
+		add("signed-ar6-load-with-absolute-markers", true, {0x1086}, 4,
+			{{r::STATE_A, 0}, {r::STATE_ST1, 0x0100}, {r::STATE_AR6, 0x0f20}},
+			{{r::STATE_A, 0xffffffff80ULL}, {r::STATE_AR6, 0x0f20}}, {{0x0d00, 0x1234}, {0x0f20, 0xff80}});
+		add("extended-signed-load-ar3-postdecrement", true, {0x6f8b, 0x0c40}, 5,
+			{{r::STATE_A, 0}, {r::STATE_ST1, 0x0100}, {r::STATE_AR3, 0x0f21}},
+			{{r::STATE_A, 0xffffffff80ULL}, {r::STATE_AR3, 0x0f20}}, {{0x0f21, 0xff80}});
+		add("subtract-signed-immediate-from-b", true, {0xf310, 0xff80}, 5,
+			{{r::STATE_A, 0x1234}, {r::STATE_B, 5}, {r::STATE_ST1, 0x0100}}, {{r::STATE_B, 133}, {r::STATE_A, 0x1234}});
+		add("mar-ar2-decrements-once", true, {0x6d8a}, 4,
+			{{r::STATE_AR2, 0x0f21}, {r::STATE_ST1, 0}}, {{r::STATE_AR2, 0x0f20}});
+		add("absolute-signed-load-b-preserves-a", true, {0x11f8, 0x0f21}, 5,
+			{{r::STATE_A, 0x1234}, {r::STATE_B, 0}, {r::STATE_ST1, 0x0100}}, {{r::STATE_B, 0xffffffff80ULL}, {r::STATE_A, 0x1234}}, {{0x0f21, 0xff80}});
+		add("subtract-signed-immediate-a-to-b", true, {0xf110, 0xff80}, 5,
+			{{r::STATE_A, 5}, {r::STATE_B, 0}, {r::STATE_ST1, 0x0100}}, {{r::STATE_B, 133}, {r::STATE_A, 5}});
+		add("absolute-double-load-a-high-low", true, {0x56f8, 0x0f20}, 5,
+			{{r::STATE_A, 0}, {r::STATE_ST1, 0x0100}}, {{r::STATE_A, 0xffff801234ULL}}, {{0x0f20, 0xff80}, {0x0f21, 0x1234}});
+		add("repeat-fourteen-adds-fifteen-times", false, {0xec0e, 0x0082}, 18,
+			{{r::STATE_A, 0}, {r::STATE_AR2, 0x0f21}, {r::STATE_AR6, 0x0a03}}, {{r::STATE_A, 15}, {r::STATE_AR2, 0x0f21}}, {{0x0f21, 1}});
+		add("mvmm-ar5-to-ar3", false, {0xe753}, 3,
+			{{r::STATE_AR5, 0x1234}, {r::STATE_AR3, 0}, {r::STATE_AR6, 0x0a03}}, {{r::STATE_AR3, 0x1234}, {r::STATE_AR5, 0x1234}});
+		add("mvmm-ar2-to-ar3-retains-ar5", false, {0xe723}, 3,
+			{{r::STATE_AR2, 0xabcd}, {r::STATE_AR3, 0}}, {{r::STATE_AR2, 0xabcd}, {r::STATE_AR3, 0xabcd}, {r::STATE_AR5, 0x1234}});
+		add("and-high-literal-preserves-b-carry", true, {0xf063, 0x0ff0}, 5,
+			{{r::STATE_A, 0xff12345678ULL}, {r::STATE_B, 0x1234}, {r::STATE_ST0, 0x0800}},
+			{{r::STATE_A, 0x02300000}, {r::STATE_B, 0x1234}, {r::STATE_ST0, 0x0800, 0x0800}});
+		add("store-low-b-ar4-stationary", true, {0x8184}, 4,
+			{{r::STATE_B, 0x12345678}, {r::STATE_AR4, 0x0f21}, {r::STATE_ST1, 0}}, {{r::STATE_AR4, 0x0f21}}, {{0x0f21, 0}}, {{0x0f21, 0x5678}});
+		add("store-low-b-ar0-preserves-neighbor", true, {0x8180}, 4,
+			{{r::STATE_A, 0xffabcd1234ULL}, {r::STATE_AR0, 0x0f23}, {r::STATE_ST0, 0x1800}},
+			{{r::STATE_AR0, 0x0f23}, {r::STATE_AR4, 0x0f21}, {r::STATE_A, 0xffabcd1234ULL}, {r::STATE_B, 0x12345678}, {r::STATE_ST0, 0x1800}},
+			{{0x0f23, 0}, {0x0f24, 0xcafe}}, {{0x0f23, 0x5678}, {0x0f24, 0xcafe}});
+		add("immediate-al-store-preserves-high-guard", true, {0x7708, 0xbeef}, 5, {},
+			{{r::STATE_A, 0xffabcdbeefULL}, {r::STATE_B, 0x12345678}, {r::STATE_ST0, 0x1800}, {r::STATE_PC, 0x05e9}});
+		add("load-high-literal-b-signed", true, {0xf162, 0xff80}, 5,
+			{{r::STATE_B, 0}, {r::STATE_ST1, 0x0100}}, {{r::STATE_B, 0xffff800000ULL}});
+		add("mar-ar6-postincrement-absolute-markers", true, {0x6d96}, 4,
+			{{r::STATE_AR6, 0x0f42}, {r::STATE_ST1, 0}}, {{r::STATE_AR6, 0x0f43}});
+		add("mar-ar5-retains-ar6-and-memory", true, {0x6d95}, 4,
+			{{r::STATE_AR5, 0x0f50}}, {{r::STATE_AR5, 0x0f51}, {r::STATE_AR6, 0x0f43}}, {{0x0f50, 0xbeef}}, {{0x0f50, 0xbeef}});
+		add("mvmm-ar1-to-ar2-preserves-source", true, {0xe712}, 4,
+			{{r::STATE_AR1, 0x1a23}, {r::STATE_AR2, 0}}, {{r::STATE_AR2, 0x1a23}, {r::STATE_AR1, 0x1a23}});
+		add("mvmm-ar1-to-ar3-preserves-source", true, {0xe713}, 4,
+			{{r::STATE_AR3, 0}}, {{r::STATE_AR3, 0x1a23}, {r::STATE_AR1, 0x1a23}});
+		// BK=5 survives these segments in the legacy sequence. Reset context
+		// is standalone-only; the final segment inherits CMPT from BANZD.
+		for (unsigned index : {0, 2, 3, 4, 7, 8, 9, 11, 13, 15, 16, 19})
+		{
+			result[index].reset_before = true;
+			result[index].reset_initial = {{r::STATE_BK, 5}, {r::STATE_ST1, index == 0 ? 0 : index == 19 ? 0x0020 : 0x0100}};
+		}
+		return result;
+	}();
+	return cases;
+}
+
 } // namespace c54x_test
 
 #endif // MAME_NOKIA_TMS320C54X_TEST_MEMORY_EXAMPLES_H

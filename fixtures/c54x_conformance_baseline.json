@@ -6555,14 +6555,14 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
-          "cases": "295",
+          "cases": "323",
           "firmware": "0",
           "nokia_devices": "0",
-          "reset_groups": "19"
+          "reset_groups": "31"
         }
       ],
       "required": [
-        "TMS320C54x generic memory examples: PASS cases=295 reset_groups=19 nokia_devices=0 firmware=0"
+        "TMS320C54x generic memory examples: PASS cases=323 reset_groups=31 nokia_devices=0 firmware=0"
       ]
     },
     "isa-parallel": {
@@ -15511,7 +15511,35 @@
         "signed-load-decrement-feeds-low-store",
         "or-decrement-feeds-dual-move",
         "mvmm-one-source-two-destinations",
-        "mvmm-stack-pointer-round-trip"
+        "mvmm-stack-pointer-round-trip",
+        "dual-move-bk5-source-wrap",
+        "dual-move-ar4-bk5-preserves-state",
+        "unsigned-ar3-load-clears-guard",
+        "byte-immediate-zero-clears-accumulator",
+        "absolute-double-store-high-low",
+        "odd-double-store-decrements-two",
+        "odd-double-load-sign-extends-high",
+        "signed-ar2-load-postincrement",
+        "store-low-ar1-postincrement",
+        "signed-ar6-load-with-absolute-markers",
+        "extended-signed-load-ar3-postdecrement",
+        "subtract-signed-immediate-from-b",
+        "mar-ar2-decrements-once",
+        "absolute-signed-load-b-preserves-a",
+        "subtract-signed-immediate-a-to-b",
+        "absolute-double-load-a-high-low",
+        "repeat-fourteen-adds-fifteen-times",
+        "mvmm-ar5-to-ar3",
+        "mvmm-ar2-to-ar3-retains-ar5",
+        "and-high-literal-preserves-b-carry",
+        "store-low-b-ar4-stationary",
+        "store-low-b-ar0-preserves-neighbor",
+        "immediate-al-store-preserves-high-guard",
+        "load-high-literal-b-signed",
+        "mar-ar6-postincrement-absolute-markers",
+        "mar-ar5-retains-ar6-and-memory",
+        "mvmm-ar1-to-ar2-preserves-source",
+        "mvmm-ar1-to-ar3-preserves-source"
       ],
       "classification": "architectural_interaction",
       "decision": "rewrite",
