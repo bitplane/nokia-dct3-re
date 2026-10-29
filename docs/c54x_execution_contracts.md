@@ -111,6 +111,16 @@ out of the architectural example sequence. Total C54x sources shrink by
 9,525 bytes/271 lines in this batch; the full-default checkpoint remains older
 than these focused changes.
 
+`isa-flow` isolates ten conditional-delay and seven-bit stack-operand examples.
+RCD A/B and BCD ALT/BLEQ must decide before delay words overwrite the tested
+accumulator; taken/fall-through outcomes, RCD stack consumption and marker
+intervals remain literal expectations. The PSHM/POPM case retains both swapped
+data words, both stack words, balanced SP and its six-cycle interval. Standalone
+cases reset independently; the legacy adapter retains its existing CPU state.
+No far-control or pending-transfer restoration case is deleted. This rewrite
+removes 1,781 C++ bytes/47 lines while preserving all 173 legacy PASS records
+and 2,474 asserted opcode words; it does not renew the full-default checkpoint.
+
 The reviewed long RAM RMW schedule retains every distinct operation, addressing,
 value, status and compatibility stimulus once (38,400 cases). For each of its
 4,800 operation/address/compatibility/status groups, the eight value pairs cover

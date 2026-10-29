@@ -9,6 +9,7 @@
 #include "tms320c54x_test_scalars.h"
 #include "tms320c54x_test_long_reference.h"
 #include "tms320c54x_test_product_examples.h"
+#include "tms320c54x_test_near_flow.h"
 #include <cstring>
 
 namespace {
@@ -35,6 +36,8 @@ protected:
 		else
 		{
 			if (products()) m_cases = c54x_test::product_examples();
+			else if (near_flow())
+				m_cases.assign(c54x_test::near_flow_cases().begin(), c54x_test::near_flow_cases().end());
 			else if (long_reference())
 				m_cases.assign(c54x_test::long_reference_cases().begin(), c54x_test::long_reference_cases().end());
 			else if (scalars())
@@ -55,6 +58,7 @@ private:
 	bool scalars() const { return !std::strcmp(machine().options().bios(), "isa-scalars"); }
 	bool long_reference() const { return !std::strcmp(machine().options().bios(), "isa-long"); }
 	bool products() const { return !std::strcmp(machine().options().bios(), "isa-products"); }
+	bool near_flow() const { return !std::strcmp(machine().options().bios(), "isa-flow"); }
 	unsigned count() const
 	{
 		return m_cases.size();
@@ -112,6 +116,11 @@ private:
 		c54x_test::check_case(*m_cpu, test, m_writes, m_last - m_first);
 		osd_printf_info("C54x ISA case: PASS id=%s\n", test.id);
 		if (++m_case < count()) { start(); return; }
+		if (near_flow())
+		{
+			osd_printf_info("TMS320C54x generic near flow: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n", m_case, m_resets);
+			throw emu_fatalerror(3, "TMS320C54x isolated generic near flow complete");
+		}
 		if (products())
 		{
 			osd_printf_info("TMS320C54x generic product sequence: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n", m_case, m_resets);
@@ -152,6 +161,7 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(3, "isa-scalars", "Scalar arithmetic boundaries with explicit stateful groups")
 	ROM_SYSTEM_BIOS(4, "isa-long", "TI long-word arithmetic examples")
 	ROM_SYSTEM_BIOS(5, "isa-products", "Literal multiply arithmetic and DELAY continuation sequence")
+	ROM_SYSTEM_BIOS(6, "isa-flow", "Conditional delayed branch return and high-address stack examples")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
 ROM_END
 

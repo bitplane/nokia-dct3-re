@@ -3,6 +3,7 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
+#include "tms320c54x_test_near_flow.h"
 
 namespace c54x_test {
 
@@ -11,137 +12,19 @@ bool tms320c54x_test_state::check_atomic_control_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 750)
+	if ((m_phase >= 750 && m_phase <= 757) || (m_phase >= 60040 && m_phase <= 60041))
 	{
-		expect_opcode(0xfe44,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 2 &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
-			"RCD ANEQ captures the true condition before its two delay words");
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(751);
-	}
-	if (m_phase == 60040)
-	{
-		expect_opcode(0xfe4c,
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 2 &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
-			"RCD BNEQ captures B before delay words change it");
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_B, 0}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(60041);
-	}
-	if (m_phase == 751 || m_phase == 60041)
-	{
-		expect_opcode(m_phase == 751 ? 0xfe44 : 0xfe4c,
-			m_cpu->state_int(m_phase == 751 ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 3 &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
-				m_phase == 751 ? "RCD ANEQ false path preserves the stack and falls through" :
-				"RCD BNEQ false path preserves the stack and falls through");
-		if (m_phase == 751)
+		unsigned const index = m_phase >= 60040 ? m_phase - 60038 : m_phase < 752 ? m_phase - 750 : m_phase - 748;
+		auto const &test = near_flow_cases()[index];
+		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
+		expect_opcode(test.opcode, true, "conditional delay/stack reference");
+		if (index == 4) expect_opcode(0x8a63, true, "POPM high address bits");
+		if (index + 1 < near_flow_cases().size())
 		{
-			program.write_word(0x05e2, 0xfe4c);
-			program.write_word(0x05e3, 0xe900);
-			program.write_word(0x05e4, 0xe902);
-			program.write_word(0x05e5, 0xe903);
+			unsigned const next = index + 1;
 			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_B, 1}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_PC, 0x05e0},
-				{cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(60040);
-		}
-		// 0x60/0x61 belong to this fixture's interrupting read peripheral.
-		program.write_word(0x05e2, 0x4a62); // PSHM MMR 0x62
-		program.write_word(0x05e3, 0x4a63); // PSHM MMR 0x63
-		program.write_word(0x05e4, 0x8a62); // POPM MMR 0x62
-		program.write_word(0x05e5, 0x8a63); // POPM MMR 0x63
-		program.write_word(0x05e6, 0x75d6);
-		program.write_word(0x05e7, 0x0124);
-		program.write_word(0x05e8, 0xf5e1);
-		data.write_word(0x0062, 0x1234);
-		data.write_word(0x0063, 0x5678);
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(752);
-	}
-	if (m_phase == 752)
-	{
-		expect_opcode(0x4a62,
-			data.read_word(0x02ff) == 0x1234 && data.read_word(0x02fe) == 0x5678 &&
-			data.read_word(0x0062) == 0x5678 && data.read_word(0x0063) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
-			"PSHM/POPM decode all seven MMR address bits with balanced stack and one-cycle costs");
-		expect_opcode(0x8a63, data.read_word(0x0063) == 0x1234,
-			"POPM preserves the high MMR address bits");
-		program.write_word(0x05e2, 0xfa43); // BCD ALT
-		program.write_word(0x05e3, 0x05ec);
-		program.write_word(0x05e4, 0xe801); // Changes A after the decision.
-		write_words(program, {
-			{0x05e5, 0xe802}, {0x05e6, 0xe803}, {0x05e7, 0x75d6}, {0x05e8, 0x0124}, {0x05e9, 0xf5e1},
-		});
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffffULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(753);
-	}
-	if (m_phase == 753)
-	{
-		expect_opcode(0xfa43,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 2 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
-			"BCD ALT captures the signed condition before both delay words");
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(754);
-	}
-	if (m_phase == 754)
-	{
-		expect_opcode(0xfa43,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 3 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
-				"BCD ALT false path falls through with its three-cycle cost");
-		program.write_word(0x05e2, 0xfa4f); // BCD BLEQ (SPRU172C condition 01001111)
-		program.write_word(0x05e4, 0xe901); // Changes B after the decision.
-		program.write_word(0x05e5, 0xe902);
-		program.write_word(0x05e6, 0xe903);
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffffULL);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		return next_atomic_phase(755);
-	}
-	if (m_phase == 755 || m_phase == 756 || m_phase == 757)
-	{
-		const bool taken = m_phase != 757;
-		expect_opcode(0xfa4f,
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (taken ? 2 : 3) &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == (taken ? 7 : 8),
-			"BCD BLEQ tests signed 40-bit B including zero before delay slots");
-		if (m_phase != 757)
-		{
-			m_port_writes = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_B, m_phase == 755 ? 0 : 1);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
+			prepare_case(*m_cpu, near_flow_cases()[next]);
+			return next_atomic_phase(next < 2 ? 750 + next : next < 4 ? 60038 + next : 748 + next);
 		}
 		// Far-control fixtures use distinct pages, not mirrored low RAM.
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);

@@ -469,6 +469,11 @@
           "description": "Literal multiply arithmetic and DELAY continuation sequence",
           "index": 5,
           "name": "isa-products"
+        },
+        {
+          "description": "Conditional delayed branch return and high-address stack examples",
+          "index": 6,
+          "name": "isa-flow"
         }
       ],
       "tms54rom4": [
@@ -3244,6 +3249,7 @@
       "TMS320C54x forward block exits: PASS cases=1152 restore=1152 branches=B,BC_AEQ,BC_BEQ counts=0,1,2,7 exits=first,middle,last,never endpoint_layouts=2 pages=2 snapshots=6 source_reads=ordered body_writes=selected braf_not_auto_cleared=1 outside_rsbx=1 spaced_endpoint_revisit=1 interrupt_composition=unvalidated silicon_phase_claim=0\n": 1,
       "TMS320C54x frame/MMR move disassembler: PASS frames=256 moves=81 rejected=175 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x generic long arithmetic: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
+      "TMS320C54x generic near flow: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic parallel: PASS cases=10 reset_each=1 nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic product sequence: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic scalars: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
@@ -6491,6 +6497,21 @@
       "required": [
         "TMS320C54x instruction observer: PASS cases=32 restore=32 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 events_each=7 logical_address=1 captured_opcode=1 repeat_entries=3 ordinary_reads=0 annulled_fetches=0 observer_writes=0",
         "TMS320C54x observer XC annulment: PASS cases=64 restore=64 frontends=atomic,staged pages=2 ovly_states=2 snapshots=4 forms=XC1,XC2 events_each=5 rejected_slots=absent accepted_source_nops=present observer_writes=0"
+      ]
+    },
+    "isa-flow": {
+      "completion": "Fatal error: TMS320C54x isolated generic near flow complete",
+      "machine": "tms54isa",
+      "reported_fields": [
+        {
+          "cases": "10",
+          "firmware": "0",
+          "nokia_devices": "0",
+          "reset_groups": "10"
+        }
+      ],
+      "required": [
+        "TMS320C54x generic near flow: PASS cases=10 reset_groups=10 nokia_devices=0 firmware=0"
       ]
     },
     "isa-long": {
@@ -15348,6 +15369,23 @@
     }
   },
   "reviewed": {
+    "isa-flow": {
+      "case_ids": [
+        "rcd-a-taken",
+        "rcd-a-fallthrough",
+        "rcd-b-taken",
+        "rcd-b-fallthrough",
+        "push-pop-high-mmr",
+        "bcd-a-negative",
+        "bcd-a-positive",
+        "bcd-b-negative",
+        "bcd-b-zero",
+        "bcd-b-positive"
+      ],
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "family": "conditional-delay-and-stack-examples"
+    },
     "isa-long": {
       "case_ids": [
         "dadd-postincrement",

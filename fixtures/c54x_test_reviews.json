@@ -396,6 +396,18 @@
       "basis": "Legacy phase739's 0x649b operand rejection is covered by source-domain: source_domains contains 0x6400 and enumerates mode0x9b across both frontends and restored contexts; the fixture asserts preserved accumulators, T, pointers/status and zero data/program/I/O side effects.",
       "obligations": ["retain the source-domain executable coverage and digest", "remove phase739 routing and its setup/check block instead of retaining a duplicate admission test among architectural examples"],
       "limits": ["the old A=0x10/T=3/AR3=0x01ff stimulus is deleted, not claimed numerically retained", "its preceding PORTW was timing scaffolding with no asserted dependency on the rejection; it is not a distinct interrupt, pipeline or data-hazard interaction", "rejection remains an emulator admission policy, not a silicon illegality claim"]
+    },
+    {
+      "id": "conditional-delay-and-stack-examples",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_near_flow.h",
+      "profiles": ["isa-flow"],
+      "case_ids": ["rcd-a-taken", "rcd-a-fallthrough", "rcd-b-taken", "rcd-b-fallthrough", "push-pop-high-mmr", "bcd-a-negative", "bcd-a-positive", "bcd-b-negative", "bcd-b-zero", "bcd-b-positive"],
+      "basis": "Literal taken/fall-through paths: delay instructions overwrite the tested accumulator after the decision. Outcomes, stack positions and seven/eight-cycle marker intervals are independently specified. The PSHM/POPM example checks literal stack/data words and six-cycle interval.",
+      "legacy_entry": "control phases750..757,60040..60041; no changes to far-control or pending-transfer restoration cases",
+      "obligations": ["RCD captures A/B before both delay words; taken consumes one stack word, fall-through preserves SP", "BCD ALT and BLEQ distinguish negative, zero and positive values before delay words change them", "seven-bit PSHM/POPM operands reach data0x62/0x63 and balance their stack while preserving the original swapped data expectations", "all ten cases independently reset in the CPU-only fixture; shared legacy adapter does not reset CPU state", "retain both opcode-accounting entries for the stack example"],
+      "limits": ["no case or literal result removed", "only originally asserted accumulators, SP and data words are checked; no additional sibling-state preservation claim", "MMR operand-address decoding is not a model of a new physical peripheral at0x62", "the separately implemented staged frontend and far-transfer save/replay tests are not replaced by this atomic family"]
     }
   ]
 }
