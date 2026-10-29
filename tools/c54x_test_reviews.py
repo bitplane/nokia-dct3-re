@@ -16,7 +16,7 @@ def reviewed_profiles(root=ROOT):
             raise ValueError('duplicate C54x family review')
         families.add(family['id'])
         ids = family['case_ids']
-        if not ids or len(ids) != len(set(ids)):
+        if (family['profiles'] and not ids) or len(ids) != len(set(ids)):
             raise ValueError('reviewed case identities must be nonempty and unique')
         for profile in family['profiles']:
             if profile in result:
@@ -32,6 +32,7 @@ if __name__ == '__main__':
     unknown = set(reviews) - set(EXTRA_PROFILES)
     if unknown:
         raise SystemExit('unknown reviewed profiles: ' + ', '.join(sorted(unknown)))
-    print(f'{len({v["family"] for v in reviews.values()})} reviewed families; '
+    families = json.loads((ROOT / 'fixtures/c54x_test_reviews.json').read_text())['families']
+    print(f'{len(families)} reviewed families; '
           f'{len(reviews)} reviewed isolated profiles; '
           f'{len(set(EXTRA_PROFILES) - set(reviews))} isolated profiles unreviewed')

@@ -37,6 +37,28 @@
         "no save-state coverage in the original family",
         "the default sequence retains its explicit continuation; standalone cases reset independently"
       ]
+    },
+    {
+      "id": "rnd-boundaries",
+      "classification": "isa_documented",
+      "decision": "keep",
+      "basis": "TI SPRU172C page 4-142: RND adds 2^15, with the documented OVM behavior. Literal raw/saturated results cover signed 32-bit boundaries and 40-bit wrap without using CPU helpers.",
+      "source": "tests/c54x/tms320c54x_test_arithmetic.cpp",
+      "profiles": [],
+      "legacy_entry": "default phases 200000 through 200127",
+      "case_ids": [],
+      "obligations": [
+        "eight distinct value boundaries",
+        "all four source/destination selections and opposite accumulator preservation",
+        "OVM clear/set and two preserved status patterns",
+        "final PC, idle and illegal-instruction state"
+      ],
+      "limits": [
+        "default-sequence coverage only; no claim of independently emitted case identities",
+        "atomic execution only",
+        "no checkpoint/replay Cartesian product in this family"
+      ],
+      "rationale": "The 128-case matrix is already compact and protects distinct arithmetic and preservation boundaries. Keep it rather than force a rewrite for a small line-count gain; prioritize shared harness ownership and large replay matrices. CPU-only relocation remains separate from this retention decision."
     }
   ]
 }
