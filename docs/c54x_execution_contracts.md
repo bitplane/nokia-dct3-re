@@ -57,6 +57,15 @@ choices; 448 absolute TC-clear controls and 14,208 short-source controls retain
 status, shift-boundary and repeat contexts separately. The digest encodes the
 instruction, extension, context and control tag.
 
+The census also owns 1,408 staged MAC admission controls: 80 unsupported
+absolute sources plus eight short forms, four selectors, two pages and the
+original checkpoints 3/5. These retain prefetched instruction state not
+covered by the base census's checkpoints 1/10. All original program words,
+asserted register seeds and no-operand-effects checks remain; census-wide
+program/I/O, SP and RC preservation checks also apply. The combined 46,064-case
+digest is `60d443519ef671c5`; its first 44,656 keys retain `6ae942418d722665`.
+The old global-phase admission fixture is removed, not kept as a second copy.
+
 `isa-scalars` runs 34 literal arithmetic-boundary cases in 19 reset groups.
 Fifteen rows deliberately continue from checked predecessor state rather than
 resetting: sticky overflow, retained instruction words, carry and preserved
@@ -127,10 +136,20 @@ operand-identity observer checks. Its 64 value/literal pairs in every fixed
 operation/form/flags/selector/page group now distribute evenly across all four
 checkpoints, instead of replaying every pair four times. The ordered original
 case-key digest is `085b13667b310f01`; actual successful restores are counted.
-The following 1,408 admission exclusions remain unchanged and separately
-unreviewed. Serial native capture time drops from about 156 to 40 seconds;
+Admission controls are owned separately by `source-domain`, not this positive
+profile. Serial native capture time for the original balanced bundle dropped
+from about 156 to 40 seconds;
 this adds 2,517 C++ bytes/43 lines of scheduling and accounting rather than
 reducing source size. It does not change or renew the full-default checkpoint.
+
+These are SPRU172C MPY syntax 3 and MAC syntax 4 (MAC page 4-82). The retained
+memory word and signed immediate produce the result at Execute; MAC adds the
+selected signed 40-bit accumulator after the existing FRCT/SMUL product rule,
+then applies destination OVM/sticky overflow. DP/SP selection shares the
+direct-form page cases; CMPT=0 is fixed, and MPY fixes PMST=0. BK=13 circular
+indexing uses an aligned 16-word queue with its initial index inside the queue.
+The fixture does not qualify arbitrary peripheral/control sources, repeat,
+IRQ or new producer/consumer-latency compositions.
 
 The reviewed long RAM RMW schedule retains every distinct operation, addressing,
 value, status and compatibility stimulus once (38,400 cases). For each of its
@@ -2755,10 +2774,10 @@ formatting add 1,824 C++ bytes/114 lines; this is not a source-size reduction
 and does not renew the older full-default checkpoint.
 
 The `mpy-mem-imm` RAM/MPY controls retain their distinct inputs with balanced
-checkpoints, as described above. Their
-negative MAC fixture now excludes the remaining eighty low/control/peripheral
-addresses and eight write-only MOD=3 forms: 1,408 cases/replays across all
-selectors, two pages and two snapshots. Producer, control, repeat and
+checkpoints, as described above. The implementation-limit controls for the
+remaining eighty low/control/peripheral addresses and eight write-only MOD=3
+forms run separately in `source-domain`: all 1,408 cases/replays, selectors,
+pages and original checkpoint choices are retained. Producer, control, repeat and
 interrupt compositions are not newly qualified, nor are physical bus phases.
 
 ## Parallel Store/Multiply

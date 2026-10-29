@@ -819,7 +819,6 @@ private:
 	};
 	static memory_immediate_fixture memory_immediate_case(unsigned variant);
 	void start_memory_immediate_multiply(unsigned variant = 0);
-	void start_memory_immediate_mac_exclusion(unsigned variant = 0);
 	void start_mmr_long_edge(unsigned variant = 0);
 	static unsigned block_branch_count(unsigned variant);
 	static u16 block_branch_source(unsigned variant, unsigned i);

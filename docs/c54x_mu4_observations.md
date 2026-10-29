@@ -1414,47 +1414,12 @@ MVDD also pass (five profiles total), along with evidence validation and
 native 5110 restoration. The shared broad checkpoint
 also covers these profiles.
 
-Memory/immediate MPY uses Class 6A/6B (SPRU172C, MPY syntax 3): the
-memory word publishes to T in Read, while the retained memory word and
-signed literal produce the accumulator result at Execute. Absolute and
-long-offset forms retain address/offset before the multiplier literal,
-adding one word and cycle. The `mpy-mem-imm` fixture passes 98,304
-cases/restores: twelve forms (DP/SP direct, short fixed/postincrement/
-postdecrement, long offset/preincrement/circular, absolute
-RAM and mapped AL/AH/T/AR3), eight memory values, eight literals, eight
-FRCT/OVM/SXM configurations, both destinations, two pages and four
-snapshots. DP/SP selection shares the direct-form page cases; CMPT=0
-and PMST=0 are fixed. BK=13 circular indexing uses an aligned 16-word
-queue with the initial index inside the queue. Address modifiers, one
-source read, ordered extension fetches, Read-owned T, signed/FRCT product,
-OVM saturation, sticky overflow and carry preservation are checked.
-Poisoning literals, the selected pointer, source and T verifies retained
-ownership through replay. Peripheral/control sources, repeats, IRQs and
-new producer/consumer-latency composition are outside acceptance.
-The shared existing T/immediate control passes 86,016 replay cases, and
-its mapped-consumer control passes 3,072. Offset loads, ABS and peripheral
-MVDD also pass (six profiles including the new fixture), along with
-evidence validation and native 5110 restoration. No new
-CPU saved fields are introduced. The shared broad checkpoint also covers
-these profiles without promoting untested compositions.
-
-The same retained operand path supports `MAC Smem,#lk,src,dst`
-(SPRU172C, MAC syntax 4, page 4-82). Smem publishes to T in Read;
-Execute multiplies the retained signed memory word and literal, applies
-FRCT and SMUL product saturation, adds the selected signed 40-bit
-accumulator and applies destination OVM/sticky overflow. No new CPU saved
-fields are needed. The compatibility-named `mpy-mem-imm` gate additionally
-passes 262,144 MAC cases and replays: eight RAM address forms, eight memory
-values, eight literals, sixteen FRCT/OVM/SXM/SMUL configurations, all four
-source/destination selections, two pages and four snapshots. Source
-accumulator patterns include negative, extended and saturation-boundary
-values; source/literal/pointer poisoning checks retained ownership.
-Another 1,664 cases/replays reject all 96 mapped/control/peripheral source
-addresses and all eight write-only short MOD=3 encodings, across all
-selectors and pages and two snapshots, without data accesses or pointer,
-accumulator, T or ST0 changes. These are scoped frontend exclusions, not
-silicon trap semantics. Repeat, interrupt and new producer/consumer
-compositions remain outside this acceptance.
+Memory/immediate multiply uses MPY syntax 3 and MAC syntax 4 (SPRU172C;
+MAC page 4-82). Instruction qualification, fixture domains and admission
+controls have one owner in the [execution contracts](c54x_execution_contracts.md).
+The positive `mpy-mem-imm` profile is separate from `source-domain`'s
+implementation-limit controls; neither promotes physical bus timing or
+handset acceptance.
 
 Original R060 AA88 contains `6582 0009` at `03:ba1a`:
 `MAC *AR2,#9,A,B`. `mu4_context_contract.py` pins its eleven-word

@@ -57,17 +57,21 @@ static_assert(std::size(source_domains) == 125);
 constexpr unsigned domain_cases = 125 * 15 * 16;
 constexpr unsigned domain_tc0_cases = 4 * 7 * 16;
 constexpr unsigned domain_control_cases = (40 + 34 + 14 + 2 + 21) * 8 * 16;
-constexpr unsigned domain_total_cases = domain_cases + domain_tc0_cases + domain_control_cases;
+constexpr unsigned domain_mac_source_cases = 80 * 4 * 2 * 2;
+constexpr unsigned domain_mac_short_cases = 8 * 4 * 2 * 2;
+constexpr unsigned domain_total_cases = domain_cases + domain_tc0_cases + domain_control_cases + domain_mac_source_cases + domain_mac_short_cases;
 
 struct domain_input
 {
 	source_domain_instruction instruction;
 	unsigned mode, context;
 	std::uint16_t st0 = 0x1804, st1 = 0x0800, prefix = 0, tag = 0;
+	std::uint16_t absolute_source = 0xffff;
+	unsigned checkpoint = 0;
 	std::uint32_t key() const
 	{
 		return (std::uint32_t(instruction.opcode | mode) << 16) |
-			(std::uint32_t(instruction.operation) << 4) | tag | context;
+			(std::uint32_t(absolute_source == 0xffff ? instruction.operation : absolute_source) << 4) | tag | context;
 	}
 };
 
@@ -111,6 +115,18 @@ inline domain_input select_domain(unsigned index)
 		0x7100, 0x7300, 0x7500, 0x7f00, 0x7d00, 0x7900, 0x7b00, 0x4c00, 0x4d00,
 		0x6800, 0x6900, 0x6a00, 0x6b00})
 		if (group(opcode, 0, 0x98, 8, 0x0804, 0x0800, 0, 0x8000)) return input;
+	// Retain the old MAC guard cohort in its original order. Its checkpoint 3
+	// retains prefetched instruction state, unlike the base census's 1/10 pair.
+	if (index < domain_mac_source_cases + domain_mac_short_cases)
+	{
+		unsigned const form = index % 88, selectors = (index / 88) % 4;
+		unsigned const context = ((index / 352) % 2 ? 2 : 0) | (index >= 704 ? 8 : 0);
+		bool const absolute = form < 80;
+		return {{std::uint16_t(0x6400 | (selectors << 8)), std::uint16_t(absolute ? 0 : 9)},
+			absolute ? 0xf8U : 0x98U + form - 80, context, 0x1028, 0x0800, 0,
+			std::uint16_t(absolute ? 0 : 0x0400),
+			std::uint16_t(absolute ? form < 8 ? form : form + 16 : 0xffff), index >= 704 ? 5U : 3U};
+	}
 	throw std::out_of_range("C54x domain case");
 }
 

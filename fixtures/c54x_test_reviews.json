@@ -101,10 +101,10 @@
       "profile_coverage": {
         "source-domain": {
           "result_prefix": "TMS320C54x source-domain exclusions: PASS ",
-          "cases": 44656,
-          "key": "(opcode_word << 16) | (operation_extension << 4) | context | control_tag; original 30448 identities first, followed by shift, ASM, C16, repeat and TC-clear short controls; tags 0x4000=ASM, 0x2000=C16, 0x1000=RPT, 0x8000=TC-clear (tags only for unshifted forms)",
+          "cases": 46064,
+          "key": "(opcode_word << 16) | (operation_extension_or_absolute_source << 4) | context | control_tag; original 44656 identities first, then the1408 MAC guard inputs in original order. Tags0x4000=ASM,0x2000=C16,0x1000=RPT,0x8000=TC-clear,0x0400=MAC prefetched short control.",
           "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
-          "fnv64": "6ae942418d722665"
+          "fnv64": "60d443519ef671c5"
         }
       },
       "obligations": [
@@ -114,6 +114,7 @@
         "no data reads/writes, program writes or I/O accesses; illegal latch reached by cycle 20",
         "all original 30000 identities and restores retain their ordering; 448 appended TC-clear RMW controls preserve the distinct status input from the retired alias profiles",
         "14208 short controls retain 5120 shifted extensions, 4352 nonzero-ASM inputs, 1792 C16 inputs, 256 prefixed SUBC inputs and 2688 TC-clear inputs",
+        "1408 appended staged MAC guards retain 80 unsupported absolute sources and8 short forms, four accumulator selectors, both pages and both original checkpoint3/5 choices; no CMPT/frontend Cartesian expansion",
         "CPU-only device graph and ROM-free execution; no shared phase dispatcher or handset state"
       ],
       "limits": [
@@ -416,7 +417,7 @@
       "source": "tests/c54x/tms320c54x_test_memory_immediate_schedule.h",
       "profiles": ["mpy-mem-imm"],
       "case_ids": [],
-      "scope": "Successful MPY/MAC operand and retention cases only. The following 1408 implementation-admission exclusions remain unchanged and are not reviewed by this family.",
+      "scope": "Successful MPY/MAC operand and retention cases. The implementation-admission tail is now owned separately by source-domain.",
       "basis": "The existing independent signed-product, accumulator-add, 40-bit mask and saturation references are unchanged. Literal source/immediate fixtures and bus observers determine expected values and transfers; no CPU implementation helper supplies a result. Declared publication clocks are implementation contracts, not measured silicon.",
       "profile_coverage": {
         "mpy-mem-imm": {
@@ -473,6 +474,27 @@
         "c54x_cpp_lines_before": 57591,
         "c54x_cpp_lines_after": 57705,
         "source_assessment": "Adds 1824 bytes/114 lines for explicit fixture ownership and formatting while removing legacy phase/setup/checker coupling. Architecture/runtime improvement, not source-size reduction."
+      }
+    },
+    {
+      "id": "memory-mac-admission-boundaries",
+      "classification": "implementation_limit",
+      "decision": "merge",
+      "source": "tests/c54x/tms320c54x_test_domain_schedule.h",
+      "profiles": [],
+      "case_ids": [],
+      "basis": "Explicit implementation guards: unsupported absolute sources0..7/24..95 and short MOD3 forms98..9f. Preserve supplied state and reject before operand effects; not an assertion of silicon illegality. No expected value comes from a CPU implementation helper.",
+      "obligations": ["all 1408 original tuples remain:88 forms,4 selectors,2 program pages,2 checkpoint choices", "retain original program words, ST0=0x1028,ST1=0x0800,A/B/T and address-register seeds", "retain checkpoint3 with prefetched instruction state and checkpoint5 at/after rejection; base census checkpoint1/10 is not equivalent pending-state coverage", "no data reads/writes; preserve all formerly asserted registers, with census-wide program/I/O and stack/RC preservation checks added", "remove the old phase254351/254352 fixture and terminate the positive mpy-mem-imm profile before admission checks"],
+      "limits": ["owned by the source-domain review and its ordered digest, not a new isolated profile", "no case or claimed assertion removed; unrelated previously unasserted SP/RC reset defaults are replaced by explicit census sentinels", "the short forms overlap base instruction admission but retain different checkpoint states", "the first44656 source-domain keys and their digest remain unchanged; the new combined digest appends the retained cohort"],
+      "measurement": {
+        "baseline_commit": "f8b8f204",
+        "c54x_cpp_bytes_before": 3779270,
+        "c54x_cpp_bytes_after": 3776316,
+        "c54x_cpp_lines_before": 57705,
+        "c54x_cpp_lines_after": 57682,
+        "source_domain_seconds_before": 20.63,
+        "source_domain_seconds_after": 21.73,
+        "scope": "Serial runner wall times; the after census includes 1408 cases previously bundled with mpy-mem-imm. Category/ownership and source reduction, not a claimed runtime optimization or renewal of the full-default checkpoint."
       }
     }
   ]

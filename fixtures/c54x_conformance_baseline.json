@@ -3325,7 +3325,6 @@
       "TMS320C54x memory DP conformance: PASS variants=3\n": 1,
       "TMS320C54x memory MAC/MAS disassembler: PASS forms=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x memory SQUR: PASS cases=52224 restore=52224 forms=RAM,mapped accumulators=2 patterns=8 flags=16 t_publication=Read operand_retained=1 newer_t_preserved=1 duplicate_reads=0 data_writes=0 physical_phase_claim=0\n": 1,
-      "TMS320C54x memory immediate MAC exclusions: PASS cases=1408 restore=1408 mapped_sources=80 mod3_forms=8 selectors=4 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x memory immediate MAC: PASS cases=%u restore=%u ram_forms=8 values=8 literals=8 flags=16 selectors=4 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0 coverage_cases=%u coverage_fnv64=%016llx\n": 1,
       "TMS320C54x memory immediate MPY: PASS cases=%u restore=%u forms=12 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x memory logical disassembler: PASS modes=1536 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
@@ -3432,7 +3431,7 @@
       "TMS320C54x software interrupt conformance: PASS variants=64\n": 1,
       "TMS320C54x software interrupt fast return: PASS variants=64\n": 1,
       "TMS320C54x software-saved IRQ repeat: PASS cases=3840 restore=3840 outer_counts=0,1,2,7,56 inner_counts=0,1,3,63 sources=IRQ,NMI pages=2 stacks=2 returns=FRETE,FRETED snapshots=6 leaf_return=inside,REA_plus_1 ordered_copies=1 balanced_frames=1 physical_phase_claim=0\n": 1,
-      "TMS320C54x source-domain exclusions: PASS cases=%u restore=%u base_cases=30000 absolute_tc0_cases=448 short_control_cases=14208 base_instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 shifts=0,1,15,16,31 modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n": 1,
+      "TMS320C54x source-domain exclusions: PASS cases=%u restore=%u base_cases=30000 absolute_tc0_cases=448 short_control_cases=14208 mac_source_cases=1280 mac_short_checkpoint_cases=128 mac_frontend=staged mac_checkpoints=3,5 mac_modes=f8,98..9f base_instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 shifts=0,1,15,16,31 base_modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n": 1,
       "TMS320C54x special load disassembler: PASS memory_forms=768 arp=8 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x stack address latency conformance: PASS variants=24\n": 1,
       "TMS320C54x staged ABS: PASS cases=13824 selectors=4 patterns=16 status_states=32 pages=2 producer_cases=1536 restore=13824 data_accesses=0 irq_acceptance=0 silicon_phase_claim=0\n": 1,
@@ -8374,25 +8373,11 @@
           "source_reads": "1",
           "t_publication": "Read",
           "values": "8"
-        },
-        {
-          "cases": "1408",
-          "data_reads": "0",
-          "data_writes": "0",
-          "mapped_sources": "80",
-          "mod3_forms": "8",
-          "pages": "2",
-          "pointer_changes": "0",
-          "restore": "1408",
-          "selectors": "4",
-          "silicon_trap_claim": "0",
-          "snapshots": "2"
         }
       ],
       "required": [
         "TMS320C54x memory immediate MPY: PASS cases=24576 restore=24576 forms=12 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0",
-        "TMS320C54x memory immediate MAC: PASS cases=65536 restore=65536 ram_forms=8 values=8 literals=8 flags=16 selectors=4 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0 coverage_cases=90112 coverage_fnv64=085b13667b310f01",
-        "TMS320C54x memory immediate MAC exclusions: PASS cases=1408 restore=1408 mapped_sources=80 mod3_forms=8 selectors=4 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0"
+        "TMS320C54x memory immediate MAC: PASS cases=65536 restore=65536 ram_forms=8 values=8 literals=8 flags=16 selectors=4 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0 coverage_cases=90112 coverage_fnv64=085b13667b310f01"
       ]
     },
     "mpy-t-imm": {
@@ -12737,18 +12722,23 @@
           "absolute_tc0_cases": "448",
           "base_cases": "30000",
           "base_instruction_forms": "125",
-          "cases": "44656",
+          "base_modes": "98..9f,f9..ff",
+          "cases": "46064",
           "cmpt": "2",
-          "coverage_fnv64": "6ae942418d722665",
+          "coverage_fnv64": "60d443519ef671c5",
           "data_reads": "0",
           "data_writes": "0",
           "frontends": "2",
           "io_accesses": "0",
+          "mac_checkpoints": "3,5",
+          "mac_frontend": "staged",
+          "mac_modes": "f8,98..9f",
+          "mac_short_checkpoint_cases": "128",
+          "mac_source_cases": "1280",
           "mmr_sources": "4",
-          "modes": "98..9f,f9..ff",
           "pages": "2",
           "program_writes": "0",
-          "restore": "44656",
+          "restore": "46064",
           "shifted_reads": "10",
           "shifts": "0,1,15,16,31",
           "short_control_cases": "14208",
@@ -12758,7 +12748,7 @@
         }
       ],
       "required": [
-        "TMS320C54x source-domain exclusions: PASS cases=44656 restore=44656 base_cases=30000 absolute_tc0_cases=448 short_control_cases=14208 base_instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 shifts=0,1,15,16,31 modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=6ae942418d722665"
+        "TMS320C54x source-domain exclusions: PASS cases=46064 restore=46064 base_cases=30000 absolute_tc0_cases=448 short_control_cases=14208 mac_source_cases=1280 mac_short_checkpoint_cases=128 mac_frontend=staged mac_checkpoints=3,5 mac_modes=f8,98..9f base_instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 shifts=0,1,15,16,31 base_modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=60d443519ef671c5"
       ]
     },
     "sqacc-repeat": {
@@ -15599,7 +15589,7 @@
       },
       "decision": "merge",
       "family": "memory-immediate-multiply",
-      "scope": "Successful MPY/MAC operand and retention cases only. The following 1408 implementation-admission exclusions remain unchanged and are not reviewed by this family."
+      "scope": "Successful MPY/MAC operand and retention cases. The implementation-admission tail is now owned separately by source-domain."
     },
     "reg-banks": {
       "case_ids": [],
@@ -15657,10 +15647,10 @@
       "case_ids": [],
       "classification": "implementation_limit",
       "coverage": {
-        "cases": 44656,
+        "cases": 46064,
         "encoding": "FNV-1a64 over little-endian uint32 keys in execution order",
-        "fnv64": "6ae942418d722665",
-        "key": "(opcode_word << 16) | (operation_extension << 4) | context | control_tag; original 30448 identities first, followed by shift, ASM, C16, repeat and TC-clear short controls; tags 0x4000=ASM, 0x2000=C16, 0x1000=RPT, 0x8000=TC-clear (tags only for unshifted forms)",
+        "fnv64": "60d443519ef671c5",
+        "key": "(opcode_word << 16) | (operation_extension_or_absolute_source << 4) | context | control_tag; original 44656 identities first, then the1408 MAC guard inputs in original order. Tags0x4000=ASM,0x2000=C16,0x1000=RPT,0x8000=TC-clear,0x0400=MAC prefetched short control.",
         "result_prefix": "TMS320C54x source-domain exclusions: PASS "
       },
       "decision": "merge",

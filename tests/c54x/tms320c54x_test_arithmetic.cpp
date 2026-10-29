@@ -2461,33 +2461,6 @@ void tms320c54x_test_state::start_memory_immediate_multiply(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_memory_immediate_mac_exclusion(unsigned variant)
-{
-	m_cpu->reset(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	unsigned const form = variant % 88, selectors = (variant / 88) % 4;
-	u32 const base = (variant / 352) % 2 ? 0x20000 : 0;
-	unsigned const excluded_source = form < 8 ? form : form+16;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(base + 0x600, 0x6400 | (selectors << 8) | (form < 80 ? 0xf8 : 0x98 + form - 80));
-	program.write_word(base + 0x601, form < 80 ? excluded_source : 9);
-	program.write_word(base + 0x602, form < 80 ? 9 : 0xf4e1);
-	program.write_word(base + 0x603, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1028); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xabcd);
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x1400 + i);
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "memory_mac_excluded_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "memory_mac_excluded_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254351;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
 tms320c54x_test_state::delay_multiply_fixture tms320c54x_test_state::delay_multiply_case(unsigned variant, bool mac, bool rounded)
 {
 	unsigned const group = mac || rounded ? variant / 18432 : 0;
@@ -7984,29 +7957,11 @@ bool tms320c54x_test_state::check_memory_immediate_results()
 			if (variant + 1 == memory_immediate_mpy_inputs) osd_printf_info("TMS320C54x memory immediate MPY: PASS cases=%u restore=%u forms=12 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n", m_memory_immediate_coverage.count, m_memory_immediate_restores);
 			if (variant + 1 < memory_immediate_inputs) { start_memory_immediate_multiply(variant + 1); return true; }
 			osd_printf_info("TMS320C54x memory immediate MAC: PASS cases=%u restore=%u ram_forms=8 values=8 literals=8 flags=16 selectors=4 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0 coverage_cases=%u coverage_fnv64=%016llx\n", m_memory_immediate_coverage.count - memory_immediate_mpy_inputs, m_memory_immediate_restores - memory_immediate_mpy_inputs, m_memory_immediate_coverage.count, (unsigned long long)m_memory_immediate_coverage.value);
-			start_memory_immediate_mac_exclusion(); return true;
+			throw emu_fatalerror(3, "TMS320C54x isolated memory immediate MPY complete");
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 254350) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254340; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 254351)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant / 704 ? 5 : 3;
-		expect(!m_pipeline_operand_reads && !m_pipeline_store_writes && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xabcd && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1028, "Excluded memory MAC has no operand, accumulator or status side effects");
-		for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x1400 + i, "Excluded memory MAC preserves all address registers");
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save excluded memory MAC before its operand read"); }
-		if (tick == 12)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Unvalidated mapped sources and write-only short MOD3 remain rejected");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Replay excluded MAC without memory side effects"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 254352; m_check_timer->enable(true); return true; }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 1407) { start_memory_immediate_mac_exclusion(variant + 1); return true; }
-			osd_printf_info("TMS320C54x memory immediate MAC exclusions: PASS cases=1408 restore=1408 mapped_sources=80 mod3_forms=8 selectors=4 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated memory immediate MPY complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254352) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254351; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 

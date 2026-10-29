@@ -36,7 +36,7 @@ class OperandDomainInventoryTest(unittest.TestCase):
             for context in range(16):
                 for mode in aliases:
                     key = ((opcode | mode) << 16) | (operation << 4) | context | tag
-                    rows.append((key, opcode, operation, mode, context, st0, st1, prefix))
+                    rows.append((key, opcode, operation, mode, context, st0, st1, prefix, 0xffff, 0))
 
         for opcode, operation in expected:
             append(opcode, operation, (*range(0x98, 0xa0), *range(0xf9, 0x100)))
@@ -57,6 +57,18 @@ class OperandDomainInventoryTest(unittest.TestCase):
                        0x7100, 0x7300, 0x7500, 0x7f00, 0x7d00, 0x7900, 0x7b00, 0x4c00, 0x4d00,
                        0x6800, 0x6900, 0x6a00, 0x6b00):
             append(opcode, 0, range(0x98, 0xa0), st0=0x0804, tag=0x8000)
+        for snapshot in range(2):
+            for page in range(2):
+                for selectors in range(4):
+                    for form in range(88):
+                        absolute = form < 80
+                        address = form if form < 8 else form + 16
+                        opcode, mode = 0x6400 | (selectors << 8), 0xf8 if absolute else 0x98 + form - 80
+                        context = (page << 1) | (snapshot << 3)
+                        operation, tag = (0, 0) if absolute else (9, 0x0400)
+                        key = ((opcode | mode) << 16) | ((address if absolute else operation) << 4) | tag | context
+                        rows.append((key, opcode, operation, mode, context, 0x1028, 0x0800, 0,
+                                     address if absolute else 0xffff, 5 if snapshot else 3))
         if not shutil.which('c++'):
             self.skipTest('host C++ compiler unavailable')
         with compiled_cpp(r'''
@@ -66,7 +78,8 @@ int main() {
     for (unsigned i = 0; i < c54x_test::domain_total_cases; ++i) {
         auto const c = c54x_test::select_domain(i);
         std::cout << c.key() << ' ' << c.instruction.opcode << ' ' << c.instruction.operation
-            << ' ' << c.mode << ' ' << c.context << ' ' << c.st0 << ' ' << c.st1 << ' ' << c.prefix << '\n';
+            << ' ' << c.mode << ' ' << c.context << ' ' << c.st0 << ' ' << c.st1 << ' ' << c.prefix
+            << ' ' << c.absolute_source << ' ' << c.checkpoint << '\n';
     }
     try { c54x_test::select_domain(c54x_test::domain_total_cases); }
     catch (std::out_of_range const &) { return 0; }
@@ -84,6 +97,8 @@ int main() {
                 digest = ((digest ^ byte) * 1099511628211) & ((1 << 64) - 1)
             if index == 30447:
                 self.assertEqual(f'{digest:016x}', 'ba74a1da74928725')
+            if index == 44655:
+                self.assertEqual(f'{digest:016x}', '6ae942418d722665')
         coverage = reviewed_profiles()['source-domain']['coverage']
         self.assertEqual(len(keys), coverage['cases'])
         self.assertEqual(f'{digest:016x}', coverage['fnv64'])

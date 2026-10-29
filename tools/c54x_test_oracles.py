@@ -364,7 +364,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated generic square complete",
     ),
     "source-domain": (
-        "TMS320C54x source-domain exclusions: PASS cases=44656 restore=44656 base_cases=30000 absolute_tc0_cases=448 short_control_cases=14208 base_instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 shifts=0,1,15,16,31 modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=6ae942418d722665",
+        "TMS320C54x source-domain exclusions: PASS cases=46064 restore=46064 base_cases=30000 absolute_tc0_cases=448 short_control_cases=14208 mac_source_cases=1280 mac_short_checkpoint_cases=128 mac_frontend=staged mac_checkpoints=3,5 mac_modes=f8,98..9f base_instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 shifts=0,1,15,16,31 base_modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=60d443519ef671c5",
         "Fatal error: TMS320C54x isolated source-domain exclusions complete",
     ),
     "idle-modes": (
@@ -1683,7 +1683,6 @@ EXTRA_PROFILES = {
         (
             "TMS320C54x memory immediate MPY: PASS cases=24576 restore=24576 forms=12 values=8 literals=8 flags=8 accumulators=2 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read address_literal_retained=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0",
             "TMS320C54x memory immediate MAC: PASS cases=65536 restore=65536 ram_forms=8 values=8 literals=8 flags=16 selectors=4 pages=2 snapshots=4 checkpoint_policy=balanced source_reads=1 data_writes=0 t_publication=Read repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0 coverage_cases=90112 coverage_fnv64=085b13667b310f01",
-            "TMS320C54x memory immediate MAC exclusions: PASS cases=1408 restore=1408 mapped_sources=80 mod3_forms=8 selectors=4 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0",
         ),
         "Fatal error: TMS320C54x isolated memory immediate MPY complete",
     ),

@@ -33,7 +33,7 @@ public:
 		require(!m_reads && !m_writes && !m_program_writes && !m_io,
 			"rejection precedes data/program/I-O effects");
 		check_case_state(m_cpu, m_case);
-		unsigned const checkpoint = context() & 8 ? 10 : 1;
+		unsigned const checkpoint = m_input.checkpoint ? m_input.checkpoint : (context() & 8 ? 10 : 1);
 		if (m_tick == checkpoint && !m_replay)
 			require(capture_snapshot(m_machine, m_saved) == STATERR_NONE, "capture rejection checkpoint");
 		if (m_tick != 20) { schedule(); return false; }
@@ -79,6 +79,13 @@ private:
 			{{r::STATE_ST0, u64(m_input.st0)}, {r::STATE_ST1, u64(m_input.st1 | (context() & 1 ? 0x20 : 0))},
 			 {r::STATE_A, 0x123456789aULL}, {r::STATE_B, 0xfedcba9876ULL},
 			 {r::STATE_T, 0xabcd}, {r::STATE_SP, 0x1600}}, 0, 0};
+		if (m_input.absolute_source != 0xffff)
+		{
+			m_case.program[1].value = m_input.absolute_source;
+			m_case.program[2].value = 9;
+		}
+		else if (m_input.checkpoint)
+			m_case.program[2].value = 0xf4e1; // Retained two-word MAC guard program.
 		if (m_input.prefix)
 			m_case.program = {{base + 0x600, m_input.prefix}, {base + 0x601, m_case.opcode}, {base + 0x602, 0xf4e1}};
 		else
