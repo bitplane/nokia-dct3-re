@@ -8,6 +8,36 @@
   },
   "families": [
     {
+      "id": "unsupported-block-call-and-repeat-probes",
+      "classification": "implementation_limit",
+      "decision": "delete",
+      "profiles": [],
+      "case_ids": [],
+      "retired_profiles": ["rptb-call-edge", "rptb-fcall-edge", "rptb-rpt-edge"],
+      "basis": "These fixtures assert the prototype's rejection policy for internal targets, incomplete call spans and unsupported repeat compositions, not documented silicon results. Retain representative block-control admission checks instead of a separate state/tap/replay matrix per unsupported family. This is a deliberate coverage tradeoff, not a proof of complete overlap.",
+      "retained": [
+        "rptb-br-edges retains 32 existing rejected control cases covering eight forms, both pages and both snapshots, including an older legal source read before rejection",
+        "rptbd-edge retains 28 existing delayed-block boundary cases and counter/pointer preservation checks",
+        "all successful near CALL/CALLD, far FCALL/FCALLD, immediate/memory inner-repeat, branch, interrupt and frame-restoration fixtures remain unchanged",
+        "the CPU's admission behavior is untouched; removing a research profile neither admits nor rejects instructions"
+      ],
+      "coverage_loss": [
+        "72 near-call, 20 far-call and 16 inner-repeat rejected case/restore pairs are removed",
+        "the deleted combinations' exact illegal-latch timing, no-frame/no-data and per-clock loop/register preservation are no longer asserted",
+        "the retained block controls are representative, not substitutes for each deleted CALL/CALLD/FCALL/FCALLD or nested-repeat input"
+      ],
+      "verification": "All three retired profiles and both retained boundary controls pass on the pre-change binary. Removal is limited to their isolated BIOS/dispatch entries, setup routines and negative-only phase branches. Nine retained shared builders/setup/control bodies and six mixed-handler positive phase branches are byte-identical. Retained BIOS identities, descriptions and order are unchanged; no default requirement is removed.",
+      "measurement": {
+        "baseline_commit": "1bee7048",
+        "c54x_cpp_bytes_before": 3546494,
+        "c54x_cpp_bytes_after": 3536883,
+        "c54x_cpp_lines_before": 54231,
+        "c54x_cpp_lines_after": 54138,
+        "rejected_case_restore_pairs_retired": 108,
+        "scope": "9611 C++ bytes/93 lines removed. The three removed isolated matrices took about 0.28 seconds together; they were not default-suite work, so no default runtime reduction is claimed."
+      }
+    },
+    {
       "id": "mapped-word-and-bitfield-clocked-contracts",
       "classification": "isa_documented",
       "decision": "rewrite",

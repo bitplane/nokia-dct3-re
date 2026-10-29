@@ -97,6 +97,15 @@ longer coverage claims. Supported delay-slot arithmetic, addressing, control
 and restoration tests remain separate. Older revision-bound checkpoints below
 may name retired diagnostics; they are not the current test inventory.
 
+Block-control admission similarly retains the 32-case `rptb-br-edges` and
+28-case `rptbd-edge` boundary controls rather than a separate exclusion profile
+for every unsupported composition. The near-call, far-call and inner-repeat
+exclusion matrices are retired: 108 rejected case/restore pairs, their precise
+trap clocks and per-combination preservation predicates are no longer coverage
+claims. This is an explicit reduction of implementation-policy tests, not proof
+that the retained controls cover those combinations. Successful CALL/CALLD,
+FCALL/FCALLD and inner-repeat interaction fixtures remain unchanged.
+
 The compatibility-named `tms54isa` bench separates architectural examples
 (`isa-square`, `isa-parallel`, `isa-scalars`, `mac-map-imm`) from implementation-admission checks
 (`source-domain`) by explicit profile and review classification. Source-domain
@@ -1173,7 +1182,7 @@ original firmware passes this setup; this is not a complete recording
 or a claim that every original outer-loop iteration has settled.
 
 Companion isolated controls are `repeat-context`, `repeat-pmst`,
-`repeat-popd`, `repeat-rearm`, `rptb-ccd`, `rptbd-irq` and `rptb-fcall-edge`.
+`repeat-popd`, `repeat-rearm`, `rptb-ccd` and `rptbd-irq`.
 Their renewal is not implied by a default run; aggregate scope is maintained
 in [Core regression checkpoint](#core-regression-checkpoint).
 
@@ -1983,8 +1992,7 @@ copies ordered RAM words until negative. The test checks exactly
 balanced interrupt frames and restored held words. Interrupts arrive after
 the first copy, not at every clock. The 32-case `rptb-br-edges` control now
 tests below/above-block targets and a conditional call instead of treating
-ordinary backward branches as unsupported. Unconditional near calls remain
-covered by `rptb-fcall-edge`. Outside-block branches, delayed back edges and
+ordinary backward branches as unsupported. Outside-block branches, delayed back edges and
 measured physical phase timing remain unvalidated.
 
 FCALL is admitted from inside a block when the complete call precedes the
@@ -2006,11 +2014,9 @@ its `FCALL` Execute hook once before the next exclusion. `rptb-fcalld` adds
 2,304 replay cases with the same counts/pages/depths/interrupts, middle and
 endpoint delay placement, and two single-word, one double-word or original
 LD/NOP delay layouts. It checks once-only delay effects and paired page/PC
-frames returning to call+4. `rptb-fcall-edge` has 20 cases/restores retaining
-delayed/non-delayed internal targets, a non-delayed call ending at the
-endpoint, near calls and delayed spans spilling outside the block. These
-reject before data work or frame allocation and are prototype limits, not
-silicon traps. Callee loop-control writes, arbitrary control mixtures and
+frames returning to call+4. Rejection of unsupported internal targets and
+incomplete call spans is an implementation limit, not a silicon-trap claim.
+Callee loop-control writes, arbitrary control mixtures and
 physical phase timing remain unvalidated.
 
 Acceptance for this composition includes all 288 required checks in the
@@ -2055,9 +2061,6 @@ MVDD, immediate ST and NOP bodies, middle/end placement, two pages and four
 snapshots. Ordered RAM copies/stores, one prefix/suffix per outer iteration,
 final BRC/RPTC, BRAF, RSA/REA and continuation are checked. NOP has no memory
 effects; it is a control-state case, not an independently measured cycle count.
-`rptb-rpt-edge` adds 16 cases/restores for a short header at the endpoint,
-long-immediate or memory-count inner RPT, and nested RPTB; all remain prototype
-exclusions before data transactions. Those exclusions are not silicon traps.
 Boundary-straddling body encodings, combined inner-RPT/block interrupt behavior
 and measured physical phases remain unvalidated, independently of the existing
 standalone-repeat and RPTB IRQ/NMI controls.
@@ -4459,10 +4462,6 @@ final BRC/BRAF and a once-only post-loop sentinel are checked. The final
 parking IDLE follows interrupt-drain space: a pending IRQ legitimately
 wakes an adjacent IDLE (SPRU131G section 6.11.1), so that cannot itself
 prove a failed return. Physical phase timing is not a silicon measurement.
-`rptb-call-edge` passes 72 exclusion/replay cases for internal targets,
-spilled delay words and a spilled target literal, with no data reads,
-writes or stack allocation. The existing far-call exclusion profile now
-uses an internal near-call target rather than rejecting all near calls.
 
 ## Memory-sourced repeat counts
 

@@ -1356,10 +1356,6 @@ EXTRA_PROFILES = {
         "TMS320C54x adjacent PSHM POPM: PASS cases=2048 restore=2048 sources=8 destinations=T,AR3,BK,SP patterns=4 pages=2 stack_alignments=2 snapshots=4 source_reads=1 stack_reads=1 stack_writes=1 register_writes=1 source_mutation_after_read=1 stack_mutation_after_read=1 logical_bypass=1 interrupt_composition=unvalidated physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated adjacent PSHM POPM complete",
     ),
-    "rptb-fcall-edge": (
-        "TMS320C54x in-block far call exclusions: PASS cases=20 restore=20 forms=delayed_internal,endpoint,internal_target,near_internal,delay_spill pages=2 snapshots=2 data_reads=0 data_writes=0 frame_allocation=0 counters_preserved=1 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated in-block far call exclusions complete",
-    ),
     "rptb-fcall": (
         "TMS320C54x in-block far calls: PASS cases=768 restore=768 counts=0,1,2,7 layouts=early,near_end caller_pages=2 callee_pages=same,cross depths=1,2 sources=none,IRQ,NMI snapshots=4 ordered_copy=1 balanced_stack=1 caller_loop_preserved=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated in-block far calls complete",
@@ -1375,10 +1371,6 @@ EXTRA_PROFILES = {
     "macsu-dual-edge": (
         "TMS320C54x dual MACSU exclusions: PASS cases=16 restore=16 operands=X,Y sources=cpu_register,peripheral pages=2 snapshots=2 reads=0 pointer_updates=0 register_publication=0 silicon_trap_claim=0 coverage_fnv64=2135120b48416d25",
         "Fatal error: TMS320C54x isolated dual MACSU exclusions complete",
-    ),
-    "rptb-rpt-edge": (
-        "TMS320C54x inner repeat exclusions: PASS cases=16 restore=16 forms=header_at_end,long_immediate,memory_count,nested_block pages=2 snapshots=2 data_reads=0 data_writes=0 counters_preserved=1 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated inner repeat exclusions complete",
     ),
     "rptb-single": (
         "TMS320C54x single repeat in block: PASS cases=768 restore=768 outer_counts=4 inner_counts=4 bodies=MVDD,ST,NOP positions=middle,end pages=2 snapshots=4 ordered_memory=1 outer_counts_preserved=1 duplicate_transactions=0 interrupt_composition=unvalidated physical_phase_claim=0",
@@ -1865,10 +1857,6 @@ EXTRA_PROFILES = {
     "rptb-call": (
         "TMS320C54x in-block near calls: PASS cases=3456 restore=3456 counts=0,1,5,15 layouts=middle,endpoint,whole_block pages=3 depths=1,2 sources=none,IRQ,NMI calls=CALL,CALLD returns=RET,RETD snapshots=4 ordered_copy=1 balanced_stack=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated in-block near calls complete",
-    ),
-    "rptb-call-edge": (
-        "TMS320C54x in-block near call exclusions: PASS cases=72 restore=72 forms=internal_target,delay_spill,literal_spill pages=3 counts=2 snapshots=4 reads=0 writes=0 stack_allocation=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated in-block near call exclusions complete",
     ),
     "rpt-mem-copy": (
         "TMS320C54x memory-count copies: PASS cases=27648 restore=27648 count_sources=24 owned_mapped_sources=18 counts=0,1,7,31 bodies=MVDD,MVKD,MVDK flag_states=2 pages=2 sources=none,IRQ,NMI snapshots=4 patterns=2 count_reads=once mutation_after_read=1 body_fetches=once physical_phase_claim=0",

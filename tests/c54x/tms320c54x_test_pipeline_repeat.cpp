@@ -833,18 +833,6 @@ void tms320c54x_test_state::start_block_far_call(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.caller + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_block_far_call_edge(unsigned variant)
-{
-	u32 const base = (variant / 5) % 2 ? 0x20000 : 0; unsigned const kind = variant % 5;
-	start_block_far_call(2 + (base ? 8 : 0)); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto &program = m_cpu->space(AS_PROGRAM); for (unsigned i = 0x602; i <= 0x609; ++i) program.write_word(base + i, 0xf495);
-	unsigned const call = kind == 1 ? 0x608 : kind == 4 ? 0x607 : 0x603;
-	program.write_word(base + call, kind == 3 ? 0xf074 : (kind == 0 || kind == 4 ? 0xfb80 : 0xf980) | (base >> 16)); program.write_word(base + call + 1, kind == 0 || kind == 2 || kind == 3 ? 0x602 : 0x700);
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "block_fcall_edge_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "block_fcall_edge_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_phase = 255220; m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
 
 tms320c54x_test_state::block_near_call_fixture tms320c54x_test_state::block_near_call_case(unsigned v)
 {
@@ -914,19 +902,6 @@ void tms320c54x_test_state::start_block_near_call(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_block_near_call_edge(unsigned variant)
-{
-	unsigned const kind = variant % 3, page = (variant / 3) % 3;
-	start_block_near_call((variant / 9) % 2 + page * 12); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	u32 const base = std::array<u32, 3>{0, 0x20000, 0x7f0000}[page]; auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0x602; i <= 0x60a; ++i) program.write_word(base + i, 0xf495);
-	unsigned const call = kind == 0 ? 0x603 : kind == 1 ? 0x607 : 0x609;
-	program.write_word(base + call, kind == 1 ? 0xf274 : 0xf074); program.write_word(base + call + 1, kind == 0 ? 0x602 : 0x700);
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "block_near_edge_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "block_near_edge_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_phase = 62152; m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
 
 tms320c54x_test_state::block_single_fixture tms320c54x_test_state::block_single_case(unsigned v) const
 {
@@ -990,17 +965,6 @@ void tms320c54x_test_state::start_block_single(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_block_single_edge(unsigned variant)
-{
-	u32 const base = (variant / 4) % 2 ? 0x20000 : 0; unsigned const kind = variant % 4;
-	start_block_single(2 + (base ? 96 : 0)); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(base + 0x601, kind ? 0x603 : 0x602); program.write_word(base + 0x602, std::array<u16, 4>{0xec07, 0xf070, 0x47f8, 0xf072}[kind]); program.write_word(base + 0x603, kind == 3 ? 0x604 : 1);
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "block_single_edge_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "block_single_edge_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_phase = 255180; m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
 
 tms320c54x_test_state::branch_repeat_fixture tms320c54x_test_state::branch_repeat_case(unsigned v) const
 {
@@ -2362,22 +2326,6 @@ bool tms320c54x_test_state::check_delay_dld_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 255250) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255240; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 255220)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, guard = std::array<unsigned, 5>{9, 14, 9, 9, 13}[variant % 5], checkpoint = guard - 1 + variant / 10;
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (tick >= guard) && !m_pipeline_operand_reads && !m_pipeline_store_writes, "Unsupported block call forms reject before stack or data work");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 2 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (tick < 4 ? 0x900 : 0x8900) && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x7000, "Excluded block calls preserve frame and loop ownership");
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save block call exclusion before or after Decode rejection"); }
-		if (tick == 20)
-		{
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(255230, "Restore rejected block call without frame allocation"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 19) { start_block_far_call_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x in-block far call exclusions: PASS cases=20 restore=20 forms=delayed_internal,endpoint,internal_target,near_internal,delay_spill pages=2 snapshots=2 data_reads=0 data_writes=0 frame_allocation=0 counters_preserved=1 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated in-block far call exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255230) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255220; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 255200)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -2400,22 +2348,6 @@ bool tms320c54x_test_state::check_delay_dld_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 255210) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255200; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 255180)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, guard = variant % 4 ? 8 : 7, checkpoint = guard - 1 + variant / 8;
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (tick >= guard) && !m_pipeline_operand_reads && !m_pipeline_store_writes, "Unsupported inner repeat forms reject before any data transactions");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_BRC) == 2 && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (tick < 4 ? 0x800 : 0x8800) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5555 && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x7000, "Excluded repeat setup preserves counters and body state");
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save unsupported inner repeat before or after rejection"); }
-		if (tick == 16)
-		{
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(255190, "Restore inner repeat exclusion without changing outer ownership"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 15) { start_block_single_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x inner repeat exclusions: PASS cases=16 restore=16 forms=header_at_end,long_immediate,memory_count,nested_block pages=2 snapshots=2 data_reads=0 data_writes=0 counters_preserved=1 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated inner repeat exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255190) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255180; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 255160)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = block_single_case(variant);
@@ -2440,26 +2372,10 @@ bool tms320c54x_test_state::check_delay_dld_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_block_near_call_edge_results()
+bool tms320c54x_test_state::check_block_near_call_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 62152)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 4>{5, 9, 12, 16}[variant / 18];
-		expect(!m_pipeline_operand_reads && !m_pipeline_store_writes && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Unsupported block near calls allocate no frame or data transaction");
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save near call rejection before or after Decode"); }
-		if (tick == 24)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Internal targets and incomplete call spans remain excluded");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(62153, "Restore near call exclusion without side effects"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 71) { start_block_near_call_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x in-block near call exclusions: PASS cases=72 restore=72 forms=internal_target,delay_spill,literal_spill pages=3 counts=2 snapshots=4 reads=0 writes=0 stack_allocation=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated in-block near call exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62153) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62152; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 62150)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = block_near_call_case(variant);

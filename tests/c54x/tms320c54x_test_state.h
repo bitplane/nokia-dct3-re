@@ -1227,7 +1227,6 @@ private:
 	};
 	static block_far_call_fixture block_far_call_case(unsigned v, bool delayed = false);
 	void start_block_far_call(unsigned variant = 0);
-	void start_block_far_call_edge(unsigned variant = 0);
 	struct block_near_call_fixture
 	{
 		unsigned count, layout, depth, interrupt, checkpoint;
@@ -1237,7 +1236,6 @@ private:
 	};
 	static block_near_call_fixture block_near_call_case(unsigned v);
 	void start_block_near_call(unsigned variant = 0);
-	void start_block_near_call_edge(unsigned variant = 0);
 	struct block_single_fixture
 	{
 		unsigned outer, inner, kind, checkpoint, total;
@@ -1249,7 +1247,6 @@ private:
 	};
 	block_single_fixture block_single_case(unsigned v) const;
 	void start_block_single(unsigned variant = 0);
-	void start_block_single_edge(unsigned variant = 0);
 	struct asm_mapped_fixture
 	{
 		unsigned source, form, raw, flags, ar, read, checkpoint;
@@ -2213,7 +2210,7 @@ private:
 	bool check_mapped_parallel_load_results();
 	bool check_mvdm_acc_results();
 	bool check_memory_copy_repeat_results();
-	bool check_block_near_call_edge_results();
+	bool check_block_near_call_results();
 	bool check_repeated_mvdk_results();
 	bool check_portr_bypass_results();
 	bool check_sqdst_results();
