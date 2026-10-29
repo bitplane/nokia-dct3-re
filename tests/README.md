@@ -92,3 +92,11 @@ and observation types live in the repeat-state header. The template shares
 storage only: event-driven checkpoints, rewind order and input-edge handling
 stay in each family's code. Unrelated rearm and conditional-call handlers are
 dispatched separately in their original order.
+
+Atomic and peripheral replays use separate checkpoint streams for
+transport/repeat, near return, far transfer, XF output, idle/NMI, deep-idle
+timer, idle DMA, timer prescaler, BSP, PLL lock and selected clock rates.
+Transport/repeat retains its saved host read count and shared-RAM comparison;
+far-transfer capture and replay share one owner across the control and restore
+modules. These are storage boundaries, not reset-independent fixtures: phase
+order, host-counter rewinds and device mutation remain explicit at each site.

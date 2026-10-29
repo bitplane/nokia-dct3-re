@@ -81,6 +81,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_peripherals.cpp` | Bus, clock, serial, DMA and timer fixtures |
 | `tests/c54x/tms320c54x_test_restore.cpp` | Atomic far-transfer replay and extended program-memory continuations |
 | `tests/c54x/tms320c54x_test_repeat_restore.cpp` | Saved/body IRQ repeats, active-context restoration and delayed far-call/return replay |
+| `tests/c54x/tms320c54x_test_snapshot_state.h` | Atomic transport/repeat and cross-module far-transfer checkpoint storage; peripheral checkpoint streams remain family-specific bench members |
 | `tests/c54x/tms320c54x_test_repeat_state.h` | Independent case inputs, observation types and per-family replay storage; no generic rewind policy |
 | `tests/c54x/tms320c54x_test_disassembler.cpp` | Bounded decoding and operand-domain matrices |
 | `tests/firmware/tms320c54x_test_rom4.cpp` | Acquired-ROM routine execution and independent reference comparisons |

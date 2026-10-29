@@ -9020,15 +9020,15 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 			return next_atomic_phase(index < 3 ? m_phase + 1 : index == 3 ? 6547 : m_phase + 1);
 		}
-		m_saved_repeat.str(std::string());
-		m_saved_repeat.clear();
-		expect(machine().save().write_stream(m_saved_repeat) == STATERR_NONE,
+		m_xf_saved.str(std::string());
+		m_xf_saved.clear();
+		expect(machine().save().write_stream(m_xf_saved) == STATERR_NONE,
 			"save architectural XF low");
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, cases[index].st1_after | 0x2000);
 		expect(m_xf_pin, "debugger ST1 import drives XF high immediately");
-		m_saved_repeat.clear();
-		m_saved_repeat.seekg(0);
-		expect(machine().save().read_stream(m_saved_repeat) == STATERR_NONE && !m_xf_pin,
+		m_xf_saved.clear();
+		m_xf_saved.seekg(0);
+		expect(machine().save().read_stream(m_xf_saved) == STATERR_NONE && !m_xf_pin,
 			"post-load re-drives restored XF low instead of retaining external high");
 		osd_printf_info("TMS320C54x XF output: PASS status_variants=8 debugger=1 restore=1\n");
 		program.write_word(0x05e2, 0xfd30); // XC 1,TC

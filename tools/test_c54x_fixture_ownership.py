@@ -19,6 +19,37 @@ def methods(filename):
 
 
 class FixtureOwnershipTests(unittest.TestCase):
+    def test_snapshot_stream_boundaries(self):
+        # Architectural ownership only: the executable replay gates establish
+        # restoration behavior, including checkpoints shared across modules.
+        owners = {
+            'm_transport_repeat.saved': {'check_atomic_basic_results'},
+            'm_near_return_saved': {'check_atomic_control_results'},
+            'm_far_transfer.saved': {'check_atomic_control_results', 'check_far_save_results'},
+            'm_xf_saved': {'check_atomic_corpus_results'},
+            'm_idle_nmi_saved': {'check_idle_nmi_result_results'},
+            'm_idle_timer_saved': {'check_idle_wake_results'},
+            'm_idle_dma_saved': {'check_idle_wake_results'},
+            'm_timer_prescaler_saved': {'check_stopped_timer_reload_results'},
+            'm_bsp_saved': {'check_bsp_interrupt_results'},
+            'm_pll_saved': {'check_bsp_interrupt_results'},
+            'm_clock_rates_saved': {'check_bsp_interrupt_results'},
+        }
+        users = {owner: set() for owner in owners}
+        operations = {owner: set() for owner in owners}
+        for filename in ROOT.glob('tms320c54x_test*.cpp'):
+            self.assertNotRegex(filename.read_text(), r'\bm_saved_repeat\b')
+            for name, body in methods(filename.name).items():
+                for operation, stream in re.findall(
+                        r'\b(write_stream|read_stream)\(\s*(m_\w+(?:\.\w+)?)\s*\)', body):
+                    if stream in owners:
+                        users[stream].add(name)
+                        operations[stream].add(operation)
+        self.assertEqual(users, owners)
+        for owner in owners:
+            with self.subTest(stream=owner):
+                self.assertEqual(operations[owner], {'write_stream', 'read_stream'})
+
     def check_owners(self, filename, owners, handoffs=(), legacy_taps=()):
         bodies = methods(filename)
         self.assertEqual(set(bodies), set(owners))

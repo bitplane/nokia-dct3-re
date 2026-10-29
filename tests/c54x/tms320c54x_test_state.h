@@ -21,6 +21,7 @@
 #include "tms320c54x_test_rejection_state.h"
 #include "tms320c54x_test_entry_state.h"
 #include "tms320c54x_test_repeat_state.h"
+#include "tms320c54x_test_snapshot_state.h"
 #include <sstream>
 #include <bitset>
 
@@ -2432,7 +2433,6 @@ private:
 	u16 m_first_port_value = 0;
 	u16 m_middle_port_value = 0;
 	u16 m_last_port_value = 0;
-	unsigned m_saved_repeat_reads = 0;
 	// Immutable case inputs remain unchanged across each manual replay.
 	mvdd_fixture m_mvdd_fixture = {};
 	popd_fixture m_popd_fixture = {};
@@ -2440,9 +2440,12 @@ private:
 	offset_logic_fixture m_offset_logic_fixture = {};
 	unsigned m_acc_branch_mapped_writes = 0;
 	u32 m_popd_write_mask = 0;
-	std::stringstream m_saved_repeat;
-	bool m_far_save_return = false;
-	std::array<u16, 0x800> m_saved_transport = {};
+	transport_repeat_snapshot m_transport_repeat;
+	far_transfer_snapshot m_far_transfer;
+	std::stringstream m_near_return_saved, m_xf_saved;
+	// Separate checkpoint lifetimes; host observations still rewind explicitly.
+	std::stringstream m_idle_nmi_saved, m_idle_timer_saved, m_idle_dma_saved;
+	std::stringstream m_timer_prescaler_saved, m_bsp_saved, m_pll_saved, m_clock_rates_saved;
 };
 
 } // namespace c54x_test

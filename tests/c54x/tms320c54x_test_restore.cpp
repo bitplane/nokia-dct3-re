@@ -8,7 +8,7 @@ namespace c54x_test {
 
 void tms320c54x_test_state::start_far_save_case(bool returning)
 {
-	m_far_save_return = returning;
+	m_far_transfer.returning = returning;
 	auto &program = m_cpu->space(AS_PROGRAM);
 	auto &data = m_cpu->space(AS_DATA);
 	const unsigned origin = returning ? 0x030600 : 0x010600;
@@ -47,7 +47,7 @@ bool tms320c54x_test_state::check_far_save_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 786 || m_phase == 787)
 	{
-		const unsigned continuation = m_far_save_return ? 0x010606 : 0x010605;
+		const unsigned continuation = m_far_transfer.returning ? 0x010606 : 0x010605;
 		expect(m_cpu->state_int(STATE_GENPC) == continuation &&
 			m_cpu->state_int(tms320c54x_device::STATE_A) == 7 &&
 			m_cpu->state_int(tms320c54x_device::STATE_B) == 5 &&
@@ -61,11 +61,11 @@ bool tms320c54x_test_state::check_far_save_results()
 			});
 			data.write_word(0x03fe, 0x7f);
 			data.write_word(0x03ff, 0xbad);
-			m_saved_repeat.clear();
-			m_saved_repeat.seekg(0);
-			expect(machine().save().read_stream(m_saved_repeat) == STATERR_NONE,
+			m_far_transfer.saved.clear();
+			m_far_transfer.saved.seekg(0);
+			expect(machine().save().read_stream(m_far_transfer.saved) == STATERR_NONE,
 				"restore pending far-transfer save state");
-			expect(m_cpu->state_int(STATE_GENPC) == (m_far_save_return ? 0x030602 : 0x010603) &&
+			expect(m_cpu->state_int(STATE_GENPC) == (m_far_transfer.returning ? 0x030602 : 0x010603) &&
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == 0 &&
 				data.read_word(0x03fe) == 1 && data.read_word(0x03ff) == 0x0604,
@@ -74,7 +74,7 @@ bool tms320c54x_test_state::check_far_save_results()
 			m_check_timer->adjust(attotime::from_usec(100));
 			return true;
 		}
-		if (!m_far_save_return)
+		if (!m_far_transfer.returning)
 		{
 			start_far_save_case(true);
 			return true;
