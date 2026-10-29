@@ -8,7 +8,6 @@
 #include "tms320c54x_test_store_schedule.h"
 #include "tms320c54x_test_shifted_schedule.h"
 #include "tms320c54x_test_register_schedule.h"
-#include "tms320c54x_test_bitfield_schedule.h"
 
 namespace c54x_test {
 
@@ -1632,11 +1631,21 @@ tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::memory_s
 
 void tms320c54x_test_state::start_pipeline_memory_arithmetic(unsigned variant)
 {
+	using kind = smem_schedule::kind;
+	if (!variant)
+	{
+		m_memory_kind = profile_is("memory-shift16") ? kind::shift16 : profile_is("adds") ? kind::unsigned_add :
+			profile_is("subs") ? kind::unsigned_sub : kind::signed_word;
+		m_memory_alu_coverage = {}; m_memory_alu_restores = 0;
+	}
 	if (variant % 18 == 5) ++variant; // Short MOD=3 is write-only; retain raw snapshot IDs.
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const shift16 = profile_is("memory-shift16");
-	bool const adds = profile_is("adds");
-	auto const f = shift16 ? memory_shift16_case(variant) : adds || profile_is("subs") ? memory_unsigned_case(variant, !adds) : memory_arithmetic_case(variant);
+	bool const shift16 = m_memory_kind == kind::shift16, adds = m_memory_kind == kind::unsigned_add;
+	// Pure input/reference data is fixed for the live/replay pair. Do not
+	// rebuild it on every timer tick or derive it from the mutated CPU state.
+	m_memory_input = shift16 ? memory_shift16_case(variant) : adds || m_memory_kind == kind::unsigned_sub ?
+		memory_unsigned_case(variant, !adds) : memory_arithmetic_case(variant);
+	auto const &f = m_memory_input;
 	u32 const base = f.reg == 6 ? 0x20000 : 0;
 	auto &program = m_cpu->space(AS_PROGRAM);
 	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
@@ -6488,11 +6497,11 @@ bool tms320c54x_test_state::check_absolute_xorm_results()
 	if (m_phase == 252910)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const subs = profile_is("subs");
-		bool const adds = profile_is("adds");
-		bool const shift16 = profile_is("memory-shift16");
-		auto const f = shift16 ? memory_shift16_case(variant) : adds || subs ? memory_unsigned_case(variant, !adds) : memory_arithmetic_case(variant);
-		unsigned const checkpoint = std::array<unsigned, 3>{3, f.read_cycle - 1, f.read_cycle}[variant / (shift16 ? 73728 : adds || subs ? 18432 : 36864)];
+		using kind = smem_schedule::kind;
+		bool const subs = m_memory_kind == kind::unsigned_sub, adds = m_memory_kind == kind::unsigned_add;
+		bool const shift16 = m_memory_kind == kind::shift16;
+		auto const &f = m_memory_input;
+		unsigned const checkpoint = std::array<unsigned, 3>{3, f.read_cycle - 1, f.read_cycle}[smem_schedule::checkpoint(variant, m_memory_kind)];
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Memory ADD/SUB has retained staged ownership");
 		if (f.form >= 14 && tick == 4)
 		{
@@ -6528,26 +6537,30 @@ bool tms320c54x_test_state::check_absolute_xorm_results()
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
 				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore memory ADD/SUB without operand resampling or duplicate AR modification");
+				++m_memory_alu_restores;
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252920; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (shift16 ? 221183 : adds || subs ? 55295 : 110591)) { start_pipeline_memory_arithmetic(variant + 1); return true; }
+			m_memory_alu_coverage.add(smem_schedule::key(variant, m_memory_kind));
+			expect(m_memory_alu_restores == m_memory_alu_coverage.count, "Every retained memory arithmetic input completed a real restore");
+			if (variant + 1 < smem_schedule::raw_inputs(m_memory_kind)) { start_pipeline_memory_arithmetic(variant + 1); return true; }
+			expect(m_memory_alu_coverage.count == smem_schedule::cases(m_memory_kind), "Complete the legal memory arithmetic input bank once");
 			if (shift16)
 			{
-				osd_printf_info("TMS320C54x staged memory shift16: PASS cases=208896 restore=208896 forms=17 registers=8 selectors=8 patterns=8 sxm_ovm=4 compatibility=2 reads=1 data_writes=0 partial_carry=1 mapped_acceptance=0 silicon_phase_claim=0\n");
+				osd_printf_info("TMS320C54x staged memory shift16: PASS cases=%u restore=%u forms=17 registers=8 selectors=8 patterns=8 sxm_ovm=4 compatibility=2 reads=1 data_writes=0 partial_carry=1 mapped_acceptance=0 silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n", m_memory_alu_coverage.count, m_memory_alu_restores, (unsigned long long)m_memory_alu_coverage.value);
 				throw emu_fatalerror(0, "TMS320C54x isolated memory shift16 complete");
 			}
 			if (adds)
 			{
-				osd_printf_info("TMS320C54x staged ADDS: PASS cases=52224 restore=52224 forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0\n");
+				osd_printf_info("TMS320C54x staged ADDS: PASS cases=%u restore=%u forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n", m_memory_alu_coverage.count, m_memory_alu_restores, (unsigned long long)m_memory_alu_coverage.value);
 				throw emu_fatalerror(0, "TMS320C54x isolated staged ADDS complete");
 			}
 			if (subs)
 			{
-				osd_printf_info("TMS320C54x staged SUBS: PASS cases=52224 restore=52224 forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0\n");
+				osd_printf_info("TMS320C54x staged SUBS: PASS cases=%u restore=%u forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n", m_memory_alu_coverage.count, m_memory_alu_restores, (unsigned long long)m_memory_alu_coverage.value);
 				throw emu_fatalerror(0, "TMS320C54x isolated staged SUBS complete");
 			}
-			osd_printf_info("TMS320C54x staged memory ADD/SUB: PASS cases=104448 forms=17 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=104448 duplicate_reads=0 data_writes=0\n");
+			osd_printf_info("TMS320C54x staged memory ADD/SUB: PASS cases=%u forms=17 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=%u duplicate_reads=0 data_writes=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n", m_memory_alu_coverage.count, m_memory_alu_restores, (unsigned long long)m_memory_alu_coverage.value);
 			if (profile_is("memory-alu")) throw emu_fatalerror(0, "TMS320C54x isolated memory ADD SUB complete");
 			start_pipeline_register_arithmetic(); return true;
 		}
@@ -6654,7 +6667,7 @@ bool tms320c54x_test_state::check_bitfield_address_results()
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 		bool const compare = profile_is("cmpm-smem");
 		auto const f = bitfield_address_case(variant); auto const input = bitfield_inputs(variant, compare);
-		unsigned const read_cycle = f.read_cycle + 1, checkpoint = std::array<unsigned, 3>{4, read_cycle - 1, read_cycle}[bitfield_schedule::checkpoint(variant)];
+		unsigned const read_cycle = f.read_cycle + 1, checkpoint = std::array<unsigned, 3>{4, read_cycle - 1, read_cycle}[smem_schedule::checkpoint(variant)];
 		bool const initial_tc = (variant / 1152) % 2, result = compare ? input[0] == input[1] : bool(input[0] & input[1]);
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Smem test/compare has staged source and literal ownership");
 		expect(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST0), 12) == (tick <= read_cycle ? initial_tc : result),
@@ -6694,10 +6707,10 @@ bool tms320c54x_test_state::check_bitfield_address_results()
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253020; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			m_bitfield_coverage.add(bitfield_schedule::key(variant));
+			m_bitfield_coverage.add(smem_schedule::key(variant));
 			expect(m_bitfield_restores == m_bitfield_coverage.count, "Every retained test/compare input completed a real restore");
-			if (variant + 1 < bitfield_schedule::raw_inputs) { start_pipeline_bitfield(variant + 1); return true; }
-			expect(m_bitfield_coverage.count == bitfield_schedule::cases, "Complete the legal test/compare source domain once");
+			if (variant + 1 < smem_schedule::raw_inputs(smem_schedule::kind::test_compare)) { start_pipeline_bitfield(variant + 1); return true; }
+			expect(m_bitfield_coverage.count == smem_schedule::cases(smem_schedule::kind::test_compare), "Complete the legal test/compare source domain once");
 			if (compare)
 			{
 				osd_printf_info("TMS320C54x staged Smem CMPM: PASS cases=%u restore=%u forms=17 registers=8 compare_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 source_reads=1 literal_fetches=1,2 duplicate_pointer_updates=0 data_writes=0 mapped_sources=excluded silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n", m_bitfield_coverage.count, m_bitfield_restores, (unsigned long long)m_bitfield_coverage.value);

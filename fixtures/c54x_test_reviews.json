@@ -498,6 +498,71 @@
       }
     },
     {
+      "id": "smem-arithmetic-retention",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_arithmetic.cpp; tests/c54x/tms320c54x_test_smem_schedule.h",
+      "profiles": [
+        "memory-alu",
+        "memory-shift16",
+        "adds",
+        "subs"
+      ],
+      "case_ids": [],
+      "basis": "Independent fixture-owned signed-integer arithmetic, low-32-bit carry/borrow, destination sticky-overflow and OVM saturation references; ADDS/SUBS use unsigned 16-bit sources and shift16 retains its conditional carry-update rule. Address/BK references obey the documented circular fixture domain. The existing pure reference functions are unchanged; no CPU implementation helper supplies expectations.",
+      "profile_coverage": {
+        "memory-alu": {
+          "cases": 34816,
+          "fnv64": "7605a400a87ea30d",
+          "result_prefix": "TMS320C54x staged memory ADD/SUB: PASS",
+          "key": "raw + 36864*checkpoint; raw preserves form/register/selector/pattern/flags/compatibility in the original first bank, excluding raw%18==5"
+        },
+        "memory-shift16": {
+          "cases": 69632,
+          "fnv64": "ecba0abea16a63e2",
+          "result_prefix": "TMS320C54x staged memory shift16: PASS",
+          "key": "raw + 73728*checkpoint; all eight source/destination/operation selectors and original raw inputs retained"
+        },
+        "adds": {
+          "cases": 17408,
+          "fnv64": "c21de3d0686da5d5",
+          "result_prefix": "TMS320C54x staged ADDS: PASS",
+          "key": "raw + 18432*checkpoint; unsigned-add profile supplies the operation identity"
+        },
+        "subs": {
+          "cases": 17408,
+          "fnv64": "c21de3d0686da5d5",
+          "result_prefix": "TMS320C54x staged SUBS: PASS",
+          "key": "same raw encoding in the distinct unsigned-subtract profile"
+        }
+      },
+      "obligations": [
+        "retain all 139264 distinct inputs across the four banks, including every original pattern, selected/decoy accumulator, flag state, legal address form, register field and compatibility state",
+        "preserve exact result/status/pointer expectations, literal poisoning, Access-owned pointer mutation, Read-owned source mutation and no duplicate read/write effects in both live and replay execution",
+        "retain all three original checkpoint shapes, balanced two/three/three across eight patterns in each fixed non-pattern group; count actual restores and check ordered raw-case/checkpoint identities",
+        "compiled old-input-period audit compares all 15 descriptor fields for 417792 old cases against the retained first bank without CPU execution; cached references depend only on the raw input and profile kind",
+        "BITF/CMPM share the same schedule mechanism without changing their prior case identities, digests or predicates"
+      ],
+      "limits": [
+        "278528 additional value/checkpoint case-and-restore pairs retired; no full pattern/checkpoint Cartesian-product claim",
+        "mapped-register, BK-specific, immediate, variable-shift, paired-word, conditional-control, repeat and interrupt compositions remain distinct and outside this review",
+        "short MOD=3 remains excluded as a read source and is owned by the source-domain implementation-limit contract",
+        "pipeline clocks are the existing emulator retention contract, not measured silicon timing",
+        "these profiles remain in the legacy bench; sharing the CPU-independent schedule does not complete CPU-only harness extraction",
+        "focused acceptance does not renew the revision-bound full-default checkpoint"
+      ],
+      "measurement": {
+        "baseline_commit": "e3302c92",
+        "c54x_cpp_bytes_before": 3682267,
+        "c54x_cpp_bytes_after": 3684554,
+        "c54x_cpp_lines_before": 55804,
+        "c54x_cpp_lines_after": 55830,
+        "seconds_before": {"memory-alu": 45.75, "memory-shift16": 91.79, "adds": 22.93, "subs": 23.12},
+        "seconds_after": {"memory-alu": 15.37, "memory-shift16": 30.54, "adds": 7.75, "subs": 7.77},
+        "scope": "Serial focused runner wall times: total 183.59 to 61.43 seconds. Explicit schedule, cached descriptor and actual-restore accounting add 2287 C++ bytes/26 lines, including replacement of the former BITF-only policy header. This is runtime reduction and shared harness policy, not source shrinkage or a renewed full-default measurement."
+      }
+    },
+    {
       "id": "memory-operand-literal-reference",
       "classification": "architectural_interaction",
       "decision": "rewrite",
@@ -580,7 +645,7 @@
       "id": "smem-test-compare",
       "classification": "architectural_interaction",
       "decision": "rewrite",
-      "source": "tests/c54x/tms320c54x_test_arithmetic.cpp; tests/c54x/tms320c54x_test_bitfield_schedule.h",
+      "source": "tests/c54x/tms320c54x_test_arithmetic.cpp; tests/c54x/tms320c54x_test_smem_schedule.h",
       "profiles": ["bitf-smem", "cmpm-smem"],
       "case_ids": [],
       "basis": "TI SPRU172C BITF page 4-22: TC indicates a nonzero masked word; CMPM page 4-33: TC indicates 16-bit equality. Existing fixture-owned address/pointer references, status preservation and per-clock retained-operand assertions remain unchanged; no CPU implementation helper supplies expectations.",

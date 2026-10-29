@@ -433,8 +433,8 @@ preservation of a newer T value. Accepted captures are
 (512 LTD/DELAY rejection cases/restores). Neither establishes physical
 pipeline phases or complete instruction-set conformance.
 
-Other positive domains retain 104,448 scalar ADD/SUB cases, 52,224 each for
-ADDS/SUBS, 208,896 shift-16 and 153,984 TS arithmetic cases (6,528 address
+Other positive domains retain 34,816 scalar ADD/SUB inputs, 17,408 each for
+ADDS/SUBS, 69,632 shift-16 and 153,984 TS arithmetic cases (6,528 address
 plus 147,456 numeric). Variable-shift ADD/SUB retains 81,920 distinct stimuli,
 with balanced checkpoints rather than three copies of each input.
 CMPM and BITF each retain 17,408 distinct inputs over 17 forms, with balanced
@@ -459,6 +459,18 @@ from 22.90/23.07 seconds to 7.69/7.77 seconds. Explicit schedule/accounting adds
 1,750 C++ bytes/34 lines; this is not source shrinkage. Mapped-source, branch,
 peripheral, repeat and delay interactions remain separate contracts. The
 profiles still use the legacy bench, not the independent CPU-only binary.
+
+`memory-alu`, `adds`, `subs` and `memory-shift16` share that same replay policy:
+every original input gets one live/replay pair, with eight patterns distributed two/three/three
+across the three checkpoints in each fixed non-pattern group. The four banks
+retain 139,264 distinct inputs rather than 417,792 checkpoint copies. A compiled
+audit checks that all 15 fields of every old input/reference descriptor match
+its first-bank counterpart. Descriptors are pure functions of the case identity
+and profile kind, cached for the live/replay pair rather than recomputed each
+tick. Signed/unsigned source extension, conditional shift-16 carry updates,
+destination overflow, OVM saturation, literal/source/pointer poisoning and
+exact preservation/bus checks remain unchanged. Ordered digests and actual
+restore counts are mandatory; the full pattern/checkpoint product is retired.
 
 LTD and DELAY read `Smem` and copy to `Smem+1`; LTD also loads T
 ([SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf), pages4-81/4-41).
@@ -562,7 +574,7 @@ execution. This is the existing emulator phase contract, not a new physical
 timing claim. Conformance failures now print the case, tick, replay, registers
 and transaction counters, and the runner rejects any such assertion diagnostic
 even if completion markers are also present.
-The current full default core gate reproduces all 294 required
+The revision-bound full default checkpoint below reproduces its 294 required
 markers exactly once, including the legal MACP/MACD examples. The separate
 program-multiply rejection and repeated-SUBC/ST profiles and the complete tool
 suite also pass. These are executable emulator regressions, not all-ISA or
@@ -2328,7 +2340,7 @@ end-to-end handset speech/calls. Later source/device changes do not silently
 renew this checkpoint. Earlier revision-bound controls below preserve their
 narrower results, not competing current default-suite baselines.
 
-The subsequent balanced BITF/CMPM schedules have focused native acceptance;
+The subsequent balanced BITF/CMPM and memory-arithmetic schedules have focused native acceptance;
 those runs do not renew this full-default checkpoint.
 
 The historical `c54x_modularization_checkpoint.json` separately records seven named core scopes, representative

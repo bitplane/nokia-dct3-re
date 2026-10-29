@@ -154,7 +154,7 @@
       "TMS320C54x staged original long MVDK pair: PASS cases=8 restore=8 stl_write=7 source_read=8 ar2_write=8 zero_gap_cmpr=1 duplicate_writes=0",
       "TMS320C54x staged TC branches: PASS cases=1536 forms=BC,BCD conditions=TC,NTC producers=BIT,CMPR_EQ,status_bit,CMPR_LT gaps=0,1,2 pages=2 restore=1536 post_evaluate_change=0,1 duplicate_fetches=0",
       "TMS320C54x staged long RMW: PASS cases=38400 operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=38400 duplicate_reads=0 duplicate_writes=0 snapshots=4 checkpoint_policy=balanced coverage_fnv64=882e53fb781dc875",
-      "TMS320C54x staged memory ADD/SUB: PASS cases=104448 forms=17 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=104448 duplicate_reads=0 data_writes=0",
+      "TMS320C54x staged memory ADD/SUB: PASS cases=34816 forms=17 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=34816 duplicate_reads=0 data_writes=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=7605a400a87ea30d",
       "TMS320C54x staged mapped AR arithmetic: PASS cases=1024 registers=8 selectors=4 sxm_ovm=4 patterns=2 forms=direct,absolute restore=1024 duplicate_reads=0 data_writes=0",
       "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
       "TMS320C54x staged signed branch producer: PASS cases=12 counts=0,1,2,65535 restore=12 ldm_read=5 sub_read=7 target_fetch=10 duplicate_reads=0 data_writes=0",
@@ -3442,7 +3442,7 @@
       "TMS320C54x stack address latency conformance: PASS variants=24\n": 1,
       "TMS320C54x staged ABS: PASS cases=13824 selectors=4 patterns=16 status_states=32 pages=2 producer_cases=1536 restore=13824 data_accesses=0 irq_acceptance=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x staged ADDM: PASS cases=768 address_forms=4 value_pairs=8 status_combinations=8 restore=768 duplicate_reads=0 duplicate_writes=0\n": 1,
-      "TMS320C54x staged ADDS: PASS cases=52224 restore=52224 forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0\n": 1,
+      "TMS320C54x staged ADDS: PASS cases=%u restore=%u forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n": 1,
       "TMS320C54x staged ASM store bypass: PASS cases=24576 restore=24576 selectors=4 shifts=32 sxm_sst=4 destinations=2 gaps=0,1 aliases=0,1 pages=2 snapshots=3 retained_shift=1 alias_reads=0 writes=1 physical_banks=unvalidated\n": 1,
       "TMS320C54x staged BANZ: PASS cases=288 values=3 modifications=3 encoded_modes=2 cmpt_states=2 pages=2 restore=288 premodify_condition=1 duplicate_auxiliary_updates=0\n": 1,
       "TMS320C54x staged BANZD: PASS cases=3072 registers=8 values=4 modifications=3 cmpt_states=2 pages=2 delay_forms=two_single,one_double restore=3072 duplicate_target_fetches=0 data_accesses=0 silicon_phase_claim=0\n": 1,
@@ -3563,7 +3563,7 @@
       "TMS320C54x staged STM ST1 exclusions: PASS cases=16 restore=16 pages=2 snapshots=2 classes=delay,repeat,block,XC data_reads=0 data_writes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x staged STM ST1: PASS cases=18432 restore=18432 families=raw,SXM_LD,ASM_LD,long_SXM_LD,ASM_ADD,ASM_SUB gaps=0,1,2,3 pages=2 snapshots=3 literal_reads=1 literal_poison=1 status_writes=1 destination_reads=0 short_latency=0 long_latency=0 clear_policy=legacy_unverified reset_before_restore=1 silicon_phase_claim=0\n": 1,
       "TMS320C54x staged SUBC: PASS ram_cases=6144 mapped_ar_cases=4096 value_pairs=64 sxm_ovm=4 accumulators=2 restore=10240 snapshots=balanced duplicate_reads=0 data_writes=0 silicon_phase_claim=0 combined_cases=%u combined_restore=%u coverage_fnv64=%016llx\n": 1,
-      "TMS320C54x staged SUBS: PASS cases=52224 restore=52224 forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0\n": 1,
+      "TMS320C54x staged SUBS: PASS cases=%u restore=%u forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n": 1,
       "TMS320C54x staged Smem CMPM: PASS cases=%u restore=%u forms=17 registers=8 compare_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 source_reads=1 literal_fetches=1,2 duplicate_pointer_updates=0 data_writes=0 mapped_sources=excluded silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n": 1,
       "TMS320C54x staged Smem T dependencies: PASS cases=107520 restore=107520 opcodes=14 patterns=8 flags=16 layouts=5 sources=RAM,mapped_T pages=2 snapshots=3 source_reads=1 t_sample=Read repeat_acceptance=0 irq_acceptance=0 physical_phase_claim=0\n": 1,
       "TMS320C54x staged T/TRN moves: PASS cases=1920 restore=1920 forms=MVMD_AR,MVDK_direct,MVDK_short,MVDK_offset,MVDK_absolute destinations=T,TRN values=4 frct_ovm=4 gaps=0,1 pages=2 snapshots=3 source_reads=1 destination_writes=1 consumers=MPY,LDM silicon_phase_claim=0\n": 1,
@@ -3669,7 +3669,7 @@
       "TMS320C54x staged mapped load age: PASS cases=18432 restore=18432 loads=LD,LDU forms=DP,indirect,absolute,offset registers=8 accumulators=2 values=4 younger=MAR_inc,MAR_dec,MVMM sxm=2 pages=2 snapshots=3 physical_phase_claim=0\n": 1,
       "TMS320C54x staged mapped word arithmetic: PASS cases=6912 registers=AL,AH,AG,BL,BH,BG,T,TRN selectors=4 forms=direct,absolute producer_cases=768 restore=6912 reads_each=1 data_writes=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x staged mask RMW: PASS read=7 write=8 accepted_irq=1 subsequent_masked=1 pending_write_restore=1 duplicate_reads=0\n": 1,
-      "TMS320C54x staged memory ADD/SUB: PASS cases=104448 forms=17 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=104448 duplicate_reads=0 data_writes=0\n": 1,
+      "TMS320C54x staged memory ADD/SUB: PASS cases=%u forms=17 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=%u duplicate_reads=0 data_writes=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n": 1,
       "TMS320C54x staged memory DP: PASS pages=512 cases=1536 source_read=5 producer_execute=8 consumer_execute=9 restore=1536 duplicate_reads=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x staged memory LD T: PASS cases=52224 ram_and_mapped=1 restore=52224 read_publication=1 retirement_rewrite=0 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x staged memory LD shift16: PASS ram_cases=52224 mapped_ar_cases=2304 address_forms=17 registers=8 accumulators=2 values=8 sxm_ovm=4 compatibility=2 restore=54528 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n": 1,
@@ -3679,7 +3679,7 @@
       "TMS320C54x staged memory move BRC exclusions: PASS cases=24 restore=24 writers=MVDK,MVMD contexts=block_body,RPTBD_delay pages=2 snapshots=3 source_reads=0 counter_writes=0 pointer_effects=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x staged memory move BRC: PASS cases=960 restore=960 source_forms=8 counts=0,1,2,7,127 gaps=0,1 rptb_rptbd=2 pages=2 snapshots=3 source_reads=1 counter_reads=0 counter_writes=1 latency=0 source_retained=1 count_plus_one=1 active_repeat_write_acceptance=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x staged memory multiply: PASS ram_cases=27648 mapped_cases=24576 operations=MPYA,MASA,MACA,MACAR patterns=8 flag_states=16 restore=52224 t_read_owned=1 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n": 1,
-      "TMS320C54x staged memory shift16: PASS cases=208896 restore=208896 forms=17 registers=8 selectors=8 patterns=8 sxm_ovm=4 compatibility=2 reads=1 data_writes=0 partial_carry=1 mapped_acceptance=0 silicon_phase_claim=0\n": 1,
+      "TMS320C54x staged memory shift16: PASS cases=%u restore=%u forms=17 registers=8 selectors=8 patterns=8 sxm_ovm=4 compatibility=2 reads=1 data_writes=0 partial_carry=1 mapped_acceptance=0 silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n": 1,
       "TMS320C54x staged multiword stream: PASS long_execute=7,9 short_execute=10 literal_reads=2\n": 1,
       "TMS320C54x staged multiword: PASS cases=4 literal_fetch=3 complete_decode=4 execute=7 vector_fetch=7 return_pc=0602 pending_decode_restore=4\n": 1,
       "TMS320C54x staged original MU4 context: PASS words=37 cases=6 context_saves=8 context_restored=1 returned=4044 restore=6 full_handler_claim=0\n": 1,
@@ -4133,22 +4133,25 @@
       "reported_fields": [
         {
           "accumulators": "2",
-          "cases": "52224",
+          "cases": "17408",
+          "checkpoint_policy": "balanced",
           "compatibility": "2",
+          "coverage_fnv64": "c21de3d0686da5d5",
           "data_writes": "0",
           "forms": "17",
           "mapped_acceptance": "0",
           "patterns": "8",
           "reads": "1",
           "registers": "8",
-          "restore": "52224",
+          "restore": "17408",
           "silicon_phase_claim": "0",
+          "snapshots": "3",
           "source_unsigned": "1",
           "sxm_ovm": "4"
         }
       ],
       "required": [
-        "TMS320C54x staged ADDS: PASS cases=52224 restore=52224 forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0"
+        "TMS320C54x staged ADDS: PASS cases=17408 restore=17408 forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=c21de3d0686da5d5"
       ]
     },
     "addsub-ar-age": {
@@ -7981,20 +7984,23 @@
       "machine": "tms54test",
       "reported_fields": [
         {
-          "cases": "104448",
+          "cases": "34816",
+          "checkpoint_policy": "balanced",
           "compatibility": "2",
+          "coverage_fnv64": "7605a400a87ea30d",
           "data_writes": "0",
           "duplicate_reads": "0",
           "forms": "17",
           "patterns": "8",
           "registers": "8",
-          "restore": "104448",
+          "restore": "34816",
           "selectors": "4",
+          "snapshots": "3",
           "sxm_ovm": "4"
         }
       ],
       "required": [
-        "TMS320C54x staged memory ADD/SUB: PASS cases=104448 forms=17 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=104448 duplicate_reads=0 data_writes=0"
+        "TMS320C54x staged memory ADD/SUB: PASS cases=34816 forms=17 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=34816 duplicate_reads=0 data_writes=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=7605a400a87ea30d"
       ]
     },
     "memory-shift16": {
@@ -8002,8 +8008,10 @@
       "machine": "tms54test",
       "reported_fields": [
         {
-          "cases": "208896",
+          "cases": "69632",
+          "checkpoint_policy": "balanced",
           "compatibility": "2",
+          "coverage_fnv64": "ecba0abea16a63e2",
           "data_writes": "0",
           "forms": "17",
           "mapped_acceptance": "0",
@@ -8011,14 +8019,15 @@
           "patterns": "8",
           "reads": "1",
           "registers": "8",
-          "restore": "208896",
+          "restore": "69632",
           "selectors": "8",
           "silicon_phase_claim": "0",
+          "snapshots": "3",
           "sxm_ovm": "4"
         }
       ],
       "required": [
-        "TMS320C54x staged memory shift16: PASS cases=208896 restore=208896 forms=17 registers=8 selectors=8 patterns=8 sxm_ovm=4 compatibility=2 reads=1 data_writes=0 partial_carry=1 mapped_acceptance=0 silicon_phase_claim=0"
+        "TMS320C54x staged memory shift16: PASS cases=69632 restore=69632 forms=17 registers=8 selectors=8 patterns=8 sxm_ovm=4 compatibility=2 reads=1 data_writes=0 partial_carry=1 mapped_acceptance=0 silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=ecba0abea16a63e2"
       ]
     },
     "minmax": {
@@ -14681,22 +14690,25 @@
       "reported_fields": [
         {
           "accumulators": "2",
-          "cases": "52224",
+          "cases": "17408",
+          "checkpoint_policy": "balanced",
           "compatibility": "2",
+          "coverage_fnv64": "c21de3d0686da5d5",
           "data_writes": "0",
           "forms": "17",
           "mapped_acceptance": "0",
           "patterns": "8",
           "reads": "1",
           "registers": "8",
-          "restore": "52224",
+          "restore": "17408",
           "silicon_phase_claim": "0",
+          "snapshots": "3",
           "source_unsigned": "1",
           "sxm_ovm": "4"
         }
       ],
       "required": [
-        "TMS320C54x staged SUBS: PASS cases=52224 restore=52224 forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0"
+        "TMS320C54x staged SUBS: PASS cases=17408 restore=17408 forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=c21de3d0686da5d5"
       ]
     },
     "t-load-control": {
@@ -15393,6 +15405,18 @@
     }
   },
   "reviewed": {
+    "adds": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 17408,
+        "fnv64": "c21de3d0686da5d5",
+        "key": "raw + 18432*checkpoint; unsigned-add profile supplies the operation identity",
+        "result_prefix": "TMS320C54x staged ADDS: PASS"
+      },
+      "decision": "rewrite",
+      "family": "smem-arithmetic-retention"
+    },
     "bitf-smem": {
       "case_ids": [],
       "classification": "architectural_interaction",
@@ -15680,6 +15704,30 @@
       "decision": "rewrite",
       "family": "mapped-memory-immediate-mac"
     },
+    "memory-alu": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 34816,
+        "fnv64": "7605a400a87ea30d",
+        "key": "raw + 36864*checkpoint; raw preserves form/register/selector/pattern/flags/compatibility in the original first bank, excluding raw%18==5",
+        "result_prefix": "TMS320C54x staged memory ADD/SUB: PASS"
+      },
+      "decision": "rewrite",
+      "family": "smem-arithmetic-retention"
+    },
+    "memory-shift16": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 69632,
+        "fnv64": "ecba0abea16a63e2",
+        "key": "raw + 73728*checkpoint; all eight source/destination/operation selectors and original raw inputs retained",
+        "result_prefix": "TMS320C54x staged memory shift16: PASS"
+      },
+      "decision": "rewrite",
+      "family": "smem-arithmetic-retention"
+    },
     "mpy-mem-imm": {
       "case_ids": [],
       "classification": "architectural_interaction",
@@ -15758,6 +15806,18 @@
       },
       "decision": "merge",
       "family": "single-memory-admission"
+    },
+    "subs": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 17408,
+        "fnv64": "c21de3d0686da5d5",
+        "key": "same raw encoding in the distinct unsigned-subtract profile",
+        "result_prefix": "TMS320C54x staged SUBS: PASS"
+      },
+      "decision": "rewrite",
+      "family": "smem-arithmetic-retention"
     }
   },
   "schema": 2,

@@ -18,6 +18,7 @@
 #include "tms320c54x_test_repeat_state.h"
 #include "tms320c54x_test_snapshot_state.h"
 #include "tms320c54x_test_snapshot.h"
+#include "tms320c54x_test_smem_schedule.h"
 #include "tms320c54x_test_pipeline_state.h"
 #include <sstream>
 #include <bitset>
@@ -2327,6 +2328,10 @@ private:
 	unsigned m_register_bank_replays = 0;
 	ordered_case_digest m_shifted_coverage;
 	ordered_case_digest m_memory_immediate_coverage;
+	smem_schedule::kind m_memory_kind = smem_schedule::kind::signed_word;
+	memory_arithmetic_fixture m_memory_input{};
+	ordered_case_digest m_memory_alu_coverage;
+	unsigned m_memory_alu_restores = 0;
 	ordered_case_digest m_bitfield_coverage;
 	unsigned m_bitfield_restores = 0;
 	unsigned m_memory_immediate_restores = 0;
