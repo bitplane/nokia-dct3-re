@@ -212,6 +212,14 @@ refactor pass; `--write` is reserved for an explicitly reviewed contract change.
 Expected arithmetic/timing results must remain independent of CPU execution
 helpers and shared profile-selection metadata.
 
+Literal `instruction_case` records own `reset_before` and `reset_initial`.
+The CPU-only runner applies reset-only seeds after its common CPU reset setup;
+ordinary `prepare_case` ignores that metadata, so legacy adapters preserve
+their predecessor state. Scalar continuation boundaries and the product/memory
+groups therefore have one data owner, not a parallel reset vector or BIOS-name
+seed branches. An old/new comparison preserves all 134 literal records and 55
+reset groups, including every program/data/register/mask/marker field.
+
 `tms320c54x_test_snapshot.h` centralizes buffer reset, rewind and MAME
 serialization. The three-argument restore cancels the check timer before
 loading; the two-argument overload leaves scheduling with its caller. Do not

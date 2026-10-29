@@ -24,10 +24,12 @@ struct instruction_case
 	std::vector<register_check> expected;
 	unsigned port_writes, port_interval;
 	std::vector<memory_word> expected_data{};
+	bool reset_before = true;
+	std::vector<register_setting> reset_initial{};
 };
 
-// No implicit reset: standalone fixtures reset explicitly, while an existing
-// ordered regression can use the same case without losing its continuation.
+// No implicit reset: the standalone runner owns reset_before/reset_initial;
+// legacy adapters ignore that metadata and retain their checked predecessor.
 template <typename Cpu>
 void prepare_case(Cpu &cpu, instruction_case const &test)
 {

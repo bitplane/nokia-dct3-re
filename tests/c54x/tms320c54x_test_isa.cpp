@@ -46,15 +46,13 @@ protected:
 			else if (long_reference())
 				m_cases.assign(c54x_test::long_reference_cases().begin(), c54x_test::long_reference_cases().end());
 			else if (scalars())
-				for (auto const &row : c54x_test::scalar_vectors()) m_cases.push_back(row.test);
+				m_cases = c54x_test::scalar_vectors();
 			else if (parallel())
 				for (unsigned i = 0; i < c54x_test::parallel_vectors().size(); ++i) m_cases.push_back(c54x_test::parallel_case(i));
 			else
 				for (unsigned i = 0; i < c54x_test::square_vectors.size(); ++i) m_cases.push_back(c54x_test::square_case(i));
-			m_reset_before.assign(m_cases.size(), !(products() || memory_reference()));
-			m_reset_before[0] = true;
-			if (scalars())
-				for (unsigned i = 0; i < m_cases.size(); ++i) m_reset_before[i] = c54x_test::scalar_vectors()[i].reset;
+			if (m_cases.empty() || !m_cases.front().reset_before)
+				throw emu_fatalerror("C54x literal bank must start with an explicit CPU reset");
 		}
 	}
 	void machine_reset() override
@@ -97,22 +95,15 @@ private:
 	}
 	void start()
 	{
-		if (m_reset_before.at(m_case))
+		if (test_case().reset_before)
 		{
 			++m_resets;
 			m_cpu->reset();
 			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 			m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-			// The sequence uses circular PORTW timing markers, not firmware I/O.
-			if (products() || memory_reference())
-			{
-				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, memory_reference() ? 0x0a01 : 0x0a03);
-				m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
-				// The memory group enters from the checked C16 long-word row
-				// in the legacy sequence. Seed that mode only at its standalone reset.
-				if (memory_reference()) m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0180);
-			}
+			for (auto const &setting : test_case().reset_initial)
+				m_cpu->set_state_int(setting.index, setting.value);
 		}
 		m_writes = 0; m_first = m_last = 0;
 		c54x_test::prepare_case(*m_cpu, test_case());
@@ -179,7 +170,6 @@ private:
 	std::unique_ptr<c54x_test::source_domain_fixture> m_domains;
 	std::unique_ptr<c54x_test::mapped_mac_fixture> m_mapped;
 	std::vector<c54x_test::instruction_case> m_cases;
-	std::vector<bool> m_reset_before;
 };
 
 ROM_START(tms54isa)

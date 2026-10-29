@@ -25,6 +25,7 @@ inline auto const &product_examples()
 			std::vector<memory_word> expected_data = {}, unsigned writes = 2) {
 			instruction_case test{id, *words.begin(), {{0x05e0, 0x75d6}, {0x05e1, 0x0124}},
 				std::move(data), std::move(initial), std::move(expected), writes, cycles, std::move(expected_data)};
+			test.reset_before = result.empty();
 			unsigned pc = 0x05e2;
 			for (auto word : words) test.program.emplace_back(pc++, word);
 			for (u16 word : {0x75d6, 0x0124, 0xf5e1}) test.program.emplace_back(pc++, word);
@@ -81,6 +82,8 @@ inline auto const &product_examples()
 		add("mpyu-fractional-saturate", {0x2483},
 			{{r::STATE_A, 0}, {r::STATE_T, 0xffff}, {r::STATE_ST0, 0}, {r::STATE_ST1, 0x0240}, {r::STATE_AR3, 0x0200}},
 			{{r::STATE_A, 0x007fffffffULL}, {r::STATE_T, 0xffff}, {r::STATE_AR3, 0x0200}, {r::STATE_ST0, 0x0400, 0x0400}}, {{0x0200, 0xffff}});
+		// Standalone group entry uses circular PORTW timing markers.
+		result.front().reset_initial = {{r::STATE_AR6, 0x0a03}, {r::STATE_BK, 4}};
 		return result;
 	}();
 	return cases;

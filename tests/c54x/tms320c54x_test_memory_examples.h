@@ -24,6 +24,7 @@ inline auto const &memory_examples()
 			std::initializer_list<u16> extension = {}) {
 			instruction_case test{id, opcode, {{0x05e0, 0x75d6}, {0x05e1, 0x0124}, {0x05e2, opcode}},
 				std::move(data), std::move(initial), std::move(expected), 2, cycles, std::move(expected_data)};
+			test.reset_before = result.empty();
 			unsigned pc = 0x05e3;
 			for (auto word : extension) test.program.emplace_back(pc++, word);
 			for (u16 word : {0x75d6, 0x0124, 0xf5e1}) test.program.emplace_back(pc++, word);
@@ -154,6 +155,9 @@ inline auto const &memory_examples()
 		add("sub-shift16-ar2-postdecrement", 0x438a, {{r::STATE_B, 0x30000}, {r::STATE_AR2, 0x0f92}},
 			{{r::STATE_A, 0x1234}, {r::STATE_B, 0x10000}, {r::STATE_T, 0x9abc}, {r::STATE_AR2, 0x0f91},
 			 {r::STATE_ST0, 0, 0x0a00}}, {}, 3, {{0x0f92, 2}});
+		// Standalone entry reproduces the checked long-word predecessor's
+		// C16 mode and circular markers; legacy preparation does not apply it.
+		result.front().reset_initial = {{r::STATE_AR6, 0x0a01}, {r::STATE_BK, 4}, {r::STATE_ST1, 0x0180}};
 		return result;
 	}();
 	return cases;

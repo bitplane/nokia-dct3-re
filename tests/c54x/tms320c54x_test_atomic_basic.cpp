@@ -13,7 +13,7 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	auto prepare_scalar = [&](unsigned index) {
-		auto const &test = scalar_vectors().at(index).test;
+		auto const &test = scalar_vectors().at(index);
 		if (test.port_writes) m_port_writes = 0;
 		prepare_case(*m_cpu, test);
 	};
@@ -22,7 +22,7 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 	{
 		unsigned const index = m_phase >= 9100 ? m_phase - 9100 : m_phase >= 70 ? m_phase - 70 + 26 :
 			m_phase >= 67 ? m_phase - 67 + 24 : m_phase - 45 + 8;
-		auto const &test = scalar_vectors().at(index).test;
+		auto const &test = scalar_vectors().at(index);
 		if (index < 8) check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
 		else check_case_state(*m_cpu, test);
 		if (index < 8 || m_phase == 45 || (m_phase >= 75 && m_phase <= 77))

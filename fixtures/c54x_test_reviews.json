@@ -498,6 +498,25 @@
       }
     },
     {
+      "id": "literal-case-lifecycle",
+      "classification": "harness_infrastructure",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_case.h; tests/c54x/tms320c54x_test_isa.cpp",
+      "profiles": [],
+      "case_ids": [],
+      "basis": "CPU reset/continuation ownership, not instruction expectations. Explicit case records replace the scalar-only wrapper, separate reset vector and BIOS-specific reset seeds; legacy preparation intentionally ignores reset-only metadata.",
+      "obligations": ["old/new compiled record comparison preserves all 134 literal cases and 55 reset groups, including complete program, data, initial registers, expectations/masks, markers and reset seeds", "CPU-only entry applies seeds only after a requested CPU reset; each bank must begin with a reset", "legacy preparation performs no implicit reset or reset-only seed writes", "all six literal profiles preserve ordered case identities and result records, and the legacy prefix preserves its asserted opcode words"],
+      "limits": ["does not qualify additional instruction families or remove cases", "source ownership cleanup, not a runtime optimization", "mapped-MAC and admission fixtures retain their own replay lifecycle; unreviewed legacy families are not made CPU-only by this change"],
+      "measurement": {
+        "baseline_commit": "4fb8c856",
+        "c54x_cpp_bytes_before": 3684554,
+        "c54x_cpp_bytes_after": 3684479,
+        "c54x_cpp_lines_before": 55830,
+        "c54x_cpp_lines_after": 55824,
+        "scope": "All C54x C++/headers including case metadata and reset-only seeds; net reduction 75 bytes/6 lines. No case, assertion, expected value or runtime reduction claimed."
+      }
+    },
+    {
       "id": "smem-arithmetic-retention",
       "classification": "architectural_interaction",
       "decision": "rewrite",

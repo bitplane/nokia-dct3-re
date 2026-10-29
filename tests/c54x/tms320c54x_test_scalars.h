@@ -11,12 +11,6 @@
 
 namespace c54x_test {
 
-struct scalar_vector
-{
-	instruction_case test;
-	bool reset;
-};
-
 // Literal TI arithmetic boundaries. A false reset marks an intentional
 // continuation: program words, flags or an accumulator come from the preceding
 // checked case. The standalone runner resets at each named group's first case.
@@ -24,7 +18,7 @@ inline auto const &scalar_vectors()
 {
 	using r = tms320c54x_device;
 	static const auto cases = [] {
-		std::vector<scalar_vector> result;
+		std::vector<instruction_case> result;
 		auto add = [&](const char *id, u16 opcode, unsigned pc, std::initializer_list<u16> words,
 			std::vector<register_setting> initial, std::vector<register_check> expected,
 			bool reset = true, std::vector<memory_word> data = {}, unsigned writes = 0, unsigned interval = 0) {
@@ -32,7 +26,8 @@ inline auto const &scalar_vectors()
 			unsigned address = pc;
 			for (auto word : words) test.program.emplace_back(address++, word);
 			test.initial.insert(test.initial.end(), {{r::STATE_PC, pc}, {r::STATE_IDLE, 0}});
-			result.push_back({std::move(test), reset});
+			test.reset_before = reset;
+			result.push_back(std::move(test));
 		};
 		struct negate { const char *id; u16 opcode; u64 source, a, b; u16 st0, st1; };
 		for (auto const &v : {
