@@ -166,7 +166,7 @@ REQUIRED = [
     "TMS320C54x staged mapped AR arithmetic: PASS cases=1024 registers=8 selectors=4 sxm_ovm=4 patterns=2 forms=direct,absolute restore=1024 duplicate_reads=0 data_writes=0",
     "TMS320C54x staged signed branches: PASS cases=12288 conditions=GE,LT,NE,EQ,GT,LE accumulators=A,B forms=BC,BCD patterns=8 sxm_ovm=4 pages=2 restore=12288 post_evaluate_change=0,1 duplicate_fetches=0",
     "TMS320C54x staged signed branch producer: PASS cases=12 counts=0,1,2,65535 restore=12 ldm_read=5 sub_read=7 target_fetch=10 duplicate_reads=0 data_writes=0",
-    "TMS320C54x staged BITF: PASS cases=52224 forms=17 registers=8 mask_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 restore=52224 duplicate_reads=0 data_writes=0",
+    "TMS320C54x staged BITF: PASS cases=17408 forms=17 registers=8 mask_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 restore=17408 duplicate_reads=0 data_writes=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=e8a1e8427edb11e5",
     "TMS320C54x staged mapped BITF branch: PASS cases=96 source=AR7 masks=0001,007f conditions=TC,NTC initial_tc=2 restore=96 source_read=7 target_fetch=10 duplicate_reads=0 data_writes=0",
     "TMS320C54x staged timer observation: complete cases=8 fidelity_acceptance=0",
     "TMS320C54x FIRS sum: PASS cases=32 sxm=0,1 ovm=0,1 carry=1 sticky_ova=1 pipeline_claim=0",
@@ -1112,7 +1112,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated extended AR consumer complete",
     ),
     "cmpm-smem": (
-        "TMS320C54x staged Smem CMPM: PASS cases=52224 restore=52224 forms=17 registers=8 compare_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 source_reads=1 literal_fetches=1,2 duplicate_pointer_updates=0 data_writes=0 mapped_sources=excluded silicon_phase_claim=0",
+        "TMS320C54x staged Smem CMPM: PASS cases=17408 restore=17408 forms=17 registers=8 compare_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 source_reads=1 literal_fetches=1,2 duplicate_pointer_updates=0 data_writes=0 mapped_sources=excluded silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=e8a1e8427edb11e5",
         "Fatal error: TMS320C54x isolated Smem CMPM complete",
     ),
     "cmpm-branch": (
@@ -1640,7 +1640,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated shifted memory arithmetic complete",
     ),
     "bitf-smem": (
-        "TMS320C54x staged BITF: PASS cases=52224 forms=17 registers=8 mask_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 restore=52224 duplicate_reads=0 data_writes=0",
+        "TMS320C54x staged BITF: PASS cases=17408 forms=17 registers=8 mask_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 restore=17408 duplicate_reads=0 data_writes=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=e8a1e8427edb11e5",
         "Fatal error: TMS320C54x isolated Smem BITF complete",
     ),
     "mapped-bitf": (

@@ -498,6 +498,33 @@
       }
     },
     {
+      "id": "smem-test-compare",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "source": "tests/c54x/tms320c54x_test_arithmetic.cpp; tests/c54x/tms320c54x_test_bitfield_schedule.h",
+      "profiles": ["bitf-smem", "cmpm-smem"],
+      "case_ids": [],
+      "basis": "TI SPRU172C BITF page 4-22: TC indicates a nonzero masked word; CMPM page 4-33: TC indicates 16-bit equality. Existing fixture-owned address/pointer references, status preservation and per-clock retained-operand assertions remain unchanged; no CPU implementation helper supplies expectations.",
+      "profile_coverage": {
+        "bitf-smem": {"cases": 17408, "fnv64": "e8a1e8427edb11e5", "result_prefix": "TMS320C54x staged BITF: PASS", "key": "raw + 18432*checkpoint; raw is the original first-bank form/register/pair/initial-TC/flags/compatibility identity, omitting raw%18==5"},
+        "cmpm-smem": {"cases": 17408, "fnv64": "e8a1e8427edb11e5", "result_prefix": "TMS320C54x staged Smem CMPM: PASS", "key": "same raw/snapshot encoding in the distinct CMPM profile; CMPM uses its independently retained equality pairs"}
+      },
+      "obligations": ["retain every one of the original17408 distinct setups per instruction, in order; 17 forms, eight register fields, eight value/literal pairs, both initial-TC states, four SXM/OVM combinations and both compatibility states", "retain zero/high-bit/all-bit boundary pairs, signed address literals, original BK/ARP/DP/SP references and register-correlated program pages", "retain literal poisoning, pointer poisoning after Access and memory poisoning after Read, with TC publication, exact status/accumulator preservation and no duplicate bus effects checked in both live and replay execution", "each fixed non-pair group retains all eight pairs, with two or three assigned to each of the three original checkpoints", "count actual successful restores and require the ordered case/checkpoint digest; compiled exhaustive schedule checks must not derive expected CPU results"],
+      "limits": ["retire34816 extra value/checkpoint executions per profile; the complete value-by-checkpoint Cartesian product is no longer covered", "existing mapped-register, immediate-branch, peripheral, delay-slot and repeat interactions are not duplicates of this standalone RAM test and remain outside this review", "short MOD=3 is a write-only source-admission limit owned by source-domain, not a positive BITF/CMPM case", "per-clock publication is the existing emulator contract, not measured silicon timing", "these profiles still execute in the legacy bench containing DMA/McBSP and shared GSM declarations; no private ROM is loaded, but this is not CPU-only harness extraction"],
+      "measurement": {
+        "baseline_commit": "a13c6aea",
+        "c54x_cpp_bytes_before": 3687198,
+        "c54x_cpp_bytes_after": 3688948,
+        "c54x_cpp_lines_before": 55971,
+        "c54x_cpp_lines_after": 56005,
+        "bitf_seconds_before": 22.90,
+        "bitf_seconds_after": 7.69,
+        "cmpm_seconds_before": 23.07,
+        "cmpm_seconds_after": 7.77,
+        "scope": "Serial focused runner wall times. The explicit schedule, digest and actual-restore accounting add1750 C++ bytes/34 lines; this is a replay/runtime reduction, not source shrinkage or renewal of the full-default checkpoint."
+      }
+    },
+    {
       "id": "nokia-integration-compositions",
       "classification": "harness_infrastructure",
       "decision": "relocate",

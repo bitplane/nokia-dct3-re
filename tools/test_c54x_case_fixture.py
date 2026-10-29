@@ -29,6 +29,43 @@ def compiled_cpp(source):
 
 class CaseFixtureTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
+    def test_bitfield_schedule_keeps_every_input_and_balances_replay(self):
+        source = r'''
+#include <array>
+#include <algorithm>
+#include <cassert>
+#include <cstdio>
+#include "tests/c54x/tms320c54x_test_bitfield_schedule.h"
+#include "tests/c54x/tms320c54x_test_support.h"
+int main() {
+    using namespace c54x_test;
+    std::array<unsigned, 18432> seen{};
+    std::array<std::array<unsigned, 3>, 2304> groups{};
+    ordered_case_digest coverage;
+    for (unsigned raw = 0; raw != 18432; ++raw) {
+        if (!bitfield_schedule::valid(raw)) continue;
+        unsigned const key = bitfield_schedule::key(raw);
+        assert(key < 55296 && key % 18432 == raw && !seen[raw]++);
+        unsigned const group = raw % 144 + 144 * (raw / 1152);
+        ++groups[group][key / 18432];
+        coverage.add(key);
+    }
+    for (unsigned raw = 0; raw != 18432; ++raw) assert(seen[raw] == unsigned(raw % 18 != 5));
+    for (unsigned i = 0; i < groups.size(); ++i) {
+        auto counts = groups[i];
+        std::sort(counts.begin(), counts.end());
+        assert((counts == (i % 18 == 5 ? std::array<unsigned, 3>{0, 0, 0} :
+                            std::array<unsigned, 3>{2, 3, 3})));
+    }
+    assert(!bitfield_schedule::valid(18432));
+    std::printf("cases=%u digest=%016llx\n", coverage.count, (unsigned long long)coverage.value);
+}
+'''
+        with compiled_cpp(source) as program:
+            output = subprocess.check_output([str(program)], text=True).strip()
+        self.assertEqual(output, 'cases=17408 digest=e8a1e8427edb11e5')
+
+    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_mapped_mac_schedule_preserves_alias_inputs_and_balances_checkpoints(self):
         source = r'''
 #include <array>

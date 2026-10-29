@@ -424,14 +424,28 @@ Other positive domains retain 104,448 scalar ADD/SUB cases, 52,224 each for
 ADDS/SUBS, 208,896 shift-16 and 153,984 TS arithmetic cases (6,528 address
 plus 147,456 numeric). Variable-shift ADD/SUB retains 81,920 distinct stimuli,
 with balanced checkpoints rather than three copies of each input.
-CMPM and BITF each retain 52,224 cases over 17 forms, omitting 3,072 invalid
-cases. `rpt-subc-st` retains 38,400 SUBC and 38,400 repeated-store cases;
+CMPM and BITF each retain 17,408 distinct inputs over 17 forms, with balanced
+checkpoints rather than three replays of every input. `rpt-subc-st` retains 38,400 SUBC and 38,400 repeated-store cases;
 memory/immediate MPY retains 24,576 inputs with balanced checkpoints. Paired reads retain 6,144 DSUB,
 12,288 DADD and 6,144 DRSUB cases over eight forms, omitting raw form 4.
 These totals describe selected fixture domains, not every legal operand.
 Circular-input constraints have their own
 [contract](#circular-fixture-domains); modulo expectations alone are not
 silicon evidence.
+
+`bitf-smem` and `cmpm-smem` retain all eight original word/literal pairs,
+both initial TC states, SXM/OVM combinations, register fields and compatibility
+states. Their independent predicates follow [SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf),
+pages 4-22/4-33: nonzero masked word and 16-bit equality, respectively.
+Literal/address/source poisoning, TC publication, preservation and bus-effect
+assertions remain in live and replay execution. Each fixed non-pair group
+distributes its eight inputs two or three per original checkpoint;
+no complete value-by-checkpoint product is claimed. Actual restores and ordered
+raw-case/checkpoint digest `e8a1e8427edb11e5` are required. The focused runs drop
+from 22.90/23.07 seconds to 7.69/7.77 seconds. Explicit schedule/accounting adds
+1,750 C++ bytes/34 lines; this is not source shrinkage. Mapped-source, branch,
+peripheral, repeat and delay interactions remain separate contracts. The
+profiles still use the legacy bench, not the independent CPU-only binary.
 
 LTD and DELAY read `Smem` and copy to `Smem+1`; LTD also loads T
 ([SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf), pages4-81/4-41).
@@ -2300,6 +2314,9 @@ ISA, physical pipeline timing, fitted DSP-mask compatibility, native RF or
 end-to-end handset speech/calls. Later source/device changes do not silently
 renew this checkpoint. Earlier revision-bound controls below preserve their
 narrower results, not competing current default-suite baselines.
+
+The subsequent balanced BITF/CMPM schedules have focused native acceptance;
+those runs do not renew this full-default checkpoint.
 
 The historical `c54x_modularization_checkpoint.json` separately records seven named core scopes, representative
 arithmetic, interrupt and restore profiles, and ROM4 CRC/FR decoder controls on

@@ -8,6 +8,7 @@
 #include "tms320c54x_test_store_schedule.h"
 #include "tms320c54x_test_shifted_schedule.h"
 #include "tms320c54x_test_register_schedule.h"
+#include "tms320c54x_test_bitfield_schedule.h"
 
 namespace c54x_test {
 
@@ -1768,6 +1769,7 @@ tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::bitfield
 
 void tms320c54x_test_state::start_pipeline_bitfield(unsigned variant)
 {
+	if (!variant) { m_bitfield_coverage = {}; m_bitfield_restores = 0; }
 	if (variant % 18 == 5) ++variant; // Preserve raw IDs, omitting write-only short MOD=3.
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	bool const compare = profile_is("cmpm-smem");
@@ -6652,7 +6654,7 @@ bool tms320c54x_test_state::check_bitfield_address_results()
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 		bool const compare = profile_is("cmpm-smem");
 		auto const f = bitfield_address_case(variant); auto const input = bitfield_inputs(variant, compare);
-		unsigned const read_cycle = f.read_cycle + 1, checkpoint = std::array<unsigned, 3>{4, read_cycle - 1, read_cycle}[variant / 18432];
+		unsigned const read_cycle = f.read_cycle + 1, checkpoint = std::array<unsigned, 3>{4, read_cycle - 1, read_cycle}[bitfield_schedule::checkpoint(variant)];
 		bool const initial_tc = (variant / 1152) % 2, result = compare ? input[0] == input[1] : bool(input[0] & input[1]);
 		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Smem test/compare has staged source and literal ownership");
 		expect(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST0), 12) == (tick <= read_cycle ? initial_tc : result),
@@ -6688,16 +6690,20 @@ bool tms320c54x_test_state::check_bitfield_address_results()
 				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
 				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
 				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore BITF without duplicate source reads or pointer modifications");
+				++m_bitfield_restores;
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 253020; m_check_timer->enable(true); return true;
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 55295) { start_pipeline_bitfield(variant + 1); return true; }
+			m_bitfield_coverage.add(bitfield_schedule::key(variant));
+			expect(m_bitfield_restores == m_bitfield_coverage.count, "Every retained test/compare input completed a real restore");
+			if (variant + 1 < bitfield_schedule::raw_inputs) { start_pipeline_bitfield(variant + 1); return true; }
+			expect(m_bitfield_coverage.count == bitfield_schedule::cases, "Complete the legal test/compare source domain once");
 			if (compare)
 			{
-				osd_printf_info("TMS320C54x staged Smem CMPM: PASS cases=52224 restore=52224 forms=17 registers=8 compare_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 source_reads=1 literal_fetches=1,2 duplicate_pointer_updates=0 data_writes=0 mapped_sources=excluded silicon_phase_claim=0\n");
+				osd_printf_info("TMS320C54x staged Smem CMPM: PASS cases=%u restore=%u forms=17 registers=8 compare_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 source_reads=1 literal_fetches=1,2 duplicate_pointer_updates=0 data_writes=0 mapped_sources=excluded silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n", m_bitfield_coverage.count, m_bitfield_restores, (unsigned long long)m_bitfield_coverage.value);
 				throw emu_fatalerror(0, "TMS320C54x isolated Smem CMPM complete");
 			}
-			osd_printf_info("TMS320C54x staged BITF: PASS cases=52224 forms=17 registers=8 mask_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 restore=52224 duplicate_reads=0 data_writes=0\n");
+			osd_printf_info("TMS320C54x staged BITF: PASS cases=%u forms=17 registers=8 mask_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 restore=%u duplicate_reads=0 data_writes=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n", m_bitfield_coverage.count, m_bitfield_restores, (unsigned long long)m_bitfield_coverage.value);
 			if (profile_is("bitf-smem")) throw emu_fatalerror(0, "TMS320C54x isolated Smem BITF complete");
 			start_pipeline_bitfield_ar7(); return true;
 		}
