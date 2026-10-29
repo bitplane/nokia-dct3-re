@@ -44,7 +44,7 @@ public:
 		}
 		if (m_tick == m_input.finish)
 		{
-			require(m_cpu.state_int(tms320c54x_device::STATE_IDLE), "sequence reaches its real IDLE instruction");
+			if (m_input.require_idle) require(m_cpu.state_int(tms320c54x_device::STATE_IDLE), "sequence reaches its real IDLE instruction");
 			if (m_input.single_fetch) require(m_fetches == 1, "one opcode fetch");
 			if (m_input.data_events) require(m_data_cursor == m_input.data_events->size(), "complete data-bus trace");
 			require(m_program_cursor == m_input.retained_program_reads.size(), "complete retained-program trace");
@@ -67,7 +67,14 @@ private:
 	void apply_actions(bool before)
 	{
 		for (auto const &action : m_input.actions) if (m_tick == action.tick && action.before_observation == before)
+		{
 			for (auto const &value : action.values) m_cpu.set_state_int(value.index, value.value);
+			if (!action.program.empty())
+			{
+				auto const disable = m_machine.disable_side_effects();
+				for (auto const &word : action.program) m_cpu.space(AS_PROGRAM).write_word(word.address, word.value);
+			}
+		}
 	}
 	void require(bool value, char const *message) const
 	{

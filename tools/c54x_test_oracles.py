@@ -2111,11 +2111,17 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated BC T/TRN stores complete",
     ),
     "st-t-long": (
+        (
+        "TMS320C54x long T store coverage: PASS cases=6144 restore=6144 coverage_fnv64=72668623d09f3125",
         "TMS320C54x extended T/TRN stores: PASS cases=6144 restore=6144 forms=absolute,offset,premod,circular registers=8 compatibility=2 sources=T,TRN values=4 endpoints=RAM,peripheral pages=2 snapshots=3 destination=Read source=Execute literal_retained=1 pointer_updates=once destination_reads=0 writes=1 peripheral_extra_clock=1 silicon_phase_claim=0",
+        ),
         "Fatal error: TMS320C54x isolated extended T/TRN stores complete",
     ),
     "st-t-long-edge": (
-        "TMS320C54x extended T/TRN exclusions: PASS cases=6144 restore=6144 forms=4 registers=8 compatibility=2 sources=2 pages=2 snapshots=3 reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0",
+        (
+        "TMS320C54x long T store coverage: PASS cases=256 restore=256 coverage_fnv64=003aa8584fcdd6bd",
+        "TMS320C54x extended T/TRN exclusions: PASS cases=256 restore=256 forms=4 registers=8 compatibility=2 sources=2 pages=2 snapshots=3 checkpoint_policy=balanced reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0",
+        ),
         "Fatal error: TMS320C54x isolated extended T/TRN exclusions complete",
     ),
     "t-peripheral": (

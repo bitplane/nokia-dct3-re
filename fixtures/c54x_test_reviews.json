@@ -8,6 +8,30 @@
   },
   "families": [
     {
+      "id": "cpu-only-long-t-stores",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "profiles": ["st-t-long"],
+      "case_ids": [],
+      "profile_coverage": {"st-t-long": {"cases": 6144, "fnv64": "72668623d09f3125", "result_prefix": "TMS320C54x long T store coverage: PASS"}},
+      "basis": "SPRU172C ST T/TRN encoding and independent literal address/source expectations from the existing factory; no CPU implementation helpers are used.",
+      "obligations": ["retain all 6144 original inputs and checkpoints", "retain literal poisoning after fetch, Read pointer capture, Execute-live T/TRN replacement, exact data-write clock and no destination reads", "use the shared CPU-only clocked runner instead of legacy phase routing"],
+      "limits": ["clock schedules are implementation regressions, not measured silicon timing", "no new IRQ, delay-span or repeat qualification"],
+      "verification": "Native CPU-only runs complete all 6144 cases/restores with the original-key digest. The reference-factory body matches the old factory byte-for-byte apart from the type name. Rebuilt legacy controls arith-ar, mapped-word, mapped-bitf, status-bitf, st-t-branch, stm-ind and stld-repeat pass. All 378 focused host tests and the full host suite pass.",
+      "measurement": {"c54x_cpp_bytes_before": 3527740, "c54x_cpp_bytes_after": 3527442, "c54x_cpp_lines_before": 53895, "c54x_cpp_lines_after": 53958, "scope": "298 fewer bytes but 63 more lines: this is isolation and rejection-runtime reduction, not source-line reduction. No full-default runtime improvement or renewed full-default checkpoint is claimed."}
+    },
+    {
+      "id": "cpu-only-long-t-store-rejections",
+      "classification": "implementation_limit",
+      "decision": "merge",
+      "profiles": ["st-t-long-edge"],
+      "case_ids": [],
+      "profile_coverage": {"st-t-long-edge": {"cases": 256, "fnv64": "003aa8584fcdd6bd", "result_prefix": "TMS320C54x long T store coverage: PASS"}},
+      "basis": "The excluded mapped destination is always 0x0e; the old value and endpoint dimensions never change setup, actions or checked behavior. Retain one distinct stimulus per form/register/compatibility/source/page tuple.",
+      "obligations": ["retain illegal latch at clock 6, poisoned extension, no reads/writes, unchanged pointer/status/accumulators and snapshot replay", "balance original 5/6/7-clock checkpoints within every form/source group"],
+      "limits": ["6144 executions become 256: remove 5376 exact stimulus duplicates and 512 repeated checkpoint combinations", "every distinct input is no longer restored at all three clocks", "rejection is an emulator implementation limit, not a silicon-trap assertion"]
+    },
+    {
       "id": "legacy-local-result-ownership",
       "classification": "harness_infrastructure",
       "decision": "rewrite",
@@ -26,7 +50,8 @@
         "ownership repair is not a retention review of the T-store arithmetic and admission matrices"
       ],
       "baseline": "Both st-t-long and st-t-long-edge fail before any edit: case 0, tick 1, phase 62134 enters the RAM STM AR-preservation predicate. They had not reached their own result checker.",
-      "verification": "After ownership selection, full st-t-long and st-t-long-edge (6144 cases/restores each), st-t-branch (32), stm-ind (1536), stm-ind-edge (1536) and stld-repeat (9216) pass. All 378 focused host tests pass, including an executable check of the real dispatch block's owner-first and fail-closed behavior. No CPU source, input factory or result predicate changed."
+      "verification": "After ownership selection, full st-t-long and st-t-long-edge (6144 cases/restores each), st-t-branch (32), stm-ind (1536), stm-ind-edge (1536) and stld-repeat (9216) pass. All 378 focused host tests pass, including an executable check of the real dispatch block's owner-first and fail-closed behavior. No CPU source, input factory or result predicate changed.",
+      "current_scope": "Long-store profiles subsequently moved to the CPU-only clocked runner. Only branch/store retains this local legacy owner. The baseline failures above describe the repaired pre-migration harness."
     },
     {
       "id": "cpu-only-disassembly-contracts",

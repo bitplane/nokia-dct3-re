@@ -1606,16 +1606,6 @@ private:
 	};
 	static mvkd_peripheral_fixture mvkd_peripheral_case(unsigned variant);
 	void start_mvkd_peripheral(unsigned variant = 0);
-	struct extended_t_store_fixture
-	{
-		unsigned form, reg, selected, snapshot, write;
-		bool trn, compatibility, excluded;
-		u16 mode, literal, destination, value, st0;
-		u32 base;
-		std::array<u16, 8> initial, final;
-	};
-	static extended_t_store_fixture extended_t_store_case(unsigned v, bool excluded);
-	void start_extended_t_store(unsigned variant = 0);
 	void start_t_store_branch(unsigned variant = 0);
 	struct t_peripheral_fixture
 	{
@@ -2168,7 +2158,7 @@ private:
 	bool check_repeat_mvkd_results();
 	bool check_conditional_call_results();
 	bool check_near_accumulator_results();
-	bool check_extended_t_store_results();
+	bool check_t_store_branch_results();
 	bool check_circular_portr_results();
 	bool check_ifr_pair_results();
 	bool check_mvmd_ar_results();

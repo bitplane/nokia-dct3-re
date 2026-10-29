@@ -322,12 +322,8 @@ void tms320c54x_test_state::machine_reset()
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"bitf-peripheral"}, [](self &test) { test.start_pipeline_bitfield_ar7(); } },
 		{ {"t-peripheral"}, [](self &test) { test.start_t_peripheral(); } },
-		{ {"st-t-long", "st-t-long-edge"}, [](self &test) {
-			test.m_result_owner = &self::check_extended_t_store_results;
-			test.start_extended_t_store();
-		} },
 		{ {"st-t-branch"}, [](self &test) {
-			test.m_result_owner = &self::check_extended_t_store_results;
+			test.m_result_owner = &self::check_t_store_branch_results;
 			test.start_t_store_branch();
 		} },
 		{ {"portr-circular"}, [](self &test) { test.start_circular_portr(); } },

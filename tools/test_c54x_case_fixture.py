@@ -71,21 +71,34 @@ int main() {
 #include <vector>
 #include "tests/c54x/tms320c54x_test_support.h"
 using c54x_test::register_setting;
+using c54x_test::memory_word;
+constexpr int AS_PROGRAM = 0;
 ''' + action + r'''
 struct bench {
     unsigned m_tick = 5;
+    bool disabled = false;
+    bench &m_machine = *this;
+    struct suppression { bool &flag; ~suppression() { flag = false; } };
+    suppression disable_side_effects() { assert(!disabled); disabled = true; return {disabled}; }
     struct input { std::vector<clocked_register_action> actions; } m_input{
-        {{5, {{0, 10}, {0, 11}}, true}, {5, {{0, 12}}}, {6, {{0, 13}}, true}}};
+        {{5, {{0, 10}, {0, 11}}, true, {{0x20, 99}}}, {5, {{0, 12}}, false, {{0x21, 98}}}, {6, {{0, 13}}, true}}};
     struct cpu {
-        std::vector<unsigned> writes;
+        bool &disabled;
+        std::vector<unsigned> writes{}, memory{};
         void set_state_int(int index, unsigned value) { assert(index == 0); writes.push_back(value); }
-    } m_cpu;
+        cpu &space(int index) { assert(index == AS_PROGRAM); return *this; }
+        void write_word(unsigned at, unsigned value) {
+            assert(disabled && writes.back() == (value == 99 ? 11 : 12));
+            memory.push_back(at); memory.push_back(value);
+        }
+    } m_cpu{disabled};
 ''' + method + r'''
 };
 int main() {
     bench b;
     b.apply_actions(true); assert((b.m_cpu.writes == std::vector<unsigned>{10, 11}));
     b.apply_actions(false); assert((b.m_cpu.writes == std::vector<unsigned>{10, 11, 12}));
+    assert(!b.disabled && (b.m_cpu.memory == std::vector<unsigned>{0x20, 99, 0x21, 98}));
     b.m_tick = 6; b.apply_actions(false); assert(b.m_cpu.writes.size() == 3);
     b.apply_actions(true); assert(b.m_cpu.writes.back() == 13);
 }

@@ -48,10 +48,11 @@ Family retention/rewrite/merge/relocation/deletion decisions live in
 devices or private firmware; legacy default continuations can reuse reviewed
 case data without making the entire sequenced bench generic.
 
-Legacy phase numbers are not globally unique. The extended T/TRN store and
-branch/store profiles explicitly select their result owner before execution;
-their local `62134..62137` continuations must not enter the unrelated indirect
-STM or repeated-STLD checker. An owned continuation that is not recognized is
+Legacy phase numbers are not globally unique. The branch/store profile
+explicitly selects its result owner before execution; its local
+`62136..62137` continuations must not enter the unrelated repeated-STLD
+checker. Long T/TRN stores instead use the CPU-only clocked runner, without
+global phase routing. An owned continuation that is not recognized is
 a harness error, not a reason to try another fixture. The owner is host routing
 metadata, unchanged by guest snapshot replay and reset on machine reset.
 
@@ -4908,9 +4909,14 @@ the literal and changes auxiliary registers after address capture, and
 changes T/TRN immediately before Execute. No destination read occurs;
 peripheral writes retain the existing one-extra-clock model.
 
-`st-t-long-edge` verifies 6,144 cases and replays that reject mapped
-destinations before data effects, restoring any previewed long-address
-pointer/ARP modification. `st-t-branch` verifies 32 cases and replays of
+`st-t-long-edge` verifies 256 distinct rejected inputs and replays that reject
+mapped destinations before data effects, restoring any previewed long-address
+pointer/ARP modification. Rejection does not consume the value or endpoint
+dimensions: eight identical stimuli per checkpoint are removed. The original
+5/6/7-clock checkpoints are balanced across form/register/mode/source/page
+inputs instead of replaying each input at all three points. Both long-store
+profiles use the CPU-only shared clocked runner.
+`st-t-branch` verifies 32 cases and replays of
 ordinary stores after both outcomes of nondelayed TC/NTC branches.
 A draining conditional-branch control counter is not evidence that the
 following instruction occupies a delay span. Actual delay spans, repeats,
