@@ -136,6 +136,18 @@ No far-control or pending-transfer restoration case is deleted. This rewrite
 removes 1,781 C++ bytes/47 lines while preserving all 173 legacy PASS records
 and 2,474 asserted opcode words.
 
+`isa-memory` retains 45 ordered memory-operand arithmetic, multiply and T-load
+examples in one reset group. The legacy adapter shares the literal data without
+resetting its predecessor state. Carry retained across AND/MPY and shifted-SUB
+rows remains observable; the 14 multiply rows keep their full ST1 assertions,
+while the other rows keep their original partial masks. The POLY values match
+the [SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf) page 4-126 example.
+An old/new setup and predicate comparison checks 25,200 register/RAM/marker
+mutations without CPU execution. Both native entries pass; the independent
+binary runs with an empty ROM directory and lists only the root and C54x CPU.
+The rewrite removes 6,681 C++ bytes/201 lines. It retains every case and makes
+no runtime, all-ISA or physical-timing claim.
+
 `mpy-mem-imm` retains all 24,576 MPY and 65,536 MAC inputs, with the original
 result references, address/literal poisoning, Read-owned T publication and
 operand-identity observer checks. Its 64 value/literal pairs in every fixed
@@ -244,6 +256,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_square.h` | Reviewed literal SQUR/SQURA/SQURS cases shared by generic and default-sequence entries |
 | `tests/c54x/tms320c54x_test_parallel.h` | Reviewed parallel store/arithmetic vectors, including same-cell ordering and circular pointer controls |
 | `tests/c54x/tms320c54x_test_scalars.h` | Literal scalar boundaries with explicit reset/continuation groups, shared with the legacy basic adapter |
+| `tests/c54x/tms320c54x_test_memory_examples.h` | Ordered literal memory arithmetic/multiply/T examples, with original partial setup and assertion masks |
 | `tests/c54x/tms320c54x_test_domains.h` | Independent single-memory admission fixture: catalogue, preserved state, bus observers and replay |
 | `tests/c54x/tms320c54x_test_dispatch.cpp` | Ordered callback routing and the initial-program completion tail |
 | `tests/c54x/tms320c54x_test_arithmetic.cpp` | Arithmetic, multiplier and logical-operation fixtures and checks |

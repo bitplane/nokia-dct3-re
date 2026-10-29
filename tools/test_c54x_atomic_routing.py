@@ -39,6 +39,22 @@ def top_level_guards(text):
     return guards
 
 
+def literal_phase_guard(text, guard):
+    membership = re.fullmatch(r'(\w+)\s*!=\s*std::end\((\w+)\)', guard.strip())
+    if not membership:
+        return guard
+    variable, array = membership.groups()
+    lookup = (rf'\b{variable}\s*=\s*std::find\(std::begin\({array}\),\s*'
+              rf'std::end\({array}\),\s*m_phase\)')
+    values = re.search(rf'constexpr unsigned {array}\[\]\s*=\s*\{{([\d,\s]+)\}}', text)
+    if not values or not re.search(lookup, text):
+        raise ValueError('Unclassified phase membership: ' + guard)
+    phases = [int(value) for value in values[1].split(',') if value.strip()]
+    if not phases or len(set(phases)) != len(phases):
+        raise ValueError('Empty or duplicate literal phase list')
+    return '(' + ' || '.join(f'm_phase == {phase}' for phase in phases) + ')'
+
+
 def guarded_partition():
     header = (SOURCES / 'tms320c54x_test_state.h').read_text()
     native = int(re.search(r'native_store_phase\s*=\s*([\d\']+)', header)[1].replace("'", ''))
@@ -50,6 +66,7 @@ def guarded_partition():
         text = (SOURCES / f'tms320c54x_test_atomic_{owner}.cpp').read_text()
         guards = top_level_guards(text)
         for guard in guards:
+            guard = literal_phase_guard(text, guard)
             expression = guard.replace('m_phase', 'phase').replace('native_store_phase', str(native))
             expression = expression.replace('std::size(far_opcodes)', str(far_count))
             expression = expression.replace('&&', ' and ').replace('||', ' or ')
@@ -83,6 +100,17 @@ def guarded_partition():
 
 
 class AtomicRoutingTests(unittest.TestCase):
+    def test_literal_membership_requires_a_closed_find_table(self):
+        source = '''static constexpr unsigned phases[] = {7, 19, 42};
+auto const selected = std::find(std::begin(phases), std::end(phases), m_phase);'''
+        guard = 'selected != std::end(phases)'
+        self.assertEqual(literal_phase_guard(source, guard),
+                         '(m_phase == 7 || m_phase == 19 || m_phase == 42)')
+        for bad in (source.replace('42', '19'), source.replace('42', 'unknown'),
+                    source.replace(', m_phase', ', other_state')):
+            with self.assertRaises(ValueError):
+                literal_phase_guard(bad, guard)
+
     def test_guard_extraction_ignores_indentation_and_literal_braces(self):
         text = '''namespace fixture {
 bool result() {

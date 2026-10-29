@@ -479,6 +479,11 @@
           "description": "Read-retained mapped source with Execute-live immediate MAC",
           "index": 7,
           "name": "mac-map-imm"
+        },
+        {
+          "description": "Ordered literal memory arithmetic multiply and T examples",
+          "index": 8,
+          "name": "isa-memory"
         }
       ],
       "tms54rom4": [
@@ -3249,6 +3254,7 @@
       "TMS320C54x forward block exits: PASS cases=1152 restore=1152 branches=B,BC_AEQ,BC_BEQ counts=0,1,2,7 exits=first,middle,last,never endpoint_layouts=2 pages=2 snapshots=6 source_reads=ordered body_writes=selected braf_not_auto_cleared=1 outside_rsbx=1 spaced_endpoint_revisit=1 interrupt_composition=unvalidated silicon_phase_claim=0\n": 1,
       "TMS320C54x frame/MMR move disassembler: PASS frames=256 moves=81 rejected=175 pages=2 bounded_extensions=1 pipeline_claim=0\n": 1,
       "TMS320C54x generic long arithmetic: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
+      "TMS320C54x generic memory examples: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic near flow: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic parallel: PASS cases=10 reset_each=1 nokia_devices=0 firmware=0\n": 1,
       "TMS320C54x generic product sequence: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n": 1,
@@ -6532,6 +6538,21 @@
       ],
       "required": [
         "TMS320C54x generic long arithmetic: PASS cases=18 reset_groups=18 nokia_devices=0 firmware=0"
+      ]
+    },
+    "isa-memory": {
+      "completion": "Fatal error: TMS320C54x isolated generic memory examples complete",
+      "machine": "tms54isa",
+      "reported_fields": [
+        {
+          "cases": "45",
+          "firmware": "0",
+          "nokia_devices": "0",
+          "reset_groups": "1"
+        }
+      ],
+      "required": [
+        "TMS320C54x generic memory examples: PASS cases=45 reset_groups=1 nokia_devices=0 firmware=0"
       ]
     },
     "isa-parallel": {
@@ -15437,6 +15458,58 @@
       "classification": "architectural_interaction",
       "decision": "rewrite",
       "family": "long-arithmetic-examples"
+    },
+    "isa-memory": {
+      "case_ids": [
+        "subc-b-preserves-a",
+        "dadst-offset-preincrement",
+        "subb-a-borrow-in",
+        "subb-b-no-borrow",
+        "add-b-carry-bit32",
+        "subs-b-unsigned",
+        "and-b-preserves-carry",
+        "mpy-b-preserves-carry",
+        "mpyr-b-round",
+        "mpyu-b-unsigned-source",
+        "squr-b-load-t",
+        "mac-b-signed-product",
+        "macr-b-round",
+        "mas-a-retains-b",
+        "mas-b-retains-a",
+        "masr-a-round",
+        "masr-b-round",
+        "mpy-ar2-to-a",
+        "mpy-ar2-postdecrement-to-b",
+        "mac-ar2-to-a",
+        "mac-ar2-fractional",
+        "mas-ar2-postincrement-to-b",
+        "masa-acca-source",
+        "maca-acca-source",
+        "macar-acca-round",
+        "poly-postincrement-retains-t",
+        "load-t-stationary",
+        "square-add-b",
+        "square-sub-a",
+        "add-shift16-to-a",
+        "add-shift16-a-to-b",
+        "add-shift16-b-to-a",
+        "add-shift16-to-b",
+        "add-shift16-ar2-postincrement-a",
+        "add-shift16-ar2-postincrement-b",
+        "add-shift16-ar2-stationary-b",
+        "add-shift16-ar2-not-decoy",
+        "load-t-ar2-postdecrement",
+        "sub-shift16-retains-clear-carry",
+        "sub-shift16-a-to-b",
+        "sub-shift16-borrow-to-a",
+        "sub-shift16-b-retains-clear-carry",
+        "sub-shift16-ar2-not-decoy",
+        "sub-shift16-ar2-postincrement",
+        "sub-shift16-ar2-postdecrement"
+      ],
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "family": "memory-operand-literal-reference"
     },
     "isa-parallel": {
       "case_ids": [

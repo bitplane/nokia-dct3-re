@@ -9,6 +9,7 @@
 #include "tms320c54x_test_scalars.h"
 #include "tms320c54x_test_long_reference.h"
 #include "tms320c54x_test_product_examples.h"
+#include "tms320c54x_test_memory_examples.h"
 #include "tms320c54x_test_near_flow.h"
 #include "tms320c54x_test_mapped_mac.h"
 #include <cstring>
@@ -38,7 +39,8 @@ protected:
 		else if (m_domain) m_domains = std::make_unique<c54x_test::source_domain_fixture>(machine(), *m_cpu, *m_timer);
 		else
 		{
-			if (products()) m_cases = c54x_test::product_examples();
+			if (memory_reference()) m_cases = c54x_test::memory_examples();
+			else if (products()) m_cases = c54x_test::product_examples();
 			else if (near_flow())
 				m_cases.assign(c54x_test::near_flow_cases().begin(), c54x_test::near_flow_cases().end());
 			else if (long_reference())
@@ -49,7 +51,7 @@ protected:
 				for (unsigned i = 0; i < c54x_test::parallel_vectors().size(); ++i) m_cases.push_back(c54x_test::parallel_case(i));
 			else
 				for (unsigned i = 0; i < c54x_test::square_vectors.size(); ++i) m_cases.push_back(c54x_test::square_case(i));
-			m_reset_before.assign(m_cases.size(), !products());
+			m_reset_before.assign(m_cases.size(), !(products() || memory_reference()));
 			m_reset_before[0] = true;
 			if (scalars())
 				for (unsigned i = 0; i < m_cases.size(); ++i) m_reset_before[i] = c54x_test::scalar_vectors()[i].reset;
@@ -67,6 +69,7 @@ private:
 	bool scalars() const { return !std::strcmp(machine().options().bios(), "isa-scalars"); }
 	bool long_reference() const { return !std::strcmp(machine().options().bios(), "isa-long"); }
 	bool products() const { return !std::strcmp(machine().options().bios(), "isa-products"); }
+	bool memory_reference() const { return !std::strcmp(machine().options().bios(), "isa-memory"); }
 	bool near_flow() const { return !std::strcmp(machine().options().bios(), "isa-flow"); }
 	unsigned count() const
 	{
@@ -102,10 +105,13 @@ private:
 			m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 			// The sequence uses circular PORTW timing markers, not firmware I/O.
-			if (products())
+			if (products() || memory_reference())
 			{
-				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, memory_reference() ? 0x0a01 : 0x0a03);
 				m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+				// The memory group enters from the checked C16 long-word row
+				// in the legacy sequence. Seed that mode only at its standalone reset.
+				if (memory_reference()) m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0180);
 			}
 		}
 		m_writes = 0; m_first = m_last = 0;
@@ -135,6 +141,11 @@ private:
 		{
 			osd_printf_info("TMS320C54x generic near flow: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n", m_case, m_resets);
 			throw emu_fatalerror(3, "TMS320C54x isolated generic near flow complete");
+		}
+		if (memory_reference())
+		{
+			osd_printf_info("TMS320C54x generic memory examples: PASS cases=%u reset_groups=%u nokia_devices=0 firmware=0\n", m_case, m_resets);
+			throw emu_fatalerror(3, "TMS320C54x isolated generic memory examples complete");
 		}
 		if (products())
 		{
@@ -180,6 +191,7 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(5, "isa-products", "Literal multiply arithmetic and DELAY continuation sequence")
 	ROM_SYSTEM_BIOS(6, "isa-flow", "Conditional delayed branch return and high-address stack examples")
 	ROM_SYSTEM_BIOS(7, "mac-map-imm", "Read-retained mapped source with Execute-live immediate MAC")
+	ROM_SYSTEM_BIOS(8, "isa-memory", "Ordered literal memory arithmetic multiply and T examples")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
 ROM_END
 
