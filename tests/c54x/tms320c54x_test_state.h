@@ -1621,16 +1621,6 @@ private:
 	void start_parallel_sub_fraction(unsigned index);
 
 
-	struct xc_latency_fixture
-	{
-		unsigned gap, kind, slots, prefix;
-		bool initial, polarity, staged, snapshot;
-		bool take() const { return (gap < 2 ? initial : !initial) == polarity; }
-		bool source() const { return slots == 2 && take() ? !polarity : !initial; }
-		u16 status(bool after) const { return 0x605 | (kind < 2 ? (after ? source() : initial) << (kind ? 11 : 12) : 0); }
-	};
-	static xc_latency_fixture xc_latency_case(unsigned index);
-	void start_xc_latency(unsigned index);
 
 
 	struct xorm_fixture
@@ -1951,7 +1941,6 @@ private:
 	bool check_staged_bus_stm_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_native_dual_sub_results();
-	bool check_xc_latency_results();
 	bool check_atomic_xorm_results();
 	bool check_conditional_register_results();
 	bool check_rom4_codec_is_results();

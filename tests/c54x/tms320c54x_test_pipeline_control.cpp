@@ -294,51 +294,6 @@ tms320c54x_test_state::conditional_register_fixture tms320c54x_test_state::condi
 }
 
 
-tms320c54x_test_state::xc_latency_fixture tms320c54x_test_state::xc_latency_case(unsigned index)
-{
-	unsigned const kind = (index / 16) % 6;
-	return {index % 4, kind, 1 + (index / 96) % 2, kind >= 4 ? 2U : 1U,
-		bool((index / 8) % 2), bool((index / 4) % 2), index < 384, bool((index / 192) % 2)};
-}
-
-void tms320c54x_test_state::start_xc_latency(unsigned index)
-{
-	auto const f = xc_latency_case(index);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 20; ++i) program.write_word(0x600 + i, 0xf495);
-	unsigned pc = 0x600;
-	if (f.kind < 2) program.write_word(pc++, (f.initial ? 0xf4b0 : 0xf5b0) | (f.kind ? 11 : 12));
-	else if (f.kind < 4) program.write_word(pc++, 0xe800 | ((f.kind & 1) << 8) | !f.initial);
-	else { program.write_word(pc++, 0xf020 | ((f.kind & 1) << 8)); program.write_word(pc++, !f.initial); }
-	pc += f.gap;
-	u16 const predicate = f.kind == 0 ? (f.polarity ? 0x30 : 0x20) : f.kind == 1 ? (f.polarity ? 0x0c : 8) :
-		0x40 | ((f.kind & 1) << 3) | (f.polarity ? 4 : 5);
-	program.write_word(pc++, (f.slots == 2 ? 0xff00 : 0xfd00) | predicate);
-	if (f.slots == 2)
-		program.write_word(pc++, f.kind < 2 ? ((f.polarity ? 0xf4b0 : 0xf5b0) | (f.kind ? 11 : 12)) :
-			0xe800 | ((f.kind & 1) << 8) | !f.polarity);
-	program.write_word(pc++, f.kind >= 2 && !(f.kind & 1) ? 0xe933 : 0xe833);
-	program.write_word(pc + 1, 0xf4e1);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_PC, 0x600}, {cpu_regs::STATE_SP, 0x1000},
-		{cpu_regs::STATE_A, f.kind >= 2 && !(f.kind & 1) ? f.initial : 0},
-		{cpu_regs::STATE_B, f.kind >= 2 && (f.kind & 1) ? f.initial : 0},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.status(false));
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_TCR, 0x10},
-		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_cpu->set_pipeline_frontend(f.staged);
-	m_rom4_codec_replay = false; m_rom4_codec_replays = 0;
-	m_phase = 523000 + index;
-	if (!f.snapshot)
-	{
-		expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save XC condition source before its producer");
-		m_rom4_codec_replays = 1;
-	}
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 void tms320c54x_test_state::start_atomic_conditional_return(unsigned index)
@@ -643,42 +598,6 @@ bool tms320c54x_test_state::check_delayed_condition_return_results()
 }
 
 
-bool tms320c54x_test_state::check_xc_latency_results()
-{
-	if (m_phase >= 523000 && m_phase < 523768)
-	{
-		unsigned const index = m_phase - 523000;
-		auto const f = xc_latency_case(index);
-		if (!m_rom4_codec_replays && (f.staged ? m_cpu->pipeline_cycles() == 5 + f.prefix : m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x600 + f.prefix))
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save XC after its producer without replacing the retained Access condition");
-			m_rom4_codec_replays = 1;
-		}
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "XC producer and single predicate remain admitted");
-		if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE)) { m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-		u64 const a = f.kind >= 2 && !(f.kind & 1) ? f.source() : f.take() ? 0x33 : 0;
-		u64 const b = f.kind >= 2 && (f.kind & 1) ? f.source() : f.kind >= 2 && f.take() ? 0x33 : 0;
-		if (m_cpu->state_int(tms320c54x_device::STATE_A) != a || m_cpu->state_int(tms320c54x_device::STATE_B) != b || m_cpu->state_int(tms320c54x_device::STATE_ST0) != f.status(true))
-			osd_printf_info("XC condition divergence: case=%u staged=%u kind=%u gap=%u slots=%u initial=%u polarity=%u A=%04x expectedA=%04x B=%04x expectedB=%04x ST0=%04x expectedST0=%04x\n",
-				index, f.staged, f.kind, f.gap, f.slots, f.initial, f.polarity, unsigned(m_cpu->state_int(tms320c54x_device::STATE_A)), unsigned(a),
-				unsigned(m_cpu->state_int(tms320c54x_device::STATE_B)), unsigned(b), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), f.status(true));
-		expect(m_rom4_codec_replays == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.status(true) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 &&
-			m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x603 + f.prefix + f.gap + f.slots && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
-			"XC retains old or settled TC/C/A/B once for all controlled words across one/two-word producers");
-		if (!m_rom4_codec_replay)
-		{
-			expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore XC condition history and selected/annulled words");
-			m_phase = 523000 + index; m_rom4_codec_replay = true;
-			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-		}
-		if (index == 383) osd_printf_info("TMS320C54x staged XC conditions: PASS cases=384 restore=384 sources=TC,C,A,B producer_words=1,2 gaps=0,1,2,3 controlled_words=1,2 snapshots=2 physical_phase_claim=0\n");
-		if (index < 767) { start_xc_latency(index + 1); return true; }
-		osd_printf_info("TMS320C54x atomic XC conditions: PASS cases=384 restore=384 sources=TC,C,A,B producer_words=1,2 gaps=0,1,2,3 controlled_words=1,2 snapshots=2 physical_phase_claim=0\n");
-		throw emu_fatalerror(0, "TMS320C54x isolated XC conditions complete");
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_conditional_register_results()
 {
