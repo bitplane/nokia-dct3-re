@@ -239,6 +239,7 @@ def main():
     counts['atomic_logic_pointer_literals'] = 18
     counts['atomic_logic_program_literals'] = 5
     counts['atomic_accumulator_add_literals'] = 7
+    counts['atomic_multiply_move_literals'] = 7
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

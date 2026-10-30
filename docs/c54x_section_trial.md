@@ -305,6 +305,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_accumulator_add_literals.h` | Retain shifted opposite-accumulator ADD, four A/B destination ×OVM overflow literals, self-ADD and immediate shifted LD. Explicit source/old destination/T/TC/carry/SXM/OVM, fixed40-bit and saturation results, destination-specific sticky overflow, source/T preservation, no data traffic and pre-instruction replay. Drop port-marker timing; atomic semantic scope. | Native7 cases/restores, unchanged count; build5.321s/run0.018s. Delete phase470 successor setup,471/6554..6557/472 and473 assertions/preparations. Unmigrated register-bit bank references remain untouched. |
 
+| `atomic_multiply_move_literals.h` | Retain signed MPYA with T capture, signed SUB, absolute40-bit XOR, four-store pointer sequence, two guarded low-A stores and STLM→MVDD→MVMM sequence. Explicit operands, unrelated pointers and flags replace cross-bank state; fixed memory/accumulator/T results, complete ordered MMR/RAM accesses, neighbors, pointer updates and pre-sequence replay. Drop port-marker timing; atomic semantic/access scope. | Native7 cases/restores, unchanged count; build5.422s/run0.016s. Delete phase475 successor setup,476..479/9229..9231 and480 assertions/preparations; following branch setup and unmigrated bit-bank assertions remain reference material. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
