@@ -447,6 +447,16 @@ product is deliberately retired. Numeric expectations, extension poisoning,
 post-read mutation and publication checks are unchanged. Ordered input/stage
 digests and actual restore counts protect the retained schedules.
 
+`timer_prescaler` owns 93 independent cases/replays: fifteen TDDR reductions
+preserve the larger current PSC until borrow, then use the new divider and
+latch TINT on expiry; fourteen TIM writes preserve PSC without an intervening
+TIM/TCR read; sixty-four reserved/Free/Soft combinations retain stopped PSC.
+Half-clock observation cadence preserves the old non-edge sampling points.
+Only instantaneous timer values are asserted; intervening ticks do not read
+TIM/TCR. PRD is overwritten after the final expiry check so replay must restore
+reload configuration and phase. Free/Soft storage is tested, not debugger
+halt behavior. The legacy setup/checker branches and private snapshot are gone.
+
 `stopped_timer_reload` owns 48 independently initialized cases and replays:
 all sixteen TDDR/PSC values, reload-only, identity ORM and attempted read-only
 PSC writes. Original atomic instruction words produce the PRD/TCR bus writes;

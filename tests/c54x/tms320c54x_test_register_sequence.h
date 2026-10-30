@@ -129,7 +129,7 @@ private:
 	{
 		if (!value) throw emu_fatalerror("C54x register sequence case=%u tick=%u replay=%u: %s", m_case, m_tick, unsigned(m_replay), message);
 	}
-	void schedule() { m_timer.adjust(attotime::from_ticks(1, m_cpu.clock())); }
+	void schedule() { m_timer.adjust(attotime::from_ticks(1, m_cpu.clock()) / m_input.observation_subticks); }
 	bool accept_bus_event(std::vector<clocked_data_event> const &events, unsigned &cursor, clocked_data_event actual)
 	{
 		unsigned const index = cursor;
@@ -152,6 +152,7 @@ private:
 	{
 		m_observing_outputs = false;
 		m_cpu.suspend(SUSPEND_REASON_DISABLE, true); m_input = m_build(m_case);
+		require(m_input.observation_subticks == 1 || m_input.observation_subticks == 2, "whole/half CPU clock observation cadence");
 		require(!m_input.states.empty() && m_input.states.front().tick == 0, "explicit initial observation");
 		for (unsigned i = 1; i < m_input.states.size(); ++i)
 			require(m_input.states[i - 1].tick < m_input.states[i].tick, "ordered observation clocks");

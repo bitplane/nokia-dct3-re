@@ -336,6 +336,7 @@ def main():
     counts['long_pair_arithmetic'] = 8192
     counts['memory_mac'] = 15616
     counts['stopped_timer_reload'] = 48
+    counts['timer_prescaler'] = 93
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

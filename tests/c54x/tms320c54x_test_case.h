@@ -108,6 +108,7 @@ struct clocked_register_case
 	std::optional<std::vector<clocked_line_sample>> bio_samples{};
 	bool observe_data_reads = true; // Write-only contracts can leave variable polling reads unconstrained.
 	std::vector<memory_word> synthetic_data_reads{}; // Test endpoints, not claims about peripheral register contents.
+	unsigned observation_subticks = 1; // Two samples per CPU clock avoid timer-edge observation ties.
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

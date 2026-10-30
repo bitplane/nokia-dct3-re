@@ -151,49 +151,8 @@ void tms320c54x_test_state::start_idle_wake_case(unsigned index)
 }
 
 
-void tms320c54x_test_state::start_timer_prescaler_divider_case(unsigned divider)
-{
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PRD, 2},
-		{cpu_regs::STATE_TCR, 0x30 | divider},
-	});
-	// TDDR changes the next reload, not the current read-only PSC.
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 1);
-	m_phase = 7350 + divider;
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
-void tms320c54x_test_state::start_timer_counter_write_case(unsigned divider)
-{
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PRD, 2},
-		{cpu_regs::STATE_TCR, 0x20 | divider}, {cpu_regs::STATE_IDLE, 1},
-	});
-	m_phase = 7700 + divider;
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
-void tms320c54x_test_state::check_timer_reserved_fields()
-{
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 9);
-	for (unsigned control = 0; control < 4; ++control)
-		for (unsigned reserved = 0; reserved < 16; ++reserved)
-		{
-			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x33);
-			m_cpu->set_state_int(tms320c54x_device::STATE_TCR,
-					(reserved << 12) | (control << 10) | 0x13);
-			u16 const actual = m_cpu->state_int(tms320c54x_device::STATE_TCR);
-			osd_printf_info("TMS320C54x timer reserved fields: reserved=%u control=%u tcr=%04x\n",
-				reserved, control, actual);
-			expect(actual == ((control << 10) | 0xd3) &&
-				m_cpu->state_int(tms320c54x_device::STATE_TIM) == 9,
-				"SPRU131G TCR reserved bits read zero while Free/Soft storage and stopped PSC are preserved");
-		}
-	osd_printf_info("TMS320C54x timer reserved fields: PASS cases=64 debugger_free_soft_behavior_claim=0\n");
-}
 
 
 
@@ -1156,78 +1115,6 @@ bool tms320c54x_test_state::check_timer_peripheral_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 7351 && m_phase <= 7365)
-	{
-		unsigned const divider = m_phase - 7350;
-		u16 const tim = m_cpu->state_int(tms320c54x_device::STATE_TIM);
-		u16 const tcr = m_cpu->state_int(tms320c54x_device::STATE_TCR);
-		osd_printf_info("TMS320C54x timer divider change: loaded_psc=%u tim=%04x tcr=%04x\n",
-			divider, tim, tcr);
-		expect(tim == 2 && tcr == ((divider - 1) << 6) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_IFR),
-			"SPRU131G changing TDDR preserves current PSC until borrow or TRB");
-		expect(capture_snapshot(machine(), m_timer_prescaler_saved) == STATERR_NONE,
-			"save current PSC larger than new TDDR");
-		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 9);
-		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x20);
-		expect(restore_snapshot(machine(), m_timer_prescaler_saved) == STATERR_NONE &&
-			m_cpu->state_int(tms320c54x_device::STATE_TIM) == tim &&
-			m_cpu->state_int(tms320c54x_device::STATE_TCR) == tcr,
-			"restore current PSC interval independently of overwritten timer reload");
-		m_phase = 7450 + divider;
-		// Observe after the first borrow, halfway to the following edge.
-		m_check_timer->adjust(attotime::from_ticks(2 * divider + 1, m_cpu->clock()) / 2);
-		return true;
-	}
-	if ((m_phase >= 7451 && m_phase <= 7465) ||
-		(m_phase >= 7551 && m_phase <= 7565) ||
-		(m_phase >= 7651 && m_phase <= 7665))
-	{
-		unsigned const stage = (m_phase - 7350) / 100;
-		unsigned const divider = (m_phase - 7350) % 100;
-		u16 const expected_tim = stage == 1 ? 1 : stage == 2 ? 0 : 2;
-		expect(m_cpu->state_int(tms320c54x_device::STATE_TIM) == expected_tim &&
-			m_cpu->state_int(tms320c54x_device::STATE_TCR) == 0 &&
-			m_cpu->state_int(tms320c54x_device::STATE_IFR) == (stage == 3 ? 8 : 0),
-			"SPRU131G PSC borrows once, then reloads new TDDR; timer expiry reloads PRD and latches TINT");
-		if (stage < 3)
-		{
-			m_phase += 100;
-			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-			return true;
-		}
-		if (divider < 15) { start_timer_prescaler_divider_case(divider + 1); return true; }
-		osd_printf_info("TMS320C54x timer divider change: PASS cases=15 save_replay=15 borrow_expiry_checks=45\n");
-		start_timer_counter_write_case(2);
-		return true;
-	}
-	if (m_phase >= 7702 && m_phase <= 7715)
-	{
-		// Do not read TIM/TCR here: a read would refresh cached PSC and
-		// conceal a write path that otherwise restarts the prescaler.
-		m_cpu->set_state_int(tms320c54x_device::STATE_TIM, 9);
-		m_phase += 100;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-		return true;
-	}
-	if (m_phase >= 7802 && m_phase <= 7815)
-	{
-		unsigned const divider = m_phase - 7800;
-		u16 const tim = m_cpu->state_int(tms320c54x_device::STATE_TIM);
-		u16 const tcr = m_cpu->state_int(tms320c54x_device::STATE_TCR);
-		osd_printf_info("TMS320C54x timer counter write: divider=%u tim=%04x tcr=%04x\n",
-			divider, tim, tcr);
-		expect(tim == 9 && tcr == (divider | ((divider - 2) << 6)) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_IFR),
-			"SPRU131G TIM writes replace only TIM, preserving live read-only PSC without an intervening read");
-		if (divider < 15) { start_timer_counter_write_case(divider + 1); return true; }
-		osd_printf_info("TMS320C54x timer counter write: PASS cases=14\n");
-		check_timer_reserved_fields();
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		start_timer_boundary_probe(0);
-		return true;
-	}
 	if (m_phase >= 7020 && m_phase <= 7027)
 	{
 		unsigned const index = m_phase - 7020;

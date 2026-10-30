@@ -57,9 +57,6 @@ private:
 	void start_idle_external_serial_case(unsigned index);
 	void start_idle_timer_case(unsigned index);
 	void start_idle_wake_case(unsigned index);
-	void start_timer_prescaler_divider_case(unsigned divider);
-	void start_timer_counter_write_case(unsigned divider);
-	void check_timer_reserved_fields();
 	void start_pipeline_mu4_prologue(unsigned variant = 0);
 	void observe_context_irq(int line);
 	bool check_rom4_context_results();
@@ -1047,7 +1044,7 @@ private:
 	u32 m_popd_write_mask = 0;
 	// Separate checkpoint lifetimes; host observations still rewind explicitly.
 	std::stringstream m_idle_nmi_saved, m_idle_timer_saved, m_idle_dma_saved;
-	std::stringstream m_timer_prescaler_saved, m_bsp_saved, m_pll_saved, m_clock_rates_saved;
+	std::stringstream m_bsp_saved, m_pll_saved, m_clock_rates_saved;
 };
 
 } // namespace c54x_test
