@@ -450,46 +450,6 @@ int main() {
         self.assertEqual([tuple(map(int, line.split())) for line in output[:-1]], expected)
         self.assertEqual(output[-1], 'digest=' + reviewed_profiles()['reg-banks']['coverage']['fnv64'])
 
-    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
-    def test_store_schedule_retains_each_stimulus_and_checkpoint_group(self):
-        source = r'''
-#include <iostream>
-#include "tests/c54x/tms320c54x_test_support.h"
-#include "tests/c54x/tms320c54x_test_store_schedule.h"
-int main() {
-    using s = c54x_test::long_store_schedule;
-    c54x_test::ordered_case_digest digest;
-    for (unsigned v = 0; v < s::end; v = s::next(v)) {
-        unsigned const key = s::case_key(v);
-        digest.add(key);
-        std::cout << v << ' ' << key << ' ' << s::checkpoint(v) << '\n';
-    }
-    std::cout << "digest=" << std::hex << digest.value << '\n';
-}
-'''
-        expected, groups, ordinal = [], defaultdict(Counter), 0
-        for shifted in (False, True):
-            forms = 7 if shifted else 25
-            for major in range(32 if shifted else 2):
-                for pattern in range(4):
-                    for flags in range(4):
-                        for selector in range(4):
-                            for offset in range(4):
-                                for form in range(forms):
-                                    checkpoint = (form + offset + selector + flags + pattern + major) % 3
-                                    variant = 38400 + ordinal - 12800 if shifted else ordinal
-                                    tick = ((4, 7, 8) if shifted else (3, 6, 7))[checkpoint]
-                                    expected.append((variant, ordinal * 3 + checkpoint, tick))
-                                    groups[shifted, major, flags, selector, offset, form][checkpoint] += 1
-                                    ordinal += 1
-        self.assertEqual(ordinal, 70144)
-        self.assertEqual(len(groups), 3200 + 14336)
-        self.assertTrue(all(sorted(group.values()) == [1, 1, 2] for group in groups.values()))
-        with compiled_cpp(source) as program:
-            output = subprocess.run([str(program)], check=True, capture_output=True,
-                                    text=True).stdout.splitlines()
-        self.assertEqual([tuple(map(int, line.split())) for line in output[:-1]], expected)
-        self.assertEqual(output[-1], 'digest=' + reviewed_profiles()['long-mvkd']['coverage']['fnv64'])
 
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_rmw_schedule_preserves_stimuli_and_checkpoint_shapes(self):

@@ -5,7 +5,6 @@
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_memory_immediate_schedule.h"
 #include "tms320c54x_test_rmw_schedule.h"
-#include "tms320c54x_test_store_schedule.h"
 #include "tms320c54x_test_shifted_schedule.h"
 #include "tms320c54x_test_register_schedule.h"
 
@@ -182,23 +181,6 @@ void tms320c54x_test_state::start_pipeline_long_pair(unsigned variant)
 
 tms320c54x_test_state::accumulator_store_fixture tms320c54x_test_state::long_accumulator_store_fixture(unsigned variant)
 {
-	if (variant >= 38400)
-	{
-		unsigned const v = (variant - 38400) % 57344, form = v % 7, offset = (v / 7) % 4;
-		unsigned const selector = (v / 28) % 4, flags = (v / 112) % 4, pattern = (v / 448) % 4;
-		unsigned const original_form = form == 6 ? 24 : (form / 2) * 8 + (form & 1 ? 6 : 1);
-		auto f = long_accumulator_store_fixture(original_form + offset * 25 + selector * 100 + flags * 400 + pattern * 1600);
-		int const shift = int((v / 1792) % 32) - 16;
-		u64 const shifted = shift < 0 ? (BIT(f.st1, 8) ? u64((BIT(f.source, 39) ? s64(f.source) - (s64(1) << 40) : s64(f.source)) >> -shift) : f.source >> -shift) & 0xffffffffffULL : (f.source << shift) & 0xffffffffffULL;
-		u32 stored = u32(shifted);
-		if (f.pmst & 1)
-		{
-			if (!BIT(f.st1, 8)) stored = shifted > 0xffffffffULL ? 0xffffffffU : u32(shifted);
-			else stored = u32(std::clamp(BIT(shifted, 39) ? s64(shifted) - (s64(1) << 40) : s64(shifted), s64(-2147483648LL), s64(2147483647LL)));
-		}
-		f.value = stored >> (selector & 2 ? 16 : 0);
-		return f;
-	}
 	unsigned const form = variant % 25, kind = form == 24 ? 3 : form / 8, reg = form == 24 ? 0 : form % 8;
 	unsigned const selector = (variant / 100) % 4, flags = (variant / 400) % 4;
 	bool const compatibility = (variant / 6400) % 2;
@@ -225,48 +207,6 @@ tms320c54x_test_state::accumulator_store_fixture tms320c54x_test_state::long_acc
 }
 
 
-void tms320c54x_test_state::start_pipeline_long_accumulator_store(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	if (!variant) { m_long_store_coverage = {}; m_long_store_replays = 0; }
-	auto const f = long_accumulator_store_fixture(variant);
-	u32 const base = f.reg == 6 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, f.opcode); program.write_word(base + 0x601, f.literal);
-	bool const shifted = variant >= 38400;
-	if (shifted)
-	{
-		program.write_word(base + 0x600, 0x6f00 | u8(f.opcode));
-		program.write_word(base + 0x602, (f.selector & 2 ? 0x0c60 : 0x0c80) | ((f.selector & 1) << 8) | ((int(((variant - 38400) % 57344 / 1792) % 32) - 16) & 31));
-	}
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, f.pmst},
-		{cpu_regs::STATE_ILLEGAL, 0},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x1007);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, f.initial);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x11112222); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x33334444);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->space(AS_DATA).write_word(f.address, 0xaaaa);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "long_accumulator_store_no_read",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Accumulator store does not read its destination"); });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "long_accumulator_store_write",
-		[this, f, shifted](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == f.address && word == f.value && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == (shifted ? 8 : 7),
-				"Long-offset STL/STH owns one retained-address write with Execute-live source saturation"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601 + shifted, "long_accumulator_store_offset",
-		[this, f, shifted, variant, base](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			bool const operation = shifted && at == base + 0x602;
-			u16 const expected = operation ? (f.selector & 2 ? 0x0c60 : 0x0c80) | ((f.selector & 1) << 8) | ((int(((variant - 38400) % 57344 / 1792) % 32) - 16) & 31) : f.literal;
-			expect(word == expected && m_pipeline_extensions_reads == unsigned(operation), "STL/STH retains address before operation extension"); ++m_pipeline_extensions_reads; });
-	m_phase = 252810; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 std::array<u16, 2> tms320c54x_test_state::long_rmw_expected(unsigned arithmetic, unsigned operation, u16 flags)
 {
@@ -1645,79 +1585,6 @@ bool tms320c54x_test_state::check_accumulator_shift_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_long_accumulator_store_results()
-{
-	if (m_phase == 252810)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		auto const f = long_accumulator_store_fixture(variant);
-		bool const shifted = variant >= 38400;
-		unsigned const read_cycle = shifted ? 7 : 6;
-		unsigned const checkpoint = long_store_schedule::checkpoint(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Long-offset accumulator store has staged ownership");
-		if (tick == 4)
-		{
-			auto const disable = machine().disable_side_effects();
-			m_cpu->space(AS_PROGRAM).write_word((f.reg == 6 ? 0x20000 : 0) + 0x601, 0xdead);
-			if (shifted) m_cpu->space(AS_PROGRAM).write_word((f.reg == 6 ? 0x20000 : 0) + 0x602, 0xdead);
-		}
-		if (tick == read_cycle)
-		{
-			for (unsigned ar = 0; ar < 8; ++ar)
-				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (ar == f.selected ? f.next_ar : 0x1007),
-					"Long accumulator store updates only its selected pointer at address presentation");
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2222);
-			m_cpu->set_state_int((f.selector & 1) ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.source);
-		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save STL/STH at partial Decode, retained address or publication");
-		}
-		if (tick == 16)
-		{
-			u16 const st0 = (f.st1 & 0x20) && f.reg && f.kind != 3 ? (f.st0 & 0x1fff) | (f.reg << 13) : f.st0;
-			{
-				auto const disable = machine().disable_side_effects();
-				expect(m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == (shifted ? 2 : 1) && m_cpu->space(AS_DATA).read_word(f.address) == f.value &&
-					m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
-					m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == 0x2222 &&
-					m_cpu->state_int(tms320c54x_device::STATE_A) == ((f.selector & 1) ? 0x11112222 : f.source) &&
-					m_cpu->state_int(tms320c54x_device::STATE_B) == ((f.selector & 1) ? f.source : 0x33334444),
-					"STL/STH preserves source/status and never retargets through a changed AR or literal");
-			}
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore STL/STH without duplicate pointer update or RAM write");
-				++m_long_store_replays;
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252820; m_check_timer->enable(true); return true;
-			}
-			m_long_store_coverage.add(long_store_schedule::case_key(variant));
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant + 1 == long_store_schedule::regular_cases)
-			{
-				expect(m_long_store_coverage.count == long_store_schedule::regular_cases && m_long_store_replays == long_store_schedule::regular_cases,
-					"Long store coverage counts completed cases and actual restores");
-				osd_printf_info("TMS320C54x staged long STL/STH: PASS cases=12800 forms=25 offsets=4 selectors=4 sst_sxm=4 patterns=4 compatibility=2 restore=12800 duplicate_writes=0 destination_reads=0 checkpoints=3 checkpoint_policy=balanced\n");
-			}
-			if (auto const next = long_store_schedule::next(variant); next < long_store_schedule::end)
-				{ start_pipeline_long_accumulator_store(next); return true; }
-			expect(m_long_store_coverage.count == long_store_schedule::cases && m_long_store_replays == long_store_schedule::cases,
-				"Store coverage digest includes every distinct regular and shifted stimulus after replay");
-			osd_printf_info("TMS320C54x staged shifted STL/STH: PASS cases=57344 forms=7 offsets=4 selectors=4 shifts=32 sst_sxm=4 patterns=4 restore=57344 duplicate_writes=0 destination_reads=0 silicon_phase_claim=0 checkpoints=3 checkpoint_policy=balanced coverage_cases=%u coverage_restores=%u coverage_fnv64=%016llx\n",
-				m_long_store_coverage.count, m_long_store_replays, (unsigned long long)m_long_store_coverage.value);
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252820)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252810;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_absolute_xorm_results()
 {

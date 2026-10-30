@@ -32,7 +32,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_accumulator_shift_results()) return;
 	if (check_branch_repeat_results()) return;
 	if (check_rptbd_t_load_results()) return;
-	if (check_long_accumulator_store_results()) return;
 	if (check_absolute_xorm_results()) return;
 	if (check_staged_load_results()) return;
 	if (check_immediate_arithmetic_results()) return;

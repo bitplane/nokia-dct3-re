@@ -171,7 +171,6 @@ private:
 	};
 	static long_mvkd_fixture long_mvkd_case(unsigned variant);
 	void start_pipeline_long_mvkd(unsigned variant = 0);
-	void start_pipeline_long_accumulator_store(unsigned variant = 0);
 	static std::array<u16, 2> long_rmw_expected(unsigned arithmetic, unsigned operation, u16 flags);
 	static accumulator_store_fixture peripheral_long_rmw_fixture(unsigned variant);
 	static accumulator_store_fixture absolute_xorm_fixture(unsigned variant);
@@ -1030,7 +1029,6 @@ private:
 	bool check_accumulator_shift_results();
 	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
-	bool check_long_accumulator_store_results();
 	bool check_absolute_xorm_results();
 	bool check_staged_load_results();
 	bool check_immediate_arithmetic_results();
@@ -1129,8 +1127,6 @@ private:
 	unsigned m_pipeline_indirect_case = 0;
 	ordered_case_digest m_long_rmw_coverage;
 	unsigned m_long_rmw_replays = 0;
-	ordered_case_digest m_long_store_coverage;
-	unsigned m_long_store_replays = 0;
 	ordered_case_digest m_register_bank_coverage;
 	unsigned m_register_bank_replays = 0;
 	ordered_case_digest m_shifted_coverage;

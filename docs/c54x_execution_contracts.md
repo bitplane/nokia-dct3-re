@@ -411,13 +411,18 @@ one read/write, two extension fetches, preserved state and the extra peripheral
 clock remain checked. These are synthetic peripheral-bus timing regressions,
 not evidence of real peripheral semantics or measured silicon phases.
 
-Long STL/STH uses the same retention policy: 12,800 regular and 57,344 shifted
-stimuli run once each, rather than three times each. Within each fixed
-address/selector/status/compatibility-or-shift group, the four value patterns
-exercise all three checkpoints, one twice. The 140,288 repeated executions are
-retired; there is no claim of every value at every checkpoint. A combined
-ordered digest and actual replay count protect both matrices. The review on
-`long-mvkd` explicitly covers these store results, not all members of the bundle.
+The independent `long_accumulator_store` section replaces the ordinary/shifted
+STL/STH bank with 3,408 cases/replays: 800 routing cases for all 25 forms,
+four offsets, four selectors and both compatibility modes; 2,048 numeric cases
+covering every shift -16..15, four values and SATD/SXM settings at an absolute
+destination; and 560 shifted-routing cases covering the original seven forms
+with offsets/selectors at five representative shift boundaries. Numeric settings
+are distributed in the routing banks rather than multiplied across them.
+One exact Write/no reads, ordered extension capture/poisoning, selected-pointer
+update, later pointer poison, Execute-live source and preservation of unrelated
+AR/status state are checked through IDLE/replay. Three checkpoints and pages
+are distributed. The 70,144-execution legacy bank and its enumeration-only
+schedule header/test are removed. These are model contracts, not measured clocks.
 
 Shifted memory ADD/SUB and SUBC use a balanced schedule as well: 81,920
 ADD/SUB inputs and 10,240 SUBC inputs run once each. `shifted-alu` covers both
@@ -1646,14 +1651,12 @@ set only the selected pointer to the circular start, preserving unrelated
 AR values and alias checks. MVDK's retained-BK assertion uses the fixture's
 BK unless the instruction explicitly writes BK.
 
-The compatibility-named `long-mvkd` BIOS now isolates all seven shared
-consumers: immediate ST, ordinary and shifted STL/STH, MVDK, its original
-instruction-pair control, RMW and MVKD. Its runner requires every marker,
-covering 172,296 cases/restores without adding a BIOS slot or changing CPU
-emulation. The peripheral-only fixtures retain their separate register and
-latency contracts. `long-mvkd`, `st-long-periph`, `rmw-long-periph`,
-`preinc-store` and `preinc-st` all pass, including the unrelated short-store
-controls. The runner rejects missing or duplicate shared-consumer markers.
+The legacy `long-mvkd` bundle is not current executable acceptance during
+section migration. Ordinary/shifted STL/STH now live in the independent
+`long_accumulator_store` section. Its old regular address factory remains only
+because MVDK/MVKD, RMW and peripheral fixtures still consume it; the store-owned
+shift expansion, setup, result phases and coverage scheduler are removed.
+Those remaining consumers must migrate before the shared factory can go.
 
 These corrections do not constitute an exhaustive ISA or fixture-domain
 audit. Other older generators' modulo expectations remain insufficient
