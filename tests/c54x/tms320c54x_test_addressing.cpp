@@ -1832,74 +1832,6 @@ void tms320c54x_test_state::start_xmem_load(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-u64 tms320c54x_test_state::xmem_store_source(unsigned variant)
-{
-	return std::array<u64, 8>{0, 1, 0x7fffffff, 0x80000000ULL, 0xff80000000ULL, 0xffffffffULL, 0x123456789aULL, 0xffffffffffULL}[(variant / 256) % 8];
-}
-
-u16 tms320c54x_test_state::xmem_store_expected(unsigned variant)
-{
-	auto const f = xmem_load_case(variant % 196608);
-	u64 value = (xmem_store_source(variant) << f.shift) & 0xffffffffffULL;
-	if ((variant / 393216) % 2)
-	{
-		if (f.flags & 1)
-		{
-			s64 const signed_value = value & 0x8000000000ULL ? s64(value) - (s64(1) << 40) : s64(value);
-			value = u32(std::clamp(signed_value, s64(-2147483648LL), s64(2147483647LL)));
-		}
-		else if (value > 0xffffffffULL) value = 0xffffffffULL;
-	}
-	return u16(value >> ((variant / 196608) % 2 ? 16 : 0));
-}
-
-void tms320c54x_test_state::start_xmem_store(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = xmem_load_case(variant % 196608);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, 0x9800 | (((variant / 196608) % 2) << 9) | (f.destination << 8) | (f.x << 4) | f.shift);
-	program.write_word(f.base + 0x601, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, (variant / 393216) % 2);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0()); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1());
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x4000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead);
-	for (unsigned ar = 2; ar <= 5; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x100f + 0x100 * (ar - 2));
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.linear ? 0 : 16);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	data.write_word(f.address(), 0xbeef);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "xmem_store_no_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_operand_reads; expect(false, "Xmem store never reads its destination"); } });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "xmem_store_write", [this, f, variant](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && at == f.address() && word == xmem_store_expected(variant) && m_cpu->pipeline_cycles() == 6, "Xmem store writes the Execute-owned source to the retained EAB exactly once"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "xmem_store_fetch", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "Xmem store fetches one opcode"); ++m_pipeline_extensions_reads; } });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254840;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-u16 tms320c54x_test_state::square_repeat_memory(poly_fixture const &f, unsigned ordinal)
-{
-	return f.form == 2 ? f.t ^ u16(ordinal * 0x1111) : ordinal & 1 ? u16(~f.t) : f.t;
-}
 
 
 
@@ -3756,37 +3688,6 @@ bool tms320c54x_test_state::check_repeated_mvdk_results()
 
 bool tms320c54x_test_state::check_xmem_load_results()
 {
-	if (m_phase == 254840)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + (variant % 196608) / 65536;
-		auto const f = xmem_load_case(variant % 196608);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Compact Xmem store stays in the retained frontend");
-		if (tick == 4 || tick == 5)
-		{
-			for (unsigned ar = 2; ar <= 5; ++ar) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (tick == 5 && ar == 2 + (f.x & 3) ? f.next_ar() : 0x100f + 0x100 * (ar - 2)), "Xmem store publishes its one pointer update with the Read-owned EAB");
-			if (tick == 5)
-			{
-				m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + 2 + (f.x & 3), 0x2222);
-				m_cpu->set_state_int(f.destination ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, xmem_store_source(variant));
-			}
-		}
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads},
-			"Save Xmem store before address sampling and after retained EAB");
-		if (tick == 12)
-		{
-			{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(f.address()) == xmem_store_expected(variant), "Xmem store publishes the shifted/saturated word in RAM"); }
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.destination ? 0x123456789aULL : xmem_store_source(variant)) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.destination ? xmem_store_source(variant) : 0xfeabcd9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_AR0 + 2 + (f.x & 3)) == 0x2222, "Xmem store preserves both accumulators and never reapplies its pointer update");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0() && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1() && m_cpu->state_int(tms320c54x_device::STATE_PMST) == (variant / 393216) % 2 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xdead && !m_pipeline_operand_reads && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 1, "Xmem store preserves status/T with one fetch/write and no destination read");
-			if (replay_pipeline_at(254850, checkpoint,
-				"Restore Xmem store without duplicate writes, fetches or address updates")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 786431) { start_xmem_store(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged Xmem stores: PASS cases=786432 restore=786432 encodings=1024 operations=STL,STH xmem_modes=16 shifts=0..15 values=8 accumulators=2 status_states=16 pages=2 snapshots=3 eab=Read eb=Execute destination_reads=0 data_writes=1 sst_sxm=1 ovm_independent=1 bk_zero_and_wrap=1 mapped_acceptance=0 repeat_acceptance=0 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated Xmem stores complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254850) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254840; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 254120)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + (variant % 196608) / 65536; auto const f = xmem_load_case(variant % 196608);

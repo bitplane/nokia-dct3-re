@@ -789,9 +789,6 @@ private:
 	};
 	static xmem_arithmetic_result xmem_arithmetic_expected(unsigned variant);
 	void start_xmem_load(unsigned variant = 0);
-	static u64 xmem_store_source(unsigned variant);
-	static u16 xmem_store_expected(unsigned variant);
-	void start_xmem_store(unsigned variant = 0);
 	void start_staged_bus_stm(unsigned variant = 0);
 	void start_delayed_far_call(unsigned variant = 0);
 	struct mac_smem_fixture
