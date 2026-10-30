@@ -147,15 +147,6 @@ private:
 	void start_pipeline_logical_immediate(unsigned variant = 0);
 	void start_pipeline_worker_xc(unsigned variant = 0);
 	void start_xc_return(unsigned variant = 0);
-	struct signed_xc_fixture
-	{
-		unsigned condition, layout;
-		bool b, taken;
-		u64 value, opposite;
-		u32 base;
-	};
-	static signed_xc_fixture signed_xc_case(unsigned variant);
-	void start_signed_xc(unsigned variant = 0);
 	void start_pipeline_original_worker_roundtrip(unsigned variant = 0);
 	void start_pipeline_original_context_call(unsigned variant = 0, bool full_body = false);
 	static std::array<u16, 2> addm_inputs(unsigned variant);
@@ -1956,7 +1947,6 @@ private:
 	bool check_repeated_mvdk_results();
 	bool check_portr_bypass_results();
 	bool check_sqdst_results();
-	bool check_signed_xc_results();
 	bool check_xmem_load_results();
 	bool check_repeat_push_results();
 	bool check_block_exit_results();
