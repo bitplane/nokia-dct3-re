@@ -343,6 +343,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_basic_repeat_sequences.h` | Retain five basic long-RPT/load/DST, RPTZ B, memory-counted ADDM, repeated MVDP and mixed absolute-store/MVDM/DLD/complement/XOR sequences. Explicit programs/data/flags/pointers and fixed accumulator results replace the global synthetic image and inherited state. Exact ordered RAM/MMR/program transactions, count drain, pointer updates, distinct memory spaces, source preservation and pre-sequence replay. | Native5 cases/restores, unchanged count; build5.393s/run0.015s. Delete basic phases5..9 assertions/transitions, their0350..037e program seeds and exclusively owned data seeds, and shrink the basic routing interval. Remaining basic programs are still non-executable reference material. |
 
+| `atomic_basic_control_sequences.h` | Retain13 basic delayed/indirect/conditional branches, RETE/conditional return/call, shifted absolute LD, SUB variants, repeated WRITA, load ASM, signed frame adjustment and right shift. Explicit program targets, stack sentinels, accumulators/flags/pointers and both memory spaces replace global image/inherited state. Exact target fetch and stack/data/program effects, fixed continuations/results, count/address progression and pre-operation replay. | Native13 cases/restores, unchanged count; build5.438s/run0.019s. Delete basic10..22 assertions/transitions and0380..03e0 image/data seeds; retain only22's following ADDC setup and shrink routing. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
