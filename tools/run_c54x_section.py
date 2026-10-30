@@ -42,6 +42,7 @@ def main():
     counts['paired_load'] = 64
     counts['immediate_add'] = 128
     counts['data_move'] = 40
+    counts['compiler_stack'] = 40
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

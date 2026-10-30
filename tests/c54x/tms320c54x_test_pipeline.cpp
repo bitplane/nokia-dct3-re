@@ -194,62 +194,6 @@ void tms320c54x_test_state::start_pipeline_mask_rmw_case()
 
 
 
-void tms320c54x_test_state::start_pipeline_explicit_sp(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const kind = variant % 5, gap = (variant / 5) % 4;
-	bool const store = BIT(variant / 20, 0);
-	u32 const base = BIT(variant / 40, 0) ? 0x20000 : 0;
-	unsigned const words = kind == 1 || kind == 2 || kind == 4 ? 2 : 1;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	if (kind == 0) program.write_word(base + 0x600, 0x8a18);
-	if (kind == 1) { program.write_word(base + 0x600, 0x7718); program.write_word(base + 0x601, 0x1020); }
-	if (kind == 2) { program.write_word(base + 0x600, 0x7182); program.write_word(base + 0x601, 0x0018); }
-	if (kind == 3) program.write_word(base + 0x600, 0xee20);
-	if (kind == 4) { program.write_word(base + 0x600, 0x8081); program.write_word(base + 0x601, 0x8a18); }
-	program.write_word(base + 0x600 + words + gap, store ? 0x8020 : 0x1020);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa600}, {cpu_regs::STATE_ST1, 0x4800}, {cpu_regs::STATE_SP, 0x1000},
-		{cpu_regs::STATE_A, 0x7777}, {cpu_regs::STATE_B, 0x2233445566ULL}, {cpu_regs::STATE_AR1, 0x11},
-		{cpu_regs::STATE_AR2, 0x70}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	auto &data = m_cpu->space(AS_DATA);
-	data.write_word(0x70, 0x1020); data.write_word(0x1000, 0x1020);
-	data.write_word(0x1020, 0x1111); data.write_word(0x1040, 0x2222);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
-	unsigned const access = 4 + words + gap;
-	bool const new_sp = gap >= (kind == 0 ? 2 : kind == 4 ? 3 : 1);
-	u16 const address = new_sp ? 0x1040 : 0x1020;
-	m_pipeline_operand_tap = data.install_read_tap(0x70, 0x1040, "explicit_sp_sources",
-		[this, kind, store, access, address, new_sp](offs_t at, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			bool const source = at == (kind == 2 ? 0x70 : 0x1000);
-			expect(source ? (kind == 0 || kind == 2 || kind == 4) && value == 0x1020 && m_cpu->pipeline_cycles() == (kind == 4 ? 6 : 5) :
-				!store && at == address && value == (new_sp ? 0x2222 : 0x1111) && m_cpu->pipeline_cycles() == access + 1,
-				"Explicit SP source and basic compiler operand use their documented separate visibility");
-			++m_pipeline_operand_reads;
-		});
-	m_pipeline_write_tap = data.install_write_tap(0x18, 0x1040, "explicit_sp_publications",
-		[this, kind, store, access, address](offs_t at, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			if (at == 0x18)
-			{
-				expect(kind != 3 && value == 0x1020 && m_cpu->pipeline_cycles() == (kind == 4 ? 7 : 5), "Explicit SP publishes once; only DAGEN conflict defers POPM");
-				++m_pipeline_register_writes;
-			}
-			else
-			{
-				expect(store && at == address && value == 0x7777 && m_cpu->pipeline_cycles() == access + 2, "Compiler store retains its old or new SP-based address");
-				++m_pipeline_store_writes;
-			}
-		});
-	m_phase = 252190; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_pmst(unsigned variant)
 {
