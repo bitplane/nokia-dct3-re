@@ -796,9 +796,18 @@ the default 3210 semantic acceptance also passes. The
 [core checkpoint](#core-regression-checkpoint) additionally qualifies the
 complete default suite with these source guards and corrected fixtures.
 
+`atomic_operand_order` checks 46 independently reset instruction/form cases.
+Ordered program traces include every extension and any program operand;
+data and IO events require the extension cursor to have reached the complete
+instruction before operand access. This preserves cross-bus ordering, not just
+independent final access counts. Source/destination values, pointer updates,
+comparison TC and IDLE/replay are checked. Seven old MVPD f9..ff success cases
+are retired as undocumented absolute aliases; this does not change the CPU
+decoder or certify those encodings. No physical timing claim is made.
+
 Operand role is essential. MVKD/MVDM, PORTR, MVPD and POPD encode a
 destination and must not inherit a read-only Smem restriction. In particular,
-`7c9a` in operand-fetch case 45 is a valid MVPD destination, not a missed
+`7c9a` in `atomic_operand_order` is a valid MVPD destination, not a missed
 source rejection. Xmem/Ymem have separate grammars. For `6fxx`, classify the
 operation extension before deciding source versus destination; shifted
 STL/STH remain unchanged. Rejection support does not imply positive staged

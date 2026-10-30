@@ -50,7 +50,6 @@ private:
 	void xf_w(int state);
 	bool m_xf_pin = true;
 	void start_repeat_endpoint_case(unsigned index);
-	void start_operand_fetch_case(unsigned index);
 	void start_loop_xc_case(unsigned index);
 	void start_xc_irq_case(unsigned index);
 	void check_control_disassembler();
@@ -1138,9 +1137,7 @@ private:
 	unsigned m_repeat_boundary_requests = 0;
 	memory_passthrough_handler m_xc_irq_tap;
 	unsigned m_xc_irq_fetches = 0;
-	memory_passthrough_handler m_operand_fetch_tap, m_operand_data_tap, m_operand_io_tap, m_operand_program_tap;
-	unsigned m_operand_extension_count = 0, m_operand_extensions = 0, m_operand_reads = 0;
-	bool m_operand_order_violation = false;
+	memory_passthrough_handler m_operand_data_tap;
 	unsigned m_phase = 0;
 	bool (tms320c54x_test_state::*m_result_owner)() = nullptr;
 	std::bitset<65536> m_asserted_opcodes;

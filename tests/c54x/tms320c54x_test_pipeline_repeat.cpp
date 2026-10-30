@@ -1132,43 +1132,6 @@ bool tms320c54x_test_state::check_repeat_endpoints_results()
 		m_cpu->set_input_line(index >= 2 ? INPUT_LINE_NMI : 2, CLEAR_LINE);
 		if (index < 3) { start_loop_xc_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x loop XC protection: PASS cases=4 body_words=1,2 sources=irq,nmi\n");
-		start_operand_fetch_case(0); return true;
-	}
-	if (m_phase >= 86000 && m_phase < 86053)
-	{
-		unsigned const index = m_phase - 86000;
-		unsigned const family = index >= 45 ? 10 : index >= 25 ? 6 + (index - 25) / 4 : index / 4;
-		unsigned const form = index == 45 ? 4 : index >= 46 ? 3 : index >= 25 ? (index - 25) % 4 : index % 4;
-		osd_printf_info("C54x operand fetch case=%u extensions=%u reads=%u early_read=%u\n",
-			index, m_operand_extension_count, m_operand_reads, m_operand_order_violation);
-		m_operand_fetch_tap.remove(); m_operand_data_tap.remove();
-		m_operand_io_tap.remove(); m_operand_program_tap.remove();
-		expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Operand fetch fixture terminates");
-		expect(!m_operand_order_violation && m_operand_reads == (index == 24 ? 3 : 1),
-			"Instruction operand words are fetched before data, I/O or program operand reads");
-		auto &data = m_cpu->space(AS_DATA);
-		if (index == 24)
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x189ed0000ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0, "FIRS operand data preserved");
-		else
-		{
-			if (family == 0) expect(data.read_word(0x0700) == 0xbeef, "MVDK operand data preserved");
-			if (family == 1) expect(m_cpu->space(AS_PROGRAM).read_word(0x0700) == 0xbeef, "MVDP operand data preserved");
-			if (family == 2) expect(m_port_writes == 1 && m_first_port_value == 0xbeef, "PORTW operand data preserved");
-			if (family >= 3) expect(data.read_word(0x0600) == (family == 3 ? 0xabcd : 0xbeef), "Input operand data preserved");
-			if (family == 6 || family == 7) expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000, "Comparison/test publishes TC");
-			if (family == 8) expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0701 &&
-				data.read_word(0x0700) == 0xbeef, "POPD increments SP once and preserves popped stack contents");
-			if (family == 9) expect(m_cpu->space(AS_PROGRAM).read_word(0x0900) == 0xbeef &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0900, "WRITA writes the distinct program destination without changing A");
-			if (family == 10) expect(data.read_word(0x05ff) == 0xcafe &&
-				m_cpu->space(AS_PROGRAM).read_word(0x0900) == 0xbeef, "MVPD preserves the preceding destination and program source");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) ==
-				(form == 1 ? 0x0601 : form == 2 ? 0x05fb : 0x0600), "Address modifier preserved");
-		}
-		if (index < 52) { start_operand_fetch_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x operand fetch order: PASS cases=53 families=12 forms=direct,indirect,long,absolute,preincrement\n");
 		return true;
 	}
 	return false;

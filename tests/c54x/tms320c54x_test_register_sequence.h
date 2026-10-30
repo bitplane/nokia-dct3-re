@@ -133,6 +133,8 @@ private:
 	bool accept_bus_event(std::vector<clocked_data_event> const &events, unsigned &cursor, clocked_data_event actual)
 	{
 		unsigned const index = cursor;
+		if (index < events.size() && events[index].minimum_program_events)
+			require(m_program_cursor >= *events[index].minimum_program_events, "instruction extensions precede operand bus access");
 		if (!accept_data_event(events,cursor,actual)) return false;
 		auto const disable = m_machine.disable_side_effects();
 		for (auto const &reg : events[index].registers)
