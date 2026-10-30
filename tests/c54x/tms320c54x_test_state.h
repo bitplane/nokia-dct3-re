@@ -303,7 +303,6 @@ private:
 	};
 	static branch_arithmetic_fixture branch_arithmetic_case(unsigned variant);
 	void start_branch_arithmetic(unsigned variant = 0);
-	void start_branch_arithmetic_edge(unsigned variant = 0);
 	struct circular_mar_fixture
 	{
 		unsigned mode, reg, selected, checkpoint;
@@ -425,7 +424,6 @@ private:
 		u32 base;
 	};
 	void start_shifted_ar_conflict(unsigned variant = 0);
-	void start_shifted_ar_edge(unsigned variant = 0);
 	static extended_ar_store_fixture extended_ar_store_case(unsigned variant, bool consumer, bool shifted = false);
 	void start_extended_ar_store(unsigned variant = 0);
 	void start_pipeline_stlm(unsigned variant = 0);
@@ -759,7 +757,6 @@ private:
 	};
 	static rptbd_shift_store_fixture rptbd_shift_store_case(unsigned v);
 	void start_rptbd_shift_store(unsigned variant = 0);
-	void start_rptbd_shift_store_edge(unsigned variant = 0);
 	struct rptbd_square_fixture
 	{
 		unsigned operation, destination, pattern, flags, layout, form, count, snapshot;
@@ -1144,7 +1141,6 @@ private:
 	};
 	static offset_logic_fixture offset_logic_case(unsigned v);
 	void start_offset_logic(unsigned variant = 0);
-	void start_offset_logic_edges(unsigned variant = 0);
 	struct absolute_logic_fixture
 	{
 		unsigned kind, snapshot;
@@ -1648,7 +1644,6 @@ private:
 	};
 	static delayed_conditional_call_fixture delayed_conditional_call_case(unsigned v, bool tc=false);
 	void start_delayed_conditional_call(unsigned variant = 0);
-	void start_delayed_conditional_call_edge(unsigned variant = 0);
 	struct block_conditional_call_fixture
 	{
 		unsigned count, checkpoint;

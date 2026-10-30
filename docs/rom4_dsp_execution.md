@@ -934,9 +934,8 @@ points. Arithmetic may change the branch-tested accumulator without
 changing the already sampled decision. An independent signed-40-bit oracle
 checks the result, saturation and C/OV flags; memory mutation after Read
 cannot change the operand. There is one data read and no data write or call
-frame. `bcd-arith-edge` checks 288 replay cases preserving the new subset's
-ANEQ/BNEQ exclusions and rejecting a two-word operand starting in the final
-delay word before DAGEN or operand effects. The pre-existing absolute ADD
+frame. ANEQ/BNEQ composition and a two-word operand starting in the final
+delay word remain outside this qualification. The pre-existing absolute ADD
 admission for other owners is unchanged. Other new owner compositions and
 physical pipeline timing are not claimed.
 

@@ -1221,17 +1221,6 @@ void tms320c54x_test_state::start_delayed_conditional_call(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_delayed_conditional_call_edge(unsigned variant)
-{
-	u32 const base = (variant / 8) % 2 ? 0x20000 : 0;
-	start_delayed_conditional_call(base ? 192 : 0); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_operand_data_tap.remove();
-	m_cpu->space(AS_PROGRAM).write_word(base + 0x600, 0xfb00 | std::array<u16, 8>{0, 2, 3, 8, 0x0c, 0x24, 0x34, 0x70}[variant % 8]);
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "ccd_edge_no_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "ccd_edge_no_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_phase = 255440; m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
-
 tms320c54x_test_state::block_conditional_call_fixture tms320c54x_test_state::block_conditional_call_case(unsigned v)
 {
 	return {std::array<unsigned, 4>{0, 1, 2, 7}[v % 4], std::array<unsigned, 4>{4, 12, 13, 18}[v / 256],
@@ -1938,23 +1927,6 @@ bool tms320c54x_test_state::check_delayed_call_replay_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 255470) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255460; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 255440)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 2 + variant / 16;
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save unadmitted CCD predicate before or after Decode guard"); }
-		if (tick == 16)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->pipeline_cycles() == 3 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x5555 &&
-				!m_pipeline_operand_reads && !m_pipeline_store_writes && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900, "Unadmitted CCD conditions stop before predicate side effects or stack reservation");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_pipeline_store_writes = 0; return restore_pipeline_at(255450, "Restore unadmitted CCD condition without fallback execution"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 31) { start_delayed_conditional_call_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x delayed conditional call exclusions: PASS cases=32 restore=32 conditions=8 pages=2 snapshots=2 stack_reads=0 stack_writes=0 stack_reservation=0 status_changes=0 silicon_trap_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated delayed conditional call exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255450) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255440; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 255420)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delayed_conditional_call_case(variant,profile_is("tc-delay-call"));

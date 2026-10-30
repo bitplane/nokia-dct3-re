@@ -129,9 +129,6 @@ Executable shifted-AR acceptance is split into four isolated profiles:
   MVDK, POPM or constant ST to the same or a different AR. RAM controls
   publish at clock 7; shared-bank collisions defer the younger write to
   clock 8 without repeating its source read or stack increment.
-- `st-shift-ar-edge`: 48 replays retaining twelve control/peripheral
-  destination exclusions before and after rejection, with no data access
-  or register mutation. These are prototype exclusions, not silicon traps.
 
 These isolated shifted-store profiles are separate from the default CPU
 suite; passing that suite does not imply their coverage.
@@ -208,11 +205,9 @@ the delay span and unsupported mapped destinations remain guarded.
 AR destinations, all four accumulator/store selectors, signed shifts,
 SST/SXM, program pages, CPL and IRQ/NMI arrivals. It checks one delay
 write and pointer effect, Execute-live source capture, retained fetched
-words, BRC+1 body iterations and balanced interrupt frames. The separate
-`rptbd-shift-edge` profile passes 16 cases/replays for span spill,
-three-word addressing, BRC destinations and a different control owner,
-with no data or pointer side effects. These exclusions are prototype
-limits, not claimed silicon traps; physical pipeline phases remain unvalidated.
+words, BRC+1 body iterations and balanced interrupt frames. Span spill,
+three-word addressing, BRC destinations and other control-owner combinations
+remain unqualified. Physical pipeline phases remain unvalidated.
 
 ## REL memory-sourced repeat contract
 

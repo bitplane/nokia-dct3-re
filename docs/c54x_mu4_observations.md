@@ -1354,12 +1354,11 @@ four value pairs, four SXM/OVM states, both CMPT settings, BK=0/13, two
 pages and four snapshots. Poisoning the fetched literal, all ARs after
 Access and source RAM after Read checks single modification and retained
 operands. Other accumulator, T, stack and arithmetic flags are preserved.
-The `logic-edges` profile passes 24 fail-closed cases for mapped/peripheral
-sources, repeats and control-delay composition, with no operand access or
-pointer update. Interrupt composition and physical silicon phases are not
-claimed. Separate short/peripheral/absolute logic controls pass 576/864/
+Mapped/peripheral offset sources, repeat/control-delay composition,
+interrupt composition and physical silicon phases are not qualified here.
+Separate short/peripheral/absolute logic controls pass 576/864/
 1,536 cases, and the offset-load control passes 12,672. Both accumulator-
-branch producer controls and repeated POPD also pass (nine profiles total).
+branch producer controls and repeated POPD also pass.
 Native 5110 save-state restoration and the shared broad checkpoint pass.
 
 MVMD now admits T/TRN sources through its existing retained Class-19A

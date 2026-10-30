@@ -1840,10 +1840,8 @@ Delay instructions change the tested accumulator without changing the
 retained decision. Fetched target/delay words and sampled return frames
 are replaced afterward to detect rereads. Both paths execute delay work
 once; only the taken path visits the callee, balances a frame and returns
-to the shared continuation. `cond-cd-edge` adds 32 cases/restores for eight
-unadmitted condition encodings on two pages, before/after the Decode guard.
-They stop before stack reservation, data transactions or status changes;
-these are prototype exclusions, not silicon traps.
+to the shared continuation. Other condition encodings remain outside this
+qualification; prototype rejection is not a silicon trap contract.
 
 An in-block CCD may target an outside callee when its complete header and
 two delay words fit within the block, including a delay span ending at REA.
