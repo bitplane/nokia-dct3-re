@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,23 +21,41 @@ def copy_changed(source, target):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('section', choices=['immediate_store', 'basic_memory', 'stack', 'dagen'])
+    counts = dict(immediate_store=8, basic_memory=18, stack=141, dagen=292)
+    parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
+    parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
     args = parser.parse_args()
+    if args.section == 'all':
+        if args.negative_control:
+            parser.error('select one section for the negative control')
+        for section in counts:
+            subprocess.run([sys.executable, __file__, section, '--jobs', str(args.jobs)], check=True)
+        return
     sections = ROOT / 'tests/c54x/sections'
     overlay = ROOT / 'mame/src/mame/nokia'
-    output = ROOT / 'tmp/c54x-section-trial' / args.section
+    output = ROOT / 'tmp/c54x-section-trial' / (args.section + ('-negative' if args.negative_control else ''))
     output.mkdir(parents=True, exist_ok=True)
     for source in (ROOT / 'tests/c54x').glob('*.h'):
         copy_changed(source, overlay / source.name)
     copy_changed(sections / 'runner.cpp', overlay / 'tms320c54x_test_isa.cpp')
     copy_changed(sections / 'common.h', overlay / 'c54x_section_common.h')
     copy_changed(sections / (args.section + '.h'), overlay / 'c54x_section_selected.h')
+    if args.negative_control:
+        selected = overlay / 'c54x_section_selected.h'
+        text = selected.read_text()
+        if text.count('return cases;') != 1:
+            parser.error('negative control requires one section return')
+        selected.write_text(text.replace('return cases;',
+            'cases.front().states.back().observation.expected.push_back({r::STATE_ILLEGAL,1}); return cases;'))
     start = time.monotonic()
     with (output / 'build.log').open('w') as log:
-        subprocess.run(['make', '-C', str(ROOT / 'mame'), 'REGENIE=1', 'SUBTARGET=c54xisa',
+        build = subprocess.run(['make', '-C', str(ROOT / 'mame'), 'REGENIE=1', 'SUBTARGET=c54xisa',
                         'SOURCES=src/mame/nokia/tms320c54x_test_isa.cpp', 'USE_QTDEBUG=0',
-                        '-j' + str(args.jobs)], stdout=log, stderr=subprocess.STDOUT, check=True)
+                        '-j' + str(args.jobs)], stdout=log, stderr=subprocess.STDOUT)
+    if build.returncode:
+        print('\n'.join((output / 'build.log').read_text().splitlines()[-30:]), file=sys.stderr)
+        raise SystemExit('section build failed')
     built = time.monotonic()
     command = [str(ROOT / 'mame/c54xisa'), 'tms54isa', '-video', 'none', '-sound', 'none',
                '-joystickprovider', 'none', '-midiprovider', 'none', '-nothrottle',
@@ -49,7 +68,11 @@ def main():
     (output / 'timing.json').write_text(json.dumps(result, indent=2) + '\n')
     print(text, end='')
     print(json.dumps(result))
-    if run.returncode != 3 or 'C54x section: PASS' not in text or 'C54x section complete' not in text:
+    if args.negative_control:
+        if run.returncode != 3 or 'expected=1' not in text or 'C54x section: PASS' in text:
+            raise SystemExit('negative control did not detect the wrong expectation')
+        print('C54x negative control: PASS (wrong expectation rejected)')
+    elif run.returncode != 3 or f'C54x section: PASS cases={counts[args.section]} restores={counts[args.section]}' not in text or 'C54x section complete' not in text:
         raise SystemExit('section failed')
 
 
