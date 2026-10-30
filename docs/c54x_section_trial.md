@@ -188,6 +188,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `store_forwarding.h` | Keep six ordinary, six Xmem and all ASM source/word/shift/SXM/SST store producers ×both LDU destinations ×gap/no-gap ×alias/non-alias. Preserve exact one Write6, backing Read6/7 only when required, zero backing read on immediate forwarding, pointer/ASM poison, source/status/T/TRN, terminal IDLE and replay. Distribute pages and three checkpoints instead of crossing them; no numeric/producer combinations lost. Signed division/floor oracle replaces prior rounded-negative helper. | Native4192 cases/restores versus25152; build5.348s/run1.529s. Delete three profile routes, setup/three value helpers, phases254440/254450 branches and declarations. BRC-move checker now owns only its named remaining bank. |
 
+| `stlm_bk_dependency.h` | Keep both STLM accumulator sources ×BK0/3/4/13 ×four gaps ×LDU/Xmem circular consumers. Preserve Decode-owned BK despite later live replacement, gap-specific pointer wrap and BK publication, exact register Write6/consumer Read6..9, source/sibling/status, PC/IDLE and replay. BK0 remains a legacy linear implementation behavior; no silicon-phase claim. Distribute pages and three checkpoints, not their Cartesian product. | Native64 cases/restores versus384; build5.322s/run0.037s. Delete setup, phases254460/254470 checker branches, route/declaration; mixed delay-store checker retains its other banks. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).

@@ -125,7 +125,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"mvkd-sp"}, [](self &test) { test.start_mvkd_sp(); } },
 		{ {"add-bk", "add-absolute", "add-sp"}, [](self &test) { test.start_pipeline_absolute_add(); } },
 		{ {"instr-observer"}, [](self &test) { test.start_instruction_observer(); } },
-		{ {"stlm-bk"}, [](self &test) { test.start_stlm_bk(); } },
 		{ {"software-intr"}, [](self &test) { test.start_software_intr(); } },
 		{ {"rptb-br-edges"}, [](self &test) { test.start_block_branch_edge(); } },
 		{ {"bio-branch"}, [](self &test) { test.start_pipeline_bio_branch(); } },

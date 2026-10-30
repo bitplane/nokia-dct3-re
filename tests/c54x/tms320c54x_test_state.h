@@ -507,7 +507,6 @@ private:
 	};
 	static delay_store_fixture delay_store_case(unsigned variant);
 	void start_delay_store(unsigned variant = 0);
-	void start_stlm_bk(unsigned variant = 0);
 	void start_block_xc_irq(unsigned variant = 0);
 	struct block_xc_fixture
 	{

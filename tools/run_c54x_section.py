@@ -149,6 +149,7 @@ def main():
     counts['scalar_boundaries'] = 34
     counts['atomic_repeat_irq'] = 2
     counts['store_forwarding'] = 4192
+    counts['stlm_bk_dependency'] = 64
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
