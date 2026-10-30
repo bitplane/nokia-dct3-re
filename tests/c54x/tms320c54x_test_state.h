@@ -329,14 +329,12 @@ private:
 	void start_pipeline_arp(unsigned variant = 0);
 	void start_pipeline_read_a(unsigned variant = 0);
 	void start_pipeline_banz(unsigned variant = 0);
-	void start_pipeline_absolute_add(unsigned variant = 0);
 	void start_instruction_observer(unsigned variant = 0);
 	void start_pipeline_add_sp_context(unsigned variant = 0);
 	void start_pipeline_add_sp_exclusion(unsigned variant = 0);
 	void start_pipeline_direct_rmw(unsigned variant = 0);
 	void start_pipeline_peripheral_logic(unsigned variant = 0);
 	void start_pipeline_port_write(unsigned variant = 0);
-	void start_pipeline_direct_immediate_store(unsigned variant = 0);
 	static u16 stlm_fixture_value(unsigned variant);
 	struct memory_arithmetic_fixture
 	{
@@ -2023,7 +2021,7 @@ private:
 	bool check_mvkd_sp_results();
 	bool check_pipeline_add_sp_context_results();
 	bool check_pipeline_peripheral_logic_results();
-	bool check_pipeline_direct_immediate_store_results();
+	bool check_mvdd_source_results();
 	bool check_ts_load_results();
 	bool check_extended_ar_store_results();
 	bool check_data_copy_results();
