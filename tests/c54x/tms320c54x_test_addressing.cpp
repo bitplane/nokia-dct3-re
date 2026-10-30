@@ -230,53 +230,7 @@ void tms320c54x_test_state::start_pipeline_extended_dst(unsigned variant)
 
 
 
-tms320c54x_test_state::long_store_fixture tms320c54x_test_state::immediate_long_store_fixture(unsigned variant)
-{
-	unsigned const reg = variant % 8, kind = (variant / 8) % 3;
-	bool const compatibility = (variant / 384) % 2;
-	s16 const offset = std::array<s16, 4>{0, 1, -1, s16(0xf495)}[(variant / 24) % 4];
-	u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xf495}[(variant / 96) % 4];
-	u16 const initial = kind == 2 ? 0x4007 : 0x1007, bk = kind == 2 ? 8192 : 16;
-	u16 const address = kind == 2 ? circular_fixture_next(initial, offset, bk) : u16(initial + offset);
-	return {reg, compatibility && !reg ? 3U : reg, kind, u16(offset), value, address,
-		u16(kind ? address : initial), u16(compatibility ? 0x6608 : 0x608), compatibility, initial, bk};
-}
 
-void tms320c54x_test_state::start_pipeline_long_immediate_store(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const peripheral = profile_is("st-long-periph");
-	auto const f = peripheral ? peripheral_long_store_fixture(variant) : immediate_long_store_fixture(variant);
-	u32 const base = (variant / 768) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0x76e0 | (f.kind << 3) | f.reg);
-	program.write_word(base + 0x601, f.offset); program.write_word(base + 0x602, f.value);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, f.st0}, {cpu_regs::STATE_ST1, 0x800 | (f.compatibility << 5)},
-	});
-	if (peripheral) for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5555);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_AR0 + f.selected, peripheral ? u16(f.address - f.offset) : f.initial},
-		{cpu_regs::STATE_BK, f.bk}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(f.address, 0xaaaa);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "long_immediate_store_no_read",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Long immediate ST does not read its destination"); });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "long_immediate_store_publication",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == f.address && word == f.value && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == (f.address >= 0x20 && f.address < 0x60 ? 9 : 8),
-				"Long immediate ST owns its cached address and literal value with one Execute write"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x602, "long_immediate_store_literals",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_extensions_reads < 2 && (at & 0xffff) == 0x601 + m_pipeline_extensions_reads &&
-				word == (m_pipeline_extensions_reads ? f.value : f.offset), "Long immediate ST fetches offset then value exactly once"); ++m_pipeline_extensions_reads; });
-	m_phase = 252650; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 

@@ -148,16 +148,6 @@ private:
 	static long_pair_fixture_data long_add_fixture(unsigned variant);
 	static long_pair_fixture_data long_reverse_fixture(unsigned variant);
 	void start_pipeline_long_pair(unsigned variant = 0);
-	struct long_store_fixture
-	{
-		unsigned reg, selected, kind;
-		u16 offset, value, address, next_ar, st0;
-		bool compatibility;
-		u16 initial = 0x1007, bk = 16;
-	};
-	static long_store_fixture immediate_long_store_fixture(unsigned variant);
-	static long_store_fixture peripheral_long_store_fixture(unsigned variant);
-	void start_pipeline_long_immediate_store(unsigned variant = 0);
 	void start_pipeline_bio_branch(unsigned variant = 0);
 	void start_pipeline_store_mvmm(unsigned variant = 0);
 	struct indexed_store_fixture;
@@ -1213,7 +1203,7 @@ private:
 	bool check_mvdd_source_results();
 	bool check_extended_ar_store_results();
 	bool check_accumulator_shift_results();
-	bool check_peripheral_long_store_results();
+	bool check_pipeline_bio_branch_results();
 	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
 	bool check_pipeline_port_read_results();

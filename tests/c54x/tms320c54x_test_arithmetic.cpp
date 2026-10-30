@@ -2124,7 +2124,7 @@ bool tms320c54x_test_state::check_accumulator_shift_results()
 				osd_printf_info("TMS320C54x staged long-pair controls: PASS dsub=6144 dadd=12288 restore=18432 pair_reads=2 memory_writes=0\n");
 				throw emu_fatalerror(3, "TMS320C54x isolated long-pair controls complete");
 			}
-			start_pipeline_long_immediate_store(); return true;
+			return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}

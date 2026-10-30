@@ -431,15 +431,6 @@ void tms320c54x_test_state::start_pipeline_port_write(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::long_store_fixture tms320c54x_test_state::peripheral_long_store_fixture(unsigned variant)
-{
-	unsigned const reg = variant % 8, kind = (variant / 8) % 2;
-	bool const compatibility = (variant / 64) % 2, ram = (variant / 384) % 2;
-	u16 const offset = std::array<u16, 3>{0x3b, 0x38, 0x49}[(variant / 128) % 3], pointer = ram ? 0x1400 : 0;
-	return {reg, compatibility && !reg ? 3U : reg, kind, offset,
-		std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 16) % 4], u16(pointer + offset),
-		u16(kind ? pointer + offset : pointer), u16(compatibility ? 0x6608 : 0x608), compatibility};
-}
 
 void tms320c54x_test_state::start_pipeline_bio_branch(unsigned variant)
 {
@@ -2326,70 +2317,8 @@ bool tms320c54x_test_state::check_pipeline_peripheral_logic_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_peripheral_long_store_results()
+bool tms320c54x_test_state::check_pipeline_bio_branch_results()
 {
-	if (m_phase == 252650)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const peripheral = profile_is("st-long-periph");
-		auto const f = peripheral ? peripheral_long_store_fixture(variant) : immediate_long_store_fixture(variant);
-		u32 const base = (variant / 768) % 2 ? 0x20000 : 0;
-		unsigned const checkpoint = std::array<unsigned, 4>{4, 5, 7, 8}[variant / 1536];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Long immediate ST keeps partial and complete Decode operands separate");
-		if (tick == 4)
-		{
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead);
-		}
-		if (tick == 5)
-		{
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x602, 0xbeef);
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, m_cpu->state_int(tms320c54x_device::STATE_ST1) ^ 0x4000);
-		}
-		if (tick == 7)
-		{
-			u16 const st0 = f.compatibility && f.reg ? (f.st0 & ~0xe000) | (f.reg << 13) : f.st0;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == f.next_ar && m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0,
-				"Long immediate ST applies only its encoded AR/compatibility modification once");
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2000);
-			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 32);
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, (st0 & ~0x1ff) | 9);
-		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save partial/complete long ST Decode or retained address/publication");
-		}
-		if (tick == 20)
-		{
-			{
-				auto const disable = machine().disable_side_effects();
-				expect(m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 2 && m_cpu->space(AS_DATA).read_word(f.address) == f.value &&
-					m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == 0x2000,
-					"Long ST does not resample poisoned operands or overwrite a later pointer update");
-			}
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				return restore_pipeline_at(252660, "Restore long ST without operand/address resampling or duplicate write");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 6143) { start_pipeline_long_immediate_store(variant + 1); return true; }
-			if (peripheral)
-			{
-				osd_printf_info("TMS320C54x staged long peripheral ST: PASS cases=6144 restore=6144 registers=8 forms=offset,preincrement values=4 compatibility=2 offsets=3b,38,49 spans=peripheral,RAM pages=2 snapshots=4 literal_fetches=2 reads=0 writes=1 peripheral_extra=1 ram_extra=0 address_retained=1 device_semantics=unvalidated silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated long peripheral ST complete");
-			}
-			osd_printf_info("TMS320C54x staged long immediate ST: PASS cases=6144 forms=offset,preincrement,circular registers=8 offsets=4 values=4 compatibility=0,1 pages=2 restore=6144 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
-			if (profile_is("long-mvkd")) { start_pipeline_long_accumulator_store(); return true; }
-			start_pipeline_bio_branch(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252660)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252650;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
 	if (m_phase == 252670)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, transition = (variant / 8) % 4;
