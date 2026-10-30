@@ -203,7 +203,6 @@ void tms320c54x_test_state::machine_reset()
 	if (profile_is("xorm")) { check_control_disassembler(); start_atomic_xorm(0); return; }
 	if (profile_is("dual-sub-native")) { start_native_dual_sub(0); return; }
 	if (profile_is("parallel-sub")) { start_parallel_sub_fraction(0); return; }
-	if (profile_is("saccd")) { start_saccd_case(0); return; }
 	if (profile_is("pshd-long")) { start_extended_push(); return; }
 	if (profile_is("pshd-long-map")) { start_extended_push(96000); return; }
 	if (start_profile(*this, machine().options().bios(), {

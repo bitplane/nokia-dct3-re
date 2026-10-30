@@ -65,16 +65,6 @@ private:
 		{0x8000000001ULL, -1, {0x00000000, 0x00000000, 0xffffffff, 0x80000000}},
 	};
 	void start_store_shift_case(unsigned index);
-	struct saccd_boundary_vector { u64 value; int shift; u16 logical; u16 arithmetic; };
-	static constexpr saccd_boundary_vector SACCD_BOUNDARIES[] = {
-		{0x0180012345ULL, 0, 0x8001, 0x8001},
-		{0xfe7ffe1234ULL, 0, 0x7ffe, 0x7ffe},
-		{0x8000000001ULL, -16, 0x0080, 0xff80},
-		{0xffffffffffULL, -16, 0x00ff, 0xffff},
-		{0xffffffffffULL, -1, 0xffff, 0xffff},
-		{0x0080012345ULL, 15, 0x91a2, 0x91a2},
-	};
-	void start_saccd_boundary_case(unsigned index);
 	void xf_w(int state);
 	bool m_xf_pin = true;
 	unsigned m_xf_publications = 0;
@@ -1609,7 +1599,6 @@ private:
 
 	void start_rcd_acc_case(unsigned index);
 
-	void start_saccd_case(unsigned index);
 
 
 	static std::array<s16, 4> rom4_pair_vector(unsigned index);

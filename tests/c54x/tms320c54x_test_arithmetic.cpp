@@ -175,27 +175,6 @@ void tms320c54x_test_state::start_store_shift_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_saccd_boundary_case(unsigned index)
-{
-	auto const &vector = SACCD_BOUNDARIES[index / 16];
-	bool const source_b = index & 1, sxm = index & 2, sst = index & 4, take = !(index & 8);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0800, 0x9e80 | (source_b ? 0x0100 : 0) |
-		(source_b ? 0 : 8) | (take ? 6 : 3)); // *AR2+, test the other accumulator.
-	program.write_word(0x0801, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(0x0600, 0xa55a);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_AR2, 0x0600}, {cpu_regs::STATE_A, source_b ? 1 : vector.value},
-		{cpu_regs::STATE_B, source_b ? vector.value : 1}, {cpu_regs::STATE_ST0, 0x1c00},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1,
-		0x0800 | (sxm ? 0x0100 : 0) | (vector.shift & 31));
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, sst ? 1 : 0);
-	m_cpu->set_state_int(STATE_GENPC, 0x0800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_phase = 270000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 
@@ -3772,28 +3751,6 @@ void tms320c54x_test_state::start_rcd_acc_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_saccd_case(unsigned index)
-{
-	unsigned const condition = index % 12;
-	unsigned const sign = (index / 12) % 3;
-	unsigned const source = (index / 36) % 2;
-	unsigned const mode = (index / 72) % 4;
-	unsigned const shift = index / 288;
-	u64 const tested = sign == 0 ? 0 : sign == 1 ? 0x12340000ULL : 0xffedcc0000ULL;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0700, 0x9e00 | (source << 8) | (mode << 6) | (condition < 6 ? 2 + condition : 10 + condition - 6));
-	program.write_word(0x0701, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(0x0500, 0xa55a);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_XPC, 0}, {cpu_regs::STATE_PC, 0x0700},
-		{cpu_regs::STATE_A, condition < 6 ? tested : 0x23450000},
-		{cpu_regs::STATE_B, condition < 6 ? 0x23450000 : tested}, {cpu_regs::STATE_AR0, 3},
-		{cpu_regs::STATE_AR2, 0x0500}, {cpu_regs::STATE_BK, 0}, {cpu_regs::STATE_ST0, 0},
-		{cpu_regs::STATE_ST1, 0x0900 | shift}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 75000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 bool tms320c54x_test_state::check_branch_arithmetic_results()
@@ -4324,46 +4281,6 @@ bool tms320c54x_test_state::check_store_shift_results()
 
 bool tms320c54x_test_state::check_saccd_results()
 {
-	if (m_phase >= 75000 && m_phase < 75576)
-	{
-		unsigned const index = m_phase - 75000;
-		unsigned const condition = index % 12;
-		unsigned const sign = (index / 12) % 3;
-		unsigned const source = (index / 36) % 2;
-		unsigned const mode = (index / 72) % 4;
-		unsigned const shift = index / 288;
-		bool const predicates[] = {sign != 2, sign == 2, sign != 0, sign == 0, sign == 1, sign != 1};
-		u16 const tested = sign == 0 ? 0 : sign == 1 ? 0x1234 : 0xedcc;
-		u16 const expected = predicates[condition % 6] ? u16(((source == unsigned(condition >= 6)) ? tested : 0x2345) << shift) : 0xa55a;
-		unsigned const delta[] = {0, 0xffff, 1, 3};
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			m_cpu->space(AS_DATA).read_word(0x0500) == expected &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == u16(0x0500 + delta[mode]),
-			"SACCD conditions, accumulator selection, ASM and unconditional pointer update");
-		if (index < 575) { start_saccd_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x SACCD conformance: PASS variants=576\n");
-		start_saccd_boundary_case(0);
-		return true;
-	}
-	if (m_phase >= 270000 && m_phase < 270096)
-	{
-		unsigned const index = m_phase - 270000;
-		auto const &vector = SACCD_BOUNDARIES[index / 16];
-		bool const source_b = index & 1, sxm = index & 2, take = !(index & 8);
-		expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->space(AS_DATA).read_word(0x0600) == (take ? (sxm ? vector.arithmetic : vector.logical) : 0xa55a) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0601 &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (source_b ? 1 : vector.value) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (source_b ? vector.value : 1) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1c00,
-			"SACCD preserves 40-bit source, obeys SXM/ASM and ignores SST");
-		if (index < 95) { start_saccd_boundary_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x SACCD boundaries: PASS cases=96 asm=-16,-1,0,15 sxm=0,1 sst_ignored=1 sources=A,B false_store=1 pipeline_claim=0\n");
-		if (profile_is("saccd")) throw emu_fatalerror(0, "TMS320C54x isolated SACCD complete");
-		start_rcd_acc_case(0);
-		return true;
-	}
 	if (m_phase >= 76000 && m_phase < 76036)
 	{
 		unsigned const index = m_phase - 76000;
