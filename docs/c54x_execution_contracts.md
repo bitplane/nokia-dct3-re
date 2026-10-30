@@ -788,8 +788,6 @@ Corrected positive load domains are:
 | `scalar_variable_load` | 5,248 | 17 forms; all32 shifts at postincrement AR1, boundary shifts elsewhere. |
 | `paired_indirect_load` | 7,680 | 15 indirect/long forms; short write-only MOD3 omitted; checkpoints distributed. |
 
-Shared scalar arithmetic omits `memory_arithmetic_case` form 5.
-
 The four independent scalar-load sections initialize every AR and keep
 signed/unsigned result semantics, all fixed-load status/address combinations,
 and mapped AR source values through direct, absolute and long-offset reads.
@@ -1742,22 +1740,16 @@ These are CPU-model timing contracts, not measured silicon. Run each with
 `python3 tools/run_c54x_section.py paired_indirect_load` or
 `python3 tools/run_c54x_section.py paired_indirect_store`.
 
-The shared arithmetic/load generator carries BK through its callers rather
-than configuring BK=16 independently of their expected addresses. Short
-indexed circular forms start all ARs at `5007`, so AR0 supplies a signed
+Scalar load sections configure BK consistently with their circular address
+expectations. Short indexed circular forms start all ARs at `5007`, so AR0 supplies a signed
 step of that magnitude even when another AR is selected. Those forms and
 long circular forms use BK=32768, aligned base zero and initial index
 `5007`: both the AR0-derived step and every signed 16-bit literal fit the
-buffer. Unit-step circular forms retain BK=16. The guarded modulo oracle
-computes the indexed pointer update and long circular address only after
-checking this domain. Raw case IDs, signed literals, case counts and
-read/restore assertions are retained; no CPU behavior changes.
-
-This contract applies to the shared ADD/SUB, unsigned and shift-16 arithmetic,
-CMPM/BITF, offset/unsigned/shifted/variable/TS loads, memory multiply/T-load
-and TS arithmetic fixtures. Their initializers use the fixture's BK;
-handwritten register-only aggregates retain their default BK=16. It does
-not establish physical memory-bank placement or instruction timing.
+buffer. Unit-step circular forms retain BK=16. The modulo oracle computes
+the indexed pointer update and long circular address within that domain.
+Independent product/load sections own their explicit address contracts;
+the retired shared scalar descriptor is no longer an execution dependency.
+These fixtures do not establish physical memory-bank placement or timing.
 
 Current acceptance belongs to the independently executed sections and their
 disposition entries, not the retired profile chain. Other legacy users of

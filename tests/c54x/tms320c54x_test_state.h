@@ -64,8 +64,6 @@ private:
 	}
 	void start_pipeline_original_worker_roundtrip(unsigned variant = 0);
 	void start_pipeline_original_context_call(unsigned variant = 0, bool full_body = false);
-	static std::array<u16, 2> addm_inputs(unsigned variant);
-	static std::array<u16, 2> addm_expected(unsigned variant);
 	void start_pipeline_mu4_timer_context(unsigned variant = 0);
 	void start_pipeline_mu4_recurring_timer(unsigned variant = 0);
 	void start_pipeline_idle_sp_tail(unsigned variant = 0);
@@ -85,19 +83,11 @@ private:
 	static u32 repeated_writa_destination(repeated_writa_fixture const &f, unsigned index);
 	void start_repeated_writa(unsigned variant = 0);
 	void start_instruction_observer(unsigned variant = 0);
-	struct memory_arithmetic_fixture
-	{
-		unsigned form, reg, selected, read_cycle;
-		u16 opcode, literal, address, next_ar, memory, st0, st1, result_st0;
-		u64 source, result;
-		u16 bk = 16;
-	};
 	static unsigned circular_fixture_mask(u16 bk);
 	static bool circular_fixture_domain(u16 initial, int step, u16 bk);
 	static u16 circular_fixture_next(u16 initial, int step, u16 bk);
 	void start_pipeline_store_mvmm(unsigned variant = 0);
 	struct indexed_store_fixture;
-	static memory_arithmetic_fixture memory_arithmetic_case(unsigned variant, bool unsigned_memory = false, unsigned shift16_selector = 8);
 	struct extended_banz_fixture
 	{
 		unsigned form, reg, selected;
