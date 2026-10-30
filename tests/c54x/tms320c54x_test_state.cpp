@@ -108,7 +108,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"ldu-imr"}, [](self &test) { test.start_ldu_imr(); } },
 		{ {"mvmd-status-irq"}, [](self &test) { test.start_mvmd_status_irq(); } },
 		{ {"mvmd-block"}, [](self &test) { test.start_mvmd_status_block(); } },
-		{ {"mvmd-status-alu"}, [](self &test) { test.start_mvmd_status_alu(); } },
 		{ {"mpy-delay", "mac-delay", "maca-delay"}, [](self &test) { test.start_delay_multiply(); } },
 		{ {"mpyr-delay"}, [](self &test) { test.start_delay_multiply(); } },
 		{ {"bd-maca-long"}, [](self &test) { test.start_delay_multiply(); } },

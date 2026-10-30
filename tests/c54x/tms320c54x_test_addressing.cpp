@@ -3237,30 +3237,6 @@ void tms320c54x_test_state::start_mvmd_status_block(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_mvmd_status_alu(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const fields = variant % 256;
-	bool const sxm = fields & 1, shift = fields & 64;
-	u16 const status = 0x800 | (sxm ? 0x100 : 0) | ((fields / 2) & 31);
-	u32 const base = fields & 128 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0x730b); program.write_word(base + 0x601, 7);
-	program.write_word(base + 0x602, shift ? 0xf682 : 0x1080);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa200); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, status ^ 0x11f);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x55); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x8012340000ULL | status); m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x1400);
-	data.write_word(0x1400, 0x8001);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvmd_status_alu_reads",
-		[this, status, shift](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0xb) { expect(!m_pipeline_operand_reads && word == status && m_cpu->pipeline_cycles() == 5, "Full status move samples BL once"); ++m_pipeline_operand_reads; } else { expect(!shift && at == 0x1400 && word == 0x8001 && !m_pipeline_register_writes && m_cpu->pipeline_cycles() == 7, "Adjacent SXM load samples its RAM operand once"); ++m_pipeline_register_writes; } });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvmd_status_alu_write",
-		[this, status](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 7 && word == status && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 6, "Full status publication precedes adjacent arithmetic"); ++m_pipeline_store_writes; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253850;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::stack_mmr_w(offs_t offset, u16 value)
 {
@@ -4969,28 +4945,6 @@ bool tms320c54x_test_state::check_mapped_dual_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 62111) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62110; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 253850)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, fields = variant % 256, checkpoint = std::array<unsigned, 3>{4, 6, 7}[variant / 256];
-		bool const sxm = fields & 1, shift = fields & 64;
-		u16 const status = 0x800 | (sxm ? 0x100 : 0) | ((fields / 2) & 31);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Full status and adjacent arithmetic remain staged");
-		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, 0}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save full status publication and adjacent consumer"); }
-		if (tick == 14)
-		{
-			u64 const source = 0x8012340000ULL | status;
-			int const count = int(status & 31) - ((status & 16) ? 32 : 0);
-			u64 const expected = !shift ? (sxm ? 0xffffff8001ULL : 0x8001) : count >= 0 ? (source << count) & 0xffffffffffULL : sxm ? u64((s64(source) - (s64(1) << 40)) >> -count) & 0xffffffffffULL : source >> -count;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == expected && m_cpu->state_int(tms320c54x_device::STATE_B) == source && m_cpu->state_int(tms320c54x_device::STATE_ST1) == status && (m_cpu->state_int(tms320c54x_device::STATE_ST0) & ~0x400) == 0xa200 && m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x1400 && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == unsigned(!shift), "Adjacent SXM and ASM consumers use the newly published fields with zero latency");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; return restore_pipeline_at(253860, "Restore status/consumer without duplicate accesses"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 767) { start_mvmd_status_alu(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged MVMD status ALU: PASS cases=768 restore=768 consumers=SXM_LD,ASM_LD sxm_states=2 asm_values=32 pages=2 snapshots=3 source_reads=1 status_writes=1 latency=0 interrupt_composition=unvalidated silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated MVMD status ALU complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253860) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253850; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 

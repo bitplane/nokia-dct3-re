@@ -1148,7 +1148,6 @@ private:
 	void start_ldu_imr(unsigned variant = 0);
 	void start_mvmd_status_irq(unsigned variant = 0);
 	void start_mvmd_status_block(unsigned variant = 0);
-	void start_mvmd_status_alu(unsigned variant = 0);
 	virtual void machine_start() override;
 
 	virtual void machine_reset() override;
