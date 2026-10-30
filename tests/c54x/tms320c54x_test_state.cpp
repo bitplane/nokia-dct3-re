@@ -80,7 +80,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"rptb-single"}, [](self &test) { test.start_block_single(); } },
 		{ {"rptb-memory"}, [](self &test) { test.start_block_single(); } },
 		{ {"rptb-fcall", "rptb-fcalld"}, [](self &test) { test.start_block_far_call(); } },
-		{ {"rptb-back"}, [](self &test) { test.start_block_back(); } },
 		{ {"load-delay", "add-delay", "dld-delay"}, [](self &test) { test.start_delay_load(); } },
 		{ {"st-dagen"}, [](self &test) { test.start_constant_dagen(); } },
 		{ {"shift-delay"}, [](self &test) { test.start_delay_load(); } },
@@ -440,7 +439,6 @@ void tms320c54x_test_state::test(machine_config &config)
 			auto const f = rptbd_shift_store_case(m_pipeline_peripheral_case);
 			expect(f.irq && line == (f.irq == 2 || f.irq == 4 ? INPUT_LINE_NMI : 2) && !m_rptbd_counts.acks++ && m_rptbd_counts.delay_writes == 1 && m_cpu->pipeline_cycles() >= 9, "RPTBD shifted-store interrupt is acknowledged only after its complete delay publication"); m_cpu->set_input_line(line, CLEAR_LINE);
 		}
-		if (m_phase == 255240) { auto const f = block_back_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks && m_pipeline_store_writes, "Backward block acknowledges its pending source once after the first copy"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 255200) { auto const f = block_far_call_case(m_pipeline_peripheral_case, profile_is("rptb-fcalld")); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks && m_pipeline_operand_reads, "In-block far call acknowledges the actual pending source once after callee entry"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 62150) { auto const f = block_near_call_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks && m_pipeline_operand_reads, "In-block near call acknowledges its actual pending interrupt once"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 62154) { auto const f = memory_copy_repeat_case(m_pipeline_peripheral_case); expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0, "Memory-count repeat defers its actual pending interrupt until all copies complete"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }

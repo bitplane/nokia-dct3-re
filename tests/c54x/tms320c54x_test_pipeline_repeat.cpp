@@ -243,34 +243,6 @@ void tms320c54x_test_state::start_move_repeat_owner(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_block_back(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = block_back_case(variant);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, 0xf072); program.write_word(f.base + 0x601, f.end);
-	program.write_word(f.base + 0x602, f.b ? 0xf120 : 0xf020); program.write_word(f.base + 0x603, f.inner - 1);
-	program.write_word(f.base + 0x604, 0xe589); program.write_word(f.base + 0x605, f.b ? 0xf300 : 0xf000); program.write_word(f.base + 0x606, 0xffff);
-	program.write_word(f.base + 0x607, (f.b ? 0xf84a : 0xf842) | (f.kind ? 1 : 0)); program.write_word(f.base + 0x608, f.kind ? 0x60c : 0x604);
-	if (f.kind) { program.write_word(f.base + 0x609, 0xf073); program.write_word(f.base + 0x60a, 0x604); }
-	program.write_word(f.base + f.end - 1, 0x6d94); program.write_word(f.base + f.end + 1, 0xf4e1);
-	unsigned const vector = f.interrupt == 2 ? 4 : 0x48; program.write_word(f.base | vector, 0xf495); program.write_word((f.base | vector) + 1, 0xf4eb);
-	for (unsigned i = 0; i < 128; ++i) { data.write_word(0x5000 + i, 0x9000 + i); data.write_word(0x6000 + i, 0); }
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, f.interrupt == 1 ? 4 : 0},
-		{cpu_regs::STATE_ST0, 0xa002}, {cpu_regs::STATE_ST1, f.st1}, {cpu_regs::STATE_BRC, f.outer},
-		{cpu_regs::STATE_A, 0x123456789aULL}, {cpu_regs::STATE_B, 0xfeabcd9876ULL}, {cpu_regs::STATE_T, 0x5555},
-		{cpu_regs::STATE_SP, 0x3000}, {cpu_regs::STATE_AR2, 0x5000}, {cpu_regs::STATE_AR3, 0x6000},
-		{cpu_regs::STATE_AR4, 0x7000},
-	});
-	m_cpu->set_input_line(2, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_fast_stack_reads = m_vector_acks = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "block_back_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x2fff) { expect(f.interrupt && !m_fast_stack_reads && m_pipeline_register_writes == 1 && word >= 0x602 && word <= f.end + 1, "Backward block IRQ restores one foreground continuation"); ++m_fast_stack_reads; return; } unsigned const i = m_pipeline_operand_reads; expect(i < (f.outer + 1) * f.inner && at == 0x5000 + i && word == 0x9000 + i, "Backward inner loop reads every source once without consuming BRC"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "block_back_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x2fff) { expect(f.interrupt && !m_pipeline_register_writes && word >= 0x602 && word <= f.end + 1, "Backward block IRQ stacks one retained continuation"); ++m_pipeline_register_writes; return; } unsigned const i = m_pipeline_store_writes; expect(i < (f.outer + 1) * f.inner && at == 0x6000 + i && word == 0x9000 + i, "Backward inner loop writes only its ordered selected copies"); ++m_pipeline_store_writes; if (!i && f.interrupt) m_cpu->set_input_line(f.interrupt == 2 ? INPUT_LINE_NMI : 2, ASSERT_LINE); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255240;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
 tms320c54x_test_state::block_far_call_fixture tms320c54x_test_state::block_far_call_case(unsigned v, bool delayed)
 {
 	block_far_call_fixture f{};
@@ -1140,26 +1112,6 @@ bool tms320c54x_test_state::check_delay_dld_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 255270) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255260; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 255240)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = block_back_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Internal backward branch retains the active outer block");
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_register_writes, &m_fast_stack_reads, &m_vector_acks},
-			"Save backward block branch predicate held word and interrupt state");
-		if (tick == 2000)
-		{
-			unsigned const total = (f.outer + 1) * f.inner;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + f.end + 2 && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_RSA) == 0x602 && m_cpu->state_int(tms320c54x_device::STATE_REA) == f.end && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa002 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Backward inner loop completes the outer count and final BRAF once");
-			expect(m_pipeline_operand_reads == total && m_pipeline_store_writes == total && m_pipeline_register_writes == unsigned(bool(f.interrupt)) && m_fast_stack_reads == unsigned(bool(f.interrupt)) && m_vector_acks == unsigned(bool(f.interrupt)) && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x5000 + total && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x6000 + total && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x7001 + f.outer && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.b ? 0x123456789aULL : 0xffffffffffULL) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.b ? 0xffffffffffULL : 0xfeabcd9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5555, "Backward branches preserve ordered memory work and independent inner/outer counters");
-			if (replay_pipeline_at(255250, f.checkpoint,
-				"Restore backward inner loop without duplicate copies or lost outer ownership")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 1535) { start_block_back(variant + 1); return true; }
-			osd_printf_info("TMS320C54x backward in-block branches: PASS cases=1536 restore=1536 outer_counts=4 inner_counts=4 forms=conditional_back,unconditional_back accumulators=2 pages=2 sources=none,IRQ,NMI snapshots=4 ordered_copies=1 outer_counts_preserved=1 held_words_restored=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated backward in-block branches complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255250) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255240; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 255200)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;

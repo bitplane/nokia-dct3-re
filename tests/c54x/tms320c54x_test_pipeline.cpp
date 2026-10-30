@@ -63,23 +63,4 @@ tms320c54x_test_state::delay_load_fixture tms320c54x_test_state::delay_add_case(
 	return f;
 }
 
-tms320c54x_test_state::block_back_fixture tms320c54x_test_state::block_back_case(unsigned v)
-{
-	block_back_fixture f{};
-	f.outer = std::array<unsigned, 4>{0, 1, 2, 7}[v % 4]; f.inner = std::array<unsigned, 4>{1, 2, 4, 8}[(v / 4) % 4];
-	f.kind = (v / 16) % 2; f.b = (v / 32) % 2; f.base = (v / 64) % 2 ? 0x20000 : 0; f.interrupt = (v / 128) % 3;
-	f.checkpoint = std::array<unsigned, 4>{9, 12, 15, 19}[v / 384]; f.end = f.kind ? 0x60d : 0x60a; f.st1 = f.interrupt ? 0x100 : 0x900;
-	return f;
-}
-
-
-
-
-
-
-
-
-
-
-
 } // namespace c54x_test

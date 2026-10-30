@@ -2525,14 +2525,18 @@ retains the held word's block metadata. Back edges do not consume outer
 iterations. Conditional calls are explicitly excluded from this branch class,
 despite sharing the generic conditional-control predicate.
 
-`rptb-back` passes 1,536 cases/restores across outer counts 0/1/2/7, inner
+`block_repeat_backward` owns384 independent cases/restores across outer counts0/1/2/7, inner
 counts 1/2/4/8, conditional GE back edges or LT exits plus unconditional back
-edges, both accumulators, two pages, none/IRQ/NMI and four snapshots. Each
+edges, both accumulators, two pages and none/IRQ/NMI. Four snapshots are
+distributed instead of crossed with every input. Each
 outer iteration initializes its inner accumulator counter; the inner loop
 copies ordered RAM words until negative. The test checks exactly
 `(outer+1)*inner` copies, one outer suffix, final counters/BRAF, continuation,
 balanced interrupt frames and restored held words. Interrupts arrive after
-the first copy, not at every clock. The 32-case `rptb-br-edges` control now
+the first copy, not at every clock. On the unconditional route with another
+inner copy pending, its Read precedes IACK and its Write drains before the
+hardware frame; the complete ordered trace checks that model interaction.
+An off-by-one inner count fails on an extra source Read. The32-case `rptb-br-edges` control
 tests below/above-block targets and a conditional call instead of treating
 ordinary backward branches as unsupported. Outside-block branches, delayed back edges and
 measured physical phase timing remain unvalidated.

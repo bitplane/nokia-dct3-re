@@ -234,15 +234,6 @@ private:
 	static delay_load_fixture delay_dld_case(unsigned v);
 	static delay_load_fixture delay_add_case(unsigned v);
 	void start_delay_load(unsigned variant = 0);
-	struct block_back_fixture
-	{
-		unsigned outer, inner, kind, interrupt, checkpoint;
-		bool b;
-		u32 base;
-		u16 end, st1;
-	};
-	static block_back_fixture block_back_case(unsigned v);
-	void start_block_back(unsigned variant = 0);
 	struct block_far_call_fixture
 	{
 		unsigned count, layout, depth, interrupt, checkpoint, delay_form;
