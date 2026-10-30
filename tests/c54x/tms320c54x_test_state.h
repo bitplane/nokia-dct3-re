@@ -154,18 +154,6 @@ private:
 	};
 	static circular_portr_block_fixture circular_portr_block_case(unsigned v);
 	void start_circular_portr_block(unsigned variant = 0);
-	struct accumulator_store_fixture
-	{
-		unsigned reg, selected, kind, selector;
-		u16 opcode, literal, address, next_ar, st0, st1, pmst, value;
-		u64 source;
-		u16 initial = 0x1007, bk = 16;
-	};
-	static accumulator_store_fixture long_accumulator_store_fixture(unsigned variant);
-	static std::array<u16, 2> long_rmw_expected(unsigned arithmetic, unsigned operation, u16 flags);
-	static accumulator_store_fixture peripheral_long_rmw_fixture(unsigned variant);
-	static accumulator_store_fixture absolute_xorm_fixture(unsigned variant);
-	void start_pipeline_long_rmw(unsigned variant = 0);
 	static memory_arithmetic_fixture memory_arithmetic_case(unsigned variant, bool unsigned_memory = false, unsigned shift16_selector = 8);
 	static memory_arithmetic_fixture offset_load_case(unsigned variant);
 	static memory_arithmetic_fixture unsigned_load_case(unsigned variant);
@@ -1020,7 +1008,6 @@ private:
 	bool check_accumulator_shift_results();
 	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
-	bool check_absolute_xorm_results();
 	bool check_staged_load_results();
 	bool check_immediate_arithmetic_results();
 	bool check_memory_repeat_results();
@@ -1116,8 +1103,6 @@ private:
 	unsigned m_pipeline_store_case = 0;
 	unsigned m_pipeline_store_writes = 0;
 	unsigned m_pipeline_indirect_case = 0;
-	ordered_case_digest m_long_rmw_coverage;
-	unsigned m_long_rmw_replays = 0;
 	ordered_case_digest m_register_bank_coverage;
 	unsigned m_register_bank_replays = 0;
 	ordered_case_digest m_shifted_coverage;

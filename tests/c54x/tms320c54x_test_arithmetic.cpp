@@ -4,7 +4,6 @@
 #include "emu.h"
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_memory_immediate_schedule.h"
-#include "tms320c54x_test_rmw_schedule.h"
 #include "tms320c54x_test_shifted_schedule.h"
 #include "tms320c54x_test_register_schedule.h"
 
@@ -179,49 +178,10 @@ void tms320c54x_test_state::start_pipeline_long_pair(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::accumulator_store_fixture tms320c54x_test_state::long_accumulator_store_fixture(unsigned variant)
-{
-	unsigned const form = variant % 25, kind = form == 24 ? 3 : form / 8, reg = form == 24 ? 0 : form % 8;
-	unsigned const selector = (variant / 100) % 4, flags = (variant / 400) % 4;
-	bool const compatibility = (variant / 6400) % 2;
-	s16 const offset = std::array<s16, 4>{0, 1, -1, s16(0xf495)}[(variant / 25) % 4];
-	u64 const source = std::array<u64, 4>{0x12345678, 0x0180000000ULL, 0xff7fffffffULL, 0xffffffffffULL}[(variant / 1600) % 4];
-	u16 const initial = kind == 2 ? 0x4007 : 0x1007, bk = kind == 2 ? 8192 : 16;
-	u16 const address = kind == 3 ? u16(0x1500 + offset) : kind == 2 ? circular_fixture_next(initial, offset, bk) : u16(initial + offset);
-	u32 result = u32(source);
-	if (flags & 1)
-	{
-		if (!(flags & 2)) { if (source > 0xffffffffULL) result = 0xffffffff; }
-		else
-		{
-			s64 const signed_source = source & (1ULL << 39) ? s64(source) - (1LL << 40) : s64(source);
-			if (signed_source < -0x80000000LL) result = 0x80000000;
-			else if (signed_source > 0x7fffffffLL) result = 0x7fffffff;
-		}
-	}
-	return {reg, compatibility && !reg ? 3U : reg, kind, selector,
-		u16(0x8000 | (selector << 8) | (kind == 3 ? 0xf8 : 0xe0 | (kind << 3) | reg)),
-		u16(kind == 3 ? address : u16(offset)), address, u16(kind && kind != 3 ? address : initial),
-		u16(compatibility ? 0x6608 : 0x608), u16(0x800 | ((flags & 2) ? 0x100 : 0) | (compatibility ? 0x20 : 0)),
-		u16(flags & 1), u16(result >> ((selector & 2) ? 16 : 0)), source, initial, bk};
-}
 
 
 
-std::array<u16, 2> tms320c54x_test_state::long_rmw_expected(unsigned arithmetic, unsigned operation, u16 flags)
-{
-	auto const input = addm_inputs(arithmetic);
-	if (operation) return {u16(operation == 1 ? input[0] & input[1] : operation == 2 ? input[0] | input[1] : input[0] ^ input[1]), flags};
-	auto const sum = addm_expected(arithmetic);
-	return {sum[0], u16((flags & ~0x0c00) | (sum[1] & 0x0c00))};
-}
 
-tms320c54x_test_state::accumulator_store_fixture tms320c54x_test_state::absolute_xorm_fixture(unsigned variant)
-{
-	auto f = long_accumulator_store_fixture(24 + 25 * (variant % 4) + (((variant / 256) % 2) ? 6400 : 0));
-	f.reg = (variant / 512) % 2 ? 6 : 0;
-	return f;
-}
 
 tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::memory_arithmetic_case(unsigned variant, bool unsigned_memory, unsigned shift16_selector)
 {
@@ -1586,95 +1546,6 @@ bool tms320c54x_test_state::check_accumulator_shift_results()
 }
 
 
-bool tms320c54x_test_state::check_absolute_xorm_results()
-{
-	if (m_phase == 252890)
-	{
-		bool const peripheral = profile_is("rmw-long-periph");
-		bool const xorm = profile_is("xorm-absolute");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, operation = xorm ? 3 : variant % 3, arithmetic = (variant / (xorm ? 4 : peripheral ? 576 : 300)) % 64;
-		bool const compatibility = (variant / (peripheral ? 288 : 19200)) % 2;
-		auto const f = xorm ? absolute_xorm_fixture(variant) : peripheral ? peripheral_long_rmw_fixture(variant) : long_accumulator_store_fixture((variant / 3) % 100 + (compatibility ? 6400 : 0));
-		u16 const initial_st0 = (f.st0 & ~0x0400) | (BIT(arithmetic, 2) << 10) | 0x0800;
-		u16 const modified_st0 = compatibility && f.reg && f.kind != 3 ? (initial_st0 & 0x1fff) | (f.reg << 13) : initial_st0;
-		auto const expected = long_rmw_expected(arithmetic, operation, modified_st0);
-		unsigned const checkpoint = xorm ? std::array<unsigned, 4>{4, 6, 7, 8}[variant / 1024] : peripheral ? peripheral_rmw_schedule::checkpoints[peripheral_rmw_schedule::checkpoint_index(variant)] : long_rmw_schedule::checkpoints[long_rmw_schedule::checkpoint_index(variant)];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Long-offset RMW has three-word staged ownership");
-		if (tick == 5)
-		{
-			auto const disable = machine().disable_side_effects();
-			u32 const base = (peripheral ? bool((variant / 36864) % 2) : f.reg == 6) ? 0x20000 : 0;
-			m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead); m_cpu->space(AS_PROGRAM).write_word(base + 0x602, 0xdead);
-		}
-		if (tick == 6)
-		{
-			for (unsigned ar = 0; ar < 8; ++ar)
-				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (ar == f.selected ? f.next_ar : peripheral ? 0x5555 : 0x1007),
-					"Long RMW modifies only its selected source pointer once at address capture");
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, xorm ? f.address : 0x2222);
-		}
-		if (tick == (f.address >= 0x20 && f.address < 0x60 ? 8 : 7))
-		{
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0x4444);
-		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save long RMW during Decode, address capture, sampled Read or publication");
-		}
-		if (tick == 20)
-		{
-			{
-				auto const disable = machine().disable_side_effects();
-				expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 2 &&
-					m_cpu->space(AS_DATA).read_word(f.address) == expected[0] && m_cpu->state_int(tms320c54x_device::STATE_ST0) == expected[1] &&
-					m_cpu->state_int(tms320c54x_device::STATE_ST1) == (f.st1 | (BIT(arithmetic, 0) << 8) | (BIT(arithmetic, 1) << 9)) &&
-					m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == (xorm ? f.address : 0x2222) &&
-					m_cpu->state_int(tms320c54x_device::STATE_A) == (xorm ? (u64(BIT(arithmetic, 0) ? s64(s16(expected[0])) : s64(expected[0])) & 0xffffffffffULL) : 0x123456789aULL) && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL,
-					"Long RMW preserves accumulators, operation-specific status and the captured source despite later pointer/RAM changes");
-			}
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore long RMW without duplicate reads, writes or pointer updates");
-				if (!xorm) ++m_long_rmw_replays;
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252900; m_check_timer->enable(true); return true;
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (!xorm) m_long_rmw_coverage.add(peripheral ? peripheral_rmw_schedule::case_key(variant) : long_rmw_schedule::case_key(variant));
-			unsigned const limit = xorm ? 4096 : peripheral ? peripheral_rmw_schedule::unique_cases : long_rmw_schedule::unique_cases;
-			if (variant + 1 < limit) { start_pipeline_long_rmw(variant + 1); return true; }
-			if (xorm)
-			{
-				osd_printf_info("TMS320C54x staged absolute XORM: PASS cases=4096 restore=4096 addresses=4 value_status_pairs=64 compatibility=2 pages=2 snapshots=4 reads=1 writes=1 literal_fetches=2 flags_preserved=1 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated absolute XORM complete");
-			}
-			if (peripheral)
-			{
-				expect(m_long_rmw_coverage.count == limit && m_long_rmw_replays == limit,
-					"Every scheduled peripheral RMW case executes and replays exactly once");
-				osd_printf_info("TMS320C54x staged long peripheral RMW: PASS cases=%u restore=%u operations=ADDM,ANDM,ORM registers=8 forms=offset,preincrement offsets=3b,39,49 spans=peripheral,RAM value_pairs=8 status_states=8 compatibility=2 pages=2 snapshots=5 reads=1 writes=1 literal_fetches=2 peripheral_extra=1 ram_extra=0 double_charge=0 device_semantics=unvalidated silicon_phase_claim=0 checkpoint_policy=balanced coverage_fnv64=%016llx\n",
-					m_long_rmw_coverage.count, m_long_rmw_replays, (unsigned long long)m_long_rmw_coverage.value);
-				throw emu_fatalerror(0, "TMS320C54x isolated long peripheral RMW complete");
-			}
-			expect(m_long_rmw_coverage.count == limit && m_long_rmw_replays == limit,
-				"Every scheduled long RMW case executes and replays exactly once");
-			osd_printf_info("TMS320C54x staged long RMW: PASS cases=%u operations=ADDM,ANDM,ORM forms=25 offsets=4 value_pairs=8 status_states=8 compatibility=2 restore=%u duplicate_reads=0 duplicate_writes=0 snapshots=4 checkpoint_policy=balanced coverage_fnv64=%016llx\n",
-				m_long_rmw_coverage.count, m_long_rmw_replays,
-				(unsigned long long)m_long_rmw_coverage.value);
-			if (profile_is("rmw-long")) throw emu_fatalerror(3, "TMS320C54x isolated long RAM RMW complete");
-			return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252900)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252890;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 
 bool tms320c54x_test_state::check_immediate_arithmetic_results()

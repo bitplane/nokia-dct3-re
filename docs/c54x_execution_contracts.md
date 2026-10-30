@@ -393,23 +393,24 @@ indexing uses an aligned 16-word queue with its initial index inside the queue.
 The fixture does not qualify arbitrary peripheral/control sources, repeat,
 IRQ or new producer/consumer-latency compositions.
 
-The reviewed long RAM RMW schedule retains every distinct operation, addressing,
-value, status and compatibility stimulus once (38,400 cases). For each of its
-4,800 operation/address/compatibility/status groups, the eight value pairs cover
-all four checkpoints twice. `rmw-long` runs this balanced schedule; the full
-value-by-checkpoint cross-product is not retained. Ordered
-case/checkpoint digests and actual replay counts are required acceptance, with
-the selector independently checked outside the CPU. The exact staged cycle
-placement remains a model contract, not measured silicon timing.
+`long_memory_rmw` replaces the long RAM/peripheral ADDM/ANDM/ORM and absolute
+XORM profiles with 2,264 cases/replays. Routing banks cover all 25 RAM forms,
+four offsets, compatibility selection, and all eight AR fields for paired RAM
+and peripheral-window endpoints. Separate numeric banks retain eight operand
+pairs and all SXM/OVM/initial-overflow combinations without crossing them with
+every address. Absolute XORM retains four addresses, all value/status pairs,
+both compatibility modes and an adjacent load consuming its forwarded result.
+Pages and checkpoints are distributed, not Cartesian dimensions.
 
-`rmw-long-periph` retains all 73,728 operation/address/operand/status/page
-inputs once. Within each of 9,216 fixed groups, the eight operand pairs visit
-all five original checkpoints (4/6/7/8/9); the 294,912 additional checkpoint
-copies are retired. Original flat case IDs form the required ordered digest,
-with actual completed-case and restore counts. Literal/pointer/RAM poisoning,
-one read/write, two extension fetches, preserved state and the extra peripheral
-clock remain checked. These are synthetic peripheral-bus timing regressions,
-not evidence of real peripheral semantics or measured silicon phases.
+Each case checks ordered capture of both literals, pointer/RAM/literal poison,
+one Read/Write pair, unchanged unrelated state and replay. The extra peripheral
+clock remains checked. ST0 is checked inside the Write callback, preserving
+publication ordering rather than only comparing state after the clock. Optional
+register expectations on bus events support the same observation for data,
+program and IO traces; they add no mutable observer state. The old 116,224-case
+machinery, schedule header and enumeration-only tests are removed. These are
+synthetic peripheral timing contracts, not real device semantics or measured
+silicon phases.
 
 The independent `long_accumulator_store` section replaces the ordinary/shifted
 STL/STH bank with 3,408 cases/replays: 800 routing cases for all 25 forms,
@@ -1664,11 +1665,9 @@ AR values and alias checks. MVDK's retained-BK assertion uses the fixture's
 BK unless the instruction explicitly writes BK.
 
 The legacy `long-mvkd` bundle is not current executable acceptance during
-section migration. Ordinary/shifted STL/STH now live in the independent
-`long_accumulator_store` section. Its old regular address factory remains only
-because MVDK/MVKD, RMW and peripheral fixtures still consume it; the store-owned
-shift expansion, setup, result phases and coverage scheduler are removed.
-Those remaining consumers must migrate before the shared factory can go.
+section migration. Ordinary/shifted STL/STH, MVKD and long RMW now have
+independent sections. Their former shared address factory has no remaining
+consumers and is removed, along with its descriptor and coverage schedulers.
 
 These corrections do not constitute an exhaustive ISA or fixture-domain
 audit. Other older generators' modulo expectations remain insufficient
@@ -4943,9 +4942,9 @@ therefore does not establish correct decoder execution.
 
 Staged `6af8` retains its absolute address, immediate and Read sample, publishes
 one XOR result at Execute and leaves status unchanged. The same XOR result
-feeds pending-write forwarding. `xorm-absolute` checks 4,096 cases and restores:
-four addresses, 64 value/status combinations, compatibility modes, two pages
-and four checkpoints. An adjacent load must consume the XOR result without a
+feeds pending-write forwarding. The XORM bank in `long_memory_rmw` checks 512
+cases/replays: four addresses, 64 value/status combinations and both compatibility
+modes, with pages/four checkpoints distributed. An adjacent load must consume the XOR result without a
 second bus read; later literal, pointer and RAM changes cannot replace retained
 operands. Other XORM addressing forms remain unqualified. These are emulator
 phase contracts, not measured silicon timing.

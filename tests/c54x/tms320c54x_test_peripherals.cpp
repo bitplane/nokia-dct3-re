@@ -356,16 +356,6 @@ void tms320c54x_test_state::start_circular_portr_block(unsigned variant)
 }
 
 
-tms320c54x_test_state::accumulator_store_fixture tms320c54x_test_state::peripheral_long_rmw_fixture(unsigned variant)
-{
-	unsigned const reg = (variant / 3) % 8, kind = (variant / 24) % 2;
-	bool const compatibility = (variant / 288) % 2, ram = (variant / 144) % 2;
-	auto f = long_accumulator_store_fixture(reg + (compatibility ? 6400 : 0));
-	f.kind = kind; f.opcode = 0x80e0 | (kind << 3) | reg;
-	f.literal = std::array<u16, 3>{0x3b, 0x39, 0x49}[(variant / 48) % 3];
-	f.address = (ram ? 0x1400 : 0) + f.literal; f.next_ar = kind ? f.address : ram ? 0x1400 : 0;
-	return f;
-}
 
 
 void tms320c54x_test_state::start_pll_transition_case()

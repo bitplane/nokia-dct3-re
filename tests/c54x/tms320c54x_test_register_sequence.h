@@ -130,6 +130,17 @@ private:
 		if (!value) throw emu_fatalerror("C54x register sequence case=%u tick=%u replay=%u: %s", m_case, m_tick, unsigned(m_replay), message);
 	}
 	void schedule() { m_timer.adjust(attotime::from_ticks(1, m_cpu.clock())); }
+	bool accept_bus_event(std::vector<clocked_data_event> const &events, unsigned &cursor, clocked_data_event actual)
+	{
+		unsigned const index = cursor;
+		if (!accept_data_event(events,cursor,actual)) return false;
+		auto const disable = m_machine.disable_side_effects();
+		for (auto const &reg : events[index].registers)
+			if ((m_cpu.state_int(reg.index) & reg.mask) != (reg.value & reg.mask))
+				throw emu_fatalerror("C54x bus-state case=%u event=%u clock=%u register=%d actual=%llx expected=%llx",m_case,index,
+					actual.cycle,reg.index,(unsigned long long)m_cpu.state_int(reg.index),(unsigned long long)reg.value);
+		return true;
+	}
 	void begin()
 	{
 		m_observing_outputs = false;
@@ -157,7 +168,7 @@ private:
 			require(m_input.observed_data_space != AS_IO, "one IO observation policy");
 			auto access = [this](bool write,offs_t at,u16 value) {
 				if (m_machine.side_effects_disabled()) return;
-				require(accept_data_event(*m_input.io_events,m_io_cursor,{write,u32(at),value,unsigned(m_cpu.pipeline_cycles())}), "ordered IO transaction");
+				require(accept_bus_event(*m_input.io_events,m_io_cursor,{write,u32(at),value,unsigned(m_cpu.pipeline_cycles())}), "ordered IO transaction");
 			};
 			m_io_tap = m_cpu.space(AS_IO).install_readwrite_tap(0,0xffff,"register_sequence_io",
 				[access](offs_t at,u16 &value,u16) { access(false,at,value); },
@@ -177,7 +188,7 @@ private:
 					require(m_last_data_total && m_cpu.total_cycles() - *m_last_data_total == *expected->cycles_from_previous, "relative data-bus clock interval");
 				if (expected && expected->cycles_from_first)
 					require(m_first_data_total && m_cpu.total_cycles() - *m_first_data_total == *expected->cycles_from_first, "first-to-current data-bus clock interval");
-				if (!accept_data_event(*m_input.data_events, m_data_cursor,
+				if (!accept_bus_event(*m_input.data_events, m_data_cursor,
 					{write, u32(at), word, unsigned(m_cpu.pipeline_cycles())}))
 					throw emu_fatalerror("C54x case=%u event=%u write=%u address=%x value=%x clock=%llu",
 						m_case, m_data_cursor, unsigned(write), unsigned(at), word, (unsigned long long)m_cpu.pipeline_cycles());
@@ -213,7 +224,7 @@ private:
 					if (m_machine.side_effects_disabled()) return;
 					bool selected = write && writes;
 					if (!write) for (auto const &event : m_input.program_events) selected |= event.address == at;
-					if (selected && !accept_data_event(m_input.program_events,m_program_cursor,
+					if (selected && !accept_bus_event(m_input.program_events,m_program_cursor,
 						{write,u32(at),word,unsigned(m_cpu.pipeline_cycles())}))
 						throw emu_fatalerror("C54x program case=%u event=%u write=%u address=%x value=%x clock=%llu",m_case,m_program_cursor,unsigned(write),
 							unsigned(at),word,(unsigned long long)m_cpu.pipeline_cycles());

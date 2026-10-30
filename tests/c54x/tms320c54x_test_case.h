@@ -54,6 +54,7 @@ struct clocked_data_event
 	std::optional<int> raise_input{};
 	std::optional<unsigned> cycles_from_previous{}; // CPU clocks between selected bus events, including atomic execution.
 	std::optional<unsigned> cycles_from_first{};
+	std::vector<register_check> registers{}; // State visible inside the selected bus callback.
 };
 struct clocked_irq_expectation
 {
