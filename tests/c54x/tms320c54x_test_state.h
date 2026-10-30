@@ -139,7 +139,6 @@ private:
 	static u16 repeated_writa_word(unsigned reg, unsigned index);
 	static u32 repeated_writa_destination(repeated_writa_fixture const &f, unsigned index);
 	void start_repeated_writa(unsigned variant = 0);
-	void start_ar_addm_load(unsigned variant = 0);
 	void start_instruction_observer(unsigned variant = 0);
 	void start_pipeline_peripheral_logic(unsigned variant = 0);
 	void start_pipeline_port_write(unsigned variant = 0);

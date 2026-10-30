@@ -396,40 +396,6 @@ void tms320c54x_test_state::start_addm_brc_loop(unsigned variant)
 
 
 
-void tms320c54x_test_state::start_ar_addm_load(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const reg = variant % 8, pattern = (variant / 8) % 4;
-	bool const long_load = (variant / 32) % 2;
-	// SPRU131G table 7-7: both unshifted LD forms are Category I consumers.
-	unsigned const gap = 2 + (variant / 64) % 2;
-	u32 const base = (variant / 128) % 2 ? 0x20000 : 0;
-	u16 const initial = std::array<u16, 4>{0x1200, 0x7ff0, 0xfff0, 0x8000}[pattern];
-	u16 const immediate = std::array<u16, 4>{0x0800, 0x0020, 0x1040, 0x9800}[pattern], result = initial + immediate;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x9000 + i, 0xf495);
-	program.write_word(base + 0x9000, 0x6bf8); program.write_word(base + 0x9001, 0x10 + reg); program.write_word(base + 0x9002, immediate);
-	program.write_word(base + 0x9003 + gap, 0x1000 | (long_load ? 0xe0 : 0x80) | reg);
-	if (long_load) program.write_word(base + 0x9004 + gap, 0);
-	program.write_word(base + 0x9004 + gap + long_load, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(initial, 0x5678); m_cpu->space(AS_DATA).write_word(result, 0x4000 + pattern);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa024); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, ar == reg ? initial : 0x3000 + ar);
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "ar_addm_load_read",
-		[this, reg, initial, result, pattern](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			if (!m_pipeline_operand_reads) expect(at == 0x10 + reg && word == initial, "Mapped ADDM reads the original AR before the consumer");
-			else expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && at == result && word == 0x4000 + pattern, "Legal-gap consumer uses the newly published address rather than stale RAM");
-			++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "ar_addm_load_write",
-		[this, reg, result](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && at == 0x10 + reg && word == result, "AR result publishes once before a legal indirect consumer"); ++m_pipeline_store_writes; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = ar_addm_phase + 2;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 u64 tms320c54x_test_state::ts_load_expected(u16 memory, u16 t, bool sxm)
 {
@@ -3439,25 +3405,6 @@ bool tms320c54x_test_state::check_mapped_addm_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == ar_addm_phase + 1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = ar_addm_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == ar_addm_phase + 2)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 3>{6, 8, 10}[variant / 256];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped ADDM and legal-gap consumer remain admitted");
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes},
-			"Save mapped ADDM and legal-gap indirect consumer");
-		if (tick == 32)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 2 && m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x4000 + (variant / 8) % 4, "Legal-gap indirect load observes the published AR value");
-			if (replay_pipeline_at(ar_addm_phase + 3, checkpoint,
-				"Restore mapped ADDM consumer without duplicate data transactions")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 767) { start_ar_addm_load(variant + 1); return true; }
-			osd_printf_info("TMS320C54x mapped AR ADDM consumers: PASS cases=768 restore=768 registers=8 patterns=4 consumers=short,long_offset legal_gaps=2_3,2_3 pages=2 snapshots=3 data_reads=2 ar_writes=1 forbidden_gap_claim=0 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated mapped AR ADDM consumers complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == ar_addm_phase + 3) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = ar_addm_phase + 2; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 

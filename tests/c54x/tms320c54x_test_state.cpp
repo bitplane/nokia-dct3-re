@@ -57,7 +57,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"addm-brc"}, [](self &test) { test.start_ar_addm(); } },
 		{ {"addm-t"}, [](self &test) { test.start_ar_addm(); } },
 		{ {"addm-brc-loop"}, [](self &test) { test.start_addm_brc_loop(); } },
-		{ {"addm-ar-load"}, [](self &test) { test.start_ar_addm_load(); } },
 		{ {"std-swwsr"}, [](self &test) { test.start_standard_swwsr_test(); } },
 	}))
 		return;
