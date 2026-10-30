@@ -2336,72 +2336,8 @@ void tms320c54x_test_state::start_xmem_store(unsigned variant)
 
 
 
-bool tms320c54x_test_state::standard_reada_brc() const
-{ return profile_is("reada-brc16"); }
 
-tms320c54x_test_state::reada_brc_fixture tms320c54x_test_state::reada_brc_case(unsigned v) const
-{
-	reada_brc_fixture f{};
-	f.form = v % 6; v /= 6; f.reg = v % 8; v /= 8; unsigned const pattern = v % 4; v /= 4;
-	f.logical = (v % 2 ? 0x20000 : 0) | 0x400; v /= 2; f.overlay = v % 2; v /= 2;
-	f.gap = 1 + v % 3; v /= 3; f.loop = v % 2; v /= 2;
-	f.checkpoint = std::array<unsigned, 4>{6, 9, 11, 16}[v];
-	f.value = (f.loop ? std::array<u16, 4>{0, 1, 2, 7} : std::array<u16, 4>{0, 1, 0x8000, 0xffff})[pattern];
-	f.physical = standard_reada_brc() || f.overlay ? f.logical & 0xffff : f.logical;
-	f.mode = f.form == 0 ? 0x1a : f.form == 1 ? 0x0a : f.form == 2 ? 0xf8 : (f.form == 3 ? 0x80 : f.form == 4 ? 0x90 : 0x88) | f.reg;
-	f.st1 = f.form == 1 ? 0x4800 : 0x800;
-	f.body_reg = (f.reg + 1) % 8; f.words = f.form == 2 ? 2 : 1; f.read = 8 + f.words; f.write = f.read + 1;
-	return f;
-}
 
-void tms320c54x_test_state::start_reada_brc(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = reada_brc_case(variant); m_cpu->set_extended_program(!standard_reada_brc());
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 40; ++i) program.write_word(0x600 + i, 0xf495);
-	program.write_word(0x600, 0x7e00 | f.mode); if (f.form == 2) program.write_word(0x601, 0x1a);
-	if (f.loop)
-	{
-		unsigned const setup = 0x600 + f.words + f.gap;
-		program.write_word(setup, 0xf072); program.write_word(setup + 1, setup + 3);
-		program.write_word(setup + 2, 0x7690 | f.body_reg); program.write_word(setup + 3, 0x2222); program.write_word(setup + 4, 0xf4e1);
-	}
-	else program.write_word(0x600 + f.words + 6, 0xf4e1);
-	program.write_word(f.physical, f.value); program.write_word(0x480, f.value ^ 0xffff); program.write_word(0x30480, f.value ^ 0xffff);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.overlay ? 0x20 : 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1200000000ULL | f.logical); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, f.form == 1 ? 0x10 : 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 0x55aa);
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, i == f.body_reg ? 0x1400 : f.form >= 3 && i == f.reg ? 0x1a : 0x1500 + i);
-	m_pipeline_operand_reads = m_pipeline_register_writes = m_pipeline_store_writes = m_pipeline_extensions_reads = m_fast_stack_reads = 0;
-	m_pipeline_operand_tap = program.install_read_tap(f.physical, f.physical, "reada_brc_source", [this, f](offs_t, u16 &value, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(!m_pipeline_operand_reads && value == f.value && m_cpu->pipeline_cycles() == f.read, "READA BRC reads the retained physical program source once"); ++m_pipeline_operand_reads;
-	});
-	m_pipeline_fetch_tap = program.install_read_tap(0x601, 0x601, "reada_brc_extension", [this, f](offs_t, u16 &value, u16) {
-		if (machine().side_effects_disabled() || f.form != 2) return;
-		expect(!m_pipeline_extensions_reads && value == 0x1a, "Absolute READA BRC owns one retained destination extension"); ++m_pipeline_extensions_reads;
-	});
-	m_vector_prefetch_tap = data.install_read_tap(0, 0xffff, "reada_brc_no_data_reads", [this](offs_t, u16 &, u16) {
-		if (!machine().side_effects_disabled()) { ++m_fast_stack_reads; expect(false, "READA BRC and its immediate-store loop perform no data reads"); }
-	});
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "reada_brc_writes", [this, f](offs_t address, u16 &value, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (address == 0x1a)
-		{
-			expect(!m_pipeline_register_writes && value == f.value && m_pipeline_operand_reads == 1 && m_cpu->pipeline_cycles() == f.write, "READA publishes BRC once in Execute using the retained word");
-			++m_pipeline_register_writes; return;
-		}
-		unsigned const i = m_pipeline_store_writes++;
-		expect(f.loop && i <= f.value && address == 0x1400 + i && value == 0x2222 && m_pipeline_register_writes == 1, "Spaced RPTB consumes the new READA count, not the stale BRC seed");
-	});
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62066;
-	m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -5150,39 +5086,6 @@ bool tms320c54x_test_state::check_xmem_load_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_reada_brc_results()
-{
-	if (m_phase == 62066)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = reada_brc_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Inactive BRC accepts the owned READA transfer");
-		if (tick == 5 && f.form == 2) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(0x601, 0x1b); }
-		if (tick == 7) m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x3400030480ULL);
-		if (tick == f.read) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.physical, f.value ^ 0xffff); }
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_register_writes, &m_pipeline_store_writes, &m_pipeline_extensions_reads, &m_fast_stack_reads},
-			"Save READA BRC through PAR capture, program hold, publication and following loop");
-		if (tick == 96)
-		{
-			unsigned const writes = f.loop ? f.value + 1 : 0;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_register_writes == 1 && m_pipeline_store_writes == writes &&
-				m_pipeline_extensions_reads == unsigned(f.form == 2) && !m_fast_stack_reads && m_cpu->state_int(tms320c54x_device::STATE_BRC) == (f.loop ? 0 : f.value), "READA count publication and spaced loop have exact once-only effects");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x3400030480ULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfeabcd9876ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == (f.form == 1 ? 0x10 : 0x3000), "READA BRC preserves accumulators, status and compiler-mode SP");
-			for (unsigned i = 0; i < 8; ++i)
-				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (i == f.body_reg ? 0x1400 + writes : f.form >= 3 && i == f.reg ? 0x1a + (f.form == 4 ? 1 : f.form == 5 ? -1 : 0) : 0x1500 + i), "READA applies only its owned pointer update and the subsequent loop's updates");
-			if (replay_pipeline_at(62067, f.checkpoint,
-				"Restore READA BRC without retargeting PAR, rereading poisoned source or duplicating count writes")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 18431) { start_reada_brc(variant + 1); return true; }
-			osd_printf_info("TMS320C54x READA BRC: PASS cases=18432 restore=18432 forms=DP,SP,absolute,plain,postinc,postdec registers=8 standalone_values=0,1,8000,ffff loop_counts=0,1,2,7 gaps=1,2,3 source_pages=2 ovly=2 snapshots=4 address_bits=%u program_reads=1 brc_writes=1 data_reads=0 retained_par=1 retained_word=1 source_poison=1 silicon_phase_claim=0\n", standard_reada_brc() ? 16 : 23);
-			throw emu_fatalerror(0, "TMS320C54x isolated READA BRC complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62067) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62066; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 
 } // namespace c54x_test

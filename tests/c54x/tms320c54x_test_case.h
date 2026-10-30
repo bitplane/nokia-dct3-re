@@ -81,6 +81,7 @@ struct clocked_register_case
 	std::vector<clocked_irq_expectation> irqs{};
 	bool pipeline_frontend = true;
 	std::vector<register_setting> initial_input_lines{};
+	bool extended_program = true;
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

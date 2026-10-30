@@ -106,6 +106,7 @@ private:
 		require(m_input.checkpoint && m_input.checkpoint < m_input.finish, "checkpoint precedes completion");
 		m_label = std::string(m_input.states.front().observation.id) + "/" + std::to_string(m_input.identity.value_or(m_case));
 		for (auto &state : m_input.states) state.observation.id = m_label.c_str();
+		m_cpu.set_extended_program(m_input.extended_program);
 		prepare_case(m_cpu, m_input.states.front().observation);
 		m_fetches = m_data_cursor = m_program_cursor = 0;
 		require(!(m_input.forbid_data_access && m_input.data_events), "one data-bus observation policy");

@@ -67,7 +67,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"rptb-exit", "rptb-exit-delay"}, [](self &test) { test.start_block_exit(); } },
 	}))
 		return;
-	if (profile_is("reada-brc") || standard_reada_brc()) { start_reada_brc(); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"st1-rules"}, [](self &test) { test.check_st1_memory_rules(); } },
 		{ {"stlm-st1"}, [](self &test) { test.start_stlm_status(); } },

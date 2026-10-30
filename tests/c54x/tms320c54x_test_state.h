@@ -842,16 +842,6 @@ private:
 	static u16 xmem_store_expected(unsigned variant);
 	void start_xmem_store(unsigned variant = 0);
 	void start_staged_bus_stm(unsigned variant = 0);
-	struct reada_brc_fixture
-	{
-		unsigned form, reg, body_reg, gap, words, read, write, checkpoint;
-		u32 logical, physical;
-		u16 value, mode, st1;
-		bool overlay, loop;
-	};
-	bool standard_reada_brc() const;
-	reada_brc_fixture reada_brc_case(unsigned v) const;
-	void start_reada_brc(unsigned variant = 0);
 	void start_delayed_far_call(unsigned variant = 0);
 	struct mac_smem_fixture
 	{
@@ -1333,7 +1323,6 @@ private:
 	bool check_portr_bypass_results();
 	bool check_sqdst_results();
 	bool check_xmem_load_results();
-	bool check_reada_brc_results();
 	bool check_block_exit_results();
 	bool check_staged_bus_stm_results();
 	bool check_rom4_fr_decoder_results();
