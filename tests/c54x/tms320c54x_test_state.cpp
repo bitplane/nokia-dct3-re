@@ -116,7 +116,6 @@ void tms320c54x_test_state::machine_reset()
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"mvdk-mapped", "mvdk-acc", "clock-mvdk"}, [](self &test) { test.start_mvdk_mapped(); } },
 		{ {"mvdk-producer", "mvdk-acc-prod"}, [](self &test) { test.start_mvdk_producer(); } },
-		{ {"mvdd-periph"}, [](self &test) { test.start_mvdd_peripheral(); } },
 		{ {"mvdd-source", "mvdd-source-rpt"}, [](self &test) { test.start_mvdd_source(); } },
 		{ {"alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus"}, [](self &test) { test.start_mapped_dual(); } },
 		{ {"popd-mapped", "popd-repeat"}, [](self &test) { test.start_popd_mapped(); } },

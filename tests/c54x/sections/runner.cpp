@@ -75,6 +75,23 @@ protected:
 		m_cases = c54x_test::section_cases();
 		m_fixture = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 			m_cases.size(), [this](unsigned i) { return m_cases.at(i); });
+#ifdef C54X_SECTION_OBSERVE_MVDD
+		m_fixture->set_data_observer([this](bool write,u32 at,u16) {
+			auto const &input=m_cases.at(m_fixture->count());
+			auto const &instruction=input.states.front().observation.program.front();
+			u32 pc=0; u16 opcode=0,source=0;
+			bool valid=write ? m_cpu->observe_staged_mvdd_write(at,pc,opcode,source) : m_cpu->observe_staged_data_read(at,pc,opcode);
+			if (!valid || pc!=instruction.address || opcode!=instruction.value || (write && source!=input.data_events->front().address))
+				throw emu_fatalerror("Section MVDD observer loses logical instruction or source identity");
+			if (write && m_cpu->observe_staged_data_read(input.data_events->front().address,pc,opcode))
+				throw emu_fatalerror("Section MVDD read identity outlives its Read");
+			if (write ? m_cpu->observe_staged_mvdd_write(at^1,pc,opcode,source) : m_cpu->observe_staged_data_read(at^1,pc,opcode))
+				throw emu_fatalerror("Section MVDD observer accepts wrong bus address");
+			auto const disable=machine().disable_side_effects();
+			if (write ? m_cpu->observe_staged_mvdd_write(at,pc,opcode,source) : m_cpu->observe_staged_data_read(at,pc,opcode))
+				throw emu_fatalerror("Section MVDD observer accepts debugger peek");
+		});
+#endif
 #ifdef C54X_SECTION_OBSERVE_STORE
 		m_fixture->set_data_observer([this](bool write, u32 at, u16 value) {
 			if (!write) return;

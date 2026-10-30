@@ -447,6 +447,15 @@ product is deliberately retired. Numeric expectations, extension poisoning,
 post-read mutation and publication checks are unchanged. Ordered input/stage
 digests and actual restore counts protect the retained schedules.
 
+`peripheral_mvdd` owns 192 cases/replays across three peripheral destinations,
+four words and all sixteen dual modifiers. Pages/four checkpoints are
+distributed instead of 1,536 executions. Exact Read5/Write7, Access pointer
+updates, later pointer/source poison and retained flags/accumulators/SP are
+checked. Inside bus callbacks, Read and MVDD Write observers must report the
+logical instruction/opcode and original source, reject wrong addresses and
+debugger peeks, and expire Read identity before Write. No repeat/IRQ or
+physical timing claim is added. Legacy setup/result/declarations are removed.
+
 `timer_irq_mask` retains the staged short-period timer reload followed by four
 NOPs, direct IMR masking and a foreground marker. The timer generates a real
 IRQ3, PSHM XPC/FRETE balances SP, the mask completes and the marker is written

@@ -684,7 +684,6 @@ private:
 	};
 	static mvdd_source_fixture mvdd_source_case(unsigned variant, bool repeated);
 	void start_mvdd_source(unsigned variant = 0);
-	void start_mvdd_peripheral(unsigned variant = 0);
 	struct mvdk_mapped_fixture
 	{
 		u16 source, destination, value;
@@ -908,7 +907,6 @@ private:
 	bool check_circular_portr_results();
 	bool check_poly_results();
 	bool check_popd_mapped_results();
-	bool check_mvdd_peripheral_results();
 	bool check_block_branch_count_results();
 	bool check_bd_long_accumulator_results();
 	bool check_block_xc_results();
