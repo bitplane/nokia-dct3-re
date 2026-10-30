@@ -224,6 +224,7 @@ def main():
     counts['extended_push'] = 2416
     counts['long_immediate_store'] = 1536
     counts['imr_store'] = 2304
+    counts['atomic_absolute_literals'] = 30
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

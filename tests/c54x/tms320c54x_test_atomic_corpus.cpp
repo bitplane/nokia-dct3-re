@@ -2272,14 +2272,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_port_writes = 0;
 			return resume_atomic_at(0x05e0, 386);
 		}
-		return begin_atomic_case(absolute_operand_examples()[0], 387);
 	}
-	if (m_phase >= 387 && m_phase <= 401)
+	if (m_phase == 401)
 	{
-		auto const &cases = absolute_operand_examples();
-		unsigned const index = m_phase - 387;
-		verify_atomic_case(cases[index]);
-		if (m_phase < 401) return begin_atomic_case(cases[index + 1], m_phase + 1);
 		write_words(program, {
 			{0x05e3, 0xf842}, // BC 05f0,AGEQ
 			{0x05e4, 0x05f0},
@@ -2304,14 +2299,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff00000000ULL);
 			return resume_atomic_at(0x05e0, 403);
 		}
-		return begin_atomic_case(absolute_operand_examples()[15], 404);
 	}
-	if (m_phase >= 404 && m_phase <= 406)
+	if (m_phase == 406)
 	{
-		auto const &cases = absolute_operand_examples();
-		unsigned const index = m_phase - 404 + 15;
-		verify_atomic_case(cases[index]);
-		if (m_phase < 406) return begin_atomic_case(cases[index + 1], m_phase + 1);
 		write_words(program, {
 			{0x05e3, 0xf945}, // CC 05f0,AEQ
 			{0x05e4, 0x05f0},
@@ -2374,14 +2364,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(410);
 		}
-		return begin_atomic_case(absolute_operand_examples()[18], 411);
 	}
-	if (m_phase >= 411 && m_phase <= 422)
+	if (m_phase == 422)
 	{
-		auto const &cases = absolute_operand_examples();
-		unsigned const index = m_phase - 411 + 18;
-		verify_atomic_case(cases[index]);
-		if (m_phase < 422) return begin_atomic_case(cases[index + 1], m_phase + 1);
 		write_words(program, {
 			{0x05e3, 0xff4d}, // XC 2,BEQ
 			{0x05e4, 0xe801}, // LD #1,A
