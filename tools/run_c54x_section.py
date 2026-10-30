@@ -115,6 +115,7 @@ def main():
     counts['mapped_addm'] = 1728
     counts['mapped_repeat_dependency'] = 32
     counts['multiword_decode'] = 5
+    counts['logical_immediate'] = 480
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

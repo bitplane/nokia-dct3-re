@@ -95,7 +95,6 @@ private:
 	{
 		if (profile_is("rom4-context")) m_context_coverage.add((bank << 8) | raw);
 	}
-	void start_pipeline_logical_immediate(unsigned variant = 0);
 	void start_xc_return(unsigned variant = 0);
 	void start_pipeline_original_worker_roundtrip(unsigned variant = 0);
 	void start_pipeline_original_context_call(unsigned variant = 0, bool full_body = false);
@@ -1650,7 +1649,6 @@ private:
 	bool check_pipeline_frontend_results();
 	bool check_peripheral_mmr_timing_audit_results();
 	bool check_pipeline_immediate_store_results();
-	bool check_pipeline_logical_immediate_results();
 	bool check_addm_expected_results();
 	bool check_pipeline_memory_logic_results();
 	bool check_pipeline_idle_results();
