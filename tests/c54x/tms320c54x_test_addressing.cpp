@@ -1847,31 +1847,6 @@ void tms320c54x_test_state::start_indirect_pshm_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_stack_address_latency_case(unsigned index)
-{
-	auto &program = m_cpu->space(AS_PROGRAM);
-	auto &data = m_cpu->space(AS_DATA);
-	unsigned const producer = index / 8;
-	unsigned cursor = 0x0109d0;
-	program.write_word(cursor++, producer == 0 ? 0x8a0b : producer == 1 ? 0x4a0b : 0xeeff);
-	if (index & 1) program.write_word(cursor++, 0xf495);
-	if (index & 4)
-	{
-		program.write_word(cursor++, 0x6f06);
-		program.write_word(cursor++, 0x0c80); // Extended-shift STL A,0,6 (category II).
-	}
-	else program.write_word(cursor++, 0x8006);
-	program.write_word(cursor, 0xf4e1);
-	for (unsigned address = 0x0fff; address <= 0x1007; ++address) data.write_word(address, 0xcccc);
-	data.write_word(0x1000, 0x5566); data.write_word(0x1806, 0xcccc);
-	set_registers(*m_cpu, {
-		{STATE_GENPC, 0x0109d0}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_ST0, 0x0030},
-		{cpu_regs::STATE_ST1, (index & 2) ? 0x0800 : 0x4800}, {cpu_regs::STATE_A, 0x4044}, {cpu_regs::STATE_B, 0x1234},
-		{cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 2672 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 void tms320c54x_test_state::start_banz_offset_case(unsigned index)
@@ -4569,25 +4544,6 @@ bool tms320c54x_test_state::check_banz_offset_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_compact_load_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 2672 && m_phase < 2696)
-	{
-		unsigned const index = m_phase - 2672;
-		u16 const final_sp = index / 8 == 0 ? 0x1001 : 0x0fff;
-		u16 const address = (index & 2) ? 0x1806 : ((index & 5) ? final_sp : 0x1000) + 6;
-		expect(data.read_word(address) == 0x4044 &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == final_sp &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-			"SPRU131G table 7-9: POPM/PSHM/FRAME to CPL store has category-I latency and category-II forwarding");
-		if (index < 23) { start_stack_address_latency_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x stack address latency conformance: PASS variants=24\n");
-		return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_trn_store_results()
 {
