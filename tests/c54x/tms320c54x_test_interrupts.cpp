@@ -65,69 +65,6 @@ u16 tms320c54x_test_state::repeat_irq_r(offs_t offset)
 }
 
 
-bool tms320c54x_test_state::check_idle_pll_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 79700 && m_phase <= 79705)
-	{
-		if (m_phase == 79700)
-		{
-			expect(data.read_word(0x58) == 0x77ff, "PLL locks before software-managed idle transition");
-			data.write_word(0x58, 0x77fc);
-			m_phase = 79701; m_check_timer->adjust(attotime::from_usec(1)); return true;
-		}
-		if (m_phase == 79701)
-		{
-			expect(data.read_word(0x58) == 0x77fc, "DIV source with PLL power held before IDLE3");
-			auto &program = m_cpu->space(AS_PROGRAM);
-			program.write_word(0x0b80, 0xf5e1); program.write_word(0x0b81, 0xf4e1);
-			set_registers(*m_cpu, {
-				{STATE_GENPC, 0x0b80}, {cpu_regs::STATE_ST1, 0x0800}, {cpu_regs::STATE_IMR, 1},
-				{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IDLE, 0},
-			});
-			m_cpu->resume(SUSPEND_REASON_DISABLE);
-			m_phase = 79702; m_check_timer->adjust(attotime::from_usec(10)); return true;
-		}
-		if (m_phase == 79702)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == 0x0b81,
-				"original IDLE3 instruction stops before continuation");
-			m_cpu->set_input_line(0, ASSERT_LINE);
-			m_phase = 79703; m_check_timer->adjust(attotime::from_usec(10)); return true;
-		}
-		if (m_phase == 79703)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == 0x0b82,
-				"enabled IRQ wakes IDLE3 to masked-interrupt continuation in DIV mode");
-			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-			m_cpu->set_input_line(0, CLEAR_LINE);
-			data.write_word(0x58, 0x77ff);
-			m_phase = 79704; m_check_timer->adjust(attotime::from_usec(1)); return true;
-		}
-		if (m_phase == 79704)
-		{
-			expect(data.read_word(0x58) == 0x77fe && m_cpu->clock() == 5'997'600,
-				"IDLE3 invalidates retained PLL lock: software re-entry cannot skip the lock count");
-			m_phase = 79705; m_check_timer->adjust(attotime::from_usec(340)); return true;
-		}
-		expect(data.read_word(0x58) == 0x77ff && m_cpu->clock() == 95'961'600,
-			"software-managed PLL re-entry completes its new lock delay after IDLE3");
-		m_cpu->set_follow_clkmd(false); m_cpu->set_pll_reference_clock(0);
-		m_cpu->set_unscaled_clock(13'000'000);
-		m_cpu->resume(SUSPEND_REASON_DISABLE);
-		osd_printf_info("TMS320C54x IDLE3 PLL relock: PASS div_wake=1 power_held=1 lock_invalidated=1 software_reentry=1 automatic_pll_wake_claim=0\n");
-		return true;
-	}
-	return false;
-}
-
-
-
-
-
-
-
 bool tms320c54x_test_state::check_repeat_mvdp_irq_results()
 {
 	if (m_phase == 259960)

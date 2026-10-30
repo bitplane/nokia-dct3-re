@@ -29,8 +29,11 @@ public:
 	void test(machine_config &c)
 	{
 		TMS320C54X(c, m_cpu, 13'000'000);
-#if defined(C54X_SECTION_PLL_TRANSITIONS) || defined(C54X_SECTION_CLOCK_RATES)
+#if defined(C54X_SECTION_PLL_TRANSITIONS) || defined(C54X_SECTION_CLOCK_RATES) || defined(C54X_SECTION_IDLE3_PLL)
 		m_cpu->set_pll_reference_clock(13'000'000);
+#endif
+#ifdef C54X_SECTION_IDLE3_PLL
+		m_cpu->set_follow_clkmd(true); m_cpu->set_reset_clkmd(0x77ff);
 #endif
 #ifdef C54X_SECTION_CLOCK_RATES
 		m_cpu->set_follow_clkmd(true); m_cpu->set_reset_clkmd(0);
@@ -378,6 +381,13 @@ private:
 #endif
 	TIMER_CALLBACK_MEMBER(tick)
 	{
+#ifdef C54X_SECTION_IDLE3_PLL
+		unsigned const pll_now=m_fixture->tick_count();
+		if ((pll_now==128 || pll_now==480 || pll_now==640) && m_cpu->clock()!=6'500'000)
+			throw emu_fatalerror("IDLE3 wake and pending software relock must stay on DIV");
+		if (pll_now==65880 && m_cpu->clock()!=104'000'000)
+			throw emu_fatalerror("Software relock must publish x8 only after the new lock delay");
+#endif
 #ifdef C54X_SECTION_CLOCK_RATES
 		check_clock_rates();
 #endif

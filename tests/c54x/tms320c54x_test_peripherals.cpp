@@ -6,14 +6,6 @@
 
 namespace c54x_test {
 
-void tms320c54x_test_state::start_idle3_pll_relock_case()
-{
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->space(AS_DATA).write_word(0x58, 0x77ff);
-	m_phase = 79700;
-	m_check_timer->adjust(attotime::from_usec(341));
-}
-
 void tms320c54x_test_state::check_mmr_bus()
 {
 	auto &data = m_cpu->space(AS_DATA);

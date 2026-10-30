@@ -235,6 +235,14 @@ An explicit reset restores DIV/CLKMD0. A fixed fixture observation clock keeps
 the timeline independent of CPU rate changes. The outer pending-lock checkpoint
 replays the complete composition; these configured rates are not board evidence.
 
+`idle3_pll` starts from an explicit prelocked reset profile, exits to DIV while
+keeping PLL power, and executes a real IDLE3 instruction. An enabled external
+request under INTM resumes the untouched continuation in DIV. Software PLL
+re-entry must now pay the full lock count, rather than use the warm-lock shortcut;
+only then may it publish x8. A checkpoint inside that pending relock restores
+both the sleeping continuation and DIV clock before replaying the delay. This
+does not claim automatic PLL wake, physical restart latency or handset timing.
+
 The independent `status_bitfield` section owns ST0/ST1 BITF sampling: 128
 register/pattern/mask/initial-TC/addressing combinations, with pages and three
 checkpoint positions distributed rather than multiplied into 768 executions.

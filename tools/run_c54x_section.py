@@ -415,6 +415,7 @@ def main():
     counts['staged_idle'] = 28
     counts['pll_transitions'] = 1
     counts['clock_rates'] = 1
+    counts['idle3_pll'] = 1
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216

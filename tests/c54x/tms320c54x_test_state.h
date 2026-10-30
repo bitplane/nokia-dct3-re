@@ -196,7 +196,6 @@ private:
 	void start_block_xc(unsigned variant = 0);
 	void start_move_repeat_owner(unsigned variant = 0);
 	void start_long_mapped_original(unsigned variant = 0);
-	void start_idle3_pll_relock_case();
 	void check_mmr_bus();
 
 
@@ -708,7 +707,6 @@ private:
 		m_check_timer->enable(true);
 		return true;
 	}
-	bool check_idle_pll_results();
 	bool check_repeat_endpoints_results();
 	bool check_instruction_observer_results();
 	bool check_block_page_results();
