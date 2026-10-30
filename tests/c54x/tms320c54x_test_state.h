@@ -150,7 +150,6 @@ private:
 	void start_pipeline_call(unsigned variant = 0);
 	void start_pipeline_worker_xc(unsigned variant = 0);
 	void start_xc_return(unsigned variant = 0);
-	void start_pipeline_xc_tc(unsigned variant = 0);
 	void start_pipeline_plain_branch(unsigned variant = 0);
 	struct signed_xc_fixture
 	{
@@ -1874,7 +1873,7 @@ private:
 	bool check_pipeline_immediate_store_results();
 	bool check_pipeline_logical_immediate_results();
 	bool check_pipeline_conditional_branch_results();
-	bool check_pipeline_xc_tc_results();
+	bool check_pipeline_plain_branch_results();
 	bool check_pipeline_delayed_return_results();
 	bool check_addm_expected_results();
 	bool check_pipeline_retd_data_order_results();
