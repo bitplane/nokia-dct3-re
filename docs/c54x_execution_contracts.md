@@ -2354,6 +2354,22 @@ Access proves retirement and restoration do not reapply the update; no data
 read, data write or extension fetch occurs. Adjacent AR0/CMPT producer latency
 and physical phase timing are not established by this fixture.
 
+`accumulator_branch_targets` owns BACC/FBACC target capture in 324 cases/replays:
+both accumulators, three caller and upper-target pages, IRQ/NMI or DLD/READA
+producers with gaps 0/1/2. The branch allocates no call frame; an interrupt
+stacks only the selected target PC. Complete producer transactions, target
+fetch/refetch counts, target execution, source poisoning and flushed sequential
+TRN writes are checked. Four checkpoints are distributed instead of multiplied
+into the old 1,296 executions. Observed pipeline clocks are model contracts,
+not silicon timing measurements; phase-specific fixture/ACK routing is removed.
+
+The firmware-only `nibble_composition` retains the relocated 23-word helper as
+64 input/index/SXM combinations with distributed pages and independent nibble
+selection expectations. It checks the original selected input/count bus ranges,
+both count writes, IDLE, restored SP/AR1 and replay. It does not establish a
+complete call-frame bus trace. No ROM image is needed; this composition remains
+separate from generic CPU forwarding tests. The old 128-case profile is removed.
+
 Immediate MAC (`f067/f167/f267/f367`, SPRU172C syntax 3) retains its literal
 and Read-owned signed T operand through the existing Class-2 path. Execute
 adds the signed product to the selected 40-bit source accumulator. FRCT shifts

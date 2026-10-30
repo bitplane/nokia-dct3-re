@@ -62,7 +62,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_poly_results()) return;
 	if (check_delayed_far_call_results()) return;
 	if (check_popd_mapped_results()) return;
-	if (check_accumulator_branch_results()) return;
 	if (check_mvdd_peripheral_results()) return;
 	if (check_memory_immediate_results()) return;
 	if (check_block_branch_count_results()) return;
@@ -70,7 +69,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_block_xc_results()) return;
 	if (check_block_xc_irq_results()) return;
 	if (check_move_repeat_owner_results()) return;
-	if (check_nibble_input_results()) return;
 	if (check_software_intr_results()) return;
 	if (check_block_branch_edge_results()) return;
 	if (check_delay_dld_results()) return;

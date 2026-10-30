@@ -386,8 +386,6 @@ private:
 	static block_xc_fixture block_xc_case(unsigned v);
 	void start_block_xc(unsigned variant = 0);
 	void start_move_repeat_owner(unsigned variant = 0);
-	static u16 nibble_input(unsigned variant);
-	void start_original_nibble(unsigned variant = 0);
 	void start_software_intr(unsigned variant = 0);
 	void start_long_mapped_original(unsigned variant = 0);
 	struct dst_bypass_fixture
@@ -445,19 +443,6 @@ private:
 	static popd_fixture popd_case(unsigned v, bool repeated);
 	void start_popd_mapped(unsigned variant = 0);
 	void start_popd_edges(unsigned variant = 0);
-	struct accumulator_branch_fixture
-	{
-		bool near, b;
-		unsigned producer, irq, prefix, wait, snapshot;
-		u32 base, destination, table;
-		u16 hint, st0, st1;
-		u64 initial, other;
-		unsigned sample() const { return 5 + prefix + wait; }
-		u16 opcode() const { return (near ? 0xf4e2 : 0xf4e6) | (b ? 0x100 : 0); }
-		u16 marker() const { return b ? u16(other) : 0xbeef; }
-	};
-	accumulator_branch_fixture accumulator_branch_case(unsigned v);
-	void start_accumulator_branch(unsigned variant = 0);
 	struct delay_load_fixture
 	{
 		unsigned kind, form, ar, selected, destination, flags, read, checkpoint;
@@ -1075,7 +1060,6 @@ private:
 	bool check_poly_results();
 	bool check_delayed_far_call_results();
 	bool check_popd_mapped_results();
-	bool check_accumulator_branch_results();
 	bool check_mvdd_peripheral_results();
 	bool check_memory_immediate_results();
 	bool check_block_branch_count_results();
@@ -1083,7 +1067,6 @@ private:
 	bool check_block_xc_results();
 	bool check_block_xc_irq_results();
 	bool check_move_repeat_owner_results();
-	bool check_nibble_input_results();
 	bool check_software_intr_results();
 	bool check_block_branch_edge_results();
 	bool check_delay_dld_results();
@@ -1231,8 +1214,6 @@ private:
 	u16 m_last_port_value = 0;
 	// Immutable case inputs remain unchanged across each manual replay.
 	popd_fixture m_popd_fixture = {};
-	accumulator_branch_fixture m_acc_branch_fixture = {};
-	unsigned m_acc_branch_mapped_writes = 0;
 	u32 m_popd_write_mask = 0;
 	// Separate checkpoint lifetimes; host observations still rewind explicitly.
 	std::stringstream m_idle_nmi_saved, m_idle_timer_saved, m_idle_dma_saved;
