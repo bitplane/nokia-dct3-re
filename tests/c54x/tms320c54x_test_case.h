@@ -111,6 +111,7 @@ struct clocked_register_case
 	unsigned observation_subticks = 1; // Two samples per CPU clock avoid timer-edge observation ties.
 	bool forbid_program_writes = false;
 	bool reset_cpu_before_case = false; // Explicit cold-start contracts, not implicit predecessor cleanup.
+	std::vector<memory_word> volatile_data_reads{}; // Synthetic endpoints toggle after each side-effecting read.
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

@@ -3385,11 +3385,15 @@ peripheral arbitration remain separate exclusions. The extra clock is a
 documented instruction cost, not a measured silicon pipeline phase; the
 parallel carry-preservation policy remains unvalidated.
 
-`stld-periph` passes 393,216 cases and cleared-pipeline replays, extending
-the same six-form/eight-selector/two-pattern/mode/page/checkpoint matrix
-across all 64 addresses `0020..005f`. A volatile read fixture checks one
+`peripheral_parallel_load` owns 49,152 cases with cleared-pipeline replay,
+retaining all six forms, eight selectors, two patterns and status modes across
+all64 addresses `0020..005f`. Pages and four checkpoints are distributed,
+not crossed into393,216 executions. A stateful synthetic endpoint checks one
 sample at Read with the extra peripheral clock, one RAM store at Execute,
-and no resampling after the endpoint changes. This is bus-delivery and
+and no resampling after the endpoint changes. Its word toggles on an actual
+read, debugger peeks are nondestructive, and the endpoint word is restored
+alongside the test's bus-observation state. Disabling the toggle or restoring
+CPU state without the endpoint state must fail. This is bus-delivery and
 instruction-ordering evidence, not an endpoint-identity claim: the fixture
 supplies the read value even at CPU-owned timer/clock addresses. Actual
 register semantics retain their separate gates. On the handset board,

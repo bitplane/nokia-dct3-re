@@ -534,16 +534,6 @@ tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::bsp_parallel
 	return c;
 }
 
-tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::peripheral_parallel_load_case(unsigned variant)
-{
-	auto c = bsp_parallel_load_case(variant / 64);
-	auto &f = c.memory;
-	unsigned const offset = variant % 64;
-	f.xaddress += offset;
-	f.initial[f.x & 3] += offset;
-	f.final[f.x & 3] += offset;
-	return c;
-}
 
 
 

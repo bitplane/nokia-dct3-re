@@ -66,6 +66,7 @@ public:
 			m_saved_bio_cursor = m_bio_cursor; m_saved_bio_level = m_bio_level;
 			m_saved_program_cursor = m_program_cursor;
 			m_saved_xf_cursor = m_xf_cursor;
+			m_saved_volatile_words = m_volatile_words;
 			m_saved_data_age = m_last_data_total ? std::optional<u64>(m_cpu.total_cycles() - *m_last_data_total) : std::nullopt;
 			m_saved_first_data_age = m_first_data_total ? std::optional<u64>(m_cpu.total_cycles() - *m_first_data_total) : std::nullopt;
 			require(capture_snapshot(m_machine, m_saved) == STATERR_NONE, "capture register-sequence checkpoint");
@@ -79,6 +80,8 @@ public:
 			if (m_input.io_events) require(m_io_cursor == m_input.io_events->size(), "complete IO-bus trace");
 			if (m_input.bio_samples) require(m_bio_cursor == m_input.bio_samples->size(), "complete BIO sample trace");
 			if (m_input.xf_events) require(m_xf_cursor == m_input.xf_events->size(), "complete XF publication trace");
+			for (unsigned i=0;i<m_volatile_words.size();++i)
+				require(m_volatile_words[i] == u16(m_input.volatile_data_reads[i].value^0xffff), "volatile source consumed once");
 			m_observing_outputs = false;
 			require(m_program_cursor == (m_input.program_events.empty() ? m_input.retained_program_reads.size() : m_input.program_events.size()), "complete retained-program trace");
 			if (!m_replay)
@@ -89,6 +92,7 @@ public:
 				m_bio_cursor = m_saved_bio_cursor; m_bio_level = m_saved_bio_level;
 				m_program_cursor = m_saved_program_cursor;
 				m_xf_cursor = m_saved_xf_cursor;
+				m_volatile_words = m_saved_volatile_words;
 				if (m_input.clear_pipeline_before_restore) m_cpu.set_pipeline_frontend(true);
 				require(restore_snapshot(m_machine, m_timer, m_saved) == STATERR_NONE, "restore register sequence");
 				m_last_data_total = m_saved_data_age ? std::optional<u64>(m_cpu.total_cycles() - *m_saved_data_age) : std::nullopt;
@@ -170,9 +174,12 @@ private:
 		m_fetches = m_data_cursor = m_program_cursor = m_io_cursor = m_bio_cursor = 0;
 		m_bio_level = m_input.initial_bio;
 		m_xf_cursor = 0;
+		m_volatile_words.clear();
+		for (auto const &endpoint : m_input.volatile_data_reads) m_volatile_words.push_back(endpoint.value);
 		m_last_data_total.reset();
 		m_first_data_total.reset();
 		require(!(m_input.forbid_data_access && m_input.data_events), "one data-bus observation policy");
+		require(m_input.volatile_data_reads.empty() || m_input.data_events.has_value(), "volatile endpoints require an ordered bus contract");
 		require(m_input.observe_data_reads || m_input.data_events.has_value(), "write-only data policy requires explicit events");
 		if (m_input.io_events) {
 			require(m_input.observed_data_space != AS_IO, "one IO observation policy");
@@ -209,6 +216,11 @@ private:
 			};
 			m_data_tap = m_cpu.space(m_input.observed_data_space).install_readwrite_tap(0, 0xffff, "register_sequence_data",
 				[this,access](offs_t at, u16 &word, u16) {
+					for (unsigned i=0;i<m_input.volatile_data_reads.size();++i)
+						if (at == m_input.volatile_data_reads[i].address) {
+							word=m_volatile_words[i];
+							if (!m_machine.side_effects_disabled()) m_volatile_words[i]^=0xffff;
+						}
 					if (!m_machine.side_effects_disabled())
 						for (auto const &endpoint : m_input.synthetic_data_reads)
 							if (at == endpoint.address) word = endpoint.value;
@@ -284,6 +296,7 @@ private:
 	std::optional<u64> m_last_data_total, m_saved_data_age;
 	std::optional<u64> m_first_data_total, m_saved_first_data_age;
 	bool m_observing_outputs = false;
+	std::vector<u16> m_volatile_words, m_saved_volatile_words;
 	builder m_build;
 	std::function<void(u16, u16)> m_opcode_observer;
 	std::function<void(bool, u32, u16)> m_data_observer;
