@@ -315,6 +315,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_guard_conditions.h` | Retain seven BGEQ/BLT/BLEQ branch literals, two ALEQ returns and nine ALEQ/BNEQ/BLEQ/ANEQ conditional-slot literals. Explicit negative guard/zero/positive40-bit operands, flags/TC, pointers and stack replace phase-selected values. Exact taken target fetch, conditional stack read/pop, executed/annulled MAR slots, preserved operands/flags and pre-condition replay. Drop port-marker timing; atomic semantic/access scope. | Native18 cases/restores, unchanged count; build5.353s/run0.020s. Delete phase499 setup,500..509/6565..6567/6585..6586 assertions/iteration and BLEQ phase counter. Only following signed-SUB setup remains reference material. Supersedes atomic_register_copy_sequences' pending branch setup. |
 
+| `atomic_memory_alu_literals.h` | Retain stationary SUB AR2 and signed/unsigned SUB AR1, four A/B×SXM postincrement ADD literals and indirect/absolute OR B. Explicit flags/SXM/accumulators/source pointers and decoy words; fixed signed/unsigned results, carry/no-borrow, exact one read/no writes, pointer and source/sibling preservation, pre-instruction replay. Drop port-marker timing; atomic semantic/access scope. | Native9 cases/restores, unchanged count; build5.315s/run0.017s. Delete phase6586 setup,510/6501/6502/6525..6528/511 and512 assertions/preparations. Following absolute high-load setup remains reference material. Supersedes atomic_guard_conditions' pending SUB setup. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
