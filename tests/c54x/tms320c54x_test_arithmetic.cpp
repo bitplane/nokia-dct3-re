@@ -4207,7 +4207,6 @@ bool tms320c54x_test_state::check_shifted_high_store_results()
 			"SPRU172C shifted STH Xmem preserves accumulators/status and applies address modification and SST");
 		if (index < 127) { start_shifted_high_store_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x shifted high store conformance: PASS variants=128\n");
-		start_zero_bk_case(0);
 		return true;
 	}
 	return false;

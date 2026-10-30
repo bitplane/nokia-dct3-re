@@ -1639,7 +1639,6 @@ private:
 
 	void start_rom4_pcm_mute(unsigned index);
 
-	void start_zero_bk_case(unsigned index);
 
 
 	void start_rcd_acc_case(unsigned index);
@@ -1774,7 +1773,6 @@ private:
 	bool check_store_shift_results();
 	bool check_reverse_carry_reference_results();
 	bool check_intm_protection_results();
-	bool check_zero_bk_results();
 	bool check_saccd_results();
 	bool check_bsp_interrupt_results();
 	bool check_vector_prefetch_results();

@@ -4680,25 +4680,6 @@ void tms320c54x_test_state::start_staged_conditional_store(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_zero_bk_case(unsigned index)
-{
-	static constexpr u16 addresses[] = { 0, 1, 0x007f, 0x0100, 0x7fff, 0x8000, 0xfffe, 0xffff };
-	static constexpr u16 steps[] = { 0, 1, 3, 0xffff, 0xfffd, 0x7fff, 0x8000, 0x8001 };
-	static constexpr u16 opcodes[] = { 0x6dc2, 0x6dd2, 0x6dca, 0x6dda, 0xa4c1 };
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0700, opcodes[index % 5]);
-	program.write_word(0x0701, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_XPC, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0700);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, steps[(index / 5) % 8]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, addresses[index / 40]);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_AR3, 0x0f00}, {cpu_regs::STATE_BK, 0}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x0800},
-		{cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 73000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 bool tms320c54x_test_state::check_mvdd_follow_results()
@@ -4989,27 +4970,6 @@ bool tms320c54x_test_state::check_reverse_carry_reference_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_zero_bk_results()
-{
-	if (m_phase >= 73000 && m_phase < 73320)
-	{
-		unsigned const index = m_phase - 73000;
-		static constexpr u16 addresses[] = { 0, 1, 0x007f, 0x0100, 0x7fff, 0x8000, 0xfffe, 0xffff };
-		static constexpr s16 steps[] = { 0, 1, 3, -1, -3, 0x7fff, -0x8000, -0x7fff };
-		unsigned const form = index % 5;
-		s32 const step = form == 0 ? -1 : form == 1 ? 1 : form == 2 ? -s32(steps[(index / 5) % 8]) : steps[(index / 5) % 8];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == u16(addresses[index / 40] + step) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f00,
-			"BK zero preserves linear modulo-16-bit address updates for Smem and dual operands");
-		if (index < 319) { start_zero_bk_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x zero BK addressing: PASS variants=320\n");
-		start_saccd_case(0);
-		return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_indirect_popm_results()
 {

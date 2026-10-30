@@ -87,6 +87,7 @@ def main():
     counts['conditional_control'] = 196
     counts['conditional_register_store'] = 2304
     counts['circular_mar'] = 8192
+    counts['zero_bk'] = 208
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
