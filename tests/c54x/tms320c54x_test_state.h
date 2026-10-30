@@ -265,8 +265,6 @@ private:
 	static memory_arithmetic_fixture delay_copy_case(unsigned variant);
 	void start_delay_copy(unsigned variant = 0);
 	void start_pipeline_memory_multiply(unsigned variant = 0);
-	static std::array<u64, 5> t_multiply_pair_case(unsigned variant);
-	void start_pipeline_t_multiply_pair(unsigned variant = 0);
 	struct shifted_arithmetic_fixture
 	{
 		memory_arithmetic_fixture operand;
