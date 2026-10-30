@@ -2333,85 +2333,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 	if (m_phase == 470)
 	{
 		verify_atomic_case(register_bit_examples()[16]);
-		program.write_word(0x05e2, 0xf508); // ADD A<<8,B
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 0x10000}, {cpu_regs::STATE_ST0, 0},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(471);
-	}
-	if (m_phase == 471)
-	{
-		expect_opcode(0xf508, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x133400 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-				"ROM4 ADD A<<8,B updates B only in one cycle");
-		program.write_word(0x05e2, 0xf500); // ADD A,B.
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 1}, {cpu_regs::STATE_B, 0x7fffffff}, {cpu_regs::STATE_T, 0x8888},
-			{cpu_regs::STATE_ST0, 0x1800}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(6554);
-	}
-	if (m_phase >= 6554 && m_phase <= 6557)
-	{
-		const unsigned index = m_phase - 6554;
-		const bool destination_b = !(index & 1);
-		const u16 st1 = index >= 2 ? 0x0200 : 0;
-		const u64 result = index >= 2 ? 0x7fffffff : 0x80000000;
-		expect_opcode(destination_b ? 0xf500 : 0xf600,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (destination_b ? 1 : result) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (destination_b ? result : 1) &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x8888 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (destination_b ? 0x1200 : 0x1400) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == st1 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"ROM4 ADD A/B into the opposite accumulator preserves its source/T/TC, selects destination overflow, clears carry and obeys OVM in one cycle");
-		if (index < 3)
-		{
-			const bool next_b = !((index + 1) & 1);
-			program.write_word(0x05e2, next_b ? 0xf500 : 0xf600);
-			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, next_b ? 1 : 0x7fffffff}, {cpu_regs::STATE_B, next_b ? 0x7fffffff : 1},
-				{cpu_regs::STATE_ST0, 0x1800}, {cpu_regs::STATE_ST1, index + 1 >= 2 ? 0x0200 : 0},
-				{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-			});
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
-		program.write_word(0x05e2, 0xf400); // ADD A,A
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x7fffffff}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(472);
-	}
-	if (m_phase == 472)
-	{
-		expect_opcode(0xf400, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffffffeULL &&
-				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0400) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-				"ROM4 ADD A,A sets overflow across the 32-bit boundary in one cycle");
-		write_words(program, {
-			{0x05e2, 0xf028}, // LD #00aa,8,A
-			{0x05e3, 0x00aa}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
-		});
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-		return resume_atomic_at(0x05e0, 473);
 	}
 	if (m_phase == 473)
 	{
-		expect_opcode(0xf028, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xaa00 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-				"ROM4 LD #00aa,8,A consumes its immediate in two cycles");
 		return begin_atomic_case(register_bit_examples()[17], 474);
 	}
 	if (m_phase == 474)

@@ -303,6 +303,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_logic_program_literals.h` | Retain AR5 ANDM/ORM with neighbors/unrelated word, signed shifted circular LD, and decrement/increment READA. Explicit prior logical result, flags/BK/pointers and distinct program/data contents at A replace inheritance. Exact RAM read/write and program-read events, memory-space discrimination, fixed results/state and pre-instruction replay. Drop port-marker cycle deltas; atomic semantic/access scope. | Native5 cases/restores, unchanged count; build5.343s/run0.016s. Delete phase9220..9222,468/469/6539 setup/checks. |
 
+| `atomic_accumulator_add_literals.h` | Retain shifted opposite-accumulator ADD, four A/B destination ×OVM overflow literals, self-ADD and immediate shifted LD. Explicit source/old destination/T/TC/carry/SXM/OVM, fixed40-bit and saturation results, destination-specific sticky overflow, source/T preservation, no data traffic and pre-instruction replay. Drop port-marker timing; atomic semantic scope. | Native7 cases/restores, unchanged count; build5.321s/run0.018s. Delete phase470 successor setup,471/6554..6557/472 and473 assertions/preparations. Unmigrated register-bit bank references remain untouched. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
