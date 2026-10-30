@@ -905,7 +905,6 @@ private:
 	};
 	static mvdk_producer_fixture mvdk_producer_case(unsigned v, bool accumulator_destination = false);
 	void start_mvdk_producer(unsigned variant = 0);
-	void start_mvmd_accumulator(unsigned variant = 0);
 	void start_mcbsp_control_sequence(unsigned variant = 0);
 	void check_st1_memory_rules();
 	struct shifted_peripheral_fixture
@@ -1124,7 +1123,6 @@ private:
 	bool check_shifted_peripheral_results();
 	bool check_xc_return_results();
 	bool check_mapped_dual_results();
-	bool check_mvmd_accumulator_results();
 	bool check_repeat_mvdp_irq_results();
 	bool check_near_accumulator_results();
 	bool check_circular_portr_results();

@@ -1976,31 +1976,6 @@ void tms320c54x_test_state::start_accumulator_call(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_mvmd_accumulator(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const status = profile_is("mvmd-st1");
-	bool const b = variant & 1, store = variant >= 144;
-	unsigned const gap = (variant / 8) % 3;
-	u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 2) % 4], source = b ? 0x0b : 8;
-	u32 const base = (variant / 24) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, store ? (b ? 0x800b : 0x8108) : 0x8a00 | source);
-	program.write_word(base + 0x601 + gap, 0x7300 | source); program.write_word(base + 0x602 + gap, status ? 7 : 0x1400);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, b && store ? value : 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, !b && store ? value : 0xfedcba9876ULL);
-	data.write_word(0x1000, value); data.write_word(0x1400, 0xaaaa);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_fast_stack_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvmd_accumulator_reads",
-		[this, source, value, gap, store](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0x1000) { expect(!store && !m_fast_stack_reads && word == value && m_cpu->pipeline_cycles() == 5, "POPM reads one owned stack word"); ++m_fast_stack_reads; } else { expect(at == source && word == value && !m_pipeline_operand_reads && m_pipeline_register_writes == 1 && m_cpu->pipeline_cycles() == 6 + gap, "MVMD reads the published mapped accumulator word once with no mapped-write conflict"); ++m_pipeline_operand_reads; } });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvmd_accumulator_publication",
-		[this, source, value, gap, status](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == value, "Mapped producer and MVMD retain their exact word"); if (at == source) { expect(!m_pipeline_register_writes && m_cpu->pipeline_cycles() == 6, "Mapped producer publishes once in Execute"); ++m_pipeline_register_writes; } else { expect(at == (status ? 7 : 0x1400) && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 7 + gap, "MVMD publishes one retained mapped word at its owned move clock"); ++m_pipeline_store_writes; } });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253830;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 bool tms320c54x_test_state::shifted_unowned_fixture() const
 { return profile_is("shift-unowned"); }
@@ -2701,39 +2676,6 @@ bool tms320c54x_test_state::check_negate_results()
 
 
 
-bool tms320c54x_test_state::check_mvmd_accumulator_results()
-{
-	if (m_phase == 253830)
-	{
-		bool const status = profile_is("mvmd-st1");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, gap = (variant / 8) % 3, read = 6 + gap, checkpoint = std::array<unsigned, 3>{5, read, read + 1}[(variant % 144) / 48];
-		bool const b = variant & 1, store = variant >= 144; u16 const value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 2) % 4], source = b ? 0x0b : 8;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped accumulator MVMD remains admitted");
-		if (tick == read) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(source, 0xdead); }
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_register_writes, &m_fast_stack_reads},
-			"Save mapped producer/MVMD around source and RAM ownership");
-		if (tick == 18)
-		{
-			{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(status ? 7 : 0x1400) == (status ? value & ~u16(0x400) : value) && m_cpu->space(AS_DATA).read_word(source) == 0xdead, "MVMD retains the source and respects the reserved status bit after later mapped-register changes"); }
-			expect(m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == ((b ? 0xfedcba0000ULL : 0x1234560000ULL) | 0xdead), "Mapped low-word writes preserve the accumulator's high and guard words");
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_register_writes == 1 && m_fast_stack_reads == unsigned(!store) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(!store) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (status ? value & ~u16(0x400) : 0x800) && m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (store ? value : b ? 0x123456789aULL : 0xfedcba9876ULL), "Mapped producer/MVMD preserves other status, accumulator and stack ownership");
-			if (replay_pipeline_at(253840, checkpoint,
-				"Replay mapped producer/MVMD without duplicate accesses")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 287) { start_mvmd_accumulator(variant + 1); return true; }
-			if (status)
-			{
-				osd_printf_info("TMS320C54x staged MVMD ST1: PASS cases=288 restore=288 sources=AL,BL producers=POPM,STL gaps=0,1,2 pages=2 values=4 source_reads=1 status_writes=1 destination_reads=0 consumer_latency=unvalidated interrupt_composition=unvalidated silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated MVMD ST1 complete");
-			}
-			osd_printf_info("TMS320C54x staged MVMD accumulator: PASS cases=288 restore=288 sources=AL,BL producers=POPM,STL gaps=0,1,2 pages=2 values=4 source_reads=1 ram_writes=1 mapped_no_conflict=1 status_destination=unvalidated silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated MVMD accumulator complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253840) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253830; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_near_accumulator_results()
 {

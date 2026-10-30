@@ -291,6 +291,7 @@ def main():
     counts['peripheral_logic'] = 108
     counts['peripheral_waits'] = 9
     counts['peripheral_cost_classes'] = 20
+    counts['mapped_accumulator_move'] = 96
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
