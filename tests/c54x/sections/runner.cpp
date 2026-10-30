@@ -16,12 +16,14 @@ public:
 		m_cpu->set_extended_program(true);
 		m_cpu->set_addrmap(AS_PROGRAM, &section_state::program);
 		m_cpu->set_addrmap(AS_DATA, &section_state::data);
+		m_cpu->xf_out_cb().set([this](int value) { m_xf = bool(value); });
 	}
 protected:
 	void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(section_state::tick), this);
 		save_item(NAME(m_irq_acks));
+		save_item(NAME(m_xf));
 #ifdef C54X_SECTION_IRQ
 		m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
 			if (line != 0 || m_cpu->pipeline_cycles() != 6)
@@ -35,12 +37,14 @@ protected:
 #ifdef C54X_SECTION_OBSERVE_STORE
 		m_fixture->set_data_observer([this](bool write, u32 at, u16 value) {
 			if (!write) return;
-			u16 const opcode = m_cpu->space(AS_PROGRAM).read_word(0x600);
+			auto const &input = m_cases.at(m_fixture->count()).states.front().observation;
+			u16 const opcode = input.opcode;
+			u32 const pc = input.program.front().address;
 			if ((opcode & 0xfe00) != 0x4a00 && at != 0x420) return;
 			u16 destination = 0, observed = 0;
-			if (!m_cpu->observe_execute_memory_store(0x600,opcode,destination,observed) || destination != at || observed != value ||
-				m_cpu->observe_execute_memory_store(0x601,opcode,destination,observed) ||
-				m_cpu->observe_execute_memory_store(0x600,opcode ^ 0x100,destination,observed))
+			if (!m_cpu->observe_execute_memory_store(pc,opcode,destination,observed) || destination != at || observed != value ||
+				m_cpu->observe_execute_memory_store(pc+1,opcode,destination,observed) ||
+				m_cpu->observe_execute_memory_store(pc,opcode ^ 0x100,destination,observed))
 				throw emu_fatalerror("Section store observation identity mismatch");
 		});
 #endif
@@ -51,7 +55,12 @@ private:
 	void data(address_map &map) { map(0, 0xffff).ram(); }
 	TIMER_CALLBACK_MEMBER(tick)
 	{
-		if (!m_fixture->step()) return;
+		bool const complete = m_fixture->step();
+#ifdef C54X_SECTION_XF
+		if (m_xf != bool(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST1),13)))
+			throw emu_fatalerror("Section XF output mismatch");
+#endif
+		if (!complete) return;
 #ifdef C54X_SECTION_IRQ
 		if (m_irq_acks != m_cases.size()) throw emu_fatalerror("Section IRQ count mismatch");
 #endif
@@ -63,6 +72,7 @@ private:
 	std::vector<c54x_test::clocked_register_case> m_cases;
 	std::unique_ptr<c54x_test::register_sequence_fixture> m_fixture;
 	u32 m_irq_acks = 0;
+	bool m_xf = false;
 };
 ROM_START(tms54isa)
 ROM_END

@@ -171,55 +171,16 @@ void tms320c54x_test_state::start_pipeline_stm_case(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_pipeline_xpc_push(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	u32 const base = variant & 1 ? 0x10000 : 0;
-	u16 const source = variant < 6 ? 0x1e : (variant - 6) / 6;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : 0x4a00 | source);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_SP, 0x1000},
-	});
-	m_cpu->space(AS_DATA).write_word(0xfff, 0xaaaa);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600);
-	u16 const expected = m_cpu->space(AS_DATA).read_word(source);
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(source, source, "staged_mmr_push_source",
-		[this, expected](offs_t, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(value == expected && m_cpu->pipeline_cycles() == 5, "PSHM direct MMR samples its source once in Read before stack allocation");
-			++m_pipeline_operand_reads;
-		});
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0xfff, 0xfff, "staged_xpc_push_stack",
-		[this, expected](offs_t, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(value == expected && m_cpu->pipeline_cycles() == 6, "PSHM direct MMR writes the retained source to its allocated stack word");
-			u32 const base = m_pipeline_peripheral_case & 1 ? 0x10000 : 0;
-			u16 const source = m_pipeline_peripheral_case < 6 ? 0x1e : (m_pipeline_peripheral_case-6)/6;
-			u16 destination = 0, observed = 0;
-			expect(m_cpu->observe_execute_memory_store(base+0x600,0x4a00|source,destination,observed) && destination == 0xfff && observed == value,
-				"PSHM inspection retains allocated stack address and source across restore");
-			expect(!m_cpu->observe_execute_memory_store(base+0x601,0x4a00|source,destination,observed) &&
-				!m_cpu->observe_execute_memory_store(base+0x600,0x4b00|source,destination,observed), "PSHM inspection rejects wrong instruction identities");
-			++m_pipeline_store_writes;
-		});
-	m_phase = 251270; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_mmr_pop(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 	m_pipeline_peripheral_case = variant;
-	bool const irq = profile_is("pop-irq"); auto const f = irq_pop_case(variant);
-	u16 const destination = irq ? f.destination : variant / 6 < 18 ? 6 + variant / 6 : 0x19;
-	u16 const value = irq ? f.value : 0x6aa5;
-	u32 const base = irq ? f.base : BIT(variant, 0) ? 0x10000 : 0;
+	// Ordinary POPM moved to sections/stack.h; only the IRQ-register reference remains.
+	bool const irq = true; auto const f = irq_pop_case(variant);
+	u16 const destination = f.destination;
+	u16 const value = f.value;
+	u32 const base = f.base;
 	auto &program = m_cpu->space(AS_PROGRAM);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : 0x8a00 | destination);
 	set_registers(*m_cpu, {
@@ -6274,41 +6235,6 @@ bool tms320c54x_test_state::check_pipeline_immediate_store_results()
 		start_pipeline_immediate_store();
 		return true;
 	}
-	if (m_phase == 251270)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		u64 const checkpoint = 4 + (m_pipeline_peripheral_case % 6) / 2;
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_pipeline_operand_reads == unsigned(cycle >= 5) && m_pipeline_store_writes == unsigned(cycle >= 6) &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= 5 ? 0xfff : 0x1000), "PSHM XPC retains source, stack ownership and one decrement across replay");
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save PSHM before Read, after Read or after Write");
-		}
-		if (cycle == 10)
-		{
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true;
-				m_pipeline_operand_reads = unsigned(checkpoint >= 5); m_pipeline_store_writes = unsigned(checkpoint >= 6);
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore retained XPC source and allocated stack destination");
-				return restart_pipeline_observer(251280, checkpoint + 1);
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < 197) { start_pipeline_xpc_push(m_pipeline_peripheral_case + 1); return true; }
-			osd_printf_info("TMS320C54x staged MMR push: PASS cases=198 sources=32 pages=2 source_read=5 stack_write=6 restore=198 duplicate_accesses=0 silicon_phase_claim=0\n");
-			if (profile_is("push-observe"))
-				throw emu_fatalerror(3, "TMS320C54x isolated push observation complete");
-			start_pipeline_far_return(); return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251280)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251270;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
 	return false;
 }
 
@@ -6316,10 +6242,10 @@ bool tms320c54x_test_state::check_pipeline_mmr_pop_results()
 {
 	if (m_phase == 251450)
 	{
-		bool const irq = profile_is("pop-irq"); auto const f = irq_pop_case(m_pipeline_peripheral_case);
+		bool const irq = true; auto const f = irq_pop_case(m_pipeline_peripheral_case);
 		u64 const cycle = m_cpu->pipeline_cycles();
-		u64 const checkpoint = irq ? f.checkpoint : 4 + (m_pipeline_peripheral_case % 6) / 2;
-		u16 const destination = irq ? f.destination : m_pipeline_peripheral_case / 6 < 18 ? 6 + m_pipeline_peripheral_case / 6 : 0x19;
+		u64 const checkpoint = f.checkpoint;
+		u16 const destination = f.destination;
 		unsigned const write_clock = destination >= 0x10 ? 5 : 6;
 		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
 			m_pipeline_operand_reads == unsigned(cycle >= 5) && m_pipeline_store_writes == unsigned(cycle >= write_clock) &&
@@ -6332,9 +6258,6 @@ bool tms320c54x_test_state::check_pipeline_mmr_pop_results()
 				!m_pipeline_extensions_reads && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xe && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
 				"POPM IMR replaces its mask; POPM IFR acknowledges saved one bits without destination reads or status changes");
 		}
-		if (!irq && cycle >= write_clock)
-			expect(m_cpu->space(AS_DATA).read_word(destination) == (destination == 0x0a || destination == 0x0d ? 0xa5 : 0x6aa5) &&
-				m_xf_pin == bool(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST1), 13)), "POPM destination applies its normal register mask and XF output");
 		if (irq && cycle == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x1000,0xdead); }
 		if (cycle == checkpoint && !m_pipeline_replay)
 		{
@@ -6356,8 +6279,6 @@ bool tms320c54x_test_state::check_pipeline_mmr_pop_results()
 				osd_printf_info("TMS320C54x staged interrupt POPM: PASS cases=192 restore=192 destinations=IMR,IFR values=4 pending_patterns=4 pages=2 snapshots=3 stack_read=5 register_write=6 w1c=1 source_retained=1 destination_reads=0 irq_delivery=unvalidated physical_phase_claim=0\n");
 				throw emu_fatalerror(0,"TMS320C54x isolated interrupt POPM complete");
 			}
-			osd_printf_info("TMS320C54x staged MMR pop: PASS cases=114 destinations=19 pages=2 stack_read=5 dagen_write=5 other_write=6 restore=114 duplicate_accesses=0 silicon_phase_claim=0\n");
-			start_pipeline_pop_dagen_conflict(); return true;
 		}
 		++m_pipeline_expected_cycle;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

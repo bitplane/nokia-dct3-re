@@ -186,7 +186,6 @@ private:
 	void start_pipeline_stm_case(unsigned variant = 0);
 	void start_peripheral_mmr_timing_audit(unsigned variant = 0);
 	void start_pipeline_peripheral_case(unsigned variant = 0);
-	void start_pipeline_xpc_push(unsigned variant = 0);
 	void start_pipeline_far_return(unsigned variant = 0);
 	void start_pipeline_far_irq(unsigned variant = 0);
 	void start_pipeline_intm(unsigned variant = 0);
