@@ -190,6 +190,7 @@ def main():
     counts['atomic_register_shift'] = 36
     counts['atomic_register_logic'] = 20
     counts['atomic_product_literals'] = 21
+    counts['atomic_conditional_control'] = 12
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
