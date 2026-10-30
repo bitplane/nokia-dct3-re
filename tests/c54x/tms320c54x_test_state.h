@@ -597,15 +597,6 @@ private:
 	static memory_repeat_fixture memory_repeat_case(unsigned variant);
 	static std::array<u64, 2> repeat_subc_result(memory_repeat_fixture const &f, unsigned iterations);
 	void start_pipeline_memory_repeat(unsigned variant = 0);
-	struct banzd_fixture
-	{
-		unsigned encoded, selected, modification;
-		bool compatibility, two_word;
-		u16 value, next_ar;
-		u32 base;
-	};
-	static banzd_fixture banzd_case(unsigned variant);
-	void start_pipeline_banzd(unsigned variant = 0);
 	struct extended_push_fixture
 	{
 		unsigned form, selected, pattern, irq, checkpoint;
@@ -1978,7 +1969,6 @@ private:
 	bool check_pipeline_extended_banz_results();
 	bool check_immediate_arithmetic_results();
 	bool check_memory_repeat_results();
-	bool check_banzd_results();
 	bool check_push_pop_same_results();
 	bool check_asm_store_results_part2();
 	bool check_repeat_rearm_results();

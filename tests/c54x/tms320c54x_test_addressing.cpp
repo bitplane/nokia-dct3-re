@@ -6169,7 +6169,6 @@ bool tms320c54x_test_state::check_memory_repeat_results()
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 				osd_printf_info("TMS320C54x staged repeat immediate ST: PASS cases=38400 forms=5 rpt=short,long counts=0,1,15,32,255 values=4 sst_sxm_ovm=8 sources=none,IRQ,NMI pages=2 restore=38400 count_plus_one=1 literal_fetches=1 body_fetches=1 destination_reads=0 cycles_each=2 silicon_phase_claim=0\n");
 				if (profile_is("rpt-subc-st")) throw emu_fatalerror(0, "TMS320C54x isolated repeated SUBC and ST complete");
-				start_pipeline_banzd(); return true;
 			}
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 		}
