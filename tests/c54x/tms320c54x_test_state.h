@@ -652,7 +652,6 @@ private:
 	static constexpr u16 cmpr_values[][2] = {{0, 0}, {0, 1}, {1, 0}, {0xffff, 0x8000}, {0x8000, 0xffff}, {0xffff, 0xffff}};
 	void start_cmpr_case(unsigned index);
 	void start_banz_offset_case(unsigned index);
-	void start_bit_case(unsigned index);
 	static constexpr u16 bio_opcodes[] = {
 		0xf802, 0xf803, 0xfa02, 0xfa03, 0xf902, 0xf903,
 		0xfc02, 0xfc03, 0xfe02, 0xfe03, 0xfd02, 0xfd03, 0xff02, 0xff03

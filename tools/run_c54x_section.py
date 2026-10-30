@@ -119,6 +119,7 @@ def main():
     counts['memory_add_immediate'] = 256
     counts['memory_logic'] = 192
     counts['logic_composition'] = 5
+    counts['bit_immediate'] = 512
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
