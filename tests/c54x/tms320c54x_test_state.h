@@ -163,7 +163,6 @@ private:
 	void start_pipeline_addm(unsigned variant = 0);
 	void start_pipeline_memory_logic(unsigned variant = 0);
 	void start_pipeline_mu4_logic_tail(unsigned variant = 0);
-	void start_pipeline_far_branch(unsigned variant = 0);
 	void start_pipeline_mu4_timer_context(unsigned variant = 0);
 	void start_pipeline_mu4_recurring_timer(unsigned variant = 0);
 	void start_pipeline_far_call(unsigned variant = 0);
@@ -1869,7 +1868,6 @@ private:
 	bool check_pipeline_worker_xc_results();
 	bool check_addm_expected_results();
 	bool check_pipeline_memory_logic_results();
-	bool check_pipeline_far_branch_results();
 	bool check_pipeline_far_call_results();
 	bool check_pipeline_idle_results();
 	bool check_repeat_pop_exclusion_results();

@@ -69,6 +69,7 @@ def main():
     counts['plain_return'] = 16
     counts['call'] = 44
     counts['delayed_return'] = 8
+    counts['far_branch'] = 10
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
