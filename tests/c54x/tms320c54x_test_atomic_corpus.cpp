@@ -561,14 +561,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0x1c8b, xor_results, "ROM4 XOR *AR3- selects A and decrements AR3");
 		expect_opcode(0x1d93, xor_results, "ROM4 XOR *AR3+ selects B without SXM extension");
 		expect_opcode(0x1c82, xor_results, "ROM4 XOR *AR2 selects A; three XORs cost three cycles");
-		return begin_atomic_case(paired_memory_examples()[0], 216);
-	}
-	if (m_phase >= 216 && m_phase <= 218)
-	{
-		auto const &cases = paired_memory_examples();
-		unsigned const index = 0 + m_phase - 216;
-		verify_atomic_case(cases[index]);
-		if (m_phase < 218) return begin_atomic_case(cases[index + 1], m_phase + 1);
 	}
 	if (m_phase == 219)
 	{
@@ -677,16 +669,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect(data.read_word(0x0d60) == 0 &&
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0400,
 				"ADDM SXM-clear 16-bit wrap does not carry out of the 32-bit ALU");
-		return begin_atomic_case(paired_memory_examples()[3], 226);
 	}
-	if (m_phase >= 226 && m_phase <= 235)
-	{
-		auto const &cases = paired_memory_examples();
-		unsigned const index = 3 + m_phase - 226;
-		verify_atomic_case(cases[index]);
-		if (m_phase < 235) return begin_atomic_case(cases[index + 1], m_phase + 1);
+	if (m_phase == 235)
 		return begin_atomic_case(memory_address_examples()[0], 236);
-	}
 	if (m_phase == 236 || m_phase == 6584)
 	{
 		static constexpr unsigned phases[] = {236, 6584};

@@ -325,6 +325,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_single_slot_conditions.h` | Retain eight XC1 TC/NTC/BLT/BEQ taken/annulled literals. Explicit guard-sign/zero/TC inputs, unrelated A, flags/SXM and pointer; fixed continuation, exactly one or zero MAR updates, no data traffic and pre-condition replay. Drop port-marker timing; atomic conditional-slot semantics. | Native8 cases/restores, unchanged count; build5.325s/run0.017s. Delete phase6550 successor setup and537..542/6543/6544 bank; supersedes atomic_status_xf's pending one-slot XC setup. |
 
+| `atomic_memory_pairs.h` | Retain13 paired store/copy/load/logic/MAR/MVMM contracts, including inter-instruction pointer/data dependencies and SP round-trip. Explicit per-pair registers/SXM/BK/source/target contents replace ordered-bank state. Exact complete bus order, fixed results, source preservation and pre-pair replay. Remove PORTW markers and their two interval assertions: atomic semantic/access scope only; no replacement timing claim. | Native13 cases/restores, unchanged count; build5.425s/run0.019s. Delete paired_memory_examples, ISA reference,216..218/226..235 dispatch and215/225 entry calls. Next memory-address-bank entry remains reference material. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
