@@ -2743,53 +2743,8 @@ void tms320c54x_test_state::start_mvdk_producer(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::accumulator_store_fixture tms320c54x_test_state::preincrement_store_case(unsigned variant)
-{
-	unsigned const reg = variant % 8, selector = (variant / 8) % 4, flags = (variant / 32) % 4, pattern = (variant / 128) % 4;
-	bool const compatibility = (variant / 512) % 2;
-	auto f = long_accumulator_store_fixture(reg + selector * 100 + flags * 400 + pattern * 1600 + (compatibility ? 6400 : 0));
-	f.opcode = 0x8000 | (selector << 8) | 0x98 | reg;
-	f.address = std::array<u16, 4>{0x1400, 0xfffe, 0xffff, 0}[pattern]; f.next_ar = f.address;
-	return f;
-}
 
-tms320c54x_test_state::accumulator_store_fixture tms320c54x_test_state::preincrement_immediate_case(unsigned variant)
-{
-	auto f = preincrement_store_case(variant % 8 + ((variant / 8) % 4) * 32 +
-		((variant / 32) % 4) * 128 + ((variant / 128) % 2) * 512);
-	f.opcode = 0x7698 | f.reg;
-	f.value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 32) % 4];
-	return f;
-}
 
-void tms320c54x_test_state::start_preincrement_store(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const immediate = profile_is("preinc-st");
-	auto const f = immediate ? preincrement_immediate_case(variant) : preincrement_store_case(variant); u32 const base = (immediate ? bool(variant & 256) : bool(variant & 1024)) ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, f.opcode);
-	if (immediate) program.write_word(base + 0x601, f.value);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.selector & 1 ? 0xabcdef1234ULL : f.source ^ 0xffff); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.selector & 1 ? f.source ^ 0xffff : 0xabcdef1234ULL);
-	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, u16(f.address - 1));
-	data.write_word(f.address, 0xaaaa);
-	m_pipeline_store_writes = 0;
-	if (immediate)
-	{
-		m_pipeline_extensions_reads = 0;
-		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "preincrement_immediate_literal", [this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_extensions_reads && word == f.value, "Preincrement immediate store retains its literal once"); ++m_pipeline_extensions_reads; });
-	}
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "preincrement_store_no_read",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Preincrement accumulator store does not read its destination"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "preincrement_store_write",
-		[this, f, immediate](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == f.address && word == f.value && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == (immediate ? 7 : 6), "Preincrement store writes one retained destination and its operation-owned value"); ++m_pipeline_store_writes; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253930;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 tms320c54x_test_state::stlm_status_fixture tms320c54x_test_state::stlm_status_case(unsigned variant, bool immediate)
@@ -4151,49 +4106,7 @@ bool tms320c54x_test_state::check_long_mapped_original_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_preincrement_immediate_results()
-{
-	if (m_phase == 253930)
-	{
-		bool const immediate = profile_is("preinc-st");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = immediate ? std::array<unsigned, 3>{4, 6, 7}[variant / 512] : std::array<unsigned, 3>{4, 5, 6}[variant / 2048]; auto const f = immediate ? preincrement_immediate_case(variant) : preincrement_store_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Short preincrement accumulator stores remain staged");
-		if (immediate && tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word((variant & 256 ? 0x20000 : 0) + 0x601, 0xdead); }
-		if (tick == (immediate ? 6 : 5))
-		{
-			for (unsigned ar = 0; ar < 8; ++ar) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (ar == f.selected ? f.address : u16(f.address - 1)), "Preincrement updates only the selected pointer before retaining the destination");
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2222); m_cpu->set_state_int(f.selector & 1 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.source);
-		}
-		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_store_writes, immediate ? m_pipeline_extensions_reads : 0}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save preincrement around pointer, captured address and publication"); }
-		if (tick == 18)
-		{
-			u16 const status = BIT(f.st1, 5) && f.reg ? (f.st0 & 0x1fff) | (f.reg << 13) : f.st0;
-			{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(f.address) == f.value, "RAM or wrapped IMR destination contains the independently saturated word"); }
-			expect(m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.selector & 1 ? 0xabcdef1234ULL : f.source) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.selector & 1 ? f.source : 0xabcdef1234ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == status && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == 0x2222, "Preincrement retains its write address without restoring a changed pointer or altering accumulator/status");
-			if (immediate) expect(m_pipeline_extensions_reads == 1, "Immediate preincrement emits one literal-owned write despite accumulator and program changes");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; if (immediate) m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; return restore_pipeline_at(253940, "Restore preincrement without duplicate pointer modifications or writes"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (immediate)
-			{
-				m_pipeline_fetch_tap.remove();
-				if (variant < 1535) { start_preincrement_store(variant + 1); return true; }
-				osd_printf_info("TMS320C54x staged preincrement ST: PASS cases=1536 restore=1536 registers=8 literals=4 sst_sxm=4 compatibility=2 pages=2 snapshots=3 literal_fetches=1 reads=0 writes=1 pointer_updates=1 wrap_imr=1 source_literal_retained=1 single_repeat_acceptance=0 interrupt_composition=unvalidated silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated preincrement ST complete");
-			}
-			if (variant < 6143) { start_preincrement_store(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged preincrement store: PASS cases=6144 restore=6144 selectors=STL_A,STL_B,STH_A,STH_B registers=8 patterns=4 sst_sxm=4 compatibility=2 pages=2 snapshots=3 reads=0 writes=1 pointer_updates=1 wrap_imr=1 source_execute_live=1 interrupt_composition=unvalidated silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated preincrement store complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
-bool tms320c54x_test_state::check_repeat_pop_exclusion_results_part2()
-{
-	if (m_phase == 253940) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253930; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_staged_conditional_store_results()
 {

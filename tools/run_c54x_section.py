@@ -206,6 +206,7 @@ def main():
     counts['reada_brc'] = 3456
     counts['mvmm_producer'] = 8
     counts['xmem_bit'] = 3072
+    counts['preincrement_store'] = 1280
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

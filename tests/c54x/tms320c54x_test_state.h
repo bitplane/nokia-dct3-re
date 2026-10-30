@@ -1014,9 +1014,6 @@ private:
 	void start_mvdk_producer(unsigned variant = 0);
 	void start_mvmd_accumulator(unsigned variant = 0);
 	void start_mcbsp_control_sequence(unsigned variant = 0);
-	static accumulator_store_fixture preincrement_store_case(unsigned variant);
-	static accumulator_store_fixture preincrement_immediate_case(unsigned variant);
-	void start_preincrement_store(unsigned variant = 0);
 	struct stlm_status_fixture
 	{
 		unsigned family, gap, checkpoint;
@@ -1279,9 +1276,7 @@ private:
 	bool check_negate_results();
 	bool check_long_mapped_original_results();
 	bool check_mcbsp_control_sequence_results();
-	bool check_preincrement_immediate_results();
 	bool check_stack_irq_order_results();
-	bool check_repeat_pop_exclusion_results_part2();
 	bool check_staged_conditional_store_results();
 	bool check_ldu_peripheral_results();
 	bool check_ldu_imr_results();
