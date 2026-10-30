@@ -8,7 +8,6 @@ namespace c54x_test {
 
 bool tms320c54x_test_state::check_atomic_program_results()
 {
-	static_assert(native_store_phase == 1000000);
 	switch (atomic_fixture_for(m_phase))
 	{
 	case atomic_fixture::corpus: return check_atomic_corpus_results();

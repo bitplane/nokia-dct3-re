@@ -1309,9 +1309,7 @@ private:
 	bool m_operand_order_violation = false;
 	unsigned m_phase = 0;
 	bool (tms320c54x_test_state::*m_result_owner)() = nullptr;
-	static constexpr unsigned native_store_phase = 1'000'000; // Outside legacy phase bands.
 	std::bitset<65536> m_asserted_opcodes;
-	std::array<u16, 3> m_native_store_context = {};
 	static constexpr unsigned rom4_staged_cold_phase = 62000;
 	static constexpr unsigned repeated_writa_phase = 62044;
 	unsigned m_rom4_checks = 0;

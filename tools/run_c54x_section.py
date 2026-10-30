@@ -277,6 +277,8 @@ def main():
     counts['atomic_short_immediate'] = 520
     counts['atomic_port_delayed_branch'] = 6
     counts['atomic_port_register_examples'] = 6
+    counts['atomic_port_low_store'] = 6
+    counts['atomic_port_indirect_output'] = 5
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
