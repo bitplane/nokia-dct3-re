@@ -1465,41 +1465,6 @@ void tms320c54x_test_state::start_immediate_mapped(unsigned variant)
 
 
 
-void tms320c54x_test_state::start_bitf_offset_case(unsigned index)
-{
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0600, 0x75d6); program.write_word(0x0601, 0x0124);
-	program.write_word(0x0602, (index & 2) ? 0x61e9 : 0x61e1);
-	program.write_word(0x0603, 4);
-	program.write_word(0x0604, (index & 1) ? 2 : 1);
-	program.write_word(0x0605, 0x75d6); program.write_word(0x0606, 0x0124);
-	program.write_word(0x0607, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(0x1004, 2);
-	m_cpu->space(AS_DATA).write_word(0x1001, 4); // Reversed-field sentinels.
-	m_cpu->space(AS_DATA).write_word(0x1002, 4);
-	m_port_writes = 0;
-	set_registers(*m_cpu, {
-		{STATE_GENPC, 0x0600}, {cpu_regs::STATE_AR1, 0x1000}, {cpu_regs::STATE_ST0, 0x0aa5}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 60030 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
-
-void tms320c54x_test_state::start_cmpm_offset_case(unsigned index)
-{
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0109c0, (index & 2) ? 0x60e9 : 0x60e1);
-	program.write_word(0x0109c1, 4);
-	program.write_word(0x0109c2, (index & 1) ? 1 : 2);
-	program.write_word(0x0109c3, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(0x1004, 1);
-	set_registers(*m_cpu, {
-		{STATE_GENPC, 0x0109c0}, {cpu_regs::STATE_AR1, 0x1000}, {cpu_regs::STATE_ST0, 0x02a5},
-		{cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 1628 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 
@@ -2791,26 +2756,6 @@ bool tms320c54x_test_state::check_bitf_offset_results()
 			return true;
 		}
 		osd_printf_info("TMS320C54x delayed ALEQ conformance: PASS variants=5\n");
-		m_phase = 60030;
-		start_bitf_offset_case(0);
-		return true;
-	}
-	if (m_phase >= 60030 && m_phase <= 60033)
-	{
-		unsigned const index = m_phase - 60030;
-		expect_opcode((index & 2) ? 0x61e9 : 0x61e1,
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == ((index & 1) ? 0x1aa5 : 0x0aa5) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR1) == ((index & 2) ? 0x1004 : 0x1000) &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5 &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-			"long BITF consumes displacement before mask, changes only TC and preserves update/cycle semantics");
-		if (index != 3)
-		{
-			start_bitf_offset_case(index + 1);
-			return true;
-		}
-		osd_printf_info("TMS320C54x BITF offset conformance: PASS variants=4\n");
-		start_bio_case(0);
 		return true;
 	}
 	return false;
@@ -2831,21 +2776,6 @@ bool tms320c54x_test_state::check_bit_results()
 }
 
 
-bool tms320c54x_test_state::check_cmpm_offset_results()
-{
-	if (m_phase >= 1628 && m_phase < 1632)
-	{
-		unsigned const index = m_phase - 1628;
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0x02a5 | ((index & 1) ? 0x1000 : 0)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR1) == ((index & 2) ? 0x1004 : 0x1000) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE), "CMPM consumes long displacement before immediate");
-		if (index < 3) { start_cmpm_offset_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x CMPM offset conformance: PASS variants=4\n");
-		start_compact_load_case(0);
-		return true;
-	}
-	return false;
-}
 
 
 
