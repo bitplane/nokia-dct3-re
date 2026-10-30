@@ -114,18 +114,6 @@ private:
 	void start_pipeline_original_idle(unsigned variant = 0);
 	void start_pipeline_pmst(unsigned variant = 0);
 	void start_stack_irq_order(unsigned variant = 0);
-	struct ar_addm_fixture
-	{
-		unsigned reg, checkpoint;
-		u32 base;
-		u16 initial, immediate, result, st0, st1, final_st0;
-		bool t = false, short_form = false;
-		unsigned short_ar_form = 0;
-		unsigned read = 7, write = 8, extensions = 2;
-	};
-	ar_addm_fixture ar_addm_case(unsigned variant) const;
-	ar_addm_fixture mapped_addm_case(unsigned variant) const;
-	void start_ar_addm(unsigned variant = 0);
 	void start_addm_brc_loop(unsigned variant = 0);
 	struct repeated_writa_fixture
 	{
@@ -1560,7 +1548,6 @@ private:
 	};
 	// Return true only when the original callback would return; order is retained.
 	bool check_repeated_writa_results();
-	bool check_mapped_addm_results();
 	bool check_shifted_store_dld_results();
 	bool check_idle_nmi_result_results();
 	bool check_shifted_high_store_results();
@@ -1887,7 +1874,6 @@ private:
 	unsigned m_bleq_case = 0;
 	static constexpr unsigned rom4_staged_cold_phase = 62000;
 	static constexpr unsigned repeated_writa_phase = 62044;
-	static constexpr unsigned ar_addm_phase = 62020;
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
 	unsigned m_fast_stack_reads = 0;

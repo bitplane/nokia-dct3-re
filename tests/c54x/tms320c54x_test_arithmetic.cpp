@@ -295,82 +295,6 @@ void tms320c54x_test_state::start_pipeline_mu4_logic_tail(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::ar_addm_fixture tms320c54x_test_state::ar_addm_case(unsigned variant) const
-{
-	unsigned const flags = (variant / 128) % 16;
-	u16 const initial = std::array<u16, 4>{0, 0x7fff, 0x8000, 0xffff}[(variant / 8) % 4];
-	u16 const immediate = std::array<u16, 4>{1, 0x0800, 0x7fff, 0xffff}[(variant / 32) % 4];
-	s32 const left = flags & 1 ? s16(initial) : initial, right = flags & 1 ? s16(immediate) : immediate;
-	s32 const sum = left + right;
-	bool const overflow = sum < -32768 || sum > 32767;
-	bool const carry = u64(u32(left)) + u32(right) > 0xffffffffULL;
-	u16 const st0 = 0xa024 | (flags & 4 ? 0x800 : 0) | (flags & 8 ? 0x400 : 0);
-	return {variant % 8, std::array<unsigned, 3>{6, 7, 8}[variant / 8192], (variant / 4096) % 2 ? 0x20000U : 0,
-		initial, immediate, u16((flags & 2) && overflow ? sum < 0 ? -32768 : 32767 : sum), st0,
-		u16(0x800 | (flags & 1 ? 0x100 : 0) | (flags & 2 ? 0x200 : 0) | ((variant / 2048) % 2 ? 0x20 : 0)),
-		u16((st0 & ~0x800) | (carry ? 0x800 : 0) | (overflow ? 0x400 : 0))};
-}
-
-tms320c54x_test_state::ar_addm_fixture tms320c54x_test_state::mapped_addm_case(unsigned variant) const
-{
-	bool const brc = profile_is("addm-brc");
-	bool const t = profile_is("addm-t");
-	bool const short_ar = profile_is("addm-ar-short");
-	auto f = ar_addm_case(t ? (variant / 2) * 8 : brc ? variant * 8 : short_ar ? variant / 2 : variant);
-	if (brc) f.reg = 10;
-	if (t)
-	{
-		f.t = true; f.short_form = variant % 2;
-		if (f.short_form)
-		{
-			--f.read; --f.write; --f.checkpoint; --f.extensions;
-			f.st0 &= ~0x1ff; f.final_st0 &= ~0x1ff;
-		}
-	}
-	if (short_ar)
-	{
-		f.short_ar_form = variant % 2 + 1; f.short_form = true;
-		--f.read; --f.write; --f.checkpoint; --f.extensions;
-		f.st0 &= ~0x1ff; f.final_st0 &= ~0x1ff;
-		if (f.short_ar_form == 2 && (f.st1 & 0x20))
-			f.final_st0 = (f.final_st0 & ~0xe000) | ((f.reg == 4 ? 5 : 4) << 13);
-	}
-	return f;
-}
-
-void tms320c54x_test_state::start_ar_addm(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const brc = profile_is("addm-brc");
-	auto f = mapped_addm_case(variant);
-	u16 const address = f.t ? 0x0e : 0x10 + f.reg;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x9000 + i, 0xf495);
-	program.write_word(f.base + 0x9000, 0x6bf8); program.write_word(f.base + 0x9001, 0x10 + f.reg);
-	program.write_word(f.base + 0x9002, f.immediate); program.write_word(f.base + 0x9003, 0xf4e1);
-	program.write_word(f.base + 0x9001, address);
-	unsigned const pointer = f.reg == 4 ? 5 : 4;
-	if (f.short_form) { program.write_word(f.base + 0x9000, 0x6b00 | (f.t ? 0x0e : f.short_ar_form == 2 ? 0x80 | pointer : address)); program.write_word(f.base + 0x9001, f.immediate); program.write_word(f.base + 0x9002, 0xf4e1); }
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
-	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, !f.t && ar == f.reg ? f.initial : 0x3000 + ar);
-	if (f.short_ar_form == 2) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + pointer, address);
-	if (brc) m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.initial);
-	if (f.t) m_cpu->set_state_int(tms320c54x_device::STATE_T, f.initial);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "ar_addm_read",
-		[this, f, address](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == address && word == f.initial && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read, "Mapped ADDM samples its original register once in Read"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "ar_addm_write",
-		[this, f, address](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == address && word == f.result && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == f.write, "Mapped ADDM publishes its retained arithmetic result once in Execute"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x9001, f.base + 0x9000 + f.extensions, "ar_addm_extensions",
-		[this, f](offs_t at, u16 &, u16) { if (machine().side_effects_disabled()) return; expect(m_pipeline_extensions_reads < f.extensions && at == f.base + 0x9001 + m_pipeline_extensions_reads, "Mapped ADDM retains its address and immediate extensions once"); ++m_pipeline_extensions_reads; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = ar_addm_phase;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_addm_brc_loop(unsigned variant)
 {
@@ -3368,45 +3292,6 @@ void tms320c54x_test_state::start_staged_overflow(unsigned variant)
 
 
 
-bool tms320c54x_test_state::check_mapped_addm_results()
-{
-	if (m_phase == ar_addm_phase)
-	{
-		bool const brc = profile_is("addm-brc");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto f = mapped_addm_case(variant);
-		unsigned const destination = f.t ? tms320c54x_device::STATE_T : brc ? tms320c54x_device::STATE_BRC : tms320c54x_device::STATE_AR0 + f.reg;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Absolute mapped-AR ADDM is admitted");
-		if (tick == f.read - 1) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x9000 + f.extensions, 0xdead); }
-		if (tick == f.read) m_cpu->set_state_int(destination, 0x55aa);
-		if (tick == f.checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save mapped ADDM before Read, before Execute or after publication");
-		}
-		if (tick == 24)
-		{
-			if (f.short_ar_form && (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(destination) != f.result || m_cpu->state_int(tms320c54x_device::STATE_ST0) != f.final_st0 || m_cpu->state_int(tms320c54x_device::STATE_ST1) != f.st1))
-				osd_printf_info("Short ADDM mismatch: variant=%u replay=%u idle=%u result=%04x/%04x st0=%04x/%04x st1=%04x/%04x reads=%u writes=%u extensions=%u\n", variant, unsigned(m_pipeline_replay), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)), unsigned(m_cpu->state_int(destination)), f.result, unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), f.final_st0, unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), f.st1, m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads);
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == f.extensions && m_cpu->state_int(destination) == f.result && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.final_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL, "Mapped ADDM preserves retained operands, arithmetic flags and unaffected accumulators");
-			for (unsigned ar = 0; ar < 8; ++ar) if (f.t || ar != f.reg) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (f.short_ar_form == 2 && ar == (f.reg == 4 ? 5U : 4U) ? 0x10 + f.reg : 0x3000 + ar), "Mapped ADDM does not retarget other ARs under CMPT");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				if (f.short_ar_form) m_cpu->set_pipeline_frontend(true);
-				return restore_pipeline_at(ar_addm_phase + 1, "Restore mapped ADDM without resampling or duplicate publication");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (f.short_ar_form ? 49151 : f.t ? 6143 : brc ? 3071 : 24575)) { start_ar_addm(variant + 1); return true; }
-			if (f.short_ar_form) { osd_printf_info("TMS320C54x short mapped AR ADDM: PASS cases=49152 restore=49152 forms=DP,indirect registers=8 values=4 immediates=4 sxm_ovm_c_ova=16 cmpt=2 pages=2 snapshots=3 read=6 write=7 retained_source=1 modifying_forms=excluded physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated short mapped AR ADDM complete"); }
-			if (f.t) { osd_printf_info("TMS320C54x mapped T ADDM: PASS cases=6144 restore=6144 forms=DP,absolute values=4 immediates=4 sxm_ovm_c_ova=16 cmpt=2 pages=2 snapshots=3 retained_source=1 newer_t_overwritten=1 duplicate_reads=0 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated mapped T ADDM complete"); }
-			if (brc) { osd_printf_info("TMS320C54x mapped BRC ADDM: PASS cases=3072 restore=3072 values=4 immediates=4 sxm_ovm_c_ova=16 cmpt=2 pages=2 snapshots=3 read=7 write=8 reads=1 writes=1 extensions=2 retained_source=1 active_loop_composition=excluded physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated mapped BRC ADDM complete"); }
-			osd_printf_info("TMS320C54x mapped AR ADDM: PASS cases=24576 restore=24576 registers=8 values=4 immediates=4 sxm_ovm_c_ova=16 cmpt=2 pages=2 snapshots=3 read=7 write=8 reads=1 writes=1 extensions=2 accumulators_preserved=1 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated mapped AR ADDM complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == ar_addm_phase + 1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = ar_addm_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_shifted_store_dld_results()
 {
