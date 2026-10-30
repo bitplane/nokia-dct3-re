@@ -921,45 +921,7 @@ void tms320c54x_test_state::start_original_nibble(unsigned variant)
 
 
 
-tms320c54x_test_state::multiply_mapped_fixture tms320c54x_test_state::multiply_mapped_case(unsigned variant)
-{
-	unsigned const v = variant % 1536;
-	u16 const t = std::array<u16, 4>{3, 0xffff, 0x8000, 0x7fff}[v % 4];
-	u16 const literal = std::array<u16, 4>{3, 0xffff, 0x8000, 0x7fff}[(v / 4) % 4];
-	bool const producer_b = (v / 16) % 2, consumer_b = (v / 96) % 2;
-	unsigned const part = (v / 32) % 3, gap = (v / 192) % 2, flags = v / 384;
-	s64 const product = s64(s16(t)) * s16(literal) * (flags & 1 ? 2 : 1);
-	u64 const result = u64(flags & 2 ? std::clamp(product, s64(-2147483648LL), s64(2147483647LL)) : product) & 0xffffffffffULL;
-	return {producer_b, consumer_b, gap, 6 + gap + variant / 1536, t, literal,
-		u16((producer_b ? 0x0b : 0x08) + part), u16(0x800 | (flags & 1 ? 0x40 : 0) | (flags & 2 ? 0x200 : 0)),
-		u16(part == 2 ? (result >> 32) & 0xff : result >> (16 * part))};
-}
 
-void tms320c54x_test_state::start_pipeline_multiply_mapped(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = multiply_mapped_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(0x600 + i, 0xf495);
-	program.write_word(0x600, 0xf066 | (f.producer_b << 8)); program.write_word(0x601, f.literal);
-	program.write_word(0x602 + f.gap, 0x4800 | (f.consumer_b << 8) | f.source);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1804); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x87654321);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t); m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "multiply_mapped_read",
-		[this, f](offs_t at, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(at == f.source && value == f.sampled && !m_pipeline_operand_reads,
-				"Two-word MPY permits adjacent mapped accumulator read without a gap (SPRU131G table 7-28)"); ++m_pipeline_operand_reads;
-		});
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "multiply_mapped_no_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "MPY/LDM composition has no data writes"); });
-	m_pipeline_fetch_tap = program.install_read_tap(0x601, 0x601, "multiply_mapped_literal",
-		[this, f](offs_t, u16 &value, u16) { if (machine().side_effects_disabled()) return; expect(value == f.literal && !m_pipeline_extensions_reads, "MPY literal is fetched once"); ++m_pipeline_extensions_reads; });
-	m_phase = 253470; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::immediate_mapped_fixture tms320c54x_test_state::immediate_mapped_case(unsigned variant)
 {
@@ -2309,31 +2271,6 @@ bool tms320c54x_test_state::check_rptbd_shift_store_results()
 
 bool tms320c54x_test_state::check_negate_results()
 {
-	if (m_phase == 253470)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		auto const f = multiply_mapped_case(variant);
-		if (tick == 6) m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x7777);
-		if (tick == 7 + f.gap) m_cpu->set_state_int(f.producer_b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, 0x012345abcdULL);
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_extensions_reads},
-			"Save before/after mapped accumulator read");
-		if (tick == 16)
-		{
-			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(f.consumer_b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == f.sampled &&
-				m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1, "LDM retains the post-MPY word despite later accumulator and T mutations");
-			if (replay_pipeline_at(253480, f.checkpoint,
-				"Restore adjacent MPY/LDM without duplicate sampling")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 3071) { start_pipeline_multiply_mapped(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged MPY mapped consumer: PASS cases=3072 restore=3072 sources=AL,AH,AG,BL,BH,BG gaps=0,1 reads_each=1 literal_fetches=1 data_writes=0 silicon_phase_claim=0\n");
-			start_immediate_mapped(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253480)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253470; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
 	if (m_phase == 399920)
 	{
 		unsigned const tick = ++m_idle_fixture_tick, variant = m_pipeline_peripheral_case; auto const f = immediate_mapped_case(variant);

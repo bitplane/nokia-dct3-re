@@ -389,14 +389,6 @@ private:
 	static u16 nibble_input(unsigned variant);
 	void start_original_nibble(unsigned variant = 0);
 	void start_software_intr(unsigned variant = 0);
-	struct multiply_mapped_fixture
-	{
-		bool producer_b, consumer_b;
-		unsigned gap, checkpoint;
-		u16 t, literal, source, st1, sampled;
-	};
-	static multiply_mapped_fixture multiply_mapped_case(unsigned variant);
-	void start_pipeline_multiply_mapped(unsigned variant = 0);
 	struct immediate_mapped_fixture
 	{
 		bool original, selected_b;
@@ -427,7 +419,6 @@ private:
 
 
 
-	std::unique_ptr<register_sequence_fixture> m_register_sequence;
 
 	struct bus_io_fixture
 	{

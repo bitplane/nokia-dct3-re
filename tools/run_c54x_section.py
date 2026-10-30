@@ -296,6 +296,7 @@ def main():
     counts['mapped_accumulator_arithmetic'] = 1152
     counts['mapped_accumulator_bitfield'] = 576
     counts['immediate_product'] = 4224
+    counts['product_mapped_consumer'] = 1536
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

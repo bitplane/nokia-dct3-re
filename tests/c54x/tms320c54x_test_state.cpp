@@ -227,10 +227,6 @@ void tms320c54x_test_state::machine_reset()
 	{
 		start_bus_register_test(); return;
 	}
-	if (!strcmp(machine().system().name, "tms54test") && profile_is("mpy-mapped"))
-	{
-		start_pipeline_multiply_mapped(); return;
-	}
 	if (!strcmp(machine().system().name, "tms54test") &&
 			profile_is("timer"))
 	{

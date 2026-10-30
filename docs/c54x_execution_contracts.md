@@ -2376,6 +2376,17 @@ IDLE/replay. Zero-gap producer behavior is a model contract, not a guaranteed
 silicon schedule. Adjacent accumulator producer timing, repeat and interrupt
 composition remain unvalidated. The 258,048-execution legacy machinery is gone.
 
+`product_mapped_consumer` separately owns MPY→LDM interactions: 1,536 cases
+cover all sixteen signed operand pairs, FRCT/OVM, producer and consumer A/B,
+all six accumulator word fields, and gaps 0/1. A mapped Read at model clock
+7+gap sees the published product field; AG/BG expose eight guard bits.
+T is poisoned after its earlier sample and the producer accumulator after
+the LDM Read. Exact one-Read/no-Write and one-literal-fetch checks survive
+replay, and the destination retains the captured word. The two original
+checkpoint cohorts are distributed rather than run as 3,072 cases. These
+are model publication checks, not physical timing measurements; the legacy
+profile, descriptor, setup and result phases are removed.
+
 Dual-memory ADD/SUB (`a000..a3ff`, SPRU172C syntax 6) uses the same retained
 address/read machinery as dual MPY, but does not load T. Both operands are
 extended according to SXM and shifted left by 16; their sum/difference replaces
