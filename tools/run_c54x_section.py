@@ -229,6 +229,7 @@ def main():
     counts['pmst_store'] = 4608
     counts['mvdp'] = 41
     counts['repeated_mvdp'] = 1040
+    counts['write_a'] = 280
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

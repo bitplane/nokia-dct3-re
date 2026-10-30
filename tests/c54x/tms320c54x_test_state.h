@@ -864,7 +864,6 @@ private:
 	void start_accumulator_call(unsigned variant = 0);
 	void start_repeat_mvdp(unsigned variant = 0);
 	void start_repeat_mvdp_irq(unsigned variant = 0);
-	void start_write_a(unsigned variant = 0);
 	struct delayed_conditional_call_fixture
 	{
 		unsigned condition, layout, checkpoint;
@@ -1212,7 +1211,6 @@ private:
 	bool check_mapped_dual_results();
 	bool check_mvmd_accumulator_results();
 	bool check_repeat_mvdp_irq_results();
-	bool check_program_transfer_results();
 	bool check_near_accumulator_results();
 	bool check_circular_portr_results();
 	bool check_ifr_pair_results();

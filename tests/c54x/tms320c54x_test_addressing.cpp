@@ -1975,46 +1975,6 @@ void tms320c54x_test_state::start_repeat_mvdp(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_write_a(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const form = variant % 7, reg = (variant / 7) % 8, pattern = (variant / 56) % 4;
-	bool const mapped = (variant / 448) % 2, extended = form >= 3;
-	u32 const base = (variant / 224) % 2 ? 0x20000 : 0;
-	u32 const logical = std::array<u32, 4>{0x032e00, 0x03a000, 0x7fff00, 0xffffff}[pattern];
-	u32 const physical = mapped && (logical & 0xffff) < 0x8000 ? logical & 0xffff : logical & 0x7fffff;
-	u16 const source = std::array<u16, 7>{0x1203, 0x1203, 0x1230, 0x1230, 0x122f, 0x1231, 0x1201}[form];
-	u16 const value = std::array<u16, 4>{0, 0xf495, 0xffff, 0x1234}[pattern];
-	u8 const mode = form < 2 ? 3 : form == 2 ? 0x90 + reg : form == 3 ? 0xf8 : 0xe0 + (form - 4) * 8 + reg;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned page : {0U, 0x20000U})
-	{
-		for (unsigned i = 0; i < 16; ++i) program.write_word(page + 0x600 + i, 0xf495);
-		program.write_word(page + 0x600, 0x7f00 | mode);
-		if (extended) program.write_word(page + 0x601, form == 3 ? source : form == 4 ? 0xffff : form == 5 ? 1 : 2);
-		program.write_word(page + 0x601 + extended, 0xf4e1);
-	}
-	program.write_word(physical, 0xbeef);
-	m_cpu->space(AS_DATA).write_word(source, value);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, mapped ? 0x20 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa624); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (form == 1 ? 0x4000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1200);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
-	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, ar == reg ? form == 6 ? 0x120f : 0x1230 : 0x3000 + ar);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1200000000ULL | logical); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x123456789aULL);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "write_a_source",
-		[this, source, value, extended](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == source && word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 5 + extended, "WRITA samples its Access-owned source once in Read"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = program.install_write_tap(0, 0x7fffff, "write_a_destination",
-		[this, physical, value, extended](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == physical && word == value && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 10 + extended, "WRITA writes one retained word to its mapped PAR after the held clocks"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(physical, physical, "write_a_no_destination_read",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "WRITA never reads the destination program word"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254800;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -3519,52 +3479,6 @@ bool tms320c54x_test_state::check_mapped_dual_results()
 }
 
 
-bool tms320c54x_test_state::check_program_transfer_results()
-{
-	if (m_phase == 254800)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		unsigned const form = variant % 7, reg = (variant / 7) % 8, pattern = (variant / 56) % 4;
-		bool const mapped = (variant / 448) % 2, extended = form >= 3;
-		unsigned const checkpoint = std::array<unsigned, 4>{4, 5, 6, 9}[variant / 896] + extended;
-		u16 const source = std::array<u16, 7>{0x1203, 0x1203, 0x1230, 0x1230, 0x122f, 0x1231, 0x1201}[form];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "WRITA retained transfer remains admitted");
-		if (tick == 4 + extended)
-		{
-			u16 const next = form == 6 ? 0x1201 : form == 2 || form == 5 ? 0x1231 : 0x1230;
-			if (m_cpu->state_int(tms320c54x_device::STATE_AR0 + reg) != next)
-				osd_printf_info("WRITA address mismatch: case=%u tick=%u AR%u=%04x expected=%04x\n", variant, tick, reg, unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR0 + reg)), next);
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + reg) == next, "WRITA address modification happens once at Access");
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + reg, 0x4000);
-		}
-		if (tick == 5 + extended) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(source, 0xdead); }
-		if (tick == 6 + extended)
-		{
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7f9000);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, mapped ? 0 : 0x20);
-		}
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes},
-			"Save WRITA before source, PAR capture and write");
-		if (tick == 24)
-		{
-			{ auto const disable = machine().disable_side_effects();
-				u32 const logical = std::array<u32, 4>{0x032e00, 0x03a000, 0x7fff00, 0xffffff}[pattern];
-				u32 const physical = mapped && (logical & 0xffff) < 0x8000 ? logical & 0xffff : logical & 0x7fffff;
-				expect(m_cpu->space(AS_PROGRAM).read_word(physical) == std::array<u16, 4>{0, 0xf495, 0xffff, 0x1234}[pattern], "WRITA publishes the retained word in program RAM, not merely a write tap");
-			}
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x7f9000 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa624 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (form == 1 ? 0x4000 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_AR0 + reg) == 0x4000, "WRITA retains its word and mapped destination without rewriting status, accumulators or pointers");
-			if (replay_pipeline_at(254810, checkpoint,
-				"Restore WRITA without duplicate source reads or program writes")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 3583) { start_write_a(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged WRITA: PASS cases=3584 restore=3584 forms=7 registers=8 values=4 pages=2 mapping=2 snapshots=4 source_reads=1 program_writes=1 destination_reads=0 repeat=unvalidated mapped_source=excluded silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated WRITA complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254810) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254800; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 
 

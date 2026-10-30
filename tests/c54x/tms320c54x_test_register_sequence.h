@@ -150,7 +150,7 @@ private:
 			auto access = [this,writes](bool write,offs_t at,u16 word) {
 					if (m_machine.side_effects_disabled()) return;
 					bool selected = write && writes;
-					if (!write) for (auto const &event : m_input.program_events) selected |= !event.write && event.address == at;
+					if (!write) for (auto const &event : m_input.program_events) selected |= event.address == at;
 					if (selected && !accept_data_event(m_input.program_events,m_program_cursor,
 						{write,u32(at),word,unsigned(m_cpu.pipeline_cycles())}))
 						throw emu_fatalerror("C54x program case=%u event=%u write=%u address=%x value=%x clock=%llu",m_case,m_program_cursor,unsigned(write),

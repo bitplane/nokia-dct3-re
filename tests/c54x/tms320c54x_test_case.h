@@ -76,7 +76,7 @@ struct clocked_register_case
 	bool check_pipeline_clock = false;
 	std::optional<unsigned> final_pipeline_clock{};
 	bool clear_pipeline_before_restore = false;
-	std::vector<clocked_data_event> program_events{}; // Selected reads; any write expectation enables whole-program write observation.
+	std::vector<clocked_data_event> program_events{}; // Reads at listed addresses; any write expectation enables whole-program write observation.
 	std::vector<std::array<u32,2>> data_ranges{}; // Empty means the whole data bus.
 	std::vector<clocked_irq_expectation> irqs{};
 	bool pipeline_frontend = true;
