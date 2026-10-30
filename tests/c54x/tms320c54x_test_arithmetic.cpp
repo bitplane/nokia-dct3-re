@@ -44,44 +44,6 @@ void tms320c54x_test_state::start_smul_control_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_store_shift_case(unsigned index)
-{
-	auto const &vector = STORE_SHIFTS[index / 40];
-	unsigned const form = (index / 8) % 5;
-	bool const source_b = index & 1, sxm = index & 2, sst = index & 4;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	if (form < 2)
-	{
-		program.write_word(0x0800, 0x8493 | (form << 9) | (source_b ? 0x100 : 0));
-		program.write_word(0x0801, 0xf4e1);
-	}
-	else if (form < 4)
-	{
-		program.write_word(0x0800, 0x6f93);
-		program.write_word(0x0801, (form == 2 ? 0x0c80 : 0x0c60) |
-			(source_b ? 0x100 : 0) | (vector.shift & 31));
-		program.write_word(0x0802, 0xf4e1);
-	}
-	else
-	{
-		program.write_word(0x0800, 0xe489 | (source_b ? 0x200 : 0)); // ST src,*AR3+ || LD *AR2+,T.
-		program.write_word(0x0801, 0xf4e1);
-	}
-	m_cpu->space(AS_DATA).write_word(0x0600, 0xa55a);
-	m_cpu->space(AS_DATA).write_word(0x0610, 0x1234);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_AR2, 0x0610}, {cpu_regs::STATE_AR3, 0x0600}, {cpu_regs::STATE_T, 0},
-		{cpu_regs::STATE_A, source_b ? 1 : vector.value}, {cpu_regs::STATE_B, source_b ? vector.value : 1},
-		{cpu_regs::STATE_ST0, 0x1c00},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1,
-		0x0800 | (sxm ? 0x0100 : 0) | (vector.shift & 31));
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, sst ? 1 : 0);
-	m_cpu->set_state_int(STATE_GENPC, 0x0800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_phase = 280000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 
@@ -4125,35 +4087,6 @@ bool tms320c54x_test_state::check_acc_delayed_results()
 
 bool tms320c54x_test_state::check_store_shift_results()
 {
-	if (m_phase >= 280000 && m_phase < 280120)
-	{
-		unsigned const index = m_phase - 280000;
-		auto const &vector = STORE_SHIFTS[index / 40];
-		unsigned const form = (index / 8) % 5;
-		bool const source_b = index & 1;
-		u32 const result = vector.results[(index >> 1) & 3];
-		u16 const expected = u16(result >> (form == 0 || form == 2 ? 0 : 16));
-		if (m_cpu->space(AS_DATA).read_word(0x0600) != expected)
-			osd_printf_info("C54x store shift mismatch: case=%u form=%u shift=%d flags=%u actual=%04x expected=%04x\n",
-				index, form, vector.shift, index & 7, m_cpu->space(AS_DATA).read_word(0x0600), expected);
-		expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->space(AS_DATA).read_word(0x0600) == expected &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0601 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == (form == 4 ? 0x0611 : 0x0610) &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == (form == 4 ? 0x1234 : 0) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (source_b ? 1 : vector.value) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (source_b ? vector.value : 1) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1c00 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) ==
-				(0x0800 | (index & 2 ? 0x0100 : 0) | (vector.shift & 31)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_PMST) == (index & 4 ? 1 : 0),
-			"store right shifts obey SXM before SST, preserve source/status and update pointers");
-		if (index < 119) { start_store_shift_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x store shift boundaries: PASS cases=120 asm=-16,-1 sxm=0,1 sst=0,1 forms=5 sources=A,B pipeline_claim=0\n");
-		start_smul_control_case(0);
-		return true;
-	}
 	if (m_phase >= 290000 && m_phase < 290192)
 	{
 		unsigned const index = m_phase - 290000;

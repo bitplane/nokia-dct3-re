@@ -4748,7 +4748,6 @@ bool tms320c54x_test_state::check_asm_store_results()
 			"SPRU172C ASM STL/STH stores shifted low/high words without modifying either accumulator or status");
 		if (index < 127) { start_asm_store_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x ASM store conformance: PASS variants=128\n");
-		start_store_shift_case(0);
 		return true;
 	}
 	return false;

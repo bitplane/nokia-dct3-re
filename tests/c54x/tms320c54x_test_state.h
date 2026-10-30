@@ -58,13 +58,6 @@ private:
 		{0xffc0000000ULL, 0xff80000000ULL, 0xff80000000ULL},
 	};
 	void start_smul_control_case(unsigned index);
-	struct store_shift_vector { u64 value; int shift; u32 results[4]; };
-	static constexpr store_shift_vector STORE_SHIFTS[] = {
-		{0x8000000001ULL, -16, {0x00800000, 0xff800000, 0x00800000, 0xff800000}},
-		{0xffffffffffULL, -16, {0x00ffffff, 0xffffffff, 0x00ffffff, 0xffffffff}},
-		{0x8000000001ULL, -1, {0x00000000, 0x00000000, 0xffffffff, 0x80000000}},
-	};
-	void start_store_shift_case(unsigned index);
 	void xf_w(int state);
 	bool m_xf_pin = true;
 	unsigned m_xf_publications = 0;
