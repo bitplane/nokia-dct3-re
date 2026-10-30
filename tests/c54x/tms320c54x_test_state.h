@@ -111,14 +111,6 @@ private:
 		u16 bk;
 	};
 	static extended_banz_fixture extended_banz_case(unsigned variant);
-	struct memory_multiply_fixture
-	{
-		memory_arithmetic_fixture operand;
-		u64 a, b, result;
-		u16 result_st0, pmst, t = 0x9abc;
-	};
-	static memory_multiply_fixture memory_multiply_case(unsigned variant, bool square = false);
-	void start_pipeline_memory_multiply(unsigned variant = 0);
 	struct shifted_arithmetic_fixture
 	{
 		memory_arithmetic_fixture operand;
@@ -803,7 +795,7 @@ private:
 	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
 	bool check_staged_load_results();
-	bool check_memory_operand_arithmetic_results();
+	bool check_shifted_memory_arithmetic_results();
 	bool check_memory_repeat_results();
 	bool check_asm_store_results_part2();
 	bool check_fcala_delay_results();

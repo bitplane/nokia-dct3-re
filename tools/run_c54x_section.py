@@ -387,6 +387,11 @@ def main():
     counts['paired_indirect_load'] = 7680
     counts['paired_indirect_store'] = 4096
     counts['paired_store_forwarding'] = 1152
+    counts['memory_accumulator_product'] = 8704
+    counts['memory_unsigned_product'] = 8704
+    counts['memory_signed_product'] = 8704
+    counts['memory_square'] = 8704
+    counts['memory_load_t'] = 2176
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216

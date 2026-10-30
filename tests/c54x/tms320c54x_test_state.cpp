@@ -76,10 +76,8 @@ void tms320c54x_test_state::machine_reset()
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"store-observe"}, [](self &test) { test.start_pipeline_store_case(); } },
 		{ {"push-observe"}, [](self &test) { test.start_pipeline_xpc_push(); } },
-		{ {"mul-t-sources"}, [](self &test) { test.start_pipeline_memory_multiply(); } },
 	}))
 		return;
-	if (profile_is("squr-smem")) { check_control_disassembler(); start_pipeline_memory_multiply(); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"shifted-alu", "shifted-bk"}, [](self &test) { test.start_pipeline_shifted_arithmetic(); } },
 		{ {"indirect-load"}, [](self &test) { test.start_pipeline_indirect_case(); } },
@@ -91,7 +89,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"rpt-subc-st"}, [](self &test) { test.start_pipeline_memory_repeat(); } },
 	}))
 		return;
-	if (profile_is("t-load-control")) { start_pipeline_memory_multiply(165888); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"rptb-single"}, [](self &test) { test.start_block_single(); } },
 		{ {"rptb-memory"}, [](self &test) { test.start_block_single(); } },

@@ -776,20 +776,24 @@ Corrected positive load domains are:
 
 The legacy LDU/shift-16/variable banks preserve raw case IDs and skip invalid
 forms rather than substituting duplicate legal cases. Shared scalar
-arithmetic omits `memory_arithmetic_case` form 5; the four memory multiply/T
-banks omit RAM kind 5. Each latter bank retains 52,224 cases: 27,648 RAM
-cases over nine forms plus 24,576 mapped-source cases, totaling 208,896
-across MPYA/MASA/MACA/MACAR, MPYU, MPY/MPYR and LD T. Unrelated multiply
-generators still require independent domain audit.
+arithmetic omits `memory_arithmetic_case` form 5.
 
-Memory SQUR uses this same generator and raw-ID exclusion, retaining
-52,224 cases/restores rather than admitting the 3,072 short-MOD=3 RAM
-cases. `squr-smem` verifies both accumulators, eight patterns, sixteen flag
-states, RAM/mapped sources, Read-stage T publication, retained operands and
-preservation of a newer T value. Accepted captures are
-`tmp/run_c54x_core_pkd3rv1w` (SQUR) and `tmp/run_c54x_core_jyveg6cq`
-(512 LTD/DELAY rejection cases/restores). Neither establishes physical
-pipeline phases or complete instruction-set conformance.
+Independent memory-product sections omit the same write-only short form:
+`memory_accumulator_product`, `memory_unsigned_product`,
+`memory_signed_product` and `memory_square` each own 8,704 cases/restores;
+`memory_load_t` owns 2,176. Each covers nine RAM forms at AR1/AR6 and all
+sixteen CPU-mapped source words AL..AR7. The eight numeric patterns and
+eight FRCT/OVM/SMUL combinations remain crossed with those sources and
+operations. SXM, pages and Decode/Access/Read checkpoints are distributed
+rather than crossed; their full Cartesian interactions are not claimed.
+LD T's four duplicate operation labels collapse to one actual opcode.
+
+Every section initializes all auxiliary registers, status and accumulators.
+Read captures one source, publishes T where specified, and precedes
+Execute's accumulator/overflow publication. Literal, pointer/SP and RAM
+poisoning test retention; T is overwritten after Read and must not be
+rewritten at retirement. Unexpected data writes are forbidden. These are
+CPU-model contracts, not peripheral identity or physical timing evidence.
 
 Other positive domains retain 34,816 scalar ADD/SUB inputs, 17,408 each for
 ADDS/SUBS, 69,632 shift-16 and 153,984 TS arithmetic cases (6,528 address
@@ -2521,9 +2525,9 @@ load. `asm-consumer` passes 9,216 cases/restores with immediately following
 LD/ADD/SUB ASM operations, all 32 signed shift encodings, positive/negative
 accumulators, SXM/OVM combinations, gaps 0/1, two pages and three snapshots.
 Upper bits of the source word do not overwrite other ST1 flags. The isolated
-`t-load-control` reuses 52,224 existing RAM/mapped T-load and 768 multiply-pair
-cases, with 52,992 restores, to protect Read-owned T publication without a
-retirement rewrite. The `memory_mac` and delayed-comparison controls
+`memory_load_t` owns 2,176 independent RAM/mapped cases protecting Read-owned
+T publication without a retirement rewrite. Multiply-pair composition is a
+separate contract, not part of that section's acceptance. The `memory_mac` and delayed-comparison controls
 also pass after the shared-path rename. General ASM-load interrupt/control-delay
 composition, mapped sources and measured physical phase timing remain unvalidated.
 
@@ -4317,17 +4321,16 @@ OVM controls positive overflow saturation. It does not consume an unrelated
 old T or overwrite a newer T at retirement. The accumulator-A form remains
 a distinct seventeen-bit operation that leaves T unchanged.
 
-`squr-smem` passes 52,224 cases plus replay through the existing memory
-multiply operand matrix: RAM and CPU-mapped sources, both destinations,
-eight patterns and sixteen mode combinations. It checks one retained read,
+`memory_square` passes 8,704 cases plus replay: RAM and CPU-mapped sources,
+both destinations, eight patterns and eight FRCT/OVM/SMUL combinations;
+SXM, pages and checkpoints are distributed. It checks one retained read,
 address/literal ownership, later T poisoning, unselected accumulator and carry
 state and no data writes. Program/memory are changed after capture.
 Peripheral electrical timing, single-repeat and delay-slot SQUR composition
 are not newly qualified. The original register-SQUR and multiply/T-source
 gates retain their independent results.
-The bounded memory multiply/bit disassembler matrix also covers both SQUR
-destinations (2,304 forms over two program pages), including indirect and
-extended-address syntax.
+Disassembly syntax coverage is separate from the independent execution
+sections and does not establish arithmetic or pipeline correctness.
 
 ## Delayed forward block exits
 
