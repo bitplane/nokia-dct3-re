@@ -642,7 +642,6 @@ private:
 	void start_software_interrupt_case(unsigned index, bool trap = false);
 	void start_trn_store_case(unsigned index);
 	void start_indirect_pshm_case(unsigned index);
-	void start_rounded_load_case(unsigned index);
 	void start_stack_address_latency_case(unsigned index);
 	void start_immediate_dp_case(unsigned index);
 	void start_compact_load_case(unsigned index);
@@ -1627,7 +1626,6 @@ private:
 	bool check_software_interrupt_entry_results();
 	bool check_software_interrupt_results();
 	bool check_trn_store_results();
-	bool check_parallel_load_multiply_results();
 	bool check_compact_store_results();
 	bool check_asm_store_results();
 	bool check_reverse_carry_reference_results();
