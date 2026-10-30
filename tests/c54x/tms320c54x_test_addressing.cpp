@@ -2880,24 +2880,6 @@ u16 tms320c54x_test_state::square_repeat_memory(poly_fixture const &f, unsigned 
 
 
 
-void tms320c54x_test_state::start_t_store_branch(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	u32 const base = variant & 8 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 20; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, variant & 1 ? 0xf830 : 0xf820); program.write_word(base + 0x601, 0x602);
-	program.write_word(base + 0x602, variant & 4 ? 0x8df8 : 0x8cf8); program.write_word(base + 0x603, 0x1200); program.write_word(base + 0x604, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608 | (variant & 2 ? 0x1000 : 0)); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x2468); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x3579);
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "t_store_branch_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "t_store_branch_write", [this, variant](offs_t at, u16 &value, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && at == 0x1200 && value == (variant & 4 ? 0x3579 : 0x2468), "A nondelayed conditional branch reaches one ordinary T/TRN store on either outcome"); ++m_pipeline_store_writes; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62136;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_mvdp(unsigned variant)
 {
@@ -5713,28 +5695,6 @@ bool tms320c54x_test_state::check_repeat_mvkd_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_t_store_branch_results()
-{
-	if (m_phase == 62136)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant & 16 ? 10 : 5;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Draining nondelayed BC bookkeeping is not a T/TRN delay-slot owner");
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes},
-			"Save conditional branch and ordinary long T/TRN store");
-		if (tick == 24)
-		{
-			expect(!m_pipeline_operand_reads && m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa608 | (variant & 2 ? 0x1000 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900, "TC/NTC taken and untaken paths preserve flags and publish exactly one store");
-			if (replay_pipeline_at(62137, checkpoint,
-				"Restore BC/store composition without duplicate writes")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 31) { start_t_store_branch(variant + 1); return true; }
-			osd_printf_info("TMS320C54x BC T/TRN stores: PASS cases=32 restore=32 predicates=TC,NTC initial_tc=2 sources=T,TRN pages=2 snapshots=2 writes=1 reads=0 delayed_acceptance=0 silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated BC T/TRN stores complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62137) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62136; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 
 

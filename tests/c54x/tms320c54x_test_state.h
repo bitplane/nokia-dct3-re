@@ -1070,7 +1070,6 @@ private:
 	};
 	static mvkd_peripheral_fixture mvkd_peripheral_case(unsigned variant);
 	void start_mvkd_peripheral(unsigned variant = 0);
-	void start_t_store_branch(unsigned variant = 0);
 	struct t_peripheral_fixture
 	{
 		u16 source, destination, value;
@@ -1502,7 +1501,6 @@ private:
 	bool check_repeat_mvdp_irq_results();
 	bool check_repeat_mvkd_results();
 	bool check_near_accumulator_results();
-	bool check_t_store_branch_results();
 	bool check_circular_portr_results();
 	bool check_ifr_pair_results();
 	bool check_poly_results();

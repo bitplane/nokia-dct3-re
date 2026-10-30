@@ -210,6 +210,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `dual_memory_copy.h` | Keep all256 X/Y encodings, three alias/overlap layouts, linear/circular addressing, four standalone words, repeat counts0/1/15 and short/long RPT. Preserve Access-owned addresses/X-priority shared-AR update, pointer/source poison, next-Read-before-older-Write streaming memory, exact copy/opcode/count transactions, deferred IRQ/NMI with complete stack write/read, caller-page PC/SP/status/RC and replay. Distribute pages/four checkpoints and repeated IRQ modes; deliberately lose their exhaustive cross-products, while each encoding still sees none/IRQ/NMI. Mapped/memory-count forms remain excluded; no silicon phase claim. | Native15360 cases/restores versus270336; build5.630s/run5.766s. Delete both profile routes, setup/helper/cached fixture, phases254140/254150 checker/declarations/dispatch, and phase-keyed ACK hook. |
 
+| `branch_word_store.h` | Keep TC/NTC ×both initial TC states ×T/TRN sources followed by an ordinary two-word store at the shared taken/fallthrough continuation. Preserve admission (not a delay-slot owner), exactly one Write/no reads, source/flags, terminal PC/IDLE and replay. Distribute pages/two checkpoints rather than crossing them; no fixed-cycle or delayed-branch acceptance claim. | Native8 cases/restores versus32; build5.338s/run0.016s. Delete setup/checker, phases62136/62137, dedicated result-owner/profile route, declarations/dispatch. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
