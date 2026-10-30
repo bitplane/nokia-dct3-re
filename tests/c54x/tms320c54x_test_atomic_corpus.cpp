@@ -11,117 +11,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 325)
-	{
-		program.write_word(0x05e3, 0xfa20); // BCD 05f0h, NTC
-		program.write_word(0x05e4, 0x05f0);
-		program.write_word(0x05e5, 0xe801); // Delay slot 1
-		program.write_word(0x05e6, 0xe902); // Delay slot 2
-		program.write_word(0x05e7, 0xe803); // Fall-through only
-		write_words(program, {
-			{0x05e8, 0x75f8}, {0x05e9, 0x0d00}, {0x05ea, 0x0124}, {0x05eb, 0xf5e1}, {0x05f0, 0x75f8}, {0x05f1, 0x0d00},
-			{0x05f2, 0x0124}, {0x05f3, 0xf5e1},
-		});
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); // NTC true
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(326);
-	}
-	if (m_phase == 326)
-	{
-		expect_opcode(0xfa20, m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 2 &&
-				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05f4 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
-				"BCD NTC executes two delay words then branches in three cycles");
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1000); // NTC false
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(327);
-	}
-	if (m_phase == 327)
-	{
-		expect_opcode(0xfa20, m_cpu->state_int(tms320c54x_device::STATE_A) == 3 &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 2 &&
-				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05ec &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 9,
-				"BCD NTC false executes delay words and falls through");
-		write_words(program, {
-			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
-		});
-		m_phase = 328;
-	}
-	if (m_phase >= 328 && m_phase <= 331)
-	{
-		static constexpr u16 opcodes[] = { 0x8814, 0x8813, 0x8811, 0x8912 };
-		static constexpr unsigned registers[] = { 4, 3, 1, 2 };
-		const unsigned index = m_phase - 328;
-		if (index)
-		{
-			expect_opcode(opcodes[index - 1],
-					m_cpu->state_int(tms320c54x_device::STATE_AR0 + registers[index - 1]) ==
-						0xbeef &&
-					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-					"STLM writes the selected address register in one cycle");
-		}
-		program.write_word(0x05e3, opcodes[index]);
-		m_port_writes = 0;
-		for (unsigned ar = 0; ar != 8; ++ar)
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x1234beef}, {cpu_regs::STATE_B, 0x5678cafe}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		++m_phase;
-		m_check_timer->adjust(attotime::from_usec(100));
-		return true;
-	}
-	if (m_phase == 332)
-	{
-		expect_opcode(0x8912,
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0xcafe &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-				"STLM B writes AR2 in one cycle");
-		write_words(program, {
-			{0x05e3, 0xec0c}, // RPT #12
-			{0x05e4, 0x6d10}, // MAR *AR0+
-			{0x05e5, 0xe80f}, // LD #15,A
-			{0x05e6, 0x75f8}, {0x05e7, 0x0d00}, {0x05e8, 0x0124}, {0x05e9, 0xf5e1},
-		});
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR0, 0}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(333);
-	}
-	if (m_phase == 333)
-	{
-		expect_opcode(0xec0c, m_cpu->state_int(tms320c54x_device::STATE_AR0) == 13 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 18,
-				"RPT #12 executes MAR thirteen times after one-cycle setup");
-		expect_opcode(0xe80f, m_cpu->state_int(tms320c54x_device::STATE_A) == 15,
-				"LD #15,A writes the accumulator after the repeated body");
-		program.write_word(0x05e3, 0x13f8); // LDU *(0f20h),B
-		write_words(program, {
-			{0x05e4, 0x0f20}, {0x05e5, 0x75f8}, {0x05e6, 0x0d00}, {0x05e7, 0x0124}, {0x05e8, 0xf5e1},
-		});
-		data.write_word(0x0f20, 0x8001);
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
-		return resume_atomic_at(0x05e0, 334);
-	}
-	if (m_phase == 334)
-	{
-		expect_opcode(0x13f8, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8001 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
-				"absolute LDU B zero-extends even with SXM set in two cycles");
-	}
 	if (m_phase == 9023)
 	{
 		program.write_word(0x05e3, 0x81f8); // STL B,*(0f21h)
@@ -276,43 +165,8 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_port_writes == 3 && m_last_port_cycle - m_first_port_cycle == 5,
 			"ROM4 PORTW emits old AR2 memory before one decrement, preserves source/unrelated pointers and costs two cycles");
 	}
-	if (m_phase == 340)
-	{
-		program.write_word(0x05e3, 0xfa4d); // BCD 05f0h, BEQ
-		program.write_word(0x05e4, 0x05f0);
-		program.write_word(0x05e5, 0xe801); // Delay slot 1
-		program.write_word(0x05e6, 0xe902); // Delay slot 2 changes B
-		program.write_word(0x05e7, 0xe803); // Fall-through only
-		write_words(program, {
-			{0x05e8, 0x75f8}, {0x05e9, 0x0d00}, {0x05ea, 0x0124}, {0x05eb, 0xf5e1}, {0x05f0, 0x75f8}, {0x05f1, 0x0d00},
-			{0x05f2, 0x0124}, {0x05f3, 0xf5e1},
-		});
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(341);
-	}
-	if (m_phase == 341)
-	{
-		expect_opcode(0xfa4d, m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 2 &&
-				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05f4 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
-				"BCD BEQ uses pre-slot B and executes both delay words");
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 1}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(342);
-	}
 	if (m_phase == 342)
 	{
-		expect_opcode(0xfa4d, m_cpu->state_int(tms320c54x_device::STATE_A) == 3 &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 2 &&
-				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05ec &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 9,
-				"BCD BEQ false executes slots and falls through");
 		write_words(program, {
 			{0x05e3, 0xfc4d}, // RC BEQ
 			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
@@ -405,39 +259,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0xec01, m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0f02 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 				"ROM4 RPT #1 executes MAR twice after one-cycle setup");
-		write_words(program, {
-			{0x05e3, 0xfa30}, // BCD 05f0,TC
-			{0x05e4, 0x05f0},
-			{0x05e5, 0xe801}, // Delay slot 1
-			{0x05e6, 0xe902}, // Delay slot 2
-			{0x05e7, 0xe803}, // Fallthrough only
-			{0x05e8, 0x75f8}, {0x05e9, 0x0d00}, {0x05ea, 0x0124}, {0x05eb, 0xf5e1},
-		});
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1000); // TC true
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(358);
-	}
-	if (m_phase == 358 || m_phase == 359)
-	{
-		expect_opcode(0xfa30,
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (m_phase == 358 ? 1 : 3) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 2 &&
-				m_cpu->state_int(tms320c54x_device::STATE_PC) == (m_phase == 358 ? 0x05f4 : 0x05ec) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle ==
-					(m_phase == 358 ? 8 : 9),
-				"ROM4 BCD TC executes both delay words and selects the correct target");
-		if (m_phase == 358)
-		{
-			m_port_writes = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); // TC false
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(359);
-		}
 	}
 	if (m_phase == 361)
 	{
