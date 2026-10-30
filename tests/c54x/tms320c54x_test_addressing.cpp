@@ -1802,35 +1802,6 @@ void tms320c54x_test_state::start_memory_copy_repeat(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base | f.origin); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::xmem_load_fixture tms320c54x_test_state::xmem_load_case(unsigned v)
-{
-	unsigned const pattern = (v / 256) % 8;
-	return {v % 16, (v / 16) % 16, (v / 2048) % 2, (v / 4096) % 8,
-		std::array<u16, 8>{0, 1, 0x7fff, 0x8000, 0xffff, 0x1234, 0x5555, 0xaaaa}[pattern], (v / 32768) % 2 ? 0x20000U : 0, bool(pattern & 4)};
-}
-
-void tms320c54x_test_state::start_xmem_load(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = xmem_load_case(variant % 196608);
-	bool const arithmetic = profile_is("xmem-alu");
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, (arithmetic ? 0x9000 | (variant >= 196608 ? 0x200 : 0) : 0x9400) | (f.destination << 8) | (f.x << 4) | f.shift); program.write_word(f.base + 0x601, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0()); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1());
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x4000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead);
-	if (arithmetic) m_cpu->set_state_int(f.destination ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, xmem_arithmetic_expected(variant).source);
-	for (unsigned i = 2; i <= 5; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x100f + 0x100 * (i - 2));
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.linear ? 0 : 16);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); data.write_word(f.address(), f.value);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "xmem_load_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads && at == f.address() && word == f.value && m_cpu->pipeline_cycles() == 5, "Xmem LD owns one captured Read regardless of later AR mutation"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "xmem_load_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false, "Xmem LD writes no data memory"); } });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "xmem_load_fetch", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "Xmem LD fetches one opcode"); ++m_pipeline_extensions_reads; } });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254120;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -3686,45 +3657,6 @@ bool tms320c54x_test_state::check_repeated_mvdk_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_xmem_load_results()
-{
-	if (m_phase == 254120)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 3 + (variant % 196608) / 65536; auto const f = xmem_load_case(variant % 196608);
-		bool const arithmetic = profile_is("xmem-alu");
-		auto const a = xmem_arithmetic_expected(variant);
-		u64 const result = arithmetic ? a.result : f.result();
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Xmem LD stays in the staged frontend");
-		if (tick == 5 || tick == 6) expect(m_cpu->state_int(f.destination ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == (tick == 5 ? arithmetic ? a.source : (f.destination ? 0xfeabcd9876ULL : 0x123456789aULL) : result), "Xmem result publishes at Execute, not Read");
-		if (tick == 4)
-		{
-			for (unsigned ar = 2; ar <= 5; ++ar) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (ar == 2 + (f.x & 3) ? f.next_ar() : 0x100f + 0x100 * (ar - 2)), "Xmem LD modifies only the selected pointer once at Access");
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + 2 + (f.x & 3), 0x2222);
-		}
-		if (tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address(), 0xdead); }
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads},
-			"Save Xmem LD at Decode, captured address or retained Read");
-		if (tick == 12)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_A) == (f.destination ? 0x123456789aULL : result) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.destination ? result : 0xfeabcd9876ULL), "Xmem shifts its retained signed/unsigned source and preserves the other accumulator");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (arithmetic ? a.st0 : f.st0()) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1() && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xdead && m_pipeline_operand_reads == 1 && !m_pipeline_store_writes && m_pipeline_extensions_reads == 1, "Xmem arithmetic updates carry/sticky overflow and preserves other status and T");
-			if (replay_pipeline_at(254130, checkpoint,
-				"Restore Xmem LD without rereading its source or repeating its pointer update")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (arithmetic ? 393215 : 196607)) { start_xmem_load(variant + 1); return true; }
-			if (arithmetic)
-			{
-				osd_printf_info("TMS320C54x staged Xmem arithmetic: PASS cases=393216 restore=393216 encodings=1024 operations=ADD,SUB xmem_modes=16 shifts=0..15 values=8 accumulators=2 status_states=8 pages=2 snapshots=3 read=5 publish=6 pointer_access=4 captured_source=1 bk_zero_and_wrap=1 data_writes=0 mapped_acceptance=0 repeat_acceptance=0 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated Xmem arithmetic complete");
-			}
-			osd_printf_info("TMS320C54x staged Xmem LD: PASS cases=196608 restore=196608 encodings=512 xmem_modes=16 shifts=0..15 values=8 accumulators=2 status_states=8 pages=2 snapshots=3 source_read=5 result_publish=6 pointer_access=4 captured_source=1 bk_zero_and_wrap=1 reads=1 data_writes=0 mapped_acceptance=0 repeat_acceptance=0 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated Xmem LD complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254130) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254120; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 
 

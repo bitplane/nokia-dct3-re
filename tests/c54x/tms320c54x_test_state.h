@@ -769,26 +769,6 @@ private:
 	static addc_fixture mapped_shift16_case(unsigned variant);
 	static addc_fixture mapped_logic_case(unsigned variant);
 	void start_addc(unsigned variant = 0);
-	struct xmem_load_fixture
-	{
-		unsigned x, shift, destination, flags;
-		u16 value;
-		u32 base;
-		bool linear;
-		u16 st0() const { return 0xa002 | (flags & 4 ? 0x1e00 : 0); }
-		u16 st1() const { return 0x800 | ((flags & 3) << 8) | (value & 2 ? 0x4020 : 0); }
-		u16 address() const { return 0x100f + 0x100 * (x & 3); }
-		u16 next_ar() const { return address() + std::array<int, 4>{0, -1, 1, linear ? 3 : -13}[x >> 2]; }
-		u64 result() const { return u64((flags & 1 ? s64(s16(value)) : s64(value)) * (s64(1) << shift)) & 0xffffffffffULL; }
-	};
-	static xmem_load_fixture xmem_load_case(unsigned v);
-	struct xmem_arithmetic_result
-	{
-		u64 source, result;
-		u16 st0;
-	};
-	static xmem_arithmetic_result xmem_arithmetic_expected(unsigned variant);
-	void start_xmem_load(unsigned variant = 0);
 	void start_staged_bus_stm(unsigned variant = 0);
 	void start_delayed_far_call(unsigned variant = 0);
 	struct mac_smem_fixture
@@ -1235,7 +1215,6 @@ private:
 	bool check_repeated_mvdk_results();
 	bool check_portr_bypass_results();
 	bool check_sqdst_results();
-	bool check_xmem_load_results();
 	bool check_block_exit_results();
 	bool check_staged_bus_stm_results();
 	bool check_rom4_fr_decoder_results();

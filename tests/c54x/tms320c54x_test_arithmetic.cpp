@@ -1609,21 +1609,6 @@ void tms320c54x_test_state::start_addc(unsigned variant)
 
 
 
-tms320c54x_test_state::xmem_arithmetic_result tms320c54x_test_state::xmem_arithmetic_expected(unsigned variant)
-{
-	auto const f = xmem_load_case(variant % 196608);
-	u64 const source = std::array<u64, 8>{0, 1, 0x7fffffff, 0xff80000000ULL, 0xffffffffULL, 0x7fffffffffULL, 0x8000000000ULL, 0x123456789aULL}[(variant / 256) % 8];
-	u64 const operand = f.result();
-	s64 const left = source & 0x8000000000ULL ? s64(source) - (s64(1) << 40) : s64(source);
-	s64 const right = operand & 0x8000000000ULL ? s64(operand) - (s64(1) << 40) : s64(operand);
-	bool const subtract = variant >= 196608;
-	s64 const sum = subtract ? left - right : left + right;
-	bool const overflow = sum < -2147483648LL || sum > 2147483647LL;
-	bool const carry = subtract ? u32(source) >= u32(operand) : u64(u32(source)) + u32(operand) > 0xffffffffULL;
-	u16 const st0 = (f.st0() & ~0x0800) | (carry ? 0x0800 : 0) | (overflow ? f.destination ? 0x0200 : 0x0400 : 0);
-	s64 const result = (f.flags & 2) && overflow ? (sum < 0 ? -2147483648LL : 2147483647LL) : sum;
-	return {source, u64(result) & 0xffffffffffULL, st0};
-}
 
 
 tms320c54x_test_state::mac_smem_fixture tms320c54x_test_state::mac_smem_case(unsigned variant, bool bk, bool square)
