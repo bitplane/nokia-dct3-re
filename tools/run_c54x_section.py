@@ -374,6 +374,7 @@ def main():
     counts['parallel_load'] = 15552
     counts['parallel_arithmetic'] = 24576
     counts['parallel_multiply'] = 14336
+    counts['mapped_parallel_load'] = 24576
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

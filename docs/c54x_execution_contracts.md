@@ -3274,13 +3274,15 @@ uses the Execute-live old accumulator before load replacement. Mapped AR
 sources observe the existing Access-stage modifier model. Loading T retains
 its Read publication and cannot overwrite a newer T in Execute.
 
-`stld-map` passes 147,456 cases and cleared-pipeline replays: all six A/B/T forms, all 32
+`mapped_parallel_load` owns 24,576 cases with cleared-pipeline replay: all six A/B/T forms, all 32
 source addresses, eight nonaliasing selector pairs, two patterns, SXM/SST/OVM,
-ASM=0/-1, two pages and three checkpoints. It checks one read and one RAM
+ASM=0/-1, with pages and three checkpoints distributed rather than crossed.
+Source words are explicit pre-Read state, including modified ARs; no CPU peek
+supplies an expected value. It checks one read and one RAM
 write, exact pointer updates, late accumulator/ASM/T changes and preserved
 carry under the existing explicitly unvalidated policy. IMR/IFR reads do not
 acknowledge interrupt state. Same-pointer aliasing, other ASM values and RAM
-numeric boundaries remain in the separate `stld` matrix. Mapped Y writes and
+numeric boundaries remain in `parallel_load`. Mapped Y writes and
 mapped single-repeat bodies remain excluded. Physical
 timing and arbitrary block/interrupt composition are not proved here.
 

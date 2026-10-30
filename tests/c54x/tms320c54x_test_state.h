@@ -465,7 +465,6 @@ private:
 		u16 t = 0xbeef;
 	};
 	static void finish_parallel_load_case(parallel_load_fixture &c);
-	static parallel_load_fixture mapped_parallel_load_case(unsigned v);
 	static parallel_load_fixture bsp_parallel_load_case(unsigned variant);
 	static parallel_load_fixture peripheral_parallel_load_case(unsigned variant);
 	void start_parallel_load(unsigned variant = 0);

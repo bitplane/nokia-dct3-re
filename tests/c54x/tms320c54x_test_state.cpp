@@ -142,7 +142,6 @@ void tms320c54x_test_state::machine_reset()
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"stld-map"}, [](self &test) { test.start_parallel_load(); } },
 		{ {"stld-bsp"}, [](self &test) { test.start_parallel_load(); } },
 		{ {"stld-periph"}, [](self &test) { test.start_parallel_load(); } },
 		{ {"mvdk-circular", "mvdk-index"}, [](self &test) { test.start_circular_move(); } },
