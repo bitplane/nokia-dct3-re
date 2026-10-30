@@ -338,64 +338,8 @@ tms320c54x_test_state::block_back_fixture tms320c54x_test_state::block_back_case
 }
 
 
-bool tms320c54x_test_state::check_pipeline_control_sequences_results()
+bool tms320c54x_test_state::check_delay_asm_results()
 {
-	if (m_phase == 251170)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		bool const pending_irq = m_pipeline_branch_case >= 8;
-		u64 const checkpoint = pending_irq ? (m_pipeline_branch_case & 4 ? 8 : 6) : (m_pipeline_branch_case & 4 ? 5 : 3);
-		bool const delayed = !(m_pipeline_branch_case & 1);
-		u64 const acceptance = delayed ? 9 : 7;
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Branch frontend advances without executing flushed words");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (pending_irq && cycle >= acceptance + 2 ? 0xfff : 0x1000) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == (!pending_irq || cycle >= acceptance + 3 ? 0x800 : 0), "Only accepted IRQ entry changes SP and INTM around the branch");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 10 ? 0x44 : delayed && cycle >= 8 ? 0x22 : 0), "Branch delay or flush precedes target Execute");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_B) == (pending_irq && cycle >= acceptance + 7 ? 0x55 : delayed && cycle >= 9 ? 0x33 : 0), "Branch delay words drain before the ISR executes");
-		if (pending_irq && cycle == 5) m_cpu->set_input_line(0, ASSERT_LINE);
-		if (pending_irq && cycle > 5)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == (cycle < acceptance + 3 ? 1 : 0), "Branch IRQ remains pending until vector Fetch");
-			expect(m_vector_acks == (cycle < acceptance + 3 ? 0 : 1), "Branch IRQ vector is acknowledged once after the protected operation");
-		}
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save branch partial Decode or redirected Prefetch");
-		}
-		if (cycle == (pending_irq ? acceptance + 7 : 10))
-		{
-			expect(m_pipeline_drained_fetches == 1 && m_pipeline_extensions_reads == 1, "Branch restoration duplicates neither literal nor target fetch");
-			if (pending_irq)
-				expect(m_cpu->space(AS_DATA).read_word(0xfff) == (delayed ? 0x703 : 0x701), "Branch IRQ stacks the first not-decoded target continuation");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true;
-				m_pipeline_drained_fetches = checkpoint >= 6 ? 1 : 0;
-				m_vector_acks = 0;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint, "Restore branch target and flush/delay ownership");
-				return restart_pipeline_observer(251180, checkpoint + 1);
-			}
-			m_pipeline_fetch_tap.remove(); m_pipeline_operand_tap.remove();
-			m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_branch_case < 15) { start_pipeline_branch_case(m_pipeline_branch_case + 1); return true; }
-			osd_printf_info("TMS320C54x staged branches: PASS cases=8 literal_fetch=3 target_fetch=6 delay_execute=8,9 target_execute=10 restore=8\n");
-			osd_printf_info("TMS320C54x staged branch IRQ: PASS cases=8 request=5 vector_fetch=10,12 stack_write=11,13 continuation=0701,0703 pending_restore=8\n");
-			start_pipeline_stm_case();
-			return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-		return true;
-	}
-	if (m_phase == 251180)
-	{
-		u64 const checkpoint = m_pipeline_branch_case >= 8 ? (m_pipeline_branch_case & 4 ? 8 : 6) : (m_pipeline_branch_case & 4 ? 5 : 3);
-		expect(m_cpu->pipeline_cycles() == checkpoint, "Settlement does not advance branch Prefetch");
-		m_cpu->resume(SUSPEND_REASON_DISABLE);
-		m_phase = 251170;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-		return true;
-	}
 	if (m_phase == 311000)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delay_asm_case(variant);

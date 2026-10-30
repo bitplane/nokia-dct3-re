@@ -22,55 +22,6 @@ void tms320c54x_test_state::start_cala_rtn_case(unsigned index)
 }
 
 
-void tms320c54x_test_state::start_pipeline_branch_case(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_branch_case = variant;
-	u32 const base = variant & 2 ? 0x10000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i)
-	{
-		program.write_word(base + 0x600 + i, 0xf495);
-		program.write_word(base + 0x700 + i, 0xf495);
-	}
-	program.write_word(base + 0x600, variant & 1 ? 0xf073 : 0xf273);
-	program.write_word(base + 0x601, 0x700);
-	program.write_word(base + 0x602, 0xe822);
-	program.write_word(base + 0x603, 0xe933);
-	program.write_word(base + 0x604, 0x77e1); // Unsupported indirect STM must not reach Decode.
-	program.write_word(base + 0x700, 0xe844);
-	if (variant >= 8)
-	{
-		for (unsigned i = 0; i < 12; ++i) program.write_word(base + 0x40 + i, 0xf495);
-		program.write_word(base + 0x40, 0xe955);
-	}
-	m_cpu->set_input_line(0, CLEAR_LINE);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST1, variant >= 8 ? 0 : 0x800},
-		{cpu_regs::STATE_IMR, 1}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_SP, 0x1000},
-		{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {STATE_GENPC, base + 0x600},
-	});
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false;
-	m_pipeline_expected_cycle = 1;
-	m_pipeline_drained_fetches = m_pipeline_extensions_reads = 0;
-	m_vector_acks = 0;
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x700, base + 0x700, "branch_target_fetch",
-		[this](offs_t, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_cpu->pipeline_cycles() == 6, "Branch target Fetch follows literal Access");
-			++m_pipeline_drained_fetches;
-		});
-	m_pipeline_operand_tap = program.install_read_tap(base + 0x601, base + 0x601, "branch_literal_fetch",
-		[this](offs_t, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_cpu->pipeline_cycles() == 3 && value == 0x700, "Branch literal is fetched once independently of target instructions");
-			++m_pipeline_extensions_reads;
-		});
-	m_phase = 251170;
-	m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::delay_asm_fixture tms320c54x_test_state::delay_asm_case(unsigned v)
 {

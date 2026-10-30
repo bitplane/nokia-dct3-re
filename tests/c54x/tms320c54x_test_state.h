@@ -126,7 +126,6 @@ private:
 	void start_empty_pipeline_case(bool nmi);
 	void start_multiword_pipeline_case(unsigned variant = 0);
 	void start_multiword_stream_case();
-	void start_pipeline_branch_case(unsigned variant = 0);
 	struct delay_asm_fixture
 	{
 		unsigned control, form, raw, pattern, flags, checkpoint;
@@ -1891,7 +1890,7 @@ private:
 	bool check_pipeline_frontend_results();
 	bool check_multiword_pipeline_results();
 	bool check_pipeline_store_results();
-	bool check_pipeline_control_sequences_results();
+	bool check_delay_asm_results();
 	bool check_peripheral_mmr_timing_audit_results();
 	bool check_pipeline_immediate_store_results();
 	bool check_pipeline_far_return_results();

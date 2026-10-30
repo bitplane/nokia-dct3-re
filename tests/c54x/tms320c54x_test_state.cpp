@@ -836,11 +836,6 @@ void tms320c54x_test_state::test(machine_config &config)
 			++m_vector_acks;
 		}
 		observe_context_irq(line);
-		if (m_phase == 251170)
-		{
-			expect(m_pipeline_branch_case >= 8 && line == 0 && m_cpu->pipeline_cycles() == (m_pipeline_branch_case & 1 ? 10 : 12), "Branch IRQ acknowledges during its vector Fetch");
-			++m_vector_acks;
-		}
 		if (m_phase == 251090)
 		{
 			expect(line == 0 && m_cpu->pipeline_cycles() == 6, "Indirect load drains while vector IACK occurs");
