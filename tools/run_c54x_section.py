@@ -48,6 +48,7 @@ def main():
     counts['accumulator_program_read'] = 24
     counts['mapped_stack'] = 144
     counts['mapped_operand_limits'] = 45
+    counts['direct_memory_modify'] = 96
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
