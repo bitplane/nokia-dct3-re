@@ -212,6 +212,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `branch_word_store.h` | Keep TC/NTC ×both initial TC states ×T/TRN sources followed by an ordinary two-word store at the shared taken/fallthrough continuation. Preserve admission (not a delay-slot owner), exactly one Write/no reads, source/flags, terminal PC/IDLE and replay. Distribute pages/two checkpoints rather than crossing them; no fixed-cycle or delayed-branch acceptance claim. | Native8 cases/restores versus32; build5.338s/run0.016s. Delete setup/checker, phases62136/62137, dedicated result-owner/profile route, declarations/dispatch. |
 
+| `mvmd_word_register.h` | Keep T/TRN/BK and STLM-NOP→BK contexts ×all AR/BK destinations ×four word boundaries. Preserve Read-owned source/mapped publication5 (or7 after producer), STLM Write6, post-Read source mutation including self-BK, untouched source sibling/ARs/accumulators/status/SP, terminal PC/IDLE and replay. Distribute pages and three checkpoints; no semantic input combinations lost. | Native144 cases/restores versus864; build5.279s/run0.068s. Delete two profile routes, setup/checker, phases254300/254310, declarations/dispatch. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).

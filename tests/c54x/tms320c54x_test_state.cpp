@@ -186,7 +186,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"mvdk-producer", "mvdk-acc-prod"}, [](self &test) { test.start_mvdk_producer(); } },
 		{ {"mvdd-periph"}, [](self &test) { test.start_mvdd_peripheral(); } },
 		{ {"mvdd-source", "mvdd-source-rpt"}, [](self &test) { test.start_mvdd_source(); } },
-		{ {"mvmd-t", "mvmd-bk"}, [](self &test) { test.start_mvmd_word_register(); } },
 		{ {"mvmd-acc", "mvmd-st1"}, [](self &test) { test.start_mvmd_accumulator(); } },
 		{ {"alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus"}, [](self &test) { test.start_mapped_dual(); } },
 		{ {"xc-ret"}, [](self &test) { test.start_xc_return(); } },

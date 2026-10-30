@@ -1180,7 +1180,6 @@ private:
 	static mvdd_source_fixture mvdd_source_case(unsigned variant, bool repeated);
 	void start_mvdd_source(unsigned variant = 0);
 	void start_mvdd_peripheral(unsigned variant = 0);
-	void start_mvmd_word_register(unsigned variant = 0);
 	struct mvdk_mapped_fixture
 	{
 		u16 source, destination, value;
@@ -1508,7 +1507,6 @@ private:
 	bool check_absolute_logic_results();
 	bool check_popd_mapped_results();
 	bool check_accumulator_branch_results();
-	bool check_mvmd_word_register_results();
 	bool check_mvdd_peripheral_results();
 	bool check_push_mvmm_results();
 	bool check_memory_immediate_results();
