@@ -5328,20 +5328,20 @@ ST T/TRN admits absolute, signed-offset, premodified and circular long
 Smem forms using the shared extended-store address path. SPRU172C page
 4-167 specifies the source and additional address word; the modeled
 destination is retained at Read while T/TRN remains Execute-live.
-`st-t-long` verifies 6,144 cases and replays across both sources, four
-values, all eight auxiliary registers, compatibility selection, RAM and
-peripheral endpoints, two program pages and three snapshots. It poisons
+`extended_t_store` verifies 1,024 accepted cases and 128 rejected cases,
+each with replay, across both sources, four values, all eight auxiliary
+registers, compatibility selection, and RAM/peripheral endpoints. Program
+pages and checkpoints are distributed rather than crossed. It poisons
 the literal and changes auxiliary registers after address capture, and
 changes T/TRN immediately before Execute. No destination read occurs;
 peripheral writes retain the existing one-extra-clock model.
 
-`st-t-long-edge` verifies 256 distinct rejected inputs and replays that reject
-mapped destinations before data effects, restoring any previewed long-address
-pointer/ARP modification. Rejection does not consume the value or endpoint
-dimensions: eight identical stimuli per checkpoint are removed. The original
-5/6/7-clock checkpoints are balanced across form/register/mode/source/page
-inputs instead of replaying each input at all three points. Both long-store
-profiles use the CPU-only shared clocked runner.
+Rejected mapped destinations have no data effects or pointer/ARP updates.
+Rejection does not consume value or endpoint dimensions. Standard mode now
+seeds ARP0: the legacy fixture's nonzero ARP with CMPT clear was invalid
+setup, not useful standard-mode coverage. Compatibility mode retains ARP4
+and all explicit pointer selections. Accepted paths must reach IDLE; rejected
+paths must latch the implementation guard without reaching IDLE.
 `st-t-branch` verifies 32 cases and replays of
 ordinary stores after both outcomes of nondelayed TC/NTC branches.
 A draining conditional-branch control counter is not evidence that the

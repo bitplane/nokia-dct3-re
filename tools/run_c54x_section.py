@@ -350,6 +350,7 @@ def main():
     counts['frame_stack_consumers'] = 262
     counts['address_mode_publication'] = 48
     counts['immediate_dp_forwarding'] = 1024
+    counts['extended_t_store'] = 1152
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

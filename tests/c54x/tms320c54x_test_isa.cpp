@@ -6,7 +6,6 @@
 #include "tms320c54x_test_domains.h"
 #include "tms320c54x_test_word_examples.h"
 #include "tms320c54x_test_disassembly.h"
-#include "tms320c54x_test_long_t_store.h"
 #include "tms320c54x_test_dual.h"
 #include "tms320c54x_test_normalization.h"
 #include "tms320c54x_test_register_sequence.h"
@@ -25,9 +24,8 @@ public:
 		m_domain = !std::strcmp(config.options().bios(), "source-domain");
 		m_dual_mode = c54x_test::dual_multiply_mode::select(config.options().bios());
 		m_normalization_kind = c54x_test::select_normalization(config.options().bios());
-		m_long_t_store_kind = c54x_test::select_long_t_store(config.options().bios());
 		m_composition_limit = c54x_test::select_composition_limit(config.options().bios());
-		m_extended_program = m_long_t_store_kind != c54x_test::long_t_store_kind::none || !std::strcmp(config.options().bios(), "isa-disasm") || m_domain || bool(m_dual_mode) ||
+		m_extended_program = !std::strcmp(config.options().bios(), "isa-disasm") || m_domain || bool(m_dual_mode) ||
 			m_normalization_kind != c54x_test::normalization_kind::none || m_composition_limit != c54x_test::composition_limit::none;
 		TMS320C54X(config, m_cpu, 13'000'000);
 		m_cpu->set_extended_program(m_extended_program);
@@ -43,10 +41,6 @@ protected:
 		if (m_composition_limit != c54x_test::composition_limit::none)
 			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 				c54x_test::composition_limit_count(m_composition_limit), [this](unsigned raw) { return c54x_test::composition_limit_case<tms320c54x_device>(raw, m_composition_limit); });
-		else if (m_long_t_store_kind != c54x_test::long_t_store_kind::none)
-			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
-				c54x_test::long_t_store_count(m_long_t_store_kind),
-				[this](unsigned key) { return c54x_test::long_t_store_sequence<tms320c54x_device>(key, m_long_t_store_kind); });
 		else if (m_normalization_kind != c54x_test::normalization_kind::none)
 			m_normalization = std::make_unique<c54x_test::exponent_normalization_fixture>(machine(), *m_cpu, *m_timer, m_normalization_kind);
 		else if (m_dual_mode) m_dual = std::make_unique<c54x_test::dual_multiply_fixture_runner>(machine(), *m_cpu, *m_timer, m_dual_mode);
@@ -97,19 +91,7 @@ private:
 			osd_printf_info("%s\n", contract.summary);
 			throw emu_fatalerror(3, "%s", contract.completion);
 		}
-		if (m_long_t_store_kind != c54x_test::long_t_store_kind::none)
-		{
-			osd_printf_info("TMS320C54x long T store coverage: PASS cases=%u restore=%u coverage_fnv64=%016llx\n",
-				m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
-			if (m_long_t_store_kind == c54x_test::long_t_store_kind::rejected)
-			{
-				osd_printf_info("TMS320C54x extended T/TRN exclusions: PASS cases=256 restore=256 forms=4 registers=8 compatibility=2 sources=2 pages=2 snapshots=3 checkpoint_policy=balanced reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0\n");
-				throw emu_fatalerror(3, "TMS320C54x isolated extended T/TRN exclusions complete");
-			}
-			osd_printf_info("TMS320C54x extended T/TRN stores: PASS cases=6144 restore=6144 forms=absolute,offset,premod,circular registers=8 compatibility=2 sources=T,TRN values=4 endpoints=RAM,peripheral pages=2 snapshots=3 destination=Read source=Execute literal_retained=1 pointer_updates=once destination_reads=0 writes=1 peripheral_extra_clock=1 silicon_phase_claim=0\n");
-			throw emu_fatalerror(3, "TMS320C54x isolated extended T/TRN stores complete");
-		}
-		throw emu_fatalerror("Legacy register-pair result retired: run saturation_pair or rotate_pair");
+		throw emu_fatalerror("No active legacy register sequence");
 	}
 	[[noreturn]] void normalization_result() const
 	{
@@ -277,7 +259,6 @@ private:
 	bool m_extended_program = false;
 	c54x_test::dual_multiply_mode m_dual_mode;
 	c54x_test::normalization_kind m_normalization_kind = c54x_test::normalization_kind::none;
-	c54x_test::long_t_store_kind m_long_t_store_kind = c54x_test::long_t_store_kind::none;
 	std::unique_ptr<c54x_test::register_sequence_fixture> m_register_sequence;
 	c54x_test::composition_limit m_composition_limit = c54x_test::composition_limit::none;
 	std::unique_ptr<c54x_test::exponent_normalization_fixture> m_normalization;
@@ -308,8 +289,6 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(20, "exp-t", "Staged exponent publication and T consumer latency")
 	ROM_SYSTEM_BIOS(29, "isa-words", "Atomic instruction-word arithmetic and addressing examples")
 	ROM_SYSTEM_BIOS(30, "isa-disasm", "Debugger syntax length page wrapping and stepping contracts")
-	ROM_SYSTEM_BIOS(31, "st-t-long", "Long-address T/TRN stores and retained Execute source")
-	ROM_SYSTEM_BIOS(32, "st-t-long-edge", "Rejected mapped destinations of long-address T/TRN stores")
 	ROM_SYSTEM_BIOS(35, "pop-irq-edge", "Interrupt-register POPM composition admission limits")
 	ROM_SYSTEM_BIOS(36, "clock-mvdk-edge", "CLKMD move composition admission limits")
 	ROM_SYSTEM_BIOS(37, "st-delay-edge", "Rejected stores crossing the control-delay boundary")
