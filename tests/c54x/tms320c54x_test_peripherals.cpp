@@ -1650,7 +1650,6 @@ bool tms320c54x_test_state::check_idle_wake_results()
 		osd_printf_info("TMS320C54x IDLE3 DMA clock: PASS cases=2 replay=2 system_hz=13000000 input_hz=3250000\n");
 		osd_printf_info("TMS320C54x IDLE3 DMA absent clock: PASS cases=2 replay=2 pending_preserved=1\n");
 		osd_printf_info("TMS320C54x DMA partial clock loss: PASS cases=2 replay=2 first_word_remaining_clocks=2\n");
-		start_rounded_multiply_case(0);
 		return true;
 	}
 	return false;

@@ -104,6 +104,7 @@ def main():
     counts['firs_sum'] = 32
     counts['arithmetic_boundaries'] = 80
     counts['conditional_accumulator_store'] = 168
+    counts['rounded_multiply'] = 104
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

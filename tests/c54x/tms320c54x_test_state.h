@@ -84,16 +84,6 @@ private:
 	void start_idle_external_serial_case(unsigned index);
 	void start_idle_timer_case(unsigned index);
 	int bio_r();
-	struct rounded_multiply_case
-	{
-		u16 opcode, t, memory, status;
-		u64 initial, expected;
-		bool overflow;
-		u16 pmst = 0;
-	};
-	static rounded_multiply_case const &rounded_multiply_vector(unsigned index);
-	void start_rounded_multiply_case(unsigned index);
-	bool check_rounded_multiply();
 	void start_idle_wake_case(unsigned index);
 	void start_stopped_timer_reload_case(unsigned index);
 	void start_timer_prescaler_divider_case(unsigned divider);
