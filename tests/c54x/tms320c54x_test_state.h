@@ -70,18 +70,6 @@ private:
 	unsigned pipeline_idle_kind(unsigned variant) const;
 	void start_pipeline_idle1(unsigned variant = 0, bool modes = false);
 	void start_pipeline_original_idle(unsigned variant = 0);
-	struct repeated_writa_fixture
-	{
-		unsigned form, setup, reg, count, words, read, write, checkpoint;
-		bool mapped, standard_width;
-		u16 source, count_address;
-		u32 target, page;
-		int direction;
-	};
-	static repeated_writa_fixture repeated_writa_case(unsigned variant, bool standard_width = false);
-	static u16 repeated_writa_word(unsigned reg, unsigned index);
-	static u32 repeated_writa_destination(repeated_writa_fixture const &f, unsigned index);
-	void start_repeated_writa(unsigned variant = 0);
 	void start_instruction_observer(unsigned variant = 0);
 	static unsigned circular_fixture_mask(u16 bk);
 	static bool circular_fixture_domain(u16 initial, int step, u16 bk);
@@ -715,7 +703,6 @@ private:
 	void expect_opcode(u16 opcode, bool condition, const char *message);
 
 	// Return true only when the original callback would return; order is retained.
-	bool check_repeated_writa_results();
 	bool check_idle_nmi_result_results();
 	bool check_idle_wake_results();
 	bool restart_pipeline_observer(unsigned phase, u64 next_cycle)
@@ -867,7 +854,6 @@ private:
 	bool (tms320c54x_test_state::*m_result_owner)() = nullptr;
 	std::bitset<65536> m_asserted_opcodes;
 	static constexpr unsigned rom4_staged_cold_phase = 62000;
-	static constexpr unsigned repeated_writa_phase = 62044;
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
 	unsigned m_fast_stack_reads = 0;

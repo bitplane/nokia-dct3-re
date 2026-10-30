@@ -2759,14 +2759,30 @@ bus-phase placement is provisional, not measured silicon timing. Later source,
 AR, A or PMST mutations cannot redirect or resample the retained write.
 The wait counter and mapped program destination are save-state registered.
 
-`write-a` passes 3,584 cases/restores: DP, CPL, short postincrement, absolute,
-offset, long preincrement and circular sources; eight registers, four values,
-two logical code pages, two mapping states and four snapshots. It checks one
-source read and one program write, no destination read, status preservation
-and physical program-RAM readback. Excluded source/control combinations remain
-work to implement, not hardware-invalid forms. Mapped READA, PMST mapping,
-MVDD source repeats and load/return controls pass. WRITA's focused acceptance
-is separate from the versioned aggregate regression scopes.
+`write_a` owns 280 independent cases/restores: DP, CPL, short postincrement,
+absolute, offset, long preincrement and circular sources; all encoded
+indirect registers, four value/destination patterns and both mapping states.
+Pages and four checkpoints are distributed; unused direct/absolute AR
+selectors are not crossed. It checks one source Read and one program Write,
+no destination read, status preservation and physical program-RAM readback.
+Source/pointer/A/OVLY changes after capture must not redirect the write.
+
+`repeated_write_a` and `repeated_write_a16` each own 4,800 cases/restores.
+All DP/SP/plain/decrement/increment sources, five count-source forms,
+eight registers, counts 0/1/7/255, three target boundaries and both overlay
+settings remain. Extended pages and four snapshots are distributed.
+The 23-bit profile exercises ordinary, overlay-boundary and 23-bit-wrap
+destinations; the 16-bit profile exercises ordinary, halfspace and 16-bit
+wrap destinations, ignoring overlay in its address calculation.
+
+Each count source is sampled once, then poisoned. The first source word and
+logical PAR are retained before RAM/A poisoning. Every later source is
+published only after the preceding program write; exact cross-space event
+counts enforce Read(n) after Write(n-1) and before Write(n). Every actual
+program-RAM destination starts poisoned and must contain the expected word
+after count+1 writes and replay. RC, pointer progression and unrelated CPU
+state settle independently. These are CPU-model ownership/cadence tests,
+not physical program-bus timing measurements.
 
 Compact Xmem arithmetic (`9000..93ff`) retains its RAM address and performs
 one pointer update at Access, samples the word at Read and publishes ADD/SUB

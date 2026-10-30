@@ -40,7 +40,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"pop-irq"}, [](self &test) { test.start_pipeline_mmr_pop(); } },
 		{ {"mvpd-extended"}, [](self &test) { test.start_extended_mvpd(); } },
 		{ {"mvpd-controls"}, [](self &test) { test.start_pipeline_mvpd(); } },
-		{ {"rpt-writa", "rpt-writa16"}, [](self &test) { test.start_repeated_writa(); } },
 		{ {"std-swwsr"}, [](self &test) { test.start_standard_swwsr_test(); } },
 	}))
 		return;

@@ -58,6 +58,7 @@ struct clocked_data_event
 	std::optional<unsigned> minimum_program_events{}; // Required prior program events, e.g. instruction extensions.
 	std::optional<std::array<u16,2>> value_range{}; // Inclusive bounds when the contract deliberately leaves the exact word open.
 	std::optional<int> value_register{}; // Relational bus contract, e.g. an interrupt frame contains RTN.
+	std::optional<unsigned> program_events_before{}; // Exact cross-space ordering, e.g. Read(n) follows Write(n-1).
 };
 struct clocked_irq_expectation
 {

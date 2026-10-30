@@ -20,46 +20,6 @@ namespace c54x_test {
 
 
 
-tms320c54x_test_state::repeated_writa_fixture tms320c54x_test_state::repeated_writa_case(unsigned variant, bool standard_width)
-{
-	repeated_writa_fixture f{};
-	f.standard_width = standard_width;
-	if (standard_width) variant = variant % 4800 + (variant / 4800) * 9600;
-	f.form = variant % 5; f.setup = (variant / 5) % 5; f.reg = (variant / 25) % 8;
-	f.count = std::array<unsigned, 4>{0, 1, 7, 255}[(variant / 200) % 4];
-	f.target = (standard_width ? std::array<u32, 3>{0x3200, 0x7ffe, 0xfffe} : std::array<u32, 3>{0x033200, 0x037ffe, 0x7ffffe})[(variant / 800) % 3];
-	f.mapped = (variant / 2400) % 2; f.page = (variant / 4800) % 2 ? 0x20000 : 0;
-	f.words = f.setup == 0 || f.setup == 2 ? 1 : 2;
-	f.read = 5 + f.words + (f.setup >= 2 ? 2 : 0); f.write = f.read + 5;
-	f.checkpoint = std::array<unsigned, 4>{f.read, f.read + 1, f.write, f.write + 3}[variant / 9600];
-	f.source = f.form < 2 ? 0x1201 : 0x3000; f.direction = f.form == 3 ? -1 : f.form == 4 ? 1 : 0;
-	f.count_address = f.setup == 2 ? 0x1202 : f.setup == 3 ? 0x1400 : 0x10 + ((f.reg + 1) % 8);
-	return f;
-}
-
-u16 tms320c54x_test_state::repeated_writa_word(unsigned reg, unsigned index)
-{ return 0x2468 ^ (reg * 0x1111) ^ (index * 0x0101); }
-
-u32 tms320c54x_test_state::repeated_writa_destination(repeated_writa_fixture const &f, unsigned index)
-{
-	if (f.standard_width) return (f.target + index) & 0xffff;
-	u32 const logical = (f.target + index) & 0x7fffff;
-	return f.mapped && !(logical & 0x8000) ? logical & 0xffff : logical;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 tms320c54x_test_state::delay_load_fixture tms320c54x_test_state::delay_dld_case(unsigned v)
 {
 	auto f = delay_load_case(v);

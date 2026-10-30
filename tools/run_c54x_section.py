@@ -400,6 +400,8 @@ def main():
     counts['scalar_shift16_load'] = 18176
     counts['scalar_variable_load'] = 5248
     counts['mcbsp_control'] = 16
+    counts['repeated_write_a'] = 4800
+    counts['repeated_write_a16'] = 4800
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216

@@ -158,6 +158,8 @@ private:
 		unsigned const index = cursor;
 		if (index < events.size() && events[index].minimum_program_events)
 			require(m_program_cursor >= *events[index].minimum_program_events, "instruction extensions precede operand bus access");
+		if (index < events.size() && events[index].program_events_before)
+			require(m_program_cursor == *events[index].program_events_before, "exact program/data transaction ordering");
 		if (!accept_data_event(events,cursor,actual)) return false;
 		{
 			auto const disable = m_machine.disable_side_effects();
