@@ -1272,17 +1272,23 @@ interrupts and control-delay compositions need separate acceptance.
 
 ### Signed MAC/MAS with a BK operand
 
-`--profile mac-bk` passes 98,304 cases and save/replays: MAC, MACR, MAS
-and MASR, both destinations, direct/absolute BK addressing, 64 T/BK pairs,
-16 FRCT/OVM/SMUL/SXM combinations, two pages and three checkpoints.
+`memory_mac` owns 15,616 cases/replays across MAC/MACR/MAS/MASR,
+SQURA/SQURS, both destinations and 16 FRCT/OVM/SMUL/SXM combinations.
+Full 64 T/memory pairs use indirect RAM; address-routing cases cover
+indirect/absolute RAM, absolute AR1 and direct/absolute BK with four
+representative pairs. Pages/checkpoints are distributed instead of the old
+208,896 numerical/address cross-product executions.
 The existing multiply-accumulate pipeline samples BK once in Read, preserves
 T, and publishes the signed accumulation/subtraction with optional rounding,
 saturation and sticky overflow. Poisoning BK and T after Read proves that
 the operation retains its operands and does not overwrite their later values.
 The non-destination accumulator, status and absence of data writes are checked.
 
-The shared fixture's original `mac-smem` population also passes 73,728
-cases and save/replays, now with an explicit unchanged-T assertion at Read.
+Square operations alone publish T at Read. The exact Read, later operand/T
+poison, Execute result/flags and retained extension are checked; no Writes
+occur. NOP spacing preserves the original standalone mapped-square context:
+an adjacent IDLE trips a separate control-composition admission guard.
+The old factories/setup/result branches and two profiles are removed.
 Admission is limited to the signed accumulating `28xx..2fxx` family;
 other BK operand families, additional special registers, control-delay
 composition and physical silicon phase placement are not established here.
@@ -2467,7 +2473,7 @@ accumulators, SXM/OVM combinations, gaps 0/1, two pages and three snapshots.
 Upper bits of the source word do not overwrite other ST1 flags. The isolated
 `t-load-control` reuses 52,224 existing RAM/mapped T-load and 768 multiply-pair
 cases, with 52,992 restores, to protect Read-owned T publication without a
-retirement rewrite. The 73,728-case MAC/MAS and delayed-comparison controls
+retirement rewrite. The `memory_mac` and delayed-comparison controls
 also pass after the shared-path rename. General ASM-load interrupt/control-delay
 composition, mapped sources and measured physical phase timing remain unvalidated.
 

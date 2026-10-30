@@ -174,7 +174,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"rptb-call"}, [](self &test) { test.start_block_near_call(); } },
 		{ {"rpt-mem-copy", "rpt-mem-wrap", "rpt-mem-chain"}, [](self &test) { test.start_memory_copy_repeat(); } },
 		{ {"st-extended-ar", "st-ar-consumer", "st-shift-ar", "st-shift-ar-use"}, [](self &test) { test.start_extended_ar_store(); } },
-		{ {"mac-smem", "mac-bk"}, [](self &test) { test.start_mac_smem(); } },
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {

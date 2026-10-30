@@ -577,14 +577,6 @@ private:
 	static memory_copy_repeat_fixture memory_copy_repeat_case(unsigned v, bool wrap = false, bool chain = false);
 	void set_repeat_count_source(u16 address, u16 value);
 	void start_memory_copy_repeat(unsigned variant = 0);
-	struct mac_smem_fixture
-	{
-		u16 opcode, memory, t, st0, st1, pmst, address, result_st0;
-		u64 a, b, result;
-		unsigned read;
-		u32 base = 0;
-	};
-	static mac_smem_fixture mac_smem_case(unsigned variant, bool bk = false, bool square = false);
 	struct poly_fixture
 	{
 		unsigned form, iterations, checkpoint;
@@ -621,7 +613,6 @@ private:
 	static u16 product_input_t(register_product_fixture const &f);
 	static std::array<u64,3> register_product_reference(register_product_fixture const &f);
 	void start_register_product(unsigned variant = 0);
-	void start_mac_smem(unsigned variant = 0);
 	using fcala_delay_fixture = c54x_test::fcala_delay_fixture;
 	static fcala_delay_fixture fcala_delay_case(unsigned v);
 	void start_fcala_delay(unsigned variant = 0);
