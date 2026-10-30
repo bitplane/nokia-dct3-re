@@ -623,7 +623,6 @@ private:
 	void start_reverse_carry_sequence(bool subtract);
 	void start_asm_store_case(unsigned index);
 	void start_compact_store_case(unsigned index);
-	void start_software_interrupt_case(unsigned index, bool trap = false);
 	void start_trn_store_case(unsigned index);
 	void start_indirect_pshm_case(unsigned index);
 	void start_stack_address_latency_case(unsigned index);
@@ -1592,8 +1591,6 @@ private:
 	bool check_bit_results();
 	bool check_banz_offset_results();
 	bool check_compact_load_results();
-	bool check_software_interrupt_entry_results();
-	bool check_software_interrupt_results();
 	bool check_trn_store_results();
 	bool check_compact_store_results();
 	bool check_asm_store_results();

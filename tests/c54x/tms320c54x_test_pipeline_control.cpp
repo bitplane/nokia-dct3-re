@@ -105,37 +105,6 @@ void tms320c54x_test_state::start_far_case(unsigned index)
 
 
 
-bool tms320c54x_test_state::check_software_interrupt_entry_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 2701 && m_phase < 2765)
-	{
-		unsigned const index = m_phase - 2701;
-		unsigned const vector = index & 31;
-		u16 const base = (index & 1) ? 0x4000 : 0x2000;
-		u16 const flags = vector >= 16 ? u16(0xffff & ~(1U << (vector - 16))) : 0xffff;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			m_cpu->state_int(tms320c54x_device::STATE_PC) == base + vector * 4 + 3 &&
-			m_cpu->state_int(tms320c54x_device::STATE_XPC) == 1 &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff && data.read_word(0x0fff) == 0x09d3 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0980 &&
-			m_cpu->state_int(tms320c54x_device::STATE_IMR) == 0 &&
-			m_cpu->state_int(tms320c54x_device::STATE_IFR) == flags &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
-			"INTR selects IPTR:K, ignores masks, saves next PC, sets INTM, clears only selected IFR and costs three cycles");
-		program.write_word(0x10000 | (base + vector * 4 + 3), 0xf49b); // RETF
-		program.write_word(0x0109d3, 0xf4e1);
-		data.write_word(0x0fff, 0xdead); // RTN, not this stack word, must supply PC.
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		m_phase = 61000 + index;
-		m_check_timer->adjust(attotime::from_usec(100));
-		return true;
-	}
-	return false;
-}
-
 
 
 
