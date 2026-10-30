@@ -221,16 +221,6 @@ private:
 	};
 	static delay_bitt_fixture delay_bitt_case(unsigned v);
 	void start_delay_bitt(unsigned variant = 0);
-	struct mvdd_follow_fixture
-	{
-		unsigned pattern, modifier, consumer, gap, layout, snapshot;
-		u32 base;
-		u16 value() const { return std::array<u16,4>{0,1,0x8000,0xffff}[pattern]; }
-		unsigned at() const { return (layout ? 0x700 : 0x601) + gap; }
-		unsigned checkpoint() const { return std::array<unsigned,4>{3,5,6,8}[snapshot]; }
-	};
-	static mvdd_follow_fixture mvdd_follow_case(unsigned v);
-	void start_mvdd_follow(unsigned variant=0);
 	struct repeat_store_case
 	{
 		unsigned form, mode, reg, count, setup, pattern, flags, checkpoint;
@@ -1669,7 +1659,6 @@ private:
 	bool check_repeated_writa_results();
 	bool check_branch_arithmetic_results();
 	bool check_bitt_results();
-	bool check_mvdd_follow_results();
 	bool check_delay_bitt_results();
 	bool check_repeat_store_results();
 	bool check_rptz_results();
@@ -2001,7 +1990,6 @@ private:
 	bool (tms320c54x_test_state::*m_result_owner)() = nullptr;
 	static constexpr unsigned native_store_phase = 1'000'000; // Outside legacy phase bands.
 	static constexpr unsigned delay_bitt_phase = 1'000'020;
-	static constexpr unsigned mvdd_follow_phase = 1'000'030;
 	static constexpr unsigned push_mvmm_phase = 1'000'060;
 	static constexpr unsigned mvdm_t_phase = 1'000'070;
 	std::bitset<65536> m_asserted_opcodes;

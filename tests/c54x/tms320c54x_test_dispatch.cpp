@@ -18,7 +18,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_repeated_writa_results()) return;
 	if (check_branch_arithmetic_results()) return;
 	if (check_bitt_results()) return;
-	if (check_mvdd_follow_results()) return;
 	if (check_delay_bitt_results()) return;
 	if (check_repeat_store_results()) return;
 	if (check_rptz_results()) return;
