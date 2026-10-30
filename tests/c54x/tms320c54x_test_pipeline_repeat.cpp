@@ -700,23 +700,6 @@ void tms320c54x_test_state::set_repeat_count_source(u16 address, u16 value)
 }
 
 
-std::array<u64,3> tms320c54x_test_state::square_repeat_step(poly_fixture const &f, std::array<u64,3> state, unsigned ordinal)
-{
-	unsigned const destination = f.operation & 1;
-	s64 const old = state[destination] & 0x8000000000ULL ? s64(state[destination]) - 0x10000000000LL : s64(state[destination]);
-	s64 const sample = s16(square_repeat_memory(f, ordinal));
-	s64 product = sample * (f.tmac ? s16(f.t) : sample) * (f.st1 & 0x40 ? 2 : 1);
-	if (f.tmac && (f.pmst & 2) && (f.st1 & 0x240) == 0x240) product = std::clamp(product,s64(-2147483648LL),s64(2147483647LL));
-	s64 result = old + (f.operation & (f.tmac ? 4 : 2) ? -product : product);
-	if (f.tmac && (f.operation & 2)) result = (result + 32768) & ~s64(65535);
-	if (result < -2147483648LL || result > 2147483647LL)
-	{
-		state[2] |= destination ? 0x200 : 0x400;
-		if (f.st1 & 0x200) result = result < 0 ? -2147483648LL : 2147483647LL;
-	}
-	state[destination] = u64(result) & 0xffffffffffULL; return state;
-}
-
 tms320c54x_test_state::delayed_conditional_call_fixture tms320c54x_test_state::delayed_conditional_call_case(unsigned v, bool tc)
 {
 	delayed_conditional_call_fixture f{};

@@ -425,6 +425,10 @@ def main():
     counts['mmr_bus'] = 1
     counts['repeated_stld'] = 456
     counts['repeated_parallel_alu'] = 1400
+    counts['repeated_dual_mac'] = 4288
+    counts['repeated_square'] = 1572
+    counts['repeated_tmac'] = 3144
+    counts['repeated_poly'] = 576
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216

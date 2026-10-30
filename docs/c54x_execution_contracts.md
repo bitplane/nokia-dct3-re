@@ -4362,9 +4362,11 @@ Each copy retains two RAM reads, publishes X to T in Read, and reads its
 feedback accumulator in Execute. MPY/MACSU and parallel-store repeat families
 are not admitted by this change.
 
-`mac-rpt` passes 98,304 cases plus replay: four operations, all four source/
+`repeated_dual_mac` owns4288 independent cases/restores: four operations, all four source/
 destination accumulator pairings, four operand/accumulator patterns, sixteen
-FRCT/OVM/SMUL/SXM combinations, counts 0/1/7/255, two pages and three snapshots.
+FRCT/OVM/SMUL/SXM combinations at eight copies. A separate bank covers1/2/256
+copies per form/op/selector with assigned numeric boundaries. Pages and snapshots
+are distributed, not multiplied; full long-count × numeric correlation is lost.
 The four address layouts cover fixed pointers, the ROM's exact `b09a`
 post-increment form, decrement/increment, and conflicting modifiers on an
 aliased AR. Both aliased reads retain the original address and X's update wins
@@ -4389,11 +4391,12 @@ Read and the retained sample is squared against the live Execute accumulator
 (SPRU172C 4-163/4-164). FRCT scales the square, OVM controls saturation,
 SMUL does not clamp it, and carry is unchanged.
 
-`sqacc-repeat` passes 49,152 cases plus replay: add/subtract, A/B destinations,
+`repeated_square` owns1572 independent cases/restores: add/subtract, A/B destinations,
 DP/plain/post-increment RAM sources, eight input/accumulator patterns, sixteen
-FRCT/SXM/OVM/SMUL combinations, counts 0/1/7/255, two program pages and four
-snapshots. An independent expectation checks every accumulator/status clock.
-Fixed-address inputs alternate after each read; post-increment inputs vary
+FRCT/SXM/OVM/C16 combinations at eight copies, plus assigned numeric boundaries
+for1/2/256 copies per form/op. Pages and four snapshots are distributed rather
+than multiplied. An integer expectation checks every accumulator/status clock.
+Fixed-address inputs change after each read; post-increment inputs vary
 by address and consumed words are poisoned. The body opcode is overwritten
 after capture, and a newer T is installed after the final Read. It checks
 one opcode fetch, exact reads, no CPU data writes, and final continuation.
@@ -5475,10 +5478,12 @@ live destination accumulator at Execute, and does not publish T. Rounding,
 fractional multiplication, PMST.SMUL product saturation, accumulator
 saturation and sticky destination overflow retain ordinary-instruction semantics.
 
-`tmac-repeat` passes 98,304 cases and cleared-pipeline replays: both
+`repeated_tmac` owns3144 independent cases and cleared-pipeline replays: both
 destinations, four operations, DP/plain/postincrement RAM forms, eight
-operand/accumulator patterns, sixteen flag configurations, counts 0/1/7/255,
-two program pages and four snapshots. It checks every accumulator publication,
+operand/accumulator patterns and sixteen flag configurations at eight copies.
+The count bank covers1/2/256 copies per form/op with assigned numeric boundaries;
+the retained C16/SMUL setting remains coupled as in its input contract. Two pages
+and four snapshots are distributed, not multiplied. It checks every accumulator publication,
 one source read per iteration, a single retained opcode, source/opcode poisoning,
 and preservation of a newer T value after the last Read.
 This is bounded instruction qualification, not measured silicon timing or

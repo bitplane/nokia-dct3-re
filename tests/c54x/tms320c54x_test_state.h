@@ -394,28 +394,6 @@ private:
 	static memory_copy_repeat_fixture memory_copy_repeat_case(unsigned v, bool wrap = false, bool chain = false);
 	void set_repeat_count_source(u16 address, u16 value);
 	void start_memory_copy_repeat(unsigned variant = 0);
-	struct poly_fixture
-	{
-		unsigned form, iterations, checkpoint;
-		u32 base;
-		u16 st0, st1, t;
-		u64 a, b;
-		bool square = false;
-		bool tmac = false;
-		unsigned operation = 0;
-		bool dual = false;
-		unsigned selector = 0;
-		u16 xseed = 0, yseed = 0, pmst = 0;
-	};
-	poly_fixture poly_case(unsigned variant) const;
-	static u16 poly_memory(unsigned ordinal);
-	static u16 square_repeat_memory(poly_fixture const &f, unsigned ordinal);
-	static u16 mac_repeat_address(poly_fixture const &f, unsigned ordinal, bool y);
-	static u16 mac_repeat_memory(poly_fixture const &f, unsigned ordinal, bool y);
-	static std::array<u64,3> mac_repeat_step(poly_fixture const &f, std::array<u64,3> state, unsigned ordinal);
-	static std::array<u64,3> square_repeat_step(poly_fixture const &f, std::array<u64,3> state, unsigned ordinal);
-	static std::array<u64,3> poly_reference(poly_fixture const &f);
-	void start_poly(unsigned variant = 0);
 	struct register_product_fixture
 	{
 		u16 opcode, t, st0, st1, pmst;
@@ -699,7 +677,7 @@ private:
 	bool check_staged_conditional_store_results();
 	bool check_mapped_dual_results();
 	bool check_repeat_mvdp_irq_results();
-	bool check_poly_results();
+	bool check_register_product_results();
 	bool check_popd_mapped_results();
 	bool check_block_branch_count_results();
 	bool check_bd_long_accumulator_results();
@@ -741,7 +719,6 @@ private:
 	unsigned m_vector_reads = 0, m_vector_acks = 0;
 	std::stringstream m_saved_pipeline;
 	std::vector<std::pair<offs_t, u16>> m_observed_instructions, m_saved_observed_instructions;
-	std::vector<std::array<u64, 3>> m_repeat_load_expected;
 	u64 m_pipeline_expected_cycle = 0;
 	bool m_pipeline_memory_case = false;
 	unsigned m_pipeline_operand_reads = 0;
