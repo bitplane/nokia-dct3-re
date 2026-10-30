@@ -1396,15 +1396,22 @@ disassembling their actual page-zero backing identifies the restore and
 `FRETE` instructions. Do not infer execution of zero-filled code from that
 history rendering.
 
-`repeat-body-isr` reproduces the defect independently: the pre-fix first
-case performs one of two copies and exits with BRC=`1`, BRAF set. The
-return paths now rebuild fetch prediction from firmware-restored
+`body_repeat_restore` checks this reconstruction independently. The
+return paths rebuild fetch prediction from software-restored
 RSA/REA/BRC/ST1 before fetching the continuation: Execute for an ordinary
 far return, Read for a delayed far return. No hidden loop-context stack,
 firmware-address hook or shift-domain relaxation is introduced.
 
-The fixture passes 768 cases and save/replays: outer counts 1/2/7/56,
-ISR counts 0/1/3/63, IRQ/NMI, two pages, FRETE/FRETED and six snapshots.
+The independent fixture owns128 cases/restores: outer counts1/2/7/56,
+ISR counts0/1/3/63, IRQ/NMI, both pages and FRETE/FRETED. Six checkpoints
+are distributed across the decode boundary and completed bus prefixes during
+save/inner-loop/restore/resume, not crossed with every input. The complete
+ordered trace covers real source copies, hardware return frame, software MMR
+saves, ISR loop and poisoned stack pops. Each return word equals live RTN
+within the unexecuted-body range. Delayed FRETED reads the page before the
+pending ST1 write; ordinary FRETE reads it later. This is observed model
+ordering, not a physical bus-phase claim. A wrong BRC restoration fails at its
+controller write, before the final pointer/memory checks.
 It checks ordered source/destination words, exact saved register values,
 seven balanced stack accesses in each direction, retained stack samples
 after backing-memory mutation, and one resumed continuation. The ISR's
@@ -3184,9 +3191,9 @@ save-state round trip and exact original MU4 resident-memory comparison pass.
 Tooling acceptance at that checkpoint was 2,878 tests (one skip). These
 isolated scopes are distinct from the current full default population above.
 
-The direct-ISR-return checkpoint at `59f4285f` renews the full default population: all
+The direct-ISR-return checkpoint at `59f4285f` renewed the then-default population: all
 288 required markers exactly once, expected completion exit and terminal
-completion check. `repeat-body-isr` passes 768 cases and save/replays.
+completion check. At that revision, `repeat-body-isr` passed768 cases and save/replays.
 Controls `repeat-isr`, `repeat-context`, `repeat-pmst`, `repeat-popd`,
 `rptbd-irq`, `rptb-fcall`, `rptb-bd`, `rptb-bcd` and `rptb-banz` pass.
 Tooling acceptance is 2,877 tests (one skip), and the native 5110

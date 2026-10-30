@@ -429,6 +429,7 @@ def main():
     counts['repeated_square'] = 1572
     counts['repeated_tmac'] = 3144
     counts['repeated_poly'] = 576
+    counts['body_repeat_restore'] = 128
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216

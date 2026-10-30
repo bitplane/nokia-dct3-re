@@ -61,8 +61,10 @@ public:
 		}
 		// A clock's mutations follow observation but precede snapshot capture.
 		apply_actions(false);
-		if (m_tick == m_input.checkpoint && !m_replay)
+		if (!m_replay && !m_checkpoint_tick && m_tick>=m_input.checkpoint &&
+			(!m_input.checkpoint_after_data_events || m_data_cursor>=*m_input.checkpoint_after_data_events))
 		{
+			m_checkpoint_tick=m_tick;
 			m_saved_fetches = m_fetches;
 			m_saved_data_cursor = m_data_cursor;
 			m_saved_io_cursor = m_io_cursor;
@@ -78,6 +80,7 @@ public:
 		}
 		if (m_tick == m_input.finish)
 		{
+			require(m_checkpoint_tick, "requested checkpoint bus prefix was reached");
 			if (m_input.final_pipeline_clock) require(m_cpu.pipeline_cycles() == *m_input.final_pipeline_clock, "final pipeline clock matches the declared stop");
 			if (m_input.require_idle) require(m_cpu.state_int(tms320c54x_device::STATE_IDLE), "sequence reaches its real IDLE instruction");
 			if (m_input.single_fetch) require(m_fetches == 1, "one opcode fetch");
@@ -100,7 +103,7 @@ public:
 			require(m_program_cursor == (m_input.program_events.empty() ? m_input.retained_program_reads.size() : m_input.program_events.size()), "complete retained-program trace");
 			if (!m_replay)
 			{
-				m_replay = true; m_tick = m_input.checkpoint; m_fetches = m_saved_fetches;
+				m_replay = true; m_tick = m_checkpoint_tick; m_fetches = m_saved_fetches;
 				m_data_cursor = m_saved_data_cursor;
 				m_io_cursor = m_saved_io_cursor;
 				m_bio_cursor = m_saved_bio_cursor; m_bio_level = m_saved_bio_level;
@@ -305,7 +308,7 @@ private:
 					++m_program_cursor;
 				});
 		}
-		m_tick = 0; m_replay = m_resume = false;
+		m_tick = m_checkpoint_tick = 0; m_replay = m_resume = false;
 		m_cpu.set_pipeline_frontend(m_input.pipeline_frontend);
 		for (auto const &line : m_input.initial_input_lines) m_cpu.set_input_line(line.index, line.value);
 		m_observing_outputs = true;
@@ -315,6 +318,7 @@ private:
 	tms320c54x_device &m_cpu;
 	emu_timer &m_timer;
 	unsigned m_cases, m_case = 0, m_tick = 0, m_restores = 0;
+	unsigned m_checkpoint_tick=0;
 	unsigned m_fetches = 0, m_saved_fetches = 0;
 	unsigned m_data_cursor = 0, m_saved_data_cursor = 0;
 	unsigned m_io_cursor = 0, m_saved_io_cursor = 0;

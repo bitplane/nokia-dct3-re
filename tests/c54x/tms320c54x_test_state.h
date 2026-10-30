@@ -450,9 +450,6 @@ private:
 	static saved_repeat_fixture saved_repeat_case(unsigned v);
 	u16 saved_repeat_word(saved_repeat_fixture const &f, unsigned slot) const;
 	void start_saved_repeat(unsigned variant = 0);
-	static saved_repeat_fixture body_repeat_case(unsigned v);
-	u16 body_repeat_word(saved_repeat_fixture const &f, unsigned slot) const;
-	void start_body_repeat(unsigned variant = 0);
 	using repeat_context_fixture = c54x_test::repeat_context_fixture;
 	static repeat_context_fixture repeat_context_case(unsigned v);
 	u16 repeat_context_word(repeat_context_fixture const &f, unsigned part) const;
@@ -666,7 +663,6 @@ private:
 	bool check_memory_repeat_results();
 	bool check_asm_store_results_part2();
 	bool check_fcala_delay_results();
-	bool check_body_repeat_results();
 	bool check_saved_repeat_results();
 	bool check_repeat_context_results();
 	bool check_delayed_call_replay_results();
@@ -735,7 +731,7 @@ private:
 	bool m_pipeline_replay = false;
 	instruction_observer_fixture m_instruction_observer;
 	rptbd_observations m_rptbd_counts, m_rptbd_saved_counts;
-	replay_fixture<saved_repeat_observations> m_saved_irq_repeat, m_body_irq_repeat;
+	replay_fixture<saved_repeat_observations> m_saved_irq_repeat;
 	replay_fixture<repeat_context_observations> m_repeat_context;
 	replay_fixture<fcala_delay_observations> m_fcala_delay;
 	u16 m_rptbd_return = 0, m_rptbd_saved_return = 0;

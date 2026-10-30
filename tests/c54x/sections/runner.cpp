@@ -215,6 +215,14 @@ protected:
 #endif
 				return m_cases.at(i);
 			});
+#ifdef C54X_SECTION_CONTEXT_POP_POISON
+		m_fixture->set_data_observer([this](bool write,u32 address,u16 word) {
+			if (!write && address>=0x2ff9 && address<0x3000) {
+				auto const disable=machine().disable_side_effects();
+				m_cpu->space(AS_DATA).write_word(address,word^0xffff);
+			}
+		});
+#endif
 #ifdef C54X_SECTION_IDLE_DMA
 		m_fixture->set_data_observer([this](bool write,u32 address,u16) {
 			if (!write || address<0x530 || address>0x533) return;

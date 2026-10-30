@@ -105,7 +105,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"rptb-ccd"}, [](self &test) { test.start_block_conditional_call(); } },
 		{ {"repeat-isr"}, [](self &test) { test.start_saved_repeat(); } },
 		{ {"repeat-stlm"}, [](self &test) { test.start_saved_repeat(); } },
-		{ {"repeat-body-isr"}, [](self &test) { test.start_body_repeat(); } },
 		{ {"repeat-context"}, [](self &test) { test.start_repeat_context(); } },
 		{ {"repeat-pmst"}, [](self &test) { test.start_repeat_context(); } },
 		{ {"repeat-popd"}, [](self &test) { test.start_repeat_context(); } },
@@ -402,7 +401,6 @@ void tms320c54x_test_state::expect(bool condition, const char *message)
 		switch (m_phase)
 		{
 		case 255800: case 255810: progress(m_saved_irq_repeat); break;
-		case 255840: case 255850: progress(m_body_irq_repeat); break;
 		case 255480: case 255490: progress(m_repeat_context); break;
 		case 255820: case 255830: progress(m_fcala_delay); break;
 		case 292000: case 292010: progress(m_instruction_observer); break;
