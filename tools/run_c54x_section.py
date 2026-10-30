@@ -168,6 +168,7 @@ def main():
     counts['move_brc'] = 460
     counts['indexed_mar'] = 1024
     counts['move_sp'] = 64
+    counts['move_data'] = 104
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

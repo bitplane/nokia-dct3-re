@@ -137,13 +137,6 @@ private:
 	void verify_paired_circular_domain();
 	static dst_extended_fixture extended_dst_fixture(unsigned variant);
 	void start_pipeline_extended_dst(unsigned variant = 0);
-	struct mvkd_fixture
-	{
-		unsigned form, read_cycle;
-		u16 source, destination, next_ar, value;
-	};
-	static mvkd_fixture data_copy_fixture(unsigned variant);
-	void start_pipeline_data_copy(unsigned variant = 0);
 	struct long_pair_fixture_data
 	{
 		unsigned form, reg, read_cycle;
@@ -1383,7 +1376,6 @@ private:
 	bool check_pipeline_peripheral_logic_results();
 	bool check_mvdd_source_results();
 	bool check_extended_ar_store_results();
-	bool check_data_copy_results();
 	bool check_accumulator_shift_results();
 	bool check_peripheral_long_store_results();
 	bool check_branch_repeat_results();

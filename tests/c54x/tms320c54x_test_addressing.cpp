@@ -228,54 +228,7 @@ void tms320c54x_test_state::start_pipeline_extended_dst(unsigned variant)
 
 
 
-tms320c54x_test_state::mvkd_fixture tms320c54x_test_state::data_copy_fixture(unsigned variant)
-{
-	unsigned const form = variant % 7, kind = (variant / 7) % 4;
-	u16 const destination = std::array<u16, 7>{0x402, 0x1002, 0x1000, 0x1000, 0x1001, 0x1500, 0x11}[form];
-	u16 const next_ar = form == 2 || form == 4 ? 0x1001 : form == 3 ? 0xfff : 0x1000;
-	u16 const source = std::array<u16, 4>{0x11, 0x1400, destination, 0x12}[kind];
-	u16 const value = kind == 0 ? next_ar : std::array<u16, 4>{0, 1, 0x8000, 0xf495}[(variant / 28) % 4];
-	return {form, form == 5 ? 7U : 6U, source, destination, next_ar, value};
-}
 
-void tms320c54x_test_state::start_pipeline_data_copy(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = data_copy_fixture(variant);
-	u32 const base = (variant / 112) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0x7000 | std::array<u16, 7>{2, 2, 0x91, 0x89, 0x99, 0xf8, 0x11}[f.form]);
-	program.write_word(base + 0x601, f.form == 5 ? f.destination : f.source);
-	if (f.form == 5) program.write_word(base + 0x602, f.source);
-	if (f.form == 6) program.write_word(base + 0x602 + ((variant / 112) % 2), 0xf4a9); // CMPR with zero/one gap (table 7-7).
-	// A preceding shared fixture finishes in architectural IDLE.
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0},
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, f.form == 6 ? 0xa600 : 0xa608}, {cpu_regs::STATE_ST1, 0x900 | (f.form == 1 ? 0x4000 : 0)},
-		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR1, 0x1000}, {cpu_regs::STATE_AR0, f.value},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	if (f.destination >= 0x60) m_cpu->space(AS_DATA).write_word(f.destination, 0xaaaa);
-	if (f.source != 0x11 || (variant / 7) % 4 != 0) m_cpu->space(AS_DATA).write_word(f.source, f.value);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_store_writes = m_pipeline_extensions_reads = m_pipeline_operand_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mvkd_source",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == f.source && word == f.value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read_cycle,
-				"MVKD samples its retained literal source once after destination-pointer modification"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "mvkd_destination",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == f.destination && word == f.value && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == f.read_cycle + (f.form != 6),
-				"MVKD publishes the retained source once to its original destination"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + (f.form == 5 ? 0x602 : 0x601), "mvkd_literals",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_extensions_reads < (f.form == 5 ? 2 : 1) && (at & 0xffff) == 0x601 + m_pipeline_extensions_reads &&
-				word == (f.form == 5 && !m_pipeline_extensions_reads ? f.destination : f.source), "MVKD retains address/source literals in original order"); ++m_pipeline_extensions_reads; });
-	m_phase = 252590; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::long_store_fixture tms320c54x_test_state::immediate_long_store_fixture(unsigned variant)
 {
@@ -3722,7 +3675,6 @@ bool tms320c54x_test_state::check_extended_ar_store_results()
 			if (variant < 12287) { start_pipeline_extended_dst(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged extended DST: PASS cases=3072 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=4 compatibility=0,1 sst=0,1 restore=3072 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
 			osd_printf_info("TMS320C54x staged short-indirect DST: PASS cases=9216 modes=12 registers=8 accumulators=2 parity=even,odd compatibility=0,1 sst=0,1 restore=9216 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
-			start_pipeline_data_copy(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
@@ -3734,67 +3686,6 @@ bool tms320c54x_test_state::check_extended_ar_store_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_data_copy_results()
-{
-	if (m_phase == 252590)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		auto const f = data_copy_fixture(variant);
-		u32 const base = (variant / 112) % 2 ? 0x20000 : 0;
-		unsigned const checkpoint = f.read_cycle - 2 + std::array<unsigned, 3>{0, 2, 3}[variant / 224];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "MVKD has distinct retained source and destination ownership");
-		if (tick == f.read_cycle - 2)
-		{
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, m_cpu->state_int(tms320c54x_device::STATE_ST1) ^ 0x4000);
-			auto const disable = machine().disable_side_effects();
-			m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead);
-			if (f.form == 5) m_cpu->space(AS_PROGRAM).write_word(base + 0x602, 0xbeef);
-		}
-		if (tick == f.read_cycle - 1)
-		{
-			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x2000);
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, (m_cpu->state_int(tms320c54x_device::STATE_ST0) & ~0x1ff) | 9);
-		}
-		if (tick == f.read_cycle)
-		{
-			auto const disable = machine().disable_side_effects();
-			if (f.source >= 0x60) m_cpu->space(AS_DATA).write_word(f.source, 0xdead);
-			if (f.form != 6) m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x2000);
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0xbeef);
-		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_extensions_reads, m_pipeline_operand_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save MVKD after Decode, source read or write");
-		}
-		if (tick == 24)
-		{
-			{
-				auto const disable = machine().disable_side_effects();
-				bool const equal = (variant / 112) % 2 || (variant / 7) % 4 == 0 || (variant / 7) % 4 == 2;
-				expect(m_pipeline_store_writes == 1 && m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == (f.form == 5 ? 2 : 1) &&
-					m_cpu->space(AS_DATA).read_word(f.destination) == f.value && (f.form != 6 || BIT(m_cpu->state_int(tms320c54x_device::STATE_ST0), 12) == equal),
-					"MVKD preserves its sample and allows a Category-I AR consumer after one intervening instruction");
-			}
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_pipeline_operand_reads = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(252600, "Restore MVKD without duplicate sampling or publication");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 671) { start_pipeline_data_copy(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged MVKD: PASS cases=672 forms=DP,CPL,postincrement,postdecrement,preincrement,absolute,AR sources=AR1,RAM,alias,AR2 values=4 pages=2 category_i_gaps=0,1 restore=672 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
-			start_pipeline_long_mvkd(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252600)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252590;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 
 bool tms320c54x_test_state::check_rptbd_t_load_results()
