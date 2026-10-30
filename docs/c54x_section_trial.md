@@ -208,6 +208,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `reada_accumulator.h` | Keep all six accumulator destinations ×four program-word boundaries ×direct/absolute forms. Preserve held full program address after live-A replacement, merge into the newer live accumulator without neighboring-lane loss, guard masking, exact program Read9/10 and mapped Write10/11, status, terminal PC/IDLE and replay. Distribute two source pages and three snapshots; deliberately lose their exhaustive pairings. | Native48 cases/restores versus288; build5.428s/run0.036s. Delete setup, phases253610/253620, route/declaration; rename the surviving checker for its sole MVDD bank. |
 
+| `dual_memory_copy.h` | Keep all256 X/Y encodings, three alias/overlap layouts, linear/circular addressing, four standalone words, repeat counts0/1/15 and short/long RPT. Preserve Access-owned addresses/X-priority shared-AR update, pointer/source poison, next-Read-before-older-Write streaming memory, exact copy/opcode/count transactions, deferred IRQ/NMI with complete stack write/read, caller-page PC/SP/status/RC and replay. Distribute pages/four checkpoints and repeated IRQ modes; deliberately lose their exhaustive cross-products, while each encoding still sees none/IRQ/NMI. Mapped/memory-count forms remain excluded; no silicon phase claim. | Native15360 cases/restores versus270336; build5.630s/run5.766s. Delete both profile routes, setup/helper/cached fixture, phases254140/254150 checker/declarations/dispatch, and phase-keyed ACK hook. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).

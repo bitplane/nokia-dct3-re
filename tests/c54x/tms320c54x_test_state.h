@@ -641,19 +641,6 @@ private:
 	void start_standard_swwsr_test();
 	void start_bus_register_test();
 	void start_atomic_io_composition(unsigned variant = 0);
-	struct mvdd_fixture
-	{
-		unsigned x, y, count, irq, prefix, snapshot;
-		bool repeated, linear;
-		u32 base;
-		u16 input, st0, st1;
-		std::array<u16, 4> initial, final;
-		std::array<u16, 16> source, destination, word;
-		unsigned first_write() const { return 6 + prefix; }
-		static u16 seed(unsigned address) { return 0xa500U ^ ((address - 0x1000) * 73U); }
-	};
-	static mvdd_fixture mvdd_case(unsigned v, bool repeated);
-	void start_mvdd(unsigned variant = 0);
 	struct popd_fixture
 	{
 		unsigned mode, count, prefix, irq, snapshot;
@@ -1520,7 +1507,6 @@ private:
 	bool check_ifr_pair_results();
 	bool check_poly_results();
 	bool check_delayed_far_call_results();
-	bool check_mvdd_results();
 	bool check_absolute_logic_results();
 	bool check_popd_mapped_results();
 	bool check_accumulator_branch_results();
@@ -1694,7 +1680,6 @@ private:
 	u16 m_middle_port_value = 0;
 	u16 m_last_port_value = 0;
 	// Immutable case inputs remain unchanged across each manual replay.
-	mvdd_fixture m_mvdd_fixture = {};
 	popd_fixture m_popd_fixture = {};
 	accumulator_branch_fixture m_acc_branch_fixture = {};
 	offset_logic_fixture m_offset_logic_fixture = {};

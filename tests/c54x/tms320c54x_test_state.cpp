@@ -193,8 +193,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"drsub", "long-pair"}, [](self &test) { test.start_pipeline_long_pair(); } },
 		{ {"xmem-store"}, [](self &test) { test.start_xmem_store(); } },
 		{ {"xmem-load", "xmem-alu"}, [](self &test) { test.start_xmem_load(); } },
-		{ {"mvdd"}, [](self &test) { test.start_mvdd(); } },
-		{ {"mvdd-repeat"}, [](self &test) { test.start_mvdd(); } },
 		{ {"logic-absolute"}, [](self &test) { test.start_absolute_logic(); } },
 		{ {"popd-mapped", "popd-repeat"}, [](self &test) { test.start_popd_mapped(); } },
 		{ {"popd-edges"}, [](self &test) { test.start_popd_edges(); } },
@@ -717,7 +715,6 @@ void tms320c54x_test_state::test(machine_config &config)
 		if (m_phase == 62154) { auto const f = memory_copy_repeat_case(m_pipeline_peripheral_case); expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0, "Memory-count repeat defers its actual pending interrupt until all copies complete"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 254360) { unsigned const interrupt = m_pipeline_peripheral_case / 4096; expect(interrupt && line == (interrupt == 2 ? INPUT_LINE_NMI : 2) && !m_vector_acks, "In-block branch interrupt acknowledges its actual pending source once"); ++m_vector_acks; m_cpu->set_input_line(line, CLEAR_LINE); }
 		if (m_phase == 253980) { expect(line == ((m_pipeline_peripheral_case / 4) % 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_cpu->pipeline_cycles() == 6, "Stack ordering preserves the selected IRQ/NMI acknowledgement"); ++m_vector_acks; }
-		if (m_phase == 254140) { auto const &f = m_mvdd_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.first_write() + f.count, "MVDD acknowledges IRQ/NMI only after the final retained destination write"); ++m_vector_acks; }
 		if (m_phase == 254200) { auto const &f = m_popd_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.read_clock() + f.count + 1, "POPD acknowledges IRQ/NMI only after the last repeat iteration retires"); ++m_vector_acks; }
 		if (m_phase == 254240) { auto const &f = m_acc_branch_fixture; expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && !m_pipeline_store_writes && !m_pipeline_register_writes, "Accumulator branch completes target selection before IRQ without allocating a call frame"); ++m_vector_acks; }
 		if (m_phase == 254070) { auto const f = repeat_push_case(m_pipeline_peripheral_case); expect(f.interrupt && line == (f.interrupt == 2 ? INPUT_LINE_NMI : 0) && !m_vector_acks && m_pipeline_store_writes == f.count + 1 && m_cpu->pipeline_cycles() > f.first_write() + f.count, "Repeated PSHD acknowledges IRQ/NMI only after its final Execute"); ++m_vector_acks; }
