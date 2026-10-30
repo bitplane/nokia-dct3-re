@@ -394,65 +394,6 @@ void tms320c54x_test_state::start_addm_brc_loop(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_bitt(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const form = variant % 8, selector = (variant / 8) % 16;
-	bool const invert = (variant / 256) % 2;
-	u16 const t = selector | ((variant / 128) % 2 ? 0xa5f0 : 0), mask = u16(1U << (15 - selector)), value = invert ? u16(~mask) : mask;
-	u16 const source = form == 5 ? 0x06d1 : 0x1201;
-	u32 const base = (variant / 1024) % 2 ? 0x20000 : 0;
-	bool const extended = form >= 5;
-	u8 const mode = std::array<u8, 8>{1, 1, 0x83, 0x8b, 0x93, 0xf8, 0xe3, 0xeb}[form];
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 12; ++i) program.write_word(base + 0x9000 + i, 0xf495);
-	program.write_word(base + 0x9000, 0x3400 | mode);
-	if (extended) program.write_word(base + 0x9001, form == 5 ? source : 1);
-	program.write_word(base + 0x9001 + unsigned(extended), 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(source, value);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa824 | ((variant / 512) % 2 ? 0x1000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0xb00 | (form == 1 ? 0x4000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1200); m_cpu->set_state_int(tms320c54x_device::STATE_T, t);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff12345678ULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x81abcdef01ULL);
-	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, ar == 3 ? (form >= 6 ? 0x1200 : 0x1201) : 0x4000 + ar);
-	m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "bitt_source",
-		[this, source, value, extended](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads && at == source && word == value && m_cpu->pipeline_cycles() == (extended ? 6 : 5), "BITT samples its memory operand once in Read"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "bitt_no_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "BITT never writes its memory operand"); });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x9001, base + 0x9001, "bitt_extension",
-		[this, extended](offs_t, u16 &, u16) { if (!machine().side_effects_disabled() && extended) { expect(!m_pipeline_extensions_reads, "BITT retains its address extension once"); ++m_pipeline_extensions_reads; } });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = bitt_phase;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_bitt_retd(unsigned variant)
-{
-	unsigned const form = variant % 2, selector = (variant / 2) % 16;
-	unsigned const basic = (form ? 6 : 5) + selector * 8 + ((variant / 32) % 2) * 128 + ((variant / 64) % 2) * 256 + ((variant / 128) % 2) * 512 + ((variant / 256) % 2) * 1024;
-	start_bitt(basic);
-	u32 const base = (variant / 256) % 2 ? 0x20000 : 0;
-	u16 const source = form ? 0x1201 : 0x06d1, mask = u16(1U << (15 - selector)), value = (variant / 64) % 2 ? u16(~mask) : mask;
-	m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove();
-	{
-		auto const disable = machine().disable_side_effects(); auto &program = m_cpu->space(AS_PROGRAM);
-		program.write_word(base + 0x9000, 0xfe00); program.write_word(base + 0x9001, form ? 0x34e3 : 0x34f8); program.write_word(base + 0x9002, form ? 1 : source);
-		program.write_word(base + 0x9003, 0xffff); program.write_word(base + 0x9100, 0xf4e1);
-		m_cpu->space(AS_DATA).write_word(0x2000, 0x9100);
-	}
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x2000);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "retd_bitt_reads",
-		[this, source, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_operand_reads < 2 && (m_pipeline_operand_reads ? at == source && word == value : at == 0x2000 && word == 0x9100), "RETD reads one return word before BITT reads its retained memory operand"); ++m_pipeline_operand_reads; });
-	m_pipeline_fetch_tap = m_cpu->space(AS_PROGRAM).install_read_tap(base + 0x9002, base + 0x9002, "retd_bitt_extension",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads, "RETD retains BITT's delay extension without refetch"); ++m_pipeline_extensions_reads; } });
-	m_pipeline_peripheral_case = variant; m_phase = bitt_phase + 2;
-}
 
 tms320c54x_test_state::delay_bitt_fixture tms320c54x_test_state::delay_bitt_case(unsigned v)
 {
@@ -3505,70 +3446,6 @@ void tms320c54x_test_state::start_staged_overflow(unsigned variant)
 
 
 
-bool tms320c54x_test_state::check_bitt_results()
-{
-	if (m_phase == bitt_phase)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, form = variant % 8;
-		bool const extended = form >= 5, invert = (variant / 256) % 2;
-		unsigned const read_tick = extended ? 6 : 5, checkpoint = std::array<unsigned, 3>{4, 6, 7}[variant / 2048];
-		u16 const t = (variant / 8) % 16 | ((variant / 128) % 2 ? 0xa5f0 : 0);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Staged BITT addressing is admitted");
-		if (tick == read_tick)
-		{
-			auto const disable = machine().disable_side_effects();
-			m_cpu->space(AS_DATA).write_word(form == 5 ? 0x06d1 : 0x1201, 0x5555);
-			m_cpu->set_state_int(tms320c54x_device::STATE_T, t ^ 15);
-		}
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_extensions_reads},
-			"Save BITT before or after retained Read and Execute");
-		if (tick == 20)
-		{
-			u16 const pointer = form == 3 ? 0x1200 : form == 4 ? 0x1202 : form == 6 ? 0x1200 : 0x1201;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(extended) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa824 | (!invert ? 0x1000 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0xb00 | (form == 1 ? 0x4000 : 0)) &&
-				m_cpu->state_int(tms320c54x_device::STATE_T) == (t ^ 15) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1200 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == pointer &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff12345678ULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x81abcdef01ULL, "BITT uses retained memory and T(3:0), changes only TC, and updates its address once");
-			if (replay_pipeline_at(bitt_phase + 1, checkpoint,
-				"Restore BITT without resampling memory or T")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 6143) { start_bitt(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged BITT: PASS cases=6144 restore=6144 forms=DP,SP,plain,postdec,postinc,absolute,long_offset,long_update selectors=16 t_high=2 values=2 tc_initial=2 pages=2 snapshots=3 reads=1 writes=0 retained_memory_t=1 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated staged BITT complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == bitt_phase + 1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = bitt_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == bitt_phase + 2)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 3>{4, 7, 10}[variant / 512];
-		u16 const t = (variant / 2) % 16 | ((variant / 32) % 2 ? 0xa5f0 : 0);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "RETD admits a two-word BITT as its complete delay span");
-		if (m_pipeline_operand_reads == 2 && !m_pipeline_store_writes)
-		{
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(variant % 2 ? 0x1201 : 0x06d1, 0x5555); m_cpu->set_state_int(tms320c54x_device::STATE_T, t ^ 15); m_pipeline_store_writes = 1;
-		}
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_extensions_reads, &m_pipeline_store_writes},
-			"Save RETD capture/replay and BITT delay operand");
-		if (tick == 24)
-		{
-			u32 const base = (variant / 256) % 2 ? 0x20000 : 0;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == base + 0x9101 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x2001 &&
-				m_pipeline_operand_reads == 2 && m_pipeline_extensions_reads == 1 && m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_T) == (t ^ 15) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa824 | ((variant / 64) % 2 ? 0 : 0x1000)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0xb00 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff12345678ULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x81abcdef01ULL, "RETD executes BITT once, preserves retained T and memory, balances stack and reaches only its target");
-			if (replay_pipeline_at(bitt_phase + 3, checkpoint,
-				"Restore RETD/BITT without duplicate stack/operand reads")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 1535) { start_bitt_retd(variant + 1); return true; }
-			osd_printf_info("TMS320C54x RETD BITT: PASS cases=1536 restore=1536 forms=absolute,long_offset selectors=16 t_high=2 values=2 tc_initial=2 pages=2 snapshots=3 stack_reads=1 operand_reads=1 extension_fetches=1 retained_memory_t=1 target_only=1 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated RETD BITT complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == bitt_phase + 3) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = bitt_phase + 2; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_delay_bitt_results()
 {

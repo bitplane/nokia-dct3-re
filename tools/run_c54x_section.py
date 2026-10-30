@@ -109,6 +109,7 @@ def main():
     counts['smul_control'] = 192
     counts['delayed_signed_branch'] = 60
     counts['branch_arithmetic'] = 1536
+    counts['bit_test_t'] = 320
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

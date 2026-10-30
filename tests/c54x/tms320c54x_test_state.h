@@ -139,8 +139,6 @@ private:
 	static u16 repeated_writa_word(unsigned reg, unsigned index);
 	static u32 repeated_writa_destination(repeated_writa_fixture const &f, unsigned index);
 	void start_repeated_writa(unsigned variant = 0);
-	void start_bitt(unsigned variant = 0);
-	void start_bitt_retd(unsigned variant = 0);
 	struct delay_bitt_fixture
 	{
 		unsigned control, form, slot, selector, snapshot;
@@ -1587,7 +1585,6 @@ private:
 	};
 	// Return true only when the original callback would return; order is retained.
 	bool check_repeated_writa_results();
-	bool check_bitt_results();
 	bool check_delay_bitt_results();
 	bool check_mapped_addm_results();
 	bool check_shifted_store_dld_results();
@@ -1917,7 +1914,6 @@ private:
 	unsigned m_bleq_case = 0;
 	static constexpr unsigned rom4_staged_cold_phase = 62000;
 	static constexpr unsigned repeated_writa_phase = 62044;
-	static constexpr unsigned bitt_phase = 62032;
 	static constexpr unsigned ar_addm_phase = 62020;
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
