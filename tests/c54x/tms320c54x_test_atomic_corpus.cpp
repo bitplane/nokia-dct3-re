@@ -2330,60 +2330,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				"XC 2 releases a pending interrupt after one two-word instruction");
 		m_cpu->set_input_line(2, CLEAR_LINE);
 	}
-	if (m_phase == 6553)
-	{
-		return begin_atomic_case(circular_marker_examples()[0], 450);
-	}
-	if (m_phase >= 450 && m_phase <= 453)
-	{
-		auto const &cases = circular_marker_examples();
-		unsigned const index = m_phase - 450;
-		verify_atomic_case(cases[index]);
-		if (m_phase < 453) return begin_atomic_case(cases[index + 1], m_phase + 1);
-		program.write_word(0x05e2, 0xff20); // XC 2,NTC
-		program.write_word(0x05e3, 0x6d91); // MAR *AR1+
-		program.write_word(0x05e4, 0x6d92); // MAR *AR2+
-		program.write_word(0x05e5, 0x75d6);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR1, 0x0120}, {cpu_regs::STATE_AR2, 0x0130}, {cpu_regs::STATE_ST0, 0},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(454);
-	}
-	if (m_phase == 454)
-	{
-		expect_opcode(0x6d92, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0131,
-				"ROM4 MAR *AR2+ advances the second auxiliary register");
-		expect_opcode(0xff20, m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0121 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0131 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
-				"ROM4 XC 2,NTC executes two one-word MAR slots when TC is clear");
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR1, 0x0120}, {cpu_regs::STATE_AR2, 0x0130}, {cpu_regs::STATE_ST0, 0x1000},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(455);
-	}
-	if (m_phase == 455)
-	{
-		expect_opcode(0xff20, m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0120 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0130 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
-				"rejected ROM4 XC 2,NTC charges two NOP slots without modifying ARs");
-		return begin_atomic_case(circular_marker_examples()[4], 456);
-	}
-	if (m_phase >= 456 && m_phase <= 467)
-	{
-		auto const &cases = circular_marker_examples();
-		unsigned const index = m_phase - 456 + 4;
-		verify_atomic_case(cases[index]);
-		if (m_phase < 467) return begin_atomic_case(cases[index + 1], m_phase + 1);
-		m_phase = 9220;
-	}
 	if (m_phase >= 9220 && m_phase <= 9222)
 	{
 		if (m_phase != 9220)
