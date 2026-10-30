@@ -5097,12 +5097,10 @@ Their case data
 explicitly specifies the program/setup and register observations at ticks
 0/6/7; the reusable runner observes each CPU clock, restores at the declared
 checkpoint and requires real IDLE at tick 16. It neither computes results
-nor resets the CPU between cases. Ordered original-key digests and actual
-successful restore counts qualify all 7,680 cases. No Nokia devices, GSM or
-private ROM are involved. The original fixtures did not observe data/I-O
-absence, and extraction does not add that claim. All new headers included,
-this separation adds 173 bytes/61 C++ lines rather than claiming source
-shrinkage; it removes duplicate legacy start/phase/replay ownership.
+from CPU helpers. Every case starts independently; native execution checks
+1,280 successful restores, exactly two opcode fetches and no data-bus
+accesses. No Nokia devices, GSM, private ROM or physical phase measurements
+are involved.
 
 ## Staged circular accumulator stores
 
