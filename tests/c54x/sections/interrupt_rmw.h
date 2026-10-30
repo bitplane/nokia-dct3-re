@@ -42,6 +42,24 @@ inline std::vector<clocked_register_case> section_cases()
 		c.irq = clocked_irq_expectation{0,write,isr,1,continuation};
 		cases.push_back(std::move(c));
 	}
+	{
+		auto initial = initial_case("interrupt-mask-rmw", {0x68f8,0,0xfffe});
+		for (unsigned at = 0x40; at < 0x60; ++at) initial.program.push_back({at,at == 0x40 ? 0xe955U : 0xf495U});
+		initial.initial.insert(initial.initial.end(), {{r::STATE_ST1,0},{r::STATE_IMR,1}});
+		initial.expected.insert(initial.expected.end(), {{r::STATE_IMR,1},{r::STATE_B,0}});
+		clocked_register_case c{{{0,std::move(initial)},
+			{8,observation("mask-cleared", {{r::STATE_IMR,0},{r::STATE_B,0}})},
+			{12,observation("accepted-isr", {{r::STATE_IMR,0},{r::STATE_B,0x55},{r::STATE_SP,0xfff}})},
+			{18,observation("new-request-masked", {{r::STATE_IMR,0},{r::STATE_IFR,1},{r::STATE_ST1,0},
+				{r::STATE_B,0x55},{r::STATE_SP,0xfff}}, {{0xfff,0x603}})}},7,18};
+		c.require_idle = false; c.check_pipeline_clock = true;
+		c.actions = {{2,{},false,{},{{0,ASSERT_LINE},{0,CLEAR_LINE}}},
+			{12,{{r::STATE_ST1,0}},false,{},{{0,ASSERT_LINE},{0,CLEAR_LINE}}}};
+		c.program_events = {{false,0x601,0,3},{false,0x602,0xfffe,4},{false,0x40,0xe955,0,false}};
+		c.data_events = std::vector<clocked_data_event>{{false,0,1,7},{true,0,0,8},{true,0xfff,0x603,0,false}};
+		c.irq = clocked_irq_expectation{0,8,8,1,0x603};
+		cases.push_back(std::move(c));
+	}
 	return cases;
 }
 }

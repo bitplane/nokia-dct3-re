@@ -95,43 +95,6 @@ void tms320c54x_test_state::start_operand_fetch_case(unsigned index)
 }
 
 
-void tms320c54x_test_state::start_pipeline_mask_rmw_case()
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i)
-	{
-		program.write_word(0x600 + i, 0xf495);
-		program.write_word(0x40 + i, 0xf495);
-	}
-	program.write_word(0x600, 0x68f8); // ANDM #fffe,*(IMR).
-	program.write_word(0x601, 0); program.write_word(0x602, 0xfffe);
-	program.write_word(0x40, 0xe955);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_IMR, 1}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_B, 0},
-		{STATE_GENPC, 0x600},
-	});
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false;
-	m_pipeline_expected_cycle = 1;
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_vector_acks = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0, "pipeline_imr_read",
-		[this](offs_t, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_cpu->pipeline_cycles() == 7 && value == 1, "RMW samples the real IMR register in Read");
-			++m_pipeline_operand_reads;
-		});
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0, "pipeline_imr_write",
-		[this](offs_t, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_cpu->pipeline_cycles() == 8 && value == 0, "Pending RMW clears IMR through its actual Execute-stage bus write");
-			++m_pipeline_store_writes;
-		});
-	m_phase = 251130;
-	m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -375,62 +338,8 @@ tms320c54x_test_state::block_back_fixture tms320c54x_test_state::block_back_case
 }
 
 
-bool tms320c54x_test_state::check_pipeline_rmw_results()
+bool tms320c54x_test_state::check_pipeline_control_sequences_results()
 {
-	if (m_phase == 251130)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IMR) == (cycle < 8 ? 1 : 0),
-			"Mask RMW changes IMR only when its retained operation retires");
-		expect(m_pipeline_store_writes == (cycle < 8 ? 0 : 1) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle < 12 ? 0 : 0x55),
-			"Accepted entry completes after the staged mask write without a second commit");
-		if (cycle == 2) m_cpu->set_input_line(0, ASSERT_LINE);
-		if (cycle == 7 && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE,
-				"Save sampled IMR operand before the hardware mask write");
-		}
-		if (cycle == 12)
-		{
-			// Controller conformance: remove INTM as a confound, then pulse
-			// another physical IRQ while the firmware-owned IMR write holds.
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
-			m_cpu->set_input_line(0, CLEAR_LINE);
-			m_cpu->set_input_line(0, ASSERT_LINE);
-		}
-		if (cycle == 18)
-		{
-			expect(m_vector_acks == 1 && m_pipeline_operand_reads == (m_pipeline_replay ? 0 : 1) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IFR) == 1,
-				"New IRQ remains pending under IMR=0 despite INTM being clear");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true;
-				m_vector_acks = m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == 7,
-					"Restore sampled mask RMW without rereading the MMR");
-				return restart_pipeline_observer(251140, 8);
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
-			m_cpu->set_pipeline_frontend(false);
-			osd_printf_info("TMS320C54x staged mask RMW: PASS read=7 write=8 accepted_irq=1 subsequent_masked=1 pending_write_restore=1 duplicate_reads=0\n");
-			start_pipeline_return_case();
-			return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-		return true;
-	}
-	if (m_phase == 251140)
-	{
-		expect(m_cpu->pipeline_cycles() == 7, "Scheduler settlement does not perform a pending mask write");
-		m_cpu->resume(SUSPEND_REASON_DISABLE);
-		m_phase = 251130;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-		return true;
-	}
 	if (m_phase == 251150)
 	{
 		u64 const cycle = m_cpu->pipeline_cycles();

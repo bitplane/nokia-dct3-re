@@ -55,7 +55,7 @@ def main():
     counts['flag_branch'] = 240
     counts['ram_forwarding'] = 2432
     counts['opcode_literals'] = 9
-    counts['interrupt_rmw'] = 12
+    counts['interrupt_rmw'] = 13
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

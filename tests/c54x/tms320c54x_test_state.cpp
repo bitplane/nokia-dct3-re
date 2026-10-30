@@ -847,11 +847,6 @@ void tms320c54x_test_state::test(machine_config &config)
 			expect(line == 0 && m_cpu->pipeline_cycles() == cycle, "Fast-return fixture acknowledges each IRQ in its vector Fetch");
 			++m_vector_acks;
 		}
-		if (m_phase == 251130)
-		{
-			expect(line == 0 && m_cpu->pipeline_cycles() == 8, "Accepted IRQ acknowledges once alongside mask RMW retirement");
-			++m_vector_acks;
-		}
 		if (m_phase == 251090)
 		{
 			expect(line == 0 && m_cpu->pipeline_cycles() == 6, "Indirect load drains while vector IACK occurs");
