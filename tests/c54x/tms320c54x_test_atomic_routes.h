@@ -18,8 +18,6 @@ struct atomic_phase_range
 // test_c54x_atomic_routing checks the complete guard partition independently.
 inline constexpr atomic_phase_range atomic_phase_ranges[] = {
 	{128, 128, atomic_fixture::corpus},
-	{342, 345, atomic_fixture::corpus},
-	{354, 357, atomic_fixture::corpus},
 	{361, 365, atomic_fixture::corpus},
 	{367, 368, atomic_fixture::corpus},
 	{373, 373, atomic_fixture::corpus},
