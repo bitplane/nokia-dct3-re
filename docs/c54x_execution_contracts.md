@@ -187,7 +187,7 @@ devices. Five default result records become one; the full-default checkpoint
 is not silently renewed by this focused extraction.
 
 Unsupported delay combinations are not architectural conformance. The suite
-retains `st-delay-edge` as a sixteen-case fail-closed store-boundary/replay
+retains sixteen fail-closed store-boundary cases in `composition_limits`
 control, rather than a rejection matrix for each unsupported instruction family.
 Nine sibling probes and their 188 case/restore pairs are retired; their exact
 trap clocks, excluded extensions and per-family no-effect predicates are no
@@ -196,7 +196,7 @@ and restoration tests remain separate. Older revision-bound checkpoints below
 may name retired diagnostics; they are not the current test inventory.
 
 Block-control admission similarly retains the 32-case `rptb-br-edges` and
-28-case `rptbd-edge` boundary controls rather than a separate exclusion profile
+28 delayed-block boundary cases in `composition_limits` rather than a separate exclusion profile
 for every unsupported composition. The near-call, far-call and inner-repeat
 exclusion matrices are retired: 108 rejected case/restore pairs, their precise
 trap clocks and per-combination preservation predicates are no longer coverage
@@ -2271,7 +2271,7 @@ the endpoint and delay words after Fetch, and the delay-load source after
 Read, cannot change retained work. Ordered body reads/writes, final memory,
 RSA/REA/BRC/BRAF, once-only delay effects and unrelated registers are checked.
 
-`rptbd-edge` passes 28 cases/restores across seven exclusions, two pages and
+`composition_limits` retains 28 delayed-block cases/restores across seven exclusions, two pages and
 snapshots before/after the guard: STM/STLM/POPM BRC in the delay span, a
 branch, a two-word spill into one remaining delay word, and nested RPTBD
 in the body or delay span. They stop before data transactions, pointer
@@ -2866,7 +2866,7 @@ conditions, TC/NTC and UNC), three slot layouts, counts 0/1/2/7, interior/end
 placement, two pages, four snapshots and two source rotations. It verifies
 ordered source reads, selected writes, absent rejected writes, opcode-shaped
 literals, pointer updates and per-iteration BRC/BRAF ownership.
-`block-xc-edge` passes 24 cases/restores rejecting spans crossing the block
+`composition_limits` retains 18 XC cases/restores rejecting spans crossing the block
 end before data access or pointer effects. This exclusion is a bounded model
 boundary, not a claimed silicon trap.
 
@@ -3025,7 +3025,8 @@ recording, physical loop timing or handset speech.
 
 The earlier ASM-delay checkpoint at `930c486b` covers 30,720 cases and save/replays plus sixteen
 partial-slot exclusions. Controls `asm-load`, `asm-mapped`, `asm-consumer`,
-`asm-edge`, `dld-delay-edge`, `mac-delay-edge` and `st-delay-edge` also pass.
+The retained delay-store exclusions now belong to `composition_limits`;
+the sibling exclusion matrices are retired.
 It also renewed exact MU4 resident-memory comparison (48,261 program and
 3,656 data words); those additional isolated profiles are revision-bound.
 
@@ -3041,9 +3042,9 @@ the renewed default population:
 
 - `fd9e402c`: `dld-delay` (147,456), `dld-delay-edge` (sixteen),
   `load-delay`, `ld-delay-edge`, `add-delay`, `mac-delay-edge`,
-  `st-delay-edge` and `rptb-back`.
+  the delay-store bank in `composition_limits` and `rptb-back`.
 - `40996160`: `mac-delay` (147,456), `mac-delay-edge` (sixteen),
-  `mpy-delay`, `mpy-delay-edge`, `st-delay-edge`, `add-delay` and `fcala-delay`.
+  `mpy-delay`, the delay-store bank in `composition_limits`, `add-delay` and `fcala-delay`.
 - `d1ea11b3`: `mac-bk` (98,304), `mac-smem` (73,728), `arith-bk`,
   `arith-ar`, `add-bk`, `add-delay`, `fcala-delay`, `mpy-mapped` and `mac-t-imm`.
 - `5ad89352`: `fcala-delay` (648), the eight accumulator-call/branch
@@ -4015,7 +4016,7 @@ or new synthetic event participates.
 OV/NOV), four layouts including the penultimate XC 1, counts 0/1/2/7, interior
 and endpoint positions, two pages, four checkpoints and two source rotations.
 Ordered reads, selected writes, per-iteration conditions, pointer effects,
-BRC/BRAF and final fall-through remain checked. The eighteen `block-xc-edge`
+BRC/BRAF and final fall-through remain checked. The eighteen XC `composition_limits`
 cases plus replay retain guards when the *conditionally selected* span crosses
 the endpoint: XC 1 at the endpoint, or XC 2 at/just before it. These are
 model-scope exclusions, not silicon traps.

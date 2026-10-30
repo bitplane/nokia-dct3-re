@@ -7,8 +7,6 @@
 #include "tms320c54x_test_word_examples.h"
 #include "tms320c54x_test_disassembly.h"
 #include "tms320c54x_test_dual.h"
-#include "tms320c54x_test_register_sequence.h"
-#include "tms320c54x_test_composition_limits.h"
 #include <cstring>
 
 namespace {
@@ -22,9 +20,7 @@ public:
 	{
 		m_domain = !std::strcmp(config.options().bios(), "source-domain");
 		m_dual_mode = c54x_test::dual_multiply_mode::select(config.options().bios());
-		m_composition_limit = c54x_test::select_composition_limit(config.options().bios());
-		m_extended_program = !std::strcmp(config.options().bios(), "isa-disasm") || m_domain || bool(m_dual_mode) ||
-			m_composition_limit != c54x_test::composition_limit::none;
+		m_extended_program = !std::strcmp(config.options().bios(), "isa-disasm") || m_domain || bool(m_dual_mode);
 		TMS320C54X(config, m_cpu, 13'000'000);
 		m_cpu->set_extended_program(m_extended_program);
 		m_cpu->set_addrmap(AS_PROGRAM, &c54x_isa_test_state::program_map);
@@ -36,10 +32,7 @@ protected:
 	{
 		m_timer = timer_alloc(FUNC(c54x_isa_test_state::check), this);
 		if (disassembly()) return;
-		if (m_composition_limit != c54x_test::composition_limit::none)
-			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
-				c54x_test::composition_limit_count(m_composition_limit), [this](unsigned raw) { return c54x_test::composition_limit_case<tms320c54x_device>(raw, m_composition_limit); });
-		else if (m_dual_mode) m_dual = std::make_unique<c54x_test::dual_multiply_fixture_runner>(machine(), *m_cpu, *m_timer, m_dual_mode);
+		if (m_dual_mode) m_dual = std::make_unique<c54x_test::dual_multiply_fixture_runner>(machine(), *m_cpu, *m_timer, m_dual_mode);
 		else if (m_domain) m_domains = std::make_unique<c54x_test::source_domain_fixture>(machine(), *m_cpu, *m_timer);
 		else
 		{
@@ -70,24 +63,11 @@ protected:
 			throw emu_fatalerror(3, "TMS320C54x isolated disassembly contracts complete");
 		}
 		m_case = m_resets = 0;
-		if (m_register_sequence) m_register_sequence->start();
-		else if (m_dual) m_dual->start();
+		if (m_dual) m_dual->start();
 		else if (m_domains) m_domains->start();
 		else start();
 	}
 private:
-	[[noreturn]] void register_sequence_result() const
-	{
-		if (m_composition_limit != c54x_test::composition_limit::none)
-		{
-			osd_printf_info("C54x composition rejection coverage: PASS cases=%u restore=%u coverage_fnv64=%016llx\n",
-				m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
-			auto const contract = c54x_test::composition_limit_result(m_composition_limit);
-			osd_printf_info("%s\n", contract.summary);
-			throw emu_fatalerror(3, "%s", contract.completion);
-		}
-		throw emu_fatalerror("No active legacy register sequence");
-	}
 	[[noreturn]] void dual_result() const
 	{
 		bool const alu = m_dual_mode.alu(), parallel = m_dual_mode.parallel(), family = m_dual_mode.family(), macsu = m_dual_mode.macsu(), edge = m_dual_mode.edge;
@@ -141,7 +121,6 @@ private:
 	void program_map(address_map &map)
 	{
 		map(0, 0xffff).ram();
-		if (m_composition_limit == c54x_test::composition_limit::interrupt_pop) map(0x10000, 0x1ffff).ram();
 		if (m_extended_program) map(0x20000, 0x2ffff).ram();
 	}
 	void io_map(address_map &map)
@@ -175,7 +154,6 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
-		if (m_register_sequence) { if (m_register_sequence->step()) register_sequence_result(); return; }
 		if (m_dual) { if (m_dual->step()) dual_result(); return; }
 		if (m_domains)
 		{
@@ -229,8 +207,6 @@ private:
 	bool m_domain = false;
 	bool m_extended_program = false;
 	c54x_test::dual_multiply_mode m_dual_mode;
-	std::unique_ptr<c54x_test::register_sequence_fixture> m_register_sequence;
-	c54x_test::composition_limit m_composition_limit = c54x_test::composition_limit::none;
 	std::unique_ptr<c54x_test::dual_multiply_fixture_runner> m_dual;
 	std::unique_ptr<c54x_test::source_domain_fixture> m_domains;
 	std::vector<c54x_test::instruction_case> m_cases;
@@ -254,11 +230,6 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(16, "stmac-edge", "Parallel MAC mapped operand exclusions")
 	ROM_SYSTEM_BIOS(29, "isa-words", "Atomic instruction-word arithmetic and addressing examples")
 	ROM_SYSTEM_BIOS(30, "isa-disasm", "Debugger syntax length page wrapping and stepping contracts")
-	ROM_SYSTEM_BIOS(35, "pop-irq-edge", "Interrupt-register POPM composition admission limits")
-	ROM_SYSTEM_BIOS(36, "clock-mvdk-edge", "CLKMD move composition admission limits")
-	ROM_SYSTEM_BIOS(37, "st-delay-edge", "Rejected stores crossing the control-delay boundary")
-	ROM_SYSTEM_BIOS(38, "block-xc-edge", "Rejected XC spans crossing the block endpoint")
-	ROM_SYSTEM_BIOS(39, "rptbd-edge", "Rejected delayed-block control and spill forms")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
 ROM_END
 

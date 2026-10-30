@@ -5,45 +5,10 @@
 #define MAME_NOKIA_TMS320C54X_TEST_COMPOSITION_LIMITS_H
 
 #include "tms320c54x_test_case.h"
-#include <string_view>
 
 namespace c54x_test {
 
-enum class composition_limit { none, interrupt_pop, clock_move, delay_store, block_xc, delayed_block };
-inline composition_limit select_composition_limit(std::string_view name)
-{
-	return name == "pop-irq-edge" ? composition_limit::interrupt_pop :
-		name == "clock-mvdk-edge" ? composition_limit::clock_move :
-		name == "st-delay-edge" ? composition_limit::delay_store :
-		name == "block-xc-edge" ? composition_limit::block_xc :
-		name == "rptbd-edge" ? composition_limit::delayed_block : composition_limit::none;
-}
-
-constexpr unsigned composition_limit_count(composition_limit kind)
-{
-	return kind == composition_limit::delay_store ? 16 : kind == composition_limit::block_xc ? 18 :
-		kind == composition_limit::delayed_block ? 28 : 24;
-}
-
-struct composition_limit_contract { char const *summary, *completion; };
-inline composition_limit_contract composition_limit_result(composition_limit kind)
-{
-	switch (kind)
-	{
-	case composition_limit::interrupt_pop:
-		return {"TMS320C54x interrupt POPM exclusions: PASS cases=24 restore=24 destinations=IMR,IFR contexts=RPT,BD_first,BD_last pages=2 snapshots=2 reads=0 writes=0 stack_changes=0 mask_changes=0 acknowledgements=0 hardware_trap_claim=0", "TMS320C54x isolated interrupt POPM exclusions complete"};
-	case composition_limit::clock_move:
-		return {"TMS320C54x CLKMD MVDK exclusions: PASS cases=24 restore=24 contexts=RPT,BD_delay source_forms=3 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 clock_changes=0 hardware_trap_claim=0", "TMS320C54x isolated CLKMD MVDK exclusions complete"};
-	case composition_limit::delay_store:
-		return {"TMS320C54x delay store boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0", "TMS320C54x isolated delay store boundary complete"};
-	case composition_limit::block_xc:
-		return {"TMS320C54x block XC exclusions: PASS cases=18 restore=18 forms=XC1,XC2 selected_span_crossings=3 pages=2 snapshots=3 data_reads=0 data_writes=0 pointer_effects=0 silicon_trap_claim=0", "TMS320C54x isolated block XC exclusions complete"};
-	case composition_limit::delayed_block:
-		return {"TMS320C54x delayed block repeat exclusions: PASS cases=28 restore=28 forms=STM_BRC,STLM_BRC,POPM_BRC,branch,spill,nested_body,nested_delay pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_updates=0 counters_preserved=1 silicon_trap_claim=0", "TMS320C54x isolated delayed block repeat exclusions complete"};
-	default:
-		return {"", ""};
-	}
-}
+enum class composition_limit { interrupt_pop, clock_move, delay_store, block_xc, delayed_block };
 
 template<typename R>
 clocked_register_case rejection_sequence(instruction_case input, unsigned raw, unsigned checkpoint, unsigned finish)
