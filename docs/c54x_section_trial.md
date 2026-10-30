@@ -323,6 +323,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_status_xf.h` | Retain eight RSBX/SSBX literals with explicit initial/final ST0/ST1 and exact XF publication values/counts, including zero publications for unrelated bits. Case-owned output cursors replay independently; setup and post-load re-drive are outside instruction-event counting. External XF sink is deliberately unsaved: debugger import flips it, restoring CPU state must re-drive the saved level. Exact zero data access and pre-instruction replay. Drop port-marker timing; atomic status/output contract. | Native8 cases/restores plus debugger/restore probe; build5.378s/run0.019s. Wrong XF expectation fails. Affected status_bits128, status_consumer128, status_store_consumers5376, load_status48 and stack141 pass after harness change. Delete old533..536/6547..6550 status bank, publication counter/snapshot buffer and6855 setup; following one-slot XC setup remains reference material. Supersedes atomic_transfer_repeat_literals' pending XF setup. |
 
+| `atomic_single_slot_conditions.h` | Retain eight XC1 TC/NTC/BLT/BEQ taken/annulled literals. Explicit guard-sign/zero/TC inputs, unrelated A, flags/SXM and pointer; fixed continuation, exactly one or zero MAR updates, no data traffic and pre-condition replay. Drop port-marker timing; atomic conditional-slot semantics. | Native8 cases/restores, unchanged count; build5.325s/run0.017s. Delete phase6550 successor setup and537..542/6543/6544 bank; supersedes atomic_status_xf's pending one-slot XC setup. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).

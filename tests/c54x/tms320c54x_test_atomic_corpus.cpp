@@ -2298,54 +2298,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				"XC 2 releases a pending interrupt after one two-word instruction");
 		m_cpu->set_input_line(2, CLEAR_LINE);
 	}
-	if (m_phase == 6550)
-	{
-		program.write_word(0x05e2, 0xfd30); // XC 1,TC
-		program.write_word(0x05e3, 0x6d91); // MAR *AR1+
-		program.write_word(0x05e4, 0x75d6);
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1000);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_B, 0}, {cpu_regs::STATE_AR1, 0x0120}, {cpu_regs::STATE_AR6, 0x0a03},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(537);
-	}
-	if ((m_phase >= 537 && m_phase <= 542) || m_phase == 6543 || m_phase == 6544)
-	{
-		static constexpr u16 xc_words[] = {
-			0xfd30, 0xfd30, 0xfd4b, 0xfd4b, 0xfd4d, 0xfd4d, 0xfd20, 0xfd20
-		};
-		static constexpr u16 st0_values[] = { 0x1000, 0, 0, 0, 0, 0, 0x0800, 0x1800 };
-		static constexpr u64 b_values[] = {
-			0, 0, 0xff00000000ULL, 0, 0, 1, 0x12345678, 0x12345678
-		};
-		const unsigned index = m_phase >= 6543 ? m_phase - 6543 + 6 : m_phase - 537;
-		const bool accepted = (index & 1) == 0;
-		expect_opcode(xc_words[index],
-				m_cpu->state_int(tms320c54x_device::STATE_AR1) ==
-					(accepted ? 0x0121 : 0x0120) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0_values[index] &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == b_values[index] &&
-				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e7 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-				"ROM4 XC 1 tests TC/NTC/BLT/BEQ, preserves status/B and executes or rejects one MAR slot");
-		if (index < 7)
-		{
-			program.write_word(0x05e2, xc_words[index + 1]);
-			m_port_writes = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, st0_values[index + 1]);
-			m_cpu->set_state_int(tms320c54x_device::STATE_B, b_values[index + 1]);
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_AR1, 0x0120}, {cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_PC, 0x05e0},
-				{cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(index < 5 ? m_phase + 1 : index == 5 ? 6543 : 6544);
-		}
-	}
 	return false;
 }
 
