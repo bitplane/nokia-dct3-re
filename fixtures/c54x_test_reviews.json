@@ -8,6 +8,36 @@
   },
   "families": [
     {
+      "id": "mu4-worker-subset-retirement",
+      "classification": "firmware_integration",
+      "decision": "delete",
+      "profiles": [],
+      "case_ids": [],
+      "retired_default_cases": {"original_worker_return_tail": "raw0..9, ten cases/restores", "complete_mu4_worker": "raw0..47, forty-eight cases/restores"},
+      "basis": "These are copied Nokia ROM4 worker fragments, not an independent ISA specification. A literal-array comparison proves the retired seven-word tail is identical to the retained worker-roundtrip tail, and the retired38-word worker is exactly retained entry9+body22+tail7. The four-word CALLD sequence occurs in both retained roundtrip and outer context. The retained roundtrip covers saved INTM0/1, source and stack poisoning, return/delay ownership and pending IRQ after caller continuation; the retained128-case outer context covers both body conditional outcomes, both pages and context restoration. This is overlap-based retirement with explicit coverage loss, not a claim that every former stimulus is a subset.",
+      "retained_default_scopes": ["six-case outer prologue skip-worker branch", "sixteen-case skip-body CALLD/RETD roundtrip with pending IRQ and eight checkpoints", "forty-case outer-context skip-body call path", "128-case active outer-context body path, eight checkpoints and both conditional outcomes", "existing timer-triggered context integration uses the same retained setup helper unchanged"],
+      "known_limits": ["This retirement does not semantically re-certify retained integration stimuli. In particular, the outer wrappers seed ST0=a61b with CMPT clear, contrary to SPRU131G's ARP0 restriction; their legal entry contexts still need review. Exact local clocks remain software-model observations, not silicon qualification."],
+      "coverage_loss": ["58 separate executions/restores retired", "the tail's separately seeded high accumulator bits, five local checkpoints and exact isolated clock trajectory are no longer qualified by that probe", "the worker's standalone initial register pattern, six checkpoints and exposed intermediate/final register-state matrix are no longer qualified; outer restoration can hide internal register errors", "same instruction bytes do not prove equivalent coverage; independent scalar/stack/control tests and larger integration scopes are retained, not asserted to replace every lost combination"],
+      "changes": ["delete two setups and four phase handlers251810/251820/252050/252060", "default continuations now enter retained worker-roundtrip and active outer-context setup directly", "rename the surviving body/FB result router to check_pipeline_context_body_results; no production CPU/device change"],
+      "measurements": {"baseline_commit": "ae988b21", "before_cpp_bytes": 3335571, "before_cpp_lines": 50828, "after_cpp_bytes": 3320638, "after_cpp_lines": 50623, "source_assessment": "14933 bytes and205 C++ lines removed. Two default result requirements retire; isolated profile identities unchanged. Runtime improvement is not assumed from source size."},
+      "verification": "Full build and default regression pass with287 requirements exactly once and293 native PASS records. Retained roundtrip, skip-worker/skip-body/active-body paths and original/recurring timer integration pass in that same run. All5079 host tests pass with one established skip (62.426 seconds). The394-profile inventory passes. Literal-array overlap is checked against ae988b21; retained outer-context setup and active-body/FB observation blocks are byte-identical. No full retained-isolated-suite or handset renewal is claimed.",
+      "default_checkpoint": {
+        "capture": "tmp/c54x-corpus-transfer-review/run_c54x_core_n750mbsj",
+        "source_base_commit": "ae988b21",
+        "bench_patch_command": "git diff --no-ext-diff --binary ae988b21 -- tests/c54x",
+        "bench_patch_sha256": "73b9120564b037429378f9c5cf1de0bcc9eabd6079a7eeafa226356eeeedb168",
+        "executable_sha256": "67fabe1b6a287b300087c45ce611e9ada77092216a6302ce051b838aa09563b5",
+        "acceptance_sha256": {"tools/run_c54x_core.py": "70ef9f2bc24630e9a7b2eff039f2781f7d6ed82f20424c1b22ccdd831b8e061d", "tools/c54x_test_oracles.py": "1907e14edf60c2141fb62d27575682876b10fd62bd1d0de25624ecfaf31a6165"},
+        "required_markers": 287,
+        "native_ordered_pass_records": 293,
+        "mame_exit": 3,
+        "runner_exit": 0,
+        "wall_seconds": 961.74,
+        "comparison": "Against the address-mode-fixture-ownership capture, two probe records retire and three coverage records change as planned (CPL/DP result, basic-bank digest, SP result). The other290 ordered PASS records match exactly. All5690 ordered opassert words match; SHA256 of newline-joined words2764b84dd60e9c560191bfbd638d982ca4cd2ba756fa6595ee9339d54cf6d20e.",
+        "scope": "Default regression including the address-mode-valid-programs and frame-and-stack-sp-sequences changes; not a complete isolated-profile run, handset acceptance, silicon timing or semantic approval of every retained integration sentinel. No runtime improvement is claimed."
+      }
+    },
+    {
       "id": "frame-and-stack-sp-sequences",
       "classification": "architectural_interaction",
       "decision": "rewrite",

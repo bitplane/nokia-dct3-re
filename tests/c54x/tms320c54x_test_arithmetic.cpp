@@ -5333,7 +5333,7 @@ bool tms320c54x_test_state::check_pipeline_memory_logic_results()
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 4) { start_pipeline_mu4_logic_tail(m_pipeline_peripheral_case + 1); return true; }
 			osd_printf_info("TMS320C54x staged original MU4 logical tail: PASS cases=5 original_words=6 page=2 restore=5 duplicate_reads=0 duplicate_writes=0\n");
-			start_pipeline_mu4_full_worker(); return true;
+			start_pipeline_original_context_call(0, true); return true;
 		}
 		++m_pipeline_expected_cycle;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

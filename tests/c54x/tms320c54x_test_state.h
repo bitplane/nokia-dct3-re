@@ -237,7 +237,6 @@ private:
 	static signed_xc_fixture signed_xc_case(unsigned variant);
 	void start_signed_xc(unsigned variant = 0);
 	void start_pipeline_delayed_return(unsigned variant = 0);
-	void start_pipeline_original_worker_tail(unsigned variant = 0);
 	void start_pipeline_original_worker_roundtrip(unsigned variant = 0);
 	void start_pipeline_original_context_call(unsigned variant = 0, bool full_body = false);
 	static std::array<u16, 2> addm_inputs(unsigned variant);
@@ -251,7 +250,6 @@ private:
 	void start_pipeline_mar(unsigned variant = 0);
 	void start_pipeline_memory_logic(unsigned variant = 0);
 	void start_pipeline_mu4_logic_tail(unsigned variant = 0);
-	void start_pipeline_mu4_full_worker(unsigned variant = 0);
 	void start_pipeline_far_branch(unsigned variant = 0);
 	void start_pipeline_mu4_timer_context(unsigned variant = 0);
 	void start_pipeline_mu4_recurring_timer(unsigned variant = 0);
@@ -2084,7 +2082,7 @@ private:
 	bool check_pipeline_data_pop_results();
 	bool check_pipeline_cmpr_results();
 	bool check_pipeline_memory_logic_results();
-	bool check_pipeline_mu4_full_worker_results();
+	bool check_pipeline_context_body_results();
 	bool check_pipeline_mu4_timer_context_results();
 	bool check_pipeline_absolute_load_results();
 	bool check_pipeline_far_call_results();

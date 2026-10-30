@@ -124,6 +124,17 @@ The retained FRAME trace checks one AR1 read and one stack write, with replay
 cursor restoration. The small SP bank retains its final register/RAM checks.
 Exact observation clocks remain model regressions, not physical timing claims.
 
+Copied MU4 context/worker programs are Nokia firmware integration, not ISA
+conformance. The isolated seven-word return-tail and standalone active-worker
+probes are retired: the retained sixteen-case call/return roundtrip executes
+the same tail with source/stack poisoning and pending IRQ, and the 128-case
+outer context executes the complete active body on both conditional outcomes.
+The outer skip-worker and skip-body paths remain because they are distinct
+branches. Literal overlap is not full coverage equivalence: separately seeded
+register patterns, local clock trajectories and standalone worker register
+results are deliberately lost. `mu4-worker-subset-retirement` records the
+retained scopes and all 58 retired execution/restore identities.
+
 `mapped-word`, `mapped-bitf` and `status-bitf` use the same runner with a shared
 mapped-register descriptor builder. The distinct ADD/SUB and TC reference rules
 remain fixture-owned. All 21,504 cases retain their per-clock register predicates,
@@ -806,8 +817,8 @@ execution. This is the existing emulator phase contract, not a new physical
 timing claim. Conformance failures now print the case, tick, replay, registers
 and transaction counters, and the runner rejects any such assertion diagnostic
 even if completion markers are also present.
-The full default checkpoint below reproduces its 289 required
-markers exactly once, including the legal MACP/MACD examples. The separate
+The revision-bound full-default checkpoint below includes the legal MACP/MACD
+examples; its current requirement count is recorded there. The separate
 program-multiply rejection and repeated-SUBC/ST profiles and the complete tool
 suite also pass. These are executable emulator regressions, not all-ISA or
 physical pipeline conformance.
@@ -2566,23 +2577,17 @@ Repeat/interrupt composition and physical timing remain separate scopes.
 ## Core regression checkpoint
 
 The latest completed full-default capture is the `default_checkpoint` under
-`address-mode-fixture-ownership` in `fixtures/c54x_test_reviews.json`.
-It records all 289 required markers, 295 native ordered PASS records,
-intentional MAME exit 3 and runner exit 0, in 959.15 seconds.
-The preceding 293 PASS records and all 5,690 asserted opcode words remain
-identical; two coverage records are added. The review binds the result to its
-executable, acceptance-source hashes and exact bench patch over `f6277a5e`;
-no CPU/device source changed. This establishes compatibility, not semantic
-approval of the invalid ARP contexts identified in that review. No runtime
-improvement is claimed.
-
-That capture predates the `address-mode-valid-programs` review: the default
-CPL/DP continuation now runs eight safely separated cases instead of thirty-two,
-and immediate-DP inputs now clear ARP. The shared standalone bank qualifies
-those changed inputs; it does not renew the full-default capture.
-The subsequent `frame-and-stack-sp-sequences` review likewise keeps all 768
-FRAME cases but reduces the small SP bank from sixteen to six cases. Its
-standalone execution does not renew the default-suite checkpoint either.
+`mu4-worker-subset-retirement` in `fixtures/c54x_test_reviews.json`.
+It records all 287 required markers exactly once, 293 native ordered PASS
+records, intentional MAME exit 3 and runner exit 0, in 961.74 seconds.
+Against the preceding address-mode checkpoint, two probe records retire and
+three coverage records change as planned; the other 290 records retain their
+order and text. All 5,690 asserted opcode words remain identical. This run
+also includes the legal address-mode and reduced SP banks described above.
+The review binds the result to its executable, acceptance-source hashes and
+exact bench patch over `ae988b21`; no CPU/device source changed. No runtime
+improvement or valid-program qualification of the remaining synthetic MU4
+status-register seeds is claimed.
 
 `fixtures/c54x_fidelity_checkpoint.json` remains an immutable historical
 capture: 294 then-required markers, 295 native PASS records and 1,058.73 seconds.
