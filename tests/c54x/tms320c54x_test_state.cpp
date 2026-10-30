@@ -211,7 +211,6 @@ void tms320c54x_test_state::machine_reset()
 	if (profile_is("xorm")) { check_control_disassembler(); start_atomic_xorm(0); return; }
 	if (profile_is("xc-status")) { start_xc_status(0); return; }
 	if (profile_is("xc-latency")) { start_xc_latency(0); return; }
-	if (profile_is("xc-barrier")) { start_xc_barrier(0); return; }
 	if (profile_is("dual-sub-native")) { start_native_dual_sub(0); return; }
 	if (profile_is("parallel-sub")) { start_parallel_sub_fraction(0); return; }
 	if (profile_is("saccd")) { start_saccd_case(0); return; }

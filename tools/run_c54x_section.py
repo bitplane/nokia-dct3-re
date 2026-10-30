@@ -74,6 +74,7 @@ def main():
     counts['tc_return'] = 96
     counts['delayed_program_read'] = 128
     counts['signed_xc'] = 288
+    counts['return_barrier'] = 12
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

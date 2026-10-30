@@ -170,7 +170,7 @@ private:
 				});
 		}
 		m_tick = 0; m_replay = m_resume = false;
-		m_cpu.set_pipeline_frontend(true); m_cpu.resume(SUSPEND_REASON_DISABLE); schedule();
+		m_cpu.set_pipeline_frontend(m_input.pipeline_frontend); m_cpu.resume(SUSPEND_REASON_DISABLE); schedule();
 	}
 	running_machine &m_machine;
 	tms320c54x_device &m_cpu;

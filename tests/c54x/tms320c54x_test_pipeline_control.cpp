@@ -293,31 +293,6 @@ tms320c54x_test_state::conditional_register_fixture tms320c54x_test_state::condi
 		condition < 6 ? tested : 0x23456789ULL, condition < 6 ? 0x23456789ULL : tested};
 }
 
-void tms320c54x_test_state::start_xc_barrier(unsigned index)
-{
-	unsigned const kind = index % 3;
-	bool const initial = (index / 3) % 2;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x600, initial ? 0xf4bc : 0xf5bc);
-	program.write_word(0x601, kind == 0 ? 0xfc00 : kind == 1 ? 0xfc45 : 0xfc44);
-	program.write_word(0x602, initial ? 0xfd20 : 0xfd30);
-	program.write_word(0x603, 0xe933); program.write_word(0x604, 0xf495); program.write_word(0x605, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(0x1000, 0x602);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_PC, 0x600}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0},
-		{cpu_regs::STATE_ST0, 0xe05 | (initial ? 0x1000 : 0)}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_cpu->set_pipeline_frontend(index < 12);
-	m_rom4_codec_replay = false; m_rom4_codec_replays = 0;
-	m_phase = 524000 + index;
-	if (!((index / 6) % 2))
-	{
-		expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save status producer and sequential-target return barrier");
-		m_rom4_codec_replays = 1;
-	}
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::xc_latency_fixture tms320c54x_test_state::xc_latency_case(unsigned index)
 {
@@ -693,37 +668,8 @@ bool tms320c54x_test_state::check_delayed_condition_return_results()
 }
 
 
-bool tms320c54x_test_state::check_xc_barrier_results()
+bool tms320c54x_test_state::check_xc_latency_status_results()
 {
-	if (m_phase >= 524000 && m_phase < 524024)
-	{
-		unsigned const index = m_phase - 524000;
-		bool const initial = (index / 3) % 2, taken = index % 3 != 2;
-		if (!m_rom4_codec_replays && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x602)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save return barrier after its optional stack read");
-			m_rom4_codec_replays = 1;
-		}
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Return barrier and XC remain admitted");
-		if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE)) { m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-		if (m_cpu->state_int(tms320c54x_device::STATE_B) != 0x33)
-			osd_printf_info("XC return barrier divergence: case=%u staged=%u kind=%u initial_tc=%u B=%04x expected_B=0033\n", index, index < 12, index % 3, initial,
-				unsigned(m_cpu->state_int(tms320c54x_device::STATE_B)));
-		expect(m_rom4_codec_replays == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x33 &&
-			m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x606 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(taken) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xe05 | (!initial ? 0x1000 : 0)),
-			"Return pipeline drain makes preceding status visible even at a sequential target or untaken conditional return");
-		if (!m_rom4_codec_replay)
-		{
-			expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore return drain and selected XC without reusing stale history");
-			m_phase = 524000 + index; m_rom4_codec_replay = true;
-			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-		}
-		if (index == 11) osd_printf_info("TMS320C54x staged XC return barriers: PASS cases=12 restore=12 forms=RET,RC_taken,RC_untaken sequential_target=1 snapshots=2 physical_phase_claim=0\n");
-		if (index < 23) { start_xc_barrier(index + 1); return true; }
-		osd_printf_info("TMS320C54x atomic XC return barriers: PASS cases=12 restore=12 forms=RET,RC_taken,RC_untaken sequential_target=1 snapshots=2 physical_phase_claim=0\n");
-		throw emu_fatalerror(0, "TMS320C54x isolated XC return barriers complete");
-	}
 	if (m_phase >= 523000 && m_phase < 523768)
 	{
 		unsigned const index = m_phase - 523000;
