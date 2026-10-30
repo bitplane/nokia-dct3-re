@@ -92,16 +92,15 @@ the final arithmetic/status/source checks still occur at clock 16. This does
 not yet relocate either profile out of the legacy machine or qualify other
 memory families. Bus cycles are implementation observations, not silicon timing.
 
-`mode-latency` combines 1,072 address-context cases in the CPU-only runner:
-eight RSBX/SSBX CPL/DP cases, forty full-status producer/field cases,
-and 1,024 immediate-DP cases. `mvmd-cpl`, `mvmd-cmpt`, `stlm-cpl`, `stlm-cmpt`,
-`stm-cpl` and `stm-cmpt` remain descriptive case labels, not separate BIOS
-configurations. This standalone profile owns the banks; their redundant
-default-chain adapters have been removed.
+`address_mode_publication` owns eight RSBX/SSBX CPL/DP and forty full-status
+producer/field cases. `immediate_dp_forwarding` owns all1,024 immediate-DP
+cases. Explicit producer/set/store/gap and page/chain loops replace the old
+ordinal decoder; no retained input is dropped. Legacy header/profile/result
+plumbing is removed.
 The original NOP streams, clock-11/10 observations and snapshots remain;
 these bounded streams do not require IDLE. Optional pipeline-clock checking
 preserves their per-clock progress check without changing other runner users.
-The family review owns the ordinal-to-old-case map and ordered coverage digest.
+The native sections own their setup and expectations, not legacy case keys.
 
 SPRU131G tables 7-16/7-18/7-19 supply the required consumer spacing: two NOPs
 after MVMD/STM and three after STLM/RSBX/SSBX for these Category-I forms.
@@ -571,7 +570,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_normalization_input.h` | Independent bit-position/leading-bit expectations, shared with legacy EXP-product controls |
 | `tests/c54x/tms320c54x_test_normalization_schedule.h` | Unique normalization/exponent inputs with balanced replay checkpoints |
 | `tests/c54x/tms320c54x_test_register_sequence.h` | CPU-only clocked register observations and snapshot continuation; no instruction arithmetic |
-| `tests/c54x/tms320c54x_test_address_mode.h` | Shared address-mode/DP inputs and observations; programming-state limitations remain explicit |
+| `tests/c54x/tms320c54x_test_address_mode_section.h` | Address-mode/DP section inputs and observations; programming-state limitations remain explicit |
 | `tests/c54x/sections/frame_stack_consumers.h` | CPU-only FRAME/push and safely separated compiler-SP inputs |
 | `tests/firmware/tms320c54x_test_rom4_context.cpp` | Copied Nokia context/worker/timer integration; separate profile, legal standard-mode status seeds |
 | `tests/c54x/tms320c54x_test_register_pairs.h` | SAT and carry/TC rotate pairs with independent expected register states |
