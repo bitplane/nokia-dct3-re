@@ -4,7 +4,6 @@
 #include "emu.h"
 #include "emuopts.h"
 #include "tms320c54x_test_domains.h"
-#include "tms320c54x_test_product_examples.h"
 #include "tms320c54x_test_memory_examples.h"
 #include "tms320c54x_test_memory_continuations.h"
 #include "tms320c54x_test_word_examples.h"
@@ -96,7 +95,7 @@ protected:
 					m_cases.insert(m_cases.end(), bank->begin(), bank->end());
 			}
 			else if (words()) m_cases = c54x_test::instruction_word_examples();
-			else if (products()) m_cases = c54x_test::product_examples();
+			else if (products()) throw emu_fatalerror("Legacy product bank retired: run atomic_product_literals");
 			else if (near_flow())
 				throw emu_fatalerror("Legacy near-flow bank retired: run the atomic_near_control section");
 			else if (long_reference())

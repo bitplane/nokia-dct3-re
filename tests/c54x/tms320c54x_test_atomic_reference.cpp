@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
-#include "tms320c54x_test_product_examples.h"
 #include "tms320c54x_test_memory_examples.h"
 #include "tms320c54x_test_memory_continuations.h"
 #include <algorithm>
@@ -683,24 +682,6 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			return true;
 		}
 		osd_printf_info("TMS320C54x ASM arithmetic shifts: PASS variants=512 shifts=32 sxm_settings=2 ovm_settings=2 sticky_settings=2\n");
-		return begin_atomic_case(product_examples()[0], 730);
-	}
-	if ((m_phase >= 730 && m_phase <= 738) || (m_phase >= 740 && m_phase <= 749) ||
-		(m_phase >= 6558 && m_phase <= 6559))
-	{
-		unsigned const index = m_phase >= 6558 ? m_phase - 6555 :
-			m_phase <= 732 ? m_phase - 730 : m_phase <= 738 ? m_phase - 728 : m_phase - 729;
-		auto const &test = product_examples()[index];
-		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
-		expect_opcode(test.opcode, true, "literal multiply/arithmetic/DELAY reference sequence");
-		if (index + 1 < product_examples().size())
-		{
-			unsigned const next = index + 1;
-			m_port_writes = 0;
-			prepare_case(*m_cpu, product_examples()[next]);
-			return next_atomic_phase(next < 3 ? 730 + next : next < 5 ? 6555 + next :
-				next <= 10 ? 728 + next : 729 + next);
-		}
 	}
 	return false;
 }
