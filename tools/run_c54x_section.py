@@ -107,6 +107,7 @@ def main():
     counts['rounded_multiply'] = 104
     counts['store_shift'] = 120
     counts['smul_control'] = 192
+    counts['delayed_signed_branch'] = 60
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

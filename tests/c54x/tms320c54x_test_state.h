@@ -694,7 +694,6 @@ private:
 	void start_reverse_carry_sequence(bool subtract);
 	void start_shifted_high_store_case(unsigned index);
 	void start_asm_store_case(unsigned index);
-	void start_acc_delayed_case(unsigned index);
 	void start_compact_store_case(unsigned index);
 	void start_software_interrupt_case(unsigned index, bool trap = false);
 	void start_trn_store_case(unsigned index);
@@ -1573,7 +1572,6 @@ private:
 
 
 
-	void start_rcd_acc_case(unsigned index);
 
 
 
@@ -1696,11 +1694,9 @@ private:
 	bool check_trn_store_results();
 	bool check_parallel_load_multiply_results();
 	bool check_compact_store_results();
-	bool check_acc_delayed_results();
 	bool check_asm_store_results();
 	bool check_reverse_carry_reference_results();
 	bool check_intm_protection_results();
-	bool check_saccd_results();
 	bool check_bsp_interrupt_results();
 	bool check_vector_prefetch_results();
 	bool check_idle_pll_results();

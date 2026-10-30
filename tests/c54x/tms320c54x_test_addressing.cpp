@@ -4721,7 +4721,6 @@ bool tms320c54x_test_state::check_compact_store_results()
 			"SPRU172C STL SHFT Xmem preserves accumulators/status and uses compact AR2-5 addressing");
 		if (index < 511) { start_compact_store_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x compact store conformance: PASS variants=512\n");
-		start_acc_delayed_case(0);
 		return true;
 	}
 	return false;

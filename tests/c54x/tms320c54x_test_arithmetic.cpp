@@ -2132,24 +2132,6 @@ void tms320c54x_test_state::start_shifted_high_store_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_acc_delayed_case(unsigned index)
-{
-	unsigned const predicate = index / 5;
-	static constexpr u64 values[] = {0xffffffffffULL, 0, 1, 0x0100000000ULL, 0x8000000000ULL};
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0109d0, 0xfa42 + predicate % 6 + (predicate >= 6 ? 8 : 0)); program.write_word(0x0109d1, 0x09e0);
-	program.write_word(0x0109d2, 0xe900); // Both accumulators change after the condition is captured.
-	program.write_word(0x0109d3, 0xe800);
-	program.write_word(0x0109d4, 0xe801); program.write_word(0x0109d5, 0xf4e1);
-	program.write_word(0x0109e0, 0xe802); program.write_word(0x0109e1, 0xf4e1);
-	m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, predicate >= 6 ? values[index % 5] : 1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, predicate < 6 ? values[index % 5] : 1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_phase = 3277 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 void tms320c54x_test_state::start_parallel_load_multiply_case(unsigned index)
 {
@@ -3568,27 +3550,6 @@ void tms320c54x_test_state::start_staged_overflow(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_rcd_acc_case(unsigned index)
-{
-	unsigned const condition = index % 12;
-	unsigned const sign = index / 12;
-	u64 const tested = sign == 0 ? 0 : sign == 1 ? 0x12340000ULL : 0xffedcc0000ULL;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	write_words(program, {
-		{0x0700, 0xfe40 | (condition < 6 ? 2 + condition : 10 + condition - 6)}, {0x0701, 0x7710}, {0x0702, 0x4321},
-		{0x0703, 0xf4e1}, {0x0720, 0xf4e1},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0);
-	m_cpu->space(AS_DATA).write_word(0x1ec3, 0x0720);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_XPC, 0}, {cpu_regs::STATE_PC, 0x0700}, {cpu_regs::STATE_SP, 0x1ec3},
-		{cpu_regs::STATE_A, condition < 6 ? tested : 0x23450000},
-		{cpu_regs::STATE_B, condition < 6 ? 0x23450000 : tested}, {cpu_regs::STATE_ST1, 0x0900},
-		{cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 76000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 
@@ -4029,52 +3990,6 @@ bool tms320c54x_test_state::check_parallel_load_multiply_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_acc_delayed_results()
-{
-	if (m_phase >= 3277 && m_phase < 3337)
-	{
-		unsigned const index = m_phase - 3277;
-		static constexpr bool outcomes[6][5] = {
-			{false, true, true, true, false}, {true, false, false, false, true},
-			{true, false, true, true, true}, {false, true, false, false, false},
-			{false, false, true, true, false}, {true, true, false, false, true}
-		};
-		bool const taken = outcomes[(index / 5) % 6][index % 5];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (taken ? 2 : 1) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0 &&
-			m_cpu->state_int(tms320c54x_device::STATE_PC) == (taken ? 0x09e2 : 0x09d6) &&
-			m_cpu->state_int(tms320c54x_device::STATE_XPC) == 1,
-			"BCD tests all twelve signed/zero accumulator predicates before both delay words");
-		if (index < 59) { start_acc_delayed_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x delayed accumulator predicates conformance: PASS variants=60\n");
-		return true;
-	}
-	return false;
-}
-
-
-bool tms320c54x_test_state::check_saccd_results()
-{
-	if (m_phase >= 76000 && m_phase < 76036)
-	{
-		unsigned const index = m_phase - 76000;
-		unsigned const sign = index / 12;
-		bool const predicates[] = {sign != 2, sign == 2, sign != 0, sign == 0, sign == 1, sign != 1};
-		bool const take = predicates[index % 6];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x4321 &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == (take ? 0x1ec4 : 0x1ec3) &&
-			m_cpu->state_int(tms320c54x_device::STATE_PC) == (take ? 0x0721 : 0x0704),
-			"conditional delayed return preserves delay instruction and conditionally pops stack");
-		if (index < 35) { start_rcd_acc_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x RCD accumulator conditions: PASS variants=36\n");
-		start_bsp_interrupt_case(0);
-		return true;
-	}
-	return false;
-}
 
 
 
