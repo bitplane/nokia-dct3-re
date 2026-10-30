@@ -47,9 +47,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (standard_bus_io()) { start_bus_io_test(); return; }
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"std-stm"}, [](self &test) { test.start_staged_bus_stm(); } },
-		{ {"clock-stm"}, [](self &test) { test.start_staged_bus_stm(); } },
-		{ {"serial-stm"}, [](self &test) { test.start_staged_bus_stm(); } },
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
@@ -193,8 +190,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (absolute_memory_dp()) { start_pipeline_memory_dp(); return; }
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"bus-stm"}, [](self &test) { test.start_staged_bus_stm(); } },
-		{ {"timer-stm"}, [](self &test) { test.start_staged_bus_stm(); } },
 		{ {"bus-io-compose"}, [](self &test) { test.start_atomic_io_composition(); } },
 	}))
 		return;
@@ -519,8 +514,8 @@ void tms320c54x_test_state::test(machine_config &config)
 				"Retained multiply observation rejects a mismatched instruction address");
 		});
 	m_cpu->set_extended_program(true);
-	if (!strcmp(config.options().bios(), "std-swwsr") || !strcmp(config.options().bios(), "std-stm") || !strcmp(config.options().bios(), "std-io") || !strcmp(config.options().bios(), "std-io-atomic")) m_cpu->set_standard_swwsr(true);
-	if (!strcmp(config.options().bios(), "bus-registers") || !strcmp(config.options().bios(), "bus-io") || !strcmp(config.options().bios(), "bus-io-atomic") || !strcmp(config.options().bios(), "bus-io-compose") || !strcmp(config.options().bios(), "bus-stm")) m_cpu->set_c5416_bus_profile(true);
+	if (!strcmp(config.options().bios(), "std-swwsr") || !strcmp(config.options().bios(), "std-io") || !strcmp(config.options().bios(), "std-io-atomic")) m_cpu->set_standard_swwsr(true);
+	if (!strcmp(config.options().bios(), "bus-registers") || !strcmp(config.options().bios(), "bus-io") || !strcmp(config.options().bios(), "bus-io-atomic") || !strcmp(config.options().bios(), "bus-io-compose")) m_cpu->set_c5416_bus_profile(true);
 	m_cpu->ready_in_cb().set([this]() { return int(m_bus_ready); });
 	m_cpu->clkout_divisor_cb().set([this](u8 value) { m_bus_divisor = value; });
 	m_cpu->iack_enable_cb().set([this](int value) { m_bus_iack_enable = bool(value); });

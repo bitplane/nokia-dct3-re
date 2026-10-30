@@ -736,39 +736,6 @@ tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::peripheral_p
 	return c;
 }
 
-void tms320c54x_test_state::start_staged_bus_stm(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const timer = profile_is("timer-stm");
-	bool const standard = profile_is("std-stm");
-	bool const clock = profile_is("clock-stm");
-	bool const serial = profile_is("serial-stm");
-	u16 const address = serial ? 0x22 : standard ? 0x28 : clock ? 0x58 : (timer ? std::array<u16, 3>{0x24, 0x25, 0x26} : std::array<u16, 3>{0x28, 0x29, 0x2b})[variant % 3];
-	u16 const value = (serial ? std::array<u16, 4>{0xc008, 0xc0c8, 0, 0xffff} : clock ? std::array<u16, 4>{0, 0x3146, 0x8006, 0xffff} : standard ? std::array<u16, 4>{0x2000, 0x7fff, 0x8006, 0xffff} : address == 0x26 ? std::array<u16, 4>{0x10, 0x13, 0x30, 0xffff} : std::array<u16, 4>{0, 0x7fff, 0x8006, 0xffff})[(variant / 3) % 4];
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
-	program.write_word(0x600, 0x7700 | address); program.write_word(0x601, value);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	if (timer)
-	{
-		// Seed stopped PSC=3 via TRB; writes to PSC itself must not change it.
-		data.write_word(0x25, 0x4567); data.write_word(0x26, 0x33); data.write_word(0x24, 0x2345);
-	}
-	else { data.write_word(0x28, 0); data.write_word(0x29, 0); data.write_word(0x2b, 0); }
-	if (clock) { data.write_word(0x58, 0); data.write_word(0x58, 0); }
-	m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_write_tap = data.install_write_tap(address, address, "staged_bus_stm_write",
-		[this, value](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && word == value && m_cpu->pipeline_cycles() == 8, "Control STM publishes once in Execute after its peripheral clock"); ++m_pipeline_store_writes; });
-	m_pipeline_operand_tap = data.install_read_tap(address, address, "staged_bus_stm_no_read",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_operand_reads; expect(false, "Bus STM must not read its destination"); } });
-	m_pipeline_fetch_tap = program.install_read_tap(0x601, 0x601, "staged_bus_stm_literal",
-		[this, value](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_extensions_reads && word == value, "Bus STM owns one literal fetch"); ++m_pipeline_extensions_reads; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253590;
-	m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -1836,71 +1803,6 @@ bool tms320c54x_test_state::check_mvdd_peripheral_results()
 bool tms320c54x_test_state::check_staged_bus_stm_results()
 {
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 253590)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const timer = profile_is("timer-stm");
-		bool const standard = profile_is("std-stm");
-		bool const clock = profile_is("clock-stm");
-		bool const serial = profile_is("serial-stm");
-		u16 const address = serial ? 0x22 : standard ? 0x28 : clock ? 0x58 : (timer ? std::array<u16, 3>{0x24, 0x25, 0x26} : std::array<u16, 3>{0x28, 0x29, 0x2b})[variant % 3];
-		u16 const value = (serial ? std::array<u16, 4>{0xc008, 0xc0c8, 0, 0xffff} : clock ? std::array<u16, 4>{0, 0x3146, 0x8006, 0xffff} : standard ? std::array<u16, 4>{0x2000, 0x7fff, 0x8006, 0xffff} : address == 0x26 ? std::array<u16, 4>{0x10, 0x13, 0x30, 0xffff} : std::array<u16, 4>{0, 0x7fff, 0x8006, 0xffff})[(variant / 3) % 4];
-		unsigned const checkpoint = std::array<unsigned, 3>{6, 7, 9}[variant / 12];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Only configured bus STM forms execute");
-		if (tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(0x601, value ^ 0xffff); }
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, 0};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save bus STM before/during peripheral wait or after publication");
-		}
-		if (tick == 12)
-		{
-			{
-				auto const disable = machine().disable_side_effects(); auto &data = m_cpu->space(AS_DATA);
-				if (timer)
-				{
-					u16 const expected_tcr = address == 0x26 ? (value & 0x0c1f) | ((value & 0x20) ? (value & 0xf) << 6 : 0xc0) : 0xd3;
-					expect(data.read_word(0x24) == (address == 0x24 ? value : address == 0x26 && (value & 0x20) ? 0x4567 : 0x2345), "Timer STM preserves TIM except explicit write or TRB reload");
-					expect(data.read_word(0x25) == (address == 0x25 ? value : 0x4567) && data.read_word(0x26) == expected_tcr, "Timer STM applies PRD, writable TCR mask and TRB-owned PSC reload");
-					expect(!m_cpu->state_int(tms320c54x_device::STATE_IFR), "Stopped timer STM cannot generate an interrupt");
-				}
-				else if (clock) expect(data.read_word(0x58) == ((value & ~u16(1)) | BIT(value, 1)), "CLKMD STM uses the existing unclocked DIV/PLL status contract");
-				else expect(data.read_word(address) == (value & (standard ? 0x7fff : address == 0x29 ? 0xf006 : address == 0x2b ? 1 : 0xffff)), "Bus STM retains the device register mask");
-			}
-			expect(m_pipeline_store_writes == 1 && !m_pipeline_operand_reads && m_pipeline_extensions_reads == 1, "Bus STM has one literal and one write without destination reads");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(253600, "Restore bus STM without repeating the wait or write");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant + (standard || clock || serial ? 3 : 1) < 36) { start_staged_bus_stm(variant + (standard || clock || serial ? 3 : 1)); return true; }
-			if (serial)
-			{
-				osd_printf_info("TMS320C54x staged BSP STM: PASS cases=12 restore=12 literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 peripheral_extra_clock=1 endpoint_semantics=external silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated staged BSP STM complete");
-			}
-			if (clock)
-			{
-				osd_printf_info("TMS320C54x staged CLKMD STM: PASS cases=12 restore=12 literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 pll_reference=unconfigured physical_clock_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated staged CLKMD STM complete");
-			}
-			if (standard)
-			{
-				osd_printf_info("TMS320C54x standard SWWSR STM: PASS cases=12 restore=12 literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 physical_mapping=unvalidated\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated standard SWWSR STM complete");
-			}
-			if (timer)
-			{
-				osd_printf_info("TMS320C54x staged timer STM: PASS cases=36 restore=36 registers=TIM,PRD,TCR literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 peripheral_extra_clock=1 stopped_timer=1 trb_reload=1 psc_write_mask=1 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated staged timer STM complete");
-			}
-			osd_printf_info("TMS320C54x staged bus STM: PASS cases=36 restore=36 registers=SWWSR,BSCR,SWCR literal_fetches=1 writes=1 destination_reads=0 publish_clock=8 peripheral_extra_clock=1 physical_mapping=unvalidated\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated staged bus STM complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253600) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253590; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 253570)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;

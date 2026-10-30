@@ -14,6 +14,12 @@ public:
 	{
 		TMS320C54X(c, m_cpu, 13'000'000);
 		m_cpu->set_extended_program(true);
+#ifdef C54X_SECTION_C5416_BUS
+		m_cpu->set_c5416_bus_profile(true);
+#endif
+#ifdef C54X_SECTION_STANDARD_SWWSR
+		m_cpu->set_standard_swwsr(true);
+#endif
 		m_cpu->set_addrmap(AS_PROGRAM, &section_state::program);
 		m_cpu->set_addrmap(AS_DATA, &section_state::data);
 		m_cpu->set_addrmap(AS_IO, &section_state::data);

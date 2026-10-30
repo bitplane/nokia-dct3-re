@@ -1964,6 +1964,18 @@ producing 384 executions. These are model capture/publication contracts;
 active interrupt composition is not qualified. The old LDU setup/result phase
 and profile are removed.
 
+### Immediate peripheral control writes
+
+Immediate control writes are split into `peripheral_stm` (20 cases for
+stopped TIM/PRD/TCR, unclocked CLKMD and BSP control), `c5416_bus_stm`
+(12 SWWSR/BSCR/SWCR cases) and `standard_bus_stm` (4 original-family SWWSR
+cases). CPU variant configuration is explicit in each section. One retained
+literal, its later poisoning, exact Write8/no Reads and device-specific masks
+are checked through replay. Timer cases preserve stopped PSC and exercise
+TRB reload; no physical PLL/BSP phase is claimed. Checkpoints are distributed
+instead of expanding 36 distinct inputs into 108 executions. The five legacy
+profiles, setup and result branches are removed.
+
 ### MVKD peripheral store
 
 `mvkd_peripheral_store` covers 108 source/form/destination/value cases and

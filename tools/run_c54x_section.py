@@ -320,6 +320,9 @@ def main():
     counts['unsigned_peripheral_load'] = 1536
     counts['t_peripheral_store'] = 144
     counts['mvkd_peripheral_store'] = 108
+    counts['peripheral_stm'] = 20
+    counts['c5416_bus_stm'] = 12
+    counts['standard_bus_stm'] = 4
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

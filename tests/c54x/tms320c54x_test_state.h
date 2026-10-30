@@ -647,7 +647,6 @@ private:
 	static addc_fixture mapped_shift16_case(unsigned variant);
 	static addc_fixture mapped_logic_case(unsigned variant);
 	void start_addc(unsigned variant = 0);
-	void start_staged_bus_stm(unsigned variant = 0);
 	struct mac_smem_fixture
 	{
 		u16 opcode, memory, t, st0, st1, pmst, address, result_st0;
