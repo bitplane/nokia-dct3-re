@@ -36,8 +36,6 @@ void tms320c54x_test_state::start_instruction_observer(unsigned variant)
 
 bool tms320c54x_test_state::check_instruction_observer_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 292000)
 	{
 		unsigned const variant = m_instruction_observer.variant, tick = ++m_instruction_observer.tick;

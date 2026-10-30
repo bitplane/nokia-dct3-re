@@ -1352,8 +1352,6 @@ tms320c54x_test_state::block_back_fixture tms320c54x_test_state::block_back_case
 
 bool tms320c54x_test_state::check_literal_guard_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == literal_guard_phase)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, count = (variant / 3) % 3;
@@ -1380,8 +1378,6 @@ bool tms320c54x_test_state::check_literal_guard_results()
 
 bool tms320c54x_test_state::check_pipeline_rmw_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 251110)
 	{
 		u64 const cycle = m_cpu->pipeline_cycles();
@@ -1680,8 +1676,6 @@ bool tms320c54x_test_state::check_pipeline_rmw_results()
 
 bool tms320c54x_test_state::check_pipeline_intm_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 251310)
 	{
 		u64 const cycle = m_cpu->pipeline_cycles();
@@ -1792,8 +1786,6 @@ bool tms320c54x_test_state::check_pipeline_intm_results()
 
 bool tms320c54x_test_state::check_pipeline_load_add_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 251490)
 	{
 		u64 const cycle = m_cpu->pipeline_cycles();
@@ -1896,8 +1888,6 @@ bool tms320c54x_test_state::check_pipeline_load_add_results()
 
 bool tms320c54x_test_state::check_pipeline_cmpr_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 251970)
 	{
 		unsigned const variant = m_pipeline_peripheral_case;
@@ -2031,8 +2021,6 @@ bool tms320c54x_test_state::check_pipeline_cmpr_results()
 
 bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 252330)
 	{
 		unsigned const variant = m_pipeline_peripheral_case;
@@ -2200,8 +2188,6 @@ bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 
 bool tms320c54x_test_state::check_pipeline_add_sp_context_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 291000)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, producer = variant % 4;
@@ -2394,8 +2380,6 @@ bool tms320c54x_test_state::check_pipeline_add_sp_context_results()
 
 bool tms320c54x_test_state::check_pipeline_long_move_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 252830)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, destination_kind = (variant / 100) % 12;
@@ -2553,8 +2537,6 @@ bool tms320c54x_test_state::check_pipeline_long_move_results()
 
 bool tms320c54x_test_state::check_pipeline_swap_body_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 253310)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -2648,8 +2630,6 @@ bool tms320c54x_test_state::check_pipeline_swap_body_results()
 
 bool tms320c54x_test_state::check_block_repeat_forwarding_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 253350)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, count = rptb_count(variant);

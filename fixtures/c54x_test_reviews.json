@@ -8,6 +8,18 @@
   },
   "families": [
     {
+      "id": "unused-result-handler-address-spaces",
+      "classification": "harness_infrastructure",
+      "decision": "delete",
+      "profiles": [],
+      "case_ids": [],
+      "basis": "189 result handlers declare program/data address-space references they never use. After stripping C++ strings/comments and delimiting complete function bodies, the removed local identifiers have no other token occurrence. MAME device_memory_interface::space is an asserted pointer lookup returning the existing mapped space; these unused references perform no bus access or fixture mutation.",
+      "changes": ["delete356 unused local-reference declarations across13 CPU/firmware fixture modules", "diff proof admits only those exact declaration-line deletions: no added C++ token, changed assertion, setup, expected result, case identity, checkpoint, phase or scheduling expression"],
+      "limits": ["mechanical boilerplate removal, not semantic review of additional profiles or retirement of any execution case", "used address-space references remain; this is not a broad removal of observation or bus instrumentation"],
+      "measurement": {"baseline_commit": "7a4f61db", "cpp_lines_deleted_net": 356, "cpp_bytes_deleted_net": 20352, "retired_cases": 0},
+      "verification": "Full build passes;16 focused executable routing/ownership/selection/inventory tests pass in1.222 seconds. Native legacy-atomic, logic-short, xc-controls, power-idle, rom4-context, instr-observer, stack-irq, repeat-context and stm-ind pass using an empty ROM directory. The separate cold-pipeline firmware integration profile passes using mame/roms; the initial empty-ROM attempt correctly refuses to run without its acquired images. Every completed profile has intentional MAME exit3 and runner0. Acceptance inventory and all case identities are unchanged. Full-default/all-isolated and handset acceptance are not renewed."
+    },
+    {
       "id": "atomic-minmax-roltc-matrix-retirement",
       "classification": "architectural_interaction",
       "decision": "rewrite",

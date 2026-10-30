@@ -482,7 +482,6 @@ u16 tms320c54x_test_state::repeat_irq_r(offs_t offset)
 
 bool tms320c54x_test_state::check_software_interrupt_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 61000 && m_phase < 61064)
 	{
@@ -526,7 +525,6 @@ bool tms320c54x_test_state::check_software_interrupt_results()
 
 bool tms320c54x_test_state::check_intm_protection_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 6164 && m_phase <= 6166)
 	{
@@ -608,7 +606,6 @@ bool tms320c54x_test_state::check_idle_pll_results()
 
 bool tms320c54x_test_state::check_xc_interrupt_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 81000 && m_phase < 81004)
 	{
@@ -630,8 +627,6 @@ bool tms320c54x_test_state::check_xc_interrupt_results()
 
 bool tms320c54x_test_state::check_pipeline_far_irq_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 251370)
 	{
 		u64 const cycle = m_cpu->pipeline_cycles();
@@ -677,8 +672,6 @@ bool tms320c54x_test_state::check_pipeline_far_irq_results()
 
 bool tms320c54x_test_state::check_interrupt_pop_edge_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62080)
 	{
 		unsigned const variant=m_pipeline_peripheral_case,tick=++m_idle_fixture_tick,checkpoint=2+variant/12;
@@ -708,8 +701,6 @@ bool tms320c54x_test_state::check_interrupt_pop_edge_results()
 
 bool tms320c54x_test_state::check_pipeline_xc_irq_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 251710)
 	{
 		u64 const cycle = m_cpu->pipeline_cycles();
@@ -752,8 +743,6 @@ bool tms320c54x_test_state::check_pipeline_xc_irq_results()
 
 bool tms320c54x_test_state::check_stack_irq_order_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 253980)
 	{
 		bool const returning = profile_is("stack-irq-return");
@@ -784,8 +773,6 @@ bool tms320c54x_test_state::check_stack_irq_order_results()
 
 bool tms320c54x_test_state::check_ldu_imr_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 253910)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, form = (variant / 16) % 4, read = form == 3 ? 7 : form == 1 ? 6 : 5, checkpoint = std::array<unsigned, 3>{3, read - 1, read}[variant / 128];
@@ -847,8 +834,6 @@ bool tms320c54x_test_state::check_ldu_imr_results()
 
 bool tms320c54x_test_state::check_repeat_mvdp_irq_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 259960)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -894,8 +879,6 @@ bool tms320c54x_test_state::check_repeat_mvdp_irq_results()
 
 bool tms320c54x_test_state::check_ifr_pair_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 253730)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -936,8 +919,6 @@ bool tms320c54x_test_state::check_ifr_pair_results()
 
 bool tms320c54x_test_state::check_block_xc_irq_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 255660)
 	{
 		bool const endpoint = profile_is("block-xc-end-irq");
@@ -967,8 +948,6 @@ bool tms320c54x_test_state::check_block_xc_irq_results()
 
 bool tms320c54x_test_state::check_software_intr_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 254400)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant & 128 ? 5 : 3;
@@ -999,8 +978,6 @@ bool tms320c54x_test_state::check_software_intr_results()
 
 bool tms320c54x_test_state::check_poll_interrupt_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 256100)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;

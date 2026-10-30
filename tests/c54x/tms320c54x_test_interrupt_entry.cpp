@@ -204,7 +204,6 @@ bool tms320c54x_test_state::check_vector_prefetch_results()
 
 bool tms320c54x_test_state::check_interrupt_entry_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 180000 && m_phase < 180002)
 	{

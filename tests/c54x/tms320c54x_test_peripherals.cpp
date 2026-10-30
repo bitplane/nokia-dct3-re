@@ -2242,8 +2242,6 @@ bool tms320c54x_test_state::check_peripheral_mmr_timing_audit_results()
 
 bool tms320c54x_test_state::check_pipeline_idle_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 252230)
 	{
 		bool const modes = m_idle_mode_bank;
@@ -2326,8 +2324,6 @@ bool tms320c54x_test_state::check_pipeline_idle_results()
 
 bool tms320c54x_test_state::check_pipeline_peripheral_logic_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 252470)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, operation = variant % 3, mode = (variant / 3) % 3;
@@ -2425,8 +2421,6 @@ bool tms320c54x_test_state::check_pipeline_peripheral_logic_results()
 
 bool tms320c54x_test_state::check_peripheral_long_store_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 252650)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -2540,8 +2534,6 @@ bool tms320c54x_test_state::check_peripheral_long_store_results()
 
 bool tms320c54x_test_state::check_pipeline_port_read_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 252790)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, mode = variant % 13;
@@ -2609,8 +2601,6 @@ bool tms320c54x_test_state::check_pipeline_port_read_results()
 
 bool tms320c54x_test_state::check_clkmd_move_edge_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62070)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -2643,8 +2633,6 @@ bool tms320c54x_test_state::check_clkmd_move_edge_results()
 
 bool tms320c54x_test_state::check_mcbsp_control_sequence_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 253950)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, snapshot = variant / 4;
@@ -2669,8 +2657,6 @@ bool tms320c54x_test_state::check_mcbsp_control_sequence_results()
 
 bool tms320c54x_test_state::check_ldu_peripheral_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 254420)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, form = (variant / 256) % 3, read = form == 1 ? 7 : 6;
@@ -2700,8 +2686,6 @@ bool tms320c54x_test_state::check_ldu_peripheral_results()
 
 bool tms320c54x_test_state::check_shifted_peripheral_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62120)
 	{
 		auto const f = shifted_peripheral_case(m_pipeline_peripheral_case, shifted_bsp_fixture(), shifted_unowned_fixture()); unsigned const tick = ++m_idle_fixture_tick;
@@ -2741,8 +2725,6 @@ bool tms320c54x_test_state::check_shifted_peripheral_results()
 
 bool tms320c54x_test_state::check_circular_portr_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62138)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = circular_portr_case(variant);
@@ -2840,8 +2822,6 @@ bool tms320c54x_test_state::check_circular_portr_results()
 
 bool tms320c54x_test_state::check_mvdd_peripheral_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 254320)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 4 + variant / 384;
@@ -2872,8 +2852,6 @@ bool tms320c54x_test_state::check_mvdd_peripheral_results()
 
 bool tms320c54x_test_state::check_portr_bypass_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62144)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = portr_bypass_case(variant);
@@ -2899,7 +2877,6 @@ bool tms320c54x_test_state::check_portr_bypass_results()
 
 bool tms320c54x_test_state::check_staged_bus_stm_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 253590)
 	{

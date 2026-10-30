@@ -4030,8 +4030,6 @@ void tms320c54x_test_state::start_saccd_case(unsigned index)
 
 bool tms320c54x_test_state::check_branch_arithmetic_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == branch_arithmetic_phase)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = branch_arithmetic_case(variant);
@@ -4060,8 +4058,6 @@ bool tms320c54x_test_state::check_branch_arithmetic_results()
 
 bool tms320c54x_test_state::check_bitt_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == bitt_phase)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, form = variant % 8;
@@ -4127,8 +4123,6 @@ bool tms320c54x_test_state::check_bitt_results()
 
 bool tms320c54x_test_state::check_delay_bitt_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == delay_bitt_phase)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delay_bitt_case(variant);
@@ -4222,8 +4216,6 @@ bool tms320c54x_test_state::check_mapped_addm_results()
 
 bool tms320c54x_test_state::check_shifted_store_dld_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 321000)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -4267,7 +4259,6 @@ bool tms320c54x_test_state::check_shifted_store_dld_results()
 
 bool tms320c54x_test_state::check_shifted_high_store_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 30000 && m_phase < 30128)
 	{
@@ -4301,16 +4292,12 @@ bool tms320c54x_test_state::check_shifted_high_store_results()
 
 bool tms320c54x_test_state::check_rounded_multiply_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (check_rounded_multiply()) return true;
 	return false;
 }
 
 bool tms320c54x_test_state::check_bitf_offset_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 60020 && m_phase <= 60024)
 	{
 		u64 const values[] = {0x8000000000ULL, 0xffffffffffULL, 0, 1, 0x7fffffffffULL};
@@ -4359,8 +4346,6 @@ bool tms320c54x_test_state::check_bitf_offset_results()
 
 bool tms320c54x_test_state::check_bit_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 818)
 	{
 		expect(m_cpu->state_int(STATE_GENPC) == 0x010934 &&
@@ -4399,7 +4384,6 @@ bool tms320c54x_test_state::check_bit_results()
 bool tms320c54x_test_state::check_cmpr_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 1427 && m_phase < 1619)
 	{
 		unsigned const index = m_phase - 1427;
@@ -4429,8 +4413,6 @@ bool tms320c54x_test_state::check_cmpr_results()
 
 bool tms320c54x_test_state::check_cmpm_offset_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 1628 && m_phase < 1632)
 	{
 		unsigned const index = m_phase - 1628;
@@ -4447,8 +4429,6 @@ bool tms320c54x_test_state::check_cmpm_offset_results()
 
 bool tms320c54x_test_state::check_parallel_load_multiply_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 95000 && m_phase < 95064)
 	{
 		unsigned const index = m_phase - 95000;
@@ -4497,8 +4477,6 @@ bool tms320c54x_test_state::check_parallel_load_multiply_results()
 
 bool tms320c54x_test_state::check_acc_delayed_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 3277 && m_phase < 3337)
 	{
 		unsigned const index = m_phase - 3277;
@@ -4525,8 +4503,6 @@ bool tms320c54x_test_state::check_acc_delayed_results()
 
 bool tms320c54x_test_state::check_store_shift_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 280000 && m_phase < 280120)
 	{
 		unsigned const index = m_phase - 280000;
@@ -4590,8 +4566,6 @@ bool tms320c54x_test_state::check_store_shift_results()
 
 bool tms320c54x_test_state::check_saccd_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 75000 && m_phase < 75576)
 	{
 		unsigned const index = m_phase - 75000;
@@ -4653,8 +4627,6 @@ bool tms320c54x_test_state::check_saccd_results()
 
 bool tms320c54x_test_state::check_shifted_arithmetic_selector_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 170000 && m_phase < 170104)
 	{
 		unsigned const index = m_phase - 170000, selectors = index % 8;
@@ -4685,8 +4657,6 @@ bool tms320c54x_test_state::check_shifted_arithmetic_selector_results()
 
 bool tms320c54x_test_state::check_rounding_boundary_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 200000 && m_phase < 200128)
 	{
 		unsigned const index = m_phase - 200000, selectors = index % 4, input = (index / 4) % 8;
@@ -4836,8 +4806,6 @@ bool tms320c54x_test_state::check_rounding_boundary_results()
 
 bool tms320c54x_test_state::check_multiword_pipeline_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 251040)
 	{
 		u64 const cycle = m_cpu->pipeline_cycles();
@@ -4899,8 +4867,6 @@ bool tms320c54x_test_state::check_multiword_pipeline_results()
 
 bool tms320c54x_test_state::check_pipeline_logical_immediate_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 251570)
 	{
 		u64 const cycle = m_cpu->pipeline_cycles();
@@ -4956,8 +4922,6 @@ bool tms320c54x_test_state::check_pipeline_logical_immediate_results()
 
 bool tms320c54x_test_state::check_addm_expected_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 251870)
 	{
 		u64 const cycle = m_cpu->pipeline_cycles(); unsigned const variant = m_pipeline_peripheral_case;
@@ -5003,8 +4967,6 @@ bool tms320c54x_test_state::check_addm_expected_results()
 
 bool tms320c54x_test_state::check_pipeline_memory_logic_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 252010)
 	{
 		unsigned const variant = m_pipeline_peripheral_case;
@@ -5105,8 +5067,6 @@ bool tms320c54x_test_state::check_pipeline_memory_logic_results()
 
 bool tms320c54x_test_state::check_ts_load_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 254580)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -5207,8 +5167,6 @@ bool tms320c54x_test_state::check_accumulator_logic_results()
 
 bool tms320c54x_test_state::check_accumulator_shift_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 252610)
 	{
 		if (m_register_sequence->step())
@@ -5291,8 +5249,6 @@ bool tms320c54x_test_state::check_accumulator_shift_results()
 
 bool tms320c54x_test_state::check_long_accumulator_store_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 252810)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -5368,8 +5324,6 @@ bool tms320c54x_test_state::check_long_accumulator_store_results()
 
 bool tms320c54x_test_state::check_absolute_xorm_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 252890)
 	{
 		bool const peripheral = profile_is("rmw-long-periph");
@@ -5593,8 +5547,6 @@ bool tms320c54x_test_state::check_absolute_xorm_results()
 
 bool tms320c54x_test_state::check_bitfield_address_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 253010)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -5739,8 +5691,6 @@ bool tms320c54x_test_state::check_bitfield_address_results()
 
 bool tms320c54x_test_state::check_immediate_arithmetic_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 253110)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -6042,8 +5992,6 @@ bool tms320c54x_test_state::check_immediate_arithmetic_results()
 
 bool tms320c54x_test_state::check_rptbd_shift_store_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 310400)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -6085,8 +6033,6 @@ bool tms320c54x_test_state::check_rptbd_shift_store_results()
 
 bool tms320c54x_test_state::check_negate_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 253410)
 	{
 		if (m_register_sequence->step())
@@ -6221,8 +6167,6 @@ bool tms320c54x_test_state::check_negate_results()
 
 bool tms320c54x_test_state::check_accumulator_cmpm_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62126)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -6272,8 +6216,6 @@ bool tms320c54x_test_state::check_accumulator_cmpm_results()
 
 bool tms320c54x_test_state::check_accumulator_stm_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62132)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = accumulator_stm_case(variant);
@@ -6325,8 +6267,6 @@ bool tms320c54x_test_state::check_accumulator_stm_results()
 
 bool tms320c54x_test_state::check_staged_overflow_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62172)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -6374,8 +6314,6 @@ bool tms320c54x_test_state::check_staged_overflow_results()
 
 bool tms320c54x_test_state::check_mvmd_accumulator_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 253830)
 	{
 		bool const status = profile_is("mvmd-st1");
@@ -6410,8 +6348,6 @@ bool tms320c54x_test_state::check_mvmd_accumulator_results()
 
 bool tms320c54x_test_state::check_near_accumulator_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 253790)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -6460,8 +6396,6 @@ bool tms320c54x_test_state::check_near_accumulator_results()
 
 bool tms320c54x_test_state::check_poly_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 399980)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = poly_case(variant);
@@ -6610,8 +6544,6 @@ bool tms320c54x_test_state::check_poly_results()
 
 bool tms320c54x_test_state::check_absolute_logic_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 254160)
 	{
 		auto const f = absolute_logic_case(m_pipeline_peripheral_case); unsigned const tick = ++m_idle_fixture_tick;
@@ -6642,8 +6574,6 @@ bool tms320c54x_test_state::check_absolute_logic_results()
 
 bool tms320c54x_test_state::check_accumulator_branch_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 254240)
 	{
 		auto const &f = m_acc_branch_fixture; unsigned const tick = ++m_idle_fixture_tick;
@@ -6703,8 +6633,6 @@ bool tms320c54x_test_state::check_accumulator_branch_results()
 
 bool tms320c54x_test_state::check_memory_immediate_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 254340)
 	{
 		auto const f = memory_immediate_case(m_pipeline_peripheral_case); unsigned const tick = ++m_idle_fixture_tick;
@@ -6736,8 +6664,6 @@ bool tms320c54x_test_state::check_memory_immediate_results()
 
 bool tms320c54x_test_state::check_bd_long_accumulator_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 254540)
 	{
 		bool const mac = profile_is("mac-delay");
@@ -6783,8 +6709,6 @@ bool tms320c54x_test_state::check_bd_long_accumulator_results()
 
 bool tms320c54x_test_state::check_nibble_input_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 399900)
 	{
 		unsigned const tick = ++m_idle_fixture_tick, variant = m_pipeline_peripheral_case;
@@ -6813,8 +6737,6 @@ bool tms320c54x_test_state::check_nibble_input_results()
 
 bool tms320c54x_test_state::check_asm_mapped_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 255140)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = asm_mapped_case(variant);
@@ -6842,8 +6764,6 @@ bool tms320c54x_test_state::check_asm_mapped_results()
 
 bool tms320c54x_test_state::check_ts_arithmetic_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 255060)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const producer = profile_is("ts-alu-producer"); auto const f = ts_arithmetic_case(variant, producer); auto const &o = f.address;
@@ -6874,8 +6794,6 @@ bool tms320c54x_test_state::check_ts_arithmetic_results()
 
 bool tms320c54x_test_state::check_addm_brc_loop_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 276020)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, count = std::array<unsigned, 4>{0, 1, 3, 7}[variant % 4], checkpoint = std::array<unsigned, 5>{6, 7, 8, 10, 16}[variant / 64];
@@ -6898,8 +6816,6 @@ bool tms320c54x_test_state::check_addm_brc_loop_results()
 
 bool tms320c54x_test_state::check_delay_compare_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 254980)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delay_compare_case(variant);
@@ -6933,8 +6849,6 @@ bool tms320c54x_test_state::check_delay_compare_results()
 
 bool tms320c54x_test_state::check_addc_chain_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62158)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = addc_chain_case(variant);
@@ -6959,8 +6873,6 @@ bool tms320c54x_test_state::check_addc_chain_results()
 
 bool tms320c54x_test_state::check_mvdm_acc_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62160)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = mvdm_acc_case(variant);
@@ -7049,8 +6961,6 @@ bool tms320c54x_test_state::check_mvdm_acc_results()
 
 bool tms320c54x_test_state::check_sqdst_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62142)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -7101,7 +7011,6 @@ bool tms320c54x_test_state::check_sqdst_results()
 
 bool tms320c54x_test_state::check_native_dual_sub_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 700000 && m_phase < 700256)
 	{
@@ -7165,7 +7074,6 @@ bool tms320c54x_test_state::check_native_dual_sub_results()
 
 bool tms320c54x_test_state::check_atomic_xorm_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 520000 && m_phase < 521024)
 	{

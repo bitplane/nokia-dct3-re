@@ -104,8 +104,6 @@ void tms320c54x_test_state::start_empty_pipeline_case(bool nmi)
 
 bool tms320c54x_test_state::check_pipeline_frontend_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 251000)
 	{
 		u64 const cycle = m_cpu->pipeline_cycles();

@@ -790,7 +790,6 @@ u16 tms320c54x_test_state::rom4_loader_entry_r()
 
 bool tms320c54x_test_state::check_rom4_fr_decoder_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 72000 && m_phase < 72064)
 	{
@@ -944,7 +943,6 @@ bool tms320c54x_test_state::check_rom4_fr_decoder_results()
 
 bool tms320c54x_test_state::check_rom4_codec_is_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase >= 304000 && m_phase < 304519)
 	{

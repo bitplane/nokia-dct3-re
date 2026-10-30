@@ -118,8 +118,6 @@ void tms320c54x_test_state::start_saved_repeat(unsigned variant)
 
 bool tms320c54x_test_state::check_saved_repeat_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 255800)
 	{
 		unsigned const stlm = profile_is("repeat-stlm");
@@ -238,8 +236,6 @@ void tms320c54x_test_state::start_body_repeat(unsigned variant)
 
 bool tms320c54x_test_state::check_body_repeat_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 255840)
 	{
 		unsigned const variant = m_body_irq_repeat.variant, tick = ++m_body_irq_repeat.tick; auto const f = body_repeat_case(variant); auto const &c = m_body_irq_repeat.observed;
@@ -376,8 +372,6 @@ void tms320c54x_test_state::start_repeat_context(unsigned variant)
 
 bool tms320c54x_test_state::check_repeat_context_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 255480)
 	{
 		bool const pmst = profile_is("repeat-pmst");
@@ -482,8 +476,6 @@ void tms320c54x_test_state::start_fcala_delay(unsigned variant)
 
 bool tms320c54x_test_state::check_fcala_delay_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 255820)
 	{
 		unsigned const variant = m_fcala_delay.variant, tick = ++m_fcala_delay.tick; auto const f = fcala_delay_case(variant); auto const &c = m_fcala_delay.observed;
