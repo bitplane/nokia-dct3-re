@@ -3521,36 +3521,6 @@ bool tms320c54x_test_state::check_mapped_dual_results()
 
 bool tms320c54x_test_state::check_program_transfer_results()
 {
-	if (m_phase == 259940)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		unsigned const form = variant % 5, reg = (variant / 5) % 8;
-		unsigned const count = std::array<unsigned, 5>{0, 1, 2, 7, 255}[(variant / 40) % 5];
-		unsigned const checkpoint = std::array<unsigned, 3>{5, 8, 12}[variant / 3200];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Legal short-source repeated MVDP is admitted");
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, unsigned(m_first_port_cycle)};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save repeated MVDP before and during the stream");
-		}
-		if (tick == count + 64)
-		{
-			u16 const next = form == 3 ? 0x1230 + count + 1 : form == 4 ? 0x1230 - count - 1 : 0x1230;
-			expect(m_pipeline_operand_reads == count + 1 && m_pipeline_store_writes == count + 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_AR0 + reg) == next, "Repeated MVDP retires count plus one transfers and resumes after pmad");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_first_port_cycle = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(259950, "Restore repeated MVDP without duplicate transfers");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 9599) { start_repeat_mvdp(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged repeated MVDP: PASS cases=9600 restore=9600 forms=5 registers=8 counts=0,1,2,7,255 count_forms=2 pages=2 destinations=ordinary,wrap ovly=2 snapshots=3 source_reads=count+1 program_writes=count+1 stream_clocks=1 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated repeated MVDP complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 259950) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 259940; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 254800)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;

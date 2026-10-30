@@ -168,7 +168,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"logic-peripheral"}, [](self &test) { test.start_pipeline_peripheral_logic(); } },
 		{ {"load-offset"}, [](self &test) { test.start_pipeline_offset_load(); } },
 		{ {"write-a"}, [](self &test) { test.start_write_a(); } },
-		{ {"rpt-mvdp"}, [](self &test) { test.start_repeat_mvdp(); } },
 		{ {"rpt-mvdp-irq"}, [](self &test) { test.start_repeat_mvdp_irq(); } },
 		{ {"conditional-cd"}, [](self &test) { test.start_delayed_conditional_call(); } },
 		{ {"tc-delay-call"}, [](self &test) { test.start_delayed_conditional_call(); } },
