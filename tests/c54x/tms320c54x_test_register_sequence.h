@@ -24,6 +24,7 @@ public:
 	unsigned count() const { return m_case; }
 	unsigned restores() const { return m_restores; }
 	void set_opcode_observer(std::function<void(u16, u16)> observer) { m_opcode_observer = std::move(observer); }
+	void set_data_observer(std::function<void(bool, u32, u16)> observer) { m_data_observer = std::move(observer); }
 	u64 digest() const { return m_coverage.value; }
 	bool step()
 	{
@@ -74,6 +75,7 @@ private:
 		for (auto const &action : m_input.actions) if (m_tick == action.tick && action.before_observation == before)
 		{
 			for (auto const &value : action.values) m_cpu.set_state_int(value.index, value.value);
+			for (auto const &line : action.input_lines) m_cpu.set_input_line(line.index, int(line.value));
 			if (!action.program.empty())
 			{
 				auto const disable = m_machine.disable_side_effects();
@@ -105,9 +107,11 @@ private:
 		if (m_input.data_events)
 		{
 			auto access = [this](bool write, offs_t at, u16 word) {
-				if (!m_machine.side_effects_disabled())
-					require(accept_data_event(*m_input.data_events, m_data_cursor,
-						{write, u32(at), word, unsigned(m_cpu.pipeline_cycles())}), "ordered data-bus event");
+				if (!m_machine.side_effects_disabled() && !accept_data_event(*m_input.data_events, m_data_cursor,
+					{write, u32(at), word, unsigned(m_cpu.pipeline_cycles())}))
+					throw emu_fatalerror("C54x case=%u event=%u write=%u address=%x value=%x clock=%llu",
+						m_case, m_data_cursor, unsigned(write), unsigned(at), word, (unsigned long long)m_cpu.pipeline_cycles());
+				if (!m_machine.side_effects_disabled() && m_data_observer) m_data_observer(write, u32(at), word);
 			};
 			m_data_tap = m_cpu.space(AS_DATA).install_readwrite_tap(0, 0xffff, "register_sequence_data",
 				[access](offs_t at, u16 &word, u16) { access(false, at, word); },
@@ -152,6 +156,7 @@ private:
 	unsigned m_program_cursor = 0, m_saved_program_cursor = 0;
 	builder m_build;
 	std::function<void(u16, u16)> m_opcode_observer;
+	std::function<void(bool, u32, u16)> m_data_observer;
 	clocked_register_case m_input;
 	bool m_replay = false, m_resume = false;
 	std::string m_label;

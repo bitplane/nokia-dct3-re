@@ -12,6 +12,7 @@ build/run times are in ignored `tmp/c54x-section-trial/SECTION/`.
 | Pass | Replacement | Retired source | Validation |
 | --- | --- | --- | --- |
 | 1 | `immediate_store.h`: eight direct/indirect/absolute/peripheral literal-store checkpoints | Legacy immediate-store start and phases251250/251260 | Native eight cases/restores; build5.083s, run0.016s |
+| 2 | `basic_memory.h`: twelve stores and six indirect loads, captured address, IRQ drain and store observation API | Two starts and phases251070..251100 | Native18 cases/restores; build5.246s, run0.021s |
 
 The pilot retains opcode-shaped literals, pointer updates, exact data writes
 and before/after-write replay. Clock assertions describe the current pipeline

@@ -40,6 +40,7 @@ struct clocked_register_action
 	std::vector<register_setting> values;
 	bool before_observation = false;
 	std::vector<memory_word> program{};
+	std::vector<register_setting> input_lines{};
 };
 struct clocked_data_event { bool write; std::uint32_t address; u16 value; unsigned cycle; };
 

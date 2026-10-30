@@ -127,8 +127,6 @@ private:
 	void start_empty_pipeline_case(bool nmi);
 	void start_multiword_pipeline_case(unsigned variant = 0);
 	void start_multiword_stream_case();
-	void start_pipeline_store_case(unsigned variant = 0);
-	void start_pipeline_indirect_case(unsigned variant = 0);
 	void start_pipeline_rmw_case(unsigned variant = 0);
 	void start_pipeline_mask_rmw_case();
 	void start_pipeline_return_case(unsigned variant = 0);
