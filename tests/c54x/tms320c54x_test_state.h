@@ -810,11 +810,9 @@ private:
 	};
 	static t_peripheral_fixture t_peripheral_case(unsigned variant);
 	void start_t_peripheral(unsigned variant = 0);
-	bool near_accumulator_fixture() const;
 	using fcala_delay_fixture = c54x_test::fcala_delay_fixture;
 	static fcala_delay_fixture fcala_delay_case(unsigned v);
 	void start_fcala_delay(unsigned variant = 0);
-	void start_accumulator_call(unsigned variant = 0);
 	void start_repeat_mvdp(unsigned variant = 0);
 	void start_repeat_mvdp_irq(unsigned variant = 0);
 	struct delayed_conditional_call_fixture
@@ -1124,7 +1122,6 @@ private:
 	bool check_xc_return_results();
 	bool check_mapped_dual_results();
 	bool check_repeat_mvdp_irq_results();
-	bool check_near_accumulator_results();
 	bool check_circular_portr_results();
 	bool check_ifr_pair_results();
 	bool check_poly_results();
