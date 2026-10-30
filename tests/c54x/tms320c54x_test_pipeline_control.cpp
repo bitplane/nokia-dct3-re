@@ -2140,7 +2140,7 @@ bool tms320c54x_test_state::check_pipeline_far_call_results()
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 319) { start_pipeline_explicit_sp(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged explicit SP: PASS cases=320 producers=POPM,STM,MVDK,FRAME,POPM_conflict compiler_consumers=LD,ST gap_nops=0,1,2,3 restore=320 duplicate_reads=0 duplicate_writes=0\n");
-			start_pipeline_idle_sp_tail(); return true;
+			start_pipeline_pmst(); return true;
 		}
 		++m_pipeline_expected_cycle;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

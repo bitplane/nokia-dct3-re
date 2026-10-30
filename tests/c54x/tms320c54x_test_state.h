@@ -264,7 +264,7 @@ private:
 	void start_pipeline_explicit_sp(unsigned variant = 0);
 	void start_pipeline_idle_sp_tail(unsigned variant = 0);
 	unsigned pipeline_idle_kind(unsigned variant) const;
-	void start_pipeline_idle1(unsigned variant = 0);
+	void start_pipeline_idle1(unsigned variant = 0, bool modes = false);
 	void start_pipeline_original_idle(unsigned variant = 0);
 	void start_pipeline_pmst(unsigned variant = 0);
 	void start_stack_irq_order(unsigned variant = 0);
@@ -2089,7 +2089,7 @@ private:
 	bool check_pipeline_far_branch_results();
 	bool check_pipeline_absolute_load_results();
 	bool check_pipeline_far_call_results();
-	bool check_pipeline_idle_sp_tail_results();
+	bool check_pipeline_idle_results();
 	bool check_repeat_pop_exclusion_results();
 	bool check_pipeline_sp_rmw_results();
 	bool check_pipeline_memory_repeat_read_a_results();
@@ -2227,6 +2227,8 @@ private:
 	u16 m_shifted_bus_word = 0;
 	ordered_case_digest m_shifted_bus_coverage;
 	ordered_case_digest m_context_coverage;
+	ordered_case_digest m_idle_coverage;
+	bool m_idle_mode_bank = false;
 	ordered_case_digest m_circular_move_coverage;
 	ordered_case_digest m_parallel_coverage;
 	unsigned m_circular_move_excluded = 0;

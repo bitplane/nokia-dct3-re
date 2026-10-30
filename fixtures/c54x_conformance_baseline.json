@@ -76,11 +76,6 @@
       "TMS320C54x staged absolute LD: PASS cases=64 accumulators=2 sxm_states=2 values=4 restore=64 duplicate_literal_fetches=0 duplicate_operand_reads=0",
       "TMS320C54x staged FCALL/FRET: PASS cases=80 source_pages=2 target_pages=5 restore=80 stack_words=2 duplicate_stack_writes=0 duplicate_stack_reads=0",
       "TMS320C54x staged explicit SP: PASS cases=320 producers=POPM,STM,MVDK,FRAME,POPM_conflict compiler_consumers=LD,ST gap_nops=0,1,2,3 restore=320 duplicate_reads=0 duplicate_writes=0",
-      "TMS320C54x staged original idle SP tail: PASS cases=4 original_words=4 restore=4 duplicate_reads=0 duplicate_sp_writes=0",
-      "TMS320C54x staged IDLE1: PASS cases=48 wake_profiles=6 source_pages=2 restore=48 suspended_younger_words=1 timer_runs=1 real_irq_return=1",
-      "TMS320C54x staged original idle call: PASS cases=8 original_words=44 setup_paths=2 stack_alignments=2 restore=8 external_wake=1 isr_claim=0",
-      "TMS320C54x staged original idle timer wake: PASS cases=8 idle_words=44 isr_words=94 stack_alignments=2 restore=8 original_vector=1 original_frete=1",
-      "TMS320C54x staged original idle zero/TINT: PASS cases=4 original_words=138 stack_alignments=2 restore=4 mask_drained=1 forced_continuation=0 native_profile_claim=0",
       "TMS320C54x staged STM PMST: PASS cases=64 values=4 source_pages=2 target_regions=2 restore=64 duplicate_literal_fetches=0 duplicate_register_writes=0",
       "TMS320C54x staged MVPD: PASS cases=128 addressing_modes=4 source_pages=2 source_regions=2 ovly_states=2 restore=128 duplicate_program_reads=0 duplicate_data_writes=0",
       "TMS320C54x staged RPT MVPD: PASS cases=128 counts=4 pages=2 ovly_states=2 destination_modes=2 restore=128 count_plus_one=1 duplicate_transfers=0",
@@ -2624,9 +2619,9 @@
           "name": "dual-sub-native"
         },
         {
-          "description": "Staged IDLE1/2/3 barriers, timer clocks, interrupt wake and replay",
+          "description": "IDLE1/2/3 timer clocks plus external and timer wake replay",
           "index": 156,
-          "name": "idle-modes"
+          "name": "power-idle"
         },
         {
           "description": "Retained RAM-to-CLKMD moves and peripheral access across restore",
@@ -2680,7 +2675,7 @@
       "C54x native backend RF observation: PASS debugger_reads=8 ordinary_reads=3 source_restore=1 reset=1 physical_rf_claim=0\n": 1,
       "C54x native backend compare requests: PASS cases=16 channels=2 pending_restore=16 armed_restore=16 overlap_restore=1 payload_preserved=1 masked_pending=1 ack_ports=1,2 reset=16 mapping_claim=0\n": 1,
       "C54x staged backend BSP clocked store: PASS opcode=7721 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 physical_phase_claim=0\n": 1,
-      "Nokia ROM4 context integration: PASS cases=%u restore=%u banks=6 silicon_phase_claim=0 coverage_fnv64=%016llx\n": 1,
+      "Nokia ROM4 context integration: PASS cases=%u restore=%u banks=8 silicon_phase_claim=0 coverage_fnv64=%016llx\n": 1,
       "TMS320C54x ABDST overflow: PASS cases=16 frct=0,1 ovm=0,1 sticky_ovb=1 pipeline_claim=0\n": 1,
       "TMS320C54x ADDC chains: PASS cases=4096 restore=4096 destinations=AA,BA,AB,BB accumulator_pairs=4 word_pairs=4 carry_states=2 sxm_ovm=4 pages=2 snapshots=4 issue_gap=0 read_retention=1 carry_sample=Execute physical_phase_claim=0\n": 1,
       "TMS320C54x ADDC: PASS cases=110592 restore=110592 numeric_cases=73728 mapped_cases=36864 ram_forms=6 mapped_sources=16 accumulators=2 carry_states=2 sxm_ovm=4 words=8 accumulator_patterns=8 late_accumulator_carry=2 pages=2 snapshots=3 unsigned_smem=1 physical_phase_claim=0 control_composition=unvalidated\n": 1,
@@ -2982,6 +2977,7 @@
       "TMS320C54x peripheral MMR timing: PASS cases=20 families=STM,ANDM,ORM,ST,LD extra_cycles=1 rmw_double_charge=0 scratch_wait=0\n": 1,
       "TMS320C54x peripheral MVDD: PASS cases=1536 restore=1536 destinations=3 values=4 dual_modifiers=16 pages=2 snapshots=4 source_reads=1 peripheral_writes=1 extra_cycles=1 retained_address=1 retained_source=1 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x polling loop interrupts: PASS cases=384 restore=384 sources=IRQ,NMI arrivals=32 pages=2 snapshots=3 release=handler balanced_frames=1 physical_phase_claim=0\n": 1,
+      "TMS320C54x power idle: PASS cases=%u restore=%u mode_cases=96 wake_cases=48 banks=2 physical_clock_claim=0 coverage_fnv64=%016llx\n": 1,
       "TMS320C54x program overlay conformance: PASS\n": 1,
       "TMS320C54x repeat endpoints: PASS cases=12 endpoints=ordinary,ffff,0000 counts=short,long sources=irq,nmi\n": 1,
       "TMS320C54x repeat page comparator: PASS cases=384 restore=384 frontends=atomic,staged counts=0,1,2,7 caller_pages=0,2,127 targets=foreign call_forms=FCALL,FCALLD hazard_controls=2 snapshots=4 rea_width=16 wrap_page=current balanced_frames=1 delay_effects=once physical_phase_claim=0\n": 1,
@@ -5712,26 +5708,6 @@
       ],
       "required": [
         "TMS320C54x staged FCALA producer: PASS cases=216 restore=216 producer=DLD accumulators=2 gaps=0,1,2 caller_pages=3 target_pages=3 ram_reads=2 target_retained=1 frame_roundtrip=1 silicon_phase_claim=0"
-      ]
-    },
-    "idle-modes": {
-      "completion": "Fatal error: TMS320C54x isolated staged idle modes complete",
-      "machine": "tms54xtra",
-      "reported_fields": [
-        {
-          "cases": "96",
-          "modes": "3",
-          "pages": "2",
-          "physical_clock_claim": "0",
-          "real_irq_return": "1",
-          "restore": "96",
-          "suspended_younger_words": "1",
-          "timer_stop": "1",
-          "wake_profiles": "4"
-        }
-      ],
-      "required": [
-        "TMS320C54x staged idle modes: PASS cases=96 modes=3 wake_profiles=4 pages=2 restore=96 timer_stop=1 suspended_younger_words=1 real_irq_return=1 physical_clock_claim=0"
       ]
     },
     "ifr-pair": {
@@ -9607,6 +9583,24 @@
         "TMS320C54x circular PORTR: PASS cases=98304 restore=98304 modes=4 registers=8 compatibility=2 bk=4 indices=4 samples=4 ports=2 flags=2 pages=2 snapshots=3 literal_retained=1 sample_retained=1 pointer_updates=once destination_reads=0 excluded_io_reads=0 excluded_writes=0 bk_zero=legacy_linear silicon_phase_claim=0"
       ]
     },
+    "power-idle": {
+      "completion": "Fatal error: TMS320C54x isolated power idle complete",
+      "machine": "tms54xtra",
+      "reported_fields": [
+        {
+          "banks": "2",
+          "cases": "144",
+          "coverage_fnv64": "0a26fee7ba04c325",
+          "mode_cases": "96",
+          "physical_clock_claim": "0",
+          "restore": "144",
+          "wake_cases": "48"
+        }
+      ],
+      "required": [
+        "TMS320C54x power idle: PASS cases=144 restore=144 mode_cases=96 wake_cases=48 banks=2 physical_clock_claim=0 coverage_fnv64=0a26fee7ba04c325"
+      ]
+    },
     "preinc-st": {
       "completion": "Fatal error: TMS320C54x isolated preincrement ST complete",
       "machine": "tms54test",
@@ -10349,15 +10343,15 @@
       "machine": "tms54xtra",
       "reported_fields": [
         {
-          "banks": "6",
-          "cases": "334",
-          "coverage_fnv64": "f2680b443bf25b9c",
-          "restore": "334",
+          "banks": "8",
+          "cases": "358",
+          "coverage_fnv64": "ce54ab5aff19dbc0",
+          "restore": "358",
           "silicon_phase_claim": "0"
         }
       ],
       "required": [
-        "Nokia ROM4 context integration: PASS cases=334 restore=334 banks=6 silicon_phase_claim=0 coverage_fnv64=f2680b443bf25b9c"
+        "Nokia ROM4 context integration: PASS cases=358 restore=358 banks=8 silicon_phase_claim=0 coverage_fnv64=ce54ab5aff19dbc0"
       ]
     },
     "rotate": {
@@ -15121,6 +15115,18 @@
       "family": "normalization-recovered-count-aliases",
       "scope": "Positive inferred count-alias model, not documented ISA conformance, an illegal-operand test or handset integration."
     },
+    "power-idle": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 144,
+        "fnv64": "0a26fee7ba04c325",
+        "key": "0..95: original idle-modes raw indices;96..143: original default IDLE1 raw0..47. Preserve the three-mode/four-wake and IDLE1/six-wake cohorts, both pages and four snapshots independently.",
+        "result_prefix": "TMS320C54x power idle: PASS"
+      },
+      "decision": "merge",
+      "family": "idle-mode-and-wake-banks"
+    },
     "reg-banks": {
       "case_ids": [],
       "classification": "architectural_interaction",
@@ -15187,13 +15193,13 @@
       "case_ids": [],
       "classification": "firmware_integration",
       "coverage": {
-        "cases": 334,
-        "fnv64": "f2680b443bf25b9c",
-        "key": "(bank<<8)|raw, banks in order: prologue0..5, roundtrip0..15, skip-body context0..39, active-body context0..127, timer ISR0..47, recurring timer0..95. Same raw identities, explicitly corrected input contents; digest does not certify unchanged stimuli.",
+        "cases": 358,
+        "fnv64": "ce54ab5aff19dbc0",
+        "key": "(bank<<8)|raw; existing banks0..5 unchanged, bank6=original idle-wrapper raw0..19, bank7=original POPM-SP/RET tail raw0..3. The latter covers four distinct poisoned-source replay boundaries.",
         "result_prefix": "Nokia ROM4 context integration: PASS"
       },
       "decision": "relocate",
-      "family": "rom4-context-legal-entry-and-isolation"
+      "family": "rom4-idle-wrapper-ownership"
     },
     "rotate": {
       "case_ids": [],

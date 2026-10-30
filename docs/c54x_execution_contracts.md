@@ -125,7 +125,7 @@ cursor restoration. The small SP bank retains its final register/RAM checks.
 Exact observation clocks remain model regressions, not physical timing claims.
 
 Copied MU4 context/worker programs are Nokia firmware integration, not ISA
-conformance. The `rom4-context` profile owns 334 cases in six banks under
+conformance. The `rom4-context` profile owns 358 cases in eight banks under
 `tests/firmware/tms320c54x_test_rom4_context.cpp`; those banks no longer execute
 again in the default suite. It needs no external ROM file. Corrected inputs
 keep ARP zero and CMPT clear at every observation; all low status sentinels,
@@ -134,12 +134,22 @@ The standalone baseline, corrected and relocated executions produce identical
 native logs. Exact local clocks remain model regressions, not silicon evidence.
 
 The outer skip-worker/skip-body paths, poisoned-source call/return roundtrip,
-active body and timer/recurring-ISR banks remain distinct. The two overlapping
+active body, timer/recurring-ISR, copied idle wrapper and poisoned SP-return
+banks remain distinct. The two overlapping
 smaller probes and their 58 case/restore pairs are retired with explicit loss
-of separate register patterns and local observations. The remaining original-
-idle fixture still borrows the timer image setup: shared legacy controller
-storage and other copied snippets remain to be reviewed. This relocation is
+of separate register patterns and local observations. All callers of the
+timer image setup now live in the firmware module; generic CPU tests no longer
+borrow it. Shared legacy controller storage and other copied snippets remain
+to be reviewed. This relocation is
 ownership separation, not a net source-size reduction.
+
+`power-idle` separately owns the 96-case IDLE1/2/3 bank and the 48-case
+IDLE1 wake bank, with explicit immutable mode input rather than a profile-name
+test inside the loop. All 144 identities, page/wake cohorts and four snapshot
+classes remain. The selected-result-owner route keeps them out of the default
+dispatcher; the CPU-only controller extraction remains outstanding. Legal
+standard-mode inputs keep ARP zero. These timer/interrupt observations do not
+establish physical frequencies or silicon restart latency.
 
 `mapped-word`, `mapped-bitf` and `status-bitf` use the same runner with a shared
 mapped-register descriptor builder. The distinct ADD/SUB and TC reference rules
@@ -2593,10 +2603,11 @@ match the preceding capture. The review binds its executable, acceptance
 sources and exact bench patch over `66cfbfc9`; no CPU/device source changed.
 No runtime improvement or blanket validity of other fixture inputs is claimed.
 
-This capture precedes the final router cleanup: the integration profile now
-selects its result owner at reset instead of querying it every default CPU
-clock. The existing compiled selection test and focused integration rerun
-qualify that route; the record does not claim a second full-default run.
+The current layout has 276 default requirements after the additional idle
+banks moved to `power-idle` and `rom4-context`. Focused native and executable
+host checks qualify the selected-owner routing and regrouped inputs. A
+current-tree full-default/all-isolated run remains outstanding; this older
+capture is not silently renewed by those focused checks.
 
 `fixtures/c54x_fidelity_checkpoint.json` remains an immutable historical
 capture: 294 then-required markers, 295 native PASS records and 1,058.73 seconds.

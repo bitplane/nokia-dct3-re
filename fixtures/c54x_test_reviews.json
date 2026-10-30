@@ -8,10 +8,52 @@
   },
   "families": [
     {
-      "id": "rom4-context-legal-entry-and-isolation",
+      "id": "idle-mode-and-wake-banks",
+      "classification": "architectural_interaction",
+      "decision": "merge",
+      "profiles": ["power-idle"],
+      "case_ids": [],
+      "retired_profiles": ["idle-modes"],
+      "profile_coverage": {
+        "power-idle": {"cases": 144, "fnv64": "0a26fee7ba04c325", "result_prefix": "TMS320C54x power idle: PASS", "key": "0..95: original idle-modes raw indices;96..143: original default IDLE1 raw0..47. Preserve the three-mode/four-wake and IDLE1/six-wake cohorts, both pages and four snapshots independently."}
+      },
+      "basis": "TI SPRU172C IDLE and SPRU131G CPU power-management/interrupt contracts define suspension, enabled wake and interrupt masking. Existing fixtures independently specify continuation refetch, exact stack words, pending-source retention and timer-running/stopped observations. Exact internal clocks, physical timer units and silicon wake latency remain model observations, not vendor-measured conformance.",
+      "changes": ["two existing banks share an explicit per-case mode parameter rather than interpreting the profile name inside the clock loop", "replace idle-modes BIOS with power-idle and expose the48 former default-only wake cases; remove their duplicate default execution", "use the existing selected-result-owner route; no unconditional dispatcher lookup", "clear incidental ARP5 sentinel to ARP0 with CMPT clear and check the legal context at every observation", "retain every original input combination, snapshot and observation predicate apart from that explicitly corrected sentinel; no execution case is deleted"],
+      "known_limits": ["timer/decode/retirement clocks are emulator regressions, not physical frequency or silicon phase qualification", "mode-bank selection is immutable host fixture input, not emulated/save-state data", "the two cohorts differ in timer setup; they are not assumed redundant merely because some wake sources overlap", "the profile still uses the legacy bench class, not the minimal tms54isa executable; CPU-only controller extraction remains outstanding"],
+      "verification": "Original96-case idle-modes baseline passes. The merged power-idle profile passes all144 cases/restores with digest0a26fee7ba04c325. The expanded rom4-context profile passes all358, and neighboring stack-sp(774) and mode-latency(1072) controls pass. All5079 host tests pass with one established skip in63.295 seconds. Inventory has395 isolated profiles and276 default requirements. Full-default, retained-all-isolated and handset checks are not renewed by this focused batch.",
+      "measurements": {"baseline_commit": "ef7d7f1a", "before_cpu_cpp_bytes": 3274653, "before_cpu_cpp_lines": 49963, "after_cpu_cpp_bytes": 3258372, "after_cpu_cpp_lines": 49735, "before_cpu_and_firmware_cpp_bytes": 3822648, "before_cpu_and_firmware_cpp_lines": 59248, "after_cpu_and_firmware_cpp_bytes": 3823311, "after_cpu_and_firmware_cpp_lines": 59260, "source_assessment": "228 lines leave the CPU directory by relocation. Combined source grows663 bytes/12 lines; this is ownership and scope consolidation, not net source deletion. No case is retired and no measured runtime speedup is claimed."},
+      "native_checkpoints": {
+        "source_base_commit": "ef7d7f1a",
+        "bench_patch_command": "git diff --no-ext-diff --binary ef7d7f1a -- tests/c54x tests/firmware",
+        "bench_patch_sha256": "cadc739441619f9e711a4197e1924a2f4d0a9dd860debc27b58dce752f9ded74",
+        "executable_sha256": "d0f77af7cb46378c3d3a6a10595f098a39ffcf1bda5c8acea34c625648a5bd63",
+        "acceptance_sha256": {"tools/run_c54x_core.py": "70ef9f2bc24630e9a7b2eff039f2781f7d6ed82f20424c1b22ccdd831b8e061d", "tools/c54x_test_oracles.py": "0cad157cb13f5ee797b04fb07777623a49f34aa09e237598010b1b60bc3e8734"},
+        "power_idle_capture": "tmp/c54x-corpus-transfer-review/run_c54x_core_pmkcqzpt",
+        "rom4_context_capture": "tmp/c54x-corpus-transfer-review/run_c54x_core_ycvnfqgq",
+        "mame_exit_each": 3,
+        "runner_exit_each": 0,
+        "scope": "All144 generic idle and358 copied-program integration cases/restores. No full-default, all-isolated, handset or physical-clock renewal."
+      }
+    },
+    {
+      "id": "rom4-idle-wrapper-ownership",
       "classification": "firmware_integration",
       "decision": "relocate",
       "profiles": ["rom4-context"],
+      "case_ids": [],
+      "profile_coverage": {
+        "rom4-context": {"cases": 358, "fnv64": "ce54ab5aff19dbc0", "result_prefix": "Nokia ROM4 context integration: PASS", "key": "(bank<<8)|raw; existing banks0..5 unchanged, bank6=original idle-wrapper raw0..19, bank7=original POPM-SP/RET tail raw0..3. The latter covers four distinct poisoned-source replay boundaries."}
+      },
+      "basis": "Copied Nokia programs and typed fixture inputs specify firmware integration, not generic ISA conformance. The complete wrapper covers setup/skip paths, two stack alignments, externally woken return, real timer ISR return and zero-flag initialization/re-halt. The small tail separately poisons both stack sources after sampling and observes duplicate reads/SP publication; the complete wrapper does not provide those observations, so deleting it as redundant would lose a distinct interaction regression.",
+      "changes": ["move both idle setups, four result-phase handlers and the copied-wrapper timer IACK observation into the existing firmware integration module", "all callers of the shared timer-image setup now live in the same firmware module; no generic CPU test borrows that Nokia image", "remove four copied-program result requirements from default execution while retaining all24 cases in rom4-context", "clear ARP5 from these standard-mode inputs/expectations and retain all low status bits, instruction words, stack poisoning, exact ordered bus checks and replay boundaries", "the SP-tail setup now explicitly seeds IDLE0: its old predecessor was awake, but the new preceding zero/TINT bank legitimately ends asleep; declaring the runnable input removes that fixture dependency"],
+      "known_limits": ["POPM-SP alias publication and exact local phases are declared model/integration observations, not independent silicon qualification", "legacy bench storage and configuration selection remain shared; other copied prefix/tail fragments still need review"],
+      "verification": "The preceding default capture passed all24 old cases. The expanded integration profile passes all358 cases/restores, including the four poisoned-source tail cases, with digestce54ab5aff19dbc0. Its first run exposed the implicit awake-state dependency; adding explicit runnable IDLE0, not changing CPU behavior or weakening a result predicate, resolves it. All5079 host tests pass with one established skip; neighboring stack and address-mode controls pass. This does not renew full-default, retained-all-isolated or handset acceptance."
+    },
+    {
+      "id": "rom4-context-legal-entry-and-isolation",
+      "classification": "firmware_integration",
+      "decision": "relocate",
+      "profiles": [],
       "case_ids": [],
       "profile_coverage": {
         "rom4-context": {"cases": 334, "fnv64": "f2680b443bf25b9c", "result_prefix": "Nokia ROM4 context integration: PASS", "key": "(bank<<8)|raw, banks in order: prologue0..5, roundtrip0..15, skip-body context0..39, active-body context0..127, timer ISR0..47, recurring timer0..95. Same raw identities, explicitly corrected input contents; digest does not certify unchanged stimuli."}

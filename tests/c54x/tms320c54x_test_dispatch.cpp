@@ -96,7 +96,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_pipeline_far_branch_results()) return;
 	if (check_pipeline_absolute_load_results()) return;
 	if (check_pipeline_far_call_results()) return;
-	if (check_pipeline_idle_sp_tail_results()) return;
 	if (check_repeat_pop_exclusion_results()) return;
 	if (check_pipeline_sp_rmw_results()) return;
 	if (check_pipeline_memory_repeat_read_a_results()) return;

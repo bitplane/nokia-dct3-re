@@ -329,8 +329,131 @@ void tms320c54x_test_state::start_pipeline_mu4_recurring_timer(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
+void tms320c54x_test_state::start_pipeline_original_idle(unsigned variant)
+{
+	bool const service = variant >= 8, initialize = variant >= 16;
+	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+	if (service)
+	{
+		// Reuse the pinned original timer vector/handler/worker image and
+		// typed worker data. This is CPU composition, not native flag setup.
+		start_pipeline_mu4_timer_context();
+		m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove();
+		m_vector_stack_tap.remove(); m_vector_prefetch_tap.remove();
+	}
+	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+	bool const skip = !initialize && (service || BIT(variant, 0));
+	u16 const sp = 0x1000 + (service ? BIT(variant, 0) : BIT(variant, 1));
+	std::array<u16, 29> const idle{0x4a11, 0xeeff, 0x10f8, 0xa531, 0xf844, 0x98e9,
+		0x7711, 0x0025, 0x7681, 0x0001, 0x7711, 0x0026, 0x7681, 0x0020,
+		0x7711, 0x0000, 0x6881, 0xfff7, 0x7711, 0x0000, 0x6981, 0x08c0,
+		0x76f8, 0xa531, 0x0001, 0xf4e1, 0xee01, 0x8a11, 0xf4e4};
+	std::array<u16, 15> const wrapper{0x4918, 0x68f8, 0x0018, 0xfffe, 0xf7be,
+		0xf495, 0x4a0b, 0x4a0b, 0xf982, 0x98d0, 0xf6be, 0x8a18, 0xf495, 0xf495, 0xfc00};
+	auto &program = m_cpu->space(AS_PROGRAM);
+	for (unsigned i = 0; i < 64; ++i) { program.write_word(0x23d2f + i, 0xf495); program.write_word(0x298d0 + i, 0xf495); program.write_word(0x20700 + i, 0xf495); }
+	for (unsigned i = 0; i < idle.size(); ++i) program.write_word(0x298d0 + i, idle[i]);
+	for (unsigned i = 0; i < wrapper.size(); ++i) program.write_word(0x23d2f + i, wrapper[i]);
+	program.write_word(0x20700, 0xe855);
+	if (service)
+	{
+		for (unsigned i = 0; i < wrapper.size(); ++i) program.write_word(0x3d2f + i, wrapper[i]);
+		for (unsigned i = 0; i < 512; ++i) program.write_word(0x700 + i, i ? 0xf495 : 0xe855);
+	}
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, service ? 0x2020 : 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0x0608}, {cpu_regs::STATE_ST1, service ? 0 : 0x800}, {cpu_regs::STATE_SP, sp},
+		{cpu_regs::STATE_AR1, 0x1357}, {cpu_regs::STATE_A, 0x77}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_IFR, 0},
+		{cpu_regs::STATE_IMR, service ? 8 : 0x40},
+	});
+	auto &data = m_cpu->space(AS_DATA);
+	data.write_word(sp, 0x700); data.write_word(0xa531, skip ? 1 : 0);
+	m_cpu->set_state_int(STATE_GENPC, 0x23d2f); m_cpu->set_pipeline_frontend(true);
+	if (service && !initialize)
+	{
+		m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0xffff);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x20);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TIM, 119);
+	}
+	m_pipeline_replay = false; m_idle_fixture_tick = 0;
+	m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+	m_vector_acks = m_pipeline_drained_fetches = m_vector_reads = 0;
+	m_pipeline_write_tap = data.install_write_tap(0, 0xa531, "original_idle_setup",
+		[this, skip, initialize](offs_t at, u16 &value, u16) {
+			if (machine().side_effects_disabled() || (at != 0 && at != 0x25 && at != 0x26 && at != 0xa531)) return;
+			std::array<u16, 5> const addresses{0x25, 0x26, 0, 0, 0xa531};
+			std::array<u16, 5> const values{1, 0x20, initialize ? u16(0) : u16(0x40), 0x8c0, 1};
+			expect(!skip && m_pipeline_store_writes < addresses.size() && at == addresses[m_pipeline_store_writes] && value == values[m_pipeline_store_writes],
+				"Original zero flag owns ordered timer, interrupt mask and local flag writes; nonzero skips them");
+			++m_pipeline_store_writes;
+		});
+	m_pipeline_fetch_tap = program.install_read_tap(service ? 0x700 : 0x20700, service ? 0x700 : 0x20700, "original_idle_caller",
+		[this, service](offs_t, u16 &value, u16) {
+			if (machine().side_effects_disabled()) return;
+			expect(value == 0xe855 && m_idle_fixture_tick >= 120 && (!service || (m_vector_acks == 1 && m_vector_reads == 1)), "Original wrapper reaches its caller only after physical wake and any required ISR return");
+			++m_pipeline_extensions_reads;
+		});
+	if (service)
+		m_vector_prefetch_tap = program.install_read_tap(0x204c, 0x4044, "original_idle_timer_route",
+			[this](offs_t at, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				if (at == 0x204c) { expect(value == 0x4a1e, "Original timer vector saves XPC before far branching"); ++m_pipeline_operand_reads; }
+				if (at == 0x3d73) { expect(value == 0xeeff, "Original idle timer wake enters the uploaded context handler"); ++m_pipeline_drained_fetches; }
+				if (at == 0x4044) { expect(value == 0xf4e5, "Original idle timer wake returns through uploaded FRETE"); ++m_vector_reads; }
+			});
+	m_phase = 252250; m_cpu->resume(SUSPEND_REASON_DISABLE);
+	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+}
+
+void tms320c54x_test_state::start_pipeline_idle_sp_tail(unsigned variant)
+{
+	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+	auto &program = m_cpu->space(AS_PROGRAM);
+	for (unsigned i = 0; i < 24; ++i) { program.write_word(0x23d3a + i, 0xf495); program.write_word(0x20700 + i, 0xf495); }
+	std::array<u16, 4> const words{0x8a18, 0xf495, 0xf495, 0xfc00};
+	for (unsigned i = 0; i < words.size(); ++i) program.write_word(0x23d3a + i, words[i]);
+	program.write_word(0x23d3e, 0xffff); program.write_word(0x20700, 0xe855);
+	set_registers(*m_cpu, {
+		{cpu_regs::STATE_IDLE, 0},
+		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
+		{cpu_regs::STATE_ST0, 0x0608}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_SP, 0xffe},
+		{cpu_regs::STATE_A, 0x77}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
+	});
+	m_cpu->space(AS_DATA).write_word(0xffe, 0x1000); m_cpu->space(AS_DATA).write_word(0x1000, 0x700);
+	m_cpu->set_state_int(STATE_GENPC, 0x23d3a); m_cpu->set_pipeline_frontend(true);
+	m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_operand_reads = m_pipeline_register_writes = m_pipeline_extensions_reads = 0;
+	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0xffe, 0x1000, "idle_original_sp_return_sources",
+		[this](offs_t address, u16 &value, u16) {
+			if (machine().side_effects_disabled()) return;
+			expect(address == (m_pipeline_operand_reads ? 0x1000 : 0xffe) && value == (m_pipeline_operand_reads ? 0x700 : 0x1000) &&
+				m_cpu->pipeline_cycles() == (m_pipeline_operand_reads ? 8 : 5), "Original suffix pops restored SP then reads the caller return at that restored address");
+			++m_pipeline_operand_reads;
+		});
+	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x18, 0x18, "idle_original_sp_publication",
+		[this](offs_t, u16 &value, u16) {
+			if (machine().side_effects_disabled()) return;
+			expect(value == 0x1000 && m_cpu->pipeline_cycles() == 5, "POPM SP publishes its popped value without incrementing it afterward");
+			++m_pipeline_register_writes;
+		});
+	m_pipeline_fetch_tap = program.install_read_tap(0x20700, 0x20700, "idle_original_sp_caller",
+		[this](offs_t, u16 &, u16) {
+			if (machine().side_effects_disabled()) return;
+			expect(m_cpu->pipeline_cycles() == 10, "Original idle suffix returns to its same-page caller"); ++m_pipeline_extensions_reads;
+		});
+	m_phase = 252210; m_cpu->resume(SUSPEND_REASON_DISABLE);
+	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+}
+
 void tms320c54x_test_state::observe_context_irq(int line)
 {
+	if (m_phase == 252250 && m_pipeline_peripheral_case >= 8)
+	{
+		m_timer_probe_return_pc = m_cpu->state_int(tms320c54x_device::STATE_RTN);
+		expect(line == 3 && (m_pipeline_peripheral_case >= 16 || m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x98ea),
+			"Original idle timer wake acknowledges TINT at the unexecuted post-IDLE continuation");
+		++m_vector_acks;
+	}
 	if (m_phase == 252110 || m_phase == 252130)
 	{
 		expect(line == 3, "Original MU4 timer fixture acknowledges only the hardware timer source");
@@ -664,9 +787,7 @@ bool tms320c54x_test_state::check_rom4_context_results()
 			record_context_case(5, variant);
 			if (variant < 95) { start_pipeline_mu4_recurring_timer(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged recurring MU4 timer: PASS cases=96 returns_per_leg=8 periods=2 foreground_pages=2 sxm_states=2 control_outcomes=2 restore=96 exact_return_cycle=1 firmware_reseeding=0\n");
-			osd_printf_info("Nokia ROM4 context integration: PASS cases=%u restore=%u banks=6 silicon_phase_claim=0 coverage_fnv64=%016llx\n",
-				m_context_coverage.count, m_context_coverage.count, (unsigned long long)m_context_coverage.value);
-			throw emu_fatalerror(3, "Nokia ROM4 context integration complete");
+			start_pipeline_original_idle(); return true;
 		}
 		++m_pipeline_expected_cycle;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
@@ -674,6 +795,125 @@ bool tms320c54x_test_state::check_rom4_context_results()
 	if (m_phase == 252140)
 	{
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252130;
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+	}
+	if (m_phase == 252250)
+	{
+		unsigned const variant = m_pipeline_peripheral_case;
+		bool const service = variant >= 8, initialize = variant >= 16, skip = !initialize && (service || BIT(variant, 0));
+		u16 const sp = 0x1000 + (service ? BIT(variant, 0) : BIT(variant, 1));
+		unsigned const tick = ++m_idle_fixture_tick;
+		unsigned const checkpoint = initialize ? (variant >= 18 ? 140 : 60) : service ? std::array<unsigned, 4>{80, 110, 140, 300}[(variant - 8) / 2] : BIT(variant, 2) ? 110 : 80;
+		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Original 44-word idle call uses only validated staged forms");
+		if (!initialize && tick >= 80 && tick < 120)
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_extensions_reads == 0 &&
+				m_pipeline_store_writes == (skip ? 0 : 5) && m_cpu->state_int(tms320c54x_device::STATE_IMR) == (service ? 8 : skip ? 0x40 : 0x8c0),
+				"Original setup masks its short-period timer before sleeping, without executing its continuation");
+		if (!service && tick == 120) { m_cpu->set_input_line(6, ASSERT_LINE); m_cpu->set_input_line(6, CLEAR_LINE); }
+		if (tick == checkpoint && !m_pipeline_replay)
+		{
+			m_idle_fixture_saved_tick = tick; m_pipeline_store_case = m_pipeline_store_writes;
+			m_recurring_irq_snapshot = {m_vector_acks, m_pipeline_operand_reads, m_pipeline_drained_fetches, m_vector_reads, m_pipeline_extensions_reads, m_timer_probe_return_pc};
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save original idle call after firmware-owned setup and before external wake");
+		}
+		if (tick == (initialize ? 1000 : service ? 400 : 200))
+		{
+			if (initialize)
+			{
+				osd_printf_info("Original idle zero/TINT observation: case=%u replay=%u writes=%u acks=%u vectors=%u handlers=%u returns=%u idle=%llu pc=%04llx rtn=%04llx sp=%04llx imr=%04llx ifr=%04llx interrupted_pc=%04x\n",
+					variant, unsigned(m_pipeline_replay), m_pipeline_store_writes, m_vector_acks, m_pipeline_operand_reads, m_pipeline_drained_fetches, m_vector_reads,
+					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IDLE), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_PC),
+					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_RTN), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_SP),
+					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IMR), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IFR), m_timer_probe_return_pc);
+				expect(m_pipeline_extensions_reads == 0 && m_pipeline_store_writes == 5 && m_vector_acks == 1 &&
+					m_pipeline_operand_reads == 1 && m_pipeline_drained_fetches == 1 && m_vector_reads == 1 && m_timer_probe_return_pc == 0x98e4 &&
+					m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x98ea &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0xffa && m_cpu->state_int(tms320c54x_device::STATE_IMR) == 0x8c0 &&
+					m_cpu->state_int(tms320c54x_device::STATE_IFR) == 8 && m_cpu->space(AS_DATA).read_word(0xa531) == 1,
+					"Original zero path drains its mask before timer entry, returns at ORM, commits its flag and sleeps without forced continuation");
+			}
+			else
+			{
+			osd_printf_info("Original idle observation: case=%u replay=%u idle=%llu caller_fetch=%u sp=%04llx ar1=%04llx a=%llx b=%llx st1=%04llx xpc=%llx ifr=%04llx\n",
+				variant, unsigned(m_pipeline_replay), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IDLE), m_pipeline_extensions_reads,
+				(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_SP), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_AR1),
+				(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),
+				(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST1), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_XPC),
+				(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IFR));
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_extensions_reads == 1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == sp + 1 && m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x1357 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x55 && m_cpu->state_int(tms320c54x_device::STATE_B) == sp &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (service ? 0 : 0x800) && m_cpu->state_int(tms320c54x_device::STATE_XPC) == 2 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IFR) == (service ? 0 : skip ? 0x40 : 0x48) &&
+				(!service || (m_vector_acks == 1 && m_pipeline_operand_reads == 1 && m_pipeline_drained_fetches == 1 && m_vector_reads == 1)),
+				"Original idle wake, FRET and wrapper restore caller SP/AR1/CPL, retaining unserviced enabled IRQ under INTM");
+			}
+			if (!m_pipeline_replay)
+			{
+				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_store_writes = m_pipeline_store_case;
+				m_vector_acks = m_recurring_irq_snapshot[0]; m_pipeline_operand_reads = m_recurring_irq_snapshot[1];
+				m_pipeline_drained_fetches = m_recurring_irq_snapshot[2]; m_vector_reads = m_recurring_irq_snapshot[3]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[4];
+				m_timer_probe_return_pc = m_recurring_irq_snapshot[5];
+				return restore_pipeline_at(252260, "Restore original idle call with retained timer and stack state");
+			}
+			m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove();
+			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_pipeline_frontend(false);
+			if (variant == 7) osd_printf_info("TMS320C54x staged original idle call: PASS cases=8 original_words=44 setup_paths=2 stack_alignments=2 restore=8 external_wake=1 isr_claim=0\n");
+			if (variant == 15) osd_printf_info("TMS320C54x staged original idle timer wake: PASS cases=8 idle_words=44 isr_words=94 stack_alignments=2 restore=8 original_vector=1 original_frete=1\n");
+			record_context_case(6, variant);
+			if (variant < 19) { start_pipeline_original_idle(variant + 1); return true; }
+			osd_printf_info("TMS320C54x staged original idle zero/TINT: PASS cases=4 original_words=138 stack_alignments=2 restore=4 mask_drained=1 forced_continuation=0 native_profile_claim=0\n");
+			start_pipeline_idle_sp_tail(); return true;
+		}
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+	}
+	if (m_phase == 252260)
+	{
+		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252250;
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+	}
+	if (m_phase == 252210)
+	{
+		u64 const cycle = m_cpu->pipeline_cycles(); unsigned const checkpoint = std::array<unsigned, 4>{5, 7, 8, 9}[m_pipeline_peripheral_case];
+		auto const reads_at = [](u64 clock) { return unsigned(clock >= 5) + unsigned(clock >= 8); };
+		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+			m_pipeline_operand_reads == reads_at(cycle) && m_pipeline_register_writes == unsigned(cycle >= 5) && m_pipeline_extensions_reads == unsigned(cycle >= 10) &&
+			m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= 7 ? 0x1001 : cycle >= 5 ? 0x1000 : 0xffe) &&
+			m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 14 ? 0x55 : 0x77) &&
+			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
+			"Original POPM SP/NOP/NOP/RET suffix restores and consumes the intended caller frame");
+		if (cycle == 5 || cycle == 8)
+		{
+			auto const disable = machine().disable_side_effects();
+			m_cpu->space(AS_DATA).write_word(cycle == 5 ? 0xffe : 0x1000, 0xdead);
+		}
+		if (cycle == checkpoint && !m_pipeline_replay)
+		{
+			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save original idle SP restoration and captured near-return word");
+		}
+		if (cycle == 16)
+		{
+			if (!m_pipeline_replay)
+			{
+				m_pipeline_replay = true; m_pipeline_operand_reads = reads_at(checkpoint); m_pipeline_register_writes = unsigned(checkpoint >= 5); m_pipeline_extensions_reads = unsigned(checkpoint >= 10);
+				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore original idle suffix without a second SP publication or return-word read");
+				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252220;
+				m_check_timer->enable(true); return true;
+			}
+			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+			record_context_case(7, m_pipeline_peripheral_case);
+			if (m_pipeline_peripheral_case < 3) { start_pipeline_idle_sp_tail(m_pipeline_peripheral_case + 1); return true; }
+			osd_printf_info("TMS320C54x staged original idle SP tail: PASS cases=4 original_words=4 restore=4 duplicate_reads=0 duplicate_sp_writes=0\n");
+			osd_printf_info("Nokia ROM4 context integration: PASS cases=%u restore=%u banks=8 silicon_phase_claim=0 coverage_fnv64=%016llx\n",
+				m_context_coverage.count, m_context_coverage.count, (unsigned long long)m_context_coverage.value);
+			throw emu_fatalerror(3, "Nokia ROM4 context integration complete");
+		}
+		++m_pipeline_expected_cycle;
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+	}
+	if (m_phase == 252220)
+	{
+		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252210;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	throw emu_fatalerror("Unowned ROM4 context phase %u", m_phase);

@@ -47,7 +47,7 @@ void tms320c54x_test_state::machine_reset()
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"rom4-context"}, [](self &test) { test.m_result_owner = &self::check_rom4_context_results; test.start_pipeline_mu4_prologue(); } },
 		{ {"reg-banks"}, [](self &test) { test.start_pipeline_accumulator_arithmetic(); } },
-		{ {"idle-modes"}, [](self &test) { test.start_pipeline_idle1(); } },
+		{ {"power-idle"}, [](self &test) { test.m_result_owner = &self::check_pipeline_idle_results; test.start_pipeline_idle1(0, true); } },
 		{ {"pop-irq"}, [](self &test) { test.start_pipeline_mmr_pop(); } },
 		{ {"pop-irq-edge"}, [](self &test) { test.start_interrupt_pop_edge(); } },
 		{ {"clock-mvdk-edge"}, [](self &test) { test.start_clkmd_move_edge(); } },
@@ -878,13 +878,6 @@ void tms320c54x_test_state::test(machine_config &config)
 			expect(line == (BIT(m_pipeline_peripheral_case, 3) ? INPUT_LINE_NMI : 0) && m_pipeline_store_writes == count + 1 &&
 				m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x9004 && !m_vector_acks,
 				"RPT accepts the pending source only after its full copy and stacks the unexecuted continuation"); ++m_vector_acks;
-		}
-		if (m_phase == 252250 && m_pipeline_peripheral_case >= 8)
-		{
-			m_timer_probe_return_pc = m_cpu->state_int(tms320c54x_device::STATE_RTN);
-			expect(line == 3 && (m_pipeline_peripheral_case >= 16 || m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x98ea),
-				"Original idle timer wake acknowledges TINT at the unexecuted post-IDLE continuation");
-			++m_vector_acks;
 		}
 		if (m_phase == 252230)
 		{

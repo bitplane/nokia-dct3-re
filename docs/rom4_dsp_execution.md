@@ -1080,7 +1080,8 @@ The complete worker at `02:3dbc`--`02:3de1` is 38 words, including its
 executes it with the original CALLD/STM parameter sequence. Its copied code
 and typed inputs live in `tests/firmware/tms320c54x_test_rom4_context.cpp`,
 selected by `tools/run_c54x_core.py --profile rom4-context`. The six banks
-cover 334 cases/restores separately from the default CPU regression. They
+cover 358 cases/restores separately from the default CPU regression, including
+the copied idle wrapper and independently poisoned SP-return tail. They
 qualify supplied firmware/context interactions, not recovered recorder
 operand provenance or measured silicon timing.
 
@@ -1205,7 +1206,7 @@ INTM; INTM=0 accepts the ISR before continuation, whereas INTM=1 resumes
 without servicing it. Masked pending requests do not wake the CPU, and NMI
 wakes and vectors regardless of IMR/INTM (SPRU131G section 6.11.1).
 
-`check-c54x-core` covers 48 staged IDLE1 cases: external IRQ, masked IRQ
+The `power-idle` wake bank covers 48 staged IDLE1 cases: external IRQ, masked IRQ
 followed by enabled IRQ, timer IRQ, INTM-blocked external/timer wake and
 NMI; source pages 0/2; and four save/restore boundaries before entry,
 during sleep and after return. The fixture changes its own continuation
@@ -1216,18 +1217,18 @@ each leg. This verifies the declared restart/refetch model, not a measured
 silicon restart bus phase or execution of the original 44-word call.
 Staged IDLE2/3 use the same drain/refetch barrier and the shared mode-specific
 clock-stop/wake implementation as the atomic frontend. The focused
-`idle-modes` profile covers 96 cases: all three modes, enabled external IRQ,
+`power-idle` mode bank covers 96 cases: all three modes, enabled external IRQ,
 INTM-blocked IRQ, a masked request followed by enabled IRQ, NMI, pages 0/2
 and four save/load boundaries. Its timer continues in IDLE1 and freezes in
 IDLE2/3; continuation replacement, real ISR stack/return traffic and replay
-are checked. The unchanged core fails at the first IDLE2 case with `illegal=1`;
-the corrected staged decoder passes all 96. IDLE in a control-delay window
+are checked. Both banks run under one selected result owner, with 144 ordered
+case identities and standard-mode ARP zero. IDLE in a control-delay window
 and reserved NN=11 remain excluded. Physical clock/restart latency is not
 established by this fixture.
 
 ```sh
 .venv/bin/python tools/run_c54x_core.py --mame mame/mame \
-  --rompath mame/roms --profile idle-modes --output-root tmp/c54x-idle-modes
+  --rompath mame/roms --profile power-idle --output-root tmp/c54x-power-idle
 ```
 
 The original AA22 instruction `028922: f5e1` is a concrete native consumer

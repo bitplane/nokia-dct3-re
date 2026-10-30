@@ -84,11 +84,6 @@ REQUIRED = [
     "TMS320C54x staged absolute LD: PASS cases=64 accumulators=2 sxm_states=2 values=4 restore=64 duplicate_literal_fetches=0 duplicate_operand_reads=0",
     "TMS320C54x staged FCALL/FRET: PASS cases=80 source_pages=2 target_pages=5 restore=80 stack_words=2 duplicate_stack_writes=0 duplicate_stack_reads=0",
     "TMS320C54x staged explicit SP: PASS cases=320 producers=POPM,STM,MVDK,FRAME,POPM_conflict compiler_consumers=LD,ST gap_nops=0,1,2,3 restore=320 duplicate_reads=0 duplicate_writes=0",
-    "TMS320C54x staged original idle SP tail: PASS cases=4 original_words=4 restore=4 duplicate_reads=0 duplicate_sp_writes=0",
-    "TMS320C54x staged IDLE1: PASS cases=48 wake_profiles=6 source_pages=2 restore=48 suspended_younger_words=1 timer_runs=1 real_irq_return=1",
-    "TMS320C54x staged original idle call: PASS cases=8 original_words=44 setup_paths=2 stack_alignments=2 restore=8 external_wake=1 isr_claim=0",
-    "TMS320C54x staged original idle timer wake: PASS cases=8 idle_words=44 isr_words=94 stack_alignments=2 restore=8 original_vector=1 original_frete=1",
-    "TMS320C54x staged original idle zero/TINT: PASS cases=4 original_words=138 stack_alignments=2 restore=4 mask_drained=1 forced_continuation=0 native_profile_claim=0",
     "TMS320C54x staged STM PMST: PASS cases=64 values=4 source_pages=2 target_regions=2 restore=64 duplicate_literal_fetches=0 duplicate_register_writes=0",
     "TMS320C54x staged MVPD: PASS cases=128 addressing_modes=4 source_pages=2 source_regions=2 ovly_states=2 restore=128 duplicate_program_reads=0 duplicate_data_writes=0",
     "TMS320C54x staged RPT MVPD: PASS cases=128 counts=4 pages=2 ovly_states=2 destination_modes=2 restore=128 count_plus_one=1 duplicate_transfers=0",
@@ -309,7 +304,7 @@ DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cas
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
     "rom4-context": (
-        "Nokia ROM4 context integration: PASS cases=334 restore=334 banks=6 silicon_phase_claim=0 coverage_fnv64=f2680b443bf25b9c",
+        "Nokia ROM4 context integration: PASS cases=358 restore=358 banks=8 silicon_phase_claim=0 coverage_fnv64=ce54ab5aff19dbc0",
         "Fatal error: Nokia ROM4 context integration complete",
     ),
     "stack-sp": (
@@ -374,9 +369,9 @@ EXTRA_PROFILES = {
         "TMS320C54x source-domain exclusions: PASS cases=61496 restore=61496 base_cases=30000 absolute_tc0_cases=448 short_control_cases=14208 mac_source_cases=1280 mac_short_checkpoint_cases=128 mapped_rejection_cases=8328 mmr_guard_cases=2304 repeat_transfer_guard_cases=4800 guard_checkpoints=balanced pmst_bit14=2 mac_frontend=staged mac_checkpoints=3,5 mac_modes=f8,98..9f base_instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 shifts=0,1,15,16,31 base_modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=df0d5af19745df89",
         "Fatal error: TMS320C54x isolated source-domain exclusions complete",
     ),
-    "idle-modes": (
-        "TMS320C54x staged idle modes: PASS cases=96 modes=3 wake_profiles=4 pages=2 restore=96 timer_stop=1 suspended_younger_words=1 real_irq_return=1 physical_clock_claim=0",
-        "Fatal error: TMS320C54x isolated staged idle modes complete",
+    "power-idle": (
+        "TMS320C54x power idle: PASS cases=144 restore=144 mode_cases=96 wake_cases=48 banks=2 physical_clock_claim=0 coverage_fnv64=0a26fee7ba04c325",
+        "Fatal error: TMS320C54x isolated power idle complete",
     ),
     "ov-branch-pipe": (
         "TMS320C54x staged overflow branches: PASS cases=4608 restore=4608 forms=BC,BCD predicates=AOV,ANOV,BOV,BNOV flags=4 producers=seed,SSBX,RSBX gaps=0,1,2 pages=2 snapshots=4 selected_flag_clear=1 post_evaluate_mutation=2 literal_reads=1 target_fetches=once writes=0 reset_before_restore=1 arithmetic_producers=unvalidated physical_phase_claim=0",
