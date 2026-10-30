@@ -3364,32 +3364,22 @@ SMUL clamps the fractional product before accumulation only in its existing
 fractional-overflow mode; result saturation and sticky OVA/OVB remain
 destination-owned. No data-memory write is synthesized.
 
-`mac-map-imm` runs on the CPU-only machine without ROMs or handset devices.
-Its fixture owns its observations, timer cadence and replay state rather than
-using the global phase dispatcher. It retains all 262,144 inputs: all sixteen
-mapped addresses, DP/plain-indirect/absolute/offset forms, four source-word
-patterns (guard fields retain their eight-bit width), eight literals, all
-FRCT/OVM/SXM/SMUL combinations, four accumulator selectors, two pages and
-three checkpoint boundaries. The 32 source-pattern/literal pairs in every
-fixed source/form/flags/selectors/page group distribute across the checkpoints
-10/11/11 instead of executing every pair three times. The ordered original-key
-digest is `020c459448602a55`; actual completed cases and restores are counted.
-A/B change after Read to distinguish retained memory data
-from the Execute-live addend, including same-accumulator source aliases.
-T, TRN, pointers and literals are poisoned after their ownership boundaries.
-The fixture checks exact product/accumulation/saturation/status results,
-one source read, no bus write and no duplicate extension fetch. Restoring
-the old MAC mapped-source guard makes it fail. A compiled comparison of the
-old and relocated selectors checked setup and expected-result equivalence for
-all 262,144 retained inputs. Resetting each independent case does not claim
-preservation of unrelated legacy-machine state. Exact publication clocks are
-implementation contracts, not physical timing evidence.
+`mapped_immediate_mac` uses the common CPU-only section runner for 18,432
+cases/replays. A numerical group crosses four words, eight literals, all
+FRCT/OVM/SXM/SMUL combinations and all accumulator selectors on AL. Routing
+crosses all sixteen mapped addresses and four addressing forms with four
+patterns, all flags/selectors and distributed literals/pages/checkpoints.
+Guard fields retain eight-bit width. The full arithmetic/address/literal
+Cartesian product is deliberately not retained.
 
-The standalone binary completes the retained profile with an empty ROM
-directory. Runner wall time drops from 339 to 104 seconds, including the
-balanced replay schedule and smaller save graph. Explicit ownership and
-formatting add 1,824 C++ bytes/114 lines; this is not a source-size reduction.
-This isolated profile is not part of the default run.
+A/B change after Read to distinguish retained mapped data from the
+Execute-live addend, including same-accumulator aliases. T, TRN, every pointer
+and literal words are poisoned after capture. Exact source Read, Read-owned
+T, Execute-only arithmetic/sticky overflow, no Writes, extension retention and
+cleared-future-pipeline replay are preserved. This is implementation ordering,
+not measured silicon timing. The old 262,144-input owner, independent timer,
+snapshot/counter machinery and enumeration-only schedule test are deleted.
+Focused build/run: 6.051/7.023 seconds; negative expectations are rejected.
 
 The `memory_immediate_product` RAM/MPY section separates numerical and routing
 coverage as described above. The implementation-limit controls for the

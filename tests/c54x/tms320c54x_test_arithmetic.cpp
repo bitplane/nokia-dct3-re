@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
-#include "tms320c54x_test_memory_immediate_schedule.h"
 #include "tms320c54x_test_shifted_schedule.h"
 #include "tms320c54x_test_register_schedule.h"
 

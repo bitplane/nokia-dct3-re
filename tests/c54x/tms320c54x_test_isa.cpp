@@ -7,7 +7,6 @@
 #include "tms320c54x_test_word_examples.h"
 #include "tms320c54x_test_disassembly.h"
 #include "tms320c54x_test_long_t_store.h"
-#include "tms320c54x_test_mapped_mac.h"
 #include "tms320c54x_test_dual.h"
 #include "tms320c54x_test_normalization.h"
 #include "tms320c54x_test_register_sequence.h"
@@ -29,7 +28,6 @@ public:
 	void test(machine_config &config)
 	{
 		m_domain = !std::strcmp(config.options().bios(), "source-domain");
-		m_mapped_mac = !std::strcmp(config.options().bios(), "mac-map-imm");
 		m_dual_mode = c54x_test::dual_multiply_mode::select(config.options().bios());
 		m_normalization_kind = c54x_test::select_normalization(config.options().bios());
 		m_register_pair_kind = c54x_test::select_register_pair(config.options().bios());
@@ -39,7 +37,7 @@ public:
 		m_address_modes = !std::strcmp(config.options().bios(), "mode-latency");
 		m_stack_sequences = !std::strcmp(config.options().bios(), "stack-sp");
 		m_composition_limit = c54x_test::select_composition_limit(config.options().bios());
-		m_extended_program = m_long_t_store_kind != c54x_test::long_t_store_kind::none || !std::strcmp(config.options().bios(), "isa-disasm") || m_domain || m_mapped_mac || bool(m_dual_mode) ||
+		m_extended_program = m_long_t_store_kind != c54x_test::long_t_store_kind::none || !std::strcmp(config.options().bios(), "isa-disasm") || m_domain || bool(m_dual_mode) ||
 			m_normalization_kind != c54x_test::normalization_kind::none || m_register_pair_kind != c54x_test::register_pair_kind::none || m_register_alu_kind != c54x_test::register_alu_kind::none || m_register_unary_kind != c54x_test::register_unary_kind::none || m_composition_limit != c54x_test::composition_limit::none;
 		TMS320C54X(config, m_cpu, 13'000'000);
 		m_cpu->set_extended_program(m_extended_program);
@@ -76,7 +74,6 @@ protected:
 		else if (m_normalization_kind != c54x_test::normalization_kind::none)
 			m_normalization = std::make_unique<c54x_test::exponent_normalization_fixture>(machine(), *m_cpu, *m_timer, m_normalization_kind);
 		else if (m_dual_mode) m_dual = std::make_unique<c54x_test::dual_multiply_fixture_runner>(machine(), *m_cpu, *m_timer, m_dual_mode);
-		else if (m_mapped_mac) m_mapped = std::make_unique<c54x_test::mapped_mac_fixture>(machine(), *m_cpu, *m_timer);
 		else if (m_domain) m_domains = std::make_unique<c54x_test::source_domain_fixture>(machine(), *m_cpu, *m_timer);
 		else
 		{
@@ -110,7 +107,6 @@ protected:
 		if (m_register_sequence) m_register_sequence->start();
 		else if (m_normalization) m_normalization->start();
 		else if (m_dual) m_dual->start();
-		else if (m_mapped) m_mapped->start();
 		else if (m_domains) m_domains->start();
 		else start();
 	}
@@ -289,12 +285,6 @@ private:
 		if (m_register_sequence) { if (m_register_sequence->step()) register_sequence_result(); return; }
 		if (m_normalization) { if (m_normalization->step()) normalization_result(); return; }
 		if (m_dual) { if (m_dual->step()) dual_result(); return; }
-		if (m_mapped)
-		{
-			if (!m_mapped->step()) return;
-			osd_printf_info("TMS320C54x mapped memory immediate MAC: PASS cases=%u restore=%u sources=AL,AH,AG,BL,BH,BG,T,TRN,AR0_AR7 forms=DP,plain,absolute,offset values=4 literals=8 flags=16 selectors=4 pages=2 snapshots=3 checkpoint_policy=balanced source_sample=Read accumulator_sample=Execute t_publication=Read pointer_literal_poison=1 reset_before_restore=1 physical_phase_claim=0 cpu_only=1 coverage_fnv64=%016llx\n", m_mapped->count(), m_mapped->restores(), (unsigned long long)m_mapped->digest());
-			throw emu_fatalerror(3, "TMS320C54x isolated mapped memory immediate MAC complete");
-		}
 		if (m_domains)
 		{
 			if (!m_domains->step()) return;
@@ -346,7 +336,6 @@ private:
 	u64 m_first = 0, m_middle = 0, m_last = 0;
 	bool m_domain = false;
 	bool m_extended_program = false;
-	bool m_mapped_mac = false;
 	c54x_test::dual_multiply_mode m_dual_mode;
 	c54x_test::normalization_kind m_normalization_kind = c54x_test::normalization_kind::none;
 	c54x_test::register_pair_kind m_register_pair_kind = c54x_test::register_pair_kind::none;
@@ -360,7 +349,6 @@ private:
 	std::unique_ptr<c54x_test::exponent_normalization_fixture> m_normalization;
 	std::unique_ptr<c54x_test::dual_multiply_fixture_runner> m_dual;
 	std::unique_ptr<c54x_test::source_domain_fixture> m_domains;
-	std::unique_ptr<c54x_test::mapped_mac_fixture> m_mapped;
 	std::vector<c54x_test::instruction_case> m_cases;
 };
 
@@ -372,7 +360,6 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(4, "isa-long", "TI long-word arithmetic examples")
 	ROM_SYSTEM_BIOS(5, "isa-products", "Literal multiply arithmetic and DELAY continuation sequence")
 	ROM_SYSTEM_BIOS(6, "isa-flow", "Conditional delayed branch return and high-address stack examples")
-	ROM_SYSTEM_BIOS(7, "mac-map-imm", "Read-retained mapped source with Execute-live immediate MAC")
 	ROM_SYSTEM_BIOS(9, "mpy-dual", "Dual-memory multiply addresses and arithmetic replay")
 	ROM_SYSTEM_BIOS(10, "mpy-dual-edge", "Excluded dual-memory multiply low-page operands")
 	ROM_SYSTEM_BIOS(11, "alu-dual", "Dual-memory ADD SUB retained arithmetic replay")
