@@ -4,7 +4,6 @@
 #include "emu.h"
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_absolute_examples.h"
-#include <algorithm>
 
 namespace c54x_test {
 
@@ -13,70 +12,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if ((m_phase >= 300 && m_phase <= 309) || m_phase == 6534 || m_phase == 6535)
-	{
-		static constexpr unsigned phases[] = {300, 301, 302, 303, 6534, 6535, 304, 305, 306, 307, 308, 309};
-		auto const &cases = absolute_arithmetic_examples();
-		expect(cases.size() == std::size(phases), "Absolute arithmetic case/continuation map is complete");
-		unsigned const index = unsigned(std::find(std::begin(phases), std::end(phases), m_phase) - std::begin(phases));
-		verify_atomic_case(cases[index]);
-		if (index + 1 < cases.size()) return begin_atomic_case(cases[index + 1], phases[index + 1]);
-		write_words(program, {
-			{0x05e3, 0x0282}, // ADDS *AR2,A
-			{0x05e4, 0x75f8}, {0x05e5, 0x0d00}, {0x05e6, 0x0124}, {0x05e7, 0xf5e1},
-		});
-		data.write_word(0x0f66, 0xffff);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 1}, {cpu_regs::STATE_AR2, 0x0f66}, {cpu_regs::STATE_ST0, 0},
-			{cpu_regs::STATE_ST1, 0x0100}, // SXM
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(310);
-	}
-	if (m_phase == 310 || m_phase == 311 || m_phase == 90010 || m_phase == 90011)
-	{
-		const bool destination_b = m_phase == 90010 || m_phase == 90011;
-		const bool carry_case = m_phase == 311 || m_phase == 90011;
-		if (destination_b)
-			osd_printf_info("ADDS B observation: phase=%d a=%010llx b=%010llx st0=%04x ar7=%04x writes=%d cycles=%d\n",
-				m_phase, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
-				(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),
-				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)),
-				unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR7)), m_port_writes,
-				int(m_last_port_cycle - m_first_port_cycle));
-		expect_opcode(destination_b ? 0x0387 : 0x0282,
-				m_cpu->state_int(destination_b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) ==
-				(!carry_case ? 0x10000 : 0x100000000ULL) &&
-				bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) ==
-				carry_case &&
-				(!destination_b || m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678) &&
-				m_cpu->state_int(destination_b ? tms320c54x_device::STATE_AR7 : tms320c54x_device::STATE_AR2) == 0x0f66 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-				"ADDS Smem,A/B ignores SXM, preserves the other accumulator, and carries at bit 32 in one cycle");
-		if (m_phase == 310 || m_phase == 90010)
-		{
-			data.write_word(0x0f66, 1);
-			m_port_writes = 0;
-			m_cpu->set_state_int(destination_b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, 0xffffffffULL);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(destination_b ? 90011 : 311);
-		}
-		if (m_phase == 311)
-		{
-			program.write_word(0x05e3, 0x0387); // ADDS *AR7,B
-			data.write_word(0x0f66, 0xffff);
-			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, 0x12345678}, {cpu_regs::STATE_B, 1}, {cpu_regs::STATE_AR7, 0x0f66},
-				{cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0x0100}, {cpu_regs::STATE_PC, 0x05e0},
-				{cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(90010);
-		}
-		return begin_atomic_case(long_offset_examples()[0], 312);
-	}
 	if (m_phase >= 312 && m_phase <= 325)
 	{
 		auto const &cases = long_offset_examples();

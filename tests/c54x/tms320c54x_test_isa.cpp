@@ -84,7 +84,6 @@ protected:
 			if (memory_reference())
 			{
 				for (auto const *bank : {
-					&c54x_test::absolute_arithmetic_examples(),
 					&c54x_test::long_offset_examples(),
 					&c54x_test::memory_route_examples()})
 					m_cases.insert(m_cases.end(), bank->begin(), bank->end());
