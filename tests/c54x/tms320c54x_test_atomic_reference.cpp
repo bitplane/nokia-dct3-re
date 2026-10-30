@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
-#include "tms320c54x_test_parallel.h"
 #include "tms320c54x_test_product_examples.h"
 #include "tms320c54x_test_memory_examples.h"
 #include "tms320c54x_test_memory_continuations.h"
@@ -345,21 +344,6 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			m_check_timer->adjust(attotime::from_usec(100));
 			return true;
 		}
-		return begin_atomic_case(parallel_case(0), 695);
-	}
-	if ((m_phase >= 695 && m_phase <= 702) || m_phase == 6503 || m_phase == 6533)
-	{
-		static constexpr unsigned phases[] = {695, 696, 697, 698, 699, 700, 6503, 6533, 701, 702};
-		unsigned const index = std::find(std::begin(phases), std::end(phases), m_phase) - std::begin(phases);
-		auto const test = parallel_case(index);
-		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
-		// Record opcode coverage only after the shared checks succeed.
-		expect_opcode(test.opcode, true, "parallel store arithmetic reference case");
-		if (index + 1 < std::size(phases))
-		{
-			return begin_atomic_case(parallel_case(index + 1), phases[index + 1]);
-		}
-		return begin_atomic_case(shift_examples().front(), 703);
 	}
 	static constexpr unsigned shift_phases[] = {703, 7031, 704, 7041, 705, 706, 707, 708, 709, 710, 711, 712, 713, 714, 715, 716, 9248, 9249, 717, 718, 719, 720, 721, 722, 723};
 	auto const shift_phase = std::find(std::begin(shift_phases), std::end(shift_phases), m_phase);

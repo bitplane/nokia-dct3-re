@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "emuopts.h"
-#include "tms320c54x_test_parallel.h"
 #include "tms320c54x_test_domains.h"
 #include "tms320c54x_test_product_examples.h"
 #include "tms320c54x_test_memory_examples.h"
@@ -105,9 +104,7 @@ protected:
 			else if (long_reference())
 				throw emu_fatalerror("Legacy long bank retired: run the long_literals section");
 			else if (parallel())
-			{
-				for (unsigned i = 0; i < c54x_test::parallel_vectors().size(); ++i) m_cases.push_back(c54x_test::parallel_case(i));
-			}
+				throw emu_fatalerror("Legacy parallel bank retired: run atomic_parallel_literals");
 			else
 				throw emu_fatalerror("Legacy square bank retired: run the square_literals section");
 			if (m_cases.empty() || !m_cases.front().reset_before)

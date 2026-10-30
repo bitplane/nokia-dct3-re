@@ -185,6 +185,7 @@ def main():
     counts['long_literals'] = 33
     counts['atomic_mac_literals'] = 39
     counts['atomic_dual_address'] = 11
+    counts['atomic_parallel_literals'] = 10
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
