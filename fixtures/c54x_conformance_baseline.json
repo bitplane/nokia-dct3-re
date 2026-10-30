@@ -6369,14 +6369,14 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
-          "cases": "49",
+          "cases": "60",
           "firmware": "0",
           "nokia_devices": "0",
-          "reset_groups": "11"
+          "reset_groups": "12"
         }
       ],
       "required": [
-        "TMS320C54x generic parallel: PASS cases=49 reset_groups=11 nokia_devices=0 firmware=0"
+        "TMS320C54x generic parallel: PASS cases=60 reset_groups=12 nokia_devices=0 firmware=0"
       ]
     },
     "isa-products": {
@@ -14879,7 +14879,18 @@
         "dual-mas-fract",
         "st-mas-fract",
         "dual-mas-saturate",
-        "st-mas-saturate"
+        "st-mas-saturate",
+        "dual-mac-negative-x",
+        "dual-mac-b-circular-y",
+        "dual-mac-a-circular-y",
+        "sqdst-circular-y",
+        "sqdst-negative-x-two-decrements",
+        "sqdst-negative-x-fract",
+        "dual-mpy-negative-x-circular-y",
+        "dual-macr-b-decrement-y",
+        "dual-macr-negative-x-circular-y",
+        "st-b-macr-negative-y-circular",
+        "st-b-macr-negative-y-two-pointers"
       ],
       "classification": "isa_documented",
       "decision": "rewrite",

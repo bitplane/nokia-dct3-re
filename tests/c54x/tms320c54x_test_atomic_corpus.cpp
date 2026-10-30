@@ -7,6 +7,7 @@
 #include "tms320c54x_test_shift_examples.h"
 #include "tms320c54x_test_absolute_examples.h"
 #include "tms320c54x_test_memory_examples.h"
+#include "tms320c54x_test_dual_reference.h"
 #include <algorithm>
 
 namespace c54x_test {
@@ -41,41 +42,16 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x0a01 &&
 			m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e3,
 			"ROM4 PORTR consumes its port word and stores through AR4 before circular wrap without selecting AR6");
-		program.write_word(0x05e0, 0xb03a); // MAC *AR5, *AR4+, A, A
-		program.write_word(0x05e1, 0xf5e1);
-		data.write_word(0x0b00, 0xfffe);
-		data.write_word(0x0c00, 3);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 10}, {cpu_regs::STATE_B, 20}, {cpu_regs::STATE_AR5, 0x0b00},
-			{cpu_regs::STATE_AR4, 0x0c00}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(79);
+		return begin_atomic_case(dual_address_examples()[0], 79);
 	}
 	if (m_phase == 79)
 	{
-		expect_opcode(0xb03a, m_cpu->state_int(tms320c54x_device::STATE_A) == 4 &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 20 &&
-				m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c01 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b00,
-				"ROM4 b03a signed MAC updates T and one pointer");
-		program.write_word(0x05e0, 0xb3be); // MAC *AR5+, *AR4+%, B, B
-		data.write_word(0x0b00, 0xfffd);
-		data.write_word(0x0c03, 4);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR0, 1}, {cpu_regs::STATE_AR4, 0x0c03}, {cpu_regs::STATE_AR5, 0x0b00},
-			{cpu_regs::STATE_B, 20}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(80);
+		verify_atomic_case(dual_address_examples()[0]);
+		return begin_atomic_case(dual_address_examples()[1], 80);
 	}
 	if (m_phase == 80)
 	{
-		expect_opcode(0xb3be, m_cpu->state_int(tms320c54x_device::STATE_B) == 8 &&
-				m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffd &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b01,
-				"ROM4 b3be signed MAC updates both pointer modes");
+		verify_atomic_case(dual_address_examples()[1]);
 		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
 		program.write_word(0x05e1, 0x0124);
 		program.write_word(0x05e2, 0x75d6);
@@ -140,73 +116,25 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_port_reads == 2 &&
 				m_last_port_cycle - m_first_port_cycle == 4,
 				"LD absolute Smem sign-extends and costs an extra cycle");
-		program.write_word(0x05e0, 0xb0be); // MAC *AR5+, *AR4+%, A, A
-		program.write_word(0x05e1, 0xf5e1);
-		data.write_word(0x0b00, 0xfffd);
-		data.write_word(0x0c03, 4);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR0, 1}, {cpu_regs::STATE_AR4, 0x0c03}, {cpu_regs::STATE_AR5, 0x0b00},
-			{cpu_regs::STATE_BK, 4}, {cpu_regs::STATE_A, 20}, {cpu_regs::STATE_B, 9}, {cpu_regs::STATE_ST1, 0},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(85);
+		return begin_atomic_case(dual_address_examples()[2], 85);
 	}
 	if (m_phase == 85)
 	{
-		expect_opcode(0xb0be, m_cpu->state_int(tms320c54x_device::STATE_A) == 8 &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 9 &&
-				m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffd &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b01,
-				"ROM4 b0be signed MAC preserves B and updates both pointers");
-		program.write_word(0x05e0, 0xe2e4); // SQDST *AR4+%, *AR2-
-		program.write_word(0x05e1, 0xf5e1);
-		data.write_word(0x0c03, 5);
-		data.write_word(0x0d00, 7);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x0000030000ULL}, {cpu_regs::STATE_B, 10}, {cpu_regs::STATE_AR0, 1},
-			{cpu_regs::STATE_AR4, 0x0c03}, {cpu_regs::STATE_AR2, 0x0d00}, {cpu_regs::STATE_BK, 4},
-		});
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
-		return resume_atomic_at(0x05e0, 86);
+		verify_atomic_case(dual_address_examples()[2]);
+		return begin_atomic_case(dual_address_examples()[3], 86);
 	}
 	if (m_phase == 86)
 	{
-		expect_opcode(0xe2e4, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffffe0000ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 19 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0cff,
-				"ROM4 e2e4 SQDST squares old A and loads signed vector difference");
-		program.write_word(0x05e0, 0xe245); // SQDST *AR2-,*AR3-.
-		data.write_word(0x0c10, 0xfffb);
-		data.write_word(0x0d10, 7);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x30000}, {cpu_regs::STATE_B, 10}, {cpu_regs::STATE_T, 0x2222},
-			{cpu_regs::STATE_AR2, 0x0c10}, {cpu_regs::STATE_AR3, 0x0d10}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(6506);
+		verify_atomic_case(dual_address_examples()[3]);
+		return begin_atomic_case(dual_address_examples()[4], 6506);
 	}
 	if (m_phase == 6506 || m_phase == 6507)
 	{
 		bool const fractional = m_phase == 6507;
-		expect_opcode(fractional ? 0xe249 : 0xe245,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffff40000ULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (fractional ? 28 : 19) &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x2222 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0c0f &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == (fractional ? 0x0d11 : 0x0d0f) &&
-			data.read_word(0x0c10) == 0xfffb && data.read_word(0x0d10) == 7,
-			"ROM4 SQDST uses signed X-Y, squares old A with FRCT scaling and independently modifies X/Y");
+		verify_atomic_case(dual_address_examples()[fractional ? 5 : 4]);
 		if (!fractional)
 		{
-			program.write_word(0x05e0, 0xe249); // SQDST *AR2-,*AR3+.
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, 0x30000}, {cpu_regs::STATE_B, 10}, {cpu_regs::STATE_AR2, 0x0c10},
-				{cpu_regs::STATE_AR3, 0x0d10}, {cpu_regs::STATE_ST1, 0x0140}, {cpu_regs::STATE_PC, 0x05e0},
-				{cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(6507);
+			return begin_atomic_case(dual_address_examples()[5], 6507);
 		}
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
 		program.write_word(0x05e0, 0x74d6); // PORTR port, *AR6+%
@@ -388,97 +316,31 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0e00,
 				"ROM4 5781 DLD sign-extends B without modifying AR1");
-		program.write_word(0x05e0, 0xa5be); // MPY *AR5+, *AR4+0%, B
-		program.write_word(0x05e1, 0xf5e1);
-		data.write_word(0x0b00, 0xfffe);
-		data.write_word(0x0c03, 3);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR0, 1}, {cpu_regs::STATE_AR4, 0x0c03}, {cpu_regs::STATE_AR5, 0x0b00},
-			{cpu_regs::STATE_BK, 4}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(95);
+		return begin_atomic_case(dual_address_examples()[6], 95);
 	}
 	if (m_phase == 95)
 	{
-		expect_opcode(0xa5be, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfffffffffaULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b01,
-				"ROM4 a5be signed dual MPY loads T and updates both pointers");
-		program.write_word(0x05e0, 0xb736); // MACR *AR5, *AR4-, B, B
-		data.write_word(0x0b00, 3);
-		data.write_word(0x0c03, 4);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR5, 0x0b00}, {cpu_regs::STATE_AR4, 0x0c03}, {cpu_regs::STATE_B, 0x8000},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(96);
+		verify_atomic_case(dual_address_examples()[6]);
+		return begin_atomic_case(dual_address_examples()[7], 96);
 	}
 	if (m_phase == 96)
 	{
-		expect_opcode(0xb736, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x10000 &&
-				m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c02 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b00,
-				"ROM4 b736 MACR rounds and updates Y pointer");
-		program.write_word(0x05e0, 0xb43e); // MACR *AR5,*AR4+0%,A,A.
-		data.write_word(0x0b00, 0xfffe);
-		data.write_word(0x0c03, 4);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x8008}, {cpu_regs::STATE_B, 0x12345678}, {cpu_regs::STATE_AR0, 1},
-			{cpu_regs::STATE_AR5, 0x0b00}, {cpu_regs::STATE_AR4, 0x0c03}, {cpu_regs::STATE_BK, 4},
-			{cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(6530);
+		verify_atomic_case(dual_address_examples()[7]);
+		return begin_atomic_case(dual_address_examples()[8], 6530);
 	}
 	if (m_phase == 6530)
 	{
-		expect_opcode(0xb43e,
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x10000 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678 &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b00 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
-			data.read_word(0x0b00) == 0xfffe && data.read_word(0x0c03) == 4,
-			"ROM4 MACR uses signed X/Y, rounds old A plus product, publishes X in T and circularly wraps Y");
-		program.write_word(0x05e0, 0xd6e1); // ST B,*AR3 || MACR *AR4+0%,A
-		data.write_word(0x0c03, 0xfffe);
-		data.write_word(0x0d00, 0);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x8008}, {cpu_regs::STATE_B, 0x0012345678ULL}, {cpu_regs::STATE_T, 4},
-			{cpu_regs::STATE_AR0, 1}, {cpu_regs::STATE_AR4, 0x0c03}, {cpu_regs::STATE_AR3, 0x0d00},
-			{cpu_regs::STATE_BK, 4}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(97);
+		verify_atomic_case(dual_address_examples()[8]);
+		return begin_atomic_case(dual_address_examples()[9], 97);
 	}
 	if (m_phase == 97)
 	{
-		expect_opcode(0xd6e1, data.read_word(0x0d00) == 0x1234 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x10000 &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0012345678ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_T) == 4 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d00,
-				"ROM4 d6e1 stores old B and rounds MAC into A");
-		program.write_word(0x05e0, 0xd6e9); // ST B,*AR3+ || MACR *AR4+0%,A.
-		data.write_word(0x0c03, 0xfffe);
-		data.write_word(0x0d00, 0);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x8008}, {cpu_regs::STATE_AR4, 0x0c03}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(6504);
+		verify_atomic_case(dual_address_examples()[9]);
+		return begin_atomic_case(dual_address_examples()[10], 6504);
 	}
 	if (m_phase == 6504)
 	{
-		expect_opcode(0xd6e9,
-			data.read_word(0x0d00) == 0x1234 && data.read_word(0x0c03) == 0xfffe &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x10000 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0012345678ULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 4 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d01,
-			"ROM4 d6e9 stores old B, rounds signed MAC into A and updates both pointers independently");
+		verify_atomic_case(dual_address_examples()[10]);
 		write_words(program, {
 			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
 			{0x05e1, 0x0124},

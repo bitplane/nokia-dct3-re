@@ -359,7 +359,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated register banks complete",
     ),
     "isa-parallel": (
-        "TMS320C54x generic parallel: PASS cases=49 reset_groups=11 nokia_devices=0 firmware=0",
+        "TMS320C54x generic parallel: PASS cases=60 reset_groups=12 nokia_devices=0 firmware=0",
         "Fatal error: TMS320C54x isolated generic parallel complete",
     ),
     "rmw-long": (

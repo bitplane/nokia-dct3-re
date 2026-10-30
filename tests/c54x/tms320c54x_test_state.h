@@ -2013,7 +2013,8 @@ private:
 	}
 	void verify_atomic_case(instruction_case const &test)
 	{
-		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle,
+		// A case without markers has no interval; ignore predecessor timestamps.
+		check_case(*m_cpu, test, m_port_writes, m_port_writes ? m_last_port_cycle - m_first_port_cycle : 0,
 			std::array<u64, 2>{m_middle_port_cycle - m_first_port_cycle, m_last_port_cycle - m_middle_port_cycle});
 		expect_opcode(test.opcode, true, "Literal atomic instruction case");
 		for (auto word : test.additional_opcodes) expect_opcode(word, true, "Literal atomic instruction case");

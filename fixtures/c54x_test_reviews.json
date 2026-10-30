@@ -701,10 +701,10 @@
       "id": "parallel-store-reference",
       "classification": "isa_documented",
       "decision": "rewrite",
-      "basis": "TI SPRU172C dual MAC/MACR/MAS/MASR and parallel ST with MAC/MACR/MAS/MASR/MPY/ADD/SUB/LD semantics; independent literal results, old-source stores, rounding, FRCT/OVM and address updates. Same-cell and circular controls retain synthetic fixtures, not private-ROM instructions.",
+      "basis": "TI SPRU172C dual MAC/MACR/MAS/MASR/MPY, SQDST and parallel ST with MAC/MACR/MAS/MASR/MPY/ADD/SUB/LD semantics; independent literal results, old-source stores, rounding, FRCT/OVM and address updates. Same-cell and circular controls retain synthetic fixtures, not private-ROM instructions.",
       "source": "tests/c54x/tms320c54x_test_parallel.h; tests/c54x/tms320c54x_test_dual_reference.h; tests/c54x/tms320c54x_test_port_case.h",
       "profiles": ["isa-parallel"],
-      "legacy_entry": "default atomic phases 695..702, 6503 and 6533, plus ordered phases 614..652; adapters preserve each family's original position",
+      "legacy_entry": "default atomic phases 695..702, 6503 and 6533, plus ordered phases 614..652; signed/circular examples at 79,80,85,86,6506,6507,95,96,6530,97,6504 retain their original positions",
       "case_ids": [
         "st-mpy-fract", "st-mpy-old-destination", "st-add-opposite",
         "st-sub-circular-asm", "st-ld-signed", "st-ld-t-same-cell",
@@ -748,7 +748,12 @@
         "dual-mas-fract",
         "st-mas-fract",
         "dual-mas-saturate",
-        "st-mas-saturate"
+        "st-mas-saturate",
+        "dual-mac-negative-x", "dual-mac-b-circular-y", "dual-mac-a-circular-y",
+        "sqdst-circular-y", "sqdst-negative-x-two-decrements", "sqdst-negative-x-fract",
+        "dual-mpy-negative-x-circular-y", "dual-macr-b-decrement-y",
+        "dual-macr-negative-x-circular-y", "st-b-macr-negative-y-circular",
+        "st-b-macr-negative-y-two-pointers"
       ],
       "obligations": [
         "every original literal register and RAM result, including source-memory preservation where asserted",
@@ -761,15 +766,26 @@
         "all 16 dual and 16 parallel selector combinations, two ASM examples, same-AR read-before-write and four FRCT/OVM controls retain their literal values and original status masks",
         "compiled old/new setup comparison and 22464 predicate mutations preserve all 39 cases without executing CPU arithmetic helpers",
         "shared PORTW construction changes stimulus only; arithmetic expectations remain literal and existing 134-case records remain identical",
-        "default-sequence continuation and CPU-only execution with eleven explicit reset groups"
+        "eleven signed/circular MAC, MPY, SQDST and ST/MACR examples retain their literal register/RAM predicates and ordered partial setup; the shared bank makes their otherwise implicit entry BK=4 explicit only for standalone execution",
+        "default-sequence continuation and CPU-only execution with twelve explicit reset groups"
       ],
       "limits": [
         "atomic execution only; no staged retention, peripheral or silicon-phase claim",
         "does not subsume the separate pipeline, repeat or interrupt composition matrices",
         "case data supplies inputs and literal expectations; it is not an instruction interpreter",
         "the separate 1720320-case staged parallel-MAC matrix has distinct retained-operand coverage and unvalidated carry policy; opcode overlap is not grounds to remove these atomic carry controls",
-        "all 49 cases retained; no runtime reduction claimed"
+        "all 60 cases retained; no runtime reduction claimed",
+        "the eleven unmarked examples gain a no-PORTW check but do not gain port-marker timing or staged replay claims"
       ],
+      "signed_circular_extension": {
+        "baseline_commit": "fdd62735",
+        "legacy_phases_in_case_order": [79, 80, 85, 86, 6506, 6507, 95, 96, 6530, 97, 6504],
+        "retention": "These negative-operand, fractional, circular and source-preservation examples are not identical to the earlier positive-operand routing vectors. Keep all eleven literal contracts and original ordering, rather than claiming opcode overlap makes them redundant. Replace eleven setup fragments and ten result blocks (one shared by two cases); the rest of the corpus source reconstructs byte-for-byte when those replacements are reversed.",
+        "verification": "Compiled old/new comparison matches all eleven partial setup states and their literal register/RAM predicates across 10208 mutations, without a CPU implementation helper. Full and CPU-only builds pass. isa-parallel passes all 60 ordered IDs in twelve reset groups on both executables with an empty ROM directory. The legacy prefix preserves all 168 native ordered PASS records and 2474 opcode assertions byte-for-byte; neighboring isa-memory and isa-products pass. All 382 focused C54x host tests and all 5079 host tests pass (one established skip). The first full-host attempt had twelve sandbox loopback-socket permission errors; the unsandboxed rerun passes. The inventory remains 402 isolated profiles/289 default requirements. No full-default or handset checkpoint renewal is claimed.",
+        "before_cpp_bytes": 3344165, "before_cpp_lines": 50951,
+        "after_cpp_bytes": 3341419, "after_cpp_lines": 50886,
+        "source_assessment": "2746 bytes and 65 C++ lines removed, including the new shared bank and standalone adapter. No case retirement, generated replacement, new test module or runtime improvement."
+      },
       "measurement": {
         "baseline_commit": "21cfd887",
         "c54x_cpp_bytes_before": 3684479,

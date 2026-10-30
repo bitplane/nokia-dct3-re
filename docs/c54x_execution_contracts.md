@@ -185,12 +185,18 @@ record and the explicit transport-free completion. Long-RMW replay and both
 3210 menu gates pass. The full-default checkpoint below also includes this
 separation.
 
-`isa-parallel` runs 49 literal cases: ten independently reset parallel
+`isa-parallel` runs 60 literal cases: ten independently reset parallel
 store/arithmetic controls, followed by 39 dual/parallel MAC/MACR/MAS/MASR
-references in one ordered reset group. The latter retain all source/destination
+references and eleven signed/circular MAC, MPY, SQDST and ST/MACR examples,
+each bank in one ordered reset group (twelve groups total).
+The 39-case bank retains all source/destination
 combinations, two ASM examples, same-AR read-before-write and four FRCT/OVM
 controls. Partial RAM setup, the alias case's omitted AR4 setup/check and the
 original carry/overflow masks are intentional.
+The signed/circular bank retains negative products, signed X-Y, old-A square
+accumulation with FRCT, rounded MAC, independent pointer updates, source-RAM
+preservation and old-B stores. Its entry BK=4 is explicit standalone reset
+metadata, not a reset inserted into the legacy sequence.
 The default sequence reuses their literal register, masked-status and RAM
 expectations through a short adapter; old phase numbers are compatibility
 routing, not the case identities. The aliasing case checks the loaded old RAM
@@ -198,11 +204,10 @@ word and the newly stored word separately. These atomic cases do not replace
 pipeline retention, repeat or interrupt-composition coverage. In particular,
 the staged parallel-MAC matrix's carry policy is unvalidated; it does not
 subsume these atomic carry controls. A shared PORTW constructor builds stimulus
-only, not numeric expectations. Compiled comparison preserves all 39 old
-setup sequences and 22,464 predicate mutations; all 134 existing literal case
-records remain unchanged by the constructor consolidation. Including both new
-headers, the shared bank/constructor removes 2,476 C++ bytes/65 lines. No case
-or checkpoint is retired and no runtime improvement is claimed.
+only, not numeric expectations. The eleven unmarked examples instead execute
+their literal instruction and IDLE without PORTW; their no-output check does
+not create a timing claim. Compiled setup/predicate comparisons and native
+acceptance are recorded in the family review. No case or checkpoint is retired.
 
 `isa-long` runs 18 independently reset DADD/DSUB/DRSUB and T-based long-word
 examples. Literal accumulators, address updates, source/decoy RAM, cycle
