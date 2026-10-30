@@ -159,8 +159,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"store-index", "imm-index", "store-circular", "asm-circular"}, [](self &test) { test.start_indexed_store(); } },
 		{ {"poll-interrupt"}, [](self &test) { test.start_poll_interrupt(); } },
 		{ {"compare-delay"}, [](self &test) { test.start_delay_compare(); } },
-		{ {"asm-load", "asm-consumer"}, [](self &test) { test.start_asm_load(); } },
-		{ {"asm-immediate"}, [](self &test) { test.start_asm_load(); } },
 	}))
 		return;
 	if (profile_is("t-load-control")) { start_pipeline_memory_multiply(165888); return; }

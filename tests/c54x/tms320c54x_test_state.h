@@ -843,17 +843,6 @@ private:
 	};
 	static asm_mapped_fixture asm_mapped_case(unsigned v);
 	void start_asm_mapped(unsigned variant = 0);
-	struct asm_load_fixture
-	{
-		unsigned form, ar, selected, raw, flags, read, consumer_clock, checkpoint, operation, gap;
-		bool consumer, compatibility;
-		u32 base;
-		u16 mode, word, st0, st1, final_st0;
-		u64 a, b, result;
-		std::array<u16, 8> initial, final;
-	};
-	static asm_load_fixture asm_load_case(unsigned v, bool consumer);
-	void start_asm_load(unsigned variant = 0);
 	void start_poll_interrupt(unsigned variant = 0);
 	struct delay_compare_fixture
 	{
@@ -1667,7 +1656,6 @@ private:
 	bool check_asm_mapped_results();
 	bool check_t_store_results();
 	bool check_ts_arithmetic_results();
-	bool check_asm_load_results();
 	bool check_poll_interrupt_results();
 	bool check_delay_compare_results();
 	bool check_asm_circular_store_results();
