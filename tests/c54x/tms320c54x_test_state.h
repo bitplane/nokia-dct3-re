@@ -797,16 +797,6 @@ private:
 	};
 	block_single_fixture block_single_case(unsigned v) const;
 	void start_block_single(unsigned variant = 0);
-	struct asm_mapped_fixture
-	{
-		unsigned source, form, raw, flags, ar, read, checkpoint;
-		u32 base;
-		u16 word, st1, t, trn;
-		u64 a, b;
-		std::array<u16, 8> initial, final;
-	};
-	static asm_mapped_fixture asm_mapped_case(unsigned v);
-	void start_asm_mapped(unsigned variant = 0);
 	void start_poll_interrupt(unsigned variant = 0);
 	struct delay_compare_fixture
 	{
@@ -1595,7 +1585,6 @@ private:
 	bool check_software_intr_results();
 	bool check_block_branch_edge_results();
 	bool check_delay_dld_results();
-	bool check_asm_mapped_results();
 	bool check_t_store_results();
 	bool check_ts_arithmetic_results();
 	bool check_poll_interrupt_results();

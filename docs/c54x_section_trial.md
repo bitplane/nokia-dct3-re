@@ -190,6 +190,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `stlm_bk_dependency.h` | Keep both STLM accumulator sources ×BK0/3/4/13 ×four gaps ×LDU/Xmem circular consumers. Preserve Decode-owned BK despite later live replacement, gap-specific pointer wrap and BK publication, exact register Write6/consumer Read6..9, source/sibling/status, PC/IDLE and replay. BK0 remains a legacy linear implementation behavior; no silicon-phase claim. Distribute pages and three checkpoints, not their Cartesian product. | Native64 cases/restores versus384; build5.322s/run0.037s. Delete setup, phases254460/254470 checker branches, route/declaration; mixed delay-store checker retains its other banks. |
 
+| `asm_mapped.h` | Keep16 mapped accumulator/T/TRN/AR sources ×four DP/postincrement/offset/absolute forms ×all32 low-bit ASM codes. Preserve guard-lane masking, exact mapped Read5/6/no writes, literal Fetch3/poison, Access-owned pointer update, post-Read replacement of all source registers, every-clock ASM-only publication/status and replay. Distribute four ignored status/high-word patterns, pages and three checkpoints; deliberately lose their full Cartesian pairing. | Native2048 cases/restores versus49152; build5.445s/run0.775s. Delete setup/helper/fixture/checker, phases255140/255150, profile route/declarations/dispatch. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
