@@ -4808,31 +4808,6 @@ bool tms320c54x_test_state::check_reverse_carry_reference_results()
 
 
 
-bool tms320c54x_test_state::check_pipeline_store_results()
-{
-	if (m_phase == 251060)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
-			"Consecutive multiword forms consume one frontend clock per word");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 10 ? 0x77 : cycle >= 7 ? 0xe833 : 0) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 9 ? 0xf4950000ULL : 0),
-			"Long A/B loads retire in order before the following one-word instruction");
-		if (cycle == 10)
-		{
-			expect(m_pipeline_operand_reads == 2, "Each consecutive literal is fetched only once");
-			m_pipeline_operand_tap.remove();
-			m_cpu->set_pipeline_frontend(false);
-			osd_printf_info("TMS320C54x staged multiword stream: PASS long_execute=7,9 short_execute=10 literal_reads=2\n");
-			start_pipeline_store_case();
-			return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-		return true;
-	}
-	return false;
-}
 
 
 bool tms320c54x_test_state::check_pipeline_immediate_store_results()

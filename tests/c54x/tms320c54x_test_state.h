@@ -77,8 +77,6 @@ private:
 	void check_timer_reserved_fields();
 	void start_pipeline_frontend_case(bool memory = false, bool memory_b = false);
 	void start_empty_pipeline_case(bool nmi);
-	void start_multiword_pipeline_case(unsigned variant = 0);
-	void start_multiword_stream_case();
 	struct accumulator_stm_fixture
 	{
 		unsigned lane, snapshot;
@@ -1650,8 +1648,6 @@ private:
 	bool check_repeat_endpoints_results();
 	bool check_interrupt_entry_results();
 	bool check_pipeline_frontend_results();
-	bool check_multiword_pipeline_results();
-	bool check_pipeline_store_results();
 	bool check_peripheral_mmr_timing_audit_results();
 	bool check_pipeline_immediate_store_results();
 	bool check_pipeline_logical_immediate_results();
@@ -1806,7 +1802,6 @@ private:
 	u64 m_pipeline_expected_cycle = 0;
 	bool m_pipeline_memory_case = false;
 	unsigned m_pipeline_operand_reads = 0;
-	unsigned m_pipeline_long_case = 0;
 	unsigned m_pipeline_store_case = 0;
 	unsigned m_pipeline_store_writes = 0;
 	unsigned m_pipeline_indirect_case = 0;

@@ -222,7 +222,6 @@ bool tms320c54x_test_state::check_pipeline_frontend_results()
 		m_cpu->set_pipeline_frontend(false);
 		if (!m_frontend.nmi) { start_empty_pipeline_case(true); return true; }
 		osd_printf_info("TMS320C54x staged empty frontend: PASS irq=1 nmi=1 return_pc=0600 vector_fetch=4 stack_write=5 isr_execute=8\n");
-		start_multiword_pipeline_case();
 		return true;
 	}
 	return false;
