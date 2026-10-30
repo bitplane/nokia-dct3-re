@@ -2345,185 +2345,30 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 	{
 		verify_atomic_case(register_bit_examples()[18]);
 	}
-	if (m_phase == 480)
+	if (m_phase == 490)
 	{
-		program.write_word(0x05e2, 0xf843); // BC 05f0,ALT
-		program.write_word(0x05e3, 0x05f0);
-		program.write_word(0x05e4, 0x75d6); // Rejected-branch marker.
-		program.write_word(0x05e5, 0x0124);
-		program.write_word(0x05e6, 0xf5e1);
-		program.write_word(0x05f0, 0x75d6); // Taken-branch marker.
-		program.write_word(0x05f1, 0x0124);
-		program.write_word(0x05f2, 0xf5e1);
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff00000000ULL);
-		return resume_atomic_at(0x05e0, 481);
-	}
-	if (m_phase == 481 || m_phase == 482)
-	{
-		expect_opcode(0xf843,
-				m_port_writes == 2 &&
-				m_last_port_cycle - m_first_port_cycle == (m_phase == 481 ? 7 : 5) &&
-				m_cpu->state_int(tms320c54x_device::STATE_PC) ==
-					(m_phase == 481 ? 0x05f3 : 0x05e7),
-				"ROM4 BC ALT tests A's guard sign and costs five/three cycles");
-		if (m_phase == 481)
-		{
-			m_port_writes = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0100000000ULL);
-			return resume_atomic_at(0x05e0, 482);
-		}
-		program.write_word(0x05e2, 0xff30); // XC 2,TC
-		program.write_word(0x05e3, 0x6d91); // MAR *AR1+
-		program.write_word(0x05e4, 0x6d92); // MAR *AR2+
-		program.write_word(0x05e5, 0x75d6);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
+		program.write_word(0x05e2, 0x4812); // LDM AR2,A
+		program.write_word(0x05e3, 0x8095); // STL A,*AR5+
+		program.write_word(0x05e4, 0x4813); // LDM AR3,A
+		program.write_word(0x05e5, 0x8095);
+		program.write_word(0x05e6, 0x4814); // LDM AR4,A
+		program.write_word(0x05e7, 0x8095);
+		program.write_word(0x05e8, 0x4817); // LDM AR7,A
+		program.write_word(0x05e9, 0x8095);
+		program.write_word(0x05ea, 0x4910); // LDM AR0,B
+		program.write_word(0x05eb, 0x75d6);
+		program.write_word(0x05ec, 0x0124);
+		program.write_word(0x05ed, 0xf5e1);
+		for (u16 address = 0x0f40; address != 0x0f44; ++address)
+			data.write_word(address, 0);
 		m_port_writes = 0;
 		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR1, 0x0120}, {cpu_regs::STATE_AR2, 0x0130}, {cpu_regs::STATE_ST0, 0x1000},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(483);
-	}
-	if (m_phase == 483 || m_phase == 484)
-	{
-		expect_opcode(0xff30,
-				m_cpu->state_int(tms320c54x_device::STATE_AR1) ==
-					(m_phase == 483 ? 0x0121 : 0x0120) &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) ==
-					(m_phase == 483 ? 0x0131 : 0x0130) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
-				"ROM4 XC 2,TC executes or rejects two slots at five-cycle marker span");
-		if (m_phase == 483)
-		{
-			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_AR1, 0x0120}, {cpu_regs::STATE_AR2, 0x0130}, {cpu_regs::STATE_ST0, 0},
-				{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(484);
-		}
-		program.write_word(0x05e2, 0x1192); // LD *AR2+,B
-		program.write_word(0x05e3, 0x6dd2); // MAR *AR2+%
-		program.write_word(0x05e4, 0x7683); // ST #lk,*AR3
-		program.write_word(0x05e5, 0x5aa5);
-		program.write_word(0x05e6, 0x8085); // STL A,*AR5
-		program.write_word(0x05e7, 0x75d6);
-		program.write_word(0x05e8, 0x0124);
-		program.write_word(0x05e9, 0xf5e1);
-		data.write_word(0x0f22, 0x8000);
-		data.write_word(0x0f30, 0);
-		data.write_word(0x0f31, 0);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x1234abcd}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_AR2, 0x0f22},
-			{cpu_regs::STATE_AR3, 0x0f30}, {cpu_regs::STATE_AR5, 0x0f31}, {cpu_regs::STATE_BK, 4},
-			{cpu_regs::STATE_ST0, 0x0800},
+			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_AR0, 0x8000},
+			{cpu_regs::STATE_AR2, 0x8002}, {cpu_regs::STATE_AR3, 0x8003}, {cpu_regs::STATE_AR4, 0x8004},
+			{cpu_regs::STATE_AR5, 0x0f40}, {cpu_regs::STATE_AR7, 0x8007}, {cpu_regs::STATE_ST0, 0x0800},
 		});
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
-		return resume_atomic_at(0x05e0, 485);
-	}
-	if (m_phase == 485)
-	{
-		expect_opcode(0x1192,
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xffffff8000ULL,
-				"ROM4 LD *AR2+,B sign-extends under SXM");
-		expect_opcode(0x6dd2,
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20,
-				"ROM4 MAR *AR2+% wraps after the preceding linear load");
-		expect_opcode(0x7683, data.read_word(0x0f30) == 0x5aa5 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f30,
-				"ROM4 ST immediate writes the direct AR3 destination");
-		expect_opcode(0x8085, data.read_word(0x0f31) == 0xabcd &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f31 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234abcd &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
-				"ROM4 load/MAR/immediate-store/accumulator-store cost 1+1+2+1 cycles");
-		write_words(program, {
-			{0x05e2, 0x771d}, // STM #lk,PMST
-			{0x05e3, 0x4567}, {0x05e4, 0x75d6}, {0x05e5, 0x0124}, {0x05e6, 0xf5e1},
-		});
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR4, 0}, {cpu_regs::STATE_AR5, 0x0f13}, {cpu_regs::STATE_PMST, 0},
-			{cpu_regs::STATE_ST0, 0x0800}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(486);
-	}
-	if (m_phase == 486)
-	{
-		expect_opcode(0x771d,
-				m_cpu->state_int(tms320c54x_device::STATE_PMST) == 0x4567 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f13 &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-				"ROM4 STM writes direct PMST without pointer motion in two cycles");
-		program.write_word(0x05e2, 0xff45); // XC 2,AEQ
-		program.write_word(0x05e3, 0x6d91); // MAR *AR1+
-		program.write_word(0x05e4, 0x6d92); // MAR *AR2+
-		program.write_word(0x05e5, 0x75d6);
-		program.write_word(0x05e6, 0x0124);
-		program.write_word(0x05e7, 0xf5e1);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_AR1, 0x0120}, {cpu_regs::STATE_AR2, 0x0130},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(487);
-	}
-	if (m_phase >= 487 && m_phase <= 490)
-	{
-		const bool accepted = m_phase == 487 || m_phase == 489;
-		expect_opcode(m_phase < 489 ? 0xff45 : 0xff4e,
-				m_cpu->state_int(tms320c54x_device::STATE_AR1) ==
-					(accepted ? 0x0121 : 0x0120) &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) ==
-					(accepted ? 0x0131 : 0x0130) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
-				"ROM4 XC AEQ/BGT executes or rejects two guarded MAR slots");
-		if (m_phase == 490)
-		{
-			program.write_word(0x05e2, 0x4812); // LDM AR2,A
-			program.write_word(0x05e3, 0x8095); // STL A,*AR5+
-			program.write_word(0x05e4, 0x4813); // LDM AR3,A
-			program.write_word(0x05e5, 0x8095);
-			program.write_word(0x05e6, 0x4814); // LDM AR4,A
-			program.write_word(0x05e7, 0x8095);
-			program.write_word(0x05e8, 0x4817); // LDM AR7,A
-			program.write_word(0x05e9, 0x8095);
-			program.write_word(0x05ea, 0x4910); // LDM AR0,B
-			program.write_word(0x05eb, 0x75d6);
-			program.write_word(0x05ec, 0x0124);
-			program.write_word(0x05ed, 0xf5e1);
-			for (u16 address = 0x0f40; address != 0x0f44; ++address)
-				data.write_word(address, 0);
-			m_port_writes = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_AR0, 0x8000},
-				{cpu_regs::STATE_AR2, 0x8002}, {cpu_regs::STATE_AR3, 0x8003}, {cpu_regs::STATE_AR4, 0x8004},
-				{cpu_regs::STATE_AR5, 0x0f40}, {cpu_regs::STATE_AR7, 0x8007}, {cpu_regs::STATE_ST0, 0x0800},
-			});
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
-			return resume_atomic_at(0x05e0, 491);
-		}
-		if (m_phase == 488)
-			program.write_word(0x05e2, 0xff4e); // XC 2,BGT
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A,
-				m_phase == 487 ? 1 : 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B,
-				m_phase == 488 ? 0x0100000000ULL : 0xff00000000ULL);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR1, 0x0120}, {cpu_regs::STATE_AR2, 0x0130}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		++m_phase;
-		m_check_timer->adjust(attotime::from_usec(100));
-		return true;
+		return resume_atomic_at(0x05e0, 491);
 	}
 	if (m_phase == 491)
 	{

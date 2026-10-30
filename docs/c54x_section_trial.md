@@ -307,6 +307,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_multiply_move_literals.h` | Retain signed MPYA with T capture, signed SUB, absolute40-bit XOR, four-store pointer sequence, two guarded low-A stores and STLM→MVDD→MVMM sequence. Explicit operands, unrelated pointers and flags replace cross-bank state; fixed memory/accumulator/T results, complete ordered MMR/RAM accesses, neighbors, pointer updates and pre-sequence replay. Drop port-marker timing; atomic semantic/access scope. | Native7 cases/restores, unchanged count; build5.422s/run0.016s. Delete phase475 successor setup,476..479/9229..9231 and480 assertions/preparations; following branch setup and unmigrated bit-bank assertions remain reference material. |
 
+| `atomic_conditional_slot_literals.h` | Retain BC ALT taken/untaken, XC TC/AEQ/BGT accepted/annulled two-MAR slots, LD→circular MAR→two-store sequence and direct STM PMST. Explicit sign/TC/accumulators/flags/BK/pointers; target fetch, fixed pointer/memory/control results, exact data bus, sibling preservation and pre-operation replay. Drop port-marker timing; atomic semantic/access scope. | Native10 cases/restores, unchanged count; build5.464s/run0.017s. Delete phase480..489 and490 assertions/iteration logic; only490's following mapped-load sequence preparation remains reference material. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
