@@ -332,12 +332,8 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 	{
 		verify_atomic_case(register_bit_examples()[10]);
 	}
-	if (m_phase >= 152 && m_phase <= 185)
+	if (m_phase == 185)
 	{
-		auto const &cases = memory_transfer_examples();
-		unsigned const index = m_phase - 152;
-		verify_atomic_case(cases[index]);
-		if (index + 1 < cases.size()) return begin_atomic_case(cases[index + 1], m_phase + 1);
 		u16 pc = 0x0600;
 		for (unsigned i = 0; i != std::size(rom4_saved_mmr); ++i)
 		{

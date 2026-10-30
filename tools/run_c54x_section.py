@@ -217,6 +217,7 @@ def main():
     counts['atomic_zero_repeat'] = 3
     counts['atomic_program_transfers'] = 8
     counts['atomic_conditional_repeat'] = 4
+    counts['atomic_transfer_literals'] = 34
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
