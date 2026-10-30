@@ -772,9 +772,9 @@ Corrected positive load domains are:
 | `ldu-shift16` | 54,528 per family | 17 RAM forms plus mapped AR sources; 3,072 invalid cases omitted per family. |
 | `ld-ts` | 208,896 | Reindexed 17-form domain; 12,288 invalid cases omitted. |
 | `load-variable` | 104,448 | 17 forms and all 32 shifts; 6,144 invalid cases omitted. |
-| `indirect-dld` | 23,040 | 15 indirect/long forms; 1,536 invalid cases omitted. |
+| `paired_indirect_load` | 7,680 | 15 indirect/long forms; short write-only MOD3 omitted; checkpoints distributed. |
 
-The LDU/shift-16/variable/DLD banks preserve raw case IDs and skip invalid
+The legacy LDU/shift-16/variable banks preserve raw case IDs and skip invalid
 forms rather than substituting duplicate legal cases. Shared scalar
 arithmetic omits `memory_arithmetic_case` form 5; the four memory multiply/T
 banks omit RAM kind 5. Each latter bank retains 52,224 cases: 27,648 RAM
@@ -1689,17 +1689,25 @@ guard controls cover invalid size/step/index combinations, signed wrap and
 power-of-two mask boundaries; they are not executed DSP instructions.
 BK=0 behavior and physical memory-bank/timing details are outside this pass.
 
-The existing `indirect-dld` profile now requires the guard, 3,072 extended
-DST cases, 9,216 short-indirect DST cases, 1,152 store/DLD composition cases
-and 23,040 DLD cases. Case IDs, instruction-shaped literals, save/restore
-and bus-access assertions are retained; no invalid case is replaced by a
-duplicate legal tuple. Load-source rejection is covered separately by the
-CPU-only `source_admission` census. CPU emulation code is unchanged.
+The independent `paired_indirect_store` section owns 4,096 cases/restores
+across all sixteen short/long address forms, eight encoded registers, A/B,
+four accumulator patterns, saturation and compatibility modes.
+`paired_indirect_load` owns 7,680 cases/restores across fifteen admitted
+forms, eight registers, A/B, four 32-bit patterns, SXM/C16/compatibility modes.
+Pages and three replay boundaries are distributed instead of crossing each
+input with checkpoints. Every AR is initialized explicitly; unrelated ARs
+remain unchanged. Load-source rejection belongs to `source_admission`.
 
-```sh
-python3 tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
-  --output-root tmp/c54x-paired-circular --profile indirect-dld
-```
+Both sections retain odd-address ordering (second word at address XOR 1),
+linear/preincrement/reversed/circular pointer updates and instruction-shaped
+long literals. Pointer/BK poisoning follows Access; destination reads and
+unexpected data accesses are forbidden. DLD reads both words at clock 5
+(6 long), preserves accumulators through Read, publishes at Execute, and
+ignores subsequent RAM poisoning. DST captures before source poisoning,
+writes at 6/7 (7/8 long), and checks final RAM after replay between writes.
+These are CPU-model timing contracts, not measured silicon. Run each with
+`python3 tools/run_c54x_section.py paired_indirect_load` or
+`python3 tools/run_c54x_section.py paired_indirect_store`.
 
 The shared arithmetic/load generator carries BK through its callers rather
 than configuring BK=16 independently of their expected addresses. Short
@@ -3234,21 +3242,12 @@ matrix, not the default full-core set or native handset speech.
 
 ## Paired-memory assertion attribution
 
-`indirect-dld` already validates extended DST (3,072 cases), short-indirect
-DST (9,216), indirect DLD (23,040), and store/load composition (1,152),
-including saved in-flight execution. The final paired-memory result checks
-now attribute their exact opcode instead of only emitting family-level PASS
-markers. Source/address retention, bus counts and pointer checks are unchanged;
-this does not change CPU execution or expand the tested status/operand domains.
-
-A fresh verbose profile run links 22 observed NSK-3 words (641,822 executions)
-to actual execution and assertions in that fixture. Eight of these words were
-absent from the default fixture's assertion inventory: `4e81/4e83/4e85/4e86`,
-`4ed2`, `5682`, `578d`, and `57d2` (120,365 observed executions). This is
-attribution of existing semantic checks, not discovery of eight CPU defects.
-Run `tools/run_c54x_core.py` with the same paths as above and
-`--profile indirect-dld --verbose`, retaining its complete log before combining
-it through the coverage tool's `--additional-fixture-log` option.
+Paired CPU ownership is now the independent DLD/DST sections described under
+Circular Fixture Domains. Historical `indirect-dld` profile assertion counts
+are not acceptance for these replacements or for native handset execution.
+The sections check exact opcodes, bus words/order, retained operands and CPU
+state through replay. Store/load composition and private-ROM attribution
+remain separate contracts; they are not implied by this migration.
 
 ## Mapped move and younger repeat ownership
 

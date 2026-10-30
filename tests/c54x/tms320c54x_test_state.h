@@ -92,20 +92,9 @@ private:
 		u64 source, result;
 		u16 bk = 16;
 	};
-	struct dst_extended_fixture
-	{
-		unsigned reg, selected, source, kind;
-		u16 literal, address, next_ar;
-		u64 value;
-		u32 stored;
-		u16 initial, bk;
-	};
 	static unsigned circular_fixture_mask(u16 bk);
 	static bool circular_fixture_domain(u16 initial, int step, u16 bk);
 	static u16 circular_fixture_next(u16 initial, int step, u16 bk);
-	void verify_paired_circular_domain();
-	static dst_extended_fixture extended_dst_fixture(unsigned variant);
-	void start_pipeline_extended_dst(unsigned variant = 0);
 	void start_pipeline_store_mvmm(unsigned variant = 0);
 	struct indexed_store_fixture;
 	static memory_arithmetic_fixture memory_arithmetic_case(unsigned variant, bool unsigned_memory = false, unsigned shift16_selector = 8);
@@ -114,8 +103,6 @@ private:
 	static memory_arithmetic_fixture shifted_memory_load_case(unsigned variant);
 	static memory_arithmetic_fixture staged_load_case(unsigned variant);
 	void start_pipeline_offset_load(unsigned variant = 0);
-	static dst_extended_fixture indirect_dld_case(unsigned variant);
-	void start_pipeline_indirect_dld(unsigned variant = 0);
 	struct extended_banz_fixture
 	{
 		unsigned form, reg, selected;
@@ -822,7 +809,6 @@ private:
 	bool check_instruction_observer_results();
 	bool check_block_page_results();
 	bool check_mvdd_source_results();
-	bool check_extended_dst_results();
 	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
 	bool check_staged_load_results();

@@ -45,112 +45,6 @@ u16 tms320c54x_test_state::circular_fixture_next(u16 initial, int step, u16 bk)
 	return (initial & ~mask) | (index < 0 ? index + bk : index);
 }
 
-void tms320c54x_test_state::verify_paired_circular_domain()
-{
-	struct guard_case { u16 initial, bk; int step; bool legal; u16 next; };
-	static constexpr guard_case cases[] = {
-		{0x1007,16,-2923,false,0}, {0x4007,8192,-2923,true,0x549c},
-		{0x1007,16,4103,false,0}, {0x1007,8192,4103,true,0x000e},
-		{0x1007,8192,-4103,true,0}, {0x5007,16,32767,false,0},
-		{0x5007,32768,32767,true,0x5006}, {0x5007,32768,-32768,true,0x5007},
-		{0x0010,16,1,false,0}, {0x001f,31,-1,false,0},
-		{0x000f,16,1,true,0}, {0,16,-1,true,15},
-		{0x001e,31,1,true,0}, {0x1007,0,0,false,0},
-	};
-	for (auto const &f : cases)
-	{
-		expect(circular_fixture_domain(f.initial, f.step, f.bk) == f.legal,
-			"Circular fixture guard distinguishes legal steps/indices from modulo-only stress inputs");
-		if (f.legal) expect(circular_fixture_next(f.initial, f.step, f.bk) == f.next,
-			"Circular fixture oracle covers signed wrap and the strict power-of-two base mask");
-	}
-	osd_printf_info("TMS320C54x paired circular fixture guard: PASS cases=14 nonzero_bk_domain=SPRU131G_5.5.3.4 cpu_execution=0\n");
-}
-
-tms320c54x_test_state::dst_extended_fixture tms320c54x_test_state::extended_dst_fixture(unsigned variant)
-{
-	if (variant >= 3072)
-	{
-		unsigned const v = (variant - 3072) % 3072;
-		unsigned const reg = v % 8, source = (v / 8) % 2, mode = (v / 16) % 12, pattern = (v / 192) % 4;
-		bool const compatibility = (v / 768) % 2, sst = (v / 1536) % 2;
-		unsigned const selected = compatibility && !reg ? 3 : reg;
-		u16 const initial = 0x1007 + (pattern & 1), index = selected ? 3 : initial;
-		u16 const bk = !selected && (mode == 9 || mode == 11) ? 8192 : 16;
-		auto reverse = [](u16 word) { u16 result = 0; for (unsigned i = 0; i < 16; ++i) result |= ((word >> i) & 1) << (15 - i); return result; };
-		int const delta = mode == 1 || mode == 8 ? -2 : mode == 2 || mode == 3 || mode == 10 ? 2 : mode == 5 || mode == 9 ? -int(index) : int(index);
-		u16 next = initial;
-		if (mode == 4 || mode == 7) next = reverse(u16(reverse(initial) + (mode == 4 ? -int(reverse(index)) : int(reverse(index)))));
-		else if (mode >= 8) next = circular_fixture_next(initial, delta, bk);
-		else if (mode) next = initial + delta;
-		u64 const value = std::array<u64, 4>{0x0012345678ULL, 0xff87654321ULL, 0x017fffffffULL, 0xfe80000000ULL}[pattern];
-		s64 const signed_value = BIT(value, 39) ? s64(value) - (s64(1) << 40) : s64(value);
-		u32 const stored = u32(sst ? std::clamp(signed_value, s64(-2147483648LL), s64(2147483647LL)) : signed_value);
-		return {reg, selected, source, 4 + mode, initial, u16(mode == 3 ? next : initial), next, value, stored, initial, bk};
-	}
-	unsigned const reg = variant % 8, source = (variant / 8) % 2, kind = (variant / 16) % 4, pattern = (variant / 64) % 4;
-	bool const compatibility = (variant / 256) % 2, sst = (variant / 512) % 2;
-	unsigned const selected = compatibility && !reg ? 3 : reg;
-	s16 const offset = std::array<s16, 4>{0, 1, -1, s16(0xf495)}[pattern];
-	// Preserve the opcode-shaped offset with a legal negative wrap, not repeated BK=16 wrapping.
-	u16 const initial = kind == 2 ? 0x4007 : 0x1007, bk = kind == 2 ? 8192 : 16;
-	u16 const linear = u16(initial + offset);
-	u16 const address = kind == 2 ? circular_fixture_next(initial, offset, bk) : linear;
-	u64 const value = std::array<u64, 4>{0x0012345678ULL, 0xff87654321ULL, 0x017fffffffULL, 0xfe80000000ULL}[pattern];
-	s64 const signed_value = BIT(value, 39) ? s64(value) - (s64(1) << 40) : s64(value);
-	u32 const stored = u32(sst ? std::clamp(signed_value, s64(-2147483648LL), s64(2147483647LL)) : signed_value);
-	return {reg, selected, source, kind, kind == 3 ? address : u16(offset), address,
-		u16(kind == 1 || kind == 2 ? address : initial), value, stored, initial, bk};
-}
-
-void tms320c54x_test_state::start_pipeline_extended_dst(unsigned variant)
-{
-	if (!variant) verify_paired_circular_domain();
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = extended_dst_fixture(variant);
-	bool const short_form = variant >= 3072;
-	unsigned const flags = short_form ? (variant - 3072) % 3072 : variant;
-	u32 const base = f.reg & 1 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0x4e00 | (f.source << 8) | (short_form ? 0x80 + (f.kind - 4) * 8 + f.reg : f.kind == 3 ? 0xf8 : 0xe0 + f.kind * 8 + f.reg));
-	if (!short_form) program.write_word(base + 0x601, f.literal);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, (flags / (short_form ? 1536 : 512)) % 2},
-		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 0x6608},
-		{cpu_regs::STATE_ST1, 0x4900 | (((flags / (short_form ? 768 : 256)) % 2) << 5)},
-		{cpu_regs::STATE_A, f.source ? 0xdead : f.value}, {cpu_regs::STATE_B, f.source ? f.value : 0xdead},
-		{cpu_regs::STATE_AR0, 3}, {cpu_regs::STATE_AR0 + f.selected, f.initial}, {cpu_regs::STATE_BK, f.bk},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(f.address, 0xaaaa);
-	m_cpu->space(AS_DATA).write_word(f.address ^ 1, 0xaaaa);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "extended_dst_no_operand_read",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "DST does not read either destination word"); });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x60, 0xffff, "extended_dst_pair",
-		[this, f, short_form](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_store_writes < 2 && at == (f.address ^ m_pipeline_store_writes) &&
-				word == (m_pipeline_store_writes ? u16(f.stored) : u16(f.stored >> 16)) && m_cpu->pipeline_cycles() == (short_form ? 6 : 7) + m_pipeline_store_writes,
-				"Extended DST retains its original address and saturated pair across two owned write clocks"); ++m_pipeline_store_writes; });
-	if (!short_form) m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "extended_dst_literal",
-		[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(word == f.literal && !m_pipeline_extensions_reads, "DST long offset/address is fetched once, including opcode-shaped literals"); ++m_pipeline_extensions_reads; });
-	m_phase = 252550; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-
-
-
-
-
-
-
-
-
-
 void tms320c54x_test_state::start_pipeline_store_mvmm(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -326,56 +220,6 @@ void tms320c54x_test_state::start_pipeline_offset_load(unsigned variant)
 			expect(word == expected && m_pipeline_extensions_reads == unsigned(operation && f.form >= 14), "Memory load retains address then operation extension once");
 			++m_pipeline_extensions_reads; });
 	m_phase = 253050; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-tms320c54x_test_state::dst_extended_fixture tms320c54x_test_state::indirect_dld_case(unsigned variant)
-{
-	unsigned const v = variant % 8192, form = v % 16, reg = (v / 16) % 8, destination = (v / 128) % 2;
-	unsigned const pattern = (v / 256) % 4, flags = (v / 1024) % 8;
-	bool const compatibility = flags & 2;
-	auto f = extended_dst_fixture(form < 12 ? 3072 + reg + 8 * destination + 16 * form + 192 * pattern + 768 * compatibility :
-		reg + 8 * destination + 16 * (form - 12) + 64 * pattern + 256 * compatibility);
-	f.stored = std::array<u32, 4>{0x12345678, 0x87654321, 0x80000000, 0xffff0001}[pattern];
-	f.value = f.stored;
-	if ((flags & 1) && BIT(f.stored, 31)) f.value |= 0xff00000000ULL;
-	return f;
-}
-
-void tms320c54x_test_state::start_pipeline_indirect_dld(unsigned variant)
-{
-	if (variant % 16 == 3) ++variant; // Short MOD=3 is write-only, including paired accesses.
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = indirect_dld_case(variant);
-	unsigned const v = variant % 8192, form = v % 16, flags = (v / 1024) % 8, read_cycle = form < 12 ? 5 : 6;
-	u32 const base = f.reg & 1 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0x5600 | (f.source << 8) | (form < 12 ? 0x80 + form * 8 + f.reg : form == 15 ? 0xf8 : 0xe0 + (form - 12) * 8 + f.reg));
-	if (form >= 12) program.write_word(base + 0x601, f.literal);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 0x6608},
-		{cpu_regs::STATE_ST1, 0x800 | ((flags & 1) << 8) | ((flags & 2) << 4) | ((flags & 4) << 5)},
-		{cpu_regs::STATE_AR0, 3}, {cpu_regs::STATE_AR0 + f.selected, f.initial}, {cpu_regs::STATE_BK, f.bk},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1111222233ULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x4444555566ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->space(AS_DATA).write_word(f.address, f.stored >> 16); m_cpu->space(AS_DATA).write_word(f.address ^ 1, f.stored);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "indirect_dld_pair",
-		[this, f, read_cycle](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_operand_reads < 2 && at == (f.address ^ m_pipeline_operand_reads) &&
-				word == (m_pipeline_operand_reads ? u16(f.stored) : u16(f.stored >> 16)) && m_cpu->pipeline_cycles() == read_cycle,
-				"Indirect DLD samples the retained high/low pair once in Read, preserving odd-address ordering"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "indirect_dld_no_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Indirect DLD publishes only its accumulator"); });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "indirect_dld_literal",
-		[this, f, form](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || form < 12) return;
-			expect(word == f.literal && !m_pipeline_extensions_reads, "Extended DLD fetches its retained offset/address once"); ++m_pipeline_extensions_reads; });
-	m_phase = 253070; m_cpu->resume(SUSPEND_REASON_DISABLE);
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
@@ -2002,67 +1846,6 @@ bool tms320c54x_test_state::check_mvdd_source_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_extended_dst_results()
-{
-	if (m_phase == 252550)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		auto const f = extended_dst_fixture(variant);
-		bool const short_form = variant >= 3072;
-		unsigned const checkpoint = short_form ? std::array<unsigned, 3>{3, 5, 6}[(variant - 3072) / 3072] : std::array<unsigned, 3>{4, 6, 7}[variant / 1024];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Extended DST owns its retained address and both writes");
-		if (tick == 4 && !short_form)
-		{
-			auto const disable = machine().disable_side_effects();
-			m_cpu->space(AS_PROGRAM).write_word((f.reg & 1 ? 0x20000 : 0) + 0x601, 0xdead);
-		}
-		if (tick == (short_form ? 4 : 5))
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == f.next_ar, "Long DST applies preincrement/circular modification once in Access");
-			bool const compatibility = short_form ? ((variant - 3072) / 768) % 2 : (variant / 256) % 2;
-			u16 const st0 = compatibility && f.reg && f.kind != 3 ? (0x6608 & ~0xe000) | (f.reg << 13) : 0x6608;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0, "Long DST uses standard ARF or compatibility ARP ownership without DP/CPL addressing");
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2000);
-			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 32);
-		}
-		if (tick == (short_form ? 5 : 6)) m_cpu->set_state_int(f.source ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, 0);
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save extended DST after Decode, source capture or first write");
-		}
-		if (tick == 24)
-		{
-			{
-				auto const disable = machine().disable_side_effects();
-				u16 const opcode = 0x4e00 | (f.source << 8) | (short_form ? 0x80 + (f.kind - 4) * 8 + f.reg : f.kind == 3 ? 0xf8 : 0xe0 + f.kind * 8 + f.reg);
-				expect_opcode(opcode, m_pipeline_store_writes == 2 && m_pipeline_extensions_reads == (short_form ? 0 : 1) &&
-					m_cpu->space(AS_DATA).read_word(f.address) == u16(f.stored >> 16) && m_cpu->space(AS_DATA).read_word(f.address ^ 1) == u16(f.stored) &&
-					m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == 0x2000,
-					"DST retains both source words and destination despite later accumulator/AR/literal changes");
-			}
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				return restore_pipeline_at(252560, "Restore DST without duplicate address updates or writes");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 12287) { start_pipeline_extended_dst(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged extended DST: PASS cases=3072 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=4 compatibility=0,1 sst=0,1 restore=3072 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
-			osd_printf_info("TMS320C54x staged short-indirect DST: PASS cases=9216 modes=12 registers=8 accumulators=2 parity=even,odd compatibility=0,1 sst=0,1 restore=9216 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252560)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252550;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
-
-
-
 bool tms320c54x_test_state::check_rptbd_t_load_results()
 {
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
@@ -2284,71 +2067,12 @@ bool tms320c54x_test_state::check_staged_load_results()
 			if (variant < 238463) { start_pipeline_offset_load(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged variable memory LD: PASS cases=104448 address_forms=17 registers=2 accumulators=2 values=4 shifts=32 sxm_ovm=4 restore=104448 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
 			if (profile_is("load-variable")) throw emu_fatalerror(0, "TMS320C54x isolated variable memory loads complete");
-			start_pipeline_indirect_dld(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 253060)
 	{
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253050;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253070)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, v = variant % 8192;
-		auto const f = indirect_dld_case(variant);
-		unsigned const form = v % 16, flags = (v / 1024) % 8, read_cycle = form < 12 ? 5 : 6;
-		unsigned const checkpoint = std::array<unsigned, 3>{3, read_cycle - 1, read_cycle}[variant / 8192];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Indirect DLD owns its paired reads and retained address");
-		if (form >= 12 && tick == 4)
-		{
-			auto const disable = machine().disable_side_effects();
-			m_cpu->space(AS_PROGRAM).write_word((f.reg & 1 ? 0x20000 : 0) + 0x601, 0xdead);
-		}
-		if (tick == read_cycle - 1)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == f.next_ar,
-				"DLD applies its selected two-word or indexed/circular pointer step once in Access");
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2222);
-			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 32);
-		}
-		if (tick == read_cycle)
-		{
-			auto const disable = machine().disable_side_effects();
-			m_cpu->space(AS_DATA).write_word(f.address, 0xdead); m_cpu->space(AS_DATA).write_word(f.address ^ 1, 0xbeef);
-		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save indirect DLD in Decode, Access or paired Read");
-		}
-		if (tick == 18)
-		{
-			u16 const st0 = (flags & 2) && f.reg && form != 15 ? (0x6608 & ~0xe000) | (f.reg << 13) : 0x6608;
-			u16 const st1 = 0x800 | ((flags & 1) << 8) | ((flags & 2) << 4) | ((flags & 4) << 5);
-			u16 const opcode = 0x5600 | (f.source << 8) | (form < 12 ? 0x80 + form * 8 + f.reg : form == 15 ? 0xf8 : 0xe0 + (form - 12) * 8 + f.reg);
-			expect_opcode(opcode, m_pipeline_operand_reads == 2 && m_pipeline_extensions_reads == unsigned(form >= 12) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == st1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (f.source ? 0x1111222233ULL : f.value) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (f.source ? f.value : 0x4444555566ULL) &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == 0x2222,
-				"DLD publishes its retained 32-bit pair with SXM guard extension in either C16 mode, preserving the other accumulator/status");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				return restore_pipeline_at(253080, "Restore DLD without duplicate paired reads or pointer updates");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 24575) { start_pipeline_indirect_dld(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged indirect DLD: PASS cases=23040 forms=15 registers=8 accumulators=2 patterns=4 sxm=0,1 c16=0,1 compatibility=0,1 restore=23040 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
-			if (profile_is("indirect-dld")) throw emu_fatalerror(0, "TMS320C54x isolated indirect double loads complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253080)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253070;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	return false;

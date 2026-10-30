@@ -86,7 +86,6 @@ void tms320c54x_test_state::machine_reset()
 	}))
 		return;
 	if (profile_is("ldu-shift16")) { start_pipeline_offset_load(12672); return; }
-	if (profile_is("indirect-dld")) { start_pipeline_extended_dst(); return; }
 	if (profile_is("load-variable")) { start_pipeline_offset_load(127872); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"rpt-subc-st"}, [](self &test) { test.start_pipeline_memory_repeat(); } },
