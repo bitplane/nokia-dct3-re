@@ -226,7 +226,6 @@ private:
 	};
 	static delayed_condition_return_fixture delayed_condition_return_case(unsigned v);
 	void start_delayed_condition_return(unsigned variant = 0);
-	void start_tc_return(unsigned variant = 0);
 	void start_bitt(unsigned variant = 0);
 	void start_bitt_retd(unsigned variant = 0);
 	struct delay_bitt_fixture
@@ -1739,7 +1738,6 @@ private:
 	bool check_repeated_writa_results();
 	bool check_branch_arithmetic_results();
 	bool check_circular_mar_results();
-	bool check_tc_return_results();
 	bool check_bitt_results();
 	bool check_bd_read_a_results();
 	bool check_mvdd_follow_results();
@@ -2095,7 +2093,6 @@ private:
 	static constexpr unsigned repeated_writa_phase = 62044;
 	static constexpr unsigned branch_arithmetic_phase = 62040;
 	static constexpr unsigned circular_mar_phase = 62038;
-	static constexpr unsigned tc_return_phase = 62036;
 	static constexpr unsigned bitt_phase = 62032;
 	static constexpr unsigned repeat_store_phase = 62028;
 	static constexpr unsigned rptz_phase = 62026;

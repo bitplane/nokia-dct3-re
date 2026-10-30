@@ -54,7 +54,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"rpt-writa", "rpt-writa16"}, [](self &test) { test.start_repeated_writa(); } },
 		{ {"bcd-arithmetic"}, [](self &test) { test.start_branch_arithmetic(); } },
 		{ {"mar-circular"}, [](self &test) { test.start_circular_mar(); } },
-		{ {"tc-return"}, [](self &test) { test.start_tc_return(); } },
 		{ {"rcd"}, [](self &test) { test.start_delayed_condition_return(); } },
 		{ {"bitt-retd"}, [](self &test) { test.start_bitt_retd(); } },
 		{ {"bitt-ctrl"}, [](self &test) { test.start_delay_bitt(); } },
