@@ -650,55 +650,6 @@ void tms320c54x_test_state::start_accumulator_cmpm(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_pipeline_bitfield_ar7(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const short_compare = profile_is("cmpm-branch");
-	bool const compare = short_compare || profile_is("cmpm-absolute");
-	bool const peripheral = profile_is("bitf-peripheral"), offset = peripheral && (variant / 32) % 2;
-	u16 const value = std::array<u16, 4>{0, 1, u16(compare ? 0x7f : 2), 0x8000}[variant % 4], mask = (variant / 16) % 2 ? 0x7f : peripheral ? 2 : 1;
-	bool const tc = (variant / 4) % 2, initial_tc = (variant / 8) % 2;
-	u32 const base = (short_compare ? (variant / 32) % 2 : peripheral ? (variant / 64) % 2 : variant % 2) ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
-	std::array<u16, 7> const words{u16(short_compare ? 0x6081 : compare ? 0x60f8 : offset ? 0x61e1 : 0x61f8), u16(compare ? 0x3762 : peripheral ? offset ? 1 : 0x49 : 0x0017), mask, u16(0xf820 | (tc << 4)), 0x0700, 0xe811, 0xf4e1};
-	for (unsigned i = 0; i < words.size(); ++i)
-		if (!short_compare || i != 1) program.write_word(base + 0x600 + i - (short_compare && i > 1), words[i]);
-	program.write_word(base + 0x700, 0xe855); program.write_word(base + 0x701, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608 | (initial_tc ? 0x1000 : 0)); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR7, value);
-	if (compare) m_cpu->space(AS_DATA).write_word(0x3762, value);
-	if (short_compare) m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x3762);
-	if (peripheral) { m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x48); m_cpu->space(AS_DATA).write_word(0x49, value); }
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	if (compare)
-	{
-		m_fast_stack_reads = 0;
-		m_operand_data_tap = program.install_read_tap(base + 0x601, base + (short_compare ? 0x601 : 0x602), "cmpm_literal_ownership",
-			[this, base, mask, short_compare](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-				expect(m_fast_stack_reads < (short_compare ? 1 : 2) && at == base + 0x601 + m_fast_stack_reads && word == (short_compare || m_fast_stack_reads ? mask : 0x3762), "CMPM captures its comparison literal after any address extension exactly once"); ++m_fast_stack_reads; });
-	}
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "bitfield_ar7_sample",
-		[this, value, compare, peripheral, short_compare](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == (compare ? 0x3762 : peripheral ? 0x49 : 0x17) && word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == (short_compare ? 6 : peripheral ? 8 : 7),
-				"Original BITF family samples mapped AR7 once before TC publication"); ++m_pipeline_operand_reads; });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x700, base + 0x700, "bitfield_ar7_target",
-		[this, value, tc, mask, compare, peripheral, short_compare](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return;
-			if (m_cpu->pipeline_cycles() != (short_compare ? 9 : peripheral ? 11 : 10)) osd_printf_info("Mapped BITF target timing: cycle=%llu value=%04x mask=%04x tc_condition=%u\n",
-				(unsigned long long)m_cpu->pipeline_cycles(), value, mask, tc);
-			expect((compare ? value == mask : bool(value & mask)) == tc && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == (short_compare ? 9 : peripheral ? 11 : 10),
-				"Immediate TC/NTC branch consumes BITF's published mask result"); ++m_pipeline_extensions_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "bitfield_ar7_no_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "BITF/branch does not write its register source"); });
-	m_phase = 253030; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::shifted_memory_load_case(unsigned variant)
 {
@@ -3378,87 +3329,13 @@ bool tms320c54x_test_state::check_bitfield_address_results()
 			}
 			osd_printf_info("TMS320C54x staged BITF: PASS cases=%u forms=17 registers=8 mask_pairs=8 initial_tc=2 sxm_ovm=4 compatibility=2 restore=%u duplicate_reads=0 data_writes=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n", m_bitfield_coverage.count, m_bitfield_restores, (unsigned long long)m_bitfield_coverage.value);
 			if (profile_is("bitf-smem")) throw emu_fatalerror(0, "TMS320C54x isolated Smem BITF complete");
-			start_pipeline_bitfield_ar7(); return true;
+			return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 253020)
 	{
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253010;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253030)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const short_compare = profile_is("cmpm-branch");
-		bool const compare = short_compare || profile_is("cmpm-absolute");
-		bool const peripheral = profile_is("bitf-peripheral");
-		u16 const value = std::array<u16, 4>{0, 1, u16(compare ? 0x7f : 2), 0x8000}[variant % 4], mask = (variant / 16) % 2 ? 0x7f : peripheral ? 2 : 1;
-		bool const result = compare ? value == mask : bool(value & mask), taken = result == bool((variant / 4) % 2), initial_tc = (variant / 8) % 2;
-		unsigned const checkpoint = short_compare ? std::array<unsigned, 3>{3, 5, 6}[variant / 64] : peripheral ? std::array<unsigned, 3>{5, 8, 9}[variant / 128] : (compare ? std::array<unsigned, 3>{3, 7, 8} : std::array<unsigned, 3>{5, 7, 8})[variant / 32];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Mapped AR7 BITF and its immediate branch are organic CPU instructions");
-		expect(BIT(m_cpu->state_int(tms320c54x_device::STATE_ST0), 12) == (tick < (short_compare ? 7 : peripheral ? 9 : 8) ? initial_tc : result), "BITF/CMPM publishes its retained source result in Execute");
-		if (short_compare && tick == 5) m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x7777);
-		if (tick == 6 && compare)
-		{
-			expect(m_fast_stack_reads == (short_compare ? 1 : 2), "CMPM captures its extensions before later program changes");
-			auto const disable = machine().disable_side_effects(); u32 const base = (short_compare ? (variant / 32) % 2 : variant % 2) ? 0x20000 : 0;
-			m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0xdead);
-			if (!short_compare) m_cpu->space(AS_PROGRAM).write_word(base + 0x602, 0xbeef);
-		}
-		if (tick == (short_compare ? 6 : peripheral ? 8 : 7))
-		{
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x7777);
-			if (compare) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x3762, 0x7777); }
-			if (peripheral) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x49, 0x7777); }
-		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads, m_fast_stack_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save mapped BITF before/after source sampling or TC publication");
-		}
-		if (tick == 30)
-		{
-			if (compare) expect(m_fast_stack_reads == (short_compare ? 1 : 2), "CMPM never re-fetches its captured extensions");
-			if (short_compare) expect(m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x7777, "Short CMPM retains its captured address without restoring or reapplying the pointer");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(taken) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (taken ? 0x55 : 0x11) && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x7777 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa608 | (result ? 0x1000 : 0)),
-				"Immediate TC/NTC consumes mapped AR7 BITF's retained value rather than the later register contents");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				if (compare) m_fast_stack_reads = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(253040, "Restore mapped BITF/branch without source or target resampling");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			if (compare) m_operand_data_tap.remove();
-			if (variant < (short_compare ? 191 : peripheral ? 383 : 95)) { start_pipeline_bitfield_ar7(variant + 1); return true; }
-			if (short_compare)
-			{
-				osd_printf_info("TMS320C54x staged short CMPM branch: PASS cases=192 restore=192 pages=2 conditions=TC,NTC initial_tc=2 source_read=6 tc_publish=7 target_fetch=9 source_reads=1 literal_fetches=1 data_writes=0 adjacent_branch=1 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated short CMPM branch complete");
-			}
-			if (peripheral)
-			{
-				osd_printf_info("TMS320C54x staged peripheral BITF: PASS cases=384 restore=384 forms=offset,absolute pages=2 conditions=TC,NTC source_read=8 tc_publish=9 target_fetch=11 reads=1 destination_writes=0 peripheral_extra_clock=1 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated peripheral BITF complete");
-			}
-			if (compare)
-			{
-				osd_printf_info("TMS320C54x staged absolute CMPM: PASS cases=96 restore=96 source=RAM conditions=TC,NTC initial_tc=2 source_read=7 target_fetch=10 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated absolute CMPM complete");
-			}
-			osd_printf_info("TMS320C54x staged mapped BITF branch: PASS cases=96 source=AR7 masks=0001,007f conditions=TC,NTC initial_tc=2 restore=96 source_read=7 target_fetch=10 duplicate_reads=0 data_writes=0\n");
-			start_pipeline_offset_load(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253040)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253030;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	return false;

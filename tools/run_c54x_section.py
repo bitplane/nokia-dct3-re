@@ -127,6 +127,7 @@ def main():
     counts['shifted_high_store'] = 128
     counts['direct_memory_compare'] = 64
     counts['sticky_overflow_branch'] = 576
+    counts['bitfield_compare_branch'] = 160
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

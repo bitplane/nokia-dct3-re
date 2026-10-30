@@ -246,7 +246,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (profile_is("far-atomic")) { m_cpu->set_pipeline_frontend(false); start_far_case(0); return; }
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"bitf-peripheral"}, [](self &test) { test.start_pipeline_bitfield_ar7(); } },
 		{ {"t-peripheral"}, [](self &test) { test.start_t_peripheral(); } },
 		{ {"st-t-branch"}, [](self &test) {
 			test.m_result_owner = &self::check_t_store_branch_results;
@@ -294,11 +293,9 @@ void tms320c54x_test_state::machine_reset()
 		{ {"logic-map"}, [](self &test) { test.start_addc(); } },
 		{ {"addc-chain"}, [](self &test) { test.start_addc_chain(); } },
 		{ {"mvkd-peripheral"}, [](self &test) { test.start_mvkd_peripheral(); } },
-		{ {"cmpm-absolute"}, [](self &test) { test.start_pipeline_bitfield_ar7(); } },
 		{ {"cmpm-acc"}, [](self &test) { test.start_accumulator_cmpm(); } },
 		{ {"cmpm-map", "cmpm-map-edge"}, [](self &test) { test.start_accumulator_cmpm(); } },
 		{ {"cmpm-smem", "bitf-smem"}, [](self &test) { test.start_pipeline_bitfield(); } },
-		{ {"cmpm-branch"}, [](self &test) { test.start_pipeline_bitfield_ar7(); } },
 		{ {"st-extended-ar", "st-ar-consumer", "st-shift-ar", "st-shift-ar-use"}, [](self &test) { test.start_extended_ar_store(); } },
 		{ {"st-shift-ar-bank"}, [](self &test) { test.start_shifted_ar_conflict(); } },
 		{ {"ld-ts", "ld-ts-producer"}, [](self &test) { test.start_ts_load(); } },

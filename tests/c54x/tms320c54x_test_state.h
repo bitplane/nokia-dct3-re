@@ -295,7 +295,6 @@ private:
 	};
 	static accumulator_cmpm_fixture accumulator_cmpm_case(unsigned v, bool mapped = false, bool edge = false);
 	void start_accumulator_cmpm(unsigned variant = 0);
-	void start_pipeline_bitfield_ar7(unsigned variant = 0);
 	static memory_arithmetic_fixture offset_load_case(unsigned variant);
 	static memory_arithmetic_fixture unsigned_load_case(unsigned variant);
 	static memory_arithmetic_fixture shifted_memory_load_case(unsigned variant);
