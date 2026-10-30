@@ -272,6 +272,7 @@ def main():
     counts['atomic_port_marked_transfers'] = 9
     counts['atomic_port_marked_counter'] = 8
     counts['atomic_absolute_arithmetic'] = 16
+    counts['atomic_long_offset_literals'] = 14
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

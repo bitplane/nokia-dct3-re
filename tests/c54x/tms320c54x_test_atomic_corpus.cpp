@@ -12,12 +12,8 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 312 && m_phase <= 325)
+	if (m_phase == 325)
 	{
-		auto const &cases = long_offset_examples();
-		unsigned const index = m_phase - 312;
-		verify_atomic_case(cases[index]);
-		if (m_phase < 325) return begin_atomic_case(cases[index + 1], m_phase + 1);
 		program.write_word(0x05e3, 0xfa20); // BCD 05f0h, NTC
 		program.write_word(0x05e4, 0x05f0);
 		program.write_word(0x05e5, 0xe801); // Delay slot 1
