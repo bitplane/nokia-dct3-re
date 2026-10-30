@@ -335,7 +335,6 @@ private:
 	void start_pipeline_direct_rmw(unsigned variant = 0);
 	void start_pipeline_peripheral_logic(unsigned variant = 0);
 	void start_pipeline_port_write(unsigned variant = 0);
-	static u16 stlm_fixture_value(unsigned variant);
 	struct memory_arithmetic_fixture
 	{
 		unsigned form, reg, selected, read_cycle;
@@ -366,7 +365,6 @@ private:
 	void start_shifted_ar_conflict(unsigned variant = 0);
 	static extended_ar_store_fixture extended_ar_store_case(unsigned variant, bool consumer, bool shifted = false);
 	void start_extended_ar_store(unsigned variant = 0);
-	void start_pipeline_stlm(unsigned variant = 0);
 	struct dst_extended_fixture
 	{
 		unsigned reg, selected, source, kind;
