@@ -17,8 +17,8 @@ public:
 		: driver_device(config, type, tag), m_cpu(*this, "cpu") { }
 	void test(machine_config &config)
 	{
-		m_dual_mode = c54x_test::dual_multiply_mode::select(config.options().bios());
-		m_extended_program = !std::strcmp(config.options().bios(), "isa-disasm") || bool(m_dual_mode);
+		m_parallel_mac = !std::strcmp(config.options().bios(), "stmac");
+		m_extended_program = !std::strcmp(config.options().bios(), "isa-disasm") || m_parallel_mac;
 		TMS320C54X(config, m_cpu, 13'000'000);
 		m_cpu->set_extended_program(m_extended_program);
 		m_cpu->set_addrmap(AS_PROGRAM, &c54x_isa_test_state::program_map);
@@ -30,7 +30,7 @@ protected:
 	{
 		m_timer = timer_alloc(FUNC(c54x_isa_test_state::check), this);
 		if (disassembly()) return;
-		if (m_dual_mode) m_dual = std::make_unique<c54x_test::dual_multiply_fixture_runner>(machine(), *m_cpu, *m_timer, m_dual_mode);
+		if (m_parallel_mac) m_dual = std::make_unique<c54x_test::parallel_mac_fixture_runner>(machine(), *m_cpu, *m_timer);
 		else
 		{
 			if (words()) m_cases = c54x_test::instruction_word_examples();
@@ -66,13 +66,8 @@ protected:
 private:
 	[[noreturn]] void dual_result() const
 	{
-		if (m_dual_mode.parallel())
-		{
-			osd_printf_info("TMS320C54x parallel MAC: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 shifts=32 reads=1 writes=1 retained=T,X,ASM old_source_store=1 carry=unvalidated physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest());
-			throw emu_fatalerror(3, "TMS320C54x isolated parallel MAC complete");
-		}
-		osd_printf_info("TMS320C54x dual MAC family: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 snapshots=3 reads=2 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest());
-		throw emu_fatalerror(3, "TMS320C54x isolated dual MAC family complete");
+		osd_printf_info("TMS320C54x parallel MAC: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 shifts=32 reads=1 writes=1 retained=T,X,ASM old_source_store=1 carry=unvalidated physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest());
+		throw emu_fatalerror(3, "TMS320C54x isolated parallel MAC complete");
 	}
 	bool parallel() const { return !std::strcmp(machine().options().bios(), "isa-parallel"); }
 	bool scalars() const { return !std::strcmp(machine().options().bios(), "isa-scalars"); }
@@ -169,8 +164,8 @@ private:
 	unsigned m_case = 0, m_writes = 0, m_resets = 0;
 	u64 m_first = 0, m_middle = 0, m_last = 0;
 	bool m_extended_program = false;
-	c54x_test::dual_multiply_mode m_dual_mode;
-	std::unique_ptr<c54x_test::dual_multiply_fixture_runner> m_dual;
+	bool m_parallel_mac = false;
+	std::unique_ptr<c54x_test::parallel_mac_fixture_runner> m_dual;
 	std::vector<c54x_test::instruction_case> m_cases;
 };
 
@@ -181,7 +176,6 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(4, "isa-long", "TI long-word arithmetic examples")
 	ROM_SYSTEM_BIOS(5, "isa-products", "Literal multiply arithmetic and DELAY continuation sequence")
 	ROM_SYSTEM_BIOS(6, "isa-flow", "Conditional delayed branch return and high-address stack examples")
-	ROM_SYSTEM_BIOS(14, "mac-family", "Dual MAC MACR MAS MASR with independent source and destination")
 	ROM_SYSTEM_BIOS(15, "stmac", "Parallel MAC stores with retained T X and ASM")
 	ROM_SYSTEM_BIOS(29, "isa-words", "Atomic instruction-word arithmetic and addressing examples")
 	ROM_SYSTEM_BIOS(30, "isa-disasm", "Debugger syntax length page wrapping and stepping contracts")

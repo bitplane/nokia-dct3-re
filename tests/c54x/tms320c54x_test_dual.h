@@ -8,47 +8,23 @@
 #include "tms320c54x_test_dual_schedule.h"
 #include "tms320c54x_test_snapshot.h"
 #include "cpu/tms320c54x/tms320c54x.h"
-#include <string_view>
 
 namespace c54x_test {
 
-struct dual_multiply_mode
-{
-	enum class operation { none, mac, parallel_mac };
-	operation op = operation::none;
-	explicit operator bool() const { return op != operation::none; }
-	bool parallel() const { return op == operation::parallel_mac; }
-	unsigned count() const
-	{
-		return dual_mac_schedule::cases;
-	}
-	unsigned key(unsigned ordinal) const
-	{
-		return dual_mac_schedule::key(ordinal);
-	}
-	static dual_multiply_mode select(std::string_view name)
-	{
-		operation const op = name == "mac-family" ? operation::mac :
-			name == "stmac" ? operation::parallel_mac : operation::none;
-		return {op};
-	}
-};
-
 // Synthetic CPU-only RAM fixture. Original per-clock mutations and assertions
 // remain explicit; the host continuation survives guest snapshot restoration.
-class dual_multiply_fixture_runner
+class parallel_mac_fixture_runner
 {
 public:
-	dual_multiply_fixture_runner(running_machine &machine, tms320c54x_device &cpu, emu_timer &timer, dual_multiply_mode mode)
-		: m_machine(machine), m_cpu(cpu), m_timer(timer), m_mode(mode) { }
+	parallel_mac_fixture_runner(running_machine &machine, tms320c54x_device &cpu, emu_timer &timer)
+		: m_machine(machine), m_cpu(cpu), m_timer(timer) { }
 	void start() { m_ordinal = m_restores = 0; m_coverage = {}; begin(); }
 	bool step()
 	{
 		if (m_resume) { m_resume = false; m_cpu.resume(SUSPEND_REASON_DISABLE); schedule(); return false; }
-		bool const parallel = m_mode.parallel();
 		auto const &f = m_input;
 		unsigned const variant = m_raw, tick = ++m_tick;
-		unsigned const feedback = parallel ? f.destination : f.source;
+		unsigned const feedback = f.destination;
 		unsigned const checkpoint = 3 + f.snapshot;
 		require(!state(r::STATE_ILLEGAL), "Dual MPY admits RAM pairs and rejects low-page operands before effects");
 		u64 const before = dual_macsu_seed(variant % 215040U, false) ^ (tick <= 5 ? 0xffffffffffULL : 0);
@@ -60,10 +36,10 @@ public:
 		}
 		if (tick == 5)
 		{
-			require(state(r::STATE_T) == (parallel ? f.yword : f.xword), "Dual memory Read publishes T only for dual-read multiply");
+			require(state(r::STATE_T) == f.yword, "Dual memory Read publishes T only for dual-read multiply");
 			m_cpu.set_state_int(r::STATE_T, 0xdead);
 			m_cpu.set_state_int(feedback ? r::STATE_B : r::STATE_A, dual_macsu_seed(variant % 215040U, false));
-			if (parallel) m_cpu.set_state_int(r::STATE_ST1, f.st1 ^ 31);
+			m_cpu.set_state_int(r::STATE_ST1, f.st1 ^ 31);
 			auto const disable = m_machine.disable_side_effects();
 			m_cpu.space(AS_DATA).write_word(f.xaddress, 0xdead); m_cpu.space(AS_DATA).write_word(f.yaddress, 0xbeef);
 		}
@@ -73,7 +49,7 @@ public:
 		}
 		if (tick == 12)
 		{
-			require(m_reads == (parallel ? 1U : 2U) && m_writes == unsigned(parallel) && m_fetches == 1 && bool(state(r::STATE_IDLE)) && state(r::STATE_T) == 0xdead && state(r::STATE_ST1) == (parallel ? f.st1 ^ 31 : f.st1) && state(r::STATE_PMST) == f.pmst, "Dual multiply retains operands and ASM without duplicate publications");
+			require(m_reads == 1U && m_writes == 1U && m_fetches == 1 && bool(state(r::STATE_IDLE)) && state(r::STATE_T) == 0xdead && state(r::STATE_ST1) == (f.st1 ^ 31) && state(r::STATE_PMST) == f.pmst, "Dual multiply retains operands and ASM without duplicate publications");
 			for (unsigned i = 0; i < 4; ++i) require(state(r::STATE_AR2 + i) == (0x2200 + i), "Dual MPY never reapplies its address modification");
 			if (!m_replay)
 			{
@@ -83,7 +59,7 @@ public:
 				m_cpu.suspend(SUSPEND_REASON_DISABLE, true); m_resume = true; m_timer.enable(true); return false;
 			}
 			m_read_tap.remove(); m_write_tap.remove(); m_fetch_tap.remove(); m_cpu.set_pipeline_frontend(false);
-			if (++m_ordinal < m_mode.count()) { begin(); return false; }
+			if (++m_ordinal < dual_mac_schedule::cases) { begin(); return false; }
 			return true;
 		}
 		schedule(); return false;
@@ -102,29 +78,28 @@ private:
 	void begin()
 	{
 		m_cpu.suspend(SUSPEND_REASON_DISABLE, true);
-		bool const parallel = m_mode.parallel();
-		m_raw = m_mode.key(m_ordinal);
-		m_input = dual_multiply_case(m_raw, false, false, true, true, true, parallel);
+		m_raw = dual_mac_schedule::key(m_ordinal);
+		m_input = dual_multiply_case(m_raw, false, false, true, true, true, true);
 		auto const &f = m_input;
 		m_coverage.add(m_raw);
-		unsigned const feedback = parallel ? f.destination : f.source;
+		unsigned const feedback = f.destination;
 		auto &program = m_cpu.space(AS_PROGRAM); auto &data = m_cpu.space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		program.write_word(f.base + 0x600, (parallel ? 0xd000 : 0xb000) | (f.operation << 10) | (f.source << 9) | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
+		program.write_word(f.base + 0x600, 0xd000 | (f.operation << 10) | (f.source << 9) | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
 		if (f.xaddress >= 0x60) data.write_word(f.xaddress, f.xword);
 		if (f.yaddress >= 0x60) data.write_word(f.yaddress, f.yword);
 		m_cpu.set_state_int(r::STATE_IDLE, 0); m_cpu.set_state_int(r::STATE_ILLEGAL, 0);
 		m_cpu.set_state_int(r::STATE_PMST, f.pmst); m_cpu.set_state_int(r::STATE_ST0, f.st0); m_cpu.set_state_int(r::STATE_ST1, f.st1);
 		m_cpu.set_state_int(r::STATE_TCR, 0x10); m_cpu.set_state_int(r::STATE_IFR, 0); m_cpu.set_state_int(r::STATE_IMR, 0);
 		m_cpu.set_state_int(r::STATE_A, 0x123456789aULL); m_cpu.set_state_int(r::STATE_B, 0xfeabcd9876ULL); m_cpu.set_state_int(r::STATE_T, 0xabcd);
-		if (parallel) m_cpu.set_state_int(r::STATE_T, f.yword);
+		m_cpu.set_state_int(r::STATE_T, f.yword);
 		m_cpu.set_state_int(feedback ? r::STATE_B : r::STATE_A, dual_macsu_seed(m_raw % 215040U, false) ^ 0xffffffffffULL);
 		for (unsigned i = 0; i < 4; ++i) m_cpu.set_state_int(r::STATE_AR2 + i, f.initial[i]);
 		m_cpu.set_state_int(r::STATE_AR0, 3); m_cpu.set_state_int(r::STATE_BK, f.linear ? 0 : 16);
 		m_cpu.set_input_line(0, CLEAR_LINE); m_cpu.set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
 		m_reads = m_fetches = m_writes = 0;
-		m_read_tap = data.install_read_tap(0, 0xffff, "dual_multiply_reads", [this, f, parallel](offs_t at, u16 &word, u16) { if (m_machine.side_effects_disabled()) return; require(m_reads < (parallel ? 1U : 2U) && at == (m_reads ? f.yaddress : f.xaddress) && word == (m_reads ? f.yword : f.xword) && m_cpu.pipeline_cycles() == 5, "Dual multiply retains its captured logical operands in Read"); ++m_reads; });
-		m_write_tap = data.install_write_tap(0, 0xffff, "dual_multiply_write", [this, f, parallel](offs_t at, u16 &word, u16) { if (m_machine.side_effects_disabled()) return; require(parallel && !m_writes && at == f.yaddress && word == f.stored && m_cpu.pipeline_cycles() == 6, "Parallel MAC writes the old shifted source once at Execute"); ++m_writes; });
+		m_read_tap = data.install_read_tap(0, 0xffff, "dual_multiply_reads", [this, f](offs_t at, u16 &word, u16) { if (m_machine.side_effects_disabled()) return; require(m_reads < 1U && at == f.xaddress && word == f.xword && m_cpu.pipeline_cycles() == 5, "Dual multiply retains its captured logical operands in Read"); ++m_reads; });
+		m_write_tap = data.install_write_tap(0, 0xffff, "dual_multiply_write", [this, f](offs_t at, u16 &word, u16) { if (m_machine.side_effects_disabled()) return; require(!m_writes && at == f.yaddress && word == f.stored && m_cpu.pipeline_cycles() == 6, "Parallel MAC writes the old shifted source once at Execute"); ++m_writes; });
 		m_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x600, "dual_multiply_fetch", [this](offs_t, u16 &, u16) { if (!m_machine.side_effects_disabled()) { require(!m_fetches, "Dual MPY opcode is fetched once"); ++m_fetches; } });
 		m_replay = m_resume = false; m_tick = 0;
 		m_cpu.set_state_int(STATE_GENPC, f.base + 0x600); m_cpu.set_pipeline_frontend(true); m_cpu.resume(SUSPEND_REASON_DISABLE);
@@ -133,7 +108,6 @@ private:
 	running_machine &m_machine;
 	tms320c54x_device &m_cpu;
 	emu_timer &m_timer;
-	dual_multiply_mode m_mode;
 	dual_multiply_fixture m_input{};
 	unsigned m_ordinal = 0, m_raw = 0, m_tick = 0, m_restores = 0, m_reads = 0, m_fetches = 0, m_writes = 0;
 	bool m_replay = false, m_resume = false;

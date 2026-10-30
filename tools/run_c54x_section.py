@@ -361,6 +361,10 @@ def main():
     counts['dual_arithmetic'] = 45056
     counts['dual_admission'] = 64
     counts['dual_unsigned_mac'] = 51200
+    counts['dual_mac'] = 38912
+    counts['dual_mac_round'] = 38912
+    counts['dual_mas'] = 38912
+    counts['dual_mas_round'] = 38912
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

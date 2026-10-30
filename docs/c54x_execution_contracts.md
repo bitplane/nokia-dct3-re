@@ -562,8 +562,8 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_square.h` | Reviewed literal SQUR/SQURA/SQURS cases shared by generic and default-sequence entries |
 | `tests/c54x/tms320c54x_test_parallel.h` | Reviewed parallel store/arithmetic vectors, including same-cell ordering and circular pointer controls |
 | `tests/c54x/tms320c54x_test_dual_reference.h` | Ordered dual/parallel MAC literal references with explicit partial setup and status masks |
-| `tests/c54x/tms320c54x_test_dual.h` | Remaining signed/parallel MAC legacy reference, pending migration |
-| `tests/c54x/tms320c54x_test_dual_operand_section.h` | Explicit MPY/ADD/SUB/MACSU cases using common clocked execution and replay |
+| `tests/c54x/tms320c54x_test_dual.h` | Remaining parallel MAC legacy reference, pending migration |
+| `tests/c54x/tms320c54x_test_dual_operand_section.h` | Explicit MPY/ADD/SUB/MACSU/MAC-family cases using common clocked execution and replay |
 | `tests/c54x/tms320c54x_test_dual_input.h` | Shared fixture-owned integer inputs/expectations; no CPU implementation helpers or Nokia dependencies |
 | `tests/c54x/tms320c54x_test_memory_continuations.h` | Ordered literal continuations with inherited RAM, partial masks and coefficient/address ordering |
 | `tests/c54x/tms320c54x_test_shift_examples.h` | Ordered TS/Xmem shifts, signed comparisons, normalization and one-cycle rounding/saturation references |
@@ -1957,9 +1957,8 @@ reuses paired address capture and retained RAM reads. The accumulator
 remains Execute-owned, with FRCT, SMUL product handling, OVM and sticky
 destination overflow handled by the existing arithmetic helpers.
 
-The same-accumulator MAC contract belongs to operation/selector block zero
-of `mac-family`. The separate `mac-dual` profile was an exact descriptor/
-snapshot duplicate. Low-page admission is represented by the shared dual-read
+The same-accumulator MAC contract belongs to `dual_mac`, alongside its
+cross-accumulator inputs. Low-page admission is represented by the shared dual-read
 guard controls, not an additional MAC-specific rejection matrix.
 Operand/pointer/BK mutation after capture detects rereads or repeated updates;
 accumulator mutation before Execute checks feedback ownership. The complete
@@ -2687,7 +2686,7 @@ memory and T after Read, and require the two ordered reads at clock5 and result
 at clock6. MPY publishes T while ADD/SUB preserves it. The replacement uses
 fixture-owned integer expectations and the common replay runner, not the
 legacy variant decoder or custom snapshot/tap machinery. No handset acceptance
-is inferred from these focused runs. Signed/parallel MAC remain legacy owners
+is inferred from these focused runs. Parallel MAC remains a legacy owner
 pending migration; MACSU uses the same independent section builder
 as MPY/ADD/SUB. Its unsigned-X/signed-Y arithmetic and live feedback are checked
 directly, not inferred from the other operations.
@@ -4960,19 +4959,20 @@ and optional rounding by adding `0x8000` and clearing the low sixteen bits.
 The accumulator is sampled at Execute; SMUL product saturation precedes
 addition/subtraction, and rounding precedes destination overflow handling.
 
-The `mac-family` profile passes 671,744 cases and save-state replays,
-covering all 4,096 encodings, aliased/distinct pointers, circular and legacy
-BK=0 addressing, both program pages, all four source/destination pairs,
-eight accumulator seeds, 64 numerical operand pairs and status combinations.
-Its expected rounding uses signed floor division rather than the CPU's bit
-mask implementation. Address/operand mutation and snapshots around Access,
-Read and Execute verify retained operands and Execute-owned feedback.
-All 147,456 addressing cases remain: their snapshot cohorts also change
-status and accumulator seeds. The 524,288 numerical inputs retain every
-operand pair, feedback seed, flag combination, selector and page, but each
-now uses one of the original three checkpoints. Every fixed non-pair group
-splits its 64 pairs 21/21/22 between those checkpoints. The former complete
-value-by-checkpoint Cartesian product is intentionally retired.
+`dual_mac`, `dual_mac_round`, `dual_mas` and `dual_mas_round` each own
+38,912 cases/restores: 6,144 address cases and 32,768 numerical cases. Together
+they replace 671,744 executions with 155,648. Every encoding, source/destination
+pair, alias layout and linear/circular BK mode remains, but addressing no longer
+crosses all old page/checkpoint/status/seed cohorts. Those interactions are
+deliberately reduced to representative contexts, not claimed equivalent.
+Numerical cases retain all 64 operand pairs, eight feedback seeds, four
+source/destination pairs and every FRCT/OVM/SMUL/sticky-overflow combination.
+SXM is distributed rather than doubled because this instruction's operands
+are signed independently of SXM; both contexts remain. Pages/checkpoints are
+also distributed. Rounding uses signed floor division, not the CPU bit-mask
+implementation. Explicit memory/T/pointer/BK poisoning and feedback changes
+preserve Read ownership and Execute-live accumulation. The common clocked
+runner owns actual snapshot restores; the old profile and runner branch are gone.
 Low-page rejection uses the shared dual-read admission controls rather than
 a separate per-operation matrix. Physical memory-bank timing and interrupt/repeat
 composition remain unvalidated; this is not native handset acceptance.
@@ -5030,7 +5030,7 @@ The cached descriptor belongs to a complete live/replay pair; arithmetic
 expectations and all per-clock mutation/assertion points are unchanged.
 These banks use the independent CPU-only machine: root and CPU only, an empty
 ROM directory, program pages zero/two and data RAM. The shared staged fixture
-now hosts only signed/parallel MAC profiles. MPY/dual ALU/MACSU and the admission
+now hosts only parallel MAC. MPY/dual ALU/MACSU/signed MAC and the admission
 limits use independent sections with explicit setup and actual restore checks.
 
 ### Representative dual admission controls

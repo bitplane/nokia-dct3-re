@@ -5,13 +5,18 @@
 #include "c54x_section_common.h"
 #include <algorithm>
 namespace c54x_test {
-inline std::vector<clocked_register_case> dual_operand_cases(bool arithmetic,bool unsigned_mac=false)
+enum class dual_section_operation { multiply, arithmetic, unsigned_mac, mac, mac_round, mas, mas_round };
+inline std::vector<clocked_register_case> dual_operand_cases(dual_section_operation kind)
 {
+	bool const arithmetic=kind==dual_section_operation::arithmetic,unsigned_mac=kind==dual_section_operation::unsigned_mac;
+	unsigned const signed_mac=kind>=dual_section_operation::mac ? unsigned(kind)-unsigned(dual_section_operation::mac) : 4;
+	bool const signed_family=signed_mac<4,mac=unsigned_mac || signed_family;
 	std::vector<clocked_register_case> cases;
 	std::array<u16,8> const words{0,1,0xffff,0x8000,0x7fff,0x1234,0x5555,0xaaaa};
 	std::array<u64,8> const seeds{0,1,0xffffffffffULL,0x7fffffff,0xff80000000ULL,0x0180000000ULL,0xfe7fffffffULL,0x123456789aULL};
 	auto append=[&](unsigned op,unsigned x,unsigned y,unsigned layout,bool linear,unsigned destination,
-		unsigned flags,unsigned context,u32 base,u16 xword,u16 yword,u64 seed) {
+		unsigned flags,unsigned context,u32 base,u16 xword,u16 yword,u64 seed,unsigned relation) {
+		unsigned const source=destination^relation;
 		std::array<u16,4> initial_ar{},final_ar{};
 		for (unsigned i=0;i<4;++i) initial_ar[i]=layout==2 ? 0x1048+i : 0x100f+(layout ? 0 : 0x100*i);
 		u16 const xaddress=initial_ar[x&3],yaddress=initial_ar[y&3];
@@ -29,17 +34,22 @@ inline std::vector<clocked_register_case> dual_operand_cases(bool arithmetic,boo
 		s64 const left=s64(flags&8 ? s16(xword) : s32(xword))*65536;
 		s64 const right=s64(flags&8 ? s16(yword) : s32(yword))*65536;
 		s64 product=s64(unsigned_mac ? s32(xword) : s32(s16(xword)))*s16(yword)*(flags&1 ? 2 : 1);
-		if (unsigned_mac && (flags&7)==7) product=std::clamp(product,s64(-2147483648LL),s64(2147483647LL));
+		if (mac && (flags&7)==7) product=std::clamp(product,s64(-2147483648LL),s64(2147483647LL));
 		s64 const feedback=seed&0x8000000000ULL ? s64(seed)-(s64(1)<<40) : s64(seed);
-		s64 const number=unsigned_mac ? feedback+product : op ? (op==2 ? left-right : left+right) : product;
+		s64 number=mac ? feedback+(signed_family && (signed_mac&2) ? -product : product) : op ? (op==2 ? left-right : left+right) : product;
+		if (signed_family && (signed_mac&1)) {
+			s64 const biased=number+32768;
+			number=(biased>=0 ? biased/65536 : -((-biased+65535)/65536))*65536;
+		}
 		bool const overflow=number<-2147483648LL || number>2147483647LL;
 		u64 const result=u64(overflow && (flags&2) ? (number<0 ? -2147483648LL : 2147483647LL) : number)&0xffffffffffULL;
 		bool const carry=op==2 ? xword>=yword : u32(xword)+yword>65535;
 		u16 const final_st0=(op ? (st0&~0x800)|(carry ? 0x800 : 0) : st0)|(overflow ? destination ? 0x200 : 0x400 : 0);
-		u64 const before_a=unsigned_mac && !destination ? seed^0xffffffffffULL : 0x123456789aULL;
-		u64 const before_b=unsigned_mac && destination ? seed^0xffffffffffULL : 0xfeabcd9876ULL;
-		u64 const a=destination ? before_a : result,b=destination ? result : before_b;
-		u16 const opcode=(unsigned_mac ? 0xa600 : op ? op==2 ? 0xa200 : 0xa000 : 0xa400)|(destination<<8)|(x<<4)|y;
+		u64 const before_a=mac && !source ? seed^0xffffffffffULL : 0x123456789aULL;
+		u64 const before_b=mac && source ? seed^0xffffffffffULL : 0xfeabcd9876ULL;
+		u64 const a=destination ? mac && !source ? seed : before_a : result;
+		u64 const b=destination ? result : mac && source ? seed : before_b;
+		u16 const opcode=(signed_family ? 0xb000|(signed_mac<<10)|(source<<9) : unsigned_mac ? 0xa600 : op ? op==2 ? 0xa200 : 0xa000 : 0xa400)|(destination<<8)|(x<<4)|y;
 		auto initial=initial_case("dual-operands-address-capture-and-Execute-result",{opcode,0xf4e1});
 		for (auto &word : initial.program) word.address+=base;
 		initial.data={{xaddress,xword},{yaddress,yword}};
@@ -59,23 +69,30 @@ inline std::vector<clocked_register_case> dual_operand_cases(bool arithmetic,boo
 				{r::STATE_AR2,0x2200},{r::STATE_AR3,0x2201},{r::STATE_AR4,0x2202},{r::STATE_AR5,0x2203}})}},3+context,12};
 		c.actions={{4,{{r::STATE_AR2,0x2200},{r::STATE_AR3,0x2201},{r::STATE_AR4,0x2202},{r::STATE_AR5,0x2203},{r::STATE_BK,32}}},
 			{5,{{r::STATE_T,0xdead}},false,{},{},{{xaddress,0xdead},{yaddress,0xbeef}}}};
-		if (unsigned_mac) c.actions.back().values.push_back({destination ? r::STATE_B : r::STATE_A,seed});
+		if (mac) c.actions.back().values.push_back({source ? r::STATE_B : r::STATE_A,seed});
 		c.data_events=std::vector<clocked_data_event>{{false,xaddress,xword,5},{false,yaddress,yword,5}};
 		c.single_fetch=base+0x600;
 		cases.push_back(std::move(c));
 	};
 	for (unsigned op=arithmetic ? 1 : 0;op<(arithmetic ? 3U : 1U);++op) {
-		// All address cohorts remain: their flags vary with page/checkpoint context.
-		for (unsigned context=0;context<3;++context) for (unsigned page=0;page<2;++page)
+		for (unsigned relation=0;relation<(signed_family ? 2U : 1U);++relation) {
+		// MPY/ALU/MACSU retain status-varying cohorts; signed MAC distributes those contexts.
+		for (unsigned context=0;context<(signed_family ? 1U : 3U);++context) for (unsigned page=0;page<(signed_family ? 1U : 2U);++page)
 		for (unsigned linear=0;linear<2;++linear) for (unsigned layout=0;layout<3;++layout)
 		for (unsigned destination=0;destination<2;++destination) for (unsigned y=0;y<16;++y) for (unsigned x=0;x<16;++x) {
 			unsigned const flags=((y/4+4*destination+8*layout+24*linear+48*page+96*context)^(layout+3*linear+6*page+12*context))%32;
-			append(op,x,y,layout,linear,destination,flags,context,page ? 0x20000 : 0,words[y%8],words[(y/8+2*destination+4*layout+4*linear)%8],seeds[(layout+3*linear+6*page+12*context)%8]);
+			unsigned const point=signed_family ? (x+y+layout+destination+relation)%3 : context;
+			unsigned const bank=signed_family ? (x+y+layout+linear+destination+relation)%2 : page;
+			append(op,x,y,layout,linear,destination,flags,point,bank ? 0x20000 : 0,words[y%8],words[(y/8+2*destination+4*layout+4*linear)%8],seeds[(layout+3*linear+6*page+12*context)%8],relation);
 		}
-		for (unsigned flags=0;flags<32;++flags) for (unsigned destination=0;destination<2;++destination)
-		for (unsigned seed=0;seed<(unsigned_mac ? 8U : 1U);++seed)
-		for (u16 xword : words) for (u16 yword : words)
-			append(op,8,9,0,true,destination,flags,cases.size()%3,cases.size()%2 ? 0x20000 : 0,xword,yword,seeds[seed]);
+		for (unsigned flags=0;flags<(signed_family ? 16U : 32U);++flags) for (unsigned destination=0;destination<2;++destination)
+		for (unsigned seed=0;seed<(mac ? 8U : 1U);++seed)
+		for (u16 xword : words) for (u16 yword : words) {
+			// Signed MAC ignores SXM; preserve both contexts without duplicating its numeric domain.
+			unsigned const status=signed_family ? (flags&7)|((flags&8)<<1)|((xword+yword+seed+destination+relation)&1 ? 8 : 0) : flags;
+			append(op,8,9,0,true,destination,status,cases.size()%3,cases.size()%2 ? 0x20000 : 0,xword,yword,seeds[seed],relation);
+		}
+		}
 	}
 	return cases;
 }
