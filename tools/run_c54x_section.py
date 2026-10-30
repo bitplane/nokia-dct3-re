@@ -147,6 +147,7 @@ def main():
     counts['shifted_ar_conflict'] = 128
     counts['atomic_xorm'] = 256
     counts['scalar_boundaries'] = 34
+    counts['atomic_repeat_irq'] = 2
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

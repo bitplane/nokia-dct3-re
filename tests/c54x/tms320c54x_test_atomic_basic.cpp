@@ -11,7 +11,7 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 9107 || m_phase == 60 || m_phase == 68 || m_phase == 77)
+	if (m_phase == 9107 || m_phase == 68 || m_phase == 77)
 	{
 		switch (m_phase)
 		{
@@ -28,20 +28,6 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 				{cpu_regs::STATE_IDLE, 0},
 			});
 			return next_atomic_phase(42);
-		case 60:
-			program.write_word(0x04e0, 0xec03); // RPT #3
-			program.write_word(0x04e1, 0x0082); // ADD *AR2, A
-			program.write_word(0x04e2, 0xf5e1);
-			program.write_word(0x0048, 0x0083); // Observe A on ISR entry.
-			program.write_word(0x0049, 0xf49b);
-			m_repeat_reads = 0;
-			m_irq_accumulator = 0;
-			set_registers(*m_cpu, {
-				{cpu_regs::STATE_A, 0}, {cpu_regs::STATE_AR2, 0x0060}, {cpu_regs::STATE_AR3, 0x0061},
-				{cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_IMR, 4},
-				{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_PC, 0x04e0}, {cpu_regs::STATE_IDLE, 0},
-			});
-			return next_atomic_phase(61);
 		case 68:
 			program.write_word(0x0580, 0x0082);
 			program.write_word(0x0581, 0xf020); // LD #1234, A
@@ -614,22 +600,6 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 	}
 	if (m_phase == 61)
 	{
-		osd_printf_info("repeat IRQ: reads=%u isr_a=%llx a=%llx pc=%04x idle=%u\n",
-				m_repeat_reads, (unsigned long long)m_irq_accumulator,
-				(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
-				unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)),
-				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)));
-		expect_opcode(0xec03, m_repeat_reads == 4 && m_irq_accumulator == 4 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 4 &&
-				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-				"pending interrupt defers until the complete single-repeat body retires");
-		expect(m_last_operand_cycle - m_first_operand_cycle == 3,
-				"repeated ADD consumes one cycle per body iteration");
-		osd_printf_info("TMS320C54x interrupt boundary observation: "
-				"repeat_reads=%u body_cycles=%llu final_read_to_vector_read=%llu "
-				"pipeline_fidelity_claim=0\n", m_repeat_reads,
-				(unsigned long long)(m_last_operand_cycle - m_first_operand_cycle),
-				(unsigned long long)(m_irq_operand_cycle - m_last_operand_cycle));
 		m_cpu->set_input_line(2, CLEAR_LINE);
 		program.write_word(0x04f0, 0x0082); // Cycle marker before BD.
 		program.write_word(0x04f1, 0xf273);
@@ -652,51 +622,10 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
 				"BD takes two cycles and defers IRQ through both delay slots");
 		m_cpu->set_input_line(2, CLEAR_LINE);
-		program.write_word(0x0500, 0x7726); // STM #TSS, TCR
-		program.write_word(0x0501, 0x0010);
-		program.write_word(0x0502, 0xf070); // RPT #65535
-		program.write_word(0x0503, 0xffff);
-		program.write_word(0x0504, 0x0082);
-		program.write_word(0x0505, 0xf5e1);
-		m_repeat_reads = 0;
-		m_irq_trigger_read = 1;
-		m_irq_accumulator = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-		return resume_atomic_at(0x0500, 63);
-	}
-	if (m_phase == 63)
-	{
-		expect(m_repeat_reads > 0 && m_repeat_reads < 65536 &&
-				(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4),
-				"save checkpoint has active repeat and pending IRQ");
-		m_active_repeat.reads = m_repeat_reads;
-		expect(capture_snapshot(machine(), m_active_repeat.saved) == STATERR_NONE,
-				"write active-repeat save state");
-		m_phase = 64;
-		m_check_timer->adjust(attotime::from_msec(6));
 		return true;
 	}
-	if (m_phase == 64 || m_phase == 65)
+	if (m_phase == 65)
 	{
-		osd_printf_info("repeat state phase=%u reads=%u isr=%llu a=%llu pc=%04x\n", m_phase,
-				m_repeat_reads, (unsigned long long)m_irq_accumulator,
-				(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
-				unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
-		expect(m_repeat_reads == 65536 && m_irq_accumulator == 65536 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 65536 &&
-				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0506,
-				"active-repeat save replay completes identically and services pending IRQ");
-		if (m_phase == 64)
-		{
-			expect(restore_snapshot(machine(), *m_check_timer, m_active_repeat.saved) == STATERR_NONE,
-					"restore active-repeat save state");
-			m_repeat_reads = m_active_repeat.reads;
-			m_irq_accumulator = 0;
-			m_phase = 65;
-			m_check_timer->adjust(attotime::from_msec(6));
-			return true;
-		}
-		osd_printf_info("TMS320C54x active repeat restore: PASS iterations=65536 pending_irq=1 save_replay=1 live_and_replay=2 transport=0\n");
 		m_cpu->set_input_line(2, CLEAR_LINE);
 		program.write_word(0x0520, 0x0082);
 		program.write_word(0x0521, 0xf274); // CALLD 0540

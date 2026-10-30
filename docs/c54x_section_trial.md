@@ -184,6 +184,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `scalar_boundaries.h` | Retain34 literal NEG/load/ABS/saturation/shift/carry/rotate/XOR boundaries with independent explicit program, A/B, flags and memory. Preserve destination/sibling and documented flag masks; add exact memory Read/no writes, terminal PC/IDLE and replay. Remove inherited host-side continuations and artificial PORTW4 timing brackets around NEG; no timing claim. | Native34 cases/restores; build5.311s/run0.028s. Delete scalar-vector header, preparation/check/advance routing and ISA-bank inclusion. Terminal phase blocks that set up other unmigrated banks remain solely as their reference material, not as scalar tests. |
 
+| `atomic_repeat_irq.h` | Keep compact RPT#3 and long RPT#ffff ADD with a physically pulsed IRQ, exact operand count/order, one stack write, return PC/SP/RC/INTM and replay. IRQ acknowledgement requires all body reads to precede it. The maximum-count snapshot explicitly proves active RC and pending IFR; no host read-counter rewind. Deliberately retire the old3-cycle PORTW/test-port interval claim and fixed6ms replay delay, not the maximum count or deferral contract. | Native2 cases/restores, including65536 body iterations; build5.446s/run0.022s. Delete old repeat setups/assertions in phases60/61/62..65 and active-repeat snapshot fixture/member. Neighboring BD/CALLD setup/checks remain unmigrated reference material. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).

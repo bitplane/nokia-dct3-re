@@ -8,11 +8,6 @@
 
 namespace c54x_test {
 
-struct active_repeat_snapshot
-{
-	unsigned reads = 0;
-	std::stringstream saved;
-};
 
 // Capture is in the atomic-control sequence; replay is in the restore module.
 struct far_transfer_snapshot

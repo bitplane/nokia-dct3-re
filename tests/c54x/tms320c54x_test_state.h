@@ -1765,7 +1765,6 @@ private:
 	offset_logic_fixture m_offset_logic_fixture = {};
 	unsigned m_acc_branch_mapped_writes = 0;
 	u32 m_popd_write_mask = 0;
-	active_repeat_snapshot m_active_repeat;
 	far_transfer_snapshot m_far_transfer;
 	std::stringstream m_near_return_saved, m_xf_saved;
 	// Separate checkpoint lifetimes; host observations still rewind explicitly.
