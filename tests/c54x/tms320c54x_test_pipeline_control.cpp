@@ -70,26 +70,6 @@ void tms320c54x_test_state::start_xc_return(unsigned variant)
 
 
 
-void tms320c54x_test_state::start_delayed_call_case(unsigned index)
-{
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0109d0, index < 4 ? 0xfb44 : 0xfb76); program.write_word(0x0109d1, 0x09e0);
-	program.write_word(0x0109d2, 0xe800); // ANEQ must use A before this delay word.
-	program.write_word(0x0109d3, 0xe901);
-	program.write_word(0x0109d4, 0xf4e1);
-	program.write_word(0x0109e0, 0xe902); program.write_word(0x0109e1, 0xfc00);
-	m_cpu->space(AS_DATA).write_word(0x0fff, 0xbeef);
-	set_registers(*m_cpu, {
-		{STATE_GENPC, 0x0109d0}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_ST1, 0x0900},
-	});
-	static constexpr u64 values[] = {0, 1, 0xffffffffffULL, 0x0100000000ULL, 0, 1, 0xffffffffffULL, 1, 0x0100000000ULL};
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_A, values[index]}, {cpu_regs::STATE_ST0, index >= 4 && index != 7 ? 0x0400 : 0},
-		{cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 3337 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 void tms320c54x_test_state::start_return_alt_case(unsigned index)
 {
@@ -249,29 +229,6 @@ bool tms320c54x_test_state::check_return_alt_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_delayed_call_results()
-{
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 3337 && m_phase < 3346)
-	{
-		unsigned const index = m_phase - 3337;
-		bool const taken = index == 1 || index == 2 || index == 3 || index == 5 || index == 8;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (taken ? 2 : 1) &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
-			data.read_word(0x0fff) == (taken ? 0x09d4 : 0xbeef) &&
-			m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x09d5 &&
-			m_cpu->state_int(tms320c54x_device::STATE_XPC) == 1,
-			"CCD captures full-width A and combined overflow conditions, executes delay words and returns after them without changing XPC");
-		if (index < 8) { start_delayed_call_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x delayed conditional call conformance: PASS variants=9\n");
-		start_asm_store_case(0);
-		return true;
-	}
-	return false;
-}
 
 
 

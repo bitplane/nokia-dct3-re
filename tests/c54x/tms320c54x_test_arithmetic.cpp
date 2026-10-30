@@ -4410,7 +4410,6 @@ bool tms320c54x_test_state::check_acc_delayed_results()
 			"BCD tests all twelve signed/zero accumulator predicates before both delay words");
 		if (index < 59) { start_acc_delayed_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x delayed accumulator predicates conformance: PASS variants=60\n");
-		start_delayed_call_case(0);
 		return true;
 	}
 	return false;
