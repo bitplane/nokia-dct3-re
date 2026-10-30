@@ -57,6 +57,7 @@ struct clocked_data_event
 	std::vector<register_check> registers{}; // State visible inside the selected bus callback.
 	std::optional<unsigned> minimum_program_events{}; // Required prior program events, e.g. instruction extensions.
 	std::optional<std::array<u16,2>> value_range{}; // Inclusive bounds when the contract deliberately leaves the exact word open.
+	std::optional<int> value_register{}; // Relational bus contract, e.g. an interrupt frame contains RTN.
 };
 struct clocked_irq_expectation
 {

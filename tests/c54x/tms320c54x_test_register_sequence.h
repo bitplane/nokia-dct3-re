@@ -138,6 +138,8 @@ private:
 		if (!accept_data_event(events,cursor,actual)) return false;
 		{
 			auto const disable = m_machine.disable_side_effects();
+			if (events[index].value_register)
+				require(actual.value == u16(m_cpu.state_int(*events[index].value_register)), "bus word matches architectural register");
 			for (auto const &reg : events[index].registers)
 				if ((m_cpu.state_int(reg.index) & reg.mask) != (reg.value & reg.mask))
 					throw emu_fatalerror("C54x bus-state case=%u event=%u clock=%u register=%d actual=%llx expected=%llx",m_case,index,

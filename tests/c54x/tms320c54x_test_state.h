@@ -818,7 +818,6 @@ private:
 	bool shifted_unowned_fixture() const;
 	void start_shifted_peripheral(unsigned variant = 0);
 	void start_ldu_peripheral(unsigned variant = 0);
-	void start_mvmd_status_irq(unsigned variant = 0);
 	virtual void machine_start() override;
 
 	virtual void machine_reset() override;
@@ -1009,7 +1008,6 @@ private:
 	bool check_mcbsp_control_sequence_results();
 	bool check_staged_conditional_store_results();
 	bool check_ldu_peripheral_results();
-	bool check_status_write_interrupt_results();
 	bool check_shifted_peripheral_results();
 	bool check_mapped_dual_results();
 	bool check_repeat_mvdp_irq_results();

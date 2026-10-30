@@ -1962,7 +1962,20 @@ retained/poisoned extension words and unchanged status are checked through
 IDLE/replay. Pages and three checkpoint positions are distributed instead of
 producing 384 executions. These are model capture/publication contracts;
 active interrupt composition is not qualified. The old LDU setup/result phase
-and profile are removed; the remaining status-write owner has its own name.
+and profile are removed.
+
+### Full-status interrupt composition
+
+`status_write_interrupt` replaces both MVMD/STLM status IRQ profiles with
+192 independent cases/replays. It crosses old/requested INTM, IMR, IRQ/NMI,
+three arrivals and one/two-word followers. Pages/checkpoints are distributed
+rather than multiplied into 1,152 executions. Source Read5 and ST1 Write6
+remain exact; the foreground marker executes once, and accepted service owns
+one frame whose push/pop words equal RTN within the bounded continuation.
+Rejected IRQ remains pending. Memory-write INTM clearing is still an
+implementation-limit contract, not validated silicon behavior. Neither exact
+IACK latency nor exact marker timing is claimed. A masked pending input can
+wake successive IDLE instructions, so terminal IDLE is not required.
 
 ### Active repeat context and stack bypass
 

@@ -48,36 +48,6 @@ void tms320c54x_test_state::start_repeat_mvdp_irq(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_mvmd_status_irq(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const stlm = profile_is("stlm-st1-irq");
-	bool const two_word = variant >= 288;
-	bool const masked = variant & 2, enabled = variant & 4, nmi = variant & 8;
-	u32 const base = variant & 16 ? 0x20000 : 0, vector = base + (nmi ? 4 : 0x40);
-	u16 const status = masked ? 0x800 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	// A masked pending source may wake IDLE without being serviced. Keep
-	// the bounded continuation valid rather than running into erased words.
-	for (unsigned i = 0; i < 64; ++i) program.write_word(base + 0x600 + i, i >= 4 ? 0xf4e1 : 0xf495);
-	program.write_word(base + 0x600, 0x730b); program.write_word(base + 0x601, 7);
-	if (stlm) { program.write_word(base + 0x600, 0x8907); program.write_word(base + 0x601, 0xf495); }
-	program.write_word(base + 0x602, two_word ? 0x770e : 0x880e); program.write_word(base + 0x603, two_word ? 0x55 : 0xf495);
-	program.write_word(base + 0x604, 0xf4e1); program.write_word(base + 0x620, 0xf4e1);
-	program.write_word(vector, 0xf495); program.write_word(vector + 1, 0xf4eb);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x2000); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, variant & 1 ? 0x800 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, enabled ? 1 : 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x55); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234560000ULL | status); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_vector_acks = m_fast_stack_reads = m_pipeline_extensions_reads = 0; m_timer_probe_return_pc = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvmd_status_irq_reads",
-		[this, status](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 0xb) { expect(!m_pipeline_operand_reads && word == status && m_cpu->pipeline_cycles() == 5, "Status source read survives pending IRQ/NMI drain"); ++m_pipeline_operand_reads; } else { expect(at == 0xfff && !m_fast_stack_reads && m_vector_acks == 1 && word == m_timer_probe_return_pc, "RETE pops only the owned interrupt continuation"); ++m_fast_stack_reads; } });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvmd_status_irq_writes",
-		[this, status](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; if (at == 7) { expect(!m_pipeline_store_writes && word == status && m_cpu->pipeline_cycles() == 6, "Full status publishes once despite pending interrupts"); ++m_pipeline_store_writes; } else if (at == 0xe) { expect(!m_pipeline_register_writes && word == 0x55, "Foreground marker executes exactly once across interrupt return"); ++m_pipeline_register_writes; } else { expect(at == 0xfff && !m_pipeline_extensions_reads && m_vector_acks == 1 && word == m_timer_probe_return_pc, "IRQ/NMI stacks one owned continuation"); ++m_pipeline_extensions_reads; } });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253890;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 u16 tms320c54x_test_state::repeat_irq_r(offs_t offset)
 {
@@ -157,43 +127,6 @@ bool tms320c54x_test_state::check_idle_pll_results()
 
 
 
-bool tms320c54x_test_state::check_status_write_interrupt_results()
-{
-	if (m_phase == 253890)
-	{
-		bool const stlm = profile_is("stlm-st1-irq");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, arrival = std::array<unsigned, 3>{4, 6, 8}[(variant / 32) % 3], checkpoint = std::array<unsigned, 3>{5, 7, 12}[(variant % 288) / 96];
-		bool const old_masked = variant & 1, masked = variant & 2, enabled = variant & 4, nmi = variant & 8;
-		// The two-word follower has an incomplete Decode at clock five;
-		// the one-word follower permits selection before clock-six INTM.
-		bool const effective_masked = old_masked && masked;
-		bool const accepted = nmi || (enabled && !effective_masked);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Status/IRQ composition remains staged");
-		if (tick == arrival) m_cpu->set_input_line(nmi ? INPUT_LINE_NMI : 0, ASSERT_LINE);
-		if (tick == arrival + 1) m_cpu->set_input_line(nmi ? INPUT_LINE_NMI : 0, CLEAR_LINE);
-		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_vector_acks, m_fast_stack_reads, m_pipeline_extensions_reads, m_timer_probe_return_pc}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save status mask change and pending/accepted interrupt"); }
-		if (tick == 96)
-		{
-			if (m_vector_acks != unsigned(accepted) || m_pipeline_register_writes != 1 || m_fast_stack_reads != unsigned(accepted) || m_pipeline_extensions_reads != unsigned(accepted))
-				osd_printf_info("MVMD status IRQ mismatch: case=%u replay=%u accepted=%u source=%u status=%u marker=%u ack=%u stack_read=%u stack_write=%u pc=%06x sp=%04x st1=%04x ifr=%04x t=%04x return=%04x\n", variant, unsigned(m_pipeline_replay), unsigned(accepted), m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_vector_acks, m_fast_stack_reads, m_pipeline_extensions_reads, unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_T)), m_timer_probe_return_pc);
-			expect(m_pipeline_operand_reads == unsigned(!stlm) && m_pipeline_store_writes == 1 && m_pipeline_register_writes == 1 && m_vector_acks == unsigned(accepted) && m_fast_stack_reads == unsigned(accepted) && m_pipeline_extensions_reads == unsigned(accepted) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x55 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x55 && m_cpu->state_int(tms320c54x_device::STATE_B) == (0x1234560000ULL | (masked ? 0x800 : 0)), "Full status mask transitions preserve pending selection, one frame and the foreground continuation");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == (effective_masked && !accepted ? 0x800 : 0) && (m_cpu->state_int(tms320c54x_device::STATE_IFR) & 1) == unsigned(!nmi && !accepted), "Memory writes cannot set INTM; masked IRQ remains pending and RETE clears INTM after accepted service");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_vector_acks = m_recurring_irq_snapshot[3]; m_fast_stack_reads = m_recurring_irq_snapshot[4]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[5]; m_timer_probe_return_pc = m_recurring_irq_snapshot[6]; return restore_pipeline_at(253900, "Restore mask publication and IRQ/NMI without duplicate service"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 575) { start_mvmd_status_irq(variant + 1); return true; }
-			if (stlm)
-			{
-				osd_printf_info("TMS320C54x staged STLM ST1 IRQ: PASS cases=576 restore=576 sources=IRQ,NMI accumulator=B gap_nops=1 intm_requests=4 memory_cannot_set_intm=1 clear_policy=legacy_unverified imr_states=2 arrivals=4,6,8 pages=2 snapshots=3 followers=STLM,STM source_reads=0 status_writes=1 accepted_frame=1 masked_frame=0 foreground_once=1 rsbx_guard_inherited=0 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated STLM ST1 IRQ complete");
-			}
-			osd_printf_info("TMS320C54x staged MVMD status IRQ: PASS cases=576 restore=576 sources=IRQ,NMI intm_requests=4 memory_cannot_set_intm=1 clear_policy=legacy_unverified imr_states=2 arrivals=4,6,8 pages=2 snapshots=3 followers=STLM,STM source_reads=1 status_writes=1 accepted_frame=1 masked_frame=0 foreground_once=1 rsbx_guard_inherited=0 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated MVMD status IRQ complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253900) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253890; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_repeat_mvdp_irq_results()
 {
