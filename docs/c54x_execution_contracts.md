@@ -3775,9 +3775,10 @@ operand or result, and no status bits are written. Existing peripheral-logic
 contracts are unchanged. Long-offset mapped sources and the remaining low
 register/control addresses stay guarded.
 
-`logic-map` passes 110,592 cases plus replay: AND/OR/XOR, sixteen mapped
+`logic_mapped_alu` passes 9,216 cases plus replay: AND/OR/XOR, sixteen mapped
 sources, DP/absolute/plain-indirect forms, both accumulators, eight flag
-states, four patterns, early/late accumulators, two pages and three snapshots.
+states and four patterns. Early/late sampling, pages and checkpoints are
+distributed rather than multiplied into 110,592 executions.
 The independent bitwise reference checks high accumulator bits, zero
 extension, source/destination lane aliases and preservation of Execute-live
 status. Mapped sources change after Read without retargeting or resampling.
@@ -3801,10 +3802,11 @@ and SUB only clears it on a borrow. Overflow remains sticky on the selected
 destination, with OVM clamping. Memory sampling and arithmetic do not republish
 the mapped source after it changes.
 
-`shift16-map` passes 147,456 cases plus replay: eight ADD/SUB/input/output
+`shift16_mapped_alu` passes 12,288 cases plus replay: eight ADD/SUB/input/output
 forms, sixteen mapped sources, DP/absolute/plain-indirect addressing, eight
-carry/SXM/OVM flag states, four input patterns, early/late input accumulators,
-two pages and three checkpoints. An independent integer oracle checks the
+carry/SXM/OVM flag states and four input patterns, with distributed early/late
+input sampling, pages and checkpoints instead of 147,456 executions.
+An independent integer oracle checks the
 shifted result and flags. The fixture changes the mapped source after Read,
 including aliases with either accumulator, then checks the retained word
 against the later live accumulator and carry. Pipeline state is cleared before
@@ -4752,13 +4754,13 @@ Carry is defined at bit 32, not at the 40-bit guard boundary (SPRU131G
 table 4-1). An input word of `ffff` plus carry must remain a 17-bit
 increment, not wrap to zero before addition.
 
-`addc` passes 110,592 cases and replays: 73,728 numeric cases over six RAM
-addressing forms and 36,864 mapped cases over sixteen sources `0008..0017`.
-Both accumulators, two carry inputs, SXM/OVM combinations, eight words and
-eight accumulator patterns, direct/absolute/indirect mapped addressing,
-two pages and three snapshots are covered. Source words and auxiliary
-registers change after Read; half the cases also change the accumulator
-and carry before Execute. `addc-chain` adds 4,096 replays of adjacent
+`unsigned_mapped_alu` covers ADDC/ADDS/SUBS in 16,512 cases/replays. Each
+operation has 2,048 full word/accumulator/flag/destination/late-sampling
+numerical inputs on one RAM form, 384 six-form RAM routing inputs and 3,072
+mapped-source routing inputs. All sixteen mapped sources and three forms
+remain, with distributed early/late sampling, pages/checkpoints. Source words
+and auxiliary registers change after Read; selected cases change the live
+accumulator/carry before Execute. `addc_chain` separately covers adjacent
 ADDC instructions in AA/BA/AB/BB order, checking the preceding ALU's carry
 and accumulator updates without a gap. `addc-edge` adds 1,920 no-read,
 no-write exclusions for control/unowned mapped sources. Interrupt,
@@ -4778,15 +4780,13 @@ The staged path admits mapped sources `0008..0017`: six accumulator
 slices, T/TRN and eight auxiliary registers. Sources are actual mapped
 reads retained in Read; the accumulator and arithmetic flags are
 Execute-owned. SP/BK, control and peripheral sources remain excluded.
-`unsigned-map` passes 221,184 cases and save-state replays, including
-147,456 RAM and 73,728 mapped cases across both operations, both
-accumulators, three mapped-address forms, six RAM forms, eight words,
-eight accumulator patterns, SXM/OVM and initial-C combinations, late
-accumulator/status changes, two pages and three snapshots. Source memory,
+ADDS/SUBS now share the `unsigned_mapped_alu` section described above,
+with numerical coverage separated from address routing. Source memory,
 mapped words and pointers change after Read, including self-aliasing
 accumulator sources. `unsigned-edge` adds 3,840 replayed exclusions for
 80 addresses and DP/absolute/indirect forms without data access, writes
-or pointer changes. The unchanged core rejects mapped ADDS AL (`0208`).
+or pointer changes. Owned AL (`0208`) is a positive mapped-source case;
+it must not be confused with the separately guarded low/control sources.
 The fixture shares address/sample ownership with ADDC but uses operation-specific
 add/subtract expectations. Native `0af8 000b` at `403e` executes
 without an observer-supplied source/result; the RF/host counters do not

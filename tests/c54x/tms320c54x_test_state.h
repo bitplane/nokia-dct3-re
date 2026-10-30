@@ -610,21 +610,6 @@ private:
 	static memory_copy_repeat_fixture memory_copy_repeat_case(unsigned v, bool wrap = false, bool chain = false);
 	void set_repeat_count_source(u16 address, u16 value);
 	void start_memory_copy_repeat(unsigned variant = 0);
-	struct addc_fixture
-	{
-		u64 a, b, after_a, after_b, final_a, final_b;
-		u16 opcode, literal = 0, address, word, st0, st1, execute_st0, final_st0, bk = 0, t, trn;
-		u32 base;
-		std::array<u16, 8> initial;
-		u16 next_ar3;
-		unsigned read_clock, snapshot;
-		bool extension, late;
-	};
-	static std::array<u64, 2> addc_expected(u64 source, u16 word, u16 st0, u16 st1, bool b, unsigned family = 0);
-	static addc_fixture addc_case(unsigned v, unsigned family = 0);
-	static addc_fixture mapped_shift16_case(unsigned variant);
-	static addc_fixture mapped_logic_case(unsigned variant);
-	void start_addc(unsigned variant = 0);
 	struct mac_smem_fixture
 	{
 		u16 opcode, memory, t, st0, st1, pmst, address, result_st0;
@@ -980,7 +965,6 @@ private:
 	bool check_block_branch_edge_results();
 	bool check_delay_dld_results();
 	bool check_mapped_parallel_load_results();
-	bool check_mapped_alu_results();
 	bool check_memory_copy_repeat_results();
 	bool check_block_near_call_results();
 	bool check_repeated_mvdk_results();

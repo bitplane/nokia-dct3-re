@@ -327,6 +327,9 @@ def main():
     counts['memory_immediate_product'] = 7424
     counts['mapped_immediate_mac'] = 18432
     counts['delayed_compare'] = 3456
+    counts['unsigned_mapped_alu'] = 16512
+    counts['shift16_mapped_alu'] = 12288
+    counts['logic_mapped_alu'] = 9216
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

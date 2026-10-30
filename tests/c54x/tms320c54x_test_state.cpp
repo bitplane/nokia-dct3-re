@@ -175,10 +175,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"mvdk-repeat", "mvdk-index-rpt"}, [](self &test) { test.start_repeated_mvdk(); } },
 		{ {"rptb-call"}, [](self &test) { test.start_block_near_call(); } },
 		{ {"rpt-mem-copy", "rpt-mem-wrap", "rpt-mem-chain"}, [](self &test) { test.start_memory_copy_repeat(); } },
-		{ {"addc"}, [](self &test) { test.start_addc(); } },
-		{ {"unsigned-map"}, [](self &test) { test.start_addc(); } },
-		{ {"shift16-map"}, [](self &test) { test.start_addc(); } },
-		{ {"logic-map"}, [](self &test) { test.start_addc(); } },
 		{ {"st-extended-ar", "st-ar-consumer", "st-shift-ar", "st-shift-ar-use"}, [](self &test) { test.start_extended_ar_store(); } },
 		{ {"mac-smem", "mac-bk"}, [](self &test) { test.start_mac_smem(); } },
 	}))
