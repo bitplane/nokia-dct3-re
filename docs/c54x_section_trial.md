@@ -335,6 +335,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_coefficient_fir_literals.h` | Retain MACP, MACD, repeated MACP, FIRS and repeated FIRS fixed examples. Explicit A/B/T/pointers/source/coefficient arrays replace predecessor inheritance. Exact separate program/data transaction streams, MACD successor write versus MACP source preservation, repeated coefficient advancement, fixed numeric results/pointers/T and pre-operation replay. Drop port-marker timing; atomic semantic/access scope. | Native5 cases/restores, unchanged count; build5.474s/run0.016s. Delete655 setup,656..659 and660 assertions/preparations with owning route interval; following dual ADD/SUB setup remains reference material. Supersedes atomic_dual_arithmetic_literals' pending coefficient-MAC setup. |
 
+| `atomic_dual_add_sub_literals.h` | Retain four dual ADD/SUB A/B literals, modifying/stationary signed dual SUB with carry, and stationary/decrement ADDM signed16 saturation. Explicit X/Y operands, A/B/T/flags/SXM/OVM, pointers and neighbors replace inherited setup. Fixed40-bit outcomes, exact dual reads or read/write pair, pointer updates, source/neighbor preservation and pre-instruction replay. Drop port-marker timing; atomic semantic/access scope. | Native8 cases/restores, unchanged count; build5.430s/run0.017s. Delete660 setup,661..664/6522/6523/9223..9225 loops/assertions and owning routes. Supersedes atomic_coefficient_fir_literals' pending dual ADD/SUB setup. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
