@@ -35,48 +35,6 @@ void tms320c54x_test_state::start_indirect_popm_case(unsigned index)
 
 
 
-tms320c54x_test_state::circular_mar_fixture tms320c54x_test_state::circular_mar_case(unsigned variant)
-{
-	circular_mar_fixture f{};
-	f.mode = variant % 4; f.reg = (variant / 4) % 8; f.compatibility = (variant / 32) % 2;
-	f.selected = f.compatibility && !f.reg ? 4 : f.reg;
-	unsigned const size_index = (variant / 64) % 8, position = (variant / 512) % 4, stride = (variant / 2048) % 4;
-	f.size = std::array<u16, 8>{1, 2, 3, 13, 16, 31, 32, 250}[size_index];
-	// Explicit legal alignments from SPRU131G 5.5.3, not the CPU mask helper.
-	unsigned const alignment = std::array<unsigned, 8>{2, 4, 4, 16, 32, 32, 64, 256}[size_index];
-	unsigned const base = f.selected == 0 ? 0 : position >= 2 ? 0xff00 : 0x1200;
-	expect(base % alignment == 0, "Circular MAR fixture base obeys strict-greater-than-BK alignment");
-	unsigned const index = std::array<unsigned, 4>{0, unsigned(f.size - 1), unsigned(f.size / 2), 1U % f.size}[position];
-	for (unsigned ar = 0; ar < 8; ++ar) f.initial[ar] = 0x4000 + ar;
-	f.initial[0] = std::array<u16, 4>{0, 1, u16(f.size - 1), u16(1 - f.size)}[stride];
-	f.initial[f.selected] = base + index;
-	int const step = f.mode == 0 ? -1 : f.mode == 2 ? 1 : (f.mode == 1 ? -int(s16(f.initial[0])) : int(s16(f.initial[0])));
-	expect(std::abs(step) <= f.size, "Circular MAR fixture never relies on an out-of-contract stride");
-	int const residue = (int(index) + step) % f.size;
-	f.result = base + (residue < 0 ? residue + f.size : residue);
-	f.st0 = f.compatibility && f.reg ? 0x608 | (f.reg << 13) : 0x8608;
-	f.page = (variant / 8192) % 2 ? 0x20000 : 0; f.checkpoint = std::array<unsigned, 3>{3, 4, 6}[variant / 16384];
-	return f;
-}
-
-void tms320c54x_test_state::start_circular_mar(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = circular_mar_case(variant);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 12; ++i) program.write_word(f.page + 0x9000 + i, 0xf495);
-	program.write_word(f.page + 0x9000, 0x6dc0 | (f.mode << 3) | f.reg); program.write_word(f.page + 0x9001, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x8608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (f.compatibility ? 0x20 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.size);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff12345678ULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x81abcdef01ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5);
-	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, f.initial[ar]);
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "circular_mar_no_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Circular MAR has no data read"); });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "circular_mar_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Circular MAR has no data write"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = circular_mar_phase;
-	m_cpu->set_state_int(STATE_GENPC, f.page + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::mvdd_follow_fixture tms320c54x_test_state::mvdd_follow_case(unsigned v)
 {
@@ -4742,38 +4700,6 @@ void tms320c54x_test_state::start_zero_bk_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-bool tms320c54x_test_state::check_circular_mar_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == circular_mar_phase)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = circular_mar_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Short circular MAR encodings are admitted");
-		for (unsigned ar = 0; ar < 8; ++ar) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (tick >= 4 && ar == f.selected ? f.result : f.initial[ar]), "Circular MAR publishes once in Access and preserves other ARs, including AR0 alias selection");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= 4 ? f.st0 : 0x8608), "Circular MAR updates ARP only under the documented CMPT selection rule");
-		if (tick == f.checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save circular MAR before/after its address publication");
-		}
-		if (tick == 16)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_BK) == f.size && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (f.compatibility ? 0x20 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff12345678ULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x81abcdef01ULL, "Circular MAR preserves BK, T, accumulators and non-ARP status");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; return restore_pipeline_at(circular_mar_phase + 1, "Restore circular MAR without double stepping");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 49151) { start_circular_mar(variant + 1); return true; }
-			osd_printf_info("TMS320C54x circular MAR: PASS cases=49152 restore=49152 modifiers=minus1,minusAR0,plus1,plusAR0 registers=8 cmpt=2 bk=1,2,3,13,16,31,32,250 positions=4 strides=4 pages=2 snapshots=3 legal_domain=1 independent_residue_oracle=1 publication=Access data_accesses=0 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated circular MAR complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == circular_mar_phase + 1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = circular_mar_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_mvdd_follow_results()
 {

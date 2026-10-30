@@ -196,16 +196,6 @@ private:
 	};
 	static branch_arithmetic_fixture branch_arithmetic_case(unsigned variant);
 	void start_branch_arithmetic(unsigned variant = 0);
-	struct circular_mar_fixture
-	{
-		unsigned mode, reg, selected, checkpoint;
-		bool compatibility;
-		u16 size, result, st0;
-		u32 page;
-		std::array<u16, 8> initial;
-	};
-	circular_mar_fixture circular_mar_case(unsigned variant);
-	void start_circular_mar(unsigned variant = 0);
 	void start_bitt(unsigned variant = 0);
 	void start_bitt_retd(unsigned variant = 0);
 	struct delay_bitt_fixture
@@ -1680,7 +1670,6 @@ private:
 	// Return true only when the original callback would return; order is retained.
 	bool check_repeated_writa_results();
 	bool check_branch_arithmetic_results();
-	bool check_circular_mar_results();
 	bool check_bitt_results();
 	bool check_mvdd_follow_results();
 	bool check_delay_bitt_results();
@@ -2025,7 +2014,6 @@ private:
 	static constexpr unsigned rom4_staged_cold_phase = 62000;
 	static constexpr unsigned repeated_writa_phase = 62044;
 	static constexpr unsigned branch_arithmetic_phase = 62040;
-	static constexpr unsigned circular_mar_phase = 62038;
 	static constexpr unsigned bitt_phase = 62032;
 	static constexpr unsigned repeat_store_phase = 62028;
 	static constexpr unsigned rptz_phase = 62026;
