@@ -343,6 +343,8 @@ def main():
     counts['accumulator_shifts'] = 3840
     counts['negate'] = 400
     counts['absolute'] = 400
+    counts['saturation_pair'] = 512
+    counts['rotate_pair'] = 768
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

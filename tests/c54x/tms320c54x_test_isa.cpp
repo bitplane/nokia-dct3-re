@@ -12,7 +12,6 @@
 #include "tms320c54x_test_register_sequence.h"
 #include "tms320c54x_test_address_mode.h"
 #include "tms320c54x_test_stack_sequence.h"
-#include "tms320c54x_test_register_pairs.h"
 #include "tms320c54x_test_register_alu.h"
 #include "tms320c54x_test_composition_limits.h"
 #include <cstring>
@@ -29,14 +28,13 @@ public:
 		m_domain = !std::strcmp(config.options().bios(), "source-domain");
 		m_dual_mode = c54x_test::dual_multiply_mode::select(config.options().bios());
 		m_normalization_kind = c54x_test::select_normalization(config.options().bios());
-		m_register_pair_kind = c54x_test::select_register_pair(config.options().bios());
 		m_register_alu_kind = c54x_test::select_register_alu(config.options().bios());
 		m_long_t_store_kind = c54x_test::select_long_t_store(config.options().bios());
 		m_address_modes = !std::strcmp(config.options().bios(), "mode-latency");
 		m_stack_sequences = !std::strcmp(config.options().bios(), "stack-sp");
 		m_composition_limit = c54x_test::select_composition_limit(config.options().bios());
 		m_extended_program = m_long_t_store_kind != c54x_test::long_t_store_kind::none || !std::strcmp(config.options().bios(), "isa-disasm") || m_domain || bool(m_dual_mode) ||
-			m_normalization_kind != c54x_test::normalization_kind::none || m_register_pair_kind != c54x_test::register_pair_kind::none || m_register_alu_kind != c54x_test::register_alu_kind::none || m_composition_limit != c54x_test::composition_limit::none;
+			m_normalization_kind != c54x_test::normalization_kind::none || m_register_alu_kind != c54x_test::register_alu_kind::none || m_composition_limit != c54x_test::composition_limit::none;
 		TMS320C54X(config, m_cpu, 13'000'000);
 		m_cpu->set_extended_program(m_extended_program);
 		m_cpu->set_addrmap(AS_PROGRAM, &c54x_isa_test_state::program_map);
@@ -61,10 +59,10 @@ protected:
 			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 				c54x_test::long_t_store_count(m_long_t_store_kind),
 				[this](unsigned key) { return c54x_test::long_t_store_sequence<tms320c54x_device>(key, m_long_t_store_kind); });
-		else if (m_register_pair_kind != c54x_test::register_pair_kind::none || m_register_alu_kind != c54x_test::register_alu_kind::none)
+		else if (m_register_alu_kind != c54x_test::register_alu_kind::none)
 			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
-				m_register_pair_kind != c54x_test::register_pair_kind::none ? c54x_test::register_pair_count(m_register_pair_kind) : c54x_test::register_alu_count(m_register_alu_kind),
-				[this](unsigned key) { return m_register_pair_kind != c54x_test::register_pair_kind::none ? c54x_test::register_pair_case<tms320c54x_device>(key, m_register_pair_kind) : c54x_test::register_alu_case<tms320c54x_device>(key, m_register_alu_kind); });
+				c54x_test::register_alu_count(m_register_alu_kind),
+				[this](unsigned key) { return c54x_test::register_alu_case<tms320c54x_device>(key, m_register_alu_kind); });
 		else if (m_normalization_kind != c54x_test::normalization_kind::none)
 			m_normalization = std::make_unique<c54x_test::exponent_normalization_fixture>(machine(), *m_cpu, *m_timer, m_normalization_kind);
 		else if (m_dual_mode) m_dual = std::make_unique<c54x_test::dual_multiply_fixture_runner>(machine(), *m_cpu, *m_timer, m_dual_mode);
@@ -149,13 +147,7 @@ private:
 			osd_printf_info("TMS320C54x staged accumulator SQUR: PASS cases=%u restore=%u destinations=2 a_patterns=16 b_patterns=2 flags=8 pages=2 snapshots=4 operand_bits=17 operand=Execute t_unchanged=1 sticky_overflow=1 data_accesses=0 producer_composition=unvalidated silicon_phase_claim=0 coverage_fnv64=%016llx\n", m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
 			throw emu_fatalerror(3, "TMS320C54x isolated accumulator SQUR complete");
 		}
-		if (m_register_pair_kind == c54x_test::register_pair_kind::saturation)
-		{
-			osd_printf_info("TMS320C54x staged SAT: PASS cases=%u restore=%u patterns=16 accumulators=2 initial_overflow=4 sxm_ovm=4 pages=2 snapshots=3 adjacent=2 silicon_phase_claim=0 coverage_fnv64=%016llx\n", m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
-			throw emu_fatalerror(3, "TMS320C54x isolated staged SAT complete");
-		}
-		osd_printf_info("TMS320C54x staged rotates: PASS cases=%u restore=%u forms=ROR_A,ROR_B,ROL_A,ROL_B,ROLTC_A,ROLTC_B patterns=8 c_tc=4 sxm_ovm=4 pages=2 snapshots=3 adjacent=2 guard_clear=1 status_preserved=1 silicon_phase_claim=0 coverage_fnv64=%016llx\n", m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
-		throw emu_fatalerror(3, "TMS320C54x isolated staged rotates complete");
+		throw emu_fatalerror("Legacy register-pair result retired: run saturation_pair or rotate_pair");
 	}
 	[[noreturn]] void normalization_result() const
 	{
@@ -323,7 +315,6 @@ private:
 	bool m_extended_program = false;
 	c54x_test::dual_multiply_mode m_dual_mode;
 	c54x_test::normalization_kind m_normalization_kind = c54x_test::normalization_kind::none;
-	c54x_test::register_pair_kind m_register_pair_kind = c54x_test::register_pair_kind::none;
 	c54x_test::register_alu_kind m_register_alu_kind = c54x_test::register_alu_kind::none;
 	c54x_test::long_t_store_kind m_long_t_store_kind = c54x_test::long_t_store_kind::none;
 	bool m_address_modes = false;
@@ -356,8 +347,6 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(18, "norm-edge", "Recovered negative normalization-count aliases")
 	ROM_SYSTEM_BIOS(19, "exp-norm", "EXP producer and normalization T latency")
 	ROM_SYSTEM_BIOS(20, "exp-t", "Staged exponent publication and T consumer latency")
-	ROM_SYSTEM_BIOS(21, "sat", "Staged signed saturation and overflow publication")
-	ROM_SYSTEM_BIOS(22, "rotate", "Staged accumulator rotates and carry forwarding")
 	ROM_SYSTEM_BIOS(23, "minmax", "Signed accumulator MAX MIN Execute ownership and replay")
 	ROM_SYSTEM_BIOS(24, "squr", "Accumulator square with signed 17-bit operand")
 	ROM_SYSTEM_BIOS(29, "isa-words", "Atomic instruction-word arithmetic and addressing examples")

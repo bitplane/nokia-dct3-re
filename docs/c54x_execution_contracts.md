@@ -5073,24 +5073,27 @@ unvalidated.
 
 SAT A/B is admitted as a register-only Execute operation. TI SPRU172C,
 page 4-154, specifies signed 32-bit saturation independently of OVM and
-replacement of the selected accumulator's overflow flag. The CPU-only `sat`
-profile verifies 3,072 cases and save-state replays: 16 signed 40-bit
+replacement of the selected accumulator's overflow flag. `saturation_pair`
+verifies 512 cases and save-state replays: 16 signed 40-bit
 patterns around both clamp boundaries, both accumulators, all initial
-overflow-bit combinations, SXM/OVM combinations, two program pages and
-three snapshots around adjacent Execute publications. A second adjacent
+overflow-bit combinations and SXM/OVM combinations. Pages and three
+snapshots are distributed around adjacent Execute publications. A second adjacent
 SAT clears the overflow from a preceding clamp. The other accumulator,
 unrelated status bits and modes remain unchanged. This qualifies the
 declared staged schedule, not measured silicon pipeline phases;
 single-instruction repeat remains rejected by the existing repeat guard.
 
-`rotate` retains 4,608 cases/restores: ROR/ROL/ROLTC on A/B, eight values,
-all four C/TC combinations, all four SXM/OVM modes, both program pages and
-checkpoints 5/6/7. Two consecutive ROR/ROL instructions forward carry;
+`rotate_pair` retains 768 cases/restores: ROR/ROL/ROLTC on A/B, eight values,
+all four C/TC combinations and all four SXM/OVM modes, with distributed pages
+and checkpoints 5/6/7. Two consecutive ROR/ROL instructions forward carry;
 ROLTC instead continues to use TC. The result clears guards and preserves
 the other accumulator and unrelated full status. These are staged pair
 interactions, not duplicates of the atomic single-instruction examples.
 
-Both banks retain every original input and checkpoint. Their case data
+Together these retire 6,400 duplicated page/checkpoint executions. Six
+independent literal examples are native expected results, not a layout-only
+host census. Legacy factories/profile plumbing and that census are removed.
+Their case data
 explicitly specifies the program/setup and register observations at ticks
 0/6/7; the reusable runner observes each CPU clock, restores at the declared
 checkpoint and requires real IDLE at tick 16. It neither computes results
