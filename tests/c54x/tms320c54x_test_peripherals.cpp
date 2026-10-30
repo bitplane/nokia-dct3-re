@@ -770,41 +770,7 @@ void tms320c54x_test_state::start_staged_bus_stm(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::mvkd_peripheral_fixture tms320c54x_test_state::mvkd_peripheral_case(unsigned variant)
-{
-	unsigned const form = variant % 3, read = form == 2 ? 7 : 6;
-	return {std::array<u16, 3>{0x3b, 0x48, 0x49}[(variant / 3) % 3],
-		std::array<u16, 3>{0x10, 0x19, 0x1400}[(variant / 36) % 3],
-		std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 9) % 4],
-		u32((variant / 108) % 2 ? 0x20000 : 0), form, read, read + 2,
-		std::array<unsigned, 3>{read - 1, read, read + 2}[variant / 216]};
-}
 
-void tms320c54x_test_state::start_mvkd_peripheral(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = mvkd_peripheral_case(variant);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, f.form == 2 ? 0x70f8 : f.form ? 0x7092 : 0x7082);
-	program.write_word(f.base + 0x601, f.form == 2 ? f.destination : f.source);
-	if (f.form == 2) program.write_word(f.base + 0x602, f.source);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, f.destination);
-	data.write_word(f.source, f.value); data.write_word(f.destination, 0xaaaa);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvkd_peripheral_source",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == f.source && word == f.value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read, "MVKD samples one source before its peripheral wait"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvkd_peripheral_destination",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == f.destination && word == f.value && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == f.write, "MVKD pays one peripheral clock before publishing its retained source once"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + (f.form == 2 ? 0x602 : 0x601), "mvkd_peripheral_literals",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const part = m_pipeline_extensions_reads++; expect(part < (f.form == 2 ? 2 : 1) && at == f.base + 0x601 + part && word == (f.form == 2 && !part ? f.destination : f.source), "MVKD captures its source/address extensions once in order"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253750;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -1833,34 +1799,6 @@ bool tms320c54x_test_state::check_circular_portr_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 62141) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62140; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 253750)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		auto const f = mvkd_peripheral_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "MVKD peripheral transaction remains admitted");
-		if (tick == f.read)
-		{
-			expect(m_pipeline_operand_reads == 1 && !m_pipeline_store_writes, "Source capture precedes peripheral publication");
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, 0xdead);
-			m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xbeef);
-			if (f.form == 2) m_cpu->space(AS_PROGRAM).write_word(f.base + 0x602, 0xbeef);
-		}
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads},
-			"Save MVKD before Read, before peripheral wait or after publication");
-		if (tick == 14)
-		{
-			{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(f.destination) == f.value && m_cpu->space(AS_DATA).read_word(f.source) == 0xdead, "MVKD retains its source across the peripheral wait"); }
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == (f.form == 2 ? 2 : 1) && m_cpu->state_int(tms320c54x_device::STATE_AR2) == f.destination + unsigned(f.form == 1) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL, "MVKD peripheral replay preserves status/accumulators and modifies its pointer once");
-			if (replay_pipeline_at(253760, f.checkpoint,
-				"Replay MVKD without duplicating its peripheral wait or write")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 647) { start_mvkd_peripheral(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged peripheral MVKD: PASS cases=648 restore=648 sources=AR,BK,RAM forms=indirect,postincrement,absolute destinations=3b,48,49 pages=2 reads=1 writes=1 peripheral_extra_clock=1 pointer_updates=once bk_producer_latency=unvalidated silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated peripheral MVKD complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253760) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253750; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 

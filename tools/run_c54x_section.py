@@ -319,6 +319,7 @@ def main():
     counts['status_write_interrupt'] = 192
     counts['unsigned_peripheral_load'] = 1536
     counts['t_peripheral_store'] = 144
+    counts['mvkd_peripheral_store'] = 108
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

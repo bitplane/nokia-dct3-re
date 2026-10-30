@@ -693,14 +693,6 @@ private:
 	static std::array<u64,3> register_product_reference(register_product_fixture const &f);
 	void start_register_product(unsigned variant = 0);
 	void start_mac_smem(unsigned variant = 0);
-	struct mvkd_peripheral_fixture
-	{
-		u16 destination, source, value;
-		u32 base;
-		unsigned form, read, write, checkpoint;
-	};
-	static mvkd_peripheral_fixture mvkd_peripheral_case(unsigned variant);
-	void start_mvkd_peripheral(unsigned variant = 0);
 	using fcala_delay_fixture = c54x_test::fcala_delay_fixture;
 	static fcala_delay_fixture fcala_delay_case(unsigned v);
 	void start_fcala_delay(unsigned variant = 0);

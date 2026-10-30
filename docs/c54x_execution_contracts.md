@@ -1964,6 +1964,17 @@ producing 384 executions. These are model capture/publication contracts;
 active interrupt composition is not qualified. The old LDU setup/result phase
 and profile are removed.
 
+### MVKD peripheral store
+
+`mvkd_peripheral_store` covers 108 source/form/destination/value cases and
+replays. AR0, BK and RAM sources feed destinations 003b/0048/0049 through
+indirect, postincrement and absolute addressing. Exact Read6 (absolute7)
+precedes Write by two clocks. Poisoned source/extensions cannot change the
+captured publication; flags/accumulators and one pointer update are retained.
+Pages/checkpoints are distributed instead of multiplying to 648 executions.
+The legacy factory/setup/result phase/profile are removed. BK source-producer
+latency and physical peripheral timing remain unvalidated.
+
 ### T/TRN peripheral store
 
 `t_peripheral_store` owns 144 instruction-driven T/TRN store cases/replays:
