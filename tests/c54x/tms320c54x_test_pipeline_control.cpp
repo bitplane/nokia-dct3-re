@@ -106,21 +106,6 @@ void tms320c54x_test_state::start_return_alt_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_carry_branch_case(unsigned index)
-{
-	auto &program = m_cpu->space(AS_PROGRAM);
-	unsigned cursor = 0x0109a0;
-	program.write_word(cursor++, 0xf808 | ((index & 2) ? 4 : 0) | ((index & 4) ? 0x200 : 0));
-	program.write_word(cursor++, 0x09b0);
-	if (index & 4) { program.write_word(cursor++, 0xf495); program.write_word(cursor++, 0xf495); }
-	program.write_word(cursor++, 0xf020); program.write_word(cursor++, 0x1111); program.write_word(cursor, 0xf4e1);
-	program.write_word(0x0109b0, 0xf020); program.write_word(0x0109b1, 0x2222); program.write_word(0x0109b2, 0xf4e1);
-	set_registers(*m_cpu, {
-		{STATE_GENPC, 0x0109a0}, {cpu_regs::STATE_ST0, 0x02a5 | ((index & 1) ? 0x800 : 0)}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 1620 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 void tms320c54x_test_state::start_far_case(unsigned index)
 {
@@ -217,32 +202,6 @@ tms320c54x_test_state::conditional_register_fixture tms320c54x_test_state::condi
 
 
 
-bool tms320c54x_test_state::check_carry_branch_results()
-{
-	if (m_phase == 1619)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0xc800 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x4800 &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-			"RPTB publishes bit-15 BRAF while preserving independent bit-14 CPL on retirement");
-		osd_printf_info("TMS320C54x BRAF/CPL independence: PASS\n");
-		start_carry_branch_case(0);
-		return true;
-	}
-	if (m_phase >= 1620 && m_phase < 1628)
-	{
-		unsigned const index = m_phase - 1620;
-		bool const taken = bool(index & 1) == bool(index & 2);
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (taken ? 0x2222 : 0x1111) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0x02a5 | ((index & 1) ? 0x800 : 0)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE), "BC/BCD C/NC uses carry and preserves status");
-		if (index < 7) { start_carry_branch_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x carry branch conformance: PASS variants=8\n");
-		start_cmpm_offset_case(0);
-		return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_return_alt_results()
 {

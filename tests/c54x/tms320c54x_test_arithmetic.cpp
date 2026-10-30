@@ -4320,14 +4320,6 @@ bool tms320c54x_test_state::check_cmpr_results()
 			"CMPR conditions are unsigned, cover every AR and modify only TC");
 		if (index < 191) { start_cmpr_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x CMPR conformance: PASS variants=192\n");
-		program.write_word(0x010990, 0x771a); program.write_word(0x010991, 1);
-		program.write_word(0x010992, 0xf072); program.write_word(0x010993, 0x0995);
-		program.write_word(0x010994, 0xf495); program.write_word(0x010995, 0x4907);
-		program.write_word(0x010996, 0xf4e1);
-		m_cpu->set_state_int(STATE_GENPC, 0x010990);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4800);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		m_phase = 1619;
 		m_check_timer->adjust(attotime::from_usec(100));
 		return true;
 	}

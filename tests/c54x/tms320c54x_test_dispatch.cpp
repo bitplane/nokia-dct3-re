@@ -37,7 +37,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_bit_results()) return;
 	if (check_banz_offset_results()) return;
 	if (check_cmpr_results()) return;
-	if (check_carry_branch_results()) return;
 	if (check_cmpm_offset_results()) return;
 	if (check_compact_load_results()) return;
 	if (check_return_alt_results()) return;
