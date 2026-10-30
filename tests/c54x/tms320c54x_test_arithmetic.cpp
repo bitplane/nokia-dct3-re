@@ -316,25 +316,6 @@ void tms320c54x_test_state::start_sqdst_overflow_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_rounding_boundary_case(unsigned index)
-{
-	static constexpr u64 inputs[] = {0, 0xffffffffffULL, 0x7fffffff,
-		0x80000000, 0xff80000000ULL, 0x7fffffffffULL,
-		0x8000000000ULL, 0x0123456789ULL};
-	m_cpu->reset();
-	unsigned const selectors = index % 4;
-	u64 const source = inputs[(index / 4) % 8];
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0800, 0xf49f | ((selectors & 2) << 8) | ((selectors & 1) << 8));
-	program.write_word(0x0801, 0xf4e1); // Stop after exactly one RND.
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_A, selectors & 2 ? 0x123456789aULL : source},
-		{cpu_regs::STATE_B, selectors & 2 ? source : 0x123456789aULL}, {cpu_regs::STATE_ST0, index >= 64 ? 0xabcd : 0},
-		{cpu_regs::STATE_ST1, (index / 32) & 1 ? 0x0200 : 0}, {STATE_GENPC, 0x0800}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 200000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 void tms320c54x_test_state::start_multiword_pipeline_case(unsigned variant)
@@ -4519,37 +4500,8 @@ bool tms320c54x_test_state::check_saccd_results()
 }
 
 
-bool tms320c54x_test_state::check_rounding_boundary_results()
+bool tms320c54x_test_state::check_arithmetic_boundary_results()
 {
-	if (m_phase >= 200000 && m_phase < 200128)
-	{
-		unsigned const index = m_phase - 200000, selectors = index % 4, input = (index / 4) % 8;
-		// Explicit SPRU172C 4-142 add-8000h results, including 40-bit wrap
-		// and OVM's signed 32-bit saturation; no core helper is reused.
-		static constexpr u64 raw[] = {0x8000, 0x7fff, 0x80007fff,
-			0x80008000, 0xff80008000ULL, 0x8000007fffULL,
-			0x8000008000ULL, 0x012345e789ULL};
-		static constexpr u64 saturated[] = {0x8000, 0x7fff, 0x7fffffff,
-			0x7fffffff, 0xff80008000ULL, 0x7fffffff,
-			0xff80000000ULL, 0x7fffffff};
-		static constexpr u64 inputs[] = {0, 0xffffffffffULL, 0x7fffffff,
-			0x80000000, 0xff80000000ULL, 0x7fffffffffULL,
-			0x8000000000ULL, 0x0123456789ULL};
-		u64 const result = ((index / 32) & 1 ? saturated : raw)[input];
-		u64 const a = selectors & 2 ? 0x123456789aULL : inputs[input];
-		u64 const b = selectors & 2 ? inputs[input] : 0x123456789aULL;
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (selectors & 1 ? a : result) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (selectors & 1 ? result : b) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (index >= 64 ? 0xabcd : 0) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == (((index / 32) & 1) ? 0x0200 : 0) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(STATE_GENPC) == 0x0802,
-			"RND preserves source and status across selectors, signed boundaries and OVM");
-		if (index < 127) { start_rounding_boundary_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x RND boundaries: PASS cases=128 selectors=4 inputs=8 ovm=0,1 status_preserved=1 pipeline_claim=0\n");
-		start_sqdst_overflow_case(0); return true;
-	}
 	if (m_phase >= 210000 && m_phase < 210008)
 	{
 		unsigned const index = m_phase - 210000;

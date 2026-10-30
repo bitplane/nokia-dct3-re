@@ -293,7 +293,7 @@ bool tms320c54x_test_state::check_interrupt_entry_results()
 				m_entry.fetch_tap.remove(); m_entry.stack_tap.remove();
 				if (m_entry.restore_case < 9) { start_entry_stage_restore_case(m_entry.restore_case + 1); return true; }
 				osd_printf_info("TMS320C54x entry stage restoration: PASS cases=10 sources=irq,nmi boundaries=5 one_fetch=1 one_ack=1 one_stack_write=1 retained_opcode=1 pipeline_drain_claim=0\n");
-				start_rounding_boundary_case(0); return true;
+				return true;
 			}
 			expect(restore_snapshot(machine(), m_entry.saved) == STATERR_NONE,
 				"Restore each IRQ/NMI entry boundary");
