@@ -14,22 +14,21 @@ namespace c54x_test {
 
 struct dual_multiply_mode
 {
-	enum class operation { none, unsigned_mac, mac, parallel_mac };
+	enum class operation { none, mac, parallel_mac };
 	operation op = operation::none;
 	explicit operator bool() const { return op != operation::none; }
 	bool parallel() const { return op == operation::parallel_mac; }
-	bool family() const { return op == operation::mac || parallel(); }
 	unsigned count() const
 	{
-		return family() ? dual_mac_schedule::cases : dual_macsu_schedule::cases;
+		return dual_mac_schedule::cases;
 	}
 	unsigned key(unsigned ordinal) const
 	{
-		return family() ? dual_mac_schedule::key(ordinal) : dual_macsu_schedule::key(ordinal);
+		return dual_mac_schedule::key(ordinal);
 	}
 	static dual_multiply_mode select(std::string_view name)
 	{
-		operation const op = name == "macsu-dual" ? operation::unsigned_mac : name == "mac-family" ? operation::mac :
+		operation const op = name == "mac-family" ? operation::mac :
 			name == "stmac" ? operation::parallel_mac : operation::none;
 		return {op};
 	}
@@ -46,13 +45,13 @@ public:
 	bool step()
 	{
 		if (m_resume) { m_resume = false; m_cpu.resume(SUSPEND_REASON_DISABLE); schedule(); return false; }
-		bool const parallel = m_mode.parallel(), family = m_mode.family();
+		bool const parallel = m_mode.parallel();
 		auto const &f = m_input;
 		unsigned const variant = m_raw, tick = ++m_tick;
 		unsigned const feedback = parallel ? f.destination : f.source;
 		unsigned const checkpoint = 3 + f.snapshot;
 		require(!state(r::STATE_ILLEGAL), "Dual MPY admits RAM pairs and rejects low-page operands before effects");
-		u64 const before = dual_macsu_seed(family ? variant % 215040U : variant, false) ^ (tick <= 5 ? 0xffffffffffULL : 0);
+		u64 const before = dual_macsu_seed(variant % 215040U, false) ^ (tick <= 5 ? 0xffffffffffULL : 0);
 		require(state(r::STATE_A) == (tick >= 6 && !f.destination ? f.result : !feedback ? before : 0x123456789aULL) && state(r::STATE_B) == (tick >= 6 && f.destination ? f.result : feedback ? before : 0xfeabcd9876ULL) && state(r::STATE_ST0) == (tick >= 6 ? f.result_st0 : f.st0), "Dual multiply publishes its Execute-owned result and sticky destination overflow");
 		if (tick == 4)
 		{
@@ -63,7 +62,7 @@ public:
 		{
 			require(state(r::STATE_T) == (parallel ? f.yword : f.xword), "Dual memory Read publishes T only for dual-read multiply");
 			m_cpu.set_state_int(r::STATE_T, 0xdead);
-			m_cpu.set_state_int(feedback ? r::STATE_B : r::STATE_A, dual_macsu_seed(family ? variant % 215040U : variant, false));
+			m_cpu.set_state_int(feedback ? r::STATE_B : r::STATE_A, dual_macsu_seed(variant % 215040U, false));
 			if (parallel) m_cpu.set_state_int(r::STATE_ST1, f.st1 ^ 31);
 			auto const disable = m_machine.disable_side_effects();
 			m_cpu.space(AS_DATA).write_word(f.xaddress, 0xdead); m_cpu.space(AS_DATA).write_word(f.yaddress, 0xbeef);
@@ -103,15 +102,15 @@ private:
 	void begin()
 	{
 		m_cpu.suspend(SUSPEND_REASON_DISABLE, true);
-		bool const parallel = m_mode.parallel(), family = m_mode.family();
+		bool const parallel = m_mode.parallel();
 		m_raw = m_mode.key(m_ordinal);
-		m_input = dual_multiply_case(m_raw, false, false, true, family, family, parallel);
+		m_input = dual_multiply_case(m_raw, false, false, true, true, true, parallel);
 		auto const &f = m_input;
 		m_coverage.add(m_raw);
 		unsigned const feedback = parallel ? f.destination : f.source;
 		auto &program = m_cpu.space(AS_PROGRAM); auto &data = m_cpu.space(AS_DATA);
 		for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-		program.write_word(f.base + 0x600, (family ? (parallel ? 0xd000 : 0xb000) | (f.operation << 10) : 0xa600) | (family ? f.source << 9 : 0) | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
+		program.write_word(f.base + 0x600, (parallel ? 0xd000 : 0xb000) | (f.operation << 10) | (f.source << 9) | (f.destination << 8) | (f.x << 4) | f.y); program.write_word(f.base + 0x601, 0xf4e1);
 		if (f.xaddress >= 0x60) data.write_word(f.xaddress, f.xword);
 		if (f.yaddress >= 0x60) data.write_word(f.yaddress, f.yword);
 		m_cpu.set_state_int(r::STATE_IDLE, 0); m_cpu.set_state_int(r::STATE_ILLEGAL, 0);
@@ -119,7 +118,7 @@ private:
 		m_cpu.set_state_int(r::STATE_TCR, 0x10); m_cpu.set_state_int(r::STATE_IFR, 0); m_cpu.set_state_int(r::STATE_IMR, 0);
 		m_cpu.set_state_int(r::STATE_A, 0x123456789aULL); m_cpu.set_state_int(r::STATE_B, 0xfeabcd9876ULL); m_cpu.set_state_int(r::STATE_T, 0xabcd);
 		if (parallel) m_cpu.set_state_int(r::STATE_T, f.yword);
-		m_cpu.set_state_int(feedback ? r::STATE_B : r::STATE_A, dual_macsu_seed(family ? m_raw % 215040U : m_raw, false) ^ 0xffffffffffULL);
+		m_cpu.set_state_int(feedback ? r::STATE_B : r::STATE_A, dual_macsu_seed(m_raw % 215040U, false) ^ 0xffffffffffULL);
 		for (unsigned i = 0; i < 4; ++i) m_cpu.set_state_int(r::STATE_AR2 + i, f.initial[i]);
 		m_cpu.set_state_int(r::STATE_AR0, 3); m_cpu.set_state_int(r::STATE_BK, f.linear ? 0 : 16);
 		m_cpu.set_input_line(0, CLEAR_LINE); m_cpu.set_input_line(INPUT_LINE_NMI, CLEAR_LINE);

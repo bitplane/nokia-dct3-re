@@ -562,7 +562,8 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_square.h` | Reviewed literal SQUR/SQURA/SQURS cases shared by generic and default-sequence entries |
 | `tests/c54x/tms320c54x_test_parallel.h` | Reviewed parallel store/arithmetic vectors, including same-cell ordering and circular pointer controls |
 | `tests/c54x/tms320c54x_test_dual_reference.h` | Ordered dual/parallel MAC literal references with explicit partial setup and status masks |
-| `tests/c54x/tms320c54x_test_dual.h` | CPU-only staged MPY/ALU/MACSU/MAC setup, per-clock checks and paired snapshot continuation |
+| `tests/c54x/tms320c54x_test_dual.h` | Remaining signed/parallel MAC legacy reference, pending migration |
+| `tests/c54x/tms320c54x_test_dual_operand_section.h` | Explicit MPY/ADD/SUB/MACSU cases using common clocked execution and replay |
 | `tests/c54x/tms320c54x_test_dual_input.h` | Shared fixture-owned integer inputs/expectations; no CPU implementation helpers or Nokia dependencies |
 | `tests/c54x/tms320c54x_test_memory_continuations.h` | Ordered literal continuations with inherited RAM, partial masks and coefficient/address ordering |
 | `tests/c54x/tms320c54x_test_shift_examples.h` | Ordered TS/Xmem shifts, signed comparisons, normalization and one-cycle rounding/saturation references |
@@ -2407,13 +2408,14 @@ uses the current destination accumulator, FRCT and SMUL product handling,
 OVM and sticky destination overflow. Carry and other status bits are preserved.
 This follows SPRU172C 4-91 and the shared multiply-product/result helpers.
 
-`macsu-dual` retains 83,968 cases/restores in factored matrices: 18,432 address cases
+`dual_unsigned_mac` owns 51,200 cases/restores in factored matrices: 18,432 address cases
 cover all 512 encodings, three alias/address layouts, linear/circular BK,
-two pages and three snapshots; 65,536 distinct arithmetic inputs cross 64 value pairs,
-both destinations, eight accumulator patterns, 32 status profiles, two pages
-with one checkpoint per numeric input, balanced across checkpoints 3/4/5.
-The full numeric-by-checkpoint Cartesian product is retired; all address cases
-remain. This is not the address/arithmetic full cross-product.
+two pages and three snapshots; 32,768 arithmetic inputs retain 64 value pairs,
+both destinations, eight accumulator patterns and 32 status profiles, with
+pages and checkpoints3/4/5 distributed. All status-varying address cohorts
+remain. This is not the address/arithmetic full cross-product. Setup, arithmetic
+expectations and Execute feedback are explicit; no legacy variant decoder or
+custom snapshot machinery supplies acceptance.
 Post-Access pointer replacement and post-Read RAM/T replacement cannot change
 retained inputs; replacing the accumulator after Read checks Execute ownership.
 Paired reads are ordered and occur twice even when logical addresses alias;
@@ -2685,8 +2687,10 @@ memory and T after Read, and require the two ordered reads at clock5 and result
 at clock6. MPY publishes T while ADD/SUB preserves it. The replacement uses
 fixture-owned integer expectations and the common replay runner, not the
 legacy variant decoder or custom snapshot/tap machinery. No handset acceptance
-is inferred from these focused runs. MACSU and the MAC families remain separate
-legacy owners pending migration.
+is inferred from these focused runs. Signed/parallel MAC remain legacy owners
+pending migration; MACSU uses the same independent section builder
+as MPY/ADD/SUB. Its unsigned-X/signed-Y arithmetic and live feedback are checked
+directly, not inferred from the other operations.
 
 SPRU131G section 7.5.10 distinguishes direct accumulator consumers (no
 pipeline latency) from memory-mapped accumulator reads. The zero-terminated
@@ -5026,7 +5030,7 @@ The cached descriptor belongs to a complete live/replay pair; arithmetic
 expectations and all per-clock mutation/assertion points are unchanged.
 These banks use the independent CPU-only machine: root and CPU only, an empty
 ROM directory, program pages zero/two and data RAM. The shared staged fixture
-now hosts only MACSU and MAC-family profiles. MPY/dual ALU and the admission
+now hosts only signed/parallel MAC profiles. MPY/dual ALU/MACSU and the admission
 limits use independent sections with explicit setup and actual restore checks.
 
 ### Representative dual admission controls

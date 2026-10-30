@@ -71,13 +71,8 @@ private:
 			osd_printf_info("TMS320C54x parallel MAC: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 shifts=32 reads=1 writes=1 retained=T,X,ASM old_source_store=1 carry=unvalidated physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest());
 			throw emu_fatalerror(3, "TMS320C54x isolated parallel MAC complete");
 		}
-		if (m_dual_mode.family())
-		{
-			osd_printf_info("TMS320C54x dual MAC family: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 snapshots=3 reads=2 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest());
-			throw emu_fatalerror(3, "TMS320C54x isolated dual MAC family complete");
-		}
-		osd_printf_info("TMS320C54x staged dual MACSU: PASS address_cases=18432 arithmetic_cases=65536 restore=%u encodings=512 layouts=3 bk_modes=2 value_pairs=64 accumulator_patterns=8 arithmetic_flags=32 pages=2 snapshots=3 checkpoint_policy=balanced reads=2 data_writes=0 x_unsigned_y_signed=1 x_alias_priority=1 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->restores(), (unsigned long long)m_dual->digest());
-		throw emu_fatalerror(0, "TMS320C54x isolated dual MACSU complete");
+		osd_printf_info("TMS320C54x dual MAC family: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 snapshots=3 reads=2 t_publish=Read accumulator_sample=Execute physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest());
+		throw emu_fatalerror(3, "TMS320C54x isolated dual MAC family complete");
 	}
 	bool parallel() const { return !std::strcmp(machine().options().bios(), "isa-parallel"); }
 	bool scalars() const { return !std::strcmp(machine().options().bios(), "isa-scalars"); }
@@ -186,7 +181,6 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(4, "isa-long", "TI long-word arithmetic examples")
 	ROM_SYSTEM_BIOS(5, "isa-products", "Literal multiply arithmetic and DELAY continuation sequence")
 	ROM_SYSTEM_BIOS(6, "isa-flow", "Conditional delayed branch return and high-address stack examples")
-	ROM_SYSTEM_BIOS(13, "macsu-dual", "Dual signed unsigned multiply accumulate ownership")
 	ROM_SYSTEM_BIOS(14, "mac-family", "Dual MAC MACR MAS MASR with independent source and destination")
 	ROM_SYSTEM_BIOS(15, "stmac", "Parallel MAC stores with retained T X and ASM")
 	ROM_SYSTEM_BIOS(29, "isa-words", "Atomic instruction-word arithmetic and addressing examples")

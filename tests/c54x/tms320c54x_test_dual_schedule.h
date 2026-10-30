@@ -27,7 +27,6 @@ struct dual_operand_schedule
 	}
 };
 
-using dual_macsu_schedule = dual_operand_schedule<65536, 1>;
 using dual_mac_schedule = dual_operand_schedule<65536, 8>;
 
 } // namespace c54x_test
