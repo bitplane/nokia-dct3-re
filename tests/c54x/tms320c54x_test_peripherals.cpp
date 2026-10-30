@@ -456,30 +456,6 @@ void tms320c54x_test_state::start_bus_register_test()
 
 
 
-void tms320c54x_test_state::start_mcbsp_control_sequence(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	u32 const base = variant & 1 ? 0x20000 : 0; bool const sxm = variant & 2;
-	m_idle_mcbsp_external = false; m_idle_mcbsp->reset(); m_idle_mcbsp_words = 0;
-	m_idle_mcbsp->control_w(0, 1); m_idle_mcbsp->control_w(1, 1); m_idle_mcbsp->control_w(0, 5);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	static constexpr u16 words[] = {0x76e1, 0x38, 1, 0x68e1, 0x39, 0xfffe, 0xf4e1};
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, i < std::size(words) ? words[i] : 0xf495);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1600); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, sxm ? 0x900 : 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0); m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xabcdef1234ULL);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_drained_fetches = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0x38, 0x39, "mcbsp_control_read", [this](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x39 && word == 3 && !m_pipeline_operand_reads && m_pipeline_store_writes == 1, "ANDM reads actual enabled/ready McBSP status after selector publication"); ++m_pipeline_operand_reads; m_idle_mcbsp->data_w(3, 0xa55a); expect(m_idle_mcbsp->control_r(1) == 1, "A real DXR write changes XRDY after the captured CPU read"); ++m_pipeline_drained_fetches; });
-	m_pipeline_write_tap = data.install_write_tap(0x38, 0x39, "mcbsp_control_write", [this](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(m_pipeline_store_writes < 2 && at == (m_pipeline_store_writes ? 0x39 : 0x38) && word == (m_pipeline_store_writes ? 2 : 1) && (!m_pipeline_store_writes || m_pipeline_operand_reads == 1), "Actual McBSP selector/read/reset order retains the volatile status word"); ++m_pipeline_store_writes; });
-	m_pipeline_replay = false; m_idle_fixture_tick = m_idle_fixture_saved_tick = 0; m_phase = 253950;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-
-
-
-
 u16 tms320c54x_test_state::test_port_r()
 {
 	const u64 cycle = m_cpu->total_cycles();
@@ -1114,32 +1090,6 @@ bool tms320c54x_test_state::check_pipeline_idle_results()
 }
 
 
-
-
-
-bool tms320c54x_test_state::check_mcbsp_control_sequence_results()
-{
-	if (m_phase == 253950)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, snapshot = variant / 4;
-		bool const checkpoint = snapshot == 0 ? tick == 4 : snapshot == 1 ? m_pipeline_store_writes == 1 && !m_pipeline_operand_reads : snapshot == 2 ? m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 : m_pipeline_store_writes == 2;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Actual McBSP control sequence remains staged");
-		if (checkpoint && !m_pipeline_replay && !m_idle_fixture_saved_tick) { m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_drained_fetches, m_idle_mcbsp_words}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save CPU and real McBSP selection/read/reset sequence"); }
-		if (tick == 32)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 2 && m_pipeline_drained_fetches == 1 && m_idle_mcbsp_words == 0 && m_idle_mcbsp->control_r(0) == 1 && m_idle_mcbsp->control_r(1) == 0, "CPU retains the pre-busy status, clears XRST and observes the device's real reset state");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xabcdef1234ULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1600 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (variant & 2 ? 0x900 : 0x800), "Selector/mask composition preserves CPU address, accumulator and status ownership");
-			if (!m_pipeline_replay) { expect(m_idle_fixture_saved_tick != 0, "Each semantic McBSP snapshot boundary must actually occur"); m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_drained_fetches = m_recurring_irq_snapshot[2]; m_idle_mcbsp_words = m_recurring_irq_snapshot[3]; return restore_pipeline_at(253960, "Restore CPU and McBSP without duplicate device transactions"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 15) { start_mcbsp_control_sequence(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged McBSP control: PASS cases=16 restore=16 pages=2 sxm_states=2 snapshots=4 selector_writes=1 status_reads=1 reset_writes=1 captured_ready=1 busy_after_read=1 device_reset=1 physical_mapping=unvalidated silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated McBSP control complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253960) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253950; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 
 

@@ -57,7 +57,6 @@ void tms320c54x_test_state::machine_reset()
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"mcbsp-control"}, [](self &test) { test.start_mcbsp_control_sequence(); } },
 		{ {"st-mvmm"}, [](self &test) { test.start_pipeline_store_mvmm(); } },
 		{ {"st-acc-mvmm"}, [](self &test) { test.start_pipeline_store_mvmm(); } },
 		{ {"move-rpt-owner"}, [](self &test) { test.start_move_repeat_owner(); } },
@@ -384,12 +383,6 @@ void tms320c54x_test_state::program_map(address_map &map)
 	map(0x7f0000, 0x7fffff).ram();
 }
 
-void tms320c54x_test_state::mcbsp_control_map(address_map &map)
-{
-	map(0, 0xffff).ram();
-	map(0x38, 0x39).rw(m_idle_mcbsp, FUNC(tms320c54x_mcbsp_device::control_r), FUNC(tms320c54x_mcbsp_device::control_w));
-}
-
 void tms320c54x_test_state::data_map(address_map &map)
 {
 	map(0x0000, 0xffff).ram();
@@ -569,7 +562,6 @@ void tms320c54x_test_state::test(machine_config &config)
 		m_cpu->set_input_line(6, CLEAR_LINE);
 	});
 	m_cpu->set_addrmap(AS_PROGRAM, &tms320c54x_test_state::program_map);
-	if (!strcmp(config.options().bios(), "mcbsp-control")) m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::mcbsp_control_map);
 	// The low-page copy must see RAM at 0060, not the legacy IRQ probe.
 	else if (!strncmp(config.options().bios(), "mvdd-source", 11) || !strcmp(config.options().bios(), "stm-ind") || !strcmp(config.options().bios(), "stm-ind-edge") || !strcmp(config.options().bios(), "stm-low-ram") || !strcmp(config.options().bios(), "bitt-ctrl")) m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::plain_data_map);
 	else m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::data_map);

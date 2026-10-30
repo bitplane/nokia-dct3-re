@@ -399,6 +399,7 @@ def main():
     counts['scalar_unsigned_load'] = 18176
     counts['scalar_shift16_load'] = 18176
     counts['scalar_variable_load'] = 5248
+    counts['mcbsp_control'] = 16
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216
@@ -421,6 +422,9 @@ def main():
     copy_changed(sections / 'runner.cpp', overlay / 'tms320c54x_test_isa.cpp')
     copy_changed(sections / 'common.h', overlay / 'c54x_section_common.h')
     copy_changed(ROOT / 'driver/tms320c54x_bsp_state.h', overlay / 'tms320c54x_bsp_state.h')
+    if args.section == 'mcbsp_control':
+        for name in ('tms320c54x_mcbsp.h', 'tms320c54x_mcbsp.cpp'):
+            copy_changed(ROOT / 'driver' / name, overlay / name)
     selected_source = ROOT / ('tests/firmware/c54x_' + args.section + '.h') if args.section in ('descriptor_copy', 'byte_swap', 'block_swap', 'signed_branch', 'store_compare', 'conditional_store', 'stack_alignment', 'store_move_compare', 'xc_context', 'logic_composition', 'nibble_composition') else sections / (args.section + '.h')
     copy_changed(selected_source, overlay / 'c54x_section_selected.h')
     if args.negative_control:
@@ -431,9 +435,12 @@ def main():
         selected.write_text(text.replace('return cases;',
             'cases.front().states.back().observation.expected.push_back({r::STATE_ILLEGAL,1}); return cases;'))
     start = time.monotonic()
+    sources = 'src/mame/nokia/tms320c54x_test_isa.cpp'
+    if args.section == 'mcbsp_control':
+        sources += ',src/mame/nokia/tms320c54x_mcbsp.cpp'
     with (output / 'build.log').open('w') as log:
         build = subprocess.run(['make', '-C', str(ROOT / 'mame'), 'REGENIE=1', 'SUBTARGET=c54xisa',
-                        'SOURCES=src/mame/nokia/tms320c54x_test_isa.cpp', 'USE_QTDEBUG=0',
+                        'SOURCES=' + sources, 'USE_QTDEBUG=0',
                         '-j' + str(args.jobs)], stdout=log, stderr=subprocess.STDOUT)
     if build.returncode:
         print('\n'.join((output / 'build.log').read_text().splitlines()[-30:]), file=sys.stderr)

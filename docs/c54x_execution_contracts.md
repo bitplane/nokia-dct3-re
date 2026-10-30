@@ -5437,6 +5437,23 @@ and their counts as regression evidence. Its result explicitly leaves
 `physical_low_gap_identity_claim` false. The Lua taps issue no extra reads
 of these fields or endpoints and never replace values.
 
+## Indexed McBSP control
+
+`mcbsp_control` retains sixteen cases/restores across two program pages,
+both SXM states and four semantic checkpoints. It attaches the real indexed
+McBSP device at test-map addresses 38/39, initially enabled/ready with its
+selector on another register. Firmware writes selector 1, reads status 3,
+and clears XRST using the retained status word. The read observer queues
+a real DXR word, making the live status 1 before the masked write publishes
+2. The device must finish with selector 1/status 0 and transmit no word.
+CPU AR1, accumulators and status remain unchanged.
+
+The ordered model-regression events occur at clocks 9/12/13. Snapshots at
+4/9/12/13 retain CPU, device and observer state before selection, after
+selection, after the now-stale read and after reset. Omitting the DXR write
+fails the busy-state check. This is indexed-device/CPU composition, not a
+physical address-map, serial-pin or silicon-timing claim.
+
 ## Extended accumulator stores to auxiliary registers
 
 Independent sections `extended_ar_store` (3,584), `extended_ar_consumer`

@@ -6,13 +6,20 @@
 #ifdef C54X_SECTION_BSP_WORD_SOURCE
 #include "tms320c54x_bsp_state.h"
 #endif
+#ifdef C54X_SECTION_MCBSP_CONTROL
+#include "tms320c54x_mcbsp.h"
+#endif
 
 namespace {
 class section_state : public driver_device
 {
 public:
 	section_state(machine_config const &c, device_type t, char const *tag)
-		: driver_device(c, t, tag), m_cpu(*this, "cpu") { }
+		: driver_device(c, t, tag), m_cpu(*this, "cpu")
+#ifdef C54X_SECTION_MCBSP_CONTROL
+		, m_mcbsp(*this, "mcbsp")
+#endif
+	{ }
 	void test(machine_config &c)
 	{
 		TMS320C54X(c, m_cpu, 13'000'000);
@@ -42,6 +49,10 @@ public:
 		m_cpu->set_addrmap(AS_PROGRAM, &section_state::program);
 		m_cpu->set_addrmap(AS_DATA, &section_state::data);
 		m_cpu->set_addrmap(AS_IO, &section_state::data);
+#ifdef C54X_SECTION_MCBSP_CONTROL
+		TMS320C54X_MCBSP(c, m_mcbsp, 13'000'000);
+		m_mcbsp->tx_word_cb().set([](u16) { throw emu_fatalerror("McBSP control fixture must reset before transmitting a word"); });
+#endif
 		m_cpu->bio_in_cb().set([this]() { return m_fixture ? m_fixture->sample_bio() : 1; });
 		m_cpu->xf_out_cb().set([this](int value) {
 			m_xf = bool(value);
@@ -83,6 +94,10 @@ protected:
 		m_cases = c54x_test::section_cases();
 		m_fixture = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 			m_cases.size(), [this](unsigned i) {
+#ifdef C54X_SECTION_MCBSP_CONTROL
+				m_mcbsp->reset();
+				m_mcbsp->control_w(0,1); m_mcbsp->control_w(1,1); m_mcbsp->control_w(0,5);
+#endif
 #ifdef C54X_SECTION_BSP_WORD_SOURCE
 				if (i) check_bsp_frame(i-1);
 				m_bsp.reset(); m_bsp.control_w(0x80);
@@ -92,6 +107,14 @@ protected:
 #endif
 				return m_cases.at(i);
 			});
+#ifdef C54X_SECTION_MCBSP_CONTROL
+		m_fixture->set_data_observer([this](bool write,u32 at,u16) {
+			if (!write && at==0x39) {
+				m_mcbsp->data_w(3,0xa55a);
+				if (m_mcbsp->control_r(1)!=1) throw emu_fatalerror("Real DXR write must make captured XRDY stale");
+			}
+		});
+#endif
 #ifdef C54X_SECTION_OBSERVE_MVDD
 		m_fixture->set_data_observer([this](bool write,u32 at,u16) {
 			auto const &input=m_cases.at(m_fixture->count());
@@ -134,6 +157,9 @@ private:
 	}
 	void data(address_map &map) {
 		map(0, 0xffff).ram();
+#ifdef C54X_SECTION_MCBSP_CONTROL
+		map(0x38,0x39).rw(m_mcbsp,FUNC(tms320c54x_mcbsp_device::control_r),FUNC(tms320c54x_mcbsp_device::control_w));
+#endif
 #ifdef C54X_SECTION_BSP_WORD_SOURCE
 		map(0x20,0x20).r(FUNC(section_state::bsp_read));
 #endif
@@ -184,6 +210,9 @@ private:
 		throw emu_fatalerror(0, "C54x section complete");
 	}
 	required_device<tms320c54x_device> m_cpu;
+#ifdef C54X_SECTION_MCBSP_CONTROL
+	required_device<tms320c54x_mcbsp_device> m_mcbsp;
+#endif
 	emu_timer *m_timer = nullptr;
 	std::vector<c54x_test::clocked_register_case> m_cases;
 	std::unique_ptr<c54x_test::register_sequence_fixture> m_fixture;

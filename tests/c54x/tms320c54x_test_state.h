@@ -599,7 +599,6 @@ private:
 	};
 	static mvdk_producer_fixture mvdk_producer_case(unsigned v, bool accumulator_destination = false);
 	void start_mvdk_producer(unsigned variant = 0);
-	void start_mcbsp_control_sequence(unsigned variant = 0);
 	void check_st1_memory_rules();
 	virtual void machine_start() override;
 
@@ -607,7 +606,6 @@ private:
 
 	void program_map(address_map &map) ATTR_COLD;
 
-	void mcbsp_control_map(address_map &map) ATTR_COLD;
 	void data_map(address_map &map) ATTR_COLD;
 	void plain_data_map(address_map &map) ATTR_COLD;
 	void io_map(address_map &map) ATTR_COLD;
@@ -783,7 +781,6 @@ private:
 	bool check_basic_repeat_results();
 	bool check_rptbd_shift_store_results();
 	bool check_long_mapped_original_results();
-	bool check_mcbsp_control_sequence_results();
 	bool check_staged_conditional_store_results();
 	bool check_mapped_dual_results();
 	bool check_repeat_mvdp_irq_results();
