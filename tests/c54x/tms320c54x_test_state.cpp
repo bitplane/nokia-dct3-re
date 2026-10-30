@@ -56,7 +56,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"st1-rules"}, [](self &test) { test.check_st1_memory_rules(); } },
 	}))
 		return;
-	if (profile_is("shift-periph") || shifted_bsp_fixture() || shifted_unowned_fixture()) { start_shifted_peripheral(); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"mcbsp-control"}, [](self &test) { test.start_mcbsp_control_sequence(); } },
 		{ {"st-mvmm"}, [](self &test) { test.start_pipeline_store_mvmm(); } },

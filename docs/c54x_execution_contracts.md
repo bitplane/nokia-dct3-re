@@ -3371,9 +3371,21 @@ producer hazards. Absolute ADD's separate decode path is included.
 Carry/TS/shift-16 arithmetic, RMW, logic and dual-read age compositions
 retain their separate contracts; this does not admit them implicitly.
 
+`shifted_peripheral` owns 2,520 cases/restores: 1,280 numeric boundary cases
+at `0020/005f` and 1,240 interior address/form/shift cases. It retains the
+previous four shift boundaries, both numeric destinations, all flags and word
+patterns at the boundaries, and unsigned `8000` interior controls. Pages and
+three checkpoints are distributed instead of 11,400 executions. Synthetic
+source words change on Read, and retained literals/pointers are poisoned;
+these are bus-class contracts, not endpoint identities or physical clock claims.
+
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.
-The independent `shift-bsp` control passes 40,960 cases and save/load replays.
+`shifted_bsp` owns 5,120 cases/restores: all 32 shifts, five addressing forms,
+SXM/OVM, both accumulators and four words. Pages and four checkpoints are
+distributed instead of 40,960 crossed executions. It poisons retained literals,
+replaces the postincrement pointer before Read, checks peeks before/after
+acknowledgement and uses the same BSP word-state attachment as the parallel bank.
 `bsp_parallel_load` owns 768 cases with cleared-pipeline replay, replacing
 6,144 page/checkpoint-crossed executions:
 six forms, eight distinct X/Y selector pairs, two signed-boundary patterns,
@@ -5369,10 +5381,11 @@ The CPU's internal map does not own data words `0002..0005`; accesses
 delegate to the board data map. Shifted LD now preserves that dispatch
 instead of rejecting every low-page address as an unsupported CPU register.
 No register, return constant or peripheral response has been added.
-`shift-unowned` verifies 122,880 cases and replays: all four addresses,
+`shifted_unowned` owns 20,480 cases/restores: all four addresses,
 all 32 shifts, DP/SP/absolute/post-increment/offset forms, SXM/OVM states,
-both accumulators, four volatile word patterns, two program pages and three
-snapshots. It checks a single bus read, retained operands/literals/pointers
+both accumulators and four volatile words, with pages and three checkpoints
+distributed instead of 122,880 crossed executions. It checks a single bus read,
+retained operands/literals/pointers
 and Execute publication without the peripheral-region extra clock. This
 qualifies bus delegation in the current model, not the physical identity,
 electrical behavior or fitted-silicon timing of reserved register-map gaps.

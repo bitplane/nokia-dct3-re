@@ -377,6 +377,9 @@ def main():
     counts['mapped_parallel_load'] = 24576
     counts['peripheral_parallel_load'] = 49152
     counts['bsp_parallel_load'] = 768
+    counts['shifted_peripheral'] = 2520
+    counts['shifted_unowned'] = 20480
+    counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

@@ -865,8 +865,6 @@ void tms320c54x_test_state::start_register_product(unsigned variant)
 
 
 
-bool tms320c54x_test_state::shifted_unowned_fixture() const
-{ return profile_is("shift-unowned"); }
 
 
 

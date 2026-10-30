@@ -676,18 +676,6 @@ private:
 	void start_mvdk_producer(unsigned variant = 0);
 	void start_mcbsp_control_sequence(unsigned variant = 0);
 	void check_st1_memory_rules();
-	struct shifted_peripheral_fixture
-	{
-		u16 address, value, st1, opcode, operation;
-		unsigned form, read, checkpoint, literals;
-		bool b, bsp, unowned;
-		u32 base;
-		u64 result;
-	};
-	static shifted_peripheral_fixture shifted_peripheral_case(unsigned variant, bool bsp, bool unowned = false);
-	bool shifted_bsp_fixture() const;
-	bool shifted_unowned_fixture() const;
-	void start_shifted_peripheral(unsigned variant = 0);
 	virtual void machine_start() override;
 
 	virtual void machine_reset() override;
@@ -875,7 +863,6 @@ private:
 	bool check_long_mapped_original_results();
 	bool check_mcbsp_control_sequence_results();
 	bool check_staged_conditional_store_results();
-	bool check_shifted_peripheral_results();
 	bool check_mapped_dual_results();
 	bool check_repeat_mvdp_irq_results();
 	bool check_circular_portr_results();
@@ -899,7 +886,6 @@ private:
 
 	required_device<tms320c54x_device> m_cpu;
 	u16 m_shifted_bus_word = 0;
-	ordered_case_digest m_shifted_bus_coverage;
 	ordered_case_digest m_context_coverage;
 	ordered_case_digest m_idle_coverage;
 	bool m_idle_mode_bank = false;
