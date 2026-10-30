@@ -145,6 +145,7 @@ def main():
     counts['smem_arithmetic'] = 4864
     counts['t_shift_load'] = 2336
     counts['shifted_ar_conflict'] = 128
+    counts['atomic_xorm'] = 256
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

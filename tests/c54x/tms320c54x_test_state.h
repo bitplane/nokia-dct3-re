@@ -1376,13 +1376,6 @@ private:
 
 
 
-	struct xorm_fixture
-	{
-		u16 mode, address, next, source, mask, st1;
-		unsigned words;
-	};
-	static xorm_fixture atomic_xorm_case(unsigned index);
-	void start_atomic_xorm(unsigned index);
 
 
 
@@ -1627,7 +1620,6 @@ private:
 	bool check_staged_bus_stm_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_native_dual_sub_results();
-	bool check_atomic_xorm_results();
 	bool check_rom4_codec_is_results();
 	bool check_rom4_crc_input_results();
 	TIMER_CALLBACK_MEMBER(check_results);

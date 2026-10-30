@@ -2429,51 +2429,7 @@ void tms320c54x_test_state::start_parallel_sub_fraction(unsigned index)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::xorm_fixture tms320c54x_test_state::atomic_xorm_case(unsigned index)
-{
-	unsigned const form = index % 8, flags = (index / 128) % 4;
-	return {std::array<u16, 8>{5,5,0x83,0x93,0x8b,0xdb,0xeb,0xf8}[form],
-		std::array<u16, 8>{0x1505,0x1505,0x1500,0x1500,0x1500,0x1503,0x1502,0x1507}[form],
-		std::array<u16, 8>{0x1500,0x1500,0x1500,0x1501,0x14ff,0x1501,0x1502,0x1500}[form],
-		std::array<u16, 4>{0,0xffff,0xff,0x8000}[(index / 8) % 4],
-		std::array<u16, 4>{0,0xffff,0x5555,0x8001}[(index / 32) % 4],
-		u16(0x800 | ((flags & 1) << 8) | ((flags & 2) << 8) | (form == 1 ? 0x4000 : 0)), form >= 6 ? 3U : 2U};
-}
 
-void tms320c54x_test_state::start_atomic_xorm(unsigned index)
-{
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
-	auto const f = atomic_xorm_case(index);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	program.write_word(0x600, 0x6a00 | f.mode);
-	program.write_word(0x601, f.mode == 0xf8 ? f.address : f.mask);
-	if (f.words == 3) program.write_word(0x602, f.mode == 0xf8 ? f.mask : 2);
-	program.write_word(0x600 + f.words, 0xf4e1);
-	data.write_word(f.address, f.source);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_PC, 0x600}, {cpu_regs::STATE_SP, index % 8 == 1 ? 0x1500 : 0x1000},
-		{cpu_regs::STATE_A, 0x123456789ULL}, {cpu_regs::STATE_B, 0xff76543210ULL}, {cpu_regs::STATE_T, 0x1357},
-		{cpu_regs::STATE_AR0, 2}, {cpu_regs::STATE_AR3, index % 8 == 5 ? 0x1503 : 0x1500}, {cpu_regs::STATE_BK, 4},
-		{cpu_regs::STATE_ST0, 0x1e2a}, {cpu_regs::STATE_ST1, f.st1}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "atomic_xorm_read", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(at == f.address && word == f.source && !m_pipeline_operand_reads++ && !m_pipeline_store_writes, "XORM retains one destination read before its write"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "atomic_xorm_write", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(at == f.address && word == u16(f.source ^ f.mask) && m_pipeline_operand_reads == 1 && !m_pipeline_store_writes++, "XORM writes the XOR result once to its resolved address"); });
-	m_rom4_codec_replay = false; m_rom4_codec_replays = 0;
-	m_phase = 520000 + index;
-	if (index < 512)
-	{
-		m_recurring_irq_snapshot = {0, 0};
-		expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save XORM before address/literal consumption");
-		m_rom4_codec_replays = 1;
-	}
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -4008,44 +3964,6 @@ bool tms320c54x_test_state::check_native_dual_sub_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_atomic_xorm_results()
-{
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 520000 && m_phase < 521024)
-	{
-		unsigned const index = m_phase - 520000;
-		auto const f = atomic_xorm_case(index);
-		if (!m_rom4_codec_replays && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x600 + f.words)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save XORM after its single read/write transaction");
-			m_rom4_codec_replays = 1;
-		}
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Atomic XORM remains admitted");
-		if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE)) { m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-		auto const disable = machine().disable_side_effects();
-		expect(m_rom4_codec_replays == 1 && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 &&
-			data.read_word(f.address) == u16(f.source ^ f.mask) && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x601 + f.words &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == f.next && m_cpu->state_int(tms320c54x_device::STATE_AR0) == 2 &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == (index % 8 == 1 ? 0x1500 : 0x1000) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789ULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff76543210ULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x1357 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1e2a &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1,
-			"XORM preserves arithmetic state and updates its address once independently of SXM/OVM");
-		if (!m_rom4_codec_replay)
-		{
-			expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore XORM without duplicating its resolved transaction");
-			m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1];
-			m_phase = 520000 + index; m_rom4_codec_replay = true;
-			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-		}
-		if (index < 1023) { start_atomic_xorm(index + 1); return true; }
-		osd_printf_info("TMS320C54x atomic XORM: PASS cases=1024 restore=1024 forms=8 values=4 literals=4 sxm_ovm=4 snapshots=2 reads=1 writes=1 flags_preserved=1 staged_acceptance=0 silicon_phase_claim=0\n");
-		m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
-		throw emu_fatalerror(3, "TMS320C54x isolated XORM complete");
-	}
-	return false;
-}
 
 
 } // namespace c54x_test

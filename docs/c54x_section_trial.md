@@ -180,6 +180,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `shifted_ar_conflict.h` | Keep all AR destinations, four early writers (STM/MVDK/POPM/ST), same/different target and AR-bank versus RAM controls. Preserve owned source Read7, shifted-store Write7, early publication7/free or8/conflict, exact transactions, final pointers/SP/status and replay; add terminal IDLE. Free-bank early mapped writes precede older Write at the same clock (implementation ordering, not silicon evidence). Distribute page/checkpoint rather than crossing them; deliberately lose that duplicate execution. | Native128 cases/restores versus768; build5.421s/run0.060s. Delete setup/checker, phases310100/310110, profile route/declarations/dispatch. |
 
+| `atomic_xorm.h` | Keep eight DP/CPL/indirect/circular/offset/absolute forms ×four source patterns ×four masks, exact Read-before-Write once, resolved address/pointer/SP/accumulator/T/status preservation, final PC and replay before/after transaction. Distribute ignored SXM/OVM rather than crossing them. The post-transaction snapshot is now at terminal IDLE, deliberately dropping the old pre-IDLE PC-specific checkpoint; atomic semantics only, no timing claim. | Native256 cases/restores versus1024; build5.323s/run0.108s. Delete setup/helper/fixture/checker, phases520000..521023, profile route/declarations/dispatch. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
