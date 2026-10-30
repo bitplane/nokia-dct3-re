@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "emuopts.h"
-#include "tms320c54x_test_square.h"
 #include "tms320c54x_test_parallel.h"
 #include "tms320c54x_test_dual_reference.h"
 #include "tms320c54x_test_domains.h"
@@ -117,7 +116,7 @@ protected:
 				m_cases.insert(m_cases.end(), addresses.begin(), addresses.end());
 			}
 			else
-				for (unsigned i = 0; i < c54x_test::square_vectors.size(); ++i) m_cases.push_back(c54x_test::square_case(i));
+				throw emu_fatalerror("Legacy square bank retired: run the square_literals section");
 			if (m_cases.empty() || !m_cases.front().reset_before)
 				throw emu_fatalerror("C54x literal bank must start with an explicit CPU reset");
 		}

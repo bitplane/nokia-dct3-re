@@ -4,7 +4,6 @@
 #include "emu.h"
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_near_flow.h"
-#include "tms320c54x_test_square.h"
 #include "tms320c54x_test_parallel.h"
 #include "tms320c54x_test_long_reference.h"
 #include "tms320c54x_test_product_examples.h"
@@ -21,19 +20,6 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 548 && m_phase <= 553)
-	{
-		unsigned const index = m_phase - 548;
-		auto const test = square_case(index);
-		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
-		// The verifier throws on mismatch; retain opcode accounting after success.
-		expect_opcode(test.opcode, true, "TI square reference case");
-		if (index + 1 < square_vectors.size())
-		{
-			return begin_atomic_case(square_case(index + 1), m_phase + 1);
-		}
-		return begin_atomic_case(long_reference_cases()[0], 554);
-	}
 	if ((m_phase >= 554 && m_phase <= 562) || m_phase == 9211 || m_phase == 9212)
 	{
 		unsigned const index = m_phase >= 9211 ? m_phase - 9211 + 9 : m_phase - 554;

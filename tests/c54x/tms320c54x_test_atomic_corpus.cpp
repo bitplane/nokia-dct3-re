@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
-#include "tms320c54x_test_square.h"
 #include "tms320c54x_test_shift_examples.h"
 #include "tms320c54x_test_absolute_examples.h"
 #include "tms320c54x_test_memory_examples.h"
@@ -5517,7 +5516,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		unsigned const index = unsigned(std::find(std::begin(phases), std::end(phases), m_phase) - std::begin(phases));
 		verify_atomic_case(cases[index]);
 		if (index + 1 < cases.size()) return begin_atomic_case(cases[index + 1], phases[index + 1]);
-		return begin_atomic_case(square_case(0), 548);
 	}
 	return false;
 }
