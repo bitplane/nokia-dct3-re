@@ -16,6 +16,7 @@ public:
 		m_cpu->set_extended_program(true);
 		m_cpu->set_addrmap(AS_PROGRAM, &section_state::program);
 		m_cpu->set_addrmap(AS_DATA, &section_state::data);
+		m_cpu->set_addrmap(AS_IO, &section_state::data);
 		m_cpu->xf_out_cb().set([this](int value) {
 			m_xf = bool(value);
 			if (m_fixture) m_fixture->observe_xf(m_xf);

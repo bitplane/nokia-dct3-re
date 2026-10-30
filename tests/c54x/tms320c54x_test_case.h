@@ -90,6 +90,8 @@ struct clocked_register_case
 	std::vector<register_setting> initial_input_lines{};
 	bool extended_program = true;
 	std::optional<std::vector<bool>> xf_events{}; // Instruction/debugger publications; setup and post-load re-drive are separate.
+	int observed_data_space = AS_DATA; // AS_IO selects port transactions using the same ordered-event policy.
+	std::vector<memory_word> initial_io{};
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

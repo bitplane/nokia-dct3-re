@@ -124,6 +124,7 @@ private:
 		for (auto &state : m_input.states) state.observation.id = m_label.c_str();
 		m_cpu.set_extended_program(m_input.extended_program);
 		prepare_case(m_cpu, m_input.states.front().observation);
+		for (auto const &word : m_input.initial_io) m_cpu.space(AS_IO).write_word(word.address,word.value);
 		m_fetches = m_data_cursor = m_program_cursor = 0;
 		m_xf_cursor = 0;
 		m_last_data_total.reset();
@@ -152,7 +153,7 @@ private:
 				if (expected && expected->raise_input) m_cpu.set_input_line(*expected->raise_input,ASSERT_LINE);
 				if (m_data_observer) m_data_observer(write, u32(at), word);
 			};
-			m_data_tap = m_cpu.space(AS_DATA).install_readwrite_tap(0, 0xffff, "register_sequence_data",
+			m_data_tap = m_cpu.space(m_input.observed_data_space).install_readwrite_tap(0, 0xffff, "register_sequence_data",
 				[access](offs_t at, u16 &word, u16) { access(false, at, word); },
 				[access](offs_t at, u16 &word, u16) { access(true, at, word); });
 		}

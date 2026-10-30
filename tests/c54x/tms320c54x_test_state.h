@@ -1136,7 +1136,6 @@ private:
 		expect_opcode(test.opcode, true, "Literal atomic instruction case");
 		for (auto word : test.additional_opcodes) expect_opcode(word, true, "Literal atomic instruction case");
 	}
-	bool check_atomic_basic_results();
 	bool check_atomic_corpus_results();
 	bool check_bio_results();
 	bool check_bit_results();
