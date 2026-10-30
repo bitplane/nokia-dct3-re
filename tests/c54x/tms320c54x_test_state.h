@@ -697,7 +697,6 @@ private:
 	static std::array<u64,3> register_product_reference(register_product_fixture const &f);
 	void start_register_product(unsigned variant = 0);
 	void start_mac_smem(unsigned variant = 0);
-	void start_ifr_pair(unsigned variant = 0);
 	struct mvkd_peripheral_fixture
 	{
 		u16 destination, source, value;
@@ -1021,7 +1020,6 @@ private:
 	bool check_mapped_dual_results();
 	bool check_repeat_mvdp_irq_results();
 	bool check_circular_portr_results();
-	bool check_ifr_pair_results();
 	bool check_poly_results();
 	bool check_popd_mapped_results();
 	bool check_mvdd_peripheral_results();

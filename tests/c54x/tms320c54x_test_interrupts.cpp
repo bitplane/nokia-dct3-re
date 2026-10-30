@@ -114,30 +114,6 @@ void tms320c54x_test_state::start_poll_interrupt(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_ifr_pair(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const b = variant & 1;
-	u16 const flags = std::array<u16, 4>{0, 8, 0x438, 0xffff}[(variant / 2) % 4] | (variant >= 48 && variant < 72 ? 0x1000 : 0);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
-	program.write_word(0x600, b ? 0x4901 : 0x4801);
-	program.write_word(0x601, b ? 0x8901 : 0x8801);
-	program.write_word(4, 0xf4eb); program.write_word(0x70, 0xf4eb);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, variant >= 48 ? 0 : 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, flags); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x23456789);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(12, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_vector_acks = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(1, 1, "ifr_pair_read",
-		[this, flags](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == flags && !m_pipeline_operand_reads, "LDM reads pending IFR exactly once"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(1, 1, "ifr_pair_ack",
-		[this, flags](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == flags && !m_pipeline_store_writes, "STLM acknowledges the adjacent LDM result exactly once"); ++m_pipeline_store_writes; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253730;
-	m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_repeat_mvdp_irq(unsigned variant)
 {
@@ -439,45 +415,6 @@ bool tms320c54x_test_state::check_repeat_mvdp_irq_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_ifr_pair_results()
-{
-	if (m_phase == 253730)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		unsigned const checkpoint = std::array<unsigned, 3>{4, 6, 8}[(variant % 24) / 8];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "IFR pair remains admitted");
-		if (tick == 5 && variant >= 24 && variant < 48)
-		{
-			expect(m_pipeline_operand_reads == 1 && !m_pipeline_store_writes, "Late IRQ arrives strictly between IFR Read and acknowledgement");
-			m_cpu->set_input_line(12, ASSERT_LINE); m_cpu->set_input_line(12, CLEAR_LINE);
-		}
-		if (tick == 5 && variant >= 48)
-		{
-			expect(m_pipeline_operand_reads == 1 && !m_pipeline_store_writes, "IRQ/NMI selection composes with an in-flight IFR acknowledgement");
-			if (variant < 72) m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0x1000);
-			else { m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); }
-		}
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_vector_acks},
-			"Save IFR pair around Read and acknowledgement");
-		if (tick == (variant >= 48 ? 40 : 12))
-		{
-			u16 const flags = std::array<u16, 4>{0, 8, 0x438, 0xffff}[(variant / 2) % 4];
-			u16 const remaining = variant >= 24 && variant < 48 ? (0x1000 & ~flags) : 0;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == remaining && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1, "Read-back/write-back clears sampled IFR bits and retains a newly pending IRQ");
-			expect(m_cpu->state_int((variant & 1) ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == ((variant & 1) ? 0x12345678 : 0x23456789), "IFR acknowledgement preserves the unselected accumulator");
-			expect(m_vector_acks == unsigned(variant >= 48) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000, "Accepted IRQ/NMI completes exactly one entry and RETE restores the stack");
-			if (replay_pipeline_at(253740, checkpoint,
-				"Replay IFR acknowledgement ownership")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 95) { start_ifr_pair(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged IFR pair: PASS cases=96 restore=96 accumulators=2 patterns=4 pending_only=1 late_irq=1 accepted_irq=1 nmi=1 interrupt_return=1 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated IFR pair complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253740) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253730; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_block_xc_irq_results()
 {

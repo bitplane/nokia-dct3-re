@@ -1938,6 +1938,20 @@ are checked through IDLE/replay. These are model timing/ownership contracts,
 not silicon measurements. The two legacy profiles and phase-specific IRQ hook
 are removed.
 
+### Sampled IFR acknowledgement
+
+`ifr_ack_pair` owns 32 A/B/pattern/scenario cases: pending-only acknowledgement,
+late masked IRQ, accepted IRQ and independent NMI. The adjacent LDM/STLM pair
+reads IFR at model clock 5 and writes the retained sample at 7. A late bit not
+present in the sample remains pending; a previously sampled bit is cleared even
+if another edge arrives before acknowledgement. IMR enable/NMI input after
+Read also verifies that selected entry survives the IFR write, with one owned
+frame and RETE roundtrip. Exact bus traffic, IACK progress, preserved unselected
+accumulator and final flags/stack are replayed. Three checkpoints are distributed
+instead of expanding to 96 cases. IMR changes are explicit latch conformance;
+these are not physical interrupt timing measurements. The old profile and
+phase-specific IRQ hook are removed.
+
 ### Active repeat context and stack bypass
 
 The original wrapper uses `POPD *AR7` at logical `03:1f02`, with AR7
