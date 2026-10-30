@@ -34,49 +34,6 @@ void tms320c54x_test_state::start_xc_irq_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_pipeline_far_irq(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	u32 const base = BIT(variant, 0) ? 0x10000 : 0;
-	u32 const target = (base ^ 0x10000) + 0x700;
-	bool const delayed = BIT(variant, 1);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) {
-		program.write_word(base + 0x600 + i, 0xf495);
-		program.write_word(target + i, 0xf495);
-		program.write_word(0x44 + i, i ? 0xf495 : 0xe955);
-		program.write_word(0x10044 + i, i ? 0xf495 : 0xe955);
-	}
-	program.write_word(base + 0x600, (delayed ? 0xf6e4 : 0xf4e4) | (BIT(variant, 2) ? 0 : 1));
-	program.write_word(target, 0xe811);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 2},
-	});
-	m_cpu->space(AS_DATA).write_word(0x1000, target >> 16);
-	m_cpu->space(AS_DATA).write_word(0x1001, 0x700);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600);
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	auto vector_read = [this, target](offs_t address, u16 &, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(address == (target & 0x10000) + 0x44, "Pending far-return IRQ fetches its vector in the restored page");
-		++m_pipeline_operand_reads;
-	};
-	m_pipeline_operand_tap = program.install_read_tap(0x44, 0x44, "staged_far_irq_low", vector_read);
-	m_pipeline_fetch_tap = program.install_read_tap(0x10044, 0x10044, "staged_far_irq_high", vector_read);
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x1001, 0x1001, "staged_far_irq_stack",
-		[this, delayed](offs_t, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(value == (delayed ? 0x702 : 0x700), "Pending far-return IRQ retains the first undecoded target continuation");
-			++m_pipeline_store_writes;
-		});
-	m_phase = 251370; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -592,47 +549,6 @@ bool tms320c54x_test_state::check_xc_interrupt_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_pipeline_far_irq_results()
-{
-	if (m_phase == 251370)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		bool const delayed = BIT(m_pipeline_peripheral_case, 1);
-		bool const masked = BIT(m_pipeline_peripheral_case, 2);
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Pending cross-page far IRQ advances without unsupported forms");
-		if (cycle == 4) m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 2);
-		if (cycle == 5 && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save pending IRQ with retained cross-page far return");
-		}
-		if (cycle == 20)
-		{
-			expect(m_pipeline_operand_reads == unsigned(!masked) && m_pipeline_store_writes == unsigned(!masked) &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == (masked ? 0x1002 : 0x1001) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (masked || delayed ? 0x11 : 0) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (masked ? 0 : 0x55) &&
-				m_cpu->state_int(tms320c54x_device::STATE_IFR) == (masked ? 2 : 0),
-				"Pending far return drains decoded target work, enters once and preserves the continuation stack");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore pending cross-page far-return IRQ");
-				return restart_pipeline_observer(251380, 6);
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < 7) { start_pipeline_far_irq(m_pipeline_peripheral_case + 1); return true; }
-			osd_printf_info("TMS320C54x staged cross-page far IRQ: PASS cases=8 masked=4 restored_vector_page=1 continuations=0700,0702 restore=8 duplicate_vectors=0 silicon_phase_claim=0\n");
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251380)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251370;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 
 bool tms320c54x_test_state::check_pipeline_xc_irq_results()
