@@ -2695,7 +2695,7 @@ bool tms320c54x_test_state::check_block_repeat_forwarding_results()
 			}
 			osd_printf_info("TMS320C54x staged RMW forwarding: PASS cases=768 restore=768 same_and_different=1 gap_words=0,1 flags=4 pages=2 cpl=2 silicon_phase_claim=0\n");
 			if (profile_is("rmw-forward")) throw emu_fatalerror(0, "TMS320C54x isolated RMW forwarding complete");
-			start_pipeline_negate(); return true;
+			start_pipeline_mapped_word_arithmetic(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}

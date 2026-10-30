@@ -104,7 +104,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_pipeline_direct_immediate_store_results()) return;
 	if (check_ts_load_results()) return;
 	if (check_extended_ar_store_results()) return;
-	if (check_accumulator_logic_results()) return;
 	if (check_data_copy_results()) return;
 	if (check_accumulator_shift_results()) return;
 	if (check_peripheral_long_store_results()) return;

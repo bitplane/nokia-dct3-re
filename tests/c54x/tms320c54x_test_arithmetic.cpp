@@ -11,23 +11,6 @@
 
 namespace c54x_test {
 
-void tms320c54x_test_state::start_register_unary(register_unary_kind kind, unsigned phase)
-{
-	m_register_sequence = std::make_unique<register_sequence_fixture>(machine(), *m_cpu, *m_check_timer,
-		register_unary_count(kind), [kind](unsigned key) { return register_unary_case<cpu_regs>(key, kind); });
-	if (kind == register_unary_kind::shift)
-		m_register_sequence->set_opcode_observer([this](u16 word, u16 expected) {
-			expect_opcode(word, word == expected, "Register shift fetch matches its checked sequence");
-		});
-	m_phase = phase; m_register_sequence->start();
-}
-
-void tms320c54x_test_state::report_register_unary(register_unary_kind kind) const
-{
-	osd_printf_info("%s\n", register_unary_result(kind, m_register_sequence->count(),
-		m_register_sequence->restores(), m_register_sequence->digest()).c_str());
-}
-
 tms320c54x_test_state::rounded_multiply_case const & tms320c54x_test_state::rounded_multiply_vector(unsigned index)
 {
 	// Explicit results from SPRU172C MPYR/MACR/MASR arithmetic, not
@@ -1046,17 +1029,6 @@ void tms320c54x_test_state::start_shifted_ar_conflict(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-
-void tms320c54x_test_state::start_pipeline_accumulator_logic()
-{
-	start_register_unary(register_unary_kind::logic, 252570);
-}
-
-
-void tms320c54x_test_state::start_pipeline_accumulator_shift()
-{
-	start_register_unary(register_unary_kind::shift, 252610);
-}
 
 tms320c54x_test_state::long_pair_fixture_data tms320c54x_test_state::long_pair_fixture(unsigned variant)
 {
@@ -2676,11 +2648,6 @@ void tms320c54x_test_state::start_bit_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-
-void tms320c54x_test_state::start_pipeline_negate()
-{
-	start_register_unary(register_unary_kind::negate, 253410);
-}
 
 tms320c54x_test_state::mapped_word_arithmetic_fixture tms320c54x_test_state::mapped_word_arithmetic_case(unsigned variant)
 {
@@ -5149,29 +5116,8 @@ bool tms320c54x_test_state::check_ts_load_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_accumulator_logic_results()
-{
-	if (m_phase != 252570) return false;
-	if (m_register_sequence->step())
-	{
-		report_register_unary(register_unary_kind::logic);
-		m_register_sequence.reset(); start_pipeline_data_copy();
-	}
-	return true;
-}
-
 bool tms320c54x_test_state::check_accumulator_shift_results()
 {
-	if (m_phase == 252610)
-	{
-		if (m_register_sequence->step())
-		{
-			report_register_unary(register_unary_kind::shift);
-			m_register_sequence.reset(); start_pipeline_long_pair();
-		}
-		return true;
-	}
-
 	if (m_phase == 252630)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
@@ -6028,16 +5974,6 @@ bool tms320c54x_test_state::check_rptbd_shift_store_results()
 
 bool tms320c54x_test_state::check_negate_results()
 {
-	if (m_phase == 253410)
-	{
-		if (m_register_sequence->step())
-		{
-			report_register_unary(register_unary_kind::negate);
-			m_register_sequence.reset(); start_pipeline_mapped_word_arithmetic();
-		}
-		return true;
-	}
-
 	if (m_phase == 253430 || m_phase == 253450)
 	{
 		if (!m_register_sequence->step()) return true;

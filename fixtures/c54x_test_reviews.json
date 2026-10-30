@@ -8,6 +8,16 @@
   },
   "families": [
     {
+      "id": "register-unary-default-duplicate-retirement",
+      "classification": "harness_infrastructure",
+      "decision": "merge",
+      "profiles": [],
+      "case_ids": [],
+      "basis": "Default logic3104, shifts16384 and NEG4608 called register_unary_case with the identical kind and ordinal used by their standalone profiles. Remove duplicate execution and adapters, retaining every builder input and expectation unchanged.",
+      "coverage_change": "24096 duplicate live/replay cases and three default requirements retired. Standalone reg-logic, reg-shifts and negate remain required by the full retained regression. Default-only opcode assertion accounting from the shift adapter is retired; lexical word tags are not semantic coverage.",
+      "limits": ["No numeric cross-products are justified or reduced by this ownership change.", "Incidental predecessor context is not retained as a contract; the next broad default checkpoint must validate bypass continuations."]
+    },
+    {
       "id": "address-stack-default-duplicate-retirement",
       "classification": "harness_infrastructure",
       "decision": "merge",

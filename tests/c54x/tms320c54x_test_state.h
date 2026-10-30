@@ -14,7 +14,6 @@
 #include "tms320c54x_test_selection.h"
 #include "tms320c54x_test_support.h"
 #include "tms320c54x_test_register_sequence.h"
-#include "tms320c54x_test_register_unary.h"
 #include "tms320c54x_test_atomic_routes.h"
 #include "tms320c54x_test_entry_state.h"
 #include "tms320c54x_test_repeat_state.h"
@@ -438,7 +437,6 @@ private:
 	void verify_paired_circular_domain();
 	static dst_extended_fixture extended_dst_fixture(unsigned variant);
 	void start_pipeline_extended_dst(unsigned variant = 0);
-	void start_pipeline_accumulator_logic();
 	struct mvkd_sp_fixture
 	{
 		unsigned form, read, checkpoint;
@@ -455,7 +453,6 @@ private:
 	};
 	static mvkd_fixture data_copy_fixture(unsigned variant);
 	void start_pipeline_data_copy(unsigned variant = 0);
-	void start_pipeline_accumulator_shift();
 	struct long_pair_fixture_data
 	{
 		unsigned form, reg, read_cycle;
@@ -1029,9 +1026,6 @@ private:
 
 	void start_pipeline_rmw_forward(unsigned variant = 0);
 
-	void start_pipeline_negate();
-	void start_register_unary(register_unary_kind kind, unsigned phase);
-	void report_register_unary(register_unary_kind kind) const;
 	std::unique_ptr<register_sequence_fixture> m_register_sequence;
 
 	struct mapped_word_arithmetic_fixture
@@ -2094,7 +2088,6 @@ private:
 	bool check_pipeline_direct_immediate_store_results();
 	bool check_ts_load_results();
 	bool check_extended_ar_store_results();
-	bool check_accumulator_logic_results();
 	bool check_data_copy_results();
 	bool check_accumulator_shift_results();
 	bool check_peripheral_long_store_results();

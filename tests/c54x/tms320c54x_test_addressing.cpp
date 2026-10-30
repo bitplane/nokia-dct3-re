@@ -7562,7 +7562,7 @@ bool tms320c54x_test_state::check_extended_ar_store_results()
 			osd_printf_info("TMS320C54x staged extended DST: PASS cases=3072 forms=offset,preincrement,circular,absolute registers=8 accumulators=2 offsets=4 compatibility=0,1 sst=0,1 restore=3072 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
 			osd_printf_info("TMS320C54x staged short-indirect DST: PASS cases=9216 modes=12 registers=8 accumulators=2 parity=even,odd compatibility=0,1 sst=0,1 restore=9216 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n");
 			if (profile_is("indirect-dld")) { start_shifted_store_dld(); return true; }
-			start_pipeline_accumulator_logic(); return true;
+			start_pipeline_data_copy(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
@@ -8747,7 +8747,7 @@ bool tms320c54x_test_state::check_long_mapped_original_results()
 			}
 			osd_printf_info("TMS320C54x staged STM IMR: PASS cases=4608 restore=4608 irq_bits=16 masks=4 initial_masks=2 intm=2 sources=none,IRQ,NMI pages=2 literal_fetches=1 writes_each=1 destination_reads=0 silicon_phase_claim=0\n");
 			if (profile_is("imr-store")) throw emu_fatalerror(0, "TMS320C54x isolated STM IMR complete");
-			start_pipeline_accumulator_shift(); return true;
+			start_pipeline_long_pair(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
