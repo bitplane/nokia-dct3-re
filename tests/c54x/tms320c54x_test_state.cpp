@@ -9,7 +9,6 @@ namespace c54x_test {
 void tms320c54x_test_state::xf_w(int state)
 {
 	m_xf_pin = bool(state);
-	++m_xf_publications;
 }
 
 int tms320c54x_test_state::bio_r()

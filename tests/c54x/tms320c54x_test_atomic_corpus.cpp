@@ -2298,60 +2298,8 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				"XC 2 releases a pending interrupt after one two-word instruction");
 		m_cpu->set_input_line(2, CLEAR_LINE);
 	}
-	if (m_phase == 6855)
+	if (m_phase == 6550)
 	{
-		program.write_word(0x05e2, 0xf6bd); // RSBX ST1 bit 13
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x2000);
-		m_xf_publications = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-		return resume_atomic_at(0x05e0, 533);
-	}
-	if ((m_phase >= 533 && m_phase <= 536) || (m_phase >= 6547 && m_phase <= 6550))
-	{
-		struct status_case { u16 opcode, st0_before, st1_before, st0_after, st1_after; };
-		static constexpr status_case cases[] = {
-			{ 0xf6bd, 0x0800, 0x2000, 0x0800, 0 },
-			{ 0xf6bf, 0x0800, 0x8000, 0x0800, 0 },
-			{ 0xf7bd, 0x0800, 0, 0x0800, 0x2000 },
-			{ 0xf7be, 0x0800, 0, 0x0800, 0x4000 },
-			{ 0xf5bc, 0x0800, 0x0100, 0x1800, 0x0100 },
-			{ 0xf4bc, 0x1800, 0x0100, 0x0800, 0x0100 },
-			{ 0xf6b8, 0x1800, 0x0300, 0x1800, 0x0200 },
-			{ 0xf7b8, 0x1800, 0x0200, 0x1800, 0x0300 }
-		};
-		const unsigned index = m_phase >= 6547 ? m_phase - 6547 + 4 : m_phase - 533;
-		expect(m_xf_pin == bool(BIT(cases[index].st1_after, 13)) &&
-				m_xf_publications == unsigned(BIT(cases[index].st1_before ^ cases[index].st1_after, 13)),
-				"XF pin follows status mutations exactly once and ignores unrelated bits");
-		expect_opcode(cases[index].opcode,
-				m_cpu->state_int(tms320c54x_device::STATE_ST1) == cases[index].st1_after &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == cases[index].st0_after &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-				"ROM4 RSBX/SSBX changes only the selected ST0/ST1 bit in one cycle");
-		if (index < 7)
-		{
-			program.write_word(0x05e2, cases[index + 1].opcode);
-			m_port_writes = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, cases[index + 1].st0_before);
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, cases[index + 1].st1_before);
-			m_xf_publications = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(index < 3 ? m_phase + 1 : index == 3 ? 6547 : m_phase + 1);
-		}
-		expect(capture_snapshot(machine(), m_xf_saved) == STATERR_NONE,
-			"save architectural XF low");
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, cases[index].st1_after | 0x2000);
-		expect(m_xf_pin, "debugger ST1 import drives XF high immediately");
-		expect(restore_snapshot(machine(), m_xf_saved) == STATERR_NONE && !m_xf_pin,
-			"post-load re-drives restored XF low instead of retaining external high");
-		osd_printf_info("TMS320C54x XF output: PASS status_variants=8 debugger=1 restore=1\n");
 		program.write_word(0x05e2, 0xfd30); // XC 1,TC
 		program.write_word(0x05e3, 0x6d91); // MAR *AR1+
 		program.write_word(0x05e4, 0x75d6);

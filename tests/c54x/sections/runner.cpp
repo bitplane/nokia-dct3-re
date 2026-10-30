@@ -16,14 +16,16 @@ public:
 		m_cpu->set_extended_program(true);
 		m_cpu->set_addrmap(AS_PROGRAM, &section_state::program);
 		m_cpu->set_addrmap(AS_DATA, &section_state::data);
-		m_cpu->xf_out_cb().set([this](int value) { m_xf = bool(value); });
+		m_cpu->xf_out_cb().set([this](int value) {
+			m_xf = bool(value);
+			if (m_fixture) m_fixture->observe_xf(m_xf);
+		});
 	}
 protected:
 	void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(section_state::tick), this);
 		save_item(NAME(m_irq_acks));
-		save_item(NAME(m_xf));
 		save_item(NAME(m_last_irq_case));
 		save_item(NAME(m_case_irq_cursor));
 		m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
@@ -76,6 +78,16 @@ private:
 			throw emu_fatalerror("Section XF output mismatch");
 #endif
 		if (!complete) return;
+#ifdef C54X_SECTION_XF_RESTORE
+		// The external sink is deliberately unsaved: post-load must re-drive it.
+		std::stringstream saved;
+		if (c54x_test::capture_snapshot(machine(),saved) != STATERR_NONE) throw emu_fatalerror("Capture XF restore probe");
+		u16 const st1 = m_cpu->state_int(tms320c54x_device::STATE_ST1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1,st1 ^ 0x2000);
+		if (m_xf != !bool(BIT(st1,13))) throw emu_fatalerror("Debugger import must drive XF immediately");
+		if (c54x_test::restore_snapshot(machine(),saved) != STATERR_NONE || m_xf != bool(BIT(st1,13)))
+			throw emu_fatalerror("Post-load must re-drive the unsaved XF sink");
+#endif
 		unsigned expected_irqs = 0;
 		for (auto const &input : m_cases) expected_irqs += input.irqs.size();
 		if (m_irq_acks != expected_irqs) throw emu_fatalerror("Section IRQ count mismatch: actual=%u expected=%u",m_irq_acks,expected_irqs);

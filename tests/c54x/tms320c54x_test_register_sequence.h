@@ -27,6 +27,12 @@ public:
 	unsigned data_events_seen() const { return m_data_cursor; }
 	void set_opcode_observer(std::function<void(u16, u16)> observer) { m_opcode_observer = std::move(observer); }
 	void set_data_observer(std::function<void(bool, u32, u16)> observer) { m_data_observer = std::move(observer); }
+	void observe_xf(bool value)
+	{
+		if (!m_observing_outputs || !m_input.xf_events) return;
+		require(m_xf_cursor < m_input.xf_events->size() && value == (*m_input.xf_events)[m_xf_cursor], "ordered XF publication");
+		++m_xf_cursor;
+	}
 	u64 digest() const { return m_coverage.value; }
 	bool step()
 	{
@@ -47,6 +53,7 @@ public:
 			m_saved_fetches = m_fetches;
 			m_saved_data_cursor = m_data_cursor;
 			m_saved_program_cursor = m_program_cursor;
+			m_saved_xf_cursor = m_xf_cursor;
 			require(capture_snapshot(m_machine, m_saved) == STATERR_NONE, "capture register-sequence checkpoint");
 		}
 		if (m_tick == m_input.finish)
@@ -55,14 +62,18 @@ public:
 			if (m_input.require_idle) require(m_cpu.state_int(tms320c54x_device::STATE_IDLE), "sequence reaches its real IDLE instruction");
 			if (m_input.single_fetch) require(m_fetches == 1, "one opcode fetch");
 			if (m_input.data_events) require(m_data_cursor == m_input.data_events->size(), "complete data-bus trace");
+			if (m_input.xf_events) require(m_xf_cursor == m_input.xf_events->size(), "complete XF publication trace");
+			m_observing_outputs = false;
 			require(m_program_cursor == (m_input.program_events.empty() ? m_input.retained_program_reads.size() : m_input.program_events.size()), "complete retained-program trace");
 			if (!m_replay)
 			{
 				m_replay = true; m_tick = m_input.checkpoint; m_fetches = m_saved_fetches;
 				m_data_cursor = m_saved_data_cursor;
 				m_program_cursor = m_saved_program_cursor;
+				m_xf_cursor = m_saved_xf_cursor;
 				if (m_input.clear_pipeline_before_restore) m_cpu.set_pipeline_frontend(true);
 				require(restore_snapshot(m_machine, m_timer, m_saved) == STATERR_NONE, "restore register sequence");
+				m_observing_outputs = true;
 				++m_restores; m_cpu.suspend(SUSPEND_REASON_DISABLE, true); m_resume = true; m_timer.enable(true); return false;
 			}
 			m_data_tap.remove(); m_fetch_tap.remove(); m_program_tap.remove(); m_cpu.set_pipeline_frontend(false);
@@ -95,6 +106,7 @@ private:
 	void schedule() { m_timer.adjust(attotime::from_ticks(1, m_cpu.clock())); }
 	void begin()
 	{
+		m_observing_outputs = false;
 		m_cpu.suspend(SUSPEND_REASON_DISABLE, true); m_input = m_build(m_case);
 		require(!m_input.states.empty() && m_input.states.front().tick == 0, "explicit initial observation");
 		for (unsigned i = 1; i < m_input.states.size(); ++i)
@@ -109,6 +121,7 @@ private:
 		m_cpu.set_extended_program(m_input.extended_program);
 		prepare_case(m_cpu, m_input.states.front().observation);
 		m_fetches = m_data_cursor = m_program_cursor = 0;
+		m_xf_cursor = 0;
 		require(!(m_input.forbid_data_access && m_input.data_events), "one data-bus observation policy");
 		if (m_input.data_events)
 		{
@@ -178,6 +191,7 @@ private:
 		m_tick = 0; m_replay = m_resume = false;
 		m_cpu.set_pipeline_frontend(m_input.pipeline_frontend);
 		for (auto const &line : m_input.initial_input_lines) m_cpu.set_input_line(line.index, line.value);
+		m_observing_outputs = true;
 		m_cpu.resume(SUSPEND_REASON_DISABLE); schedule();
 	}
 	running_machine &m_machine;
@@ -187,6 +201,8 @@ private:
 	unsigned m_fetches = 0, m_saved_fetches = 0;
 	unsigned m_data_cursor = 0, m_saved_data_cursor = 0;
 	unsigned m_program_cursor = 0, m_saved_program_cursor = 0;
+	unsigned m_xf_cursor = 0, m_saved_xf_cursor = 0;
+	bool m_observing_outputs = false;
 	builder m_build;
 	std::function<void(u16, u16)> m_opcode_observer;
 	std::function<void(bool, u32, u16)> m_data_observer;

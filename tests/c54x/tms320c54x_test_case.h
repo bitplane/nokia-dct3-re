@@ -82,6 +82,7 @@ struct clocked_register_case
 	bool pipeline_frontend = true;
 	std::vector<register_setting> initial_input_lines{};
 	bool extended_program = true;
+	std::optional<std::vector<bool>> xf_events{}; // Instruction/debugger publications; setup and post-load re-drive are separate.
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

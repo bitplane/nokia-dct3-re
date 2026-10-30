@@ -50,7 +50,6 @@ private:
 
 	void xf_w(int state);
 	bool m_xf_pin = true;
-	unsigned m_xf_publications = 0;
 	void start_repeat_endpoint_case(unsigned index);
 	void start_operand_fetch_case(unsigned index);
 	void start_loop_xc_case(unsigned index);
@@ -1358,7 +1357,6 @@ private:
 	accumulator_branch_fixture m_acc_branch_fixture = {};
 	unsigned m_acc_branch_mapped_writes = 0;
 	u32 m_popd_write_mask = 0;
-	std::stringstream m_xf_saved;
 	// Separate checkpoint lifetimes; host observations still rewind explicitly.
 	std::stringstream m_idle_nmi_saved, m_idle_timer_saved, m_idle_dma_saved;
 	std::stringstream m_timer_prescaler_saved, m_bsp_saved, m_pll_saved, m_clock_rates_saved;
