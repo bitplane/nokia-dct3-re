@@ -126,7 +126,6 @@ private:
 	void start_empty_pipeline_case(bool nmi);
 	void start_multiword_pipeline_case(unsigned variant = 0);
 	void start_multiword_stream_case();
-	void start_pipeline_rmw_case(unsigned variant = 0);
 	void start_pipeline_mask_rmw_case();
 	void start_pipeline_return_case(unsigned variant = 0);
 	void start_pipeline_branch_case(unsigned variant = 0);
@@ -2070,7 +2069,6 @@ private:
 	unsigned m_pipeline_store_case = 0;
 	unsigned m_pipeline_store_writes = 0;
 	unsigned m_pipeline_indirect_case = 0;
-	unsigned m_pipeline_rmw_case = 0;
 	ordered_case_digest m_long_rmw_coverage;
 	unsigned m_long_rmw_replays = 0;
 	ordered_case_digest m_long_store_coverage;

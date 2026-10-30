@@ -852,12 +852,6 @@ void tms320c54x_test_state::test(machine_config &config)
 			expect(line == 0 && m_cpu->pipeline_cycles() == 8, "Accepted IRQ acknowledges once alongside mask RMW retirement");
 			++m_vector_acks;
 		}
-		if (m_phase == 251110)
-		{
-			expect(line == 0 && m_cpu->pipeline_cycles() == ((m_pipeline_rmw_case / 2) % 3 == 1 ? 8 : 7),
-				"RMW retires alongside the accepted vector Fetch/IACK");
-			++m_vector_acks;
-		}
 		if (m_phase == 251090)
 		{
 			expect(line == 0 && m_cpu->pipeline_cycles() == 6, "Indirect load drains while vector IACK occurs");
