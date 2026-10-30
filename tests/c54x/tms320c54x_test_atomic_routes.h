@@ -28,7 +28,7 @@ inline constexpr atomic_phase_range atomic_phase_ranges[] = {
 	{533, 547, atomic_fixture::corpus},
 	{548, 569, atomic_fixture::reference},
 	{602, 613, atomic_fixture::reference},
-	{655, 726, atomic_fixture::reference},
+	{660, 726, atomic_fixture::reference},
 	{728, 738, atomic_fixture::reference},
 	{740, 749, atomic_fixture::reference},
 	{6501, 6502, atomic_fixture::corpus},

@@ -333,6 +333,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_dual_arithmetic_literals.h` | Retain three fixed LMS/MACSU examples: both-accumulator LMS result without T overwrite, unsigned-X/signed-Y MACSU A and fractional MACSU B. Explicit operands/A/B/T/flags/FRCT/pointers, exact ordered dual reads/no writes, fixed literal results, unchanged sources/status and pre-instruction replay. Drop port-marker timing; atomic semantic/access scope. | Native3 cases/restores, unchanged count; build5.405s/run0.015s. Delete614..652 preparation,653/654 and655 assertions/preparations with owning route interval. Only following coefficient-MAC setup remains reference material. |
 
+| `atomic_coefficient_fir_literals.h` | Retain MACP, MACD, repeated MACP, FIRS and repeated FIRS fixed examples. Explicit A/B/T/pointers/source/coefficient arrays replace predecessor inheritance. Exact separate program/data transaction streams, MACD successor write versus MACP source preservation, repeated coefficient advancement, fixed numeric results/pointers/T and pre-operation replay. Drop port-marker timing; atomic semantic/access scope. | Native5 cases/restores, unchanged count; build5.474s/run0.016s. Delete655 setup,656..659 and660 assertions/preparations with owning route interval; following dual ADD/SUB setup remains reference material. Supersedes atomic_dual_arithmetic_literals' pending coefficient-MAC setup. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
