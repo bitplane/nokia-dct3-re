@@ -1437,7 +1437,7 @@ internal BD at `03:da7e`.
 The shared runner checks observations before the explicit tick5 operand
 writes and captures checkpoints afterward. Cases own expected arithmetic;
 the runner owns only the CPU clock, optional bus observers and snapshot
-continuation. It neither resets between cases nor imports a handset device.
+continuation. Each case has explicit setup; no handset device is imported.
 
 ### Unconditional delayed branch in a block
 
@@ -2571,7 +2571,7 @@ shared literal reference bank retains the existing MIN/MAX interval examples
 and adds four full-status MIN/MAX witnesses plus two ROLTC witnesses, both
 destinations with opposed C/TC and guard-bearing inputs. These execute the
 atomic backend with independent literal results and port-bracketed cost
-checks; staged `minmax`/`rotate` retain the broader numeric and replay coverage.
+checks; staged `minmax`/`rotate_pair` retain the broader numeric and replay coverage.
 This deliberately removes the old atomic Cartesian products, not merely
 their routing. Shared MIN/MAX/SQUR and SAT/rotate fixtures use ARP0 when
 CMPT is clear; original ordered identities do not certify unchanged inputs.
