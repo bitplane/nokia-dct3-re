@@ -33,11 +33,6 @@ struct rptbd_observations
 	unsigned acks = 0, stack_reads = 0, stack_writes = 0;
 };
 
-struct delayed_block_repeat_fixture : replay_fixture<rptbd_observations>
-{
-	u16 return_pc = 0, saved_return_pc = 0;
-};
-
 } // namespace c54x_test
 
 #endif // MAME_NOKIA_TMS320C54X_TEST_PIPELINE_STATE_H

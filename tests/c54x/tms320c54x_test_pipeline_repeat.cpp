@@ -251,20 +251,6 @@ void tms320c54x_test_state::start_pipeline_repeat_nop(unsigned variant)
 }
 
 
-unsigned tms320c54x_test_state::rptbd_seed(unsigned v)
-{ return v < 512 ? v : (v - 512) % 16 + (((v - 512) / 16) % 2) * 64; }
-
-unsigned tms320c54x_test_state::rptbd_count(unsigned v)
-{ return std::array<unsigned, 4>{0, 1, 2, 7}[rptbd_seed(v) % 4]; }
-
-unsigned tms320c54x_test_state::rptbd_layout(unsigned v)
-{ return (rptbd_seed(v) / 4) % 4; }
-
-u32 tms320c54x_test_state::rptbd_base(unsigned v)
-{ return (rptbd_seed(v) / 64) % 2 ? 0x20000 : 0; }
-
-u16 tms320c54x_test_state::rptbd_source(unsigned v, unsigned i)
-{ return std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(rptbd_seed(v) / 16) % 4] ^ u16(i * 0x1357); }
 
 tms320c54x_test_state::basic_repeat_fixture tms320c54x_test_state::basic_repeat_case(unsigned v)
 {

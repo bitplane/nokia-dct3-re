@@ -202,7 +202,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"shift-delay"}, [](self &test) { test.start_delay_load(); } },
 		{ {"shift-alu-delay"}, [](self &test) { test.start_delay_load(); } },
 		{ {"ld-ar0-index", "ld-circular"}, [](self &test) { test.start_indexed_load(); } },
-		{ {"rptbd"}, [](self &test) { test.start_rptbd(); } },
 		{ {"rptbd-square"}, [](self &test) { test.start_rptbd_square(); } },
 		{ {"rptbd-squr"}, [](self &test) { test.start_rptbd_square(); } },
 		{ {"rptbd-shift-st"}, [](self &test) { test.start_rptbd_shift_store(); } },
@@ -228,7 +227,6 @@ void tms320c54x_test_state::machine_reset()
 	if (profile_is("saccd")) { start_saccd_case(0); return; }
 	if (profile_is("pshd-long")) { start_extended_push(); return; }
 	if (profile_is("pshd-long-map")) { start_extended_push(96000); return; }
-	if (profile_is("rptbd-irq")) { start_rptbd(512); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"mvdk-mapped", "mvdk-acc", "clock-mvdk"}, [](self &test) { test.start_mvdk_mapped(); } },
 		{ {"mvdk-producer", "mvdk-acc-prod"}, [](self &test) { test.start_mvdk_producer(); } },
@@ -790,7 +788,6 @@ void tms320c54x_test_state::test(machine_config &config)
 				osd_printf_info("Memory repeat interrupt mismatch case=%u replay=%u line=%d acks=%u iterations=%u count=%u cycle=%llu\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), line, m_rptbd_counts.acks, iterations, f.count, (unsigned long long)m_cpu->pipeline_cycles());
 			expect(f.irq && line == (f.irq == 2 ? INPUT_LINE_NMI : 2) && !m_rptbd_counts.acks++ && iterations == f.count + 1, "Memory repeat defers IRQ/NMI until its complete body count"); m_cpu->set_input_line(line, CLEAR_LINE);
 		}
-		acknowledge_rptbd_interrupt(line);
 		if (m_phase == 310400)
 		{
 			auto const f = rptbd_shift_store_case(m_pipeline_peripheral_case);

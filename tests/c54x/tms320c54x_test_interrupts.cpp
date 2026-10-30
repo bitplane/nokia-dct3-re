@@ -155,12 +155,6 @@ void tms320c54x_test_state::start_stack_irq_order(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-int tms320c54x_test_state::rptbd_irq_line(unsigned v)
-{ return ((v - 512) / 32) % 2 ? INPUT_LINE_NMI : 2; }
-
-bool tms320c54x_test_state::rptbd_late_irq(unsigned v)
-{ return ((v - 512) / 64) % 2; }
-
 void tms320c54x_test_state::start_block_xc_irq(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;

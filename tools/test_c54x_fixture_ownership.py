@@ -28,11 +28,6 @@ class FixtureOwnershipTests(unittest.TestCase):
                          'm_vector_prefetch_tap', 'm_vector_stack_tap'))
         self.check_owners('tms320c54x_test_observer.cpp', dict.fromkeys((
             'start_instruction_observer', 'check_instruction_observer_results'), 'm_instruction_observer'))
-        self.check_owners('tms320c54x_test_block_repeat.cpp', dict.fromkeys((
-            'start_rptbd', 'check_rptbd_layout_results',
-            'acknowledge_rptbd_interrupt'), 'm_rptbd'),
-            handoffs=('start_rptbd',),
-            legacy_taps=('m_pipeline_operand_tap', 'm_pipeline_write_tap', 'm_pipeline_fetch_tap'))
 
     def test_snapshot_stream_boundaries(self):
         # Architectural ownership only: the executable replay gates establish

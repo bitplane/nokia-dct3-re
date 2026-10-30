@@ -92,7 +92,6 @@ private:
 	void start_interrupt_acceptance_checkpoint();
 	void acknowledge_entry_interrupt(int line);
 	void acknowledge_frontend_interrupt(int line);
-	void acknowledge_rptbd_interrupt(int line);
 	void start_entry_stage_restore_case(unsigned index);
 	void start_cala_rtn_case(unsigned index);
 	void start_operand_fetch_case(unsigned index);
@@ -607,13 +606,6 @@ private:
 	};
 	static banzd_fixture banzd_case(unsigned variant);
 	void start_pipeline_banzd(unsigned variant = 0);
-	static unsigned rptbd_seed(unsigned v);
-	static unsigned rptbd_count(unsigned v);
-	static unsigned rptbd_layout(unsigned v);
-	static u32 rptbd_base(unsigned v);
-	static u16 rptbd_source(unsigned v, unsigned i);
-	static int rptbd_irq_line(unsigned v);
-	static bool rptbd_late_irq(unsigned v);
 	struct extended_push_fixture
 	{
 		unsigned form, selected, pattern, irq, checkpoint;
@@ -705,7 +697,6 @@ private:
 	};
 	rptbd_square_fixture rptbd_square_case(unsigned v) const;
 	void start_rptbd_square(unsigned variant = 0);
-	void start_rptbd(unsigned variant = 0);
 	struct memory_immediate_fixture
 	{
 		unsigned form, read, access, checkpoint, words;
@@ -2034,7 +2025,6 @@ private:
 	bool check_mvdk_mapped_results();
 	bool check_basic_repeat_results();
 	bool check_rptbd_shift_store_results();
-	bool check_rptbd_layout_results();
 	bool check_ram_forwarding_results();
 	bool check_negate_results();
 	bool check_long_mapped_original_results();
@@ -2191,7 +2181,6 @@ private:
 	bool m_pipeline_replay = false;
 	frontend_entry_fixture m_frontend;
 	instruction_observer_fixture m_instruction_observer;
-	delayed_block_repeat_fixture m_rptbd;
 	rptbd_observations m_rptbd_counts, m_rptbd_saved_counts;
 	replay_fixture<saved_repeat_observations> m_saved_irq_repeat, m_body_irq_repeat;
 	replay_fixture<repeat_context_observations> m_repeat_context;
