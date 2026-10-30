@@ -1412,104 +1412,9 @@ void tms320c54x_test_state::start_accumulator_branch(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::offset_logic_fixture tms320c54x_test_state::offset_logic_case(unsigned v)
-{
-	offset_logic_fixture f{};
-	f.operation = (v % 6) / 2; f.b = v & 1;
-	unsigned const mode = (v / 6) % 24, pair = (v / 576) % 4, flags = (v / 2304) % 4;
-	f.kind = mode / 8; f.encoded = mode % 8; f.cmpt = (v / 9216) % 2; f.linear = (v / 18432) % 2;
-	f.selected = f.cmpt && !f.encoded ? 3 : f.encoded;
-	unsigned const offset_index = (v / 144) % 4;
-	s16 const offset = offset_index == 3 && f.kind == 2 && !f.linear ? 7 : std::array<s16, 4>{0, 1, -1, 0x1462}[offset_index];
-	f.literal = u16(offset);
-	u16 const initial = offset_logic_fixture::initial_ar(f.selected);
-	// BK=13 uses a 16-word aligned base and an initial queue index of 12.
-	int const index = (12 + offset) % 13;
-	f.address = f.kind == 2 && !f.linear ? (initial & 0xfff0) | (index < 0 ? index + 13 : index) : u16(initial + offset);
-	f.next = f.kind ? f.address : initial;
-	f.base = ((v / 36864) % 2) ? 0x20000 : 0;
-	f.snapshot = std::array<unsigned, 4>{3, 5, 6, 7}[v / 73728];
-	f.st0 = 0x6608 | (pair & 1 ? 0x1800 : 0);
-	f.st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 2 ? 0x200 : 0) | (f.cmpt ? 0x20 : 0) | (pair & 2 ? 0x80 : 0);
-	f.source = std::array<u64, 4>{0, 0xffff, 0x123456789aULL, 0xff80000000ULL}[pair];
-	f.value = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[pair];
-	return f;
-}
 
-void tms320c54x_test_state::start_offset_logic(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; m_offset_logic_fixture = offset_logic_case(variant); auto const f = m_offset_logic_fixture;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, f.opcode()); program.write_word(f.base + 0x601, f.literal); program.write_word(f.base + 0x602, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.linear ? 0 : 13);
-	for (unsigned r = 0; r < 8; ++r) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + r, offset_logic_fixture::initial_ar(r));
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.b ? 0x2233445566ULL : f.source); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b ? f.source : 0x2233445566ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead); m_cpu->set_state_int(tms320c54x_device::STATE_RTN, 0x5555);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); data.write_word(f.address, f.value);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "offset_logic_source", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (at != f.address || word != f.value || m_cpu->pipeline_cycles() != 6 || m_pipeline_operand_reads) osd_printf_info("offset_logic_read: case=%u at=%04x expected=%04x word=%04x expected_word=%04x cycle=%llu\n", m_pipeline_peripheral_case, unsigned(at), f.address, word, f.value, (unsigned long long)m_cpu->pipeline_cycles());
-		expect(at == f.address && word == f.value && m_cpu->pipeline_cycles() == 6 && !m_pipeline_operand_reads, "Long logical Smem reads its captured address once at Read"); ++m_pipeline_operand_reads;
-	});
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "offset_logic_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false, "Long memory logic never writes data memory"); } });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "offset_logic_literal", [this, f](offs_t, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(word == f.literal && m_cpu->pipeline_cycles() == 3 && !m_pipeline_extensions_reads, "Long memory logic retains one signed offset literal"); ++m_pipeline_extensions_reads;
-	});
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254260;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
-tms320c54x_test_state::absolute_logic_fixture tms320c54x_test_state::absolute_logic_case(unsigned v)
-{
-	absolute_logic_fixture f{};
-	f.kind = v % 6;
-	// 0060/0061 are the harness's synthetic IRQ peripheral, not RAM.
-	f.address = std::array<u16, 4>{0x0062, 0x1001, 0xb582, 0xffff}[(v / 6) % 4];
-	unsigned const pair = (v / 24) % 4;
-	f.value = std::array<u16, 4>{0xffff, 0x8000, 0x00ff, 0x8001}[pair];
-	f.source = std::array<u64, 4>{0, 0xffff, 0x123456789aULL, 0xff80000000ULL}[pair];
-	f.status = 0x4a20 | (((v / 96) % 2) ? 0x100 : 0);
-	f.base = ((v / 192) % 2) ? 0x20000 : 0;
-	f.snapshot = std::array<unsigned, 4>{3, 4, 6, 7}[v / 384];
-	return f;
-}
 
-void tms320c54x_test_state::start_absolute_logic(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = absolute_logic_case(variant);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, f.opcode()); program.write_word(f.base + 0x601, f.address); program.write_word(f.base + 0x602, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xb601); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.status);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x2222); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xdead);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.kind & 1 ? 0x2233445566ULL : f.source);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, f.kind & 1 ? f.source : 0x2233445566ULL);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	data.write_word(f.address, f.value);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "absolute_logic_read", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (at != f.address || word != f.value || m_cpu->pipeline_cycles() != 6 || m_pipeline_operand_reads) osd_printf_info("absolute_logic_read: case=%u replay=%u at=%04x expected=%04x word=%04x expected_word=%04x cycle=%llu reads=%u\n", m_pipeline_peripheral_case, unsigned(m_pipeline_replay), unsigned(at), f.address, word, f.value, (unsigned long long)m_cpu->pipeline_cycles(), m_pipeline_operand_reads);
-		expect(at == f.address && word == f.value && m_cpu->pipeline_cycles() == 6 && !m_pipeline_operand_reads, "Absolute logic reads only its retained address once at Read"); ++m_pipeline_operand_reads;
-	});
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "absolute_logic_write", [this](offs_t, u16 &, u16) {
-		if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false, "Absolute accumulator logic never writes data memory"); }
-	});
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "absolute_logic_literal", [this, f](offs_t, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(word == f.address && m_cpu->pipeline_cycles() == 3 && !m_pipeline_extensions_reads, "Absolute logic fetches one address literal"); ++m_pipeline_extensions_reads;
-	});
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254160;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -3286,35 +3191,6 @@ bool tms320c54x_test_state::check_poly_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_absolute_logic_results()
-{
-	if (m_phase == 254160)
-	{
-		auto const f = absolute_logic_case(m_pipeline_peripheral_case); unsigned const tick = ++m_idle_fixture_tick;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_pipeline_extensions_reads == unsigned(tick >= 3) && m_pipeline_operand_reads == unsigned(tick >= 6) && !m_pipeline_store_writes, "Absolute logic owns its literal and operand without duplicate transactions");
-		expect(m_cpu->state_int(f.kind & 1 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == (tick >= 7 ? f.result() : f.source) && m_cpu->state_int(f.kind & 1 ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x2233445566ULL, "Absolute logic zero-extends independently of SXM and publishes only at Execute");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xb601 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.status && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xdead && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x2222 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Absolute logic preserves status, pointers, T and stack");
-		if (tick == 3) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xf495); }
-		if (tick == 6) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead); }
-		if (tick == f.snapshot && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save absolute logic's partial Decode, captured address, operand or publication"); }
-		if (tick == 12)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x603, "Absolute logic consumes its address word and reaches the exact next instruction");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_extensions_reads = unsigned(f.snapshot >= 3); m_pipeline_operand_reads = unsigned(f.snapshot >= 6); m_idle_fixture_tick = f.snapshot;
-				return restore_pipeline_at(254170, "Restore absolute logic without refetching or rereading captured words");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < 1535) { start_absolute_logic(m_pipeline_peripheral_case + 1); return true; }
-			osd_printf_info("TMS320C54x staged absolute logic: PASS cases=1536 restore=1536 operations=AND,OR,XOR accumulators=2 addresses=4 values=4 sxm_states=2 pages=2 snapshots=4 literal_fetches=1 source_reads=1 data_writes=0 retained_address=1 retained_source=1 mapped_acceptance=0 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated absolute logic complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254170) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254160; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_accumulator_branch_results()
 {
@@ -3343,35 +3219,6 @@ bool tms320c54x_test_state::check_accumulator_branch_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 254250) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254240; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 254260)
-	{
-		auto const &f = m_offset_logic_fixture; unsigned const tick = ++m_idle_fixture_tick;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_pipeline_operand_reads == unsigned(tick >= 6) && m_pipeline_extensions_reads == unsigned(tick >= 3) && !m_pipeline_store_writes, "Long memory logic retains exact literal and source transactions");
-		expect(m_cpu->state_int(f.b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == (tick >= 7 ? f.result() : f.source) && m_cpu->state_int(f.b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x2233445566ULL, "Long memory logic zero-extends its source independently of SXM/OVM/C16 and publishes at Execute");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (tick >= 5 ? f.final_st0() : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xdead && m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0x5555, "Long logical addressing changes only the legitimate ARP field and selected pointer");
-		if (tick == 3) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xf495); }
-		if (tick == 5)
-		{
-			for (unsigned r = 0; r < 8; ++r) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + r) == (r == f.selected ? f.next : offset_logic_fixture::initial_ar(r)), "Long logic resolves the encoded/compatibility AR and applies one offset modification at Access");
-			for (unsigned r = 0; r < 8; ++r) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + r, 0x3330 + r);
-		}
-		if (tick >= 5) for (unsigned r = 0; r < 8; ++r) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + r) == 0x3330 + r, "Retained logical addresses do not reapply a pointer update after mutation or replay");
-		if (tick == 6) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead); }
-		if (tick == f.snapshot && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save long logical literal, modified pointer, sampled word or result"); }
-		if (tick == 12)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x603 && m_cpu->state_int(tms320c54x_device::STATE_BK) == (f.linear ? 0 : 13), "Long memory logic consumes its extension and leaves BK unchanged");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = f.snapshot; m_pipeline_operand_reads = unsigned(f.snapshot >= 6); m_pipeline_extensions_reads = unsigned(f.snapshot >= 3); return restore_pipeline_at(254270, "Restore long memory logic without refetching, rereading or reapplying the modifier");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < 294911) { start_offset_logic(m_pipeline_peripheral_case + 1); return true; }
-			osd_printf_info("TMS320C54x staged long memory logic: PASS cases=294912 restore=294912 operations=AND,OR,XOR accumulators=2 modes=24 offsets=4 value_pairs=4 sxm_ovm=4 cmpt=2 bk=0,13 pages=2 snapshots=4 literal_fetches=1 source_reads=1 data_writes=0 pointer_updates_once=1 native_offset1462=1 mapped_acceptance=0 repeat_acceptance=0 irq_acceptance=0 silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated long memory logic complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254270) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254260; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 

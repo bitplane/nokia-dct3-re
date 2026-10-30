@@ -603,31 +603,6 @@ private:
 	};
 	accumulator_branch_fixture accumulator_branch_case(unsigned v);
 	void start_accumulator_branch(unsigned variant = 0);
-	struct offset_logic_fixture
-	{
-		unsigned operation, encoded, selected, kind, snapshot;
-		bool b, cmpt, linear;
-		u16 literal, address, next, st0, st1, value;
-		u32 base;
-		u64 source;
-		static u16 initial_ar(unsigned r) { return 0x100c + r * 0x100; }
-		u16 opcode() const { return (0x1800 + operation * 0x200) | (b ? 0x100 : 0) | (0xe0 + kind * 8 + encoded); }
-		u16 final_st0() const { return cmpt && encoded ? (st0 & 0x1fff) | (encoded << 13) : st0; }
-		u64 result() const { return operation == 0 ? source & value : operation == 1 ? source | value : source ^ value; }
-	};
-	static offset_logic_fixture offset_logic_case(unsigned v);
-	void start_offset_logic(unsigned variant = 0);
-	struct absolute_logic_fixture
-	{
-		unsigned kind, snapshot;
-		u32 base;
-		u16 address, value, status;
-		u64 source;
-		u16 opcode() const { return 0x18f8 + (kind / 2) * 0x200 + (kind & 1) * 0x100; }
-		u64 result() const { return kind < 2 ? source & value : kind < 4 ? source | value : source ^ value; }
-	};
-	static absolute_logic_fixture absolute_logic_case(unsigned v);
-	void start_absolute_logic(unsigned variant = 0);
 	struct delay_load_fixture
 	{
 		unsigned kind, form, ar, selected, destination, flags, read, checkpoint;
@@ -1388,7 +1363,6 @@ private:
 	bool check_ifr_pair_results();
 	bool check_poly_results();
 	bool check_delayed_far_call_results();
-	bool check_absolute_logic_results();
 	bool check_popd_mapped_results();
 	bool check_accumulator_branch_results();
 	bool check_mvdd_peripheral_results();
@@ -1556,7 +1530,6 @@ private:
 	// Immutable case inputs remain unchanged across each manual replay.
 	popd_fixture m_popd_fixture = {};
 	accumulator_branch_fixture m_acc_branch_fixture = {};
-	offset_logic_fixture m_offset_logic_fixture = {};
 	unsigned m_acc_branch_mapped_writes = 0;
 	u32 m_popd_write_mask = 0;
 	far_transfer_snapshot m_far_transfer;

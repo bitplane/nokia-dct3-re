@@ -176,6 +176,7 @@ def main():
     counts['page_zero_stack'] = 6528
     counts['load_return'] = 8
     counts['atomic_subtract'] = 384
+    counts['long_memory_logic'] = 9408
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
