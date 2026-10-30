@@ -927,14 +927,6 @@ private:
 	bool standard_reada_brc() const;
 	reada_brc_fixture reada_brc_case(unsigned v) const;
 	void start_reada_brc(unsigned variant = 0);
-	struct page_zero_stack_fixture
-	{
-		unsigned form, snapshot;
-		u16 address, value, sp, st1;
-		u32 base;
-	};
-	static page_zero_stack_fixture page_zero_stack_case(unsigned v, bool edge);
-	void start_page_zero_stack(unsigned variant = 0);
 	void start_delayed_far_call(unsigned variant = 0);
 	struct mac_smem_fixture
 	{

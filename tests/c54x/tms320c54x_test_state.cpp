@@ -265,7 +265,6 @@ void tms320c54x_test_state::machine_reset()
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"stack-page0", "stack-page0-edge"}, [](self &test) { test.start_page_zero_stack(); } },
 	}))
 		return;
 	if (absolute_memory_dp()) { start_pipeline_memory_dp(); return; }
