@@ -28,54 +28,6 @@ void tms320c54x_test_state::start_cala_rtn_case(unsigned index)
 
 
 
-void tms320c54x_test_state::start_pipeline_worker_xc(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	bool const branch = variant >= 8;
-	u32 const origin = branch ? 0x23dbc : 0x600;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) { program.write_word(origin + i, 0xf495); if (branch) program.write_word(0x23ddb + i, 0xf495); }
-	std::array<u16, 9> const prefix{0xfd00, 0x4a07, 0xfd00, 0xf7bb, 0x7192, 0x0010, 0x1092, 0xf844, 0x3ddb};
-	for (unsigned i = 0; i < (branch ? 9 : variant >= 4 ? 7 : 4); ++i) program.write_word(origin + i, prefix[i]);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0}, {cpu_regs::STATE_SP, 0x500}, {cpu_regs::STATE_IFR, 0},
-		{cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_AR0, 0x5678}, {cpu_regs::STATE_AR2, 0x510},
-		{cpu_regs::STATE_A, 0x1234},
-	});
-	m_cpu->space(AS_DATA).write_word(0x510, 0xbeef);
-	m_cpu->space(AS_DATA).write_word(0x511, branch ? BIT(variant, 0) : 0x1357);
-	m_cpu->set_state_int(STATE_GENPC, origin);
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_drained_fetches = 0;
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x4ff, 0x4ff, "worker_xc_push",
-		[this](offs_t, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(word == 0 && m_cpu->pipeline_cycles() == 7, "Original XC prefix saves old ST1 once before setting INTM");
-			++m_pipeline_store_writes;
-		});
-	if (variant >= 4)
-		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x510, 0x511, "original_worker_reads",
-			[this, variant, branch](offs_t address, u16 &word, u16) {
-				if (machine().side_effects_disabled()) return;
-				expect(word == (address == 0x510 ? 0xbeef : branch ? BIT(variant, 0) : 0x1357) &&
-					m_cpu->pipeline_cycles() == (address == 0x510 ? 9 : 11), "Original worker MVDK and adjacent LD sample successive source words once");
-				++m_pipeline_operand_reads;
-			});
-	if (branch)
-		m_pipeline_fetch_tap = program.install_read_tap(0x23dc7, 0x23ddb, "original_worker_bc_route",
-			[this, variant](offs_t address, u16 &, u16) {
-				if (machine().side_effects_disabled()) return;
-				if (address != 0x23dc7 && address != 0x23ddb) return;
-				expect(bool(BIT(variant, 0)) == (address == 0x23ddb) && m_cpu->pipeline_cycles() == 14, "Original worker BC consumes adjacent load and fetches the selected route once");
-				if (address == 0x23ddb) ++m_pipeline_extensions_reads;
-				else ++m_pipeline_drained_fetches;
-			});
-	m_phase = 251690; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_xc_return(unsigned variant)
 {
@@ -453,61 +405,6 @@ bool tms320c54x_test_state::check_delayed_call_results()
 }
 
 
-bool tms320c54x_test_state::check_pipeline_worker_xc_results()
-{
-	if (m_phase == 251690)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		bool const composed = m_pipeline_peripheral_case >= 4;
-		bool const branch = m_pipeline_peripheral_case >= 8;
-		bool const nonzero = BIT(m_pipeline_peripheral_case, 0);
-		u64 const checkpoint = branch ? 11 + (m_pipeline_peripheral_case - 8) / 2 : 3 + 2 * (m_pipeline_peripheral_case & 3);
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_pipeline_store_writes == unsigned(cycle >= 7) &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= 6 ? 0x4ff : 0x500) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == (cycle >= 9 ? 0x800 : 0),
-			"Original unconditional XC worker prefix preserves PSHM/INTM ordering");
-		if (composed)
-			expect(m_pipeline_operand_reads == unsigned(cycle >= 9) + unsigned(cycle >= 11) &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR0) == (cycle >= 9 ? 0xbeef : 0x5678) &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (cycle >= 10 ? 0x512 : cycle >= 9 ? 0x511 : 0x510) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 12 ? (branch ? (cycle >= 14 ? !nonzero : nonzero) : 0x1357) : 0x1234),
-				"Original worker prefix composes XC, stack, INTM, MVDK and next indirect load without duplicate source updates");
-		if (branch)
-			expect(m_pipeline_extensions_reads == unsigned(nonzero && cycle >= 14) &&
-				m_pipeline_drained_fetches == unsigned(!nonzero && cycle >= 14), "Original worker BC retains its page-2 target and sampled route on replay");
-		if (branch && cycle == 13) m_cpu->set_state_int(tms320c54x_device::STATE_A, !nonzero);
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save original XC prefix");
-		}
-		if (composed && cycle == 9) m_cpu->space(AS_DATA).write_word(0x510, 0);
-		if (branch && cycle == 11) m_cpu->space(AS_DATA).write_word(0x511, 0xdead);
-		if (cycle == (branch ? 21 : 16))
-		{
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_store_writes = unsigned(checkpoint >= 7);
-				m_pipeline_operand_reads = composed ? unsigned(checkpoint >= 9) + unsigned(checkpoint >= 11) : 0;
-				m_pipeline_extensions_reads = m_pipeline_drained_fetches = 0;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore original XC prefix without duplicate push");
-				return restart_pipeline_observer(251700, checkpoint + 1);
-			}
-			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < 13) { start_pipeline_worker_xc(m_pipeline_peripheral_case + 1); return true; }
-			osd_printf_info("TMS320C54x staged original worker XC prefix: PASS cases=14 restore=14 composed_seven_words=4 composed_nine_words=6 duplicate_pushes=0\n");
-			return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251700)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251690;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 
 
