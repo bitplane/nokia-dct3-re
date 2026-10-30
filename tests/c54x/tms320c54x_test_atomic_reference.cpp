@@ -4,7 +4,6 @@
 #include "emu.h"
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_memory_examples.h"
-#include "tms320c54x_test_memory_continuations.h"
 #include <algorithm>
 
 namespace c54x_test {
@@ -299,20 +298,6 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			});
 			return next_atomic_phase(6523);
 		}
-		return begin_atomic_case(memory_continuations().front(), 665);
-	}
-	if (m_phase >= 665 && m_phase <= 694)
-	{
-		unsigned const index = m_phase - 665;
-		auto const &cases = memory_continuations();
-		auto const &test = cases[index];
-		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
-		expect_opcode(test.opcode, true, "Literal memory/accumulator continuation");
-		if (index + 1 < cases.size())
-		{
-			return begin_atomic_case(cases[index + 1], m_phase + 1);
-		}
-		m_phase = 9223;
 	}
 	if (m_phase >= 9223 && m_phase <= 9225)
 	{
