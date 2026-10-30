@@ -167,59 +167,6 @@ void tms320c54x_test_state::start_repeat_store(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_pipeline_repeat_mvpd(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const interrupt = variant >= 128, nmi = interrupt && BIT(variant, 3);
-	unsigned const count = std::array<unsigned, 4>{0, 1, 3, 15}[variant % 4];
-	u32 const base = BIT(variant, 2) ? 0x30000 : 0x20000;
-	u32 const source = BIT(variant, 3) ? 0x700 : base + 0x700;
-	bool const advance = BIT(variant, 4);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 80; ++i) program.write_word(base + 0x9000 + i, 0xf495);
-	std::array<u16, 5> const code{0xf070, u16(count), u16(advance ? 0x7c92 : 0x7c82), 0x700, 0xe955};
-	for (unsigned i = 0; i < code.size(); ++i) program.write_word(base + 0x9000 + i, code[i]);
-	for (unsigned i = 0; i <= count; ++i) { program.write_word(source + i, 0x1200 + i); m_cpu->space(AS_DATA).write_word(0x420 + i, 0xffff); }
-	if (interrupt)
-	{
-		u32 const vector = nmi ? 4 : base + 0x40;
-		program.write_word(vector, 0x4a1e); program.write_word(vector + 1, 0xf495); program.write_word(vector + 2, 0xf4e5);
-	}
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, BIT(variant, 3) ? 0x20 : 0);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 0xa608},
-		{cpu_regs::STATE_ST1, interrupt && !nmi ? 0 : 0x800}, {cpu_regs::STATE_SP, 0x1000},
-		{cpu_regs::STATE_AR2, 0x420}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_IFR, 0},
-		{cpu_regs::STATE_IMR, interrupt && !nmi ? 1 : 0},
-	});
-	m_cpu->set_state_int(STATE_GENPC, base + 0x9000); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0;
-	m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_vector_acks = 0;
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x420, 0x430, "repeat_mvpd_data",
-		[this, advance, count](offs_t at, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_store_writes <= count && at == 0x420 + (advance ? m_pipeline_store_writes : 0) && value == 0x1200 + m_pipeline_store_writes &&
-				m_cpu->pipeline_cycles() == 10 + m_pipeline_store_writes, "RPT MVPD retires count+1 ordered words, then one transfer per stream clock"); ++m_pipeline_store_writes;
-		});
-	m_pipeline_operand_tap = program.install_read_tap(source, source + count, "repeat_mvpd_source",
-		[this, source, count](offs_t at, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_operand_reads <= count && at == source + m_pipeline_operand_reads && value == 0x1200 + m_pipeline_operand_reads &&
-				m_cpu->pipeline_cycles() == (m_pipeline_operand_reads ? 10 + m_pipeline_operand_reads : 9), "RPT MVPD increments its retained program source without operand refetch"); ++m_pipeline_operand_reads;
-		});
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x9004, base + 0x9004, "repeat_mvpd_continuation",
-		[this, count, interrupt](offs_t, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			// Count zero leaves a continuation Prefetch before pending
-			// INTR acceptance; that fetched word is drained and discarded.
-			expect(m_pipeline_extensions_reads < (interrupt && !count ? 3 : 2) && value == (m_pipeline_extensions_reads ? 0xe966 : 0xe955) &&
-				(!m_pipeline_extensions_reads || m_pipeline_store_writes == count + 1), "RPT discards the speculative continuation and refetches only after final retirement"); ++m_pipeline_extensions_reads;
-		});
-	m_phase = 252310; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_memory_repeat_read_a(unsigned variant)
 {
@@ -5606,52 +5553,6 @@ bool tms320c54x_test_state::check_repeat_pop_exclusion_results()
 	if (m_phase == 252280)
 	{
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252270;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252310)
-	{
-		unsigned const variant = m_pipeline_peripheral_case;
-		bool const interrupt = variant >= 128, nmi = interrupt && BIT(variant, 3);
-		unsigned const count = std::array<unsigned, 4>{0, 1, 3, 15}[variant % 4];
-		u32 const base = BIT(variant, 2) ? 0x30000 : 0x20000;
-		u32 const source = BIT(variant, 3) ? 0x700 : base + 0x700;
-		unsigned const tick = ++m_idle_fixture_tick;
-		unsigned const checkpoint = interrupt ? 9 : std::array<unsigned, 4>{6, 9, 11, 20}[variant / 32];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Staged RPT MVPD owns a complete retained transfer loop");
-		if (interrupt && tick == 3) { int const line = nmi ? INPUT_LINE_NMI : 0; m_cpu->set_input_line(line, ASSERT_LINE); m_cpu->set_input_line(line, CLEAR_LINE); }
-		if (interrupt && tick < count + 10) expect(!m_vector_acks, "RPT Decode suppresses IRQ and NMI until all repeated transfers retire");
-		if (tick == 6) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x9004, 0xe966); }
-		if (tick == 9) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(source, 0xaaaa); }
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_operand_reads, m_pipeline_extensions_reads, m_vector_acks};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save RPT body barrier, first transfer, stream iteration or final continuation");
-		}
-		if (tick == count + 40)
-		{
-			expect(m_pipeline_store_writes == count + 1 && m_pipeline_operand_reads == count + 1 && m_pipeline_extensions_reads == (interrupt && !count ? 3 : 2) &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x420 + (BIT(variant, 4) ? count + 1 : 0) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x66 && m_vector_acks == unsigned(interrupt) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
-				"RPT retires its full count+1 body before fresh continuation, without duplicated reads, writes or postincrements");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_operand_reads = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				m_vector_acks = m_recurring_irq_snapshot[3];
-				return restore_pipeline_at(252320, "Restore repeat stream and retained operand without restarting the loop");
-			}
-			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant == 127) osd_printf_info("TMS320C54x staged RPT MVPD: PASS cases=128 counts=4 pages=2 ovly_states=2 destination_modes=2 restore=128 count_plus_one=1 duplicate_transfers=0\n");
-			if (variant < 143) { start_pipeline_repeat_mvpd(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged RPT interrupts: PASS cases=16 sources=IRQ,NMI counts=4 pages=2 restore=16 deferred_until_final_write=1 correct_continuation=1\n");
-			if (profile_is("mvpd-controls")) throw emu_fatalerror(0, "TMS320C54x isolated MVPD controls complete");
-			start_pipeline_sp_rmw(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252320)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252310;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	return false;

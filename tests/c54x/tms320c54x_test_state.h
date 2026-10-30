@@ -325,7 +325,6 @@ private:
 	void start_repeat_store(unsigned variant = 0);
 	void start_rptz(unsigned variant = 0);
 	void start_ar_addm_load(unsigned variant = 0);
-	void start_pipeline_repeat_mvpd(unsigned variant = 0);
 	void start_pipeline_sp_rmw(unsigned variant = 0);
 	void start_pipeline_arp(unsigned variant = 0);
 	void start_pipeline_read_a(unsigned variant = 0);

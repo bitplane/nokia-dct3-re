@@ -24,13 +24,18 @@ protected:
 		m_timer = timer_alloc(FUNC(section_state::tick), this);
 		save_item(NAME(m_irq_acks));
 		save_item(NAME(m_xf));
-#ifdef C54X_SECTION_IRQ
+		save_item(NAME(m_last_irq_case));
 		m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
-			if (line != 0 || m_cpu->pipeline_cycles() != 6)
-				throw emu_fatalerror("Section IRQ ordering mismatch");
-			++m_irq_acks; m_cpu->set_input_line(line, CLEAR_LINE); return 0;
+			unsigned const index = m_fixture->count();
+			auto const &expected = m_cases.at(index).irq;
+			u64 const cycle = m_cpu->pipeline_cycles();
+			if (!expected || line != expected->line || cycle < expected->earliest || cycle > expected->latest ||
+				m_last_irq_case == index || m_fixture->data_events_seen() != expected->data_events_before ||
+				(expected->return_pc && m_cpu->state_int(tms320c54x_device::STATE_RTN) != *expected->return_pc))
+				throw emu_fatalerror("Section IRQ case=%u line=%d clock=%llu data_events=%u previous_case=%u",
+					index,line,(unsigned long long)cycle,m_fixture->data_events_seen(),m_last_irq_case);
+			m_last_irq_case = index; ++m_irq_acks; m_cpu->set_input_line(line, CLEAR_LINE); return 0;
 		}, "section_irq");
-#endif
 		m_cases = c54x_test::section_cases();
 		m_fixture = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 			m_cases.size(), [this](unsigned i) { return m_cases.at(i); });
@@ -61,9 +66,9 @@ private:
 			throw emu_fatalerror("Section XF output mismatch");
 #endif
 		if (!complete) return;
-#ifdef C54X_SECTION_IRQ
-		if (m_irq_acks != m_cases.size()) throw emu_fatalerror("Section IRQ count mismatch");
-#endif
+		unsigned expected_irqs = 0;
+		for (auto const &input : m_cases) expected_irqs += bool(input.irq);
+		if (m_irq_acks != expected_irqs) throw emu_fatalerror("Section IRQ count mismatch");
 		osd_printf_info("C54x section: PASS cases=%u restores=%u\n", m_fixture->count(), m_fixture->restores());
 		throw emu_fatalerror(0, "C54x section complete");
 	}
@@ -72,6 +77,7 @@ private:
 	std::vector<c54x_test::clocked_register_case> m_cases;
 	std::unique_ptr<c54x_test::register_sequence_fixture> m_fixture;
 	u32 m_irq_acks = 0;
+	u32 m_last_irq_case = ~u32(0);
 	bool m_xf = false;
 };
 ROM_START(tms54isa)

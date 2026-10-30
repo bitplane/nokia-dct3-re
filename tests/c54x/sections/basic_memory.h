@@ -1,7 +1,6 @@
 // license:BSD-3-Clause
 // copyright-holders:Gaz
 #include "c54x_section_common.h"
-#define C54X_SECTION_IRQ
 #define C54X_SECTION_OBSERVE_STORE
 namespace c54x_test {
 inline std::vector<clocked_register_case> section_cases()
@@ -46,6 +45,8 @@ inline std::vector<clocked_register_case> section_cases()
 			c.data_events = std::vector<clocked_data_event>{{true,0x420,value,6}};
 		}
 		c.data_events->push_back({true,0xfff,0x601,7});
+		// Vector Fetch shares clock6 with the store's Execute publication.
+		c.irq = clocked_irq_expectation{0,6,6,load ? 1U : 0U};
 		cases.push_back(std::move(c));
 	}
 	return cases;

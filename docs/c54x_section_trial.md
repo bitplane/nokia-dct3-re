@@ -49,6 +49,7 @@ Subsequent replacements use the same section-only workflow:
 | `stack_control.h` | IMR replacement/IFR W1C POPM without destination reads, poisoned retained stack value, before/after-write replay; DAGEN-bank conflict versus RAM control; active-repeat POPM rejection before effects. Remove duplicated pages, retain all register/value/pending combinations, and add replay to the three rejection controls. Same-clock publication order is model-only evidence. | Native108 cases/restores; build5.365s/run0.055s. Replaces192 IRQ-pop,12 conflict and3 rejection executions; removes their starts, decoder and phase handlers. |
 | `stm_ram.h` |256 successful indirect and256 rejected-alias cases retain all selectors, four literal/destination choices and both compatibility states.512 direct cases retain every32 low-RAM destination, eight literals and adjacent/gapped LDM. Distribute status and snapshot choices; retire page/status/replay Cartesian replication. Preserve poisoned literal/pointer/status inputs, neighboring RAM, no destination reads, complete bus events and clearing the frontend before restoring a saved pending instruction. Correct nonzero standard-mode ARP. | Native1,024 cases/restores; build5.449s/run0.398s. Removes68,608 legacy executions and their fixture/starts/phases62134/62135. |
 | `program_transfer.h` |32 short MVPD cases retain all destination modes, two source regions, overlay states and pages2/3.800 extended cases retain absolute plus all indirect selectors, four values, mapping/region/compatibility combinations, pointer/source poisoning and all-AR preservation. Distribute replay points; collapse redundant absolute-selector and page-zero replication. Correct standard-mode ARP. New program-event observations check literal order and held source-read clocks; unrelated instruction fetches are outside that trace. | Native832 cases/restores; build5.582s/run0.410s. Replaces6,272 legacy executions and their starts/phase handlers. Memory-DP48 and STM1,024 retained-literal controls also pass after the observer addition. |
+| `repeat_program.h` | Repeat counts0/1/3/15, fixed/advancing destinations and mapped/unmapped sources; IRQ/NMI acknowledged only after all writes, with RTN9004 and restored SP. Verify source-read/write order, first-source poisoning and no early continuation result, then fresh66 continuation. Distribute page/replay choices rather than multiply them. Independently vary IRQ source and mapping (the old bank coupled them). Retire exact speculative-prefetch counts, not continuation behavior. Data trace is explicitly scoped to the transfer buffer; return/stack behavior has separate assertions. Standard-mode ARP corrected to0. | Native48 cases/restores; build5.539s/run0.028s. Replaces144 legacy executions and their start, IRQ callback and phases252310/252320. IRQ source/timing/RTN/transfer-count expectations now belong to each case rather than a basic-memory runner macro. |
 
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
@@ -81,3 +82,11 @@ Linear extrapolation is roughly20 hours, not a promise; budget15-30 hours for
 the remaining migration/integration and final validation, revising after a
 larger batch. Already structured independent cases should not be rewritten
 merely to satisfy that estimate. Full retained-suite timing is still unknown.
+
+After the case-owned IRQ expectation change, all15 migrated sections pass:
+2,842 cases/restores, including the firmware descriptor-copy section. This
+is a migrated-section checkpoint, not full CPU or handset acceptance.
+The basic store IRQ acknowledges in the same clock before its Write tap;
+the basic load acknowledges after its earlier Read. Case-owned bus-progress
+expectations preserve that distinction without putting opcode logic in the
+IRQ runner. Snapshot registration restores the IRQ count/last-case observer.

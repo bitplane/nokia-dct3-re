@@ -44,6 +44,12 @@ struct clocked_register_action
 	std::vector<memory_word> data{};
 };
 struct clocked_data_event { bool write; std::uint32_t address; u16 value; unsigned cycle; };
+struct clocked_irq_expectation
+{
+	int line;
+	unsigned earliest, latest, data_events_before;
+	std::optional<u16> return_pc{};
+};
 
 inline bool accept_data_event(std::vector<clocked_data_event> const &events, unsigned &cursor, clocked_data_event actual)
 {
@@ -69,6 +75,8 @@ struct clocked_register_case
 	std::optional<unsigned> final_pipeline_clock{};
 	bool clear_pipeline_before_restore = false;
 	std::vector<clocked_data_event> program_events{};
+	std::optional<std::array<u32,2>> data_range{}; // Explicitly scoped bus observations.
+	std::optional<clocked_irq_expectation> irq{};
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

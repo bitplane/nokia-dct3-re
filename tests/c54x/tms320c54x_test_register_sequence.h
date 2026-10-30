@@ -24,6 +24,7 @@ public:
 	void start() { require(m_cases > 0, "nonempty register sequence"); m_case = m_restores = 0; m_coverage = {}; begin(); }
 	unsigned count() const { return m_case; }
 	unsigned restores() const { return m_restores; }
+	unsigned data_events_seen() const { return m_data_cursor; }
 	void set_opcode_observer(std::function<void(u16, u16)> observer) { m_opcode_observer = std::move(observer); }
 	void set_data_observer(std::function<void(bool, u32, u16)> observer) { m_data_observer = std::move(observer); }
 	u64 digest() const { return m_coverage.value; }
@@ -116,7 +117,8 @@ private:
 						m_case, m_data_cursor, unsigned(write), unsigned(at), word, (unsigned long long)m_cpu.pipeline_cycles());
 				if (!m_machine.side_effects_disabled() && m_data_observer) m_data_observer(write, u32(at), word);
 			};
-			m_data_tap = m_cpu.space(AS_DATA).install_readwrite_tap(0, 0xffff, "register_sequence_data",
+			auto const range = m_input.data_range.value_or(std::array<u32,2>{0,0xffff});
+			m_data_tap = m_cpu.space(AS_DATA).install_readwrite_tap(range[0], range[1], "register_sequence_data",
 				[access](offs_t at, u16 &word, u16) { access(false, at, word); },
 				[access](offs_t at, u16 &word, u16) { access(true, at, word); });
 		}
