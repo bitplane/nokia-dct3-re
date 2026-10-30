@@ -18,6 +18,29 @@ sets the reduction order. Unreviewed families remain undecided.
 
 ## Execution policy
 
+### Unary review finding
+
+The existing four unary profiles contain 28,704 numeric cases. Their earlier
+reviews justified balancing replay points, but did not justify retaining the
+entire numeric/status/page cross-product. Those preservation obligations are
+not constraints on this reduction campaign.
+
+NEG and ABS are the first numeric reduction target: keep all sixteen numeric
+patterns across four source/destination selectors and OVM on/off; cover all
+32 status combinations at representative overflow and zero boundaries rather
+than for every pattern and page. Keep adjacent immediate producers for zero
+and nonzero values. Program-page coverage belongs to fetch/control tests,
+not every unary arithmetic tuple. Explicitly record the lost cross-product
+coverage when implementing the replacement; matching opcode counts would
+not establish equivalence.
+
+SFTA/SFTL need a separate selection: SXM, saturation and incoming carry have
+different relevance for right, zero and left shifts. Preserve all encoded
+shift amounts and operand-width boundaries, but do not blindly preserve all
+flag combinations for logical shifts. The current builders also seed ARP
+nonzero in standard mode; correct those inputs against TI's ARP=0 rule rather
+than preserving them as architectural witnesses.
+
 - Initial investigation is limited to 15 minutes per ambiguous family. Record
   the concrete unresolved question rather than invent a retention rationale.
 - Use focused native tests per batch; full default and handset gates are broad

@@ -918,7 +918,7 @@
       "basis": "TI SPRU172C AND/OR/XOR accumulator and CMPL descriptions; independent bit-position reference, additionally checked by whole-word masked logical operations, not CPU helpers.",
       "source": "tests/c54x/tms320c54x_test_register_unary.h; tests/c54x/tms320c54x_test_register_sequence.h",
       "profiles": ["reg-logic"],
-      "legacy_entry": "default phases252570/252580; one adapter now delegates to the shared clocked runner, then continues to the original data-copy family",
+      "legacy_entry": "Retired: standalone reg-logic owns the bank; default now enters data-copy directly.",
       "case_ids": [],
       "profile_coverage": {
         "reg-logic": {"cases": 3104, "fnv64": "55e8b6d128246315", "result_prefix": "TMS320C54x staged register logic: PASS", "key": "Original raw keys: logical tuple0..3071 plus its selected 3072-stride checkpoint; complement tuple0..31 plus6144 and its selected32-stride checkpoint."}
@@ -933,7 +933,7 @@
       "basis": "TI SPRU172C SFTA and SFTL, pages4-155..4-159: signed40-bit versus zero-filled32-bit shifting, carry, saturation and destination overflow. Existing per-bit reference body is unchanged; independent whole-word arithmetic/division checks its retained results.",
       "source": "tests/c54x/tms320c54x_test_register_unary.h; tests/c54x/tms320c54x_test_register_sequence.h",
       "profiles": ["reg-shifts"],
-      "legacy_entry": "default phase252610, then the unchanged long-pair initializer; opcode coverage is observed at the actual matching fetch, while the runner owns all result/status checks",
+      "legacy_entry": "Retired: standalone reg-shifts owns the bank; default now enters long-pair directly. Default-only lexical opcode accounting is no longer emitted.",
       "case_ids": [],
       "profile_coverage": {
         "reg-shifts": {"cases": 16384, "fnv64": "50bc9b13b4563125", "result_prefix": "TMS320C54x staged accumulator shifts: PASS", "key": "Original numeric ordinal0..16383 plus its balanced choice of original checkpoint key0/16384."}
@@ -948,7 +948,7 @@
       "basis": "TI SPRU172C NEG and ABS instruction descriptions: two's-complement/absolute arithmetic, zero-source carry, sticky destination overflow and optional32-bit saturation. Unchanged integer fixture body is checked independently by sign/magnitude arithmetic.",
       "source": "tests/c54x/tms320c54x_test_register_unary.h; tests/c54x/tms320c54x_test_register_sequence.h",
       "profiles": ["negate", "absolute"],
-      "legacy_entry": "NEG remains in the default sequence at phase253410 before mapped-word arithmetic; both isolated profiles move from the legacy composition to the CPU-only machine",
+      "legacy_entry": "Retired: standalone negate and absolute own their banks; default now enters mapped-word arithmetic directly.",
       "case_ids": [],
       "profile_coverage": {
         "negate": {"cases": 4608, "fnv64": "1dd6c7685f95e5c7", "result_prefix": "TMS320C54x staged NEG: PASS", "key": "Original numeric ordinal0..4607 plus one of original0/4608/9216 replay-key offsets, balanced by selector, flags, pattern and page."},

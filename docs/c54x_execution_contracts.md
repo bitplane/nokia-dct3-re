@@ -563,8 +563,8 @@ share the clocked CPU-only runner and independent integer case builders.
 They retain every original numeric/status/page tuple, assigning each one a
 balanced original replay point instead of replaying the whole matrix at every
 point. The host census checks the projection and checkpoint classes; the
-review ledger owns exact keys and digests. Default adapters retain their
-original successors. A real final IDLE replaces unobserved padding, not a
+review ledger owns exact keys and digests. Redundant default adapters have
+been retired; standalone profiles own these banks. A real final IDLE replaces unobserved padding, not a
 consumer interaction. Repeat, IRQ and memory-operand compositions stay separate.
 The basis is [TI SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf);
 publication clocks and the documented left-carry policy are not silicon measurements.
