@@ -52,7 +52,6 @@ private:
 	void start_idle_dma_case(unsigned index);
 	void start_idle_external_serial_case(unsigned index);
 	void start_idle_timer_case(unsigned index);
-	void start_idle_wake_case(unsigned index);
 	void start_pipeline_mu4_prologue(unsigned variant = 0);
 	void observe_context_irq(int line);
 	bool check_rom4_context_results();
@@ -680,7 +679,7 @@ private:
 	void expect_opcode(u16 opcode, bool condition, const char *message);
 
 	// Return true only when the original callback would return; order is retained.
-	bool check_idle_wake_results();
+	bool check_deep_idle_results();
 	bool restart_pipeline_observer(unsigned phase, u64 next_cycle)
 	{
 		// This replaces the deadline with one CPU clock; timed restores keep theirs.

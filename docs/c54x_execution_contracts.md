@@ -165,6 +165,16 @@ negative control fail. MAME HALT is fixture control here, not an asserted
 C54x pin assignment. Cycle accuracy and staged-frontend equivalence are not
 claimed by this section.
 
+`idle_wake` owns six atomic-frontend IDLE1 cases: external requests with
+IMR/INTM combinations, plus timer requests with the timer mask disabled or
+enabled. IMR gates wake independently of INTM. Enabled/unmasked interrupts
+enter the vector and stack the old continuation; enabled requests under
+INTM instead resume foreground, write its marker and stop the timer. Masked
+requests remain pending without executing foreground. Exact IFR, PC, SP,
+marker/stack RAM and ordered writes are checked after a pre-wake checkpoint
+and replay. Timer start is explicit MMIO/state conformance stimulus; no
+physical clock-rate or exact wake-latency claim is made.
+
 The independent `status_bitfield` section owns ST0/ST1 BITF sampling: 128
 register/pattern/mask/initial-TC/addressing combinations, with pages and three
 checkpoint positions distributed rather than multiplied into 768 executions.

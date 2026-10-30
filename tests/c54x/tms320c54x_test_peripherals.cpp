@@ -96,37 +96,6 @@ void tms320c54x_test_state::start_idle_timer_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_idle_wake_case(unsigned index)
-{
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x010900, 0xf4e1); // IDLE1
-	program.write_word(0x010901, 0x76f8); // Mark foreground continuation.
-	program.write_word(0x010902, 0x0501);
-	program.write_word(0x010903, 1);
-	program.write_word(0x010904, 0x7726); // Stop the periodic source after continuation.
-	program.write_word(0x010905, 0x0010);
-	program.write_word(0x010906, 0xf4e1);
-	program.write_word(0x010040, 0xf4e1); // External IRQ0 vector, without return.
-	m_cpu->space(AS_DATA).write_word(0x0501, 0);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_SP, 0x1000},
-		{cpu_regs::STATE_ST1, index >= 2 ? 0x0800 : 0}, {cpu_regs::STATE_IMR, (index & 1) ? (index >= 4 ? 8 : 1) : 0},
-		{cpu_regs::STATE_IFR, 0}, {STATE_GENPC, 0x010900}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 6200 + index * 2;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
-
-
-
-
-
-
-
-
-
-
-
 unsigned tms320c54x_test_state::pipeline_idle_kind(unsigned variant) const
 {
 	return m_idle_mode_bank ?
@@ -480,47 +449,10 @@ void tms320c54x_test_state::start_bsp_interrupt_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-bool tms320c54x_test_state::check_idle_wake_results()
+bool tms320c54x_test_state::check_deep_idle_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 6200 && m_phase < 6212)
-	{
-		unsigned const index = (m_phase - 6200) / 2;
-		if (!(m_phase & 1))
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-				m_cpu->state_int(STATE_GENPC) == 0x010901,
-				"IDLE1 reaches its continuation before the wake source is supplied");
-			if (index < 4)
-			{
-				m_cpu->set_input_line(0, ASSERT_LINE);
-				m_cpu->set_input_line(0, CLEAR_LINE);
-			}
-			else
-			{
-				m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 9);
-				m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x20);
-			}
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		bool const enabled = index & 1;
-		bool const serviced = enabled && index < 2;
-		bool const continued = enabled && !serviced;
-		expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->space(AS_DATA).read_word(0x0501) == (continued ? 1 : 0) &&
-			m_cpu->state_int(STATE_GENPC) == (serviced ? 0x010041 : continued ? 0x010907 : 0x010901) &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == (serviced ? 0x0fff : 0x1000) &&
-			(serviced || (m_cpu->state_int(tms320c54x_device::STATE_IFR) & (index >= 4 ? 8 : 1))),
-			"SPRU131G IDLE1 wake requires IMR enable, independently of INTM; masked requests remain pending");
-		if (index < 5) { start_idle_wake_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x IDLE1 wake: PASS external_cases=4 timer_cases=2\n");
-		start_idle_timer_case(0);
-		return true;
-	}
 	if ((m_phase >= 6220 && m_phase < 6232) || (m_phase >= 6240 && m_phase < 6244))
 	{
 		unsigned const index = m_phase >= 6240 ? m_phase - 6240 : (m_phase - 6220) / 3;
