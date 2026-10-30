@@ -192,7 +192,6 @@ private:
 	}
 	void start_pipeline_dld(unsigned variant = 0);
 	void start_pipeline_immediate_add(unsigned variant = 0);
-	void start_pipeline_ldm(unsigned variant = 0);
 	void start_pipeline_logical_immediate(unsigned variant = 0);
 	bool absolute_memory_dp() const;
 	void start_pipeline_memory_dp(unsigned variant = 0);
@@ -2038,7 +2037,6 @@ private:
 	bool check_pipeline_intm_results();
 	bool check_pipeline_mmr_pop_results();
 	bool check_pipeline_load_add_results();
-	bool check_pipeline_dst_results();
 	bool check_pipeline_logical_immediate_results();
 	bool check_absolute_memory_dp_results();
 	bool check_pipeline_conditional_branch_results();

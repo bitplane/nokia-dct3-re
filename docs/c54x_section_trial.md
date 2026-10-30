@@ -40,6 +40,7 @@ Subsequent replacements use the same section-only workflow:
 | Section | Contract and deliberate reduction | Validation |
 | --- | --- | --- |
 | `paired_store.h` | DST high/low write order, odd/even address, DP/CPL, both accumulators, four saturation boundaries and poisoned source after Read. All64 numeric tuples retained with distributed replay points instead of192 executions. Standard-mode ARP corrected to0; literal saturation expectations replace the duplicated arithmetic formula. | Native64 cases/restores; build5.122s/run0.038s. Legacy DST start and phases251530/251540 removed. |
+| `register_load.h` | LDM zero-extension, nine source classes, both accumulators and SXM/CPL states, peripheral wait and poisoned retained RAM value. Keep both XPC pages but retire other page replication; distribute replay points. Correct standard-mode ARP to0 and use literal source expectations instead of CPU readback. | Native80 cases/restores; build5.298s/run0.045s. Retires288 legacy executions and start/results phases251550/251560. |
 
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,

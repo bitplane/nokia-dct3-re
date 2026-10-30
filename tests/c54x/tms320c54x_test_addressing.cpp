@@ -169,39 +169,6 @@ void tms320c54x_test_state::start_pipeline_pop_dagen_conflict(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_pipeline_ldm(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	u16 const source = std::array<u16, 9>{6, 7, 8, 0x0a, 0x11, 0x18, 0x1e, 0x7e, 0x25}[(variant / 16) % 9];
-	u32 const base = BIT(variant, 3) ? 0x10000 : 0;
-	unsigned const wait = source == 0x25;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : 0x4800 | (BIT(variant, 0) << 8) | source);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa61a},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (BIT(variant, 1) << 8) | (BIT(variant, 2) << 14));
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR1, 0xffff}, {cpu_regs::STATE_A, 0x123456cafeULL},
-		{cpu_regs::STATE_B, 0x234567abcdULL}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(0x7e, 0x8001);
-	m_cpu->space(AS_DATA).write_word(0x25, 0xabcd);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600);
-	u16 const expected = m_cpu->space(AS_DATA).read_word(source);
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_operand_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(source, source, "staged_ldm_source",
-		[this, expected, wait](offs_t, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(value == expected && m_cpu->pipeline_cycles() == 5 + wait, "LDM retains its page-zero word after any peripheral wait");
-			++m_pipeline_operand_reads;
-		});
-	m_phase = 251550; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 bool tms320c54x_test_state::absolute_memory_dp() const
 { return profile_is("dp-absolute"); }
@@ -6124,52 +6091,6 @@ bool tms320c54x_test_state::check_pipeline_mmr_pop_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_pipeline_dst_results()
-{
-	if (m_phase == 251550)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		unsigned const variant = m_pipeline_peripheral_case;
-		unsigned const index = (variant / 16) % 9, wait = index == 8;
-		u16 const st1 = 0x800 | (BIT(variant, 1) << 8) | (BIT(variant, 2) << 14);
-		u16 const expected = std::array<u16, 9>{0xa61a, st1, 0xcafe, 0x12, 0xffff, 0x1000, u16(BIT(variant, 3)), 0x8001, 0xabcd}[index];
-		u64 const checkpoint = variant >= 144 ? 5 + wait : 4;
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_pipeline_operand_reads == unsigned(cycle >= 5 + wait) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 6 + wait && !BIT(variant, 0) ? expected : 0x123456cafeULL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 6 + wait && BIT(variant, 0) ? expected : 0x234567abcdULL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa61a &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == st1 &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
-			"LDM zero-extends page-zero data independently of DP/CPL/SXM and preserves the other accumulator/status");
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save LDM before/after its retained source sample");
-		}
-		if (cycle == 5 + wait && index == 7) m_cpu->space(AS_DATA).write_word(0x7e, 0);
-		if (cycle == 10)
-		{
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_operand_reads = checkpoint >= 5 + wait ? 1 : 0;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore LDM source/peripheral wait without another bus read");
-				return restart_pipeline_observer(251560, checkpoint + 1);
-			}
-			m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 287) { start_pipeline_ldm(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged LDM: PASS cases=288 sources=9 destinations=A,B pages=2 sxm=0,1 cpl=0,1 restore=288 duplicate_reads=0\n");
-			start_pipeline_logical_immediate(); return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251560)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251550;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_absolute_memory_dp_results()
 {
