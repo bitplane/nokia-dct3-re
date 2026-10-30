@@ -1419,9 +1419,9 @@ in [Core regression checkpoint](#core-regression-checkpoint).
 
 ### Accumulator SQUR
 
-CPU-only `squr` retains 4,096 cases/restores: two destinations, 16 A operands,
-two opposite-sign B sentinels, eight FRCT/OVM/SXM combinations, two pages and
-all four checkpoints per retained tuple. B is never a multiplicand; the
+`accumulator_square` retains 512 cases/restores: two destinations, 16 A operands,
+two opposite-sign B sentinels and eight FRCT/OVM/SXM combinations. Pages/four
+checkpoints are distributed rather than multiplied. B is never a multiplicand; the
 14 other B values are retired, not claimed as retained numeric coverage.
 The sentinels `123456789a`/`edcba98765` distinguish B preservation for an A
 destination from overwrite for a B destination, and neither equals any
@@ -2550,19 +2550,18 @@ phase timing, remain unvalidated. Store-bypass and indexed-MAR controls pass.
 MAX/MIN (`f486/f586/f487/f587`, SPRU172C 4-99/100) compares signed 40-bit
 accumulators in Execute and replaces only the selected destination and carry.
 Equality selects B and sets carry; SXM and OVM do not change comparison or
-saturate the selected value. CPU-only `minmax` retains 19,456 cases/restores:
-all four selectors, 256 value pairs, eight status combinations and two pages.
-Every numeric tuple remains; equality tuples retain all four checkpoints,
-while strict comparisons retain one each. A compiled census verifies all
-four restore boundaries in every selector/full-status/page and LT/EQ/GT
-class. Guard-bit patterns distinguish signed 40-bit from signed 32-bit or
+saturate the selected value. `minmax` retains 8,192 cases/restores:
+all four selectors, 256 value pairs and eight status combinations. Pages/four
+checkpoints are distributed, including equality tuples; their extra checkpoint
+copies are retired. Sign-bit-biased unsigned ordering independently checks
+signed 40-bit comparison. Guard-bit patterns distinguish signed 40-bit from signed 32-bit or
 unsigned comparison. Replacing both accumulators after Read proves Execute
 ownership; no data access occurs. This is not an instruction-driven adjacent
 producer or interrupt-composition proof. Signed-XC and EXP/NORM controls pass.
 
 MIN/MAX and accumulator SQUR use the shared clocked register-case runner.
 Case data explicitly supplies the tick5 A/B replacement, tick6 observations,
-bus-access prohibition, opcode address and original raw identity. The runner
+bus-access prohibition and opcode address. The runner
 rewinds the fetch observer separately from guest state; replay must not
 duplicate a fetch. Arithmetic remains in the unchanged independent reference,
 not the runner or a CPU implementation helper.
