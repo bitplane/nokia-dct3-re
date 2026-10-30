@@ -651,7 +651,6 @@ private:
 
 	void start_rom4_fr_encoder(unsigned frame, unsigned stage);
 
-	void start_bsp_interrupt_case(unsigned index);
 
 	void start_rom4_pcm_mute(unsigned index);
 
@@ -720,7 +719,7 @@ private:
 		m_check_timer->enable(true);
 		return true;
 	}
-	bool check_bsp_interrupt_results();
+	bool check_clock_control_results();
 	bool check_idle_pll_results();
 	bool check_repeat_endpoints_results();
 	bool check_pipeline_idle_results();
@@ -860,7 +859,7 @@ private:
 	u32 m_popd_write_mask = 0;
 	// Separate checkpoint lifetimes; host observations still rewind explicitly.
 	std::stringstream m_idle_dma_saved;
-	std::stringstream m_bsp_saved, m_pll_saved, m_clock_rates_saved;
+	std::stringstream m_pll_saved, m_clock_rates_saved;
 };
 
 } // namespace c54x_test

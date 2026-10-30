@@ -3,7 +3,7 @@
 #include "emu.h"
 #include "tms320c54x_test_register_sequence.h"
 #include "c54x_section_selected.h"
-#ifdef C54X_SECTION_BSP_WORD_SOURCE
+#if defined(C54X_SECTION_BSP_WORD_SOURCE) || defined(C54X_SECTION_BSP_INTERRUPT)
 #include "tms320c54x_bsp_state.h"
 #endif
 #if defined(C54X_SECTION_MCBSP_CONTROL) || defined(C54X_SECTION_DEEP_IDLE_CLOCKS)
@@ -257,6 +257,21 @@ private:
 #endif
 	TIMER_CALLBACK_MEMBER(tick)
 	{
+#ifdef C54X_SECTION_BSP_INTERRUPT
+		if (m_fixture->tick_count()==16) {
+			unsigned const index=m_fixture->count(), source=index<4 ? 4 : 5;
+			tms320c54x_bsp_state port;
+			port.control_w(index==8 ? 0xc0 : source==4 ? 0x80 : 0x40);
+			if (source==5) port.transmit_w(0x1234);
+			u16 output=0;
+			auto const frame=port.duplex_frame(0x5678,output);
+			if (frame.transmit_ready_edge!=(source==5) || frame.receive_ready_edge!=(source==4 || index==8) ||
+				frame.transmitted!=(source==5) || (frame.transmitted && output!=0x1234))
+				throw emu_fatalerror("BSP frame must produce only its enabled ready transitions");
+			if (frame.transmit_ready_edge) m_cpu->set_input_line(5,HOLD_LINE);
+			if (frame.receive_ready_edge) m_cpu->set_input_line(4,HOLD_LINE);
+		}
+#endif
 #ifdef C54X_SECTION_DEEP_IDLE_CLOCKS
 		unsigned const now=m_fixture->tick_count(), index=m_fixture->count();
 		if (now==100) {

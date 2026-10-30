@@ -187,6 +187,15 @@ Disconnecting the peripheral-clock output fails on premature transmission.
 Register inspection is nondestructive observation, not guest bus traffic.
 These are clock-domain and replay contracts, not physical rate measurements.
 
+`bsp_interrupt` owns nine atomic completed-frame interrupt cases. The standard
+BSP word-state implementation generates RX/TX ready transitions, then the test
+attachment routes them to CPU inputs4/5. An execution hold allows the snapshot
+to capture pending IFR before vector dispatch. RX wins simultaneous readiness;
+IMR-masked requests stay pending, INTM-set eligible requests resume foreground,
+and ordinary unmasked requests push one continuation and enter the appropriate
+vector. PC, SP, status/masks, pending IFR and exact writes survive replay.
+This verifies completed-word routing, not serial pin cadence or handset audio.
+
 The independent `status_bitfield` section owns ST0/ST1 BITF sampling: 128
 register/pattern/mask/initial-TC/addressing combinations, with pages and three
 checkpoint positions distributed rather than multiplied into 768 executions.
