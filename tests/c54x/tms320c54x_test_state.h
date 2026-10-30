@@ -267,7 +267,6 @@ private:
 	void start_repeat_pop_exclusion(unsigned variant = 0);
 	void start_pipeline_mvpd(unsigned variant = 0);
 	void start_extended_mvpd(unsigned variant = 0);
-	void start_extended_mvpd_edge(unsigned variant = 0);
 	void start_literal_guard(unsigned variant = 0);
 	struct ar_addm_fixture
 	{
@@ -1355,8 +1354,8 @@ private:
 		bool excluded;
 		unsigned write_clock;
 	};
-	static circular_move_fixture circular_move_case(unsigned variant, bool edge);
-	static circular_move_fixture indexed_move_case(unsigned variant, bool edge);
+	static circular_move_fixture circular_move_case(unsigned variant);
+	static circular_move_fixture indexed_move_case(unsigned variant);
 	void start_circular_move(unsigned variant = 0);
 	struct repeated_mvdk_fixture
 	{
@@ -1368,7 +1367,7 @@ private:
 		bool excluded;
 		static u16 seed(u16 address) { return u16((unsigned(address) * 0x3917) ^ 0xa55a); }
 	};
-	static repeated_mvdk_fixture repeated_mvdk_case(unsigned variant, bool edge = false, bool indexed = false);
+	static repeated_mvdk_fixture repeated_mvdk_case(unsigned variant, bool indexed = false);
 	struct rptbd_t_load_fixture
 	{
 		unsigned count, slot, form, snapshot, accumulator;
@@ -1626,7 +1625,6 @@ private:
 	static bool repeat_mvkd_bypass(repeat_mvkd_fixture const &f, unsigned n);
 	static u16 repeat_mvkd_value(repeat_mvkd_fixture const &f, unsigned n);
 	void start_repeat_mvkd(unsigned variant = 0);
-	void start_repeat_mvkd_edge(unsigned variant = 0);
 	void start_repeat_mvdp(unsigned variant = 0);
 	void start_repeat_mvdp_irq(unsigned variant = 0);
 	void start_mvdp_pair(unsigned variant = 0);
@@ -1721,7 +1719,7 @@ private:
 			return mvdd_source_word(address(i), pattern, base, repeated ? 0x1000 + issued : 0x2222, repeated ? source + (fixed ? 0 : issued) : 0x3333);
 		}
 	};
-	static mvdd_source_fixture mvdd_source_case(unsigned variant, bool repeated, bool edge = false);
+	static mvdd_source_fixture mvdd_source_case(unsigned variant, bool repeated);
 	void start_mvdd_source(unsigned variant = 0);
 	void start_mvdd_peripheral(unsigned variant = 0);
 	void start_mvmd_word_register(unsigned variant = 0);
@@ -1742,7 +1740,6 @@ private:
 	};
 	static mvdk_producer_fixture mvdk_producer_case(unsigned v, bool accumulator_destination = false);
 	void start_mvdk_producer(unsigned variant = 0);
-	void start_mvdk_mapped_edge(unsigned variant = 0);
 	void start_mvmd_accumulator(unsigned variant = 0);
 	void start_mcbsp_control_sequence(unsigned variant = 0);
 	static accumulator_store_fixture preincrement_store_case(unsigned variant);
@@ -2118,7 +2115,7 @@ private:
 	bool check_saved_repeat_results();
 	bool check_repeat_context_results();
 	bool check_delayed_call_replay_results();
-	bool check_mvdk_mapped_edge_results();
+	bool check_mvdk_producer_results();
 	bool check_clkmd_move_edge_results();
 	bool check_mvdk_mapped_results();
 	bool check_basic_repeat_edge_results();

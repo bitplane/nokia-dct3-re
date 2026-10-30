@@ -388,10 +388,8 @@ an atomic fallback or any synthesized payload.
 preincrement-offset and circular destinations, eight AR initializations,
 four values, two program pages/regions, both OVLY/CMPT states and three
 snapshots. Post-read source/mapping changes and late AR mutation must not
-retarget or repeat the transfer. `mvpd-ext-edge` adds 512 cases/restores
-requiring zero source reads, destination writes and AR/status changes for
-unsupported CPU/peripheral destinations, including rollback of a long
-address preview. These are emulator exclusions, not hardware traps.
+retarget or repeat the transfer. Unsupported CPU/peripheral destinations
+remain outside this admission; prototype exclusions are not hardware traps.
 `mvpd-controls` reruns the existing short-transfer, repeat and deferred
 interrupt banks. Absolute/long-offset single-instruction repeats remain
 forbidden by the independent TI addressing guard; block/XC/control-delay

@@ -546,10 +546,6 @@ EXTRA_PROFILES = {
         ),
         "Fatal error: TMS320C54x isolated MVPD controls complete",
     ),
-    "mvpd-ext-edge": (
-        "TMS320C54x extended MVPD exclusions: PASS cases=512 restore=512 forms=4 registers=8 cmpt=2 pages=2 endpoints=CPU,peripheral snapshots=2 program_reads=0 data_writes=0 ar_status_changes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated extended MVPD exclusions complete",
-    ),
     "mvpd-extended": (
         "TMS320C54x staged extended MVPD: PASS cases=6144 restore=6144 forms=absolute,offset,preincrement,circular registers=8 values=4 pages=2 ovly=2 source_regions=2 cmpt=2 snapshots=3 program_reads=1 data_writes=1 extensions=2 repeat_acceptance=0 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated extended MVPD complete",
@@ -634,10 +630,6 @@ EXTRA_PROFILES = {
     "rpt-mvdp-irq": (
         "TMS320C54x staged repeated MVDP interrupts: PASS cases=288 restore=288 sources=IRQ,NMI counts=0,1,7,255 count_forms=2 pages=2 arrivals=3 snapshots=3 deferred_until_final_write=1 balanced_stack=1 duplicate_transfers=0",
         "Fatal error: TMS320C54x isolated repeated MVDP interrupts complete",
-    ),
-    "rpt-mvkd-edge": (
-        "TMS320C54x repeated MVKD exclusions: PASS cases=32 restore=32 kinds=mapped_source,mapped_destination,absolute,long_offset count_forms=2 pages=2 snapshots=2 reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated repeated MVKD exclusions complete",
     ),
     "rpt-mvkd": (
         "TMS320C54x repeated MVKD: PASS cases=9216 restore=9216 forms=DP,SP,plain,postinc,postdec,preinc registers=8 counts=0,1,2,7 count_forms=2 layouts=distinct,equal,overlap pages=2 snapshots=4 source_increment=1 same_address_bypass=1 issue_interval=1 literal_fetches=once mapped_acceptance=0 interrupt_composition=unvalidated silicon_phase_claim=0",
@@ -1057,10 +1049,6 @@ EXTRA_PROFILES = {
         "TMS320C54x staged RMW forwarding: PASS cases=768 restore=768 same_and_different=1 gap_words=0,1 flags=4 pages=2 cpl=2 silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated RMW forwarding complete",
     ),
-    "mvdd-source-edge": (
-        "TMS320C54x mapped MVDD exclusions: PASS cases=12 restore=12 cpu_register_destination=4 dual_peripheral=4 repeated_peripheral_write=4 pages=2 snapshots=2 reads=0 writes=0 pointer_updates=0 source_opcode_fetches=1 atomic_fallback=0",
-        "Fatal error: TMS320C54x isolated mapped MVDD exclusions complete",
-    ),
     "mvdd-source": (
         "TMS320C54x mapped MVDD sources: PASS cases=49152 restore=49152 source_addresses=96 patterns=4 x_modifiers=4 y_modifiers=4 pages=2 snapshots=4 source_reads=1 guest_writes=1 source_opcode_fetches=1 peripheral_extra_clock=1 ram_extra_clock=0 register_aliases=Read_owned read_clear=retained endpoint_identities=unvalidated silicon_phase_claim=0",
         "Fatal error: TMS320C54x isolated mapped MVDD sources complete",
@@ -1243,10 +1231,6 @@ EXTRA_PROFILES = {
     "mvdk-producer": (
         "TMS320C54x mapped MVDK producers: PASS cases=5184 restore=5184 sources=AL,AH,AG,BL,BH,BG forms=3 producers=STL,POPM,LD gaps=0,1 destinations=AR3,RAM patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 direct_alu_latency=retained direct_ld_gap0=projection_only mapped_no_conflict=1 physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated mapped MVDK producers complete",
-    ),
-    "mvdk-map-edge": (
-        "TMS320C54x mapped MVDK exclusions: PASS cases=48 restore=48 sources=12 pages=2 snapshots=2 data_reads=0 data_writes=0 destination_publication=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated mapped MVDK exclusions complete",
     ),
     "conditional-cd": (
         "TMS320C54x delayed conditional call: PASS cases=1920 restore=1920 conditions=12 patterns=8 delay_layouts=2 pages=2 snapshots=5 target_literals=1 delay_words=2 delay_effects=once predicate_retained=1 taken_frame=PC+4 untaken_stack_accesses=0 balanced_return=1 interrupt_composition=unvalidated physical_phase_claim=0",
@@ -1794,17 +1778,9 @@ EXTRA_PROFILES = {
         "TMS320C54x repeated indexed MVDK: PASS cases=8928 restore=8928 source_geometries_skipped=288 encodings=16 counts=4 placements=6 cmpt=2 cpl=2 pages=2 snapshots=3 ordered_samples=1 destination_literal_once=1 mapped_access=excluded reset_before_restore=1 physical_phase_claim=0 interrupt_composition=unvalidated",
         "Fatal error: TMS320C54x isolated repeated indexed MVDK complete",
     ),
-    "mvdk-irpt-edge": (
-        "TMS320C54x repeated indexed MVDK exclusions: PASS cases=480 restore=480 sources_destinations=10 counts=2 encodings=2 cmpt=2 pages=2 snapshots=3 reads=0 writes=0 reset_before_restore=1 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated repeated indexed MVDK exclusions complete",
-    ),
     "mvdk-index": (
         "TMS320C54x indexed MVDK: PASS cases=294336 restore=294336 excluded=8064 encodings=16 destination_kinds=21 mapped_sources=18 indices=1,-1,BK,-BK snapshots=2,3 raw_words=1 alias_order=sample,modify,publish reset_before_restore=1 physical_phase_claim=0 interrupt_repeat_composition=unvalidated",
         "Fatal error: TMS320C54x isolated indexed MVDK complete",
-    ),
-    "mvdk-index-edge": (
-        "TMS320C54x indexed MVDK exclusions: PASS cases=19712 restore=19712 encodings=16 destinations=77 cmpt=2 pages=2 snapshots=2 reads=0 writes=0 reset_before_restore=1 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated indexed MVDK exclusions complete",
     ),
     "mvdk-circular": (
         "TMS320C54x circular MVDK: PASS cases=294336 restore=294336 excluded=8064 encodings=32 asserted_encodings=32 destination_kinds=21 mapped_sources=18 native_bk=82 snapshots=2,3 raw_words=1 alias_order=sample,modify,publish physical_phase_claim=0 interrupt_repeat_composition=unvalidated",
@@ -1813,10 +1789,6 @@ EXTRA_PROFILES = {
     "mvdk-repeat": (
         "TMS320C54x repeated MVDK: PASS cases=105696 restore=105696 source_geometries_skipped=288 encodings=184 counts=4 placements=6 compatibility_states=2 cpl_states=2 pages=2 snapshots=3 mapped_access=excluded physical_phase_claim=0 interrupt_composition=unvalidated",
         "Fatal error: TMS320C54x isolated repeated MVDK complete",
-    ),
-    "mvdk-rpt-edge": (
-        "TMS320C54x repeated MVDK exclusions: PASS cases=480 restore=480 sources_destinations=10 counts=2 encodings=2 compatibility_states=2 pages=2 snapshots=3 reads=0 writes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated repeated MVDK exclusions complete",
     ),
     "rptb-call": (
         "TMS320C54x in-block near calls: PASS cases=3456 restore=3456 counts=0,1,5,15 layouts=middle,endpoint,whole_block pages=3 depths=1,2 sources=none,IRQ,NMI calls=CALL,CALLD returns=RET,RETD snapshots=4 ordered_copy=1 balanced_stack=1 physical_phase_claim=0",
@@ -1841,10 +1813,6 @@ EXTRA_PROFILES = {
     "addc-chain": (
         "TMS320C54x ADDC chains: PASS cases=4096 restore=4096 destinations=AA,BA,AB,BB accumulator_pairs=4 word_pairs=4 carry_states=2 sxm_ovm=4 pages=2 snapshots=4 issue_gap=0 read_retention=1 carry_sample=Execute physical_phase_claim=0",
         "Fatal error: TMS320C54x isolated ADDC chains complete",
-    ),
-    "mvdk-circ-edge": (
-        "TMS320C54x circular MVDK exclusions: PASS cases=19712 restore=19712 encodings=32 destinations=77 compatibility_states=2 pages=2 snapshots=2 reads=0 writes=0 silicon_trap_claim=0",
-        "Fatal error: TMS320C54x isolated circular MVDK exclusions complete",
     ),
     "portr-bypass": (
         "TMS320C54x PORTR consumer bypass: PASS cases=6656 restore=6656 generic_cases=6144 dispatcher_cases=512 consumers=LD,AND,OR,XOR gaps=0,1,2 alias_controls=2 accumulators=2 sxm=2 patterns=8 pages=2 snapshots=4 volatile_io=1 real_writes=1 peripheral_bypass_claim=0 physical_banks=unvalidated",

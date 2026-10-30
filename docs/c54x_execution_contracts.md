@@ -1905,10 +1905,9 @@ and all three positive profiles. No CPU emulation change is retained.
 This tests the bounded diagnostic API, not every operand family, physical
 silicon phases or a renewed complete default-core checkpoint.
 
-`mvdk-map-edge` passes 48 cases/restores for 12 still-unadmitted status,
-repeat-control and peripheral sources on two pages with snapshots before/
-after the guard. They stop before data transactions or destination writes;
-these are prototype exclusions, not silicon traps. Existing MVMD accumulator,
+Unadmitted status, repeat-control and peripheral sources remain outside
+the mapped-source contract; prototype exclusions are not silicon traps.
+Existing MVMD accumulator,
 MVMD ST1, T/TRN move, mapped multiply and RPTBD interrupt controls pass.
 Passive Execute hooks verify the original recorder's MVDK and following
 instruction, with zero observer writes; current execution counts and the
@@ -3531,9 +3530,8 @@ linear pointer results: sixteen unique encodings, twenty-one destination
 kinds, eighteen mapped sources, representative signed indices, two pages and
 two/three checkpoints. Each accepted case samples one raw word, fetches one
 destination literal and publishes once; accumulator lanes, T/TRN, DAGEN,
-BRC and RAM destinations retain their separate ownership. The 19,712
-`mvdk-index-edge` cases plus replay preserve control/peripheral exclusions.
-Both profiles clear the live pipeline before restoring their snapshots.
+BRC and RAM destinations retain their separate ownership. The profile
+clears the live pipeline before restoring its snapshots.
 
 Short RPT has a separate `mvdk-index-rpt` qualification: 8,928 cases plus
 replay, all sixteen encodings, counts 0/1/5/15, six separated/overlapping RAM
@@ -3543,9 +3541,8 @@ retained destination literal. The reference preserves the existing staged
 ordering in which a copy's Access sample precedes the previous copy's Read
 publication. This is not independent silicon validation of overlapping-bus
 ordering. 288 self-indexed source geometries that enter mapped space are
-excluded from positive acceptance. `mvdk-irpt-edge` checks 480 first-access
-mapped source/destination exclusions with zero transactions and replay after
-clearing live pipeline state. Interrupt and wider control compositions remain
+excluded from positive acceptance. Mapped repeated source/destination
+accesses, interrupts and wider control compositions remain
 unqualified; no firmware-specific address participates in the implementation.
 
 ## Parallel store with ADD/SUB
@@ -4452,10 +4449,11 @@ source pointer using the old BK/index, then publish the destination. Native
 `71d2` uses a +1 circular step, not AR0. The `mvdk-circular` profile passes
 294,336 cases and save-state replays, including 8,064 excluded source cases,
 all 32 encodings, 21 destination kinds, 18 owned mapped sources and native
-BK=82. `mvdk-circ-edge` passes 19,712 exclusion/replay cases with no data
-reads or writes. Unsupported literal destinations reject in Decode;
-unsupported resolved sources reject in Access. Physical phase timing and
-interrupt/repeat composition remain unvalidated.
+BK=82. Destination admission is register-specific: CLKMD at `0058` has a
+separate move path, so the peripheral range is not a blanket rejection
+domain. Circular/indexed CLKMD writes are not covered by the dedicated
+clock-move gate. Physical phase timing and interrupt/repeat composition
+remain unvalidated.
 
 Successful, nonexcluded cases emit exact-word assertion attribution for
 `71c0..71df`; excluded cases do not earn execution credit. The completion gate
@@ -4475,8 +4473,7 @@ The `mvdk-repeat` gate passes 105,696 cases and save-state replays across
 184 direct/short/circular source encodings, four counts, six disjoint/overlap
 placements, both CMPT/CPL states, two program pages and three snapshots.
 Its address oracle skips 288 self-indexed geometries that enter mapped
-memory, rather than claiming them as RAM cases. `mvdk-rpt-edge` independently
-passes 480 mapped-source/destination exclusion and replay cases. Mapped
+memory, rather than claiming them as RAM cases. Mapped
 repeat accesses, physical memory-bank timing and interrupt composition
 remain unqualified. The overlap tests pin the existing staged order:
 Access(n) samples before Read(n-1) publishes in the same clock; this is not
@@ -4884,8 +4881,7 @@ This differs from assuming that physical Read-before-Write ordering must
 return the old memory word. The source and issue state survive restoration.
 
 Mapped sources/destinations and long-offset/absolute Smem repeat forms
-remain excluded. `rpt-mvkd-edge` checks 32 cases and replays of those exclusions
-before bus or pointer effects. Interrupt composition and physical pipeline phases remain
+remain excluded. Interrupt composition and physical pipeline phases remain
 unqualified for this new repeated form.
 
 ## Immediate accumulator-field publication

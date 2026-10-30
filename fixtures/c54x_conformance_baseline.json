@@ -1380,533 +1380,523 @@
           "name": "mvdd-source-rpt"
         },
         {
-          "description": "Rejected mapped dual-transfer endpoint combinations",
-          "index": 113,
-          "name": "mvdd-source-edge"
-        },
-        {
           "description": "Adjacent load and conditional return replay",
-          "index": 114,
+          "index": 113,
           "name": "ret-load"
         },
         {
           "description": "Carry branch retained decision and delay replay",
-          "index": 115,
+          "index": 114,
           "name": "carry-branch"
         },
         {
           "description": "Long-offset BANZ/BANZD ownership and replay",
-          "index": 116,
+          "index": 115,
           "name": "banzd-long"
         },
         {
           "description": "Retained accumulator-addressed program writes",
-          "index": 117,
+          "index": 116,
           "name": "write-a"
         },
         {
           "description": "Retained compact Xmem ADD and SUB replay",
-          "index": 118,
+          "index": 117,
           "name": "xmem-alu"
         },
         {
           "description": "Retained compact shifted Xmem stores",
-          "index": 119,
+          "index": 118,
           "name": "xmem-store"
         },
         {
           "description": "Compact Xmem store and load bus bypass",
-          "index": 120,
+          "index": 119,
           "name": "xmem-store-bp"
         },
         {
           "description": "Retained reversed long-word subtraction",
-          "index": 121,
+          "index": 120,
           "name": "drsub"
         },
         {
           "description": "DADD and DSUB retained long-pair controls",
-          "index": 122,
+          "index": 121,
           "name": "long-pair"
         },
         {
           "description": "Signed XC predicate and protected-slot replay",
-          "index": 123,
+          "index": 122,
           "name": "xc-signed"
         },
         {
           "description": "Existing XC sampling and interrupt controls",
-          "index": 124,
+          "index": 123,
           "name": "xc-controls"
         },
         {
           "description": "Immediate MAC retained T literal and accumulator selection",
-          "index": 125,
+          "index": 124,
           "name": "mac-t-imm"
         },
         {
           "description": "Indexed MAR AR0 arithmetic and restoration",
-          "index": 126,
+          "index": 125,
           "name": "mar-index"
         },
         {
           "description": "AR0-indexed accumulator stores with retained Read addresses",
-          "index": 127,
+          "index": 126,
           "name": "store-index"
         },
         {
           "description": "CMPM BITF delayed branch condition and interrupt ownership",
-          "index": 128,
+          "index": 127,
           "name": "compare-delay"
         },
         {
           "description": "Retained memory load to ASM without T publication",
-          "index": 129,
+          "index": 128,
           "name": "asm-load"
         },
         {
           "description": "Zero-latency ASM load and adjacent register consumers",
-          "index": 130,
+          "index": 129,
           "name": "asm-consumer"
         },
         {
           "description": "Existing RAM mapped T loads and multiply pair control",
-          "index": 131,
+          "index": 130,
           "name": "t-load-control"
         },
         {
           "description": "Retained memory arithmetic with T-selected shifts",
-          "index": 132,
+          "index": 131,
           "name": "ts-alu"
         },
         {
           "description": "Instruction-driven T shift arithmetic latency",
-          "index": 133,
+          "index": 132,
           "name": "ts-alu-producer"
         },
         {
           "description": "Extended accumulator stores to mapped T",
-          "index": 134,
+          "index": 133,
           "name": "st-t"
         },
         {
           "description": "Mapped T store shift latency and younger Read merge",
-          "index": 135,
+          "index": 134,
           "name": "st-t-consumer"
         },
         {
           "description": "Mapped accumulator T TRN and AR sources for LD ASM",
-          "index": 136,
+          "index": 135,
           "name": "asm-mapped"
         },
         {
           "description": "Single repeat within an outer block repeat",
-          "index": 137,
+          "index": 136,
           "name": "rptb-single"
         },
         {
           "description": "Far calls nested callees and interrupts within a block repeat",
-          "index": 138,
+          "index": 137,
           "name": "rptb-fcall"
         },
         {
           "description": "Finite backward inner loops within block repeat",
-          "index": 139,
+          "index": 138,
           "name": "rptb-back"
         },
         {
           "description": "Complete offset LD in control delay words",
-          "index": 140,
+          "index": 139,
           "name": "load-delay"
         },
         {
           "description": "AR0 indexed plain LD address read and replay ownership",
-          "index": 141,
+          "index": 140,
           "name": "ld-ar0-index"
         },
         {
           "description": "Delayed block repeat with retained delay words and replay",
-          "index": 142,
+          "index": 141,
           "name": "rptbd"
         },
         {
           "description": "Delayed block repeat count control and spill exclusions",
-          "index": 143,
+          "index": 142,
           "name": "rptbd-edge"
         },
         {
           "description": "Delayed block repeat IRQ NMI and saved continuation",
-          "index": 144,
+          "index": 143,
           "name": "rptbd-irq"
         },
         {
           "description": "Retained MVDK mapped register source and alias publication",
-          "index": 145,
+          "index": 144,
           "name": "mvdk-mapped"
         },
         {
           "description": "Mapped MVDK accumulator producer latency and publication",
-          "index": 146,
+          "index": 145,
           "name": "mvdk-producer"
         },
         {
-          "description": "Unadmitted MVDK control and peripheral source exclusions",
-          "index": 147,
-          "name": "mvdk-map-edge"
-        },
-        {
           "description": "Delayed signed accumulator conditional calls and replay",
-          "index": 148,
+          "index": 146,
           "name": "conditional-cd"
         },
         {
           "description": "Unadmitted delayed conditional call predicate exclusions",
-          "index": 149,
+          "index": 147,
           "name": "cond-cd-edge"
         },
         {
           "description": "Delayed conditional calls inside repeat blocks and at endpoints",
-          "index": 150,
+          "index": 148,
           "name": "rptb-ccd"
         },
         {
           "description": "Outside-body restoration of same or replaced active repeat contexts",
-          "index": 151,
+          "index": 149,
           "name": "repeat-context"
         },
         {
           "description": "Adjacent PSHM POPM same-location source and destination ownership",
-          "index": 152,
+          "index": 150,
           "name": "push-pop-same"
         },
         {
           "description": "Indirect PMST stack restoration and retained program mapping",
-          "index": 153,
+          "index": 151,
           "name": "pmst-popd"
         },
         {
           "description": "Indirect unchanged PMST restoration outside an active repeat body",
-          "index": 154,
+          "index": 152,
           "name": "repeat-pmst"
         },
         {
           "description": "Indirect active repeat-context restoration outside the loop body",
-          "index": 155,
+          "index": 153,
           "name": "repeat-popd"
         },
         {
           "description": "Post-loop immediate BRC publication and adjacent repeat ownership",
-          "index": 156,
+          "index": 154,
           "name": "repeat-rearm"
         },
         {
           "description": "Access-owned in-body BRC publication exclusion",
-          "index": 157,
+          "index": 155,
           "name": "rearm-edge"
         },
         {
           "description": "AR0 reverse-carry MAR updates with retained Access ownership",
-          "index": 158,
+          "index": 156,
           "name": "mar-reverse"
         },
         {
           "description": "Delayed signed conditional branches within a repeat block",
-          "index": 159,
+          "index": 157,
           "name": "rptb-bcd"
         },
         {
           "description": "Immediate ASM publication and zero-latency accumulator consumers",
-          "index": 160,
+          "index": 158,
           "name": "asm-immediate"
         },
         {
           "description": "Retained short ASM accumulator stores and Execute-owned source",
-          "index": 161,
+          "index": 159,
           "name": "asm-store"
         },
         {
           "description": "Zero-latency immediate ASM load to short accumulator store",
-          "index": 162,
+          "index": 160,
           "name": "asm-store-ld"
         },
         {
           "description": "Complete shifted memory loads in retained control-delay words",
-          "index": 163,
+          "index": 161,
           "name": "shift-delay"
         },
         {
           "description": "ASM-shifted same-location store and load bypass",
-          "index": 164,
+          "index": 162,
           "name": "asm-store-bp"
         },
         {
           "description": "Memory move block count and zero-latency repeat setup",
-          "index": 165,
+          "index": 163,
           "name": "move-brc"
         },
         {
           "description": "Signed circular loads with retained block size and replay",
-          "index": 166,
+          "index": 164,
           "name": "ld-circular"
         },
         {
           "description": "Short repeat XC interrupt protection and instance overlap",
-          "index": 167,
+          "index": 165,
           "name": "block-xc-irq"
         },
         {
           "description": "Conditional block slots and loop endpoint ownership",
-          "index": 168,
+          "index": 166,
           "name": "block-xc"
         },
         {
           "description": "Conditional execution crossing repeat endpoints is excluded",
-          "index": 169,
+          "index": 167,
           "name": "block-xc-edge"
         },
         {
           "description": "Immediate RAM store forwarding and producer replay",
-          "index": 170,
+          "index": 168,
           "name": "imm-forward"
         },
         {
           "description": "Software-saved callback repeat and interrupted CCD resumption",
-          "index": 171,
+          "index": 169,
           "name": "repeat-isr"
         },
         {
           "description": "Unconditional delayed branches within a repeat block",
-          "index": 172,
+          "index": 170,
           "name": "rptb-bd"
         },
         {
           "description": "Long-offset BANZ within a repeat block",
-          "index": 173,
+          "index": 171,
           "name": "rptb-banz"
         },
         {
           "description": "Absolute mapped and RAM ADD within a control delay",
-          "index": 174,
+          "index": 172,
           "name": "add-delay"
         },
         {
           "description": "Mapped BK operand capture for ordinary ADD and SUB",
-          "index": 175,
+          "index": 173,
           "name": "arith-bk"
         },
         {
           "description": "Existing mapped auxiliary-register arithmetic controls",
-          "index": 176,
+          "index": 174,
           "name": "arith-ar"
         },
         {
           "description": "AR0-indexed immediate stores with retained literals",
-          "index": 177,
+          "index": 175,
           "name": "imm-index"
         },
         {
           "description": "Delayed accumulator far-call frame and interrupt composition",
-          "index": 178,
+          "index": 176,
           "name": "fcala-delay"
         },
         {
           "description": "Mapped BK signed multiply-accumulate operand ownership",
-          "index": 179,
+          "index": 177,
           "name": "mac-bk"
         },
         {
           "description": "Retained signed multiply-accumulate in complete control delays",
-          "index": 180,
+          "index": 178,
           "name": "mac-delay"
         },
         {
           "description": "Retained double-word load in complete control delays",
-          "index": 181,
+          "index": 179,
           "name": "dld-delay"
         },
         {
           "description": "Retained constant DAGEN initialization and bank arbitration",
-          "index": 182,
+          "index": 180,
           "name": "st-dagen"
         },
         {
           "description": "Retained ASM load and adjacent shift in branch delays",
-          "index": 183,
+          "index": 181,
           "name": "asm-delay"
         },
         {
           "description": "Software-saved ISR repeat returning directly into an outer body",
-          "index": 184,
+          "index": 182,
           "name": "repeat-body-isr"
         },
         {
           "description": "Retained absolute ADD from SP and stack-update contexts",
-          "index": 185,
+          "index": 183,
           "name": "add-sp"
         },
         {
           "description": "Execute-owned instruction observation without program-read aliases",
-          "index": 186,
+          "index": 184,
           "name": "instr-observer"
         },
         {
           "description": "Retained MVKD and MVDM from mapped SP with stack-update contexts",
-          "index": 187,
+          "index": 185,
           "name": "mvkd-sp"
         },
         {
           "description": "Low-PC repeat endpoint and foreign-page hazard",
-          "index": 188,
+          "index": 186,
           "name": "rptb-page"
         },
         {
           "description": "Delayed far calls and complete delay spans inside block repeats",
-          "index": 189,
+          "index": 187,
           "name": "rptb-fcalld"
         },
         {
           "description": "Shifted accumulator stores to retained AR destinations",
-          "index": 190,
+          "index": 188,
           "name": "st-shift-ar"
         },
         {
           "description": "Shifted AR stores with legal-gap indirect consumers",
-          "index": 191,
+          "index": 189,
           "name": "st-shift-ar-use"
         },
         {
           "description": "Shifted stores and shared-bank early DAGEN write arbitration",
-          "index": 192,
+          "index": 190,
           "name": "st-shift-ar-bank"
         },
         {
           "description": "Shifted-store control and peripheral destination exclusions",
-          "index": 193,
+          "index": 191,
           "name": "st-shift-ar-edge"
         },
         {
           "description": "Retained MVDK to accumulator fields and guard-width aliases",
-          "index": 194,
+          "index": 192,
           "name": "mvdk-acc"
         },
         {
           "description": "Mapped and direct accumulator producers before MVDK field destinations",
-          "index": 195,
+          "index": 193,
           "name": "mvdk-acc-prod"
         },
         {
           "description": "Retained MVKD source forwarded to same-address RAM followers",
-          "index": 196,
+          "index": 194,
           "name": "mvkd-forward"
         },
         {
           "description": "Shifted stores in complete RPTBD delays with interrupt and replay",
-          "index": 197,
+          "index": 195,
           "name": "rptbd-shift-st"
         },
         {
           "description": "Shifted RPTBD span, destination and control-owner exclusions",
-          "index": 198,
+          "index": 196,
           "name": "rptbd-shift-edge"
         },
         {
           "description": "Basic memory repeat counts with address, interrupt and replay coverage",
-          "index": 199,
+          "index": 197,
           "name": "rpt-smem"
         },
         {
           "description": "Memory repeat control, address and lifecycle exclusions",
-          "index": 200,
+          "index": 198,
           "name": "rpt-smem-edge"
         },
         {
           "description": "Repeated accumulator loads with per-iteration flags, interrupts and replay",
-          "index": 201,
+          "index": 199,
           "name": "rpt-ld"
         },
         {
           "description": "Unadmitted repeated register-family exclusions",
-          "index": 202,
+          "index": 200,
           "name": "rpt-ld-edge"
         },
         {
           "description": "Focused repeated accumulator loads inside an outer block repeat",
-          "index": 203,
+          "index": 201,
           "name": "rpt-ld-block"
         },
         {
           "description": "Execute-owned accumulator PMST stores with mapping and interrupt replay",
-          "index": 204,
+          "index": 202,
           "name": "stlm-pmst"
         },
         {
           "description": "PMST store owner, addressing and neighboring-destination exclusions",
-          "index": 205,
+          "index": 203,
           "name": "stlm-pmst-edge"
         },
         {
           "description": "Long-offset and absolute pushes with interrupt and replay coverage",
-          "index": 206,
+          "index": 204,
           "name": "pshd-long"
         },
         {
           "description": "Focused long-address push mapped-register source coverage",
-          "index": 207,
+          "index": 205,
           "name": "pshd-long-map"
         },
         {
           "description": "Long-address push source, addressing and compound-owner exclusions",
-          "index": 208,
+          "index": 206,
           "name": "pshd-long-edge"
         },
         {
           "description": "Repeated legal SUBC and immediate store replay",
-          "index": 209,
+          "index": 207,
           "name": "rpt-subc-st"
         },
         {
           "description": "Legal short-indirect load address and read replay",
-          "index": 210,
+          "index": 208,
           "name": "indirect-load"
         },
         {
           "description": "Legal unsigned and shift16 load domains",
-          "index": 211,
+          "index": 209,
           "name": "ldu-shift16"
         },
         {
           "description": "Legal indirect double-word load replay",
-          "index": 212,
+          "index": 210,
           "name": "indirect-dld"
         },
         {
           "description": "Legal variable-shift memory load replay",
-          "index": 213,
+          "index": 211,
           "name": "load-variable"
         },
         {
           "description": "Read-capable Smem bitfield and immediate replay",
-          "index": 214,
+          "index": 212,
           "name": "bitf-smem"
         },
         {
           "description": "Read-capable scalar memory ADD and SUB replay",
-          "index": 215,
+          "index": 213,
           "name": "memory-alu"
         },
         {
           "description": "Read-capable shifted ADD/SUB and conditional SUBC replay",
-          "index": 216,
+          "index": 214,
           "name": "shifted-alu"
         },
         {
           "description": "Read-capable memory multiply and T-load replay",
-          "index": 217,
+          "index": 215,
           "name": "mul-t-sources"
         },
         {
           "description": "Legacy atomic CPU/peripheral prefix and active-repeat restore",
-          "index": 218,
+          "index": 216,
           "name": "legacy-atomic"
         }
       ],
@@ -2012,828 +2002,798 @@
           "name": "mvpd-extended"
         },
         {
-          "description": "Rejected mapped MVPD destinations without address effects",
-          "index": 20,
-          "name": "mvpd-ext-edge"
-        },
-        {
           "description": "Existing short and repeated MVPD regression controls",
-          "index": 21,
+          "index": 20,
           "name": "mvpd-controls"
         },
         {
           "description": "Opcode-shaped literal words in legal block stores",
-          "index": 22,
+          "index": 21,
           "name": "literal-guard"
         },
         {
           "description": "Retained absolute mapped-AR addition and flags",
-          "index": 23,
+          "index": 22,
           "name": "addm-ar"
         },
         {
           "description": "Legal-gap indirect consumers after mapped-AR addition",
-          "index": 24,
+          "index": 23,
           "name": "addm-ar-load"
         },
         {
           "description": "Retained staged repeat and accumulator clearing",
-          "index": 25,
+          "index": 24,
           "name": "rptz"
         },
         {
           "description": "Repeated short accumulator stores through real pipeline slots",
-          "index": 26,
+          "index": 25,
           "name": "rpt-store"
         },
         {
           "description": "Repeated mapped-store exclusions before DAGEN or bus effects",
-          "index": 27,
+          "index": 26,
           "name": "rpt-store-edge"
         },
         {
           "description": "Retained staged BITT memory and T selection",
-          "index": 28,
+          "index": 27,
           "name": "bitt"
         },
         {
           "description": "RETD with an absolute or long-offset BITT delay instruction",
-          "index": 29,
+          "index": 28,
           "name": "bitt-retd"
         },
         {
           "description": "TC/NTC returns with live BITT producers and retained decisions",
-          "index": 30,
+          "index": 29,
           "name": "tc-return"
         },
         {
           "description": "Circular MAR with legal buffer, stride and compatibility cases",
-          "index": 31,
+          "index": 30,
           "name": "mar-circular"
         },
         {
           "description": "Retained arithmetic in AEQ/BEQ branch delay words",
-          "index": 32,
+          "index": 31,
           "name": "bcd-arithmetic"
         },
         {
           "description": "Excluded branch predicates and incomplete arithmetic delay spans",
-          "index": 33,
+          "index": 32,
           "name": "bcd-arith-edge"
         },
         {
           "description": "All signed A/B conditional calls with retained target and frame",
-          "index": 34,
+          "index": 33,
           "name": "signed-call"
         },
         {
           "description": "Retained repeated WRITA with immediate and memory counts",
-          "index": 35,
+          "index": 34,
           "name": "rpt-writa"
         },
         {
           "description": "Repeated WRITA on the standard 16-bit program-address profile",
-          "index": 36,
+          "index": 35,
           "name": "rpt-writa16"
         },
         {
           "description": "Retained immediate BSP control publication",
-          "index": 37,
+          "index": 36,
           "name": "serial-stm"
         },
         {
           "description": "Retained ST0 and ST1 bitfield sampling",
-          "index": 38,
+          "index": 37,
           "name": "status-bitf"
         },
         {
           "description": "Accumulator publication to external BSP transmit register",
-          "index": 39,
+          "index": 38,
           "name": "stlm-bsp"
         },
         {
           "description": "Forward loop exits with explicit outside BRAF clear",
-          "index": 40,
+          "index": 39,
           "name": "rptb-exit"
         },
         {
           "description": "Program-memory counter publication and spaced RPTB",
-          "index": 41,
+          "index": 40,
           "name": "reada-brc"
         },
         {
           "description": "Standard-width program-memory counter publication",
-          "index": 42,
+          "index": 41,
           "name": "reada-brc16"
         },
         {
           "description": "Primary-source ST1 reserved-bit and memory-write constraints",
-          "index": 43,
+          "index": 42,
           "name": "st1-rules"
         },
         {
           "description": "Status-bit instructions retain direct INTM control",
-          "index": 44,
+          "index": 43,
           "name": "st1-bits"
         },
         {
           "description": "Accumulator status publication and SXM/ASM consumer latency",
-          "index": 45,
+          "index": 44,
           "name": "stlm-st1"
         },
         {
           "description": "Full status accumulator store CPL consumer latency",
-          "index": 46,
+          "index": 45,
           "name": "stlm-cpl"
         },
         {
           "description": "Full status accumulator store compatibility-mode latency",
-          "index": 47,
+          "index": 46,
           "name": "stlm-cmpt"
         },
         {
           "description": "Accumulator status publication IRQ/NMI composition",
-          "index": 48,
+          "index": 47,
           "name": "stlm-st1-irq"
         },
         {
           "description": "Shifted peripheral operand retention and access clock",
-          "index": 49,
+          "index": 48,
           "name": "shift-periph"
         },
         {
           "description": "Shifted BSP receive acknowledgement and pending next frame",
-          "index": 50,
+          "index": 49,
           "name": "shift-bsp"
         },
         {
           "description": "Circular accumulator stores with retained addresses",
-          "index": 51,
+          "index": 50,
           "name": "store-circular"
         },
         {
           "description": "TC and NTC conditional calls with retained predicate",
-          "index": 52,
+          "index": 51,
           "name": "tc-call"
         },
         {
           "description": "Retained CMPM reads of all accumulator register lanes",
-          "index": 53,
+          "index": 52,
           "name": "cmpm-acc"
         },
         {
           "description": "Repeated data-memory moves with retained source progression",
-          "index": 54,
+          "index": 53,
           "name": "rpt-mvkd"
         },
         {
-          "description": "Excluded mapped and extended repeated data moves",
-          "index": 55,
-          "name": "rpt-mvkd-edge"
-        },
-        {
           "description": "Immediate accumulator-field publication and mapped read ordering",
-          "index": 56,
+          "index": 54,
           "name": "stm-acc"
         },
         {
           "description": "Ordinary T/TRN stores after nondelayed conditional branches",
-          "index": 57,
+          "index": 55,
           "name": "st-t-branch"
         },
         {
           "description": "Shifted bus reads of unowned low-address gaps",
-          "index": 58,
+          "index": 56,
           "name": "shift-unowned"
         },
         {
           "description": "Circular I/O reads with retained pointers and samples",
-          "index": 59,
+          "index": 57,
           "name": "portr-circular"
         },
         {
           "description": "Circular I/O sampling within a retained RPTBD block",
-          "index": 60,
+          "index": 58,
           "name": "portr-block"
         },
         {
           "description": "Square distance with retained operands and old accumulator feedback",
-          "index": 61,
+          "index": 59,
           "name": "sqdst"
         },
         {
           "description": "Square distance mapped operand exclusions",
-          "index": 62,
+          "index": 60,
           "name": "sqdst-edge"
         },
         {
           "description": "PORTR consumers and the native request-mask sequence",
-          "index": 63,
+          "index": 61,
           "name": "portr-bypass"
         },
         {
           "description": "Circular source moves with retained data and mapped publications",
-          "index": 64,
+          "index": 62,
           "name": "mvdk-circular"
         },
         {
-          "description": "Circular move control and peripheral destination exclusions",
-          "index": 65,
-          "name": "mvdk-circ-edge"
-        },
-        {
           "description": "Repeated destination-addressed copies with consecutive EAR publication",
-          "index": 66,
+          "index": 63,
           "name": "mvdk-repeat"
         },
         {
-          "description": "Repeated MVDK mapped-memory composition exclusions",
-          "index": 67,
-          "name": "mvdk-rpt-edge"
-        },
-        {
           "description": "Near calls and returns at block endpoints and whole-block calls",
-          "index": 68,
+          "index": 64,
           "name": "rptb-call"
         },
         {
           "description": "Captured memory counts driving pipelined data transfers",
-          "index": 69,
+          "index": 65,
           "name": "rpt-mem-copy"
         },
         {
           "description": "Captured repeat counts across the 16-bit program counter wrap",
-          "index": 70,
+          "index": 66,
           "name": "rpt-mem-wrap"
         },
         {
           "description": "Independent ownership across copy and NOP memory-count repeats",
-          "index": 71,
+          "index": 67,
           "name": "rpt-mem-chain"
         },
         {
           "description": "Unsigned Smem addition with Execute-live carry and accumulators",
-          "index": 72,
+          "index": 68,
           "name": "addc"
         },
         {
           "description": "Adjacent ADDC accumulator and carry dependencies",
-          "index": 73,
+          "index": 69,
           "name": "addc-chain"
         },
         {
           "description": "STLM suspension and restoration of an interrupted block repeat",
-          "index": 74,
+          "index": 70,
           "name": "repeat-stlm"
         },
         {
           "description": "Absolute data-to-accumulator-slice MVDM",
-          "index": 75,
+          "index": 71,
           "name": "mvdm-acc"
         },
         {
           "description": "Direct page-zero RAM PSHM and POPM",
-          "index": 76,
+          "index": 72,
           "name": "stack-page0"
         },
         {
           "description": "Direct page-zero stack peripheral and indirect exclusions",
-          "index": 77,
+          "index": 73,
           "name": "stack-page0-edge"
         },
         {
           "description": "Parallel store with retained Xmem load into accumulator or T",
-          "index": 78,
+          "index": 74,
           "name": "stld"
         },
         {
           "description": "Parallel store/load mapped operand exclusions",
-          "index": 79,
+          "index": 75,
           "name": "stld-edge"
         },
         {
           "description": "ADDS and SUBS retained mapped sources and Execute-live arithmetic",
-          "index": 80,
+          "index": 76,
           "name": "unsigned-map"
         },
         {
           "description": "CMPM retained T TRN and auxiliary sources with TC consumers",
-          "index": 81,
+          "index": 77,
           "name": "cmpm-map"
         },
         {
           "description": "CMPM unowned mapped-source exclusions",
-          "index": 82,
+          "index": 78,
           "name": "cmpm-map-edge"
         },
         {
           "description": "Interrupt delivery through a delayed conditional polling loop",
-          "index": 83,
+          "index": 79,
           "name": "poll-interrupt"
         },
         {
           "description": "TC NTC delayed branch ownership inside a block repeat",
-          "index": 84,
+          "index": 80,
           "name": "rptb-tc-delay"
         },
         {
           "description": "Conditional delayed return predicate stack and retained delay words",
-          "index": 85,
+          "index": 81,
           "name": "rcd"
         },
         {
           "description": "Retained absolute ADDM arithmetic on BRC",
-          "index": 86,
+          "index": 82,
           "name": "addm-brc"
         },
         {
           "description": "ADDM BRC publication before separated RPTB and RPTBD consumers",
-          "index": 87,
+          "index": 83,
           "name": "addm-brc-loop"
         },
         {
           "description": "Immediate-store postincrement visibility to MVMM",
-          "index": 88,
+          "index": 84,
           "name": "st-mvmm"
         },
         {
           "description": "Older LDM source before younger DAGEN updates",
-          "index": 89,
+          "index": 85,
           "name": "ldm-ar-age"
         },
         {
           "description": "Mapped LD and LDU before younger DAGEN updates",
-          "index": 90,
+          "index": 86,
           "name": "mapped-load-age"
         },
         {
           "description": "Fixed AL BL source with incrementing repeated MVMD destination",
-          "index": 91,
+          "index": 87,
           "name": "mvmd-repeat"
         },
         {
           "description": "Delay-owned T load consumed by the first RPTBD multiply",
-          "index": 92,
+          "index": 88,
           "name": "rptbd-t-load"
         },
         {
           "description": "Delayed forward block exits retain decision and delay ownership",
-          "index": 93,
+          "index": 89,
           "name": "rptb-exit-delay"
         },
         {
           "description": "RPTZ clear precedes the first fixed-accumulator MVMD sample",
-          "index": 94,
+          "index": 90,
           "name": "mvmd-rptz"
         },
         {
           "description": "Memory SQUR retains its signed operand and publishes T at Read",
-          "index": 95,
+          "index": 91,
           "name": "squr-smem"
         },
         {
           "description": "Repeated arithmetic accumulator shift carry overflow and replay",
-          "index": 96,
+          "index": 92,
           "name": "rpt-sfta"
         },
         {
           "description": "Mapped T ADDM retained arithmetic and replay",
-          "index": 97,
+          "index": 93,
           "name": "addm-t"
         },
         {
           "description": "Memory-counted single repeat inside an outer block",
-          "index": 98,
+          "index": 94,
           "name": "rptb-memory"
         },
         {
           "description": "Delay-owned T load across taken and untaken BANZD",
-          "index": 99,
+          "index": 95,
           "name": "banzd-t-load"
         },
         {
           "description": "Repeated RAM square accumulate per-iteration ownership and replay",
-          "index": 100,
+          "index": 96,
           "name": "sqacc-repeat"
         },
         {
           "description": "Repeated square mapped and peripheral source exclusions",
-          "index": 101,
+          "index": 97,
           "name": "sqacc-rpt-edge"
         },
         {
           "description": "Repeated dual MAC paired reads live feedback and replay",
-          "index": 102,
+          "index": 98,
           "name": "mac-rpt"
         },
         {
           "description": "Repeated dual MAC low operand exclusions",
-          "index": 103,
+          "index": 99,
           "name": "mac-rpt-edge"
         },
         {
           "description": "BD delay repeat completes before a fresh target repeat",
-          "index": 104,
+          "index": 100,
           "name": "bd-rpt"
         },
         {
           "description": "Delay repeat owner and word-span exclusions",
-          "index": 105,
+          "index": 101,
           "name": "bd-rpt-edge"
         },
         {
           "description": "Plain indirect STM page-zero RAM publication",
-          "index": 106,
+          "index": 102,
           "name": "stm-ind"
         },
         {
           "description": "Plain indirect STM register and peripheral exclusions",
-          "index": 107,
+          "index": 103,
           "name": "stm-ind-edge"
         },
         {
           "description": "Repeated parallel store and accumulator or T load",
-          "index": 108,
+          "index": 104,
           "name": "stld-repeat"
         },
         {
           "description": "Repeated parallel store/load mapped operand exclusions",
-          "index": 109,
+          "index": 105,
           "name": "stld-rpt-edge"
         },
         {
           "description": "XC1 repeat-end protection across wrap and final fallthrough",
-          "index": 110,
+          "index": 106,
           "name": "block-xc-end-irq"
         },
         {
           "description": "ASM-shifted circular accumulator stores",
-          "index": 111,
+          "index": 107,
           "name": "asm-circular"
         },
         {
           "description": "Parallel store and add or subtract",
-          "index": 112,
+          "index": 108,
           "name": "st-par-alu"
         },
         {
           "description": "Parallel store arithmetic mapped operand exclusions",
-          "index": 113,
+          "index": 109,
           "name": "st-par-edge"
         },
         {
           "description": "AR0-indexed source moves with mapped publications",
-          "index": 114,
+          "index": 110,
           "name": "mvdk-index"
         },
         {
-          "description": "Indexed move control and peripheral destination exclusions",
-          "index": 115,
-          "name": "mvdk-index-edge"
-        },
-        {
           "description": "Repeated indexed source moves and overlapping RAM copies",
-          "index": 116,
+          "index": 111,
           "name": "mvdk-index-rpt"
         },
         {
-          "description": "Repeated indexed move mapped source and destination exclusions",
-          "index": 117,
-          "name": "mvdk-irpt-edge"
-        },
-        {
           "description": "Conditional register and accumulator RAM stores",
-          "index": 118,
+          "index": 112,
           "name": "cond-store"
         },
         {
           "description": "Conditional store mapped destination exclusions",
-          "index": 119,
+          "index": 113,
           "name": "cond-store-edge"
         },
         {
           "description": "Shift16 ADD SUB with retained owned mapped sources",
-          "index": 120,
+          "index": 114,
           "name": "shift16-map"
         },
         {
           "description": "Memory logic with retained owned mapped sources",
-          "index": 121,
+          "index": 115,
           "name": "logic-map"
         },
         {
           "description": "Short repeat in the first RPTBD delay word",
-          "index": 122,
+          "index": 116,
           "name": "rptbd-rpt"
         },
         {
           "description": "RPTBD delay repeat span and count exclusions",
-          "index": 123,
+          "index": 117,
           "name": "rptbd-rpt-edge"
         },
         {
           "description": "Delay repeat drains before a retained stack return",
-          "index": 124,
+          "index": 118,
           "name": "retd-rpt"
         },
         {
           "description": "Immediate ST1 publication and arithmetic consumers",
-          "index": 125,
+          "index": 119,
           "name": "stm-st1"
         },
         {
           "description": "Immediate ST1 CPL consumer latency",
-          "index": 126,
+          "index": 120,
           "name": "stm-cpl"
         },
         {
           "description": "Immediate ST1 CMPT consumer latency",
-          "index": 127,
+          "index": 121,
           "name": "stm-cmpt"
         },
         {
           "description": "Dual memory ADD SUB with owned mapped sources",
-          "index": 128,
+          "index": 122,
           "name": "alu-map"
         },
         {
           "description": "Dual memory ADD SUB unowned source exclusions",
-          "index": 129,
+          "index": 123,
           "name": "alu-map-edge"
         },
         {
           "description": "Overflow branch decision and consumed sticky flags",
-          "index": 130,
+          "index": 124,
           "name": "ov-branch-pipe"
         },
         {
           "description": "Shifted memory ADD SUB in delayed transfer words",
-          "index": 131,
+          "index": 125,
           "name": "shift-alu-delay"
         },
         {
           "description": "Accumulator memory multiply in delayed transfer words",
-          "index": 132,
+          "index": 126,
           "name": "maca-delay"
         },
         {
           "description": "Read retained successor memory copy",
-          "index": 133,
+          "index": 127,
           "name": "delay-copy"
         },
         {
           "description": "Successor memory copy in control delay words",
-          "index": 134,
+          "index": 128,
           "name": "delay-copy-ctrl"
         },
         {
           "description": "Return preserves bounded XC word protection",
-          "index": 135,
+          "index": 129,
           "name": "xc-ret"
         },
         {
           "description": "BRC move in ordinary delayed control words",
-          "index": 136,
+          "index": 130,
           "name": "move-brc-delay"
         },
         {
           "description": "Square arithmetic in delayed block setup words",
-          "index": 137,
+          "index": 131,
           "name": "rptbd-square"
         },
         {
           "description": "Dual ADD SUB samples IMR IFR without acknowledgement",
-          "index": 138,
+          "index": 132,
           "name": "alu-map-irq"
         },
         {
           "description": "Dual ADD SUB samples unowned low words through board map",
-          "index": 139,
+          "index": 133,
           "name": "alu-low-bus"
         },
         {
           "description": "Rounded memory multiplication in delayed controls",
-          "index": 140,
+          "index": 134,
           "name": "mpyr-delay"
         },
         {
           "description": "Parallel load from owned registers and unowned board words",
-          "index": 141,
+          "index": 135,
           "name": "stld-map"
         },
         {
           "description": "Parallel BSP receive and RAM store",
-          "index": 142,
+          "index": 136,
           "name": "stld-bsp"
         },
         {
           "description": "Parallel volatile peripheral read and RAM store",
-          "index": 143,
+          "index": 137,
           "name": "stld-periph"
         },
         {
           "description": "Square accumulation in ordinary delayed controls",
-          "index": 144,
+          "index": 138,
           "name": "square-delay"
         },
         {
           "description": "Parallel store and retained-T memory multiply",
-          "index": 145,
+          "index": 139,
           "name": "st-par-mpy"
         },
         {
           "description": "Parallel multiply mapped operand exclusions",
-          "index": 146,
+          "index": 140,
           "name": "st-mpy-edge"
         },
         {
           "description": "Conditional stores to mapped auxiliary registers",
-          "index": 147,
+          "index": 141,
           "name": "cond-store-ar"
         },
         {
           "description": "Short delay repeat completes before a near call and return",
-          "index": 148,
+          "index": 142,
           "name": "calld-rpt"
         },
         {
           "description": "Short T loads in ordinary delayed controls",
-          "index": 149,
+          "index": 143,
           "name": "ctrl-t-load"
         },
         {
           "description": "Absolute immediate low RAM stores and adjacent consumers",
-          "index": 150,
+          "index": 144,
           "name": "stm-low-ram"
         },
         {
           "description": "Repeated parallel stores and ADD/SUB feedback",
-          "index": 151,
+          "index": 145,
           "name": "st-alu-rpt"
         },
         {
           "description": "Repeated parallel ADD/SUB mapped operand exclusions",
-          "index": 152,
+          "index": 146,
           "name": "st-alu-rpt-edge"
         },
         {
           "description": "Memory SQUR in ordinary control delay words",
-          "index": 153,
+          "index": 147,
           "name": "squr-delay"
         },
         {
           "description": "Memory SQUR and MPYA in RPTBD delay words",
-          "index": 154,
+          "index": 148,
           "name": "rptbd-squr"
         },
         {
           "description": "Conditional branch outcomes after delay-owned repeats",
-          "index": 155,
+          "index": 149,
           "name": "bcd-rpt"
         },
         {
           "description": "Conditional branch delay repeat exclusions",
-          "index": 156,
+          "index": 150,
           "name": "bcd-rpt-edge"
         },
         {
           "description": "Short BITT and T-producer ordering in delayed controls",
-          "index": 157,
+          "index": 151,
           "name": "bitt-ctrl"
         },
         {
           "description": "Retained MVDD forwarding across adjacency and delayed calls",
-          "index": 158,
+          "index": 152,
           "name": "mvdd-follow"
         },
         {
           "description": "Pending accumulator-store DAGEN visibility to MVMM",
-          "index": 159,
+          "index": 153,
           "name": "st-acc-mvmm"
         },
         {
           "description": "Shifted mapped AR loads retain the older Read sample",
-          "index": 160,
+          "index": 154,
           "name": "shift16-load-age"
         },
         {
           "description": "Mapped ADD SUB retains the older AR Read sample",
-          "index": 161,
+          "index": 155,
           "name": "addsub-ar-age"
         },
         {
           "description": "Retained READA transfers in unconditional BD delay spans",
-          "index": 162,
+          "index": 156,
           "name": "bd-read-a"
         },
         {
           "description": "TC NTC delayed conditional calls retain their Read decision",
-          "index": 163,
+          "index": 157,
           "name": "tc-delay-call"
         },
         {
           "description": "Repeated RAM T-based MAC retains operands and accumulator feedback",
-          "index": 164,
+          "index": 158,
           "name": "tmac-repeat"
         },
         {
           "description": "Repeated T-based MAC mapped and peripheral exclusions",
-          "index": 165,
+          "index": 159,
           "name": "tmac-rpt-edge"
         },
         {
           "description": "Paired LMS samples and dual accumulator Execute ownership",
-          "index": 166,
+          "index": 160,
           "name": "lms"
         },
         {
           "description": "LMS mapped and peripheral operand exclusions",
-          "index": 167,
+          "index": 161,
           "name": "lms-edge"
         },
         {
           "description": "Short DP and plain indirect mapped AR ADDM ownership",
-          "index": 168,
+          "index": 162,
           "name": "addm-ar-short"
         },
         {
           "description": "Long offset and absolute accumulator multiply in BD delay",
-          "index": 169,
+          "index": 163,
           "name": "bd-maca-long"
         },
         {
           "description": "MVMM SP view includes preceding pending stack allocations",
-          "index": 170,
+          "index": 164,
           "name": "push-mvmm-sp"
         },
         {
           "description": "Staged absolute immediate XORM retained read and publication",
-          "index": 171,
+          "index": 165,
           "name": "xorm-absolute"
         },
         {
           "description": "MVDM T TRN source capture and adjacent mapped consumer",
-          "index": 172,
+          "index": 166,
           "name": "mvdm-t"
         },
         {
           "description": "Mapped move precedes an independent repeat header",
-          "index": 173,
+          "index": 167,
           "name": "move-rpt-owner"
         },
         {
           "description": "Read-owned extended ADD/SUB from mapped BK",
-          "index": 174,
+          "index": 168,
           "name": "shifted-bk"
         },
         {
           "description": "Retained accumulator-store inspection across pending write restore",
-          "index": 175,
+          "index": 169,
           "name": "store-observe"
         },
         {
           "description": "Retained direct-PSHM stack and source inspection across restore",
-          "index": 176,
+          "index": 170,
           "name": "push-observe"
         },
         {
           "description": "Exact native dual-memory subtraction and pointer updates",
-          "index": 177,
+          "index": 171,
           "name": "dual-sub-native"
         },
         {
           "description": "Staged IDLE1/2/3 barriers, timer clocks, interrupt wake and replay",
-          "index": 178,
+          "index": 172,
           "name": "idle-modes"
         },
         {
           "description": "Retained RAM-to-CLKMD moves and peripheral access across restore",
-          "index": 179,
+          "index": 173,
           "name": "clock-mvdk"
         },
         {
           "description": "Excluded repeated/delayed CLKMD moves have no operand or clock effects",
-          "index": 180,
+          "index": 174,
           "name": "clock-mvdk-edge"
         },
         {
           "description": "Retained IMR/IFR stack writes and W1C acknowledgement across restore",
-          "index": 181,
+          "index": 175,
           "name": "pop-irq"
         },
         {
           "description": "Excluded repeated/delayed interrupt pops have no stack or acknowledgement effects",
-          "index": 182,
+          "index": 176,
           "name": "pop-irq-edge"
         },
         {
           "description": "Staged long RAM read-modify-write matrix",
-          "index": 183,
+          "index": 177,
           "name": "rmw-long"
         },
         {
           "description": "Staged register arithmetic and load with producer controls",
-          "index": 184,
+          "index": 178,
           "name": "reg-banks"
         }
       ]
@@ -3013,7 +2973,6 @@
       "TMS320C54x circular ASM stores: PASS cases=393216 restore=393216 modes=4 selectors=4 auxiliary_registers=8 cmpt=2 bk=4 indices=4 shifts=-16,-1,0,15 sxm_sat=4 pages=2 snapshots=3 bk_sample=Decode address_asm_sample=Read data_sample=Execute destination_reads=0 pointer_updates=once low_page_rejected=1 reset_before_restore=1 bk_zero=legacy_linear physical_phase_claim=0\n": 1,
       "TMS320C54x circular LD: PASS cases=393216 restore=393216 ram_cases=368640 excluded_cases=24576 modifiers=4 registers=8 compatibility_states=2 destinations=2 bk=0,1,7,16,8192 index_patterns=4 valid_nonzero_steps=1 memory_values=4 sxm_ovm_sst=8 pages=2 snapshots=3 bk_sample=Decode address_index_sample=Access source_sample=Read result_publish=Execute self_index=1 pointer_updates=once data_writes=0 interrupt_delay_repeat_composition=unvalidated physical_phase_claim=0\n": 1,
       "TMS320C54x circular MAR: PASS cases=49152 restore=49152 modifiers=minus1,minusAR0,plus1,plusAR0 registers=8 cmpt=2 bk=1,2,3,13,16,31,32,250 positions=4 strides=4 pages=2 snapshots=3 legal_domain=1 independent_residue_oracle=1 publication=Access data_accesses=0 silicon_phase_claim=0\n": 1,
-      "TMS320C54x circular MVDK exclusions: PASS cases=19712 restore=19712 encodings=32 destinations=77 compatibility_states=2 pages=2 snapshots=2 reads=0 writes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x circular MVDK: PASS cases=294336 restore=294336 excluded=8064 encodings=32 asserted_encodings=32 destination_kinds=21 mapped_sources=18 native_bk=82 snapshots=2,3 raw_words=1 alias_order=sample,modify,publish physical_phase_claim=0 interrupt_repeat_composition=unvalidated\n": 1,
       "TMS320C54x circular PORTR block: PASS cases=1728 restore=1728 counts=2,7,17 bk=1,7,16 registers=8 compatibility=2 start_positions=2 pages=2 snapshots=3 source=volatile_io issue_interval=2 sample_retained=1 wrap=1 destination_reads=0 duplicate_reads=0 duplicate_writes=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x circular PORTR: PASS cases=98304 restore=98304 modes=4 registers=8 compatibility=2 bk=4 indices=4 samples=4 ports=2 flags=2 pages=2 snapshots=3 literal_retained=1 sample_retained=1 pointer_updates=once destination_reads=0 excluded_io_reads=0 excluded_writes=0 bk_zero=legacy_linear silicon_phase_claim=0\n": 1,
@@ -3060,7 +3019,6 @@
       "TMS320C54x entry stage restoration: PASS cases=10 sources=irq,nmi boundaries=5 one_fetch=1 one_ack=1 one_stack_write=1 retained_opcode=1 pipeline_drain_claim=0\n": 1,
       "TMS320C54x extended AR store consumer: PASS cases=6144 restore=6144 destinations=8 stores=STL_A,STL_B,STH_A,STH_B patterns=4 sst_sxm=4 legal_gaps=2,3 pages=2 snapshots=3 publish_clock=7 consumer_reads=1 ar_writes=1 literal_fetches=1 forbidden_gap_claim=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x extended AR stores: PASS cases=24576 restore=24576 forms=absolute,offset,preincrement,circular destinations=8 stores=STL_A,STL_B,STH_A,STH_B patterns=4 sst_sxm=4 aliases=self,other pages=2 snapshots=3 publish_clock=7 destination_reads=0 writes=1 literal_fetches=1 execute_live_source=1 silicon_phase_claim=0\n": 1,
-      "TMS320C54x extended MVPD exclusions: PASS cases=512 restore=512 forms=4 registers=8 cmpt=2 pages=2 endpoints=CPU,peripheral snapshots=2 program_reads=0 data_writes=0 ar_status_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x extended POPD exclusions: PASS cases=64 restore=64 forms=mapped,SP,peripheral,unadmitted_mode,delay,repeat,block,XC pages=2 cmpt=2 snapshots=2 data_reads=0 data_writes=0 stack_changes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x extended POPD: PASS cases=16128 restore=16128 forms=25 values=4 cmpt=2 cpl=2 pages=2 snapshots=3 circular_bk=9 circular_steps_bounded=1 literal_fetches=1 stack_reads=1 destination_writes=1 pointer_updates=once source_retained=1 mapped_acceptance=0 irq_acceptance=0 physical_phase_claim=0\n": 1,
       "TMS320C54x extended PSHD exclusions: PASS cases=64 restore=64 forms=SP,peripheral,self_AR,unadmitted_mode,delay,repeat,block,XC pages=2 cmpt=2 snapshots=2 data_reads=0 data_writes=0 stack_changes=0 pointer_changes=0 silicon_trap_claim=0\n": 1,
@@ -3091,7 +3049,6 @@
       "TMS320C54x in-block far calls: PASS cases=768 restore=768 counts=0,1,2,7 layouts=early,near_end caller_pages=2 callee_pages=same,cross depths=1,2 sources=none,IRQ,NMI snapshots=4 ordered_copy=1 balanced_stack=1 caller_loop_preserved=1 physical_phase_claim=0\n": 1,
       "TMS320C54x in-block near calls: PASS cases=3456 restore=3456 counts=0,1,5,15 layouts=middle,endpoint,whole_block pages=3 depths=1,2 sources=none,IRQ,NMI calls=CALL,CALLD returns=RET,RETD snapshots=4 ordered_copy=1 balanced_stack=1 physical_phase_claim=0\n": 1,
       "TMS320C54x in-body STM BRC exclusion: PASS cases=8 restore=8 pages=2 snapshots=4 write_owner=Access publications=0 body_effects=0 silicon_trap_claim=0\n": 1,
-      "TMS320C54x indexed MVDK exclusions: PASS cases=19712 restore=19712 encodings=16 destinations=77 cmpt=2 pages=2 snapshots=2 reads=0 writes=0 reset_before_restore=1 silicon_trap_claim=0\n": 1,
       "TMS320C54x indexed MVDK: PASS cases=294336 restore=294336 excluded=8064 encodings=16 destination_kinds=21 mapped_sources=18 indices=1,-1,BK,-BK snapshots=2,3 raw_words=1 alias_order=sample,modify,publish reset_before_restore=1 physical_phase_claim=0 interrupt_repeat_composition=unvalidated\n": 1,
       "TMS320C54x indirect POPM: PASS cases=4 pre_post=1 compatibility=1 sp_destination=1 pipeline_claim=0\n": 1,
       "TMS320C54x indirect PSHM conformance: PASS variants=8\n": 1,
@@ -3116,10 +3073,8 @@
       "TMS320C54x mapped CMPM exclusions: PASS cases=3840 restore=3840 addresses=80 forms=direct,indirect,absolute cpl=2 initial_tc=2 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 status_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x mapped CMPM: PASS cases=69120 restore=69120 registers=T,TRN,AR0..7 forms=direct,indirect,absolute cpl=2 values=8 literals=6 conditions=TC,NTC initial_tc=2 pages=2 snapshots=3 reads=1 writes=0 literal_words=1,2 source=Read tc=Execute retained=1 indirect_pointer=separate physical_phase_claim=0 control_composition=unvalidated\n": 1,
       "TMS320C54x mapped LD ASM: PASS cases=49152 restore=49152 sources=16 forms=DP,postincrement,offset,absolute shifts=32 status_states=4 pages=2 snapshots=3 source_sample=Read publish=Execute data_writes=0 pointer_updates=once physical_phase_claim=0\n": 1,
-      "TMS320C54x mapped MVDD exclusions: PASS cases=12 restore=12 cpu_register_destination=4 dual_peripheral=4 repeated_peripheral_write=4 pages=2 snapshots=2 reads=0 writes=0 pointer_updates=0 source_opcode_fetches=1 atomic_fallback=0\n": 1,
       "TMS320C54x mapped MVDD repeat: PASS cases=400 restore=400 layouts=zero_page,enter_peripheral,leave_peripheral,AR_alias,read_clear lengths=128,4 patterns=4 prefixes=short,long pages=2 snapshots=5 reads=11520 writes=11520 source_opcode_fetches=1 peripheral_waits=once register_values=Read_owned endpoint_identities=unvalidated silicon_phase_claim=0\n": 1,
       "TMS320C54x mapped MVDD sources: PASS cases=49152 restore=49152 source_addresses=96 patterns=4 x_modifiers=4 y_modifiers=4 pages=2 snapshots=4 source_reads=1 guest_writes=1 source_opcode_fetches=1 peripheral_extra_clock=1 ram_extra_clock=0 register_aliases=Read_owned read_clear=retained endpoint_identities=unvalidated silicon_phase_claim=0\n": 1,
-      "TMS320C54x mapped MVDK exclusions: PASS cases=48 restore=48 sources=12 pages=2 snapshots=2 data_reads=0 data_writes=0 destination_publication=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x mapped MVDK producers: PASS cases=5184 restore=5184 sources=AL,AH,AG,BL,BH,BG forms=3 producers=STL,POPM,LD gaps=0,1 destinations=AR3,RAM patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 direct_alu_latency=retained direct_ld_gap0=projection_only mapped_no_conflict=1 physical_phase_claim=0\n": 1,
       "TMS320C54x mapped MVDK: PASS cases=14256 restore=14256 sources=18 forms=direct,indirect,absolute destinations=11 patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_sample=Access mapped_aliases=1 producer_composition=unvalidated read_owner=Address observer_scope=bus_only debug_excluded=1 physical_phase_claim=0\n": 1,
       "TMS320C54x mapped POPD: PASS cases=4032 restore=4032 registers=21 forms=direct,postincrement,postdecrement patterns=4 cmpt=2 pages=2 snapshots=4 reads=1 writes=1 captured_destination=1 captured_source=1 dagen_write=Read data_write=Execute active_block_acceptance=0 silicon_phase_claim=0\n": 1,
@@ -3174,9 +3129,7 @@
       "TMS320C54x repeat endpoints: PASS cases=12 endpoints=ordinary,ffff,0000 counts=short,long sources=irq,nmi\n": 1,
       "TMS320C54x repeat page comparator: PASS cases=384 restore=384 frontends=atomic,staged counts=0,1,2,7 caller_pages=0,2,127 targets=foreign call_forms=FCALL,FCALLD hazard_controls=2 snapshots=4 rea_width=16 wrap_page=current balanced_frames=1 delay_effects=once physical_phase_claim=0\n": 1,
       "TMS320C54x repeated MVDD: PASS cases=221184 restore=221184 encodings=256 counts=0,1,15 forms=short,long layouts=distinct,equal,overlap bk=0,16 pages=2 snapshots=4 sources=none,IRQ,NMI read_before_older_write=1 same_ar_xmod_priority=1 opcode_fetches=1 literal_fetches=once issue_interval=1 interrupt_return=1 mapped_acceptance=0 memory_count_acceptance=0 silicon_phase_claim=0\n": 1,
-      "TMS320C54x repeated MVDK exclusions: PASS cases=480 restore=480 sources_destinations=10 counts=2 encodings=2 compatibility_states=2 pages=2 snapshots=3 reads=0 writes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x repeated MVDK: PASS cases=105696 restore=105696 source_geometries_skipped=288 encodings=184 counts=4 placements=6 compatibility_states=2 cpl_states=2 pages=2 snapshots=3 mapped_access=excluded physical_phase_claim=0 interrupt_composition=unvalidated\n": 1,
-      "TMS320C54x repeated MVKD exclusions: PASS cases=32 restore=32 kinds=mapped_source,mapped_destination,absolute,long_offset count_forms=2 pages=2 snapshots=2 reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x repeated MVKD: PASS cases=9216 restore=9216 forms=DP,SP,plain,postinc,postdec,preinc registers=8 counts=0,1,2,7 count_forms=2 layouts=distinct,equal,overlap pages=2 snapshots=4 source_increment=1 same_address_bypass=1 issue_interval=1 literal_fetches=once mapped_acceptance=0 interrupt_composition=unvalidated silicon_phase_claim=0\n": 1,
       "TMS320C54x repeated MVMD: PASS cases=1536 restore=1536 sources=AL,BL counts=0,1,39,255 patterns=4 flags=4 headers=short,long pages=2 snapshots=3 fixed_source_reads=each destination=EAR_increment literal_fetches=1 mid_repeat_source_change=1 physical_phase_claim=0\n": 1,
       "TMS320C54x repeated POPD: PASS cases=6528 restore=6528 layouts=RAM,fixed,forward_alias,back_alias,PMST_to_BK,AR6_to_BL forms=short,long counts=0,1,15,4,11 patterns=4 cmpt=2 pages=2 snapshots=4 sources=none,IRQ,NMI reads_each=1 writes_each=1 body_fetches=1 literal_fetches=once read_before_older_write=1 interrupt_return=1 active_block_acceptance=0 silicon_phase_claim=0\n": 1,
@@ -3194,7 +3147,6 @@
       "TMS320C54x repeated accumulator stores: PASS cases=49152 restore=49152 forms=STL_A,STL_B,STH_A,STH_B modes=plain,postdec,postinc,preinc registers=8 counts=0,1,7,255 setups=RPT,RPTZ patterns=2 sst_sxm=4 pages=2 snapshots=3 execute_live=1 reads=0 writes=count+1 silicon_phase_claim=0\n": 1,
       "TMS320C54x repeated dual MAC exclusions: PASS cases=512 restore=512 operations=4 selectors=4 low_operands=X,Y sources=4 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 t_changes=0 silicon_trap_claim=0\n": 1,
       "TMS320C54x repeated dual MAC: PASS cases=98304 restore=98304 operations=MAC,MACR,MAS,MASR selectors=4 layouts=fixed,postinc,postdec,alias patterns=4 flags=16 counts=0,1,7,255 pages=2 snapshots=3 per_clock_accumulator=1 paired_reads=1 t_publish=Read newer_t_preserved=1 source_opcode_poison=1 writes=0 physical_banks=unvalidated physical_phase_claim=0\n": 1,
-      "TMS320C54x repeated indexed MVDK exclusions: PASS cases=480 restore=480 sources_destinations=10 counts=2 encodings=2 cmpt=2 pages=2 snapshots=3 reads=0 writes=0 reset_before_restore=1 silicon_trap_claim=0\n": 1,
       "TMS320C54x repeated indexed MVDK: PASS cases=8928 restore=8928 source_geometries_skipped=288 encodings=16 counts=4 placements=6 cmpt=2 cpl=2 pages=2 snapshots=3 ordered_samples=1 destination_literal_once=1 mapped_access=excluded reset_before_restore=1 physical_phase_claim=0 interrupt_composition=unvalidated\n": 1,
       "TMS320C54x repeated parallel arithmetic exclusions: PASS cases=128 restore=128 forms=8 repeat_count=7 mapped_legs=X,Y pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n": 1,
       "TMS320C54x repeated parallel arithmetic: PASS cases=30720 restore=30720 forms=8 operations=ADD,SUB layouts=5 ar0_stride=3 shifts=4 sxm_sst_ovm=8 counts=0,1,7,255 pages=2 snapshots=3 fresh_sources=1 old_source_store=1 accumulator_feedback=1 carry_bit=32 sticky_overflow=1 t_preserved=1 alias_priority=X opcode_fetches=1 reset_before_restore=1 physical_phase_claim=0\n": 1,
@@ -8547,29 +8499,6 @@
         "TMS320C54x mapped MVDD sources: PASS cases=49152 restore=49152 source_addresses=96 patterns=4 x_modifiers=4 y_modifiers=4 pages=2 snapshots=4 source_reads=1 guest_writes=1 source_opcode_fetches=1 peripheral_extra_clock=1 ram_extra_clock=0 register_aliases=Read_owned read_clear=retained endpoint_identities=unvalidated silicon_phase_claim=0"
       ]
     },
-    "mvdd-source-edge": {
-      "completion": "Fatal error: TMS320C54x isolated mapped MVDD exclusions complete",
-      "machine": "tms54test",
-      "reported_fields": [
-        {
-          "atomic_fallback": "0",
-          "cases": "12",
-          "cpu_register_destination": "4",
-          "dual_peripheral": "4",
-          "pages": "2",
-          "pointer_updates": "0",
-          "reads": "0",
-          "repeated_peripheral_write": "4",
-          "restore": "12",
-          "snapshots": "2",
-          "source_opcode_fetches": "1",
-          "writes": "0"
-        }
-      ],
-      "required": [
-        "TMS320C54x mapped MVDD exclusions: PASS cases=12 restore=12 cpu_register_destination=4 dual_peripheral=4 repeated_peripheral_write=4 pages=2 snapshots=2 reads=0 writes=0 pointer_updates=0 source_opcode_fetches=1 atomic_fallback=0"
-      ]
-    },
     "mvdd-source-rpt": {
       "completion": "Fatal error: TMS320C54x isolated mapped MVDD repeat complete",
       "machine": "tms54test",
@@ -8654,27 +8583,6 @@
         "TMS320C54x MVDK accumulator producers: PASS cases=15552 restore=15552 sources=AL,AH,AG,BL,BH,BG destinations=AL,AH,AG,BL,BH,BG forms=3 producers=STL,POPM,LD gaps=0,1 patterns=4 pages=2 snapshots=3 source_reads=1 destination_writes=1 mapped_no_conflict=1 direct_ld_gap0=projection_only guard_width=8 physical_phase_claim=0"
       ]
     },
-    "mvdk-circ-edge": {
-      "completion": "Fatal error: TMS320C54x isolated circular MVDK exclusions complete",
-      "machine": "tms54xtra",
-      "reported_fields": [
-        {
-          "cases": "19712",
-          "compatibility_states": "2",
-          "destinations": "77",
-          "encodings": "32",
-          "pages": "2",
-          "reads": "0",
-          "restore": "19712",
-          "silicon_trap_claim": "0",
-          "snapshots": "2",
-          "writes": "0"
-        }
-      ],
-      "required": [
-        "TMS320C54x circular MVDK exclusions: PASS cases=19712 restore=19712 encodings=32 destinations=77 compatibility_states=2 pages=2 snapshots=2 reads=0 writes=0 silicon_trap_claim=0"
-      ]
-    },
     "mvdk-circular": {
       "completion": "Fatal error: TMS320C54x isolated circular MVDK complete",
       "machine": "tms54xtra",
@@ -8723,28 +8631,6 @@
         "TMS320C54x indexed MVDK: PASS cases=294336 restore=294336 excluded=8064 encodings=16 destination_kinds=21 mapped_sources=18 indices=1,-1,BK,-BK snapshots=2,3 raw_words=1 alias_order=sample,modify,publish reset_before_restore=1 physical_phase_claim=0 interrupt_repeat_composition=unvalidated"
       ]
     },
-    "mvdk-index-edge": {
-      "completion": "Fatal error: TMS320C54x isolated indexed MVDK exclusions complete",
-      "machine": "tms54xtra",
-      "reported_fields": [
-        {
-          "cases": "19712",
-          "cmpt": "2",
-          "destinations": "77",
-          "encodings": "16",
-          "pages": "2",
-          "reads": "0",
-          "reset_before_restore": "1",
-          "restore": "19712",
-          "silicon_trap_claim": "0",
-          "snapshots": "2",
-          "writes": "0"
-        }
-      ],
-      "required": [
-        "TMS320C54x indexed MVDK exclusions: PASS cases=19712 restore=19712 encodings=16 destinations=77 cmpt=2 pages=2 snapshots=2 reads=0 writes=0 reset_before_restore=1 silicon_trap_claim=0"
-      ]
-    },
     "mvdk-index-rpt": {
       "completion": "Fatal error: TMS320C54x isolated repeated indexed MVDK complete",
       "machine": "tms54xtra",
@@ -8770,49 +8656,6 @@
       ],
       "required": [
         "TMS320C54x repeated indexed MVDK: PASS cases=8928 restore=8928 source_geometries_skipped=288 encodings=16 counts=4 placements=6 cmpt=2 cpl=2 pages=2 snapshots=3 ordered_samples=1 destination_literal_once=1 mapped_access=excluded reset_before_restore=1 physical_phase_claim=0 interrupt_composition=unvalidated"
-      ]
-    },
-    "mvdk-irpt-edge": {
-      "completion": "Fatal error: TMS320C54x isolated repeated indexed MVDK exclusions complete",
-      "machine": "tms54xtra",
-      "reported_fields": [
-        {
-          "cases": "480",
-          "cmpt": "2",
-          "counts": "2",
-          "encodings": "2",
-          "pages": "2",
-          "reads": "0",
-          "reset_before_restore": "1",
-          "restore": "480",
-          "silicon_trap_claim": "0",
-          "snapshots": "3",
-          "sources_destinations": "10",
-          "writes": "0"
-        }
-      ],
-      "required": [
-        "TMS320C54x repeated indexed MVDK exclusions: PASS cases=480 restore=480 sources_destinations=10 counts=2 encodings=2 cmpt=2 pages=2 snapshots=3 reads=0 writes=0 reset_before_restore=1 silicon_trap_claim=0"
-      ]
-    },
-    "mvdk-map-edge": {
-      "completion": "Fatal error: TMS320C54x isolated mapped MVDK exclusions complete",
-      "machine": "tms54test",
-      "reported_fields": [
-        {
-          "cases": "48",
-          "data_reads": "0",
-          "data_writes": "0",
-          "destination_publication": "0",
-          "pages": "2",
-          "restore": "48",
-          "silicon_trap_claim": "0",
-          "snapshots": "2",
-          "sources": "12"
-        }
-      ],
-      "required": [
-        "TMS320C54x mapped MVDK exclusions: PASS cases=48 restore=48 sources=12 pages=2 snapshots=2 data_reads=0 data_writes=0 destination_publication=0 silicon_trap_claim=0"
       ]
     },
     "mvdk-mapped": {
@@ -8892,28 +8735,6 @@
       ],
       "required": [
         "TMS320C54x repeated MVDK: PASS cases=105696 restore=105696 source_geometries_skipped=288 encodings=184 counts=4 placements=6 compatibility_states=2 cpl_states=2 pages=2 snapshots=3 mapped_access=excluded physical_phase_claim=0 interrupt_composition=unvalidated"
-      ]
-    },
-    "mvdk-rpt-edge": {
-      "completion": "Fatal error: TMS320C54x isolated repeated MVDK exclusions complete",
-      "machine": "tms54xtra",
-      "reported_fields": [
-        {
-          "cases": "480",
-          "compatibility_states": "2",
-          "counts": "2",
-          "encodings": "2",
-          "pages": "2",
-          "reads": "0",
-          "restore": "480",
-          "silicon_trap_claim": "0",
-          "snapshots": "3",
-          "sources_destinations": "10",
-          "writes": "0"
-        }
-      ],
-      "required": [
-        "TMS320C54x repeated MVDK exclusions: PASS cases=480 restore=480 sources_destinations=10 counts=2 encodings=2 compatibility_states=2 pages=2 snapshots=3 reads=0 writes=0 silicon_trap_claim=0"
       ]
     },
     "mvdm-acc": {
@@ -9483,29 +9304,6 @@
         "TMS320C54x staged MVPD: PASS cases=128 addressing_modes=4 source_pages=2 source_regions=2 ovly_states=2 restore=128 duplicate_program_reads=0 duplicate_data_writes=0",
         "TMS320C54x staged RPT MVPD: PASS cases=128 counts=4 pages=2 ovly_states=2 destination_modes=2 restore=128 count_plus_one=1 duplicate_transfers=0",
         "TMS320C54x staged RPT interrupts: PASS cases=16 sources=IRQ,NMI counts=4 pages=2 restore=16 deferred_until_final_write=1 correct_continuation=1"
-      ]
-    },
-    "mvpd-ext-edge": {
-      "completion": "Fatal error: TMS320C54x isolated extended MVPD exclusions complete",
-      "machine": "tms54xtra",
-      "reported_fields": [
-        {
-          "ar_status_changes": "0",
-          "cases": "512",
-          "cmpt": "2",
-          "data_writes": "0",
-          "endpoints": "CPU,peripheral",
-          "forms": "4",
-          "pages": "2",
-          "program_reads": "0",
-          "registers": "8",
-          "restore": "512",
-          "silicon_trap_claim": "0",
-          "snapshots": "2"
-        }
-      ],
-      "required": [
-        "TMS320C54x extended MVPD exclusions: PASS cases=512 restore=512 forms=4 registers=8 cmpt=2 pages=2 endpoints=CPU,peripheral snapshots=2 program_reads=0 data_writes=0 ar_status_changes=0 silicon_trap_claim=0"
       ]
     },
     "mvpd-extended": {
@@ -11129,27 +10927,6 @@
       ],
       "required": [
         "TMS320C54x repeated MVKD: PASS cases=9216 restore=9216 forms=DP,SP,plain,postinc,postdec,preinc registers=8 counts=0,1,2,7 count_forms=2 layouts=distinct,equal,overlap pages=2 snapshots=4 source_increment=1 same_address_bypass=1 issue_interval=1 literal_fetches=once mapped_acceptance=0 interrupt_composition=unvalidated silicon_phase_claim=0"
-      ]
-    },
-    "rpt-mvkd-edge": {
-      "completion": "Fatal error: TMS320C54x isolated repeated MVKD exclusions complete",
-      "machine": "tms54xtra",
-      "reported_fields": [
-        {
-          "cases": "32",
-          "count_forms": "2",
-          "kinds": "mapped_source,mapped_destination,absolute,long_offset",
-          "pages": "2",
-          "pointer_updates": "0",
-          "reads": "0",
-          "restore": "32",
-          "silicon_trap_claim": "0",
-          "snapshots": "2",
-          "writes": "0"
-        }
-      ],
-      "required": [
-        "TMS320C54x repeated MVKD exclusions: PASS cases=32 restore=32 kinds=mapped_source,mapped_destination,absolute,long_offset count_forms=2 pages=2 snapshots=2 reads=0 writes=0 pointer_updates=0 silicon_trap_claim=0"
       ]
     },
     "rpt-sfta": {

@@ -8,6 +8,20 @@
   },
   "families": [
     {
+      "id": "unsupported-mapped-move-matrices",
+      "classification": "implementation_limit",
+      "decision": "delete",
+      "profiles": [],
+      "case_ids": [],
+      "retired_profiles": ["mvpd-ext-edge", "mvdk-map-edge", "rpt-mvkd-edge", "mvdd-source-edge", "mvdk-circ-edge", "mvdk-index-edge", "mvdk-rpt-edge", "mvdk-irpt-edge"],
+      "basis": "Dedicated matrices freeze prototype endpoint/repeat rejection policy rather than independently specified silicon behavior. Remove per-profile setup/tap/replay paths and edge-only branches in shared factories; preserve the supported factories as their old edge=false specialization. This is deliberate coverage retirement, not an equivalent-coverage claim.",
+      "retained": ["extended MVPD source/destination/literal capture and program-page/OVLY behavior", "mapped MVDK and accumulator producer interactions", "short repeated MVKD ordered copies and pending-write bypass", "mapped and repeated MVDD read ownership and bus waits", "circular/indexed MVDK alias order, all accepted matrix cases and their existing 8064 excluded source geometries", "repeated ordinary/indexed MVDK ordered RAM copies and replay", "separate CLKMD move and shared source-domain controls"],
+      "limits": ["retire 40988 nominal negative executions/restores: MVPD 512, mapped MVDK 48, repeated MVKD 32, MVDD 12, circular/indexed MVDK 19712 each, repeated ordinary/indexed MVDK 480 each", "the retired endpoint/owner combinations no longer have dedicated no-bus-effect, pointer rollback, guard-cycle or replay qualification", "no CPU guard, arithmetic reference expression, supported case count or physical hardware contract is changed", "CLKMD admission is not proof that circular/indexed CLKMD writes are silicon-correct"],
+      "baseline": "Six original profiles pass before removal. Both circular/indexed exclusion profiles fail at case 2208 clock 4: their edge factory maps destination kind 69 to 0058 (CLKMD) and unconditionally expects rejection, while the existing CPU explicitly exempts staged clock-destination moves from ordinary destination rejection. Record the conflict rather than change CPU behavior to satisfy an obsolete blanket-negative matrix.",
+      "verification": "Rebuilt mvpd-extended, mvdk-mapped, mvdk-producer, mvdk-acc-prod, rpt-mvkd, mvdd-source, mvdd-source-rpt, mvdk-index-rpt, mvdk-repeat, clock-mvdk, mvdk-circular and mvdk-index pass their complete original counts/restores. This includes both 294336-case circular/indexed matrices and their retained 8064 excluded source geometries each. Seven unaffected supported factories/setups are byte-identical; repeated MVDK and MVDD positive reference tails are byte-identical, and circular/indexed references differ only by edge=false specialization. Retained BIOS names, descriptions and order are unchanged. All 379 focused C54x tests and the full 5076-test host run pass (one established host skip). The legacy prefix retains all 168 ordered PASS records and 2474 opcode assertions. No renewal of full-default CPU or handset checkpoints is claimed.",
+      "measurement": {"c54x_cpp_bytes_before": 3428403, "c54x_cpp_bytes_after": 3411938, "c54x_cpp_lines_before": 51615, "c54x_cpp_lines_after": 51427, "isolated_profiles_before": 428, "isolated_profiles_after": 420, "scope": "16465 C++ bytes and 188 lines removed. Retiring 40988 nominal negative cases/restores is deliberate coverage loss; two retiring profiles already failed, so no aggregate speedup or green starting inventory is claimed. Supported case counts and expected calculations remain unchanged."}
+    },
+    {
       "id": "unsupported-asm-ts-and-t-store-probes",
       "classification": "implementation_limit",
       "decision": "delete",
