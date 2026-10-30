@@ -439,27 +439,6 @@ private:
 
 	std::unique_ptr<register_sequence_fixture> m_register_sequence;
 
-	struct mapped_word_arithmetic_fixture
-	{
-		u64 a, b, after_a, after_b, result;
-		u16 t, trn, address, memory, opcode, st0, st1, result_st0;
-		u32 base;
-		unsigned prefix, read_cycle, mutation_state;
-		bool absolute;
-	};
-	static mapped_word_arithmetic_fixture mapped_word_arithmetic_case(unsigned variant);
-	clocked_register_case mapped_register_sequence(unsigned variant, bool bitfield) const;
-	void start_pipeline_mapped_word_arithmetic();
-
-	struct mapped_bitfield_fixture
-	{
-		mapped_word_arithmetic_fixture registers;
-		u16 memory, mask, st0;
-		unsigned mutation_state;
-	};
-	mapped_bitfield_fixture mapped_bitfield_case(unsigned variant) const;
-	void start_pipeline_mapped_bitfield();
-
 	struct bus_io_fixture
 	{
 		unsigned waits, first, complete, checkpoint, interrupt;

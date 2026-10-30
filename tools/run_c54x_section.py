@@ -293,6 +293,8 @@ def main():
     counts['peripheral_cost_classes'] = 20
     counts['mapped_accumulator_move'] = 96
     counts['status_bitfield'] = 128
+    counts['mapped_accumulator_arithmetic'] = 1152
+    counts['mapped_accumulator_bitfield'] = 576
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

@@ -232,14 +232,6 @@ void tms320c54x_test_state::machine_reset()
 	{
 		start_pipeline_multiply_mapped(); return;
 	}
-	if (!strcmp(machine().system().name, "tms54test") && profile_is("mapped-bitf"))
-	{
-		start_pipeline_mapped_bitfield(); return;
-	}
-	if (!strcmp(machine().system().name, "tms54test") && profile_is("mapped-word"))
-	{
-		start_pipeline_mapped_word_arithmetic(); return;
-	}
 	if (!strcmp(machine().system().name, "tms54test") &&
 			profile_is("timer"))
 	{

@@ -162,8 +162,20 @@ It checks one mapped Read, no writes, retained extension words, post-Read source
 mutation, TC publication and preservation of unrelated status/register state.
 Persistent observations apply on every clock through real IDLE and replay.
 These are model sampling contracts, not silicon timing measurements.
-The legacy `mapped-word` and `mapped-bitf` banks still await replacement; they
-no longer own a status-register profile or its setup/reference branches.
+`mapped_accumulator_arithmetic` owns 1,152 ADD/SUB cases for AL/AH/AG,
+BL/BH/BG/T/TRN, both destinations, SXM/OVM, four input patterns, direct/absolute
+forms and adjacent/separated LD producers. Its reference uses signed 40-bit
+destination values, independently widened word operands, 32-bit carry/overflow
+and optional saturation. `mapped_accumulator_bitfield` owns 576 cases covering
+the same word sources, four masks, both initial TC states, both address forms
+and producer gaps. It distributes SXM/OVM because neither affects BITF.
+Both sections retain exact one-Read/no-Write contracts, source poisoning,
+extension-word retention and per-clock publication predicates through IDLE.
+Pages and checkpoint positions are distributed, not Cartesian dimensions.
+The adjacent direct arithmetic producer's older sampled AL value is explicitly
+an implementation behavior, not a silicon-supported instruction schedule.
+The old profile selectors, descriptor types, builders and result routing are
+removed; 20,736 executions are replaced by 1,728 independent cases/replays.
 
 `isa-words` owns fifty independently reset atomic instruction examples. The
 default suite shares the same bank through one loop, replacing five separate
