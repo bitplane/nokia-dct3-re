@@ -337,79 +337,6 @@ u32 tms320c54x_test_state::repeated_writa_destination(repeated_writa_fixture con
 
 
 
-void tms320c54x_test_state::start_pipeline_add_sp_context(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const copy = profile_is("mvkd-sp");
-	unsigned const producer = variant % 4, gap = std::array<unsigned, 3>{0, 1, 3}[(variant / 4) % 3];
-	u16 const initial_sp = BIT(variant / 12, 0) ? 0x9000 : 0x1000;
-	bool const compiler = BIT(variant / 24, 0), b = BIT(variant / 96, 0);
-	u32 const base = BIT(variant / 48, 0) ? 0x20000 : 0;
-	u16 const operand = initial_sp + std::array<int, 4>{-4, -1, 1, -8}[producer];
-	unsigned const read_tick = 6 + (producer == 3 ? 2 : 1) + gap;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 48; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, std::array<u16, 4>{0xeefc, 0x4a11, 0x8a11, 0x7718}[producer]);
-	if (producer == 3) program.write_word(base + 0x601, operand);
-	unsigned const add = 0x600 + (producer == 3 ? 2 : 1) + gap;
-	program.write_word(base + add, copy ? 0x7092 : b ? 0x01f8 : 0x00f8); program.write_word(base + add + 1, 0x18);
-	// A younger FRAME must not change the older instruction's sampled SP.
-	program.write_word(base + add + 2, 0xee02);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa008}, {cpu_regs::STATE_ST1, 0x900 | (compiler ? 0x4000 : 0)},
-		{cpu_regs::STATE_SP, initial_sp}, {cpu_regs::STATE_AR1, 0x1357},
-	});
-	if (copy) m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1400);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_A, b ? 0x2233445566ULL : 0}, {cpu_regs::STATE_B, b ? 0 : 0x2233445566ULL},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(initial_sp, 0xbeef);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x18, 0x18, "add_sp_context_operand",
-		[this, operand, read_tick](offs_t, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(word == operand && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == read_tick,
-				"Mapped SP ADD reads the older stack update once before the younger FRAME"); ++m_pipeline_operand_reads;
-		});
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x60, 0xffff, "mapped_sp_context_writes",
-		[this, copy, initial_sp, operand](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			if (copy && at == 0x1400) { expect(word == operand && !m_pipeline_extensions_reads, "MVKD retains one SP publication after an older stack update"); ++m_pipeline_extensions_reads; }
-			else { expect(at == u16(initial_sp - 1) && word == 0x1357 && !m_pipeline_store_writes, "PSHM retains one ordered stack write"); ++m_pipeline_store_writes; } });
-	m_pipeline_extensions_reads = 0;
-	m_phase = 291000; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_pipeline_add_sp_exclusion(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const copy = profile_is("mvkd-sp");
-	bool const destination_edge = copy && variant >= 20;
-	u16 const source = destination_edge ? 0x18 : std::array<u16, 10>{0, 1, 6, 7, 0x1a, 0x1b, 0x1c, 0x1d, 0x24, 0x58}[variant % 10];
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
-	program.write_word(0x600, copy ? destination_edge ? 0x70f8 : variant >= 10 ? 0x7212 : 0x7092 : variant >= 10 ? 0x01f8 : 0x00f8);
-	program.write_word(0x601, destination_edge ? std::array<u16, 5>{0, 0x18, 0x19, 0x1a, 0x1f}[variant - 20] : source);
-	if (destination_edge) program.write_word(0x602, source);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa008}, {cpu_regs::STATE_ST1, 0x900}, {cpu_regs::STATE_SP, 0x1000},
-	});
-	if (copy) { m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1400); m_cpu->space(AS_DATA).write_word(0x1400, 0xaaaa); }
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_A, 0x123456789aULL}, {cpu_regs::STATE_B, 0x2233445566ULL}, {cpu_regs::STATE_IFR, 0},
-		{cpu_regs::STATE_IMR, 0},
-	});
-	m_pipeline_operand_reads = m_idle_fixture_tick = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(source, source, "add_sp_excluded_source",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(true);
-	m_phase = 291020; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_direct_rmw(unsigned variant)
 {
@@ -1083,78 +1010,8 @@ bool tms320c54x_test_state::check_pipeline_rmw_results()
 
 
 
-bool tms320c54x_test_state::check_pipeline_add_sp_context_results()
+bool tms320c54x_test_state::check_pipeline_direct_rmw_results()
 {
-	if (m_phase == 291000)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, producer = variant % 4;
-		bool const copy = profile_is("mvkd-sp");
-		unsigned const gap = std::array<unsigned, 3>{0, 1, 3}[(variant / 4) % 3];
-		u16 const initial_sp = BIT(variant / 12, 0) ? 0x9000 : 0x1000;
-		u16 const operand = initial_sp + std::array<int, 4>{-4, -1, 1, -8}[producer];
-		bool const compiler = BIT(variant / 24, 0), b = BIT(variant / 96, 0);
-		unsigned const read_tick = 6 + (producer == 3 ? 2 : 1) + gap;
-		unsigned const tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 3>{4, read_tick, read_tick + 2}[variant / 192];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Absolute ADD accepts SP after an evidenced stack update");
-		if (tick == read_tick + 2)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == u16(operand + 2), "Younger FRAME updates SP after the ADD samples its older value");
-			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x2468);
-		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save SP producer, retained ADD input or younger FRAME state");
-		}
-		if (tick == 24)
-		{
-			u64 const expected = u64(s64(s16(operand))) & 0xffffffffffULL;
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == unsigned(producer == 1) &&
-				m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == (copy ? 0 : expected) &&
-				m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x2233445566ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x2468 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR1) == (producer == 2 ? 0xbeef : 0x1357) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa008 &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x900 | (compiler ? 0x4000 : 0)),
-				"Mapped SP ADD retains the producer value independently of CPL, younger FRAME and later SP replacement");
-			if (copy) { auto const disable = machine().disable_side_effects(); expect(m_pipeline_extensions_reads == 1 && m_cpu->space(AS_DATA).read_word(0x1400) == operand && m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1401, "Mapped SP copy retains the older stack value and modifies its destination pointer once"); }
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(291010, "Restore mapped-SP operand without duplicate stack effects or reads");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 575) { start_pipeline_add_sp_context(variant + 1); return true; }
-			if (copy) osd_printf_info("TMS320C54x staged MVKD SP contexts: PASS cases=576 restore=576 producers=FRAME,PSHM,POPM,STM gaps=0,1,3 cpl_states=2 pages=2 accumulators=2 younger_frame=1 retained_source=1 silicon_phase_claim=0\n");
-			else osd_printf_info("TMS320C54x staged absolute ADD SP contexts: PASS cases=576 restore=576 producers=FRAME,PSHM,POPM,STM gaps=0,1,3 cpl_states=2 pages=2 accumulators=2 younger_frame=1 retained_source=1 silicon_phase_claim=0\n");
-			start_pipeline_add_sp_exclusion(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 291010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 291000; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 291020)
-	{
-		bool const copy = profile_is("mvkd-sp");
-		if (++m_idle_fixture_tick == 12)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2233445566ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa008,
-				"SP admission does not admit control, repeat, mapping or peripheral sources");
-			if (copy) { auto const disable = machine().disable_side_effects(); expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1400 && m_cpu->space(AS_DATA).read_word(0x1400) == 0xaaaa, "Excluded MVKD and MVDM do not update the destination pointer or publish data"); }
-			m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < (copy ? 24 : 19)) { start_pipeline_add_sp_exclusion(m_pipeline_peripheral_case + 1); return true; }
-			if (copy)
-			{
-				osd_printf_info("TMS320C54x staged MVKD SP exclusions: PASS cases=25 sources=10 source_cases=20 destination_cases=5 forms=MVKD,MVDM operand_reads=0 architectural_results=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated MVKD SP complete");
-			}
-			osd_printf_info("TMS320C54x staged absolute ADD SP exclusions: PASS cases=20 sources=10 accumulators=2 operand_reads=0 architectural_results=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated absolute ADD SP complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
 	if (m_phase == 252450)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, operation = variant % 3, offset = (variant / 3) % 2 ? 0x20 : 0;

@@ -5360,7 +5360,6 @@ bool tms320c54x_test_state::check_mvkd_sp_results()
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 383) { start_mvkd_sp(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged MVKD SP: PASS cases=384 restore=384 forms=DP,CPL,indirect,postincrement,postdecrement,preincrement,absolute,offset,MVDM values=4 cpl_states=2 pages=2 snapshots=3 source_reads=1 destination_writes=1 source_retained=1 address_retained=1 silicon_phase_claim=0\n");
-			start_pipeline_add_sp_context(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}

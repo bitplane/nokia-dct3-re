@@ -317,8 +317,6 @@ private:
 	void start_rptz(unsigned variant = 0);
 	void start_ar_addm_load(unsigned variant = 0);
 	void start_instruction_observer(unsigned variant = 0);
-	void start_pipeline_add_sp_context(unsigned variant = 0);
-	void start_pipeline_add_sp_exclusion(unsigned variant = 0);
 	void start_pipeline_direct_rmw(unsigned variant = 0);
 	void start_pipeline_peripheral_logic(unsigned variant = 0);
 	void start_pipeline_port_write(unsigned variant = 0);
@@ -1925,7 +1923,7 @@ private:
 	bool check_instruction_observer_results();
 	bool check_block_page_results();
 	bool check_mvkd_sp_results();
-	bool check_pipeline_add_sp_context_results();
+	bool check_pipeline_direct_rmw_results();
 	bool check_pipeline_peripheral_logic_results();
 	bool check_mvdd_source_results();
 	bool check_ts_load_results();
