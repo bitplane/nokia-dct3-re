@@ -119,8 +119,6 @@ private:
 	void start_pipeline_extended_dst(unsigned variant = 0);
 	void start_pipeline_store_mvmm(unsigned variant = 0);
 	struct indexed_store_fixture;
-	static indexed_store_fixture circular_portr_case(unsigned v);
-	void start_circular_portr(unsigned variant = 0);
 	struct circular_portr_block_fixture
 	{
 		unsigned count, size, reg, selected, snapshot, index;

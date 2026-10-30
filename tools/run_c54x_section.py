@@ -378,6 +378,7 @@ def main():
     counts['peripheral_parallel_load'] = 49152
     counts['bsp_parallel_load'] = 768
     counts['shifted_peripheral'] = 2520
+    counts['circular_portr'] = 14784
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216

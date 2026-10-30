@@ -230,32 +230,6 @@ void tms320c54x_test_state::start_pipeline_idle1(unsigned variant, bool modes)
 
 
 
-tms320c54x_test_state::indexed_store_fixture tms320c54x_test_state::circular_portr_case(unsigned v)
-{
-	unsigned const encoded = v % 8192 + ((v / 8192) % 2 ? 7 : 0) * 8192 + ((v / 16384) % 2) * 65536 + (v / 32768) * 131072;
-	return circular_load_case(encoded);
-}
-
-void tms320c54x_test_state::start_circular_portr(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = circular_portr_case(variant);
-	u16 const port = f.selector ? 0xfffe : 0x125;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, 0x7400 | f.mode); program.write_word(f.base + 0x601, port); program.write_word(f.base + 0x602, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x8608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x9876543210ULL);
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, f.initial[i]);
-	m_shifted_bus_word = f.word; m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_IO).install_read_tap(0, 0xffff, "circular_portr_sample", [this, f, port](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!f.excluded && at == port && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 6, "Circular PORTR samples one retained port in Read"); word = m_shifted_bus_word; expect(word == f.word, "Circular PORTR captures the original volatile sample"); m_shifted_bus_word ^= 0xffff; ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "circular_portr_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!f.excluded && at == f.address && word == f.word && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 7, "Circular PORTR writes its retained old address and sampled word once at Execute"); ++m_pipeline_store_writes; });
-	m_operand_data_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "circular_portr_no_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Circular PORTR never reads its data destination"); });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "circular_portr_literal", [this, port](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_extensions_reads && word == port, "Circular PORTR fetches its port literal once"); ++m_pipeline_extensions_reads; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62138;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -1209,31 +1183,6 @@ bool tms320c54x_test_state::check_mcbsp_control_sequence_results()
 
 bool tms320c54x_test_state::check_circular_portr_results()
 {
-	if (m_phase == 62138)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = circular_portr_case(variant);
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (f.excluded && tick >= 5), "Circular PORTR excludes unsupported mapped destinations before I/O or pointer effects");
-		if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
-		if (!f.excluded && tick == 5)
-		{
-			for (unsigned i = 0; i < 8; ++i) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (i == f.selected ? f.final_ar : f.initial[i]), "PORTR circular address modification belongs to Access once"); m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x2200 + i); }
-		}
-		unsigned const checkpoint = 4 + f.snapshot;
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads},
-			"Save circular PORTR literal, address or sampled I/O value");
-		if (tick == 16)
-		{
-			expect(m_pipeline_operand_reads == unsigned(!f.excluded) && m_pipeline_store_writes == unsigned(!f.excluded) && m_pipeline_extensions_reads == 1 && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !f.excluded && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x9876543210ULL, "Circular PORTR retains address and sample across replay without duplicate I/O, writes or flag changes");
-			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (f.excluded ? f.initial[i] : 0x2200 + i), "PORTR never resamples AR after Access or modifies an excluded pointer");
-			if (replay_pipeline_at(62139, checkpoint,
-				"Restore circular PORTR without repeating a consumed port sample")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_operand_data_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 98303) { start_circular_portr(variant + 1); return true; }
-			osd_printf_info("TMS320C54x circular PORTR: PASS cases=98304 restore=98304 modes=4 registers=8 compatibility=2 bk=4 indices=4 samples=4 ports=2 flags=2 pages=2 snapshots=3 literal_retained=1 sample_retained=1 pointer_updates=once destination_reads=0 excluded_io_reads=0 excluded_writes=0 bk_zero=legacy_linear silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated circular PORTR complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62139) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62138; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 62140)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = circular_portr_block_case(variant);

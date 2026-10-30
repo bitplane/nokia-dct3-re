@@ -80,8 +80,11 @@ public:
 			if (m_input.io_events) require(m_io_cursor == m_input.io_events->size(), "complete IO-bus trace");
 			if (m_input.bio_samples) require(m_bio_cursor == m_input.bio_samples->size(), "complete BIO sample trace");
 			if (m_input.xf_events) require(m_xf_cursor == m_input.xf_events->size(), "complete XF publication trace");
-			for (unsigned i=0;i<m_volatile_words.size();++i)
+			for (unsigned i=0;i<m_volatile_words.size();++i) {
+				auto const disable = m_machine.disable_side_effects();
+				require(m_cpu.space(m_input.volatile_data_space).read_word(m_input.volatile_data_reads[i].address) == m_volatile_words[i], "volatile endpoint debug peek");
 				require(m_volatile_words[i] == u16(m_input.volatile_data_reads[i].value^0xffff), "volatile source consumed once");
+			}
 			m_observing_outputs = false;
 			require(m_program_cursor == (m_input.program_events.empty() ? m_input.retained_program_reads.size() : m_input.program_events.size()), "complete retained-program trace");
 			if (!m_replay)
@@ -108,6 +111,15 @@ public:
 		schedule(); return false;
 	}
 private:
+	void volatile_read(int space, offs_t at, u16 &word)
+	{
+		if (space != m_input.volatile_data_space) return;
+		for (unsigned i=0;i<m_input.volatile_data_reads.size();++i)
+			if (at == m_input.volatile_data_reads[i].address) {
+				word = m_volatile_words[i];
+				if (!m_machine.side_effects_disabled()) m_volatile_words[i] ^= 0xffff;
+			}
+	}
 	void apply_actions(bool before)
 	{
 		for (auto const &action : m_input.actions) if (m_tick == action.tick && action.before_observation == before)
@@ -188,7 +200,7 @@ private:
 				require(accept_bus_event(*m_input.io_events,m_io_cursor,{write,u32(at),value,unsigned(m_cpu.pipeline_cycles())}), "ordered IO transaction");
 			};
 			m_io_tap = m_cpu.space(AS_IO).install_readwrite_tap(0,0xffff,"register_sequence_io",
-				[access](offs_t at,u16 &value,u16) { access(false,at,value); },
+				[this,access](offs_t at,u16 &value,u16) { volatile_read(AS_IO,at,value); access(false,at,value); },
 				[access](offs_t at,u16 &value,u16) { access(true,at,value); });
 		}
 		if (m_input.data_events)
@@ -216,11 +228,7 @@ private:
 			};
 			m_data_tap = m_cpu.space(m_input.observed_data_space).install_readwrite_tap(0, 0xffff, "register_sequence_data",
 				[this,access](offs_t at, u16 &word, u16) {
-					for (unsigned i=0;i<m_input.volatile_data_reads.size();++i)
-						if (at == m_input.volatile_data_reads[i].address) {
-							word=m_volatile_words[i];
-							if (!m_machine.side_effects_disabled()) m_volatile_words[i]^=0xffff;
-						}
+					volatile_read(m_input.observed_data_space,at,word);
 					if (!m_machine.side_effects_disabled())
 						for (auto const &endpoint : m_input.synthetic_data_reads)
 							if (at == endpoint.address) word = endpoint.value;

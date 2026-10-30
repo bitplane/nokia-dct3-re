@@ -5415,11 +5415,15 @@ its selected pointer once; Read samples the retained port and Execute
 publishes the sampled word. No data-destination read occurs. Unsupported
 mapped destinations stop before pointer or I/O effects.
 
-`portr-circular` verifies 98,304 cases and replays across all four modes,
-eight registers, compatibility selection, block sizes and index boundaries,
-four samples, two full-width port literals, mode flags, program pages and
-three snapshots. Literal, pointer and volatile I/O values change after their
-ownership stages, so re-sampling and duplicate side effects are observable.
+The independent `circular_portr` section verifies 14,784 cases and replays
+across all four modes, eight registers, compatibility selection, block sizes
+and index boundaries, four accepted samples, two full-width port literals
+and both flag patterns. Pages and three checkpoint positions are distributed
+rather than crossed. Duplicate self-indexed AR0 setups and sample variants
+rejected before I/O are removed. Literal and pointer poisoning and a volatile
+I/O endpoint expose re-sampling and duplicate effects; debugger peeks do not
+consume the endpoint. Access updates the pointer at clock 5, I/O Read occurs
+at 6, and RAM Write at 7, with no destination read.
 BK=0 retains the declared legacy linear behavior, not a new silicon claim.
 
 `portr-block` verifies 1,728 cases and replays of circular post-increment
