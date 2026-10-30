@@ -137,7 +137,6 @@ private:
 	void start_accumulator_stm(unsigned variant = 0);
 	void start_peripheral_mmr_timing_audit(unsigned variant = 0);
 	void start_pipeline_peripheral_case(unsigned variant = 0);
-	void start_pipeline_far_return(unsigned variant = 0);
 	void start_pipeline_far_irq(unsigned variant = 0);
 	void start_pipeline_mu4_prologue(unsigned variant = 0);
 	void observe_context_irq(int line);
@@ -1876,7 +1875,6 @@ private:
 	bool check_pipeline_store_results();
 	bool check_peripheral_mmr_timing_audit_results();
 	bool check_pipeline_immediate_store_results();
-	bool check_pipeline_far_return_results();
 	bool check_pipeline_far_irq_results();
 	bool check_pipeline_logical_immediate_results();
 	bool check_pipeline_conditional_branch_results();
