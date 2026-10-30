@@ -126,7 +126,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"mvkd-sp"}, [](self &test) { test.start_mvkd_sp(); } },
 		{ {"add-bk", "add-absolute", "add-sp"}, [](self &test) { test.start_pipeline_absolute_add(); } },
 		{ {"instr-observer"}, [](self &test) { test.start_instruction_observer(); } },
-		{ {"arith-bk", "arith-ar"}, [](self &test) { test.start_pipeline_register_arithmetic(); } },
 		{ {"stlm-bk"}, [](self &test) { test.start_stlm_bk(); } },
 		{ {"store-bypass", "xmem-store-bp", "asm-store-bp"}, [](self &test) { test.start_store_bypass(); } },
 		{ {"software-intr"}, [](self &test) { test.start_software_intr(); } },

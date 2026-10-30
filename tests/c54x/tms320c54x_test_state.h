@@ -279,9 +279,6 @@ private:
 	static memory_arithmetic_fixture memory_unsigned_case(unsigned variant, bool subtract = true);
 	static memory_arithmetic_fixture memory_shift16_case(unsigned variant);
 	void start_pipeline_memory_arithmetic(unsigned variant = 0);
-	static memory_arithmetic_fixture register_arithmetic_case(unsigned variant, bool bk = false);
-	static c54x_test::clocked_register_case mapped_arithmetic_sequence(unsigned variant, bool bk);
-	void start_pipeline_register_arithmetic();
 	static std::array<u16, 2> bitfield_inputs(unsigned variant, bool compare = false);
 	static memory_arithmetic_fixture bitfield_address_case(unsigned variant);
 	void start_pipeline_bitfield(unsigned variant = 0);

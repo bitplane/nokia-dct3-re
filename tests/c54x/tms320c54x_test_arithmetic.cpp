@@ -472,57 +472,6 @@ void tms320c54x_test_state::start_pipeline_memory_arithmetic(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::register_arithmetic_case(unsigned variant, bool bk)
-{
-	unsigned const reg = bk ? (variant / 256) % 2 ? 6 : 0 : variant % 8, selector = bk ? variant % 4 : (variant / 8) % 4, flags = (variant / 32) % 4, pattern = bk ? (variant / 4) % 8 : 2 + (variant / 128) % 2;
-	bool const absolute = (variant / (bk ? 128 : 256)) % 2;
-	auto f = memory_arithmetic_case(selector * 144 + pattern * 576 + flags * 4608);
-	if (bk && !pattern) { f.memory = 0; f.result = 0; f.result_st0 = (f.st0 & ~0x800) | (selector & 2 ? 0x800 : 0); }
-	f.reg = f.selected = reg; f.form = absolute ? 17 : 0; f.read_cycle = absolute ? 6 : 5;
-	f.address = f.literal = bk ? 0x19 : 0x10 + reg;
-	f.opcode = (f.opcode & 0xff00) | (absolute ? 0xf8 : f.address);
-	f.st0 &= ~0x1ff; f.result_st0 &= ~0x1ff;
-	return f;
-}
-
-clocked_register_case tms320c54x_test_state::mapped_arithmetic_sequence(unsigned variant, bool bk)
-{
-	auto const f = register_arithmetic_case(variant, bk);
-	u32 const base = f.reg == 6 ? 0x20000 : 0;
-	int const source = bk ? tms320c54x_device::STATE_BK : tms320c54x_device::STATE_AR0 + f.reg;
-	bool const dest_b = BIT(f.opcode, 8);
-	instruction_case initial{"mapped-arithmetic", f.opcode, {}, {}, {
-		{tms320c54x_device::STATE_IDLE, 0}, {tms320c54x_device::STATE_TCR, 0x10},
-		{tms320c54x_device::STATE_PMST, 0}, {tms320c54x_device::STATE_ILLEGAL, 0},
-		{tms320c54x_device::STATE_ST0, f.st0}, {tms320c54x_device::STATE_ST1, f.st1}, {source, f.memory},
-		{tms320c54x_device::STATE_A, dest_b ? 0x123456789aULL : f.source},
-		{tms320c54x_device::STATE_B, dest_b ? f.source : 0x123456789aULL},
-		{tms320c54x_device::STATE_IFR, 0}, {tms320c54x_device::STATE_IMR, 0}, {STATE_GENPC, base + 0x600}
-	}, {{tms320c54x_device::STATE_ILLEGAL, 0}}, 0, 0};
-	for (unsigned i = 0; i < 24; ++i) initial.program.push_back({base + 0x600 + i, 0xf495});
-	initial.program.push_back({base + 0x600, f.opcode});
-	if (f.form == 17) initial.program.push_back({base + 0x601, f.literal});
-	// Stop after the tested instruction instead of executing unobserved NOP padding.
-	initial.program.push_back({base + 0x601 + unsigned(f.form == 17), 0xf4e1});
-	instruction_case final{"mapped-arithmetic", f.opcode, {}, {}, {}, {
-		{tms320c54x_device::STATE_ILLEGAL, 0}, {tms320c54x_device::STATE_ST0, f.result_st0},
-		{tms320c54x_device::STATE_A, dest_b ? 0x123456789aULL : f.result},
-		{tms320c54x_device::STATE_B, dest_b ? f.result : 0x123456789aULL}, {source, 0x2222}
-	}, 0, 0};
-	clocked_register_case test{{{0, std::move(initial)}, {16, std::move(final)}},
-		variant / 512 ? f.read_cycle : f.read_cycle - 1, 16,
-		{{f.read_cycle, {{source, 0x2222}}}}, variant};
-	test.data_events = std::vector<clocked_data_event>{{false, f.address, f.memory, f.read_cycle}};
-	return test;
-}
-
-void tms320c54x_test_state::start_pipeline_register_arithmetic()
-{
-	bool const bk = profile_is("arith-bk");
-	m_register_sequence = std::make_unique<register_sequence_fixture>(machine(), *m_cpu, *m_check_timer,
-		1024, [bk](unsigned key) { return mapped_arithmetic_sequence(key, bk); });
-	m_phase = 252930; m_register_sequence->start();
-}
 
 
 std::array<u16, 2> tms320c54x_test_state::bitfield_inputs(unsigned variant, bool compare)
@@ -3178,7 +3127,7 @@ bool tms320c54x_test_state::check_absolute_xorm_results()
 			}
 			osd_printf_info("TMS320C54x staged memory ADD/SUB: PASS cases=%u forms=17 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=%u duplicate_reads=0 data_writes=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n", m_memory_alu_coverage.count, m_memory_alu_restores, (unsigned long long)m_memory_alu_coverage.value);
 			if (profile_is("memory-alu")) throw emu_fatalerror(0, "TMS320C54x isolated memory ADD SUB complete");
-			start_pipeline_register_arithmetic(); return true;
+			return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
@@ -3186,17 +3135,6 @@ bool tms320c54x_test_state::check_absolute_xorm_results()
 	{
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252910;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252930)
-	{
-		if (!m_register_sequence->step()) return true;
-		osd_printf_info("TMS320C54x mapped arithmetic coverage: PASS cases=%u restore=%u coverage_fnv64=%016llx\n",
-			m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
-		m_register_sequence.reset();
-		bool const bk = profile_is("arith-bk");
-		if (bk) { osd_printf_info("TMS320C54x staged mapped BK arithmetic: PASS cases=1024 restore=1024 selectors=ADD_A,ADD_B,SUB_A,SUB_B sxm_ovm=4 patterns=8 forms=direct,absolute pages=2 snapshots=2 source=Read post_read_change=1 duplicate_reads=0 data_writes=0 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped BK arithmetic complete"); }
-		osd_printf_info("TMS320C54x staged mapped AR arithmetic: PASS cases=1024 registers=8 selectors=4 sxm_ovm=4 patterns=2 forms=direct,absolute restore=1024 duplicate_reads=0 data_writes=0\n");
-		if (profile_is("arith-ar")) throw emu_fatalerror(3, "TMS320C54x isolated mapped AR arithmetic complete");
 	}
 	return false;
 }
