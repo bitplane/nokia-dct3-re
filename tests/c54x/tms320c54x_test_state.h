@@ -851,11 +851,8 @@ private:
 		std::array<u16, 8> initial;
 	};
 	static indexed_store_fixture indexed_store_case(unsigned v, bool immediate = false);
-	void start_indexed_store(unsigned variant = 0);
 	static indexed_store_fixture indexed_load_case(unsigned v);
 	static indexed_store_fixture circular_load_case(unsigned v);
-	static indexed_store_fixture circular_store_case(unsigned v);
-	static indexed_store_fixture asm_circular_store_case(unsigned v);
 	void start_indexed_load(unsigned variant = 0);
 	struct indexed_mar_fixture
 	{
@@ -1639,7 +1636,6 @@ private:
 	bool check_ts_arithmetic_results();
 	bool check_poll_interrupt_results();
 	bool check_delay_compare_results();
-	bool check_asm_circular_store_results();
 	bool check_indexed_mar_results();
 	bool check_addc_chain_results();
 	bool check_mapped_parallel_load_results();

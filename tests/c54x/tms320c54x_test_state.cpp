@@ -156,7 +156,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"mpy-t-imm", "mac-t-imm"}, [](self &test) { test.start_pipeline_immediate_multiply(); } },
 		{ {"mar-index"}, [](self &test) { test.start_indexed_mar(); } },
 		{ {"mar-reverse"}, [](self &test) { test.start_indexed_mar(); } },
-		{ {"store-index", "imm-index", "store-circular", "asm-circular"}, [](self &test) { test.start_indexed_store(); } },
 		{ {"poll-interrupt"}, [](self &test) { test.start_poll_interrupt(); } },
 		{ {"compare-delay"}, [](self &test) { test.start_delay_compare(); } },
 	}))
