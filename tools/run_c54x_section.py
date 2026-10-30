@@ -380,6 +380,10 @@ def main():
     counts['shifted_peripheral'] = 2520
     counts['circular_portr'] = 14784
     counts['circular_portr_block'] = 288
+    counts['extended_ar_store'] = 3584
+    counts['extended_ar_consumer'] = 1024
+    counts['shifted_ar_store'] = 17920
+    counts['shifted_ar_consumer'] = 5120
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216

@@ -92,17 +92,6 @@ private:
 		u64 source, result;
 		u16 bk = 16;
 	};
-	struct extended_ar_store_fixture
-	{
-		unsigned form, reg, selected, kind, flags, gap;
-		int shift;
-		bool shifted;
-		u16 literal, initial_ar, next_ar, result;
-		u64 value;
-		u32 base;
-	};
-	static extended_ar_store_fixture extended_ar_store_case(unsigned variant, bool consumer, bool shifted = false);
-	void start_extended_ar_store(unsigned variant = 0);
 	struct dst_extended_fixture
 	{
 		unsigned reg, selected, source, kind;
@@ -833,7 +822,7 @@ private:
 	bool check_instruction_observer_results();
 	bool check_block_page_results();
 	bool check_mvdd_source_results();
-	bool check_extended_ar_store_results();
+	bool check_extended_dst_results();
 	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
 	bool check_staged_load_results();

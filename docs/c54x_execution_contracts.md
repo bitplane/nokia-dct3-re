@@ -5407,6 +5407,29 @@ and their counts as regression evidence. Its result explicitly leaves
 `physical_low_gap_identity_claim` false. The Lua taps issue no extra reads
 of these fields or endpoints and never replace values.
 
+## Extended accumulator stores to auxiliary registers
+
+Independent sections `extended_ar_store` (3,584), `extended_ar_consumer`
+(1,024), `shifted_ar_store` (17,920) and `shifted_ar_consumer` (5,120)
+replace the legacy `st-extended-ar`, `st-ar-consumer`, `st-shift-ar` and
+`st-shift-ar-use` profiles. Each case seeds its own CPU/program/data state.
+All eight AR destinations, STL/STH A/B selectors, four accumulator patterns,
+SST/SXM combinations and shifts -16/-1/0/1/15 remain. Address-only cases
+cover absolute, offset, preincrement and circular forms with self/other
+pointer aliases; absolute addressing has no alias axis. Consumer cases use
+absolute stores followed by indirect LDU at both legal gaps 2/3. Page and
+checkpoint choices are distributed, not crossed with every input.
+
+The address is retained before source publication: ARs are checked then
+poisoned, and the source accumulator changes immediately before Execute.
+A bit-position shift oracle and signed/unsigned saturation determine the
+expected word independently of CPU helpers. One write occurs at clock 7
+(8 for the shifted extension), with no destination read. Address/shift
+literals are poisoned after capture. Consumer reads occur at Write+gap;
+subsequent RAM poisoning must not change the loaded accumulator. Replay
+checks unchanged arithmetic flags, unrelated ARs, source, SP and BK.
+These are model timing/ownership checks, not measured silicon timings.
+
 ## Circular PORTR and block composition
 
 PORTR admits short circular modes 8/9/10/11 through the shared address
