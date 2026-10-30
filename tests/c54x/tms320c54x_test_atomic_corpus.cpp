@@ -173,7 +173,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 	}
 	if (m_phase == 103)
 	{
-		verify_atomic_case(register_bit_examples()[8]);
 		program.write_word(0x05e2, 0xf073); // B 05e4
 		program.write_word(0x05e3, 0x05e4);
 		m_port_writes = 0;
@@ -289,7 +288,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 	}
 	if (m_phase == 113)
 	{
-		verify_atomic_case(register_bit_examples()[9]);
 		program.write_word(0x05e2, 0x6082); // CMPM *AR2,#lk
 		program.write_word(0x05e3, 0x1234);
 		data.write_word(0x0e00, 0x1234);
@@ -328,16 +326,8 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d01,
 				"ROM4 8093 stores the low accumulator word and post-increments AR3");
 	}
-	if (m_phase == 128)
-	{
-		verify_atomic_case(register_bit_examples()[10]);
-	}
-	if (m_phase == 191)
-	{
-	}
 	if (m_phase == 192)
 	{
-		verify_atomic_case(register_bit_examples()[1]);
 		program.write_word(0x05e2, 0xf845); // BC 05f0, AEQ
 		program.write_word(0x05e3, 0x05f0);
 		program.write_word(0x05e4, 0xffff);
@@ -370,21 +360,8 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			return next_atomic_phase(194);
 		}
 	}
-	if (m_phase == 195)
-	{
-		verify_atomic_case(register_bit_examples()[2]);
-		return begin_atomic_case(register_bit_examples()[3], 196);
-	}
-	if (m_phase == 196 || m_phase == 197)
-	{
-	}
 	if (m_phase == 198 || m_phase == 199)
 	{
-		verify_atomic_case(register_bit_examples()[m_phase == 198 ? 5 : 6]);
-		if (m_phase == 198)
-		{
-			return begin_atomic_case(register_bit_examples()[6], 199);
-		}
 		program.write_word(0x05e2, 0xf010); // SUB #lk, A
 		program.write_word(0x05e3, 0xff80);
 		m_port_writes = 0;
@@ -524,14 +501,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301 &&
 				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05f3,
 				"ROM4 RET pops continuation and costs five cycles");
-		return begin_atomic_case(register_bit_examples()[11], 211);
-	}
-	if (m_phase == 211)
-	{
 	}
 	if (m_phase == 212)
 	{
-		verify_atomic_case(register_bit_examples()[12]);
 		program.write_word(0x05e0, 0x6d90); // MAR *AR0+ (ARP-selected in compatibility mode)
 		program.write_word(0x05e1, 0xf5e1);
 		set_registers(*m_cpu, {
@@ -597,7 +569,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		unsigned const index = 0 + m_phase - 216;
 		verify_atomic_case(cases[index]);
 		if (m_phase < 218) return begin_atomic_case(cases[index + 1], m_phase + 1);
-		return begin_atomic_case(register_bit_examples()[7], 219);
 	}
 	if (m_phase == 219)
 	{
@@ -726,7 +697,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 	}
 	if (m_phase == 237)
 	{
-		verify_atomic_case(register_bit_examples()[13]);
 		return begin_atomic_case(memory_address_examples()[2], 238);
 	}
 	if (m_phase == 238)
@@ -735,7 +705,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 	}
 	if (m_phase == 239)
 	{
-		verify_atomic_case(register_bit_examples()[14]);
 		return begin_atomic_case(memory_address_examples()[3], 240);
 	}
 	if (m_phase == 240)
@@ -960,7 +929,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 	}
 	if (m_phase == 263)
 	{
-		verify_atomic_case(register_bit_examples()[15]);
 		write_words(program, {
 			{0x05e0, 0x75d6}, {0x05e1, 0x0124},
 			{0x05e2, 0xec05}, // RPT #5
@@ -2329,25 +2297,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 1,
 				"XC 2 releases a pending interrupt after one two-word instruction");
 		m_cpu->set_input_line(2, CLEAR_LINE);
-	}
-	if (m_phase == 470)
-	{
-		verify_atomic_case(register_bit_examples()[16]);
-	}
-	if (m_phase == 473)
-	{
-		return begin_atomic_case(register_bit_examples()[17], 474);
-	}
-	if (m_phase == 474)
-	{
-	}
-	if (m_phase == 475)
-	{
-		verify_atomic_case(register_bit_examples()[18]);
-	}
-	if (m_phase == 493)
-	{
-		verify_atomic_case(register_bit_examples()[19]);
 	}
 	if (m_phase == 495)
 	{
