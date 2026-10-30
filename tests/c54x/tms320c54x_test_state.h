@@ -543,7 +543,6 @@ private:
 		u16 bk;
 	};
 	static extended_banz_fixture extended_banz_case(unsigned variant);
-	void start_pipeline_extended_banz(unsigned variant = 0);
 	struct immediate_arithmetic_fixture
 	{
 		unsigned selector, shift, flags, gap, execute_cycle;
@@ -1965,7 +1964,6 @@ private:
 	bool check_signed_branch_taken_results();
 	bool check_bitfield_address_results();
 	bool check_staged_load_results();
-	bool check_pipeline_extended_banz_results();
 	bool check_immediate_arithmetic_results();
 	bool check_memory_repeat_results();
 	bool check_push_pop_same_results();

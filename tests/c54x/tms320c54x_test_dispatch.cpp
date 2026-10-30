@@ -111,7 +111,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_signed_branch_taken_results()) return;
 	if (check_bitfield_address_results()) return;
 	if (check_staged_load_results()) return;
-	if (check_pipeline_extended_banz_results()) return;
 	if (check_immediate_arithmetic_results()) return;
 	if (check_memory_repeat_results()) return;
 	if (check_push_pop_same_results()) return;

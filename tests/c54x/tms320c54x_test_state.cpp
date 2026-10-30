@@ -258,7 +258,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"rpt-mvdp"}, [](self &test) { test.start_repeat_mvdp(); } },
 		{ {"rpt-mvkd"}, [](self &test) { test.start_repeat_mvkd(); } },
 		{ {"rpt-mvdp-irq"}, [](self &test) { test.start_repeat_mvdp_irq(); } },
-		{ {"banzd-long"}, [](self &test) { test.start_pipeline_extended_banz(); } },
 		{ {"ret-load"}, [](self &test) { test.start_return_load(); } },
 		{ {"conditional-ret"}, [](self &test) { test.start_conditional_call(); } },
 		{ {"signed-call"}, [](self &test) { test.start_conditional_call(); } },

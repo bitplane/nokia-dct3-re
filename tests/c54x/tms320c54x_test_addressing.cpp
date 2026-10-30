@@ -6114,7 +6114,6 @@ bool tms320c54x_test_state::check_staged_load_results()
 			if (variant < 24575) { start_pipeline_indirect_dld(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged indirect DLD: PASS cases=23040 forms=15 registers=8 accumulators=2 patterns=4 sxm=0,1 c16=0,1 compatibility=0,1 restore=23040 duplicate_reads=0 data_writes=0 silicon_phase_claim=0\n");
 			if (profile_is("indirect-dld")) throw emu_fatalerror(0, "TMS320C54x isolated indirect double loads complete");
-			start_pipeline_extended_banz(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}

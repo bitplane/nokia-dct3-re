@@ -930,45 +930,6 @@ void tms320c54x_test_state::start_pipeline_signed_branch(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_pipeline_extended_banz(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const delayed = profile_is("banzd-long") && variant >= 2304, two_word = delayed && variant >= 4608;
-	auto const f = extended_banz_case(variant % 2304);
-	bool const compatibility = (variant / 192) % 2;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 64; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(f.base + 0x700 + i, 0xf495); }
-	program.write_word(f.base + 0x600, (delayed ? 0x6e00 : 0x6c00) | (0xe0 + f.form * 8 + f.reg));
-	program.write_word(f.base + 0x601, f.offset); program.write_word(f.base + 0x602, 0x700);
-	program.write_word(f.base + 0x603, two_word ? 0xf020 : 0xe811); program.write_word(f.base + 0x604, two_word ? 0x33 : 0xe922);
-	program.write_word(f.base + 0x700, 0xe844); program.write_word(f.base + 0x740, 0xe866);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, compatibility ? 0x6608 : 0x608},
-		{cpu_regs::STATE_ST1, 0x800 | (compatibility ? 0x20 : 0)},
-	});
-	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, ar == f.selected ? f.initial : 0x410 + ar * 16);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_BK, f.bk}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_IFR, 0},
-		{cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "extended_banz_no_read",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "BANZ tests a resolved address without reading data memory"); });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "extended_banz_no_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "BANZ modifies its AR without a data-memory write"); });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x602, "extended_banz_literals",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_extensions_reads < 2 && at == f.base + 0x601 + m_pipeline_extensions_reads &&
-				word == (m_pipeline_extensions_reads ? 0x700 : f.offset), "BANZ retains offset then target, including opcode-shaped offsets"); ++m_pipeline_extensions_reads; });
-	m_vector_prefetch_tap = program.install_read_tap(f.base + 0x700, f.base + 0x700, "extended_banz_target",
-		[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(f.resolved && word == 0xe844 && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 7,
-				"Taken long-offset BANZ fetches its retained same-page target once"); ++m_pipeline_operand_reads; });
-	m_phase = 253090; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 void tms320c54x_test_state::start_delayed_call_case(unsigned index)
@@ -2095,72 +2056,6 @@ bool tms320c54x_test_state::check_signed_branch_taken_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_pipeline_extended_banz_results()
-{
-	if (m_phase == 253090)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const delayed = profile_is("banzd-long") && variant >= 2304, two_word = delayed && variant >= 4608;
-		auto const f = extended_banz_case(variant % 2304);
-		bool const compatibility = (variant / 192) % 2;
-		unsigned const checkpoint = std::array<unsigned, 3>{4, 5, 6}[(variant % 2304) / 768];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Long-offset BANZ owns its predicate, offset and target");
-		if (delayed && tick == 10)
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (two_word ? 0x33 : 0x11) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (two_word ? 0 : 0x22),
-				"Both delay words execute before the target can overwrite their accumulator result");
-		if (tick == 5)
-		{
-			auto const disable = machine().disable_side_effects();
-			m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xbeef); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x602, 0x740);
-		}
-		if (tick == 6)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == f.next_ar,
-				"Long-offset BANZ tests the computed address, preserving ordinary AR or applying premodification once");
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, f.resolved ? 0 : 1);
-			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 32);
-		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save BANZ after first literal, complete Decode or Access decision");
-		}
-		if (tick == 18)
-		{
-			u16 const st0 = compatibility && f.reg ? (0x6608 & ~0xe000) | (f.reg << 13) : compatibility ? 0x6608 : 0x608;
-			expect(m_pipeline_extensions_reads == 2 && m_pipeline_operand_reads == unsigned(f.resolved != 0) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (f.resolved ? 0x44 : two_word ? 0x33 : 0x11) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (delayed ? two_word ? 0 : 0x22 : f.resolved ? 0 : 0x22) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (compatibility ? 0x20 : 0)) &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == (f.resolved ? 0 : 1),
-				"BANZ retains its predicate and target despite later AR/BK/literal changes, without data-memory access or flag changes");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				return restore_pipeline_at(253100, "Restore BANZ without target refetch or duplicate pointer modification");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (delayed ? 6911 : 2303)) { start_pipeline_extended_banz(variant + 1); return true; }
-			if (delayed)
-			{
-				osd_printf_info("TMS320C54x staged long-offset BANZD: PASS cases=4608 restore=4608 forms=offset,preincrement,circular registers=8 offset_pairs=8 compatibility=0,1 pages=2 delay_forms=two_single,one_double offset_fetches=1 target_fetches=1 data_accesses=0 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated long BANZD complete");
-			}
-			osd_printf_info("TMS320C54x staged long-offset BANZ: PASS cases=2304 forms=offset,preincrement,circular registers=8 offset_pairs=8 compatibility=0,1 pages=2 restore=2304 offset_fetches=1 target_fetches=1 data_accesses=0 silicon_phase_claim=0\n");
-			if (profile_is("banzd-long")) { start_pipeline_extended_banz(2304); return true; }
-			start_pipeline_immediate_arithmetic(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253100)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253090;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 
 bool tms320c54x_test_state::check_conditional_call_results()

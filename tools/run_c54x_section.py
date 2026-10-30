@@ -31,6 +31,7 @@ def main():
     counts['delayed_square'] = 4992
     counts['delayed_count_branch'] = 384
     counts['signed_branch'] = 12
+    counts['offset_count_branch'] = 1152
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
