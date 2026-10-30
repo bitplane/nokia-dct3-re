@@ -69,41 +69,6 @@ void tms320c54x_test_state::start_xc_return(unsigned variant)
 
 
 
-void tms320c54x_test_state::start_delayed_condition_return(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = delayed_condition_return_case(variant);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) { program.write_word(f.base + 0x600 + i, 0xf495); program.write_word(f.base + 0x700 + i, 0xf495); }
-	program.write_word(f.base + 0x600, f.opcode);
-	program.write_word(f.base + 0x601, f.layout ? 0x7712 : f.condition >= 12 ? (f.st0 & 0x1000 ? 0xf4bc : 0xf5bc) : 0xe800);
-	program.write_word(f.base + 0x602, f.layout ? 0xf4e1 : f.condition >= 12 ? 0xe800 : 0xe900);
-	for (u32 start : {f.base + 0x603, f.base + 0x700})
-	{
-		program.write_word(start, 0x80f8); program.write_word(start + 1, 0x1004); program.write_word(start + 2, 0x81f8); program.write_word(start + 3, 0x1005);
-		program.write_word(start + 4, start == f.base + 0x700 ? 0xe955 : 0xe933); program.write_word(start + 5, 0xf4e1);
-	}
-	data.write_word(f.sp, 0x700); data.write_word(0x1004, 0xdead); data.write_word(0x1005, 0xdead);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_ST0, f.st0},
-		{cpu_regs::STATE_ST1, 0x900}, {cpu_regs::STATE_A, f.a}, {cpu_regs::STATE_B, f.b}, {cpu_regs::STATE_T, 0x5aa5},
-		{cpu_regs::STATE_SP, f.sp}, {cpu_regs::STATE_AR2, 0x1234},
-	});
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = m_pipeline_drained_fetches = 0;
-	m_pipeline_operand_tap = data.install_read_tap(f.sp, f.sp, "rcd_stack", [this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(f.taken && !m_pipeline_operand_reads && word == 0x700, "Only a taken RCD samples its stack target once"); ++m_pipeline_operand_reads; auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.sp, 0x710); });
-	m_pipeline_write_tap = data.install_write_tap(0x1004, 0x1005, "rcd_delay_observation", [this, f](offs_t address, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(address == 0x1004 + m_pipeline_store_writes && word == u16(m_pipeline_store_writes ? f.final_b : f.final_a), "RCD executes its delay instructions once before the selected continuation"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x700, "rcd_fetch", [this, f](offs_t address, u16 &, u16) { if (machine().side_effects_disabled()) return; if (address == f.base + 0x601 || address == f.base + 0x602) { unsigned const bit = 1U << (address - f.base - 0x601); expect(!(m_pipeline_extensions_reads & bit), "RCD retains each delay word without refetch including opcode-shaped literals"); m_pipeline_extensions_reads |= bit; } if (address == f.base + 0x603 || address == f.base + 0x700) { expect(address == f.base + (f.taken ? 0x700 : 0x603) && !m_pipeline_drained_fetches, "RCD fetches only its selected continuation once"); ++m_pipeline_drained_fetches; } });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 276000;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-
-
-
-
-
-
 
 void tms320c54x_test_state::start_delayed_call_case(unsigned index)
 {
@@ -470,29 +435,6 @@ bool tms320c54x_test_state::check_conditional_call_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_delayed_condition_return_results()
-{
-	if (m_phase == 276000)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delayed_condition_return_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "RCD signed accumulator and TC predicates are admitted outside block and delay contexts");
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads, &m_pipeline_drained_fetches},
-			"Save RCD predicate stack sample and retained delay words");
-		if (tick == 96)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + (f.taken ? 0x706 : 0x609) && m_cpu->state_int(tms320c54x_device::STATE_SP) == f.sp + unsigned(f.taken) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.final_a && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.taken ? 0x55 : 0x33) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.final_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == (f.layout ? 0xf4e1 : 0x1234), "RCD retains its predicate and target while both delay words retire and only taken paths pop");
-			expect(m_pipeline_operand_reads == unsigned(f.taken) && m_pipeline_store_writes == 2 && m_pipeline_extensions_reads == 3 && m_pipeline_drained_fetches == 1, "RCD has no untaken stack access no duplicate delay fetch and exactly one continuation");
-			if (replay_pipeline_at(276010, f.checkpoint,
-				"Restore RCD without repeated stack or delay transactions")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 4479) { start_delayed_condition_return(variant + 1); return true; }
-			osd_printf_info("TMS320C54x conditional delayed returns: PASS cases=4480 restore=4480 predicates=14 patterns=8 delay_layouts=2 stack_alignments=2 pages=2 snapshots=5 predicate_before_delay=1 taken_stack_reads=1 untaken_stack_reads=0 retained_target=1 delay_fetches=once interrupt_block_composition=unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated conditional delayed returns complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 276010) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 276000; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 
 

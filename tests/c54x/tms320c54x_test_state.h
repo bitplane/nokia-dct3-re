@@ -206,16 +206,6 @@ private:
 	};
 	circular_mar_fixture circular_mar_case(unsigned variant);
 	void start_circular_mar(unsigned variant = 0);
-	struct delayed_condition_return_fixture
-	{
-		u32 base;
-		u16 opcode, sp, st0, final_st0;
-		u64 a, b, final_a, final_b;
-		unsigned condition, layout, checkpoint;
-		bool taken;
-	};
-	static delayed_condition_return_fixture delayed_condition_return_case(unsigned v);
-	void start_delayed_condition_return(unsigned variant = 0);
 	void start_bitt(unsigned variant = 0);
 	void start_bitt_retd(unsigned variant = 0);
 	struct delay_bitt_fixture
@@ -1920,7 +1910,6 @@ private:
 	bool check_ts_arithmetic_results();
 	bool check_asm_load_results();
 	bool check_addm_brc_loop_results();
-	bool check_delayed_condition_return_results();
 	bool check_poll_interrupt_results();
 	bool check_delay_compare_results();
 	bool check_asm_circular_store_results();

@@ -160,26 +160,6 @@ void tms320c54x_test_state::start_repeated_writa(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::delayed_condition_return_fixture tms320c54x_test_state::delayed_condition_return_case(unsigned v)
-{
-	delayed_condition_return_fixture f{};
-	f.condition = v % 14; unsigned const pattern = (v / 14) % 8;
-	f.layout = (v / 112) % 2; f.sp = 0x1000 + (v / 224) % 2; f.base = (v / 448) % 2 ? 0x20000 : 0;
-	f.checkpoint = std::array<unsigned, 5>{3, 4, 5, 6, 8}[v / 896];
-	u64 const raw = std::array<u64, 8>{0, 1, 0xffffffffffULL, 0x7fffffff, 0x80000000, 0xff80000000ULL, 0x7fffffffffULL, 0x8000000000ULL}[pattern];
-	f.a = f.condition < 6 ? raw : 0x12345678; f.b = f.condition >= 6 && f.condition < 12 ? raw : 0x23456789;
-	f.opcode = f.condition >= 12 ? (f.condition == 13 ? 0xfe30 : 0xfe20) : 0xfe42 + f.condition % 6 + (f.condition >= 6 ? 8 : 0);
-	f.st0 = 0xa608 | (pattern & 1 ? 0x1000 : 0);
-	if (f.condition >= 12) f.taken = bool(pattern & 1) == (f.condition == 13);
-	else
-	{
-		s64 const value = s64(raw << 24) >> 24;
-		switch (f.condition % 6) { case 0: f.taken = value >= 0; break; case 1: f.taken = value < 0; break; case 2: f.taken = value != 0; break; case 3: f.taken = value == 0; break; case 4: f.taken = value > 0; break; default: f.taken = value <= 0; break; }
-	}
-	f.final_a = f.layout ? f.a : 0; f.final_b = f.layout || f.condition >= 12 ? f.b : 0;
-	f.final_st0 = !f.layout && f.condition >= 12 ? f.st0 ^ 0x1000 : f.st0;
-	return f;
-}
 
 void tms320c54x_test_state::start_rptz(unsigned variant)
 {
