@@ -31,6 +31,7 @@ struct instruction_case
 	std::vector<memory_word> reset_data{};
 	std::optional<std::array<unsigned, 2>> split_port_intervals{}; // First/middle and middle/last writes.
 	std::vector<u16> additional_opcodes{}; // Independent words retained in the legacy assertion trace.
+	std::vector<memory_word> expected_program{};
 };
 
 struct clocked_register_state { unsigned tick; instruction_case observation; };
@@ -108,6 +109,13 @@ void check_case_state(Cpu &cpu, instruction_case const &test)
 		u16 const actual = cpu.space(AS_DATA).read_word(word.address);
 		if (actual != word.value)
 			throw emu_fatalerror("C54x case %s: data[%x]=%x expected=%x",
+				test.id, word.address, actual, word.value);
+	}
+	for (auto const &word : test.expected_program)
+	{
+		u16 const actual = cpu.space(AS_PROGRAM).read_word(word.address);
+		if (actual != word.value)
+			throw emu_fatalerror("C54x case %s: program[%x]=%x expected=%x",
 				test.id, word.address, actual, word.value);
 	}
 }

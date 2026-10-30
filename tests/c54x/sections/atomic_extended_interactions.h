@@ -12,6 +12,7 @@ inline std::vector<clocked_register_case> section_cases()
 		initial.data = {{0x500,0xbeef},{0x501,0}};
 		initial.initial.insert(initial.initial.end(), {{STATE_GENPC,0x105ff},{r::STATE_A,0x20900}});
 		auto final = observation("extended-A-address-used-for-both-transfers", {{STATE_GENPC,0x10605},{r::STATE_A,0x20900}},{{0x501,0xbeef}});
+		final.expected_program = {{0x20900,0xbeef},{0x10900,0x1111},{0x900,0x2222}};
 		clocked_register_case c{{{0,std::move(initial)},{1,observation("pre-transfer-snapshot", {{STATE_GENPC,0x10600}})},
 			{2,observation("transfer-running", {})},{48,std::move(final)}},1,48};
 		c.pipeline_frontend = false;
