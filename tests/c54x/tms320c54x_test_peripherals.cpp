@@ -806,38 +806,7 @@ void tms320c54x_test_state::start_mvkd_peripheral(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::t_peripheral_fixture tms320c54x_test_state::t_peripheral_case(unsigned variant)
-{
-	unsigned const gap = (variant / 48) % 3, write = 8 + gap;
-	return {u16((variant / 2) % 2 ? 0x0f : 0x0e),
-		std::array<u16, 3>{0x3b, 0x48, 0x49}[(variant / 16) % 3],
-		std::array<u16, 4>{0, 1, 0x8000, 0xffff}[(variant / 4) % 4],
-		u32((variant / 144) % 2 ? 0x20000 : 0), gap, write,
-		std::array<unsigned, 3>{5, write - 1, write}[variant / 288], bool(variant & 1)};
-}
 
-void tms320c54x_test_state::start_t_peripheral(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = t_peripheral_case(variant);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, 0x8800 | f.source);
-	program.write_word(f.base + 0x601 + f.gap, (f.source == 0x0f ? 0x8d00 : 0x8c00) | (f.postincrement ? 0x92 : 0x82));
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.value); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, f.destination);
-	data.write_word(f.source, 0xdead); data.write_word(f.destination, 0xaaaa);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "t_peripheral_no_reads",
-		[this](offs_t, u16 &, u16) { if (machine().side_effects_disabled()) return; ++m_pipeline_operand_reads; expect(false, "STLM/ST must not read the peripheral destination"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "t_peripheral_producer_and_store",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == f.value, "ST consumes the instruction-driven T/TRN producer value"); if (at == f.source) { expect(!m_pipeline_register_writes && m_cpu->pipeline_cycles() == 6, "STLM publishes its T/TRN producer once in Execute"); ++m_pipeline_register_writes; } else { expect(at == f.destination && !m_pipeline_store_writes && m_pipeline_register_writes == 1 && m_cpu->pipeline_cycles() == f.write, "ST publishes once after the peripheral access clock"); ++m_pipeline_store_writes; } });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 253770;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_mvdd_peripheral(unsigned variant)
 {
@@ -1864,27 +1833,6 @@ bool tms320c54x_test_state::check_circular_portr_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 62141) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62140; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 253770)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		auto const f = t_peripheral_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "STLM/ST peripheral pair remains admitted");
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_register_writes, &m_pipeline_store_writes},
-			"Save STLM/ST before producer, during peripheral wait or after publication");
-		if (tick == 16)
-		{
-			{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(f.destination) == f.value && m_cpu->space(AS_DATA).read_word(f.source) == f.value, "Peripheral ST preserves its T/TRN source"); }
-			expect(!m_pipeline_operand_reads && m_pipeline_register_writes == 1 && m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == f.destination + unsigned(f.postincrement) && m_cpu->state_int(tms320c54x_device::STATE_A) == f.value && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800, "Peripheral ST preserves status/accumulators and updates its pointer once");
-			if (replay_pipeline_at(253780, f.checkpoint,
-				"Replay T/TRN producer and peripheral publication once")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 863) { start_t_peripheral(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged peripheral T/TRN store: PASS cases=864 restore=864 sources=T,TRN producer=STLM gaps=0,1,2 forms=indirect,postincrement destinations=3b,48,49 pages=2 destination_reads=0 writes=1 peripheral_extra_clock=1 pointer_updates=once silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated peripheral T/TRN store complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253780) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253770; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 253750)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;

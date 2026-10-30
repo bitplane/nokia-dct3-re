@@ -701,15 +701,6 @@ private:
 	};
 	static mvkd_peripheral_fixture mvkd_peripheral_case(unsigned variant);
 	void start_mvkd_peripheral(unsigned variant = 0);
-	struct t_peripheral_fixture
-	{
-		u16 source, destination, value;
-		u32 base;
-		unsigned gap, write, checkpoint;
-		bool postincrement;
-	};
-	static t_peripheral_fixture t_peripheral_case(unsigned variant);
-	void start_t_peripheral(unsigned variant = 0);
 	using fcala_delay_fixture = c54x_test::fcala_delay_fixture;
 	static fcala_delay_fixture fcala_delay_case(unsigned v);
 	void start_fcala_delay(unsigned variant = 0);

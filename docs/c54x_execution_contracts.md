@@ -1964,6 +1964,16 @@ producing 384 executions. These are model capture/publication contracts;
 active interrupt composition is not qualified. The old LDU setup/result phase
 and profile are removed.
 
+### T/TRN peripheral store
+
+`t_peripheral_store` owns 144 instruction-driven T/TRN store cases/replays:
+both source registers, indirect/postincrement forms, destinations 003b/0048/0049,
+four boundary words and producer gaps 0/1/2. Exact STLM Write6 and destination
+Write(8+gap), no Reads, retained source/flags/accumulators and one pointer update
+replace 864 executions with distributed pages/checkpoints. The legacy factory,
+setup, embedded result phase and profile are removed. These are CPU/device
+publication contracts, not electrical timing measurements.
+
 ### Unsigned peripheral load
 
 `unsigned_peripheral_load` owns 1,536 cases/replays:
