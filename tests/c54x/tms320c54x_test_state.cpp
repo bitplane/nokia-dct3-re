@@ -119,7 +119,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"squr-delay"}, [](self &test) { test.start_delay_multiply(); } },
 		{ {"delay-copy"}, [](self &test) { test.start_delay_copy(); } },
 		{ {"delay-copy-ctrl"}, [](self &test) { test.start_delay_copy(); } },
-		{ {"move-t"}, [](self &test) { test.start_t_register_move(); } },
 		{ {"store-delay"}, [](self &test) { test.start_delay_store(); } },
 		{ {"mvkd-sp"}, [](self &test) { test.start_mvkd_sp(); } },
 		{ {"add-bk", "add-absolute", "add-sp"}, [](self &test) { test.start_pipeline_absolute_add(); } },

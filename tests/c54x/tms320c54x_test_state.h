@@ -462,17 +462,6 @@ private:
 	static delay_multiply_fixture delay_square_case(unsigned variant);
 	static delay_multiply_fixture delay_memory_square_case(unsigned variant);
 	void start_delay_multiply(unsigned variant = 0);
-	struct t_move_fixture
-	{
-		unsigned form, destination, flags, gap, checkpoint;
-		u16 value, source;
-		u32 base;
-		unsigned words() const { return form >= 3 ? 3 : 2; }
-		unsigned read() const { return 5 + unsigned(form >= 3); }
-		unsigned consume() const { return read() + (destination ? 2 : 3) + gap; }
-	};
-	static t_move_fixture t_move_case(unsigned variant);
-	void start_t_register_move(unsigned variant = 0);
 	struct delay_store_fixture
 	{
 		unsigned kind, operation, mode, checkpoint;
@@ -1491,7 +1480,7 @@ private:
 	bool check_memory_immediate_results();
 	bool check_block_branch_count_results();
 	bool check_bd_long_accumulator_results();
-	bool check_t_move_results();
+	bool check_delay_store_results();
 	bool check_block_xc_results();
 	bool check_block_xc_irq_results();
 	bool check_move_repeat_owner_results();

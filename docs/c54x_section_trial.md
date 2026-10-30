@@ -216,6 +216,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `push_sp_forwarding.h` | Keep one/two PSHM ×AR2/ST0/ST1/SP last sources ×three gaps ×all MVMM AR destinations ×normal/wrapping SP. Preserve every-clock Read-owned stack allocation, Decode-time mapped SP sample versus internally forwarded final SP, exact ordered source/stack/mapped transactions, opcode poison, source/status/sibling state, terminal PC/IDLE and cleared-pipeline replay. Equal-clock ordering explicitly separates PSHM Read, older stack Write, younger Decode SP read and MVMM publication (implementation contract, not measured silicon). Distribute pages/three checkpoints; no semantic combinations lost. | Native384 cases/restores versus2304; build5.577s/run0.158s. Delete setup/helper/fixture/checker, named phase pair/constant, route/declarations/dispatch. |
 
+| `word_move_consumer.h` | Keep five MVMD/MVDK forms ×T/TRN destinations ×four source boundaries ×FRCT/OVM states ×gap/no-gap MPY/LDM consumers. Preserve exact source Read5/6, mapped Write6/7 and LDM Read7..9, source/destination mutation after sampling, unsigned LDM versus signed fractional/saturating MPY results, status/sibling state, terminal PC/IDLE and replay. Distribute pages and three checkpoints; no semantic combinations lost. | Native320 cases/restores versus1920; build5.392s/run0.132s. Delete setup/helper/fixture, phases254520/254530, route/declarations; rename the surviving checker for its sole delay-store bank. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
