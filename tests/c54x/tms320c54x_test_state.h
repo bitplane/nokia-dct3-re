@@ -289,9 +289,6 @@ private:
 	};
 	static extended_push_fixture extended_push_case(unsigned v);
 	void start_extended_push(unsigned variant = 0);
-	static extended_push_fixture extended_pop_case(unsigned variant);
-	void start_extended_pop(unsigned variant = 0);
-	void start_extended_pop_edge(unsigned variant = 0);
 	struct stlm_pmst_fixture
 	{
 		unsigned pattern, irq, checkpoint;

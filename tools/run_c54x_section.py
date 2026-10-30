@@ -220,6 +220,7 @@ def main():
     counts['atomic_transfer_literals'] = 34
     counts['atomic_mmr_burst'] = 2
     counts['atomic_memory_sequences'] = 3
+    counts['extended_pop'] = 2704
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
