@@ -1449,7 +1449,6 @@ private:
 	};
 	static push_pop_same_fixture push_pop_same_case(unsigned v);
 	void start_push_pop_same(unsigned variant = 0);
-	void start_conditional_call(unsigned variant = 0);
 	static bool mvdd_source_owned(u16 address);
 	static u64 mvdd_source_a(unsigned pattern);
 	static u64 mvdd_source_b(unsigned pattern);
@@ -1870,7 +1869,6 @@ private:
 	bool check_mvmd_accumulator_results();
 	bool check_repeat_mvdp_irq_results();
 	bool check_repeat_mvkd_results();
-	bool check_conditional_call_results();
 	bool check_near_accumulator_results();
 	bool check_t_store_branch_results();
 	bool check_circular_portr_results();
