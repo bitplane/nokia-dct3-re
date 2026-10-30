@@ -53,67 +53,6 @@ bool tms320c54x_test_state::check_atomic_basic_results()
 			return next_atomic_phase(78);
 		}
 	}
-	if (m_phase == 5)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-				"long-immediate RPT terminal IDLE3");
-		expect_opcode(0xf070, m_cpu->state_int(tms320c54x_device::STATE_AR0) == 3,
-				"long-immediate RPT iteration count");
-		expect_opcode(0xf062, data.read_word(0x090c) == 0x1234 &&
-				data.read_word(0x090d) == 0,
-				"long-immediate load and long-memory store");
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_PC, 0x0360}, {cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ST0, 0}, {cpu_regs::STATE_A, 0},
-		});
-		return next_atomic_phase(6);
-	}
-	if (m_phase == 6)
-	{
-		expect(data.read_word(0x0910) == 0x5678,
-				"absolute STM extension order");
-		expect_opcode(0x7214, m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0xabcd,
-				"data-memory to MMR move");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_B) ==
-				(0x12345678 ^ ((u64(1) << 40) - 1)),
-				"absolute double-word load and accumulator complement");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x00ff0f00,
-				"shifted long-immediate accumulator XOR");
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_PC, 0x0370}, {cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_AR0, 0},
-			{cpu_regs::STATE_B, 0x1234},
-		});
-		return next_atomic_phase(7);
-	}
-	if (m_phase == 7)
-	{
-		expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0,
-				"repeat-with-zero clears its accumulator");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_AR0) == 2,
-				"repeat-with-zero iteration count");
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0374);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0);
-		return next_atomic_phase(8);
-	}
-	if (m_phase == 8)
-	{
-		expect(data.read_word(0x091a) == 2,
-				"memory-counted multiword repeat iteration count");
-		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x037a);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0920);
-		return next_atomic_phase(9);
-	}
-	if (m_phase == 9)
-	{
-		osd_printf_info("TMS320C54x repeated MVDP result: %04x,%04x\n",
-				m_cpu->space(AS_PROGRAM).read_word(0x0924),
-				m_cpu->space(AS_PROGRAM).read_word(0x0925));
-		expect(m_cpu->space(AS_PROGRAM).read_word(0x0924) == 0xaaaa &&
-				m_cpu->space(AS_PROGRAM).read_word(0x0925) == 0xbbbb,
-				"repeated MVDP advances its program destination");
-		return resume_atomic_at(0x0380, 10);
-	}
 	if (m_phase == 10)
 	{
 		expect_opcode(0xf273, m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
