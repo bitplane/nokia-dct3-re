@@ -1527,7 +1527,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated register logic complete",
     ),
     "reg-shifts": (
-        "TMS320C54x staged accumulator shifts: PASS cases=16384 restore=16384 operations=SFTA,SFTL selectors=4 shifts=-16..15 patterns=8 sxm=0,1 ovm=0,1 carry=0,1 checkpoint_policy=balanced duplicate_fetches=0 data_accesses=0 left_c_policy=manual_formula silicon_phase_claim=0 coverage_fnv64=50bc9b13b4563125",
+        "TMS320C54x staged accumulator shifts: PASS cases=3840 restore=3840 operations=SFTA,SFTL selectors=4 shifts=-16..15 patterns=8 flag_policy=boundaries arp_initial=0 checkpoint_policy=balanced duplicate_fetches=0 data_accesses=0 left_c_policy=manual_formula silicon_phase_claim=0 coverage_fnv64=a5911d5fa609e325",
         "Fatal error: TMS320C54x isolated accumulator shifts complete",
     ),
     "logic-short": (

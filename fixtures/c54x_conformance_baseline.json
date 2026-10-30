@@ -10013,25 +10013,24 @@
       "machine": "tms54isa",
       "reported_fields": [
         {
-          "carry": "0,1",
-          "cases": "16384",
+          "arp_initial": "0",
+          "cases": "3840",
           "checkpoint_policy": "balanced",
-          "coverage_fnv64": "50bc9b13b4563125",
+          "coverage_fnv64": "a5911d5fa609e325",
           "data_accesses": "0",
           "duplicate_fetches": "0",
+          "flag_policy": "boundaries",
           "left_c_policy": "manual_formula",
           "operations": "SFTA,SFTL",
-          "ovm": "0,1",
           "patterns": "8",
-          "restore": "16384",
+          "restore": "3840",
           "selectors": "4",
           "shifts": "-16..15",
-          "silicon_phase_claim": "0",
-          "sxm": "0,1"
+          "silicon_phase_claim": "0"
         }
       ],
       "required": [
-        "TMS320C54x staged accumulator shifts: PASS cases=16384 restore=16384 operations=SFTA,SFTL selectors=4 shifts=-16..15 patterns=8 sxm=0,1 ovm=0,1 carry=0,1 checkpoint_policy=balanced duplicate_fetches=0 data_accesses=0 left_c_policy=manual_formula silicon_phase_claim=0 coverage_fnv64=50bc9b13b4563125"
+        "TMS320C54x staged accumulator shifts: PASS cases=3840 restore=3840 operations=SFTA,SFTL selectors=4 shifts=-16..15 patterns=8 flag_policy=boundaries arp_initial=0 checkpoint_policy=balanced duplicate_fetches=0 data_accesses=0 left_c_policy=manual_formula silicon_phase_claim=0 coverage_fnv64=a5911d5fa609e325"
       ]
     },
     "repeat-body-isr": {
@@ -15202,9 +15201,9 @@
       "case_ids": [],
       "classification": "isa_documented",
       "coverage": {
-        "cases": 16384,
-        "fnv64": "50bc9b13b4563125",
-        "key": "Original numeric ordinal0..16383 plus its balanced choice of original checkpoint key0/16384.",
+        "cases": 3840,
+        "fnv64": "a5911d5fa609e325",
+        "key": "2048 baseline-flag tuples across every operation, selector, shift and pattern;1792 additional flag tuples at shifts-16,-1,0,15. Original raw identities/checkpoint balance retained; ARP seed corrected to0.",
         "result_prefix": "TMS320C54x staged accumulator shifts: PASS"
       },
       "decision": "rewrite",

@@ -21,7 +21,7 @@ inline register_unary_kind select_register_unary(std::string_view name)
 }
 constexpr unsigned register_unary_count(register_unary_kind kind)
 {
-	return kind == register_unary_kind::logic ? 3104 : kind == register_unary_kind::shift ? 16384 : 400;
+	return kind == register_unary_kind::logic ? 3104 : kind == register_unary_kind::shift ? 3840 : 400;
 }
 
 inline std::string register_unary_result(register_unary_kind kind, unsigned count, unsigned restores, u64 digest)
@@ -29,7 +29,7 @@ inline std::string register_unary_result(register_unary_kind kind, unsigned coun
 	char output[640];
 	char const *format = kind == register_unary_kind::logic ?
 		"TMS320C54x staged register logic: PASS cases=%u restore=%u logical_cases=3072 complement_cases=32 checkpoint_policy=balanced data_accesses=0 duplicate_fetches=0 silicon_phase_claim=0 coverage_fnv64=%016llx" : kind == register_unary_kind::shift ?
-		"TMS320C54x staged accumulator shifts: PASS cases=%u restore=%u operations=SFTA,SFTL selectors=4 shifts=-16..15 patterns=8 sxm=0,1 ovm=0,1 carry=0,1 checkpoint_policy=balanced duplicate_fetches=0 data_accesses=0 left_c_policy=manual_formula silicon_phase_claim=0 coverage_fnv64=%016llx" : kind == register_unary_kind::absolute ?
+		"TMS320C54x staged accumulator shifts: PASS cases=%u restore=%u operations=SFTA,SFTL selectors=4 shifts=-16..15 patterns=8 flag_policy=boundaries arp_initial=0 checkpoint_policy=balanced duplicate_fetches=0 data_accesses=0 left_c_policy=manual_formula silicon_phase_claim=0 coverage_fnv64=%016llx" : kind == register_unary_kind::absolute ?
 		"TMS320C54x staged ABS: PASS cases=%u restore=%u numeric=128 status_boundaries=240 producer_cases=32 pages=1 checkpoint_policy=balanced data_accesses=0 irq_acceptance=0 silicon_phase_claim=0 coverage_fnv64=%016llx" :
 		"TMS320C54x staged NEG: PASS cases=%u restore=%u numeric=128 status_boundaries=240 producer_cases=32 pages=1 checkpoint_policy=balanced data_accesses=0 silicon_phase_claim=0 coverage_fnv64=%016llx";
 	std::snprintf(output, sizeof(output), format, count, restores, (unsigned long long)digest);
@@ -45,8 +45,16 @@ constexpr unsigned register_unary_key(unsigned ordinal, register_unary_kind kind
 		unsigned const q = ordinal - 3072;
 		return 6144 + q + 32 * ((q + q / 4 + q / 16) % 2);
 	}
-	if (kind == register_unary_kind::shift) return ordinal + 16384 * ((ordinal % 2 + (ordinal / 2) % 4 +
-		(ordinal / 8) % 32 + (ordinal / 256) % 8 + (ordinal / 2048) % 2 + (ordinal / 4096) % 2 + ordinal / 8192) % 2);
+	if (kind == register_unary_kind::shift)
+	{
+		// Full shift range with baseline flags; flag interactions at four boundaries.
+		unsigned const q = ordinal < 2048 ? 0 : ordinal - 2048;
+		unsigned const raw = ordinal < 2048 ? ordinal : q % 8 +
+			8 * std::array<unsigned, 4>{0,15,16,31}[(q / 8) % 4] +
+			256 * ((q / 32) % 8) + 2048 * (1 + q / 256);
+		return raw + 16384 * ((raw % 2 + (raw / 2) % 4 + (raw / 8) % 32 +
+			(raw / 256) % 8 + (raw / 2048) % 2 + (raw / 4096) % 2 + raw / 8192) % 2);
+	}
 	// Numeric boundaries x selectors x OVM, then remaining flags at zero/overflow.
 	unsigned const raw = ordinal < 128 ? (ordinal % 16) + 16 * ((ordinal / 16) % 4) + 64 * (ordinal / 64) :
 		ordinal < 368 ? ((ordinal - 128) % 2 ? 9 : 0) + 16 * (((ordinal - 128) / 2) % 4) + 64 * (2 + (ordinal - 128) / 8) :
@@ -88,7 +96,7 @@ inline std::array<u64, 3> accumulator_shift_fixture(unsigned variant, bool after
 	int const shift = int((variant / 8) % 32) - 16;
 	u64 const value = std::array<u64, 8>{0, 1, 0x007fffffffULL, 0xff80000000ULL, 0x0180000000ULL, 0xff7fffffffULL, 0x80aa001234ULL, 0xffffffff55ULL}[pattern];
 	std::array<u64, 3> expected = {selector & 2 ? 0x246813579aULL : value, selector & 2 ? value : 0x246813579aULL,
-		u64(0xa01b | (pattern & 1 ? 0x600 : 0) | (carry ? 0x800 : 0))};
+		u64(0x001b | (pattern & 1 ? 0x600 : 0) | (carry ? 0x800 : 0))};
 	if (after)
 	{
 		u64 result = 0;

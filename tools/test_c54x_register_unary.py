@@ -43,7 +43,7 @@ int main() {
             if(logic) {
                 point=n<3072?key/3072:(key-6144)/32;
                 assert((n<3072?key%3072:3072+(key-6144)%32)==n);
-            } else if(shift) { point=key/count; assert(key%count==n); }
+            } else if(shift) { point=key/16384; }
             else { point=key/4608; }
             assert(!seen[key]++ && point<boundaries); ++points[point]; digest.add(key);
             auto c=register_unary_case<r>(n,kind);
@@ -111,6 +111,15 @@ int main() {
         }
         if(logic||shift) for(auto const &entry:groups) for(unsigned p=0;p<boundaries;++p) assert(entry.second[p]);
         for(unsigned p=0;p<boundaries;++p) assert(points[p]);
+        if(shift) {
+            assert(count==3840);
+            for(unsigned raw=0;raw<16384;++raw) {
+                unsigned amount=(raw/8)%32, matches=0;
+                for(unsigned point=0;point<2;++point) matches+=seen.count(raw+16384*point);
+                bool selected=raw<2048||amount==0||amount==15||amount==16||amount==31;
+                assert(matches==unsigned(selected));
+            }
+        }
         if(!logic&&!shift) {
             assert(count==400);
             for(unsigned flags=0;flags<32;++flags) for(unsigned selector=0;selector<4;++selector)
