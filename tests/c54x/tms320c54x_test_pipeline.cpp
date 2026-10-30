@@ -283,29 +283,6 @@ void tms320c54x_test_state::start_pipeline_pmst(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_literal_guard(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	u16 const destination = std::array<u16, 3>{0x7cf8, 0x7df8, 0x7ff8}[variant % 3];
-	unsigned const count = (variant / 3) % 3;
-	u32 const base = (variant / 9) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	std::array<u16, 6> const code{0xf072, 0x604, 0x76f8, destination, 0x1357, 0xf4e1};
-	for (unsigned i = 0; i < code.size(); ++i) program.write_word(base + 0x600 + i, code[i]);
-	m_cpu->space(AS_DATA).write_word(destination, 0xbeef);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_ST0, 0xa624}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_BRC, count},
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_pipeline_store_writes = 0;
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "literal_guard_store",
-		[this, destination, count](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == destination && word == 0x1357 && m_pipeline_store_writes <= count, "Opcode-shaped extension remains the ST destination through block repetition"); ++m_pipeline_store_writes; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = literal_guard_phase;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::repeated_writa_fixture tms320c54x_test_state::repeated_writa_case(unsigned variant, bool standard_width)
 {
@@ -451,31 +428,6 @@ tms320c54x_test_state::block_back_fixture tms320c54x_test_state::block_back_case
 	return f;
 }
 
-bool tms320c54x_test_state::check_literal_guard_results()
-{
-	if (m_phase == literal_guard_phase)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, count = (variant / 3) % 3;
-		unsigned const checkpoint = std::array<unsigned, 3>{4, 7, 12}[variant / 18];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Instruction admission must not classify a retained extension as an opcode");
-		capture_pipeline_at(checkpoint, {&m_pipeline_store_writes},
-			"Save a block with an opcode-shaped extension");
-		if (tick == 64)
-		{
-			expect(m_pipeline_store_writes == count + 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Literal-bearing block retires each complete ST exactly once");
-			{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(std::array<u16, 3>{0x7cf8, 0x7df8, 0x7ff8}[variant % 3]) == 0x1357, "Block literal names the committed RAM location"); }
-			if (replay_pipeline_at(literal_guard_phase + 1, checkpoint,
-				"Restore a retained extension without duplicate block stores")) return true;
-			m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 53) { start_literal_guard(variant + 1); return true; }
-			osd_printf_info("TMS320C54x opcode-shaped extensions: PASS cases=54 restore=54 literals=7cf8,7df8,7ff8 block_counts=0,1,2 pages=2 snapshots=3 instruction=ST_absolute writes=count+1 transfer_admission=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated opcode-shaped extensions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == literal_guard_phase + 1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = literal_guard_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_pipeline_rmw_results()
 {

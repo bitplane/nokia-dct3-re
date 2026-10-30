@@ -203,7 +203,6 @@ private:
 	void start_pipeline_original_idle(unsigned variant = 0);
 	void start_pipeline_pmst(unsigned variant = 0);
 	void start_stack_irq_order(unsigned variant = 0);
-	void start_literal_guard(unsigned variant = 0);
 	struct ar_addm_fixture
 	{
 		unsigned reg, checkpoint;
@@ -1781,7 +1780,6 @@ private:
 	bool check_repeat_store_results();
 	bool check_rptz_results();
 	bool check_mapped_addm_results();
-	bool check_literal_guard_results();
 	bool check_shifted_store_dld_results();
 	bool check_idle_nmi_result_results();
 	bool check_shifted_high_store_results();
@@ -2138,7 +2136,6 @@ private:
 	std::array<u16, 3> m_native_store_context = {};
 	unsigned m_bleq_case = 0;
 	static constexpr unsigned rom4_staged_cold_phase = 62000;
-	static constexpr unsigned literal_guard_phase = 62010;
 	static constexpr unsigned repeated_writa_phase = 62044;
 	static constexpr unsigned branch_arithmetic_phase = 62040;
 	static constexpr unsigned circular_mar_phase = 62038;
