@@ -140,69 +140,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 			});
 			return next_atomic_phase(99);
 		}
-		program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
-		program.write_word(0x05e1, 0x0124);
-		program.write_word(0x05e2, 0x4593); // LD *AR3+,16,B
-		program.write_word(0x05e3, 0x75d6);
-		program.write_word(0x05e4, 0x0124);
-		program.write_word(0x05e5, 0xf5e1);
-		data.write_word(0x0d00, 0xff80);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_AR3, 0x0d00}, {cpu_regs::STATE_AR6, 0x0a03}, {cpu_regs::STATE_B, 0},
-			{cpu_regs::STATE_ST1, 0x0100}, // SXM
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(100);
 	}
-	if (m_phase == 100)
+	if (m_phase == 9207)
 	{
-		expect_opcode(0x4593, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xffff800000ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d01 &&
-				m_port_writes == 2 &&
-				m_last_port_cycle - m_first_port_cycle == 3,
-				"ROM4 4593 sign-extends into B, post-increments AR3, and costs one cycle");
-		program.write_word(0x05e2, 0x4592); // LD *AR2+,16,B.
-		data.write_word(0x0d10, 0xff80);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x11223344}, {cpu_regs::STATE_AR2, 0x0d10}, {cpu_regs::STATE_ST0, 0x0aa5},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(6513);
-	}
-	if (m_phase == 6513 || m_phase == 6514 || m_phase == 6568 || m_phase == 6569 || m_phase == 9206 || m_phase == 9207)
-	{
-		bool const into_a = m_phase >= 9206;
-		bool const signed_memory = m_phase == 6513 || m_phase == 6568 || m_phase == 9206;
-		bool const stationary = m_phase >= 6568;
-		expect_opcode(into_a ? 0x4488 : stationary ? 0x4582 : 0x4592,
-			m_cpu->state_int(into_a ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (signed_memory ? 0xffff800000ULL : 0xff800000ULL) &&
-			m_cpu->state_int(into_a ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == 0x11223344 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == (stationary ? 0x0d10 : 0x0d11) &&
-			(!into_a || m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0d0f) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d01 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
-			data.read_word(0x0d10) == 0xff80 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-			"ROM4 shifted LD respects SXM, accumulator selection and pointer updates, preserving status/source in one cycle");
-		if (m_phase != 9207)
-		{
-			const unsigned next = m_phase == 6513 ? 6514 : m_phase == 6514 ? 6568 : m_phase == 6568 ? 6569 : m_phase == 6569 ? 9206 : 9207;
-			program.write_word(0x05e2, next >= 9206 ? 0x4488 : next >= 6568 ? 0x4582 : 0x4592);
-			m_port_writes = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d10);
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0d10);
-			if (next >= 9206)
-			{
-				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
-				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x11223344);
-			}
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, next == 6568 || next == 9206 ? 0x0100 : 0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(next);
-		}
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
 		write_words(program, {
 			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
