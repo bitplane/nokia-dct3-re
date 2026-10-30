@@ -472,14 +472,6 @@ private:
 	static parallel_load_fixture bsp_parallel_load_case(unsigned variant);
 	static parallel_load_fixture peripheral_parallel_load_case(unsigned variant);
 	void start_parallel_load(unsigned variant = 0);
-	struct sqdst_fixture
-	{
-		dual_multiply_fixture memory;
-		u64 a, b, result_a, result_b;
-		u16 result_st0;
-	};
-	static sqdst_fixture sqdst_case(unsigned variant, bool lms);
-	void start_sqdst(unsigned variant = 0);
 	struct circular_move_fixture
 	{
 		indexed_store_fixture memory;
@@ -916,7 +908,6 @@ private:
 	bool check_memory_copy_repeat_results();
 	bool check_block_near_call_results();
 	bool check_repeated_mvdk_results();
-	bool check_sqdst_results();
 	bool check_block_exit_results();
 	bool check_external_io_results();
 	bool check_rom4_fr_decoder_results();

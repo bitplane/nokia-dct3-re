@@ -369,6 +369,8 @@ def main():
     counts['parallel_mac_round'] = 43008
     counts['parallel_mas'] = 43008
     counts['parallel_mas_round'] = 43008
+    counts['square_distance'] = 5632
+    counts['least_mean_square'] = 22016
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

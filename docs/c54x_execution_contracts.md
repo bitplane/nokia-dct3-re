@@ -5053,11 +5053,14 @@ retains both memory words in Read and samples old A/B at Execute. T is
 neither an input nor a publication. The generic SMUL product clamp remains
 the existing arithmetic model, not new evidence about the fitted MAD2 revision.
 
-`sqdst` passes 9,216 addressing cases plus 393,216 numerical cases and
-402,432 save-state replays. The cohorts cover all encodings, three pointer
-layouts, circular/legacy BK=0 modes, both program pages, 64 operand pairs,
-eight signed-17-bit A patterns, eight B patterns, 32 status combinations
-and three snapshots. Independent expected results check subtraction carry,
+`square_distance` owns 5,632 cases/restores: 1,536 encoding/layout/BK cases,
+2,048 memory-pair/status cases and 2,048 old-A/old-B/status cases. Memory
+difference and square accumulation have separate numeric dependencies, so
+their former full cross-product and checkpoint copies are removed. Address/
+status/seed interactions and pages/checkpoints are representative, not equivalent
+to all old cohorts. All 64 memory pairs, eight signed-17-bit A values, eight B
+values and 32 status configurations remain. Literal witnesses require the
+17-bit square and its SMUL-clamped boundary. Integer expectations check carry,
 separate sticky A/B overflow, OVM clamping, FRCT, and the existing SMUL model.
 Post-Read accumulator mutation distinguishes Execute-owned feedback from
 retained X/Y words; it also detects squaring A after replacing it. Low-page
@@ -5207,10 +5210,14 @@ publishes T. Address capture and X-priority alias modification use the
 existing dual-operand path; low-page sources reject before either read or
 pointer update.
 
-`lms` passes 9,216 addressing cases plus 393,216 numerical cases, each
-with cleared-pipeline replay. The fixture covers all 256 encodings, three
-pointer layouts, linear/circular updates, 64 sample pairs, eight old-A and
-eight old-B patterns, 32 arithmetic flag configurations and three snapshots.
+`least_mean_square` owns 22,016 cases with cleared-pipeline replay: 1,536
+encoding/layout/BK cases, 2,048 A/X/status cases, 16,384 B/X/Y/status cases
+and 2,048 combined-A/B/status cases at one memory pair. Each output's complete
+numeric dependency domain remains; the full A/B/memory correlation is deliberately
+reduced. All 256 encodings, three layouts, linear/circular updates, 64 memory
+pairs, eight A and B patterns and 32 flag configurations remain, with pages
+and three checkpoints distributed. Literal witnesses distinguish signed and
+unsigned LMS addition independently of the general formula.
 It changes A/B after Read to distinguish Execute-owned feedback, poisons
 source words and pointers after capture, and checks exact paired reads,
 carry/overflow, no writes and unchanged newer T. Low-page admission is covered

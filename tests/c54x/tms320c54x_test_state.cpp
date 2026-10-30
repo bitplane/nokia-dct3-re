@@ -142,7 +142,6 @@ void tms320c54x_test_state::machine_reset()
 	}))
 		return;
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"sqdst"}, [](self &test) { test.start_sqdst(); } },
 		{ {"stld", "st-par-alu"}, [](self &test) { test.start_parallel_load(); } },
 		{ {"stld-map"}, [](self &test) { test.start_parallel_load(); } },
 		{ {"stld-bsp"}, [](self &test) { test.start_parallel_load(); } },
@@ -156,7 +155,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"sqacc-repeat"}, [](self &test) { test.start_poly(); } },
 		{ {"tmac-repeat"}, [](self &test) { test.start_poly(); } },
 		{ {"mac-rpt"}, [](self &test) { test.start_poly(); } },
-		{ {"lms"}, [](self &test) { test.start_sqdst(); } },
 		{ {"bd-rpt"}, [](self &test) { test.start_branch_repeat(); } },
 		{ {"retd-rpt"}, [](self &test) { test.start_branch_repeat(); } },
 		{ {"calld-rpt"}, [](self &test) { test.start_branch_repeat(); } },
