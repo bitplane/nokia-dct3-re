@@ -117,7 +117,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_mvdk_mapped_results()) return;
 	if (check_basic_repeat_results()) return;
 	if (check_rptbd_shift_store_results()) return;
-	if (check_ram_forwarding_results()) return;
 	if (check_negate_results()) return;
 	if (check_long_mapped_original_results()) return;
 	if (check_mcbsp_control_sequence_results()) return;

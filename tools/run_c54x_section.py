@@ -53,6 +53,7 @@ def main():
     counts['offset_data_move'] = 9600
     counts['store_move_compare'] = 8
     counts['flag_branch'] = 240
+    counts['ram_forwarding'] = 2432
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

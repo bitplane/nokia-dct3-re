@@ -390,10 +390,6 @@ void tms320c54x_test_state::machine_reset()
 	{
 		start_pipeline_mapped_word_arithmetic(); return;
 	}
-	if (!strcmp(machine().system().name, "tms54test") && (profile_is("rmw-forward") || profile_is("imm-forward") || profile_is("mvkd-forward")))
-	{
-		start_pipeline_rmw_forward(); return;
-	}
 	if (!strcmp(machine().system().name, "tms54test") &&
 			profile_is("timer"))
 	{

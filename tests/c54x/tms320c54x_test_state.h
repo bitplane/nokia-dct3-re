@@ -870,7 +870,6 @@ private:
 
 	void start_far_save_case(bool returning);
 
-	void start_pipeline_rmw_forward(unsigned variant = 0);
 
 	std::unique_ptr<register_sequence_fixture> m_register_sequence;
 
@@ -1947,7 +1946,6 @@ private:
 	bool check_mvdk_mapped_results();
 	bool check_basic_repeat_results();
 	bool check_rptbd_shift_store_results();
-	bool check_ram_forwarding_results();
 	bool check_negate_results();
 	bool check_long_mapped_original_results();
 	bool check_mcbsp_control_sequence_results();

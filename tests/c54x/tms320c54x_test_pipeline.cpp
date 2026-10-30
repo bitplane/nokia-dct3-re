@@ -398,51 +398,6 @@ void tms320c54x_test_state::start_pipeline_long_rmw(unsigned variant)
 
 
 
-void tms320c54x_test_state::start_pipeline_rmw_forward(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const v = variant % 256;
-	bool const copy = profile_is("mvkd-forward");
-	bool const immediate = copy || profile_is("imm-forward");
-	unsigned const consumer = immediate ? (variant / 768) % 3 : 0, form = immediate ? variant / 2304 : 0, extra = form == 2;
-	u16 const literal = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[v & 3];
-	u16 const initial = immediate ? 0x2468 : std::array<u16, 4>{0, 0x7fff, 0x8000, 0xffff}[v & 3];
-	bool const sxm = BIT(v, 2), ovm = BIT(v, 3), compiler = BIT(v, 4), gap = BIT(v, 5), different = BIT(v, 7);
-	u32 const base = BIT(v, 6) ? 0x20000 : 0;
-	u16 const target = (compiler ? 0x1000 : 0x400) + 2;
-	s32 const sum = (sxm ? s16(initial) : s32(initial)) + 1;
-	u16 const result = immediate ? literal : ovm ? u16(std::clamp(sum, s32(-0x8000), s32(0x7fff))) : u16(sum);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, copy ? form == 2 ? 0x70f8 : form == 1 ? 0x7092 : 0x7002 : immediate ? form == 2 ? 0x76f8 : form == 1 ? 0x7692 : 0x7602 : 0x6b02);
-	program.write_word(base + 0x601, form == 2 ? target : copy ? 0x11 : immediate ? literal : 1);
-	if (form == 2) program.write_word(base + 0x602, copy ? 0x11 : literal);
-	program.write_word(base + 0x602 + extra + gap, (consumer == 1 ? 0x0000 : consumer == 2 ? 0x1100 : 0x1000) | (different ? 3 : 2));
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 8},
-		{cpu_regs::STATE_ST1, 0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0) | (compiler ? 0x4000 : 0)},
-		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, 0x1234}, {cpu_regs::STATE_B, 0x5678},
-		{cpu_regs::STATE_AR2, target},
-	});
-	if (copy) m_cpu->set_state_int(tms320c54x_device::STATE_AR1, literal);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->space(AS_DATA).write_word(target, initial); m_cpu->space(AS_DATA).write_word(target + 1, 0x1357);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
-	if (copy) m_operand_data_tap = m_cpu->space(AS_DATA).install_read_tap(0x11, 0x11, "mvkd_forward_source",
-		[this, literal, extra](offs_t, u16 &value, u16) { if (machine().side_effects_disabled()) return; expect(value == literal && !m_pipeline_register_writes++ && m_cpu->pipeline_cycles() == 6 + extra, "MVKD captures its mapped source once before forwarding or real destination publication"); });
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(target, target + 1, "rmw_forward_reads",
-		[this, target, initial, result, gap, different, immediate, extra](offs_t address, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			if (!immediate && !m_pipeline_operand_reads) expect(address == target && value == initial && m_cpu->pipeline_cycles() == 6, "RMW captures one original RAM operand");
-			else expect((gap || different) && address == target + different && value == (different ? 0x1357 : result) && m_cpu->pipeline_cycles() == 7 + extra + gap, "Only a nonforwarded follower performs a real memory read");
-			++m_pipeline_operand_reads;
-		});
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(target, target, "rmw_forward_write",
-		[this, result, extra](offs_t, u16 &value, u16) { if (machine().side_effects_disabled()) return;
-			expect(value == result && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 7 + extra, "Forwarding leaves the producer Write clock unchanged"); ++m_pipeline_store_writes; });
-	m_phase = 253390; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::delay_load_fixture tms320c54x_test_state::delay_dld_case(unsigned v)
 {
@@ -811,69 +766,5 @@ bool tms320c54x_test_state::check_pipeline_rmw_results()
 
 
 
-bool tms320c54x_test_state::check_ram_forwarding_results()
-{
-	if (m_phase == 253390)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, v = variant % 256, tick = ++m_idle_fixture_tick;
-		bool const copy = profile_is("mvkd-forward");
-		bool const immediate = copy || profile_is("imm-forward");
-		unsigned const consumer = immediate ? (variant / 768) % 3 : 0, form = immediate ? variant / 2304 : 0, extra = form == 2;
-		unsigned const checkpoint = 5 + (variant / 256) % 3 + extra;
-		bool const sxm = BIT(v, 2), ovm = BIT(v, 3), compiler = BIT(v, 4), gap = BIT(v, 5), different = BIT(v, 7);
-		u16 const literal = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[v & 3];
-		u16 const initial = immediate ? 0x2468 : std::array<u16, 4>{0, 0x7fff, 0x8000, 0xffff}[v & 3];
-		s32 const sum = (sxm ? s16(initial) : s32(initial)) + 1;
-		u16 const result = immediate ? literal : ovm ? u16(std::clamp(sum, s32(-0x8000), s32(0x7fff))) : u16(sum), loaded = different ? 0x1357 : result;
-		u64 const a = sxm ? u64(s64(s16(loaded))) & 0xffffffffffULL : loaded;
-		u64 const added = (0x1234 + a) & 0xffffffffffULL;
-		u16 const st0 = immediate ? 8 | (consumer == 1 && u64(0x1234) + u32(a) > 0xffffffffULL ? 0x800 : 0) : 8 | (sum < -0x8000 || sum > 0x7fff ? 0x400 : 0) |
-			(u64(u32(sxm ? s16(initial) : s32(initial))) + 1 > 0xffffffffULL ? 0x800 : 0);
-		bool const retired = tick >= 8 + extra + gap;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == (retired && consumer != 2 ? consumer == 1 ? added : a : 0x1234) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (retired && consumer == 2 ? a : 0x5678) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == ((immediate ? retired : tick >= 7) ? st0 : 8), "Adjacent RAM consumer sees the pending producer without early accumulator or flag retirement");
-		if (immediate) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == (compiler ? 0x1002 : 0x402) + unsigned(form == 1 && tick >= (copy ? 5 : 6)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (sxm ? 0x100 : 0) | (ovm ? 0x200 : 0) | (compiler ? 0x4000 : 0)), "Immediate store updates its pointer once and preserves addressing/arithmetic modes");
-		if (copy && tick == 6 + extra) m_cpu->set_state_int(tms320c54x_device::STATE_AR1, literal ^ 0x5a5a);
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save dependency before Read, before Write or after forwarding");
-			if (immediate)
-				// A forwarded value must use the captured literal, not program RAM.
-				m_cpu->space(AS_PROGRAM).write_word((BIT(v, 6) ? 0x20000 : 0) + 0x601 + extra, (copy ? 0x11 : literal) ^ 0x5a5a);
-		}
-		if (tick == 12 + extra)
-		{
-			expect(m_pipeline_operand_reads == unsigned(!immediate) + unsigned(bool(gap || different)) && m_pipeline_store_writes == 1, "Internal-bus bypass avoids stale RAM reads and duplicate writes");
-			if (copy) expect(m_pipeline_register_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_AR1) == (literal ^ 0x5a5a), "MVKD forwarding uses its retained source, not the changed mapped register");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(253400, "Restore dependency with its retained producer operand and follower");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); if (copy) m_operand_data_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (immediate ? 6911 : 767)) { start_pipeline_rmw_forward(variant + 1); return true; }
-			if (copy)
-			{
-				osd_printf_info("TMS320C54x staged MVKD forwarding: PASS cases=6912 restore=6912 forms=direct,postincrement,absolute consumers=LD_A,ADD_A,LD_B same_and_different=1 gap_words=0,1 sxm_ovm=4 pages=2 cpl=2 source_reads=1 writes_each=1 retained_source=1 silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated MVKD forwarding complete");
-			}
-			if (immediate)
-			{
-				osd_printf_info("TMS320C54x staged immediate forwarding: PASS cases=6912 restore=6912 forms=direct,postincrement,absolute consumers=LD_A,ADD_A,LD_B same_and_different=1 gap_words=0,1 sxm_ovm=4 pages=2 cpl=2 writes_each=1 silicon_phase_claim=0\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated immediate forwarding complete");
-			}
-			osd_printf_info("TMS320C54x staged RMW forwarding: PASS cases=768 restore=768 same_and_different=1 gap_words=0,1 flags=4 pages=2 cpl=2 silicon_phase_claim=0\n");
-			if (profile_is("rmw-forward")) throw emu_fatalerror(0, "TMS320C54x isolated RMW forwarding complete");
-			start_pipeline_mapped_word_arithmetic(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253400)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253390; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 } // namespace c54x_test
