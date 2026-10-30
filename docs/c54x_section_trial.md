@@ -311,6 +311,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_mapped_load_sequences.h` | Retain five-LDM/four-STL zero-extension sequence, signed immediate ADD B→A, full40-bit LD A→B with destination overflow and indexed LD→MAR→two MVMD→ST sequence. Explicit SXM/flags/accumulators/pointers/BK and memory replace inheritance. Fixed results, complete ordered MMR/RAM transactions, source/sibling/status preservation and pre-sequence replay. Drop port-marker timing; atomic semantic/access scope. | Native4 cases/restores, unchanged count; build5.443s/run0.017s. Delete phase490 preparation,491/492/494 and495 assertions/preparations plus493 successor setup. Following STM/CLKMD setup remains reference material. Supersedes atomic_conditional_slot_literals' pending mapped-load preparation. |
 
+| `atomic_register_copy_sequences.h` | Retain STM SP/backing-page-zero/CLKMD readback, STLM A/B→AR/BRC with intermediate MVMD capture, MVDD pointer updates feeding MVMM and RPT6 with seven MAR updates. Explicit registers/flags/pointers/RAM; exact MMR/RAM transaction ordering, fixed outputs, sibling preservation and pre-sequence replay. CLKMD readback is internal CPU behavior, not a mocked board device. Drop port-marker timing; atomic semantic/access scope. | Native4 cases/restores, unchanged count; build5.300s/run0.015s. Delete phase495 setup,496..498 and499 assertions/preparations; following signed-B branch setup remains reference material. Supersedes atomic_mapped_load_sequences' pending STM/CLKMD setup. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
