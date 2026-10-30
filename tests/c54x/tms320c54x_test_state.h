@@ -232,7 +232,6 @@ private:
 	void start_xc_return(unsigned variant = 0);
 	void start_pipeline_xc_tc(unsigned variant = 0);
 	void start_pipeline_plain_branch(unsigned variant = 0);
-	void start_pipeline_xc_accumulator(unsigned variant = 0);
 	struct signed_xc_fixture
 	{
 		unsigned condition, layout;
@@ -2078,7 +2077,6 @@ private:
 	bool check_pipeline_conditional_branch_results();
 	bool check_pipeline_xc_irq_results();
 	bool check_pipeline_xc_tc_results();
-	bool check_pipeline_xc_accumulator_results();
 	bool check_pipeline_delayed_return_results();
 	bool check_addm_expected_results();
 	bool check_pipeline_data_push_results();

@@ -2524,8 +2524,15 @@ guard-only nonzero and positive-bit-31 values prevent a 32-bit comparison.
 The two-word layout includes an opcode-shaped literal and verifies that
 rejected words never become a nested instruction or data write.
 
-`xc-controls` passes 212 existing cases/restores covering unconditional IRQ
-protection, arithmetic/IRQ composition, TC/NTC and equality sampling. This
+`xc-controls` retains 164 cases/restores covering unconditional IRQ
+protection, arithmetic/IRQ composition and TC/NTC. The separate 48-case
+EQ/NE subset is retired: `xc-signed` owns accumulator equality sampling,
+including zero versus guard-only nonzero, source replacement around Access,
+rejected stores and snapshot replay. This deliberately drops the subset's
+accumulator-source store combination, snapshot6 and cumulative per-clock
+write-count checks; it is not a claim of identical case coverage.
+Signed-XC inputs now use legal ARP0 with CMPT clear, retaining low status bits.
+This
 guards the common mechanism; signed-predicate/IRQ composition is not separately
 established. The original `XC 1,ALT` at `03:dea4` executes without a firmware
 branch override. Aggregate test counts and the current execution boundary
@@ -2603,8 +2610,9 @@ match the preceding capture. The review binds its executable, acceptance
 sources and exact bench patch over `66cfbfc9`; no CPU/device source changed.
 No runtime improvement or blanket validity of other fixture inputs is claimed.
 
-The current layout has 276 default requirements after the additional idle
-banks moved to `power-idle` and `rom4-context`. Focused native and executable
+The current layout has 275 default requirements after the additional idle
+banks moved to `power-idle` and `rom4-context` and the overlapping48-case
+accumulator-XC subset was retired. Focused native and executable
 host checks qualify the selected-owner routing and regrouped inputs. A
 current-tree full-default/all-isolated run remains outstanding; this older
 capture is not silently renewed by those focused checks.

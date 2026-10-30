@@ -572,7 +572,7 @@ void tms320c54x_test_state::start_signed_xc(unsigned variant)
 	program.write_word(f.base + 0x603 + multiword, 0xf4e1);
 	set_registers(*m_cpu, {
 		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_ST0, 0xa60e}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_T, 0x5aa5},
+		{cpu_regs::STATE_ST0, 0x060e}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_T, 0x5aa5},
 		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_A, f.b ? 0x1234 : f.opposite},
 		{cpu_regs::STATE_B, f.b ? f.opposite : 0x3456}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
 	});
@@ -1850,7 +1850,12 @@ bool tms320c54x_test_state::check_pipeline_xc_tc_results()
 			m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 127) { start_pipeline_xc_tc(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged XC TC sampling: PASS cases=128 forms=TC,NTC words=1,2 restore=128 two_word_slots=32 producer_cases=64 access_sampled=1 rejected_writes=0\n");
-			start_pipeline_xc_accumulator(); return true;
+			if (profile_is("xc-controls"))
+			{
+				osd_printf_info("TMS320C54x staged XC controls: PASS unconditional_irq=4 arithmetic_irq=32 tc=128 restore=164\n");
+				throw emu_fatalerror(0, "TMS320C54x isolated XC controls complete");
+			}
+			start_pipeline_plain_branch(); return true;
 		}
 		++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
@@ -2451,7 +2456,7 @@ bool tms320c54x_test_state::check_signed_xc_results()
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 		auto const f = signed_xc_case(variant);
 		unsigned const checkpoint = std::array<unsigned, 4>{3, 4, 5, 8}[variant / 576];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa60e && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "Signed XC preserves status and T");
+		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x060e && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "Signed XC preserves legal ARP0 status and T");
 		if (tick == 3 || tick == 4) m_cpu->set_state_int(f.b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, tick == 3 ? f.value : f.opposite);
 		capture_pipeline_at(checkpoint, {&m_pipeline_store_writes, &m_pipeline_extensions_reads},
 			"Save signed XC before/after predicate and protected-slot decisions");

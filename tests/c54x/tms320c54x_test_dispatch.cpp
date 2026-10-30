@@ -85,7 +85,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_pipeline_conditional_branch_results()) return;
 	if (check_pipeline_xc_irq_results()) return;
 	if (check_pipeline_xc_tc_results()) return;
-	if (check_pipeline_xc_accumulator_results()) return;
 	if (check_pipeline_delayed_return_results()) return;
 	if (check_addm_expected_results()) return;
 	if (check_pipeline_data_push_results()) return;

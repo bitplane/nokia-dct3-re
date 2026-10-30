@@ -68,7 +68,6 @@ REQUIRED = [
     "TMS320C54x staged unconditional XC IRQ protection: PASS cases=4 forms=XC1,XC2 restore=4 protected_words=2 vector_fetches=1",
     "TMS320C54x staged XC arithmetic IRQ: PASS cases=32 forms=XC1,XC2 operations=absolute_ADD,long_SUB destinations=A,B pages=2 restore=32 duplicate_source_reads=0 duplicate_vectors=0",
     "TMS320C54x staged XC TC sampling: PASS cases=128 forms=TC,NTC words=1,2 restore=128 two_word_slots=32 producer_cases=64 access_sampled=1 rejected_writes=0",
-    "TMS320C54x staged XC accumulator sampling: PASS cases=48 conditions=AEQ,ANEQ,BEQ,BNEQ words=1,2 restore=48 access_sampled=1 rejected_writes=0",
     "TMS320C54x staged plain conditional branches: PASS cases=48 conditions=AEQ,ANEQ,BEQ,BNEQ pages=2 outcomes=2 restore=48 duplicate_fetches=0 taken_data_reads=0",
     "TMS320C54x staged delayed returns: PASS cases=24 pages=2 delay_forms=3 restore=24 xc_irq_cases=12 duplicate_stack_reads=0 third_delay_fetches=0",
     "TMS320C54x staged ADDM: PASS cases=768 address_forms=4 value_pairs=8 status_combinations=8 restore=768 duplicate_reads=0 duplicate_writes=0",
@@ -1312,7 +1311,7 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated signed XC complete",
     ),
     "xc-controls": (
-        "TMS320C54x staged XC controls: PASS unconditional_irq=4 arithmetic_irq=32 tc=128 eq_ne=48 restore=212",
+        "TMS320C54x staged XC controls: PASS unconditional_irq=4 arithmetic_irq=32 tc=128 restore=164",
         "Fatal error: TMS320C54x isolated XC controls complete",
     ),
     "norm": (

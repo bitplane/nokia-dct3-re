@@ -60,7 +60,6 @@
       "TMS320C54x staged unconditional XC IRQ protection: PASS cases=4 forms=XC1,XC2 restore=4 protected_words=2 vector_fetches=1",
       "TMS320C54x staged XC arithmetic IRQ: PASS cases=32 forms=XC1,XC2 operations=absolute_ADD,long_SUB destinations=A,B pages=2 restore=32 duplicate_source_reads=0 duplicate_vectors=0",
       "TMS320C54x staged XC TC sampling: PASS cases=128 forms=TC,NTC words=1,2 restore=128 two_word_slots=32 producer_cases=64 access_sampled=1 rejected_writes=0",
-      "TMS320C54x staged XC accumulator sampling: PASS cases=48 conditions=AEQ,ANEQ,BEQ,BNEQ words=1,2 restore=48 access_sampled=1 rejected_writes=0",
       "TMS320C54x staged plain conditional branches: PASS cases=48 conditions=AEQ,ANEQ,BEQ,BNEQ pages=2 outcomes=2 restore=48 duplicate_fetches=0 taken_data_reads=0",
       "TMS320C54x staged delayed returns: PASS cases=24 pages=2 delay_forms=3 restore=24 xc_irq_cases=12 duplicate_stack_reads=0 third_delay_fetches=0",
       "TMS320C54x staged ADDM: PASS cases=768 address_forms=4 value_pairs=8 status_combinations=8 restore=768 duplicate_reads=0 duplicate_writes=0",
@@ -3147,10 +3146,9 @@
       "TMS320C54x staged TC branches: PASS cases=1536 forms=BC,BCD conditions=TC,NTC producers=BIT,CMPR_EQ,status_bit,CMPR_LT gaps=0,1,2 pages=2 restore=1536 post_evaluate_change=0,1 duplicate_fetches=0\n": 1,
       "TMS320C54x staged WRITA: PASS cases=3584 restore=3584 forms=7 registers=8 values=4 pages=2 mapping=2 snapshots=4 source_reads=1 program_writes=1 destination_reads=0 repeat=unvalidated mapped_source=excluded silicon_phase_claim=0\n": 1,
       "TMS320C54x staged XC TC sampling: PASS cases=128 forms=TC,NTC words=1,2 restore=128 two_word_slots=32 producer_cases=64 access_sampled=1 rejected_writes=0\n": 1,
-      "TMS320C54x staged XC accumulator sampling: PASS cases=48 conditions=AEQ,ANEQ,BEQ,BNEQ words=1,2 restore=48 access_sampled=1 rejected_writes=0\n": 1,
       "TMS320C54x staged XC arithmetic IRQ: PASS cases=32 forms=XC1,XC2 operations=absolute_ADD,long_SUB destinations=A,B pages=2 restore=32 duplicate_source_reads=0 duplicate_vectors=0\n": 1,
       "TMS320C54x staged XC conditions: PASS cases=384 restore=384 sources=TC,C,A,B producer_words=1,2 gaps=0,1,2,3 controlled_words=1,2 snapshots=2 physical_phase_claim=0\n": 1,
-      "TMS320C54x staged XC controls: PASS unconditional_irq=4 arithmetic_irq=32 tc=128 eq_ne=48 restore=212\n": 1,
+      "TMS320C54x staged XC controls: PASS unconditional_irq=4 arithmetic_irq=32 tc=128 restore=164\n": 1,
       "TMS320C54x staged XC return barriers: PASS cases=12 restore=12 forms=RET,RC_taken,RC_untaken sequential_target=1 snapshots=2 physical_phase_claim=0\n": 1,
       "TMS320C54x staged XC/status: PASS cases=64 restore=64 producers=SSBX,RSBX gaps=0,1,2,3 old_condition_words=2 snapshots=2 physical_phase_claim=0\n": 1,
       "TMS320C54x staged Xmem LD: PASS cases=196608 restore=196608 encodings=512 xmem_modes=16 shifts=0..15 values=8 accumulators=2 status_states=8 pages=2 snapshots=3 source_read=5 result_publish=6 pointer_access=4 captured_source=1 bk_zero_and_wrap=1 reads=1 data_writes=0 mapped_acceptance=0 repeat_acceptance=0 silicon_phase_claim=0\n": 1,
@@ -13821,14 +13819,13 @@
       "reported_fields": [
         {
           "arithmetic_irq": "32",
-          "eq_ne": "48",
-          "restore": "212",
+          "restore": "164",
           "tc": "128",
           "unconditional_irq": "4"
         }
       ],
       "required": [
-        "TMS320C54x staged XC controls: PASS unconditional_irq=4 arithmetic_irq=32 tc=128 eq_ne=48 restore=212"
+        "TMS320C54x staged XC controls: PASS unconditional_irq=4 arithmetic_irq=32 tc=128 restore=164"
       ]
     },
     "xc-latency": {

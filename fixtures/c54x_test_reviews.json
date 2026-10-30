@@ -8,6 +8,20 @@
   },
   "families": [
     {
+      "id": "xc-equality-subset-retirement",
+      "classification": "architectural_interaction",
+      "decision": "delete",
+      "profiles": [],
+      "case_ids": [],
+      "retired_case_ids": "start_pipeline_xc_accumulator raw0..47, previously default and xc-controls",
+      "retained_profiles": ["xc-signed", "xc-controls"],
+      "basis": "SPRU172C XC defines predicate selection and protected words. The retained signed-XC family independently evaluates all six signed40-bit comparisons, including EQ/NE, for A/B and zero/guard-only nonzero. Both families replace the source at clocks3/4 to distinguish the retained Access sample. The retained family checks selected/rejected writes, exact write clocks, final accumulators/status, unique protected-word fetches and snapshot replay; it also includes a protected two-word instruction with an opcode-shaped literal. Local clocks are emulator observations, not silicon qualification.",
+      "changes": ["delete the48-case subset's setup, two result phases, declarations, dispatch and default requirement rather than moving them", "xc-controls now ends after its164 distinct unconditional-IRQ, arithmetic-IRQ and TC/NTC cases; signed EQ/NE ownership remains in xc-signed", "correct retained signed-XC ST0 sentinel a60e->060e, preserving low status bits while satisfying SPRU131G section5.5/page7-61 ARP0 requirement with CMPT clear; expectations change only for that invalid input"],
+      "limits": ["the removed raw identities are not claimed byte-for-byte equivalents: accumulator-source stores become T-source stores, snapshot6 is retired in favor of signed snapshots3/4/5/8, and the small family's per-clock cumulative-write assertion is not duplicated", "retain TC/NTC producers and both IRQ groups: signed predicate tests do not replace them", "plain BC and delayed BCD are not removed: their speculative sequential memory-read suppression and memory-DP delay interaction are absent from the broad register-only signed-branch bank", "this retires48 executions/restores, not an isolated BIOS; full retained-suite and handset renewal remain outstanding"],
+      "measurement": {"baseline_commit": "815556b6", "cpp_bytes_deleted_net": 4347, "cpp_lines_deleted_net": 75, "retired_cases_and_restores": 48, "scope": "Net deletion across CPU and firmware sources, not relocation. Focused runtime is subsecond for xc-controls and about one second for xc-signed; no whole-suite speedup is claimed."},
+      "verification": {"baseline": "xc-controls212 and xc-signed2304 pass before deletion", "retained": "xc-controls164, xc-signed2304, plain-branch48 and signed-branch12288 pass after rebuild; each intentional native exit3, runner0", "captures": ["tmp/c54x-xc-overlap-review/run_c54x_core_1kt9t3kh", "tmp/c54x-xc-overlap-review/run_c54x_core_4zy9y3fi", "tmp/c54x-xc-overlap-review/run_c54x_core_0xp9ucud", "tmp/c54x-xc-overlap-review/run_c54x_core_zfsynkrz"], "inventory": "395 isolated profiles,275 default requirements", "host": "All5079 tests pass with one established skip in64.114 seconds. Initial sandboxed run cannot open localhost SIP sockets; rerun with socket access passes."}
+    },
+    {
       "id": "idle-mode-and-wake-banks",
       "classification": "architectural_interaction",
       "decision": "merge",
