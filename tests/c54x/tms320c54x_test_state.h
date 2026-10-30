@@ -1132,10 +1132,6 @@ private:
 
 	void expect_opcode(u16 opcode, bool condition, const char *message);
 
-	static constexpr u8 rom4_saved_mmr[] = {
-		0x0e, 0x10, 0x11, 0x13, 0x14, 0x15,
-		0x16, 0x17, 0x19, 0x1a, 0x1b, 0x1c
-	};
 	// Return true only when the original callback would return; order is retained.
 	bool check_repeated_writa_results();
 	bool check_idle_nmi_result_results();
