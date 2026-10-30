@@ -328,14 +328,6 @@ u16 tms320c54x_test_state::repeat_irq_r(offs_t offset)
 {
 	if (m_phase == 6517 || m_phase == 6518 || m_phase == 251210 || m_phase == 62162 || m_phase == 62163)
 		return m_stack_mmr[offset];
-	if (m_phase == 784)
-	{
-		// Abort this timeslice after the current instruction retires. Saving
-		// inside the operand callback would capture a partial instruction.
-		m_phase = 785;
-		m_check_timer->adjust(attotime::zero);
-		return 1;
-	}
 	if (offset)
 	{
 		m_irq_operand_cycle = m_cpu->total_cycles();

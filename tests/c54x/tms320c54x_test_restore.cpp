@@ -6,77 +6,13 @@
 
 namespace c54x_test {
 
-void tms320c54x_test_state::start_far_save_case(bool returning)
-{
-	m_far_transfer.returning = returning;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	auto &data = m_cpu->space(AS_DATA);
-	const unsigned origin = returning ? 0x030600 : 0x010600;
-	unsigned next = origin;
-	program.write_word(next++, returning ? 0xf6e4 : 0xfb82);
-	if (!returning)
-		program.write_word(next++, 0x0700);
-	program.write_word(next++, 0x0082); // First delay word schedules a zero-time checkpoint.
-	program.write_word(next++, 0xe905);
-	program.write_word(next, 0xf4e1);
-	write_words(program, {
-		{0x020700, 0xe807}, {0x020701, 0xf4e4},
-		{0x000700, 0xe80f}, // Wrong-page sentinels.
-		{0x000701, 0xf4e4}, {0x010700, 0xe80e}, {0x010701, 0xf4e4},
-	});
-	if (returning)
-	{
-		program.write_word(0x010604, 0xe807);
-		program.write_word(0x010605, 0xf4e1);
-	}
-	data.write_word(0x03fe, 1);
-	data.write_word(0x03ff, 0x0604);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_SP, returning ? 0x03fe : 0x0400}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0},
-		{cpu_regs::STATE_AR2, 0x0060}, {cpu_regs::STATE_IMR, 0}, {cpu_regs::STATE_ST1, 0x0800}, {STATE_GENPC, origin},
-		{cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 784;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 bool tms320c54x_test_state::check_far_save_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 786 || m_phase == 787)
+	if (m_phase == 787)
 	{
-		const unsigned continuation = m_far_transfer.returning ? 0x010606 : 0x010605;
-		expect(m_cpu->state_int(STATE_GENPC) == continuation &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 7 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 5 &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-			"uninterrupted and restored pending far transfer complete identically");
-		if (m_phase == 786)
-		{
-			set_registers(*m_cpu, {
-				{STATE_GENPC, 0x7f0900}, {cpu_regs::STATE_SP, 0x0500}, {cpu_regs::STATE_A, 99}, {cpu_regs::STATE_B, 88},
-			});
-			data.write_word(0x03fe, 0x7f);
-			data.write_word(0x03ff, 0xbad);
-			expect(restore_snapshot(machine(), m_far_transfer.saved) == STATERR_NONE,
-				"restore pending far-transfer save state");
-			expect(m_cpu->state_int(STATE_GENPC) == (m_far_transfer.returning ? 0x030602 : 0x010603) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0 &&
-				data.read_word(0x03fe) == 1 && data.read_word(0x03ff) == 0x0604,
-				"restore exact extended checkpoint registers and stack RAM");
-			m_phase = 787;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		if (!m_far_transfer.returning)
-		{
-			start_far_save_case(true);
-			return true;
-		}
-		osd_printf_info("TMS320C54x extended save replay: PASS pending_call pending_return xpc stack delay\n");
 		program.write_word(0x010800, 0xec02); // RPT #2
 		program.write_word(0x010801, 0x7f90); // WRITA *AR0+
 		program.write_word(0x010802, 0xec02);

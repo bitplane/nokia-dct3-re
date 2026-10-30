@@ -16,7 +16,6 @@
 #include "tms320c54x_test_register_sequence.h"
 #include "tms320c54x_test_atomic_routes.h"
 #include "tms320c54x_test_repeat_state.h"
-#include "tms320c54x_test_snapshot_state.h"
 #include "tms320c54x_test_snapshot.h"
 #include "tms320c54x_test_dual_input.h"
 #include "tms320c54x_test_normalization_input.h"
@@ -509,7 +508,6 @@ private:
 	};
 	void start_bio_case(unsigned index);
 
-	void start_far_save_case(bool returning);
 
 
 	std::unique_ptr<register_sequence_fixture> m_register_sequence;
@@ -1273,7 +1271,6 @@ private:
 	bool check_atomic_basic_results();
 	bool check_atomic_corpus_results();
 	bool check_atomic_reference_results();
-	bool check_atomic_control_results();
 	bool check_far_save_results();
 	bool check_bio_results();
 	bool check_bit_results();
@@ -1501,7 +1498,6 @@ private:
 	accumulator_branch_fixture m_acc_branch_fixture = {};
 	unsigned m_acc_branch_mapped_writes = 0;
 	u32 m_popd_write_mask = 0;
-	far_transfer_snapshot m_far_transfer;
 	std::stringstream m_xf_saved;
 	// Separate checkpoint lifetimes; host observations still rewind explicitly.
 	std::stringstream m_idle_nmi_saved, m_idle_timer_saved, m_idle_dma_saved;

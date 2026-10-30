@@ -34,8 +34,6 @@ class FixtureOwnershipTests(unittest.TestCase):
         # restoration behavior, including checkpoints shared across modules.
         owners = {
             'm_active_repeat.saved': {'check_atomic_basic_results'},
-            'm_near_return_saved': {'check_atomic_control_results'},
-            'm_far_transfer.saved': {'check_atomic_control_results', 'check_far_save_results'},
             'm_xf_saved': {'check_atomic_corpus_results'},
             'm_idle_nmi_saved': {'check_idle_nmi_result_results'},
             'm_idle_timer_saved': {'check_idle_wake_results'},
