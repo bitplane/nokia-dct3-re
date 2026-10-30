@@ -213,37 +213,6 @@ tms320c54x_test_state::conditional_register_fixture tms320c54x_test_state::condi
 
 
 
-void tms320c54x_test_state::start_atomic_conditional_return(unsigned index)
-{
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
-	auto const f = conditional_register_case(index % 72);
-	unsigned const condition = index % 12;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	program.write_word(0x600, 0xfc40 | (condition < 6 ? condition + 2 : condition + 4));
-	program.write_word(0x601, 0xe811); program.write_word(0x602, 0xf4e1);
-	program.write_word(0x700, 0xe822); program.write_word(0x701, 0xf4e1);
-	data.write_word(0x1000, 0x700);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_PC, 0x600}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, f.a}, {cpu_regs::STATE_B, f.b},
-		{cpu_regs::STATE_ST0, 0x1e05}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_pipeline_operand_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "atomic_conditional_return_read", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(f.take && at == 0x1000 && word == 0x700 && !m_pipeline_operand_reads++, "Atomic conditional return reads one stack word only when taken"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "atomic_conditional_return_write", [this](offs_t, u16 &, u16) {
-		if (!machine().side_effects_disabled()) expect(false, "Atomic conditional return never writes the stack"); });
-	m_rom4_codec_replay = false; m_rom4_codec_replays = 0;
-	m_phase = 519000 + index;
-	if (index < 72)
-	{
-		m_recurring_irq_snapshot = {0};
-		expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save atomic return before predicate and optional stack read");
-		m_rom4_codec_replays = 1;
-	}
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_atomic_overflow_branch(unsigned index)
 {
@@ -441,35 +410,6 @@ bool tms320c54x_test_state::check_conditional_call_results()
 bool tms320c54x_test_state::check_conditional_register_results()
 {
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 519000 && m_phase < 519144)
-	{
-		unsigned const index = m_phase - 519000;
-		auto const f = conditional_register_case(index % 72);
-		if (!m_rom4_codec_replays && m_cpu->state_int(tms320c54x_device::STATE_PC) == (f.take ? 0x700 : 0x601))
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save atomic return after its optional stack read and PC publication");
-			m_rom4_codec_replays = 1;
-		}
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "All twelve atomic signed accumulator return predicates are admitted");
-		if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE)) { m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-		expect(m_rom4_codec_replays == 1 && m_pipeline_operand_reads == unsigned(f.take) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (f.take ? 0x22 : 0x11) && m_cpu->state_int(tms320c54x_device::STATE_B) == f.b &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(f.take) &&
-			m_cpu->state_int(tms320c54x_device::STATE_PC) == (f.take ? 0x702 : 0x603) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1e05 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800,
-			"Atomic conditional return tests the full signed accumulator and preserves status and exact stack ownership");
-		if (!m_rom4_codec_replay)
-		{
-			expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore atomic conditional return without duplicating its stack read");
-			m_pipeline_operand_reads = m_recurring_irq_snapshot[0];
-			m_phase = 519000 + index; m_rom4_codec_replay = true;
-			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-		}
-		if (index < 143) { start_atomic_conditional_return(index + 1); return true; }
-		osd_printf_info("TMS320C54x atomic conditional returns: PASS cases=144 restore=144 predicates=12 patterns=6 snapshots=2 taken_reads=1 untaken_reads=0 stack_writes=0 silicon_phase_claim=0\n");
-		throw emu_fatalerror(0, "TMS320C54x isolated atomic conditional returns complete");
-	}
 	if (m_phase >= 500000 && m_phase < 518432)
 	{
 		unsigned const index = m_phase - 500000;

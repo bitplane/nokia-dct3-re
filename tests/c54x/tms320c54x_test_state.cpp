@@ -206,7 +206,6 @@ void tms320c54x_test_state::machine_reset()
 	if (profile_is("cond-reg-store")) { check_control_disassembler(); start_conditional_register_store(0); return; }
 	if (profile_is("cond-store") || profile_is("cond-store-edge")) { start_staged_conditional_store(); return; }
 	if (profile_is("cond-store-ar")) { start_staged_conditional_store(); return; }
-	if (profile_is("atomic-ret")) { start_atomic_conditional_return(0); return; }
 	if (profile_is("xorm")) { check_control_disassembler(); start_atomic_xorm(0); return; }
 	if (profile_is("dual-sub-native")) { start_native_dual_sub(0); return; }
 	if (profile_is("parallel-sub")) { start_parallel_sub_fraction(0); return; }

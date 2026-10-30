@@ -1620,7 +1620,6 @@ private:
 	static xorm_fixture atomic_xorm_case(unsigned index);
 	void start_atomic_xorm(unsigned index);
 
-	void start_atomic_conditional_return(unsigned index);
 
 	struct staged_overflow_fixture
 	{
