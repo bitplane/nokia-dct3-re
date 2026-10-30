@@ -399,42 +399,6 @@ void tms320c54x_test_state::start_pipeline_store_mvmm(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_pipeline_mvmm_producer(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const immediate = variant % 2;
-	unsigned const gap = (variant / 2) % 4, read_cycle = (immediate ? 5 : 4) + gap;
-	u16 const value = immediate || gap >= 2 ? 0x1200 : 0x1000;
-	u32 const base = (variant / 8) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, immediate ? 0x7711 : 0x8811);
-	if (immediate) program.write_word(base + 0x601, 0x1200);
-	program.write_word(base + 0x600 + (immediate ? 2 : 1) + gap, 0xe715);
-	program.write_word(base + 0x601 + (immediate ? 2 : 1) + gap, 0x1085);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 8},
-		{cpu_regs::STATE_ST1, 0x800},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x1300);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1200);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->space(AS_DATA).write_word(0x1000, 0xaaaa); m_cpu->space(AS_DATA).write_word(0x1200, 0xbbbb);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "mvmm_producer_visibility",
-		[this, read_cycle, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			if (at == 0x11) { expect(word == value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == read_cycle,
-				"MVMM Decode observes STM immediately and STLM only after its documented source gap"); ++m_pipeline_operand_reads; }
-			else { expect(at == value && word == (value == 0x1000 ? 0xaaaa : 0xbbbb) && !m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == read_cycle + 3,
-				"MVMM forwards its retained source to a following AR consumer"); ++m_pipeline_extensions_reads; } });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "mvmm_producer_writes",
-		[this, immediate, read_cycle, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_store_writes < 2 && (at == 0x11 ? word == 0x1200 && m_cpu->pipeline_cycles() == (immediate ? 5 : 6) :
-				at == 0x15 && word == value && m_cpu->pipeline_cycles() == read_cycle + 1), "Parent and MVMM publish at their own age-ordered clocks"); ++m_pipeline_store_writes; });
-	m_phase = 252730; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_xmem_bit(unsigned variant)
 {
@@ -3548,41 +3512,6 @@ bool tms320c54x_test_state::check_rptbd_t_load_results()
 	if (m_phase == 600002)
 	{
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 600001;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252730)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, gap = (variant / 2) % 4;
-		bool const immediate = variant % 2;
-		unsigned const read_cycle = (immediate ? 5 : 4) + gap, checkpoint = read_cycle + std::array<unsigned, 3>{0, 1, 3}[variant / 16];
-		u16 const value = immediate || gap >= 2 ? 0x1200 : 0x1000;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "MVMM producer chain executes through staged register ownership");
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save MVMM source-forwarding chain after sample, publication or consumer read");
-		}
-		if (tick == 20)
-		{
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 2 && m_pipeline_extensions_reads == 1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x1200 && m_cpu->state_int(tms320c54x_device::STATE_AR5) == value &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (value == 0x1000 ? 0xaaaa : 0xbbbb), "MVMM preserves source producer latency and a zero-gap destination consumer across replay");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0];
-				m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(252740, "Restore MVMM producer forwarding without extra reads or writes");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 47) { start_pipeline_mvmm_producer(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged MVMM producers: PASS cases=48 producers=STM,STLM gap_nops=0,1,2,3 pages=2 restore=48 duplicate_reads=0 duplicate_writes=0\n");
-			start_pipeline_repeat_nop(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252740)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252730;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	return false;

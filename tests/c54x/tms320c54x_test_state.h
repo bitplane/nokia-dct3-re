@@ -161,7 +161,6 @@ private:
 	void start_pipeline_bio_branch(unsigned variant = 0);
 	void start_pipeline_mapped_load_age(unsigned variant = 0);
 	void start_pipeline_store_mvmm(unsigned variant = 0);
-	void start_pipeline_mvmm_producer(unsigned variant = 0);
 	void start_pipeline_xmem_bit(unsigned variant = 0);
 	struct indexed_store_fixture;
 	static indexed_store_fixture circular_portr_case(unsigned v);

@@ -204,6 +204,7 @@ def main():
     counts['mapped_pshd'] = 48
     counts['repeated_pshd'] = 98
     counts['reada_brc'] = 3456
+    counts['mvmm_producer'] = 8
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
