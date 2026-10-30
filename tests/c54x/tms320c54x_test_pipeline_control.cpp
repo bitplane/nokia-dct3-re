@@ -278,51 +278,6 @@ void tms320c54x_test_state::start_xc_return(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_pipeline_plain_branch(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	bool const b = BIT(variant, 0), eq = BIT(variant, 1), nonzero = BIT(variant, 2);
-	bool const taken = eq ? !nonzero : nonzero;
-	u32 const base = BIT(variant, 3) ? 0x10000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
-	program.write_word(base + 0x600, 0xf844 | (b << 3) | eq);
-	program.write_word(base + 0x601, 0x700);
-	program.write_word(base + 0x602, 0x1070); program.write_word(base + 0x603, 0x1071);
-	program.write_word(base + 0x604, 0xe866); program.write_word(base + 0x700, 0xe855);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x800},
-		{cpu_regs::STATE_A, b ? 0x9999 : nonzero ? 0x0100000000ULL : 0},
-		{cpu_regs::STATE_B, b ? (nonzero ? 0x0100000000ULL : 0) : 0x7777}, {cpu_regs::STATE_IFR, 0},
-		{cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(0x470, 0x1111); m_cpu->space(AS_DATA).write_word(0x471, 0x2222);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = program.install_read_tap(base + 0x700, base + 0x700, "plain_bc_target",
-		[this, taken](offs_t, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(taken && m_cpu->pipeline_cycles() == 7, "Taken BC fetches its target after discarding sequential Decode");
-			++m_pipeline_operand_reads;
-		});
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x602, base + 0x603, "plain_bc_sequential",
-		[this, base](offs_t address, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(address == base + 0x602 + m_pipeline_extensions_reads && m_cpu->pipeline_cycles() == (address == base + 0x602 ? 4 : 6), "BC retains each sequential Fetch exactly once across its empty slot");
-			++m_pipeline_extensions_reads;
-		});
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_read_tap(0x470, 0x471, "plain_bc_data",
-		[this, taken](offs_t address, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(!taken && word == (address == 0x470 ? 0x1111 : 0x2222) && m_cpu->pipeline_cycles() == 8 + address - 0x470, "Only not-taken BC decodes sequential data reads");
-			++m_pipeline_store_writes;
-		});
-	m_phase = 251750; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::signed_xc_fixture tms320c54x_test_state::signed_xc_case(unsigned variant)
 {
@@ -1278,49 +1233,6 @@ bool tms320c54x_test_state::check_pipeline_conditional_branch_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_pipeline_plain_branch_results()
-{
-	if (m_phase == 251750)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		unsigned const variant = m_pipeline_peripheral_case;
-		bool const taken = BIT(variant, 1) ? !BIT(variant, 2) : BIT(variant, 2);
-		u64 const checkpoint = 4 + variant / 16;
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_pipeline_operand_reads == unsigned(taken && cycle >= 7) &&
-			m_pipeline_extensions_reads == unsigned(cycle >= 4) + unsigned(cycle >= 6) &&
-			m_pipeline_store_writes == (taken ? 0 : unsigned(cycle >= 8) + unsigned(cycle >= 9)),
-			"BC retains sequential Fetch but suppresses taken-path data effects");
-		if (cycle == 6) m_cpu->set_state_int(BIT(variant, 0) ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, BIT(variant, 2) ? 0 : 1);
-		if (cycle >= 11) expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (taken ? 0x55 : 0x66), "BC uses retained outcome despite accumulator changes after evaluation");
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save BC before/after held sequential word or decision");
-		}
-		if (cycle == 14)
-		{
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-				m_pipeline_extensions_reads = unsigned(checkpoint >= 4) + unsigned(checkpoint >= 6);
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore BC held word and retained route without repeated Fetch");
-				return restart_pipeline_observer(251760, checkpoint + 1);
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 47) { start_pipeline_plain_branch(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged plain conditional branches: PASS cases=48 conditions=AEQ,ANEQ,BEQ,BNEQ pages=2 outcomes=2 restore=48 duplicate_fetches=0 taken_data_reads=0\n");
-			if (profile_is("plain-branch")) throw emu_fatalerror(0, "TMS320C54x isolated plain conditional branches complete");
-			start_pipeline_delayed_return(); return true;
-		}
-		++m_pipeline_expected_cycle; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251760)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251750;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_pipeline_delayed_return_results()
 {

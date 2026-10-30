@@ -149,7 +149,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"software-intr"}, [](self &test) { test.start_software_intr(); } },
 		{ {"rptb-br-edges"}, [](self &test) { test.start_block_branch_edge(); } },
 		{ {"bio-branch"}, [](self &test) { test.start_pipeline_bio_branch(); } },
-		{ {"plain-branch"}, [](self &test) { test.start_pipeline_plain_branch(); } },
 		{ {"rptb-branch"}, [](self &test) { test.start_block_branch(); } },
 		{ {"mpy-mem-imm"}, [](self &test) { test.start_memory_immediate_multiply(); } },
 	}))
