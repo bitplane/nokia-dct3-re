@@ -52,3 +52,22 @@ than preserving them as architectural witnesses.
 
 The module sizes above were inspected at `843c4c8d`. They identify where to
 look next, not immutable targets or semantic classifications.
+
+## Atomic corpus: bounded inspection result
+
+The 5,525-line module is one `check_atomic_corpus_results` function, not a
+single coherent contract. It must be split by behavior before deletion:
+
+| Contract | Evidence in current source | Disposition |
+| --- | --- | --- |
+| Port-bracket timing and control interactions | PORTR/PORTW counts and elapsed CPU cycles bracket BANZ, loads, XC, circular address updates and immediate repeats | Keep representative interactions. The generic numeric examples do not check these port observations. Do not discard the module as duplicate arithmetic. |
+| Declarative functional examples | `begin_atomic_case` / `verify_atomic_case` reuse dual-address, register-bit, paired-memory, address, route, absolute-operand and shift example banks | Merge execution ownership with standalone ISA banks where independent reset/setup covers the same contract; first identify inherited-state inputs before bypassing legacy entries. |
+| Immediate repeat count sweep | Phases6600..6855 execute all256 RPT immediates with the same MAR body and port-bracket formula | Rewrite to zero/one, signed-byte boundary and maximum-count representatives; retain setup-cycle and K+1 observations. Full immediate encoding enumeration has no distinct interaction rationale. |
+| Status/XF side effects | Phases533..536/6547..6550 check status masks and XF publication counts | Keep separately from arithmetic result tests; output-pin behavior is a distinct observable. |
+| Conditional annulment | Phases537..542/6543..6544 check accepted/rejected MAR, full status and port-bracket timing | Keep representative true/false and TC/accumulator predicates; do not equate register-result tests with annulled side effects. |
+
+The first expected source reduction is removing duplicated declarative-bank
+execution, not translating every handwritten phase into a new descriptor.
+Port timing checks stay explicit unless a small shared fixture actually
+removes complexity. The existing sequence inherits machine state between
+cases, so deleting its setup without checking consumers would be unsafe.
