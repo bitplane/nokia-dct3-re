@@ -297,42 +297,7 @@ void tms320c54x_test_state::start_pipeline_store_mvmm(unsigned variant)
 
 
 
-tms320c54x_test_state::long_mvkd_fixture tms320c54x_test_state::long_mvkd_case(unsigned variant)
-{
-	unsigned const v = variant % 6400, kind = (v / 200) % 4;
-	auto const f = long_accumulator_store_fixture(v % 100 + ((v / 100) % 2) * 6400);
-	u16 const source = std::array<u16, 4>{u16(0x10 + f.selected), 0x12, 0x1400, f.address}[kind];
-	u16 const value = source == 0x10 + f.selected ? f.next_ar : std::array<u16, 4>{0, 1, 0x8000, 0xf495}[(v / 800) % 4];
-	return {f, source, value, v / 3200 ? 0x20000U : 0, std::array<unsigned, 3>{4, 7, 8}[variant / 6400]};
-}
 
-void tms320c54x_test_state::start_pipeline_long_mvkd(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = long_mvkd_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, 0x7000 | u8(f.address.opcode)); program.write_word(f.base + 0x601, f.address.literal); program.write_word(f.base + 0x602, f.source);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.address.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.address.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.address.bk);
-	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x1007);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.address.selected, f.address.initial);
-	m_cpu->space(AS_DATA).write_word(f.address.address, 0xaaaa);
-	if (f.source != 0x10 + f.address.selected) m_cpu->space(AS_DATA).write_word(f.source, f.value);
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "long_mvkd_source",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == f.source && word == f.value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == 7, "Long MVKD owns one source Read after destination DAGEN"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "long_mvkd_destination",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == f.address.address && word == f.value && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == 8, "Long MVKD writes its retained source to its retained destination once"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x602, "long_mvkd_extensions",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_extensions_reads < 2 && at == f.base + 0x601 + m_pipeline_extensions_reads && word == (m_pipeline_extensions_reads ? f.source : f.address.literal), "Long MVKD fetches offset before source, exactly once"); ++m_pipeline_extensions_reads; });
-	m_phase = 253490; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -3154,40 +3119,6 @@ bool tms320c54x_test_state::check_long_mapped_original_results()
 		m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true;
 	}
 	if (m_phase==399970) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase=399960; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true; }
-	if (m_phase == 253490)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		auto const f = long_mvkd_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Long MVKD has no atomic fallback");
-		if (tick == 5)
-		{
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x602, 0xbeef);
-		}
-		if (tick == 6) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.address.selected) == f.address.next_ar, "Long MVKD updates only the selected destination pointer once in Access");
-		if (tick == 7)
-		{
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, 0xdead);
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.address.selected, 0x2000);
-		}
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_store_writes, &m_pipeline_operand_reads, &m_pipeline_extensions_reads},
-			"Save partial extensions, retained source or completed write");
-		if (tick == 16)
-		{
-			{ auto const disable = machine().disable_side_effects(); expect(m_cpu->space(AS_DATA).read_word(f.address.address) == f.value && m_pipeline_store_writes == 1 && m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 2, "Long MVKD retains both literals and its source across later mutations"); }
-			if (replay_pipeline_at(253500, f.checkpoint,
-				"Restore long MVKD without duplicate reads, pointer updates or writes")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 19199) { start_pipeline_long_mvkd(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged long MVKD: PASS cases=19200 forms=25 offsets=4 sources=selected_AR,AR2,RAM,alias values=4 compatibility=2 pages=2 restore=19200 reads_each=1 writes_each=1 extensions_each=2 silicon_phase_claim=0\n");
-			if (profile_is("long-mvkd")) throw emu_fatalerror(0, "TMS320C54x isolated long MVKD complete");
-			return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253500)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253490; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
 	if (m_phase == 253530)
 	{
 		expect(m_vector_acks == 1 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0x55 && !m_bus_iack_enable,

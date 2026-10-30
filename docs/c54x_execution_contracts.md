@@ -424,6 +424,18 @@ AR/status state are checked through IDLE/replay. Three checkpoints and pages
 are distributed. The 70,144-execution legacy bank and its enumeration-only
 schedule header/test are removed. These are model contracts, not measured clocks.
 
+The independent `long_mvkd` section owns 2,504 cases/replays across all 25
+long-address forms, four offsets, compatibility selection, selected-AR/AR2/RAM
+and aliased-RAM sources. Four values remain where they affect the stimulus;
+selected-AR sources use their updated pointer value rather than redundant
+pattern labels. AR2-as-selected-source duplicates are removed. Pages and three
+checkpoints are distributed instead of expanding to 19,200 executions.
+It checks destination pointer update before Read, exact source Read at model
+clock 7 and destination Write at 8, ordered retained extensions, source/pointer
+poison and captured destination/status through IDLE/replay. A selected-AR poison
+changes both source and pointer roles without an artificial intermediate write.
+The old descriptor/setup and 253490/253500 phases are removed.
+
 Shifted memory ADD/SUB and SUBC use a balanced schedule as well: 81,920
 ADD/SUB inputs and 10,240 SUBC inputs run once each. `shifted-alu` covers both
 banks, including the formerly default-only SUBC tail. `shifted-bk` retains

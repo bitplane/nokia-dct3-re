@@ -1664,7 +1664,6 @@ bool tms320c54x_test_state::check_absolute_xorm_results()
 				m_long_rmw_coverage.count, m_long_rmw_replays,
 				(unsigned long long)m_long_rmw_coverage.value);
 			if (profile_is("rmw-long")) throw emu_fatalerror(3, "TMS320C54x isolated long RAM RMW complete");
-			if (profile_is("long-mvkd")) { start_pipeline_long_mvkd(); return true; }
 			return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

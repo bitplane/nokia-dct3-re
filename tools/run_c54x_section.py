@@ -302,6 +302,7 @@ def main():
     counts['accumulator_branch_targets'] = 324
     counts['nibble_composition'] = 64
     counts['long_accumulator_store'] = 3408
+    counts['long_mvkd'] = 2504
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

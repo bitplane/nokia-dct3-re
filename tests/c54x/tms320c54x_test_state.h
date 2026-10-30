@@ -162,15 +162,6 @@ private:
 		u16 initial = 0x1007, bk = 16;
 	};
 	static accumulator_store_fixture long_accumulator_store_fixture(unsigned variant);
-	struct long_mvkd_fixture
-	{
-		accumulator_store_fixture address;
-		u16 source, value;
-		u32 base;
-		unsigned checkpoint;
-	};
-	static long_mvkd_fixture long_mvkd_case(unsigned variant);
-	void start_pipeline_long_mvkd(unsigned variant = 0);
 	static std::array<u16, 2> long_rmw_expected(unsigned arithmetic, unsigned operation, u16 flags);
 	static accumulator_store_fixture peripheral_long_rmw_fixture(unsigned variant);
 	static accumulator_store_fixture absolute_xorm_fixture(unsigned variant);
