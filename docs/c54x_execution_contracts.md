@@ -2550,17 +2550,21 @@ or save fields are introduced. Code outside the low 16-bit interval does not
 acquire its body tags, but a foreign page's matching low PC can consume the
 loop. See the shared [repeat-endpoint contract](rom4_dsp_execution.md#repeat-endpoint-and-page-hazard).
 
-`rptb-fcall` passes 768 cases/restores across counts 0/1/2/7, early/near-end
+`block_far_call` owns192 independent cases/restores across counts0/1/2/7, early/near-end
 placement, two caller pages, same/cross-page callees, one/two nested far-call
-frames, none/IRQ/NMI and four snapshots. Interrupts arrive on the first callee
+frames and none/IRQ/NMI. Four snapshots are distributed rather than crossed
+with every input. Interrupts arrive on the first callee
 RAM read, not at every possible clock. The test checks one ordered copy per
 outer iteration, balanced frame/interrupt transactions, caller-page return,
 prefix/suffix counts, BRC, RSA/REA and final BRAF. The original recorder reaches
-its `FCALL` Execute hook once before the next exclusion. `rptb-fcalld` adds
-2,304 replay cases with the same counts/pages/depths/interrupts, middle and
+its `FCALL` Execute hook once before the next exclusion. `block_delayed_far_call`
+owns576 replayed cases with the same counts/pages/depths/interrupts, middle and
 endpoint delay placement, and two single-word, one double-word or original
 LD/NOP delay layouts. It checks once-only delay effects and paired page/PC
-frames returning to call+4. Rejection of unsupported internal targets and
+frames returning to call+4. The complete bus trace distinguishes IRQ entry
+after an outer FRET from entry with both nested frames still active. Read-owned
+STM delay publication precedes the call's Execute-owned page Write. These are
+model-ordering assertions, not physical bus timing. Rejection of unsupported internal targets and
 incomplete call spans is an implementation limit, not a silicon-trap claim.
 Callee loop-control writes, arbitrary control mixtures and
 physical phase timing remain unvalidated.

@@ -234,15 +234,6 @@ private:
 	static delay_load_fixture delay_dld_case(unsigned v);
 	static delay_load_fixture delay_add_case(unsigned v);
 	void start_delay_load(unsigned variant = 0);
-	struct block_far_call_fixture
-	{
-		unsigned count, layout, depth, interrupt, checkpoint, delay_form;
-		u32 caller, callee, nested;
-		u16 call, st1;
-		bool delayed;
-	};
-	static block_far_call_fixture block_far_call_case(unsigned v, bool delayed = false);
-	void start_block_far_call(unsigned variant = 0);
 	struct block_near_call_fixture
 	{
 		unsigned count, layout, depth, interrupt, checkpoint;

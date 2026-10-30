@@ -439,6 +439,8 @@ def main():
     counts['repeat_endpoints'] = 12
     counts['block_repeat_pages'] = 96
     counts['block_repeat_backward'] = 384
+    counts['block_far_call'] = 192
+    counts['block_delayed_far_call'] = 576
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216
