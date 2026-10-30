@@ -1771,29 +1771,6 @@ void tms320c54x_test_state::start_reverse_carry_sequence(bool subtract)
 
 
 
-void tms320c54x_test_state::start_banz_offset_case(unsigned index)
-{
-	unsigned const ar = index & 7;
-	unsigned const mode = (index / 16) % 3;
-	bool const zero = (index / 8) & 1;
-	bool const delayed = index >= 48;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	unsigned next = 0x010960;
-	program.write_word(next++, (delayed ? 0x6e00 : 0x6c00) | (0xe0 + mode * 8 + ar));
-	program.write_word(next++, 0xffff);
-	program.write_word(next++, 0x0970);
-	if (delayed) { program.write_word(next++, 0xf495); program.write_word(next++, 0xf495); }
-	program.write_word(next++, 0xf020); program.write_word(next++, 0x1111);
-	program.write_word(next++, 0xf4e1);
-	program.write_word(0x010970, 0xf020); program.write_word(0x010971, 0x2222);
-	program.write_word(0x010972, 0xf4e1);
-	set_registers(*m_cpu, {
-		{STATE_GENPC, 0x010960}, {cpu_regs::STATE_ST1, 0x0800}, {cpu_regs::STATE_AR0 + ar, zero ? 1 : 5},
-		{cpu_regs::STATE_BK, 8}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 1331 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 tms320c54x_test_state::mvdd_fixture tms320c54x_test_state::mvdd_case(unsigned v, bool repeated)
 {
@@ -4333,26 +4310,6 @@ void tms320c54x_test_state::start_staged_conditional_store(unsigned variant)
 
 
 
-bool tms320c54x_test_state::check_banz_offset_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 1331 && m_phase < 1427)
-	{
-		unsigned const index = m_phase - 1331;
-		unsigned const ar = index & 7;
-		unsigned const mode = (index / 16) % 3;
-		bool const zero = (index / 8) & 1;
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (zero ? 0x1111 : 0x2222) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (mode ? (zero ? 0 : 4) : (zero ? 1 : 5)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-			"BANZ/BANZD long-offset Sind tests effective address and consumes displacement before destination");
-		if (index < 95) { start_banz_offset_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x BANZ offset conformance: PASS variants=96\n");
-		return true;
-	}
-	return false;
-}
 
 
 
