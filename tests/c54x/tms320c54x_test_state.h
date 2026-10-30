@@ -1546,7 +1546,6 @@ private:
 	bool check_atomic_reference_results();
 	bool check_atomic_control_results();
 	bool check_far_save_results();
-	bool check_bitf_offset_results();
 	bool check_bio_results();
 	bool check_bit_results();
 	bool check_intm_protection_results();

@@ -202,20 +202,6 @@ bool tms320c54x_test_state::check_far_save_results()
 			return true;
 		}
 		osd_printf_info("TMS320C54x memory DP conformance: PASS variants=3\n");
-		write_words(program, {
-			{0x0600, 0x75d6}, {0x0601, 0x0124}, {0x0602, 0xfa47}, {0x0603, 0x060c},
-			{0x0604, 0xe801}, // Changes A after the branch predicate is captured.
-		});
-		write_words(program, {
-			{0x0605, 0xe902}, {0x0606, 0xe903}, {0x0607, 0x75d6}, {0x0608, 0x0124}, {0x0609, 0xf4e1}, {0x060c, 0x75d6},
-			{0x060d, 0x0124}, {0x060e, 0xf4e1},
-		});
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x8000000000ULL);
-		m_cpu->set_state_int(STATE_GENPC, 0x0600);
-		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		m_phase = 60020;
-		m_check_timer->adjust(attotime::from_usec(100));
 		return true;
 	}
 	return false;

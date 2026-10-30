@@ -21,7 +21,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_stopped_timer_reload_results()) return;
 	if (check_atomic_program_results()) return;
 	if (check_far_save_results()) return;
-	if (check_bitf_offset_results()) return;
 	if (check_bio_results()) return;
 	if (check_bit_results()) return;
 	if (check_intm_protection_results()) return;

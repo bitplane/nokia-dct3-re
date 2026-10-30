@@ -32,7 +32,7 @@ def main():
     counts['count_branch'] = 576
     counts['signed_branch'] = 12
     counts['offset_count_branch'] = 1152
-    counts['signed_conditions'] = 384
+    counts['signed_conditions'] = 389
     counts['compare_register'] = 140
     counts['store_compare'] = 3
     counts['modify_address'] = 96

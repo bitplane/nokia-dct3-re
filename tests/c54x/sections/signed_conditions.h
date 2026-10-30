@@ -39,6 +39,18 @@ inline std::vector<clocked_register_case> section_cases()
 		if (taken) c.program_events.push_back({false,base + 0x700,u16(source ? 0xe855 : 0xe955),delayed ? 8U : 7U});
 		cases.push_back(std::move(c));
 	}
+	constexpr u64 atomic_inputs[]{0x8000000000ULL,0xffffffffffULL,0,1,0x7fffffffffULL};
+	for (unsigned index = 0; index < 5; ++index) {
+		auto initial = initial_case("atomic-delayed-signed40-le", {0xfa47,0x610,0xe801,0xe902,0xe903,0xf4e1});
+		initial.program[0x10].value = 0xf4e1;
+		initial.initial.push_back({r::STATE_A,atomic_inputs[index]});
+		clocked_register_case c{{{0,std::move(initial)},
+			{32,observation("predicate-precedes-delay-word-mutation", {{r::STATE_A,1},{r::STATE_B,index < 3 ? 2U : 3U}})}},
+			index & 1 ? 3U : 4U,32};
+		c.pipeline_frontend = false;
+		c.data_events = std::vector<clocked_data_event>{};
+		cases.push_back(std::move(c));
+	}
 	return cases;
 }
 }

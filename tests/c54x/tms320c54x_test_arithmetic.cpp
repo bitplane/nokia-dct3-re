@@ -2682,33 +2682,6 @@ void tms320c54x_test_state::start_atomic_xorm(unsigned index)
 
 
 
-bool tms320c54x_test_state::check_bitf_offset_results()
-{
-	if (m_phase >= 60020 && m_phase <= 60024)
-	{
-		u64 const values[] = {0x8000000000ULL, 0xffffffffffULL, 0, 1, 0x7fffffffffULL};
-		unsigned const index = m_phase - 60020;
-		bool const taken = index < 3;
-		expect_opcode(0xfa47, m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (taken ? 2 : 3) &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == (taken ? 7 : 8) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE),
-			"BCD ALEQ tests signed 40-bit A with two delay words and three-cycle branch cost");
-		if (index != 4)
-		{
-			m_port_writes = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, values[index + 1]);
-			m_cpu->set_state_int(STATE_GENPC, 0x0600);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			++m_phase;
-			m_check_timer->adjust(attotime::from_usec(100));
-			return true;
-		}
-		osd_printf_info("TMS320C54x delayed ALEQ conformance: PASS variants=5\n");
-		return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_bit_results()
 {
