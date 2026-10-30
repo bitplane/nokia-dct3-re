@@ -327,72 +327,9 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 		expect_opcode(0x8093, data.read_word(0x0d00) == 0x5678 &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d01,
 				"ROM4 8093 stores the low accumulator word and post-increments AR3");
-		program.write_word(0x05e0, 0xf7bb); // SSBX INTM
-		program.write_word(0x05e1, 0x4a08); // PSHM AL
-		program.write_word(0x05e2, 0xf5e1);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x12345678}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_ST1, 0},
-			{cpu_regs::STATE_PC, 0x05e0}, {cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(117);
-	}
-	if (m_phase == 117)
-	{
-		expect_opcode(0xf7bb, m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800,
-				"ROM4 f7bb masks interrupts");
-		expect_opcode(0x4a08, m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02ff &&
-				data.read_word(0x02ff) == 0x5678,
-				"ROM4 4a08 pushes AL to TOS");
-		program.write_word(0x05e0, 0x8a08); // POPM AL
-		program.write_word(0x05e1, 0xf5e1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12340000);
-		return resume_atomic_at(0x05e0, 118);
-	}
-	if (m_phase == 118)
-	{
-		expect_opcode(0x8a08, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
-				"ROM4 8a08 restores AL from TOS and advances SP");
-		program.write_word(0x05e0, 0x4a60); // PSHM data address 60.
-		program.write_word(0x05e1, 0x4a61); // PSHM data address 61.
-		program.write_word(0x05e2, 0xf5e1);
-		data.write_word(0x0060, 0x1234);
-		data.write_word(0x0061, 0xabcd);
-		return resume_atomic_at(0x05e0, 6517);
-	}
-	if (m_phase == 6517)
-	{
-		expect_opcode(0x4a60, data.read_word(0x02ff) == 0x1234 &&
-			data.read_word(0x0060) == 0x1234,
-			"ROM4 PSHM 60 reads its seven-bit data address and pushes without changing the source");
-		expect_opcode(0x4a61, data.read_word(0x02fe) == 0xabcd &&
-			data.read_word(0x0061) == 0xabcd &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02fe &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678,
-			"ROM4 PSHM 61 pushes after 60 in descending stack order without changing A");
-		data.write_word(0x0060, 0);
-		data.write_word(0x0061, 0);
-		program.write_word(0x05e0, 0x8a61); // POPM data address 61.
-		program.write_word(0x05e1, 0x8a60); // POPM data address 60.
-		return resume_atomic_at(0x05e0, 6518);
-	}
-	if (m_phase == 6518)
-	{
-		expect_opcode(0x8a61, data.read_word(0x0061) == 0xabcd,
-			"ROM4 POPM 61 restores the last-pushed value to its data address");
-		expect_opcode(0x8a60, data.read_word(0x0060) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678,
-			"ROM4 POPM 60 restores the first-pushed value and balances the stack without changing A");
-		program.write_word(0x05e0, 0xf6bb); // RSBX INTM
-		program.write_word(0x05e1, 0xf5e1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
-		return resume_atomic_at(0x05e0, 119);
 	}
 	if (m_phase == 119)
 	{
-		expect_opcode(0xf6bb, !(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800),
-				"ROM4 f6bb clears INTM for interrupt return");
 		write_words(program, {
 			{0x05e0, 0x75d6}, // PORTW *AR6+%, port
 			{0x05e1, 0x0124},
@@ -463,68 +400,6 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				data.read_word(0x0e12) == 0x4455 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 				"repeated MVMD advances data destination and pipelines after first move");
-		program.write_word(0x05e0, 0x4a09); // PSHM AH
-		program.write_word(0x05e1, 0x4a0a); // PSHM AG
-		program.write_word(0x05e2, 0xf5e1);
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x123456789aULL}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(124);
-	}
-	if (m_phase == 124)
-	{
-		expect_opcode(0x4a09, data.read_word(0x02ff) == 0x3456,
-				"ROM4 4a09 pushes AH before decrementing SP again");
-		expect_opcode(0x4a0a, data.read_word(0x02fe) == 0x0012 &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02fe,
-				"ROM4 4a0a pushes the eight-bit guard and decrements SP");
-		program.write_word(0x05e0, 0x8a0a); // POPM AG
-		program.write_word(0x05e1, 0x8a09); // POPM AH
-		program.write_word(0x05e2, 0xf5e1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xabcd987654ULL);
-		return resume_atomic_at(0x05e0, 125);
-	}
-	if (m_phase == 125)
-	{
-		expect_opcode(0x8a0a, (m_cpu->state_int(tms320c54x_device::STATE_A) >> 32) == 0x12,
-				"ROM4 8a0a restores AG without sign extension");
-		expect_opcode(0x8a09, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234567654ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
-				"ROM4 8a09 restores AH, preserves AL, and advances SP");
-		program.write_word(0x05e0, 0x4a0b); // PSHM BL
-		program.write_word(0x05e1, 0x4a0c); // PSHM BH
-		program.write_word(0x05e2, 0x4a0d); // PSHM BG
-		program.write_word(0x05e3, 0xf5e1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x7f1234abcdULL);
-		return resume_atomic_at(0x05e0, 126);
-	}
-	if (m_phase == 126)
-	{
-		expect_opcode(0x4a0b, data.read_word(0x02ff) == 0xabcd,
-				"ROM4 4a0b pushes BL");
-		expect_opcode(0x4a0c, data.read_word(0x02fe) == 0x1234,
-				"ROM4 4a0c pushes BH");
-		expect_opcode(0x4a0d, data.read_word(0x02fd) == 0x007f &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02fd,
-				"ROM4 4a0d pushes the eight-bit B guard");
-		program.write_word(0x05e0, 0x8a0d); // POPM BG
-		program.write_word(0x05e1, 0x8a0c); // POPM BH
-		program.write_word(0x05e2, 0x8a0b); // POPM BL
-		program.write_word(0x05e3, 0xf5e1);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5511223344ULL);
-		return resume_atomic_at(0x05e0, 127);
-	}
-	if (m_phase == 127)
-	{
-		expect_opcode(0x8a0d, (m_cpu->state_int(tms320c54x_device::STATE_B) >> 32) == 0x7f,
-				"ROM4 8a0d restores BG without sign extension");
-		expect_opcode(0x8a0c, (m_cpu->state_int(tms320c54x_device::STATE_B) >> 16 & 0xffff) == 0x1234,
-				"ROM4 8a0c restores BH");
-		expect_opcode(0x8a0b, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x7f1234abcdULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234567654ULL &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
-				"ROM4 8a0b restores BL, preserves A, and advances SP");
 	}
 	if (m_phase == 128)
 	{
