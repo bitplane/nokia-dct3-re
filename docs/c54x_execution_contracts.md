@@ -562,8 +562,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_square.h` | Reviewed literal SQUR/SQURA/SQURS cases shared by generic and default-sequence entries |
 | `tests/c54x/tms320c54x_test_parallel.h` | Reviewed parallel store/arithmetic vectors, including same-cell ordering and circular pointer controls |
 | `tests/c54x/tms320c54x_test_dual_reference.h` | Ordered dual/parallel MAC literal references with explicit partial setup and status masks |
-| `tests/c54x/tms320c54x_test_dual.h` | Remaining parallel MAC legacy reference, pending migration |
-| `tests/c54x/tms320c54x_test_dual_operand_section.h` | Explicit MPY/ADD/SUB/MACSU/MAC-family cases using common clocked execution and replay |
+| `tests/c54x/tms320c54x_test_dual_operand_section.h` | Explicit MPY/ADD/SUB/MACSU/MAC-family/parallel-store cases using common clocked execution and replay |
 | `tests/c54x/tms320c54x_test_dual_input.h` | Shared fixture-owned integer inputs/expectations; no CPU implementation helpers or Nokia dependencies |
 | `tests/c54x/tms320c54x_test_memory_continuations.h` | Ordered literal continuations with inherited RAM, partial masks and coefficient/address ordering |
 | `tests/c54x/tms320c54x_test_shift_examples.h` | Ordered TS/Xmem shifts, signed comparisons, normalization and one-cycle rounding/saturation references |
@@ -2686,8 +2685,7 @@ memory and T after Read, and require the two ordered reads at clock5 and result
 at clock6. MPY publishes T while ADD/SUB preserves it. The replacement uses
 fixture-owned integer expectations and the common replay runner, not the
 legacy variant decoder or custom snapshot/tap machinery. No handset acceptance
-is inferred from these focused runs. Parallel MAC remains a legacy owner
-pending migration; MACSU uses the same independent section builder
+is inferred from these focused runs. Parallel MAC and MACSU use the same independent section builder
 as MPY/ADD/SUB. Its unsigned-X/signed-Y arithmetic and live feedback are checked
 directly, not inferred from the other operations.
 
@@ -5009,29 +5007,25 @@ adjacent-consumer composition is not qualified by the isolated fixture.
 Adjacent ASM/SXM/FRCT/OVM writers, physical memory-bank timing and
 interrupt/single-repeat composition remain unvalidated.
 
-The `stmac` profile passes the same 671,744-case schedule and save-state replays over all
-4,096 encodings, all source/destination pairs, 32 ASM shifts, distinct and
-aliased addresses, both program pages, circular/legacy BK=0 modes, numerical
-operand/accumulator patterns and status combinations. These are distributed
-cohorts, not the Cartesian product of every dimension. Read owns one X
-access and retained T; Execute owns one Y write and accumulator publication.
-Mutating X, T, ASM, source pointers and feedback after their respective
-sampling points verifies retention. Expected stores independently apply
-SXM and SST to the shifted old source, including source/destination aliases.
-`dual_admission` retains sixteen first-operation/source-destination mapped-operand
-exclusions/replays with no bus writes,
-reads or pointer updates. The acceptance marker explicitly leaves C
-unvalidated rather than promoting the carry-preservation hypothesis.
-The positive profile requires ordered raw-case digest `a992a2f6ed8d9f42` and counts
-successful restores, not requested ones. A compiled descriptor/seed
-census establishes numerical snapshot equivalence, 147,456 distinct
-addressing cases and zero address/numerical overlap in either profile.
-The cached descriptor belongs to a complete live/replay pair; arithmetic
-expectations and all per-clock mutation/assertion points are unchanged.
-These banks use the independent CPU-only machine: root and CPU only, an empty
-ROM directory, program pages zero/two and data RAM. The shared staged fixture
-now hosts only parallel MAC. MPY/dual ALU/MACSU/signed MAC and the admission
-limits use independent sections with explicit setup and actual restore checks.
+`parallel_mac`, `parallel_mac_round`, `parallel_mas` and `parallel_mas_round`
+each own 43,008 cases/restores: 6,144 encoding/address cases, 32,768 numeric
+cases and 4,096 store-conversion cases. Together they replace 671,744 executions
+with 172,032. All encodings, selector pairs, alias layouts and BK modes remain;
+address/status/seed interactions and numerical page/checkpoint/SXM combinations
+are deliberately distributed, not preserved as full cross-products. The separate
+store bank covers all 32 ASM encodings, SXM/SST combinations, feedback seeds
+and source/destination pairs. Cross-accumulator store sources remain the explicit
+sentinels; same-accumulator stores cover all eight feedback values.
+
+Read owns one X transaction and retained T/ASM; Execute owns one Y write
+of the old shifted source before accumulator replacement. Bit-position store
+expectations independently apply SXM and signed/unsigned SST saturation.
+Pointer/BK, memory, T, ASM and feedback mutations exercise the retained/live
+boundaries. Exact Read5/Write6, publication, IDLE and replay are checked.
+The custom dual-operation snapshot/tap runner and raw-key schedule are deleted.
+`dual_admission` separately retains sixteen parallel source limits. Carry and
+physical-bank timing remain unvalidated silicon claims; these are CPU-only
+model contracts, not handset acceptance.
 
 ### Representative dual admission controls
 

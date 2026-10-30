@@ -5,7 +5,6 @@
 #include "emuopts.h"
 #include "tms320c54x_test_word_examples.h"
 #include "tms320c54x_test_disassembly.h"
-#include "tms320c54x_test_dual.h"
 #include <cstring>
 
 namespace {
@@ -17,8 +16,7 @@ public:
 		: driver_device(config, type, tag), m_cpu(*this, "cpu") { }
 	void test(machine_config &config)
 	{
-		m_parallel_mac = !std::strcmp(config.options().bios(), "stmac");
-		m_extended_program = !std::strcmp(config.options().bios(), "isa-disasm") || m_parallel_mac;
+		m_extended_program = !std::strcmp(config.options().bios(), "isa-disasm");
 		TMS320C54X(config, m_cpu, 13'000'000);
 		m_cpu->set_extended_program(m_extended_program);
 		m_cpu->set_addrmap(AS_PROGRAM, &c54x_isa_test_state::program_map);
@@ -30,8 +28,6 @@ protected:
 	{
 		m_timer = timer_alloc(FUNC(c54x_isa_test_state::check), this);
 		if (disassembly()) return;
-		if (m_parallel_mac) m_dual = std::make_unique<c54x_test::parallel_mac_fixture_runner>(machine(), *m_cpu, *m_timer);
-		else
 		{
 			if (words()) m_cases = c54x_test::instruction_word_examples();
 			else if (products()) throw emu_fatalerror("Legacy product bank retired: run atomic_product_literals");
@@ -60,15 +56,9 @@ protected:
 			throw emu_fatalerror(3, "TMS320C54x isolated disassembly contracts complete");
 		}
 		m_case = m_resets = 0;
-		if (m_dual) m_dual->start();
-		else start();
+		start();
 	}
 private:
-	[[noreturn]] void dual_result() const
-	{
-		osd_printf_info("TMS320C54x parallel MAC: PASS cases=%u restore=%u address_cases=147456 arithmetic_cases=524288 checkpoint_policy=balanced operations=MAC,MACR,MAS,MASR encodings=4096 source_destination_pairs=4 shifts=32 reads=1 writes=1 retained=T,X,ASM old_source_store=1 carry=unvalidated physical_banks=unvalidated interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_dual->count(), m_dual->restores(), (unsigned long long)m_dual->digest());
-		throw emu_fatalerror(3, "TMS320C54x isolated parallel MAC complete");
-	}
 	bool parallel() const { return !std::strcmp(machine().options().bios(), "isa-parallel"); }
 	bool scalars() const { return !std::strcmp(machine().options().bios(), "isa-scalars"); }
 	bool long_reference() const { return !std::strcmp(machine().options().bios(), "isa-long"); }
@@ -120,7 +110,6 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
-		if (m_dual) { if (m_dual->step()) dual_result(); return; }
 		auto const &test = test_case();
 		c54x_test::check_case(*m_cpu, test, m_writes, m_last - m_first,
 			std::array<u64, 2>{m_middle - m_first, m_last - m_middle});
@@ -164,8 +153,6 @@ private:
 	unsigned m_case = 0, m_writes = 0, m_resets = 0;
 	u64 m_first = 0, m_middle = 0, m_last = 0;
 	bool m_extended_program = false;
-	bool m_parallel_mac = false;
-	std::unique_ptr<c54x_test::parallel_mac_fixture_runner> m_dual;
 	std::vector<c54x_test::instruction_case> m_cases;
 };
 
@@ -176,7 +163,6 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(4, "isa-long", "TI long-word arithmetic examples")
 	ROM_SYSTEM_BIOS(5, "isa-products", "Literal multiply arithmetic and DELAY continuation sequence")
 	ROM_SYSTEM_BIOS(6, "isa-flow", "Conditional delayed branch return and high-address stack examples")
-	ROM_SYSTEM_BIOS(15, "stmac", "Parallel MAC stores with retained T X and ASM")
 	ROM_SYSTEM_BIOS(29, "isa-words", "Atomic instruction-word arithmetic and addressing examples")
 	ROM_SYSTEM_BIOS(30, "isa-disasm", "Debugger syntax length page wrapping and stepping contracts")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
