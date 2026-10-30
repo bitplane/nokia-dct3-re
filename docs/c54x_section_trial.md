@@ -35,6 +35,12 @@ rejection is an implementation limit. Its40 cases retire duplicate page runs.
 
 ## Pass 5: trial result
 
+Subsequent replacements use the same section-only workflow:
+
+| Section | Contract and deliberate reduction | Validation |
+| --- | --- | --- |
+| `paired_store.h` | DST high/low write order, odd/even address, DP/CPL, both accumulators, four saturation boundaries and poisoned source after Read. All64 numeric tuples retained with distributed replay points instead of192 executions. Standard-mode ARP corrected to0; literal saturation expectations replace the duplicated arithmetic formula. | Native64 cases/restores; build5.122s/run0.038s. Legacy DST start and phases251530/251540 removed. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).

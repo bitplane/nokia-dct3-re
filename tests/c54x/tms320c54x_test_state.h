@@ -192,7 +192,6 @@ private:
 	}
 	void start_pipeline_dld(unsigned variant = 0);
 	void start_pipeline_immediate_add(unsigned variant = 0);
-	void start_pipeline_dst(unsigned variant = 0);
 	void start_pipeline_ldm(unsigned variant = 0);
 	void start_pipeline_logical_immediate(unsigned variant = 0);
 	bool absolute_memory_dp() const;
