@@ -494,9 +494,7 @@ bool tms320c54x_test_state::check_rom4_context_results()
 				m_pipeline_store_writes = checkpoint == 6 ? 0 : checkpoint == 13 ? 5 : 8;
 				m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore overlapping original prologue sources and stack writes");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251480;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251480, checkpoint + 1);
 			}
 			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			record_context_case(0, m_pipeline_peripheral_case);
@@ -551,8 +549,7 @@ bool tms320c54x_test_state::check_rom4_context_results()
 				m_pipeline_replay = true; m_pipeline_operand_reads = reads_at(checkpoint); m_pipeline_extensions_reads = sources_at(checkpoint);
 				m_pipeline_drained_fetches = fetches_at(checkpoint); m_pipeline_store_writes = writes_at(checkpoint); m_vector_reads = 0;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore original worker roundtrip without duplicate stack or source ownership");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251840;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251840, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_stack_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			record_context_case(1, variant);
@@ -597,8 +594,7 @@ bool tms320c54x_test_state::check_rom4_context_results()
 				m_pipeline_replay = true; m_pipeline_store_writes = m_pipeline_register_writes;
 				m_pipeline_operand_reads = m_pipeline_branch_case; m_pipeline_extensions_reads = m_pipeline_stm_case;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore complete context call route without duplicated saves or return fetch");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251860;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251860, checkpoint + 1);
 			}
 			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			record_context_case(2, variant);
@@ -648,8 +644,7 @@ bool tms320c54x_test_state::check_rom4_context_results()
 				m_pipeline_replay = true; m_pipeline_store_writes = m_pipeline_register_writes; m_pipeline_operand_reads = m_pipeline_branch_case;
 				m_pipeline_extensions_reads = m_pipeline_stm_case; m_pipeline_drained_fetches = m_pipeline_store_case; m_vector_reads = m_pipeline_indirect_case;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore complete outer-context body route without repeating its work");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252080;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(252080, checkpoint + 1);
 			}
 			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove();
 			m_vector_stack_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);

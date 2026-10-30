@@ -629,9 +629,7 @@ bool tms320c54x_test_state::check_pipeline_far_irq_results()
 			{
 				m_pipeline_replay = true; m_pipeline_operand_reads = m_pipeline_store_writes = 0;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore pending cross-page far-return IRQ");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = 6; m_phase = 251380;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251380, 6);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 7) { start_pipeline_far_irq(m_pipeline_peripheral_case + 1); return true; }
@@ -672,9 +670,7 @@ bool tms320c54x_test_state::check_pipeline_xc_irq_results()
 			{
 				m_pipeline_replay = true; m_pipeline_store_writes = checkpoint >= 8 ? 2 : 0; m_pipeline_operand_reads = 0;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore XC interrupt guard and pending source");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251720;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251720, checkpoint + 1);
 			}
 			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 3) { start_pipeline_xc_irq(m_pipeline_peripheral_case + 1); return true; }

@@ -2185,11 +2185,7 @@ bool tms320c54x_test_state::check_peripheral_mmr_timing_audit_results()
 				m_pipeline_operand_reads = unsigned(family != 1 && checkpoint >= read_cycle);
 				m_pipeline_store_writes = unsigned(family != 0 && checkpoint >= write_cycle);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint, "Restore paid wait and operand ownership");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1;
-				m_phase = 251230;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-				return true;
+				return restart_pipeline_observer(251230, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 15) { start_pipeline_peripheral_case(m_pipeline_peripheral_case + 1); return true; }

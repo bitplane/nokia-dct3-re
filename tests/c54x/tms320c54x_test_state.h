@@ -1954,6 +1954,15 @@ private:
 	bool check_rounded_multiply_results();
 	bool check_stopped_timer_reload_results();
 	bool check_atomic_program_results();
+	bool restart_pipeline_observer(unsigned phase, u64 next_cycle)
+	{
+		// This replaces the deadline with one CPU clock; timed restores keep theirs.
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_expected_cycle = next_cycle;
+		m_phase = phase;
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+		return true;
+	}
 	void capture_pipeline_at(unsigned checkpoint, std::initializer_list<unsigned *> observers, const char *message)
 	{
 		if (m_idle_fixture_tick != checkpoint || m_pipeline_replay) return;

@@ -1524,9 +1524,7 @@ bool tms320c54x_test_state::check_pipeline_far_return_results()
 				m_pipeline_replay = true;
 				m_pipeline_operand_reads = unsigned(checkpoint >= first_read) + unsigned(checkpoint > first_read); m_pipeline_extensions_reads = 0;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore far-return stack samples and pending extra clock");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251300;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251300, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 71) { start_pipeline_far_return(m_pipeline_peripheral_case + 1); return true; }
@@ -1579,9 +1577,7 @@ bool tms320c54x_test_state::check_pipeline_conditional_branch_results()
 				m_pipeline_extensions_reads = unsigned(checkpoint >= 4) + unsigned(checkpoint >= 6);
 				m_pipeline_drained_fetches = unsigned(memory_dp && checkpoint >= 7); m_pipeline_store_writes = 0;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore BCD target/predicate ownership without duplicate fetches");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251620;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251620, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 95) { start_pipeline_conditional_branch(variant + 1); return true; }
@@ -1624,9 +1620,7 @@ bool tms320c54x_test_state::check_pipeline_conditional_branch_results()
 				m_pipeline_operand_reads = unsigned(checkpoint >= 5 + prefix); m_pipeline_extensions_reads = 0;
 				m_pipeline_store_writes = unsigned(pushed && checkpoint >= 6);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore ordinary return and adjacent push ownership without duplicate bus operations");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251640;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251640, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 35) { start_pipeline_plain_return(m_pipeline_peripheral_case + 1); return true; }
@@ -1677,9 +1671,7 @@ bool tms320c54x_test_state::check_pipeline_conditional_branch_results()
 				m_pipeline_drained_fetches = unsigned(adjacent && checkpoint >= 6); m_pipeline_operand_reads = 0;
 				m_pipeline_register_writes = 0;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore retained CALL target and return word without duplicate stack writes");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251660;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251660, checkpoint + 1);
 			}
 			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 131) { start_pipeline_call(m_pipeline_peripheral_case + 1); return true; }
@@ -1729,9 +1721,7 @@ bool tms320c54x_test_state::check_pipeline_conditional_branch_results()
 			{
 				m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= read_clock); m_pipeline_store_writes = unsigned(checkpoint >= write_clock);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore retained move value without duplicate reads/writes");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251680;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251680, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 107) { start_pipeline_direct_move(variant + 1); return true; }
@@ -1782,9 +1772,7 @@ bool tms320c54x_test_state::check_pipeline_conditional_branch_results()
 				m_pipeline_operand_reads = composed ? unsigned(checkpoint >= 9) + unsigned(checkpoint >= 11) : 0;
 				m_pipeline_extensions_reads = m_pipeline_drained_fetches = 0;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore original XC prefix without duplicate push");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251700;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251700, checkpoint + 1);
 			}
 			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 13) { start_pipeline_worker_xc(m_pipeline_peripheral_case + 1); return true; }
@@ -1831,8 +1819,7 @@ bool tms320c54x_test_state::check_pipeline_xc_tc_results()
 			{
 				m_pipeline_replay = true; m_pipeline_store_writes = writes_at(checkpoint);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore XC decision and pending rejected-word count");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251740;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251740, checkpoint + 1);
 			}
 			m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 127) { start_pipeline_xc_tc(variant + 1); return true; }
@@ -1875,8 +1862,7 @@ bool tms320c54x_test_state::check_pipeline_xc_tc_results()
 				m_pipeline_replay = true; m_pipeline_operand_reads = m_pipeline_store_writes = 0;
 				m_pipeline_extensions_reads = unsigned(checkpoint >= 4) + unsigned(checkpoint >= 6);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore BC held word and retained route without repeated Fetch");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251760;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251760, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 47) { start_pipeline_plain_branch(variant + 1); return true; }
@@ -1924,8 +1910,7 @@ bool tms320c54x_test_state::check_pipeline_delayed_return_results()
 				m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= 5); m_pipeline_extensions_reads = unsigned(checkpoint >= 7);
 				m_pipeline_store_writes = 2;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore RETD without repeated stack or delay Fetch");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251800;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251800, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 23) { start_pipeline_delayed_return(variant + 1); return true; }
@@ -1966,8 +1951,7 @@ bool tms320c54x_test_state::check_pipeline_retd_data_order_results()
 			{
 				m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= 5 + prefix); m_pipeline_store_writes = unsigned(checkpoint >= 6); m_pipeline_extensions_reads = 0;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore RETD target without late forwarding or duplicate stack access");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251920;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251920, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 11) { start_pipeline_retd_data_order(variant + 1); return true; }
@@ -2012,8 +1996,7 @@ bool tms320c54x_test_state::check_pipeline_far_branch_results()
 			{
 				m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= 3); m_pipeline_extensions_reads = unsigned(checkpoint >= 6);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore FB page and literal without duplicate fetch or fallthrough");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252100;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(252100, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 39) { start_pipeline_far_branch(variant + 1); return true; }

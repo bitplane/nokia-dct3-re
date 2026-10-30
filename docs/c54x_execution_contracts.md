@@ -2611,23 +2611,23 @@ Repeat/interrupt composition and physical timing remain separate scopes.
 
 ## Core regression checkpoint
 
-The latest completed full-default capture is the `default_checkpoint` under
-`rom4-context-legal-entry-and-isolation` in `fixtures/c54x_test_reviews.json`.
-It records all 281 required markers exactly once, 287 native ordered PASS
-records, intentional MAME exit 3 and runner exit 0, in 988.95 seconds.
-Six copied-context group records now belong to the separate integration
-profile; every other native PASS record and all 5,690 asserted opcode words
-match the preceding capture. The review binds its executable, acceptance
-sources and exact bench patch over `66cfbfc9`; no CPU/device source changed.
-No runtime improvement or blanket validity of other fixture inputs is claimed.
+The latest full-default capture is the `default_checkpoint` under
+`explicit-one-clock-observer-restarts` in `fixtures/c54x_test_reviews.json`.
+All 273 required markers occur exactly once, with 279 ordered native PASS
+records, intentional MAME exit 3 and runner exit 0. Elapsed time is approximately
+874 seconds from console timestamps; the changed cohort is not a controlled
+speed comparison. The record binds the executable, acceptance sources and
+exact bench patch over `d2c92523`. No CPU/device production source changed.
 
-The current layout has 273 default requirements after the additional idle
-banks moved to `power-idle` and `rom4-context` and the overlapping48-case
-accumulator-XC subset and the two atomic numeric sweeps were retired.
-Focused native and executable
-host checks qualify the selected-owner routing and regrouped inputs. A
-current-tree full-default/all-isolated run remains outstanding; this older
-capture is not silently renewed by those focused checks.
+The 279 retained PASS records match the preceding checkpoint in order and
+content after eight explicitly reviewed removals or scope moves. No previously
+asserted opcode word is lost: the 5,692-word inventory adds atomic ROLTC A/B
+and first asserts four MIN/MAX words earlier through the new literal witnesses.
+The full host suite and both 3210 v6.00/v5.01 Phone book menu gates also pass.
+
+This qualifies the default and the named focused scopes in that record, not
+all 395 isolated profiles, every fixture input, physical timing or complete
+chip conformance. The full retained-isolated regression remains outstanding.
 
 `fixtures/c54x_fidelity_checkpoint.json` remains an immutable historical
 capture: 294 then-required markers, 295 native PASS records and 1,058.73 seconds.

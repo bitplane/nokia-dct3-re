@@ -4898,9 +4898,7 @@ bool tms320c54x_test_state::check_pipeline_logical_immediate_results()
 			{
 				m_pipeline_replay = true; m_pipeline_operand_reads = 1;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore logical literal without a second program read");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251580;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251580, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 1535) { start_pipeline_logical_immediate(variant + 1); return true; }
@@ -4947,8 +4945,7 @@ bool tms320c54x_test_state::check_addm_expected_results()
 			{
 				m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= 6 + absolute); m_pipeline_store_writes = unsigned(checkpoint >= 7 + absolute);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore ADDM retained sample without repeated read or arithmetic flags");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251880;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251880, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 767) { start_pipeline_addm(variant + 1); return true; }
@@ -5001,8 +4998,7 @@ bool tms320c54x_test_state::check_pipeline_memory_logic_results()
 			{
 				m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= 5);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore logical operand without re-reading memory or changing AR twice");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252020;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(252020, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 575) { start_pipeline_memory_logic(variant + 1); return true; }
@@ -5046,8 +5042,7 @@ bool tms320c54x_test_state::check_pipeline_memory_logic_results()
 			{
 				m_pipeline_replay = true; m_pipeline_operand_reads = reads_at(checkpoint); m_pipeline_store_writes = unsigned(checkpoint >= 11);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore original logical tail without duplicate reads or final store");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252040;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(252040, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 4) { start_pipeline_mu4_logic_tail(m_pipeline_peripheral_case + 1); return true; }

@@ -6303,11 +6303,7 @@ bool tms320c54x_test_state::check_pipeline_store_results()
 				m_vector_acks = m_pipeline_store_writes = 0;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == 5,
 					"Restore the pending store with its retained write address");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = 6;
-				m_phase = 251080;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-				return true;
+				return restart_pipeline_observer(251080, 6);
 			}
 			m_pipeline_operand_tap.remove();
 			m_cpu->set_pipeline_frontend(false);
@@ -6365,11 +6361,7 @@ bool tms320c54x_test_state::check_pipeline_store_results()
 				m_vector_acks = m_pipeline_operand_reads = 0;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == 4,
 					"Restore captured DAGEN without repeating AR modification");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = 5;
-				m_phase = 251100;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-				return true;
+				return restart_pipeline_observer(251100, 5);
 			}
 			m_pipeline_operand_tap.remove();
 			m_cpu->set_pipeline_frontend(false);
@@ -6462,11 +6454,7 @@ bool tms320c54x_test_state::check_constant_dagen_results()
 				m_pipeline_replay = true;
 				m_pipeline_store_writes = unsigned(conflict && checkpoint >= 6) + unsigned(checkpoint >= write_cycle);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint, "Restore DAGEN write arbitration without repeating a committed store");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1;
-				m_phase = 251200;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-				return true;
+				return restart_pipeline_observer(251200, checkpoint + 1);
 			}
 			m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_stm_case < 11) { start_pipeline_stm_case(m_pipeline_stm_case + 1); return true; }
@@ -6529,9 +6517,7 @@ bool tms320c54x_test_state::check_pipeline_immediate_store_results()
 			{
 				m_pipeline_replay = true; m_pipeline_store_writes = unsigned(checkpoint >= write_cycle);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore immediate operand/address/wait ownership");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251260;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251260, checkpoint + 1);
 			}
 			m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 7) { start_pipeline_immediate_store(m_pipeline_peripheral_case + 1); return true; }
@@ -6564,9 +6550,7 @@ bool tms320c54x_test_state::check_pipeline_immediate_store_results()
 				m_pipeline_replay = true;
 				m_pipeline_operand_reads = unsigned(checkpoint >= 5); m_pipeline_store_writes = unsigned(checkpoint >= 6);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore retained XPC source and allocated stack destination");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251280;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251280, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 197) { start_pipeline_xpc_push(m_pipeline_peripheral_case + 1); return true; }
@@ -6630,9 +6614,7 @@ bool tms320c54x_test_state::check_pipeline_mmr_pop_results()
 				m_pipeline_replay = true;
 				m_pipeline_operand_reads = unsigned(checkpoint >= 5); m_pipeline_store_writes = unsigned(checkpoint >= write_clock);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore retained POPM stack source and destination commitment");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251460;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251460, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); if (irq) m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < (irq ? 191U : 113U)) { start_pipeline_mmr_pop(m_pipeline_peripheral_case + 1); return true; }
@@ -6681,9 +6663,7 @@ bool tms320c54x_test_state::check_pipeline_mmr_pop_results()
 				m_pipeline_operand_reads = unsigned(checkpoint >= 6);
 				m_pipeline_store_writes = unsigned(checkpoint >= 6) + unsigned(checkpoint >= write_clock);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore POPM bank-conflict boundary");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251466;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251466, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 11) { start_pipeline_pop_dagen_conflict(m_pipeline_peripheral_case + 1); return true; }
@@ -6732,9 +6712,7 @@ bool tms320c54x_test_state::check_pipeline_dst_results()
 			{
 				m_pipeline_replay = true; m_pipeline_store_writes = checkpoint >= 6 ? 1 : 0;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore DST retained source and pending low-word write");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251540;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251540, checkpoint + 1);
 			}
 			m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 191) { start_pipeline_dst(variant + 1); return true; }
@@ -6776,9 +6754,7 @@ bool tms320c54x_test_state::check_pipeline_dst_results()
 			{
 				m_pipeline_replay = true; m_pipeline_operand_reads = checkpoint >= 5 + wait ? 1 : 0;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore LDM source/peripheral wait without another bus read");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251560;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251560, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 287) { start_pipeline_ldm(variant + 1); return true; }
@@ -6824,9 +6800,7 @@ bool tms320c54x_test_state::check_absolute_memory_dp_results()
 			{
 				m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= 5 + offset); m_pipeline_extensions_reads = 0;
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore retained DP sample, forwarding and remaining held clocks");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251600;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251600, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); if (offset) m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (m_pipeline_peripheral_case < 1535) { start_pipeline_memory_dp(m_pipeline_peripheral_case + 1); return true; }
@@ -6885,8 +6859,7 @@ bool tms320c54x_test_state::check_pipeline_data_push_results()
 				m_pipeline_replay = true; m_pipeline_operand_reads = reads_at(checkpoint); m_pipeline_extensions_reads = unsigned(follower && checkpoint >= 6 + gap);
 				m_pipeline_store_writes = unsigned(checkpoint >= (addm ? 8 : 6)); m_pipeline_register_writes = unsigned(addm && checkpoint >= 7);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore PSHD without another allocation or source sample");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251900;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251900, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 43) { start_pipeline_data_push(variant + 1); return true; }
@@ -6940,8 +6913,7 @@ bool tms320c54x_test_state::check_pipeline_data_pop_results()
 				m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(checkpoint >= (copy ? 10 : 5)); m_pipeline_extensions_reads = sources_at(checkpoint);
 				m_pipeline_store_writes = unsigned(checkpoint >= (copy ? 11 : 6)); m_pipeline_drained_fetches = unsigned(copy && checkpoint >= 8); m_pipeline_register_writes = unsigned(copy && checkpoint >= 7);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore POPD without repeated stack consumption or destination retargeting");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251940;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251940, checkpoint + 1);
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 49) { start_pipeline_data_pop(variant + 1); return true; }
@@ -6980,8 +6952,7 @@ bool tms320c54x_test_state::check_pipeline_data_pop_results()
 			{
 				m_pipeline_replay = true; m_pipeline_store_writes = writes_at(checkpoint);
 				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore register-store addresses without duplicate pointer updates or writes");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251960;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
+				return restart_pipeline_observer(251960, checkpoint + 1);
 			}
 			m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < 74) { start_pipeline_register_store(variant + 1); return true; }
