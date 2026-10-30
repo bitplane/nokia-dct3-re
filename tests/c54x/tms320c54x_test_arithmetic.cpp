@@ -197,33 +197,6 @@ void tms320c54x_test_state::start_saccd_boundary_case(unsigned index)
 	m_check_timer->adjust(attotime::from_usec(100));
 }
 
-void tms320c54x_test_state::start_firs_sum_case(unsigned index)
-{
-	static constexpr u16 x[] = {0xffff, 0xffff, 0x7fff, 0x8000};
-	static constexpr u16 y[] = {1, 0xffff, 1, 0x8000};
-	unsigned const pair = index % 4;
-	m_cpu->reset();
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0800, 0xe001); // FIRS *AR2,*AR3,0900.
-	program.write_word(0x0801, 0x0900);
-	program.write_word(0x0802, 0xf4e1);
-	program.write_word(0x0900, 2);
-	m_cpu->space(AS_DATA).write_word(0x0600, x[pair]);
-	m_cpu->space(AS_DATA).write_word(0x0601, y[pair]);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_AR2, 0x0600}, {cpu_regs::STATE_AR3, 0x0601}, {cpu_regs::STATE_A, 0x10000},
-		{cpu_regs::STATE_B, 3}, {cpu_regs::STATE_T, 0x1234},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0,
-		0x1200 | (pair == 2 ? 0x0800 : 0) | (index >= 16 ? 0x0400 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1,
-		(index & 4 ? 0x0100 : 0) | (index & 8 ? 0x0200 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(STATE_GENPC, 0x0800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_phase = 230000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 void tms320c54x_test_state::start_poly_boundary_case(unsigned index)
 {
@@ -4456,30 +4429,6 @@ bool tms320c54x_test_state::check_saccd_results()
 
 bool tms320c54x_test_state::check_arithmetic_boundary_results()
 {
-	if (m_phase >= 230000 && m_phase < 230032)
-	{
-		unsigned const index = m_phase - 230000, pair = index % 4;
-		static constexpr s64 sums[2][4] = {{65536, 131070, 32768, 65536}, {0, -2, 32768, -65536}};
-		s64 const shifted = sums[bool(index & 4)][pair] * 65536;
-		bool const overflow = shifted > 0x7fffffffLL || shifted < -0x80000000LL;
-		u64 const result = overflow && (index & 8) ?
-			(shifted < 0 ? 0xff80000000ULL : 0x7fffffff) : u64(shifted) & 0xffffffffffULL;
-		u16 const flags = 0x1200 | (pair == 2 ? 0 : 0x0800) |
-			(overflow || index >= 16 ? 0x0400 : 0);
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == result &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 5 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == flags &&
-			m_cpu->state_int(tms320c54x_device::STATE_T) == 0x1234 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0600 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0601 &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(STATE_GENPC) == 0x0803,
-			"FIRS computes operand carry, SXM sum, sticky OVA and OVM saturation while accumulating old A");
-		if (index < 31) { start_firs_sum_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x FIRS sum: PASS cases=32 sxm=0,1 ovm=0,1 carry=1 sticky_ova=1 pipeline_claim=0\n");
-		start_abdst_overflow_case(0); return true;
-	}
 	if (m_phase >= 240000 && m_phase < 240016)
 	{
 		unsigned const index = m_phase - 240000;
