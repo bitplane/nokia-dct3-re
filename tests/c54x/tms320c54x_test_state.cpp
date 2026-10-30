@@ -483,7 +483,6 @@ void tms320c54x_test_state::machine_reset()
 	for (unsigned i = 0; i != 26; ++i)
 		data.write_word(0x1300 + i, 0x6000 + i);
 	m_phase = 0;
-	m_bleq_case = 0;
 	set_registers(*m_cpu, {
 		{cpu_regs::STATE_PC, 0x0100}, {cpu_regs::STATE_SP, 0x0300}, {cpu_regs::STATE_AR0, 0x0700},
 		{cpu_regs::STATE_AR2, 0x0400}, {cpu_regs::STATE_AR3, 0x0500},

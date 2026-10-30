@@ -313,6 +313,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_register_copy_sequences.h` | Retain STM SP/backing-page-zero/CLKMD readback, STLM A/B→AR/BRC with intermediate MVMD capture, MVDD pointer updates feeding MVMM and RPT6 with seven MAR updates. Explicit registers/flags/pointers/RAM; exact MMR/RAM transaction ordering, fixed outputs, sibling preservation and pre-sequence replay. CLKMD readback is internal CPU behavior, not a mocked board device. Drop port-marker timing; atomic semantic/access scope. | Native4 cases/restores, unchanged count; build5.300s/run0.015s. Delete phase495 setup,496..498 and499 assertions/preparations; following signed-B branch setup remains reference material. Supersedes atomic_mapped_load_sequences' pending STM/CLKMD setup. |
 
+| `atomic_guard_conditions.h` | Retain seven BGEQ/BLT/BLEQ branch literals, two ALEQ returns and nine ALEQ/BNEQ/BLEQ/ANEQ conditional-slot literals. Explicit negative guard/zero/positive40-bit operands, flags/TC, pointers and stack replace phase-selected values. Exact taken target fetch, conditional stack read/pop, executed/annulled MAR slots, preserved operands/flags and pre-condition replay. Drop port-marker timing; atomic semantic/access scope. | Native18 cases/restores, unchanged count; build5.353s/run0.020s. Delete phase499 setup,500..509/6565..6567/6585..6586 assertions/iteration and BLEQ phase counter. Only following signed-SUB setup remains reference material. Supersedes atomic_register_copy_sequences' pending branch setup. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
