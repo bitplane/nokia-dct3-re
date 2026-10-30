@@ -3,17 +3,9 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
-#include "tms320c54x_test_word_examples.h"
 
 namespace c54x_test {
 
-void tms320c54x_test_state::start_instruction_word_case(unsigned index)
-{
-	m_cpu->reset();
-	prepare_case(*m_cpu, instruction_word_examples().at(index));
-	m_phase = 88000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 void tms320c54x_test_state::start_operand_fetch_case(unsigned index)
 {

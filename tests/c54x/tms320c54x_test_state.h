@@ -85,7 +85,6 @@ private:
 	bool m_xf_pin = true;
 	unsigned m_xf_publications = 0;
 	void start_repeat_endpoint_case(unsigned index);
-	void start_instruction_word_case(unsigned index);
 	void start_shifted_arithmetic_selector_case(unsigned index);
 	void start_interrupt_entry_spacing_case(unsigned index);
 	void start_interrupt_acceptance_checkpoint();

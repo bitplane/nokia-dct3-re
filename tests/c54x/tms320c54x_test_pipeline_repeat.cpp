@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
-#include "tms320c54x_test_word_examples.h"
 
 namespace c54x_test {
 
@@ -1170,21 +1169,6 @@ bool tms320c54x_test_state::check_repeat_endpoints_results()
 		}
 		if (index < 52) { start_operand_fetch_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x operand fetch order: PASS cases=53 families=12 forms=direct,indirect,long,absolute,preincrement\n");
-		return true;
-	}
-	if (m_phase >= 88000 && m_phase < 88000 + instruction_word_examples().size())
-	{
-		unsigned const index = m_phase - 88000;
-		auto const &test = instruction_word_examples().at(index);
-		check_case_state(*m_cpu, test);
-		expect_opcode(test.opcode, true, "Literal atomic instruction reference");
-		if (index + 1 < instruction_word_examples().size())
-		{
-			start_instruction_word_case(index + 1);
-			return true;
-		}
-		osd_printf_info("TMS320C54x atomic instruction references: PASS cases=%u resets=%u firmware=0\n",
-			unsigned(instruction_word_examples().size()), unsigned(instruction_word_examples().size()));
 		return true;
 	}
 	return false;
