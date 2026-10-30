@@ -22,26 +22,6 @@ struct fcala_delay_observations
 	u16 irq_pc = 0;
 };
 
-struct saved_repeat_fixture
-{
-	unsigned count, inner, snapshot;
-	bool after_end, nmi, delayed;
-	u32 base;
-	u16 sp;
-	u16 end() const { return after_end ? 0x609 : 0x60b; }
-	u16 saved_count() const { return count - unsigned(after_end && count); }
-	u16 saved_st1() const { return 0x900 | (count ? 0x8000 : 0); }
-	u16 vector() const { return nmi ? 4 : 0x40; }
-};
-
-struct saved_repeat_observations
-{
-	unsigned outer_reads = 0, outer_writes = 0, leaves = 0, inner_writes = 0;
-	unsigned assertions = 0, vectors = 0, mapped_reads = 0, stack_reads = 0, stack_writes = 0, controls = 0, resumed = 0;
-	u16 return_pc = 0;
-	u64 vector_cycle = 0, inner_cycle = 0, restore_cycle = 0, st1_cycle = 0, resume_cycle = 0;
-};
-
 struct repeat_context_fixture
 {
 	bool replace, span;

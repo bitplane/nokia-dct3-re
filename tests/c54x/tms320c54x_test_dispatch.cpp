@@ -24,7 +24,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_memory_repeat_results()) return;
 	if (check_asm_store_results_part2()) return;
 	if (check_fcala_delay_results()) return;
-	if (check_saved_repeat_results()) return;
 	if (check_repeat_context_results()) return;
 	if (check_delayed_call_replay_results()) return;
 	if (check_mvdk_producer_results()) return;

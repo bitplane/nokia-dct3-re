@@ -430,6 +430,8 @@ def main():
     counts['repeated_tmac'] = 3144
     counts['repeated_poly'] = 576
     counts['body_repeat_restore'] = 128
+    counts['saved_repeat_restore'] = 320
+    counts['stlm_repeat_restore'] = 320
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216

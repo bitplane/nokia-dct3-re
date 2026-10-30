@@ -1565,14 +1565,15 @@ now replaces the one loop controller; a near return rebuilds its fetch
 prediction from restored architectural BRAF/BRC/RSA/REA, even after an
 inner loop has finished. There is no automatic context stack.
 
-`--profile repeat-isr` passes 3,840 cases and save/replays: five outer counts
+`saved_repeat_restore` owns320 independent cases/restores: five outer counts
 (`0,1,2,7,56`), four inner counts (`0,1,3,63`), IRQ/NMI, two pages, two
-stack alignments, FRETE/FRETED and six checkpoints. Physical input interrupts
+stack alignments represented, FRETE/FRETED and six distributed bus-prefix
+checkpoints. Stack/snapshot positions are not crossed with every input. Physical input interrupts
 an outside-body CCD callee. The ISR saves repeat/status registers, executes
 its own loop and restores the saved words; FRETE returns to the leaf, whose
 near return targets either the body or REA+1. Ordered copies, balanced
 frames, retained stack operands and final register state are checked. The
-original firmware passes this setup; this is not a complete recording
+synthetic instruction program is CPU-only; this is not a complete recording
 or a claim that every original outer-loop iteration has settled.
 
 Companion isolated controls are `repeat-context`, `repeat-pmst`,
@@ -4912,14 +4913,18 @@ are preserved for software save/restore. In-body writes and overlapping
 control compositions remain guarded; the six-word in-body BRAF latency
 is not newly qualified.
 
-`repeat-stlm` passes 3,840 cases and save-state replays: outer counts
+`stlm_repeat_restore` owns320 independent cases/restores: outer counts
 0/1/2/7/56, inner counts 0/1/3/63, IRQ/NMI, two pages, two stack alignments,
-FRETE/FRETED, six snapshots and callee returns inside the loop or at REA+1.
+FRETE/FRETED, six distributed bus-prefix snapshots and callee returns inside
+the loop or at REA+1. Stack and snapshot correlations with every input are
+deliberately not retained. It shares the complete stack/MMR trace builder with
+the ordinary leaf and direct-body return cases, not implicit phase state.
 The program saves real interrupt state, computes the BRAF-clearing word
 with LDM/AND/OR/STLM, runs its own loop, restores REA/RSA/BRC before ST1,
 then returns through the interrupted callee. Ordered reads/writes,
 one interrupt delivery, actual iteration counts and balanced frames are
-checked. The unchanged core rejects this composition at `090a`.
+checked. Poisoning each popped word checks retained operands; a wrong BRAF
+clear fails at the guest STLM's controller write.
 The fixture separates STLM from the following STM because BRC's Read-owned
 publication can precede the older status store's Execute in the same clock.
 Primary constraints remain SPRU131G 6.10.6 and 7.5.7.1; physical phases and

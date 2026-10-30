@@ -217,7 +217,10 @@ protected:
 			});
 #ifdef C54X_SECTION_CONTEXT_POP_POISON
 		m_fixture->set_data_observer([this](bool write,u32 address,u16 word) {
-			if (!write && address>=0x2ff9 && address<0x3000) {
+			u32 sp=0;
+			for (auto const &reg : m_cases.at(m_fixture->count()).states.front().observation.initial)
+				if (reg.index==tms320c54x_device::STATE_SP) sp=reg.value;
+			if (!write && address>=sp-8 && address<sp) {
 				auto const disable=machine().disable_side_effects();
 				m_cpu->space(AS_DATA).write_word(address,word^0xffff);
 			}
