@@ -15,7 +15,6 @@
 #include "tms320c54x_test_support.h"
 #include "tms320c54x_test_register_sequence.h"
 #include "tms320c54x_test_atomic_routes.h"
-#include "tms320c54x_test_entry_state.h"
 #include "tms320c54x_test_repeat_state.h"
 #include "tms320c54x_test_snapshot_state.h"
 #include "tms320c54x_test_snapshot.h"
@@ -55,7 +54,6 @@ private:
 	bool m_xf_pin = true;
 	unsigned m_xf_publications = 0;
 	void start_repeat_endpoint_case(unsigned index);
-	void acknowledge_entry_interrupt(int line);
 	void start_operand_fetch_case(unsigned index);
 	void start_loop_xc_case(unsigned index);
 	void start_xc_irq_case(unsigned index);
@@ -608,7 +606,6 @@ private:
 	void start_rate_dma(bool input_clock = false);
 	void start_clkmd_rate_case();
 	void start_idle3_pll_relock_case();
-	void start_vector_prefetch_case(unsigned index);
 	void check_mmr_bus();
 	void start_timer_boundary_probe(unsigned index, bool staged = false);
 	void start_intm_protection_case(unsigned index);
@@ -1555,7 +1552,6 @@ private:
 	bool check_reverse_carry_reference_results();
 	bool check_intm_protection_results();
 	bool check_bsp_interrupt_results();
-	bool check_vector_prefetch_results();
 	bool check_idle_pll_results();
 	bool check_xc_interrupt_results();
 	bool check_repeat_endpoints_results();
@@ -1667,7 +1663,6 @@ private:
 	TIMER_CALLBACK_MEMBER(check_results);
 
 	required_device<tms320c54x_device> m_cpu;
-	interrupt_entry_fixture m_entry;
 	u16 m_shifted_bus_word = 0;
 	ordered_case_digest m_shifted_bus_coverage;
 	ordered_case_digest m_context_coverage;

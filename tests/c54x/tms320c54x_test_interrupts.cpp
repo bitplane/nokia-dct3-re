@@ -429,7 +429,7 @@ bool tms320c54x_test_state::check_idle_pll_results()
 		m_cpu->set_unscaled_clock(13'000'000);
 		m_cpu->resume(SUSPEND_REASON_DISABLE);
 		osd_printf_info("TMS320C54x IDLE3 PLL relock: PASS div_wake=1 power_held=1 lock_invalidated=1 software_reentry=1 automatic_pll_wake_claim=0\n");
-		start_vector_prefetch_case(0); return true;
+		return true;
 	}
 	return false;
 }

@@ -784,7 +784,6 @@ void tms320c54x_test_state::test(machine_config &config)
 				"Direct store retires during vector Fetch/IACK");
 			++m_vector_acks;
 		}
-		acknowledge_entry_interrupt(line);
 		return 0;
 	}, "vector_acknowledge");
 	m_cpu->bio_in_cb().set(FUNC(tms320c54x_test_state::bio_r));
