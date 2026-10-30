@@ -337,6 +337,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_dual_add_sub_literals.h` | Retain four dual ADD/SUB A/B literals, modifying/stationary signed dual SUB with carry, and stationary/decrement ADDM signed16 saturation. Explicit X/Y operands, A/B/T/flags/SXM/OVM, pointers and neighbors replace inherited setup. Fixed40-bit outcomes, exact dual reads or read/write pair, pointer updates, source/neighbor preservation and pre-instruction replay. Drop port-marker timing; atomic semantic/access scope. | Native8 cases/restores, unchanged count; build5.430s/run0.017s. Delete660 setup,661..664/6522/6523/9223..9225 loops/assertions and owning routes. Supersedes atomic_coefficient_fir_literals' pending dual ADD/SUB setup. |
 
+| `atomic_immediate_product_literals.h` | Retain11 immediate MPY/MAC examples: FRCT signed products, independent B addend versus A/B destination, both destination overflow flags with OVM off/on, T-preserving immediate-only MPY and address-before-immediate absolute MPY. Explicit inputs/flags/FRCT/OVM/source memory, fixed numeric outcomes/original flag masks, exact one or zero source reads/no writes, sibling/T/source preservation and pre-instruction replay. Drop port-marker timing; atomic semantic/access scope. | Native11 cases/restores, unchanged count; build5.502s/run0.019s. Delete shift-phase successor catalogue,724/725/9400..9403/9410..9413 and726 assertions/preparations with owning routes. Following ASM-add setup remains reference material. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
