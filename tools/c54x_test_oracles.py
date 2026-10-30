@@ -1779,11 +1779,11 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated repeated indexed MVDK complete",
     ),
     "mvdk-index": (
-        "TMS320C54x indexed MVDK: PASS cases=294336 restore=294336 excluded=8064 encodings=16 destination_kinds=21 mapped_sources=18 indices=1,-1,BK,-BK snapshots=2,3 raw_words=1 alias_order=sample,modify,publish reset_before_restore=1 physical_phase_claim=0 interrupt_repeat_composition=unvalidated",
+        "TMS320C54x indexed MVDK: PASS cases=114240 restore=114240 excluded=2688 encodings=16 destination_kinds=21 mapped_sources=18 indices=1,-1,BK,-BK snapshots=balanced raw_words=1 alias_order=sample,modify,publish reset_before_restore=1 physical_phase_claim=0 interrupt_repeat_composition=unvalidated coverage_fnv64=620093b2bc366484",
         "Fatal error: TMS320C54x isolated indexed MVDK complete",
     ),
     "mvdk-circular": (
-        "TMS320C54x circular MVDK: PASS cases=294336 restore=294336 excluded=8064 encodings=32 asserted_encodings=32 destination_kinds=21 mapped_sources=18 native_bk=82 snapshots=2,3 raw_words=1 alias_order=sample,modify,publish physical_phase_claim=0 interrupt_repeat_composition=unvalidated",
+        "TMS320C54x circular MVDK: PASS cases=114240 restore=114240 excluded=2688 encodings=32 asserted_encodings=32 destination_kinds=21 mapped_sources=18 native_bk=82 snapshots=balanced raw_words=1 alias_order=sample,modify,publish physical_phase_claim=0 interrupt_repeat_composition=unvalidated coverage_fnv64=620093b2bc366484",
         "Fatal error: TMS320C54x isolated circular MVDK complete",
     ),
     "mvdk-repeat": (

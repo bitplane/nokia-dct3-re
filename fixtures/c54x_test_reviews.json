@@ -8,6 +8,23 @@
   },
   "families": [
     {
+      "id": "circular-indexed-move-replay-sampling",
+      "classification": "architectural_interaction",
+      "decision": "merge",
+      "profiles": ["mvdk-circular", "mvdk-index"],
+      "case_ids": [],
+      "profile_coverage": {
+        "mvdk-circular": {"cases": 114240, "fnv64": "620093b2bc366484", "result_prefix": "TMS320C54x circular MVDK: PASS"},
+        "mvdk-index": {"cases": 114240, "fnv64": "620093b2bc366484", "result_prefix": "TMS320C54x indexed MVDK: PASS"}
+      },
+      "basis": "The existing independent modulo/reference factories and SPRU131G circular/indexed addressing contracts are unchanged. The four cohorts contain 43008/1344/48384/21504 non-checkpoint input ordinals, formerly repeated at 3/3/2/3 snapshot times. Compile the actual factories to verify all fields other than memory.snapshot are identical across each input's copies; choose one balanced snapshot per input.",
+      "obligations": ["retain every original non-checkpoint ordinal in order, with unchanged setup and reference values", "retain both/two-or-three checkpoint classes within every cohort/destination-kind group, balanced to within one case", "retain one completed save/restore per selected execution and ordered original-key digest", "retain all circular/indexed opcodes, operand/literal retention, alias publication order, raw status and numeric checks", "retain 2688 selected implementation-limit cases per profile without granting their opcodes execution credit"],
+      "limits": ["294336 executions/restores become 114240 per profile, retiring 180096 checkpoint copies each", "each input is no longer restored at every old checkpoint; this is not equivalent cross-product coverage", "the profiles still mix architectural transfer checks with explicitly counted implementation-limit geometries", "existing overlap ordering is a model regression, not silicon timing or interrupt/repeat composition qualification", "no CPU implementation or reference arithmetic changes"],
+      "baseline": "Fresh original circular profile completes 294336 cases/restores with its old oracle before rebuilding in 129.73 seconds (native wrapper wall time).",
+      "verification": "Rebuilt circular and indexed profiles each pass all 114240 selected executions/restores, 2688 exclusions and ordered identity hash 620093b2bc366484. Circular retains all 32 asserted encodings. Native wrapper wall times are 49.94 and 50.01 seconds respectively; only circular has a fresh paired timing baseline. Host audit verifies all non-snapshot fields of both actual factories across every checkpoint copy, every original input ordinal once, and balanced snapshots by cohort/destination-kind. All 5077 host tests pass with one established skip. Full-default and handset checkpoints are not renewed by these focused runs.",
+      "measurements": {"before_cpp_bytes": 3411938, "before_cpp_lines": 51427, "after_cpp_bytes": 3414086, "after_cpp_lines": 51476, "source_assessment": "Runtime reduction, not source reduction: the schedule and runtime coverage observers add 2148 bytes and 49 lines. Two profiles retire 360192 repeated executions/restores in total."}
+    },
+    {
       "id": "unsupported-mapped-move-matrices",
       "classification": "implementation_limit",
       "decision": "delete",

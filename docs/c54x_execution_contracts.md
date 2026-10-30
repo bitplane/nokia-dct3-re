@@ -3524,11 +3524,11 @@ before a potentially aliasing mapped destination is published. CMPT/ARP
 selection and destination-specific publication use the established move
 path. BK does not impose circular wrapping on these modes.
 
-`mvdk-index` passes 294,336 cases plus replay, including 8,064 excluded source
-geometries. It reuses the circular-move matrix with independently recomputed
+`mvdk-index` retains 114,240 cases plus replay, including 2,688 selected
+excluded-input cases. It reuses the circular-move matrix with independently recomputed
 linear pointer results: sixteen unique encodings, twenty-one destination
 kinds, eighteen mapped sources, representative signed indices, two pages and
-two/three checkpoints. Each accepted case samples one raw word, fetches one
+balanced checkpoints. Each accepted case samples one raw word, fetches one
 destination literal and publishes once; accumulator lanes, T/TRN, DAGEN,
 BRC and RAM destinations retain their separate ownership. The profile
 clears the live pipeline before restoring its snapshots.
@@ -4447,13 +4447,24 @@ interrupt/repeat composition or measured bus phases.
 Short circular sources `71c0..71df` retain one raw source word, update the
 source pointer using the old BK/index, then publish the destination. Native
 `71d2` uses a +1 circular step, not AR0. The `mvdk-circular` profile passes
-294,336 cases and save-state replays, including 8,064 excluded source cases,
+114,240 cases and save-state replays, including 2,688 selected excluded-input cases,
 all 32 encodings, 21 destination kinds, 18 owned mapped sources and native
 BK=82. Destination admission is register-specific: CLKMD at `0058` has a
 separate move path, so the peripheral range is not a blanket rejection
 domain. Circular/indexed CLKMD writes are not covered by the dedicated
 clock-move gate. Physical phase timing and interrupt/repeat composition
 remain unvalidated.
+
+The four cohorts retain every non-checkpoint input ordinal: 43,008 addressing,
+1,344 numeric/status, 48,384 mapped-source and 21,504 native-BK inputs.
+Each input runs and restores once, with checkpoint selection balanced within
+every cohort/destination-kind group. This replaces the former 294,336-case
+snapshot cross-product, retiring 180,096 executions/restores per profile.
+It no longer tests every input at all two/three checkpoints and is not an
+equivalent-coverage claim. The host audit compiles the actual reference
+factories and verifies that checkpoint copies differ only in their snapshot
+selector; native completion checks ordered original-key digests. The same
+sampling policy applies to `mvdk-index`.
 
 Successful, nonexcluded cases emit exact-word assertion attribution for
 `71c0..71df`; excluded cases do not earn execution credit. The completion gate

@@ -4,6 +4,7 @@
 #include "emu.h"
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_memory_immediate_schedule.h"
+#include "tms320c54x_test_circular_move_schedule.h"
 
 namespace c54x_test {
 
@@ -4230,8 +4231,10 @@ tms320c54x_test_state::circular_move_fixture tms320c54x_test_state::indexed_move
 void tms320c54x_test_state::start_circular_move(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
+	if (!variant) { m_circular_move_coverage = {}; m_circular_move_excluded = 0; }
 	bool const indexed = profile_is("mvdk-index");
-	auto const c = indexed ? indexed_move_case(variant) : circular_move_case(variant); auto const &f = c.memory;
+	unsigned const key = circular_move_schedule::key(variant);
+	auto const c = indexed ? indexed_move_case(key) : circular_move_case(key); auto const &f = c.memory;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, 0x7100 | f.mode); program.write_word(f.base + 0x601, c.destination); program.write_word(f.base + 0x602, 0xf4e1);
@@ -10715,7 +10718,8 @@ bool tms320c54x_test_state::check_repeated_mvdk_results()
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
 		bool const indexed = profile_is("mvdk-index");
-		auto const c = indexed ? indexed_move_case(variant) : circular_move_case(variant); auto const &f = c.memory;
+		unsigned const key = circular_move_schedule::key(variant);
+		auto const c = indexed ? indexed_move_case(key) : circular_move_case(key); auto const &f = c.memory;
 		unsigned const checkpoint = 4 + f.snapshot;
 		// Literal destinations are checked in Decode; resolved source addresses in Access.
 		bool const unsupported_destination = c.destination < 0x60 && (c.destination < 8 || c.destination > 0x1a);
@@ -10743,13 +10747,15 @@ bool tms320c54x_test_state::check_repeated_mvdk_results()
 				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2]; if (indexed) m_cpu->set_pipeline_frontend(true); return restore_pipeline_at(62147, "Restore circular MVDK without duplicate reads or writes");
 			}
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant + 1 < 294336U) { start_circular_move(variant + 1); return true; }
+			m_circular_move_coverage.add(key);
+			m_circular_move_excluded += c.excluded;
+			if (variant + 1 < circular_move_schedule::cases) { start_circular_move(variant + 1); return true; }
 			if (indexed)
 			{
-				osd_printf_info("TMS320C54x indexed MVDK: PASS cases=294336 restore=294336 excluded=8064 encodings=16 destination_kinds=21 mapped_sources=18 indices=1,-1,BK,-BK snapshots=2,3 raw_words=1 alias_order=sample,modify,publish reset_before_restore=1 physical_phase_claim=0 interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated indexed MVDK complete");
+				osd_printf_info("TMS320C54x indexed MVDK: PASS cases=%u restore=%u excluded=%u encodings=16 destination_kinds=21 mapped_sources=18 indices=1,-1,BK,-BK snapshots=balanced raw_words=1 alias_order=sample,modify,publish reset_before_restore=1 physical_phase_claim=0 interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_circular_move_coverage.count, m_circular_move_coverage.count, m_circular_move_excluded, (unsigned long long)m_circular_move_coverage.value); throw emu_fatalerror(3, "TMS320C54x isolated indexed MVDK complete");
 			}
 			for (u16 mode = 0xc0; mode <= 0xdf; ++mode) expect(m_asserted_opcodes.test(0x7100 | mode), "Every circular MVDK encoding has an executed transfer assertion");
-			osd_printf_info("TMS320C54x circular MVDK: PASS cases=294336 restore=294336 excluded=8064 encodings=32 asserted_encodings=32 destination_kinds=21 mapped_sources=18 native_bk=82 snapshots=2,3 raw_words=1 alias_order=sample,modify,publish physical_phase_claim=0 interrupt_repeat_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated circular MVDK complete");
+			osd_printf_info("TMS320C54x circular MVDK: PASS cases=%u restore=%u excluded=%u encodings=32 asserted_encodings=32 destination_kinds=21 mapped_sources=18 native_bk=82 snapshots=balanced raw_words=1 alias_order=sample,modify,publish physical_phase_claim=0 interrupt_repeat_composition=unvalidated coverage_fnv64=%016llx\n", m_circular_move_coverage.count, m_circular_move_coverage.count, m_circular_move_excluded, (unsigned long long)m_circular_move_coverage.value); throw emu_fatalerror(3, "TMS320C54x isolated circular MVDK complete");
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
