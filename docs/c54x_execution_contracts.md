@@ -3374,12 +3374,18 @@ retain their separate contracts; this does not admit them implicitly.
 At `0020` the board endpoint is BSP receive data, whose ordinary read clears
 receive-ready and overrun; debugger reads must not acknowledge either.
 The independent `shift-bsp` control passes 40,960 cases and save/load replays.
-The parallel `stld-bsp` fixture passes 6,144 cases and cleared-pipeline replays:
+`bsp_parallel_load` owns 768 cases with cleared-pipeline replay, replacing
+6,144 page/checkpoint-crossed executions:
 six forms, eight distinct X/Y selector pairs, two signed-boundary patterns,
-SXM/SST/OVM, two pages and four checkpoints spanning Access, its extra wait,
+SXM/SST/OVM, with pages and four checkpoints distributed across Access, its extra wait,
 Read and Execute. It checks one acknowledged source read, one RAM store,
 retained ASM, Execute-live accumulator data, Read-owned T publication and a
-second frame left pending. The staged wait classifier now includes this
+second frame left pending. The standalone attachment uses the shared BSP
+completed-word model, not a constant read stub; control, received word, ready
+and overrun participate in the actual machine snapshot. Omitting acknowledgement
+or saved overrun state fails the native run. Serial-pin state is not exercised
+by this word-level attachment. The old descriptor, setup, result phases and
+profile routing are deleted. The staged wait classifier includes this
 parallel source. Destination MMIO, mapped single-repeat bodies and simultaneous
 peripheral arbitration remain separate exclusions. The extra clock is a
 documented instruction cost, not a measured silicon pipeline phase; the

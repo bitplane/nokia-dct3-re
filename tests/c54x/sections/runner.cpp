@@ -3,6 +3,9 @@
 #include "emu.h"
 #include "tms320c54x_test_register_sequence.h"
 #include "c54x_section_selected.h"
+#ifdef C54X_SECTION_BSP_WORD_SOURCE
+#include "tms320c54x_bsp_state.h"
+#endif
 
 namespace {
 class section_state : public driver_device
@@ -49,6 +52,11 @@ protected:
 	void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(section_state::tick), this);
+#ifdef C54X_SECTION_BSP_WORD_SOURCE
+		// Completed-word RX only; no serial-pin state changes in this attachment.
+		save_item(NAME(m_bsp.control)); save_item(NAME(m_bsp.receive));
+		save_item(NAME(m_bsp.receive_ready)); save_item(NAME(m_bsp.receive_overrun));
+#endif
 		save_item(NAME(m_irq_acks));
 		save_item(NAME(m_last_irq_case));
 		save_item(NAME(m_case_irq_cursor));
@@ -74,7 +82,16 @@ protected:
 		}, "section_irq");
 		m_cases = c54x_test::section_cases();
 		m_fixture = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
-			m_cases.size(), [this](unsigned i) { return m_cases.at(i); });
+			m_cases.size(), [this](unsigned i) {
+#ifdef C54X_SECTION_BSP_WORD_SOURCE
+				if (i) check_bsp_frame(i-1);
+				m_bsp.reset(); m_bsp.control_w(0x80);
+				u16 const word=m_cases.at(i).data_events->front().value;
+				if (!m_bsp.frame_receive(word) || m_bsp.frame_receive(word^0xffff) || !m_bsp.receive_overrun)
+					throw emu_fatalerror("BSP fixture must start with an unread frame and overrun");
+#endif
+				return m_cases.at(i);
+			});
 #ifdef C54X_SECTION_OBSERVE_MVDD
 		m_fixture->set_data_observer([this](bool write,u32 at,u16) {
 			auto const &input=m_cases.at(m_fixture->count());
@@ -115,7 +132,30 @@ private:
 		map(0x7f0000, 0x7fffff).ram();
 #endif
 	}
-	void data(address_map &map) { map(0, 0xffff).ram(); }
+	void data(address_map &map) {
+		map(0, 0xffff).ram();
+#ifdef C54X_SECTION_BSP_WORD_SOURCE
+		map(0x20,0x20).r(FUNC(section_state::bsp_read));
+#endif
+	}
+#ifdef C54X_SECTION_BSP_WORD_SOURCE
+	u16 bsp_read()
+	{
+		if (machine().side_effects_disabled()) return m_bsp.receive;
+		if (!m_bsp.receive_ready || !m_bsp.receive_overrun)
+			throw emu_fatalerror("BSP read must consume the unread overrun frame");
+		u16 const word=m_bsp.receive_r();
+		if (m_bsp.receive_ready || m_bsp.receive_overrun || !m_bsp.frame_receive(word^0xffff))
+			throw emu_fatalerror("BSP acknowledgement must admit the next frame");
+		return word;
+	}
+	void check_bsp_frame(unsigned i)
+	{
+		u16 const expected=m_cases.at(i).data_events->front().value^0xffff;
+		if (!m_bsp.receive_ready || m_bsp.receive_overrun || m_bsp.receive!=expected)
+			throw emu_fatalerror("BSP next frame must remain unread through completion and replay");
+	}
+#endif
 	TIMER_CALLBACK_MEMBER(tick)
 	{
 		bool const complete = m_fixture->step();
@@ -124,6 +164,9 @@ private:
 			throw emu_fatalerror("Section XF output mismatch");
 #endif
 		if (!complete) return;
+#ifdef C54X_SECTION_BSP_WORD_SOURCE
+		check_bsp_frame(m_cases.size()-1);
+#endif
 #ifdef C54X_SECTION_XF_RESTORE
 		// The external sink is deliberately unsaved: post-load must re-drive it.
 		std::stringstream saved;
@@ -148,6 +191,9 @@ private:
 	u32 m_last_irq_case = ~u32(0);
 	u32 m_case_irq_cursor = 0;
 	bool m_xf = false;
+#ifdef C54X_SECTION_BSP_WORD_SOURCE
+	tms320c54x_bsp_state m_bsp;
+#endif
 };
 ROM_START(tms54isa)
 ROM_END

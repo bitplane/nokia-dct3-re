@@ -1177,59 +1177,9 @@ void tms320c54x_test_state::start_repeated_stld(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::finish_parallel_load_case(parallel_load_fixture &c)
-{
-	auto &f = c.memory;
-	int const shift = int(f.st1 & 31) - (f.st1 & 16 ? 32 : 0);
-	u64 const source = f.source ? c.b : c.a;
-	s64 const signed_source = source & (1ULL << 39) ? s64(source) - (1LL << 40) : s64(source);
-	u64 shifted = shift < 0 ? u64(f.st1 & 0x100 ? signed_source >> -shift : s64(source >> -shift)) & 0xffffffffffULL : (source << shift) & 0xffffffffffULL;
-	if (f.pmst & 1)
-	{
-		if (f.st1 & 0x100) { s64 const number = shifted & (1ULL << 39) ? s64(shifted) - (1LL << 40) : s64(shifted); shifted = u64(std::clamp(number, s64(-2147483648LL), s64(2147483647LL))); }
-		else shifted = std::min(shifted, u64(0xffffffff));
-	}
-	f.stored = shifted >> 16;
-	u64 const loaded = u64(s64(f.st1 & 0x100 ? s16(f.xword) : s32(f.xword)) * 65536) & 0xffffffffffULL;
-	c.result_a = c.form < 4 && !f.destination ? loaded : c.a;
-	c.result_b = c.form < 4 && f.destination ? loaded : c.b;
-}
 
 
 
-void tms320c54x_test_state::start_parallel_load(unsigned variant)
-{
-	auto const c = bsp_parallel_load_case(variant); auto const &f = c.memory;
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, (c.form >= 4 ? 0xe400 : 0xc800 | (f.destination << 8)) | (f.source << 9) | (f.x << 4) | f.y);
-	program.write_word(f.base + 0x601, 0xf4e1);
-	m_cpu->set_pipeline_frontend(false);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, c.ifr); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, c.imr); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, c.a ^ 0x1111111111ULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, c.b ^ 0x1111111111ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T, c.t); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
-	for (unsigned i = 0; i < 4; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, f.initial[i]);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.linear ? 0 : 16);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	if (f.yaddress >= 0x60 && f.yaddress != f.xaddress) data.write_word(f.yaddress, 0xdead);
-	{ m_shifted_bsp.reset(); m_shifted_bsp.control_w(0x80); expect(m_shifted_bsp.frame_receive(f.xword), "Seed parallel BSP receive"); expect(!m_shifted_bsp.frame_receive(f.xword ^ 0xffff) && m_shifted_bsp.receive_overrun, "Seed unread BSP overrun"); }
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "parallel_load_source", [this, f](offs_t at, u16 &word, u16) {
-		if (at == f.xaddress) { word = machine().side_effects_disabled() ? m_shifted_bsp.receive : m_shifted_bsp.receive_r(); }
-		if (machine().side_effects_disabled()) return;
-		expect(!m_pipeline_operand_reads && at == f.xaddress && word == f.xword && m_cpu->pipeline_cycles() == 6, "Parallel load retains one X sample before any aliased Y write"); ++m_pipeline_operand_reads;
-		{ expect(!m_shifted_bsp.receive_ready && !m_shifted_bsp.receive_overrun, "Parallel BSP read acknowledges ready and overrun once"); expect(m_shifted_bsp.frame_receive(f.xword ^ 0xffff), "Next BSP frame remains pending"); }
-	});
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "parallel_load_store", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (at != f.yaddress || word != f.stored) osd_printf_info("STLD store mismatch: case=%u address=%04x expected=%04x value=%04x expected=%04x\n", m_pipeline_peripheral_case, unsigned(at), f.yaddress, word, f.stored);
-		expect(!m_pipeline_store_writes && at == f.yaddress && word == f.stored && m_cpu->pipeline_cycles() == 7, "Parallel store uses the Execute-live old accumulator with retained ASM before its load replacement"); ++m_pipeline_store_writes;
-	});
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62164;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::circular_move_fixture tms320c54x_test_state::circular_move_case(unsigned variant)
 {
@@ -3162,42 +3112,6 @@ bool tms320c54x_test_state::check_popd_mapped_results()
 
 
 
-bool tms320c54x_test_state::check_mapped_parallel_load_results()
-{
-	if (m_phase == 62164)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		auto const c = bsp_parallel_load_case(variant); auto const &f = c.memory;
-		unsigned const checkpoint = 4 + f.snapshot;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Parallel operation remains admitted");
-		if (tick == 6U)
-		{
-			for (unsigned i = 0; i < 4; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == f.final[i], "Parallel load applies X priority and each dual-address update once");
-			if (c.form >= 4) expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.xword, "Parallel LD Xmem,T publishes the retained input in Read");
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, c.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, c.b); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x55aa);
-			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1 ^ 31);
-			for (unsigned i = 0; i < 4; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + i, 0x2200 + i);
-		}
-		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save parallel load around address capture Read and Execute"); }
-		if (tick == 12)
-		{
-			expect(m_shifted_bsp.receive_ready && !m_shifted_bsp.receive_overrun && m_shifted_bsp.receive == u16(f.xword ^ 0xffff), "Parallel load leaves the next BSP frame unread after completion and restore");
-			u64 const a = c.result_a, b = c.result_b;
-			if (m_cpu->state_int(tms320c54x_device::STATE_A) != a || m_cpu->state_int(tms320c54x_device::STATE_B) != b) osd_printf_info("STLD result mismatch: case=%u form=%u a=%010llx expected=%010llx b=%010llx expected=%010llx\n", variant, c.form, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)a, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)b);
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x55aa, "Parallel store/load separates Read-owned input and T from Execute-owned old accumulator and destination");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (f.st1 ^ 31) && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Parallel operation preserves modes and publishes only its specified arithmetic status");
-			for (unsigned i = 0; i < 4; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == (0x2200 + i), "No pointer update is repeated after the retained address is consumed");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Parallel store/load completes before IDLE");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_cpu->set_pipeline_frontend(true); return restore_pipeline_at(62165, "Replay parallel store/load without duplicate samples publications or address effects"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant + 1 < 6144U) { start_parallel_load(variant + 1); return true; }
-			{ osd_printf_info("TMS320C54x parallel BSP load: PASS cases=6144 restore=6144 forms=6 selector_pairs=8 patterns=2 sxm_sst_ovm=8 pages=2 snapshots=4 extra_clock=1 reads=1 writes=1 ready_overrun_ack=1 next_frame_pending=1 store_source=Execute t_publish=Read reset_before_restore=1 carry_policy=preserve_unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel BSP load complete"); }
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62165) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62164; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_memory_copy_repeat_results()
 {

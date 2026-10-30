@@ -512,27 +512,6 @@ void tms320c54x_test_state::start_bus_register_test()
 }
 
 
-tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::bsp_parallel_load_case(unsigned variant)
-{
-	parallel_load_fixture c{}; auto &f=c.memory;
-	c.form=variant%6;
-	unsigned const selectors=std::array<unsigned,8>{0x01,0x0a,0x45,0xcd,0xf2,0x83,0xbc,0xef}[(variant/6)%8];
-	unsigned const pattern=(variant/48)%2,flags=(variant/96)%8;
-	f.base=(variant/768)%2 ? 0x20000 : 0; f.snapshot=variant/1536;
-	f.x=selectors>>4; f.y=selectors&15; f.source=c.form>=4 ? c.form-4 : c.form/2; f.destination=c.form&1;
-	f.initial={0x401f,0x411f,0x421f,0x431f}; f.initial[f.x&3]=0x20;
-	f.xaddress=0x20; f.yaddress=f.initial[f.y&3]; f.final=f.initial;
-	auto modify=[](u16 at,unsigned mode)->u16 { return at+(mode==1 ? -1 : mode==2 ? 1 : mode==3 ? 3 : 0); };
-	f.final[f.x&3]=modify(f.initial[f.x&3],f.x>>2);
-	f.final[f.y&3]=modify(f.initial[f.y&3],f.y>>2); f.linear=true;
-	f.st0=0xa002|(pattern ? 0x800 : 0);
-	f.st1=0x800|(flags&1 ? 0x100 : 0)|(flags&4 ? 0x200 : 0)|(pattern ? 31 : 0); f.pmst=flags&2 ? 1 : 0;
-	c.a=pattern ? 0xfe7fffffffULL : 0x123456789aULL; c.b=c.a^0x5aa55aa55aULL;
-	c.imr=pattern ? 0xa55a : 0; c.ifr=pattern ? 0x5aa5 : 0;
-	f.xword=pattern ? 0x8001 : 0x7ffe;
-	finish_parallel_load_case(c);
-	return c;
-}
 
 
 

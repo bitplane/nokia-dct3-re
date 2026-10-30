@@ -5,10 +5,10 @@
 #include "c54x_section_common.h"
 #include <algorithm>
 namespace c54x_test {
-inline std::vector<clocked_register_case> mapped_parallel_cases(bool peripheral=false)
+inline std::vector<clocked_register_case> mapped_parallel_cases(bool peripheral=false,bool bsp=false)
 {
 	std::vector<clocked_register_case> cases;
-	for (unsigned form=0;form<6;++form) for (unsigned location=0;location<(peripheral ? 64U : 32U);++location)
+	for (unsigned form=0;form<6;++form) for (unsigned location=0;location<(bsp ? 1U : peripheral ? 64U : 32U);++location)
 	for (unsigned selectors : {0x01,0x0a,0x45,0xcd,0xf2,0x83,0xbc,0xef})
 	for (unsigned pattern=0;pattern<2;++pattern) for (unsigned flags=0;flags<8;++flags) {
 		unsigned const address=location+(peripheral ? 0x20 : 0),read_clock=peripheral ? 6 : 5;
@@ -52,7 +52,7 @@ inline std::vector<clocked_register_case> mapped_parallel_cases(bool peripheral=
 		u64 const loaded=u64(s64(flags&1 ? s16(word) : s32(word))*65536)&0xffffffffffULL;
 		u64 const final_a=form<4 && !destination ? loaded : a,final_b=form<4 && destination ? loaded : b;
 		u16 const opcode=(form>=4 ? 0xe400 : 0xc800|(destination<<8))|(source<<9)|(x<<4)|y;
-		auto initial=initial_case(peripheral ? "parallel-volatile-peripheral-read-once" : "parallel-mapped-Read-versus-live-store-source",{opcode,0xf4e1});
+		auto initial=initial_case(bsp ? "parallel-BSP-read-acknowledges-one-frame" : peripheral ? "parallel-volatile-peripheral-read-once" : "parallel-mapped-Read-versus-live-store-source",{opcode,0xf4e1});
 		for (auto &p : initial.program) p.address+=base;
 		initial.data={{target,0xdead}};
 		if ((address>=2 && address<=5) || address==0x1f) initial.data.push_back({address,word});
@@ -76,7 +76,7 @@ inline std::vector<clocked_register_case> mapped_parallel_cases(bool peripheral=
 		if ((address>=2 && address<=5) || address==0x1f) c.actions.front().data={{address,u16(word^0xffff)}};
 		if (!peripheral) c.actions.front().values.insert(c.actions.front().values.end(),{{r::STATE_IMR,0x0f0f},{r::STATE_IFR,0xf0f0}});
 		else {
-			c.volatile_data_reads={{address,word}};
+			if (!bsp) c.volatile_data_reads={{address,word}};
 			c.states.back().observation.expected_data={{address,u16(word^0xffff)}};
 		}
 		c.data_events=std::vector<clocked_data_event>{{false,address,word,read_clock},{true,target,u16(shifted>>16),read_clock+1}};

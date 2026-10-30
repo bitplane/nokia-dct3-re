@@ -16,7 +16,6 @@
 #include "tms320c54x_test_register_sequence.h"
 #include "tms320c54x_test_repeat_state.h"
 #include "tms320c54x_test_snapshot.h"
-#include "tms320c54x_test_parallel_transfer_input.h"
 #include "tms320c54x_test_pipeline_state.h"
 #include <sstream>
 #include <bitset>
@@ -456,17 +455,6 @@ private:
 	static u16 repeated_stld_sample(unsigned i);
 	static u16 repeated_stld_store(repeated_stld_fixture const &f, std::array<u64, 3> const &state);
 	void start_repeated_stld(unsigned variant = 0);
-	struct parallel_load_fixture
-	{
-		parallel_transfer_fixture memory;
-		unsigned form;
-		u64 a, b, result_a, result_b;
-		u16 imr = 0, ifr = 0;
-		u16 t = 0xbeef;
-	};
-	static void finish_parallel_load_case(parallel_load_fixture &c);
-	static parallel_load_fixture bsp_parallel_load_case(unsigned variant);
-	void start_parallel_load(unsigned variant = 0);
 	struct circular_move_fixture
 	{
 		indexed_store_fixture memory;
@@ -899,7 +887,6 @@ private:
 	bool check_move_repeat_owner_results();
 	bool check_block_branch_edge_results();
 	bool check_delay_dld_results();
-	bool check_mapped_parallel_load_results();
 	bool check_memory_copy_repeat_results();
 	bool check_block_near_call_results();
 	bool check_repeated_mvdk_results();
