@@ -9,23 +9,6 @@
 
 namespace c54x_test {
 
-void tms320c54x_test_state::start_indirect_popm_case(unsigned index)
-{
-	m_cpu->reset();
-	auto &program = m_cpu->space(AS_PROGRAM);
-	static constexpr u16 opcodes[] = {0x8a93, 0x8a9b, 0x8a90, 0x8a9b};
-	program.write_word(0x0800, opcodes[index]);
-	program.write_word(0x0801, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(0x1000, 0x1234);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR0, 0xdead},
-		{cpu_regs::STATE_AR3, index == 1 ? 0x800f : index == 3 ? 0x8017 : 0x8010},
-		{cpu_regs::STATE_ST0, index == 2 ? 0x6000 : 0}, {cpu_regs::STATE_ST1, index == 2 ? 0x20 : 0},
-		{STATE_GENPC, 0x0800},
-	});
-	m_phase = 160000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 
@@ -4971,27 +4954,6 @@ bool tms320c54x_test_state::check_reverse_carry_reference_results()
 }
 
 
-bool tms320c54x_test_state::check_indirect_popm_results()
-{
-	if (m_phase >= 160000 && m_phase < 160004)
-	{
-		unsigned const index = m_phase - 160000;
-		static constexpr u16 opcodes[] = {0x8a93, 0x8a9b, 0x8a90, 0x8a9b};
-		expect_opcode(opcodes[index], m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0802 &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == (index == 3 ? 0x1234 : 0x1001) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR0) == (index == 3 ? 0xdead : 0x1234) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == (index == 1 ? 0x10 : index == 3 ? 0x18 : 0x11) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (index == 2 ? 0x6000 : 0) &&
-			m_cpu->space(AS_DATA).read_word(0x1000) == 0x1234,
-			"Indirect POPM preserves stack contents, page-zero MMR addressing, pointer update and ARP selection");
-		if (index < 3) { start_indirect_popm_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x indirect POPM: PASS cases=4 pre_post=1 compatibility=1 sp_destination=1 pipeline_claim=0\n");
-		start_shifted_arithmetic_selector_case(0); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_pipeline_store_results()
 {

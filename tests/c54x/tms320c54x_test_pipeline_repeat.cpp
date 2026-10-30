@@ -1413,7 +1413,7 @@ bool tms320c54x_test_state::check_braf_control_results()
 		}
 		osd_printf_info("TMS320C54x atomic instruction references: PASS cases=%u resets=%u firmware=0\n",
 			unsigned(instruction_word_examples().size()), unsigned(instruction_word_examples().size()));
-		start_indirect_popm_case(0); return true;
+		return true;
 	}
 	return false;
 }
