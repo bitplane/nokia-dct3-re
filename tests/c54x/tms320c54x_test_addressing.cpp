@@ -34,86 +34,6 @@ void tms320c54x_test_state::start_indirect_popm_case(unsigned index)
 
 
 
-void tms320c54x_test_state::start_pipeline_mvpd(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	unsigned const mode = variant % 4;
-	u32 const base = (BIT(variant, 4) ? 3 : 2) << 16;
-	u16 const source = BIT(variant, 3) ? 0x8700 : 0x700;
-	u16 const value = BIT(variant, 2) && !BIT(variant, 3) ? 0x1111 : 0x4444;
-	u32 const physical = BIT(variant, 2) && !BIT(variant, 3) ? source : base + source;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(base + 0x9000 + i, 0xf495);
-	program.write_word(base + 0x9000, 0x7c00 | (mode < 2 ? 0x20 : mode == 2 ? 0x82 : 0x92));
-	program.write_word(base + 0x9001, source);
-	program.write_word(source, 0x1111); program.write_word(base + source, 0x4444);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, BIT(variant, 2) ? 0x20 : 0);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, mode == 1 ? 0x4800 : 0x800},
-		{cpu_regs::STATE_SP, 0x400}, {cpu_regs::STATE_AR2, 0x420}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(0x420, 0xffff);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x9000); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0;
-	m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x420, 0x420, "mvpd_destination",
-		[this, value](offs_t, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(word == value && m_cpu->pipeline_cycles() == 8 && !m_pipeline_store_writes, "MVPD writes its retained program operand once after its extra bus clock"); ++m_pipeline_store_writes;
-		});
-	m_pipeline_operand_tap = program.install_read_tap(physical, physical, "mvpd_program_source",
-		[this, value](offs_t, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(word == value && m_cpu->pipeline_cycles() == 7 && !m_pipeline_operand_reads, "MVPD reads program space at the retained absolute address exactly once"); ++m_pipeline_operand_reads;
-		});
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x9001, base + 0x9001, "mvpd_program_literal",
-		[this, source](offs_t, u16 &word, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(word == source && !m_pipeline_extensions_reads, "MVPD does not refetch its source literal after Decode assembly"); ++m_pipeline_extensions_reads;
-		});
-	m_phase = 252290; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_extended_mvpd(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const form = variant % 4, reg = (variant / 4) % 8, pattern = (variant / 32) % 4;
-	bool const mapped = (variant / 256) % 2, compatibility = (variant / 1024) % 2;
-	u32 const base = (variant / 128) % 2 ? 0x20000 : 0;
-	u16 const source = (variant / 512) % 2 ? 0xff87 : 0x2e00;
-	u32 const physical = mapped && source < 0x8000 ? source : base + source;
-	u16 const destination = std::array<u16, 4>{0x0802, 0x122f, 0x1231, 0x1201}[form];
-	u16 const value = std::array<u16, 4>{0, 0xffff, 0x2468, 0xf495}[pattern];
-	u8 const mode = form == 0 ? 0xf8 : 0xe0 + (form - 1) * 8 + reg;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x9000 + i, 0xf495);
-	program.write_word(base + 0x9000, 0x7c00 | mode);
-	program.write_word(base + 0x9001, form == 0 ? destination : source);
-	program.write_word(base + 0x9002, form == 0 ? source : form == 1 ? 0xffff : form == 2 ? 1 : 2);
-	program.write_word(base + 0x9003, 0xf4e1);
-	program.write_word(physical ^ 0x20000, value ^ 0xffff); program.write_word(physical, value);
-	m_cpu->space(AS_DATA).write_word(destination, 0xbeef);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, mapped ? 0x20 : 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa624); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (compatibility ? 0x20 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_BK, 16);
-	unsigned const selected = compatibility && !reg ? 5 : reg;
-	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, ar == selected ? form == 3 ? 0x120f : 0x1230 : 0x3000 + ar);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = program.install_read_tap(physical, physical, "extended_mvpd_source",
-		[this, value](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads && word == value && m_cpu->pipeline_cycles() == 8, "Extended MVPD reads the correct program page once in its held clock"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "extended_mvpd_destination",
-		[this, destination, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && at == destination && word == value && m_cpu->pipeline_cycles() == 9, "Extended MVPD writes the retained word once to the captured destination"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x9001, base + 0x9002, "extended_mvpd_extensions",
-		[this, base](offs_t at, u16 &, u16) { if (machine().side_effects_disabled()) return; expect(m_pipeline_extensions_reads < 2 && at == base + 0x9001 + m_pipeline_extensions_reads, "Extended MVPD consumes both extension words once and in order"); ++m_pipeline_extensions_reads; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 259980;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::circular_mar_fixture tms320c54x_test_state::circular_mar_case(unsigned variant)
 {
@@ -5688,47 +5608,6 @@ bool tms320c54x_test_state::check_repeat_pop_exclusion_results()
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252270;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
-	if (m_phase == 252290)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, mode = variant % 4;
-		u32 const base = (BIT(variant, 4) ? 3 : 2) << 16;
-		u16 const source = BIT(variant, 3) ? 0x8700 : 0x700;
-		u32 const physical = BIT(variant, 2) && !BIT(variant, 3) ? source : base + source;
-		unsigned const tick = ++m_idle_fixture_tick;
-		unsigned const checkpoint = std::array<unsigned, 4>{4, 6, 7, 9}[variant / 32];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Staged short MVPD has explicit program-bus ownership");
-		if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x9001, 0x321); }
-		if (tick == 7) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(physical, 0xaaaa); }
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick;
-			m_recurring_irq_snapshot = {m_pipeline_store_writes, m_pipeline_operand_reads, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save MVPD literal, held program read or retained data write");
-		}
-		if (tick == 20)
-		{
-			expect(m_pipeline_store_writes == 1 && m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == 1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (mode == 3 ? 0x421 : 0x420) &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x400 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (mode == 1 ? 0x4800 : 0x800),
-				"MVPD's destination addressing/postincrement and sampled program word survive without duplicate bus traffic");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_store_writes = m_recurring_irq_snapshot[0]; m_pipeline_operand_reads = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(252300, "Restore MVPD program read and destination without reissuing transactions");
-			}
-			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 127) { start_pipeline_mvpd(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged MVPD: PASS cases=128 addressing_modes=4 source_pages=2 source_regions=2 ovly_states=2 restore=128 duplicate_program_reads=0 duplicate_data_writes=0\n");
-			start_pipeline_repeat_mvpd(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252300)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252290;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
 	if (m_phase == 252310)
 	{
 		unsigned const variant = m_pipeline_peripheral_case;
@@ -7735,50 +7614,6 @@ bool tms320c54x_test_state::check_mapped_dual_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_extended_mvpd_results()
-{
-	if (m_phase == 259980)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		unsigned const form = variant % 4, reg = (variant / 4) % 8;
-		bool const mapped = (variant / 256) % 2, compatibility = (variant / 1024) % 2;
-		unsigned const selected = compatibility && !reg ? 5 : reg, checkpoint = std::array<unsigned, 3>{6, 8, 9}[variant / 2048];
-		u16 const source = (variant / 512) % 2 ? 0xff87 : 0x2e00;
-		u32 const physical = mapped && source < 0x8000 ? source : ((variant / 128) % 2 ? 0x20000 : 0) + source;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Legal standalone extended MVPD is admitted");
-		if (tick == 7)
-		{
-			u16 const next = form == 3 ? 0x1201 : form == 2 ? 0x1231 : 0x1230;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + selected) == next, "Extended MVPD resolves and modifies its destination once");
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + selected, 0x4000);
-		}
-		if (tick == 8)
-		{
-			auto const disable = machine().disable_side_effects();
-			m_cpu->space(AS_PROGRAM).write_word(physical, 0xdead);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, mapped ? 0 : 0x20);
-		}
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads},
-			"Save extended MVPD around the retained source and destination");
-		if (tick == 24)
-		{
-			{ auto const disable = machine().disable_side_effects();
-				u16 const destination = std::array<u16, 4>{0x0802, 0x122f, 0x1231, 0x1201}[form];
-				expect(m_cpu->space(AS_DATA).read_word(destination) == std::array<u16, 4>{0, 0xffff, 0x2468, 0xf495}[(variant / 32) % 4], "Extended MVPD commits the sampled source to RAM"); }
-			expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_pipeline_extensions_reads == 2 && m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Extended MVPD completes without repeated bus effects");
-			for (unsigned ar = 0; ar < 8; ++ar) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (ar == selected ? 0x4000 : 0x3000 + ar), "Extended MVPD does not reapply address updates or alter other ARs");
-			if (replay_pipeline_at(259990, checkpoint,
-				"Restore extended MVPD without duplicate transfers")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 6143) { start_extended_mvpd(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged extended MVPD: PASS cases=6144 restore=6144 forms=absolute,offset,preincrement,circular registers=8 values=4 pages=2 ovly=2 source_regions=2 cmpt=2 snapshots=3 program_reads=1 data_writes=1 extensions=2 repeat_acceptance=0 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated extended MVPD complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 259990) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 259980; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_repeat_mvkd_results()
 {

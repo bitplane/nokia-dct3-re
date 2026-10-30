@@ -7,6 +7,7 @@
 #include "tms320c54x_test_case.h"
 #include "tms320c54x_test_snapshot.h"
 #include "cpu/tms320c54x/tms320c54x.h"
+#include <algorithm>
 #include <functional>
 
 namespace c54x_test {
@@ -53,7 +54,7 @@ public:
 			if (m_input.require_idle) require(m_cpu.state_int(tms320c54x_device::STATE_IDLE), "sequence reaches its real IDLE instruction");
 			if (m_input.single_fetch) require(m_fetches == 1, "one opcode fetch");
 			if (m_input.data_events) require(m_data_cursor == m_input.data_events->size(), "complete data-bus trace");
-			require(m_program_cursor == m_input.retained_program_reads.size(), "complete retained-program trace");
+			require(m_program_cursor == (m_input.program_events.empty() ? m_input.retained_program_reads.size() : m_input.program_events.size()), "complete retained-program trace");
 			if (!m_replay)
 			{
 				m_replay = true; m_tick = m_input.checkpoint; m_fetches = m_saved_fetches;
@@ -132,7 +133,23 @@ private:
 					require(!m_fetches && word == opcode, "one fetch of the specified opcode"); ++m_fetches;
 					if (m_opcode_observer) m_opcode_observer(word, opcode);
 				});
-		if (!m_input.retained_program_reads.empty())
+		if (!m_input.program_events.empty())
+		{
+			require(m_input.retained_program_reads.empty(), "one program-read policy");
+			u32 first = ~u32(0), last = 0;
+			for (auto const &event : m_input.program_events) { first = std::min(first,event.address); last = std::max(last,event.address); }
+			m_program_tap = m_cpu.space(AS_PROGRAM).install_read_tap(first,last,"register_sequence_program",
+				[this](offs_t at, u16 &word, u16) {
+					if (m_machine.side_effects_disabled()) return;
+					bool selected = false;
+					for (auto const &event : m_input.program_events) selected |= event.address == at;
+					if (selected && !accept_data_event(m_input.program_events,m_program_cursor,
+						{false,u32(at),word,unsigned(m_cpu.pipeline_cycles())}))
+						throw emu_fatalerror("C54x program case=%u event=%u address=%x value=%x clock=%llu",m_case,m_program_cursor,
+							unsigned(at),word,(unsigned long long)m_cpu.pipeline_cycles());
+				});
+		}
+		else if (!m_input.retained_program_reads.empty())
 		{
 			auto const &words = m_input.retained_program_reads;
 			for (unsigned i = 1; i < words.size(); ++i)

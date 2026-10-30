@@ -212,8 +212,6 @@ private:
 	void start_pipeline_original_idle(unsigned variant = 0);
 	void start_pipeline_pmst(unsigned variant = 0);
 	void start_stack_irq_order(unsigned variant = 0);
-	void start_pipeline_mvpd(unsigned variant = 0);
-	void start_extended_mvpd(unsigned variant = 0);
 	void start_literal_guard(unsigned variant = 0);
 	struct ar_addm_fixture
 	{
@@ -2085,7 +2083,6 @@ private:
 	bool check_staged_overflow_results();
 	bool check_mapped_dual_results();
 	bool check_mvmd_accumulator_results();
-	bool check_extended_mvpd_results();
 	bool check_repeat_mvdp_irq_results();
 	bool check_repeat_mvkd_results();
 	bool check_conditional_call_results();

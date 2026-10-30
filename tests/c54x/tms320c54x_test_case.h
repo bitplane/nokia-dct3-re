@@ -68,6 +68,7 @@ struct clocked_register_case
 	bool check_pipeline_clock = false;
 	std::optional<unsigned> final_pipeline_clock{};
 	bool clear_pipeline_before_restore = false;
+	std::vector<clocked_data_event> program_events{};
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

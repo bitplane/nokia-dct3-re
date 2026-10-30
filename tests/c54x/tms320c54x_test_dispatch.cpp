@@ -151,7 +151,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_staged_overflow_results()) return;
 	if (check_mapped_dual_results()) return;
 	if (check_mvmd_accumulator_results()) return;
-	if (check_extended_mvpd_results()) return;
 	if (check_repeat_mvdp_irq_results()) return;
 	if (check_repeat_mvkd_results()) return;
 	if (check_conditional_call_results()) return;
