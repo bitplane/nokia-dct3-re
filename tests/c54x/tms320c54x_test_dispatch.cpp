@@ -30,7 +30,7 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_branch_repeat_results()) return;
 	if (check_rptbd_t_load_results()) return;
 	if (check_staged_load_results()) return;
-	if (check_immediate_arithmetic_results()) return;
+	if (check_memory_operand_arithmetic_results()) return;
 	if (check_memory_repeat_results()) return;
 	if (check_asm_store_results_part2()) return;
 	if (check_fcala_delay_results()) return;

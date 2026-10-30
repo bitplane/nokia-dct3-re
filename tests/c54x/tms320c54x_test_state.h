@@ -164,16 +164,6 @@ private:
 		u16 bk;
 	};
 	static extended_banz_fixture extended_banz_case(unsigned variant);
-	struct immediate_arithmetic_fixture
-	{
-		unsigned selector, shift, flags, gap, execute_cycle;
-		bool producer, add;
-		u16 opcode, literal, st0, st1, result_st0;
-		u64 source, result;
-		u32 base;
-	};
-	static immediate_arithmetic_fixture immediate_arithmetic_case(unsigned variant);
-	void start_pipeline_immediate_arithmetic(unsigned variant = 0);
 	struct memory_multiply_fixture
 	{
 		memory_arithmetic_fixture operand;
@@ -925,7 +915,7 @@ private:
 	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
 	bool check_staged_load_results();
-	bool check_immediate_arithmetic_results();
+	bool check_memory_operand_arithmetic_results();
 	bool check_memory_repeat_results();
 	bool check_asm_store_results_part2();
 	bool check_fcala_delay_results();

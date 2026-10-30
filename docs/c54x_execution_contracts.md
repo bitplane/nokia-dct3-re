@@ -447,6 +447,15 @@ product is deliberately retired. Numeric expectations, extension poisoning,
 post-read mutation and publication checks are unchanged. Ordered input/stage
 digests and actual restore counts protect the retained schedules.
 
+`immediate_subtract` owns 4,656 immediate SUB/shift-16 ADD cases/replays:
+all SUB shifts 0..16, selectors, eight paired word/source patterns and eight
+status combinations, plus every adjacent-load gap/value/selector. Pages and
+three checkpoints are distributed instead of 27,792 executions. Signed 40-bit
+source, SXM, bit-32 carry, sticky destination overflow and OVM use independent
+integer expectations. Exact Execute publication, literal retention/poisoning,
+producer forwarding and zero data-bus traffic survive replay. Legacy factory,
+setup and result phases are removed; no physical timing claim is made.
+
 `register_accumulator_arithmetic` and `register_accumulator_load` own 18,784
 and 18,608 cases/replays. All immediate shifts -16..15 cross the original
 patterns, selectors and status inputs; ASM repeats the four numerical
