@@ -8,6 +8,17 @@
   },
   "families": [
     {
+      "id": "named-observer-checkpoint-service",
+      "classification": "harness_infrastructure",
+      "decision": "rewrite",
+      "profiles": [],
+      "case_ids": [],
+      "basis": "Manual snapshot-slot assignments duplicate the same unsigned observer selection at capture and rewind. Name the observers once, retain zero-filled spare slots, rewind them and the host tick before the existing guest-stream restore, and keep pointer bindings outside guest serialization. Guest setup, result predicates, checkpoint expressions and continuation messages are unchanged.",
+      "pilot": {"phase": 255360, "continuation": 255370, "observers": ["m_pipeline_operand_reads", "m_pipeline_store_writes", "m_pipeline_extensions_reads"], "profiles": ["mvdk-mapped", "mvdk-acc", "clock-mvdk"]},
+      "limits": ["no case retirement or new ISA expectation", "legacy adapter around the generic stream service, not a relocation to the CPU-only executable", "only simple tick-based unsigned observers; custom reset/input-line work remains explicit"],
+      "verification": "Executable tests compile the actual helpers without MAME/CPU code and check capture timing, replay suppression, capacity/null/missing-binding errors, zero-filled spare slots, observer rewind before load, continuation ordering, and save/load failure paths. All 382 focused C54x host tests pass. Rebuilt mvdk-mapped (14256 cases/restores), mvdk-acc (8208) and clock-mvdk (72) pass their complete native oracles. The unchanged 402-profile inventory passes; full-default and handset checkpoints are not renewed by the pilot."
+    },
+    {
       "id": "parallel-transfer-numeric-checkpoint-projection",
       "classification": "architectural_interaction",
       "decision": "merge",

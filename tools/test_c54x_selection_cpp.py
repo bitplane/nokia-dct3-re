@@ -1,4 +1,4 @@
-"""Execute the actual header-only fixture selector without MAME or CPU code."""
+"""Execute fixture selection and observer/replay services without MAME."""
 import os
 from pathlib import Path
 import shutil
@@ -100,6 +100,93 @@ int main() {
     assert(bad.m_phase == 9 && (bad.events == std::vector<int>{1,2,3}));
 }
 '''
+        if not shutil.which('c++'):
+            self.skipTest('C++ compiler unavailable')
+        with compiled_cpp(source) as program:
+            subprocess.run([str(program)], check=True, capture_output=True)
+
+    def test_counted_checkpoint_rewinds_observers_before_guest_load(self):
+        from tools.test_c54x_case_fixture import compiled_cpp
+        header = (ROOT / 'tests/c54x/tms320c54x_test_state.h').read_text()
+        begin = header.index('\tvoid capture_pipeline_at(')
+        end = header.index('\tbool next_atomic_phase(', begin)
+        source = r'''
+#include <array>
+#include <cassert>
+#include <initializer_list>
+#include <stdexcept>
+#include <vector>
+struct attotime { static constexpr int never = -1; };
+constexpr int STATERR_NONE=0, SUSPEND_REASON_DISABLE=1;
+#include "tests/c54x/tms320c54x_test_snapshot.h"
+using c54x_test::capture_snapshot; using c54x_test::restore_snapshot;
+struct bench {
+    unsigned reads=3, writes=7, fetches=11, m_idle_fixture_tick=4, m_phase=9;
+    unsigned m_pipeline_counter_count=0;
+    bool m_pipeline_replay=false, fail_save=false, fail_load=false;
+    std::array<unsigned,9> m_recurring_irq_snapshot{};
+    std::array<unsigned*,9> m_pipeline_counter_bindings{};
+    std::stringstream m_saved_pipeline{"stale"};
+    std::vector<unsigned> events;
+    bench &machine() { return *this; }
+    bench &save() { return *this; }
+    void expect(bool valid, const char *message) { if(!valid) throw std::runtime_error(message); }
+    int write_stream(std::stringstream &out) {
+        assert(m_phase==9 && m_idle_fixture_tick==5 && !m_pipeline_replay);
+        assert(m_pipeline_counter_count==3 && m_recurring_irq_snapshot[0]==3 &&
+            m_recurring_irq_snapshot[1]==7 && m_recurring_irq_snapshot[2]==11);
+        for(unsigned i=3;i<9;++i) assert(m_recurring_irq_snapshot[i]==0);
+        assert(out.str().empty()); out<<"saved"; events.push_back(1); return fail_save;
+    }
+    int read_stream(std::stringstream &in) {
+        assert(m_phase==9 && m_idle_fixture_tick==5 && m_pipeline_replay);
+        assert(reads==3 && writes==7 && fetches==11);
+        std::string text; in>>text; assert(text=="saved"); events.push_back(3); return fail_load;
+    }
+    struct cpu {
+        bench &b;
+        void suspend(int reason,bool eat) { assert(reason==1 && eat && b.m_phase==9); b.events.push_back(4); }
+    } core{*this}, *m_cpu=&core;
+    struct timer {
+        bench &b;
+        void adjust(int when) { assert(when==attotime::never); b.events.push_back(2); }
+        void enable(bool yes) { assert(yes && b.m_phase==123); b.events.push_back(5); }
+    } clock{*this}, *m_check_timer=&clock;
+HELPERS
+    void capture() {
+        m_recurring_irq_snapshot.fill(99); m_idle_fixture_tick=5;
+        capture_pipeline_at(5,{&reads,&writes,&fetches},"capture");
+    }
+};
+int main() {
+    bench b;
+    b.capture_pipeline_at(5,{nullptr},"not at checkpoint"); assert(b.events.empty());
+    b.capture(); assert((b.events==std::vector<unsigned>{1}));
+    b.reads=30; b.writes=70; b.fetches=110; b.m_idle_fixture_tick=12;
+    assert(b.replay_pipeline_at(123,5,"restore"));
+    assert((b.events==std::vector<unsigned>{1,2,3,4,5}));
+    b.reads=99;
+    b.capture_pipeline_at(5,{nullptr},"already replayed");
+    assert(!b.replay_pipeline_at(456,6,"already replayed") && b.reads==99 && b.events.size()==5);
+    bench bad; bad.capture(); bad.fail_load=true; bad.reads=bad.writes=bad.fetches=99;
+    try { bad.replay_pipeline_at(123,5,"restore"); assert(false); } catch(std::runtime_error const &) { }
+    assert(bad.m_phase==9 && (bad.events==std::vector<unsigned>{1,2,3}));
+    bench no_save; no_save.fail_save=true;
+    try { no_save.capture(); assert(false); } catch(std::runtime_error const &) { }
+    assert(no_save.m_phase==9 && !no_save.m_pipeline_replay && no_save.events.size()==1);
+    bench invalid; invalid.m_idle_fixture_tick=5;
+    for(unsigned kind=0;kind<4;++kind) {
+        try {
+            if(kind==0) invalid.capture_pipeline_at(5,{},"empty");
+            if(kind==1) invalid.capture_pipeline_at(5,{nullptr},"null");
+            if(kind==2) invalid.capture_pipeline_at(5,{&invalid.reads,&invalid.reads,&invalid.reads,&invalid.reads,&invalid.reads,&invalid.reads,&invalid.reads,&invalid.reads,&invalid.reads,&invalid.reads},"capacity");
+            if(kind==3) invalid.replay_pipeline_at(123,5,"missing capture");
+            assert(false);
+        } catch(std::runtime_error const &) { }
+        assert(!invalid.m_pipeline_replay && invalid.m_phase==9 && invalid.events.empty());
+    }
+}
+'''.replace('HELPERS', header[begin:end])
         if not shutil.which('c++'):
             self.skipTest('C++ compiler unavailable')
         with compiled_cpp(source) as program:

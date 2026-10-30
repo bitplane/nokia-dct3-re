@@ -1959,6 +1959,30 @@ private:
 	bool check_rounded_multiply_results();
 	bool check_stopped_timer_reload_results();
 	bool check_atomic_program_results();
+	void capture_pipeline_at(unsigned checkpoint, std::initializer_list<unsigned *> observers, const char *message)
+	{
+		if (m_idle_fixture_tick != checkpoint || m_pipeline_replay) return;
+		expect(observers.size() && observers.size() <= m_recurring_irq_snapshot.size(), "Explicit observer checkpoint capacity");
+		for (auto *observer : observers) expect(observer != nullptr, "Explicit observer checkpoint binding");
+		m_recurring_irq_snapshot.fill(0);
+		m_pipeline_counter_count = 0;
+		for (auto *observer : observers)
+		{
+			m_pipeline_counter_bindings[m_pipeline_counter_count] = observer;
+			m_recurring_irq_snapshot[m_pipeline_counter_count++] = *observer;
+		}
+		expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, message);
+	}
+	bool replay_pipeline_at(unsigned phase, unsigned checkpoint, const char *message)
+	{
+		if (m_pipeline_replay) return false;
+		expect(m_pipeline_counter_count != 0, "Replay has captured observer bindings");
+		m_pipeline_replay = true;
+		m_idle_fixture_tick = checkpoint;
+		for (unsigned i = 0; i < m_pipeline_counter_count; ++i)
+			*m_pipeline_counter_bindings[i] = m_recurring_irq_snapshot[i];
+		return restore_pipeline_at(phase, message);
+	}
 	bool restore_pipeline_at(unsigned phase, const char *message)
 	{
 		// Callers rewind host observations explicitly before loading guest state.
@@ -2276,6 +2300,9 @@ private:
 	unsigned m_pipeline_drained_fetches = 0;
 	memory_passthrough_handler m_pipeline_fetch_tap;
 	std::array<unsigned, 9> m_recurring_irq_snapshot = {};
+	// Host observation bindings, deliberately outside the guest save stream.
+	std::array<unsigned *, 9> m_pipeline_counter_bindings = {};
+	unsigned m_pipeline_counter_count = 0;
 	unsigned m_recurring_irq_first_return_writes = ~0U, m_recurring_irq_end_writes = 0;
 	unsigned m_idle_fixture_tick = 0, m_idle_fixture_saved_tick = 0;
 	unsigned m_pipeline_repeat_count_reads = 0;

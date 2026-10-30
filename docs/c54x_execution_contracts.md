@@ -70,11 +70,15 @@ mask, while the generated predicates remain unchanged. No case is retired.
 
 Timed replay uses one `restore_pipeline_at` tail: cancel the observer before
 loading the stream, reject load failure, suspend the CPU, publish its fixed
-continuation and enable the observer. Each fixture still explicitly owns its
-host-counter rewinds, checkpoint and resume callback. Untimed restoration and
-post-load assertions retain their separate ordering. Executable stub tests
-check the real helper's success and failure paths; its use does not qualify
-the instruction cases that call it.
+continuation and enable the observer. Simple tick-based fixtures can name their
+unsigned host counters once with `capture_pipeline_at`; `replay_pipeline_at`
+rewinds the tick and those counters before the same restore tail. Spare observer
+slots are zero-filled, matching explicit array capture. Bindings stay outside
+the guest save stream. Fixtures with additional reset, input-line or mixed-state
+work retain their explicit ordering, checkpoints and resume callbacks. Untimed
+restoration and post-load assertions remain separate. Executable stub tests
+check the real helpers' success and failure paths; their use does not qualify
+the instruction cases that call them.
 
 The clocked case runner can also own a complete ordered data-bus trace
 (direction, address, value and CPU pipeline cycle). Its host event cursor is

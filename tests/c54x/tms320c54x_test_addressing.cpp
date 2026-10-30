@@ -8598,10 +8598,8 @@ bool tms320c54x_test_state::check_mvdk_mapped_results()
 		if (tick == 3) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
 		if (tick == 4 && f.form == 2) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x602, 0xdead); }
 		if (tick == f.access && f.source != f.destination) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, 0xdead); }
-		if (tick == f.checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save mapped MVDK before Access, after capture or after publication");
-		}
+		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads},
+			"Save mapped MVDK before Access, after capture or after publication");
 		if (tick == 20)
 		{
 			{ auto const disable = machine().disable_side_effects();
@@ -8621,11 +8619,8 @@ bool tms320c54x_test_state::check_mvdk_mapped_results()
 				field(f.source, f.value); if (f.source != f.destination) field(f.source, 0xdead); field(f.destination, f.value);
 				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b, "Mapped accumulator move preserves every other field and truncates only guard destinations");
 			}
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[2];
-				return restore_pipeline_at(255370, "Restore mapped MVDK without rereading source or repeating writes");
-			}
+			if (replay_pipeline_at(255370, f.checkpoint,
+				"Restore mapped MVDK without rereading source or repeating writes")) return true;
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 			if (variant < (clock ? 71U : accumulator_destination ? 8207U : 14255U)) { start_mvdk_mapped(variant + 1); return true; }
 			if (clock)
