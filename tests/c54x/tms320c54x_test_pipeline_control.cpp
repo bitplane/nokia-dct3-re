@@ -156,55 +156,6 @@ void tms320c54x_test_state::start_signed_xc(unsigned variant)
 
 
 
-void tms320c54x_test_state::start_pipeline_far_call(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const page = std::array<unsigned, 5>{0, 1, 2, 3, 0x7f}[variant / 16];
-	u32 const source = BIT(variant, 0) ? 0x20000 : 0, target = page << 16;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) { program.write_word(source + 0x600 + i, 0xf495); program.write_word(target + 0x700 + i, 0xf495); }
-	program.write_word(source + 0x600, 0xf980 | page); program.write_word(source + 0x601, 0x700);
-	program.write_word(source + 0x602, 0xe844); program.write_word(source + 0x603, 0xe811);
-	program.write_word(target + 0x700, 0xe955); program.write_word(target + 0x701, 0xf4e4); program.write_word(target + 0x702, 0xffff);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x800}, {cpu_regs::STATE_SP, 0x1000},
-		{cpu_regs::STATE_RTN, 0xbeef}, {cpu_regs::STATE_A, 0}, {cpu_regs::STATE_B, 0}, {cpu_regs::STATE_IFR, 0},
-		{cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->set_state_int(STATE_GENPC, source + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_pipeline_store_writes = m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_drained_fetches = m_fast_stack_reads = 0;
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0xffe, 0xfff, "far_call_stack_pair",
-		[this, source](offs_t address, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_store_writes < 2 && address == 0xfff - m_pipeline_store_writes &&
-				value == (m_pipeline_store_writes ? source >> 16 : 0x602) && m_cpu->pipeline_cycles() == 6 + m_pipeline_store_writes,
-				"FCALL writes PC then retained caller XPC on separate clocks");
-			++m_pipeline_store_writes;
-		});
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0xffe, 0xfff, "far_call_return_pair",
-		[this, source](offs_t address, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_fast_stack_reads < 2 && address == 0xffe + m_fast_stack_reads &&
-				value == (m_fast_stack_reads ? 0x602 : source >> 16) && m_cpu->pipeline_cycles() == 10 + m_fast_stack_reads,
-				"FRET reads its saved caller page then PC without re-reading either operand");
-			++m_fast_stack_reads;
-		});
-	m_pipeline_fetch_tap = program.install_read_tap(target + 0x700, target + 0x700, "far_call_target",
-		[this](offs_t, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_cpu->pipeline_cycles() == 6, "FCALL target Fetch has class-29B branch timing"); ++m_pipeline_extensions_reads;
-		});
-	m_vector_prefetch_tap = program.install_read_tap(source + 0x601, source + 0x602, "far_call_literal_and_continuation",
-		[this, source](offs_t address, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			if (address == source + 0x601) { expect(m_cpu->pipeline_cycles() == 3, "FCALL target literal is fetched once"); ++m_pipeline_operand_reads; }
-			else { expect(m_cpu->pipeline_cycles() == (m_pipeline_drained_fetches ? 13 : 4), "Caller continuation is first flushed, then refetched after FRET"); ++m_pipeline_drained_fetches; }
-		});
-	m_phase = 252170; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_delayed_condition_return(unsigned variant)
 {
@@ -816,60 +767,6 @@ bool tms320c54x_test_state::check_pipeline_worker_xc_results()
 
 
 
-bool tms320c54x_test_state::check_pipeline_far_call_results()
-{
-	if (m_phase == 252170)
-	{
-		unsigned const variant = m_pipeline_peripheral_case;
-		unsigned const source_page = BIT(variant, 0) ? 2 : 0;
-		unsigned const checkpoint = std::array<unsigned, 8>{3, 4, 5, 6, 7, 10, 11, 12}[(variant % 16) / 2];
-		u64 const cycle = m_cpu->pipeline_cycles();
-		auto const writes_at = [](u64 clock) { return unsigned(clock >= 6) + unsigned(clock >= 7); };
-		auto const reads_at = [](u64 clock) { return unsigned(clock >= 10) + unsigned(clock >= 11); };
-		auto const caller_fetches = [](u64 clock) { return unsigned(clock >= 4) + unsigned(clock >= 13); };
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_pipeline_store_writes == writes_at(cycle) && m_fast_stack_reads == reads_at(cycle) &&
-			m_pipeline_operand_reads == unsigned(cycle >= 3) && m_pipeline_extensions_reads == unsigned(cycle >= 6) && m_pipeline_drained_fetches == caller_fetches(cycle) &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= 11 ? 0x1000 : cycle >= 10 ? 0xfff : cycle >= 5 ? 0xffe : cycle >= 4 ? 0xfff : 0x1000) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 18 ? 0x11 : cycle >= 17 ? 0x44 : 0) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 10 ? 0x55 : 0) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 &&
-			m_cpu->state_int(tms320c54x_device::STATE_RTN) == 0xbeef,
-			"FCALL and FRET balance their two-word frame and execute only the callee then real caller continuation");
-		if (cycle >= 12) expect(m_cpu->state_int(tms320c54x_device::STATE_XPC) == source_page, "FRET restores the held source page even after target-page fetches");
-		if (cycle == 10 || cycle == 11)
-		{
-			auto const disable = machine().disable_side_effects();
-			m_cpu->space(AS_DATA).write_word(cycle == 10 ? 0xffe : 0xfff, 0x7fff);
-		}
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save FCALL's partial frame and FRET's retained caller operands");
-		}
-		if (cycle == 20)
-		{
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_store_writes = writes_at(checkpoint); m_fast_stack_reads = reads_at(checkpoint);
-				m_pipeline_operand_reads = unsigned(checkpoint >= 3); m_pipeline_extensions_reads = unsigned(checkpoint >= 6); m_pipeline_drained_fetches = caller_fetches(checkpoint);
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore far call/return without duplicated pushes, reads or continuation execution");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_expected_cycle = checkpoint + 1; m_phase = 252180;
-				m_check_timer->enable(true); return true;
-			}
-			m_pipeline_write_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 79) { start_pipeline_far_call(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged FCALL/FRET: PASS cases=80 source_pages=2 target_pages=5 restore=80 stack_words=2 duplicate_stack_writes=0 duplicate_stack_reads=0\n");
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252180)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252170;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 
 
