@@ -723,17 +723,6 @@ private:
 	};
 	static t_store_fixture t_store_case(unsigned v, bool consumer);
 	void start_t_store(unsigned variant = 0);
-	struct ts_arithmetic_fixture
-	{
-		memory_arithmetic_fixture address;
-		unsigned selector, prefix, producer_kind, gap, checkpoint;
-		bool producer;
-		u32 base;
-		u16 memory, t, sampled_t, result_st0;
-		u64 a, b, result;
-	};
-	static ts_arithmetic_fixture ts_arithmetic_case(unsigned variant, bool producer);
-	void start_ts_arithmetic(unsigned variant = 0);
 	struct delay_load_fixture
 	{
 		unsigned kind, form, ar, selected, destination, flags, read, checkpoint;
@@ -1586,7 +1575,6 @@ private:
 	bool check_block_branch_edge_results();
 	bool check_delay_dld_results();
 	bool check_t_store_results();
-	bool check_ts_arithmetic_results();
 	bool check_poll_interrupt_results();
 	bool check_delay_compare_results();
 	bool check_indexed_mar_results();

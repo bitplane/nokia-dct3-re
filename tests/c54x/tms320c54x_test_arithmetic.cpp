@@ -1519,74 +1519,7 @@ void tms320c54x_test_state::start_absolute_logic(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::ts_arithmetic_fixture tms320c54x_test_state::ts_arithmetic_case(unsigned variant, bool producer)
-{
-	ts_arithmetic_fixture f{}; f.producer = producer;
-	bool const numeric = !producer && variant >= 6912;
-	unsigned const v = numeric ? variant - 6912 : variant;
-	unsigned form, reg, compatibility, code, flags, pattern, memory_pattern, snapshot;
-	if (producer)
-	{
-		f.producer_kind = v % 3; f.gap = (v / 3) % 2; code = std::array<unsigned, 8>{0, 1, 15, 16, 31, 48, 49, 63}[(v / 6) % 8];
-		memory_pattern = (v / 48) % 4; pattern = (v / 48) % 8; flags = (v / 192) % 4; f.selector = (v / 768) % 4;
-		f.base = (v / 3072) % 2 ? 0x20000 : 0; snapshot = v / 6144; form = 2; reg = 1; compatibility = 0;
-		f.prefix = (f.producer_kind == 0 ? 2 : 1) + f.gap;
-	}
-	else if (numeric)
-	{
-		unsigned const index = v % 48; code = index < 32 ? index : index + 16;
-		memory_pattern = (v / 48) % 4; pattern = (v / 192) % 8; flags = (v / 1536) % 4; f.selector = (v / 6144) % 4;
-		f.base = (v / 24576) % 2 ? 0x20000 : 0; snapshot = v / 49152; form = 0; reg = 2; compatibility = 0;
-	}
-	else
-	{
-		form = v % 18; reg = (v / 18) % 8; compatibility = (v / 144) % 2; f.selector = (v / 288) % 4;
-		f.base = (v / 1152) % 2 ? 0x20000 : 0; snapshot = v / 2304;
-		unsigned const index = v % 48; code = index < 32 ? index : index + 16;
-		memory_pattern = (v / 8) % 4; pattern = (v / 96) % 8; flags = (v / 64) % 4;
-	}
-	f.address = memory_arithmetic_case(form + 18 * reg + f.selector * 144 + pattern * 576 + flags * 4608 + compatibility * 18432);
-	auto &o = f.address; o.opcode |= 0x0400; o.read_cycle += f.prefix;
-	f.memory = std::array<u16, 4>{0, 1, 0x8000, 0xffff}[memory_pattern]; f.t = 0xa500 | code;
-	f.sampled_t = producer && f.producer_kind == 2 && !f.gap ? 15 : f.t;
-	f.a = f.selector & 1 ? 0x123456789aULL : o.source; f.b = f.selector & 1 ? o.source : 0xfeabcd9876ULL;
-	if (producer && f.producer_kind == 2) f.a = f.t;
-	u64 const left_bits = f.selector & 1 ? f.b : f.a;
-	u64 const right_bits = ts_load_expected(f.memory, f.sampled_t, flags & 1);
-	s64 const left = BIT(left_bits, 39) ? s64(left_bits) - (s64(1) << 40) : s64(left_bits);
-	s64 const right = BIT(right_bits, 39) ? s64(right_bits) - (s64(1) << 40) : s64(right_bits);
-	s64 const result = f.selector & 2 ? left - right : left + right;
-	bool const carry = f.selector & 2 ? u32(left_bits) >= u32(right_bits) : u64(u32(left_bits)) + u32(right_bits) > 0xffffffffULL;
-	bool const overflow = result < -2147483648LL || result > 2147483647LL;
-	o.result_st0 = compatibility && reg && form >= 2 && form != 17 ? (o.st0 & 0x1fff) | (reg << 13) : o.st0;
-	f.result_st0 = (o.result_st0 & ~0x800) | (carry ? 0x800 : 0) | (overflow ? f.selector & 1 ? 0x200 : 0x400 : 0);
-	f.result = u64(overflow && (flags & 2) ? std::clamp(result, s64(-2147483648LL), s64(2147483647LL)) : result) & 0xffffffffffULL;
-	f.checkpoint = producer ? std::array<unsigned, 3>{o.read_cycle - 1, o.read_cycle, o.read_cycle + 1}[snapshot] : std::array<unsigned, 3>{3, o.read_cycle, o.read_cycle + 1}[snapshot];
-	return f;
-}
 
-void tms320c54x_test_state::start_ts_arithmetic(unsigned variant)
-{
-	if (strcmp(machine().options().bios(), "ts-alu-producer") && variant < 6912 && variant % 18 == 5) ++variant;
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const producer = profile_is("ts-alu-producer"); auto const f = ts_arithmetic_case(variant, producer); auto const &o = f.address;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	if (producer) { program.write_word(f.base + 0x600, f.producer_kind == 0 ? 0x770e : f.producer_kind == 1 ? 0x3082 : 0x880e); if (!f.producer_kind) program.write_word(f.base + 0x601, f.t); }
-	program.write_word(f.base + 0x600 + f.prefix, o.opcode); if (!producer && o.form >= 14) program.write_word(f.base + 0x601, o.literal);
-	program.write_word(f.base + 0x601 + f.prefix + unsigned(o.form >= 14), 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, o.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, o.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, o.bk); m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b); m_cpu->set_state_int(tms320c54x_device::STATE_T, producer ? 15 : f.t);
-	for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x5007);
-	if (producer && f.producer_kind == 1) { m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5100); data.write_word(0x5100, f.t); } data.write_word(o.address, f.memory);
-	m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "ts_arithmetic_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; bool const t_read = f.producer && f.producer_kind == 1 && !m_pipeline_operand_reads; expect(at == (t_read ? 0x5100 : f.address.address) && word == (t_read ? f.t : f.memory) && m_pipeline_operand_reads < (f.producer && f.producer_kind == 1 ? 2U : 1U) && m_cpu->pipeline_cycles() == (t_read ? 5 : f.address.read_cycle), "TS arithmetic retains one source and any instruction-driven T input"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "ts_arithmetic_write", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(f.producer && f.producer_kind != 1 && at == 0x0e && word == f.t && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == (f.producer_kind == 0 ? 5 : 6), "TS arithmetic writes no memory except the selected T producer"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "ts_arithmetic_literal", [this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || (f.producer ? f.producer_kind != 0 : f.address.form < 14)) return; expect(word == (f.producer ? f.t : f.address.literal) && !m_pipeline_extensions_reads, "TS arithmetic owns one retained address or producer literal"); ++m_pipeline_extensions_reads; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255060;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::delay_load_fixture tms320c54x_test_state::delay_shift_alu_case(unsigned variant)
 {
@@ -3613,35 +3546,6 @@ bool tms320c54x_test_state::check_nibble_input_results()
 }
 
 
-bool tms320c54x_test_state::check_ts_arithmetic_results()
-{
-	if (m_phase == 255060)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; bool const producer = profile_is("ts-alu-producer"); auto const f = ts_arithmetic_case(variant, producer); auto const &o = f.address;
-		u16 const st0 = tick > o.read_cycle ? f.result_st0 : tick >= o.read_cycle - 1 ? o.result_st0 : o.st0;
-		bool const state_ok = !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == (!(f.selector & 1) && tick > o.read_cycle ? f.result : f.a) && m_cpu->state_int(tms320c54x_device::STATE_B) == ((f.selector & 1) && tick > o.read_cycle ? f.result : f.b) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == o.st1;
-		if (!state_ok) osd_printf_info("ts_arithmetic_state: producer=%u case=%u tick=%u a=%llx b=%llx result=%llx st0=%llx expected=%04x\n", unsigned(producer), variant, tick, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)f.result, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST0), st0);
-		expect(state_ok, "TS arithmetic publishes retained shifted data and ALU carry overflow saturation only in Execute");
-		if (tick == 4 && (producer ? f.producer_kind == 0 : o.form >= 14)) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
-		if (tick == o.read_cycle - 1) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + o.selected) == o.next_ar, "TS arithmetic modifies its captured source pointer once"); m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + o.selected, 0x2222); }
-		if (tick == o.read_cycle) { expect(m_cpu->state_int(tms320c54x_device::STATE_T) == f.t, "TS arithmetic distinguishes visible producer T from a retained restricted-gap sample"); m_cpu->set_state_int(tms320c54x_device::STATE_T, f.t ^ 63); auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(o.address, 0xdead); }
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_extensions_reads, &m_pipeline_store_writes},
-			"Save TS arithmetic address Read operands and publication");
-		if (tick == 24)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_T) == (f.t ^ 63) && m_cpu->state_int(tms320c54x_device::STATE_AR0 + o.selected) == 0x2222 && m_pipeline_operand_reads == (producer && f.producer_kind == 1 ? 2U : 1U) && m_pipeline_store_writes == unsigned(producer && f.producer_kind != 1) && m_pipeline_extensions_reads == unsigned(producer ? f.producer_kind == 0 : o.form >= 14), "TS arithmetic preserves owned operands and never repeats source reads writes or pointer updates");
-			if (replay_pipeline_at(255070, f.checkpoint,
-				"Restore TS arithmetic without resampling memory T or literals")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant + 1 < (producer ? 18432U : 154368U)) { start_ts_arithmetic(variant + 1); return true; }
-			if (producer) { osd_printf_info("TMS320C54x TS arithmetic producers: PASS cases=18432 restore=18432 producers=STM_T,LD_T,STLM_T gaps=0,1 shift_codes=8 memory_values=4 sxm_ovm=4 selectors=4 pages=2 snapshots=3 t_sample=Read projection_only_stlm_gap=0 duplicate_transactions=0 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated TS arithmetic producers complete"); }
-			osd_printf_info("TMS320C54x TS arithmetic: PASS address_cases=6528 arithmetic_cases=147456 restore=153984 operations=ADD,SUB selectors=4 address_forms=17 registers=8 compatibility_states=2 shifts=48 memory_values=4 accumulator_patterns=8 sxm_ovm=4 pages=2 snapshots=3 t_sample=Read duplicate_transactions=0 mapped_sources=excluded physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated TS arithmetic complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255070) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255060; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 
 bool tms320c54x_test_state::check_delay_compare_results()
