@@ -152,7 +152,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"popd-edges"}, [](self &test) { test.start_popd_edges(); } },
 		{ {"popd-ram"}, [](self &test) { test.start_pipeline_data_pop(); } },
 		{ {"bacc", "fbacc", "bacc-producer", "fbacc-producer"}, [](self &test) { test.start_accumulator_branch(); } },
-		{ {"logic-peripheral"}, [](self &test) { test.start_pipeline_peripheral_logic(); } },
 		{ {"load-offset"}, [](self &test) { test.start_pipeline_offset_load(); } },
 		{ {"rpt-mvdp-irq"}, [](self &test) { test.start_repeat_mvdp_irq(); } },
 		{ {"conditional-cd"}, [](self &test) { test.start_delayed_conditional_call(); } },

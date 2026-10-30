@@ -110,7 +110,11 @@ private:
 		{
 			if (action.reset_cpu) m_cpu.reset();
 			if (action.bio_level) m_bio_level = *action.bio_level;
-			for (auto const &value : action.values) m_cpu.set_state_int(value.index, value.value);
+			{
+				// Debugger assignments may use an MMR accessor; they are not guest bus work.
+				auto const disable = m_machine.disable_side_effects();
+				for (auto const &value : action.values) m_cpu.set_state_int(value.index, value.value);
+			}
 			for (auto const &line : action.input_lines) m_cpu.set_input_line(line.index, int(line.value));
 			if (!action.program.empty() || !action.data.empty() || !action.io.empty())
 			{

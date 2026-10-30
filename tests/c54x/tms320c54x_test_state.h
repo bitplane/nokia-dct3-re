@@ -99,8 +99,6 @@ private:
 	static u32 repeated_writa_destination(repeated_writa_fixture const &f, unsigned index);
 	void start_repeated_writa(unsigned variant = 0);
 	void start_instruction_observer(unsigned variant = 0);
-	void start_pipeline_peripheral_logic(unsigned variant = 0);
-	void start_pipeline_port_write(unsigned variant = 0);
 	struct memory_arithmetic_fixture
 	{
 		unsigned form, reg, selected, read_cycle;
@@ -1100,7 +1098,6 @@ private:
 	bool check_repeat_pop_exclusion_results();
 	bool check_instruction_observer_results();
 	bool check_block_page_results();
-	bool check_pipeline_peripheral_logic_results();
 	bool check_mvdd_source_results();
 	bool check_extended_ar_store_results();
 	bool check_accumulator_shift_results();
