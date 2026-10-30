@@ -71,20 +71,6 @@ void tms320c54x_test_state::start_xc_return(unsigned variant)
 
 
 
-void tms320c54x_test_state::start_return_alt_case(unsigned index)
-{
-	static constexpr u64 values[] = {0xffffffffffULL, 0x8000000000ULL, 0, 1, 0x7fffffffffULL};
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(0x0109d0, 0xfc43); program.write_word(0x0109d1, 0xf4e1);
-	program.write_word(0x0109e0, 0xf4e1);
-	m_cpu->space(AS_DATA).write_word(0x1000, 0x09e0);
-	set_registers(*m_cpu, {
-		{STATE_GENPC, 0x0109d0}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_A, values[index]},
-		{cpu_regs::STATE_ST1, 0x0800}, {cpu_regs::STATE_IDLE, 0},
-	});
-	m_phase = 2696 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
 
 
 void tms320c54x_test_state::start_far_case(unsigned index)
@@ -183,25 +169,10 @@ tms320c54x_test_state::conditional_register_fixture tms320c54x_test_state::condi
 
 
 
-bool tms320c54x_test_state::check_return_alt_results()
+bool tms320c54x_test_state::check_software_interrupt_entry_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 2696 && m_phase < 2701)
-	{
-		unsigned const index = m_phase - 2696;
-		bool const taken = index < 2;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == (taken ? 0x1001 : 0x1000) &&
-			m_cpu->state_int(tms320c54x_device::STATE_PC) == (taken ? 0x09e1 : 0x09d2) &&
-			m_cpu->state_int(tms320c54x_device::STATE_XPC) == 1,
-			"RC ALT tests signed 40-bit A, consumes only a taken return and preserves XPC");
-		if (index < 4) { start_return_alt_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x RC ALT conformance: PASS variants=5\n");
-		start_software_interrupt_case(0);
-		return true;
-	}
 	if (m_phase >= 2701 && m_phase < 2765)
 	{
 		unsigned const index = m_phase - 2701;

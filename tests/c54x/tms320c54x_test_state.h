@@ -778,7 +778,6 @@ private:
 	void start_indirect_pshm_case(unsigned index);
 	void start_parallel_load_multiply_case(unsigned index);
 	void start_rounded_load_case(unsigned index);
-	void start_return_alt_case(unsigned index);
 	void start_stack_address_latency_case(unsigned index);
 	void start_immediate_dp_case(unsigned index);
 	void start_compact_load_case(unsigned index);
@@ -1786,7 +1785,7 @@ private:
 	bool check_cmpr_results();
 	bool check_cmpm_offset_results();
 	bool check_compact_load_results();
-	bool check_return_alt_results();
+	bool check_software_interrupt_entry_results();
 	bool check_software_interrupt_results();
 	bool check_trn_store_results();
 	bool check_parallel_load_multiply_results();

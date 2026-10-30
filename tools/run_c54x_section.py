@@ -79,7 +79,7 @@ def main():
     counts['xc_latency'] = 384
     counts['xc_context'] = 4
     counts['conditional_delayed_return'] = 224
-    counts['atomic_conditional_return'] = 72
+    counts['atomic_conditional_return'] = 96
     counts['atomic_overflow_branch'] = 32
     counts['carry_branch'] = 8
     counts['repeat_status'] = 1

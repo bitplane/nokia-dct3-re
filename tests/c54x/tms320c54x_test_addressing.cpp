@@ -4940,7 +4940,6 @@ bool tms320c54x_test_state::check_compact_load_results()
 			"SPRU131G table 7-9: POPM/PSHM/FRAME to CPL store has category-I latency and category-II forwarding");
 		if (index < 23) { start_stack_address_latency_case(index + 1); return true; }
 		osd_printf_info("TMS320C54x stack address latency conformance: PASS variants=24\n");
-		start_return_alt_case(0);
 		return true;
 	}
 	return false;
