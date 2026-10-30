@@ -384,12 +384,10 @@ ROM_START(tms54xtra)
 	ROM_SYSTEM_BIOS(155, "dual-sub-native", "Exact native dual-memory subtraction and pointer updates")
 	ROM_SYSTEM_BIOS(156, "power-idle", "IDLE1/2/3 timer clocks plus external and timer wake replay")
 	ROM_SYSTEM_BIOS(157, "clock-mvdk", "Retained RAM-to-CLKMD moves and peripheral access across restore")
-	ROM_SYSTEM_BIOS(158, "clock-mvdk-edge", "Excluded repeated/delayed CLKMD moves have no operand or clock effects")
-	ROM_SYSTEM_BIOS(159, "pop-irq", "Retained IMR/IFR stack writes and W1C acknowledgement across restore")
-	ROM_SYSTEM_BIOS(160, "pop-irq-edge", "Excluded repeated/delayed interrupt pops have no stack or acknowledgement effects")
-	ROM_SYSTEM_BIOS(161, "rmw-long", "Staged long RAM read-modify-write matrix")
-	ROM_SYSTEM_BIOS(162, "reg-banks", "Staged register arithmetic and load with producer controls")
-	ROM_SYSTEM_BIOS(163, "rom4-context", "Nokia ROM4 copied context and timer integration")
+	ROM_SYSTEM_BIOS(158, "pop-irq", "Retained IMR/IFR stack writes and W1C acknowledgement across restore")
+	ROM_SYSTEM_BIOS(159, "rmw-long", "Staged long RAM read-modify-write matrix")
+	ROM_SYSTEM_BIOS(160, "reg-banks", "Staged register arithmetic and load with producer controls")
+	ROM_SYSTEM_BIOS(161, "rom4-context", "Nokia ROM4 copied context and timer integration")
 ROM_END
 
 } // anonymous namespace

@@ -49,8 +49,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"reg-banks"}, [](self &test) { test.start_pipeline_accumulator_arithmetic(); } },
 		{ {"power-idle"}, [](self &test) { test.m_result_owner = &self::check_pipeline_idle_results; test.start_pipeline_idle1(0, true); } },
 		{ {"pop-irq"}, [](self &test) { test.start_pipeline_mmr_pop(); } },
-		{ {"pop-irq-edge"}, [](self &test) { test.start_interrupt_pop_edge(); } },
-		{ {"clock-mvdk-edge"}, [](self &test) { test.start_clkmd_move_edge(); } },
 		{ {"mvpd-extended"}, [](self &test) { test.start_extended_mvpd(); } },
 		{ {"mvpd-controls"}, [](self &test) { test.start_pipeline_mvpd(); } },
 		{ {"literal-guard"}, [](self &test) { test.start_literal_guard(); } },

@@ -33,7 +33,10 @@ public:
 		apply_actions(true);
 		auto const *expected = &m_input.states.front().observation;
 		for (auto const &state : m_input.states) if (m_tick >= state.tick) expected = &state.observation;
-		check_case_state(m_cpu, *expected);
+		{
+			auto const disable = m_machine.disable_side_effects();
+			check_case_state(m_cpu, *expected);
+		}
 		// A clock's mutations follow observation but precede snapshot capture.
 		apply_actions(false);
 		if (m_tick == m_input.checkpoint && !m_replay)

@@ -68,6 +68,7 @@ int main() {
         method = runner[runner.index('\tvoid apply_actions('):runner.index('\tvoid require(')]
         clock = runner[runner.index('\tbool step()'):runner.index('\t\tapply_actions(true);')]
         clock = clock.replace('bool step()', 'bool step_clock()') + '\t\treturn true;\n\t}\n'
+        observation = runner[runner.index('\t\t{\n\t\t\tauto const disable = m_machine.disable_side_effects();'):runner.index('\n\t\t// A clock')]
         source = r'''
 #include <cassert>
 #include <stdexcept>
@@ -93,7 +94,7 @@ struct bench {
     struct cpu {
         bool &disabled;
         std::vector<unsigned> writes{}, memory{};
-        unsigned cycles = 0, resumes = 0;
+        unsigned cycles = 0, resumes = 0, observations = 0;
         unsigned pipeline_cycles() const { return cycles; }
         void resume(int reason) { assert(reason == SUSPEND_REASON_DISABLE); ++resumes; }
         void set_state_int(int index, unsigned value) { assert(index == 0); writes.push_back(value); }
@@ -103,10 +104,16 @@ struct bench {
             memory.push_back(at); memory.push_back(value);
         }
     } m_cpu{disabled};
+    void check_case_state(cpu &cpu, int) { assert(cpu.disabled); ++cpu.observations; }
+    void observe() {
+        int value = 0; auto const *expected = &value;
+''' + observation + r'''
+    }
 ''' + method + clock + r'''
 };
 int main() {
     bench b;
+    b.observe(); assert(!b.disabled && b.m_cpu.observations == 1);
     b.apply_actions(true); assert((b.m_cpu.writes == std::vector<unsigned>{10, 11}));
     b.apply_actions(false); assert((b.m_cpu.writes == std::vector<unsigned>{10, 11, 12}));
     assert(!b.disabled && (b.m_cpu.memory == std::vector<unsigned>{0x20, 99, 0x21, 98}));

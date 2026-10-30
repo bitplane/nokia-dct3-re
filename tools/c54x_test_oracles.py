@@ -564,7 +564,10 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated staged CLKMD MVDK complete",
     ),
     "clock-mvdk-edge": (
-        "TMS320C54x CLKMD MVDK exclusions: PASS cases=24 restore=24 contexts=RPT,BD_delay source_forms=3 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 clock_changes=0 hardware_trap_claim=0",
+        (
+            "C54x composition rejection coverage: PASS cases=24 restore=24 coverage_fnv64=49684e18280b7d65",
+            "TMS320C54x CLKMD MVDK exclusions: PASS cases=24 restore=24 contexts=RPT,BD_delay source_forms=3 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 clock_changes=0 hardware_trap_claim=0",
+        ),
         "Fatal error: TMS320C54x isolated CLKMD MVDK exclusions complete",
     ),
     "pop-irq": (
@@ -572,7 +575,10 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated interrupt POPM complete",
     ),
     "pop-irq-edge": (
-        "TMS320C54x interrupt POPM exclusions: PASS cases=24 restore=24 destinations=IMR,IFR contexts=RPT,BD_first,BD_last pages=2 snapshots=2 reads=0 writes=0 stack_changes=0 mask_changes=0 acknowledgements=0 hardware_trap_claim=0",
+        (
+            "C54x composition rejection coverage: PASS cases=24 restore=24 coverage_fnv64=49684e18280b7d65",
+            "TMS320C54x interrupt POPM exclusions: PASS cases=24 restore=24 destinations=IMR,IFR contexts=RPT,BD_first,BD_last pages=2 snapshots=2 reads=0 writes=0 stack_changes=0 mask_changes=0 acknowledgements=0 hardware_trap_claim=0",
+        ),
         "Fatal error: TMS320C54x isolated interrupt POPM exclusions complete",
     ),
     "std-swwsr": (

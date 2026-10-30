@@ -207,7 +207,6 @@ private:
 	};
 	static irq_pop_fixture irq_pop_case(unsigned variant);
 	void start_pipeline_mmr_pop(unsigned variant = 0);
-	void start_interrupt_pop_edge(unsigned variant = 0);
 	void start_pipeline_pop_dagen_conflict(unsigned variant = 0);
 	void start_pipeline_mu4_prologue(unsigned variant = 0);
 	void observe_context_irq(int line);
@@ -1724,7 +1723,6 @@ private:
 	};
 	static mvdk_mapped_fixture mvdk_mapped_case(unsigned v, bool accumulator_destination = false, bool clock = false);
 	void start_mvdk_mapped(unsigned variant = 0);
-	void start_clkmd_move_edge(unsigned variant = 0);
 	struct mvdk_producer_fixture
 	{
 		u16 source, destination, value, expected;
@@ -2065,7 +2063,6 @@ private:
 	bool check_pipeline_far_irq_results();
 	bool check_pipeline_intm_results();
 	bool check_pipeline_push_sp_latency_results();
-	bool check_interrupt_pop_edge_results();
 	bool check_pipeline_mmr_pop_results();
 	bool check_pipeline_load_add_results();
 	bool check_pipeline_dst_results();
@@ -2127,7 +2124,6 @@ private:
 	bool check_repeat_context_results();
 	bool check_delayed_call_replay_results();
 	bool check_mvdk_producer_results();
-	bool check_clkmd_move_edge_results();
 	bool check_mvdk_mapped_results();
 	bool check_basic_repeat_results();
 	bool check_rptbd_shift_store_results();

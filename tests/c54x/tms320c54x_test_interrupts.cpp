@@ -85,27 +85,6 @@ tms320c54x_test_state::irq_pop_fixture tms320c54x_test_state::irq_pop_case(unsig
 		(variant / 32) % 2 ? 0x10000U : 0U,4 + variant / 64};
 }
 
-void tms320c54x_test_state::start_interrupt_pop_edge(unsigned variant)
-{
-	unsigned const destination = variant % 2, context = (variant / 2) % 3;
-	u32 const base = (variant / 6) % 2 ? 0x10000 : 0;
-	start_pipeline_mmr_pop(4 + destination + (base ? 32 : 0));
-	m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_pipeline_peripheral_case = variant;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i=0;i<16;++i) program.write_word(base+0x600+i,0xf495);
-	unsigned pc=base+0x600;
-	program.write_word(pc++,context ? 0xf273 : 0xec01);
-	if (context) program.write_word(pc++,0x680);
-	if (context==2) program.write_word(pc++,0xf495);
-	program.write_word(pc,0x8a00|destination);
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-	m_pipeline_operand_reads=m_pipeline_store_writes=0;
-	m_pipeline_operand_tap=m_cpu->space(AS_DATA).install_read_tap(0,0xffff,"irq_pop_edge_reads",[this](offs_t,u16 &,u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap=m_cpu->space(AS_DATA).install_write_tap(0,0xffff,"irq_pop_edge_writes",[this](offs_t,u16 &,u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_pipeline_replay=false; m_idle_fixture_tick=0; m_phase=62080;
-	m_cpu->set_state_int(STATE_GENPC,base+0x600); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_xc_irq(unsigned variant)
 {
@@ -670,34 +649,6 @@ bool tms320c54x_test_state::check_pipeline_far_irq_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_interrupt_pop_edge_results()
-{
-	if (m_phase == 62080)
-	{
-		unsigned const variant=m_pipeline_peripheral_case,tick=++m_idle_fixture_tick,checkpoint=2+variant/12;
-		if (tick==checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE,"Save excluded interrupt POPM before stack effects");
-		}
-		if (tick==12)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads && !m_pipeline_store_writes &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP)==0x1000 && m_cpu->state_int(tms320c54x_device::STATE_IMR)==0x1357 &&
-				!m_cpu->state_int(tms320c54x_device::STATE_IFR),"Excluded interrupt POPM has no stack, mask or acknowledgement effects");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay=true; m_idle_fixture_tick=checkpoint; return restore_pipeline_at(62081, "Restore excluded interrupt POPM");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant<23) { start_interrupt_pop_edge(variant+1); return true; }
-			osd_printf_info("TMS320C54x interrupt POPM exclusions: PASS cases=24 restore=24 destinations=IMR,IFR contexts=RPT,BD_first,BD_last pages=2 snapshots=2 reads=0 writes=0 stack_changes=0 mask_changes=0 acknowledgements=0 hardware_trap_claim=0\n");
-			throw emu_fatalerror(0,"TMS320C54x isolated interrupt POPM exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true;
-	}
-	if (m_phase==62081) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase=62080; m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_pipeline_xc_irq_results()
 {

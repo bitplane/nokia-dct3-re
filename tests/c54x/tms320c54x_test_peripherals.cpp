@@ -1259,28 +1259,6 @@ void tms320c54x_test_state::start_mvdd_peripheral(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_clkmd_move_edge(unsigned variant)
-{
-	unsigned const form = variant % 3, context = (variant / 3) % 2;
-	u32 const base = (variant / 6) % 2 ? 0x20000 : 0;
-	start_mvdk_mapped(form + 3 + (base ? 12 : 0));
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	unsigned pc = base + 0x600;
-	program.write_word(pc++, context ? 0xf273 : 0xec01);
-	if (context) program.write_word(pc++, 0x680);
-	program.write_word(pc++, form == 0 ? 0x7120 : form == 1 ? 0x7196 : 0x71f8);
-	program.write_word(pc++, form == 2 ? 0x1420 : 0x58);
-	if (form == 2) program.write_word(pc++, 0x58);
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0,0xffff,"clock_move_edge_reads",[this](offs_t,u16 &,u16) { if (!machine().side_effects_disabled()) ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0,0xffff,"clock_move_edge_writes",[this](offs_t,u16 &,u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62070;
-	m_cpu->set_state_int(STATE_GENPC,base+0x600); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_mcbsp_control_sequence(unsigned variant)
 {
@@ -2599,37 +2577,6 @@ bool tms320c54x_test_state::check_pipeline_port_read_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_clkmd_move_edge_results()
-{
-	if (m_phase == 62070)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		unsigned const checkpoint = 2 + variant / 12;
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE,"Save rejected CLKMD move before its unsupported composition");
-		}
-		if (tick == 12)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads && !m_pipeline_store_writes &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR6) == (variant % 3 == 1 ? 0x1420 : 0x1406),
-				"Repeated/delayed CLKMD moves fail before operand reads, writes or source pointer effects");
-			{ auto const disable = machine().disable_side_effects(); expect(!m_cpu->space(AS_DATA).read_word(0x58),"Rejected clock move leaves CLKMD unchanged"); }
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint;
-				return restore_pipeline_at(62071, "Restore pending CLKMD exclusion");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 23) { start_clkmd_move_edge(variant+1); return true; }
-			osd_printf_info("TMS320C54x CLKMD MVDK exclusions: PASS cases=24 restore=24 contexts=RPT,BD_delay source_forms=3 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 clock_changes=0 hardware_trap_claim=0\n");
-			throw emu_fatalerror(0,"TMS320C54x isolated CLKMD MVDK exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true;
-	}
-	if (m_phase == 62071) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62070; m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_mcbsp_control_sequence_results()
 {

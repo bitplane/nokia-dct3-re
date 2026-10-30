@@ -593,6 +593,16 @@
           "description": "FRAME push and safely separated compiler SP consumers",
           "index": 34,
           "name": "stack-sp"
+        },
+        {
+          "description": "Interrupt-register POPM composition admission limits",
+          "index": 35,
+          "name": "pop-irq-edge"
+        },
+        {
+          "description": "CLKMD move composition admission limits",
+          "index": 36,
+          "name": "clock-mvdk-edge"
         }
       ],
       "tms54rom4": [
@@ -2626,39 +2636,30 @@
           "name": "clock-mvdk"
         },
         {
-          "description": "Excluded repeated/delayed CLKMD moves have no operand or clock effects",
-          "index": 158,
-          "name": "clock-mvdk-edge"
-        },
-        {
           "description": "Retained IMR/IFR stack writes and W1C acknowledgement across restore",
-          "index": 159,
+          "index": 158,
           "name": "pop-irq"
         },
         {
-          "description": "Excluded repeated/delayed interrupt pops have no stack or acknowledgement effects",
-          "index": 160,
-          "name": "pop-irq-edge"
-        },
-        {
           "description": "Staged long RAM read-modify-write matrix",
-          "index": 161,
+          "index": 159,
           "name": "rmw-long"
         },
         {
           "description": "Staged register arithmetic and load with producer controls",
-          "index": 162,
+          "index": 160,
           "name": "reg-banks"
         },
         {
           "description": "Nokia ROM4 copied context and timer integration",
-          "index": 163,
+          "index": 161,
           "name": "rom4-context"
         }
       ]
     },
     "pass_formats": {
       "C54x ISA case: PASS id=%s\n": 3,
+      "C54x composition rejection coverage: PASS cases=%u restore=%u coverage_fnv64=%016llx\n": 1,
       "C54x native backend BSP clock inputs: PASS levels=4 save_replay=4 reset_inputs=1 handset_clock_claim=0\n": 1,
       "C54x native backend BSP clocked store: PASS opcode=7721 pending_without_clocks=1 echo=0aaa untimed=0 sources=4,5 handset_clock_claim=0\n": 1,
       "C54x native backend BSP continuous RX: PASS words=5 partial_restore=1 single_sync_continuation=1 overrun_restart=1 reset_abort=1 source=4 handset_clock_claim=0\n": 1,
@@ -4869,8 +4870,13 @@
     },
     "clock-mvdk-edge": {
       "completion": "Fatal error: TMS320C54x isolated CLKMD MVDK exclusions complete",
-      "machine": "tms54xtra",
+      "machine": "tms54isa",
       "reported_fields": [
+        {
+          "cases": "24",
+          "coverage_fnv64": "49684e18280b7d65",
+          "restore": "24"
+        },
         {
           "cases": "24",
           "clock_changes": "0",
@@ -4886,6 +4892,7 @@
         }
       ],
       "required": [
+        "C54x composition rejection coverage: PASS cases=24 restore=24 coverage_fnv64=49684e18280b7d65",
         "TMS320C54x CLKMD MVDK exclusions: PASS cases=24 restore=24 contexts=RPT,BD_delay source_forms=3 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 clock_changes=0 hardware_trap_claim=0"
       ]
     },
@@ -9312,8 +9319,13 @@
     },
     "pop-irq-edge": {
       "completion": "Fatal error: TMS320C54x isolated interrupt POPM exclusions complete",
-      "machine": "tms54xtra",
+      "machine": "tms54isa",
       "reported_fields": [
+        {
+          "cases": "24",
+          "coverage_fnv64": "49684e18280b7d65",
+          "restore": "24"
+        },
         {
           "acknowledgements": "0",
           "cases": "24",
@@ -9330,6 +9342,7 @@
         }
       ],
       "required": [
+        "C54x composition rejection coverage: PASS cases=24 restore=24 coverage_fnv64=49684e18280b7d65",
         "TMS320C54x interrupt POPM exclusions: PASS cases=24 restore=24 destinations=IMR,IFR contexts=RPT,BD_first,BD_last pages=2 snapshots=2 reads=0 writes=0 stack_changes=0 mask_changes=0 acknowledgements=0 hardware_trap_claim=0"
       ]
     },
@@ -14178,6 +14191,18 @@
       "decision": "rewrite",
       "family": "smem-test-compare"
     },
+    "clock-mvdk-edge": {
+      "case_ids": [],
+      "classification": "implementation_limit",
+      "coverage": {
+        "cases": 24,
+        "fnv64": "49684e18280b7d65",
+        "key": "Original raw0..23: direct/indirect/absolute source, RPT/BD_delay, original pages0/2, snapshots2/3.",
+        "result_prefix": "C54x composition rejection coverage: PASS"
+      },
+      "decision": "rewrite",
+      "family": "special-register-composition-admission"
+    },
     "cmpm-smem": {
       "case_ids": [],
       "classification": "architectural_interaction",
@@ -15113,6 +15138,18 @@
       "decision": "rewrite",
       "family": "normalization-recovered-count-aliases",
       "scope": "Positive inferred count-alias model, not documented ISA conformance, an illegal-operand test or handset integration."
+    },
+    "pop-irq-edge": {
+      "case_ids": [],
+      "classification": "implementation_limit",
+      "coverage": {
+        "cases": 24,
+        "fnv64": "49684e18280b7d65",
+        "key": "Original raw0..23: IMR/IFR destination, RPT/BD_first/BD_last, original pages0/1, snapshots2/3.",
+        "result_prefix": "C54x composition rejection coverage: PASS"
+      },
+      "decision": "rewrite",
+      "family": "special-register-composition-admission"
     },
     "power-idle": {
       "case_ids": [],

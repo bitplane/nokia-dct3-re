@@ -492,6 +492,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_stack_sequence.h` | FRAME/push and safely separated compiler-SP inputs, shared by CPU-only and default runners |
 | `tests/firmware/tms320c54x_test_rom4_context.cpp` | Copied Nokia context/worker/timer integration; separate profile, legal standard-mode status seeds |
 | `tests/c54x/tms320c54x_test_register_pairs.h` | SAT and carry/TC rotate pairs with independent expected register states |
+| `tests/c54x/tms320c54x_test_composition_limits.h` | Explicit staged-model CLKMD/interrupt-POPM rejection policies, CPU-only inputs and replay |
 | `tests/c54x/tms320c54x_test_register_alu.h` | Signed40 MIN/MAX and signed17 SQUR expectations, retained inputs and explicit late operand writes |
 | `tests/c54x/tms320c54x_test_port_case.h` | Common PORTW stimulus construction; no instruction arithmetic or reset policy |
 | `tests/c54x/tms320c54x_test_scalars.h` | Literal scalar boundaries with explicit reset/continuation groups, shared with the legacy basic adapter |

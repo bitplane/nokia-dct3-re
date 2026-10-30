@@ -8,6 +8,23 @@
   },
   "families": [
     {
+      "id": "special-register-composition-admission",
+      "classification": "implementation_limit",
+      "decision": "rewrite",
+      "profiles": ["pop-irq-edge", "clock-mvdk-edge"],
+      "case_ids": [],
+      "profile_coverage": {
+        "pop-irq-edge": {"cases": 24, "fnv64": "49684e18280b7d65", "result_prefix": "C54x composition rejection coverage: PASS", "key": "Original raw0..23: IMR/IFR destination, RPT/BD_first/BD_last, original pages0/1, snapshots2/3."},
+        "clock-mvdk-edge": {"cases": 24, "fnv64": "49684e18280b7d65", "result_prefix": "C54x composition rejection coverage: PASS", "key": "Original raw0..23: direct/indirect/absolute source, RPT/BD_delay, original pages0/2, snapshots2/3."}
+      },
+      "basis": "Two distinct explicit staged-model guards reject CLKMD destination moves and interrupt-register POPM in repeat/control contexts before operand effects. The independently specified policy is rejection with unchanged CLKMD/source pointer, or stack/IMR/IFR, and zero data reads/writes. These are implementation limits, not architectural illegality. The generic source-domain bank covers other instruction/source grammars and is not a replacement.",
+      "changes": ["retain all48 original raw identities, program shapes, page choices and snapshots; replace four legacy setup/result methods and four phase numbers with one typed case builder and the existing CPU-only clocked runner", "remove both profiles' dependence on positive fixture setup, legacy class fields and Nokia/GSM declarations; BIOS ownership moves to tms54isa without renaming profiles", "clear the clock fixture's invalid standard-mode ARP sentinel a628->0628 per SPRU131G section5.5/page7-61; lower status bits and all tested values remain", "preservation is now checked throughout execution, not only at the final clock; the illegal latch is still required only at12, without inventing an intermediate rejection cycle", "generic expected-state inspection suppresses side effects, so passive CLKMD readback cannot become a CPU bus event; an executable stub checks suppression and restoration", "actual case/restoration counters and ordered raw-key digest replace reliance on constant summaries alone"],
+      "limits": ["no execution case retired; this removes harness coupling and redundant replay controllers, not a distinct guard", "no XC/block composition is added to either bank, and no silicon trap/clock-latency claim is made", "the minimal bench adds the original POPM page1 mapping only for its owning profile; other existing mappings remain unchanged"],
+      "measurement": {"baseline_commit": "a25994db", "cpp_bytes_deleted_net": 2096, "cpp_lines_deleted_net": 17, "legacy_methods_removed": 4, "legacy_phases_removed": 4, "cases_retired": 0, "scope": "Includes the new typed case header and minimal-bench wiring, not merely deletions from the legacy files. No runtime speedup claim."},
+      "verification": "Both24-case baselines pass. Full and CPU-only builds pass; both profiles complete every case/restore with required ordered digest49684e18280b7d65 on both executables and an empty ROM directory. Standalone mode-latency1072, stack-sp774 and st-t-long-edge256 pass; full-build pop-irq192, clock-mvdk72 and legacy-atomic pass. All49 targeted host tests pass in8.371 seconds, including observation suppression and all395 mocked BIOS selections. Inventory:395 profiles,273 default requirements,64 reviewed profile contracts. No full-default/all-isolated or handset renewal.",
+      "captures": {"pop_irq_full": "tmp/c54x-rejection-review/run_c54x_core_41xzsof5", "clock_full": "tmp/c54x-rejection-review/run_c54x_core_j005qsvt", "pop_irq_standalone": "tmp/c54x-rejection-review/run_c54x_core_lpvij7ti", "clock_standalone": "tmp/c54x-rejection-review/run_c54x_core_dtq7b6w8"}
+    },
+    {
       "id": "unused-result-handler-address-spaces",
       "classification": "harness_infrastructure",
       "decision": "delete",

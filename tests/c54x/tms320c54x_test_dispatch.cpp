@@ -76,7 +76,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_pipeline_far_irq_results()) return;
 	if (check_pipeline_intm_results()) return;
 	if (check_pipeline_push_sp_latency_results()) return;
-	if (check_interrupt_pop_edge_results()) return;
 	if (check_pipeline_mmr_pop_results()) return;
 	if (check_pipeline_load_add_results()) return;
 	if (check_pipeline_dst_results()) return;
@@ -137,7 +136,6 @@ TIMER_CALLBACK_MEMBER(tms320c54x_test_state::check_results)
 	if (check_repeat_context_results()) return;
 	if (check_delayed_call_replay_results()) return;
 	if (check_mvdk_producer_results()) return;
-	if (check_clkmd_move_edge_results()) return;
 	if (check_mvdk_mapped_results()) return;
 	if (check_basic_repeat_results()) return;
 	if (check_rptbd_shift_store_results()) return;

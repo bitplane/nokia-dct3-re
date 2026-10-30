@@ -332,7 +332,7 @@ void tms320c54x_test_state::start_pipeline_mmr_pop(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 	m_pipeline_peripheral_case = variant;
-	bool const irq = profile_is("pop-irq") || profile_is("pop-irq-edge"); auto const f = irq_pop_case(variant);
+	bool const irq = profile_is("pop-irq"); auto const f = irq_pop_case(variant);
 	u16 const destination = irq ? f.destination : variant / 6 < 18 ? 6 + variant / 6 : 0x19;
 	u16 const value = irq ? f.value : 0x6aa5;
 	u32 const base = irq ? f.base : BIT(variant, 0) ? 0x10000 : 0;
@@ -5469,7 +5469,7 @@ tms320c54x_test_state::mvdk_mapped_fixture tms320c54x_test_state::mvdk_mapped_ca
 void tms320c54x_test_state::start_mvdk_mapped(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const clock = profile_is("clock-mvdk") || profile_is("clock-mvdk-edge");
+	bool const clock = profile_is("clock-mvdk");
 	auto const f = mvdk_mapped_case(variant, profile_is("mvdk-acc"), clock); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, f.form == 0 ? 0x7100 | (f.source & 0x7f) : f.form == 1 ? 0x7196 : 0x71f8);
