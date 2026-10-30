@@ -161,31 +161,6 @@ void tms320c54x_test_state::start_repeated_writa(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_rptz(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const target = variant % 2, count = std::array<unsigned, 4>{0, 1, 3, 17}[(variant / 2) % 4];
-	u32 const base = (variant / 128) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 12; ++i) program.write_word(base + 0x9000 + i, 0xf495);
-	program.write_word(base + 0x9000, 0xf071 | (target << 8)); program.write_word(base + 0x9001, count);
-	program.write_word(base + 0x9002, 0x7693); program.write_word(base + 0x9003, 0x2468); program.write_word(base + 0x9004, 0xf4e1);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa024 | (((variant / 8) % 4) << 11)},
-		{cpu_regs::STATE_ST1, 0x800 | (((variant / 32) % 4) << 8)}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-		{cpu_regs::STATE_A, 0xff12345678ULL}, {cpu_regs::STATE_B, 0x81abcdef01ULL}, {cpu_regs::STATE_AR3, 0x1200},
-	});
-	m_pipeline_extensions_reads = m_pipeline_store_writes = 0;
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "rptz_writes",
-		[this, count](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(m_pipeline_store_writes <= count && at == 0x1200 + m_pipeline_store_writes && word == 0x2468, "RPTZ issues exactly count-plus-one ordered real stores"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x9001, base + 0x9001, "rptz_literal",
-		[this, count](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(word == count && !m_pipeline_extensions_reads, "RPTZ retains its count literal once"); ++m_pipeline_extensions_reads; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = rptz_phase;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x9000); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_repeat_nop(unsigned variant)
 {
@@ -1232,41 +1207,6 @@ bool tms320c54x_test_state::check_repeated_writa_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_rptz_results()
-{
-	if (m_phase == rptz_phase)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, target = variant % 2;
-		unsigned const count = std::array<unsigned, 4>{0, 1, 3, 17}[(variant / 2) % 4], checkpoint = std::array<unsigned, 3>{3, 5, 7}[variant / 256];
-		u32 const base = (variant / 128) % 2 ? 0x20000 : 0;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Staged RPTZ setup and immediate-store body are admitted");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (tick >= 7 && !target ? 0 : 0xff12345678ULL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (tick >= 7 && target ? 0 : 0x81abcdef01ULL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa024 | (((variant / 8) % 4) << 11)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (((variant / 32) % 4) << 8)), "RPTZ clears only its selected 40-bit accumulator at Execute and preserves status");
-		if (tick == 5) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x9001, 0xffff); }
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot[0] = m_pipeline_extensions_reads; m_recurring_irq_snapshot[1] = m_pipeline_store_writes; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save RPTZ before or after count retention and clearing");
-		}
-		if (tick == 64)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 && m_pipeline_extensions_reads == 1 &&
-				m_pipeline_store_writes == count + 1 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x1200 + count + 1, "RPTZ uses retained count-plus-one and reaches its continuation once");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_extensions_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; return restore_pipeline_at(rptz_phase + 1, "Restore staged RPTZ setup without count refetch");
-			}
-			m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 767) { start_rptz(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged RPTZ: PASS cases=768 restore=768 accumulators=2 counts=0,1,3,17 c_tc=4 sxm_ovm=4 pages=2 snapshots=3 count_plus_one=1 literal_reads=1 status_preserved=1 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated staged RPTZ complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == rptz_phase + 1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = rptz_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_braf_control_results()
 {

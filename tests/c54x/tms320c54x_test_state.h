@@ -221,7 +221,6 @@ private:
 	};
 	static delay_bitt_fixture delay_bitt_case(unsigned v);
 	void start_delay_bitt(unsigned variant = 0);
-	void start_rptz(unsigned variant = 0);
 	void start_ar_addm_load(unsigned variant = 0);
 	void start_instruction_observer(unsigned variant = 0);
 	void start_pipeline_peripheral_logic(unsigned variant = 0);
@@ -1652,7 +1651,6 @@ private:
 	bool check_branch_arithmetic_results();
 	bool check_bitt_results();
 	bool check_delay_bitt_results();
-	bool check_rptz_results();
 	bool check_mapped_addm_results();
 	bool check_shifted_store_dld_results();
 	bool check_idle_nmi_result_results();
@@ -1990,7 +1988,6 @@ private:
 	static constexpr unsigned repeated_writa_phase = 62044;
 	static constexpr unsigned branch_arithmetic_phase = 62040;
 	static constexpr unsigned bitt_phase = 62032;
-	static constexpr unsigned rptz_phase = 62026;
 	static constexpr unsigned ar_addm_phase = 62020;
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;

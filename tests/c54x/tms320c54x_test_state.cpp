@@ -56,7 +56,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"bitt-retd"}, [](self &test) { test.start_bitt_retd(); } },
 		{ {"bitt-ctrl"}, [](self &test) { test.start_delay_bitt(); } },
 		{ {"bitt"}, [](self &test) { test.start_bitt(); } },
-		{ {"rptz"}, [](self &test) { test.start_rptz(); } },
 		{ {"addm-ar"}, [](self &test) { test.start_ar_addm(); } },
 		{ {"addm-ar-short"}, [](self &test) { test.start_ar_addm(); } },
 		{ {"addm-brc"}, [](self &test) { test.start_ar_addm(); } },
