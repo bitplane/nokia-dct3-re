@@ -306,6 +306,7 @@ def main():
     counts['long_memory_rmw'] = 2264
     counts['pmst_restore'] = 368
     counts['atomic_operand_order'] = 46
+    counts['xc_return'] = 16
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

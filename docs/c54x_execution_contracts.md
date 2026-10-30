@@ -540,7 +540,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_register_unary.h` | Independent register-logic, shift, NEG/ABS inputs, balanced replay keys and explicit clocked observations |
 | `tests/c54x/tms320c54x_test_domain_schedule.h` | Independent instruction inventory and explicit admission-control schedule; no legacy phase routing |
 | `tests/c54x/tms320c54x_test_pipeline.cpp` | Dependency, status and data-path compositions and their sequenced continuations |
-| `tests/c54x/tms320c54x_test_pipeline_control.cpp` | Branch, call, return and conditional-control compositions and continuations |
+| `tests/c54x/sections/xc_return.h` | Selected/annulled XC return, resumed-word protection and interrupt deferral |
 | `tests/c54x/tms320c54x_test_pipeline_repeat.cpp` | Repeat/block-control compositions and continuations |
 | `tests/c54x/sections/frontend_drain.h` | Decoded/empty frontend entry, flush timing and case-owned acknowledgement checks |
 | `tests/c54x/tms320c54x_test_observer.cpp` | Instruction identity, ordinary-read exclusion and XC annulment observations |
@@ -3394,16 +3394,22 @@ target. Leaving that endpoint at the abandoned sequential address would
 retain protection indefinitely. A later ordinary status write must not be
 misclassified as an XC-controlled instruction.
 
-`xc-ret` passes 192 cases and cleared-pipeline replays: XC 1 BEQ/BNEQ,
-selected/annulled returns, one-/two-word resumed instructions, two pages,
-four checkpoints and none/IRQ/NMI. Interrupts are introduced only on selected
+`xc_return` passes sixteen cases and cleared-pipeline replays: XC 1 BEQ/BNEQ,
+selected/annulled returns and one-/two-word resumed instructions, with
+none/IRQ/NMI on selected paths. Two pages and four checkpoints are distributed;
+unasserted interrupt variants on annulled paths are removed. Interrupts arrive
+only on selected
 return paths, at fixture clock 7. The resumed write precedes interrupt
 stack/vector effects; the original stack target is sampled once and poisoned
 after Read. No-interrupt runs also execute a later ordinary STM ST1, beyond
 the protected word's retirement. Adjacent-status admission, other return or
 control-transfer forms and silicon interrupt timing remain unqualified.
 This validates the declared resumed-word protection model, not an independent
-measurement of the physical return pipeline.
+measurement of the physical return pipeline. Exact ordered bus events include
+the model-selected IRQ continuation and vector fetch; IRQ acceptance requires
+the return Read and protected Write to have completed. A wrong bus-progress
+expectation fails. The old 192-case profile, handlers and now-empty control
+source file are removed.
 
 Save/load fixtures must not queue synchronized input changes immediately
 before `read_stream`: restoring scheduler timers does not restore the pending

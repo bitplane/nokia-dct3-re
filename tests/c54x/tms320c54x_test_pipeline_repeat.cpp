@@ -1437,36 +1437,6 @@ bool tms320c54x_test_state::check_basic_repeat_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_xc_return_results()
-{
-	if (m_phase == 62176)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, source = (variant / 16) % 3;
-		bool const selected = bool(variant & 1) != bool(variant & 2); unsigned const checkpoint = std::array<unsigned, 4>{3, 5, 8, 12}[variant / 48];
-		if (tick == 7 && selected && source) m_cpu->set_input_line(source == 2 ? INPUT_LINE_NMI : 0, ASSERT_LINE);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "XC return protection must not leak into a later ordinary status write");
-		if (m_pipeline_operand_reads && !m_pipeline_register_writes) { auto const disabled = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x3000, 0xdead); }
-		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_vector_reads, m_pipeline_extensions_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save XC return, resumed protection and pending vector"); }
-		if (tick == 32)
-		{
-			if (m_vector_reads != unsigned(selected && source)) osd_printf_info("xc_return_vector: case=%u replay=%u vectors=%u ifr=%llx imr=%llx st1=%llx\n", variant, unsigned(m_pipeline_replay), m_vector_reads, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IFR), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IMR), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST1));
-			bool const valid = m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == unsigned(selected) && m_pipeline_store_writes == unsigned(selected) && m_pipeline_register_writes == unsigned(selected && source) && m_vector_reads == unsigned(selected && source) && (source || m_pipeline_extensions_reads == unsigned(selected)) && m_cpu->state_int(tms320c54x_device::STATE_SP) == (selected && !source ? 0x3001 : 0x3000) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (selected ? (m_pipeline_extensions_reads ? 0x340 : 0x100) | (source ? 0x800 : 0) : 0x100);
-			if (!valid) osd_printf_info("xc_return_final: case=%u replay=%u selected=%u source=%u read=%u write=%u frame=%u vector=%u status_write=%u sp=%llx st1=%llx pc=%llx idle=%llu\n", variant, unsigned(m_pipeline_replay), unsigned(selected), source, m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_register_writes, m_vector_reads, m_pipeline_extensions_reads, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_SP), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_ST1), (unsigned long long)m_cpu->state_int(STATE_GENPC), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_IDLE));
-			expect(valid, "Selected and annulled XC returns preserve one target sample, balanced stack effects and bounded protection");
-			// Do not queue synchronized input changes before read_stream:
-			// it restores scheduler timers, not device_input's pending queue.
-			// IFR/NMI and any accepted entry are already in the CPU snapshot;
-			// a fresh assertion would duplicate the original physical event.
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; m_pipeline_register_writes = m_recurring_irq_snapshot[2]; m_vector_reads = m_recurring_irq_snapshot[3]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[4]; m_check_timer->adjust(attotime::never); m_cpu->set_pipeline_frontend(false); m_cpu->set_pipeline_frontend(true); expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore XC return protection without retaining future pipeline state"); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62177; m_check_timer->enable(true); return true; }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 191) { start_xc_return(variant + 1); return true; }
-			osd_printf_info("TMS320C54x XC return protection: PASS cases=192 restore=192 predicates=BEQ,BNEQ outcomes=2 resumed_words=one,two pages=2 snapshots=4 sources=none,IRQ,NMI irq_selected_only=1 return_reads=once resumed_write=once later_STM_ST1=ordinary reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated XC return protection complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62177) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62176; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_delayed_far_call_results()
 {

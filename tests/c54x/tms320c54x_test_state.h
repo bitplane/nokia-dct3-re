@@ -70,7 +70,6 @@ private:
 	{
 		if (profile_is("rom4-context")) m_context_coverage.add((bank << 8) | raw);
 	}
-	void start_xc_return(unsigned variant = 0);
 	void start_pipeline_original_worker_roundtrip(unsigned variant = 0);
 	void start_pipeline_original_context_call(unsigned variant = 0, bool full_body = false);
 	static std::array<u16, 2> addm_inputs(unsigned variant);
@@ -1025,7 +1024,6 @@ private:
 	bool check_ldu_peripheral_results();
 	bool check_ldu_imr_results();
 	bool check_shifted_peripheral_results();
-	bool check_xc_return_results();
 	bool check_mapped_dual_results();
 	bool check_repeat_mvdp_irq_results();
 	bool check_circular_portr_results();
