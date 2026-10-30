@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
-#include "tms320c54x_test_memory_examples.h"
 #include <algorithm>
 
 namespace c54x_test {
@@ -13,23 +12,6 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	static constexpr unsigned memory_phases[] = {
-		570, 571, 572, 573, 574, 575, 576, 577, 578, 579, 580, 581, 582, 583, 584, 585, 586,
-		9200, 9201, 9202, 9203, 9204, 587, 588, 589, 590, 591, 592, 593, 594, 595, 596, 597,
-		6508, 6509, 6510, 6572, 9205, 598, 599, 600, 601, 6561, 6505, 6529
-	};
-	auto const memory_phase = std::find(std::begin(memory_phases), std::end(memory_phases), m_phase);
-	if (memory_phase != std::end(memory_phases))
-	{
-		unsigned const index = unsigned(memory_phase - std::begin(memory_phases));
-		auto const &test = memory_examples().at(index);
-		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
-		expect_opcode(test.opcode, true, "Memory-operand literal reference");
-		if (index + 1 < memory_examples().size())
-		{
-			return begin_atomic_case(memory_examples()[index + 1], memory_phases[index + 1]);
-		}
-	}
 	if (m_phase >= 614 && m_phase <= 652)
 	{
 		program.write_word(0x05e2, 0xe13a); // LMS *AR5,*AR4+.

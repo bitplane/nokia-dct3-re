@@ -4,7 +4,6 @@
 #include "emu.h"
 #include "tms320c54x_test_state.h"
 #include "tms320c54x_test_absolute_examples.h"
-#include "tms320c54x_test_memory_examples.h"
 #include <algorithm>
 
 namespace c54x_test {
