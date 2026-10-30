@@ -923,73 +923,7 @@ void tms320c54x_test_state::start_original_nibble(unsigned variant)
 
 
 
-tms320c54x_test_state::immediate_mapped_fixture tms320c54x_test_state::immediate_mapped_case(unsigned variant)
-{
-	if (variant < 16)
-	{
-		u16 const bits = std::array<u16, 8>{56,1,7,8,9,64,255,512}[variant % 8];
-		return {true, false, 0, 14, 0, 0, 8, u16((bits + 7) / 8), bits, 0x4900,
-			variant & 8 ? 0x20000U : 0, 0, (bits + 7) / 8U};
-	}
-	unsigned v = variant - 16, operation = v % 5; v /= 5;
-	bool const b = v % 2; v /= 2;
-	unsigned const part = v % 3; v /= 3;
-	unsigned const pattern = v % 4; v /= 4;
-	unsigned const gap = v % 2; v /= 2;
-	bool const sxm = v % 2; v /= 2;
-	u64 const initial = std::array<u64, 4>{0,0x123456789aULL,0xff87654321ULL,0x007fffffffULL}[pattern];
-	u16 const literal = std::array<u16, 4>{1,0x1357,0xffff,0x8000}[pattern];
-	s64 const arithmetic_operand = sxm ? s16(literal) : literal;
-	u64 const result = (operation == 0 ? initial + arithmetic_operand : operation == 1 ? initial - arithmetic_operand :
-		operation == 2 ? initial & literal : operation == 3 ? initial | literal : initial ^ literal) & 0xffffffffffULL;
-	u16 const sampled = part == 2 ? (result >> 32) & 0xff : result >> (part * 16);
-	return {false, b, gap, 6, u16(0xf000 | (std::array<unsigned,5>{0,1,3,4,5}[operation] << 4) | (b ? 0x300 : 0)),
-		literal, u16((b ? 0x0b : 8) + part), sampled, 0, u16(0x800 | (sxm ? 0x100 : 0)),
-		v % 2 ? 0x20000U : 0, initial, result};
-}
 
-void tms320c54x_test_state::start_immediate_mapped(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_cpu->set_pipeline_frontend(false); m_pipeline_peripheral_case = variant;
-	auto const f = immediate_mapped_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 40; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	if (f.original)
-	{
-		// Original AA99 02:ab09..ab15; the zero-latency AL reload is load-bearing.
-		std::array<u16,13> const source{0x10e1,5,0xf010,1,0x7102,0x0011,0x4808,0xf47d,0xf000,1,0x4808,0x4ee1,6};
-		for (unsigned i = 0; i < source.size(); ++i) program.write_word(f.base + 0x600 + i, source[i]);
-		program.write_word(f.base + 0x60d, 0xf4e1);
-		data.write_word(0x1805, f.bits); data.write_word(0x1402, 0x1900);
-		data.write_word(0x1906, 0x7777); data.write_word(0x1907, 0x8888);
-	}
-	else
-	{
-		program.write_word(f.base + 0x600, f.opcode); program.write_word(f.base + 0x601, f.literal);
-		program.write_word(f.base + 0x602 + f.gap, 0x4800 | (f.selected_b ? 0 : 0x100) | f.source);
-		program.write_word(f.base + 0x603 + f.gap, 0xf4e1);
-	}
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.original || !f.selected_b ? f.initial : 0x1234);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, !f.original && f.selected_b ? f.initial : 0x5678);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1800); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1400);
-	m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = m_pipeline_register_writes = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "immediate_alu_mapped_read", [this, f](offs_t at, u16 &value, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (f.original && at == 0x1805) { expect(value == f.bits && !m_pipeline_extensions_reads++, "Original rounding prefix reads its bit size once"); return; }
-		if (f.original && at == 0x1402) { expect(value == 0x1900 && !m_pipeline_register_writes++, "Original rounding prefix retains its destination pointer"); return; }
-		u16 const expected = f.original && !m_pipeline_operand_reads ? f.bits - 1 : f.sampled;
-		if (at != f.source || value != expected) osd_printf_info("immediate_mapped_read: case=%u address=%04x actual=%04x expected=%04x\n", m_pipeline_peripheral_case, unsigned(at), value, expected);
-		expect(at == f.source && value == expected && m_pipeline_operand_reads < unsigned(f.original ? 2 : 1), "Two-word immediate ALU permits the documented adjacent mapped read"); ++m_pipeline_operand_reads;
-	});
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "immediate_alu_mapped_write", [this, f](offs_t at, u16 &value, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(f.original && ((at == 0x11 && value == 0x1900) || (at == 0x1906 && !value) || (at == 0x1907 && value == f.sampled)), "Original rounding prefix publishes pointer and both count halves only"); ++m_pipeline_store_writes;
-	});
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 399920;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -2269,40 +2203,6 @@ bool tms320c54x_test_state::check_rptbd_shift_store_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_negate_results()
-{
-	if (m_phase == 399920)
-	{
-		unsigned const tick = ++m_idle_fixture_tick, variant = m_pipeline_peripheral_case; auto const f = immediate_mapped_case(variant);
-		if (tick == f.checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads,m_pipeline_extensions_reads,m_pipeline_store_writes,m_pipeline_register_writes};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save immediate ALU mapped dependency before completion");
-		}
-		if (tick == 40)
-		{
-			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Immediate mapped dependency completes without instruction exclusions");
-			expect(m_cpu->state_int(f.selected_b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == f.result &&
-				(f.original || m_cpu->state_int(f.selected_b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == f.sampled), "Immediate ALU result and mapped consumer agree with independent arithmetic");
-			expect(m_pipeline_operand_reads == unsigned(f.original ? 2 : 1) && m_pipeline_extensions_reads == unsigned(f.original) &&
-				m_pipeline_register_writes == unsigned(f.original) && m_pipeline_store_writes == unsigned(f.original ? 3 : 0), "Immediate mapped replay preserves exact source and destination access counts");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint;
-				m_pipeline_operand_reads=m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads=m_recurring_irq_snapshot[1]; m_pipeline_store_writes=m_recurring_irq_snapshot[2]; m_pipeline_register_writes=m_recurring_irq_snapshot[3];
-				return restore_pipeline_at(399930, "Restore immediate mapped dependency without duplicate sampling");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant == 15) osd_printf_info("TMS320C54x original byte-count prefix: PASS cases=16 restore=16 words=13 sizes=8 pages=2 mapped_reads=2 data_writes=3 silicon_phase_claim=0\n");
-			if (variant < 975) { start_immediate_mapped(variant+1); return true; }
-			osd_printf_info("TMS320C54x immediate ALU mapped consumer: PASS cases=960 restore=960 operations=ADD,SUB,AND,OR,XOR accumulators=2 parts=3 patterns=4 gaps=0,1 sxm=2 pages=2 reads=1 writes=0 silicon_phase_claim=0\n");
-			start_long_mapped_original(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true;
-	}
-	if (m_phase == 399930) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase=399920; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true; }
-	return false;
-}
 
 
 

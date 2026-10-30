@@ -2387,6 +2387,19 @@ checkpoint cohorts are distributed rather than run as 3,072 cases. These
 are model publication checks, not physical timing measurements; the legacy
 profile, descriptor, setup and result phases are removed.
 
+`immediate_mapped_consumer` covers 480 ADD/SUB/AND/OR/XOR → opposite-accumulator
+LDM combinations: both source accumulators, all three fields, four value/literal
+patterns, both SXM states and gaps 0/1. It checks the independently computed
+40-bit producer result and captured field, exactly one mapped Read/no writes,
+one retained literal, IDLE and replay. It does not claim an exact Read clock.
+Program pages are distributed instead of duplicating the 480-case grid.
+`rounded_byte_count` separately exercises a self-contained 13-word composition:
+eight boundary bit counts, stack-relative destination pointer, mapped AL reloads
+and a long store of `(bits+7)/8`. All seven data events are checked in order,
+without asserting physical or model cycle timing. No private image or firmware
+address is required. The old two-page duplication and shared phase chain are
+removed, including the now-empty misleadingly named negate-result dispatcher.
+
 Dual-memory ADD/SUB (`a000..a3ff`, SPRU172C syntax 6) uses the same retained
 address/read machinery as dual MPY, but does not load T. Both operands are
 extended according to SXM and shifted left by 16; their sum/difference replaces

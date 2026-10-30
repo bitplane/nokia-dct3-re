@@ -389,16 +389,6 @@ private:
 	static u16 nibble_input(unsigned variant);
 	void start_original_nibble(unsigned variant = 0);
 	void start_software_intr(unsigned variant = 0);
-	struct immediate_mapped_fixture
-	{
-		bool original, selected_b;
-		unsigned gap, checkpoint;
-		u16 opcode, literal, source, sampled, bits, st1;
-		u32 base;
-		u64 initial, result;
-	};
-	static immediate_mapped_fixture immediate_mapped_case(unsigned variant);
-	void start_immediate_mapped(unsigned variant = 0);
 	void start_long_mapped_original(unsigned variant = 0);
 	struct dst_bypass_fixture
 	{
@@ -1070,7 +1060,6 @@ private:
 	bool check_mvdk_mapped_results();
 	bool check_basic_repeat_results();
 	bool check_rptbd_shift_store_results();
-	bool check_negate_results();
 	bool check_long_mapped_original_results();
 	bool check_mcbsp_control_sequence_results();
 	bool check_stack_irq_order_results();
