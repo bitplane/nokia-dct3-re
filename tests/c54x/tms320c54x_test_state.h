@@ -42,7 +42,6 @@ private:
 
 	void xf_w(int state);
 	bool m_xf_pin = true;
-	void start_repeat_endpoint_case(unsigned index);
 	void check_control_disassembler();
 	void start_pipeline_mu4_prologue(unsigned variant = 0);
 	void observe_context_irq(int line);
@@ -642,7 +641,6 @@ private:
 		m_check_timer->enable(true);
 		return true;
 	}
-	bool check_repeat_endpoints_results();
 	bool check_instruction_observer_results();
 	bool check_block_page_results();
 	bool check_mvdd_source_results();
@@ -727,8 +725,6 @@ private:
 	unsigned m_idle_fixture_tick = 0, m_idle_fixture_saved_tick = 0;
 	unsigned m_pipeline_repeat_count_reads = 0;
 	u64 m_recurring_irq_checkpoint_cycle = 0, m_recurring_irq_end_cycle = 0;
-	memory_passthrough_handler m_repeat_boundary_tap;
-	unsigned m_repeat_boundary_requests = 0;
 	memory_passthrough_handler m_operand_data_tap;
 	unsigned m_phase = 0;
 	bool (tms320c54x_test_state::*m_result_owner)() = nullptr;

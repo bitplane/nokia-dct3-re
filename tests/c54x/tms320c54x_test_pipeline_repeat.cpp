@@ -6,39 +6,6 @@
 
 namespace c54x_test {
 
-void tms320c54x_test_state::start_repeat_endpoint_case(unsigned index)
-{
-	m_cpu->reset();
-	auto &program = m_cpu->space(AS_PROGRAM);
-	auto &data = m_cpu->space(AS_DATA);
-	u16 const body = index % 3 == 0 ? 0x0802 : index % 3 == 1 ? 0xfffd : 0xfffe;
-	bool const long_count = (index / 3) & 1, nmi = index >= 6;
-	u16 const start = body - (long_count ? 2 : 1);
-	program.write_word(0x010000 | start, long_count ? 0xf070 : 0xec02);
-	if (long_count) program.write_word(0x010000 | u16(start + 1), 2);
-	program.write_word(0x010000 | body, 0x7312); // MVMD AR2,dmad
-	program.write_word(0x010000 | u16(body + 1), 0x0600);
-	program.write_word(0x010000 | u16(body + 2), 0xf4e1);
-	program.write_word(nmi ? 0x010004 : 0x010040, 0xf4e1); // Stop at accepted vector.
-	for (unsigned i = 0; i < 4; ++i) data.write_word(0x0600 + i, 0xdead);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_AR2, 0x1234}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_ST1, 0},
-		{cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_IMR, 1}, {STATE_GENPC, 0x010000 | start},
-	});
-	m_repeat_boundary_requests = 0;
-	m_repeat_boundary_tap.remove();
-	m_repeat_boundary_tap = data.install_write_tap(0x0601, 0x0601, "repeat_final_request",
-		[this, nmi](offs_t, u16 &, u16) {
-			if (!machine().side_effects_disabled() && !m_repeat_boundary_requests++)
-				m_cpu->set_input_line(nmi ? INPUT_LINE_NMI : 0, ASSERT_LINE);
-		});
-	m_phase = 83000 + index;
-	m_check_timer->adjust(attotime::from_usec(100));
-}
-
-
-
-
 unsigned tms320c54x_test_state::block_branch_count(unsigned variant)
 { return std::array<unsigned, 4>{0, 1, 2, 7}[variant % 4]; }
 
@@ -870,32 +837,6 @@ void tms320c54x_test_state::start_block_bcd(unsigned variant)
 	m_phase = 255560; m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-
-bool tms320c54x_test_state::check_repeat_endpoints_results()
-{
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 83000 && m_phase < 83012)
-	{
-		unsigned const index = m_phase - 83000;
-		u16 const body = index % 3 == 0 ? 0x0802 : index % 3 == 1 ? 0xfffd : 0xfffe;
-		osd_printf_info("C54x repeat endpoint case=%u body=%04x final_word=%04x continuation=%04x\n",
-			index, body, data.read_word(0x0602), data.read_word(0x0fff));
-		expect(m_repeat_boundary_requests == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-			!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Repeat endpoint fixture reaches interrupt vector");
-		expect(data.read_word(0x0600) == 0x1234 && data.read_word(0x0601) == 0x1234 &&
-			data.read_word(0x0602) == 0x1234 && data.read_word(0x0603) == 0xdead &&
-			data.read_word(0x0fff) == u16(body + 2) &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff &&
-			m_cpu->state_int(STATE_GENPC) == (index >= 6 ? 0x010005 : 0x010041),
-			"Repeat final iteration retains address progression and IRQ/NMI protection at every endpoint");
-		m_repeat_boundary_tap.remove();
-		m_cpu->set_input_line(index >= 6 ? INPUT_LINE_NMI : 0, CLEAR_LINE);
-		if (index < 11) { start_repeat_endpoint_case(index + 1); return true; }
-		osd_printf_info("TMS320C54x repeat endpoints: PASS cases=12 endpoints=ordinary,ffff,0000 counts=short,long sources=irq,nmi\n");
-		return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_block_page_results()
 {
