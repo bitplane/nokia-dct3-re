@@ -262,6 +262,7 @@ def main():
     counts['atomic_basic_alu_control'] = 10
     counts['atomic_basic_parallel_block'] = 9
     counts['atomic_accumulator_calls'] = 3
+    counts['atomic_bus_timing'] = 3
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

@@ -350,6 +350,7 @@ Subsequent replacements use the same section-only workflow:
 | `atomic_basic_parallel_block.h` | Retain nine basic logical shift, short ASM load, delayed block repeat, dual MPY/MAC, parallel store/MACR, SQDST, delayed conditional branch and NEG examples. Explicit status/accumulators/T/pointers/BRC/memory, fixed numeric outcomes, exact dual reads or old-source store, observable delay loads, block count/BRAF retirement, carry mask and pre-operation replay. XF sink consistency remains checked for the status import. | Native9 cases/restores, unchanged count; build5.493s/run0.017s. Delete basic32 preparation and33..41 assertions/transitions; shrink basic routing to42 onward. Supersedes atomic_basic_alu_control's pending logical-shift setup. |
 
 | `atomic_accumulator_calls.h` | Retain CALA A/B and CALAD A target/return examples. Explicit accumulators, stack and subroutine store replace the phase chain. Exact call-frame write, target fetch, data write and return read; fixed continuation/SP and delayed loads prove target capture before A is overwritten. Pre-call replay, no private ROM. | Native3 cases/restores, unchanged count; build5.552s/run0.015s. Delete9107 call preparation,42..44 assertions/setup and owning route entries. |
+| `atomic_bus_timing.h` | Three atomic BD/IRQ, CALLD/RETD and long-immediate LD contracts. Preserve operand counts, 4/11/3-clock intervals, delayed IRQ observing A=3, exact stack traffic and balanced return. Case-owned bus events raise the physical IRQ; ACK checks register state. Relative timestamps rebase on restore; CALLD replays after its first operand read. Timing is an implementation regression, not measured silicon. | Native3 cases/restores; build5.453s/run0.016s. Wrong12-clock and wrong IRQ A=4 expectations fail. Remove basic61/62,65/66,68/69 setup/checks and routes; only77's port setup remains. Supersedes atomic_repeat_irq's pending BD/CALLD note. Call3, repeat265, extended-push2416 and XF8 regressions pass. |
 
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
@@ -381,6 +382,7 @@ The disposition table above records subsequent migrations and measurements.
 Already structured independent cases should not be rewritten merely to meet
 a size or throughput target. Full retained-suite timing is still unknown.
 
+The following is the early pilot checkpoint, not the current migration total.
 After the case-owned IRQ expectation change, all15 migrated sections pass:
 2,842 cases/restores, including the firmware descriptor-copy section. This
 is a migrated-section checkpoint, not full CPU or handset acceptance.

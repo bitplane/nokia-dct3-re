@@ -54,6 +54,8 @@ public:
 			m_saved_data_cursor = m_data_cursor;
 			m_saved_program_cursor = m_program_cursor;
 			m_saved_xf_cursor = m_xf_cursor;
+			m_saved_data_age = m_last_data_total ? std::optional<u64>(m_cpu.total_cycles() - *m_last_data_total) : std::nullopt;
+			m_saved_first_data_age = m_first_data_total ? std::optional<u64>(m_cpu.total_cycles() - *m_first_data_total) : std::nullopt;
 			require(capture_snapshot(m_machine, m_saved) == STATERR_NONE, "capture register-sequence checkpoint");
 		}
 		if (m_tick == m_input.finish)
@@ -73,6 +75,8 @@ public:
 				m_xf_cursor = m_saved_xf_cursor;
 				if (m_input.clear_pipeline_before_restore) m_cpu.set_pipeline_frontend(true);
 				require(restore_snapshot(m_machine, m_timer, m_saved) == STATERR_NONE, "restore register sequence");
+				m_last_data_total = m_saved_data_age ? std::optional<u64>(m_cpu.total_cycles() - *m_saved_data_age) : std::nullopt;
+				m_first_data_total = m_saved_first_data_age ? std::optional<u64>(m_cpu.total_cycles() - *m_saved_first_data_age) : std::nullopt;
 				m_observing_outputs = true;
 				++m_restores; m_cpu.suspend(SUSPEND_REASON_DISABLE, true); m_resume = true; m_timer.enable(true); return false;
 			}
@@ -122,6 +126,8 @@ private:
 		prepare_case(m_cpu, m_input.states.front().observation);
 		m_fetches = m_data_cursor = m_program_cursor = 0;
 		m_xf_cursor = 0;
+		m_last_data_total.reset();
+		m_first_data_total.reset();
 		require(!(m_input.forbid_data_access && m_input.data_events), "one data-bus observation policy");
 		if (m_input.data_events)
 		{
@@ -131,11 +137,20 @@ private:
 					for (auto const &range : m_input.data_ranges) selected |= at >= range[0] && at <= range[1];
 					if (!selected) return;
 				}
-				if (!m_machine.side_effects_disabled() && !accept_data_event(*m_input.data_events, m_data_cursor,
+				if (m_machine.side_effects_disabled()) return;
+				auto const *expected = m_data_cursor < m_input.data_events->size() ? &(*m_input.data_events)[m_data_cursor] : nullptr;
+				if (expected && expected->cycles_from_previous)
+					require(m_last_data_total && m_cpu.total_cycles() - *m_last_data_total == *expected->cycles_from_previous, "relative data-bus clock interval");
+				if (expected && expected->cycles_from_first)
+					require(m_first_data_total && m_cpu.total_cycles() - *m_first_data_total == *expected->cycles_from_first, "first-to-current data-bus clock interval");
+				if (!accept_data_event(*m_input.data_events, m_data_cursor,
 					{write, u32(at), word, unsigned(m_cpu.pipeline_cycles())}))
 					throw emu_fatalerror("C54x case=%u event=%u write=%u address=%x value=%x clock=%llu",
 						m_case, m_data_cursor, unsigned(write), unsigned(at), word, (unsigned long long)m_cpu.pipeline_cycles());
-				if (!m_machine.side_effects_disabled() && m_data_observer) m_data_observer(write, u32(at), word);
+				m_last_data_total = m_cpu.total_cycles();
+				if (!m_first_data_total) m_first_data_total = m_last_data_total;
+				if (expected && expected->raise_input) m_cpu.set_input_line(*expected->raise_input,ASSERT_LINE);
+				if (m_data_observer) m_data_observer(write, u32(at), word);
 			};
 			m_data_tap = m_cpu.space(AS_DATA).install_readwrite_tap(0, 0xffff, "register_sequence_data",
 				[access](offs_t at, u16 &word, u16) { access(false, at, word); },
@@ -202,6 +217,8 @@ private:
 	unsigned m_data_cursor = 0, m_saved_data_cursor = 0;
 	unsigned m_program_cursor = 0, m_saved_program_cursor = 0;
 	unsigned m_xf_cursor = 0, m_saved_xf_cursor = 0;
+	std::optional<u64> m_last_data_total, m_saved_data_age;
+	std::optional<u64> m_first_data_total, m_saved_first_data_age;
 	bool m_observing_outputs = false;
 	builder m_build;
 	std::function<void(u16, u16)> m_opcode_observer;

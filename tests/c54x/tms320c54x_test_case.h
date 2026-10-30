@@ -45,12 +45,19 @@ struct clocked_register_action
 	std::vector<memory_word> data{};
 	bool reset_cpu = false;
 };
-struct clocked_data_event { bool write; std::uint32_t address; u16 value; unsigned cycle; bool check_cycle = true; };
+struct clocked_data_event
+{
+	bool write; std::uint32_t address; u16 value; unsigned cycle; bool check_cycle = true;
+	std::optional<int> raise_input{};
+	std::optional<unsigned> cycles_from_previous{}; // CPU clocks between selected bus events, including atomic execution.
+	std::optional<unsigned> cycles_from_first{};
+};
 struct clocked_irq_expectation
 {
 	int line;
 	unsigned earliest, latest, data_events_before;
 	std::optional<u16> return_pc{};
+	std::vector<register_check> registers{};
 };
 
 inline bool accept_data_event(std::vector<clocked_data_event> const &events, unsigned &cursor, clocked_data_event actual)

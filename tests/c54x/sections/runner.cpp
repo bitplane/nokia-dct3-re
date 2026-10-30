@@ -41,6 +41,10 @@ protected:
 				throw emu_fatalerror("Section IRQ case=%u line=%d clock=%llu data_events=%u previous_case=%u return_pc=%04x",
 					index,line,(unsigned long long)cycle,m_fixture->data_events_seen(),m_last_irq_case,
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_RTN)));
+			for (auto const &reg : expected.registers)
+				if ((m_cpu->state_int(reg.index) & reg.mask) != (reg.value & reg.mask))
+					throw emu_fatalerror("Section IRQ case=%u register=%d value=%llx expected=%llx",index,reg.index,
+						(unsigned long long)m_cpu->state_int(reg.index),(unsigned long long)reg.value);
 			++m_case_irq_cursor; ++m_irq_acks; m_cpu->set_input_line(line, CLEAR_LINE); return 0;
 		}, "section_irq");
 		m_cases = c54x_test::section_cases();
