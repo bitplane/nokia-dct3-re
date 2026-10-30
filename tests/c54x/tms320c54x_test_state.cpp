@@ -58,7 +58,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"bitt-retd"}, [](self &test) { test.start_bitt_retd(); } },
 		{ {"bitt-ctrl"}, [](self &test) { test.start_delay_bitt(); } },
 		{ {"mvdd-follow"}, [](self &test) { test.start_mvdd_follow(); } },
-		{ {"bd-read-a"}, [](self &test) { test.start_bd_read_a(); } },
 		{ {"bitt"}, [](self &test) { test.start_bitt(); } },
 		{ {"rpt-store"}, [](self &test) { test.start_repeat_store(); } },
 		{ {"rptz"}, [](self &test) { test.start_rptz(); } },

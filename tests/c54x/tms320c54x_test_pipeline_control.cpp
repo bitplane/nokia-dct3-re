@@ -187,35 +187,6 @@ void tms320c54x_test_state::start_delayed_condition_return(unsigned variant)
 }
 
 
-tms320c54x_test_state::bd_read_a_fixture tms320c54x_test_state::bd_read_a_case(unsigned v)
-{
-	bd_read_a_fixture f{};
-	f.slot=v%2; v/=2; f.form=v%4; v/=4; f.pattern=v%4; v/=4;
-	f.base=v%2 ? 0x20000 : 0; v/=2; f.source=(v%2 ? 0x20000 : 0)+0x2700; v/=2; f.snapshot=v;
-	return f;
-}
-
-void tms320c54x_test_state::start_bd_read_a(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE,true); m_pipeline_peripheral_case=variant;
-	auto const f=bd_read_a_case(variant); auto &program=m_cpu->space(AS_PROGRAM); auto &data=m_cpu->space(AS_DATA);
-	for(unsigned i=0;i<16;++i) program.write_word(f.base+0x600+i,0xf495);
-	program.write_word(f.base+0x600,0xf273); program.write_word(f.base+0x601,0x700); program.write_word(f.base+0x700,0xf4e1);
-	if(f.slot) program.write_word(f.base+0x602,0x0084);
-	program.write_word(f.base+0x602+f.slot,0x7e00|(f.form==0 || f.form==3 ? 0x20 : f.form==1 ? 0x83 : 0x93));
-	program.write_word(f.source,f.value()); data.write_word(0x4020,0xdead); data.write_word(0x5100,5);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE,0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL,0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST,0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0,0x1080); m_cpu->set_state_int(tms320c54x_device::STATE_ST1,0x900|(f.form==3 ? 0x4000 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR,0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IMR,0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR,0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A,f.source-5*f.slot); m_cpu->set_state_int(tms320c54x_device::STATE_B,0xfeabcd9876ULL); m_cpu->set_state_int(tms320c54x_device::STATE_T,0x5aa5);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP,0x4000); m_cpu->set_state_int(tms320c54x_device::STATE_AR3,0x4020); m_cpu->set_state_int(tms320c54x_device::STATE_AR4,0x5100);
-	m_pipeline_operand_reads=m_pipeline_store_writes=m_port_reads=0;
-	m_pipeline_fetch_tap=program.install_read_tap(f.source,f.source,"bd_read_a_source",[this,f](offs_t,u16 &word,u16) { if(machine().side_effects_disabled()) return; expect(word==f.value() && !m_pipeline_operand_reads++ && m_cpu->pipeline_cycles()==f.read()+4,"BD READA samples its retained program address once after the four held clocks"); auto const disable=machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.source,u16(~f.value())); });
-	m_pipeline_operand_tap=data.install_read_tap(0,0xffff,"bd_read_a_data",[this,f](offs_t at,u16 &word,u16) { if(machine().side_effects_disabled()) return; expect(f.slot && at==0x5100 && word==5 && !m_port_reads++,"The first delay word supplies READA's address through ordinary ADD"); });
-	m_pipeline_write_tap=data.install_write_tap(0,0xffff,"bd_read_a_write",[this,f](offs_t at,u16 &word,u16) { if(machine().side_effects_disabled()) return; expect(at==0x4020 && word==f.value() && !m_pipeline_store_writes++ && m_cpu->pipeline_cycles()==f.read()+5,"BD READA commits one retained program word to its original RAM destination"); });
-	m_pipeline_replay=false; m_idle_fixture_tick=0; m_phase=bd_read_a_phase;
-	m_cpu->set_state_int(STATE_GENPC,f.base+0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock()));
-}
 
 
 
@@ -518,29 +489,6 @@ void tms320c54x_test_state::start_atomic_overflow_branch(unsigned index)
 }
 
 
-bool tms320c54x_test_state::check_bd_read_a_results()
-{
-	if (m_phase == bd_read_a_phase)
-	{
-		auto const f=bd_read_a_case(m_pipeline_peripheral_case); unsigned const tick=++m_idle_fixture_tick;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),"Short READA in BD delay spans is admitted");
-		if(tick==f.read()) { expect(m_cpu->state_int(tms320c54x_device::STATE_AR3)==unsigned(f.form==2 ? 0x4021 : 0x4020),"READA owns exactly one destination update at Read"); m_cpu->set_state_int(tms320c54x_device::STATE_AR3,0x7000); }
-		if(tick==f.read()+1) { expect(m_cpu->state_int(tms320c54x_device::STATE_A)==f.source,"READA's program address includes the older ADD result"); m_cpu->set_state_int(tms320c54x_device::STATE_A,0x5a5a); }
-		if(tick==f.checkpoint() && !m_pipeline_replay) { m_recurring_irq_snapshot={m_pipeline_operand_reads,m_pipeline_store_writes,m_port_reads}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE,"Save BD READA before or across retained program transfer"); }
-		if(tick==32)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC)==f.base+0x701 && m_cpu->state_int(tms320c54x_device::STATE_SP)==0x4000 && m_cpu->state_int(tms320c54x_device::STATE_A)==0x5a5a && m_cpu->state_int(tms320c54x_device::STATE_B)==0xfeabcd9876ULL && m_cpu->state_int(tms320c54x_device::STATE_T)==0x5aa5 && m_cpu->state_int(tms320c54x_device::STATE_ST0)==0x1080 && m_cpu->state_int(tms320c54x_device::STATE_ST1)==(0x900|(f.form==3 ? 0x4000 : 0)),"BD READA retains the branch path, program source, modes and sibling registers");
-			expect(m_pipeline_operand_reads==1 && m_pipeline_store_writes==1 && m_port_reads==f.slot && m_cpu->state_int(tms320c54x_device::STATE_AR3)==0x7000 && m_cpu->state_int(tms320c54x_device::STATE_AR4)==0x5100,"READA neither resamples poisoned addresses nor duplicates transfers");
-			if(!m_pipeline_replay) { m_pipeline_replay=true; m_idle_fixture_tick=f.checkpoint(); m_pipeline_operand_reads=m_recurring_irq_snapshot[0]; m_pipeline_store_writes=m_recurring_irq_snapshot[1]; m_port_reads=m_recurring_irq_snapshot[2]; m_cpu->set_pipeline_frontend(true); return restore_pipeline_at(bd_read_a_phase+1, "Restore BD READA after clearing future pipeline state"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if(m_pipeline_peripheral_case<511) { start_bd_read_a(m_pipeline_peripheral_case+1); return true; }
-			osd_printf_info("TMS320C54x BD READA: PASS cases=512 restore=512 slots=2 forms=DP,plain,postinc,SP values=4 caller_pages=2 source_pages=2 snapshots=4 older_ADD=slot1 retained_PAR=1 retained_destination=1 source_poison=1 reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3,"TMS320C54x isolated BD READA complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true;
-	}
-	if(m_phase==bd_read_a_phase+1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase=bd_read_a_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1,m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_carry_branch_results()
 {

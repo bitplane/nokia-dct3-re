@@ -252,16 +252,6 @@ private:
 	};
 	static delay_bitt_fixture delay_bitt_case(unsigned v);
 	void start_delay_bitt(unsigned variant = 0);
-	struct bd_read_a_fixture
-	{
-		unsigned slot, form, pattern, snapshot;
-		u32 base, source;
-		u16 value() const { return std::array<u16,4>{0,1,0x8000,0xffff}[pattern]; }
-		unsigned read() const { return 7+slot; }
-		unsigned checkpoint() const { return std::array<unsigned,4>{3,read(),read()+1,read()+4}[snapshot]; }
-	};
-	static bd_read_a_fixture bd_read_a_case(unsigned v);
-	void start_bd_read_a(unsigned variant=0);
 	struct mvdd_follow_fixture
 	{
 		unsigned pattern, modifier, consumer, gap, layout, snapshot;
@@ -1739,7 +1729,6 @@ private:
 	bool check_branch_arithmetic_results();
 	bool check_circular_mar_results();
 	bool check_bitt_results();
-	bool check_bd_read_a_results();
 	bool check_mvdd_follow_results();
 	bool check_delay_bitt_results();
 	bool check_repeat_store_results();
@@ -2083,7 +2072,6 @@ private:
 	static constexpr unsigned native_store_phase = 1'000'000; // Outside legacy phase bands.
 	static constexpr unsigned delay_bitt_phase = 1'000'020;
 	static constexpr unsigned mvdd_follow_phase = 1'000'030;
-	static constexpr unsigned bd_read_a_phase = 1'000'040;
 	static constexpr unsigned push_mvmm_phase = 1'000'060;
 	static constexpr unsigned mvdm_t_phase = 1'000'070;
 	std::bitset<65536> m_asserted_opcodes;
