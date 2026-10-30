@@ -46,6 +46,7 @@ struct clocked_register_action
 	bool reset_cpu = false;
 	std::optional<bool> bio_level{};
 	std::vector<memory_word> io{};
+	std::optional<bool> ready_level{};
 };
 struct clocked_line_sample { unsigned cycle; bool level; bool check_cycle = true; };
 struct clocked_data_event
@@ -108,6 +109,8 @@ struct clocked_register_case
 	std::vector<memory_word> initial_io{};
 	std::optional<std::vector<clocked_data_event>> io_events{}; // Additional IO observation when data_events covers RAM/MMRs.
 	bool initial_bio = true;
+	bool initial_ready = true;
+	bool bus_uses_elapsed_clocks = false; // Atomic external transfers have no staged pipeline counter.
 	std::optional<std::vector<clocked_line_sample>> bio_samples{};
 	bool observe_data_reads = true; // Write-only contracts can leave variable polling reads unconstrained.
 	std::vector<memory_word> synthetic_data_reads{}; // Test endpoints, not claims about peripheral register contents.

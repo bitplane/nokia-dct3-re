@@ -416,6 +416,10 @@ def main():
     counts['pll_transitions'] = 1
     counts['clock_rates'] = 1
     counts['idle3_pll'] = 1
+    counts['external_io_atomic'] = 960
+    counts['external_io_staged'] = 192
+    counts['standard_io_atomic'] = 480
+    counts['standard_io_staged'] = 96
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216

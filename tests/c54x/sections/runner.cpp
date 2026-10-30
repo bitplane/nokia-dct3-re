@@ -106,6 +106,7 @@ public:
 		});
 #endif
 		m_cpu->bio_in_cb().set([this]() { return m_fixture ? m_fixture->sample_bio() : 1; });
+		m_cpu->ready_in_cb().set([this]() { return m_fixture ? m_fixture->sample_ready() : 1; });
 		m_cpu->xf_out_cb().set([this](int value) {
 			m_xf = bool(value);
 			if (m_fixture) m_fixture->observe_xf(m_xf);
@@ -148,7 +149,7 @@ protected:
 			auto const &sequence = m_cases.at(index).irqs;
 			if (m_case_irq_cursor >= sequence.size()) throw emu_fatalerror("Unexpected section IRQ case=%u ordinal=%u",index,m_case_irq_cursor);
 			auto const &expected = sequence[m_case_irq_cursor];
-			u64 const cycle = m_cpu->pipeline_cycles();
+			u64 const cycle = m_fixture->bus_clock();
 			if (line != expected.line || cycle < expected.earliest || cycle > expected.latest ||
 				m_fixture->data_events_seen() != expected.data_events_before ||
 				(expected.io_events_before && m_fixture->io_events_seen() != *expected.io_events_before) ||
@@ -381,6 +382,14 @@ private:
 #endif
 	TIMER_CALLBACK_MEMBER(tick)
 	{
+#ifdef C54X_SECTION_EXTERNAL_IO_WAITS
+		unsigned const io_now=m_fixture->tick_count();
+		if (io_now+1==m_cases.at(m_fixture->count()).finish) {
+			auto const disable=machine().disable_side_effects();
+			unsigned const elapsed=0xffff-unsigned(m_cpu->state_int(tms320c54x_device::STATE_TIM));
+			if (elapsed+1<io_now || elapsed>io_now+1) throw emu_fatalerror("Timer must continue during external I/O waits");
+		}
+#endif
 #ifdef C54X_SECTION_IDLE3_PLL
 		unsigned const pll_now=m_fixture->tick_count();
 		if ((pll_now==128 || pll_now==480 || pll_now==640) && m_cpu->clock()!=6'500'000)

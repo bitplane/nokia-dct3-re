@@ -36,63 +36,6 @@ void tms320c54x_test_state::check_mmr_bus()
 
 
 
-bool tms320c54x_test_state::standard_bus_io() const
-{ return profile_is("std-io") || profile_is("std-io-atomic"); }
-
-bool tms320c54x_test_state::atomic_bus_io() const
-{ return profile_is("bus-io-atomic") || profile_is("std-io-atomic"); }
-
-unsigned tms320c54x_test_state::bus_io_form(unsigned variant) const
-{ return atomic_bus_io() ? variant / 576 : 0; }
-
-u16 tms320c54x_test_state::bus_io_address(unsigned variant) const
-{ unsigned const form = bus_io_form(variant); return form == 3 ? 0x30 : form == 4 ? 0x11 : 0x1400; }
-
-u64 tms320c54x_test_state::bus_io_clock() const
-{ return atomic_bus_io() ? m_cpu->total_cycles() - m_bus_start_cycles + 1 : m_cpu->pipeline_cycles(); }
-
-tms320c54x_test_state::bus_io_fixture tms320c54x_test_state::bus_io_case(unsigned variant) const
-{
-	unsigned const v = variant % 192, waits = (v % 8) * (1 + (v / 8) % 2);
-	bool const hold = (v / 16) % 2, write = (v / 32) % 2;
-	unsigned const form = bus_io_form(variant);
-	unsigned const first = atomic_bus_io() ? 2 + unsigned(form >= 1 && form <= 3) + unsigned(form == 3) : write ? 7 : 6, complete = first + waits + (hold && waits >= 2 ? 3 : 0);
-	// Input pulses are scheduler-synchronized; save after their delivery settles.
-	return {waits, first, complete, std::array<unsigned, 3>{first - 1, first + 1, complete + 1}[(variant % 576) / 192], v / 64, write, hold,
-		u16(write && form == 4 ? 0x11 : write || !waits ? 0x1234 : 0xabcd)};
-}
-
-void tms320c54x_test_state::start_bus_io_test(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = bus_io_case(variant); auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 64; ++i) { program.write_word(0x600 + i, 0xf495); program.write_word(i, 0xf495); }
-	unsigned const form = bus_io_form(variant);
-	bool const extended = form >= 1 && form <= 3;
-	program.write_word(0x600, (f.write ? 0x7500 : 0x7400) | (form == 1 ? 0xe1 : form == 2 || form == 3 ? 0xf8 : form == 4 ? 0x91 : 0x81));
-	program.write_word(0x601, form == 2 || form == 3 ? bus_io_address(variant) : 0x125);
-	if (extended) program.write_word(0x602, form == 1 ? 1 : 0x125);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1804); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR1, form == 1 ? 0x13ff : form == 4 ? 0x11 : 0x1400);
-	data.write_word(0x1400, 0x1234); m_cpu->space(AS_IO).write_word(0x125, 0x1234);
-	if (form == 3) data.write_word(0x30, 0x1234);
-	data.write_word(0x28, (variant % 8) << 12); data.write_word(0x2b, (variant / 8) % 2);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0xffff); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x20);
-	m_bus_ready = !f.hold; m_cpu->set_state_int(STATE_GENPC, 0x600); m_cpu->set_pipeline_frontend(!atomic_bus_io());
-	m_bus_start_cycles = m_cpu->total_cycles();
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = m_vector_acks = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_IO).install_read_tap(0x125, 0x125, "bus_io_read",
-		[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!f.write && !m_pipeline_operand_reads && word == f.value && bus_io_clock() == f.complete, "External PORTR samples once after software/READY waits"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_IO).install_write_tap(0x125, 0x125, "bus_io_write",
-		[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(f.write && !m_pipeline_store_writes && word == f.value && bus_io_clock() == f.complete, "External PORTW preserves one retained source through waits"); ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(0x601, extended ? 0x602 : 0x601, "bus_io_literal",
-		[this, extended](offs_t address, u16 &, u16) { if (!machine().side_effects_disabled()) { expect(m_pipeline_extensions_reads < 1 + unsigned(extended) && address == 0x601 + m_pipeline_extensions_reads, "External I/O extensions retain their order across stalls"); ++m_pipeline_extensions_reads; } });
-	m_phase = 253550; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
 void tms320c54x_test_state::start_standard_swwsr_test()
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
@@ -194,64 +137,6 @@ void tms320c54x_test_state::test_port_w(u16 value)
 		m_last_port_cycle = cycle;
 		m_last_port_value = value;
 	}
-}
-
-bool tms320c54x_test_state::check_external_io_results()
-{
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 253550)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = bus_io_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Staged external wait path has no atomic fallback");
-		if (tick == (atomic_bus_io() ? 1 : 6) && f.write) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x1400, 0xdead); }
-		if (tick == f.first)
-		{
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x28, 0); m_cpu->space(AS_DATA).write_word(0x2b, 0);
-			m_cpu->space(AS_IO).write_word(0x125, 0xabcd); m_cpu->space(AS_PROGRAM).write_word(0x601, 0xbeef);
-			// A zero-wait aliased read has already published AR1; do not erase its result.
-			if (bus_io_form(variant) != 4 || f.waits) m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1500);
-			if (bus_io_form(variant) >= 1 && bus_io_form(variant) <= 3) m_cpu->space(AS_PROGRAM).write_word(0x602, 0xdead);
-			if (f.interrupt) m_cpu->set_input_line(f.interrupt == 2 ? INPUT_LINE_NMI : 0, ASSERT_LINE);
-		}
-		if (f.hold && f.waits >= 2 && tick == f.complete - 1) m_bus_ready = true;
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads, &m_vector_acks},
-			"Save external transfer before/during waits or after its side effect");
-		if (tick == f.complete + 12)
-		{
-			unsigned const form = bus_io_form(variant), literals = 1 + unsigned(form >= 1 && form <= 3);
-			u16 const expected_ram = f.value + unsigned(form == 4 && !f.write);
-			{ auto const disable = machine().disable_side_effects();
-				if ((!f.write && m_cpu->space(AS_DATA).read_word(bus_io_address(variant)) != expected_ram) || m_pipeline_operand_reads != unsigned(!f.write) || m_pipeline_store_writes != unsigned(f.write) || m_pipeline_extensions_reads != literals || m_vector_acks != unsigned(bool(f.interrupt)))
-					osd_printf_info("Bus I/O failure: case=%u replay=%u waits=%u write=%u hold=%u irq=%u ram=%04x expected=%04x reads=%u writes=%u literals=%u acks=%u pc=%06x\n", variant, unsigned(m_pipeline_replay), f.waits, unsigned(f.write), unsigned(f.hold), f.interrupt, m_cpu->space(AS_DATA).read_word(0x1400), f.value, m_pipeline_operand_reads, m_pipeline_store_writes, m_pipeline_extensions_reads, m_vector_acks, unsigned(m_cpu->state_int(STATE_GENPC))); }
-			{ auto const disable = machine().disable_side_effects(); expect((f.write || m_cpu->space(AS_DATA).read_word(bus_io_address(variant)) == expected_ram) && m_pipeline_operand_reads == unsigned(!f.write) && m_pipeline_store_writes == unsigned(f.write) && m_pipeline_extensions_reads == literals && m_vector_acks == unsigned(bool(f.interrupt)), "Waited transfer keeps address/data ownership, MMR alias ordering and deferred interrupt delivery"); }
-			unsigned const elapsed = 0xffff - unsigned(m_cpu->state_int(tms320c54x_device::STATE_TIM));
-			expect(elapsed >= tick - 1 && elapsed <= tick + 1, "Timer clocks continue during external bus suspension");
-			if (replay_pipeline_at(253560, f.checkpoint,
-				"Restore retained wait/READY state without duplicate I/O")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			unsigned next = variant + 1;
-			// Original SWWSR has no multiplier: omit, rather than relabel,
-			// the existing fixture's multiplier-enabled raw case IDs.
-			if (standard_bus_io() && (next & 8)) next += 8;
-			if (next < (atomic_bus_io() ? 2880 : 576)) { start_bus_io_test(next); return true; }
-			m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-			if (standard_bus_io())
-			{
-				osd_printf_info("TMS320C54x standard SWWSR I/O: PASS frontend=%s cases=%u restore=%u software_waits=0..7 ready_threshold=2 sources=none,IRQ,NMI timer_continues=1 duplicate_io=0 program_data_wait_claim=0 physical_mapping=unvalidated\n", atomic_bus_io() ? "atomic" : "staged", atomic_bus_io() ? 1440 : 288, atomic_bus_io() ? 1440 : 288);
-				throw emu_fatalerror(0, "TMS320C54x isolated standard SWWSR I/O complete");
-			}
-			if (atomic_bus_io())
-			{
-				osd_printf_info("TMS320C54x atomic external I/O waits: PASS cases=2880 restore=2880 forms=short,offset,absolute,peripheral,AR_alias software_waits=0..14 ready_threshold=2 directions=read,write sources=none,IRQ,NMI timer_continues=1 duplicate_io=0 physical_mapping=unvalidated\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated atomic external I/O complete");
-			}
-			osd_printf_info("TMS320C54x staged external I/O waits: PASS cases=576 restore=576 software_waits=0..14 ready_threshold=2 directions=read,write sources=none,IRQ,NMI timer_continues=1 duplicate_io=0 atomic_acceptance=separate physical_mapping=unvalidated\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated staged external I/O complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 253560) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 253550; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
 }
 
 } // namespace c54x_test

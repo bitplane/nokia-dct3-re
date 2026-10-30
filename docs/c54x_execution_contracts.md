@@ -243,6 +243,20 @@ only then may it publish x8. A checkpoint inside that pending relock restores
 both the sleeping continuation and DIV clock before replaying the delay. This
 does not claim automatic PLL wake, physical restart latency or handset timing.
 
+The four `external_io_*`/`standard_io_*` sections own staged and atomic I/O
+wait contracts under enhanced and original-family SWWSR ownership. They retain
+every wait encoding, transfer direction, READY level and IRQ/NMI source; atomic
+cases also retain all five addressing forms. Snapshot positions are distributed
+across inputs, not multiplied by three. READY and elapsed-clock origin restore
+with the pending transaction. Changing wait registers, source/pointer, I/O input
+and instruction literals after capture cannot change retained address, source
+or extension ownership. Exactly one port event occurs at its modeled deadline;
+IRQ acknowledgement follows that event and the interrupt frame equals live RTN
+within the body/terminal-IDLE continuation pair. Complete RAM/stack traces and
+timer progress are checked through replay. A negative control omitting READY
+restoration fails on premature I/O. This is CPU bus-controller conformance, not
+validated board wait wiring or a physical mapping claim.
+
 The independent `status_bitfield` section owns ST0/ST1 BITF sampling: 128
 register/pattern/mask/initial-TC/addressing combinations, with pages and three
 checkpoint positions distributed rather than multiplied into 768 executions.

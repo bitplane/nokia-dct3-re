@@ -26,6 +26,8 @@ public:
 	unsigned restores() const { return m_restores; }
 	unsigned data_events_seen() const { return m_data_cursor; }
 	unsigned io_events_seen() const { return m_io_cursor; }
+	int sample_ready() const { return m_ready_level; }
+	u64 bus_clock() const { return m_input.bus_uses_elapsed_clocks ? m_cpu.total_cycles()-m_clock_start+1 : m_cpu.pipeline_cycles(); }
 	int sample_bio()
 	{
 		if (m_observing_outputs && m_input.bio_samples) {
@@ -64,6 +66,8 @@ public:
 			m_saved_fetches = m_fetches;
 			m_saved_data_cursor = m_data_cursor;
 			m_saved_io_cursor = m_io_cursor;
+			m_saved_clock_age=m_cpu.total_cycles()-m_clock_start;
+			m_saved_ready_level=m_ready_level;
 			m_saved_bio_cursor = m_bio_cursor; m_saved_bio_level = m_bio_level;
 			m_saved_program_cursor = m_program_cursor;
 			m_saved_xf_cursor = m_xf_cursor;
@@ -108,6 +112,8 @@ public:
 				m_last_data_total = m_saved_data_age ? std::optional<u64>(m_cpu.total_cycles() - *m_saved_data_age) : std::nullopt;
 				m_first_data_total = m_saved_first_data_age ? std::optional<u64>(m_cpu.total_cycles() - *m_saved_first_data_age) : std::nullopt;
 				m_observing_outputs = true;
+				m_clock_start=m_cpu.total_cycles()-m_saved_clock_age;
+				m_ready_level=m_saved_ready_level;
 				++m_restores; m_cpu.suspend(SUSPEND_REASON_DISABLE, true); m_resume = true; m_timer.enable(true); return false;
 			}
 			m_data_tap.remove(); m_io_tap.remove(); m_fetch_tap.remove(); m_program_tap.remove(); m_cpu.set_pipeline_frontend(false);
@@ -134,6 +140,7 @@ private:
 		{
 			if (action.reset_cpu) m_cpu.reset();
 			if (action.bio_level) m_bio_level = *action.bio_level;
+			if (action.ready_level) m_ready_level = *action.ready_level;
 			{
 				// Debugger assignments may use an MMR accessor; they are not guest bus work.
 				auto const disable = m_machine.disable_side_effects();
@@ -196,6 +203,8 @@ private:
 		for (auto const &word : m_input.initial_io) m_cpu.space(AS_IO).write_word(word.address,word.value);
 		m_fetches = m_data_cursor = m_program_cursor = m_io_cursor = m_bio_cursor = 0;
 		m_bio_level = m_input.initial_bio;
+		m_ready_level = m_input.initial_ready;
+		m_clock_start=m_cpu.total_cycles();
 		m_xf_cursor = 0;
 		m_volatile_words.clear();
 		for (auto const &endpoint : m_input.volatile_data_reads) m_volatile_words.push_back(endpoint.value);
@@ -208,7 +217,7 @@ private:
 			require(m_input.observed_data_space != AS_IO, "one IO observation policy");
 			auto access = [this](bool write,offs_t at,u16 value) {
 				if (m_machine.side_effects_disabled()) return;
-				require(accept_bus_event(*m_input.io_events,m_io_cursor,{write,u32(at),value,unsigned(m_cpu.pipeline_cycles())}), "ordered IO transaction");
+				require(accept_bus_event(*m_input.io_events,m_io_cursor,{write,u32(at),value,unsigned(bus_clock())}), "ordered IO transaction");
 			};
 			m_io_tap = m_cpu.space(AS_IO).install_readwrite_tap(0,0xffff,"register_sequence_io",
 				[this,access](offs_t at,u16 &value,u16) { volatile_read(AS_IO,at,value); access(false,at,value); },
@@ -230,7 +239,7 @@ private:
 				if (expected && expected->cycles_from_first)
 					require(m_first_data_total && m_cpu.total_cycles() - *m_first_data_total == *expected->cycles_from_first, "first-to-current data-bus clock interval");
 				if (!accept_bus_event(*m_input.data_events, m_data_cursor,
-					{write, u32(at), word, unsigned(m_cpu.pipeline_cycles())}))
+					{write, u32(at), word, unsigned(bus_clock())}))
 					throw emu_fatalerror("C54x case=%u event=%u write=%u address=%x value=%x clock=%llu",
 						m_case, m_data_cursor, unsigned(write), unsigned(at), word, (unsigned long long)m_cpu.pipeline_cycles());
 				m_last_data_total = m_cpu.total_cycles();
@@ -310,6 +319,8 @@ private:
 	unsigned m_io_cursor = 0, m_saved_io_cursor = 0;
 	unsigned m_bio_cursor = 0, m_saved_bio_cursor = 0;
 	bool m_bio_level = true, m_saved_bio_level = true;
+	bool m_ready_level=true, m_saved_ready_level=true;
+	u64 m_clock_start=0, m_saved_clock_age=0;
 	unsigned m_program_cursor = 0, m_saved_program_cursor = 0;
 	unsigned m_xf_cursor = 0, m_saved_xf_cursor = 0;
 	std::optional<u64> m_last_data_total, m_saved_data_age;

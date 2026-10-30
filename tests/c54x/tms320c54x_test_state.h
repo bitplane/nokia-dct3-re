@@ -201,19 +201,6 @@ private:
 
 
 
-	struct bus_io_fixture
-	{
-		unsigned waits, first, complete, checkpoint, interrupt;
-		bool write, hold;
-		u16 value;
-	};
-	bool standard_bus_io() const;
-	bool atomic_bus_io() const;
-	unsigned bus_io_form(unsigned variant) const;
-	u16 bus_io_address(unsigned variant) const;
-	u64 bus_io_clock() const;
-	bus_io_fixture bus_io_case(unsigned variant) const;
-	void start_bus_io_test(unsigned variant = 0);
 	void start_standard_swwsr_test();
 	void start_bus_register_test();
 	struct popd_fixture
@@ -739,7 +726,6 @@ private:
 	bool check_block_near_call_results();
 	bool check_repeated_mvdk_results();
 	bool check_block_exit_results();
-	bool check_external_io_results();
 	bool check_rom4_fr_decoder_results();
 	bool check_rom4_codec_is_results();
 	bool check_rom4_crc_input_results();
@@ -813,8 +799,6 @@ private:
 	unsigned m_fast_stack_reads = 0;
 	u8 m_bus_divisor = 0;
 	bool m_bus_iack_enable = false;
-	bool m_bus_ready = true;
-	u64 m_bus_start_cycles = 0;
 	unsigned m_fast_return_case = 0;
 	unsigned m_repeat_reads = 0;
 	u16 m_stack_mmr[2] = {};
