@@ -2330,68 +2330,8 @@ bool tms320c54x_test_state::check_atomic_corpus_results()
 				"XC 2 releases a pending interrupt after one two-word instruction");
 		m_cpu->set_input_line(2, CLEAR_LINE);
 	}
-	if (m_phase == 434)
-	{
-		program.write_word(0x05e3, 0x82d3); // STH A,*AR3+%.
-		data.write_word(0x0f93, 0);
-		m_port_writes = 0;
-		set_registers(*m_cpu, {
-			{cpu_regs::STATE_A, 0x12345678}, {cpu_regs::STATE_B, 0xff87654321ULL}, {cpu_regs::STATE_AR3, 0x0f93},
-			{cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ST0, 0x0aa5}, {cpu_regs::STATE_PC, 0x05e0},
-			{cpu_regs::STATE_IDLE, 0},
-		});
-		return next_atomic_phase(6515);
-	}
-	if (m_phase == 6515 || m_phase == 6516 || m_phase == 9227 || m_phase == 9228)
-	{
-		bool const ar2 = m_phase >= 9227;
-		bool const store_b = m_phase == 6516 || m_phase == 9228;
-		expect_opcode(ar2 ? (store_b ? 0x83d2 : 0x82d2) : (store_b ? 0x83d3 : 0x82d3),
-			data.read_word(0x0f93) == (store_b ? 0x8765 : 0x1234) &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
-			(!ar2 || (m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f90 &&
-				data.read_word(0x0f92) == 0xbeef && data.read_word(0x0f94) == 0xcafe)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_BK) == 4 &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff87654321ULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-			"ROM4 STH A/B stores the high word before circular wrap without changing accumulators/status");
-		if (m_phase != 9228)
-		{
-			const unsigned next = m_phase == 6515 ? 6516 : m_phase == 6516 ? 9227 : 9228;
-			program.write_word(0x05e3, next == 6516 ? 0x83d3 : next == 9227 ? 0x82d2 : 0x83d2);
-			data.write_word(0x0f93, 0);
-			if (next >= 9227)
-			{
-				data.write_word(0x0f92, 0xbeef);
-				data.write_word(0x0f94, 0xcafe);
-				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f93);
-			}
-			m_port_writes = 0;
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, next >= 9227 ? 0x0f90 : 0x0f93);
-			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
-			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			return next_atomic_phase(next);
-		}
-		program.write_word(0x05e3, 0x8292); // STH A,*AR2+.
-		data.write_word(0x0f95, 0);
-		data.write_word(0x0f96, 0xcafe);
-		m_port_writes = 0;
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f95);
-		return resume_atomic_at(0x05e0, 6575);
-	}
 	if (m_phase == 6575)
 	{
-		expect_opcode(0x8292,
-			data.read_word(0x0f95) == 0x1234 && data.read_word(0x0f96) == 0xcafe &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f96 &&
-			m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff87654321ULL &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
-			m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-			"ROM4 STH A through AR2 stores the high word before increment, preserves accumulators/status/neighbor and costs one cycle");
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 1);
 		program.write_word(0x05e3, 0x4f82); // DST B,*AR2
 		data.write_word(0x0f90, 0);

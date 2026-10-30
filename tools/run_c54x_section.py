@@ -233,6 +233,7 @@ def main():
     counts['xmem_store'] = 32768
     counts['xmem_load_alu'] = 40960
     counts['atomic_alu_store_literals'] = 8
+    counts['atomic_high_store_literals'] = 5
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

@@ -293,6 +293,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_alu_store_literals.h` | Retain eight signed LD, saturating ADD/SUB, full40-bit OR/XOR, decrement/circular STL and SST signed STH literals. Explicit initial flags/accumulators/pointers replace predecessor inheritance; fixed expected results, exact RAM reads/writes, sibling/status/pointer preservation and pre-instruction replay. Drop port-marker cycle deltas; atomic semantics/access contract only. | Native8 cases/restores, unchanged count; build5.392s/run0.019s. Delete phase426 successor setup and phase427..434 assertions/setups; phase434's following circular-STH preparation remains reference material pending that bank. |
 
+| `atomic_high_store_literals.h` | Retain four STH A/B circular literals through AR2/AR3 and the AR2 postincrement literal. Explicit40-bit accumulator inputs, unrelated pointer, BK/status, target and neighbor sentinels; exact one write/no reads, high-half result, selected pointer update and pre-instruction replay. Drop port-marker cycle deltas; atomic semantic/access scope. | Native5 cases/restores, unchanged count; build5.360s/run0.017s. Delete phase434 setup,6515/6516/9227/9228 bank and6575 assertion. The following unsigned-DST setup stays as non-executable reference. Supersedes the pending circular-STH preparation noted in atomic_alu_store_literals. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
