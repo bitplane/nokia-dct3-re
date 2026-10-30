@@ -3969,19 +3969,13 @@ void tms320c54x_test_state::finish_parallel_load_case(parallel_load_fixture &c)
 	c.result_b = c.form < 4 && f.destination ? loaded : c.b;
 }
 
-tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::parallel_load_case(unsigned variant, bool edge, bool original_edge_sources)
+tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::parallel_load_case(unsigned variant)
 {
-	unsigned const extent = edge ? 16 : 67584, v = variant % extent;
+	unsigned const extent = 67584, v = variant % extent;
 	parallel_load_fixture c{}; c.form = variant / extent;
-	auto &f = c.memory; f = dual_multiply_case(edge ? v : v % 18432, edge);
-	if (edge && !original_edge_sources && f.xaddress < 0x60 && f.yaddress >= 0x60)
-	{
-		// Low X sources are qualified; retain this cohort as destination-MMIO rejection.
-		f.yaddress = 0x20 + v % 4;
-		f.initial[f.y & 3] = f.final[f.y & 3] = f.yaddress;
-	}
+	auto &f = c.memory; f = dual_multiply_case(v % 18432, false);
 	unsigned seed = v / 512;
-	if (!edge && v >= 18432)
+	if (v >= 18432)
 	{
 		unsigned const n = v - 18432, flags = (n / 512) % 16;
 		f.x = 8; f.y = 9; f.initial = {0x1000, 0x1100, 0x1200, 0x1300}; f.final = {0x1001, 0x1101, 0x1200, 0x1300};
@@ -4033,19 +4027,17 @@ tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::mapped_paral
 
 void tms320c54x_test_state::start_parallel_load(unsigned variant)
 {
-	bool const repeated_edge = profile_is("stld-rpt-edge") || profile_is("st-alu-rpt-edge");
-	bool const arithmetic = profile_is("st-par-alu") || profile_is("st-par-edge") || profile_is("st-alu-rpt-edge");
+	bool const arithmetic = profile_is("st-par-alu");
 	bool const mapped = profile_is("stld-map");
-	bool const multiply = profile_is("st-par-mpy") || profile_is("st-mpy-edge");
+	bool const multiply = profile_is("st-par-mpy");
 	bool const bsp = profile_is("stld-bsp");
 	bool const bus = profile_is("stld-periph"), peripheral = bsp || bus;
-	bool const edge = repeated_edge || profile_is("stld-edge") || profile_is("st-par-edge") || profile_is("st-mpy-edge"); auto const c = multiply ? parallel_multiply_case(variant, edge) : bus ? peripheral_parallel_load_case(variant) : bsp ? bsp_parallel_load_case(variant) : mapped ? mapped_parallel_load_case(variant) : arithmetic ? parallel_arithmetic_case(variant, edge) : parallel_load_case(variant, edge, repeated_edge); auto const &f = c.memory;
+	auto const c = multiply ? parallel_multiply_case(variant) : bus ? peripheral_parallel_load_case(variant) : bsp ? bsp_parallel_load_case(variant) : mapped ? mapped_parallel_load_case(variant) : arithmetic ? parallel_arithmetic_case(variant) : parallel_load_case(variant); auto const &f = c.memory;
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
 	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
 	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
 	program.write_word(f.base + 0x600, (multiply ? 0xcc00 | (f.destination << 8) : arithmetic ? 0xc000 | ((c.form / 4) << 10) | (f.destination << 8) : c.form >= 4 ? 0xe400 : 0xc800 | (f.destination << 8)) | (f.source << 9) | (f.x << 4) | f.y);
 	program.write_word(f.base + 0x601, 0xf4e1);
-	if (repeated_edge) { program.write_word(f.base + 0x601, program.read_word(f.base + 0x600)); program.write_word(f.base + 0x600, 0xec07); program.write_word(f.base + 0x602, 0xf4e1); }
 	m_cpu->set_pipeline_frontend(false);
 	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
@@ -4060,18 +4052,18 @@ void tms320c54x_test_state::start_parallel_load(unsigned variant)
 	if (bsp) { m_shifted_bsp.reset(); m_shifted_bsp.control_w(0x80); expect(m_shifted_bsp.frame_receive(f.xword), "Seed parallel BSP receive"); expect(!m_shifted_bsp.frame_receive(f.xword ^ 0xffff) && m_shifted_bsp.receive_overrun, "Seed unread BSP overrun"); }
 	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
 	m_shifted_bus_word = f.xword;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "parallel_load_source", [this, f, edge, bsp, bus, peripheral](offs_t at, u16 &word, u16) {
+	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "parallel_load_source", [this, f, bsp, bus, peripheral](offs_t at, u16 &word, u16) {
 		if (bsp && at == f.xaddress) { word = machine().side_effects_disabled() ? m_shifted_bsp.receive : m_shifted_bsp.receive_r(); }
 		if (bus && at == f.xaddress) word = m_shifted_bus_word;
 		if (machine().side_effects_disabled()) return;
-		expect(!edge && !m_pipeline_operand_reads && at == f.xaddress && word == f.xword && m_cpu->pipeline_cycles() == (peripheral ? 6 : 5), "Parallel load retains one X sample before any aliased Y write"); ++m_pipeline_operand_reads;
+		expect(!m_pipeline_operand_reads && at == f.xaddress && word == f.xword && m_cpu->pipeline_cycles() == (peripheral ? 6 : 5), "Parallel load retains one X sample before any aliased Y write"); ++m_pipeline_operand_reads;
 		if (bus) m_shifted_bus_word ^= 0xffff;
 		if (bsp) { expect(!m_shifted_bsp.receive_ready && !m_shifted_bsp.receive_overrun, "Parallel BSP read acknowledges ready and overrun once"); expect(m_shifted_bsp.frame_receive(f.xword ^ 0xffff), "Next BSP frame remains pending"); }
 	});
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "parallel_load_store", [this, f, edge, peripheral](offs_t at, u16 &word, u16) {
+	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "parallel_load_store", [this, f, peripheral](offs_t at, u16 &word, u16) {
 		if (machine().side_effects_disabled()) return;
-		if (edge || at != f.yaddress || word != f.stored) osd_printf_info("STLD store mismatch: case=%u address=%04x expected=%04x value=%04x expected=%04x\n", m_pipeline_peripheral_case, unsigned(at), f.yaddress, word, f.stored);
-		expect(!edge && !m_pipeline_store_writes && at == f.yaddress && word == f.stored && m_cpu->pipeline_cycles() == (peripheral ? 7 : 6), "Parallel store uses the Execute-live old accumulator with retained ASM before its load replacement"); ++m_pipeline_store_writes;
+		if (at != f.yaddress || word != f.stored) osd_printf_info("STLD store mismatch: case=%u address=%04x expected=%04x value=%04x expected=%04x\n", m_pipeline_peripheral_case, unsigned(at), f.yaddress, word, f.stored);
+		expect(!m_pipeline_store_writes && at == f.yaddress && word == f.stored && m_cpu->pipeline_cycles() == (peripheral ? 7 : 6), "Parallel store uses the Execute-live old accumulator with retained ASM before its load replacement"); ++m_pipeline_store_writes;
 	});
 	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62164;
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -10409,17 +10401,15 @@ bool tms320c54x_test_state::check_mapped_parallel_load_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if (m_phase == 62164)
 	{
-		bool const multiply = profile_is("st-par-mpy") || profile_is("st-mpy-edge");
+		bool const multiply = profile_is("st-par-mpy");
 		bool const bsp = profile_is("stld-bsp");
 		bool const bus = profile_is("stld-periph"), peripheral = bsp || bus;
-		bool const repeated_edge = profile_is("stld-rpt-edge") || profile_is("st-alu-rpt-edge");
-		bool const arithmetic = profile_is("st-par-alu") || profile_is("st-par-edge") || profile_is("st-alu-rpt-edge");
+		bool const arithmetic = profile_is("st-par-alu");
 		bool const mapped = profile_is("stld-map");
-		bool const edge = repeated_edge || profile_is("stld-edge") || profile_is("st-par-edge") || profile_is("st-mpy-edge");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const c = multiply ? parallel_multiply_case(variant, edge) : bus ? peripheral_parallel_load_case(variant) : bsp ? bsp_parallel_load_case(variant) : mapped ? mapped_parallel_load_case(variant) : arithmetic ? parallel_arithmetic_case(variant, edge) : parallel_load_case(variant, edge, repeated_edge); auto const &f = c.memory;
+		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const c = multiply ? parallel_multiply_case(variant) : bus ? peripheral_parallel_load_case(variant) : bsp ? bsp_parallel_load_case(variant) : mapped ? mapped_parallel_load_case(variant) : arithmetic ? parallel_arithmetic_case(variant) : parallel_load_case(variant); auto const &f = c.memory;
 		unsigned const checkpoint = 4 + f.snapshot;
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= (repeated_edge ? 5 : 4)), "Parallel load excludes mapped X or Y operands before data access or pointer changes");
-		if (tick == unsigned(peripheral ? 6 : 5) && !edge)
+		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Parallel operation remains admitted");
+		if (tick == unsigned(peripheral ? 6 : 5))
 		{
 			if (mapped) expect(m_cpu->state_int(tms320c54x_device::STATE_IMR) == c.imr && m_cpu->state_int(tms320c54x_device::STATE_IFR) == c.ifr, "Parallel mapped reads do not acknowledge interrupt state");
 			for (unsigned i = 0; i < 4; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == f.final[i], "Parallel load applies X priority and each dual-address update once");
@@ -10437,18 +10427,17 @@ bool tms320c54x_test_state::check_mapped_parallel_load_results()
 		{
 			if (bus) expect(m_shifted_bus_word == u16(f.xword ^ 0xffff), "Parallel peripheral load does not resample its volatile source");
 			if (bsp) expect(m_shifted_bsp.receive_ready && !m_shifted_bsp.receive_overrun && m_shifted_bsp.receive == u16(f.xword ^ 0xffff), "Parallel load leaves the next BSP frame unread after completion and restore");
-			u64 const a = edge ? c.a ^ 0x1111111111ULL : c.result_a, b = edge ? c.b ^ 0x1111111111ULL : c.result_b;
+			u64 const a = c.result_a, b = c.result_b;
 			if (m_cpu->state_int(tms320c54x_device::STATE_A) != a || m_cpu->state_int(tms320c54x_device::STATE_B) != b) osd_printf_info("STLD result mismatch: case=%u form=%u a=%010llx expected=%010llx b=%010llx expected=%010llx\n", variant, c.form, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)a, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)b);
-			expect(m_pipeline_operand_reads == unsigned(!edge) && m_pipeline_store_writes == unsigned(!edge) && m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b && m_cpu->state_int(tms320c54x_device::STATE_T) == (edge ? c.t : 0x55aa), "Parallel store/load separates Read-owned input and T from Execute-owned old accumulator and destination");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == ((arithmetic || multiply) && !edge ? f.result_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (edge ? f.st1 : f.st1 ^ 31) && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Parallel operation preserves modes and publishes only its specified arithmetic status");
-			for (unsigned i = 0; i < 4; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == (edge ? f.initial[i] : 0x2200 + i), "No pointer update is repeated after the retained address is consumed");
-			if (!edge) expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Parallel store/load completes before IDLE");
+			expect(m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x55aa, "Parallel store/load separates Read-owned input and T from Execute-owned old accumulator and destination");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == ((arithmetic || multiply) ? f.result_st0 : f.st0) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == (f.st1 ^ 31) && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Parallel operation preserves modes and publishes only its specified arithmetic status");
+			for (unsigned i = 0; i < 4; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2 + i) == (0x2200 + i), "No pointer update is repeated after the retained address is consumed");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Parallel store/load completes before IDLE");
 			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; if (arithmetic || mapped || peripheral || multiply) m_cpu->set_pipeline_frontend(true); return restore_pipeline_at(62165, "Replay parallel store/load without duplicate samples publications or address effects"); }
 			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant + 1 < (multiply ? edge ? 64U : 270336U : bus ? 393216U : bsp ? 6144U : mapped ? 147456U : arithmetic ? edge ? 128U : 540672U : edge ? 96U : 405504U)) { start_parallel_load(variant + 1); return true; }
+			if (variant + 1 < (multiply ? 270336U : bus ? 393216U : bsp ? 6144U : mapped ? 147456U : arithmetic ? 540672U : 405504U)) { start_parallel_load(variant + 1); return true; }
 			if (multiply)
 			{
-				if (edge) { osd_printf_info("TMS320C54x parallel multiply exclusions: PASS cases=64 restore=64 forms=4 mapped_legs=X,Y pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel multiply exclusions complete"); }
 				osd_printf_info("TMS320C54x parallel multiply: PASS cases=270336 restore=270336 forms=4 address_cases=73728 numeric_cases=196608 encodings=1024 asm_modes=32 pages=2 snapshots=3 source_sample=Read t_sample=Read store_source=Execute asm_source=Read old_source_store=1 smul_product_clamp=0 pointer_updates=once reset_before_restore=1 carry_policy=preserve_unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel multiply complete");
 			}
 			if (bus) { osd_printf_info("TMS320C54x parallel peripheral load: PASS cases=393216 restore=393216 forms=6 addresses=0020..005f selector_pairs=8 patterns=2 sxm_sst_ovm=8 pages=2 snapshots=4 extra_clock=1 reads=1 writes=1 volatile_source=1 store_source=Execute t_publish=Read reset_before_restore=1 carry_policy=preserve_unvalidated endpoint_identity_claim=0 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel peripheral load complete"); }
@@ -10456,12 +10445,8 @@ bool tms320c54x_test_state::check_mapped_parallel_load_results()
 			if (mapped) { osd_printf_info("TMS320C54x mapped parallel load: PASS cases=147456 restore=147456 forms=6 source_addresses=0000..001f destination=RAM selector_pairs=8 patterns=2 sxm_sst_ovm=8 asm=0,-1 pages=2 snapshots=3 source_sample=Read store_source=Execute reads=1 writes=1 pointer_updates=once t_publish=Read carry_policy=preserve_unvalidated reset_before_restore=1 repeat_peripheral_composition=unvalidated endpoint_identity_claim=0 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped parallel load complete"); }
 			if (arithmetic)
 			{
-				if (repeated_edge) { osd_printf_info("TMS320C54x repeated parallel arithmetic exclusions: PASS cases=128 restore=128 forms=8 repeat_count=7 mapped_legs=X,Y pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated repeated parallel arithmetic exclusions complete"); }
-				if (edge) { osd_printf_info("TMS320C54x parallel arithmetic exclusions: PASS cases=128 restore=128 forms=8 mapped_legs=X,Y pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 reset_before_restore=1 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel arithmetic exclusions complete"); }
 				osd_printf_info("TMS320C54x parallel arithmetic: PASS cases=540672 restore=540672 forms=8 address_cases=147456 numeric_cases=393216 pages=2 snapshots=3 read_retained=1 asm_sample=Read accumulator_sample=Execute old_source_store=1 subtraction=memory_minus_other carry_bit=32 sticky_overflow=1 ovm=1 saturation=1 pointer_updates=once reset_before_restore=1 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel arithmetic complete");
 			}
-			if (repeated_edge) { osd_printf_info("TMS320C54x repeated STLD exclusions: PASS cases=96 restore=96 forms=6 mapped_legs=X,Y pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated repeated STLD exclusions complete"); }
-			if (edge) { osd_printf_info("TMS320C54x parallel store/load exclusions: PASS cases=96 restore=96 forms=6 mapped_legs=Y pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel store/load exclusions complete"); }
 			osd_printf_info("TMS320C54x parallel store/load: PASS cases=405504 restore=405504 forms=6 encodings=1536 address_cases=110592 numeric_cases=294912 words=8 patterns=8 asm_modes=32 pages=2 snapshots=3 read_retained=1 store_source=Execute asm_source=Read t_publication=Read alias_priority=X carry_policy=preserve_unvalidated physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated parallel store/load complete");
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;

@@ -3229,10 +3229,10 @@ void tms320c54x_test_state::start_delay_compare(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::parallel_arithmetic_case(unsigned variant, bool edge)
+tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::parallel_arithmetic_case(unsigned variant)
 {
-	unsigned const extent = edge ? 16 : 67584, form = variant / extent;
-	auto c = parallel_load_case(variant % extent + (form % 4) * extent, edge, true);
+	unsigned const extent = 67584, form = variant / extent;
+	auto c = parallel_load_case(variant % extent + (form % 4) * extent);
 	c.form = form; auto &f = c.memory;
 	u64 const old_other = f.destination ? c.a : c.b;
 	s64 const other = old_other & 0x8000000000ULL ? s64(old_other) - 0x10000000000LL : s64(old_other);
@@ -3246,9 +3246,9 @@ tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::parallel_ari
 	return c;
 }
 
-tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::parallel_multiply_case(unsigned variant, bool edge)
+tms320c54x_test_state::parallel_load_fixture tms320c54x_test_state::parallel_multiply_case(unsigned variant)
 {
-	auto c = parallel_load_case(variant, edge, true);
+	auto c = parallel_load_case(variant);
 	auto &f = c.memory;
 	c.t = std::array<u16, 8>{0, 1, 0xffff, 0x8000, 0x7fff, 0x1234, 0x5555, 0xaaaa}[(variant / 8) % 8];
 	f.st1 = (f.st1 & ~0x40) | ((variant / 64) % 2 ? 0x40 : 0);

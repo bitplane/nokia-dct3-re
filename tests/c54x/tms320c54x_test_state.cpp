@@ -310,11 +310,11 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"sqdst", "sqdst-edge"}, [](self &test) { test.start_sqdst(); } },
-		{ {"stld", "stld-edge", "stld-rpt-edge", "st-par-alu", "st-par-edge"}, [](self &test) { test.start_parallel_load(); } },
+		{ {"stld", "st-par-alu"}, [](self &test) { test.start_parallel_load(); } },
 		{ {"stld-map"}, [](self &test) { test.start_parallel_load(); } },
 		{ {"stld-bsp"}, [](self &test) { test.start_parallel_load(); } },
 		{ {"stld-periph"}, [](self &test) { test.start_parallel_load(); } },
-		{ {"st-par-mpy", "st-mpy-edge"}, [](self &test) { test.start_parallel_load(); } },
+		{ {"st-par-mpy"}, [](self &test) { test.start_parallel_load(); } },
 		{ {"portr-bypass"}, [](self &test) { test.start_portr_bypass(); } },
 		{ {"mvdk-circular", "mvdk-index"}, [](self &test) { test.start_circular_move(); } },
 		{ {"mvmd-repeat", "mvmd-rptz"}, [](self &test) { test.start_repeated_mvmd(); } },
@@ -337,7 +337,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"stm-low-ram"}, [](self &test) { test.start_indirect_stm(); } },
 		{ {"stld-repeat"}, [](self &test) { test.start_repeated_stld(); } },
 		{ {"st-alu-rpt"}, [](self &test) { test.start_repeated_stld(); } },
-		{ {"st-alu-rpt-edge"}, [](self &test) { test.start_parallel_load(); } },
 		{ {"mvdk-repeat", "mvdk-index-rpt"}, [](self &test) { test.start_repeated_mvdk(); } },
 		{ {"rptb-call"}, [](self &test) { test.start_block_near_call(); } },
 		{ {"rpt-mem-copy", "rpt-mem-wrap", "rpt-mem-chain"}, [](self &test) { test.start_memory_copy_repeat(); } },

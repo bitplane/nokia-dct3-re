@@ -3064,8 +3064,7 @@ circular addressing, pointer/memory/accumulator aliases, all 32 ASM modes,
 signed word patterns, FRCT/OVM/SMUL/SXM/SST and sticky-status combinations,
 two pages and three checkpoints. T and source memory change after Read;
 the accumulator changes before Execute and ASM changes after capture.
-`st-mpy-edge` retains 64 replayed mapped-X/Y rejections before reads,
-writes or pointer effects. Mapped/peripheral operands, arbitrary producer/
+Mapped/peripheral operands, arbitrary producer/
 interrupt/repeat composition and physical bus phases are not qualified.
 
 ## Memory SQUR in delayed controls
@@ -3563,10 +3562,9 @@ after their capture, poisons the sampled memory word, and checks one read and
 one ordered store. Aliased source/destination stores must use the old value.
 Clearing the live pipeline before each load verifies restored retained state.
 
-`st-par-edge` passes 128 cases plus replay, excluding mapped X or Y operands
-before either pointer changes or any data access. Short RPT remains guarded;
-these tests do not qualify repeated arithmetic, arbitrary inter-copy alias
-forwarding, physical bank contention or wider interrupt/control compositions.
+These single-instruction tests do not qualify mapped/peripheral operands,
+arbitrary inter-copy alias forwarding, physical bank contention or wider
+interrupt/control compositions. Repeated RAM arithmetic is qualified separately.
 The stage ownership is a partial model, not measured silicon timing.
 
 ## Circular ASM-shifted accumulator stores
@@ -3638,8 +3636,7 @@ SXM/SST/OVM combinations, counts 0/1/7/255, two pages and three checkpoints.
 An independent integer reference checks per-clock A/B/carry/overflow
 feedback, unchanged T, every old-source store, source/opcode retention and
 exact pointer updates. The strided layout uses AR0=3 with linear BK=0;
-arbitrary circular strides are not qualified here. `st-alu-rpt-edge` adds
-128 replayed mapped-X/Y rejections without data or pointer effects.
+arbitrary circular strides and mapped/peripheral operands are not qualified here.
 Interrupt/control composition, inter-copy same-address forwarding and
 physical bank phases remain unqualified.
 
@@ -3662,10 +3659,7 @@ checks every accumulator/T transition and each RAM publication. Source and
 opcode poisoning check retention; fixed-source samples change between copies.
 The live pipeline is cleared before loading each snapshot.
 
-`stld-rpt-edge` reuses the single-instruction mapped-leg fixtures under short
-RPT: 96 cases plus replay reject X or Y mapped operands before data reads,
-writes or pointer changes. The guard is a supported-model boundary, not a
-silicon trap. Memory-bank contention, circular repeated addressing and
+Mapped/peripheral operands, memory-bank contention, circular repeated addressing and
 same-address inter-copy forwarding are not established by this qualification.
 
 ## Direct STM to absolute low RAM
@@ -4366,9 +4360,8 @@ circular and linear modes, eight words, eight accumulator patterns,
 all 32 ASM values across the address cases, eight numeric boundary shifts,
 SXM/SST/OVM/carry combinations, two pages and three snapshots. Source memory,
 ASM, accumulators, pointers and T change after their respective capture
-points. `stld-edge` adds 96 replayed no-read/no-write/no-pointer-change
-mapped-Y exclusions. The repeated-source exclusion retains
-owned mapped X cases as well.
+points. Mapped sources have a separate positive fixture; destination-MMIO
+and mapped repeated operands are outside this bank's qualification.
 The existing parallel-MAC store-shift path and ordinary-RAM forwarding
 are shared; no DSP reply or firmware state is supplied by this qualification.
 
