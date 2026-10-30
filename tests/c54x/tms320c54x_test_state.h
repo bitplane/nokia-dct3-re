@@ -378,7 +378,6 @@ private:
 	static repeat_store_case repeat_store_fixture(unsigned variant);
 	static u64 repeat_store_value(unsigned pattern);
 	void start_repeat_store(unsigned variant = 0);
-	void start_repeat_store_edge(unsigned variant = 0);
 	void start_rptz(unsigned variant = 0);
 	void start_ar_addm_load(unsigned variant = 0);
 	void start_pipeline_repeat_mvpd(unsigned variant = 0);
@@ -709,7 +708,6 @@ private:
 	void start_extended_push(unsigned variant = 0);
 	static extended_push_fixture extended_pop_case(unsigned variant);
 	void start_extended_pop(unsigned variant = 0);
-	void start_extended_push_edge(unsigned variant = 0);
 	void start_extended_pop_edge(unsigned variant = 0);
 	struct stlm_pmst_fixture
 	{
@@ -722,7 +720,6 @@ private:
 	static stlm_pmst_fixture stlm_pmst_case(unsigned v);
 	static u32 pmst_fixture_physical(u32 base, u16 address, u16 pmst);
 	void start_stlm_pmst(unsigned variant = 0);
-	void start_stlm_pmst_edge(unsigned variant = 0);
 	struct repeat_load_fixture
 	{
 		unsigned selector, flags, pattern, count, setup, irq, checkpoint, first, outer;
@@ -735,7 +732,6 @@ private:
 	static std::array<u64, 3> repeat_load_initial(repeat_load_fixture const &f);
 	static std::array<u64, 3> repeat_load_step(repeat_load_fixture const &f, std::array<u64, 3> state);
 	void start_repeat_load(unsigned variant = 0);
-	void start_repeat_load_edge(unsigned variant = 0);
 	struct basic_repeat_fixture
 	{
 		unsigned form, count, irq, checkpoint, selected, modification;
@@ -745,7 +741,6 @@ private:
 	};
 	static basic_repeat_fixture basic_repeat_case(unsigned v);
 	void start_basic_repeat(unsigned variant = 0);
-	void start_basic_repeat_edge(unsigned variant = 0);
 	struct rptbd_shift_store_fixture
 	{
 		unsigned count, form, kind, flags, irq, checkpoint;
@@ -2113,7 +2108,7 @@ private:
 	bool check_mvdk_producer_results();
 	bool check_clkmd_move_edge_results();
 	bool check_mvdk_mapped_results();
-	bool check_basic_repeat_edge_results();
+	bool check_basic_repeat_results();
 	bool check_rptbd_shift_store_results();
 	bool check_rptbd_layout_results();
 	bool check_block_repeat_forwarding_results();

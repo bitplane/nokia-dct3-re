@@ -231,14 +231,10 @@ unrelated state. The earliest replay restores the fixture's queued
 external interrupt assertion; later snapshots retain the CPU's accepted
 or pending interrupt without supplying a second edge.
 
-`rpt-smem-edge` passes 100 cases/replays covering control/peripheral
-sources, write-only short MOD=3, long-offset addressing, nested repeat,
-a delayed-control owner and a block-repeat body. Its 64-case MOD=3 bank
-crosses all eight ARF values, both compatibility states, both pages and
-two snapshots. Every exclusion rejects without data or pointer effects.
 TI SPRU131G table 5-4 marks short MOD=3 as write-only, so its former
-RPT read fixtures were outside the legal domain. The other exclusions
-remain prototype limits; no rejection claims a silicon trap mechanism.
+RPT read fixtures were outside the legal domain. Control/peripheral,
+long-offset, nested-repeat and delayed/block-owner combinations remain
+outside this qualification; prototype rejection is not a silicon trap contract.
 Producer spacing, modifying
 self-AR count sources and additional repeated-body families require their
 own composition evidence. Encoded direct operand `00` does not by itself
@@ -277,10 +273,6 @@ only the actual load executes. This is a declared pipeline-model test,
 not a measured physical fetch phase. Block/IRQ composition and memory
 counts inside blocks remain outside this bank's claim.
 
-`rpt-ld-edge` passes 32 cases/replays for eight other operation families,
-rejecting before data, arithmetic or flag effects. These remain prototype
-exclusions, not silicon traps.
-
 ## Accumulator-to-PMST stores
 
 Ordinary direct `STLM A/B,PMST` is admitted. TI SPRU172C 4-175 defines
@@ -304,11 +296,9 @@ earlier IPTR/OVLY sample; a later vector uses the newly published values.
 Every run requires one PMST write, a balanced optional frame and unchanged
 XPC, pointers and unrelated state.
 
-`stlm-pmst-edge` passes 32 cases/replays for delayed-control, single-repeat
-and block-repeat owners, RSA/REA/SP destinations, indirect addressing
-and peripherals. These reject without data, control or pointer effects.
-They are prototype exclusions, not silicon restrictions. This admission
-does not establish external-access interlocks or physical MP/MC/DROM
+Delayed/repeat owners, other destinations and indirect/peripheral addressing
+are not qualified by this PMST fixture. This admission does not establish
+external-access interlocks or physical MP/MC/DROM
 memory decoding; the mapping assertions concern the existing OVLY/IPTR
 model, and phase placement remains explicitly partial.
 
@@ -345,12 +335,9 @@ inputs remain fixed safe state; ordinary register fields use four patterns.
 The modifying self-AR case is excluded, not silently tested against its
 own updated value. `pshd-long-map` runs this bank alone.
 
-`pshd-long-edge` passes 64 cases/replays for SP, peripheral and modifying
-self-AR sources, an unadmitted mode and delayed/repeat/block/XC owners,
-across both compatibility states and pages. They reject before stack,
-data or pointer effects; address-preview AR/ARP updates are discarded
-on an unadmitted source. These are prototype exclusions, not claimed
-silicon exceptions. Older-producer, adjacent-stack and compound-loop
+SP, peripheral and modifying self-AR sources, additional modes and
+delayed/repeat/block/XC owners are outside this qualification.
+Older-producer, adjacent-stack and compound-loop
 compositions need their own coverage. Long MOD=13 preincrement is a
 read-capable addressing mode, unlike short write-only MOD=3.
 
@@ -1021,19 +1008,11 @@ python3 tools/run_c54x_core.py --profile mvkd-forward \
   --mame mame/mame --rompath roms --output-root tmp
 python3 tools/run_c54x_core.py --profile rpt-smem \
   --mame mame/mame --rompath roms --output-root tmp
-python3 tools/run_c54x_core.py --profile rpt-smem-edge \
-  --mame mame/mame --rompath roms --output-root tmp
 python3 tools/run_c54x_core.py --profile rpt-ld \
-  --mame mame/mame --rompath roms --output-root tmp
-python3 tools/run_c54x_core.py --profile rpt-ld-edge \
   --mame mame/mame --rompath roms --output-root tmp
 python3 tools/run_c54x_core.py --profile stlm-pmst \
   --mame mame/mame --rompath roms --output-root tmp
-python3 tools/run_c54x_core.py --profile stlm-pmst-edge \
-  --mame mame/mame --rompath roms --output-root tmp
 python3 tools/run_c54x_core.py --profile pshd-long \
-  --mame mame/mame --rompath roms --output-root tmp
-python3 tools/run_c54x_core.py --profile pshd-long-edge \
   --mame mame/mame --rompath roms --output-root tmp
 ```
 

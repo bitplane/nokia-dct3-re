@@ -971,18 +971,6 @@ void tms320c54x_test_state::start_repeat_store(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_repeat_store_edge(unsigned variant)
-{
-	start_repeat_store(variant % 512);
-	auto const f = repeat_store_fixture(variant % 512);
-	u16 const destination = std::array<u16, 4>{0, 0x10, 0x20, 0x5f}[(variant / 512) % 4];
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.reg, u16(destination - unsigned(f.mode == 3)));
-	m_pipeline_write_tap.remove();
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "repeat_store_excluded_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Excluded repeated mapped store has no data write"); });
-	m_pipeline_peripheral_case = variant; m_phase = repeat_store_phase + 2;
-}
-
 void tms320c54x_test_state::start_pipeline_repeat_mvpd(unsigned variant)
 {
 	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
@@ -2424,19 +2412,6 @@ void tms320c54x_test_state::start_extended_pop(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_extended_push_edge(unsigned variant)
-{
-	unsigned const seed = ((variant / 8) % 2 ? 3200 : 0) + ((variant / 16) % 2 ? 400 : 0); start_extended_push(seed); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = extended_push_case(seed); auto &program = m_cpu->space(AS_PROGRAM); unsigned const kind = variant % 8;
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x5007);
-	if (kind < 4) { program.write_word(f.base + 0x600, std::array<u16, 4>{0x4bf8, 0x4beb, 0x4beb, 0x4bf9}[kind]); program.write_word(f.base + 0x601, kind == 0 ? 0x18 : kind == 1 ? u16(0x24 - 0x5007) : kind == 2 ? u16(0x13 - 0x5007) : 0x5000); }
-	if (kind == 4 || kind == 6) { program.write_word(f.base + 0x600, kind == 4 ? 0xf273 : 0xf072); program.write_word(f.base + 0x601, kind == 4 ? 0x700 : 0x605); program.write_word(f.base + 0x602, 0x4be3); program.write_word(f.base + 0x603, 4); }
-	if (kind == 5 || kind == 7) { program.write_word(f.base + 0x600, kind == 5 ? 0xec00 : 0xfd30); program.write_word(f.base + 0x601, 0x4be3); program.write_word(f.base + 0x602, 4); }
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "extended_push_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "extended_push_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
-	m_phase = 310580; m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
-
 void tms320c54x_test_state::start_extended_pop_edge(unsigned variant)
 {
 	unsigned const seed = ((variant / 8) % 2 ? 400 : 0) + ((variant / 16) % 2 ? 3200 : 0);
@@ -2518,20 +2493,6 @@ void tms320c54x_test_state::start_stlm_pmst(unsigned variant)
 		if (at != old_physical && at != new_physical) return;
 		expect(at == (f.late ? new_physical : old_physical) && word == 0xf495 && !m_rptbd_counts.fetches++ && m_cpu->pipeline_cycles() == (f.late ? 12 : 6), "INTR vector Prefetch owns IPTR/OVLY before or after the STLM publication"); });
 	m_phase = 310520; m_cpu->set_state_int(STATE_GENPC, f.base + f.entry); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_stlm_pmst_edge(unsigned variant)
-{
-	unsigned const seed = (variant / 8) % 2 ? 256 : 0; start_stlm_pmst(seed); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = stlm_pmst_case(seed); auto &program = m_cpu->space(AS_PROGRAM); unsigned const kind = variant % 8;
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-	if (kind == 0) { program.write_word(f.base + f.entry, 0xf273); program.write_word(f.base + f.entry + 1, 0x700); program.write_word(f.base + f.entry + 2, 0x891d); }
-	else if (kind == 1) { program.write_word(f.base + f.entry, 0xec00); program.write_word(f.base + f.entry + 1, 0x891d); }
-	else if (kind == 2) { program.write_word(f.base + f.entry, 0xf072); program.write_word(f.base + f.entry + 1, f.entry + 3); program.write_word(f.base + f.entry + 2, 0x891d); }
-	else program.write_word(f.base + f.entry, std::array<u16, 5>{0x891b, 0x891c, 0x8995, 0x8920, 0x8918}[kind - 3]);
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "stlm_pmst_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "stlm_pmst_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
-	m_phase = 310540; m_cpu->resume(SUSPEND_REASON_DISABLE);
 }
 
 tms320c54x_test_state::repeat_load_fixture tms320c54x_test_state::repeat_load_case(unsigned v)
@@ -2636,30 +2597,6 @@ void tms320c54x_test_state::start_repeat_load(unsigned variant)
 		if (machine().side_effects_disabled()) return;
 		expect(f.irq && at == 0x2fff && !m_rptbd_counts.stack_writes++ && word >= u16(f.body + 1) && word <= 0x60f, "Repeated accumulator load writes only the deferred interrupt frame"); m_rptbd_return = word; });
 	m_phase = 310480; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
-
-void tms320c54x_test_state::start_repeat_load_edge(unsigned variant)
-{
-	start_repeat_load(); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-	bool const tmac = profile_is("tmac-rpt-edge");
-	bool const square = profile_is("sqacc-rpt-edge") || tmac;
-	bool const dual = profile_is("mac-rpt-edge");
-	u32 const base = (dual ? (variant / 128) % 2 : square ? (variant / 16) % 2 : (variant / 8) % 2) ? 0x20000 : 0; auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0xec01);
-	program.write_word(base + 0x601, std::array<u16, 8>{0xf4f0, 0xf0e0, 0xf48f, 0xf400, 0xf080, 0xf48d, 0xf483, 0x1000}[variant % 8]);
-	if (square) { program.write_word(base+0x601,0x3882 | ((variant % 4) << 8)); m_cpu->set_state_int(tms320c54x_device::STATE_AR2,std::array<u16,4>{0x0e,0x15,0x40,0x5f}[(variant/4)%4]); }
-	if (tmac) program.write_word(base+0x601,0x2882 | ((variant % 4) << 8) | (variant & 1 ? 0x400 : 0));
-	if (dual)
-	{
-		program.write_word(base+0x601,0xb001 | (((variant/4)%4) << 10) | ((variant%4) << 8));
-		u16 const low = std::array<u16,4>{0x0e,0x15,0x40,0x5f}[(variant/32)%4]; bool const y = (variant/16)%2;
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR2,y ? 0x1800 : low); m_cpu->set_state_int(tms320c54x_device::STATE_AR3,y ? low : 0x1800);
-	}
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "repeat_load_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "repeat_load_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_phase = 310500; m_cpu->resume(SUSPEND_REASON_DISABLE);
 }
 
 tms320c54x_test_state::memory_immediate_fixture tms320c54x_test_state::memory_immediate_case(unsigned variant)
@@ -6072,31 +6009,6 @@ bool tms320c54x_test_state::check_repeat_store_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == repeat_store_phase + 1) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = repeat_store_phase; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == repeat_store_phase + 2)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 2048 ? 5 : 8;
-		auto const f = repeat_store_fixture(variant % 512);
-		u16 const destination = std::array<u16, 4>{0, 0x10, 0x20, 0x5f}[(variant / 512) % 4];
-		expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.reg) == u16(destination - unsigned(f.mode == 3)), "Excluded repeated store does not pre/postmodify its AR");
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save excluded repeat before or after rejection");
-		}
-		if (tick == 12)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Repeated mapped destination is explicitly unsupported, not fabricated");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(repeat_store_phase + 3, "Restore excluded repeated store without bus effects");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 4095) { start_repeat_store_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x repeated store exclusions: PASS cases=4096 restore=4096 forms=4 modes=4 registers=8 counts=4 destinations=0000,0010,0020,005f snapshots=2 reads=0 writes=0 ar_changes=0 silicon_trap_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated repeated store exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == repeat_store_phase + 3) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = repeat_store_phase + 2; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 
@@ -8816,22 +8728,6 @@ bool tms320c54x_test_state::check_mvdk_mapped_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 310570) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310560; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 310580)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 32 ? 3 : 10;
-		expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Excluded extended push performs no data transaction");
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save excluded extended push before or after rejection"); }
-		if (tick == 20)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x5007 && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xb608, "Excluded push preserves stack, pointer and address-status state");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(310590, "Restore excluded extended push without new side effects"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 63) { start_extended_push_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x extended PSHD exclusions: PASS cases=64 restore=64 forms=SP,peripheral,self_AR,unadmitted_mode,delay,repeat,block,XC pages=2 cmpt=2 snapshots=2 data_reads=0 data_writes=0 stack_changes=0 pointer_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated extended PSHD exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 310590) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310580; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 310520)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = stlm_pmst_case(variant);
@@ -8865,22 +8761,6 @@ bool tms320c54x_test_state::check_mvdk_mapped_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 310530) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310520; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 310540)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 16 ? 3 : 10;
-		expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Excluded PMST store performs no data transaction");
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save excluded PMST store before or after rejection"); }
-		if (tick == 20)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_PMST) == 0x200 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 && m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x7005, "Unadmitted PMST owners and neighboring destinations preserve control and pointers");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(310550, "Restore excluded PMST store without new effects"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 31) { start_stlm_pmst_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x STLM PMST exclusions: PASS cases=32 restore=32 forms=delay,repeat,block,RSA,REA,indirect,peripheral,SP pages=2 snapshots=2 data_reads=0 data_writes=0 control_changes=0 pointer_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated STLM PMST exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 310550) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310540; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 310480)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = repeat_load_case(variant);
@@ -8924,34 +8804,6 @@ bool tms320c54x_test_state::check_mvdk_mapped_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 310490) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310480; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 310500)
-	{
-		bool const tmac = profile_is("tmac-rpt-edge");
-		bool const square = profile_is("sqacc-rpt-edge") || tmac;
-		bool const dual = profile_is("mac-rpt-edge");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < (dual ? 256U : square ? 32U : 16U) ? 3 : 10;
-		expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Excluded register repeat performs no data transaction");
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save excluded register repeat before or after rejection"); }
-		if (tick == 20)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_A) == 0 && m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfedcba9876ULL && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xb808 && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x6000 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "Unadmitted repeat families reject before arithmetic, flags, pointer or stack effects");
-			if (square) expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == std::array<u16,4>{0x0e,0x15,0x40,0x5f}[(variant/4)%4] && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "Mapped repeated square rejects before source or T publication");
-			if (dual)
-			{
-				u16 const low = std::array<u16,4>{0x0e,0x15,0x40,0x5f}[(variant/32)%4]; bool const y = (variant/16)%2;
-				expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == (y ? 0x1800 : low) && m_cpu->state_int(tms320c54x_device::STATE_AR3) == (y ? low : 0x1800) && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "Repeated dual MAC rejects either low operand before pointer or T publication");
-			}
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(310510, "Restore excluded repeat without new effects"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (dual ? 511U : square ? 63U : 31U)) { start_repeat_load_edge(variant + 1); return true; }
-			if (dual) { osd_printf_info("TMS320C54x repeated dual MAC exclusions: PASS cases=512 restore=512 operations=4 selectors=4 low_operands=X,Y sources=4 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 t_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0,"TMS320C54x isolated repeated dual MAC exclusions complete"); }
-			if (tmac) { osd_printf_info("TMS320C54x repeated T MAC exclusions: PASS cases=64 restore=64 sources=T,AR5,peripheral,edge pages=2 snapshots=2 data_reads=0 data_writes=0 arithmetic_changes=0 t_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0,"TMS320C54x isolated repeated T MAC exclusions complete"); }
-			if (square) { osd_printf_info("TMS320C54x repeated square exclusions: PASS cases=64 restore=64 operations=4 sources=T,AR5,peripheral,edge pages=2 snapshots=2 data_reads=0 data_writes=0 arithmetic_changes=0 t_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0,"TMS320C54x isolated repeated square exclusions complete"); }
-			osd_printf_info("TMS320C54x repeated accumulator LD exclusions: PASS cases=32 restore=32 other_families=8 pages=2 snapshots=2 data_reads=0 data_writes=0 arithmetic_changes=0 flag_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated repeated accumulator LD exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 310510) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310500; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 

@@ -357,25 +357,6 @@ void tms320c54x_test_state::start_basic_repeat(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_basic_repeat_edge(unsigned variant)
-{
-	bool const write_only = variant >= 36; unsigned const edge = write_only ? variant - 36 : variant;
-	unsigned const seed = write_only ? ((edge / 16) % 2) * 576 + ((edge / 8) % 2) * 288 : ((variant / 9) % 2) * 576;
-	start_basic_repeat(seed); m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove();
-	u32 const base = basic_repeat_case(seed).base; unsigned const kind = write_only ? 9 : variant % 9; auto &program = m_cpu->space(AS_PROGRAM);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, kind == 6 ? 0xa608 : 0xa600);
-	program.write_word(base + 0x600, write_only ? 0x4798 | (edge % 8) : std::array<u16, 9>{0x4700, 0x4707, 0x471a, 0x4720, 0x4799, 0x47e3, 0x4700, 0xf273, 0xf072}[kind]);
-	if (kind == 4) m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1f);
-	if (kind == 5) program.write_word(base + 0x601, 0);
-	if (kind == 6) program.write_word(base + 0x601, 0x4700);
-	if (kind == 7 || kind == 8) { program.write_word(base + 0x601, kind == 7 ? 0x700 : 0x603); program.write_word(base + 0x602, 0x4700); }
-	m_rptbd_counts = {}; m_pipeline_replay = false;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "basic_repeat_edge_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "basic_repeat_edge_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd_counts.writes; });
-	m_phase = 310460; m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
-
 tms320c54x_test_state::rptbd_square_fixture tms320c54x_test_state::rptbd_square_case(unsigned v) const
 {
 	rptbd_square_fixture f{};
@@ -1962,28 +1943,10 @@ bool tms320c54x_test_state::check_delayed_call_replay_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_basic_repeat_edge_results()
+bool tms320c54x_test_state::check_basic_repeat_results()
 {
 	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 310460)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = (variant < 36 ? variant < 18 : variant < 68) ? 3 : 10;
-		expect(!m_rptbd_counts.reads && !m_rptbd_counts.writes, "Excluded memory repeat performs no data transaction");
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save excluded count before or after rejection"); }
-		if (tick == 20)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 &&
-				m_cpu->state_int(tms320c54x_device::STATE_RC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 13 && m_cpu->state_int(tms320c54x_device::STATE_AR1) == (variant < 36 && variant % 9 == 4 ? 0x1f : 0x5000), "Excluded memory count preserves stack, repeat counters and preincrement pointer");
-			if (variant >= 36) for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == 0x5000, "Write-only MOD=3 RPT forms reject before any auxiliary-register update");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(310470, "Restore excluded memory count without side effects"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 99) { start_basic_repeat_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x basic memory repeat exclusions: PASS cases=100 restore=100 forms=control,peripheral,write_only_MOD3,long_offset,nested,delay,block mod3_cases=64 arf=8 cmpt=2 pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated basic memory repeat exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 310470) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 310460; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 310440)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;

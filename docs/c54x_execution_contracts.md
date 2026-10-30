@@ -3770,10 +3770,7 @@ each paired read, the opcode is poisoned after capture, and a newer T follows
 the final Read. The gate requires exact paired reads, one opcode fetch, no CPU
 data writes, exact final pointers/status and one fresh continuation. Initial
 carry/overflow states vary with the four patterns, not independently.
-`mac-rpt-edge` adds 512 rejection/replay cases across operations, accumulator
-pairings, either low operand, four low addresses, two pages and two snapshots;
-no reads, writes, pointer or T changes precede rejection. These exclusions are
-bounded model guards, not silicon traps. Memory-count headers, nested blocks,
+Low-page operands, memory-count headers, nested blocks,
 interrupt composition, physical RAM banks and bus phases are not newly
 qualified by these gates.
 
@@ -3797,11 +3794,6 @@ Initial carry/overflow states vary with the eight patterns, not as independent
 full-cross-product axes. Extended or mapped/peripheral repeats, interrupt and
 nested-block composition are not newly qualified; physical bus phases remain
 unvalidated. Non-repeated square arithmetic retains its separate matrix.
-`sqacc-rpt-edge` adds 64 rejection/replay cases across all four operations,
-mapped T/AR5 and two low peripheral/hole addresses, two pages and snapshots
-before/after rejection. It checks zero source reads, CPU writes or changes to
-accumulators, ST0, T and the source pointer. This is a bounded model
-exclusion, not a claimed silicon trap.
 
 ## BANZD delay-owned T loads
 
@@ -4820,9 +4812,7 @@ destinations, four operations, DP/plain/postincrement RAM forms, eight
 operand/accumulator patterns, sixteen flag configurations, counts 0/1/7/255,
 two program pages and four snapshots. It checks every accumulator publication,
 one source read per iteration, a single retained opcode, source/opcode poisoning,
-and preservation of a newer T value after the last Read. `tmac-rpt-edge`
-passes 64 cases and replays rejecting mapped T/AR5, peripheral and low-page
-edge sources before any data transaction or arithmetic/pointer/T change.
+and preservation of a newer T value after the last Read.
 This is bounded instruction qualification, not measured silicon timing or
 blanket acceptance of mapped, extended, interrupt or block-repeat compositions.
 

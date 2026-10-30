@@ -8,6 +8,21 @@
   },
   "families": [
     {
+      "id": "prototype-repeat-and-control-admission-matrices",
+      "classification": "implementation_limit",
+      "decision": "delete",
+      "profiles": [],
+      "case_ids": [],
+      "retired_profiles": ["rpt-store-edge", "pshd-long-edge", "stlm-pmst-edge", "rpt-ld-edge", "sqacc-rpt-edge", "tmac-rpt-edge", "mac-rpt-edge", "rpt-smem-edge"],
+      "nominal_retired_cases": {"rpt-store-edge": 4096, "pshd-long-edge": 64, "stlm-pmst-edge": 32, "rpt-ld-edge": 32, "sqacc-rpt-edge": 64, "tmac-rpt-edge": 64, "mac-rpt-edge": 512, "rpt-smem-edge": 100},
+      "basis": "Dedicated fixtures clone supported setup and require ILLEGAL for prototype exclusions rather than independently specified silicon behavior. Eight profiles share five setup wrappers, their observation/restore phases and four completion branches in the shared repeat-load checker. Retire this instruction-by-instruction admission-policy surface instead of reproducing it in the generic architectural harness.",
+      "retained": ["all supported repeat count, arithmetic and source reference factories and their setup/result predicates", "STLM PMST mapping and interrupt composition", "extended PSHD RAM/mapped source capture and stack publication", "mixed POPD edges including 16 successful DAGEN ordering cases", "separate reviewed source-domain census and clock/interrupt compound-owner controls"],
+      "limits": ["4964 nominal rejection cases are removed; they are not equivalent to coverage elsewhere", "rpt-smem-edge did not complete its nominal 100-case matrix in the fresh baseline", "no CPU behavior or architectural support boundary changes", "the surviving basic-repeat result handler is renamed because its rejected half is removed"],
+      "baseline": "Seven retired profiles pass their complete native oracles. rpt-smem-edge fails before any edit at phase 310460, case 8, tick 20, on its unchanged stack/repeat-counter/pointer conjunction; ILLEGAL=1 and read/write counts are zero. Case 8 has a valid outer RPTB prefix before the excluded count instruction. This is a recorded unqualified rejection-policy failure, not a diagnosed CPU defect or silicon trap claim.",
+      "verification": "All 380 focused C54x host tests pass. Rebuilt pshd-long-map (3696 cases), stlm-pmst (38912), rpt-ld-block (2048), rpt-store (49152) and rpt-smem (10376) pass their complete native oracles and restore counts. 353 functions in the two edited implementation files are byte-identical. Two shared result handlers only lose retired branches; the basic-repeat handler is renamed and loses only its rejected half. Full extended-push, accumulator-load, repeated MAC/square matrices and the full-default/handset checkpoints are not implicitly renewed by these controls.",
+      "measurements": {"before_cpp_bytes": 3395768, "before_cpp_lines": 51278, "after_cpp_bytes": 3375346, "after_cpp_lines": 51072, "source_assessment": "20422 bytes and 206 C++ lines removed; no new runner, generated case bank or CPU helper is introduced."}
+    },
+    {
       "id": "prototype-arithmetic-delay-rejection-profiles",
       "classification": "implementation_limit",
       "decision": "delete",

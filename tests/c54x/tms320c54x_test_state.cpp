@@ -61,7 +61,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"mvdd-follow"}, [](self &test) { test.start_mvdd_follow(); } },
 		{ {"bd-read-a"}, [](self &test) { test.start_bd_read_a(); } },
 		{ {"bitt"}, [](self &test) { test.start_bitt(); } },
-		{ {"rpt-store-edge"}, [](self &test) { test.start_repeat_store_edge(); } },
 		{ {"rpt-store"}, [](self &test) { test.start_repeat_store(); } },
 		{ {"rptz"}, [](self &test) { test.start_rptz(); } },
 		{ {"addm-ar"}, [](self &test) { test.start_ar_addm(); } },
@@ -213,7 +212,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"rptbd-squr"}, [](self &test) { test.start_rptbd_square(); } },
 		{ {"rptbd-shift-st"}, [](self &test) { test.start_rptbd_shift_store(); } },
 		{ {"rpt-smem"}, [](self &test) { test.start_basic_repeat(); } },
-		{ {"rpt-smem-edge"}, [](self &test) { test.start_basic_repeat_edge(); } },
 		{ {"rpt-ld"}, [](self &test) { test.start_repeat_load(); } },
 		{ {"rpt-sfta"}, [](self &test) { test.start_repeat_load(); } },
 	}))
@@ -234,11 +232,8 @@ void tms320c54x_test_state::machine_reset()
 	if (profile_is("dual-sub-native")) { start_native_dual_sub(0); return; }
 	if (profile_is("parallel-sub")) { start_parallel_sub_fraction(0); return; }
 	if (profile_is("saccd")) { start_saccd_case(0); return; }
-	if (profile_is("stlm-pmst-edge")) { start_stlm_pmst_edge(); return; }
 	if (profile_is("pshd-long")) { start_extended_push(); return; }
 	if (profile_is("pshd-long-map")) { start_extended_push(96000); return; }
-	if (profile_is("pshd-long-edge")) { start_extended_push_edge(); return; }
-	if (profile_is("rpt-ld-edge")) { start_repeat_load_edge(); return; }
 	if (profile_is("rptbd-irq")) { start_rptbd(512); return; }
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"mvdk-mapped", "mvdk-acc", "clock-mvdk"}, [](self &test) { test.start_mvdk_mapped(); } },
@@ -328,11 +323,8 @@ void tms320c54x_test_state::machine_reset()
 		{ {"ctrl-t-load"}, [](self &test) { test.start_rptbd_t_load(); } },
 		{ {"sqacc-repeat"}, [](self &test) { test.start_poly(); } },
 		{ {"tmac-repeat"}, [](self &test) { test.start_poly(); } },
-		{ {"sqacc-rpt-edge"}, [](self &test) { test.start_repeat_load_edge(); } },
-		{ {"tmac-rpt-edge"}, [](self &test) { test.start_repeat_load_edge(); } },
 		{ {"mac-rpt"}, [](self &test) { test.start_poly(); } },
 		{ {"lms", "lms-edge"}, [](self &test) { test.start_sqdst(); } },
-		{ {"mac-rpt-edge"}, [](self &test) { test.start_repeat_load_edge(); } },
 		{ {"bd-rpt"}, [](self &test) { test.start_branch_repeat(); } },
 		{ {"retd-rpt"}, [](self &test) { test.start_branch_repeat(); } },
 		{ {"calld-rpt"}, [](self &test) { test.start_branch_repeat(); } },

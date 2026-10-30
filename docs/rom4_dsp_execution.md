@@ -864,11 +864,8 @@ counts 0/1/7/255, RPT/RPTZ setup, SST/SXM combinations, two source patterns,
 two instruction pages and three save points. A test-only source mutation
 after each write verifies Execute-live sampling and independent saturation
 results. There are no data reads, exactly count-plus-one writes, and no
-changes to other ARs, the other accumulator or status. `rpt-store-edge`
-checks 4,096 cases plus replay for mapped first destinations 0000/0010/
-0020/005f: rejection precedes both DAGEN updates and bus effects, including
-preincrement wrap. These are implementation exclusions, not claimed silicon
-traps. Direct, indexed, extended, ASM-shift and mapped repeated stores remain
+changes to other ARs, the other accumulator or status.
+Direct, indexed, extended, ASM-shift and mapped repeated stores remain
 outside this admitted subset; physical bus phase is not claimed.
 
 BITT consumes retained Smem and T(3..0), setting only TC from bit
