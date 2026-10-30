@@ -333,6 +333,7 @@ def main():
     counts['register_accumulator_arithmetic'] = 18784
     counts['register_accumulator_load'] = 18608
     counts['immediate_subtract'] = 4656
+    counts['long_pair_arithmetic'] = 8192
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)

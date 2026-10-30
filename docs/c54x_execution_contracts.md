@@ -2735,12 +2735,14 @@ The two words are sampled once in parity-defined MSW/LSW order, then the
 shared long-word arithmetic helper publishes at Execute. C16 mode subtracts
 the two lanes independently and does not saturate with OVM; full-width mode
 uses SXM, carry, sticky destination overflow and OVM saturation.
-`drsub` passes 6,144 cases/restores across eight read-capable address forms, A/B, eight
-patterns, C16/SXM/OVM combinations and both pair parities. Later extension,
-AR/SP and memory changes cannot alter the retained address or word pair.
-`long-pair` independently runs 6,144 DSUB and 12,288 DADD cases
-as controls. Both profiles also require the 3,584-case short-MOD=3 rejection
-bank described above. CPU low-page pairs remain excluded; physical phase timing and
+`long_pair_arithmetic` owns 8,192 cases/replays: 2,048 each DSUB/DRSUB and
+4,096 DADD, across eight read-capable forms, all accumulator selectors, eight
+paired patterns, C16/SXM/OVM and both parities. Pages retain their original
+parity association; three checkpoints are distributed instead of multiplying
+to 24,576 executions. Exact paired Reads, Execute-only results/flags, extension
+poison and later AR/SP/RAM changes are checked. The two legacy profiles,
+factories, setup and result handler are removed. Short MOD=3 and low-page
+admission remain separate from this positive section. Physical phase timing and
 general producer/interrupt composition are not established by these fixtures.
 
 NORM (`f48f/f58f/f68f/f78f`) retains T in Read before older Execute publishes
@@ -2876,7 +2878,7 @@ staged support for T-dependent arithmetic.
 
 The CPU-only `source-domain` census owns the rejection coverage. Separate
 legal controls remain in `logic-absolute`, `add-absolute`, `arith-ar` and
-`long-pair`; the latter retains 18,432 positive DADD/DSUB cases/restores.
+`long_pair_arithmetic`, which includes the positive DADD/DSUB/DRSUB contracts.
 Repeat/interrupt composition and physical timing remain separate scopes.
 
 ## Core regression checkpoint

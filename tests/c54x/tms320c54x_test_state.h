@@ -123,18 +123,6 @@ private:
 	void verify_paired_circular_domain();
 	static dst_extended_fixture extended_dst_fixture(unsigned variant);
 	void start_pipeline_extended_dst(unsigned variant = 0);
-	struct long_pair_fixture_data
-	{
-		unsigned form, reg, read_cycle;
-		u16 address, next_ar, literal, opcode, st0, st1;
-		u64 source, result;
-		u32 memory;
-		u16 result_st0;
-	};
-	static long_pair_fixture_data long_pair_fixture(unsigned variant);
-	static long_pair_fixture_data long_add_fixture(unsigned variant);
-	static long_pair_fixture_data long_reverse_fixture(unsigned variant);
-	void start_pipeline_long_pair(unsigned variant = 0);
 	void start_pipeline_store_mvmm(unsigned variant = 0);
 	struct indexed_store_fixture;
 	static indexed_store_fixture circular_portr_case(unsigned v);
@@ -911,7 +899,6 @@ private:
 	bool check_block_page_results();
 	bool check_mvdd_source_results();
 	bool check_extended_ar_store_results();
-	bool check_accumulator_shift_results();
 	bool check_branch_repeat_results();
 	bool check_rptbd_t_load_results();
 	bool check_staged_load_results();

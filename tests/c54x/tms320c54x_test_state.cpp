@@ -119,7 +119,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"mvdd-periph"}, [](self &test) { test.start_mvdd_peripheral(); } },
 		{ {"mvdd-source", "mvdd-source-rpt"}, [](self &test) { test.start_mvdd_source(); } },
 		{ {"alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus"}, [](self &test) { test.start_mapped_dual(); } },
-		{ {"drsub", "long-pair"}, [](self &test) { test.start_pipeline_long_pair(); } },
 		{ {"popd-mapped", "popd-repeat"}, [](self &test) { test.start_popd_mapped(); } },
 		{ {"popd-edges"}, [](self &test) { test.start_popd_edges(); } },
 		{ {"popd-ram"}, [](self &test) { test.start_pipeline_data_pop(); } },
