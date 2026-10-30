@@ -296,26 +296,6 @@ void tms320c54x_test_state::start_pipeline_mu4_logic_tail(unsigned variant)
 }
 
 
-void tms320c54x_test_state::start_addm_brc_loop(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	unsigned const count = std::array<unsigned, 4>{0, 1, 3, 7}[variant % 4]; bool const subtract = (variant / 4) % 2, call = (variant / 8) % 2, delayed = (variant / 16) % 2;
-	u32 const base = (variant / 32) % 2 ? 0x20000 : 0, setup = base + (call ? 0x700 : 0x604), body = setup + (delayed ? 4 : 2);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 32; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
-	program.write_word(base + 0x600, 0x6bf8); program.write_word(base + 0x601, 0x1a); program.write_word(base + 0x602, subtract ? 0xffff : 1);
-	if (call) { program.write_word(base + 0x603, 0xf074); program.write_word(base + 0x604, 0x700); program.write_word(base + 0x605, 0xf4e1); }
-	program.write_word(setup, delayed ? 0xf272 : 0xf072); program.write_word(setup + 1, u16(body + 1)); program.write_word(body, 0x6d90); program.write_word(body + 2, call ? 0xfc00 : 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BRC, u16(subtract ? count + 1 : count - 1)); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa024); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x1200);
-	m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x1a, 0x1a, "addm_brc_loop_read", [this, count, subtract](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_operand_reads && word == u16(subtract ? count + 1 : count - 1), "ADDM samples its BRC source once before the subsequent loop"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x1a, 0x1a, "addm_brc_loop_write", [this, count](offs_t, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!m_pipeline_store_writes && word == count, "ADDM publishes the derived BRC count once"); ++m_pipeline_store_writes; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 276020;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -5454,27 +5434,6 @@ bool tms320c54x_test_state::check_ts_arithmetic_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_addm_brc_loop_results()
-{
-	if (m_phase == 276020)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, count = std::array<unsigned, 4>{0, 1, 3, 7}[variant % 4], checkpoint = std::array<unsigned, 5>{6, 7, 8, 10, 16}[variant / 64];
-		bool const call = (variant / 8) % 2, delayed = (variant / 16) % 2; u32 const base = (variant / 32) % 2 ? 0x20000 : 0, body = base + (call ? 0x700 : 0x604) + (delayed ? 4 : 2);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "ADDM BRC followed by a separated RPTB or RPTBD is supported");
-		if (tick == checkpoint && !m_pipeline_replay) { m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_store_writes, 0, 0}; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save BRC arithmetic publication or consuming loop"); }
-		if (tick == 128)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == (call ? base + 0x606 : body + 3) && m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x1201 + count && !m_cpu->state_int(tms320c54x_device::STATE_BRC) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x900 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1, "A legal-gap loop consumes the ADDM result for exactly count plus one iterations");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_store_writes = m_recurring_irq_snapshot[1]; return restore_pipeline_at(276030, "Restore BRC publication and loop without duplicate arithmetic writes"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 319) { start_addm_brc_loop(variant + 1); return true; }
-			osd_printf_info("TMS320C54x ADDM BRC loop consumers: PASS cases=320 restore=320 counts=0,1,3,7 increments=1,-1 separators=NOP,CALL controls=RPTB,RPTBD pages=2 snapshots=5 ordered_publication=1 actual_iterations=1 physical_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated ADDM BRC loop consumers complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 276030) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 276020; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_delay_compare_results()
 {

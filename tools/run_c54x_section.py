@@ -113,6 +113,7 @@ def main():
     counts['delayed_bit_test'] = 2048
     counts['mapped_address_dependency'] = 128
     counts['mapped_addm'] = 1728
+    counts['mapped_repeat_dependency'] = 32
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')

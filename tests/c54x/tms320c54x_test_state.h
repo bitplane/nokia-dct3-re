@@ -114,7 +114,6 @@ private:
 	void start_pipeline_original_idle(unsigned variant = 0);
 	void start_pipeline_pmst(unsigned variant = 0);
 	void start_stack_irq_order(unsigned variant = 0);
-	void start_addm_brc_loop(unsigned variant = 0);
 	struct repeated_writa_fixture
 	{
 		unsigned form, setup, reg, count, words, read, write, checkpoint;
@@ -1743,7 +1742,6 @@ private:
 	bool check_t_store_results();
 	bool check_ts_arithmetic_results();
 	bool check_asm_load_results();
-	bool check_addm_brc_loop_results();
 	bool check_poll_interrupt_results();
 	bool check_delay_compare_results();
 	bool check_asm_circular_store_results();

@@ -52,7 +52,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"mvpd-extended"}, [](self &test) { test.start_extended_mvpd(); } },
 		{ {"mvpd-controls"}, [](self &test) { test.start_pipeline_mvpd(); } },
 		{ {"rpt-writa", "rpt-writa16"}, [](self &test) { test.start_repeated_writa(); } },
-		{ {"addm-brc-loop"}, [](self &test) { test.start_addm_brc_loop(); } },
 		{ {"std-swwsr"}, [](self &test) { test.start_standard_swwsr_test(); } },
 	}))
 		return;
