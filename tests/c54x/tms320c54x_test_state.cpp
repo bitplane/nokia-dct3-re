@@ -503,29 +503,6 @@ void tms320c54x_test_state::test(machine_config &config)
 		return 0;
 	}, "vector_acknowledge");
 	m_cpu->xf_out_cb().set(FUNC(tms320c54x_test_state::xf_w));
-	TMS320C54X_MCBSP(config, m_idle_mcbsp, 13'000'000);
-	m_cpu->peripheral_clock_stop_cb().set(m_idle_mcbsp, FUNC(tms320c54x_mcbsp_device::internal_clock_stop_w));
-	m_idle_mcbsp->tx_word_cb().set([this](u16 value) {
-		expect(value == 0xa55a, "deep-idle McBSP preserves the queued word");
-		++m_idle_mcbsp_words;
-	});
-	m_idle_mcbsp->tx_irq_cb().set([this](int state) {
-		if (m_idle_mcbsp_external) m_cpu->set_input_line(5, state);
-	});
-	TMS320C54X_DMA(config, m_idle_dma, 13'000'000);
-	m_idle_dma->set_cpu(m_cpu);
-	m_idle_dma->set_input_clock(3'250'000);
-	m_cpu->pll_clock_stop_cb().set(m_idle_dma, FUNC(tms320c54x_dma_device::pll_clock_stop_w));
-	m_cpu->system_clock_cb().set([this](u32 hz) {
-		m_idle_dma->set_unscaled_clock(hz); m_idle_mcbsp->set_unscaled_clock(hz);
-	});
-	m_idle_dma->completion_cb().set([this](u8 channel) {
-		expect(channel == 0, "idle DMA fixture completes only its configured channel");
-		++m_idle_dma_completions;
-		// Fixture routing selects the documented DMAC0/BRINT2 vector slot.
-		m_cpu->set_input_line(6, ASSERT_LINE);
-		m_cpu->set_input_line(6, CLEAR_LINE);
-	});
 	m_cpu->set_addrmap(AS_PROGRAM, &tms320c54x_test_state::program_map);
 	// The low-page copy must see RAM at 0060, not the legacy IRQ probe.
 	else if (!strncmp(config.options().bios(), "mvdd-source", 11) || !strcmp(config.options().bios(), "stm-ind") || !strcmp(config.options().bios(), "stm-ind-edge") || !strcmp(config.options().bios(), "stm-low-ram") || !strcmp(config.options().bios(), "bitt-ctrl")) m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::plain_data_map);

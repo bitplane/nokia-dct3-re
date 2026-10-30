@@ -3,13 +3,13 @@
 #include "emu.h"
 #include "tms320c54x_test_register_sequence.h"
 #include "c54x_section_selected.h"
-#ifdef C54X_SECTION_IDLE_DMA
+#if defined(C54X_SECTION_IDLE_DMA) || defined(C54X_SECTION_CLOCK_RATES)
 #include "tms320c54x_dma.h"
 #endif
 #if defined(C54X_SECTION_BSP_WORD_SOURCE) || defined(C54X_SECTION_BSP_INTERRUPT)
 #include "tms320c54x_bsp_state.h"
 #endif
-#if defined(C54X_SECTION_MCBSP_CONTROL) || defined(C54X_SECTION_DEEP_IDLE_CLOCKS)
+#if defined(C54X_SECTION_MCBSP_CONTROL) || defined(C54X_SECTION_DEEP_IDLE_CLOCKS) || defined(C54X_SECTION_CLOCK_RATES)
 #include "tms320c54x_mcbsp.h"
 #endif
 
@@ -19,18 +19,21 @@ class section_state : public driver_device
 public:
 	section_state(machine_config const &c, device_type t, char const *tag)
 		: driver_device(c, t, tag), m_cpu(*this, "cpu")
-#ifdef C54X_SECTION_IDLE_DMA
+#if defined(C54X_SECTION_IDLE_DMA) || defined(C54X_SECTION_CLOCK_RATES)
 		, m_dma(*this,"dma")
 #endif
-#if defined(C54X_SECTION_MCBSP_CONTROL) || defined(C54X_SECTION_DEEP_IDLE_CLOCKS)
+#if defined(C54X_SECTION_MCBSP_CONTROL) || defined(C54X_SECTION_DEEP_IDLE_CLOCKS) || defined(C54X_SECTION_CLOCK_RATES)
 		, m_mcbsp(*this, "mcbsp")
 #endif
 	{ }
 	void test(machine_config &c)
 	{
 		TMS320C54X(c, m_cpu, 13'000'000);
-#ifdef C54X_SECTION_PLL_TRANSITIONS
+#if defined(C54X_SECTION_PLL_TRANSITIONS) || defined(C54X_SECTION_CLOCK_RATES)
 		m_cpu->set_pll_reference_clock(13'000'000);
+#endif
+#ifdef C54X_SECTION_CLOCK_RATES
+		m_cpu->set_follow_clkmd(true); m_cpu->set_reset_clkmd(0);
 #endif
 		m_cpu->set_extended_program(true);
 #ifdef C54X_SECTION_COUNT_RETIREMENTS
@@ -67,7 +70,7 @@ public:
 		m_cpu->set_addrmap(AS_PROGRAM, &section_state::program);
 		m_cpu->set_addrmap(AS_DATA, &section_state::data);
 		m_cpu->set_addrmap(AS_IO, &section_state::data);
-#ifdef C54X_SECTION_IDLE_DMA
+#if defined(C54X_SECTION_IDLE_DMA) || defined(C54X_SECTION_CLOCK_RATES)
 		TMS320C54X_DMA(c,m_dma,13'000'000);
 		m_dma->set_cpu(m_cpu);
 		m_cpu->pll_clock_stop_cb().set(m_dma,FUNC(tms320c54x_dma_device::pll_clock_stop_w));
@@ -75,6 +78,14 @@ public:
 		m_dma->completion_cb().set([this](u8 channel) {
 			if (channel || ++m_dma_completions!=1) throw emu_fatalerror("DMA completed the wrong channel/count");
 			m_cpu->set_input_line(6,ASSERT_LINE); m_cpu->set_input_line(6,CLEAR_LINE);
+		});
+#endif
+#ifdef C54X_SECTION_CLOCK_RATES
+		TMS320C54X_MCBSP(c,m_mcbsp,13'000'000);
+		m_cpu->system_clock_cb().set([this](u32 hz) { m_dma->set_unscaled_clock(hz); m_mcbsp->set_unscaled_clock(hz); });
+		m_cpu->peripheral_clock_stop_cb().set(m_mcbsp,FUNC(tms320c54x_mcbsp_device::internal_clock_stop_w));
+		m_mcbsp->tx_word_cb().set([this](u16 value) {
+			if (value!=0xa55a || ++m_rate_words!=1) throw emu_fatalerror("Retimed McBSP word/count mismatch");
 		});
 #endif
 #ifdef C54X_SECTION_MCBSP_CONTROL
@@ -104,8 +115,11 @@ protected:
 #ifdef C54X_SECTION_STAGED_IDLE
 		save_item(NAME(m_staged_idle_tim));
 #endif
-#ifdef C54X_SECTION_IDLE_DMA
+#if defined(C54X_SECTION_IDLE_DMA) || defined(C54X_SECTION_CLOCK_RATES)
 		save_item(NAME(m_dma_completions)); save_item(NAME(m_dma_start));
+#endif
+#ifdef C54X_SECTION_CLOCK_RATES
+		save_item(NAME(m_rate_words));
 #endif
 #ifdef C54X_SECTION_DEEP_IDLE_CLOCKS
 		save_item(NAME(m_serial_words)); save_item(NAME(m_frozen_tim)); save_item(NAME(m_frozen_tcr));
@@ -150,6 +164,9 @@ protected:
 		m_cases = c54x_test::section_cases();
 		m_fixture = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 			m_cases.size(), [this](unsigned i) {
+#ifdef C54X_SECTION_CLOCK_RATES
+				m_dma->reset(); m_dma_completions=0; m_mcbsp->reset(); m_rate_words=0;
+#endif
 #ifdef C54X_SECTION_IDLE_DMA
 				m_dma->reset(); m_dma_completions=0;
 				m_dma->set_input_clock(i>=6 ? 0 : 3'250'000);
@@ -237,6 +254,69 @@ protected:
 	}
 	void machine_reset() override { m_fixture->start(); }
 private:
+#ifdef C54X_SECTION_CLOCK_RATES
+	void require_rates(u32 hz) {
+		if (m_cpu->clock()!=hz || m_dma->clock()!=hz || m_mcbsp->clock()!=hz)
+			throw emu_fatalerror("Selected clock must reach CPU, DMA and McBSP together");
+	}
+	void start_rate_dma(bool input_clock) {
+		m_dma->reset(); m_dma_completions=0;
+		m_dma->set_input_clock(3'250'000);
+		if (input_clock) m_dma->pll_clock_stop_w(1);
+		m_dma->write(1,0);
+		for (u16 value : {0x520,0x530,3,0,0x4145}) m_dma->write(2,value);
+		{
+			auto const disable=machine().disable_side_effects();
+			for (unsigned word=0;word<4;++word) m_cpu->space(AS_DATA).write_word(0x530+word,0);
+		}
+		m_dma->write(0,1);
+	}
+	void check_clock_rates() {
+		unsigned const now=m_fixture->tick_count();
+		auto const disable=machine().disable_side_effects();
+		auto &data=m_cpu->space(AS_DATA);
+		if (now==65396) {
+			require_rates(6'500'000); start_rate_dma(false);
+			for (auto const &[reg,value] : std::array<std::pair<u16,u16>,5>{{{4,0x40},{6,12},{7,0x2000},{14,0x200},{1,0x41}}}) {
+				m_mcbsp->control_w(0,reg); m_mcbsp->control_w(1,value);
+			}
+			m_mcbsp->data_w(3,0xa55a);
+		}
+		if (now==65400) {
+			require_rates(130'000'000);
+			if (m_dma_completions || data.read_word(0x530)) throw emu_fatalerror("Clock switch completed DMA too early");
+		}
+		if (now==66432) {
+			require_rates(130'000'000);
+			u16 const tim=data.read_word(0x24);
+			if (m_dma_completions!=1 || data.read_word(0x533)!=0x4444 || m_rate_words!=1 || tim<=7300 || tim>=7500)
+				throw emu_fatalerror("Timer/DMA/McBSP must continue at the newly selected rate");
+			std::stringstream saved;
+			if (c54x_test::capture_snapshot(machine(),saved)!=STATERR_NONE) throw emu_fatalerror("Save selected clock rates");
+			m_cpu->set_unscaled_clock(13'000'000); require_rates(13'000'000);
+			if (c54x_test::restore_snapshot(machine(),saved)!=STATERR_NONE || data.read_word(0x24)!=tim)
+				throw emu_fatalerror("Restore selected rates without restarting the timer");
+			require_rates(130'000'000);
+		}
+		if (now==66500) {
+			m_cpu->set_state_int(tms320c54x_device::STATE_TCR,0x10);
+			m_cpu->set_follow_clkmd(false); m_cpu->set_unscaled_clock(13'000'000);
+			m_mcbsp->reset(); start_rate_dma(true); m_cpu->set_unscaled_clock(130'000'000);
+		}
+		if (now==67460) {
+			if (m_dma_completions || data.read_word(0x532)!=0x3333 || data.read_word(0x533))
+				throw emu_fatalerror("Input-clock DMA must remain pending one CLKIN tick before completion");
+			m_cpu->set_unscaled_clock(13'000'000);
+		}
+		if (now==67525 && (m_dma_completions!=1 || data.read_word(0x533)!=0x4444))
+			throw emu_fatalerror("System rate changes must not retime input-clock DMA");
+		if (now==67600) {
+			m_dma->reset(); m_cpu->set_follow_clkmd(true); m_cpu->reset();
+			require_rates(6'500'000);
+			if (data.read_word(0x58)) throw emu_fatalerror("Explicit reset CLKMD must restore DIV");
+		}
+	}
+#endif
 #ifdef C54X_SECTION_COUNT_RETIREMENTS
 	void check_retirements(unsigned index) {
 		if (m_retired_count!=m_cases.at(index).retired_instruction->count)
@@ -298,6 +378,9 @@ private:
 #endif
 	TIMER_CALLBACK_MEMBER(tick)
 	{
+#ifdef C54X_SECTION_CLOCK_RATES
+		check_clock_rates();
+#endif
 #ifdef C54X_SECTION_STAGED_IDLE
 		unsigned const idle_now=m_fixture->tick_count();
 		if (idle_now>=6 && idle_now<20 && m_cpu->pipeline_cycles()!=6)
@@ -406,13 +489,16 @@ private:
 #ifdef C54X_SECTION_STAGED_IDLE
 	u16 m_staged_idle_tim=0;
 #endif
-#ifdef C54X_SECTION_IDLE_DMA
+#if defined(C54X_SECTION_IDLE_DMA) || defined(C54X_SECTION_CLOCK_RATES)
 	required_device<tms320c54x_dma_device> m_dma;
 	u32 m_dma_completions=0;
 	attotime m_dma_start=attotime::zero;
 #endif
-#if defined(C54X_SECTION_MCBSP_CONTROL) || defined(C54X_SECTION_DEEP_IDLE_CLOCKS)
+#if defined(C54X_SECTION_MCBSP_CONTROL) || defined(C54X_SECTION_DEEP_IDLE_CLOCKS) || defined(C54X_SECTION_CLOCK_RATES)
 	required_device<tms320c54x_mcbsp_device> m_mcbsp;
+#endif
+#ifdef C54X_SECTION_CLOCK_RATES
+	u32 m_rate_words=0;
 #endif
 #ifdef C54X_SECTION_DEEP_IDLE_CLOCKS
 	u32 m_serial_words=0;

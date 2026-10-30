@@ -6,46 +6,6 @@
 
 namespace c54x_test {
 
-void tms320c54x_test_state::start_rate_dma(bool input_clock)
-{
-	m_idle_dma->reset(); m_idle_dma_completions = 0;
-	if (input_clock)
-	{
-		m_idle_dma->set_input_clock(3'250'000);
-		m_idle_dma->pll_clock_stop_w(1);
-	}
-	u16 const registers[] = {0x0520, 0x0530, 3, 0, 0x4145};
-	m_idle_dma->write(1, 0);
-	for (u16 value : registers) m_idle_dma->write(2, value);
-	auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 4; ++i)
-	{
-		data.write_word(0x0520 + i, 0x1111 * (i + 1));
-		data.write_word(0x0530 + i, 0);
-	}
-	m_idle_dma->write(0, 1);
-}
-
-void tms320c54x_test_state::start_clkmd_rate_case()
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_cpu->set_pll_reference_clock(11'995'200);
-	m_cpu->set_follow_clkmd(true);
-	auto &data = m_cpu->space(AS_DATA);
-	data.write_word(0x58, 0x6004);
-	expect(m_cpu->clock() == 5'997'600 && m_idle_dma->clock() == 5'997'600 &&
-		m_idle_mcbsp->clock() == 5'997'600, "DIV/2 rate propagates from core to system-clocked peripherals");
-	m_idle_dma->reset(); m_idle_dma_completions = 0;
-	m_idle_mcbsp->reset(); m_idle_mcbsp_words = 0;
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_TIM, 9'999}, {cpu_regs::STATE_PRD, 9'999},
-		{cpu_regs::STATE_TCR, 0},
-	});
-	data.write_word(0x58, 0x97fb);
-	m_phase = 79600;
-	m_check_timer->adjust(attotime::from_ticks(81'727, 239'904'000) - attotime::from_ticks(1, 11'995'200));
-}
-
 void tms320c54x_test_state::start_idle3_pll_relock_case()
 {
 	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
@@ -243,86 +203,6 @@ void tms320c54x_test_state::test_port_w(u16 value)
 		m_last_port_value = value;
 	}
 }
-
-bool tms320c54x_test_state::check_clock_control_results()
-{
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase >= 79600 && m_phase <= 79604)
-	{
-		if (m_phase == 79600)
-		{
-			expect(m_cpu->clock() == 5'997'600, "core remains DIV/2 until PLLSTATUS changes");
-			start_rate_dma();
-			for (auto const &[reg, value] : std::array<std::pair<u16, u16>, 5>{{
-				{4, 0x0040}, {6, 12}, {7, 0x2000}, {14, 0x0200}, {1, 0x0041}}})
-			{
-				m_idle_mcbsp->control_w(0, reg); m_idle_mcbsp->control_w(1, value);
-			}
-			m_idle_mcbsp->data_w(3, 0xa55a);
-			m_phase = 79601;
-			m_check_timer->adjust(attotime::from_ticks(1, 11'995'200) + attotime::from_nsec(1)); return true;
-		}
-		if (m_phase == 79601)
-		{
-			expect(m_cpu->clock() == 119'952'000 && m_idle_dma->clock() == 119'952'000 &&
-				m_idle_mcbsp->clock() == 119'952'000, "PLL x10 is published only after the input-clock transition");
-			expect(!m_idle_dma_completions && !data.read_word(0x0530), "clock change does not complete pending DMA early");
-			m_phase = 79602; m_check_timer->adjust(attotime::from_usec(5)); return true;
-		}
-		if (m_phase == 79602)
-		{
-			expect(m_idle_dma_completions == 1 && data.read_word(0x0533) == 0x4444,
-				"pending DMA follows selected system clock instead of its former DIV rate");
-			expect(m_idle_mcbsp_words == 1, "internal McBSP word follows retimed system-clock generator");
-			u16 const tim = data.read_word(0x24);
-			expect(tim > 7'300 && tim < 7'500, "core timer retains count and advances at selected PLL rate");
-			expect(capture_snapshot(machine(), m_clock_rates_saved) == STATERR_NONE, "save selected CPU and peripheral rates");
-			m_cpu->set_unscaled_clock(13'000'000);
-			expect(m_idle_dma->clock() == 13'000'000 && m_idle_mcbsp->clock() == 13'000'000,
-				"core runtime clock publication reaches both consumers");
-			expect(restore_snapshot(machine(), m_clock_rates_saved) == STATERR_NONE &&
-				m_cpu->clock() == 119'952'000 && m_idle_dma->clock() == 119'952'000 &&
-				m_idle_mcbsp->clock() == 119'952'000 && data.read_word(0x24) == tim,
-				"restore selected rates without restarting core timer");
-			m_cpu->set_follow_clkmd(false); m_cpu->set_pll_reference_clock(0);
-			m_cpu->set_unscaled_clock(13'000'000);
-			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-			m_idle_mcbsp->reset();
-			start_rate_dma(true);
-			// System-rate changes must not retime DMA already on CLKIN.
-			m_cpu->set_unscaled_clock(119'952'000);
-			m_phase = 79603;
-			m_check_timer->adjust(attotime::from_ticks(15, 3'250'000)); return true;
-		}
-		if (m_phase == 79603)
-		{
-			expect(!m_idle_dma_completions && data.read_word(0x0532) == 0x3333 && !data.read_word(0x0533),
-				"input-clock DMA is still pending one CLKIN tick before four-word completion");
-			m_cpu->set_unscaled_clock(13'000'000);
-			m_phase = 79604;
-			m_check_timer->adjust(attotime::from_ticks(1, 3'250'000) + attotime::from_nsec(1)); return true;
-		}
-		if (m_phase == 79604)
-		{
-			expect(m_idle_dma_completions == 1 && data.read_word(0x0533) == 0x4444,
-				"input-clock DMA completes on CLKIN despite both system-rate changes");
-			m_idle_dma->reset();
-			m_cpu->set_pll_reference_clock(11'995'200); m_cpu->set_follow_clkmd(true);
-			m_cpu->set_reset_clkmd(0);
-			m_cpu->reset();
-			expect(data.read_word(0x58) == 0 && m_cpu->clock() == 5'997'600 &&
-				m_idle_dma->clock() == 5'997'600 && m_idle_mcbsp->clock() == 5'997'600,
-				"explicit compatibility reset restores CLKMD and divider-derived CPU/peripheral rates");
-			m_cpu->set_reset_clkmd(0, false);
-			osd_printf_info("TMS320C54x CLKMD rates: PASS div_hz=5997600 pll_hz=119952000 timer=1 dma=1 input_clock_dma=1 internal_mcbsp=1 save_restore=1 reset_profile=1 physical_rate_claim=0\n");
-			start_idle3_pll_relock_case(); return true;
-		}
-	}
-	return false;
-}
-
-
 
 bool tms320c54x_test_state::check_external_io_results()
 {

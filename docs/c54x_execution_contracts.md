@@ -223,6 +223,18 @@ requires a new lock. A pending-lock checkpoint replays the complete sequence
 over later source/multiplier changes. Sixteenth-clock observations resolve
 the rational switch edge without asserting a CPU or peripheral clock-rate model.
 
+`clock_rates` separately enables CLKMD rate following. An explicit 13MHz
+reference selects 6.5MHz DIV and 130MHz x10 PLL rates; CPU, real DMA and real
+McBSP must receive the same publication. A pending block and queued serial
+word cross the switch without early completion; the timer retains its count
+while advancing at the selected rate. A selected-rate snapshot is restored
+after an explicit rate perturbation, preserving timer count and both consumers.
+DMA running on 3.25MHz CLKIN must not retime across two system-rate changes:
+three words exist one input tick before completion and four immediately after.
+An explicit reset restores DIV/CLKMD0. A fixed fixture observation clock keeps
+the timeline independent of CPU rate changes. The outer pending-lock checkpoint
+replays the complete composition; these configured rates are not board evidence.
+
 The independent `status_bitfield` section owns ST0/ST1 BITF sampling: 128
 register/pattern/mask/initial-TC/addressing combinations, with pages and three
 checkpoint positions distributed rather than multiplied into 768 executions.

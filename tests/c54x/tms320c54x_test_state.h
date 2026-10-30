@@ -8,8 +8,6 @@
 #include "cpu/tms320c54x/tms320c54x.h"
 #include "gsm_tch_f_l1.h"
 #include "util/gsmfr.h"
-#include "tms320c54x_mcbsp.h"
-#include "tms320c54x_dma.h"
 #include "tms320c54x_bsp_state.h"
 #include "tms320c54x_test_selection.h"
 #include "tms320c54x_test_support.h"
@@ -28,9 +26,7 @@ public:
 	tms320c54x_test_state(const machine_config &mconfig, device_type type,
 			const char *tag) :
 		driver_device(mconfig, type, tag),
-		m_cpu(*this, "maincpu"),
-		m_idle_mcbsp(*this, "idle_mcbsp"),
-		m_idle_dma(*this, "idle_dma")
+		m_cpu(*this, "maincpu")
 	{
 	}
 
@@ -200,8 +196,6 @@ private:
 	void start_block_xc(unsigned variant = 0);
 	void start_move_repeat_owner(unsigned variant = 0);
 	void start_long_mapped_original(unsigned variant = 0);
-	void start_rate_dma(bool input_clock = false);
-	void start_clkmd_rate_case();
 	void start_idle3_pll_relock_case();
 	void check_mmr_bus();
 
@@ -714,7 +708,6 @@ private:
 		m_check_timer->enable(true);
 		return true;
 	}
-	bool check_clock_control_results();
 	bool check_idle_pll_results();
 	bool check_repeat_endpoints_results();
 	bool check_instruction_observer_results();
@@ -828,11 +821,6 @@ private:
 	unsigned m_repeat_reads = 0;
 	u16 m_stack_mmr[2] = {};
 	unsigned m_irq_trigger_read = 1;
-	optional_device<tms320c54x_mcbsp_device> m_idle_mcbsp;
-	unsigned m_idle_mcbsp_words = 0;
-	bool m_idle_mcbsp_external = false;
-	optional_device<tms320c54x_dma_device> m_idle_dma;
-	unsigned m_idle_dma_completions = 0;
 	u64 m_first_operand_cycle = 0;
 	u64 m_last_operand_cycle = 0;
 	u64 m_first_port_cycle = 0;
@@ -847,7 +835,6 @@ private:
 	popd_fixture m_popd_fixture = {};
 	u32 m_popd_write_mask = 0;
 	// Separate checkpoint lifetimes; host observations still rewind explicitly.
-	std::stringstream m_clock_rates_saved;
 };
 
 } // namespace c54x_test

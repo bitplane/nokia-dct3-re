@@ -414,6 +414,7 @@ def main():
     counts['idle_dma'] = 10
     counts['staged_idle'] = 28
     counts['pll_transitions'] = 1
+    counts['clock_rates'] = 1
     counts['shifted_unowned'] = 20480
     counts['shifted_bsp'] = 5120
     counts['accumulator_call_frames'] = 216
@@ -436,10 +437,10 @@ def main():
     copy_changed(sections / 'runner.cpp', overlay / 'tms320c54x_test_isa.cpp')
     copy_changed(sections / 'common.h', overlay / 'c54x_section_common.h')
     copy_changed(ROOT / 'driver/tms320c54x_bsp_state.h', overlay / 'tms320c54x_bsp_state.h')
-    if args.section in ('mcbsp_control', 'deep_idle_clocks'):
+    if args.section in ('mcbsp_control', 'deep_idle_clocks', 'clock_rates'):
         for name in ('tms320c54x_mcbsp.h', 'tms320c54x_mcbsp.cpp'):
             copy_changed(ROOT / 'driver' / name, overlay / name)
-    if args.section == 'idle_dma':
+    if args.section in ('idle_dma', 'clock_rates'):
         for name in ('tms320c54x_dma.h', 'tms320c54x_dma.cpp'):
             copy_changed(ROOT / 'driver' / name, overlay / name)
     selected_source = ROOT / ('tests/firmware/c54x_' + args.section + '.h') if args.section in ('descriptor_copy', 'byte_swap', 'block_swap', 'signed_branch', 'store_compare', 'conditional_store', 'stack_alignment', 'store_move_compare', 'xc_context', 'logic_composition', 'nibble_composition') else sections / (args.section + '.h')
@@ -453,9 +454,9 @@ def main():
             'cases.front().states.back().observation.expected.push_back({r::STATE_ILLEGAL,1}); return cases;'))
     start = time.monotonic()
     sources = 'src/mame/nokia/tms320c54x_test_isa.cpp'
-    if args.section in ('mcbsp_control', 'deep_idle_clocks'):
+    if args.section in ('mcbsp_control', 'deep_idle_clocks', 'clock_rates'):
         sources += ',src/mame/nokia/tms320c54x_mcbsp.cpp'
-    if args.section == 'idle_dma':
+    if args.section in ('idle_dma', 'clock_rates'):
         sources += ',src/mame/nokia/tms320c54x_dma.cpp'
     with (output / 'build.log').open('w') as log:
         build = subprocess.run(['make', '-C', str(ROOT / 'mame'), 'REGENIE=1', 'SUBTARGET=c54xisa',
