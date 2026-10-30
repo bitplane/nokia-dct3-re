@@ -69,9 +69,11 @@ int main() {
         clock = runner[runner.index('\tbool step()'):runner.index('\t\tapply_actions(true);')]
         clock = clock.replace('bool step()', 'bool step_clock()') + '\t\treturn true;\n\t}\n'
         observation = runner[runner.index('\t\t{\n\t\t\tauto const disable = m_machine.disable_side_effects();'):runner.index('\n\t\t// A clock')]
+        finish_clock = runner[runner.index('\t\t\tif (m_input.final_pipeline_clock)'):runner.index('\t\t\tif (m_input.require_idle)')]
         source = r'''
 #include <cassert>
 #include <stdexcept>
+#include <optional>
 #include <vector>
 #include "tests/c54x/tms320c54x_test_support.h"
 using c54x_test::register_setting;
@@ -89,7 +91,7 @@ struct bench {
     bench &m_machine = *this;
     struct suppression { bool &flag; ~suppression() { flag = false; } };
     suppression disable_side_effects() { assert(!disabled); disabled = true; return {disabled}; }
-    struct input { std::vector<clocked_register_action> actions; bool check_pipeline_clock = false; } m_input{
+    struct input { std::vector<clocked_register_action> actions; bool check_pipeline_clock = false; std::optional<unsigned> final_pipeline_clock{}; } m_input{
         {{5, {{0, 10}, {0, 11}}, true, {{0x20, 99}}}, {5, {{0, 12}}, false, {{0x21, 98}}}, {6, {{0, 13}}, true}}};
     struct cpu {
         bool &disabled;
@@ -109,11 +111,19 @@ struct bench {
         int value = 0; auto const *expected = &value;
 ''' + observation + r'''
     }
+    void check_final_clock() {
+''' + finish_clock + r'''
+    }
 ''' + method + clock + r'''
 };
 int main() {
     bench b;
     b.observe(); assert(!b.disabled && b.m_cpu.observations == 1);
+    b.check_final_clock();
+    b.m_input.final_pipeline_clock = 2; b.m_cpu.cycles = 2; b.check_final_clock();
+    b.m_cpu.cycles = 3; bool wrong_stop = false;
+    try { b.check_final_clock(); } catch (std::runtime_error const &) { wrong_stop = true; }
+    assert(wrong_stop); b.m_input.final_pipeline_clock.reset(); b.check_final_clock();
     b.apply_actions(true); assert((b.m_cpu.writes == std::vector<unsigned>{10, 11}));
     b.apply_actions(false); assert((b.m_cpu.writes == std::vector<unsigned>{10, 11, 12}));
     assert(!b.disabled && (b.m_cpu.memory == std::vector<unsigned>{0x20, 99, 0x21, 98}));

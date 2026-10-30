@@ -124,7 +124,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"move-rpt-owner"}, [](self &test) { test.start_move_repeat_owner(); } },
 		{ {"block-xc-irq", "block-xc-end-irq"}, [](self &test) { test.start_block_xc_irq(); } },
 		{ {"block-xc"}, [](self &test) { test.start_block_xc(); } },
-		{ {"block-xc-edge"}, [](self &test) { test.start_block_xc_edge(); } },
 		{ {"stm-brc"}, [](self &test) { test.start_mvmd_status_block(); } },
 		{ {"pop-brc"}, [](self &test) { test.start_mvmd_status_block(); } },
 		{ {"preinc-store"}, [](self &test) { test.start_preincrement_store(); } },
@@ -143,7 +142,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"delay-copy"}, [](self &test) { test.start_delay_copy(); } },
 		{ {"delay-copy-ctrl"}, [](self &test) { test.start_delay_copy(); } },
 		{ {"move-t"}, [](self &test) { test.start_t_register_move(); } },
-		{ {"st-delay-edge"}, [](self &test) { test.start_delay_store_edge(); } },
 		{ {"store-delay"}, [](self &test) { test.start_delay_store(); } },
 		{ {"mvkd-sp"}, [](self &test) { test.start_mvkd_sp(); } },
 		{ {"add-bk", "add-absolute", "add-sp"}, [](self &test) { test.start_pipeline_absolute_add(); } },
@@ -236,7 +234,6 @@ void tms320c54x_test_state::machine_reset()
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"mvdk-mapped", "mvdk-acc", "clock-mvdk"}, [](self &test) { test.start_mvdk_mapped(); } },
 		{ {"mvdk-producer", "mvdk-acc-prod"}, [](self &test) { test.start_mvdk_producer(); } },
-		{ {"rptbd-edge"}, [](self &test) { test.start_rptbd_edge(); } },
 		{ {"mvdd-periph"}, [](self &test) { test.start_mvdd_peripheral(); } },
 		{ {"mvdd-source", "mvdd-source-rpt"}, [](self &test) { test.start_mvdd_source(); } },
 		{ {"mvmd-t", "mvmd-bk"}, [](self &test) { test.start_mvmd_word_register(); } },
@@ -716,7 +713,7 @@ void tms320c54x_test_state::expect(bool condition, const char *message)
 		case 255480: case 255490: progress(m_repeat_context); break;
 		case 255820: case 255830: progress(m_fcala_delay); break;
 		case 292000: case 292010: progress(m_instruction_observer); break;
-		case 255320: case 255330: case 255331: case 255340: case 255350:
+		case 255320: case 255330: case 255331:
 			progress(m_rptbd); break;
 		case 251000: case 251010: case 251020: case 251030:
 			case_index = unsigned(m_frontend.memory) + unsigned(m_frontend.memory_b);

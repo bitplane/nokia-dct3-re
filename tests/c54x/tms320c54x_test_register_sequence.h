@@ -48,6 +48,7 @@ public:
 		}
 		if (m_tick == m_input.finish)
 		{
+			if (m_input.final_pipeline_clock) require(m_cpu.pipeline_cycles() == *m_input.final_pipeline_clock, "final pipeline clock matches the declared stop");
 			if (m_input.require_idle) require(m_cpu.state_int(tms320c54x_device::STATE_IDLE), "sequence reaches its real IDLE instruction");
 			if (m_input.single_fetch) require(m_fetches == 1, "one opcode fetch");
 			if (m_input.data_events) require(m_data_cursor == m_input.data_events->size(), "complete data-bus trace");

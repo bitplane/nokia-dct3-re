@@ -65,7 +65,7 @@ protected:
 		if (disassembly()) return;
 		if (m_composition_limit != c54x_test::composition_limit::none)
 			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
-				24, [this](unsigned raw) { return c54x_test::composition_limit_case<tms320c54x_device>(raw, m_composition_limit); });
+				c54x_test::composition_limit_count(m_composition_limit), [this](unsigned raw) { return c54x_test::composition_limit_case<tms320c54x_device>(raw, m_composition_limit); });
 		else if (m_stack_sequences)
 			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 				774, c54x_test::stack_sequence<tms320c54x_device>);
@@ -152,13 +152,9 @@ private:
 		{
 			osd_printf_info("C54x composition rejection coverage: PASS cases=%u restore=%u coverage_fnv64=%016llx\n",
 				m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
-			if (m_composition_limit == c54x_test::composition_limit::interrupt_pop)
-			{
-				osd_printf_info("TMS320C54x interrupt POPM exclusions: PASS cases=24 restore=24 destinations=IMR,IFR contexts=RPT,BD_first,BD_last pages=2 snapshots=2 reads=0 writes=0 stack_changes=0 mask_changes=0 acknowledgements=0 hardware_trap_claim=0\n");
-				throw emu_fatalerror(3, "TMS320C54x isolated interrupt POPM exclusions complete");
-			}
-			osd_printf_info("TMS320C54x CLKMD MVDK exclusions: PASS cases=24 restore=24 contexts=RPT,BD_delay source_forms=3 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 clock_changes=0 hardware_trap_claim=0\n");
-			throw emu_fatalerror(3, "TMS320C54x isolated CLKMD MVDK exclusions complete");
+			auto const contract = c54x_test::composition_limit_result(m_composition_limit);
+			osd_printf_info("%s\n", contract.summary);
+			throw emu_fatalerror(3, "%s", contract.completion);
 		}
 		if (m_stack_sequences)
 		{
@@ -443,6 +439,9 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(34, "stack-sp", "FRAME push and safely separated compiler SP consumers")
 	ROM_SYSTEM_BIOS(35, "pop-irq-edge", "Interrupt-register POPM composition admission limits")
 	ROM_SYSTEM_BIOS(36, "clock-mvdk-edge", "CLKMD move composition admission limits")
+	ROM_SYSTEM_BIOS(37, "st-delay-edge", "Rejected stores crossing the control-delay boundary")
+	ROM_SYSTEM_BIOS(38, "block-xc-edge", "Rejected XC spans crossing the block endpoint")
+	ROM_SYSTEM_BIOS(39, "rptbd-edge", "Rejected delayed-block control and spill forms")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
 ROM_END
 

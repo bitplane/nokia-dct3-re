@@ -789,7 +789,6 @@ private:
 	rptbd_square_fixture rptbd_square_case(unsigned v) const;
 	void start_rptbd_square(unsigned variant = 0);
 	void start_rptbd(unsigned variant = 0);
-	void start_rptbd_edge(unsigned variant = 0);
 	void start_pipeline_rptb_edge(unsigned variant = 0);
 	struct memory_immediate_fixture
 	{
@@ -908,7 +907,6 @@ private:
 	};
 	static delay_store_fixture delay_store_case(unsigned variant);
 	void start_delay_store(unsigned variant = 0);
-	void start_delay_store_edge(unsigned variant = 0);
 	void start_stlm_bk(unsigned variant = 0);
 	static u16 store_bypass_value(unsigned variant);
 	static u16 xmem_store_bypass_value(unsigned variant);
@@ -932,7 +930,6 @@ private:
 	};
 	static block_xc_fixture block_xc_case(unsigned v);
 	void start_block_xc(unsigned variant = 0);
-	void start_block_xc_edge(unsigned variant = 0);
 	struct move_brc_fixture
 	{
 		unsigned form, count, gap, snapshot, read_tick;
@@ -2170,7 +2167,7 @@ private:
 	bool check_block_branch_count_results();
 	bool check_bd_long_accumulator_results();
 	bool check_t_move_results();
-	bool check_block_xc_edge_results();
+	bool check_block_xc_results();
 	bool check_block_xc_irq_results();
 	bool check_move_repeat_owner_results();
 	bool check_move_brc_results();

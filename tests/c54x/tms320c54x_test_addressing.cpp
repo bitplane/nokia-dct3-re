@@ -2700,15 +2700,6 @@ void tms320c54x_test_state::start_delay_store(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_delay_store_edge(unsigned variant)
-{
-	unsigned const fixture = (variant % 4) * 20 + ((variant / 4) % 2) * 480;
-	start_delay_store(fixture); m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	auto const f = delay_store_case(fixture); auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(f.base + 0x602, 0xf495); program.write_word(f.base + 0x603, 0x8000 | f.mode); program.write_word(f.base + 0x604, f.literal);
-	m_pipeline_fetch_tap.remove(); m_pipeline_peripheral_case = variant; m_phase = 254500;
-	m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_stlm_bk(unsigned variant)
 {
@@ -9884,22 +9875,6 @@ bool tms320c54x_test_state::check_t_move_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 254530) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254520; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 254500)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = variant < 8 ? 3 : 5;
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save before a store straddles the control-delay boundary"); }
-		if (tick == 16)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && !m_pipeline_operand_reads && !m_pipeline_store_writes && !m_pipeline_register_writes, "A two-word store cannot start in the final one-word delay slot");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(254510, "Restore the rejected delay without a memory write or atomic fallback"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 15) { start_delay_store_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x delay store boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated delay store boundary complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254510) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254500; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 254480)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = delay_store_case(variant);

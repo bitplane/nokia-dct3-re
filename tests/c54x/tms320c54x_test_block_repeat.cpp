@@ -64,22 +64,6 @@ void tms320c54x_test_state::start_rptbd(unsigned variant)
 	m_phase = 255320; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_rptbd_edge(unsigned variant)
-{
-	start_rptbd(2 + ((variant / 7) % 2) * 64);
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_rptbd.variant = variant;
-	m_rptbd.read_tap.remove(); m_rptbd.write_tap.remove(); m_rptbd.fetch_tap.remove();
-	unsigned const kind = variant % 7; u32 const base = (variant / 7) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	program.write_word(base + 0x601, kind == 5 ? 0x605 : 0x606);
-	program.write_word(base + 0x602, std::array<u16, 7>{0x771a, 0x881a, 0x8a1a, 0xf073, 0xf495, 0xf495, 0xf272}[kind]);
-	program.write_word(base + 0x603, kind == 4 ? 0x10e1 : kind == 0 ? 1 : kind == 3 || kind == 6 ? 0x604 : 0xf495);
-	program.write_word(base + 0x604, kind == 5 ? 0xf272 : kind == 4 ? 3 : 0xf495);
-	program.write_word(base + 0x605, kind == 5 ? 0x606 : 0xf495);
-	m_rptbd.read_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "rptbd_edge_no_reads", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd.observed.reads; });
-	m_rptbd.write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "rptbd_edge_no_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_rptbd.observed.writes; });
-	m_phase = 255340; m_cpu->resume(SUSPEND_REASON_DISABLE);
-}
 
 bool tms320c54x_test_state::check_rptbd_layout_results()
 {
@@ -138,35 +122,6 @@ bool tms320c54x_test_state::check_rptbd_layout_results()
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255320; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 255331) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255320; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 255340)
-	{
-		unsigned const variant = m_rptbd.variant, kind = variant % 7, tick = ++m_rptbd.tick;
-		unsigned const guard = kind == 5 ? 8 : kind == 4 ? 6 : 5, checkpoint = guard - 1 + variant / 14;
-		if (tick == checkpoint && !m_rptbd.replay)
-		{
-			m_rptbd.snapshot = m_rptbd.observed; expect(capture_snapshot(machine(), m_rptbd.saved) == STATERR_NONE, "Save RPTBD exclusion before or after the guard");
-		}
-		if (tick == 16)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->pipeline_cycles() == guard && !m_rptbd.observed.reads && !m_rptbd.observed.writes &&
-				m_cpu->state_int(tms320c54x_device::STATE_BRC) == 2 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x5000 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x6000 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5,
-				"RPTBD exclusions stop before bus effects, pointer updates, BRC writes or frame allocation");
-			if (!m_rptbd.replay)
-			{
-				m_rptbd.replay = true; m_rptbd.tick = checkpoint; m_rptbd.observed = m_rptbd.snapshot;
-				expect(restore_snapshot(machine(), *m_check_timer, m_rptbd.saved) == STATERR_NONE, "Restore RPTBD exclusion at its exact retained guard");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 255350; m_check_timer->enable(true); return true;
-			}
-			m_rptbd.read_tap.remove(); m_rptbd.write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 27) { start_rptbd_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x delayed block repeat exclusions: PASS cases=28 restore=28 forms=STM_BRC,STLM_BRC,POPM_BRC,branch,spill,nested_body,nested_delay pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_updates=0 counters_preserved=1 silicon_trap_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated delayed block repeat exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255350) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255340; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 

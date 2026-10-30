@@ -64,6 +64,7 @@ struct clocked_register_case
 	std::vector<memory_word> retained_program_reads{};
 	bool require_idle = true;
 	bool check_pipeline_clock = false;
+	std::optional<unsigned> final_pipeline_clock{};
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

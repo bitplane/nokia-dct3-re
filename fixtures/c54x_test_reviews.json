@@ -8,6 +8,24 @@
   },
   "families": [
     {
+      "id": "control-span-admission-boundaries",
+      "classification": "implementation_limit",
+      "decision": "rewrite",
+      "profiles": ["st-delay-edge", "block-xc-edge", "rptbd-edge"],
+      "case_ids": [],
+      "profile_coverage": {
+        "st-delay-edge": {"cases": 16, "fnv64": "2135120b48416d25", "result_prefix": "C54x composition rejection coverage: PASS", "key": "Original raw0..15: offset/preincrement/circular/absolute store, pages0/2, checkpoints3/5."},
+        "block-xc-edge": {"cases": 18, "fnv64": "8a0cb80a4da17254", "result_prefix": "C54x composition rejection coverage: PASS", "key": "Original raw0..17: three XC1/XC2 endpoint crossings, pages0/2, checkpoints3/7/9."},
+        "rptbd-edge": {"cases": 28, "fnv64": "cae02933666f8cc5", "result_prefix": "C54x composition rejection coverage: PASS", "key": "Original raw0..27: seven rejected delayed-block layouts, pages0/2, snapshots immediately before/at the original guard5/6/8."}
+      },
+      "basis": "Distinct declared staged-model limits: a two-word store cannot spill beyond the admitted two-word control delay; an XC protected span cannot cross the admitted block endpoint; RPTBD rejects BRC writes, unsupported branches, spilled delay instructions and nested headers before effects. These are fail-closed implementation policies, not proof of architectural illegality. No expected value comes from a CPU implementation helper.",
+      "changes": ["all62 cases/restores and original raw identities, meaningful program words, page choices, snapshots and result predicates remain", "share typed CPU-only case data, snapshot scheduling and bus-effect prohibition with the two special-register rejection banks; remove three borrowed positive setups and six global phase continuations", "retain the RPTBD frozen pipeline-cycle predicate exactly via an optional generic final-clock expectation; executable host checks cover absent, matching and mismatching expectations", "clear invalid standard-mode ARP5 sentinels a608->0608 while preserving low status bits; no CMPT coverage was previously claimed", "remove unobserved RAM setup inherited from positive fixtures where every CPU data access is forbidden; existing preservation checks now also apply between setup and the final observation", "move profile ownership to tms54isa; shared metadata retains the original terminal summaries while actual counts/restores/digests become required acceptance lines"],
+      "limits": ["no test case retired and no physical pipeline or silicon trap claim added", "POPD edges remain separate: that mixed profile includes16 successful DAGEN-conflict cases as well as rejection cases, so it cannot be replaced by a no-bus-effects fixture", "the positive block-XC and RPTBD controllers remain independent and are not folded into rejection expectations"],
+      "measurement": {"baseline_commit": "5a6c5ee5", "cpp_bytes_deleted_net": 2088, "cpp_lines_deleted_net": 5, "legacy_start_methods_removed": 3, "legacy_phase_continuations_removed": 6, "cases_retired": 0, "scope": "Includes the expanded typed input/contract header and generic final-clock expectation. This is controller/ownership consolidation with small net deletion, not a substantial source or runtime reduction."},
+      "verification": "Original16/18/28-case baselines pass. Full and CPU-only builds pass; all three profiles pass with exact actual case/restore counts and ordered digests on both executables using an empty ROM directory. The preceding interrupt-POPM and CLKMD24-case profiles also pass on the standalone executable. Positive store-delay2880, block-xc8704 and rptbd512 controls pass. All49 targeted host tests pass in8.550 seconds, including absent/matching/mismatching final-clock checks and all395 mocked BIOS selections. Inventory:395 profiles,273 default requirements,67 reviewed profile contracts. Full-default/all-isolated and handset acceptance are not renewed.",
+      "captures": {"delay_store": "tmp/c54x-composition-review/run_c54x_core_w86d6d9r", "block_xc": "tmp/c54x-composition-review/run_c54x_core_4rcimjhv", "delayed_block": "tmp/c54x-composition-review/run_c54x_core_3xznhl98", "positive_delayed_block": "tmp/c54x-composition-review/run_c54x_core_t766q3s3"}
+    },
+    {
       "id": "special-register-composition-admission",
       "classification": "implementation_limit",
       "decision": "rewrite",

@@ -627,25 +627,6 @@ void tms320c54x_test_state::start_block_xc(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_block_xc_edge(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	u32 const base = (variant / 3) % 2 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 12; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, 0xf072); program.write_word(base + 0x601, 0x602 + (variant % 3 == 2)); program.write_word(base + 0x602, variant % 3 ? 0xff00 : 0xfd00);
-	program.write_word(base + 0x603, 0x8c93); program.write_word(base + 0x604, 0x8d94);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_IDLE, 0}, {cpu_regs::STATE_ILLEGAL, 0}, {cpu_regs::STATE_PMST, 0},
-		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x900}, {cpu_regs::STATE_IMR, 0},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_BRC, 3}, {cpu_regs::STATE_AR3, 0x5100},
-		{cpu_regs::STATE_AR4, 0x5200},
-	});
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "block_xc_edge_no_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Cross-end XC exclusion has no data reads"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "block_xc_edge_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Cross-end XC exclusion has no data writes"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255700;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_move_repeat_owner(unsigned variant)
 {
@@ -2081,23 +2062,8 @@ bool tms320c54x_test_state::check_block_branch_count_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_block_xc_edge_results()
+bool tms320c54x_test_state::check_block_xc_results()
 {
-	if (m_phase == 255700)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 3>{3, 7, 9}[variant / 6];
-		if (tick == checkpoint && !m_pipeline_replay) { expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save before and after cross-end XC rejection"); }
-		if (tick == 20)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 3 && m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x5100 && m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x5200, "Cross-end XC stays excluded before counter or protected-slot effects");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = checkpoint; return restore_pipeline_at(255710, "Restore cross-end exclusion without issuing protected words"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 17) { start_block_xc_edge(variant + 1); return true; }
-			osd_printf_info("TMS320C54x block XC exclusions: PASS cases=18 restore=18 forms=XC1,XC2 selected_span_crossings=3 pages=2 snapshots=3 data_reads=0 data_writes=0 pointer_effects=0 silicon_trap_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated block XC exclusions complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255710) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255700; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 255680)
 	{
 		auto const f = block_xc_case(m_pipeline_peripheral_case); unsigned const tick = ++m_idle_fixture_tick, checkpoint = std::array<unsigned, 4>{4, 11, 13, 24}[f.snapshot];

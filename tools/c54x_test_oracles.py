@@ -1044,7 +1044,10 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated T/TRN moves complete",
     ),
     "st-delay-edge": (
-        "TMS320C54x delay store boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0",
+        (
+            "C54x composition rejection coverage: PASS cases=16 restore=16 coverage_fnv64=2135120b48416d25",
+            "TMS320C54x delay store boundary: PASS cases=16 restore=16 forms=4 pages=2 snapshots=2 partial_instruction_rejected=1 data_reads=0 memory_writes=0 atomic_fallback=0",
+        ),
         "Fatal error: TMS320C54x isolated delay store boundary complete",
     ),
     "store-delay": (
@@ -1143,7 +1146,10 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated delayed block repeat complete",
     ),
     "rptbd-edge": (
-        "TMS320C54x delayed block repeat exclusions: PASS cases=28 restore=28 forms=STM_BRC,STLM_BRC,POPM_BRC,branch,spill,nested_body,nested_delay pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_updates=0 counters_preserved=1 silicon_trap_claim=0",
+        (
+            "C54x composition rejection coverage: PASS cases=28 restore=28 coverage_fnv64=cae02933666f8cc5",
+            "TMS320C54x delayed block repeat exclusions: PASS cases=28 restore=28 forms=STM_BRC,STLM_BRC,POPM_BRC,branch,spill,nested_body,nested_delay pages=2 snapshots=2 data_reads=0 data_writes=0 pointer_updates=0 counters_preserved=1 silicon_trap_claim=0",
+        ),
         "Fatal error: TMS320C54x isolated delayed block repeat exclusions complete",
     ),
     "rptbd-irq": (
@@ -1349,7 +1355,10 @@ EXTRA_PROFILES = {
         "Fatal error: TMS320C54x isolated block XC complete",
     ),
     "block-xc-edge": (
-        "TMS320C54x block XC exclusions: PASS cases=18 restore=18 forms=XC1,XC2 selected_span_crossings=3 pages=2 snapshots=3 data_reads=0 data_writes=0 pointer_effects=0 silicon_trap_claim=0",
+        (
+            "C54x composition rejection coverage: PASS cases=18 restore=18 coverage_fnv64=8a0cb80a4da17254",
+            "TMS320C54x block XC exclusions: PASS cases=18 restore=18 forms=XC1,XC2 selected_span_crossings=3 pages=2 snapshots=3 data_reads=0 data_writes=0 pointer_effects=0 silicon_trap_claim=0",
+        ),
         "Fatal error: TMS320C54x isolated block XC exclusions complete",
     ),
     "block-xc-end-irq": (
