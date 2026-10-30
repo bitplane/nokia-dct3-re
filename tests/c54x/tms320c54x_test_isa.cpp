@@ -11,7 +11,6 @@
 #include "tms320c54x_test_normalization.h"
 #include "tms320c54x_test_register_sequence.h"
 #include "tms320c54x_test_address_mode.h"
-#include "tms320c54x_test_stack_sequence.h"
 #include "tms320c54x_test_composition_limits.h"
 #include <cstring>
 
@@ -29,7 +28,6 @@ public:
 		m_normalization_kind = c54x_test::select_normalization(config.options().bios());
 		m_long_t_store_kind = c54x_test::select_long_t_store(config.options().bios());
 		m_address_modes = !std::strcmp(config.options().bios(), "mode-latency");
-		m_stack_sequences = !std::strcmp(config.options().bios(), "stack-sp");
 		m_composition_limit = c54x_test::select_composition_limit(config.options().bios());
 		m_extended_program = m_long_t_store_kind != c54x_test::long_t_store_kind::none || !std::strcmp(config.options().bios(), "isa-disasm") || m_domain || bool(m_dual_mode) ||
 			m_normalization_kind != c54x_test::normalization_kind::none || m_composition_limit != c54x_test::composition_limit::none;
@@ -47,9 +45,6 @@ protected:
 		if (m_composition_limit != c54x_test::composition_limit::none)
 			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 				c54x_test::composition_limit_count(m_composition_limit), [this](unsigned raw) { return c54x_test::composition_limit_case<tms320c54x_device>(raw, m_composition_limit); });
-		else if (m_stack_sequences)
-			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
-				774, c54x_test::stack_sequence<tms320c54x_device>);
 		else if (m_address_modes)
 			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 				1072, c54x_test::address_mode_bank_case<tms320c54x_device>);
@@ -106,12 +101,6 @@ private:
 			auto const contract = c54x_test::composition_limit_result(m_composition_limit);
 			osd_printf_info("%s\n", contract.summary);
 			throw emu_fatalerror(3, "%s", contract.completion);
-		}
-		if (m_stack_sequences)
-		{
-			osd_printf_info("TMS320C54x stack sequences: PASS cases=%u restore=%u frame_offsets=256 frame_snapshots=3 sp_cases=6 gap_nops=1 silicon_phase_claim=0 coverage_fnv64=%016llx\n",
-				m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
-			throw emu_fatalerror(3, "TMS320C54x isolated stack sequences complete");
 		}
 		if (m_address_modes)
 		{
@@ -301,7 +290,6 @@ private:
 	c54x_test::normalization_kind m_normalization_kind = c54x_test::normalization_kind::none;
 	c54x_test::long_t_store_kind m_long_t_store_kind = c54x_test::long_t_store_kind::none;
 	bool m_address_modes = false;
-	bool m_stack_sequences = false;
 	std::unique_ptr<c54x_test::register_sequence_fixture> m_register_sequence;
 	c54x_test::composition_limit m_composition_limit = c54x_test::composition_limit::none;
 	std::unique_ptr<c54x_test::exponent_normalization_fixture> m_normalization;
@@ -335,7 +323,6 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(31, "st-t-long", "Long-address T/TRN stores and retained Execute source")
 	ROM_SYSTEM_BIOS(32, "st-t-long-edge", "Rejected mapped destinations of long-address T/TRN stores")
 	ROM_SYSTEM_BIOS(33, "mode-latency", "Status producer CPL DP CMPT consumer ordering")
-	ROM_SYSTEM_BIOS(34, "stack-sp", "FRAME push and safely separated compiler SP consumers")
 	ROM_SYSTEM_BIOS(35, "pop-irq-edge", "Interrupt-register POPM composition admission limits")
 	ROM_SYSTEM_BIOS(36, "clock-mvdk-edge", "CLKMD move composition admission limits")
 	ROM_SYSTEM_BIOS(37, "st-delay-edge", "Rejected stores crossing the control-delay boundary")

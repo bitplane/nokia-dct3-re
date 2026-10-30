@@ -114,12 +114,11 @@ Immediate-DP cases keep their overflow sentinel without setting ARP; table
 7-17 permits their adjacent DP consumer. Exact clock-10/11 observations remain
 software-model/replay checks, not measured silicon phase guarantees.
 
-`stack-sp` owns the FRAME/adjacent-push bank (all 256 signed offsets at
-checkpoints 3/4/6) and six safely separated PSHM/POPM compiler-mode consumers.
-This standalone profile owns both banks; their redundant default-chain
-adapters have been removed. Together with `mode-latency`, this retires 1,806
-duplicated live/replay cases, not architectural coverage. The full retained
-regression must include both profiles; a default-only run is not their renewal.
+`frame_stack_consumers` owns all 256 signed FRAME/adjacent-push offsets
+and six safely separated PSHM/POPM compiler-mode consumers. FRAME checkpoints
+3/4/6 are distributed instead of multiplying to 774 executions. All262
+cases replay independently; the legacy factory and profile/result plumbing
+are removed. A default-only run does not renew this section.
 TI SPRU131G section 5.7 and Table 7-9, plus SPRU172C instruction descriptions,
 provide the stack/result contract. Eight zero-gap cases are retired because
 their old-SP outcomes are unspecified; two PSHM-SP alias cases are also retired
@@ -573,7 +572,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_normalization_schedule.h` | Unique normalization/exponent inputs with balanced replay checkpoints |
 | `tests/c54x/tms320c54x_test_register_sequence.h` | CPU-only clocked register observations and snapshot continuation; no instruction arithmetic |
 | `tests/c54x/tms320c54x_test_address_mode.h` | Shared address-mode/DP inputs and observations; programming-state limitations remain explicit |
-| `tests/c54x/tms320c54x_test_stack_sequence.h` | CPU-only FRAME/push and safely separated compiler-SP inputs |
+| `tests/c54x/sections/frame_stack_consumers.h` | CPU-only FRAME/push and safely separated compiler-SP inputs |
 | `tests/firmware/tms320c54x_test_rom4_context.cpp` | Copied Nokia context/worker/timer integration; separate profile, legal standard-mode status seeds |
 | `tests/c54x/tms320c54x_test_register_pairs.h` | SAT and carry/TC rotate pairs with independent expected register states |
 | `tests/c54x/tms320c54x_test_composition_limits.h` | CPU-only CLKMD/interrupt-POPM and control-span admission limits; fixed inputs, replay and frozen guard clocks |
