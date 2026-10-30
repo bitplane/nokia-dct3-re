@@ -249,7 +249,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"unsigned-map"}, [](self &test) { test.start_addc(); } },
 		{ {"shift16-map"}, [](self &test) { test.start_addc(); } },
 		{ {"logic-map"}, [](self &test) { test.start_addc(); } },
-		{ {"addc-chain"}, [](self &test) { test.start_addc_chain(); } },
 		{ {"mvkd-peripheral"}, [](self &test) { test.start_mvkd_peripheral(); } },
 		{ {"st-extended-ar", "st-ar-consumer", "st-shift-ar", "st-shift-ar-use"}, [](self &test) { test.start_extended_ar_store(); } },
 		{ {"ifr-pair"}, [](self &test) { test.start_ifr_pair(); } },

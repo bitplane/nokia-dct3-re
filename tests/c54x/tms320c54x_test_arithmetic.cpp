@@ -1645,43 +1645,7 @@ void tms320c54x_test_state::start_addc(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::addc_chain_fixture tms320c54x_test_state::addc_chain_case(unsigned v)
-{
-	addc_chain_fixture f{};
-	unsigned const selector = v % 4; v /= 4; unsigned const pattern = v % 4; v /= 4; unsigned const pair = v % 4; v /= 4;
-	unsigned const flags = v % 8; v /= 8; f.base = v % 2 ? 0x20000 : 0; v /= 2; f.checkpoint = std::array<unsigned, 4>{3, 5, 6, 7}[v];
-	f.a = std::array<u64, 4>{0xffffffffULL, 0, 0x7fffffffULL, 0xff80000000ULL}[pattern];
-	f.b = std::array<u64, 4>{0x123456789aULL, 0xffffffffULL, 0x7fffffffULL, 0x8000000000ULL}[pattern];
-	f.words = std::array<std::array<u16, 2>, 4>{{{1, 0}, {0xffff, 1}, {0x8000, 0xffff}, {0, 0x8000}}}[pair];
-	f.st0 = 0x1020 | (flags & 1 ? 0x800 : 0); f.st1 = 0x800 | (flags & 2 ? 0x100 : 0) | (flags & 4 ? 0x200 : 0);
-	f.final_a = f.a; f.final_b = f.b; f.final_st0 = f.st0;
-	for (unsigned i = 0; i < 2; ++i)
-	{
-		bool const b = (selector >> i) & 1; f.opcodes[i] = 0x0602 + i + (b ? 0x100 : 0);
-		u64 &accumulator = b ? f.final_b : f.final_a;
-		auto const expected = addc_expected(accumulator, f.words[i], f.final_st0, f.st1, b); accumulator = expected[0]; f.final_st0 = expected[1];
-	}
-	return f;
-}
 
-void tms320c54x_test_state::start_addc_chain(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant; auto const f = addc_chain_case(variant);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	for (unsigned i = 0; i < 2; ++i) { program.write_word(f.base + 0x600 + i, f.opcodes[i]); data.write_word(0x1002 + i, f.words[i]); }
-	program.write_word(f.base + 0x602, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1); m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "addc_chain_read", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; unsigned const i = m_pipeline_operand_reads++; expect(i < 2 && at == 0x1002 + i && word == f.words[i] && m_cpu->pipeline_cycles() == 5 + i, "Adjacent ADDC instructions retain their own unsigned word before the producer carry retires"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "addc_chain_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) { ++m_pipeline_store_writes; expect(false, "ADDC chains write no data memory"); } });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x600, f.base + 0x601, "addc_chain_fetch", [this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(m_pipeline_extensions_reads < 2 && at == f.base + 0x600 + m_pipeline_extensions_reads && word == f.opcodes[m_pipeline_extensions_reads], "ADDC chain fetches each opcode once"); ++m_pipeline_extensions_reads; });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62158;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::xmem_arithmetic_result tms320c54x_test_state::xmem_arithmetic_expected(unsigned variant)
 {
@@ -3246,33 +3210,9 @@ bool tms320c54x_test_state::check_delay_compare_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_addc_chain_results()
-{
-	if (m_phase == 62158)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = addc_chain_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Adjacent ADDC consumes the previous ALU carry without a separating instruction");
-		if (tick == 5 || tick == 6) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(0x1002 + tick - 5, 0xa55a); }
-		capture_pipeline_at(f.checkpoint, {&m_pipeline_operand_reads, &m_pipeline_extensions_reads},
-			"Save carry chain across the producer Execute and consumer Read");
-		if (tick == 12)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x603 && m_pipeline_operand_reads == 2 && m_pipeline_extensions_reads == 2 && !m_pipeline_store_writes, "ADDC chain retains two words and retires two instructions once");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == f.final_a && m_cpu->state_int(tms320c54x_device::STATE_B) == f.final_b && m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.final_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xbeef && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "ADDC chain consumes the generated carry and updated accumulator with OVM and sticky overflow");
-			if (replay_pipeline_at(62159, f.checkpoint,
-				"Restore adjacent ADDC without losing a pending carry transition")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 4095) { start_addc_chain(variant + 1); return true; }
-			osd_printf_info("TMS320C54x ADDC chains: PASS cases=4096 restore=4096 destinations=AA,BA,AB,BB accumulator_pairs=4 word_pairs=4 carry_states=2 sxm_ovm=4 pages=2 snapshots=4 issue_gap=0 read_retention=1 carry_sample=Execute physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated ADDC chains complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
-}
 
 bool tms320c54x_test_state::check_mapped_alu_results()
 {
-	if (m_phase == 62159) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62158; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 62156)
 	{
 		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;

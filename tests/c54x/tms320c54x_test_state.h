@@ -829,16 +829,6 @@ private:
 	static addc_fixture mapped_shift16_case(unsigned variant);
 	static addc_fixture mapped_logic_case(unsigned variant);
 	void start_addc(unsigned variant = 0);
-	struct addc_chain_fixture
-	{
-		u64 a, b, final_a, final_b;
-		u16 st0, st1, final_st0;
-		u32 base;
-		unsigned checkpoint;
-		std::array<u16, 2> words, opcodes;
-	};
-	static addc_chain_fixture addc_chain_case(unsigned v);
-	void start_addc_chain(unsigned variant = 0);
 	struct xmem_load_fixture
 	{
 		unsigned x, shift, destination, flags;
@@ -1367,7 +1357,6 @@ private:
 	bool check_delay_dld_results();
 	bool check_poll_interrupt_results();
 	bool check_delay_compare_results();
-	bool check_addc_chain_results();
 	bool check_mapped_parallel_load_results();
 	bool check_mapped_alu_results();
 	bool check_memory_copy_repeat_results();

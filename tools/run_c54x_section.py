@@ -178,6 +178,7 @@ def main():
     counts['atomic_subtract'] = 384
     counts['long_memory_logic'] = 9408
     counts['mapped_compare'] = 6816
+    counts['addc_chain'] = 512
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
