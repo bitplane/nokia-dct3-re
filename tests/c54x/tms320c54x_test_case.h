@@ -67,6 +67,7 @@ struct clocked_register_case
 	bool require_idle = true;
 	bool check_pipeline_clock = false;
 	std::optional<unsigned> final_pipeline_clock{};
+	bool clear_pipeline_before_restore = false;
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

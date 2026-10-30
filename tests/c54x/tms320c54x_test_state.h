@@ -147,18 +147,6 @@ private:
 	};
 	static delay_asm_fixture delay_asm_case(unsigned v);
 	void start_delay_asm(unsigned variant = 0);
-	struct indirect_stm_fixture
-	{
-		unsigned selector, ar, snapshot;
-		u16 destination, literal, st1;
-		u32 base;
-		bool edge;
-		bool direct = false;
-		u16 st0 = 0xa633;
-		unsigned gap = 0;
-	};
-	indirect_stm_fixture indirect_stm_case(unsigned v) const;
-	void start_indirect_stm(unsigned variant = 0);
 	struct accumulator_stm_fixture
 	{
 		unsigned lane, snapshot;

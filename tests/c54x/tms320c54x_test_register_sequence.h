@@ -59,6 +59,7 @@ public:
 				m_replay = true; m_tick = m_input.checkpoint; m_fetches = m_saved_fetches;
 				m_data_cursor = m_saved_data_cursor;
 				m_program_cursor = m_saved_program_cursor;
+				if (m_input.clear_pipeline_before_restore) m_cpu.set_pipeline_frontend(true);
 				require(restore_snapshot(m_machine, m_timer, m_saved) == STATERR_NONE, "restore register sequence");
 				++m_restores; m_cpu.suspend(SUSPEND_REASON_DISABLE, true); m_resume = true; m_timer.enable(true); return false;
 			}

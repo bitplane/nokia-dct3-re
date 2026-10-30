@@ -21,7 +21,7 @@ def copy_changed(source, target):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    counts = dict(immediate_store=8, basic_memory=18, stack=141, dagen=292, paired_store=64, register_load=80, memory_dp=48, data_stack=76, descriptor_copy=12, register_store=27, absolute_load=64, stack_control=108)
+    counts = dict(immediate_store=8, basic_memory=18, stack=141, dagen=292, paired_store=64, register_load=80, memory_dp=48, data_stack=76, descriptor_copy=12, register_store=27, absolute_load=64, stack_control=108, stm_ram=1024)
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
