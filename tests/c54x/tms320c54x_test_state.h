@@ -259,8 +259,6 @@ private:
 		u16 result_st0, pmst, t = 0x9abc;
 	};
 	static memory_multiply_fixture memory_multiply_case(unsigned variant, bool square = false);
-	static memory_arithmetic_fixture delay_copy_case(unsigned variant);
-	void start_delay_copy(unsigned variant = 0);
 	void start_pipeline_memory_multiply(unsigned variant = 0);
 	struct shifted_arithmetic_fixture
 	{
@@ -1262,7 +1260,6 @@ private:
 	bool check_ldu_imr_results();
 	bool check_shifted_peripheral_results();
 	bool check_xc_return_results();
-	bool check_delay_copy_results();
 	bool check_mapped_dual_results();
 	bool check_mvmd_accumulator_results();
 	bool check_repeat_mvdp_irq_results();

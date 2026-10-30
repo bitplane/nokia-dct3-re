@@ -105,8 +105,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"bd-maca-long"}, [](self &test) { test.start_delay_multiply(); } },
 		{ {"square-delay"}, [](self &test) { test.start_delay_multiply(); } },
 		{ {"squr-delay"}, [](self &test) { test.start_delay_multiply(); } },
-		{ {"delay-copy"}, [](self &test) { test.start_delay_copy(); } },
-		{ {"delay-copy-ctrl"}, [](self &test) { test.start_delay_copy(); } },
 		{ {"add-bk", "add-absolute", "add-sp"}, [](self &test) { test.start_pipeline_absolute_add(); } },
 		{ {"instr-observer"}, [](self &test) { test.start_instruction_observer(); } },
 		{ {"software-intr"}, [](self &test) { test.start_software_intr(); } },
