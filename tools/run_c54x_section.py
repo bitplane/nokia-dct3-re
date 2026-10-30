@@ -29,7 +29,7 @@ def main():
     counts['block_edges'] = 16
     counts['delayed_block'] = 128
     counts['delayed_square'] = 4992
-    counts['delayed_count_branch'] = 384
+    counts['count_branch'] = 576
     counts['signed_branch'] = 12
     counts['offset_count_branch'] = 1152
     counts['signed_conditions'] = 384

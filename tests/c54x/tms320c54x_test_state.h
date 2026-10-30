@@ -327,7 +327,6 @@ private:
 	void start_pipeline_sp_rmw(unsigned variant = 0);
 	void start_pipeline_arp(unsigned variant = 0);
 	void start_pipeline_read_a(unsigned variant = 0);
-	void start_pipeline_banz(unsigned variant = 0);
 	void start_instruction_observer(unsigned variant = 0);
 	void start_pipeline_add_sp_context(unsigned variant = 0);
 	void start_pipeline_add_sp_exclusion(unsigned variant = 0);

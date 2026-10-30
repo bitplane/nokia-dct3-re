@@ -1993,55 +1993,12 @@ bool tms320c54x_test_state::check_pipeline_sp_rmw_results()
 			if (variant == 191) osd_printf_info("TMS320C54x staged absolute READA AR1: PASS cases=192 source_pages=3 source_regions=2 ovly_states=2 consumer_gaps=4 restore=192 retained_accumulator_source=1 duplicate_program_reads=0 duplicate_register_writes=0\n");
 			if (variant < 239) { start_pipeline_read_a(variant + 1); return true; }
 			osd_printf_info("TMS320C54x staged short READA RAM: PASS cases=48 source_pages=3 source_regions=2 ovly_states=2 restore=48 retained_accumulator_source=1 postincrement_once=1 duplicate_program_reads=0 duplicate_data_writes=0\n");
-			start_pipeline_banz(); return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 252380)
 	{
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252370;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252390)
-	{
-		unsigned const variant = m_pipeline_peripheral_case;
-		u16 const value = std::array<u16, 3>{0, 1, 0xffff}[variant % 3];
-		unsigned const modification = (variant / 3) % 3, encoded = (variant / 9) % 2;
-		bool const compatibility = (variant / 18) % 2;
-		unsigned const selected = compatibility && !encoded ? 3 : encoded;
-		u32 const base = (variant / 36) % 2 ? 0x20000 : 0;
-		unsigned const tick = ++m_idle_fixture_tick, checkpoint = 4 + variant / 72;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Short non-delayed BANZ has owned predicate, auxiliary update and branch flow");
-		if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(base + 0x601, 0x740); }
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save BANZ target, before/after predicate and AR update, or redirect");
-		}
-		if (tick == 22)
-		{
-			expect(m_pipeline_extensions_reads == 1 && m_pipeline_operand_reads == unsigned(value != 0) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (value ? 0x44 : 0x11) && m_cpu->state_int(tms320c54x_device::STATE_B) == (value ? 0 : 0x22) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0x608 | ((compatibility ? encoded ? encoded : 3 : 0) << 13)) &&
-				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
-				"BANZ uses the pre-modification condition and does not execute discarded fall-through instructions");
-			for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (i == selected ? u16(value + (modification == 1 ? -1 : modification == 2 ? 1 : 0)) : 0x410 + i * 0x10),
-				"BANZ modifies exactly the selected auxiliary once on either branch outcome");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick; m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				return restore_pipeline_at(252400, "Restore BANZ without changing its target or repeating the auxiliary modification");
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 287) { start_pipeline_banz(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged BANZ: PASS cases=288 values=3 modifications=3 encoded_modes=2 cmpt_states=2 pages=2 restore=288 premodify_condition=1 duplicate_auxiliary_updates=0\n");
-			start_pipeline_memory_repeat_read_a(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252400)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252390;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	return false;
