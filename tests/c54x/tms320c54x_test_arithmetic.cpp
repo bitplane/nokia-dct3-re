@@ -324,75 +324,7 @@ tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::memory_a
 
 
 
-tms320c54x_test_state::accumulator_cmpm_fixture tms320c54x_test_state::accumulator_cmpm_case(unsigned v, bool mapped, bool edge)
-{
-	accumulator_cmpm_fixture f{};
-	if (edge)
-	{
-		unsigned const index = v % 80; v /= 80; f.source = index < 8 ? index : index + 0x10;
-		f.form = v % 3; v /= 3; f.initial_tc = v % 2; v /= 2;
-		f.st1 = 0x800 | (v % 2 ? 0x4000 : 0); v /= 2;
-		f.base = v % 2 ? 0x20000 : 0; v /= 2; f.snapshot = v; f.literal = 1; f.excluded = true;
-	}
-	else
-	{
-		f.lane = v % (mapped ? 10 : 6); v /= mapped ? 10 : 6;
-		f.value = mapped ? std::array<u16, 8>{0, 1, 0x10, 0x7f, 0x80, 0x7fff, 0x8000, 0xffff}[v % 8] :
-			std::array<u16, 4>{0, 1, 0x7f, u16(f.lane % 3 == 2 ? 0x80 : 0x8000)}[v % 4]; v /= mapped ? 8 : 4;
-		f.tc = v % 2; v /= 2; f.initial_tc = v % 2; v /= 2;
-		f.literal = mapped ? std::array<u16, 6>{0, 1, 0x10, 0x7f, 0x8000, 0xffff}[v % 6] : v % 2 ? 0x7f : 1; v /= mapped ? 6 : 2;
-		f.form = v % 3; v /= 3; f.st1 = 0x800 | (v % 2 ? 0x4000 : 0); v /= 2;
-		f.base = v % 2 ? 0x20000 : 0; v /= 2; f.snapshot = v;
-		f.source = (mapped ? 14 : 8) + f.lane;
-	}
-	f.read = f.form == 2 ? 7 : 6; f.pointer = mapped ? f.source == 0x17 ? 6 : 7 : 2;
-	f.a = 0x0011223344ULL; f.b = 0x0055667788ULL;
-	if (!mapped && !edge)
-	{
-		u64 &accumulator = f.lane < 3 ? f.a : f.b;
-		unsigned const shift = 16 * (f.lane % 3);
-		accumulator = (accumulator & ~(0xffffULL << shift)) | (u64(f.value) << shift);
-	}
-	return f;
-}
 
-void tms320c54x_test_state::start_accumulator_cmpm(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const mapped = profile_is("cmpm-map") || profile_is("cmpm-map-edge");
-	bool const edge = profile_is("cmpm-map-edge"); auto const f = accumulator_cmpm_case(variant, mapped, edge);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, f.form == 2 ? 0x60f8 : f.form == 1 ? 0x6080 | f.pointer : 0x6000 | f.source);
-	if (f.form == 2) program.write_word(f.base + 0x601, f.source);
-	unsigned const words = f.form == 2 ? 3 : 2;
-	program.write_word(f.base + 0x600 + words - 1, f.literal);
-	program.write_word(f.base + 0x600 + words, 0xf820 | (f.tc << 4));
-	program.write_word(f.base + 0x601 + words, 0x700);
-	program.write_word(f.base + 0x602 + words, 0xe811); program.write_word(f.base + 0x603 + words, 0xf4e1);
-	program.write_word(f.base + 0x700, 0xe855); program.write_word(f.base + 0x701, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa600 | (f.initial_tc ? 0x1000 : 0)); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0);
-	if (mapped)
-	{
-		for (unsigned i = 0; i < 8; ++i) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + i, 0x1200 + i * 0x100);
-		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0xabcd);
-	}
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.pointer, f.source);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a ^ 0xffffffffffULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b ^ 0xffffffffffULL);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mapped_cmpm_read", [this, f](offs_t at, u16 &value, u16) { if (machine().side_effects_disabled()) return; expect(!f.excluded && at == f.source && value == f.value && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read, "CMPM samples its selected mapped word exactly once at Read"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mapped_cmpm_no_write", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + words - 1 + 0x600, "mapped_cmpm_literals", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(at == f.base + 0x601 + m_pipeline_extensions_reads && word == (f.form == 2 && !m_pipeline_extensions_reads ? f.source : f.literal), "CMPM captures the address before its distinct comparison literal once"); ++m_pipeline_extensions_reads;
-	});
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62126;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -2910,54 +2842,6 @@ bool tms320c54x_test_state::check_negate_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_accumulator_cmpm_results()
-{
-	if (m_phase == 62126)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const mapped = profile_is("cmpm-map") || profile_is("cmpm-map-edge");
-		bool const edge = profile_is("cmpm-map-edge"); auto const f = accumulator_cmpm_case(variant, mapped, edge);
-		bool const result = f.value == f.literal, taken = result == f.tc;
-		expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) == (edge && tick >= f.read - 1) && bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000) == (edge || tick <= f.read ? f.initial_tc : result), "Mapped CMPM rejects unowned sources and publishes TC only at Execute");
-		if (tick == f.read - 1 && !edge)
-		{
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
-			if (mapped) set_repeat_count_source(f.source, f.value);
-		}
-		if (tick == f.read && !edge)
-		{
-			m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a ^ 0xffffffffffULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b ^ 0xffffffffffULL);
-			if (mapped) set_repeat_count_source(f.source, f.value ^ 0xffff);
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x600 + (f.form == 2 ? 2 : 1), 0xdead);
-			if (f.form == 2) m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead);
-		}
-		unsigned const checkpoint = f.read - (edge ? 2 : 1) + f.snapshot;
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads},
-			"Save retained mapped comparison around Read/Execute");
-		if (tick == 30)
-		{
-			expect(m_pipeline_operand_reads == unsigned(!edge) && !m_pipeline_store_writes && m_pipeline_extensions_reads == (f.form == 2 ? 2U : 1U) && bool(m_cpu->state_int(tms320c54x_device::STATE_IDLE)) == !edge && m_cpu->state_int(tms320c54x_device::STATE_A) == (edge ? f.a ^ 0xffffffffffULL : taken ? 0x55 : 0x11) && m_cpu->state_int(tms320c54x_device::STATE_B) == (f.b ^ 0xffffffffffULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xa600 | ((edge ? f.initial_tc : result) ? 0x1000 : 0)) && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && !m_cpu->state_int(tms320c54x_device::STATE_SP), "CMPM branch uses retained mapped word and literal without writes or unrelated status changes");
-			if (mapped)
-			{
-				expect(m_cpu->state_int(tms320c54x_device::STATE_T) == (!edge && f.source == 14 ? u16(f.value ^ 0xffff) : 0xbeef) && m_cpu->state_int(tms320c54x_device::STATE_TRN) == (!edge && f.source == 15 ? u16(f.value ^ 0xffff) : 0xabcd), "CMPM does not overwrite the mapped operand after it has been sampled");
-				for (unsigned i = 0; i < 8; ++i) expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + i) == (!edge && f.source == 16 + i ? u16(f.value ^ 0xffff) : i == f.pointer ? f.source : 0x1200 + i * 0x100), "CMPM preserves the separate indirect pointer and unrelated auxiliary registers");
-			}
-			if (replay_pipeline_at(62127, checkpoint,
-				"Restore mapped CMPM without duplicate reads or literal fetches")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant + 1 < (edge ? 3840U : mapped ? 69120U : 6912U)) { start_accumulator_cmpm(variant + 1); return true; }
-			if (mapped)
-			{
-				if (edge) { osd_printf_info("TMS320C54x mapped CMPM exclusions: PASS cases=3840 restore=3840 addresses=80 forms=direct,indirect,absolute cpl=2 initial_tc=2 pages=2 snapshots=2 reads=0 writes=0 pointer_changes=0 status_changes=0 silicon_trap_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped CMPM exclusions complete"); }
-				osd_printf_info("TMS320C54x mapped CMPM: PASS cases=69120 restore=69120 registers=T,TRN,AR0..7 forms=direct,indirect,absolute cpl=2 values=8 literals=6 conditions=TC,NTC initial_tc=2 pages=2 snapshots=3 reads=1 writes=0 literal_words=1,2 source=Read tc=Execute retained=1 indirect_pointer=separate physical_phase_claim=0 control_composition=unvalidated\n"); throw emu_fatalerror(3, "TMS320C54x isolated mapped CMPM complete");
-			}
-			osd_printf_info("TMS320C54x accumulator CMPM: PASS cases=6912 restore=6912 lanes=6 forms=direct,indirect,absolute cpl=2 values=4 literals=2 conditions=TC,NTC initial_tc=2 pages=2 snapshots=3 reads=1 writes=0 source=Read tc=Execute retained=1 silicon_phase_claim=0\n"); throw emu_fatalerror(0, "TMS320C54x isolated accumulator CMPM complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62127) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62126; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 
 

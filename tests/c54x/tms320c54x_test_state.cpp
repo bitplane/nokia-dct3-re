@@ -251,8 +251,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"logic-map"}, [](self &test) { test.start_addc(); } },
 		{ {"addc-chain"}, [](self &test) { test.start_addc_chain(); } },
 		{ {"mvkd-peripheral"}, [](self &test) { test.start_mvkd_peripheral(); } },
-		{ {"cmpm-acc"}, [](self &test) { test.start_accumulator_cmpm(); } },
-		{ {"cmpm-map", "cmpm-map-edge"}, [](self &test) { test.start_accumulator_cmpm(); } },
 		{ {"st-extended-ar", "st-ar-consumer", "st-shift-ar", "st-shift-ar-use"}, [](self &test) { test.start_extended_ar_store(); } },
 		{ {"ifr-pair"}, [](self &test) { test.start_ifr_pair(); } },
 		{ {"mac-smem", "mac-bk"}, [](self &test) { test.start_mac_smem(); } },

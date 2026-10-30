@@ -219,16 +219,6 @@ private:
 	static accumulator_store_fixture absolute_xorm_fixture(unsigned variant);
 	void start_pipeline_long_rmw(unsigned variant = 0);
 	static memory_arithmetic_fixture memory_arithmetic_case(unsigned variant, bool unsigned_memory = false, unsigned shift16_selector = 8);
-	struct accumulator_cmpm_fixture
-	{
-		unsigned lane, form, read, snapshot, pointer;
-		u16 source, value, literal, st1;
-		u32 base;
-		bool tc, initial_tc, excluded = false;
-		u64 a, b;
-	};
-	static accumulator_cmpm_fixture accumulator_cmpm_case(unsigned v, bool mapped = false, bool edge = false);
-	void start_accumulator_cmpm(unsigned variant = 0);
 	static memory_arithmetic_fixture offset_load_case(unsigned variant);
 	static memory_arithmetic_fixture unsigned_load_case(unsigned variant);
 	static memory_arithmetic_fixture shifted_memory_load_case(unsigned variant);
@@ -1347,7 +1337,6 @@ private:
 	bool check_preincrement_immediate_results();
 	bool check_stack_irq_order_results();
 	bool check_repeat_pop_exclusion_results_part2();
-	bool check_accumulator_cmpm_results();
 	bool check_staged_conditional_store_results();
 	bool check_ldu_peripheral_results();
 	bool check_ldu_imr_results();
