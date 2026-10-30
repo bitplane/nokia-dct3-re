@@ -345,6 +345,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_basic_control_sequences.h` | Retain13 basic delayed/indirect/conditional branches, RETE/conditional return/call, shifted absolute LD, SUB variants, repeated WRITA, load ASM, signed frame adjustment and right shift. Explicit program targets, stack sentinels, accumulators/flags/pointers and both memory spaces replace global image/inherited state. Exact target fetch and stack/data/program effects, fixed continuations/results, count/address progression and pre-operation replay. | Native13 cases/restores, unchanged count; build5.438s/run0.019s. Delete basic10..22 assertions/transitions and0380..03e0 image/data seeds; retain only22's following ADDC setup and shrink routing. |
 
+| `atomic_basic_alu_control.h` | Retain10 basic ADDC, BANZD with observable delay loads/skipped fallthrough, absolute MPYU/MPYA, conditional call+return, READA→WRITA same program address, ABS, SUBC and standard/compatibility ARP checks. Explicit stack/targets/source/register/status inputs replace predecessor state. Exact RAM/MMR/program transactions, fixed results/continuations, carry masks, source preservation and pre-operation replay. ARP cases retain flag-ownership scope, not a new compatibility pointer-selection claim. | Native10 cases/restores, unchanged count; build5.537s/run0.019s. Delete22 setup,23..31 and32 assertions/preparations and shrink basic routing; following logical-shift setup remains reference material. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).
