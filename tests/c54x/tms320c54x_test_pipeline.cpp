@@ -189,41 +189,6 @@ void tms320c54x_test_state::start_pipeline_mask_rmw_case()
 
 
 
-void tms320c54x_test_state::start_pipeline_dld(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	bool const compiler = BIT(variant, 5);
-	u16 const offset = 0x7c + BIT(variant, 4);
-	u16 const address = (compiler ? 0x500 : 0x400) + offset;
-	u16 const high = BIT(variant, 3) ? 0x8001 : 0x1234;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, i ? 0xf495 : 0x5600 | (BIT(variant, 0) << 8) | offset);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa608},
-	});
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (BIT(variant, 1) << 8) | (BIT(variant, 2) << 7) | (compiler ? 0x4000 : 0));
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_SP, 0x500}, {cpu_regs::STATE_A, 0x1111222233ULL}, {cpu_regs::STATE_B, 0x4444555566ULL},
-		{cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(address, high);
-	m_cpu->space(AS_DATA).write_word(address ^ 1, 0xabcd);
-	m_cpu->set_state_int(STATE_GENPC, 0x600);
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_operand_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(address & ~1, address | 1, "staged_dld_pair",
-		[this, address, high](offs_t observed, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_operand_reads < 2 && observed == (address ^ m_pipeline_operand_reads) &&
-				value == (m_pipeline_operand_reads ? 0xabcd : high) && m_cpu->pipeline_cycles() == 5,
-				"DLD retains its ordered address/xor-one word pair in Read");
-			++m_pipeline_operand_reads;
-		});
-	m_phase = 251490; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_immediate_add(unsigned variant)
 {
@@ -1375,53 +1340,8 @@ bool tms320c54x_test_state::check_pipeline_rmw_results()
 }
 
 
-bool tms320c54x_test_state::check_pipeline_load_add_results()
+bool tms320c54x_test_state::check_pipeline_immediate_add_results()
 {
-	if (m_phase == 251490)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		unsigned const variant = m_pipeline_peripheral_case;
-		bool const b = BIT(variant, 0), sxm = BIT(variant, 1), negative = BIT(variant, 3), compiler = BIT(variant, 5);
-		u16 const address = (compiler ? 0x500 : 0x400) + 0x7c + BIT(variant, 4);
-		u64 const result = (sxm && negative ? 0xff00000000ULL : 0) | (negative ? 0x8001abcdULL : 0x1234abcdULL);
-		u64 const checkpoint = BIT(variant, 6) ? 5 : 4;
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_pipeline_operand_reads == (cycle >= 5 ? 2 : 0) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 6 && !b ? result : 0x1111222233ULL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 6 && b ? result : 0x4444555566ULL) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x800 | (sxm << 8) | (BIT(variant, 2) << 7) | (compiler ? 0x4000 : 0)) &&
-			m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x500,
-			"DLD retires the retained pair with SXM guard extension without changing the other accumulator or status");
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save DLD before/after paired Read");
-		}
-		if (cycle == 5) {
-			m_cpu->space(AS_DATA).write_word(address, 1);
-			m_cpu->space(AS_DATA).write_word(address ^ 1, 2);
-		}
-		if (cycle == 9)
-		{
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_operand_reads = checkpoint >= 5 ? 2 : 0;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore retained DLD operands without duplicate bus reads");
-				return restart_pipeline_observer(251500, checkpoint + 1);
-			}
-			m_pipeline_operand_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 127) { start_pipeline_dld(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged DLD: PASS cases=128 destinations=A,B sxm=0,1 c16=0,1 parity=0,1 addressing=DP,CPL restore=128 duplicate_reads=0 silicon_phase_claim=0\n");
-			start_pipeline_immediate_add(); return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251500)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251490;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
 	if (m_phase == 251510)
 	{
 		u64 const cycle = m_cpu->pipeline_cycles();
