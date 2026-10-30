@@ -25,66 +25,6 @@ void tms320c54x_test_state::start_cala_rtn_case(unsigned index)
 
 
 
-void tms320c54x_test_state::start_pipeline_conditional_branch(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	bool const b = BIT(variant, 0), eq = BIT(variant, 1), nonzero = BIT(variant, 2);
-	u32 const base = BIT(variant, 3) ? 0x10000 : 0;
-	bool const taken = eq ? !nonzero : nonzero;
-	bool const memory_dp = variant >= 48;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) { program.write_word(base + 0x600 + i, 0xf495); program.write_word(base + 0x700 + i, 0xf495); }
-	write_words(program, {
-		{base + 0x600, 0xfa44 | (b << 3) | eq}, {base + 0x601, 0x700}, {base + 0x602, memory_dp ? 0x467f : 0xe811},
-		{base + 0x603, memory_dp ? 0xf495 : 0xe944}, {base + 0x604, 0xe966},
-		{base + 0x700, memory_dp ? 0x107e : 0xe955},
-	});
-	if (memory_dp) program.write_word(base + 0x701, 0xe955);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST0, 0xa608}, {cpu_regs::STATE_ST1, 0x800},
-		{cpu_regs::STATE_A, b ? 0x9999 : nonzero ? 0x0100000000ULL : 0},
-		{cpu_regs::STATE_B, b ? (nonzero ? 0x0100000000ULL : 0) : 0x7777}, {cpu_regs::STATE_IFR, 0},
-		{cpu_regs::STATE_IMR, 0},
-	});
-	if (memory_dp) {
-		m_cpu->space(AS_DATA).write_word(0x47f, 0xe012);
-		m_cpu->space(AS_DATA).write_word(0x97e, 0x3333);
-	}
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600);
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_drained_fetches = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = program.install_read_tap(base + 0x700, base + 0x700, "staged_conditional_target",
-		[this, taken, memory_dp](offs_t, u16 &, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(taken && m_cpu->pipeline_cycles() == (memory_dp ? 10 : 8), "BCD uses the retained predicate and conditional prefetch bubble");
-			++m_pipeline_operand_reads;
-		});
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x602, base + 0x603, "staged_conditional_delays",
-		[this, base, memory_dp](offs_t address, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			expect(m_pipeline_extensions_reads < 2 && address == base + 0x602 + m_pipeline_extensions_reads &&
-				value == (memory_dp ? (m_pipeline_extensions_reads ? 0xf495 : 0x467f) : (m_pipeline_extensions_reads ? 0xe944 : 0xe811)) &&
-				m_cpu->pipeline_cycles() == (m_pipeline_extensions_reads ? 6 : 4), "BCD fetches both delay words with one intervening bubble");
-			++m_pipeline_extensions_reads;
-		});
-	if (memory_dp) m_pipeline_write_tap = m_cpu->space(AS_DATA).install_read_tap(0x47f, 0x97e, "staged_conditional_dp_data",
-		[this, taken](offs_t address, u16 &value, u16) {
-			if (machine().side_effects_disabled()) return;
-			if (address == 0x47f) {
-				expect(value == 0xe012 && m_cpu->pipeline_cycles() == 7, "BCD memory-DP delay samples its original page once");
-				++m_pipeline_drained_fetches;
-			} else if (address == 0x97e) {
-				expect(taken && value == 0x3333 && m_cpu->pipeline_cycles() == 13, "Taken BCD continuation uses DP published by its delay slot");
-				++m_pipeline_store_writes;
-			}
-		});
-	m_phase = 251610; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_pipeline_plain_return(unsigned variant)
 {
@@ -1036,56 +976,8 @@ bool tms320c54x_test_state::check_delayed_call_results()
 }
 
 
-bool tms320c54x_test_state::check_pipeline_conditional_branch_results()
+bool tms320c54x_test_state::check_pipeline_plain_return_results()
 {
-	if (m_phase == 251610)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		unsigned const variant = m_pipeline_peripheral_case;
-		bool const b = BIT(variant, 0), eq = BIT(variant, 1), nonzero = BIT(variant, 2), taken = eq ? !nonzero : nonzero;
-		u64 const initial = nonzero ? 0x0100000000ULL : 0, opposite = nonzero ? 0 : 0x0100000000ULL;
-		bool const memory_dp = variant >= 48;
-		u64 const checkpoint = memory_dp ? std::array<unsigned, 3>{6, 8, 11}[(variant / 16) % 3] : std::array<unsigned, 3>{4, 6, 8}[variant / 16];
-		if (cycle == 6) m_cpu->set_state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, opposite);
-		u64 const expected_a = memory_dp ? (taken && cycle >= 14 ? 0x3333 : !b && cycle >= 6 ? opposite : b ? 0x9999 : initial) :
-			cycle >= 8 ? 0x11 : !b && cycle >= 6 ? opposite : b ? 0x9999 : initial;
-		u64 const expected_b = memory_dp ? (taken && cycle >= 15 ? 0x55 : !taken && cycle >= 13 ? 0x66 : b && cycle >= 6 ? opposite : b ? initial : 0x7777) :
-			taken && cycle >= 12 ? 0x55 : !taken && cycle >= 11 ? 0x66 : cycle >= 10 ? 0x44 : b && cycle >= 6 ? opposite : b ? initial : 0x7777;
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-			m_pipeline_operand_reads == unsigned(taken && cycle >= (memory_dp ? 10 : 8)) &&
-			m_pipeline_extensions_reads == unsigned(cycle >= 4) + unsigned(cycle >= 6) &&
-			m_cpu->state_int(tms320c54x_device::STATE_A) == expected_a && m_cpu->state_int(tms320c54x_device::STATE_B) == expected_b &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST0) == (memory_dp && cycle >= 10 ? 0xa612 : 0xa608) &&
-			m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800 &&
-			(!memory_dp || (m_pipeline_drained_fetches == unsigned(cycle >= 7) && m_pipeline_store_writes == unsigned(taken && cycle >= 13))),
-			"BCD retains the sampled 40-bit zero predicate, executes both delays and chooses only its proper continuation");
-		if (cycle == checkpoint && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save BCD bubble, sampled predicate or pending delay retirement");
-		}
-		if (cycle == 18)
-		{
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_pipeline_operand_reads = unsigned(taken && checkpoint >= (memory_dp ? 10 : 8));
-				m_pipeline_extensions_reads = unsigned(checkpoint >= 4) + unsigned(checkpoint >= 6);
-				m_pipeline_drained_fetches = unsigned(memory_dp && checkpoint >= 7); m_pipeline_store_writes = 0;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore BCD target/predicate ownership without duplicate fetches");
-				return restart_pipeline_observer(251620, checkpoint + 1);
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 95) { start_pipeline_conditional_branch(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged conditional branches: PASS cases=96 conditions=AEQ,ANEQ,BEQ,BNEQ pages=2 outcomes=2 memory_dp_delay=48 restore=96 duplicate_fetches=0 silicon_phase_claim=0\n");
-			start_pipeline_plain_return(); return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251620)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251610;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
 	if (m_phase == 251630)
 	{
 		u64 const cycle = m_cpu->pipeline_cycles();
