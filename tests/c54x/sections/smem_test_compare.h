@@ -1,6 +1,7 @@
 // license:BSD-3-Clause
 // copyright-holders:Gaz
 #include "c54x_section_common.h"
+#include "tms320c54x_test_smem_address.h"
 namespace c54x_test {
 inline std::vector<clocked_register_case> section_cases()
 {
@@ -14,21 +15,9 @@ inline std::vector<clocked_register_case> section_cases()
 		for (unsigned reg = 0; reg < 8; ++reg) for (unsigned cmpt = 0; cmpt < 2; ++cmpt)
 		for (unsigned pattern = 0; pattern < 8; ++pattern) {
 			unsigned const seed = compare + form + reg + cmpt + pattern, flags = seed % 4;
-			unsigned const selected = cmpt && !reg ? 3 : reg, read = form >= 14 ? 7 : 6;
-			u16 const mode = form < 2 ? reg * 16 + pattern + (flags & 1 ? 8 : 0) :
-				form == 17 ? 0xf8 : 0x80 | ((form - 2) << 3) | reg;
-			s16 const offset = std::array<s16,8>{0,1,-1,17,s16(0xf495),0x7fff,s16(0x8000),2}[pattern];
-			u16 const bk = form == 11 || form == 13 || form == 16 ? 0x8000 : 16;
-			auto circular = [&](int delta) {
-				int const alignment = bk == 16 ? 32 : 65536, residue = (0x5007 % alignment + delta) % int(bk);
-				return u16(0x5007 / alignment * alignment + (residue < 0 ? residue + bk : residue));
-			};
-			u16 const address = form == 0 ? 0x200 + mode : form == 1 ? 0x1000 + mode :
-				form == 16 ? circular(offset) : form >= 14 && form < 17 ? u16(0x5007 + offset) :
-				form == 17 ? u16(0x1500 + offset) : 0x5007;
-			u16 const next = form < 2 || form == 17 || form == 14 ? 0x5007 : form >= 15 ? address :
-				form == 11 || form == 13 ? circular(form == 11 ? -0x5007 : 0x5007) :
-				std::array<u16,12>{0x5007,0x5006,0x5008,0x5008,0,0,0xa00e,0x2803,0x5006,0x5000,0x5008,0x500e}[form - 2];
+			auto const f = smem_address(form,reg,cmpt,pattern,flags & 1);
+			unsigned const selected = f.selected, read = f.read + 1;
+			u16 const mode = f.mode, bk = f.bk, address = f.address, next = f.next;
 			auto const pair = compare ? comparisons[pattern] : masks[pattern];
 			bool const result = compare ? pair[0] == pair[1] : (pair[0] & pair[1]) != 0;
 			bool const initial_tc = seed & 1;
@@ -36,7 +25,7 @@ inline std::vector<clocked_register_case> section_cases()
 			u16 const addressed_st0 = cmpt && reg && form >= 2 && form != 17 ? (st0 & 0x1fff) | (reg << 13) : st0;
 			u16 const st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (flags & 2 ? 0x200 : 0) |
 				(cmpt ? 0x20 : 0) | (form == 1 ? 0x4000 : 0);
-			u16 const literal = form == 17 ? address : u16(offset);
+			u16 const literal = f.literal;
 			u32 const base = reg == 6 ? 0x20000 : 0;
 			auto initial = initial_case(compare ? "Smem-compare" : "Smem-mask-test",
 				{u16((compare ? 0x6000 : 0x6100) | mode),form >= 14 ? literal : pair[1],

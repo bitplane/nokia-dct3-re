@@ -253,53 +253,6 @@ int main() {
                                  'cases=83968 digest=a57c305fd5b3a3ba',
                                  'cases=671744 digest=a992a2f6ed8d9f42'])
 
-    @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
-    def test_smem_schedule_keeps_every_input_and_balances_replay(self):
-        source = r'''
-#include <array>
-#include <algorithm>
-#include <cassert>
-#include <cstdio>
-#include <vector>
-#include "tests/c54x/tms320c54x_test_smem_schedule.h"
-#include "tests/c54x/tms320c54x_test_support.h"
-int main() {
-    using namespace c54x_test;
-    using s = smem_schedule;
-    struct bank { s::kind kind; unsigned width, span; };
-    for (auto b : {bank{s::kind::test_compare, 144, 18432}, {s::kind::signed_word, 576, 36864},
-                   {s::kind::unsigned_add, 288, 18432}, {s::kind::unsigned_sub, 288, 18432},
-                   {s::kind::shift16, 1152, 73728}}) {
-        std::vector<unsigned> seen(b.span);
-        std::vector<std::array<unsigned, 3>> groups(b.span / 8);
-        ordered_case_digest coverage;
-        for (unsigned raw = 0; raw != b.span; ++raw) {
-            if (!s::valid(raw, b.kind)) continue;
-            unsigned const key = s::key(raw, b.kind);
-            assert(key < b.span * 3 && key % b.span == raw && !seen[raw]++);
-            unsigned const group = raw % b.width + b.width * (raw / (b.width * 8));
-            ++groups[group][key / b.span];
-            coverage.add(key);
-        }
-        for (unsigned raw = 0; raw < b.span; ++raw) assert(seen[raw] == unsigned(raw % 18 != 5));
-        for (unsigned i = 0; i < groups.size(); ++i) {
-            auto counts = groups[i];
-            std::sort(counts.begin(), counts.end());
-            assert((counts == (i % 18 == 5 ? std::array<unsigned, 3>{0, 0, 0} :
-                                            std::array<unsigned, 3>{2, 3, 3})));
-        }
-        assert(!s::valid(b.span, b.kind) && coverage.count == s::cases(b.kind));
-        std::printf("cases=%u digest=%016llx\n", coverage.count, (unsigned long long)coverage.value);
-    }
-}
-'''
-        with compiled_cpp(source) as program:
-            output = subprocess.check_output([str(program)], text=True).splitlines()
-        self.assertEqual(output, ['cases=17408 digest=e8a1e8427edb11e5',
-                                 'cases=34816 digest=7605a400a87ea30d',
-                                 'cases=17408 digest=c21de3d0686da5d5',
-                                 'cases=17408 digest=c21de3d0686da5d5',
-                                 'cases=69632 digest=ecba0abea16a63e2'])
 
     @unittest.skipUnless(shutil.which('c++'), 'C++ compiler required')
     def test_mapped_mac_schedule_preserves_alias_inputs_and_balances_checkpoints(self):

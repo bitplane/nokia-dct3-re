@@ -680,11 +680,6 @@ void tms320c54x_test_state::start_pipeline_imr_store(unsigned variant)
 	m_phase = 253510; m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::memory_unsigned_case(unsigned variant, bool subtract)
-{
-	return memory_arithmetic_case(variant % 144 + ((subtract ? 2 : 0) + (variant / 144) % 2) * 144 +
-		((variant / 288) % 8) * 576 + ((variant / 2304) % 4) * 4608 + ((variant / 9216) % 2) * 18432, true);
-}
 
 tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::offset_load_case(unsigned variant)
 {

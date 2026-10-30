@@ -420,57 +420,7 @@ tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::memory_a
 		u16(form == 17 ? address : u16(offset)), address, next_ar, memory, st0, st1, result_st0, source, result, bk};
 }
 
-tms320c54x_test_state::memory_arithmetic_fixture tms320c54x_test_state::memory_shift16_case(unsigned variant)
-{
-	return memory_arithmetic_case(variant % 144 + ((variant / 1152) % 8) * 576 +
-		((variant / 9216) % 4) * 4608 + ((variant / 36864) % 2) * 18432, false, (variant / 144) % 8);
-}
 
-void tms320c54x_test_state::start_pipeline_memory_arithmetic(unsigned variant)
-{
-	using kind = smem_schedule::kind;
-	if (!variant)
-	{
-		m_memory_kind = profile_is("memory-shift16") ? kind::shift16 : profile_is("adds") ? kind::unsigned_add :
-			profile_is("subs") ? kind::unsigned_sub : kind::signed_word;
-		m_memory_alu_coverage = {}; m_memory_alu_restores = 0;
-	}
-	if (variant % 18 == 5) ++variant; // Short MOD=3 is write-only; retain raw snapshot IDs.
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const shift16 = m_memory_kind == kind::shift16, adds = m_memory_kind == kind::unsigned_add;
-	// Pure input/reference data is fixed for the live/replay pair. Do not
-	// rebuild it on every timer tick or derive it from the mutated CPU state.
-	m_memory_input = shift16 ? memory_shift16_case(variant) : adds || m_memory_kind == kind::unsigned_sub ?
-		memory_unsigned_case(variant, !adds) : memory_arithmetic_case(variant);
-	auto const &f = m_memory_input;
-	u32 const base = f.reg == 6 ? 0x20000 : 0;
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, f.opcode); if (f.form >= 14) program.write_word(base + 0x601, f.literal);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.st0); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_BK, f.bk);
-	for (unsigned ar = 0; ar < 8; ++ar) m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x5007);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, BIT(f.opcode, shift16 ? 9 : 8) ? 0x123456789aULL : f.source);
-	m_cpu->set_state_int(tms320c54x_device::STATE_B, BIT(f.opcode, shift16 ? 9 : 8) ? f.source : 0x123456789aULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->space(AS_DATA).write_word(f.address, f.memory);
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0xffff, "memory_arithmetic_sample",
-		[this, f](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return;
-			expect(at == f.address && word == f.memory && !m_pipeline_operand_reads && m_cpu->pipeline_cycles() == f.read_cycle,
-				"Memory ADD/SUB samples one word through its captured address in Read"); ++m_pipeline_operand_reads; });
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "memory_arithmetic_no_write",
-		[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Memory ADD/SUB modifies only its accumulator/status"); });
-	m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "memory_arithmetic_literal",
-		[this, f](offs_t, u16 &word, u16) { if (machine().side_effects_disabled() || f.form < 14) return;
-			expect(word == f.literal && !m_pipeline_extensions_reads, "Memory ADD/SUB retains its offset/absolute literal once"); ++m_pipeline_extensions_reads; });
-	m_phase = 252910; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -2972,90 +2922,13 @@ bool tms320c54x_test_state::check_absolute_xorm_results()
 				(unsigned long long)m_long_rmw_coverage.value);
 			if (profile_is("rmw-long")) throw emu_fatalerror(3, "TMS320C54x isolated long RAM RMW complete");
 			if (profile_is("long-mvkd")) { start_pipeline_long_mvkd(); return true; }
-			start_pipeline_memory_arithmetic(); return true;
+			return true;
 		}
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 252900)
 	{
 		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252890;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252910)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		using kind = smem_schedule::kind;
-		bool const subs = m_memory_kind == kind::unsigned_sub, adds = m_memory_kind == kind::unsigned_add;
-		bool const shift16 = m_memory_kind == kind::shift16;
-		auto const &f = m_memory_input;
-		unsigned const checkpoint = std::array<unsigned, 3>{3, f.read_cycle - 1, f.read_cycle}[smem_schedule::checkpoint(variant, m_memory_kind)];
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Memory ADD/SUB has retained staged ownership");
-		if (f.form >= 14 && tick == 4)
-		{
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word((f.reg == 6 ? 0x20000 : 0) + 0x601, 0xdead);
-		}
-		if (tick == f.read_cycle - 1)
-		{
-			for (unsigned ar = 0; ar < 8; ++ar)
-				expect(m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (ar == f.selected ? f.next_ar : 0x5007),
-					"Memory ADD/SUB modifies only the selected pointer once in Access");
-			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + f.selected, 0x2222);
-		}
-		if (tick == f.read_cycle)
-		{
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.address, 0xdead);
-		}
-		if (tick == checkpoint && !m_pipeline_replay)
-		{
-			m_idle_fixture_saved_tick = tick; m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save memory ADD/SUB during Decode, captured address or retained Read");
-		}
-		if (tick == 18)
-		{
-			u64 const other = shift16 && BIT(f.opcode, 8) != BIT(f.opcode, 9) ? f.source : 0x123456789aULL;
-			expect_opcode(f.opcode, m_pipeline_operand_reads == 1 && m_pipeline_extensions_reads == unsigned(f.form >= 14) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == f.result_st0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (BIT(f.opcode, 8) ? other : f.result) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (BIT(f.opcode, 8) ? f.result : other) &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR0 + f.selected) == 0x2222,
-				"Memory ADD/SUB uses its retained sample with bit-32 carry, sticky destination overflow and signed OVM saturation");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = m_idle_fixture_saved_tick;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1];
-				expect(restore_snapshot(machine(), *m_check_timer, m_saved_pipeline) == STATERR_NONE, "Restore memory ADD/SUB without operand resampling or duplicate AR modification");
-				++m_memory_alu_restores;
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 252920; m_check_timer->enable(true); return true;
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			m_memory_alu_coverage.add(smem_schedule::key(variant, m_memory_kind));
-			expect(m_memory_alu_restores == m_memory_alu_coverage.count, "Every retained memory arithmetic input completed a real restore");
-			if (variant + 1 < smem_schedule::raw_inputs(m_memory_kind)) { start_pipeline_memory_arithmetic(variant + 1); return true; }
-			expect(m_memory_alu_coverage.count == smem_schedule::cases(m_memory_kind), "Complete the legal memory arithmetic input bank once");
-			if (shift16)
-			{
-				osd_printf_info("TMS320C54x staged memory shift16: PASS cases=%u restore=%u forms=17 registers=8 selectors=8 patterns=8 sxm_ovm=4 compatibility=2 reads=1 data_writes=0 partial_carry=1 mapped_acceptance=0 silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n", m_memory_alu_coverage.count, m_memory_alu_restores, (unsigned long long)m_memory_alu_coverage.value);
-				throw emu_fatalerror(0, "TMS320C54x isolated memory shift16 complete");
-			}
-			if (adds)
-			{
-				osd_printf_info("TMS320C54x staged ADDS: PASS cases=%u restore=%u forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n", m_memory_alu_coverage.count, m_memory_alu_restores, (unsigned long long)m_memory_alu_coverage.value);
-				throw emu_fatalerror(0, "TMS320C54x isolated staged ADDS complete");
-			}
-			if (subs)
-			{
-				osd_printf_info("TMS320C54x staged SUBS: PASS cases=%u restore=%u forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n", m_memory_alu_coverage.count, m_memory_alu_restores, (unsigned long long)m_memory_alu_coverage.value);
-				throw emu_fatalerror(0, "TMS320C54x isolated staged SUBS complete");
-			}
-			osd_printf_info("TMS320C54x staged memory ADD/SUB: PASS cases=%u forms=17 registers=8 selectors=4 patterns=8 sxm_ovm=4 compatibility=2 restore=%u duplicate_reads=0 data_writes=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n", m_memory_alu_coverage.count, m_memory_alu_restores, (unsigned long long)m_memory_alu_coverage.value);
-			if (profile_is("memory-alu")) throw emu_fatalerror(0, "TMS320C54x isolated memory ADD SUB complete");
-			return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 252920)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 252910;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	return false;

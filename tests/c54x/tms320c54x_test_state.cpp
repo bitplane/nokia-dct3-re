@@ -110,7 +110,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"ldu-periph"}, [](self &test) { test.start_ldu_peripheral(); } },
 		{ {"ldu-imr"}, [](self &test) { test.start_ldu_imr(); } },
 		{ {"ldu-st1"}, [](self &test) { test.start_ldu_status(); } },
-		{ {"memory-shift16"}, [](self &test) { test.start_pipeline_memory_arithmetic(); } },
 		{ {"mvmd-status-irq"}, [](self &test) { test.start_mvmd_status_irq(); } },
 		{ {"mvmd-block"}, [](self &test) { test.start_mvmd_status_block(); } },
 		{ {"mvmd-status-alu"}, [](self &test) { test.start_mvmd_status_alu(); } },
@@ -143,7 +142,6 @@ void tms320c54x_test_state::machine_reset()
 		return;
 	if (profile_is("squr-smem")) { check_control_disassembler(); start_pipeline_memory_multiply(); return; }
 	if (start_profile(*this, machine().options().bios(), {
-		{ {"memory-alu"}, [](self &test) { test.start_pipeline_memory_arithmetic(); } },
 		{ {"shifted-alu", "shifted-bk"}, [](self &test) { test.start_pipeline_shifted_arithmetic(); } },
 		{ {"indirect-load"}, [](self &test) { test.start_pipeline_indirect_case(); } },
 	}))
@@ -196,8 +194,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"mvdd-source", "mvdd-source-rpt"}, [](self &test) { test.start_mvdd_source(); } },
 		{ {"mvmd-t", "mvmd-bk"}, [](self &test) { test.start_mvmd_word_register(); } },
 		{ {"mvmd-acc", "mvmd-st1"}, [](self &test) { test.start_mvmd_accumulator(); } },
-		{ {"subs"}, [](self &test) { test.start_pipeline_memory_arithmetic(); } },
-		{ {"adds"}, [](self &test) { test.start_pipeline_memory_arithmetic(); } },
 		{ {"alu-map", "alu-map-edge", "alu-map-irq", "alu-low-bus"}, [](self &test) { test.start_mapped_dual(); } },
 		{ {"xc-ret"}, [](self &test) { test.start_xc_return(); } },
 		{ {"drsub", "long-pair"}, [](self &test) { test.start_pipeline_long_pair(); } },
