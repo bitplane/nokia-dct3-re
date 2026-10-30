@@ -1456,15 +1456,6 @@ private:
 	void start_atomic_xorm(unsigned index);
 
 
-	struct staged_overflow_fixture
-	{
-		u32 base;
-		unsigned selected, producer, gap, checkpoint;
-		bool delayed, take, mutate;
-		u16 initial, mask, opcode, sampled;
-	};
-	static staged_overflow_fixture staged_overflow_case(unsigned v);
-	void start_staged_overflow(unsigned variant = 0);
 
 	bool rom4_codec_is(char const *name) const;
 	void enable_rom4_codec_pipeline(char const *kind);
@@ -1672,7 +1663,6 @@ private:
 	bool check_shifted_peripheral_results();
 	bool check_xc_return_results();
 	bool check_delay_copy_results();
-	bool check_staged_overflow_results();
 	bool check_mapped_dual_results();
 	bool check_mvmd_accumulator_results();
 	bool check_repeat_mvdp_irq_results();

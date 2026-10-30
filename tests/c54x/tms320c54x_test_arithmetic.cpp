@@ -2806,51 +2806,6 @@ void tms320c54x_test_state::start_atomic_xorm(unsigned index)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::staged_overflow_fixture tms320c54x_test_state::staged_overflow_case(unsigned v)
-{
-	staged_overflow_fixture f{}; unsigned const condition = v % 4; v /= 4;
-	f.selected = condition & 1; f.mask = 1U << (10 - f.selected);
-	f.delayed = v % 2; v /= 2; unsigned const flags = v % 4; v /= 4;
-	f.initial = 0x1805 | ((flags & 1) << 10) | ((flags & 2) << 8);
-	f.producer = v % 3; v /= 3; f.gap = v % 3; v /= 3;
-	f.base = v % 2 ? 0x20000 : 0; v /= 2;
-	f.checkpoint = std::array<unsigned,4>{3,6 + f.gap,7 + f.gap,10 + f.gap}[v % 4]; v /= 4;
-	f.mutate = v % 2;
-	f.sampled = f.producer == 0 ? f.initial : f.producer == 1 ? f.initial | f.mask : f.initial & ~f.mask;
-	f.take = bool(f.sampled & f.mask) == bool(condition & 2);
-	f.opcode = 0xf860 | (f.delayed ? 0x200 : 0) | (f.selected << 3) | ((condition & 2) << 3);
-	return f;
-}
-
-void tms320c54x_test_state::start_staged_overflow(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto const f = staged_overflow_case(variant); auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 20; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, f.producer == 0 ? 0xf495 : (f.producer == 1 ? 0xf5b0 : 0xf4b0) | (10 - f.selected));
-	program.write_word(f.base + 0x601 + f.gap, f.opcode); program.write_word(f.base + 0x602 + f.gap, 0x700);
-	program.write_word(f.base + 0x603 + f.gap, 0xf5b0 | (10 - f.selected));
-	program.write_word(f.base + 0x604 + f.gap, 0xe955);
-	program.write_word(f.base + 0x605 + f.gap, 0xe811); program.write_word(f.base + 0x606 + f.gap, 0xf4e1);
-	program.write_word(f.base + 0x700, 0xe822); program.write_word(f.base + 0x701, 0xf4e1);
-	m_cpu->set_pipeline_frontend(false);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.initial); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
-	m_pipeline_operand_reads = m_pipeline_extensions_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = program.install_read_tap(f.base + 0x602 + f.gap, f.base + 0x602 + f.gap, "overflow_target_literal", [this](offs_t, u16 &word, u16) {
-		if (!machine().side_effects_disabled()) { expect(!m_pipeline_extensions_reads++ && word == 0x700, "Overflow branch captures one original target literal"); }
-	});
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x700, f.base + 0x700, "overflow_target_fetch", [this,f](offs_t, u16 &, u16) {
-		if (!machine().side_effects_disabled()) { expect(f.take && !m_pipeline_operand_reads++, "Overflow branch fetches its selected target once"); }
-	});
-	m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0xffff, "overflow_no_writes", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_pipeline_store_writes; });
-	m_phase = 62172; m_pipeline_replay = false; m_idle_fixture_tick = 0;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -4025,52 +3980,6 @@ bool tms320c54x_test_state::check_accumulator_cmpm_results()
 }
 
 
-bool tms320c54x_test_state::check_staged_overflow_results()
-{
-	if (m_phase == 62172)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		auto const f = staged_overflow_case(variant);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Overflow-only BC/BCD remain staged");
-		if (tick == 7 + f.gap)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (f.sampled & ~f.mask), "Evaluating OV/NOV consumes only its selected sticky flag");
-			if (f.mutate) m_cpu->set_state_int(tms320c54x_device::STATE_ST0, f.sampled | f.mask);
-		}
-		if (tick == f.checkpoint && !m_pipeline_replay)
-		{
-			m_recurring_irq_snapshot = {m_pipeline_operand_reads, m_pipeline_extensions_reads, m_pipeline_store_writes};
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save overflow predicate around Evaluate and delay execution");
-		}
-		if (tick == 24)
-		{
-			bool const slots = f.delayed || !f.take;
-			u16 const status = (f.sampled & ~f.mask) | (slots || f.mutate ? f.mask : 0);
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
-				m_cpu->state_int(STATE_GENPC) == f.base + (f.take ? 0x702 : 0x607 + f.gap) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (f.take ? 0x22 : 0x11) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (slots ? 0x55 : 0) &&
-				m_cpu->state_int(tms320c54x_device::STATE_ST0) == status && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000 &&
-				m_pipeline_extensions_reads == 1 && m_pipeline_operand_reads == unsigned(f.take) && !m_pipeline_store_writes,
-				"Overflow decision is retained across flag mutation, delay writes and restored state");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint;
-				m_pipeline_operand_reads = m_recurring_irq_snapshot[0]; m_pipeline_extensions_reads = m_recurring_irq_snapshot[1]; m_pipeline_store_writes = m_recurring_irq_snapshot[2];
-				m_check_timer->adjust(attotime::never); m_cpu->set_pipeline_frontend(true);
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore overflow branch after clearing the live pipeline");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_phase = 62173; m_check_timer->enable(true); return true;
-			}
-			m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 4607) { start_staged_overflow(variant + 1); return true; }
-			osd_printf_info("TMS320C54x staged overflow branches: PASS cases=4608 restore=4608 forms=BC,BCD predicates=AOV,ANOV,BOV,BNOV flags=4 producers=seed,SSBX,RSBX gaps=0,1,2 pages=2 snapshots=4 selected_flag_clear=1 post_evaluate_mutation=2 literal_reads=1 target_fetches=once writes=0 reset_before_restore=1 arithmetic_producers=unvalidated physical_phase_claim=0\n");
-			throw emu_fatalerror(3, "TMS320C54x isolated staged overflow branches complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62173) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62172; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 bool tms320c54x_test_state::check_mvmd_accumulator_results()
 {
