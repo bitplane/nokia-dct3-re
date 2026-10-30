@@ -15,7 +15,6 @@
 #include "tms320c54x_test_absolute_examples.h"
 #include "tms320c54x_test_disassembly.h"
 #include "tms320c54x_test_long_t_store.h"
-#include "tms320c54x_test_near_flow.h"
 #include "tms320c54x_test_mapped_mac.h"
 #include "tms320c54x_test_dual.h"
 #include "tms320c54x_test_normalization.h"
@@ -104,7 +103,7 @@ protected:
 			else if (words()) m_cases = c54x_test::instruction_word_examples();
 			else if (products()) m_cases = c54x_test::product_examples();
 			else if (near_flow())
-				m_cases.assign(c54x_test::near_flow_cases().begin(), c54x_test::near_flow_cases().end());
+				throw emu_fatalerror("Legacy near-flow bank retired: run the atomic_near_control section");
 			else if (long_reference())
 				m_cases.assign(c54x_test::long_reference_cases().begin(), c54x_test::long_reference_cases().end());
 			else if (parallel())

@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
-#include "tms320c54x_test_near_flow.h"
 
 namespace c54x_test {
 
@@ -14,18 +13,6 @@ bool tms320c54x_test_state::check_atomic_control_results()
 	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
 	if ((m_phase >= 750 && m_phase <= 757) || (m_phase >= 60040 && m_phase <= 60041))
 	{
-		unsigned const index = m_phase >= 60040 ? m_phase - 60038 : m_phase < 752 ? m_phase - 750 : m_phase - 748;
-		auto const &test = near_flow_cases()[index];
-		check_case(*m_cpu, test, m_port_writes, m_last_port_cycle - m_first_port_cycle);
-		expect_opcode(test.opcode, true, "conditional delay/stack reference");
-		if (index == 4) expect_opcode(0x8a63, true, "POPM high address bits");
-		if (index + 1 < near_flow_cases().size())
-		{
-			unsigned const next = index + 1;
-			m_port_writes = 0;
-			prepare_case(*m_cpu, near_flow_cases()[next]);
-			return next_atomic_phase(next < 2 ? 750 + next : next < 4 ? 60038 + next : 748 + next);
-		}
 		// Far-control fixtures use distinct pages, not mirrored low RAM.
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		program.write_word(0x020600, 0xf983); // FCALL 03:0700

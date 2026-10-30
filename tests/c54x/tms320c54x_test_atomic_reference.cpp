@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
-#include "tms320c54x_test_near_flow.h"
 #include "tms320c54x_test_parallel.h"
 #include "tms320c54x_test_long_reference.h"
 #include "tms320c54x_test_product_examples.h"
@@ -897,7 +896,6 @@ bool tms320c54x_test_state::check_atomic_reference_results()
 			return next_atomic_phase(next < 3 ? 730 + next : next < 5 ? 6555 + next :
 				next <= 10 ? 728 + next : 729 + next);
 		}
-		return begin_atomic_case(near_flow_cases()[0], 750);
 	}
 	return false;
 }
