@@ -88,13 +88,6 @@ struct domain_input
 	std::uint16_t indirect_source = 0xffff;
 	std::uint16_t pmst = 0, ar_base = 0x1400;
 	std::vector<std::uint16_t> words{};
-	std::uint32_t identity = 0;
-	std::uint32_t key() const
-	{
-		if (identity) return identity;
-		return (std::uint32_t(instruction.opcode | mode) << 16) |
-			(std::uint32_t(absolute_source != 0xffff ? absolute_source : indirect_source != 0xffff ? indirect_source : instruction.operation) << 4) | tag | context;
-	}
 };
 
 inline domain_input select_domain(unsigned index)
@@ -190,7 +183,6 @@ inline domain_input select_domain(unsigned index)
 		result.pmst = pmst ? 0x4000 : 0;
 		result.ar_base = 0xf040;
 		result.checkpoint = point ? 12 : 1;
-		result.identity = (repeated ? 0xc0000000 : 0x80000000) | (v + point * (repeated ? 4800 : 2304));
 		if (repeated)
 		{
 			result.prefix = long_count ? 0xf070 : 0xec00 | count;

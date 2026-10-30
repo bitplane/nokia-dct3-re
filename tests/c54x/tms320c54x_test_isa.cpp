@@ -3,7 +3,6 @@
 
 #include "emu.h"
 #include "emuopts.h"
-#include "tms320c54x_test_domains.h"
 #include "tms320c54x_test_word_examples.h"
 #include "tms320c54x_test_disassembly.h"
 #include "tms320c54x_test_dual.h"
@@ -18,9 +17,8 @@ public:
 		: driver_device(config, type, tag), m_cpu(*this, "cpu") { }
 	void test(machine_config &config)
 	{
-		m_domain = !std::strcmp(config.options().bios(), "source-domain");
 		m_dual_mode = c54x_test::dual_multiply_mode::select(config.options().bios());
-		m_extended_program = !std::strcmp(config.options().bios(), "isa-disasm") || m_domain || bool(m_dual_mode);
+		m_extended_program = !std::strcmp(config.options().bios(), "isa-disasm") || bool(m_dual_mode);
 		TMS320C54X(config, m_cpu, 13'000'000);
 		m_cpu->set_extended_program(m_extended_program);
 		m_cpu->set_addrmap(AS_PROGRAM, &c54x_isa_test_state::program_map);
@@ -33,7 +31,6 @@ protected:
 		m_timer = timer_alloc(FUNC(c54x_isa_test_state::check), this);
 		if (disassembly()) return;
 		if (m_dual_mode) m_dual = std::make_unique<c54x_test::dual_multiply_fixture_runner>(machine(), *m_cpu, *m_timer, m_dual_mode);
-		else if (m_domain) m_domains = std::make_unique<c54x_test::source_domain_fixture>(machine(), *m_cpu, *m_timer);
 		else
 		{
 			if (words()) m_cases = c54x_test::instruction_word_examples();
@@ -64,7 +61,6 @@ protected:
 		}
 		m_case = m_resets = 0;
 		if (m_dual) m_dual->start();
-		else if (m_domains) m_domains->start();
 		else start();
 	}
 private:
@@ -125,7 +121,6 @@ private:
 	}
 	void io_map(address_map &map)
 	{
-		if (m_domain) map(0, 0xffff).ram();
 		map(0x0124, 0x0124).w(FUNC(c54x_isa_test_state::port_w));
 	}
 	void port_w(u16)
@@ -155,13 +150,6 @@ private:
 	TIMER_CALLBACK_MEMBER(check)
 	{
 		if (m_dual) { if (m_dual->step()) dual_result(); return; }
-		if (m_domains)
-		{
-			if (!m_domains->step()) return;
-			osd_printf_info("TMS320C54x source-domain exclusions: PASS cases=%u restore=%u base_cases=30000 absolute_tc0_cases=448 short_control_cases=14208 mac_source_cases=1280 mac_short_checkpoint_cases=128 mapped_rejection_cases=8328 mmr_guard_cases=2304 repeat_transfer_guard_cases=4800 guard_checkpoints=balanced pmst_bit14=2 mac_frontend=staged mac_checkpoints=3,5 mac_modes=f8,98..9f base_instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 shifts=0,1,15,16,31 base_modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n",
-				m_domains->count(), m_domains->restores(), (unsigned long long)m_domains->digest());
-			throw emu_fatalerror(3, "TMS320C54x isolated source-domain exclusions complete");
-		}
 		auto const &test = test_case();
 		c54x_test::check_case(*m_cpu, test, m_writes, m_last - m_first,
 			std::array<u64, 2>{m_middle - m_first, m_last - m_middle});
@@ -204,18 +192,15 @@ private:
 	emu_timer *m_timer = nullptr;
 	unsigned m_case = 0, m_writes = 0, m_resets = 0;
 	u64 m_first = 0, m_middle = 0, m_last = 0;
-	bool m_domain = false;
 	bool m_extended_program = false;
 	c54x_test::dual_multiply_mode m_dual_mode;
 	std::unique_ptr<c54x_test::dual_multiply_fixture_runner> m_dual;
-	std::unique_ptr<c54x_test::source_domain_fixture> m_domains;
 	std::vector<c54x_test::instruction_case> m_cases;
 };
 
 ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(0, "isa-square", "TI square arithmetic reference cases")
 	ROM_SYSTEM_BIOS(1, "isa-parallel", "Parallel store arithmetic reference cases")
-	ROM_SYSTEM_BIOS(2, "source-domain", "Implemented single-memory operand admission limits")
 	ROM_SYSTEM_BIOS(3, "isa-scalars", "Scalar arithmetic boundaries with explicit stateful groups")
 	ROM_SYSTEM_BIOS(4, "isa-long", "TI long-word arithmetic examples")
 	ROM_SYSTEM_BIOS(5, "isa-products", "Literal multiply arithmetic and DELAY continuation sequence")

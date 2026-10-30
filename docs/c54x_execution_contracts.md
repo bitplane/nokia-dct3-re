@@ -206,7 +206,7 @@ FCALL/FCALLD and inner-repeat interaction fixtures remain unchanged.
 
 The compatibility-named `tms54isa` bench separates architectural examples
 (`isa-square`, `isa-parallel`, `isa-scalars`, `mac-map-imm`) from implementation-admission checks
-(`source-domain`) by explicit profile and review classification. Source-domain
+(`source_admission`) by explicit profile and review classification. Source-domain
 owns its case state, timer cadence, bus observers and replay without the legacy
 phase dispatcher. The base 30,000 cases retain their identities and checkpoint
 choices; 448 absolute TC-clear controls and 14,208 short-source controls retain
@@ -300,7 +300,7 @@ addressing forms retain T. The same bank replaces the legacy reference phase
 blocks without resetting that CPU. Case identities and expectation masks, not
 phase numbers, describe the retained contracts.
 
-`source-domain` owns write-only-source rejection for DLD `569b`, LDM `489a`,
+`source_admission` owns write-only-source rejection for DLD `569b`, LDM `489a`,
 MPY `629b` and MAC `649b`, including all sixteen base contexts and replay.
 The duplicate legacy setup/check blocks and routes are deleted. Their old
 numeric stimuli are explicitly retired in the review ledger, not claimed as
@@ -695,19 +695,25 @@ source-admission guards; optional profiles retain their separate scopes below.
 
 ### Operand-domain acceptance
 
-`source-domain` on `tms54isa` enumerates all 111 implemented ordinary
+`source_admission` enumerates all 111 implemented ordinary
 Smem/Lmem source/RMW high-byte classes, ten shifted read extensions and four
-MMR-source forms. The base 30,000 cases and save/replays check short `98..9f` and
+MMR-source forms. The base 15,000 cases and save/replays check short `98..9f` and
 unadmitted `f9..ff`, CMPT, two program pages, both CPU frontends and snapshots
-before/after rejection. Data reads/writes, program writes and I/O accesses stay
+distributed before/after rejection. Data reads/writes, program writes and I/O accesses stay
 zero; accumulators, T, status, repeat/stack pointers and all ARs are retained.
 The independent fixture inventory does not call CPU admission helpers.
-Another 448 cases check `68xx..6bxx` absolute aliases with TC initially clear.
-The 14,208 short-source controls below bring the total to 44,656 cases and
-actual restores. Small accumulator/stack sentinels and following-word literal
-repetitions are not retained as separate stimulus coverage.
+Another 224 cases check `68xx..6bxx` absolute aliases with TC initially clear.
+There are 7,104 short-source controls, 704 MAC guards, 8,328 mapped-source
+guards, 2,304 MMR guards and 4,800 repeat-transfer guards: 38,464 cases and
+actual restores, replacing 61,496 executions. Duplicate checkpoint contexts
+are removed from the base/control and MAC banks; every instruction/address/
+status/page/frontend input remains. Each case explicitly cold-resets, matching
+the original contract, including atomic repeat state. The common runner owns
+the no-data, no-I/O and no-program-write checks. The host test retains only
+the independent 125-entry instruction-inventory check, not a mirrored decoder
+or obsolete profile digest.
 
-A retained regression is case 3428: atomic `0ef9` (SUBB) must reject before
+A retained regression is atomic `0ef9` (SUBB), which must reject before
 an operand transaction or changes to status/repeat state. The shared atomic
 source-operand predicate covers the implemented single-address source classes,
 including special-load, test and transfer families. Shifted `6fxx` aliases are
@@ -916,7 +922,7 @@ the guard now rejects `98..9f` before address modification or operand access.
 This is fail-closed emulation of an unsupported operand form, not a claimed
 silicon exception. It does not introduce positive staged MACP/MACD support.
 
-The CPU-only `source-domain` census owns this rejection contract, including
+The CPU-only `source_admission` census owns this rejection contract, including
 TC-clear controls. Existing postdecrement/postincrement, absolute and
 long-offset MACP/MACD examples remain in the default core regression; long
 MOD=13 is not removed. This is still not an all-ISA closure.
@@ -1024,7 +1030,7 @@ by this byte-oriented guard. Valid short MMR forms keep their page-zero and
 AR-upper-bit-clearing semantics. Ordinary Smem long MOD=13 (`e8..ef` plus
 offset) remains read-capable and must not be rejected by this MMR rule.
 
-The CPU-only `source-domain` census retains 2,304 MMR guard tuples:
+The CPU-only `source_admission` census retains 2,304 MMR guard tuples:
 nine classes, 25 forbidden plus seven reserved bytes, both PMST-bit-14 inputs,
 two pages and both frontends. Old checkpoints 1/12 are balanced over the tuples
 instead of repeating every tuple twice. It requires no data/stack access,
@@ -1049,7 +1055,7 @@ It also does not prohibit a standalone extended transfer or a transfer in a
 block repeat.
 
 The six MVKD/MVDK, MVPD/MVDP and READA/WRITA classes reject operand bytes
-`e0..f8` under an active single repeat before operand effects. `source-domain`
+`e0..f8` under an active single repeat before operand effects. `source_admission`
 retains all 4,800 transfer tuples: six classes, all 25 offset/absolute bytes,
 short and long immediate RPT counts 0 and 2, both PMST-bit-14 inputs,
 two program pages and both frontends, with balanced checkpoints 1/12. It requires no data
@@ -1688,7 +1694,7 @@ DST cases, 9,216 short-indirect DST cases, 1,152 store/DLD composition cases
 and 23,040 DLD cases. Case IDs, instruction-shaped literals, save/restore
 and bus-access assertions are retained; no invalid case is replaced by a
 duplicate legal tuple. Load-source rejection is covered separately by the
-CPU-only `source-domain` census. CPU emulation code is unchanged.
+CPU-only `source_admission` census. CPU emulation code is unchanged.
 
 ```sh
 python3 tools/run_c54x_core.py --mame mame/mame --rompath mame/roms \
@@ -2916,7 +2922,7 @@ long-memory arithmetic changed ST0 from `1804` to `1004` before the guard.
 These are fail-closed model contracts, not silicon-trap claims or positive
 staged support for T-dependent arithmetic.
 
-The CPU-only `source-domain` census owns the rejection coverage. Separate
+The CPU-only `source_admission` census owns the rejection coverage. Separate
 legal controls remain in `logic-absolute`, `add-absolute`, `arith-ar` and
 `long_pair_arithmetic`, which includes the positive DADD/DSUB/DRSUB contracts.
 Repeat/interrupt composition and physical timing remain separate scopes.
@@ -3442,8 +3448,8 @@ Focused build/run: 6.051/7.023 seconds; negative expectations are rejected.
 The `memory_immediate_product` RAM/MPY section separates numerical and routing
 coverage as described above. The implementation-limit controls for the
 remaining eighty low/control/peripheral addresses and eight write-only MOD=3
-forms run separately in `source-domain`: all 1,408 cases/replays, selectors,
-pages and original checkpoint choices are retained. Producer, control, repeat and
+forms run separately in `source_admission`: 704 cases/replays retain all selectors
+and pages, distributing the original checkpoints instead of duplicating them. Producer, control, repeat and
 interrupt compositions are not newly qualified, nor are physical bus phases.
 
 ## Parallel Store/Multiply

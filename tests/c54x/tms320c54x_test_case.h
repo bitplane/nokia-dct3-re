@@ -109,6 +109,8 @@ struct clocked_register_case
 	bool observe_data_reads = true; // Write-only contracts can leave variable polling reads unconstrained.
 	std::vector<memory_word> synthetic_data_reads{}; // Test endpoints, not claims about peripheral register contents.
 	unsigned observation_subticks = 1; // Two samples per CPU clock avoid timer-edge observation ties.
+	bool forbid_program_writes = false;
+	bool reset_cpu_before_case = false; // Explicit cold-start contracts, not implicit predecessor cleanup.
 };
 
 // No implicit reset: the standalone runner owns reset_* metadata.

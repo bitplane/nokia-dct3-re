@@ -152,6 +152,7 @@ private:
 	{
 		m_observing_outputs = false;
 		m_cpu.suspend(SUSPEND_REASON_DISABLE, true); m_input = m_build(m_case);
+		if (m_input.reset_cpu_before_case) m_cpu.reset();
 		require(m_input.observation_subticks == 1 || m_input.observation_subticks == 2, "whole/half CPU clock observation cadence");
 		require(!m_input.states.empty() && m_input.states.front().tick == 0, "explicit initial observation");
 		for (unsigned i = 1; i < m_input.states.size(); ++i)
@@ -228,14 +229,15 @@ private:
 					require(!m_fetches && word == opcode, "one fetch of the specified opcode"); ++m_fetches;
 					if (m_opcode_observer) m_opcode_observer(word, opcode);
 				});
-		if (!m_input.program_events.empty())
+		if (!m_input.program_events.empty() || m_input.forbid_program_writes)
 		{
 			require(m_input.retained_program_reads.empty(), "one program-event policy");
 			u32 first = ~u32(0), last = 0;
 			for (auto const &event : m_input.program_events) { first = std::min(first,event.address); last = std::max(last,event.address); }
-			bool const writes = std::any_of(m_input.program_events.begin(),m_input.program_events.end(),[](auto const &event) { return event.write; });
+			bool const writes = m_input.forbid_program_writes || std::any_of(m_input.program_events.begin(),m_input.program_events.end(),[](auto const &event) { return event.write; });
 			auto access = [this,writes](bool write,offs_t at,u16 word) {
 					if (m_machine.side_effects_disabled()) return;
+					require(!(write && m_input.forbid_program_writes), "no program write before rejection");
 					bool selected = write && writes;
 					if (!write) for (auto const &event : m_input.program_events) selected |= event.address == at;
 					if (selected && !accept_bus_event(m_input.program_events,m_program_cursor,

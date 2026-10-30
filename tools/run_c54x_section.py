@@ -356,6 +356,7 @@ def main():
     counts['normalization_aliases'] = 4096
     counts['exponent_normalization'] = 768
     counts['composition_limits'] = 110
+    counts['source_admission'] = 38464
     counts['accumulator_call_frames'] = 216
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
