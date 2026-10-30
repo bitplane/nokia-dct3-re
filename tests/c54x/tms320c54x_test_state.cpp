@@ -191,8 +191,7 @@ void tms320c54x_test_state::machine_reset()
 	if (!strcmp(machine().system().name, "tms54test") &&
 			profile_is("timer"))
 	{
-		start_stopped_timer_reload_case(0);
-		return;
+		throw emu_fatalerror("Legacy timer entry retired: run stopped_timer_reload; remaining timer owners are still being migrated");
 	}
 	if (!strcmp(machine().system().name, "tms54rom4"))
 	{

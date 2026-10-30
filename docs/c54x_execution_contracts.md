@@ -447,6 +447,14 @@ product is deliberately retired. Numeric expectations, extension poisoning,
 post-read mutation and publication checks are unchanged. Ordered input/stage
 digests and actual restore counts protect the retained schedules.
 
+`stopped_timer_reload` owns 48 independently initialized cases and replays:
+all sixteen TDDR/PSC values, reload-only, identity ORM and attempted read-only
+PSC writes. Original atomic instruction words produce the PRD/TCR bus writes;
+TRB reloads TIM and PSC while stopped, reads back zero, and later writes cannot
+change PSC. Exact bus values/order and final TIM/PRD/TCR/A are checked.
+Snapshot coverage is new; no physical clock claim is added. The legacy setup
+and phase branch are removed, not kept as an executable predecessor chain.
+
 `immediate_subtract` owns 4,656 immediate SUB/shift-16 ADD cases/replays:
 all SUB shifts 0..16, selectors, eight paired word/source patterns and eight
 status combinations, plus every adjacent-load gap/value/selector. Pages and

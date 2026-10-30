@@ -57,7 +57,6 @@ private:
 	void start_idle_external_serial_case(unsigned index);
 	void start_idle_timer_case(unsigned index);
 	void start_idle_wake_case(unsigned index);
-	void start_stopped_timer_reload_case(unsigned index);
 	void start_timer_prescaler_divider_case(unsigned divider);
 	void start_timer_counter_write_case(unsigned divider);
 	void check_timer_reserved_fields();
@@ -839,7 +838,7 @@ private:
 	bool check_repeated_writa_results();
 	bool check_idle_nmi_result_results();
 	bool check_idle_wake_results();
-	bool check_stopped_timer_reload_results();
+	bool check_timer_peripheral_results();
 	bool restart_pipeline_observer(unsigned phase, u64 next_cycle)
 	{
 		// This replaces the deadline with one CPU clock; timed restores keep theirs.
