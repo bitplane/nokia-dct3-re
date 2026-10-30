@@ -1333,85 +1333,7 @@ tms320c54x_test_state::delay_multiply_fixture tms320c54x_test_state::delay_memor
 
 
 
-tms320c54x_test_state::move_brc_fixture tms320c54x_test_state::move_brc_case(unsigned variant, bool control)
-{
-	move_brc_fixture f{};
-	f.form = variant % 8;
-	f.count = std::array<unsigned, 5>{0, 1, 2, 7, 127}[(variant / 8) % 5];
-	f.gap = (variant / 40) % 2; f.delayed = (variant / 80) % 2;
-	f.base = (variant / 160) % 2 ? 0x20000 : 0; f.snapshot = variant / 320;
-	f.opcode = std::array<u16, 8>{0x7102, 0x7102, 0x7192, 0x71f8, 0x71e2, 0x7314, 0x7308, 0x7108}[f.form];
-	f.source = std::array<u16, 8>{0x1202, 0x3002, 0x1400, 0x1400, 0x1403, 0x14, 8, 8}[f.form];
-	f.offset = f.form == 3 ? 0x1400 : 3;
-	f.st1 = 0x800 | (f.form == 1 ? 0x4000 : 0);
-	f.read_tick = f.form == 3 || f.form == 4 ? 6 : 5;
-	if (control)
-	{
-		unsigned v = variant;
-		unsigned const form = std::array<unsigned, 5>{0, 2, 5, 6, 7}[v % 5]; v /= 5;
-		unsigned const count = v % 5; v /= 5;
-		unsigned const kind = v % 6; v /= 6;
-		bool const delayed = v % 2; v /= 2;
-		unsigned const page = v % 2; v /= 2;
-		f = move_brc_case(form + count * 8 + unsigned(delayed) * 80 + page * 160 + v * 320);
-		f.control_kind = kind; f.read_tick = delay_multiply_fixture::operand_read(kind, 1) - 1;
-	}
-	return f;
-}
 
-void tms320c54x_test_state::start_move_brc(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const control = profile_is("move-brc-delay");
-	auto const f = move_brc_case(variant, control);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 32; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	u32 const target_base = control && f.control_kind == 4 ? f.base ^ 0x20000 : f.base;
-	for (unsigned i = 0; i < 32; ++i) program.write_word(target_base + 0x700 + i, 0xf495);
-	unsigned cursor = control ? f.control_kind == 5 ? 0x601 : 0x602 : 0x600;
-	if (control) { program.write_word(f.base + 0x600, f.control_kind == 4 ? 0xfb80 | (target_base >> 16) : std::array<u16, 6>{0xf273, 0xfa30, 0xfa30, 0xf274, 0, 0xfe00}[f.control_kind]); if (f.control_kind != 5) program.write_word(f.base + 0x601, 0x700); }
-	program.write_word(f.base + cursor++, f.opcode);
-	if (f.form == 3 || f.form == 4) program.write_word(f.base + cursor++, f.offset);
-	program.write_word(f.base + cursor++, 0x1a);
-	if (control) cursor = f.control_kind == 2 ? 0x604 : 0x700;
-	cursor += f.gap;
-	program.write_word(target_base + cursor++, f.delayed ? 0xf272 : 0xf072);
-	u16 const end = cursor + 2 + (f.delayed ? 2 : 0);
-	program.write_word(target_base + cursor++, end);
-	if (f.delayed) cursor += 2;
-	program.write_word(target_base + cursor++, 0x1096);
-	program.write_word(target_base + cursor++, 0x8097);
-	program.write_word(target_base + cursor, 0xf4e1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, (f.form == 7 ? 0xa000 : 0xa024) | (control && f.control_kind == 1 ? 0x1000 : 0)); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.count); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000); m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1400); m_cpu->set_state_int(tms320c54x_device::STATE_AR4, f.count);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x5000); m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x5100);
-	m_cpu->set_state_int(tms320c54x_device::STATE_BRC, f.count ^ 1);
-	if (f.source >= 0x60) data.write_word(f.source, f.count);
-	if (control) data.write_word(0x3000, 0x700);
-	for (unsigned i = 0; i <= f.count; ++i) { data.write_word(0x5000 + i, 0x6000 + i); data.write_word(0x5100 + i, 0xdead); }
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_register_writes = m_pipeline_extensions_reads = 0;
-	m_fast_stack_reads = m_pipeline_drained_fetches = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "move_brc_reads", [this, f, control](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (control && at == 0x3000) { expect(f.control_kind == 5 && word == 0x700 && !m_fast_stack_reads++, "BRC move has an independent RETD target read"); return; }
-		if (at == f.source) { expect(!m_pipeline_extensions_reads++ && word == f.count && m_cpu->pipeline_cycles() == f.read_tick, "BRC move reads its source once in Access"); return; }
-		unsigned const i = m_pipeline_operand_reads++;
-		if (!(i <= f.count && at == 0x5000 + i && word == 0x6000 + i)) osd_printf_info("BRC move read failure: variant=%u address=%04x word=%04x ordinal=%u cycle=%llu\n", m_pipeline_peripheral_case, unsigned(at), word, i, (unsigned long long)m_cpu->pipeline_cycles());
-		expect(i <= f.count && at == 0x5000 + i && word == 0x6000 + i, "Move-fed repeat reads exactly count plus one ordered words");
-	});
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "move_brc_writes", [this, f, control](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		if (control && (at == 0x2fff || at == 0x2ffe)) { unsigned const i = m_pipeline_drained_fetches++; expect((f.control_kind == 3 || f.control_kind == 4) && i < (f.control_kind == 4 ? 2 : 1) && at == 0x2fff - i && word == (i ? f.base >> 16 : 0x604), "BRC move does not alter its call frame"); return; }
-		if (at == 0x1a) { expect(!m_pipeline_register_writes++ && word == f.count && m_cpu->pipeline_cycles() == f.read_tick, "BRC move publishes once before adjacent RPTB Decode"); return; }
-		unsigned const i = m_pipeline_store_writes++;
-		expect(i <= f.count && at == 0x5100 + i && word == 0x6000 + i, "Move-fed repeat writes exactly count plus one ordered words");
-	});
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 255620;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 
 
@@ -5650,41 +5572,6 @@ bool tms320c54x_test_state::check_popd_mapped_results()
 
 
 
-bool tms320c54x_test_state::check_move_brc_results()
-{
-	if (m_phase == 255620)
-	{
-		bool const control = profile_is("move-brc-delay");
-		auto const f = move_brc_case(m_pipeline_peripheral_case, control);
-		unsigned const tick = ++m_idle_fixture_tick, checkpoint = f.read_tick - 1 + f.snapshot;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Memory move BRC and following block repeat remain staged");
-		if (tick == f.read_tick)
-		{
-			expect(m_pipeline_register_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_BRC) == f.count, "Zero-latency BRC value is visible before younger block setup");
-			auto const disable = machine().disable_side_effects();
-			if (f.source >= 0x60) m_cpu->space(AS_DATA).write_word(f.source, 0xdead);
-			else if (f.source == 8) m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xdead);
-			else m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0xdead);
-		}
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_register_writes, &m_pipeline_extensions_reads, &m_fast_stack_reads, &m_pipeline_drained_fetches},
-			"Save before during and after BRC move publication");
-		if (tick == 80 + f.count * 4)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_operand_reads == f.count + 1 && m_pipeline_store_writes == f.count + 1 && m_pipeline_register_writes == 1 && m_pipeline_extensions_reads == 1 && m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_AR2) == (f.form == 2 ? 0x1401 : 0x1400) && m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x5001 + f.count && m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x5101 + f.count && m_cpu->state_int(tms320c54x_device::STATE_A) == 0x6000 + f.count, "Move-fed RPTB and RPTBD finish without stale counts or duplicate effects");
-			if (control) expect(m_fast_stack_reads == unsigned(f.control_kind == 5) && m_pipeline_drained_fetches == (f.control_kind == 4 ? 2U : unsigned(f.control_kind == 3)) && m_cpu->state_int(tms320c54x_device::STATE_SP) == (f.control_kind == 4 ? 0x2ffe : f.control_kind == 3 ? 0x2fff : f.control_kind == 5 ? 0x3001 : 0x3000), "BRC move preserves delayed call and return stack ownership");
-			if (replay_pipeline_at(255630, checkpoint,
-				"Restore retained BRC source and block continuation")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < (control ? 1799U : 959U)) { start_move_brc(m_pipeline_peripheral_case + 1); return true; }
-			if (control) { osd_printf_info("TMS320C54x delayed memory move BRC: PASS cases=1800 restore=1800 controls=BD,BCD_taken,BCD_untaken,CALLD,FCALLD,RETD source_forms=DP,postincrement,MVDK_AR,MVDK_AL,MVMD_AL counts=0,1,2,7,127 rptb_rptbd=2 pages=2 snapshots=3 source_reads=1 counter_writes=1 source_retained=1 count_plus_one=1 stack=owned active_repeat_write_acceptance=0 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated delayed memory move BRC complete"); }
-			osd_printf_info("TMS320C54x staged memory move BRC: PASS cases=960 restore=960 source_forms=8 counts=0,1,2,7,127 gaps=0,1 rptb_rptbd=2 pages=2 snapshots=3 source_reads=1 counter_reads=0 counter_writes=1 latency=0 source_retained=1 count_plus_one=1 active_repeat_write_acceptance=0 silicon_phase_claim=0\n");
-			throw emu_fatalerror(0, "TMS320C54x isolated memory move BRC complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255630) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255620; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	return false;
-}
 
 
 

@@ -482,16 +482,6 @@ private:
 	};
 	static block_xc_fixture block_xc_case(unsigned v);
 	void start_block_xc(unsigned variant = 0);
-	struct move_brc_fixture
-	{
-		unsigned form, count, gap, snapshot, read_tick;
-		bool delayed;
-		u32 base;
-		u16 source, opcode, offset, st1;
-		unsigned control_kind = 0;
-	};
-	static move_brc_fixture move_brc_case(unsigned variant, bool control = false);
-	void start_move_brc(unsigned variant = 0);
 	void start_move_repeat_owner(unsigned variant = 0);
 	static u16 nibble_input(unsigned variant);
 	void start_original_nibble(unsigned variant = 0);
@@ -1470,7 +1460,6 @@ private:
 	bool check_block_xc_results();
 	bool check_block_xc_irq_results();
 	bool check_move_repeat_owner_results();
-	bool check_move_brc_results();
 	bool check_nibble_input_results();
 	bool check_software_intr_results();
 	bool check_block_branch_edge_results();

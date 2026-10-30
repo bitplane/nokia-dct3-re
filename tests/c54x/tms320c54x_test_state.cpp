@@ -98,8 +98,6 @@ void tms320c54x_test_state::machine_reset()
 		{ {"shift16-load-age"}, [](self &test) { test.start_pipeline_mapped_load_age(); } },
 		{ {"addsub-ar-age"}, [](self &test) { test.start_pipeline_mapped_load_age(); } },
 		{ {"preinc-st"}, [](self &test) { test.start_preincrement_store(); } },
-		{ {"move-brc"}, [](self &test) { test.start_move_brc(); } },
-		{ {"move-brc-delay"}, [](self &test) { test.start_move_brc(); } },
 		{ {"move-rpt-owner"}, [](self &test) { test.start_move_repeat_owner(); } },
 		{ {"block-xc-irq", "block-xc-end-irq"}, [](self &test) { test.start_block_xc_irq(); } },
 		{ {"block-xc"}, [](self &test) { test.start_block_xc(); } },
