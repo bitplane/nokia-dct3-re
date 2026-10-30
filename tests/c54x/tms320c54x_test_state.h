@@ -508,8 +508,6 @@ private:
 	static delay_store_fixture delay_store_case(unsigned variant);
 	void start_delay_store(unsigned variant = 0);
 	void start_stlm_bk(unsigned variant = 0);
-	static u16 store_bypass_value(unsigned variant);
-	static u16 xmem_store_bypass_value(unsigned variant);
 	void start_block_xc_irq(unsigned variant = 0);
 	struct block_xc_fixture
 	{
@@ -541,10 +539,8 @@ private:
 	static move_brc_fixture move_brc_case(unsigned variant, bool control = false);
 	void start_move_brc(unsigned variant = 0);
 	void start_move_repeat_owner(unsigned variant = 0);
-	static u16 asm_store_bypass_value(unsigned variant);
 	static u16 nibble_input(unsigned variant);
 	void start_original_nibble(unsigned variant = 0);
-	void start_store_bypass(unsigned variant = 0);
 	void start_software_intr(unsigned variant = 0);
 	struct immediate_multiply_fixture
 	{

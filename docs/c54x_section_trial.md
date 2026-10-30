@@ -186,6 +186,8 @@ Subsequent replacements use the same section-only workflow:
 
 | `atomic_repeat_irq.h` | Keep compact RPT#3 and long RPT#ffff ADD with a physically pulsed IRQ, exact operand count/order, one stack write, return PC/SP/RC/INTM and replay. IRQ acknowledgement requires all body reads to precede it. The maximum-count snapshot explicitly proves active RC and pending IFR; no host read-counter rewind. Deliberately retire the old3-cycle PORTW/test-port interval claim and fixed6ms replay delay, not the maximum count or deferral contract. | Native2 cases/restores, including65536 body iterations; build5.446s/run0.022s. Delete old repeat setups/assertions in phases60/61/62..65 and active-repeat snapshot fixture/member. Neighboring BD/CALLD setup/checks remain unmigrated reference material. |
 
+| `store_forwarding.h` | Keep six ordinary, six Xmem and all ASM source/word/shift/SXM/SST store producers ×both LDU destinations ×gap/no-gap ×alias/non-alias. Preserve exact one Write6, backing Read6/7 only when required, zero backing read on immediate forwarding, pointer/ASM poison, source/status/T/TRN, terminal IDLE and replay. Distribute pages and three checkpoints instead of crossing them; no numeric/producer combinations lost. Signed division/floor oracle replaces prior rounded-negative helper. | Native4192 cases/restores versus25152; build5.348s/run1.529s. Delete three profile routes, setup/three value helpers, phases254440/254450 branches and declarations. BRC-move checker now owns only its named remaining bank. |
+
 `python3 tools/run_c54x_section.py all` rebuilds/runs each replacement in
 sequence. Final measurements: immediate-store5.214/0.019s,
 basic-memory5.423/0.020s, stack5.262/0.069s, DAGEN5.406/0.126s (build/run).

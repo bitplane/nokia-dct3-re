@@ -1463,18 +1463,7 @@ void tms320c54x_test_state::start_stlm_bk(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-u16 tms320c54x_test_state::store_bypass_value(unsigned variant)
-{
-	return std::array<u16, 6>{0x789a, 0x9876, 0x3456, 0xdcba, 0xbeef, 0x8001}[variant % 6];
-}
 
-u16 tms320c54x_test_state::xmem_store_bypass_value(unsigned variant)
-{
-	unsigned const kind = variant % 6;
-	u64 const source = kind & 1 ? 0xfedcba9876ULL : 0x123456789aULL;
-	unsigned const shift = kind < 4 ? 8 : kind == 4 ? 0 : 15;
-	return u16(((source << shift) & 0xffffffffffULL) >> (kind == 2 || kind == 3 || kind == 5 ? 16 : 0));
-}
 
 tms320c54x_test_state::move_brc_fixture tms320c54x_test_state::move_brc_case(unsigned variant, bool control)
 {
@@ -1556,65 +1545,7 @@ void tms320c54x_test_state::start_move_brc(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-u16 tms320c54x_test_state::asm_store_bypass_value(unsigned variant)
-{
-	unsigned const selector = variant % 4, raw = (variant / 4) % 32, flags = (variant / 1024) % 4;
-	u64 value = selector & 1 ? 0xfedcba9876ULL : 0x123456789aULL;
-	int const shift = raw < 16 ? int(raw) : int(raw) - 32;
-	if (shift >= 0) value = (value << shift) & 0xffffffffffULL;
-	else if ((flags & 1) && (value & 0x8000000000ULL))
-	{
-		s64 const signed_value = s64(value) - (s64(1) << 40);
-		s64 const divisor = s64(1) << -shift;
-		value = u64((signed_value - divisor + 1) / divisor) & 0xffffffffffULL;
-	}
-	else value >>= -shift;
-	if (flags & 2)
-	{
-		if (flags & 1)
-		{
-			s64 const signed_value = value & 0x8000000000ULL ? s64(value) - (s64(1) << 40) : s64(value);
-			value = u64(std::clamp(signed_value, s64(-0x80000000LL), s64(0x7fffffffLL)));
-		}
-		else value = std::min(value, u64(0xffffffffULL));
-	}
-	return u16(value >> (selector & 2 ? 16 : 0));
-}
 
-void tms320c54x_test_state::start_store_bypass(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const xmem = profile_is("xmem-store-bp");
-	bool const asm_store = profile_is("asm-store-bp");
-	unsigned const kind = variant % 6, gap = (variant / (asm_store ? 256 : 12)) % 2;
-	bool const destination = (variant / (asm_store ? 128 : 6)) % 2, alias = (variant / (asm_store ? 512 : 24)) % 2;
-	u32 const base = (variant / (asm_store ? 4096 : 48)) % 2 ? 0x20000 : 0;
-	u16 const value = asm_store ? asm_store_bypass_value(variant) : xmem ? xmem_store_bypass_value(variant) : store_bypass_value(variant);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
-	program.write_word(base + 0x600, std::array<u16, 6>{0x8082, 0x8182, 0x8282, 0x8382, 0x8c82, 0x8d82}[kind]);
-	if (xmem) program.write_word(base + 0x600, std::array<u16, 6>{0x9808, 0x9908, 0x9a08, 0x9b08, 0x9800, 0x9b0f}[kind]);
-	if (asm_store) program.write_word(base + 0x600, 0x8482 | ((variant % 4) << 8));
-	program.write_word(base + 0x601 + gap, 0x1283 | (destination ? 0x100 : 0));
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x900);
-	if (asm_store)
-	{
-		unsigned const flags = (variant / 1024) % 4;
-		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, flags & 2 ? 1 : 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800 | (flags & 1 ? 0x100 : 0) | ((variant / 4) % 32));
-	}
-	m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfedcba9876ULL);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef); m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0x8001);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x5000); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, alias ? 0x5000 : 0x5001);
-	data.write_word(0x5000, 0xdead); data.write_word(0x5001, 0xcafe);
-	m_pipeline_operand_reads = m_pipeline_store_writes = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "store_bypass_read", [this, value, gap, alias](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(!(alias && !gap) && at == (alias ? 0x5000 : 0x5001) && word == (alias ? value : 0xcafe) && !m_pipeline_operand_reads++ && m_cpu->pipeline_cycles() == 6 + gap, "Only non-bypassed loads read the backing memory once"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "store_bypass_write", [this, value](offs_t at, u16 &word, u16) { if (machine().side_effects_disabled()) return; expect(at == 0x5000 && word == value && !m_pipeline_store_writes++ && m_cpu->pipeline_cycles() == 6, "Bypass preserves one real Execute-owned store"); });
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 254440;
-	m_cpu->set_state_int(STATE_GENPC, base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 void tms320c54x_test_state::start_long_mapped_original(unsigned variant)
 {
@@ -6621,43 +6552,6 @@ bool tms320c54x_test_state::check_move_brc_results()
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
 	}
 	if (m_phase == 255630) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255620; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
-	if (m_phase == 254440)
-	{
-		bool const asm_store = profile_is("asm-store-bp");
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick, checkpoint = 5 + variant / (asm_store ? 8192 : 96), gap = (variant / (asm_store ? 256 : 12)) % 2;
-		bool const xmem = profile_is("xmem-store-bp");
-		bool const destination = (variant / (asm_store ? 128 : 6)) % 2, alias = (variant / (asm_store ? 512 : 24)) % 2;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Store-to-load bypass remains staged");
-		if (tick == 5) m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x6000);
-		if (tick == 5 && asm_store) m_cpu->set_state_int(tms320c54x_device::STATE_ST1, m_cpu->state_int(tms320c54x_device::STATE_ST1) ^ 31);
-		if (tick == 5 + gap) m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x6001);
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes},
-			"Save before, during and after a same-location store bypass");
-		if (tick == 18)
-		{
-			u16 const value = alias ? asm_store ? asm_store_bypass_value(variant) : xmem ? xmem_store_bypass_value(variant) : store_bypass_value(variant) : 0xcafe;
-			u16 const expected_st1 = asm_store ? 0x800 | (((variant / 1024) % 4) & 1 ? 0x100 : 0) | (((variant / 4) % 32) ^ 31) : 0x900;
-			expect(m_pipeline_operand_reads == unsigned(!alias || gap) && m_pipeline_store_writes == 1 && m_cpu->state_int(tms320c54x_device::STATE_A) == (destination ? 0x123456789aULL : value) && m_cpu->state_int(tms320c54x_device::STATE_B) == (destination ? value : 0xfedcba9876ULL) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == expected_st1, "Same-location load consumes the pending store without stale memory, duplicate writes or status changes");
-			if (replay_pipeline_at(254450, checkpoint,
-				"Replay same-location bypass from retained pipeline state")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < (asm_store ? 24575 : 287)) { start_store_bypass(variant + 1); return true; }
-			if (asm_store)
-			{
-				osd_printf_info("TMS320C54x staged ASM store bypass: PASS cases=24576 restore=24576 selectors=4 shifts=32 sxm_sst=4 destinations=2 gaps=0,1 aliases=0,1 pages=2 snapshots=3 retained_shift=1 alias_reads=0 writes=1 physical_banks=unvalidated\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated ASM store bypass complete");
-			}
-			if (xmem)
-			{
-				osd_printf_info("TMS320C54x staged Xmem store bypass: PASS cases=288 restore=288 producers=6 destinations=2 gaps=0,1 aliases=0,1 pages=2 snapshots=3 alias_reads=0 writes=1 physical_banks=unvalidated\n");
-				throw emu_fatalerror(0, "TMS320C54x isolated Xmem store bypass complete");
-			}
-			osd_printf_info("TMS320C54x staged store bypass: PASS cases=288 restore=288 producers=STL_A,STL_B,STH_A,STH_B,T,TRN destinations=2 gaps=0,1 aliases=0,1 pages=2 snapshots=3 alias_reads=0 writes=1 physical_banks=unvalidated\n");
-			start_original_nibble(); return true;
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 254450) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 254440; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	return false;
 }
 
