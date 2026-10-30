@@ -43,7 +43,7 @@
       "TMS320C54x staged CPL/DP latency: PASS cases=8 fields=2 directions=2 consumers=LD,ST gaps=3 restore=8",
       "TMS320C54x staged immediate DP: PASS cases=1024 pages=512 nearest_producer=512 old_st0_until_execute=1 restore=1024",
       "TMS320C54x staged FRAME: PASS offsets=256 restore=768 adjacent_push=768 duplicate_writes=0 silicon_phase_claim=0",
-      "TMS320C54x staged stack SP latency: PASS cases=16 producers=PSHM,POPM consumers=LD,ST gap_nops=0,1 restore=16",
+      "TMS320C54x staged stack SP latency: PASS cases=6 producers=PSHM,POPM consumers=LD,ST gap_nops=1 restore=6",
       "TMS320C54x staged MMR pop: PASS cases=114 destinations=19 pages=2 stack_read=5 dagen_write=5 other_write=6 restore=114 duplicate_accesses=0 silicon_phase_claim=0",
       "TMS320C54x staged POPM DAGEN conflict: PASS cases=12 bank_conflicts=6 ram_controls=6 restore=12 duplicate_accesses=0",
       "TMS320C54x staged original MU4 context: PASS words=37 cases=6 context_saves=8 context_restored=1 returned=4044 restore=6 full_handler_claim=0",
@@ -604,6 +604,11 @@
           "description": "Status producer CPL DP CMPT consumer ordering",
           "index": 33,
           "name": "mode-latency"
+        },
+        {
+          "description": "FRAME push and safely separated compiler SP consumers",
+          "index": 34,
+          "name": "stack-sp"
         }
       ],
       "tms54rom4": [
@@ -3026,6 +3031,7 @@
       "TMS320C54x software-saved IRQ repeat: PASS cases=3840 restore=3840 outer_counts=0,1,2,7,56 inner_counts=0,1,3,63 sources=IRQ,NMI pages=2 stacks=2 returns=FRETE,FRETED snapshots=6 leaf_return=inside,REA_plus_1 ordered_copies=1 balanced_frames=1 physical_phase_claim=0\n": 1,
       "TMS320C54x source-domain exclusions: PASS cases=%u restore=%u base_cases=30000 absolute_tc0_cases=448 short_control_cases=14208 mac_source_cases=1280 mac_short_checkpoint_cases=128 mapped_rejection_cases=8328 mmr_guard_cases=2304 repeat_transfer_guard_cases=4800 guard_checkpoints=balanced pmst_bit14=2 mac_frontend=staged mac_checkpoints=3,5 mac_modes=f8,98..9f base_instruction_forms=125 smem_classes=111 shifted_reads=10 mmr_sources=4 shifts=0,1,15,16,31 base_modes=98..9f,f9..ff cmpt=2 pages=2 frontends=2 snapshots=2 data_reads=0 data_writes=0 program_writes=0 io_accesses=0 silicon_trap_claim=0 coverage_fnv64=%016llx\n": 1,
       "TMS320C54x stack address latency conformance: PASS variants=24\n": 1,
+      "TMS320C54x stack sequences: PASS cases=%u restore=%u frame_offsets=256 frame_snapshots=3 sp_cases=6 gap_nops=1 silicon_phase_claim=0 coverage_fnv64=%016llx\n": 1,
       "TMS320C54x staged ADDM: PASS cases=768 address_forms=4 value_pairs=8 status_combinations=8 restore=768 duplicate_reads=0 duplicate_writes=0\n": 1,
       "TMS320C54x staged ADDS: PASS cases=%u restore=%u forms=17 registers=8 accumulators=2 patterns=8 sxm_ovm=4 compatibility=2 source_unsigned=1 reads=1 data_writes=0 mapped_acceptance=0 silicon_phase_claim=0 snapshots=3 checkpoint_policy=balanced coverage_fnv64=%016llx\n": 1,
       "TMS320C54x staged ASM store bypass: PASS cases=24576 restore=24576 selectors=4 shifts=32 sxm_sst=4 destinations=2 gaps=0,1 aliases=0,1 pages=2 snapshots=3 retained_shift=1 alias_reads=0 writes=1 physical_banks=unvalidated\n": 1,
@@ -3307,7 +3313,7 @@
       "TMS320C54x staged software INTR: PASS cases=256 restore=256 vectors=32 masks=2 pages=2 snapshots=2 frame_writes=1 return_reads=1 silicon_phase_claim=0\n": 1,
       "TMS320C54x staged stack IRQ ordering: PASS cases=48 restore=48 forms=PSHM,PSHD,POPM_T,POPM_SP sources=IRQ,NMI pages=2 snapshots=3 stack_read=5 interrupt_reserve=5 foreground_write=6 interrupt_write=7 acknowledgements=1 older_first=1 isr_return_claim=0 silicon_phase_claim=0\n": 1,
       "TMS320C54x staged stack IRQ return: PASS cases=80 restore=80 forms=PSHM,PSHD,POPM_T,POPM_SP sources=IRQ,NMI pages=2 snapshots=5 acknowledgements=1 return_reads=1 caller_cleanup=push_forms resumed_idle=1 intm_cleared=1 silicon_phase_claim=0\n": 1,
-      "TMS320C54x staged stack SP latency: PASS cases=16 producers=PSHM,POPM consumers=LD,ST gap_nops=0,1 restore=16\n": 1,
+      "TMS320C54x staged stack SP latency: PASS cases=6 producers=PSHM,POPM consumers=LD,ST gap_nops=1 restore=6\n": 1,
       "TMS320C54x staged status BITF: PASS cases=768 restore=768 registers=ST0,ST1 forms=direct,absolute masks=4 initial_tc=2 pages=2 snapshots=3 reads_each=1 data_writes=0 retained_source=1 silicon_phase_claim=0\n": 1,
       "TMS320C54x staged status bits: PASS cases=128 registers=2 bits=16 operations=2 initial_patterns=2 restore=128 xf_output=1 reserved_st1_bit10=0\n": 1,
       "TMS320C54x staged store MVMM: PASS cases=1536 restore=1536 stores=1,2 source_registers=8 destination_registers=8 gap_nops=0,1 pages=2 snapshots=3 physical_phase_claim=0\n": 1,
@@ -12636,6 +12642,25 @@
         "TMS320C54x page-zero stack exclusions: PASS cases=1536 restore=1536 forms=PSHM,POPM encodings=192 pages=2 snapshots=2 data_reads=0 data_writes=0 stack_allocation=0 silicon_trap_claim=0"
       ]
     },
+    "stack-sp": {
+      "completion": "Fatal error: TMS320C54x isolated stack sequences complete",
+      "machine": "tms54isa",
+      "reported_fields": [
+        {
+          "cases": "774",
+          "coverage_fnv64": "42c4de4918ab0578",
+          "frame_offsets": "256",
+          "frame_snapshots": "3",
+          "gap_nops": "1",
+          "restore": "774",
+          "silicon_phase_claim": "0",
+          "sp_cases": "6"
+        }
+      ],
+      "required": [
+        "TMS320C54x stack sequences: PASS cases=774 restore=774 frame_offsets=256 frame_snapshots=3 sp_cases=6 gap_nops=1 silicon_phase_claim=0 coverage_fnv64=42c4de4918ab0578"
+      ]
+    },
     "status-bitf": {
       "completion": "Fatal error: TMS320C54x isolated status BITF complete",
       "machine": "tms54xtra",
@@ -15275,6 +15300,18 @@
       },
       "decision": "merge",
       "family": "cpu-only-long-t-store-rejections"
+    },
+    "stack-sp": {
+      "case_ids": [],
+      "classification": "architectural_interaction",
+      "coverage": {
+        "cases": 774,
+        "fnv64": "42c4de4918ab0578",
+        "key": "0..767: original FRAME key, signed8 offset=key%256, snapshots3/4/6 by key/256. Then identities770,771,778,779,782,783:768+original PSHM/POPM SP key2,3,10,11,14,15.",
+        "result_prefix": "TMS320C54x stack sequences: PASS"
+      },
+      "decision": "rewrite",
+      "family": "frame-and-stack-sp-sequences"
     },
     "status-bitf": {
       "case_ids": [],

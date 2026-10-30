@@ -51,7 +51,7 @@ REQUIRED = [
     "TMS320C54x staged CPL/DP latency: PASS cases=8 fields=2 directions=2 consumers=LD,ST gaps=3 restore=8",
     "TMS320C54x staged immediate DP: PASS cases=1024 pages=512 nearest_producer=512 old_st0_until_execute=1 restore=1024",
     "TMS320C54x staged FRAME: PASS offsets=256 restore=768 adjacent_push=768 duplicate_writes=0 silicon_phase_claim=0",
-    "TMS320C54x staged stack SP latency: PASS cases=16 producers=PSHM,POPM consumers=LD,ST gap_nops=0,1 restore=16",
+    "TMS320C54x staged stack SP latency: PASS cases=6 producers=PSHM,POPM consumers=LD,ST gap_nops=1 restore=6",
     "TMS320C54x staged MMR pop: PASS cases=114 destinations=19 pages=2 stack_read=5 dagen_write=5 other_write=6 restore=114 duplicate_accesses=0 silicon_phase_claim=0",
     "TMS320C54x staged POPM DAGEN conflict: PASS cases=12 bank_conflicts=6 ram_controls=6 restore=12 duplicate_accesses=0",
     "TMS320C54x staged original MU4 context: PASS words=37 cases=6 context_saves=8 context_restored=1 returned=4044 restore=6 full_handler_claim=0",
@@ -316,6 +316,10 @@ READ_A_MAPPED_COMPLETION = "Fatal error: TMS320C54x isolated mapped READA comple
 DP_ABSOLUTE_REQUIRED = "TMS320C54x staged absolute memory DP: PASS pages=512 cases=1536 restore=1536 source_read=6 producer_execute=9 consumer_execute=10 extension_fetches=1 duplicate_reads=0 silicon_phase_claim=0"
 DP_ABSOLUTE_COMPLETION = "Fatal error: TMS320C54x isolated absolute memory DP complete"
 EXTRA_PROFILES = {
+    "stack-sp": (
+        "TMS320C54x stack sequences: PASS cases=774 restore=774 frame_offsets=256 frame_snapshots=3 sp_cases=6 gap_nops=1 silicon_phase_claim=0 coverage_fnv64=42c4de4918ab0578",
+        "Fatal error: TMS320C54x isolated stack sequences complete",
+    ),
     "isa-disasm": (
         tuple(marker for marker in REQUIRED if " disassembler: PASS" in marker),
         "Fatal error: TMS320C54x isolated disassembly contracts complete",

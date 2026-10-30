@@ -113,6 +113,17 @@ Immediate-DP cases keep their overflow sentinel without setting ARP; table
 7-17 permits their adjacent DP consumer. Exact clock-10/11 observations remain
 software-model/replay checks, not measured silicon phase guarantees.
 
+`stack-sp` owns the FRAME/adjacent-push bank (all 256 signed offsets at
+checkpoints 3/4/6) and six safely separated PSHM/POPM compiler-mode consumers.
+The default suite uses the same builders and keeps its explicit continuations.
+TI SPRU131G section 5.7 and Table 7-9, plus SPRU172C instruction descriptions,
+provide the stack/result contract. Eight zero-gap cases are retired because
+their old-SP outcomes are unspecified; two PSHM-SP alias cases are also retired
+because their assumed source sampling lacks an unambiguous independent basis.
+The retained FRAME trace checks one AR1 read and one stack write, with replay
+cursor restoration. The small SP bank retains its final register/RAM checks.
+Exact observation clocks remain model regressions, not physical timing claims.
+
 `mapped-word`, `mapped-bitf` and `status-bitf` use the same runner with a shared
 mapped-register descriptor builder. The distinct ADD/SUB and TC reference rules
 remain fixture-owned. All 21,504 cases retain their per-clock register predicates,
@@ -451,6 +462,7 @@ boundaries are:
 | `tests/c54x/tms320c54x_test_normalization_schedule.h` | Unique normalization/exponent inputs with balanced replay checkpoints |
 | `tests/c54x/tms320c54x_test_register_sequence.h` | CPU-only clocked register observations and snapshot continuation; no instruction arithmetic |
 | `tests/c54x/tms320c54x_test_address_mode.h` | Shared address-mode/DP inputs and observations; programming-state limitations remain explicit |
+| `tests/c54x/tms320c54x_test_stack_sequence.h` | FRAME/push and safely separated compiler-SP inputs, shared by CPU-only and default runners |
 | `tests/c54x/tms320c54x_test_register_pairs.h` | SAT and carry/TC rotate pairs with independent expected register states |
 | `tests/c54x/tms320c54x_test_register_alu.h` | Signed40 MIN/MAX and signed17 SQUR expectations, retained inputs and explicit late operand writes |
 | `tests/c54x/tms320c54x_test_port_case.h` | Common PORTW stimulus construction; no instruction arithmetic or reset policy |
@@ -2568,6 +2580,9 @@ That capture predates the `address-mode-valid-programs` review: the default
 CPL/DP continuation now runs eight safely separated cases instead of thirty-two,
 and immediate-DP inputs now clear ARP. The shared standalone bank qualifies
 those changed inputs; it does not renew the full-default capture.
+The subsequent `frame-and-stack-sp-sequences` review likewise keeps all 768
+FRAME cases but reduces the small SP bank from sixteen to six cases. Its
+standalone execution does not renew the default-suite checkpoint either.
 
 `fixtures/c54x_fidelity_checkpoint.json` remains an immutable historical
 capture: 294 then-required markers, 295 native PASS records and 1,058.73 seconds.

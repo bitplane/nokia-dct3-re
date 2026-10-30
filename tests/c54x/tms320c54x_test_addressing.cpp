@@ -3,6 +3,7 @@
 
 #include "emu.h"
 #include "tms320c54x_test_state.h"
+#include "tms320c54x_test_stack_sequence.h"
 #include "tms320c54x_test_memory_immediate_schedule.h"
 #include "tms320c54x_test_circular_move_schedule.h"
 #include "tms320c54x_test_parallel_schedule.h"
@@ -319,30 +320,12 @@ void tms320c54x_test_state::start_pipeline_xpc_push(unsigned variant)
 	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_pipeline_push_sp_latency(unsigned variant)
+void tms320c54x_test_state::start_pipeline_push_sp_latency()
 {
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-	m_pipeline_peripheral_case = variant;
-	unsigned const gap = BIT(variant, 1);
-	bool const pop = BIT(variant, 3);
-	auto &program = m_cpu->space(AS_PROGRAM);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
-	program.write_word(0x600, pop ? (BIT(variant, 2) ? 0x8a0b : 0x8a11) : (BIT(variant, 2) ? 0x4a18 : 0x4a11));
-	program.write_word(0x601 + gap, BIT(variant, 0) ? 0x8027 : 0x1027);
-	set_registers(*m_cpu, {
-		{cpu_regs::STATE_TCR, 0x10}, {cpu_regs::STATE_PMST, 0}, {cpu_regs::STATE_ILLEGAL, 0},
-		{cpu_regs::STATE_ST1, 0x4800}, {cpu_regs::STATE_SP, 0x1000}, {cpu_regs::STATE_AR1, 0x5678},
-		{cpu_regs::STATE_A, 0x7777}, {cpu_regs::STATE_IFR, 0}, {cpu_regs::STATE_IMR, 0},
-	});
-	m_cpu->space(AS_DATA).write_word(0xfff, 0xaaaa);
-	m_cpu->space(AS_DATA).write_word(0x1000, 0x5678);
-	m_cpu->space(AS_DATA).write_word(0x1027, 0x1111);
-	m_cpu->space(AS_DATA).write_word(pop ? 0x1028 : 0x1026, 0x2222);
-	m_cpu->set_state_int(STATE_GENPC, 0x600);
-	m_cpu->set_pipeline_frontend(true);
-	m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
-	m_phase = 251430; m_cpu->resume(SUSPEND_REASON_DISABLE);
-	m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	m_register_sequence = std::make_unique<register_sequence_fixture>(machine(), *m_cpu, *m_check_timer,
+		6, stack_sp_sequence<tms320c54x_device>);
+	m_phase = 251430;
+	m_register_sequence->start();
 }
 
 void tms320c54x_test_state::start_pipeline_mmr_pop(unsigned variant)
@@ -6628,51 +6611,11 @@ bool tms320c54x_test_state::check_pipeline_immediate_store_results()
 
 bool tms320c54x_test_state::check_pipeline_push_sp_latency_results()
 {
-	[[maybe_unused]] auto &program = m_cpu->space(AS_PROGRAM);
-	[[maybe_unused]] auto &data = m_cpu->space(AS_DATA);
-	if (m_phase == 251430)
-	{
-		u64 const cycle = m_cpu->pipeline_cycles();
-		unsigned const gap = BIT(m_pipeline_peripheral_case, 1);
-		bool const store = BIT(m_pipeline_peripheral_case, 0);
-		bool const pop = BIT(m_pipeline_peripheral_case, 3);
-		expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Push/direct-consumer stream advances without unsupported forms");
-		if (cycle == 5 + gap && !m_pipeline_replay)
-		{
-			expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save Access-owned compiler-mode SP before consumer Read");
-		}
-		if (cycle == 10)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (pop ? 0x1001 : 0xfff) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == (store ? 0x7777 : gap ? 0x2222 : 0x1111) &&
-				m_cpu->space(AS_DATA).read_word(0xfff) == (pop ? 0xaaaa : BIT(m_pipeline_peripheral_case, 2) ? 0x1000 : 0x5678) &&
-				m_cpu->space(AS_DATA).read_word(0x1027) == (store && !gap ? 0x7777 : 0x1111) &&
-				m_cpu->space(AS_DATA).read_word(pop ? 0x1028 : 0x1026) == (store && gap ? 0x7777 : 0x2222),
-				"PSHM/POPM basic direct consumer has one-instruction SP latency and preserves the alternate address");
-			if (pop) expect(m_cpu->space(AS_DATA).read_word(BIT(m_pipeline_peripheral_case, 2) ? 0x0b : 0x11) == 0x5678,
-				"POPM commits its original stack word independently of the compiler-mode consumer");
-			if (!m_pipeline_replay)
-			{
-				m_pipeline_replay = true;
-				expect(restore_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Restore captured compiler-mode SP independently of current SP");
-				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_pipeline_expected_cycle = 6 + gap; m_phase = 251440;
-				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-			}
-			m_cpu->set_pipeline_frontend(false);
-			if (m_pipeline_peripheral_case < 15) { start_pipeline_push_sp_latency(m_pipeline_peripheral_case + 1); return true; }
-			osd_printf_info("TMS320C54x staged stack SP latency: PASS cases=16 producers=PSHM,POPM consumers=LD,ST gap_nops=0,1 restore=16\n");
-			start_pipeline_mmr_pop(); return true;
-		}
-		++m_pipeline_expected_cycle;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 251440)
-	{
-		m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251430;
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	return false;
+	if (m_phase != 251430) return false;
+	if (!m_register_sequence->step()) return true;
+	osd_printf_info("TMS320C54x staged stack SP latency: PASS cases=6 producers=PSHM,POPM consumers=LD,ST gap_nops=1 restore=6\n");
+	m_register_sequence.reset();
+	start_pipeline_mmr_pop(); return true;
 }
 
 bool tms320c54x_test_state::check_pipeline_mmr_pop_results()

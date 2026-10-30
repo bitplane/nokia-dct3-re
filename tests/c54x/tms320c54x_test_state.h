@@ -197,8 +197,8 @@ private:
 	void start_pipeline_status_bit(unsigned variant = 0);
 	void start_pipeline_cpl();
 	void start_pipeline_dp_immediate();
-	void start_pipeline_frame(unsigned variant = 0);
-	void start_pipeline_push_sp_latency(unsigned variant = 0);
+	void start_pipeline_frame();
+	void start_pipeline_push_sp_latency();
 	struct irq_pop_fixture
 	{
 		u16 destination, value, pending, mask;

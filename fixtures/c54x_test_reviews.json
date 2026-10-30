@@ -8,6 +8,22 @@
   },
   "families": [
     {
+      "id": "frame-and-stack-sp-sequences",
+      "classification": "architectural_interaction",
+      "decision": "rewrite",
+      "profiles": ["stack-sp"],
+      "case_ids": [],
+      "profile_coverage": {
+        "stack-sp": {"cases": 774, "fnv64": "42c4de4918ab0578", "result_prefix": "TMS320C54x stack sequences: PASS", "key": "0..767: original FRAME key, signed8 offset=key%256, snapshots3/4/6 by key/256. Then identities770,771,778,779,782,783:768+original PSHM/POPM SP key2,3,10,11,14,15."}
+      },
+      "basis": "TI SPRU131G section5.7 defines stack growth and FRAME's signed immediate adjustment; section7.5.5/Table7-9 requires one gap for PSHM/POPM MMR followed by these basic SP-referenced direct consumers. SPRU172C pages4-60/4-128/4-132 specify FRAME/POPM/PSHM. Result/untouched-RAM predicates use fixture-owned literals and signed8 arithmetic. Clocks4/6/7 and SP-consumer final clock10 remain model/replay observations, not measured silicon phases.",
+      "contracts": ["all256 signed FRAME offsets, three original checkpoints and adjacent PSHM AR1, SP trajectory, unchanged ST0/ST1 and one stack write", "PSHM AR1, both POPM destinations AR1/BH, load/store consumers with one NOP, preserved alternate RAM and loaded register, original checkpoint6", "shared CPU-only register-sequence runner; no handset devices, firmware ROM or CPU address/arithmetic helpers"],
+      "changes": ["retire eight zero-gap SP raw keys0,1,4,5,8,9,12,13: their assumed old-SP outcomes are not independently specified by Table7-9", "retire raw keys6,7 too: the assumed pre-decrement PSHM SP source-sampling result lacks an unambiguous independent basis in the inspected instruction description; no CPU defect or alternative value is asserted", "replace two handwritten setup/clock/replay loops and phases251420/251440 with shared input builders and explicit default continuations", "FRAME bus observation now checks the complete AR1-read/stack-write stream, including order, value and clock, rather than watching only the target write; all768 old FRAME case identities remain", "explicit runnable IDLE0 seed; retain NOP streams and bounded finish10, without inserting an IDLE instruction"],
+      "known_limits": ["the small SP bank does not assert every intermediate SP value; its retained original predicates are final-state/result preservation", "no zero-gap SP result, interrupts, memory-mapped POPM policy, far pages or real-silicon timing qualification", "status-bit/XF and the larger explicit-SP producer matrix remain separate, unreviewed scopes"],
+      "verification": "Full and CPU-only builds pass; both executables pass all774 cases/restores with empty ROM directory and digest42c4de4918ab0578. The neighboring mode-latency bank passes all1072 cases/restores. A compiled CPU-free check verifies every FRAME SP/status observation against signed8 offset arithmetic, snapshots3/4/6, the retained SP keys, ordered event descriptors and full identity digest. All5079 host tests pass with one established skip (61.736 seconds); fifteen shared-fixture host tests pass separately. The394-profile/289-default inventory passes. No production CPU/device changes; default regression and handset acceptance are not renewed by this focused batch.",
+      "measurements": {"baseline_commit": "8202781a", "before_cpp_bytes": 3337361, "before_cpp_lines": 50854, "after_cpp_bytes": 3335571, "after_cpp_lines": 50828, "source_assessment": "1790 bytes and26 C++ lines removed including the new shared inputs and CPU-only profile. Ten unsupported case/restore pairs retired. No paired runtime speedup is claimed; the standalone bank avoids needing a full-default invocation for these inputs."}
+    },
+    {
       "id": "address-mode-valid-programs",
       "classification": "architectural_interaction",
       "decision": "rewrite",

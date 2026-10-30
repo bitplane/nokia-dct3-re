@@ -23,6 +23,7 @@
 #include "tms320c54x_test_normalization.h"
 #include "tms320c54x_test_register_sequence.h"
 #include "tms320c54x_test_address_mode.h"
+#include "tms320c54x_test_stack_sequence.h"
 #include "tms320c54x_test_register_pairs.h"
 #include "tms320c54x_test_register_alu.h"
 #include "tms320c54x_test_register_unary.h"
@@ -46,6 +47,7 @@ public:
 		m_register_unary_kind = c54x_test::select_register_unary(config.options().bios());
 		m_long_t_store_kind = c54x_test::select_long_t_store(config.options().bios());
 		m_address_modes = !std::strcmp(config.options().bios(), "mode-latency");
+		m_stack_sequences = !std::strcmp(config.options().bios(), "stack-sp");
 		m_extended_program = m_long_t_store_kind != c54x_test::long_t_store_kind::none || !std::strcmp(config.options().bios(), "isa-disasm") || m_domain || m_mapped_mac || bool(m_dual_mode) ||
 			m_normalization_kind != c54x_test::normalization_kind::none || m_register_pair_kind != c54x_test::register_pair_kind::none || m_register_alu_kind != c54x_test::register_alu_kind::none || m_register_unary_kind != c54x_test::register_unary_kind::none;
 		TMS320C54X(config, m_cpu, 13'000'000);
@@ -59,7 +61,10 @@ protected:
 	{
 		m_timer = timer_alloc(FUNC(c54x_isa_test_state::check), this);
 		if (disassembly()) return;
-		if (m_address_modes)
+		if (m_stack_sequences)
+			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
+				774, c54x_test::stack_sequence<tms320c54x_device>);
+		else if (m_address_modes)
 			m_register_sequence = std::make_unique<c54x_test::register_sequence_fixture>(machine(), *m_cpu, *m_timer,
 				1072, c54x_test::address_mode_bank_case<tms320c54x_device>);
 		else if (m_long_t_store_kind != c54x_test::long_t_store_kind::none)
@@ -138,6 +143,12 @@ protected:
 private:
 	[[noreturn]] void register_sequence_result() const
 	{
+		if (m_stack_sequences)
+		{
+			osd_printf_info("TMS320C54x stack sequences: PASS cases=%u restore=%u frame_offsets=256 frame_snapshots=3 sp_cases=6 gap_nops=1 silicon_phase_claim=0 coverage_fnv64=%016llx\n",
+				m_register_sequence->count(), m_register_sequence->restores(), (unsigned long long)m_register_sequence->digest());
+			throw emu_fatalerror(3, "TMS320C54x isolated stack sequences complete");
+		}
 		if (m_address_modes)
 		{
 			osd_printf_info("TMS320C54x addressing-mode banks: PASS cases=%u restore=%u basic=8 full_status=40 dp_forward=1024 producers=RSBX,SSBX,MVMD,STLM,STM,LD_DP gaps=2,3 arp_initial=0 finish=10,11 idle_required=0 silicon_phase_claim=0 coverage_fnv64=%016llx\n",
@@ -366,6 +377,7 @@ private:
 	c54x_test::register_unary_kind m_register_unary_kind = c54x_test::register_unary_kind::none;
 	c54x_test::long_t_store_kind m_long_t_store_kind = c54x_test::long_t_store_kind::none;
 	bool m_address_modes = false;
+	bool m_stack_sequences = false;
 	std::unique_ptr<c54x_test::register_sequence_fixture> m_register_sequence;
 	std::unique_ptr<c54x_test::exponent_normalization_fixture> m_normalization;
 	std::unique_ptr<c54x_test::dual_multiply_fixture_runner> m_dual;
@@ -409,6 +421,7 @@ ROM_START(tms54isa)
 	ROM_SYSTEM_BIOS(31, "st-t-long", "Long-address T/TRN stores and retained Execute source")
 	ROM_SYSTEM_BIOS(32, "st-t-long-edge", "Rejected mapped destinations of long-address T/TRN stores")
 	ROM_SYSTEM_BIOS(33, "mode-latency", "Status producer CPL DP CMPT consumer ordering")
+	ROM_SYSTEM_BIOS(34, "stack-sp", "FRAME push and safely separated compiler SP consumers")
 	ROM_REGION(1, "unused", ROMREGION_ERASE00)
 ROM_END
 
