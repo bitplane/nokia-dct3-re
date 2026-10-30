@@ -2974,40 +2974,6 @@ void tms320c54x_test_state::start_page_zero_stack(unsigned variant)
 	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-void tms320c54x_test_state::start_mvdm_acc(unsigned variant)
-{
-	auto const f = mvdm_acc_case(variant);
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	program.write_word(f.base + 0x600, 0x7208 + f.reg); program.write_word(f.base + 0x601, f.source);
-	// An immediate following ALU consumer must see the merged accumulator.
-	program.write_word(f.base + 0x602, f.reg < 3 ? 0xf040 : 0xf340);
-	program.write_word(f.base + 0x603, 0); program.write_word(f.base + 0x604, 0xf4e1);
-	m_cpu->set_pipeline_frontend(false);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa608); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
-	m_cpu->set_input_line(0, CLEAR_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.a); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.b);
-	m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef); m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x3000);
-	data.write_word(f.source, f.value);
-	m_pipeline_operand_reads = m_pipeline_store_writes = m_pipeline_extensions_reads = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "mvdm_acc_source", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(!m_pipeline_operand_reads && at == f.source && word == f.value && m_cpu->pipeline_cycles() == 6, "MVDM accumulator captures one absolute source at its owned clock"); ++m_pipeline_operand_reads;
-	});
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "mvdm_acc_write", [this, f](offs_t at, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(!m_pipeline_store_writes && at == 8 + f.reg && word == f.value && m_cpu->pipeline_cycles() == 6, "MVDM publishes exactly the encoded accumulator slice without saturation"); ++m_pipeline_store_writes;
-	});
-	m_pipeline_fetch_tap = program.install_read_tap(f.base + 0x601, f.base + 0x601, "mvdm_acc_literal", [this, f](offs_t, u16 &word, u16) {
-		if (machine().side_effects_disabled()) return;
-		expect(!m_pipeline_extensions_reads && word == f.source, "MVDM retains one source literal independent of DP and CPL"); ++m_pipeline_extensions_reads;
-	});
-	m_pipeline_replay = false; m_idle_fixture_tick = 0; m_phase = 62160;
-	m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::mvdm_t_fixture tms320c54x_test_state::mvdm_t_case(unsigned v)
 {

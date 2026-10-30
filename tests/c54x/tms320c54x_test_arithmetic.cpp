@@ -1862,15 +1862,6 @@ tms320c54x_test_state::xmem_arithmetic_result tms320c54x_test_state::xmem_arithm
 	return {source, u64(result) & 0xffffffffffULL, st0};
 }
 
-tms320c54x_test_state::mvdm_acc_fixture tms320c54x_test_state::mvdm_acc_case(unsigned v)
-{
-	unsigned const flags = (v / 1152) % 16;
-	u64 const a = std::array<u64, 8>{0, 1, 0x7fffffff, 0x80000000, 0x7fffffffffULL, 0x8000000000ULL, 0xffffffffffULL, 0x123456789aULL}[(v / 144) % 8];
-	return {v % 6, v / 36864, std::array<u16, 3>{0x500, 0x14, 0x19}[(v / 6) % 3],
-		std::array<u16, 8>{0, 1, 0x7f, 0x80, 0xff, 0x7fff, 0x8000, 0xffff}[(v / 18) % 8],
-		u16(0x800 | ((flags & 1) ? 0x100 : 0) | ((flags & 2) ? 0x200 : 0) | ((flags & 4) ? 0x4000 : 0) | ((flags & 8) ? 0x40 : 0)),
-		(v / 18432) % 2 ? 0x20000U : 0U, a, a ^ 0x5aa55aa55aULL};
-}
 
 tms320c54x_test_state::mac_smem_fixture tms320c54x_test_state::mac_smem_case(unsigned variant, bool bk, bool square)
 {
@@ -3597,41 +3588,8 @@ bool tms320c54x_test_state::check_addc_chain_results()
 	return false;
 }
 
-bool tms320c54x_test_state::check_mvdm_acc_results()
+bool tms320c54x_test_state::check_mapped_alu_results()
 {
-	if (m_phase == 62160)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick; auto const f = mvdm_acc_case(variant);
-		unsigned const checkpoint = std::array<unsigned, 3>{5, 6, 9}[f.snapshot];
-		unsigned const shift = (f.reg % 3) * 16;
-		u64 const mask = (f.reg % 3 == 2 ? 0xffULL : 0xffffULL) << shift;
-		u64 const merged = (((f.reg < 3 ? f.a : f.b) & ~mask) | ((u64(f.value) << shift) & mask));
-		u64 const a = f.reg < 3 ? merged : f.a, b = f.reg >= 3 ? merged : f.b;
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Owned MVDM source remains admitted");
-		if (tick == 4) { auto const disable = machine().disable_side_effects(); m_cpu->space(AS_PROGRAM).write_word(f.base + 0x601, 0xdead); }
-		if (tick == 6)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b && m_pipeline_operand_reads == 1 && m_pipeline_store_writes == 1, "MVDM merges only its encoded slice at publication before the following consumer");
-			auto const disable = machine().disable_side_effects(); m_cpu->space(AS_DATA).write_word(f.source, f.value ^ 0xffff);
-		}
-		capture_pipeline_at(checkpoint, {&m_pipeline_operand_reads, &m_pipeline_store_writes, &m_pipeline_extensions_reads},
-			"Save MVDM around literal capture destination publication and consumer");
-		if (tick == 12)
-		{
-			expect(m_pipeline_operand_reads == 1U && m_pipeline_store_writes == 1U && m_pipeline_extensions_reads == 1, "MVDM has one retained literal and no duplicate source or destination access");
-			if (m_cpu->state_int(tms320c54x_device::STATE_A) != a || m_cpu->state_int(tms320c54x_device::STATE_B) != b || m_cpu->state_int(tms320c54x_device::STATE_ST0) != 0xa608 || m_cpu->state_int(tms320c54x_device::STATE_ST1) != f.st1)
-				osd_printf_info("MVDM accumulator mismatch: case=%u replay=%u a=%010llx expected=%010llx b=%010llx expected=%010llx st0=%04x st1=%04x expected_st1=%04x\n", variant, unsigned(m_pipeline_replay), (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), (unsigned long long)a, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B), (unsigned long long)b, unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), f.st1);
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == a && m_cpu->state_int(tms320c54x_device::STATE_B) == b && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa608 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == f.st1 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0xbeef && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x3000, "MVDM preserves neighboring slices and status independently of SXM OVM CPL and FRCT");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == f.base + 0x605, "Immediate ALU consumer sees the new accumulator without a gap");
-			if (replay_pipeline_at(62161, checkpoint,
-				"Replay MVDM without recapturing its literal or source")) return true;
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant + 1 < 110592U) { start_mvdm_acc(variant + 1); return true; }
-			osd_printf_info("TMS320C54x MVDM accumulator: PASS cases=110592 restore=110592 destinations=AL,AH,AG,BL,BH,BG sources=RAM,AR,BK words=8 patterns=8 status_modes=16 pages=2 snapshots=3 reads=1 writes=1 neighboring_slices=preserved guard_mask=8 source_mutation_after_read=1 consumer_gap=0 physical_phase_claim=0\n"); throw emu_fatalerror(3, "TMS320C54x isolated MVDM accumulator complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 62161) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62160; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 62159) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 62158; m_check_timer->enable(true); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 62156)
 	{

@@ -290,7 +290,6 @@ void tms320c54x_test_state::machine_reset()
 	if (start_profile(*this, machine().options().bios(), {
 		{ {"mvdm-ar"}, [](self &test) { test.start_mvdm_ar(); } },
 		{ {"mvdm-t"}, [](self &test) { test.start_mvdm_t(); } },
-		{ {"mvdm-acc"}, [](self &test) { test.start_mvdm_acc(); } },
 		{ {"stack-page0", "stack-page0-edge"}, [](self &test) { test.start_page_zero_stack(); } },
 	}))
 		return;

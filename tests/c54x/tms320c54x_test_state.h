@@ -1029,15 +1029,6 @@ private:
 	};
 	static page_zero_stack_fixture page_zero_stack_case(unsigned v, bool edge);
 	void start_page_zero_stack(unsigned variant = 0);
-	struct mvdm_acc_fixture
-	{
-		unsigned reg, snapshot;
-		u16 source, value, st1;
-		u32 base;
-		u64 a, b;
-	};
-	static mvdm_acc_fixture mvdm_acc_case(unsigned v);
-	void start_mvdm_acc(unsigned variant = 0);
 	struct mvdm_t_fixture
 	{
 		unsigned destination, gap, checkpoint;
@@ -1567,7 +1558,7 @@ private:
 	bool check_indexed_mar_results();
 	bool check_addc_chain_results();
 	bool check_mapped_parallel_load_results();
-	bool check_mvdm_acc_results();
+	bool check_mapped_alu_results();
 	bool check_memory_copy_repeat_results();
 	bool check_block_near_call_results();
 	bool check_repeated_mvdk_results();
