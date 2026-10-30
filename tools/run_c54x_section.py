@@ -265,8 +265,9 @@ def main():
     counts['atomic_bus_timing'] = 3
     counts['atomic_port_timing'] = 15
     counts['atomic_mac_saturation'] = 7
-    counts['atomic_port_marked_operations'] = 16
+    counts['atomic_port_marked_operations'] = 22
     counts['atomic_compatibility_memory'] = 9
+    counts['atomic_port_marked_memory'] = 11
     parser.add_argument('section', choices=[*counts, 'all'])
     parser.add_argument('--jobs', type=int, default=8)
     parser.add_argument('--negative-control', action='store_true', help='require failure of an intentionally wrong expectation')
