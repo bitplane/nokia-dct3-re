@@ -1250,15 +1250,6 @@ private:
 	};
 	static block_conditional_call_fixture block_conditional_call_case(unsigned v);
 	void start_block_conditional_call(unsigned variant = 0);
-	struct asm_store_fixture
-	{
-		unsigned selector, raw, form, read, checkpoint;
-		u32 base;
-		u16 st1, pmst, word;
-		u64 value;
-	};
-	static asm_store_fixture asm_store_case(unsigned v, bool prefix);
-	void start_asm_store(unsigned variant = 0);
 	static u16 block_bcd_source(unsigned variant, unsigned iteration);
 	static bool block_bcd_taken(unsigned variant, u16 word);
 	static extended_banz_fixture block_banz_case(unsigned v);

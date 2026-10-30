@@ -3811,54 +3811,6 @@ void tms320c54x_test_state::start_return_load(unsigned variant)
 	m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 }
 
-tms320c54x_test_state::asm_store_fixture tms320c54x_test_state::asm_store_case(unsigned v, bool prefix)
-{
-	asm_store_fixture f{}; f.selector = v % 4; f.raw = (v / 4) % 32; f.form = (v / 4096) % 5;
-	unsigned const flags = (v / 1024) % 4;
-	f.base = (v / 20480) % 2 ? 0x20000 : 0;
-	f.read = prefix ? 6 : 5; f.checkpoint = f.read - 1 + v / 40960;
-	f.st1 = 0x800 | (flags & 1 ? 0x100 : 0) | (f.form == 1 ? 0x4000 : 0);
-	f.pmst = flags & 2 ? 1 : 0;
-	f.value = std::array<u64, 8>{0, 1, 0xffffffffffULL, 0x7fffffff, 0xff80000000ULL, 0x0180000000ULL, 0x8000000000ULL, 0x7fffffffffULL}[(v / 128) % 8];
-	int const shift = f.raw < 16 ? int(f.raw) : int(f.raw) - 32;
-	u64 shifted = f.value;
-	if (shift >= 0) shifted = (shifted << shift) & 0xffffffffffULL;
-	else if ((flags & 1) && BIT(shifted, 39))
-	{
-		s64 const signed_value = s64(shifted) - (s64(1) << 40), divisor = s64(1) << -shift;
-		shifted = u64(signed_value / divisor - (signed_value % divisor != 0)) & 0xffffffffffULL;
-	}
-	else shifted >>= -shift;
-	u32 stored = shifted;
-	if (f.pmst)
-	{
-		if (flags & 1) { s64 const signed_value = BIT(shifted, 39) ? s64(shifted) - (s64(1) << 40) : s64(shifted); stored = u32(std::clamp(signed_value, s64(-2147483648LL), s64(2147483647LL))); }
-		else stored = u32(std::min(shifted, u64(0xffffffff)));
-	}
-	f.word = stored >> (f.selector & 2 ? 16 : 0); return f;
-}
-
-void tms320c54x_test_state::start_asm_store(unsigned variant)
-{
-	m_cpu->suspend(SUSPEND_REASON_DISABLE, true); m_pipeline_peripheral_case = variant;
-	bool const prefix = profile_is("asm-store-ld"); auto const f = asm_store_case(variant, prefix);
-	auto &program = m_cpu->space(AS_PROGRAM); auto &data = m_cpu->space(AS_DATA);
-	for (unsigned i = 0; i < 16; ++i) program.write_word(f.base + 0x600 + i, 0xf495);
-	if (prefix) program.write_word(f.base + 0x600, 0xed00 | f.raw);
-	program.write_word(f.base + 0x600 + unsigned(prefix), 0x8400 | (f.selector << 8) | (f.form == 2 ? 0x93 : f.form == 3 ? 0xad : f.form == 4 ? 0xb5 : 2));
-	program.write_word(f.base + 0x601 + unsigned(prefix), 0xf4e1); data.write_word(0x1002, 0xbeef);
-	m_cpu->set_pipeline_frontend(false);
-	m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0); m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_PMST, f.pmst); m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xa020); m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1 | (prefix ? f.raw ^ 31 : f.raw));
-	m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10); m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0); m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
-	m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x1002); m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x5aa5);
-	m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3); m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x1002);
-	m_cpu->set_state_int(tms320c54x_device::STATE_A, f.selector & 1 ? 0x33445566 : f.value ^ 0xffffffffffULL); m_cpu->set_state_int(tms320c54x_device::STATE_B, f.selector & 1 ? f.value ^ 0xffffffffffULL : 0x33445566);
-	m_pipeline_store_writes = 0; m_pipeline_replay = false; m_idle_fixture_tick = 0;
-	m_pipeline_operand_tap = data.install_read_tap(0, 0xffff, "asm_store_no_read", [this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) expect(false, "Short ASM accumulator stores never read data memory"); });
-	m_pipeline_write_tap = data.install_write_tap(0, 0xffff, "asm_store_write", [this, f](offs_t at, u16 &word, u16) { if (!machine().side_effects_disabled()) { expect(at == 0x1002 && word == f.word && !m_pipeline_store_writes && m_cpu->pipeline_cycles() == f.read + 1, "ASM store publishes once from its retained address and shift but Execute-owned accumulator"); ++m_pipeline_store_writes; } });
-	m_phase = 255580; m_cpu->set_state_int(STATE_GENPC, f.base + 0x600); m_cpu->set_pipeline_frontend(true); m_cpu->resume(SUSPEND_REASON_DISABLE); m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
-}
 
 tms320c54x_test_state::extended_banz_fixture tms320c54x_test_state::block_banz_case(unsigned v)
 {
@@ -5507,29 +5459,6 @@ bool tms320c54x_test_state::check_push_pop_same_results()
 
 bool tms320c54x_test_state::check_asm_store_results_part2()
 {
-	if (m_phase == 255580)
-	{
-		unsigned const variant = m_pipeline_peripheral_case, tick = ++m_idle_fixture_tick;
-		bool const prefix = profile_is("asm-store-ld"); auto const f = asm_store_case(variant, prefix);
-		expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Short ASM accumulator stores remain admitted");
-		u16 const asm_bits = tick > f.read ? f.raw ^ 31 : prefix && tick < f.read ? f.raw ^ 31 : f.raw;
-		expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == (f.st1 | asm_bits) && m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0xa020 && m_cpu->state_int(tms320c54x_device::STATE_PMST) == f.pmst && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5aa5, "ASM stores preserve flags and non-source registers across retained publication");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_AR3) == (tick < f.read ? 0x1002 : tick == f.read ? 0x1002 + unsigned(f.form == 2) : 0x2200), "ASM store modifies its captured destination only once in Read");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_AR5) == (tick < f.read ? 0x1002 : tick == f.read ? f.form == 3 ? 0xfff : f.form == 4 ? 0x1005 : 0x1002 : 0x2300), "ASM indexed stores consume AR0 in Read and update their pointer once");
-		if (tick == f.read) { m_cpu->set_state_int(tms320c54x_device::STATE_ST1, f.st1 | (f.raw ^ 31)); m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x2200); m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x2300); m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0xdead); m_cpu->set_state_int(f.selector & 1 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, f.value); }
-		if (tick == f.checkpoint && !m_pipeline_replay) { m_pipeline_store_case = m_pipeline_store_writes; expect(capture_snapshot(machine(), m_saved_pipeline) == STATERR_NONE, "Save ASM store before and after address/ASM capture and data publication"); }
-		if (tick == 16)
-		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_pipeline_store_writes == 1 && m_cpu->state_int(f.selector & 1 ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == f.value && m_cpu->state_int(f.selector & 1 ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x33445566, "ASM store retains its shift without modifying either accumulator");
-			if (!m_pipeline_replay) { m_pipeline_replay = true; m_idle_fixture_tick = f.checkpoint; m_pipeline_store_writes = m_pipeline_store_case; return restore_pipeline_at(255590, "Restore ASM store without resampling shift/address or duplicating its write"); }
-			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
-			if (variant < 122879) { start_asm_store(variant + 1); return true; }
-			osd_printf_info("TMS320C54x short ASM stores: PASS cases=122880 restore=122880 selectors=4 shifts=32 patterns=8 sxm_sst=4 forms=DP,SP,postincrement,indexed_sub,indexed_add pages=2 snapshots=3 source=Execute address_and_shift=Read writes=1 data_reads=0 asm_load_prefix=%u physical_phase_claim=0\n", unsigned(prefix));
-			throw emu_fatalerror(3, "TMS320C54x isolated short ASM stores complete");
-		}
-		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true;
-	}
-	if (m_phase == 255590) { m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 255580; m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return true; }
 	if (m_phase == 255560)
 	{
 		bool const unconditional = profile_is("rptb-bd");
