@@ -44,6 +44,7 @@ public:
 		++m_xf_cursor;
 	}
 	u64 digest() const { return m_coverage.value; }
+	unsigned tick_count() const { return m_tick; }
 	bool step()
 	{
 		if (m_resume) { m_resume = false; m_cpu.resume(SUSPEND_REASON_DISABLE); schedule(); return false; }

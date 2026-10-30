@@ -175,6 +175,18 @@ marker/stack RAM and ordered writes are checked after a pre-wake checkpoint
 and replay. Timer start is explicit MMIO/state conformance stimulus; no
 physical clock-rate or exact wake-latency claim is made.
 
+`deep_idle_clocks` owns eight independent atomic-frontend IDLE2/3 cases.
+The CPU peripheral-clock output drives a real McBSP device. Internal timer
+count/prescaler and the queued serial word remain frozen without setting TSS;
+an enabled external IRQ resumes both, while a masked one does not. Separately,
+external frame/clock pins complete the preserved word during deep idle and
+raise the serial IFR bit; only an enabled serial mask resumes foreground.
+Every case checkpoints before the clock stimulus and checks continuation PC,
+marker write, pending IFR and exactly one eligible serial word through replay.
+Disconnecting the peripheral-clock output fails on premature transmission.
+Register inspection is nondestructive observation, not guest bus traffic.
+These are clock-domain and replay contracts, not physical rate measurements.
+
 The independent `status_bitfield` section owns ST0/ST1 BITF sampling: 128
 register/pattern/mask/initial-TC/addressing combinations, with pages and three
 checkpoint positions distributed rather than multiplied into 768 executions.

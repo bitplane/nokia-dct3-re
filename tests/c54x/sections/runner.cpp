@@ -6,7 +6,7 @@
 #ifdef C54X_SECTION_BSP_WORD_SOURCE
 #include "tms320c54x_bsp_state.h"
 #endif
-#ifdef C54X_SECTION_MCBSP_CONTROL
+#if defined(C54X_SECTION_MCBSP_CONTROL) || defined(C54X_SECTION_DEEP_IDLE_CLOCKS)
 #include "tms320c54x_mcbsp.h"
 #endif
 
@@ -16,7 +16,7 @@ class section_state : public driver_device
 public:
 	section_state(machine_config const &c, device_type t, char const *tag)
 		: driver_device(c, t, tag), m_cpu(*this, "cpu")
-#ifdef C54X_SECTION_MCBSP_CONTROL
+#if defined(C54X_SECTION_MCBSP_CONTROL) || defined(C54X_SECTION_DEEP_IDLE_CLOCKS)
 		, m_mcbsp(*this, "mcbsp")
 #endif
 	{ }
@@ -62,6 +62,16 @@ public:
 		TMS320C54X_MCBSP(c, m_mcbsp, 13'000'000);
 		m_mcbsp->tx_word_cb().set([](u16) { throw emu_fatalerror("McBSP control fixture must reset before transmitting a word"); });
 #endif
+#ifdef C54X_SECTION_DEEP_IDLE_CLOCKS
+		TMS320C54X_MCBSP(c, m_mcbsp, 13'000'000);
+		m_cpu->peripheral_clock_stop_cb().set(m_mcbsp,FUNC(tms320c54x_mcbsp_device::internal_clock_stop_w));
+		m_mcbsp->tx_word_cb().set([this](u16 value) {
+			if (value!=0xa55a || ++m_serial_words!=1) throw emu_fatalerror("Deep-idle serial word/count mismatch");
+		});
+		m_mcbsp->tx_irq_cb().set([this](int state) {
+			if (m_serial_external) m_cpu->set_input_line(5,state);
+		});
+#endif
 		m_cpu->bio_in_cb().set([this]() { return m_fixture ? m_fixture->sample_bio() : 1; });
 		m_cpu->xf_out_cb().set([this](int value) {
 			m_xf = bool(value);
@@ -72,6 +82,10 @@ protected:
 	void machine_start() override
 	{
 		m_timer = timer_alloc(FUNC(section_state::tick), this);
+#ifdef C54X_SECTION_DEEP_IDLE_CLOCKS
+		save_item(NAME(m_serial_words)); save_item(NAME(m_frozen_tim)); save_item(NAME(m_frozen_tcr));
+		save_item(NAME(m_serial_external));
+#endif
 #ifdef C54X_SECTION_COUNT_RETIREMENTS
 		save_item(NAME(m_retired_count));
 #endif
@@ -121,6 +135,15 @@ protected:
 #ifdef C54X_SECTION_MCBSP_CONTROL
 				m_mcbsp->reset();
 				m_mcbsp->control_w(0,1); m_mcbsp->control_w(1,1); m_mcbsp->control_w(0,5);
+#endif
+#ifdef C54X_SECTION_DEEP_IDLE_CLOCKS
+				m_serial_external=false; m_mcbsp->reset(); m_serial_words=0;
+				auto write=[this](u16 reg,u16 value) { m_mcbsp->control_w(0,reg); m_mcbsp->control_w(1,value); };
+				write(4,0x40);
+				if (i>=4) { write(5,1); write(1,1); }
+				else { write(6,12); write(7,0x2000); write(14,0x200); write(1,0x41); }
+				m_mcbsp->data_w(3,0xa55a);
+				m_serial_external=i>=4;
 #endif
 #ifdef C54X_SECTION_BSP_WORD_SOURCE
 				if (i) check_bsp_frame(i-1);
@@ -234,6 +257,31 @@ private:
 #endif
 	TIMER_CALLBACK_MEMBER(tick)
 	{
+#ifdef C54X_SECTION_DEEP_IDLE_CLOCKS
+		unsigned const now=m_fixture->tick_count(), index=m_fixture->count();
+		if (now==100) {
+			auto const disable=machine().disable_side_effects();
+			m_frozen_tim=m_cpu->state_int(tms320c54x_device::STATE_TIM);
+			m_frozen_tcr=m_cpu->state_int(tms320c54x_device::STATE_TCR);
+		}
+		if (now==1300 || now==2599) {
+			{
+				auto const disable=machine().disable_side_effects();
+				if (m_serial_words || (index<4 && (m_frozen_tim>=100 ||
+					m_cpu->state_int(tms320c54x_device::STATE_TIM)!=m_frozen_tim ||
+					m_cpu->state_int(tms320c54x_device::STATE_TCR)!=m_frozen_tcr || (m_frozen_tcr&0x10))))
+					throw emu_fatalerror("Deep-idle clock case=%u tick=%u words=%u TIM=%llu/%u TCR=%llu/%u",index,now,m_serial_words,
+						(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_TIM),m_frozen_tim,
+						(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_TCR),m_frozen_tcr);
+			}
+		}
+		if (now==2600 && index>=4) {
+			m_mcbsp->tx_frame_w(1);
+			for (unsigned bit=0;bit<16;++bit) { m_mcbsp->tx_clock_w(1); m_mcbsp->tx_clock_w(0); }
+		}
+		if (now==3899 && m_serial_words!=unsigned(index>=4 || (index&1)))
+			throw emu_fatalerror("Deep-idle serial clock did not complete exactly the eligible word");
+#endif
 		bool const complete = m_fixture->step();
 #ifdef C54X_SECTION_COUNT_RETIREMENTS
 		check_retirement_state(complete ? m_cases.size()-1 : m_fixture->count());
@@ -266,8 +314,13 @@ private:
 		throw emu_fatalerror(0, "C54x section complete");
 	}
 	required_device<tms320c54x_device> m_cpu;
-#ifdef C54X_SECTION_MCBSP_CONTROL
+#if defined(C54X_SECTION_MCBSP_CONTROL) || defined(C54X_SECTION_DEEP_IDLE_CLOCKS)
 	required_device<tms320c54x_mcbsp_device> m_mcbsp;
+#endif
+#ifdef C54X_SECTION_DEEP_IDLE_CLOCKS
+	u32 m_serial_words=0;
+	u16 m_frozen_tim=0, m_frozen_tcr=0;
+	bool m_serial_external=false;
 #endif
 	emu_timer *m_timer = nullptr;
 	std::vector<c54x_test::clocked_register_case> m_cases;
